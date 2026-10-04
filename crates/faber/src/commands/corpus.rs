@@ -2,6 +2,8 @@
 
 mod canonical;
 mod external;
+#[cfg(feature = "mir-llvm")]
+mod gpu;
 mod rust;
 
 use crate::cli::CorpusArgs;
@@ -21,6 +23,10 @@ struct SuiteManifest {
     cases_dir: PathBuf,
     #[serde(default)]
     targets: BTreeMap<String, SuiteTarget>,
+    #[serde(default)]
+    roots: BTreeMap<String, PathBuf>,
+    #[serde(default)]
+    expectations: BTreeMap<String, BTreeMap<String, TargetExpectation>>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -53,30 +59,50 @@ struct LoadedSuite {
 #[serde(deny_unknown_fields)]
 struct CaseManifest {
     version: u32,
+    id: Option<String>,
+    group: Option<String>,
+    input_root: Option<String>,
     input: PathBuf,
     #[serde(default)]
     args: Vec<String>,
     stdin: Option<PathBuf>,
-    expect: Option<Expected>,
+    expect: Option<RawExpected>,
+    #[serde(default)]
     targets: BTreeMap<String, TargetExpectation>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Expected {
-    #[serde(default)]
-    exit: i32,
+struct RawExpected {
+    exit: Option<i32>,
+    exit_nonzero: Option<bool>,
     stdout: Option<PathBuf>,
     stderr: Option<PathBuf>,
+    stdout_contains: Option<String>,
+    stderr_contains: Option<String>,
+    check_only: Option<bool>,
 }
 
-#[derive(Deserialize)]
+struct Expected {
+    exit: i32,
+    exit_nonzero: bool,
+    stdout: Option<PathBuf>,
+    stderr: Option<PathBuf>,
+    stdout_contains: Option<String>,
+    stderr_contains: Option<String>,
+    check_only: bool,
+}
+
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TargetExpectation {
     outcome: Outcome,
     phase: Option<String>,
+    failure_kind: Option<String>,
+    args: Option<Vec<String>>,
     diagnostic_contains: Option<String>,
     reason: Option<String>,
+    expect: Option<RawExpected>,
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -152,6 +178,13 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         );
         return;
     }
+    if args.target == "gpu" {
+        #[cfg(feature = "mir-llvm")]
+        gpu::execute(&suite.cases, &input, discover_ms, started);
+        #[cfg(not(feature = "mir-llvm"))]
+        fail("the gpu corpus target requires the faber mir-llvm feature");
+        return;
+    }
     if args.target != "runner" {
         external::execute(
             &suite.cases,
@@ -225,14 +258,21 @@ fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, String> {
         stdin: None,
         expect: Some(Expected {
             exit: 0,
+            exit_nonzero: false,
             stdout: Some(stdout),
             stderr: None,
+            stdout_contains: None,
+            stderr_contains: None,
+            check_only: false,
         }),
         target: TargetExpectation {
             outcome: Outcome::Pass,
             phase: None,
+            failure_kind: None,
+            args: None,
             diagnostic_contains: None,
             reason: None,
+            expect: None,
         },
     })
 }
@@ -246,6 +286,7 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     if suite.version != 1 {
         return Err(format!("unsupported corpus.toml version {}", suite.version));
     }
+    let roots = resolve_suite_roots(root, suite.roots)?;
     let cases_root = relative_path(root, &suite.cases_dir)?;
     if !cases_root.is_dir() {
         return Err(format!(
@@ -261,7 +302,7 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     }
     let cases = manifests
         .iter()
-        .map(|path| load_case(path, &cases_root, target))
+        .map(|path| load_case(path, &cases_root, target, &roots, &suite.expectations))
         .collect::<Result<Vec<_>, _>>()?;
     let recipe = if target == "runner" {
         None
@@ -275,6 +316,9 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
         )
     };
     let recipe = if let Some(mut recipe) = recipe {
+        if target == "gpu" && recipe.mode.as_deref() != Some("gpu") {
+            return Err("gpu target requires [targets.gpu] mode = \"gpu\"".to_owned());
+        }
         if matches!(target, "rust" | "canonical") && recipe.runtime.is_none() {
             return Err(format!(
                 "{target} target requires [targets.{target}] runtime in corpus.toml"
@@ -301,6 +345,42 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
         None
     };
     Ok(LoadedSuite { cases, recipe })
+}
+
+fn resolve_suite_roots(
+    suite_root: &Path,
+    configured: BTreeMap<String, PathBuf>,
+) -> Result<BTreeMap<String, PathBuf>, String> {
+    configured
+        .into_iter()
+        .map(|(name, path)| {
+            if name.is_empty()
+                || !name
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+            {
+                return Err(format!("invalid suite input root name {name:?}"));
+            }
+            let candidate = if path.is_absolute() {
+                path
+            } else {
+                suite_root.join(path)
+            };
+            let resolved = candidate.canonicalize().map_err(|error| {
+                format!(
+                    "cannot resolve suite input root {}: {error}",
+                    candidate.display()
+                )
+            })?;
+            if !resolved.is_dir() {
+                return Err(format!(
+                    "suite input root is not a directory: {}",
+                    resolved.display()
+                ));
+            }
+            Ok((name, resolved))
+        })
+        .collect()
 }
 
 fn find_cases(dir: &Path, manifests: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -333,7 +413,13 @@ fn find_cases(dir: &Path, manifests: &mut Vec<PathBuf>) -> Result<(), String> {
     Ok(())
 }
 
-fn load_case(manifest_path: &Path, cases_root: &Path, target: &str) -> Result<Case, String> {
+fn load_case(
+    manifest_path: &Path,
+    cases_root: &Path,
+    target: &str,
+    roots: &BTreeMap<String, PathBuf>,
+    expectations: &BTreeMap<String, BTreeMap<String, TargetExpectation>>,
+) -> Result<Case, String> {
     let text = fs::read_to_string(manifest_path)
         .map_err(|error| format!("cannot read {}: {error}", manifest_path.display()))?;
     let mut manifest: CaseManifest = toml::from_str(&text)
@@ -345,52 +431,118 @@ fn load_case(manifest_path: &Path, cases_root: &Path, target: &str) -> Result<Ca
             manifest_path.display()
         ));
     }
-    let dir = manifest_path.parent().expect("case.toml has a parent");
-    let id = dir
+    let manifest_dir = manifest_path.parent().expect("case.toml has a parent");
+    let default_id = manifest_dir
         .strip_prefix(cases_root)
         .expect("case is inside cases root")
         .to_string_lossy()
         .replace('\\', "/");
-    let expectation = manifest
-        .targets
-        .remove(target)
-        .ok_or_else(|| format!("{id}: target {target} has no expectation in case.toml"))?;
-    match expectation.outcome {
-        Outcome::Pass
-            if expectation.phase.as_deref() != Some("emit")
-                && manifest
-                    .expect
-                    .as_ref()
-                    .is_none_or(|item| item.stdout.is_none()) =>
-        {
-            return Err(format!("{id}: a passing case requires expect.stdout"));
+    let id = manifest.id.take().unwrap_or(default_id);
+    let rooted = manifest.input_root.is_some();
+    let input = if let Some(root_name) = manifest.input_root.as_deref() {
+        let input_root = roots
+            .get(root_name)
+            .ok_or_else(|| format!("{id}: unknown suite input root {root_name:?}"))?;
+        let relative = relative_path(Path::new("."), &manifest.input)?;
+        let candidate = input_root.join(relative);
+        let resolved = candidate.canonicalize().map_err(|error| {
+            format!(
+                "{id}: cannot resolve input {}: {error}",
+                candidate.display()
+            )
+        })?;
+        if !resolved.starts_with(input_root) {
+            return Err(format!("{id}: input escapes suite root {root_name:?}"));
         }
+        resolved
+    } else {
+        relative_path(manifest_dir, &manifest.input)?
+    };
+    let dir = if rooted {
+        if input.is_dir() {
+            input.clone()
+        } else {
+            input
+                .parent()
+                .ok_or_else(|| format!("{id}: input has no parent: {}", input.display()))?
+                .to_path_buf()
+        }
+    } else {
+        manifest_dir.to_path_buf()
+    };
+    let expectation = manifest.targets.remove(target).or_else(|| {
+        manifest
+            .group
+            .as_deref()
+            .and_then(|group| expectations.get(group))
+            .and_then(|group| group.get(target))
+            .cloned()
+    });
+    let Some(expectation) = expectation else {
+        return Err(format!(
+            "{id}: target {target} has no expectation from the case or group"
+        ));
+    };
+    let base_expect = resolve_expected_patch(manifest.expect.take(), manifest_dir)?;
+    let target_expect = resolve_expected_patch(expectation.expect.clone(), manifest_dir)?;
+    let expect = if rooted
+        || base_expect.is_some()
+        || target_expect.is_some()
+        || matches!(expectation.outcome, Outcome::Pass)
+    {
+        let base = base_expect.unwrap_or_default();
+        let target = target_expect.unwrap_or_default();
+        Some(Expected {
+            exit: target.exit.or(base.exit).unwrap_or(0),
+            exit_nonzero: target.exit_nonzero.or(base.exit_nonzero).unwrap_or(false),
+            stdout: target.stdout.or(base.stdout),
+            stderr: target.stderr.or(base.stderr),
+            stdout_contains: target.stdout_contains.or(base.stdout_contains),
+            stderr_contains: target.stderr_contains.or(base.stderr_contains),
+            check_only: target.check_only.or(base.check_only).unwrap_or(false),
+        })
+    } else {
+        None
+    };
+    match expectation.outcome {
         Outcome::KnownFail
-            if !matches!(expectation.phase.as_deref(), Some("emit" | "build" | "run"))
+            if !(matches!(expectation.phase.as_deref(), Some("emit" | "build" | "run"))
+                || (target == "canonical" && expectation.phase.as_deref() == Some("format")))
                 || (target == "runner" && expectation.phase.as_deref() != Some("run"))
-                || expectation
+                || !matches!(
+                    expectation.failure_kind.as_deref().unwrap_or("diagnostic"),
+                    "diagnostic" | "stdout-mismatch" | "nonzero-exit"
+                )
+                || (expectation.failure_kind.as_deref() == Some("stdout-mismatch")
+                    && (expectation.phase.as_deref() != Some("run")
+                        || expect.as_ref().is_none_or(|item| item.stdout.is_none())))
+                || (expectation.failure_kind.as_deref() == Some("nonzero-exit")
+                    && (expectation.phase.as_deref() != Some("run")
+                        || expect.as_ref().is_none_or(|item| !item.exit_nonzero)))
+                || (expectation.failure_kind.as_deref() != Some("stdout-mismatch")
+                    && expectation.failure_kind.as_deref() != Some("nonzero-exit")
+                    && expectation
+                        .diagnostic_contains
+                        .as_ref()
+                        .is_none_or(String::is_empty)) =>
+        {
+            return Err(format!(
+                "{id}: known-fail requires a supported phase and a stable diagnostic or stdout-mismatch oracle"
+            ));
+        }
+        Outcome::Pass
+            if expectation.phase.as_deref() == Some("emit")
+                && expect
+                    .as_ref()
+                    .is_some_and(|item| item.exit != 0 || item.exit_nonzero)
+                && expectation
                     .diagnostic_contains
                     .as_ref()
                     .is_none_or(String::is_empty) =>
         {
             return Err(format!(
-                "{id}: known-fail requires a supported phase and diagnostic_contains"
+                "{id}: an expected emit rejection requires nonzero expect.exit and diagnostic_contains"
             ));
-        }
-        Outcome::Pass
-            if expectation.phase.as_deref() == Some("emit")
-                && manifest.expect.as_ref().is_some_and(|item| item.exit != 0) =>
-        {
-            if manifest.expect.as_ref().is_none_or(|item| item.exit == 0)
-                || expectation
-                    .diagnostic_contains
-                    .as_ref()
-                    .is_none_or(String::is_empty)
-            {
-                return Err(format!(
-                    "{id}: an expected emit rejection requires nonzero expect.exit and diagnostic_contains"
-                ));
-            }
         }
         Outcome::Pass
             if expectation.phase.is_some()
@@ -398,44 +550,77 @@ fn load_case(manifest_path: &Path, cases_root: &Path, target: &str) -> Result<Ca
         {
             return Err(format!("{id}: passing case has unsupported phase"));
         }
+        Outcome::Pass
+            if !matches!(target, "roundtrip" | "mir" | "gpu")
+                && expectation.phase.as_deref() != Some("emit")
+                && expect.as_ref().is_some_and(|item| {
+                    item.stdout.is_none()
+                        && item.stderr.is_none()
+                        && item.stdout_contains.is_none()
+                        && item.stderr_contains.is_none()
+                        && !item.check_only
+                }) =>
+        {
+            return Err(format!(
+                "{id}: execution pass without output assertions must set expect.check_only = true"
+            ));
+        }
         Outcome::NotApplicable if expectation.reason.as_ref().is_none_or(String::is_empty) => {
             return Err(format!("{id}: not-applicable requires a reason"));
         }
         _ => {}
     }
-    let input = relative_path(dir, &manifest.input)?;
     let stdin = manifest
         .stdin
         .as_deref()
-        .map(|path| relative_path(dir, path))
-        .transpose()?;
-    let expect = manifest
-        .expect
-        .map(|item| {
-            Ok::<Expected, String>(Expected {
-                exit: item.exit,
-                stdout: item
-                    .stdout
-                    .as_deref()
-                    .map(|path| relative_path(dir, path))
-                    .transpose()?,
-                stderr: item
-                    .stderr
-                    .as_deref()
-                    .map(|path| relative_path(dir, path))
-                    .transpose()?,
-            })
-        })
+        .map(|path| relative_path(manifest_dir, path))
         .transpose()?;
     Ok(Case {
         id,
         dir: dir.to_path_buf(),
         input,
-        args: manifest.args,
+        args: expectation.args.clone().unwrap_or(manifest.args),
         stdin,
         expect,
         target: expectation,
     })
+}
+
+#[derive(Default)]
+struct ExpectedPatch {
+    exit: Option<i32>,
+    exit_nonzero: Option<bool>,
+    stdout: Option<PathBuf>,
+    stderr: Option<PathBuf>,
+    stdout_contains: Option<String>,
+    stderr_contains: Option<String>,
+    check_only: Option<bool>,
+}
+
+fn resolve_expected_patch(
+    raw: Option<RawExpected>,
+    base: &Path,
+) -> Result<Option<ExpectedPatch>, String> {
+    raw.map(|item| {
+        Ok(ExpectedPatch {
+            exit: item.exit,
+            exit_nonzero: item.exit_nonzero,
+            stdout: item
+                .stdout
+                .as_deref()
+                .map(|path| relative_path(base, path))
+                .transpose()?,
+            stderr: item
+                .stderr
+                .as_deref()
+                .map(|path| relative_path(base, path))
+                .transpose()?,
+            stdout_contains: item.stdout_contains,
+            stderr_contains: item.stderr_contains,
+            check_only: item.check_only,
+        })
+    })
+    .transpose()
 }
 
 fn relative_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
@@ -512,44 +697,80 @@ fn run_case(case: &Case, faber: &Path) -> Value {
     };
     let run_ms = ms(running);
     let comparing = Instant::now();
-    let (status, reason) = match case.target.outcome {
-        Outcome::Pass => {
-            let expected = case.expect.as_ref().expect("validated passing expectation");
-            if output.status.code() != Some(expected.exit) {
-                (
-                    "fail",
-                    Some(format!(
-                        "exit mismatch: expected {}, got {}",
-                        expected.exit, output.status
-                    )),
-                )
-            } else if expected_stdout.as_deref() != Some(output.stdout.as_slice()) {
-                ("fail", Some("stdout mismatch".to_owned()))
-            } else if output.stderr != expected_stderr.unwrap_or_default() {
-                ("fail", Some("stderr mismatch".to_owned()))
-            } else {
-                ("pass", None)
+    let (status, reason) =
+        match case.target.outcome {
+            Outcome::Pass => {
+                let expected = case.expect.as_ref().expect("validated passing expectation");
+                if !exit_matches(expected, &output.status) {
+                    (
+                        "fail",
+                        Some(format!(
+                            "exit mismatch: expected {}, got {}",
+                            expected.exit, output.status
+                        )),
+                    )
+                } else if expected_stdout.as_deref().is_some_and(|expected| {
+                    normalize_stdout(expected) != normalize_stdout(&output.stdout)
+                }) {
+                    ("fail", Some("stdout mismatch".to_owned()))
+                } else if expected.stderr.is_some()
+                    && output.stderr != expected_stderr.unwrap_or_default()
+                {
+                    ("fail", Some("stderr mismatch".to_owned()))
+                } else if expected.stdout_contains.as_ref().is_some_and(|fragment| {
+                    !String::from_utf8_lossy(&output.stdout).contains(fragment)
+                }) {
+                    ("fail", Some("stdout diagnostic mismatch".to_owned()))
+                } else if expected.stderr_contains.as_ref().is_some_and(|fragment| {
+                    !String::from_utf8_lossy(&output.stderr).contains(fragment)
+                }) {
+                    ("fail", Some("stderr diagnostic mismatch".to_owned()))
+                } else {
+                    ("pass", None)
+                }
             }
-        }
-        Outcome::KnownFail => {
-            let fragment = case
-                .target
-                .diagnostic_contains
-                .as_deref()
-                .expect("validated known failure diagnostic");
-            if output.status.success() {
-                (
-                    "fail",
-                    Some("unexpected pass; update target expectation".to_owned()),
-                )
-            } else if !String::from_utf8_lossy(&output.stderr).contains(fragment) {
-                ("fail", Some("known failure diagnostic changed".to_owned()))
-            } else {
-                ("expected-fail", None)
+            Outcome::KnownFail => {
+                if case.target.failure_kind.as_deref() == Some("stdout-mismatch") {
+                    let expected = case.expect.as_ref().expect("validated stdout expectation");
+                    let differs = expected_stdout.as_deref().is_some_and(|expected| {
+                        normalize_stdout(expected) != normalize_stdout(&output.stdout)
+                    });
+                    if !exit_matches(expected, &output.status) {
+                        (
+                            "fail",
+                            Some(format!(
+                                "exit mismatch: expected {}, got {}",
+                                expected.exit, output.status
+                            )),
+                        )
+                    } else if differs {
+                        ("expected-fail", None)
+                    } else {
+                        (
+                            "fail",
+                            Some("unexpected output match; update target expectation".to_owned()),
+                        )
+                    }
+                } else {
+                    let fragment = case
+                        .target
+                        .diagnostic_contains
+                        .as_deref()
+                        .expect("validated known failure diagnostic");
+                    if output.status.success() {
+                        (
+                            "fail",
+                            Some("unexpected pass; update target expectation".to_owned()),
+                        )
+                    } else if !String::from_utf8_lossy(&output.stderr).contains(fragment) {
+                        ("fail", Some("known failure diagnostic changed".to_owned()))
+                    } else {
+                        ("expected-fail", None)
+                    }
+                }
             }
-        }
-        Outcome::NotApplicable => unreachable!(),
-    };
+            Outcome::NotApplicable => unreachable!(),
+        };
     let compare_ms = ms(comparing);
     json!({
         "schema": 1,
@@ -562,6 +783,21 @@ fn run_case(case: &Case, faber: &Path) -> Value {
         "exit": output.status.code(),
         "timing_ms": {"read": read_ms, "run": run_ms, "compare": compare_ms, "total": ms(started)}
     })
+}
+
+fn exit_matches(expected: &Expected, status: &std::process::ExitStatus) -> bool {
+    if expected.exit_nonzero {
+        !status.success()
+    } else {
+        status.code() == Some(expected.exit)
+    }
+}
+
+pub(super) fn normalize_stdout(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes)
+        .replace("\r\n", "\n")
+        .trim_end_matches('\n')
+        .to_owned()
 }
 
 fn case_error(case: &Case, reason: String, started: Instant) -> Value {

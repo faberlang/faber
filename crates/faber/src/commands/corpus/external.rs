@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 struct Paths<'a> {
@@ -32,7 +33,10 @@ pub(super) fn execute(
         fail("target name must contain only letters, digits, '-' or '_'");
     }
     let mode = recipe.mode.as_deref().unwrap_or("external");
-    if !matches!(mode, "external" | "emit" | "roundtrip" | "mir" | "none") {
+    if !matches!(
+        mode,
+        "external" | "build" | "emit" | "roundtrip" | "mir" | "none"
+    ) {
         fail(&format!("unsupported target mode {mode}"));
     }
     if matches!(mode, "external" | "emit") && recipe.emit.is_none() {
@@ -41,6 +45,9 @@ pub(super) fn execute(
     if mode == "external" && (recipe.extension.is_none() || recipe.run.is_empty()) {
         fail(&format!("[targets.{target}] requires extension and run"));
     }
+    if mode == "build" && (recipe.extension.is_none() || recipe.build.is_empty()) {
+        fail(&format!("[targets.{target}] requires extension and build"));
+    }
     let workspace = suite.join("target/corpus").join(target);
     if cases
         .iter()
@@ -48,6 +55,10 @@ pub(super) fn execute(
     {
         fs::create_dir_all(&workspace)
             .unwrap_or_else(|error| fail(&format!("cannot create target workspace: {error}")));
+    }
+    if mode == "roundtrip" {
+        execute_roundtrip(cases, target, discover_ms, started);
+        return;
     }
     let preparation = Instant::now();
     let prepare_paths = Paths {
@@ -78,74 +89,49 @@ pub(super) fn execute(
     let mut not_applicable = 0;
     let mut failed = 0;
     let mut build_ms = 0.0;
-    for (index, case) in cases.iter().enumerate() {
-        let case_started = Instant::now();
-        let mut row = if matches!(case.target.outcome, Outcome::NotApplicable) {
-            json!({"schema":1,"type":"case","case":case.id,"target":target,
-                "status":"not-applicable","reason":case.target.reason,
-                "timing_ms":{"total":ms(case_started)}})
-        } else if let Some(Err(reason)) = &prepare {
-            result(
-                case,
-                target,
-                "fail",
-                "prepare",
-                Some(reason.clone()),
-                None,
-                case_started,
-            )
-        } else if let Some(Ok((argv, output))) = &prepare {
-            if !output.status.success() {
-                let mut row = result(
-                    case,
-                    target,
-                    "fail",
-                    "prepare",
-                    Some(format!(
-                        "target preparation failed: {}{}",
-                        String::from_utf8_lossy(&output.stderr),
-                        String::from_utf8_lossy(&output.stdout)
-                    )),
-                    Some(argv),
-                    case_started,
-                );
-                row["command"]["cwd"] = json!(workspace);
-                row
-            } else {
-                run_case(
-                    case,
-                    index,
-                    target,
-                    mode,
-                    recipe,
-                    faber,
-                    suite,
-                    &workspace,
-                    case_started,
-                    &mut build_ms,
-                )
+    let workers = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .min(4)
+        .min(cases.len().max(1));
+    let next = AtomicUsize::new(0);
+    let mut output_rows = Vec::with_capacity(cases.len());
+    std::thread::scope(|scope| {
+        let mut handles = Vec::with_capacity(workers);
+        for _ in 0..workers {
+            let next = &next;
+            let prepare = prepare.as_ref();
+            let workspace = &workspace;
+            handles.push(scope.spawn(move || {
+                let mut rows = Vec::new();
+                loop {
+                    let index = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(case) = cases.get(index) else {
+                        break;
+                    };
+                    let (row, case_build_ms) = run_case_row(
+                        case, index, target, mode, recipe, faber, suite, &workspace, prepare,
+                    );
+                    rows.push((index, row, case_build_ms));
+                }
+                rows
+            }));
+        }
+        for handle in handles {
+            match handle.join() {
+                Ok(rows) => output_rows.extend(rows),
+                Err(payload) => std::panic::resume_unwind(payload),
             }
-        } else {
-            run_case(
-                case,
-                index,
-                target,
-                mode,
-                recipe,
-                faber,
-                suite,
-                &workspace,
-                case_started,
-                &mut build_ms,
-            )
-        };
+        }
+    });
+    output_rows.sort_by_key(|(index, _, _)| *index);
+    for (_, row, case_build_ms) in output_rows {
+        build_ms += case_build_ms;
         match row["status"].as_str() {
             Some("pass") => passed += 1,
             Some("expected-fail") => expected_failures += 1,
             Some("not-applicable") => not_applicable += 1,
             _ => failed += 1,
         }
-        row["timing_ms"]["total"] = json!(ms(case_started));
         println!("{row}");
     }
     let no_applicable_cases = passed == 0 && expected_failures == 0;
@@ -155,6 +141,7 @@ pub(super) fn execute(
             "schema":1,"type":"summary","target":target,"cases":cases.len(),
             "passed":passed,"expected_failures":expected_failures,
             "not_applicable":not_applicable,"failed":failed,
+            "workers":workers,
             "status":if no_applicable_cases { "no-applicable-cases" } else if failed != 0 { "fail" } else { "pass" },
             "prepare_command":prepare.as_ref().and_then(|item| item.as_ref().ok())
                 .map(|item| json!({"argv":&item.0,"cwd":workspace})),
@@ -164,6 +151,199 @@ pub(super) fn execute(
     if failed != 0 || no_applicable_cases {
         std::process::exit(1);
     }
+}
+
+fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: Instant) {
+    use radix::module::codegen::faber::reemit_faber;
+    use radix::module::driver::{Config, Session};
+    use radix::module::locale::latin_locale_pack;
+
+    let first_session = Session::new(Config::default());
+    let emit_pack = latin_locale_pack();
+    let second_session =
+        Session::new(Config::default().with_resolved_locale_pack(emit_pack.clone()));
+    let mut passed = 0;
+    let mut expected_failures = 0;
+    let mut not_applicable = 0;
+    let mut failed = 0;
+    for case in cases {
+        let case_started = Instant::now();
+        let (status, phase, reason) = if matches!(case.target.outcome, Outcome::NotApplicable) {
+            not_applicable += 1;
+            ("not-applicable", None, case.target.reason.clone())
+        } else {
+            let source = fs::read_to_string(&case.input);
+            let first = source.as_ref().map(|source| {
+                reemit_faber(
+                    &first_session,
+                    &emit_pack,
+                    &case.input.display().to_string(),
+                    source,
+                )
+            });
+            let failure = match first {
+                Err(error) => Some(format!("cannot read source: {error}")),
+                Ok(first) if first.output.is_none() => Some(format!(
+                    "first Faber compile failed: {}",
+                    first
+                        .diagnostics
+                        .iter()
+                        .map(|item| item.message.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" | ")
+                )),
+                Ok(first) => {
+                    let first_code = &first.output.as_ref().expect("checked output").code;
+                    let second = reemit_faber(
+                        &second_session,
+                        &emit_pack,
+                        &case.input.display().to_string(),
+                        first_code,
+                    );
+                    if second.output.is_none() {
+                        Some(format!(
+                            "second Faber compile failed: {}",
+                            second
+                                .diagnostics
+                                .iter()
+                                .map(|item| item.message.as_str())
+                                .collect::<Vec<_>>()
+                                .join(" | ")
+                        ))
+                    } else if first_code != &second.output.as_ref().expect("checked output").code {
+                        Some("faber emit did not stabilize after one round-trip".to_owned())
+                    } else if source.as_ref().is_ok_and(|source| source.trim().is_empty()) {
+                        Some("source file was unexpectedly empty".to_owned())
+                    } else {
+                        None
+                    }
+                }
+            };
+            match (case.target.outcome, failure) {
+                (Outcome::Pass, None) => {
+                    passed += 1;
+                    ("pass", Some("emit"), None)
+                }
+                (Outcome::Pass, Some(reason)) => {
+                    failed += 1;
+                    ("fail", Some("emit"), Some(reason))
+                }
+                (Outcome::KnownFail, Some(reason))
+                    if case
+                        .target
+                        .diagnostic_contains
+                        .as_deref()
+                        .is_some_and(|fragment| reason.contains(fragment)) =>
+                {
+                    expected_failures += 1;
+                    ("expected-fail", Some("emit"), None)
+                }
+                (Outcome::KnownFail, Some(reason)) => {
+                    failed += 1;
+                    (
+                        "fail",
+                        Some("emit"),
+                        Some(format!("known failure changed: {reason}")),
+                    )
+                }
+                (Outcome::KnownFail, None) => {
+                    failed += 1;
+                    (
+                        "fail",
+                        Some("emit"),
+                        Some("unexpected pass; update target expectation".to_owned()),
+                    )
+                }
+                (Outcome::NotApplicable, _) => unreachable!(),
+            }
+        };
+        println!(
+            "{}",
+            json!({
+                "schema":1,"type":"case","case":case.id,"target":target,
+                "status":status,"phase":phase,"reason":reason,
+                "timing_ms":{"emit":ms(case_started),"total":ms(case_started)}
+            })
+        );
+    }
+    println!(
+        "{}",
+        json!({
+            "schema":1,"type":"summary","target":target,"cases":cases.len(),
+            "passed":passed,"expected_failures":expected_failures,
+            "not_applicable":not_applicable,"failed":failed,
+            "workers":1,
+            "status":if failed == 0 { "pass" } else { "fail" },
+            "timing_ms":{"discover":discover_ms,"prepare":0.0,"build":0.0,"total":ms(started)}
+        })
+    );
+    if failed != 0 {
+        std::process::exit(1);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_case_row(
+    case: &Case,
+    index: usize,
+    target: &str,
+    mode: &str,
+    recipe: &SuiteTarget,
+    faber: &Path,
+    suite: &Path,
+    workspace: &Path,
+    prepare: Option<&Result<(Vec<String>, Output), String>>,
+) -> (Value, f64) {
+    let case_started = Instant::now();
+    let mut build_ms = 0.0;
+    let mut row = if matches!(case.target.outcome, Outcome::NotApplicable) {
+        json!({"schema":1,"type":"case","case":case.id,"target":target,
+            "status":"not-applicable","reason":case.target.reason,
+            "timing_ms":{"total":ms(case_started)}})
+    } else if let Some(Err(reason)) = prepare {
+        result(
+            case,
+            target,
+            "fail",
+            "prepare",
+            Some(reason.clone()),
+            None,
+            case_started,
+        )
+    } else if let Some(Ok((argv, output))) = prepare
+        .filter(|prepared| matches!(prepared.as_ref(), Ok((_, output)) if !output.status.success()))
+    {
+        let mut row = result(
+            case,
+            target,
+            "fail",
+            "prepare",
+            Some(format!(
+                "target preparation failed: {}{}",
+                String::from_utf8_lossy(&output.stderr),
+                String::from_utf8_lossy(&output.stdout)
+            )),
+            Some(argv),
+            case_started,
+        );
+        row["command"]["cwd"] = json!(workspace);
+        row
+    } else {
+        run_case(
+            case,
+            index,
+            target,
+            mode,
+            recipe,
+            faber,
+            suite,
+            workspace,
+            case_started,
+            &mut build_ms,
+        )
+    };
+    row["timing_ms"]["total"] = json!(ms(case_started));
+    (row, build_ms)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -224,146 +404,113 @@ fn run_case(
         source: &source,
         artifact: &artifact,
     };
-    let emit_args = match mode {
-        "mir" => vec![
-            faber.display().to_string(),
-            "mir".to_owned(),
-            case.input.display().to_string(),
-        ],
-        "roundtrip" => vec![
-            faber.display().to_string(),
-            "emit".to_owned(),
-            "-t".to_owned(),
-            "faber".to_owned(),
-            case.input.display().to_string(),
-        ],
-        _ => vec![
-            faber.display().to_string(),
-            "emit".to_owned(),
-            "-t".to_owned(),
-            recipe.emit.as_deref().unwrap_or("").to_owned(),
-            case.input.display().to_string(),
-        ],
-    };
     let emitting = Instant::now();
-    let emitted = Command::new(faber)
-        .args(&emit_args[1..])
-        .current_dir(&case.dir)
-        .output();
-    let emit_ms = ms(emitting);
-    let output = match emitted {
-        Ok(output) => output,
-        Err(error) => {
-            return result(
-                case,
-                target,
-                "fail",
-                "emit",
-                Some(format!("cannot start Faber: {error}")),
-                Some(&emit_args),
-                started,
-            );
-        }
-    };
-    if (case.target.phase.as_deref() == Some("emit") && mode != "roundtrip")
-        || !output.status.success()
-    {
-        let (status, reason) = judge_phase(case, "emit", &output);
-        let mut row = result(
-            case,
-            target,
-            status,
-            "emit",
-            reason,
-            Some(&emit_args),
-            started,
-        );
-        row["exit"] = json!(output.status.code());
-        row["timing_ms"]["emit"] = json!(emit_ms);
-        return row;
-    }
-    if mode == "roundtrip" {
-        if let Err(error) = fs::write(&source, &output.stdout) {
-            return result(
-                case,
-                target,
-                "fail",
-                "emit",
-                Some(format!("cannot write re-emitted Faber: {error}")),
-                Some(&emit_args),
-                started,
-            );
-        }
-        let second_args = vec![
-            faber.display().to_string(),
-            "emit".to_owned(),
-            "-t".to_owned(),
-            "faber".to_owned(),
-            source.display().to_string(),
-        ];
-        let second = Command::new(faber)
-            .args(&second_args[1..])
-            .current_dir(&case_dir)
-            .output();
-        let (status, reason) = match second {
-            Ok(second) if second.status.success() && second.stdout == output.stdout => {
-                ("pass", None)
+    let api_target = (!matches!(mode, "mir") && case.input.is_file())
+        .then(|| external_target(target))
+        .flatten();
+    let (emitted_code, emit_ms, emit_command) = if let Some(api_target) = api_target {
+        let compilation = radix::services::compile_cli_path(&case.input, false, api_target);
+        let emit_ms = ms(emitting);
+        let diagnostics = compilation
+            .diagnostics
+            .iter()
+            .map(|item| match item.code {
+                Some(code) => format!("{code}: {}", item.message),
+                None => item.message.clone(),
+            })
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let emitted_code = match compilation.output {
+            Some(output) => radix::services::output_code(output),
+            None => {
+                let (status, reason) = judge_api_emit_failure(case, &diagnostics);
+                let mut row = result(case, target, status, "emit", reason, None, started);
+                row["emit"] = json!({"api_target":api_target.as_str(),"input":case.input});
+                row["timing_ms"]["emit"] = json!(emit_ms);
+                return row;
             }
-            Ok(second) if !second.status.success() => (
-                "fail",
-                Some(format!(
-                    "second Faber emission failed: {}",
-                    String::from_utf8_lossy(&second.stderr)
-                )),
-            ),
-            Ok(_) => (
-                "fail",
-                Some("Faber re-emission did not stabilize".to_owned()),
-            ),
-            Err(error) => (
-                "fail",
-                Some(format!("cannot start second Faber emission: {error}")),
-            ),
         };
-        let mut row = result(
-            case,
-            target,
-            status,
-            "emit",
-            reason,
-            Some(&second_args),
-            started,
-        );
-        row["timing_ms"]["emit"] = json!(ms(emitting));
-        row["emit_command"] = json!({"argv":emit_args,"cwd":case.dir});
-        return row;
-    }
-    if mode != "external" {
-        let mut row = result(
-            case,
-            target,
-            "pass",
-            "emit",
-            None,
-            Some(&emit_args),
-            started,
-        );
+        if case.target.phase.as_deref() == Some("emit") {
+            let (status, reason) = judge_api_emit_success(case);
+            let mut row = result(case, target, status, "emit", reason, None, started);
+            row["emit"] = json!({"api_target":api_target.as_str(),"input":case.input});
+            row["timing_ms"]["emit"] = json!(emit_ms);
+            return row;
+        }
+        (
+            emitted_code,
+            emit_ms,
+            json!({"api_target":api_target.as_str(),"input":case.input}),
+        )
+    } else {
+        let emit_args = match mode {
+            "mir" => vec![
+                faber.display().to_string(),
+                "mir".to_owned(),
+                case.input.display().to_string(),
+            ],
+            _ => vec![
+                faber.display().to_string(),
+                "emit".to_owned(),
+                "-t".to_owned(),
+                recipe.emit.as_deref().unwrap_or("").to_owned(),
+                case.input.display().to_string(),
+            ],
+        };
+        let emitted = Command::new(faber)
+            .args(&emit_args[1..])
+            .current_dir(&case.dir)
+            .output();
+        let emit_ms = ms(emitting);
+        let output = match emitted {
+            Ok(output) => output,
+            Err(error) => {
+                return result(
+                    case,
+                    target,
+                    "fail",
+                    "emit",
+                    Some(format!("cannot start Faber: {error}")),
+                    Some(&emit_args),
+                    started,
+                );
+            }
+        };
+        if (case.target.phase.as_deref() == Some("emit") && mode != "roundtrip")
+            || !output.status.success()
+        {
+            let (status, reason) = judge_phase(case, "emit", &output);
+            let mut row = result(
+                case,
+                target,
+                status,
+                "emit",
+                reason,
+                Some(&emit_args),
+                started,
+            );
+            row["exit"] = json!(output.status.code());
+            row["timing_ms"]["emit"] = json!(emit_ms);
+            return row;
+        }
+        let code = String::from_utf8_lossy(&output.stdout).into_owned();
+        (code, emit_ms, json!({"argv":emit_args,"cwd":case.dir}))
+    };
+    if !matches!(mode, "external" | "build") {
+        let mut row = result(case, target, "pass", "emit", None, None, started);
         row["timing_ms"]["emit"] = json!(emit_ms);
         return row;
     }
-    if let Err(error) = prepare_files(recipe, &paths, &output.stdout) {
-        return result(
-            case,
-            target,
-            "fail",
-            "setup",
-            Some(error),
-            Some(&emit_args),
-            started,
-        );
+    let emitted_code = if target == "go" && !emitted_code.contains("func main()") {
+        format!("{emitted_code}\nfunc main() {{}}\n")
+    } else {
+        emitted_code
+    };
+    if let Err(error) = prepare_files(recipe, &paths, emitted_code.as_bytes()) {
+        return result(case, target, "fail", "setup", Some(error), None, started);
     }
     let mut row = result(case, target, "fail", "build", None, None, started);
-    row["emit_command"] = json!({"argv":emit_args,"cwd":case.dir});
+    row["emit_command"] = emit_command;
     row["timing_ms"]["emit"] = json!(emit_ms);
     if !recipe.build.is_empty() {
         let building = Instant::now();
@@ -390,9 +537,17 @@ fn run_case(
         row["reason"] = json!("case expects build failure but target has no build step");
         return row;
     }
+    if mode == "build" {
+        row["status"] = json!("pass");
+        row["phase"] = json!("build");
+        row["reason"] = Value::Null;
+        return row;
+    }
     row["phase"] = json!("run");
     let running = Instant::now();
-    let run = run_command(&recipe.run, &paths, &case_dir, case.stdin.as_deref());
+    let mut run_recipe = recipe.run.clone();
+    run_recipe.extend(case.args.iter().cloned());
+    let run = run_command(&run_recipe, &paths, &case_dir, case.stdin.as_deref());
     row["timing_ms"]["run"] = json!(ms(running));
     let (argv, mut output) = match run {
         Ok(item) => item,
@@ -410,6 +565,68 @@ fn run_case(
     row["reason"] = json!(reason);
     row["timing_ms"]["compare"] = json!(ms(comparing));
     row
+}
+
+fn external_target(target: &str) -> Option<radix::module::Target> {
+    use radix::module::Target;
+
+    Some(match target {
+        "go" => Target::HirGo,
+        "ts" => Target::HirTypeScript,
+        "swift" => Target::HirSwift,
+        "wasm" => Target::MirWasm,
+        "llvm" => Target::MirLlvm,
+        "sexp" => Target::MirSexp,
+        _ => return None,
+    })
+}
+
+fn judge_api_emit_failure(case: &Case, diagnostics: &str) -> (&'static str, Option<String>) {
+    if case
+        .target
+        .phase
+        .as_deref()
+        .is_some_and(|phase| phase != "emit")
+    {
+        return (
+            "fail",
+            Some(format!(
+                "emit failed before expected {} phase: {diagnostics}",
+                case.target.phase.as_deref().unwrap_or("run")
+            )),
+        );
+    }
+    if matches!(case.target.outcome, Outcome::KnownFail) {
+        let fragment = case
+            .target
+            .diagnostic_contains
+            .as_deref()
+            .expect("validated known failure");
+        return if diagnostics.contains(fragment) {
+            ("expected-fail", None)
+        } else {
+            (
+                "fail",
+                Some(format!("known failure diagnostic changed: {diagnostics}")),
+            )
+        };
+    }
+    (
+        "fail",
+        Some(format!("compiler produced no target output: {diagnostics}")),
+    )
+}
+
+fn judge_api_emit_success(case: &Case) -> (&'static str, Option<String>) {
+    if case.target.phase.as_deref() == Some("emit")
+        && matches!(case.target.outcome, Outcome::KnownFail)
+    {
+        return (
+            "fail",
+            Some("unexpected pass; update target expectation".to_owned()),
+        );
+    }
+    ("pass", None)
 }
 
 fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Option<String>) {
@@ -433,6 +650,48 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
         String::from_utf8_lossy(&output.stdout)
     );
     if matches!(case.target.outcome, Outcome::KnownFail) {
+        if case.target.failure_kind.as_deref() == Some("stdout-mismatch") {
+            let expected = case.expect.as_ref().expect("validated stdout expectation");
+            if !super::exit_matches(expected, &output.status) {
+                return (
+                    "fail",
+                    Some(format!(
+                        "exit mismatch: expected {}, got {}",
+                        expected.exit, output.status
+                    )),
+                );
+            }
+            let path = expected.stdout.as_ref().expect("validated stdout golden");
+            let golden = match fs::read(path) {
+                Ok(bytes) => bytes,
+                Err(error) => return ("fail", Some(format!("cannot read stdout golden: {error}"))),
+            };
+            return if super::normalize_stdout(&golden) != super::normalize_stdout(&output.stdout) {
+                ("expected-fail", None)
+            } else {
+                (
+                    "fail",
+                    Some("unexpected output match; update target expectation".to_owned()),
+                )
+            };
+        }
+        if case.target.failure_kind.as_deref() == Some("nonzero-exit") {
+            let expected = case
+                .expect
+                .as_ref()
+                .expect("validated nonzero exit expectation");
+            return if super::exit_matches(expected, &output.status) {
+                ("expected-fail", None)
+            } else {
+                (
+                    "fail",
+                    Some(format!(
+                        "known nonzero exit changed: expected nonzero, got {}",
+                        output.status
+                    )),
+                )
+            };
+        }
         if output.status.success() {
             return (
                 "fail",
@@ -456,11 +715,11 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
     let expected = case.expect.as_ref();
     if phase == "emit" {
         if let Some(expected) = expected {
-            if output.status.code() != Some(expected.exit) {
+            if !super::exit_matches(expected, &output.status) {
                 return (
                     "fail",
                     Some(format!(
-                        "emit exit mismatch: expected {}, got {}",
+                        "emit exit mismatch: expected {}, got {}: {diagnostics}",
                         expected.exit, output.status
                     )),
                 );
@@ -495,27 +754,57 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
             ("fail", Some(format!("build failed: {diagnostics}")))
         };
     }
-    let expected = expected.expect("validated runnable case");
-    if output.status.code() != Some(expected.exit) {
+    let expected = expected.expect("passing cases have a default expectation");
+    if !super::exit_matches(expected, &output.status) {
         return (
             "fail",
             Some(format!(
-                "exit mismatch: expected {}, got {}",
+                "exit mismatch: expected {}, got {}: {diagnostics}",
                 expected.exit, output.status
             )),
         );
     }
     for (name, path, actual) in [
-        ("stdout", expected.stdout.as_ref(), output.stdout.as_slice()),
-        ("stderr", expected.stderr.as_ref(), output.stderr.as_slice()),
+        (
+            "stdout",
+            expected.stdout.as_ref(),
+            Some(output.stdout.as_slice()),
+        ),
+        (
+            "stderr",
+            expected.stderr.as_ref(),
+            Some(output.stderr.as_slice()),
+        ),
     ] {
-        let golden = match path.map(fs::read).transpose() {
-            Ok(bytes) => bytes.unwrap_or_default(),
-            Err(error) => return ("fail", Some(format!("cannot read {name} golden: {error}"))),
-        };
-        if golden != actual {
-            return ("fail", Some(format!("{name} mismatch")));
+        if let Some(path) = path {
+            let golden = match fs::read(path) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    return ("fail", Some(format!("cannot read {name} golden: {error}")));
+                }
+            };
+            if name == "stdout" {
+                if Some(super::normalize_stdout(&golden)) != actual.map(super::normalize_stdout) {
+                    return ("fail", Some(format!("{name} mismatch")));
+                }
+            } else if Some(golden.as_slice()) != actual {
+                return ("fail", Some(format!("{name} mismatch")));
+            }
         }
+    }
+    if expected
+        .stdout_contains
+        .as_ref()
+        .is_some_and(|fragment| !String::from_utf8_lossy(&output.stdout).contains(fragment))
+    {
+        return ("fail", Some("stdout diagnostic mismatch".to_owned()));
+    }
+    if expected
+        .stderr_contains
+        .as_ref()
+        .is_some_and(|fragment| !String::from_utf8_lossy(&output.stderr).contains(fragment))
+    {
+        return ("fail", Some("stderr diagnostic mismatch".to_owned()));
     }
     ("pass", None)
 }

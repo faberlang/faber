@@ -116,6 +116,307 @@ fn corpus_runs_pilot_suite_across_source_package_and_rejection_cases() {
 }
 
 #[test]
+fn corpus_suite_rooted_input_uses_explicit_golden_and_original_working_directory() {
+    let temp = tempfile::tempdir().expect("temporary rooted suite");
+    let suite = temp.path().join("suite");
+    let case = suite.join("cases/hello");
+    let package_case = suite.join("cases/regio");
+    let inputs = temp.path().join("inputs");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::create_dir_all(&package_case).expect("create package case directory");
+    fs::create_dir_all(&inputs).expect("create input root");
+    fs::copy(smoke_case(), inputs.join("main.fab")).expect("copy input");
+    fs::copy(
+        smoke_case().with_extension("expected"),
+        case.join("stdout.expected"),
+    )
+    .expect("copy suite golden");
+    let product_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../product-corpus");
+    fs::write(
+        suite.join("corpus.toml"),
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[roots]\ninput = \"../inputs\"\nproduct = {}\n",
+            toml::Value::String(product_root.canonicalize().unwrap().display().to_string())
+        ),
+    )
+    .expect("write suite manifest");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\nid = \"rooted/hello\"\ninput_root = \"input\"\ninput = \"main.fab\"\n\n[expect]\nstdout = \"stdout.expected\"\n\n[targets.runner]\noutcome = \"pass\"\n",
+    )
+    .expect("write case manifest");
+    fs::write(
+        package_case.join("case.toml"),
+        "version = 1\nid = \"product/regio\"\ninput_root = \"product\"\ninput = \"regio\"\n\n[expect]\ncheck_only = true\n\n[targets.runner]\noutcome = \"pass\"\n",
+    )
+    .expect("write package case manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(&suite)
+        .output()
+        .expect("run rooted suite");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let rows = records(&output.stdout);
+    assert_eq!(rows[0]["case"], "rooted/hello");
+    assert_eq!(rows[0]["status"], "pass");
+    let expected_cwd = inputs.canonicalize().unwrap();
+    assert_eq!(rows[0]["command"]["cwd"].as_str(), expected_cwd.to_str());
+    assert_eq!(rows[1]["case"], "product/regio");
+    assert_eq!(rows[1]["status"], "pass");
+    let expected_package_cwd = product_root.join("regio").canonicalize().unwrap();
+    assert_eq!(
+        rows[1]["command"]["cwd"].as_str(),
+        expected_package_cwd.to_str()
+    );
+}
+
+#[test]
+fn corpus_suite_allows_check_only_cases_and_target_expectation_overrides() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/check-only");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[expectations.check.runner]\noutcome = \"pass\"\n",
+    )
+    .expect("write suite manifest");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    fs::write(case.join("wrong.expected"), "wrong\n").expect("write base golden");
+    fs::write(
+        case.join("right.expected"),
+        fs::read(smoke_case().with_extension("expected")).expect("read source golden"),
+    )
+    .expect("write target golden");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ngroup = \"check\"\ninput = \"main.fab\"\n\n[expect]\nstdout = \"wrong.expected\"\n\n[targets.runner]\noutcome = \"pass\"\n\n[targets.runner.expect]\nstdout = \"right.expected\"\n",
+    )
+    .expect("write case manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run target override suite");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(records(&output.stdout)[0]["status"], "pass");
+
+    fs::remove_file(case.join("right.expected")).expect("remove golden for check-only");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ngroup = \"check\"\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n",
+    )
+    .expect("switch to check-only case");
+    let check_only = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run check-only suite");
+    assert!(
+        check_only.status.success(),
+        "{}",
+        String::from_utf8_lossy(&check_only.stdout)
+    );
+    assert_eq!(records(&check_only.stdout)[0]["status"], "pass");
+}
+
+#[test]
+fn corpus_suite_matches_intentional_nonzero_exit_and_stderr_fragment() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/runtime-trap");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n",
+    )
+    .expect("write suite manifest");
+    let trap = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/iace/failable-call-main-panic.fab");
+    fs::copy(trap, case.join("main.fab")).expect("copy runtime trap");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\nid = \"runtime-trap\"\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n\n[targets.runner]\noutcome = \"pass\"\n\n[targets.runner.expect]\nexit_nonzero = true\nstderr_contains = \"negative input\"\n",
+    )
+    .expect("write case manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run runtime-trap suite");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(records(&output.stdout)[0]["status"], "pass");
+}
+
+#[test]
+fn corpus_suite_pins_expected_stdout_mismatch_as_known_failure() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/output-mismatch");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    fs::write(case.join("expected.stdout"), "different output\n").expect("write expected output");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n",
+    )
+    .expect("write suite manifest");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[targets.runner]\noutcome = \"known-fail\"\nphase = \"run\"\nfailure_kind = \"stdout-mismatch\"\n\n[targets.runner.expect]\nstdout = \"expected.stdout\"\n",
+    )
+    .expect("write case manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run suite with known stdout mismatch");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(records(&output.stdout)[0]["status"], "expected-fail");
+
+    fs::copy(
+        smoke_case().with_extension("expected"),
+        case.join("expected.stdout"),
+    )
+    .expect("pin matching output");
+    let unexpected_pass = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run suite after known mismatch disappears");
+    assert!(!unexpected_pass.status.success());
+    assert_eq!(
+        records(&unexpected_pass.stdout)[0]["reason"],
+        "unexpected output match; update target expectation"
+    );
+}
+
+#[test]
+fn corpus_external_target_pins_a_nonzero_exit_without_diagnostics() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/process-failure");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy Faber source");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[targets.go]\nemit = \"go\"\nextension = \"go\"\nrun = [\"sh\", \"-c\", \"exit 1\"]\n",
+    )
+    .expect("write suite manifest");
+    let case_manifest = case.join("case.toml");
+    fs::write(
+        &case_manifest,
+        "version = 1\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n\n[targets.go]\noutcome = \"known-fail\"\nphase = \"run\"\nfailure_kind = \"nonzero-exit\"\n\n[targets.go.expect]\nexit_nonzero = true\n",
+    )
+    .expect("write case manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "go"])
+        .arg(temp.path())
+        .output()
+        .expect("run suite with pinned process failure");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(records(&output.stdout)[0]["status"], "expected-fail");
+
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[targets.go]\nemit = \"go\"\nextension = \"go\"\nrun = [\"sh\", \"-c\", \"exit 0\"]\n",
+    )
+    .expect("change process outcome");
+    let unexpected_pass = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "go"])
+        .arg(temp.path())
+        .output()
+        .expect("run suite after nonzero outcome disappears");
+    assert!(!unexpected_pass.status.success());
+    assert_eq!(
+        records(&unexpected_pass.stdout)[0]["reason"],
+        "known nonzero exit changed: expected nonzero, got exit status: 0"
+    );
+}
+
+#[test]
+fn corpus_external_target_forwards_case_specific_arguments() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/arguments");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy Faber source");
+    fs::write(case.join("expected.stdout"), "left right\n").expect("write expected output");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[targets.probe]\nemit = \"faber\"\nextension = \"fab\"\nrun = [\"python3\", \"-c\", \"import sys; print(' '.join(sys.argv[1:]))\"]\n",
+    )
+    .expect("write suite manifest");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\nargs = [\"default\"]\n\n[expect]\nstdout = \"expected.stdout\"\n\n[targets.probe]\noutcome = \"pass\"\nargs = [\"left\", \"right\"]\n",
+    )
+    .expect("write case manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "probe"])
+        .arg(temp.path())
+        .output()
+        .expect("run external target with target-specific arguments");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(records(&output.stdout)[0]["status"], "pass");
+    let rows = records(&output.stdout);
+    assert_eq!(rows[0]["command"]["argv"][3], "left");
+    assert_eq!(rows[0]["command"]["argv"][4], "right");
+}
+
+#[test]
+fn corpus_suite_rejects_rooted_input_path_traversal() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/escape");
+    let inputs = temp.path().join("inputs");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::create_dir(&inputs).expect("create input root");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[roots]\ninput = \"inputs\"\n",
+    )
+    .expect("write suite manifest");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput_root = \"input\"\ninput = \"../outside.fab\"\n\n[targets.runner]\noutcome = \"pass\"\n",
+    )
+    .expect("write case manifest");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .arg(temp.path())
+        .output()
+        .expect("run invalid suite");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("case path must stay relative"));
+}
+
+#[test]
 fn corpus_rust_pilot_builds_once_and_checks_generated_binaries() {
     let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
     let output = Command::new(env!("CARGO_BIN_EXE_faber"))

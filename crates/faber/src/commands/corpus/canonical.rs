@@ -77,18 +77,42 @@ pub(super) fn execute(
                 .diagnostic_contains
                 .as_deref()
                 .expect("validated diagnostic");
-            let diagnostics = String::from_utf8_lossy(&emitted.stderr);
-            let status =
-                if emitted.status.code() == Some(expected.exit) && diagnostics.contains(fragment) {
-                    "pass"
-                } else {
-                    "fail"
-                };
+            let diagnostics = format!(
+                "{}{}",
+                String::from_utf8_lossy(&emitted.stderr),
+                String::from_utf8_lossy(&emitted.stdout)
+            );
+            let (status, reason) = match case.target.outcome {
+                Outcome::KnownFail
+                    if !emitted.status.success() && diagnostics.contains(fragment) =>
+                {
+                    ("expected-fail", None)
+                }
+                Outcome::KnownFail if emitted.status.success() => (
+                    "fail",
+                    Some("unexpected pass; update target expectation".to_owned()),
+                ),
+                Outcome::KnownFail => (
+                    "fail",
+                    Some(format!("expected emit diagnostic changed: {diagnostics}")),
+                ),
+                Outcome::Pass
+                    if super::exit_matches(expected, &emitted.status)
+                        && diagnostics.contains(fragment) =>
+                {
+                    ("pass", None)
+                }
+                Outcome::Pass => (
+                    "fail",
+                    Some(format!("emit rejection changed: {diagnostics}")),
+                ),
+                Outcome::NotApplicable => unreachable!(),
+            };
             rows[index] = Some(row(
                 case,
                 status,
                 "emit",
-                (status == "fail").then(|| format!("emit rejection changed: {diagnostics}")),
+                reason,
                 Some(&argv),
                 emitted.status.code(),
                 emit_ms,
@@ -123,9 +147,30 @@ pub(super) fn execute(
             code.push_str("\nfn main() {}\n");
         }
         let runtime_value = toml::Value::String(runtime.display().to_string());
+        let needs_regex = code.contains("faber::Regex");
+        let needs_tokio = code.contains("tokio::") || code.contains("block_on_tokio");
+        let mut features = Vec::new();
+        if needs_regex {
+            features.push("\"regex\"");
+        }
+        if needs_tokio {
+            features.push("\"tokio\"");
+        }
+        let feature_list = if features.is_empty() {
+            String::new()
+        } else {
+            format!(", features = [{}]", features.join(", "))
+        };
         let manifest_text = format!(
-            "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nfaber = {{ path = {runtime_value}, default-features = false }}\n"
+            "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\nfaber = {{ path = {runtime_value}, default-features = false{feature_list} }}\n"
         );
+        let manifest_text = if needs_tokio {
+            format!(
+                "{manifest_text}tokio = {{ version = \"1\", features = [\"rt\", \"net\", \"time\"] }}\n"
+            )
+        } else {
+            manifest_text
+        };
         let written = fs::create_dir_all(source.parent().expect("source parent"))
             .and_then(|()| write_if_changed(&source, code.as_bytes()))
             .and_then(|()| write_if_changed(&manifest, manifest_text.as_bytes()));
@@ -147,7 +192,7 @@ pub(super) fn execute(
         let fmt_argv = vec![
             "rustfmt".to_owned(),
             "--edition".to_owned(),
-            "2024".to_owned(),
+            "2021".to_owned(),
             "--check".to_owned(),
             source.display().to_string(),
         ];
@@ -156,15 +201,46 @@ pub(super) fn execute(
         match checked {
             Ok(output) if output.status.success() => {}
             Ok(output) => {
+                let diagnostics = format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&output.stderr),
+                    String::from_utf8_lossy(&output.stdout)
+                );
+                let expects_format_failure = matches!(case.target.outcome, Outcome::KnownFail)
+                    && case.target.phase.as_deref() == Some("format");
+                let expected_format_failure = expects_format_failure
+                    && !output.status.success()
+                    && diagnostics.contains(
+                        case.target
+                            .diagnostic_contains
+                            .as_deref()
+                            .expect("validated diagnostic"),
+                    );
+                let (status, reason) = if expected_format_failure {
+                    ("expected-fail", None)
+                } else if expects_format_failure && output.status.success() {
+                    (
+                        "fail",
+                        Some("unexpected pass; update target expectation".to_owned()),
+                    )
+                } else if expects_format_failure {
+                    (
+                        "fail",
+                        Some(format!("expected format diagnostic changed: {diagnostics}")),
+                    )
+                } else {
+                    (
+                        "fail",
+                        Some(format!(
+                            "generated Rust is not rustfmt-clean: {diagnostics}"
+                        )),
+                    )
+                };
                 rows[index] = Some(row(
                     case,
-                    "fail",
+                    status,
                     "format",
-                    Some(format!(
-                        "generated Rust is not rustfmt-clean: {}{}",
-                        String::from_utf8_lossy(&output.stdout),
-                        String::from_utf8_lossy(&output.stderr)
-                    )),
+                    reason,
                     Some(&fmt_argv),
                     output.status.code(),
                     emit_ms,
@@ -203,7 +279,6 @@ pub(super) fn execute(
     let mut lint_exit = None;
     let mut diagnostics: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
     let mut artifacts = BTreeSet::new();
-    let mut finished = None;
     if !members.is_empty() {
         let manifest = workspace.join("Cargo.toml");
         let members_text = members
@@ -263,7 +338,7 @@ pub(super) fn execute(
                                     .push((level.to_owned(), rendered.to_owned()));
                             }
                         }
-                        Some("build-finished") => finished = message["success"].as_bool(),
+                        Some("build-finished") => {}
                         _ => {}
                     }
                 }
@@ -304,12 +379,35 @@ pub(super) fn execute(
             .flatten()
             .filter(|(level, _)| level == "warning")
             .count();
-        let (status, reason) = if !errors.is_empty() {
-            ("fail", Some(errors.join("\n")))
-        } else if !artifacts.contains(&job.name) || finished != Some(true) {
+        let diagnostic = errors.join("\n");
+        let expects_build_failure = matches!(job.case.target.outcome, Outcome::KnownFail)
+            && job.case.target.phase.as_deref() == Some("build");
+        let expected_build_failure = expects_build_failure
+            && diagnostic.contains(
+                job.case
+                    .target
+                    .diagnostic_contains
+                    .as_deref()
+                    .expect("validated diagnostic"),
+            );
+        let (status, reason) = if expected_build_failure {
+            ("expected-fail", None)
+        } else if expects_build_failure && artifacts.contains(&job.name) {
             (
                 "fail",
-                Some("Cargo Clippy did not finish a successful check for this case".to_owned()),
+                Some("unexpected pass; update target expectation".to_owned()),
+            )
+        } else if expects_build_failure {
+            (
+                "fail",
+                Some(format!("expected build diagnostic changed: {diagnostic}")),
+            )
+        } else if !diagnostic.is_empty() {
+            ("fail", Some(diagnostic))
+        } else if !artifacts.contains(&job.name) {
+            (
+                "fail",
+                Some("Cargo Clippy produced no artifact for this case".to_owned()),
             )
         } else {
             ("pass", None)
@@ -329,11 +427,13 @@ pub(super) fn execute(
         rows[job.index] = Some(value);
     }
     let mut passed = 0;
+    let mut expected_failures = 0;
     let mut failed = 0;
     let mut not_applicable = 0;
     for value in rows.into_iter().flatten() {
         match value["status"].as_str() {
             Some("pass") => passed += 1,
+            Some("expected-fail") => expected_failures += 1,
             Some("not-applicable") => not_applicable += 1,
             _ => failed += 1,
         }
@@ -342,7 +442,7 @@ pub(super) fn execute(
     println!(
         "{}",
         json!({"schema":1,"type":"summary","target":"canonical",
-        "cases":cases.len(),"passed":passed,"expected_failures":0,
+        "cases":cases.len(),"passed":passed,"expected_failures":expected_failures,
         "not_applicable":not_applicable,"failed":failed,
         "lint":{"command":lint_command,"exit":lint_exit,"cargo_invocations":usize::from(!members.is_empty())},
         "timing_ms":{"discover":discover_ms,"lint":lint_ms,"total":ms(started)}})
