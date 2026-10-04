@@ -647,6 +647,7 @@ impl<'a> BorrowChecker<'a> {
             if roots.is_empty() {
                 continue;
             }
+            let view_storage = self.storage_of_roots(&roots);
             for (other_index, other) in args.iter().enumerate() {
                 if other_index == index
                     || !params
@@ -655,12 +656,12 @@ impl<'a> BorrowChecker<'a> {
                 {
                     continue;
                 }
-                let other_roots = self.tensor_view_origins(&other.expr);
-                let other_root = Self::root_def_id(&other.expr);
-                if !roots
-                    .iter()
-                    .any(|root| other_root == Some(*root) || other_roots.contains(root))
-                {
+                let mut other_storage =
+                    self.storage_of_roots(&self.tensor_view_origins(&other.expr));
+                if let Some(other_root) = Self::root_def_id(&other.expr) {
+                    other_storage.extend(self.storage_names(other_root));
+                }
+                if view_storage.is_disjoint(&other_storage) {
                     continue;
                 }
                 self.error(
@@ -751,9 +752,9 @@ impl<'a> BorrowChecker<'a> {
             }
             if language_call_borrows {
                 if self.dest_is_mut(param) {
-                    self.borrow_from_expr(&arg.expr, BorrowKind::Mutable, None);
+                    self.borrow_arg_storage(&arg.expr, BorrowKind::Mutable);
                 } else if self.dest_is_ref(param) {
-                    self.borrow_from_expr(&arg.expr, BorrowKind::Shared, None);
+                    self.borrow_arg_storage(&arg.expr, BorrowKind::Shared);
                 } else {
                     self.check_expr(&arg.expr);
                 }
@@ -899,6 +900,40 @@ impl<'a> BorrowChecker<'a> {
             .unwrap_or_default();
         names.insert(def_id);
         names
+    }
+
+    /// The storage names of a set of view-origin roots: every root plus the
+    /// bindings aliasing it.
+    fn storage_of_roots(&self, roots: &FxHashSet<DefId>) -> FxHashSet<DefId> {
+        roots
+            .iter()
+            .flat_map(|root| self.storage_names(*root))
+            .collect()
+    }
+
+    /// Call-site borrow of an argument place. Overlap is judged on storage,
+    /// not on the argument's own binding: the borrow is registered against
+    /// every name of the argument's storage (itself first), so a `mut`
+    /// argument conflicts with another argument naming the same tensor
+    /// through `←` aliases exactly as it does for the direct spelling.
+    fn borrow_arg_storage(&mut self, expr: &HirExpression, kind: BorrowKind) {
+        let Some(root) = Self::root_def_id(expr) else {
+            self.check_expr(expr);
+            return;
+        };
+        self.check_projection_inputs(expr);
+        let mut names = vec![root];
+        names.extend(self.storage_names(root).into_iter().filter(|n| *n != root));
+        for name in names {
+            let before = self.errors.len();
+            match kind {
+                BorrowKind::Shared => self.borrow_shared_with(name, None, expr.span),
+                BorrowKind::Mutable => self.borrow_mut_with(name, None, expr.span),
+            }
+            if self.errors.len() != before {
+                break;
+            }
+        }
     }
 
     /// The places a `⇇` value reads through: the value itself when it is a
@@ -1482,6 +1517,14 @@ impl<'a> BorrowChecker<'a> {
         }
         if state.mutable || region_mut_live {
             self.conflict(ISSUE_USE_WHILE_MUTABLY_BORROWED, def_id, span);
+            return;
+        }
+        let mutably_borrowed_alias = self
+            .storage_names(def_id)
+            .into_iter()
+            .find(|name| self.states.get(name).is_some_and(|state| state.mutable));
+        if let Some(name) = mutably_borrowed_alias {
+            self.conflict(ISSUE_USE_WHILE_MUTABLY_BORROWED, name, span);
         }
     }
 
