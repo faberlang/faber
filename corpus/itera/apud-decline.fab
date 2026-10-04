@@ -25,11 +25,9 @@ locale = "en"
 #   3. set — a copia has no index to name: SEM010
 #      itera_apud_requires_indexed_iterable (`at` needs a lista, tabula,
 #      tensor, or matrix)
-#   4. generic dims — `size R, size C` dims are not concrete at lowering, so
-#      the base lane declines with the MIR unsupported diagnostic
-#      "itera collection before iterator MIR lowering" (declared fail-closed;
-#      `faber check` admits the symbolic rank — the decline is at MIR, pinned
-#      in radix-module lower_test, not in this checker oracle)
+#   4. generic dims — `size R, size C` dims are admitted: the loop bounds are
+#      read from the tensor at run time (an admit row, not a decline; it was a
+#      MIR-lane decline until loops over run-time extents landed)
 #
 # Common mistakes:
 #   • expecting half-bound coordinates on mismatch — arity == rank is a type
@@ -42,8 +40,7 @@ locale = "en"
 #
 # WHY: documents the arity and indexed-iterable contracts for coordinate
 # iteration. Cases 1–3 must reject under `faber check` with the tokens
-# pinned in apud-decline.expected; case 4 is an MIR-lane decline kept here as
-# the documented fourth row.
+# pinned in apud-decline.expected; case 4 is an admit row kept here beside them.
 
 fn arity(tensor<f32, [2, 3]> grid) → void {
     for from grid at [i] const cell {

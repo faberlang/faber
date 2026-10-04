@@ -2310,29 +2310,31 @@ incipit {
 }
 
 #[test]
-fn borrowed_pointee_outside_carrier_arms_keeps_fail_closed_decline() {
-    // Only the lista/tabula carrier arms are admitted through the borrow;
-    // a borrowed tensor keeps MRL-1's fail-closed decline (tensor admission
-    // belongs to the air-itera-ex-unroll sibling goal).
-    let mut unit = analyze(
-        r"functio summaTensoris(de tensor<numerus, [8]> t) → numerus {
+fn borrowed_tensor_receiver_itera_ex_lowers_like_its_by_value_twin() {
+    // A borrowed receiver is classified by its pointee through the one
+    // classifier, so a borrowed tensor walks the same lane as a by-value one
+    // (the earlier decline pinned tensor admission as pending; it is landed).
+    let twin = |mode: &str| {
+        dump_source(
+            &r"functio summaTensoris(MODUS tensor<numerus, [8]> t) → numerus {
   varia numerus total ← 0
   itera ex t fixum x {
     total ← total + x
   }
   redde total
-}",
-    );
-    let errors = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
-        .expect_err("borrowed tensor itera ex stays outside the pointee admission")
-        .into_iter()
-        .map(|error| error.message)
-        .collect::<Vec<_>>();
+}"
+            .replace("MODUS", mode),
+        )
+    };
+    let borrowed = twin("de");
     assert!(
-        errors
-            .iter()
-            .any(|message| message.contains("itera collection before iterator MIR lowering")),
-        "borrowed tensor itera ex must keep the decline: {errors:?}"
+        !borrowed.contains("itera collection before iterator MIR lowering"),
+        "itera ex over a de tensor param must lower: {borrowed}"
+    );
+    assert_eq!(
+        erase_type_ids(&borrowed),
+        erase_type_ids(&twin("")),
+        "de tensor receiver must match by-value twin"
     );
 }
 

@@ -1087,7 +1087,7 @@ fn ensure_itera_coordinate_array_types(hir: &crate::hir::HirModule, types: &mut 
     impl HirVisitor for IteraCoordinateCollector<'_> {
         fn visit_expr(&mut self, expr: &HirExpression) {
             match &expr.kind {
-                HirExpressionKind::Itera { coordinates, iter, .. } if !coordinates.is_empty() => {
+                HirExpressionKind::Itera { iter, .. } => {
                     self.collect_shaped_element(iter);
                 }
                 HirExpressionKind::Reduction { source, .. } => {
@@ -1105,7 +1105,7 @@ fn ensure_itera_coordinate_array_types(hir: &crate::hir::HirModule, types: &mut 
             let mut iter_ty = iter.ty;
             while let Some(ty) = iter_ty {
                 match self.types.get(ty) {
-                    Type::Alias(_, inner) => iter_ty = Some(*inner),
+                    Type::Alias(_, inner) | Type::Ref(_, inner) => iter_ty = Some(*inner),
                     Type::Tensor(element, _) | Type::Matrix(element, _) => {
                         self.elements.insert(*element);
                         break;

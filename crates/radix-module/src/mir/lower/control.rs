@@ -124,13 +124,18 @@ enum CollectionIteraKind {
     },
     Cursor(TypeId),
     AsyncCursor(TypeId),
-    Tensor(TypeId),
+    /// Coordinate-free rank-1 tensor walk. The literal lane count is the
+    /// folded case of the carrier's run-time extent.
+    Tensor(TypeId, Option<i64>),
     /// Unified shaped lane: tensors and matrices share rank-N loop lowering.
     /// The matrix flag selects static cell projections for the register carrier;
     /// tensors use the runtime indexed-access ABI for rank-N coordinates.
+    /// `literal` carries the extents when they are all compile-time facts;
+    /// otherwise each axis bound is read from the carrier at run time.
     Shaped {
         element: TypeId,
-        dimensions: Vec<i64>,
+        rank: usize,
+        literal: Option<Vec<i64>>,
         matrix: bool,
     },
     // Route B (AEU-4): runtime-len `lista<T, N>` splits on the carrier `len`
@@ -789,39 +794,7 @@ impl FunctionBuilder<'_> {
             self.bindings
                 .insert(*id, LocalBinding { local: element_local, ty: MirType::semantic(element) });
         }
-        let array_ty = MirType::semantic(self.types.find_array(integer.semantic_id())?);
-        let bounds = if let Some(dimensions) = &dimensions {
-            dimensions
-                .iter()
-                .map(|n| MirOperand::Constant(MirConstant::Int(*n)))
-                .collect::<Vec<_>>()
-        } else {
-            let shape_value = self.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::TensorShape),
-                vec![MirOperand::Place(source_place.clone())],
-                array_ty,
-                expr.span,
-            );
-            let option_ty = MirType::semantic(
-                self.types
-                    .find_equal(&Type::Option(integer.semantic_id()))?,
-            );
-            let mut bounds = Vec::new();
-            for axis in 0..rank {
-                let bound = self.runtime_call_value(
-                    MirIntrinsic::Collection(MirCollectionOp::Index),
-                    vec![shape_value.clone(), MirOperand::Constant(MirConstant::Int(axis as i64))],
-                    option_ty,
-                    expr.span,
-                );
-                bounds.push(self.assign_temp(
-                    MirValueKind::Option(MirOptionOp::Unwrap { value: bound, mode: MirOptionUnwrapMode::Assume }),
-                    integer,
-                    expr.span,
-                ));
-            }
-            bounds
-        };
+        let bounds = self.tensor_axis_bounds(&source_place, dimensions.as_deref(), rank, expr.span)?;
         let fold = ReductionFoldContext {
             op,
             term_ty,
@@ -2997,32 +2970,193 @@ impl FunctionBuilder<'_> {
         frame.is_some() && frame == self.context.scrinium_def
     }
 
-    /// Pointee classification for a borrowed itera receiver: the same
-    /// lista/tabula arms the by-value lanes already iterate, applied to the
-    /// carrier under the `Ref` marker. Other pointees stay unsupported so the
-    /// fail-closed decline (and the sibling tensor/bounded admission goals)
-    /// is untouched.
-    fn borrowed_collection_itera_kind(
+    /// Classify an itera receiver into the lane that walks it. A `Ref` marker
+    /// is peeled and its pointee classified by this same function.
+    fn classify_collection_itera(
         &self,
-        pointee: TypeId,
+        ty: TypeId,
         mode: HirIteraMode,
-        has_coordinates: bool,
+        coordinate_count: usize,
     ) -> CollectionIteraKind {
-        match self.normalized_type(pointee) {
-            Type::Map(key, value) if matches!(mode, HirIteraMode::Ex) && has_coordinates => {
-                CollectionIteraKind::MapEntries { key: *key, value: *value }
+        let has_coordinates = coordinate_count > 0;
+        let normalized = self.normalized_type(ty);
+        match normalized {
+            // The extent of each axis is read from the carrier at run time
+            // (`tensor_axis_bounds`); a literal axis is the folded case of
+            // that same read, so the rank is the only static requirement.
+            Type::Tensor(elem, shape) => {
+                let literal = i64s_from_literal_index(*shape, self.types);
+                let rank = literal
+                    .as_ref()
+                    .map(Vec::len)
+                    .or_else(|| self.tensor_shape_rank(*shape));
+                match rank {
+                    Some(rank) if matches!(mode, HirIteraMode::Ex) && has_coordinates && rank == coordinate_count => {
+                        CollectionIteraKind::Shaped { element: *elem, rank, literal, matrix: false }
+                    }
+                    // The coordinate-free route walks a rank-1 tensor.
+                    Some(1) if matches!(mode, HirIteraMode::Ex) && !has_coordinates => {
+                        CollectionIteraKind::Tensor(*elem, literal.and_then(|dims| dims.first().copied()))
+                    }
+                    _ => CollectionIteraKind::Unsupported,
+                }
+            }
+            Type::Matrix(elem, shape) => {
+                let dimensions = i64s_from_literal_index(*shape, self.types);
+                let literal_matrix = dimensions
+                    .as_ref()
+                    .is_some_and(|dims| dims.len() == 2 && dims.iter().all(|dim| u8::try_from(*dim).is_ok()));
+                if matches!(mode, HirIteraMode::Ex) && has_coordinates && coordinate_count == 2 && literal_matrix {
+                    CollectionIteraKind::Shaped { element: *elem, rank: 2, literal: dimensions, matrix: true }
+                } else {
+                    CollectionIteraKind::Unsupported
+                }
+            }
+            // Route B (AEU-4): runtime-len `lista<T, N>` lowers in the base
+            // lane to a static split on the carrier `len` with N+1
+            // guard-free arms (total N(N+1)/2 lanes). The N <= 10
+            // code-size cap keeps the split bounded; non-literal capacities
+            // (shape-generics) and N > 10 fall through to Unsupported.
+            Type::BoundedArray { element, capacity } => {
+                let literal_n = if matches!(mode, HirIteraMode::Ex) {
+                    i64s_from_literal_index(*capacity, self.types)
+                        .and_then(|dims| dims.first().copied())
+                        .filter(|n| (0..=10).contains(n))
+                } else {
+                    None
+                };
+                match literal_n {
+                    Some(n) => CollectionIteraKind::BoundedArray(*element, n),
+                    None => CollectionIteraKind::Unsupported,
+                }
+            }
+            // Route B (AEU-7): the scalar buffer forms ride the same
+            // static split — `octeti<N>` lanes bind `numerus<u8>`,
+            // `ascii<N>` / `textus<N>` lanes bind `ascii<1>` (the D14/D17
+            // scalar index rows). Arm k reads only lanes 0..k ⊆ 0..len,
+            // so the non-ASCII trap row can never fire from a dead slot.
+            Type::BoundedOcteti { capacity } | Type::BoundedAscii { capacity } | Type::BoundedTextus { capacity } => {
+                let literal_n = if matches!(mode, HirIteraMode::Ex) {
+                    i64s_from_literal_index(*capacity, self.types)
+                        .and_then(|dims| dims.first().copied())
+                        .filter(|n| (0..=10).contains(n))
+                } else {
+                    None
+                };
+                match literal_n {
+                    Some(n) => match self.scalar_buffer_element(normalized) {
+                        Some(element) => CollectionIteraKind::BoundedArray(element, n),
+                        None => CollectionIteraKind::Unsupported,
+                    },
+                    None => CollectionIteraKind::Unsupported,
+                }
             }
             Type::Array(item) => CollectionIteraKind::Array(*item),
+            // D10.4/D19.4: byte iteration binds the same u8 as octeti[i].
+            // Retain the byte carrier rather than fabricating a list type.
+            Type::Primitive(Primitive::Octeti) if matches!(mode, HirIteraMode::Ex) => {
+                match self.scalar_buffer_element(normalized) {
+                    Some(element) => CollectionIteraKind::Bytes(element),
+                    None => CollectionIteraKind::Unsupported,
+                }
+            }
+            // Text value iteration: only `ex` admits it,
+            // mirroring the queue/stack value-surface rule. The binding
+            // is `littera` (D10.1), one Unicode scalar, with no trap.
+            Type::Primitive(Primitive::Textus | Primitive::Ascii) if matches!(mode, HirIteraMode::Ex) => {
+                CollectionIteraKind::Text(self.types.primitive(Primitive::Littera))
+            }
+            // Queue and stack share the array-backed carrier but not its
+            // access order. Only `ex` admits the value iteration surface;
+            // `de`/`ab` stay unsupported rather than inventing an index law.
             Type::Queue(item) | Type::BoundedQueue { element: item, .. } if matches!(mode, HirIteraMode::Ex) => {
                 CollectionIteraKind::Queue(*item)
             }
             Type::Stack(item) | Type::BoundedStack { element: item, .. } if matches!(mode, HirIteraMode::Ex) => {
                 CollectionIteraKind::Stack(*item)
             }
+            Type::Map(key, value) if matches!(mode, HirIteraMode::Ex) && has_coordinates => {
+                CollectionIteraKind::MapEntries { key: *key, value: *value }
+            }
             Type::Map(key, _) if matches!(mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
             Type::Map(_, value) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
+            // Borrowed receiver (`de`/`mut` param, or a field read through
+            // a reference): peel the `Ref` marker and classify the pointee
+            // with this same classifier, so a borrowed receiver and its
+            // by-value twin lower through the same lane.
+            Type::Ref(_, inner) => self.classify_collection_itera(*inner, mode, coordinate_count),
+            Type::Cursor(value) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::Cursor(*value),
+            Type::AsyncCursor(value, _) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::AsyncCursor(*value),
             _ => CollectionIteraKind::Unsupported,
         }
+    }
+
+    /// Rank of a tensor shape that carries no literal extents, or `None` when
+    /// the shape does not state one. A bare size parameter may bind a whole
+    /// shape of any rank, so it states no rank here.
+    fn tensor_shape_rank(&self, shape: IndexId) -> Option<usize> {
+        match self.types.get_index(shape) {
+            radix_types::IndexExpr::Tuple(dims) => Some(dims.len()),
+            radix_types::IndexExpr::Literal(_)
+            | radix_types::IndexExpr::Runtime(_)
+            | radix_types::IndexExpr::Affine { .. }
+            | radix_types::IndexExpr::Divide { .. } => Some(1),
+            _ => None,
+        }
+    }
+
+    /// The loop bound of every axis of a tensor carrier. Literal extents fold
+    /// to constants; otherwise each axis is read from the carrier's shape at
+    /// run time, so a loop over a tensor never depends on the extent being a
+    /// compile-time fact.
+    fn tensor_axis_bounds(
+        &mut self,
+        tensor: &MirPlace,
+        literal: Option<&[i64]>,
+        rank: usize,
+        span: Span,
+    ) -> Option<Vec<MirOperand>> {
+        if let Some(dimensions) = literal {
+            return Some(
+                dimensions
+                    .iter()
+                    .map(|n| MirOperand::Constant(MirConstant::Int(*n)))
+                    .collect(),
+            );
+        }
+        let integer = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let Some(array) = self.types.find_array(integer.semantic_id()) else {
+            self.errors
+                .push(MirError::missing_type(span, "tensor shape extent list"));
+            return None;
+        };
+        let Some(option) = self.types.find_equal(&Type::Option(integer.semantic_id())) else {
+            self.errors
+                .push(MirError::missing_type(span, "tensor shape extent option"));
+            return None;
+        };
+        let (array_ty, option_ty) = (MirType::semantic(array), MirType::semantic(option));
+        let shape_value = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorShape),
+            vec![MirOperand::Place(tensor.clone())],
+            array_ty,
+            span,
+        );
+        let mut bounds = Vec::with_capacity(rank);
+        for axis in 0..rank {
+            let bound = self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Index),
+                vec![shape_value.clone(), MirOperand::Constant(MirConstant::Int(axis as i64))],
+                option_ty,
+                span,
+            );
+            bounds.push(self.assign_temp(
+                MirValueKind::Option(MirOptionOp::Unwrap { value: bound, mode: MirOptionUnwrapMode::Assume }),
+                integer,
+                span,
+            ));
+        }
+        Some(bounds)
     }
 
     fn lower_array_itera(&mut self, iter: ArrayIteraLowering<'_>) -> Option<()> {
@@ -3031,154 +3165,7 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(iter.iter.span, "itera collection source"));
             return None;
         };
-        // Classify inside a scope so the `&Type` borrow of the type table ends
-        // before the builder mutates itself below.
-        let (collection_kind, tensor_lanes) = {
-            let normalized = self.normalized_type(iter_ty);
-            let has_coordinates = !iter.coordinates.is_empty();
-            let kind = match normalized {
-                Type::Tensor(elem, shape) => {
-                    let dimensions = i64s_from_literal_index(*shape, self.types);
-                    if matches!(iter.mode, HirIteraMode::Ex)
-                        && has_coordinates
-                        && dimensions
-                            .as_ref()
-                            .is_some_and(|dims| dims.len() == iter.coordinates.len())
-                    {
-                        CollectionIteraKind::Shaped {
-                            element: *elem,
-                            dimensions: dimensions.expect("literal tensor dimensions checked above"),
-                            matrix: false,
-                        }
-                    } else {
-                        // The coordinate-free rank-1 route remains unchanged;
-                        // rank-N shaped tensors use the unified shaped arm.
-                        let rank1_literal = dimensions.as_ref().is_some_and(|dims| dims.len() == 1);
-                        if matches!(iter.mode, HirIteraMode::Ex) && !has_coordinates && rank1_literal {
-                            CollectionIteraKind::Tensor(*elem)
-                        } else {
-                            CollectionIteraKind::Unsupported
-                        }
-                    }
-                }
-                Type::Matrix(elem, shape) => {
-                    let dimensions = i64s_from_literal_index(*shape, self.types);
-                    let literal_matrix = dimensions
-                        .as_ref()
-                        .is_some_and(|dims| dims.len() == 2 && dims.iter().all(|dim| u8::try_from(*dim).is_ok()));
-                    if matches!(iter.mode, HirIteraMode::Ex)
-                        && has_coordinates
-                        && iter.coordinates.len() == 2
-                        && literal_matrix
-                    {
-                        CollectionIteraKind::Shaped {
-                            element: *elem,
-                            dimensions: dimensions.expect("literal matrix dimensions checked above"),
-                            matrix: true,
-                        }
-                    } else {
-                        CollectionIteraKind::Unsupported
-                    }
-                }
-                // Route B (AEU-4): runtime-len `lista<T, N>` lowers in the base
-                // lane to a static split on the carrier `len` with N+1
-                // guard-free arms (total N(N+1)/2 lanes). The N <= 10
-                // code-size cap keeps the split bounded; non-literal capacities
-                // (shape-generics) and N > 10 fall through to Unsupported.
-                Type::BoundedArray { element, capacity } => {
-                    let literal_n = if matches!(iter.mode, HirIteraMode::Ex) {
-                        i64s_from_literal_index(*capacity, self.types)
-                            .and_then(|dims| dims.first().copied())
-                            .filter(|n| (0..=10).contains(n))
-                    } else {
-                        None
-                    };
-                    match literal_n {
-                        Some(n) => CollectionIteraKind::BoundedArray(*element, n),
-                        None => CollectionIteraKind::Unsupported,
-                    }
-                }
-                // Route B (AEU-7): the scalar buffer forms ride the same
-                // static split — `octeti<N>` lanes bind `numerus<u8>`,
-                // `ascii<N>` / `textus<N>` lanes bind `ascii<1>` (the D14/D17
-                // scalar index rows). Arm k reads only lanes 0..k ⊆ 0..len,
-                // so the non-ASCII trap row can never fire from a dead slot.
-                Type::BoundedOcteti { capacity }
-                | Type::BoundedAscii { capacity }
-                | Type::BoundedTextus { capacity } => {
-                    let literal_n = if matches!(iter.mode, HirIteraMode::Ex) {
-                        i64s_from_literal_index(*capacity, self.types)
-                            .and_then(|dims| dims.first().copied())
-                            .filter(|n| (0..=10).contains(n))
-                    } else {
-                        None
-                    };
-                    match literal_n {
-                        Some(n) => match self.scalar_buffer_element(normalized) {
-                            Some(element) => CollectionIteraKind::BoundedArray(element, n),
-                            None => CollectionIteraKind::Unsupported,
-                        },
-                        None => CollectionIteraKind::Unsupported,
-                    }
-                }
-                Type::Array(item) => CollectionIteraKind::Array(*item),
-                // D10.4/D19.4: byte iteration binds the same u8 as octeti[i].
-                // Retain the byte carrier rather than fabricating a list type.
-                Type::Primitive(Primitive::Octeti) if matches!(iter.mode, HirIteraMode::Ex) => {
-                    match self.scalar_buffer_element(normalized) {
-                        Some(element) => CollectionIteraKind::Bytes(element),
-                        None => CollectionIteraKind::Unsupported,
-                    }
-                }
-                // Text value iteration: only `ex` admits it,
-                // mirroring the queue/stack value-surface rule. The binding
-                // is `littera` (D10.1), one Unicode scalar, with no trap.
-                Type::Primitive(Primitive::Textus | Primitive::Ascii) if matches!(iter.mode, HirIteraMode::Ex) => {
-                    CollectionIteraKind::Text(self.types.primitive(Primitive::Littera))
-                }
-                // Queue and stack share the array-backed carrier but not its
-                // access order. Only `ex` admits the value iteration surface;
-                // `de`/`ab` stay unsupported rather than inventing an index law.
-                Type::Queue(item) | Type::BoundedQueue { element: item, .. }
-                    if matches!(iter.mode, HirIteraMode::Ex) =>
-                {
-                    CollectionIteraKind::Queue(*item)
-                }
-                Type::Stack(item) | Type::BoundedStack { element: item, .. }
-                    if matches!(iter.mode, HirIteraMode::Ex) =>
-                {
-                    CollectionIteraKind::Stack(*item)
-                }
-                Type::Map(key, value) if matches!(iter.mode, HirIteraMode::Ex) && has_coordinates => {
-                    CollectionIteraKind::MapEntries { key: *key, value: *value }
-                }
-                Type::Map(key, _) if matches!(iter.mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
-                Type::Map(_, value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
-                // Borrowed receiver (`de`/`in` param, or a field read through
-                // a reference): classify by pointee. Only the by-value carrier
-                // arms are admitted through the borrow; other pointees keep
-                // the fail-closed decline below.
-                Type::Ref(_, inner) => self.borrowed_collection_itera_kind(*inner, iter.mode, has_coordinates),
-                Type::Cursor(value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::Cursor(*value),
-                Type::AsyncCursor(value, _) if matches!(iter.mode, HirIteraMode::Ex) => {
-                    CollectionIteraKind::AsyncCursor(*value)
-                }
-                _ => CollectionIteraKind::Unsupported,
-            };
-            // Static bound: the coordinate-free tensor loop runs the literal N
-            // lanes — no runtime length intrinsic on that tensor carrier.
-            let lanes = if matches!(&kind, CollectionIteraKind::Tensor(_)) {
-                let Type::Tensor(_, shape) = normalized else {
-                    unreachable!("tensor itera kind was classified from a tensor type")
-                };
-                i64s_from_literal_index(*shape, self.types)
-                    .and_then(|dims| dims.first().copied())
-                    .unwrap_or(0)
-            } else {
-                0
-            };
-            (kind, lanes)
-        };
+        let collection_kind = self.classify_collection_itera(iter_ty, iter.mode, iter.coordinates.len());
         if matches!(&collection_kind, CollectionIteraKind::Unsupported) {
             // Only map-value iteration carries the tabula decline; tensor and
             // bounded-lista declines keep the generic iterator diagnostic.
@@ -3230,8 +3217,8 @@ impl FunctionBuilder<'_> {
             _ => (collection, MirType::semantic(collection_semantic)),
         };
         let collection = self.materialize_operand_place(collection, collection_ty, iter.iter.span);
-        if let CollectionIteraKind::Shaped { element, dimensions, matrix } = &collection_kind {
-            return self.lower_shaped_itera(&iter, collection, *element, dimensions, *matrix);
+        if let CollectionIteraKind::Shaped { element, rank, literal, matrix } = &collection_kind {
+            return self.lower_shaped_itera(&iter, collection, *element, *rank, literal.as_deref(), *matrix);
         }
 
         // The map itself stays addressable for the per-key value read.
@@ -3268,7 +3255,7 @@ impl FunctionBuilder<'_> {
             CollectionIteraKind::Cursor(value) | CollectionIteraKind::AsyncCursor(value) => {
                 (collection, MirType::semantic(*value), false)
             }
-            CollectionIteraKind::Tensor(elem) => {
+            CollectionIteraKind::Tensor(elem, _) => {
                 // Element gather rides the generic Index projection over the
                 // tensor place (every lane is defined by construction).
                 (collection, MirType::semantic(*elem), false)
@@ -3309,8 +3296,11 @@ impl FunctionBuilder<'_> {
         // one frame per step from a cursor handler.
         let hoisted_length = if stepped || self.is_frame_cursor_walk(&collection_kind) {
             None
-        } else if matches!(&collection_kind, CollectionIteraKind::Tensor(_)) {
-            Some(MirOperand::Constant(MirConstant::Int(tensor_lanes)))
+        } else if let CollectionIteraKind::Tensor(_, literal_lanes) = &collection_kind {
+            let literal = literal_lanes.map(|lanes| [lanes]);
+            let bounds =
+                self.tensor_axis_bounds(&iteration_place, literal.as_ref().map(<[i64; 1]>::as_slice), 1, iter.span)?;
+            bounds.into_iter().next()
         } else {
             Some(self.runtime_call_value(
                 MirIntrinsic::Collection(MirCollectionOp::Length),
@@ -3645,10 +3635,11 @@ impl FunctionBuilder<'_> {
         iter: &ArrayIteraLowering<'_>,
         collection: MirPlace,
         element: TypeId,
-        dimensions: &[i64],
+        rank: usize,
+        literal: Option<&[i64]>,
         matrix: bool,
     ) -> Option<()> {
-        if dimensions.is_empty() || dimensions.len() != iter.coordinates.len() {
+        if rank == 0 || rank != iter.coordinates.len() || (matrix && literal.is_none()) {
             self.errors.push(MirError::unsupported(
                 iter.iter.span,
                 "itera shaped collection dimensions before nested loop MIR lowering",
@@ -3668,8 +3659,12 @@ impl FunctionBuilder<'_> {
         self.bindings
             .insert(iter.binding, LocalBinding { local: binding, ty: element_ty });
 
+        // Bounds are read once, before the outermost loop: a tensor's shape
+        // cannot change while it is walked.
+        let bounds = self.tensor_axis_bounds(&collection, literal, rank, iter.span)?;
+        let matrix_dimensions = if matrix { literal } else { None };
         let after_id = self.fresh_block(iter.span);
-        self.lower_shaped_level(iter, collection, element, binding, dimensions, matrix, 0, after_id)?;
+        self.lower_shaped_level(iter, collection, element, binding, &bounds, matrix_dimensions, 0, after_id)?;
         self.switch_to(after_id);
         Some(())
     }
@@ -3680,8 +3675,8 @@ impl FunctionBuilder<'_> {
         collection: MirPlace,
         element: TypeId,
         binding: MirLocalId,
-        dimensions: &[i64],
-        matrix: bool,
+        bounds: &[MirOperand],
+        matrix: Option<&[i64]>,
         level: usize,
         continuation: MirBlockId,
     ) -> Option<()> {
@@ -3714,7 +3709,7 @@ impl FunctionBuilder<'_> {
         let condition = self.binary_temp(
             MirBinOp::Lt,
             MirOperand::Place(MirPlace::local(coordinate)),
-            MirOperand::Constant(MirConstant::Int(dimensions[level])),
+            bounds[level].clone(),
             MirType::semantic(self.types.primitive(Primitive::Bivalens)),
             iter.span,
         );
@@ -3724,9 +3719,9 @@ impl FunctionBuilder<'_> {
         );
 
         self.switch_to(body_id);
-        if level + 1 < dimensions.len() {
-            self.lower_shaped_level(iter, collection, element, binding, dimensions, matrix, level + 1, increment_id)?;
-        } else if matrix {
+        if level + 1 < bounds.len() {
+            self.lower_shaped_level(iter, collection, element, binding, bounds, matrix, level + 1, increment_id)?;
+        } else if let Some(dimensions) = matrix {
             self.lower_shaped_matrix_body(
                 iter,
                 collection,

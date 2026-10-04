@@ -1,0 +1,44 @@
++++
+term = "tensor runtime extent loop"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "apud_clause", "redde_stmt", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A loop over a tensor whose extent is a run-time int reads its bounds from the tensor, so it visits every cell."
+syntax = "for from a at [i, j] const c { }"
+related = ["tensor", "apud", "itera", "magnitudo"]
+locale = "en"
++++
+
+# =============================================================================
+# runtime extent loop — `at [i, j]` over `tf32[2, n]` with `n` known at run time.
+# =============================================================================
+#
+# What this teaches:
+#   • the extent `n` is a run-time value, so the loop cannot read its bound
+#     from the type; it reads it from the tensor itself, exactly as it would
+#     read a literal extent folded into the type
+#   • the sum visits all six cells (1 + 2 + 3 + 4 + 5 + 6 = 21.0)
+#   • the coordinates walk row-major: i ∈ {0, 1}, j ∈ {0, 1, 2}, so
+#     Σ (i * 10 + j) = (0 + 1 + 2) + (10 + 11 + 12) = 36
+#
+# See also: apud, itera, tensor, magnitudo
+# =============================================================================
+
+fn runtime_extent(int value) → int {
+    return value
+}
+
+main {
+    const int n ← runtime_extent(3)
+    const tf32[] seed ← empty
+    const tf32[2, n] a ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, n])
+    var f32 total ← 0.0
+    var int coordinates ← 0
+    for from a at [i, j] const c {
+        total ← total + c
+        coordinates ← coordinates + i * 10 + j
+    }
+    print total
+    print coordinates
+}
