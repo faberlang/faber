@@ -405,7 +405,7 @@ template_argument ::= 'กระจาย'? IDENTIFIER ':' expression
 # [197] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'จริง' | 'เท็จ' | 'ว่างเปล่า' | '∞' | 'nan'
 # [198] primary
-primary ::= IDENTIFIER | literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | extrema_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
 # [199] ad_expr
 ad_expr ::= 'ถึง' ASCII_STRING ad_opener?
 # [200] ad_opener
@@ -454,83 +454,87 @@ scriptum_expr ::= 'จารึก' '(' STRING (',' expression)* ')'
 lege_expr ::= 'อ่าน' 'บรรทัด'?
 # [222] first_match_expr
 first_match_expr ::= 'ตรงแรก' '(' expression apud_clause? ',' 'ที่ซึ่ง' IDENTIFIER block_stmt ')'
-# [223] summa_expr
-summa_expr ::= 'ผลรวม' 'ออก' expression apud_clause? filum_clause? ('คงที่' | 'แปร') IDENTIFIER block_stmt
-# [224] filum_clause
+# [223] reducta_expr
+reducta_expr ::= 'ลดรูป' 'ผ่านทาง' reducta_op 'ออก' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+# [224] reducta_op
+reducta_op ::= 'ผลรวม' | 'ผลคูณ' | 'สูงสุด' | 'ต่ำสุด' | 'ดัชนีค่าสูงสุด' | 'ดัชนีค่าต่ําสุด' | 'ทั้งหมด' | 'ใดก็ได้' | 'นับ'
+# [225] reducta_group
+reducta_group ::= 'ตาม' expression
+# [226] reducta_body
+reducta_body ::= ('คงที่' | 'แปร') IDENTIFIER block_stmt
+# [227] reducta_identity
+reducta_identity ::= 'หรือว่าง' expression
+# [228] filum_clause
 filum_clause ::= 'เส้นใย' IDENTIFIER
-# [225] extrema_expr
-extrema_expr ::= ('สูงสุด' | 'ต่ำสุด') 'ออก' expression apud_clause? extrema_identity?
-# [226] extrema_identity
-extrema_identity ::= 'หรือว่าง' expression
-# [227] capta_expr
+# [229] capta_expr
 capta_expr ::= 'ดัก' block_stmt
-# [228] object_pattern
+# [230] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [229] pattern_property
+# [231] pattern_property
 pattern_property ::= 'ที่เหลือ'? IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [230] array_pattern
+# [232] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [231] array_pattern_element
+# [233] array_pattern_element
 array_pattern_element ::= '_' | 'ที่เหลือ'? IDENTIFIER
-# [232] nota_stmt
+# [234] nota_stmt
 nota_stmt ::= ('บันทึก' | 'ดู' | 'เตือน' | 'เขียน') expression (',' expression)*
-# [233] entry_header
+# [235] entry_header
 entry_header ::= ('อาร์กิวเมนต์' IDENTIFIER)? ('ทางออก' expression)?
-# [234] incipit_stmt
+# [236] incipit_stmt
 incipit_stmt ::= 'เริ่ม' entry_header block_stmt
-# [235] incipiet_stmt
+# [237] incipiet_stmt
 incipiet_stmt ::= 'เริ่มอะซิงก์' entry_header block_stmt
-# [236] probandum_decl
+# [238] probandum_decl
 probandum_decl ::= 'ทดสอบชุด' STRING proba_modifier* '{' probandum_body '}'
-# [237] probandum_body
+# [239] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [238] proba_stmt
+# [240] proba_stmt
 proba_stmt ::= 'ทดสอบ' STRING proba_modifier* block_stmt
-# [239] proba_modifier
+# [241] proba_modifier
 proba_modifier ::= 'คาดหวัง_ล้มเหลว' | 'ละเว้น' STRING | 'ค้าง' STRING | 'เฉพาะ' | 'แท็ก' STRING | 'เวลา' NATURAL | 'วัด' | 'ทำซ้ำ' NATURAL | 'เปราะบาง' NATURAL | 'เฉพาะใน' STRING
-# [240] praepara_block
+# [242] praepara_block
 praepara_block ::= ('เตรียม' | 'จะเตรียม' | 'หลังเตรียม' | 'จะหลังเตรียม') 'ทั้งหมด'? block_stmt
-# [241] fac_stmt
+# [243] fac_stmt
 fac_stmt ::= 'ทำ' block_stmt cape_clause? ('ขณะ' expression)?
-# [242] IDENTIFIER
+# [244] IDENTIFIER
 IDENTIFIER ::=
-# [243] NUMBER
+# [245] NUMBER
 NUMBER ::=
-# [244] NATURAL
+# [246] NATURAL
 NATURAL ::=
-# [245] STRING
+# [247] STRING
 STRING ::=
-# [246] ASCII_STRING
+# [248] ASCII_STRING
 ASCII_STRING ::=
-# [247] BACKTICK_STRING
+# [249] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [248] OCTETI_STRING
+# [250] OCTETI_STRING
 OCTETI_STRING ::=
-# [249] NEWLINE
+# [251] NEWLINE
 NEWLINE ::=
-# [250] WIDTH_MARKER
+# [252] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [251] LISTA_WIDTH_SUGAR
+# [253] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [252] TENSOR_WIDTH_SUGAR
+# [254] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [253] SPARSA_WIDTH_SUGAR
+# [255] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [254] VECTOR_WIDTH_SUGAR
+# [256] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [255] MATRIX_WIDTH_SUGAR
+# [257] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [256] FRONTMATTER_DELIMITER
+# [258] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [257] TOML_LINES
+# [259] TOML_LINES
 TOML_LINES ::=
-# [258] ANNOTATION_NAME
+# [260] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [259] ANNOTATION_FIELD_NAME
+# [261] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [260] NON_NEWLINE_TOKEN
+# [262] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [261] NO_NEWLINE
+# [263] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -780,10 +784,12 @@ NO_NEWLINE ::=
 | [`scriptum_expr`](#scriptum-expr) | `#จารึก-expr` | live |
 | [`lege_expr`](#lege-expr) | `#อ่าน-expr` | live |
 | [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
-| [`summa_expr`](#summa-expr) | `#ผลรวม-expr` | live |
+| [`reducta_expr`](#reducta-expr) | `#ลดรูป-expr` | live |
+| [`reducta_op`](#reducta-op) | `#ลดรูป-op` | live |
+| [`reducta_group`](#reducta-group) | `#ลดรูป-group` | live |
+| [`reducta_body`](#reducta-body) | `#ลดรูป-body` | live |
+| [`reducta_identity`](#reducta-identity) | `#ลดรูป-identity` | live |
 | [`filum_clause`](#filum-clause) | `#เส้นใย-clause` | live |
-| [`extrema_expr`](#extrema-expr) | `#extrema-expr` | live |
-| [`extrema_identity`](#extrema-identity) | `#extrema-identity` | live |
 | [`capta_expr`](#capta-expr) | `#ดัก-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live |
@@ -840,6 +846,8 @@ productions. It is not a second keyword authority.
 | Error | `ยืนยัน` | assert |
 | Iteration | `ก่อน` | range until exclusive |
 | Grammar | `ที่` | keyword literal derived from the production |
+| Expression | `ดัชนีค่าสูงสุด` | argmax reduction operator (en `argmax`) |
+| Expression | `ดัชนีค่าต่ําสุด` | argmin reduction operator (en `argmin`) |
 | Params | `อาร์กิวเมนต์` | CLI arguments modifier |
 | Boolean | `หรือ` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
@@ -865,9 +873,10 @@ productions. It is not a second keyword authority.
 | Testing | `คาดหวัง_ล้มเหลว` | expect failure |
 | Boolean | `เป็น` | is / type test |
 | Boolean | `และ` | and |
-| Iteration | `ออก` | for-of / import from |
+| Iteration | `ออก` | for-of / import from / reduction source |
 | Params | `ทางออก` | exit code |
 | Control | `ทำ` | do block / post-test loop |
+| Expression | `ผลคูณ` | product reduction operator (en `product`) |
 | JSON | `false` | JSON false |
 | Boolean | `เท็จ` | false |
 | Async | `สตรีมอะซิงก์` | async stream posture |
@@ -899,9 +908,9 @@ productions. It is not a second keyword authority.
 | Builtin | `อ่าน` | read |
 | Builtin | `บรรทัด` | line |
 | Declarations | `ขนาด` | size/index generic parameter |
-| Expression | `สูงสุด` | maximum reduction (en `max from`) |
+| Expression | `สูงสุด` | maximum reduction operator (en `max`) |
 | Testing | `วัด` | benchmark |
-| Expression | `ต่ำสุด` | minimum reduction (en `min from`) |
+| Expression | `ต่ำสุด` | minimum reduction operator (en `min`) |
 | Type | `โมดูลัส` | modular-word policy type head (en `wrapping`) |
 | Diagnostics | `เตือน` | warn |
 | Error | `ตาย` | panic |
@@ -912,8 +921,9 @@ productions. It is not a second keyword authority.
 | Annotation | `เคอร์เนล` | kernel annotation |
 | JSON | `null` | JSON null |
 | Literals | `ว่างเปล่า` | null |
+| Expression | `นับ` | count reduction operator (en `count`) |
 | Testing | `ละเว้น` | skip |
-| Params | `ทั้งหมด` | all / glob |
+| Params | `ทั้งหมด` | all reduction operator / glob |
 | Params | `ทางเลือก` | options modifier |
 | Declarations | `ลำดับ` | enum |
 | Type | `เป็นเจ้าของ` | owned |
@@ -925,13 +935,16 @@ productions. It is not a second keyword authority.
 | Testing | `เตรียม` | setup |
 | Testing | `จะเตรียม` | async setup |
 | Grammar | `ตรงแรก` | first-match selection head |
+| Expression | `ตาม` | grouped reduction clause (en `ต่อ`; contextual) |
 | Testing | `ทดสอบ` | test |
 | Testing | `ทดสอบชุด` | test suite |
 | Declarations | `สาธารณะ` | public visibility |
+| Expression | `ใดก็ได้` | any reduction operator (en `any`; contextual) |
 | Annotation | `radix` | compiler-reserved annotation family |
 | Objects | `ratio` | named-field aggregate type/constructor |
 | Control | `คืน` | return |
 | Async | `รอคืน` | await-return |
+| Expression | `ลดรูป` | reduction expression head (en `reduce`; contextual) |
 | Declarations | `โมดูล` | file module name (contextual) |
 | Error | `ปฏิเสธ` | reject |
 | Testing | `ทำซ้ำ` | repeat |
@@ -948,7 +961,7 @@ productions. It is not a second keyword authority.
 | Testing | `เฉพาะใน` | only-in |
 | Params | `กระจาย` | spread |
 | Declarations | `สมัครใจ` | optional declaration slot |
-| Grammar | `ผลรวม` | keyword literal derived from the production |
+| Expression | `ผลรวม` | sum reduction operator (en `sum`) |
 | Async | `รอทิ้ง` | await-discard |
 | Control | `เงียบ` | no-op |
 | Testing | `แท็ก` | tag |
@@ -960,9 +973,9 @@ productions. It is not a second keyword authority.
 | Params | `ในชื่อ` | as / alias |
 | Declarations | `แปร` | mutable binding |
 | Async | `รอแปร` | await-bind mutable |
-| Boolean | `หรือว่าง` | nullable default |
+| Boolean | `หรือว่าง` | nullable default / explicit reduction identity |
 | Boolean | `จริง` | true |
-| Conversion | `ผ่านทาง` | convert-hint clause after a `↦` target (contextual) |
+| Conversion | `ผ่านทาง` | convert-hint clause or reduction operator clause (contextual) |
 | Diagnostics | `ดู` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -2577,7 +2590,24 @@ head and never shares the reduce/scan `คงที่`/`แปร` binder tail.
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
 `ที่` coordinate clause binds per-axis indices as in `วน ออก`.
 
-`ผลรวม ออก source ที่ [i] คงที่ s { คืน term }` is the sequential sum-reduce over a shaped source: one term per element (`คืน` inside the body yields it) folded into a `+` accumulator seeded at zero. `สูงสุด ออก source [ที่ [i]] [หรือว่าง identity]` and `ต่ำสุด ออก …` (en `max from` / `min from`, with `coalesce` for `หรือว่าง`) are the extrema reductions: no binder and no body, and the optional `หรือว่าง` tail states the caller's identity for an empty source (a statically non-empty source needs none). Each head is claimed only in expression-head position immediately followed by `ออก`; elsewhere the spelling stays an ordinary identifier, so `สูงสุด(a, b)` remains a call. The distributed `เส้นใย` clause of `ผลรวม` is admitted only inside `@ เคอร์เนล` kernels today. A general `reducta ผ่านทาง Op` reduction that would retire `ผลรวม ออก` and `max from` / `min from` is admitted, not shipped (FLD K3).
+`ลดรูป ผ่านทาง <op> ออก source [ที่ [coords]] [ตาม key] ([เส้นใย f] (คงที่ | แปร) x { คืน term } | หรือว่าง identity)?` is the general reduction form. The optional tail is either a body (with an optional `เส้นใย`) or a bodiless identity; without either, the source elements are the terms. `ผ่านทาง` is mandatory and selects exactly one of `ผลรวม`, `ผลคูณ`, `สูงสุด`, `ต่ำสุด`, `ดัชนีค่าสูงสุด`, `ดัชนีค่าต่ําสุด`, `ทั้งหมด`, `ใดก็ได้`, or `นับ`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `ผ่านทาง` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.ลดรูป(f)` (en `xs.reduce(f)`).
+
+The source is a shaped tensor or matrix; lists keep their methods. An optional `ที่ [coords]` binds one integer coordinate per source axis. A body is claimed only when `(คงที่ | แปร) IDENTIFIER '{'` follows, so a declaration such as `คงที่ numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `คืน` term per element. Without a body, each source element is the term. `เส้นใย f` requires a body and a kernel context; it retains the existing sum path, while other `เส้นใย` operators fail closed by name until their lowering is implemented. Without `เส้นใย`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
+
+| Operators | Term | Result | Empty source |
+| --- | --- | --- | --- |
+| `ผลรวม` | numeric scalar | integer terms use the signed or unsigned 64-bit cap by the range rule outside device functions; otherwise the term type | identity `0` |
+| `ผลคูณ` | numeric scalar | term type | identity `1` |
+| `สูงสุด`, `ต่ำสุด` | numeric scalar | `T` when statically non-empty; otherwise `T ∪ nihil`; `T` with `หรือว่าง` | `nihil` or the supplied identity |
+| `ดัชนีค่าสูงสุด`, `ดัชนีค่าต่ําสุด` | numeric scalar | rank-one coordinate `numerus`; higher-rank `ทูเพิล<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `หรือว่าง` | `nihil` or the supplied coordinate identity |
+| `ทั้งหมด`, `ใดก็ได้` | `bivalens` | `bivalens` | `จริง`, `เท็จ` |
+| `นับ` | `bivalens` | `numerus`, the number of true terms | `0` |
+
+For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
+
+`ตาม key` groups terms into a new result tensor; it does not mutate the source or key tensor. The key expression is evaluated per element with the coordinates in scope and must be integral. The bucket extent `K` comes from the expected result type, so a grouped result has shape `tensor<R, [K]>` for the operator's result type `R`. Out-of-range keys use the existing tensor-write failure. Grouped `ผลรวม`, `ผลคูณ`, `นับ`, `ทั้งหมด`, and `ใดก็ได้` have empty-bucket identities; grouped `สูงสุด` and `ต่ำสุด` require `หรือว่าง identity`. Grouped `ดัชนีค่าสูงสุด` and `ดัชนีค่าต่ําสุด` are unsupported by name because their result is a coordinate, not a tensor element.
+
+The old `ผลรวม ออก`, `สูงสุด ออก`, and `ต่ำสุด ออก` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `ลดรูป ผ่านทาง ผลรวม`, `ลดรูป ผ่านทาง สูงสุด`, or `ลดรูป ผ่านทาง ต่ำสุด`; the operator words remain ordinary identifiers outside the `ผ่านทาง` clause.
 
 `จารึก` and `อ่าน`/`บรรทัด` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
@@ -2830,15 +2860,14 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 
 ## Admitted, Not Shipped
 
-These are ruled or admitted for the language and are **not** accepted by the
-compiler today. None of them is a production of the grammar above, and the live
-parser rejects each one.
+These are ruled or admitted for the language and are **not fully accepted by
+the compiler today**. A production may appear in the grammar before its parser,
+typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
 | `ทำ ทั้งหมด { … } จับ e { … }` (en `do all`) | admitted (FLD K1); `ทำ ทั้งหมด` is `PARSE001` |
-| `วน ออก t ที่ [i, j] เส้นใย f คงที่ v { … }` | admitted (FLD K2); a `เส้นใย` clause on `วน` is rejected (`เส้นใย` exists only in `ผลรวม ออก` inside kernels) |
-| `reducta ผ่านทาง Op ออก source …` (en `reduce ผ่านทาง Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `ผลรวม ออก` and `max from` / `min from`, all of which stay shipped meanwhile |
+| `วน ออก t ที่ [i, j] เส้นใย f คงที่ v { … }` | admitted (FLD K2); `วน` does not own a `เส้นใย` clause. Reduction forms own that clause. |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `แยก` lowering | parses and is coverage-checked; lowered only by the Rust emitter |

@@ -742,10 +742,18 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Boolean | `et` | and |
 # | Boolean | `falsum` | false |
 # | Boolean | `non` | not |
-# | Boolean | `vel` | nullable default |
+# | Boolean | `vel` | nullable default / explicit reduction identity |
 # | Boolean | `verum` | true |
-# | Expression | `maxima` | maximum reduction (en `max from`) |
-# | Expression | `minima` | minimum reduction (en `min from`) |
+# | Expression | `argmaxima` | argmax reduction operator (en `argmax`) |
+# | Expression | `argminima` | argmin reduction operator (en `argmin`) |
+# | Expression | `factum` | product reduction operator (en `product`) |
+# | Expression | `maxima` | maximum reduction operator (en `max`) |
+# | Expression | `minima` | minimum reduction operator (en `min`) |
+# | Expression | `numeratio` | count reduction operator (en `count`) |
+# | Expression | `pro` | grouped reduction clause (en `per`; contextual) |
+# | Expression | `quilibet` | any reduction operator (en `any`; contextual) |
+# | Expression | `reducta` | reduction expression head (en `reduce`; contextual) |
+# | Expression | `summa` | sum reduction operator (en `sum`) |
 # | Objects | `clausura` | legacy closure |
 # | Objects | `ego` | self |
 # | Objects | `finge` | construct variant |
@@ -754,7 +762,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Objects | `praefixum` | prefix expression |
 # | Grammar | `primus_quem` | first-match selection head |
 # | Grammar | `ubi` | first-match predicate tail |
-# | Conversion | `via` | convert-hint clause after a `↦` target (contextual) |
+# | Conversion | `via` | convert-hint clause or reduction operator clause (contextual) |
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
 # | Type | `in` | ownership in |
@@ -763,7 +771,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Type | `own` | owned |
 # | Iteration | `ab` | range iteration |
 # | Iteration | `ante` | range until exclusive |
-# | Iteration | `ex` | for-of / import from |
+# | Iteration | `ex` | for-of / import from / reduction source |
 # | Iteration | `per` | range step |
 # | Iteration | `usque` | range until inclusive |
 # | Params | `argumenta` | CLI arguments modifier |
@@ -771,7 +779,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Params | `errata` | error channel |
 # | Params | `exitus` | exit code |
 # | Params | `immutata` | immutable modifier |
-# | Params | `omnia` | all / glob |
+# | Params | `omnia` | all reduction operator / glob |
 # | Params | `optiones` | options modifier |
 # | Params | `sparge` | spread |
 # | Params | `ut` | as / alias |
@@ -1393,8 +1401,7 @@ primary := IDENTIFIER | literal | 'ego'
          | array_literal | json_literal | typed_constructor | iuncta_expr
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
          | first_match_expr
-         | summa_expr
-         | extrema_expr
+         | reducta_expr
          | capta_expr
          | '(' expression ')'
 ad_expr    := 'ad' ASCII_STRING ad_opener?
@@ -1467,22 +1474,19 @@ lege_expr      := 'lege' 'lineam'?
 # selection, `T ∪ nihil` for no-match/empty. The `ubi` predicate tail is owned
 # by this head — never the reduce/scan `fixum`/`varia` binder tail.
 first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
-# One-expression sum-reduce term fold: per-element term body, sum-only combine
-# (no identity/combine clauses — the general reduce head is a separate sketch).
-# `summa` claims only the expression-head position immediately followed by `ex`;
-# `filum` is claimed by exact spelling only inside this production.
-summa_expr  := 'summa' 'ex' expression apud_clause? filum_clause? ('fixum' | 'varia') IDENTIFIER block_stmt
+# General shaped-source reduction. `via` is mandatory; the operator is one of
+# the nine locale-pack words below. Grouping is contextual, and the optional
+# tail is either a body (with an optional `filum`) or a bodiless identity.
+# The body is claimed only by `(fixum | varia) IDENTIFIER '{'`, so a following
+# declaration remains a separate statement. `reducta` and its operator words
+# stay ordinary identifiers outside their grammar slots.
+reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
+reducta_group := 'pro' expression
+reducta_body := ('fixum' | 'varia') IDENTIFIER block_stmt
+reducta_identity := 'vel' expression
+# `filum` is claimed by exact spelling only inside a reduction production.
 filum_clause := 'filum' IDENTIFIER
-# The extrema reductions `maxima ex` / `minima ex` (en `max from` / `min from`):
-# the maximum or minimum over a shaped source, with the same optional `apud`
-# coordinate clause as `summa`. The optional `vel` tail states the caller's
-# identity for an empty source (`max from v coalesce 0.0` in the English reader);
-# a statically non-empty source needs none. Each head is claimed only in the
-# expression-head position immediately followed by `ex`; anywhere else the
-# spelling stays an ordinary identifier, so `maxima(a, b)` remains a call.
-# Unlike `summa`, there is no `fixum`/`varia` binder and no term body.
-extrema_expr := ('maxima' | 'minima') 'ex' expression apud_clause? extrema_identity?
-extrema_identity := 'vel' expression
 # Capture boundary: `capta` claims its spelling only in expression-primary
 # position directly followed by `{`; the block's trailing expression is the
 # success value and the error channel is reified into a value union.

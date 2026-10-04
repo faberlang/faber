@@ -1598,7 +1598,24 @@ head and never shares the reduce/scan `fixum`/`varia` binder tail.
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
 `apud` coordinate clause binds per-axis indices as in `itera ex`.
 
-`summa ex source apud [i] fixum s { redde term }` is the sequential sum-reduce over a shaped source: one term per element (`redde` inside the body yields it) folded into a `+` accumulator seeded at zero. `maxima ex source [apud [i]] [vel identity]` and `minima ex …` (en `max from` / `min from`, with `coalesce` for `vel`) are the extrema reductions: no binder and no body, and the optional `vel` tail states the caller's identity for an empty source (a statically non-empty source needs none). Each head is claimed only in expression-head position immediately followed by `ex`; elsewhere the spelling stays an ordinary identifier, so `maxima(a, b)` remains a call. The distributed `filum` clause of `summa` is admitted only inside `@ nucleum` kernels today. A general `reducta via Op` reduction that would retire `summa ex` and `max from` / `min from` is admitted, not shipped (FLD K3).
+`reducta via <op> ex source [apud [coords]] [pro key] ([filum f] (fixum | varia) x { redde term } | vel identity)?` is the general reduction form. The optional tail is either a body (with an optional `filum`) or a bodiless identity; without either, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, or `numeratio`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
+
+The source is a shaped tensor or matrix; lists keep their methods. An optional `apud [coords]` binds one integer coordinate per source axis. A body is claimed only when `(fixum | varia) IDENTIFIER '{'` follows, so a declaration such as `fixum numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `redde` term per element. Without a body, each source element is the term. `filum f` requires a body and a kernel context; it retains the existing sum path, while other `filum` operators fail closed by name until their lowering is implemented. Without `filum`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
+
+| Operators | Term | Result | Empty source |
+| --- | --- | --- | --- |
+| `summa` | numeric scalar | integer terms use the signed or unsigned 64-bit cap by the range rule outside device functions; otherwise the term type | identity `0` |
+| `factum` | numeric scalar | term type | identity `1` |
+| `maxima`, `minima` | numeric scalar | `T` when statically non-empty; otherwise `T ∪ nihil`; `T` with `vel` | `nihil` or the supplied identity |
+| `argmaxima`, `argminima` | numeric scalar | rank-one coordinate `numerus`; higher-rank `iuncta<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `vel` | `nihil` or the supplied coordinate identity |
+| `omnia`, `quilibet` | `bivalens` | `bivalens` | `verum`, `falsum` |
+| `numeratio` | `bivalens` | `numerus`, the number of true terms | `0` |
+
+For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
+
+`pro key` groups terms into a new result tensor; it does not mutate the source or key tensor. The key expression is evaluated per element with the coordinates in scope and must be integral. The bucket extent `K` comes from the expected result type, so a grouped result has shape `tensor<R, [K]>` for the operator's result type `R`. Out-of-range keys use the existing tensor-write failure. Grouped `summa`, `factum`, `numeratio`, `omnia`, and `quilibet` have empty-bucket identities; grouped `maxima` and `minima` require `vel identity`. Grouped `argmaxima` and `argminima` are unsupported by name because their result is a coordinate, not a tensor element.
+
+The old `summa ex`, `maxima ex`, and `minima ex` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `reducta via summa`, `reducta via maxima`, or `reducta via minima`; the operator words remain ordinary identifiers outside the `via` clause.
 
 `scriptum` and `lege`/`lineam` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
@@ -1851,15 +1868,14 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 
 ## Admitted, Not Shipped
 
-These are ruled or admitted for the language and are **not** accepted by the
-compiler today. None of them is a production of the grammar above, and the live
-parser rejects each one.
+These are ruled or admitted for the language and are **not fully accepted by
+the compiler today**. A production may appear in the grammar before its parser,
+typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
 | `fac omnia { … } cape e { … }` (en `do all`) | admitted (FLD K1); `fac omnia` is `PARSE001` |
-| `itera ex t apud [i, j] filum f fixum v { … }` | admitted (FLD K2); a `filum` clause on `itera` is rejected (`filum` exists only in `summa ex` inside kernels) |
-| `reducta via Op ex source …` (en `reduce via Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `summa ex` and `max from` / `min from`, all of which stay shipped meanwhile |
+| `itera ex t apud [i, j] filum f fixum v { … }` | admitted (FLD K2); `itera` does not own a `filum` clause. Reduction forms own that clause. |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |

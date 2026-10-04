@@ -405,7 +405,7 @@ template_argument ::= '展开'? IDENTIFIER ':' expression
 # [197] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '皆无' | '∞' | 'nan'
 # [198] primary
-primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | extrema_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
 # [199] ad_expr
 ad_expr ::= '调用' ASCII_STRING ad_opener?
 # [200] ad_opener
@@ -454,83 +454,87 @@ scriptum_expr ::= '格式化' '(' STRING (',' expression)* ')'
 lege_expr ::= '读取' '行'?
 # [222] first_match_expr
 first_match_expr ::= '首个匹配' '(' expression apud_clause? ',' '其中' IDENTIFIER block_stmt ')'
-# [223] summa_expr
-summa_expr ::= '求和' '取自' expression apud_clause? filum_clause? ('常量' | '变量') IDENTIFIER block_stmt
-# [224] filum_clause
+# [223] reducta_expr
+reducta_expr ::= '归约' '经由' reducta_op '取自' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+# [224] reducta_op
+reducta_op ::= '求和' | '求积' | '最大' | '最小' | '最大值索引' | '最小值索引' | '全部' | '任一' | '计数'
+# [225] reducta_group
+reducta_group ::= '按' expression
+# [226] reducta_body
+reducta_body ::= ('常量' | '变量') IDENTIFIER block_stmt
+# [227] reducta_identity
+reducta_identity ::= '兜底' expression
+# [228] filum_clause
 filum_clause ::= '线程' IDENTIFIER
-# [225] extrema_expr
-extrema_expr ::= ('最大' | '最小') '取自' expression apud_clause? extrema_identity?
-# [226] extrema_identity
-extrema_identity ::= '兜底' expression
-# [227] capta_expr
+# [229] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [228] object_pattern
+# [230] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [229] pattern_property
+# [231] pattern_property
 pattern_property ::= '其余'? IDENTIFIER ('作为' IDENTIFIER)?
-# [230] array_pattern
+# [232] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [231] array_pattern_element
+# [233] array_pattern_element
 array_pattern_element ::= '_' | '其余'? IDENTIFIER
-# [232] nota_stmt
+# [234] nota_stmt
 nota_stmt ::= ('显示' | '查看' | '警告' | '写入') expression (',' expression)*
-# [233] entry_header
+# [235] entry_header
 entry_header ::= ('参数' IDENTIFIER)? ('退出' expression)?
-# [234] incipit_stmt
+# [236] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [235] incipiet_stmt
+# [237] incipiet_stmt
 incipiet_stmt ::= '异步入口' entry_header block_stmt
-# [236] probandum_decl
+# [238] probandum_decl
 probandum_decl ::= '验题' STRING proba_modifier* '{' probandum_body '}'
-# [237] probandum_body
+# [239] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [238] proba_stmt
+# [240] proba_stmt
 proba_stmt ::= '测试' STRING proba_modifier* block_stmt
-# [239] proba_modifier
+# [241] proba_modifier
 proba_modifier ::= '预期失败' | '跳过' STRING | '预期' STRING | '仅' | '标签' STRING | '时限' NATURAL | '计量' | '重复' NATURAL | '易碎' NATURAL | '仅于' STRING
-# [240] praepara_block
+# [242] praepara_block
 praepara_block ::= ('备置' | '异步备置' | '收尾' | '异步收尾') '全部'? block_stmt
-# [241] fac_stmt
+# [243] fac_stmt
 fac_stmt ::= '执行' block_stmt cape_clause? ('当' expression)?
-# [242] IDENTIFIER
+# [244] IDENTIFIER
 IDENTIFIER ::=
-# [243] NUMBER
+# [245] NUMBER
 NUMBER ::=
-# [244] NATURAL
+# [246] NATURAL
 NATURAL ::=
-# [245] STRING
+# [247] STRING
 STRING ::=
-# [246] ASCII_STRING
+# [248] ASCII_STRING
 ASCII_STRING ::=
-# [247] BACKTICK_STRING
+# [249] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [248] OCTETI_STRING
+# [250] OCTETI_STRING
 OCTETI_STRING ::=
-# [249] NEWLINE
+# [251] NEWLINE
 NEWLINE ::=
-# [250] WIDTH_MARKER
+# [252] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [251] LISTA_WIDTH_SUGAR
+# [253] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [252] TENSOR_WIDTH_SUGAR
+# [254] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [253] SPARSA_WIDTH_SUGAR
+# [255] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [254] VECTOR_WIDTH_SUGAR
+# [256] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [255] MATRIX_WIDTH_SUGAR
+# [257] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [256] FRONTMATTER_DELIMITER
+# [258] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [257] TOML_LINES
+# [259] TOML_LINES
 TOML_LINES ::=
-# [258] ANNOTATION_NAME
+# [260] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [259] ANNOTATION_FIELD_NAME
+# [261] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [260] NON_NEWLINE_TOKEN
+# [262] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [261] NO_NEWLINE
+# [263] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -780,10 +784,12 @@ NO_NEWLINE ::=
 | [`scriptum_expr`](#scriptum-expr) | `#格式化-expr` | live |
 | [`lege_expr`](#lege-expr) | `#读取-expr` | live |
 | [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
-| [`summa_expr`](#summa-expr) | `#求和-expr` | live |
+| [`reducta_expr`](#reducta-expr) | `#归约-expr` | live |
+| [`reducta_op`](#reducta-op) | `#归约-op` | live |
+| [`reducta_group`](#reducta-group) | `#归约-group` | live |
+| [`reducta_body`](#reducta-body) | `#归约-body` | live |
+| [`reducta_identity`](#reducta-identity) | `#归约-identity` | live |
 | [`filum_clause`](#filum-clause) | `#线程-clause` | live |
-| [`extrema_expr`](#extrema-expr) | `#extrema-expr` | live |
-| [`extrema_identity`](#extrema-identity) | `#extrema-identity` | live |
 | [`capta_expr`](#capta-expr) | `#陷阱-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live |
@@ -840,6 +846,8 @@ productions. It is not a second keyword authority.
 | Error | `断言` | assert |
 | Iteration | `迄` | range until exclusive |
 | Grammar | `于` | keyword literal derived from the production |
+| Expression | `最大值索引` | argmax reduction operator (en `argmax`) |
+| Expression | `最小值索引` | argmin reduction operator (en `argmin`) |
 | Params | `参数` | CLI arguments modifier |
 | Boolean | `或` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
@@ -865,9 +873,10 @@ productions. It is not a second keyword authority.
 | Testing | `预期失败` | expect failure |
 | Boolean | `是` | is / type test |
 | Boolean | `且` | and |
-| Iteration | `取自` | for-of / import from |
+| Iteration | `取自` | for-of / import from / reduction source |
 | Params | `退出` | exit code |
 | Control | `执行` | do block / post-test loop |
+| Expression | `求积` | product reduction operator (en `product`) |
 | JSON | `false` | JSON false |
 | Boolean | `假` | false |
 | Async | `异流` | async stream posture |
@@ -899,9 +908,9 @@ productions. It is not a second keyword authority.
 | Builtin | `读取` | read |
 | Builtin | `行` | line |
 | Declarations | `维度` | size/index generic parameter |
-| Expression | `最大` | maximum reduction (en `max from`) |
+| Expression | `最大` | maximum reduction operator (en `max`) |
 | Testing | `计量` | benchmark |
-| Expression | `最小` | minimum reduction (en `min from`) |
+| Expression | `最小` | minimum reduction operator (en `min`) |
 | Type | `模数` | modular-word policy type head (en `wrapping`) |
 | Diagnostics | `警告` | warn |
 | Error | `崩溃` | panic |
@@ -912,8 +921,9 @@ productions. It is not a second keyword authority.
 | Annotation | `内核` | kernel annotation |
 | JSON | `null` | JSON null |
 | Literals | `皆无` | null |
+| Expression | `计数` | count reduction operator (en `count`) |
 | Testing | `跳过` | skip |
-| Params | `全部` | all / glob |
+| Params | `全部` | all reduction operator / glob |
 | Params | `可选项` | options modifier |
 | Declarations | `枚举` | enum |
 | Type | `拥有` | owned |
@@ -925,13 +935,16 @@ productions. It is not a second keyword authority.
 | Testing | `备置` | setup |
 | Testing | `异步备置` | async setup |
 | Grammar | `首个匹配` | first-match selection head |
+| Expression | `按` | grouped reduction clause (en `步`; contextual) |
 | Testing | `测试` | test |
 | Testing | `验题` | test suite |
 | Declarations | `公开` | public visibility |
+| Expression | `任一` | any reduction operator (en `any`; contextual) |
 | Annotation | `radix` | compiler-reserved annotation family |
 | Objects | `ratio` | named-field aggregate type/constructor |
 | Control | `返回` | return |
 | Async | `等返` | await-return |
+| Expression | `归约` | reduction expression head (en `reduce`; contextual) |
 | Declarations | `模块` | file module name (contextual) |
 | Error | `拒绝` | reject |
 | Testing | `重复` | repeat |
@@ -948,7 +961,7 @@ productions. It is not a second keyword authority.
 | Testing | `仅于` | only-in |
 | Params | `展开` | spread |
 | Declarations | `可选` | optional declaration slot |
-| Grammar | `求和` | keyword literal derived from the production |
+| Expression | `求和` | sum reduction operator (en `sum`) |
 | Async | `等弃` | await-discard |
 | Control | `静默` | no-op |
 | Testing | `标签` | tag |
@@ -960,9 +973,9 @@ productions. It is not a second keyword authority.
 | Params | `作为` | as / alias |
 | Declarations | `变量` | mutable binding |
 | Async | `等变` | await-bind mutable |
-| Boolean | `兜底` | nullable default |
+| Boolean | `兜底` | nullable default / explicit reduction identity |
 | Boolean | `真` | true |
-| Conversion | `经由` | convert-hint clause after a `↦` target (contextual) |
+| Conversion | `经由` | convert-hint clause or reduction operator clause (contextual) |
 | Diagnostics | `查看` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -2577,7 +2590,24 @@ head and never shares the reduce/scan `常量`/`变量` binder tail.
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
 `于` coordinate clause binds per-axis indices as in `遍历 取自`.
 
-`求和 取自 source 于 [i] 常量 s { 返回 term }` is the sequential sum-reduce over a shaped source: one term per element (`返回` inside the body yields it) folded into a `+` accumulator seeded at zero. `最大 取自 source [于 [i]] [兜底 identity]` and `最小 取自 …` (en `max from` / `min from`, with `coalesce` for `兜底`) are the extrema reductions: no binder and no body, and the optional `兜底` tail states the caller's identity for an empty source (a statically non-empty source needs none). Each head is claimed only in expression-head position immediately followed by `取自`; elsewhere the spelling stays an ordinary identifier, so `最大(a, b)` remains a call. The distributed `线程` clause of `求和` is admitted only inside `@ 内核` kernels today. A general `reducta 经由 Op` reduction that would retire `求和 取自` and `max from` / `min from` is admitted, not shipped (FLD K3).
+`归约 经由 <op> 取自 source [于 [coords]] [按 key] ([线程 f] (常量 | 变量) x { 返回 term } | 兜底 identity)?` is the general reduction form. The optional tail is either a body (with an optional `线程`) or a bodiless identity; without either, the source elements are the terms. `经由` is mandatory and selects exactly one of `求和`, `求积`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, or `计数`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `经由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.归约(f)` (en `xs.reduce(f)`).
+
+The source is a shaped tensor or matrix; lists keep their methods. An optional `于 [coords]` binds one integer coordinate per source axis. A body is claimed only when `(常量 | 变量) IDENTIFIER '{'` follows, so a declaration such as `常量 numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `返回` term per element. Without a body, each source element is the term. `线程 f` requires a body and a kernel context; it retains the existing sum path, while other `线程` operators fail closed by name until their lowering is implemented. Without `线程`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
+
+| Operators | Term | Result | Empty source |
+| --- | --- | --- | --- |
+| `求和` | numeric scalar | integer terms use the signed or unsigned 64-bit cap by the range rule outside device functions; otherwise the term type | identity `0` |
+| `求积` | numeric scalar | term type | identity `1` |
+| `最大`, `最小` | numeric scalar | `T` when statically non-empty; otherwise `T ∪ nihil`; `T` with `兜底` | `nihil` or the supplied identity |
+| `最大值索引`, `最小值索引` | numeric scalar | rank-one coordinate `numerus`; higher-rank `元组<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `兜底` | `nihil` or the supplied coordinate identity |
+| `全部`, `任一` | `bivalens` | `bivalens` | `真`, `假` |
+| `计数` | `bivalens` | `numerus`, the number of true terms | `0` |
+
+For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
+
+`按 key` groups terms into a new result tensor; it does not mutate the source or key tensor. The key expression is evaluated per element with the coordinates in scope and must be integral. The bucket extent `K` comes from the expected result type, so a grouped result has shape `tensor<R, [K]>` for the operator's result type `R`. Out-of-range keys use the existing tensor-write failure. Grouped `求和`, `求积`, `计数`, `全部`, and `任一` have empty-bucket identities; grouped `最大` and `最小` require `兜底 identity`. Grouped `最大值索引` and `最小值索引` are unsupported by name because their result is a coordinate, not a tensor element.
+
+The old `求和 取自`, `最大 取自`, and `最小 取自` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `归约 经由 求和`, `归约 经由 最大`, or `归约 经由 最小`; the operator words remain ordinary identifiers outside the `经由` clause.
 
 `格式化` and `读取`/`行` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
@@ -2830,15 +2860,14 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 
 ## Admitted, Not Shipped
 
-These are ruled or admitted for the language and are **not** accepted by the
-compiler today. None of them is a production of the grammar above, and the live
-parser rejects each one.
+These are ruled or admitted for the language and are **not fully accepted by
+the compiler today**. A production may appear in the grammar before its parser,
+typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
 | `执行 全部 { … } 捕获 e { … }` (en `do all`) | admitted (FLD K1); `执行 全部` is `PARSE001` |
-| `遍历 取自 t 于 [i, j] 线程 f 常量 v { … }` | admitted (FLD K2); a `线程` clause on `遍历` is rejected (`线程` exists only in `求和 取自` inside kernels) |
-| `reducta 经由 Op 取自 source …` (en `reduce 经由 Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `求和 取自` and `max from` / `min from`, all of which stay shipped meanwhile |
+| `遍历 取自 t 于 [i, j] 线程 f 常量 v { … }` | admitted (FLD K2); `遍历` does not own a `线程` clause. Reduction forms own that clause. |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `匹配` lowering | parses and is coverage-checked; lowered only by the Rust emitter |

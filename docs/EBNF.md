@@ -405,7 +405,7 @@ template_argument ::= 'sparge'? IDENTIFIER ':' expression
 # [197] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nulla' | '∞' | 'nonnumerus'
 # [198] primary
-primary ::= IDENTIFIER | literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | extrema_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
 # [199] ad_expr
 ad_expr ::= 'ad' ASCII_STRING ad_opener?
 # [200] ad_opener
@@ -454,83 +454,87 @@ scriptum_expr ::= 'scriptum' '(' STRING (',' expression)* ')'
 lege_expr ::= 'lege' 'lineam'?
 # [222] first_match_expr
 first_match_expr ::= 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
-# [223] summa_expr
-summa_expr ::= 'summa' 'ex' expression apud_clause? filum_clause? ('fixum' | 'varia') IDENTIFIER block_stmt
-# [224] filum_clause
+# [223] reducta_expr
+reducta_expr ::= 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+# [224] reducta_op
+reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
+# [225] reducta_group
+reducta_group ::= 'pro' expression
+# [226] reducta_body
+reducta_body ::= ('fixum' | 'varia') IDENTIFIER block_stmt
+# [227] reducta_identity
+reducta_identity ::= 'vel' expression
+# [228] filum_clause
 filum_clause ::= 'filum' IDENTIFIER
-# [225] extrema_expr
-extrema_expr ::= ('maxima' | 'minima') 'ex' expression apud_clause? extrema_identity?
-# [226] extrema_identity
-extrema_identity ::= 'vel' expression
-# [227] capta_expr
+# [229] capta_expr
 capta_expr ::= 'capta' block_stmt
-# [228] object_pattern
+# [230] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [229] pattern_property
+# [231] pattern_property
 pattern_property ::= 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
-# [230] array_pattern
+# [232] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [231] array_pattern_element
+# [233] array_pattern_element
 array_pattern_element ::= '_' | 'ceteri'? IDENTIFIER
-# [232] nota_stmt
+# [234] nota_stmt
 nota_stmt ::= ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
-# [233] entry_header
+# [235] entry_header
 entry_header ::= ('argumenta' IDENTIFIER)? ('exitus' expression)?
-# [234] incipit_stmt
+# [236] incipit_stmt
 incipit_stmt ::= 'incipit' entry_header block_stmt
-# [235] incipiet_stmt
+# [237] incipiet_stmt
 incipiet_stmt ::= 'incipiet' entry_header block_stmt
-# [236] probandum_decl
+# [238] probandum_decl
 probandum_decl ::= 'probandum' STRING proba_modifier* '{' probandum_body '}'
-# [237] probandum_body
+# [239] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [238] proba_stmt
+# [240] proba_stmt
 proba_stmt ::= 'proba' STRING proba_modifier* block_stmt
-# [239] proba_modifier
+# [241] proba_modifier
 proba_modifier ::= 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING | 'temporis' NATURAL | 'metior' | 'repete' NATURAL | 'fragilis' NATURAL | 'solum_in' STRING
-# [240] praepara_block
+# [242] praepara_block
 praepara_block ::= ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
-# [241] fac_stmt
+# [243] fac_stmt
 fac_stmt ::= 'fac' block_stmt cape_clause? ('dum' expression)?
-# [242] IDENTIFIER
+# [244] IDENTIFIER
 IDENTIFIER ::=
-# [243] NUMBER
+# [245] NUMBER
 NUMBER ::=
-# [244] NATURAL
+# [246] NATURAL
 NATURAL ::=
-# [245] STRING
+# [247] STRING
 STRING ::=
-# [246] ASCII_STRING
+# [248] ASCII_STRING
 ASCII_STRING ::=
-# [247] BACKTICK_STRING
+# [249] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [248] OCTETI_STRING
+# [250] OCTETI_STRING
 OCTETI_STRING ::=
-# [249] NEWLINE
+# [251] NEWLINE
 NEWLINE ::=
-# [250] WIDTH_MARKER
+# [252] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [251] LISTA_WIDTH_SUGAR
+# [253] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [252] TENSOR_WIDTH_SUGAR
+# [254] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [253] SPARSA_WIDTH_SUGAR
+# [255] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [254] VECTOR_WIDTH_SUGAR
+# [256] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [255] MATRIX_WIDTH_SUGAR
+# [257] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [256] FRONTMATTER_DELIMITER
+# [258] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [257] TOML_LINES
+# [259] TOML_LINES
 TOML_LINES ::=
-# [258] ANNOTATION_NAME
+# [260] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [259] ANNOTATION_FIELD_NAME
+# [261] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [260] NON_NEWLINE_TOKEN
+# [262] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [261] NO_NEWLINE
+# [263] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -780,10 +784,12 @@ NO_NEWLINE ::=
 | [`scriptum_expr`](#scriptum-expr) | `#scriptum-expr` | live |
 | [`lege_expr`](#lege-expr) | `#lege-expr` | live |
 | [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
-| [`summa_expr`](#summa-expr) | `#summa-expr` | live |
+| [`reducta_expr`](#reducta-expr) | `#reducta-expr` | live |
+| [`reducta_op`](#reducta-op) | `#reducta-op` | live |
+| [`reducta_group`](#reducta-group) | `#reducta-group` | live |
+| [`reducta_body`](#reducta-body) | `#reducta-body` | live |
+| [`reducta_identity`](#reducta-identity) | `#reducta-identity` | live |
 | [`filum_clause`](#filum-clause) | `#filum-clause` | live |
-| [`extrema_expr`](#extrema-expr) | `#extrema-expr` | live |
-| [`extrema_identity`](#extrema-identity) | `#extrema-identity` | live |
 | [`capta_expr`](#capta-expr) | `#capta-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live |
@@ -840,6 +846,8 @@ productions. It is not a second keyword authority.
 | Error | `adfirma` | assert |
 | Iteration | `ante` | range until exclusive |
 | Grammar | `apud` | keyword literal derived from the production |
+| Expression | `argmaxima` | argmax reduction operator (en `argmax`) |
+| Expression | `argminima` | argmin reduction operator (en `argmin`) |
 | Params | `argumenta` | CLI arguments modifier |
 | Boolean | `aut` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
@@ -865,9 +873,10 @@ productions. It is not a second keyword authority.
 | Testing | `erratur` | expect failure |
 | Boolean | `est` | is / type test |
 | Boolean | `et` | and |
-| Iteration | `ex` | for-of / import from |
+| Iteration | `ex` | for-of / import from / reduction source |
 | Params | `exitus` | exit code |
 | Control | `fac` | do block / post-test loop |
+| Expression | `factum` | product reduction operator (en `product`) |
 | JSON | `false` | JSON false |
 | Boolean | `falsum` | false |
 | Async | `fient` | async stream posture |
@@ -899,9 +908,9 @@ productions. It is not a second keyword authority.
 | Builtin | `lege` | read |
 | Builtin | `lineam` | line |
 | Declarations | `magnitudo` | size/index generic parameter |
-| Expression | `maxima` | maximum reduction (en `max from`) |
+| Expression | `maxima` | maximum reduction operator (en `max`) |
 | Testing | `metior` | benchmark |
-| Expression | `minima` | minimum reduction (en `min from`) |
+| Expression | `minima` | minimum reduction operator (en `min`) |
 | Type | `modulus` | modular-word policy type head (en `wrapping`) |
 | Diagnostics | `mone` | warn |
 | Error | `mori` | panic |
@@ -912,8 +921,9 @@ productions. It is not a second keyword authority.
 | Annotation | `nucleum` | kernel annotation |
 | JSON | `null` | JSON null |
 | Literals | `nulla` | null |
+| Expression | `numeratio` | count reduction operator (en `count`) |
 | Testing | `omitte` | skip |
-| Params | `omnia` | all / glob |
+| Params | `omnia` | all reduction operator / glob |
 | Params | `optiones` | options modifier |
 | Declarations | `ordo` | enum |
 | Type | `own` | owned |
@@ -925,13 +935,16 @@ productions. It is not a second keyword authority.
 | Testing | `praepara` | setup |
 | Testing | `praeparabit` | async setup |
 | Grammar | `primus_quem` | first-match selection head |
+| Expression | `pro` | grouped reduction clause (en `per`; contextual) |
 | Testing | `proba` | test |
 | Testing | `probandum` | test suite |
 | Declarations | `publica` | public visibility |
+| Expression | `quilibet` | any reduction operator (en `any`; contextual) |
 | Annotation | `radix` | compiler-reserved annotation family |
 | Objects | `ratio` | named-field aggregate type/constructor |
 | Control | `redde` | return |
 | Async | `reddet` | await-return |
+| Expression | `reducta` | reduction expression head (en `reduce`; contextual) |
 | Declarations | `regio` | file module name (contextual) |
 | Error | `reice` | reject |
 | Testing | `repete` | repeat |
@@ -948,7 +961,7 @@ productions. It is not a second keyword authority.
 | Testing | `solum_in` | only-in |
 | Params | `sparge` | spread |
 | Declarations | `sponte` | optional declaration slot |
-| Grammar | `summa` | keyword literal derived from the production |
+| Expression | `summa` | sum reduction operator (en `sum`) |
 | Async | `tacebit` | await-discard |
 | Control | `tacet` | no-op |
 | Testing | `tag` | tag |
@@ -960,9 +973,9 @@ productions. It is not a second keyword authority.
 | Params | `ut` | as / alias |
 | Declarations | `varia` | mutable binding |
 | Async | `variandum` | await-bind mutable |
-| Boolean | `vel` | nullable default |
+| Boolean | `vel` | nullable default / explicit reduction identity |
 | Boolean | `verum` | true |
-| Conversion | `via` | convert-hint clause after a `↦` target (contextual) |
+| Conversion | `via` | convert-hint clause or reduction operator clause (contextual) |
 | Diagnostics | `vide` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -2577,7 +2590,24 @@ head and never shares the reduce/scan `fixum`/`varia` binder tail.
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
 `apud` coordinate clause binds per-axis indices as in `itera ex`.
 
-`summa ex source apud [i] fixum s { redde term }` is the sequential sum-reduce over a shaped source: one term per element (`redde` inside the body yields it) folded into a `+` accumulator seeded at zero. `maxima ex source [apud [i]] [vel identity]` and `minima ex …` (en `max from` / `min from`, with `coalesce` for `vel`) are the extrema reductions: no binder and no body, and the optional `vel` tail states the caller's identity for an empty source (a statically non-empty source needs none). Each head is claimed only in expression-head position immediately followed by `ex`; elsewhere the spelling stays an ordinary identifier, so `maxima(a, b)` remains a call. The distributed `filum` clause of `summa` is admitted only inside `@ nucleum` kernels today. A general `reducta via Op` reduction that would retire `summa ex` and `max from` / `min from` is admitted, not shipped (FLD K3).
+`reducta via <op> ex source [apud [coords]] [pro key] ([filum f] (fixum | varia) x { redde term } | vel identity)?` is the general reduction form. The optional tail is either a body (with an optional `filum`) or a bodiless identity; without either, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, or `numeratio`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
+
+The source is a shaped tensor or matrix; lists keep their methods. An optional `apud [coords]` binds one integer coordinate per source axis. A body is claimed only when `(fixum | varia) IDENTIFIER '{'` follows, so a declaration such as `fixum numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `redde` term per element. Without a body, each source element is the term. `filum f` requires a body and a kernel context; it retains the existing sum path, while other `filum` operators fail closed by name until their lowering is implemented. Without `filum`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
+
+| Operators | Term | Result | Empty source |
+| --- | --- | --- | --- |
+| `summa` | numeric scalar | integer terms use the signed or unsigned 64-bit cap by the range rule outside device functions; otherwise the term type | identity `0` |
+| `factum` | numeric scalar | term type | identity `1` |
+| `maxima`, `minima` | numeric scalar | `T` when statically non-empty; otherwise `T ∪ nihil`; `T` with `vel` | `nihil` or the supplied identity |
+| `argmaxima`, `argminima` | numeric scalar | rank-one coordinate `numerus`; higher-rank `iuncta<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `vel` | `nihil` or the supplied coordinate identity |
+| `omnia`, `quilibet` | `bivalens` | `bivalens` | `verum`, `falsum` |
+| `numeratio` | `bivalens` | `numerus`, the number of true terms | `0` |
+
+For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
+
+`pro key` groups terms into a new result tensor; it does not mutate the source or key tensor. The key expression is evaluated per element with the coordinates in scope and must be integral. The bucket extent `K` comes from the expected result type, so a grouped result has shape `tensor<R, [K]>` for the operator's result type `R`. Out-of-range keys use the existing tensor-write failure. Grouped `summa`, `factum`, `numeratio`, `omnia`, and `quilibet` have empty-bucket identities; grouped `maxima` and `minima` require `vel identity`. Grouped `argmaxima` and `argminima` are unsupported by name because their result is a coordinate, not a tensor element.
+
+The old `summa ex`, `maxima ex`, and `minima ex` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `reducta via summa`, `reducta via maxima`, or `reducta via minima`; the operator words remain ordinary identifiers outside the `via` clause.
 
 `scriptum` and `lege`/`lineam` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
@@ -2830,15 +2860,14 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 
 ## Admitted, Not Shipped
 
-These are ruled or admitted for the language and are **not** accepted by the
-compiler today. None of them is a production of the grammar above, and the live
-parser rejects each one.
+These are ruled or admitted for the language and are **not fully accepted by
+the compiler today**. A production may appear in the grammar before its parser,
+typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
 | `fac omnia { … } cape e { … }` (en `do all`) | admitted (FLD K1); `fac omnia` is `PARSE001` |
-| `itera ex t apud [i, j] filum f fixum v { … }` | admitted (FLD K2); a `filum` clause on `itera` is rejected (`filum` exists only in `summa ex` inside kernels) |
-| `reducta via Op ex source …` (en `reduce via Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `summa ex` and `max from` / `min from`, all of which stay shipped meanwhile |
+| `itera ex t apud [i, j] filum f fixum v { … }` | admitted (FLD K2); `itera` does not own a `filum` clause. Reduction forms own that clause. |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |

@@ -177,7 +177,7 @@ nomen_field ::= 'नाम' '=' IDENTIFIER
 # [083] ut_field
 ut_field ::= 'रूपमें' '=' IDENTIFIER
 # [084] omnia_field
-omnia_field ::= 'सब' '=' IDENTIFIER
+omnia_field ::= 'सभी' '=' IDENTIFIER
 # [085] importa_sugar
 importa_sugar ::= 'आयात' 'सेवन' STRING publica? (named_import | wildcard_import | selective_import)?
 # [086] publica
@@ -259,7 +259,7 @@ casu_elige_clause ::= 'स्थिति' expression (block_stmt | ergo_joint s
 # [124] ceterum_clause
 ceterum_clause ::= 'अन्यतम' (block_stmt | ergo_joint statement)
 # [125] discerne_stmt
-discerne_stmt ::= 'मिलाओ' 'सब'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
+discerne_stmt ::= 'मिलाओ' 'सभी'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
 # [126] discriminants
 discriminants ::= subject_path ('और' subject_path)*
 # [127] subject_path
@@ -405,7 +405,7 @@ template_argument ::= 'फैलाओ'? IDENTIFIER ':' expression
 # [197] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'सत्य' | 'असत्य' | 'शून्यवत्' | '∞' | 'nan'
 # [198] primary
-primary ::= IDENTIFIER | literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | extrema_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
 # [199] ad_expr
 ad_expr ::= 'सेवा' ASCII_STRING ad_opener?
 # [200] ad_opener
@@ -454,83 +454,87 @@ scriptum_expr ::= 'लिखित' '(' STRING (',' expression)* ')'
 lege_expr ::= 'पढ़ो' 'पंक्ति'?
 # [222] first_match_expr
 first_match_expr ::= 'प्रथम_मेल' '(' expression apud_clause? ',' 'जहाँ' IDENTIFIER block_stmt ')'
-# [223] summa_expr
-summa_expr ::= 'योग' 'सेवन' expression apud_clause? filum_clause? ('स्थिर' | 'चर') IDENTIFIER block_stmt
-# [224] filum_clause
+# [223] reducta_expr
+reducta_expr ::= 'समेटो' 'द्वारा' reducta_op 'सेवन' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+# [224] reducta_op
+reducta_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न्यूनतम' | 'argmax' | 'argmin' | 'सभी' | 'कोई' | 'गिनती'
+# [225] reducta_group
+reducta_group ::= 'अनुसार' expression
+# [226] reducta_body
+reducta_body ::= ('स्थिर' | 'चर') IDENTIFIER block_stmt
+# [227] reducta_identity
+reducta_identity ::= 'डिफ़ॉल्ट' expression
+# [228] filum_clause
 filum_clause ::= 'धागा' IDENTIFIER
-# [225] extrema_expr
-extrema_expr ::= ('अधिकतम' | 'न्यूनतम') 'सेवन' expression apud_clause? extrema_identity?
-# [226] extrema_identity
-extrema_identity ::= 'डिफ़ॉल्ट' expression
-# [227] capta_expr
+# [229] capta_expr
 capta_expr ::= 'जाल' block_stmt
-# [228] object_pattern
+# [230] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [229] pattern_property
+# [231] pattern_property
 pattern_property ::= 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
-# [230] array_pattern
+# [232] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [231] array_pattern_element
+# [233] array_pattern_element
 array_pattern_element ::= '_' | 'बाकी'? IDENTIFIER
-# [232] nota_stmt
+# [234] nota_stmt
 nota_stmt ::= ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
-# [233] entry_header
+# [235] entry_header
 entry_header ::= ('तर्क' IDENTIFIER)? ('निर्गम' expression)?
-# [234] incipit_stmt
+# [236] incipit_stmt
 incipit_stmt ::= 'आरंभ' entry_header block_stmt
-# [235] incipiet_stmt
+# [237] incipiet_stmt
 incipiet_stmt ::= 'आरंभasync' entry_header block_stmt
-# [236] probandum_decl
+# [238] probandum_decl
 probandum_decl ::= 'परीक्षणसमूह' STRING proba_modifier* '{' probandum_body '}'
-# [237] probandum_body
+# [239] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [238] proba_stmt
+# [240] proba_stmt
 proba_stmt ::= 'परीक्षण' STRING proba_modifier* block_stmt
-# [239] proba_modifier
+# [241] proba_modifier
 proba_modifier ::= 'अपेक्षित_विफलता' | 'छोड़ो' STRING | 'लंबित' STRING | 'केवल' | 'टैग' STRING | 'समय' NATURAL | 'मापो' | 'पुनरावृत्ति' NATURAL | 'नाज़ुक' NATURAL | 'केवलमें' STRING
-# [240] praepara_block
-praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सब'? block_stmt
-# [241] fac_stmt
+# [242] praepara_block
+praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सभी'? block_stmt
+# [243] fac_stmt
 fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
-# [242] IDENTIFIER
+# [244] IDENTIFIER
 IDENTIFIER ::=
-# [243] NUMBER
+# [245] NUMBER
 NUMBER ::=
-# [244] NATURAL
+# [246] NATURAL
 NATURAL ::=
-# [245] STRING
+# [247] STRING
 STRING ::=
-# [246] ASCII_STRING
+# [248] ASCII_STRING
 ASCII_STRING ::=
-# [247] BACKTICK_STRING
+# [249] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [248] OCTETI_STRING
+# [250] OCTETI_STRING
 OCTETI_STRING ::=
-# [249] NEWLINE
+# [251] NEWLINE
 NEWLINE ::=
-# [250] WIDTH_MARKER
+# [252] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [251] LISTA_WIDTH_SUGAR
+# [253] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [252] TENSOR_WIDTH_SUGAR
+# [254] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [253] SPARSA_WIDTH_SUGAR
+# [255] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [254] VECTOR_WIDTH_SUGAR
+# [256] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [255] MATRIX_WIDTH_SUGAR
+# [257] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [256] FRONTMATTER_DELIMITER
+# [258] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [257] TOML_LINES
+# [259] TOML_LINES
 TOML_LINES ::=
-# [258] ANNOTATION_NAME
+# [260] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [259] ANNOTATION_FIELD_NAME
+# [261] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [260] NON_NEWLINE_TOKEN
+# [262] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [261] NO_NEWLINE
+# [263] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -641,7 +645,7 @@ NO_NEWLINE ::=
 | [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live |
 | [`nomen_field`](#nomen-field) | `#नाम-field` | live |
 | [`ut_field`](#ut-field) | `#रूपमें-field` | live |
-| [`omnia_field`](#omnia-field) | `#सब-field` | live |
+| [`omnia_field`](#omnia-field) | `#सभी-field` | live |
 | [`importa_sugar`](#importa-sugar) | `#आयात-sugar` | live |
 | [`सार्वजनिक`](#publica) | `#सार्वजनिक` | live |
 | [`named_import`](#named-import) | `#named-import` | live |
@@ -780,10 +784,12 @@ NO_NEWLINE ::=
 | [`scriptum_expr`](#scriptum-expr) | `#लिखित-expr` | live |
 | [`lege_expr`](#lege-expr) | `#पढ़ो-expr` | live |
 | [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
-| [`summa_expr`](#summa-expr) | `#योग-expr` | live |
+| [`reducta_expr`](#reducta-expr) | `#समेटो-expr` | live |
+| [`reducta_op`](#reducta-op) | `#समेटो-op` | live |
+| [`reducta_group`](#reducta-group) | `#समेटो-group` | live |
+| [`reducta_body`](#reducta-body) | `#समेटो-body` | live |
+| [`reducta_identity`](#reducta-identity) | `#समेटो-identity` | live |
 | [`filum_clause`](#filum-clause) | `#धागा-clause` | live |
-| [`extrema_expr`](#extrema-expr) | `#extrema-expr` | live |
-| [`extrema_identity`](#extrema-identity) | `#extrema-identity` | live |
 | [`capta_expr`](#capta-expr) | `#जाल-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live |
@@ -840,6 +846,8 @@ productions. It is not a second keyword authority.
 | Error | `पुष्टि` | assert |
 | Iteration | `पहले` | range until exclusive |
 | Grammar | `पर` | keyword literal derived from the production |
+| Expression | `argmax` | argmax reduction operator (en `argmax`) |
+| Expression | `argmin` | argmin reduction operator (en `argmin`) |
 | Params | `तर्क` | CLI arguments modifier |
 | Boolean | `या` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
@@ -865,9 +873,10 @@ productions. It is not a second keyword authority.
 | Testing | `अपेक्षित_विफलता` | expect failure |
 | Boolean | `है` | is / type test |
 | Boolean | `और` | and |
-| Iteration | `सेवन` | for-of / import from |
+| Iteration | `सेवन` | for-of / import from / reduction source |
 | Params | `निर्गम` | exit code |
 | Control | `करो` | do block / post-test loop |
+| Expression | `गुणनफल` | product reduction operator (en `product`) |
 | JSON | `false` | JSON false |
 | Boolean | `असत्य` | false |
 | Async | `async_जनक` | async stream posture |
@@ -899,9 +908,9 @@ productions. It is not a second keyword authority.
 | Builtin | `पढ़ो` | read |
 | Builtin | `पंक्ति` | line |
 | Declarations | `आकार` | size/index generic parameter |
-| Expression | `अधिकतम` | maximum reduction (en `max from`) |
+| Expression | `अधिकतम` | maximum reduction operator (en `max`) |
 | Testing | `मापो` | benchmark |
-| Expression | `न्यूनतम` | minimum reduction (en `min from`) |
+| Expression | `न्यूनतम` | minimum reduction operator (en `min`) |
 | Type | `मॉड्यूल` | modular-word policy type head (en `wrapping`) |
 | Diagnostics | `चेताओ` | warn |
 | Error | `मरोजाओ` | panic |
@@ -912,8 +921,9 @@ productions. It is not a second keyword authority.
 | Annotation | `कर्नेल` | kernel annotation |
 | JSON | `null` | JSON null |
 | Literals | `शून्यवत्` | null |
+| Expression | `गिनती` | count reduction operator (en `count`) |
 | Testing | `छोड़ो` | skip |
-| Params | `सब` | all / glob |
+| Params | `सभी` | all reduction operator / glob |
 | Params | `चयन` | options modifier |
 | Declarations | `क्रम` | enum |
 | Type | `स्वामित्व` | owned |
@@ -925,13 +935,16 @@ productions. It is not a second keyword authority.
 | Testing | `पूर्वतैयार` | setup |
 | Testing | `पूर्वतैयारasync` | async setup |
 | Grammar | `प्रथम_मेल` | first-match selection head |
+| Expression | `अनुसार` | grouped reduction clause (en `प्रति`; contextual) |
 | Testing | `परीक्षण` | test |
 | Testing | `परीक्षणसमूह` | test suite |
 | Declarations | `सार्वजनिक` | public visibility |
+| Expression | `कोई` | any reduction operator (en `any`; contextual) |
 | Annotation | `radix` | compiler-reserved annotation family |
 | Objects | `ratio` | named-field aggregate type/constructor |
 | Control | `लौटाओ` | return |
 | Async | `रुको_लौटाओ` | await-return |
+| Expression | `समेटो` | reduction expression head (en `reduce`; contextual) |
 | Declarations | `क्षेत्र` | file module name (contextual) |
 | Error | `अस्वीकार` | reject |
 | Testing | `पुनरावृत्ति` | repeat |
@@ -948,7 +961,7 @@ productions. It is not a second keyword authority.
 | Testing | `केवलमें` | only-in |
 | Params | `फैलाओ` | spread |
 | Declarations | `स्वेच्छा` | optional declaration slot |
-| Grammar | `योग` | keyword literal derived from the production |
+| Expression | `योग` | sum reduction operator (en `sum`) |
 | Async | `रुको` | await-discard |
 | Control | `मौन` | no-op |
 | Testing | `टैग` | tag |
@@ -960,9 +973,9 @@ productions. It is not a second keyword authority.
 | Params | `रूपमें` | as / alias |
 | Declarations | `चर` | mutable binding |
 | Async | `रुको_चर` | await-bind mutable |
-| Boolean | `डिफ़ॉल्ट` | nullable default |
+| Boolean | `डिफ़ॉल्ट` | nullable default / explicit reduction identity |
 | Boolean | `सत्य` | true |
-| Conversion | `द्वारा` | convert-hint clause after a `↦` target (contextual) |
+| Conversion | `द्वारा` | convert-hint clause or reduction operator clause (contextual) |
 | Diagnostics | `देखो` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -1454,7 +1467,7 @@ importa ex "./types" publica User
 importa ex "norma:consolum" fixum dic ut output
 ```
 
-A record import needs its `सेवन = "…"` source (`missing_import_source`), and `सब` cannot be combined with `नाम` or `रूपमें` (`mixed_wildcard_and_named_import`).
+A record import needs its `सेवन = "…"` source (`missing_import_source`), and `सभी` cannot be combined with `नाम` or `रूपमें` (`mixed_wildcard_and_named_import`).
 
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `सार्वजनिक` is the re-export marker. Missing named binding
@@ -2577,7 +2590,24 @@ head and never shares the reduce/scan `स्थिर`/`चर` binder tail.
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
 `पर` coordinate clause binds per-axis indices as in `दोहराओ सेवन`.
 
-`योग सेवन source पर [i] स्थिर s { लौटाओ term }` is the sequential sum-reduce over a shaped source: one term per element (`लौटाओ` inside the body yields it) folded into a `+` accumulator seeded at zero. `अधिकतम सेवन source [पर [i]] [डिफ़ॉल्ट identity]` and `न्यूनतम सेवन …` (en `max from` / `min from`, with `coalesce` for `डिफ़ॉल्ट`) are the extrema reductions: no binder and no body, and the optional `डिफ़ॉल्ट` tail states the caller's identity for an empty source (a statically non-empty source needs none). Each head is claimed only in expression-head position immediately followed by `सेवन`; elsewhere the spelling stays an ordinary identifier, so `अधिकतम(a, b)` remains a call. The distributed `धागा` clause of `योग` is admitted only inside `@ कर्नेल` kernels today. A general `reducta द्वारा Op` reduction that would retire `योग सेवन` and `max from` / `min from` is admitted, not shipped (FLD K3).
+`समेटो द्वारा <op> सेवन source [पर [coords]] [अनुसार key] ([धागा f] (स्थिर | चर) x { लौटाओ term } | डिफ़ॉल्ट identity)?` is the general reduction form. The optional tail is either a body (with an optional `धागा`) or a bodiless identity; without either, the source elements are the terms. `द्वारा` is mandatory and selects exactly one of `योग`, `गुणनफल`, `अधिकतम`, `न्यूनतम`, `argmax`, `argmin`, `सभी`, `कोई`, or `गिनती`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `द्वारा` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.समेटो(f)` (en `xs.reduce(f)`).
+
+The source is a shaped tensor or matrix; lists keep their methods. An optional `पर [coords]` binds one integer coordinate per source axis. A body is claimed only when `(स्थिर | चर) IDENTIFIER '{'` follows, so a declaration such as `स्थिर numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `लौटाओ` term per element. Without a body, each source element is the term. `धागा f` requires a body and a kernel context; it retains the existing sum path, while other `धागा` operators fail closed by name until their lowering is implemented. Without `धागा`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
+
+| Operators | Term | Result | Empty source |
+| --- | --- | --- | --- |
+| `योग` | numeric scalar | integer terms use the signed or unsigned 64-bit cap by the range rule outside device functions; otherwise the term type | identity `0` |
+| `गुणनफल` | numeric scalar | term type | identity `1` |
+| `अधिकतम`, `न्यूनतम` | numeric scalar | `T` when statically non-empty; otherwise `T ∪ nihil`; `T` with `डिफ़ॉल्ट` | `nihil` or the supplied identity |
+| `argmax`, `argmin` | numeric scalar | rank-one coordinate `numerus`; higher-rank `टपल<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `डिफ़ॉल्ट` | `nihil` or the supplied coordinate identity |
+| `सभी`, `कोई` | `bivalens` | `bivalens` | `सत्य`, `असत्य` |
+| `गिनती` | `bivalens` | `numerus`, the number of true terms | `0` |
+
+For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
+
+`अनुसार key` groups terms into a new result tensor; it does not mutate the source or key tensor. The key expression is evaluated per element with the coordinates in scope and must be integral. The bucket extent `K` comes from the expected result type, so a grouped result has shape `tensor<R, [K]>` for the operator's result type `R`. Out-of-range keys use the existing tensor-write failure. Grouped `योग`, `गुणनफल`, `गिनती`, `सभी`, and `कोई` have empty-bucket identities; grouped `अधिकतम` and `न्यूनतम` require `डिफ़ॉल्ट identity`. Grouped `argmax` and `argmin` are unsupported by name because their result is a coordinate, not a tensor element.
+
+The old `योग सेवन`, `अधिकतम सेवन`, and `न्यूनतम सेवन` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `समेटो द्वारा योग`, `समेटो द्वारा अधिकतम`, or `समेटो द्वारा न्यूनतम`; the operator words remain ordinary identifiers outside the `द्वारा` clause.
 
 `लिखित` and `पढ़ो`/`पंक्ति` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
@@ -2830,15 +2860,14 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 
 ## Admitted, Not Shipped
 
-These are ruled or admitted for the language and are **not** accepted by the
-compiler today. None of them is a production of the grammar above, and the live
-parser rejects each one.
+These are ruled or admitted for the language and are **not fully accepted by
+the compiler today**. A production may appear in the grammar before its parser,
+typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
-| `करो सब { … } पकड़ो e { … }` (en `do all`) | admitted (FLD K1); `करो सब` is `PARSE001` |
-| `दोहराओ सेवन t पर [i, j] धागा f स्थिर v { … }` | admitted (FLD K2); a `धागा` clause on `दोहराओ` is rejected (`धागा` exists only in `योग सेवन` inside kernels) |
-| `reducta द्वारा Op सेवन source …` (en `reduce द्वारा Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `योग सेवन` and `max from` / `min from`, all of which stay shipped meanwhile |
+| `करो सभी { … } पकड़ो e { … }` (en `do all`) | admitted (FLD K1); `करो सभी` is `PARSE001` |
+| `दोहराओ सेवन t पर [i, j] धागा f स्थिर v { … }` | admitted (FLD K2); `दोहराओ` does not own a `धागा` clause. Reduction forms own that clause. |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `मिलाओ` lowering | parses and is coverage-checked; lowered only by the Rust emitter |

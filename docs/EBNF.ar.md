@@ -177,7 +177,7 @@ nomen_field ::= 'اسم' '=' IDENTIFIER
 # [083] ut_field
 ut_field ::= 'كـ' '=' IDENTIFIER
 # [084] omnia_field
-omnia_field ::= 'جميع' '=' IDENTIFIER
+omnia_field ::= 'الكل' '=' IDENTIFIER
 # [085] importa_sugar
 importa_sugar ::= 'استورد' 'من' STRING publica? (named_import | wildcard_import | selective_import)?
 # [086] publica
@@ -259,7 +259,7 @@ casu_elige_clause ::= 'حالة' expression (block_stmt | ergo_joint statement)
 # [124] ceterum_clause
 ceterum_clause ::= 'افتراضي' (block_stmt | ergo_joint statement)
 # [125] discerne_stmt
-discerne_stmt ::= 'طابق' 'جميع'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
+discerne_stmt ::= 'طابق' 'الكل'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
 # [126] discriminants
 discriminants ::= subject_path ('و' subject_path)*
 # [127] subject_path
@@ -405,7 +405,7 @@ template_argument ::= 'انشر'? IDENTIFIER ':' expression
 # [197] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'خال' | '∞' | 'nan'
 # [198] primary
-primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | extrema_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
 # [199] ad_expr
 ad_expr ::= 'اتصل' ASCII_STRING ad_opener?
 # [200] ad_opener
@@ -454,83 +454,87 @@ scriptum_expr ::= 'حرر' '(' STRING (',' expression)* ')'
 lege_expr ::= 'اقرأ' 'سطرا'?
 # [222] first_match_expr
 first_match_expr ::= 'أول_مطابقة' '(' expression apud_clause? ',' 'حيث' IDENTIFIER block_stmt ')'
-# [223] summa_expr
-summa_expr ::= 'مجموع' 'من' expression apud_clause? filum_clause? ('ثابت' | 'متغير') IDENTIFIER block_stmt
-# [224] filum_clause
+# [223] reducta_expr
+reducta_expr ::= 'اختزل' 'عبر' reducta_op 'من' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+# [224] reducta_op
+reducta_op ::= 'المجموع' | 'حاصل_الضرب' | 'الأقصى' | 'الأدنى' | 'فهرس_الأكبر' | 'فهرس_الأصغر' | 'الكل' | 'أي' | 'العدّ'
+# [225] reducta_group
+reducta_group ::= 'حسب' expression
+# [226] reducta_body
+reducta_body ::= ('ثابت' | 'متغير') IDENTIFIER block_stmt
+# [227] reducta_identity
+reducta_identity ::= 'عوض' expression
+# [228] filum_clause
 filum_clause ::= 'خيط' IDENTIFIER
-# [225] extrema_expr
-extrema_expr ::= ('الأقصى' | 'الأدنى') 'من' expression apud_clause? extrema_identity?
-# [226] extrema_identity
-extrema_identity ::= 'عوض' expression
-# [227] capta_expr
+# [229] capta_expr
 capta_expr ::= 'فخ' block_stmt
-# [228] object_pattern
+# [230] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [229] pattern_property
+# [231] pattern_property
 pattern_property ::= 'باقي'? IDENTIFIER ('كـ' IDENTIFIER)?
-# [230] array_pattern
+# [232] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [231] array_pattern_element
+# [233] array_pattern_element
 array_pattern_element ::= '_' | 'باقي'? IDENTIFIER
-# [232] nota_stmt
+# [234] nota_stmt
 nota_stmt ::= ('اعرض' | 'شاهد' | 'نبه' | 'اكتب') expression (',' expression)*
-# [233] entry_header
+# [235] entry_header
 entry_header ::= ('وسائط' IDENTIFIER)? ('مخرج' expression)?
-# [234] incipit_stmt
+# [236] incipit_stmt
 incipit_stmt ::= 'بداية' entry_header block_stmt
-# [235] incipiet_stmt
+# [237] incipiet_stmt
 incipiet_stmt ::= 'استهلال' entry_header block_stmt
-# [236] probandum_decl
+# [238] probandum_decl
 probandum_decl ::= 'مختبر' STRING proba_modifier* '{' probandum_body '}'
-# [237] probandum_body
+# [239] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [238] proba_stmt
+# [240] proba_stmt
 proba_stmt ::= 'اختبر' STRING proba_modifier* block_stmt
-# [239] proba_modifier
+# [241] proba_modifier
 proba_modifier ::= 'توقع_الفشل' | 'أهمل' STRING | 'مستقبلي' STRING | 'فقط' | 'وسم' STRING | 'زمني' NATURAL | 'قس' | 'معاد' NATURAL | 'هش' NATURAL | 'حصري' STRING
-# [240] praepara_block
-praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'جميع'? block_stmt
-# [241] fac_stmt
+# [242] praepara_block
+praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'الكل'? block_stmt
+# [243] fac_stmt
 fac_stmt ::= 'افعل' block_stmt cape_clause? ('طالما' expression)?
-# [242] IDENTIFIER
+# [244] IDENTIFIER
 IDENTIFIER ::=
-# [243] NUMBER
+# [245] NUMBER
 NUMBER ::=
-# [244] NATURAL
+# [246] NATURAL
 NATURAL ::=
-# [245] STRING
+# [247] STRING
 STRING ::=
-# [246] ASCII_STRING
+# [248] ASCII_STRING
 ASCII_STRING ::=
-# [247] BACKTICK_STRING
+# [249] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [248] OCTETI_STRING
+# [250] OCTETI_STRING
 OCTETI_STRING ::=
-# [249] NEWLINE
+# [251] NEWLINE
 NEWLINE ::=
-# [250] WIDTH_MARKER
+# [252] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [251] LISTA_WIDTH_SUGAR
+# [253] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [252] TENSOR_WIDTH_SUGAR
+# [254] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [253] SPARSA_WIDTH_SUGAR
+# [255] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [254] VECTOR_WIDTH_SUGAR
+# [256] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [255] MATRIX_WIDTH_SUGAR
+# [257] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [256] FRONTMATTER_DELIMITER
+# [258] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [257] TOML_LINES
+# [259] TOML_LINES
 TOML_LINES ::=
-# [258] ANNOTATION_NAME
+# [260] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [259] ANNOTATION_FIELD_NAME
+# [261] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [260] NON_NEWLINE_TOKEN
+# [262] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [261] NO_NEWLINE
+# [263] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -641,7 +645,7 @@ NO_NEWLINE ::=
 | [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live |
 | [`nomen_field`](#nomen-field) | `#اسم-field` | live |
 | [`ut_field`](#ut-field) | `#كـ-field` | live |
-| [`omnia_field`](#omnia-field) | `#جميع-field` | live |
+| [`omnia_field`](#omnia-field) | `#الكل-field` | live |
 | [`importa_sugar`](#importa-sugar) | `#استورد-sugar` | live |
 | [`عام`](#publica) | `#عام` | live |
 | [`named_import`](#named-import) | `#named-import` | live |
@@ -780,10 +784,12 @@ NO_NEWLINE ::=
 | [`scriptum_expr`](#scriptum-expr) | `#حرر-expr` | live |
 | [`lege_expr`](#lege-expr) | `#اقرأ-expr` | live |
 | [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
-| [`summa_expr`](#summa-expr) | `#مجموع-expr` | live |
+| [`reducta_expr`](#reducta-expr) | `#اختزل-expr` | live |
+| [`reducta_op`](#reducta-op) | `#اختزل-op` | live |
+| [`reducta_group`](#reducta-group) | `#اختزل-group` | live |
+| [`reducta_body`](#reducta-body) | `#اختزل-body` | live |
+| [`reducta_identity`](#reducta-identity) | `#اختزل-identity` | live |
 | [`filum_clause`](#filum-clause) | `#خيط-clause` | live |
-| [`extrema_expr`](#extrema-expr) | `#extrema-expr` | live |
-| [`extrema_identity`](#extrema-identity) | `#extrema-identity` | live |
 | [`capta_expr`](#capta-expr) | `#فخ-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
 | [`pattern_property`](#pattern-property) | `#pattern-property` | live |
@@ -840,6 +846,8 @@ productions. It is not a second keyword authority.
 | Error | `أكد` | assert |
 | Iteration | `قبل` | range until exclusive |
 | Grammar | `عند` | keyword literal derived from the production |
+| Expression | `فهرس_الأكبر` | argmax reduction operator (en `argmax`) |
+| Expression | `فهرس_الأصغر` | argmin reduction operator (en `argmin`) |
 | Params | `وسائط` | CLI arguments modifier |
 | Boolean | `أو` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
@@ -865,9 +873,10 @@ productions. It is not a second keyword authority.
 | Testing | `توقع_الفشل` | expect failure |
 | Boolean | `هو` | is / type test |
 | Boolean | `و` | and |
-| Iteration | `من` | for-of / import from |
+| Iteration | `من` | for-of / import from / reduction source |
 | Params | `مخرج` | exit code |
 | Control | `افعل` | do block / post-test loop |
+| Expression | `حاصل_الضرب` | product reduction operator (en `product`) |
 | JSON | `false` | JSON false |
 | Boolean | `خطأ` | false |
 | Async | `مولد_غيرمتزامن` | async stream posture |
@@ -899,9 +908,9 @@ productions. It is not a second keyword authority.
 | Builtin | `اقرأ` | read |
 | Builtin | `سطرا` | line |
 | Declarations | `حجم` | size/index generic parameter |
-| Expression | `الأقصى` | maximum reduction (en `max from`) |
+| Expression | `الأقصى` | maximum reduction operator (en `max`) |
 | Testing | `قس` | benchmark |
-| Expression | `الأدنى` | minimum reduction (en `min from`) |
+| Expression | `الأدنى` | minimum reduction operator (en `min`) |
 | Type | `حلقة` | modular-word policy type head (en `wrapping`) |
 | Diagnostics | `نبه` | warn |
 | Error | `انهر` | panic |
@@ -912,8 +921,9 @@ productions. It is not a second keyword authority.
 | Annotation | `نواة` | kernel annotation |
 | JSON | `null` | JSON null |
 | Literals | `خال` | null |
+| Expression | `العدّ` | count reduction operator (en `count`) |
 | Testing | `أهمل` | skip |
-| Params | `جميع` | all / glob |
+| Params | `الكل` | all reduction operator / glob |
 | Params | `خيارات` | options modifier |
 | Declarations | `ترتيب` | enum |
 | Type | `ملك` | owned |
@@ -925,13 +935,16 @@ productions. It is not a second keyword authority.
 | Testing | `جهز` | setup |
 | Testing | `سيهيئ` | async setup |
 | Grammar | `أول_مطابقة` | first-match selection head |
+| Expression | `حسب` | grouped reduction clause (en `كل`; contextual) |
 | Testing | `اختبر` | test |
 | Testing | `مختبر` | test suite |
 | Declarations | `عام` | public visibility |
+| Expression | `أي` | any reduction operator (en `any`; contextual) |
 | Annotation | `radix` | compiler-reserved annotation family |
 | Objects | `ratio` | named-field aggregate type/constructor |
 | Control | `أعد` | return |
 | Async | `أعد_منتظرا` | await-return |
+| Expression | `اختزل` | reduction expression head (en `reduce`; contextual) |
 | Declarations | `وحدة` | file module name (contextual) |
 | Error | `ارفض` | reject |
 | Testing | `معاد` | repeat |
@@ -948,7 +961,7 @@ productions. It is not a second keyword authority.
 | Testing | `حصري` | only-in |
 | Params | `انشر` | spread |
 | Declarations | `اختياري` | optional declaration slot |
-| Grammar | `مجموع` | keyword literal derived from the production |
+| Expression | `المجموع` | sum reduction operator (en `sum`) |
 | Async | `انتظر` | await-discard |
 | Control | `صمت` | no-op |
 | Testing | `وسم` | tag |
@@ -960,9 +973,9 @@ productions. It is not a second keyword authority.
 | Params | `كـ` | as / alias |
 | Declarations | `متغير` | mutable binding |
 | Async | `انتظر_متغير` | await-bind mutable |
-| Boolean | `عوض` | nullable default |
+| Boolean | `عوض` | nullable default / explicit reduction identity |
 | Boolean | `صواب` | true |
-| Conversion | `عبر` | convert-hint clause after a `↦` target (contextual) |
+| Conversion | `عبر` | convert-hint clause or reduction operator clause (contextual) |
 | Diagnostics | `شاهد` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -1454,7 +1467,7 @@ importa ex "./types" publica User
 importa ex "norma:consolum" fixum dic ut output
 ```
 
-A record import needs its `من = "…"` source (`missing_import_source`), and `جميع` cannot be combined with `اسم` or `كـ` (`mixed_wildcard_and_named_import`).
+A record import needs its `من = "…"` source (`missing_import_source`), and `الكل` cannot be combined with `اسم` or `كـ` (`mixed_wildcard_and_named_import`).
 
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `عام` is the re-export marker. Missing named binding
@@ -1704,7 +1717,7 @@ type keeps the sign of the range (`i64` if it can be negative, else `u64`), so
 `u64 - u64` is `i64` (operator ruling 2026-09-30: it does not become `inf`;
 write `a ↦ inf - b` for the exact difference). `_` slots take the expression's
 type (`ثابت _ t ← a + b` with `u8` operands is `u16`); a collection literal
-with no declared element type, a `✓ ✗` conditional and `مجموع` take theirs from
+with no declared element type, a `✓ ✗` conditional and `المجموع` take theirs from
 the same rule. The one exception to the growth cap is an operand typed `inf`:
 see The unbounded integer `inf`.
 
@@ -1726,7 +1739,7 @@ widens into nothing). Crossing number
 families (integer, `d64`, float) always needs `↦`, in arithmetic and at stores:
 `ثابت fractus f ← n` with `n: i32` needs `n ↦ f64`. `u64` with a typed signed
 operand is a compile error in every join (arithmetic, `✓ ✗` branches, `∧ ∨ ⊻`,
-collection literals, `مجموع`): `u64_signed_arithmetic_requires_conversion`,
+collection literals, `المجموع`): `u64_signed_arithmetic_requires_conversion`,
 fixed with `↦` (to `i64` or to `inf`). Untyped constants are exempt (`x - 1` with `x: u64` is fine).
 
 **Division.** `/` is the programmer's division and `÷` the mathematician's. On
@@ -1826,7 +1839,7 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   count, enum member value) keeps the `u64` range: a longer literal there is a
   parse error.
 - **Join.** An operand typed `inf` makes the result `inf` for every integer
-  operator (`+ - * / % ⇐ ⇒ ∧ ∨ ⊻`, unary `-` `¬`, `potentia`, `مجموع`, `✓ ✗`
+  operator (`+ - * / % ⇐ ⇒ ∧ ∨ ⊻`, unary `-` `¬`, `potentia`, `المجموع`, `✓ ✗`
   branches, collection literals). An untyped constant beside an `inf` operand
   joins by exact value. Nothing else changes: bounded operands keep the 64-bit
   cap, and `u64 - u64` stays `i64` (it does not become `inf`).
@@ -2577,7 +2590,24 @@ head and never shares the reduce/scan `ثابت`/`متغير` binder tail.
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
 `عند` coordinate clause binds per-axis indices as in `كرر من`.
 
-`مجموع من source عند [i] ثابت s { أعد term }` is the sequential sum-reduce over a shaped source: one term per element (`أعد` inside the body yields it) folded into a `+` accumulator seeded at zero. `الأقصى من source [عند [i]] [عوض identity]` and `الأدنى من …` (en `max from` / `min from`, with `coalesce` for `عوض`) are the extrema reductions: no binder and no body, and the optional `عوض` tail states the caller's identity for an empty source (a statically non-empty source needs none). Each head is claimed only in expression-head position immediately followed by `من`; elsewhere the spelling stays an ordinary identifier, so `الأقصى(a, b)` remains a call. The distributed `خيط` clause of `مجموع` is admitted only inside `@ نواة` kernels today. A general `reducta عبر Op` reduction that would retire `مجموع من` and `max from` / `min from` is admitted, not shipped (FLD K3).
+`اختزل عبر <op> من source [عند [coords]] [حسب key] ([خيط f] (ثابت | متغير) x { أعد term } | عوض identity)?` is the general reduction form. The optional tail is either a body (with an optional `خيط`) or a bodiless identity; without either, the source elements are the terms. `عبر` is mandatory and selects exactly one of `المجموع`, `حاصل_الضرب`, `الأقصى`, `الأدنى`, `فهرس_الأكبر`, `فهرس_الأصغر`, `الكل`, `أي`, or `العدّ`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `عبر` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.اختزل(f)` (en `xs.reduce(f)`).
+
+The source is a shaped tensor or matrix; lists keep their methods. An optional `عند [coords]` binds one integer coordinate per source axis. A body is claimed only when `(ثابت | متغير) IDENTIFIER '{'` follows, so a declaration such as `ثابت numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `أعد` term per element. Without a body, each source element is the term. `خيط f` requires a body and a kernel context; it retains the existing sum path, while other `خيط` operators fail closed by name until their lowering is implemented. Without `خيط`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
+
+| Operators | Term | Result | Empty source |
+| --- | --- | --- | --- |
+| `المجموع` | numeric scalar | integer terms use the signed or unsigned 64-bit cap by the range rule outside device functions; otherwise the term type | identity `0` |
+| `حاصل_الضرب` | numeric scalar | term type | identity `1` |
+| `الأقصى`, `الأدنى` | numeric scalar | `T` when statically non-empty; otherwise `T ∪ nihil`; `T` with `عوض` | `nihil` or the supplied identity |
+| `فهرس_الأكبر`, `فهرس_الأصغر` | numeric scalar | rank-one coordinate `numerus`; higher-rank `توبل<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `عوض` | `nihil` or the supplied coordinate identity |
+| `الكل`, `أي` | `bivalens` | `bivalens` | `صواب`, `خطأ` |
+| `العدّ` | `bivalens` | `numerus`, the number of true terms | `0` |
+
+For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
+
+`حسب key` groups terms into a new result tensor; it does not mutate the source or key tensor. The key expression is evaluated per element with the coordinates in scope and must be integral. The bucket extent `K` comes from the expected result type, so a grouped result has shape `tensor<R, [K]>` for the operator's result type `R`. Out-of-range keys use the existing tensor-write failure. Grouped `المجموع`, `حاصل_الضرب`, `العدّ`, `الكل`, and `أي` have empty-bucket identities; grouped `الأقصى` and `الأدنى` require `عوض identity`. Grouped `فهرس_الأكبر` and `فهرس_الأصغر` are unsupported by name because their result is a coordinate, not a tensor element.
+
+The old `المجموع من`, `الأقصى من`, and `الأدنى من` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `اختزل عبر المجموع`, `اختزل عبر الأقصى`, or `اختزل عبر الأدنى`; the operator words remain ordinary identifiers outside the `عبر` clause.
 
 `حرر` and `اقرأ`/`سطرا` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
@@ -2830,15 +2860,14 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 
 ## Admitted, Not Shipped
 
-These are ruled or admitted for the language and are **not** accepted by the
-compiler today. None of them is a production of the grammar above, and the live
-parser rejects each one.
+These are ruled or admitted for the language and are **not fully accepted by
+the compiler today**. A production may appear in the grammar before its parser,
+typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
-| `افعل جميع { … } التقط e { … }` (en `do all`) | admitted (FLD K1); `افعل جميع` is `PARSE001` |
-| `كرر من t عند [i, j] خيط f ثابت v { … }` | admitted (FLD K2); a `خيط` clause on `كرر` is rejected (`خيط` exists only in `مجموع من` inside kernels) |
-| `reducta عبر Op من source …` (en `reduce عبر Op from …`) | admitted (FLD K3), with `Op` a closed set `Sum Product Max Min Argmax Argmin All Any Count`; it would retire `مجموع من` and `max from` / `min from`, all of which stay shipped meanwhile |
+| `افعل الكل { … } التقط e { … }` (en `do all`) | admitted (FLD K1); `افعل الكل` is `PARSE001` |
+| `كرر من t عند [i, j] خيط f ثابت v { … }` | admitted (FLD K2); `كرر` does not own a `خيط` clause. Reduction forms own that clause. |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `طابق` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
