@@ -396,6 +396,16 @@ impl TypeChecker<'_> {
                     self.functions.insert(item.def_id, sig);
                     if let Some(role) = func.nucleum_role() {
                         self.nucleum_roles.insert(item.def_id, role);
+                        // Without an interner publicness is unknowable: stay strict.
+                        let private = self.interner.is_some_and(|interner| {
+                            !item
+                                .annotations
+                                .iter()
+                                .any(|annotation| interner.resolve(annotation.family) == "publica")
+                        });
+                        if role == NucleumRole::Entry && private {
+                            self.private_kernels.insert(item.def_id);
+                        }
                     }
                 }
                 HirItemKind::Import(import) => {

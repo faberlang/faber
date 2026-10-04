@@ -319,6 +319,10 @@ mod visibility_annotation_test;
 mod first_match_contract_test;
 
 #[cfg(test)]
+#[path = "k8_filum_calls_test.rs"]
+mod k8_filum_calls_test;
+
+#[cfg(test)]
 #[path = "k8_filum_independence_test.rs"]
 mod k8_filum_independence_test;
 

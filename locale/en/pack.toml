@@ -4444,6 +4444,14 @@ help = "make every `aut` alternative bind the same names with the same types"
 message = "cannot prove thread iteration independence: {reason}"
 help = "use an ordinary loop, or write only the iteration’s own coordinate and read written storage only at that coordinate; do not mutate outer locals or call unproved effects"
 
+[diagnostics.SEM010.issues.reducta_body_context]
+message = "a reduction body can call only device intrinsics, fragments and private kernel helpers: {reason}"
+help = "move the call out of the reduction, or call a private kernel helper"
+
+[diagnostics.SEM010.issues.reducta_body_effect]
+message = "a reduction body must not write or call effects outside its own values: {reason}"
+help = "keep the term pure: write only locals the body declares, and call only helpers that write nothing"
+
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "expected '>' after type arguments"
 

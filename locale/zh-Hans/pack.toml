@@ -3171,6 +3171,14 @@ help = "让每个 aut 分支以相同类型绑定相同名称"
 message = "无法证明线程迭代的独立性：{reason}"
 help = "使用普通循环，或仅写入本次迭代的坐标，并仅在同一坐标读取已写入的存储；不要修改外部局部变量或调用未经证明的副作用"
 
+[diagnostics.SEM010.issues.reducta_body_context]
+message = "归约体只能调用设备内建函数、片段和私有内核辅助函数：{reason}"
+help = "把调用移出归约，或调用私有内核辅助函数"
+
+[diagnostics.SEM010.issues.reducta_body_effect]
+message = "归约体不能写入或调用其自身取值之外的副作用：{reason}"
+help = "保持项为纯：只写入归约体声明的局部变量，只调用不写任何东西的辅助函数"
+
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "类型实参后需要 '>'"
 

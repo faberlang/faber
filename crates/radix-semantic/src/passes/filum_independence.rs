@@ -3,13 +3,21 @@
 //! The proof is private to this pass. Storage roots survive aliases, and view
 //! coordinates are mapped before comparing accesses. Unknown provenance or
 //! effects decline admission; ordinary iteration is not checked.
+//!
+//! A call to a private device helper (`calls`) is analysed as if inlined
+//! (gpu-reset rule 12.7): the callee's parameters map to the caller's argument
+//! storage and coordinates, and its reads and writes meet the same rules.
+
+mod calls;
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
+use calls::{EffectScan, Frame, Module};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirLocal,
     HirModule, HirObjectKey, HirParam, HirParamMode, HirStatement, HirStatementKind,
 };
+use radix_intrinsics::{IntrinsicReceiver, IntrinsicReturnKind};
 use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -62,66 +70,119 @@ impl Facts {
     }
 }
 
+/// How the parameters of the analysed function get storage roots.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ParamRoots {
+    /// The caller-side rule of [`parameter_roots`]: `ref` and unmarked tensor
+    /// parameters share one class root.
+    Classes,
+    /// A helper being analysed as inlined: every tensor parameter keeps its
+    /// own root, which the call maps to the argument's storage. The caller's
+    /// own roots carry any overlap between arguments.
+    PerParam,
+}
+
 /// Flow-insensitive unions intentionally include stores after reads and every
 /// branch. Rebinding cannot make an earlier alias disappear from the proof.
+///
+/// A call outside every `filum` body is an effect the facts must survive.
+/// A call to a named function (not a local closure) can only reach what its
+/// arguments reach, so it poisons the argument variables and the field
+/// facts of the roots reachable from them. Every other effect poisons the
+/// whole function (`uncertain`). Effects inside a `filum` body need no
+/// poison: the proof inlines or declines each one.
 #[derive(Default)]
 struct Aliases {
     bindings: Vec<HirLocal>,
     stores: Vec<(HirExpression, HirExpression)>,
     values: FxHashMap<DefId, Facts>,
     fields: FxHashMap<(DefId, Symbol), Facts>,
+    /// Variables a call may rebind (the call's argument variables).
+    poisoned_vars: FxHashSet<DefId>,
+    /// Roots whose field facts a call may rewrite.
+    poisoned_roots: FxHashSet<DefId>,
     uncertain: bool,
 }
 
 impl Aliases {
-    fn build(params: &[HirParam], body: &HirBlock, types: &TypeTable, interner: &Interner) -> Self {
-        let mut effects = UnknownEffects {
-            types,
-            interner,
-            found: false,
-        };
-        effects.visit_block(body);
+    /// `scan` is `None` for a helper body: every effect in it runs inside the
+    /// caller's `filum` body, where the proof inlines or declines it.
+    fn build(
+        params: &[HirParam],
+        body: &HirBlock,
+        types: &TypeTable,
+        interner: &Interner,
+        mode: ParamRoots,
+        scan: Option<&Module<'_>>,
+    ) -> Self {
         let mut declarations = Declarations::default();
         declarations.visit_block(body);
+        let locals: FxHashSet<DefId> = params
+            .iter()
+            .map(|param| param.def_id)
+            .chain(declarations.bindings.iter().map(|local| local.def_id))
+            .collect();
+        let mut effects = EffectScan::new(scan, types, interner, &locals);
+        if scan.is_some() {
+            effects.visit_block(body);
+        }
         let mut result = Self {
             bindings: declarations.bindings,
             stores: declarations.stores,
-            values: parameter_roots(params, types),
+            values: parameter_roots(params, types, mode),
             ..Self::default()
         };
-        // Acyclic propagation needs at most one round per equation. A cycle
-        // that keeps transforming views has no finite address certificate.
-        let rounds = 2 * (result.bindings.len() + result.stores.len() + 1);
+        // Each poison round only grows the poisoned sets, so a few rounds per
+        // call and binding settle it; anything longer is declined as unknown.
+        let rounds = result.bindings.len() + result.stores.len() + effects.calls.len() + 2;
         for _ in 0..rounds {
-            let before = (result.values.clone(), result.fields.clone());
-            for local in result.bindings.clone() {
+            if !result.propagate(types, interner) {
+                result.uncertain = true;
+                return result;
+            }
+            if !result.poison(&effects.calls, types, interner) {
+                result.uncertain |= effects.opaque;
+                return result;
+            }
+        }
+        result.uncertain = true;
+        result
+    }
+
+    /// Acyclic propagation needs at most one round per equation. A cycle that
+    /// keeps transforming views has no finite address certificate. Returns
+    /// whether the facts settled.
+    fn propagate(&mut self, types: &TypeTable, interner: &Interner) -> bool {
+        let rounds = 2 * (self.bindings.len() + self.stores.len() + 1);
+        for _ in 0..rounds {
+            let before = (self.values.clone(), self.fields.clone());
+            for local in self.bindings.clone() {
                 let facts = if local.ty.is_some_and(|ty| types.is_copy_view(ty)) {
                     Facts::fresh(local.def_id)
                 } else if let Some(init) = &local.init {
-                    result.initializer(init, local.def_id, types, interner)
+                    self.initializer(init, local.def_id, types, interner)
                 } else {
                     Facts::unknown()
                 };
-                result.values.entry(local.def_id).or_default().merge(facts);
+                self.values.entry(local.def_id).or_default().merge(facts);
             }
-            for (target, source) in result.stores.clone() {
-                let facts = result.facts(&source, types, interner);
+            for (target, source) in self.stores.clone() {
+                let facts = self.facts(&source, types, interner);
                 match &target.kind {
                     HirExpressionKind::Path(def) => {
-                        let copied = result.bindings.iter().any(|local| {
+                        let copied = self.bindings.iter().any(|local| {
                             local.def_id == *def
                                 && local.ty.is_some_and(|ty| types.is_copy_view(ty))
                         });
-                        result.values.entry(*def).or_default().merge(if copied {
+                        self.values.entry(*def).or_default().merge(if copied {
                             Facts::fresh(*def)
                         } else {
                             facts
                         });
                     }
                     HirExpressionKind::Field(object, field) => {
-                        for storage in result.facts(object, types, interner).storage {
-                            result
-                                .fields
+                        for storage in self.facts(object, types, interner).storage {
+                            self.fields
                                 .entry((storage.root, *field))
                                 .or_default()
                                 .merge(facts.clone());
@@ -130,13 +191,59 @@ impl Aliases {
                     _ => {}
                 }
             }
-            if before == (result.values.clone(), result.fields.clone()) {
-                result.uncertain |= effects.found;
-                return result;
+            if before == (self.values.clone(), self.fields.clone()) {
+                return true;
             }
         }
-        result.uncertain = true;
-        result
+        false
+    }
+
+    /// Grow the poisoned sets from the arguments of the named calls. Returns
+    /// whether anything new was poisoned.
+    fn poison(&mut self, calls: &[HirExpression], types: &TypeTable, interner: &Interner) -> bool {
+        let before = (self.poisoned_vars.len(), self.poisoned_roots.len());
+        for arg in calls {
+            self.poison_argument(arg, types, interner);
+        }
+        before != (self.poisoned_vars.len(), self.poisoned_roots.len())
+    }
+
+    fn poison_argument(&mut self, arg: &HirExpression, types: &TypeTable, interner: &Interner) {
+        let facts = self.facts(arg, types, interner);
+        for storage in facts.storage {
+            self.poison_root(storage.root);
+        }
+        match &arg.kind {
+            HirExpressionKind::Path(def) => {
+                self.poisoned_vars.insert(*def);
+            }
+            HirExpressionKind::Field(object, _) => self.poison_argument(object, types, interner),
+            HirExpressionKind::NonNull(inner, _)
+            | HirExpressionKind::Deref(inner)
+            | HirExpressionKind::Ref(_, inner)
+            | HirExpressionKind::Verte {
+                source: inner,
+                entries: None,
+                ..
+            } => self.poison_argument(inner, types, interner),
+            _ => {}
+        }
+    }
+
+    /// A root and every root reachable through its recorded fields.
+    fn poison_root(&mut self, root: DefId) {
+        if !self.poisoned_roots.insert(root) {
+            return;
+        }
+        let reachable: Vec<DefId> = self
+            .fields
+            .iter()
+            .filter(|((owner, _), _)| *owner == root)
+            .flat_map(|(_, facts)| facts.storage.iter().map(|storage| storage.root))
+            .collect();
+        for next in reachable {
+            self.poison_root(next);
+        }
     }
 
     fn initializer(
@@ -189,6 +296,7 @@ impl Aliases {
             return Facts::unknown();
         }
         match &expr.kind {
+            HirExpressionKind::Path(def) if self.poisoned_vars.contains(def) => Facts::unknown(),
             HirExpressionKind::Path(def) => self.values.get(def).cloned().unwrap_or_default(),
             HirExpressionKind::Field(object, field) => {
                 let parent = self.facts(object, types, interner);
@@ -197,6 +305,10 @@ impl Aliases {
                     ..Facts::default()
                 };
                 for storage in parent.storage {
+                    if self.poisoned_roots.contains(&storage.root) {
+                        result.unknown = true;
+                        continue;
+                    }
                     result.merge(
                         self.fields
                             .get(&(storage.root, *field))
@@ -214,11 +326,16 @@ impl Aliases {
                 entries: None,
                 ..
             } => self.facts(inner, types, interner),
-            HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
+            HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
                 if !is_access_intrinsic(receiver, *name, args.len(), types, interner) {
                     return Facts::unknown();
                 }
                 let transform = match interner.resolve(*name) {
+                    // A shifted or edge-policy view reads another coordinate of
+                    // its parent, so its map is unknown: it certifies a read of
+                    // storage the body never writes, and nothing else.
+                    "disloco" => Transform::Unknown,
+                    "limes" if builtin_edge_policy(type_args, types) => Transform::Unknown,
                     "transpone" | "__faber_glyph_transpose" => Transform::Transpose,
                     "sectio" if args.len() >= 2 => {
                         let start = super::const_int_value(&args[0].expr);
@@ -260,26 +377,44 @@ impl Aliases {
 /// - a parameter that is not a bare tensor (list, genus, map, alias-typed
 ///   tensor, optional) gets no root, because the call-site rule is tensor-typed
 ///   only. Its accesses keep the unknown-identity decline.
-fn parameter_roots(params: &[HirParam], types: &TypeTable) -> FxHashMap<DefId, Facts> {
+fn parameter_roots(
+    params: &[HirParam],
+    types: &TypeTable,
+    mode: ParamRoots,
+) -> FxHashMap<DefId, Facts> {
     let mut roots = FxHashMap::default();
     let mut shared: Option<DefId> = None;
     for param in params {
-        let (_, inner) = types.peel_access_marker(param.ty);
-        if !matches!(types.get(inner), Type::Tensor(_, _)) {
+        let Some(root) = param_root(param, types, mode, &mut shared) else {
             continue;
-        }
-        let own = matches!(param.mode, HirParamMode::Ex) || types.is_own_view(param.ty);
-        let mutable = matches!(param.mode, HirParamMode::In) || types.is_mut_view(param.ty);
-        let root = if types.is_copy_view(param.ty) || mutable {
-            param.def_id
-        } else if own {
-            continue;
-        } else {
-            *shared.get_or_insert(param.def_id)
         };
         roots.insert(param.def_id, Facts::fresh(root));
     }
     roots
+}
+
+/// The root a tensor parameter reads and writes through, if it has one. In
+/// [`ParamRoots::PerParam`] mode `ref` and unmarked parameters keep a root of
+/// their own instead of the shared class root.
+fn param_root(
+    param: &HirParam,
+    types: &TypeTable,
+    mode: ParamRoots,
+    shared: &mut Option<DefId>,
+) -> Option<DefId> {
+    let (_, inner) = types.peel_access_marker(param.ty);
+    if !matches!(types.get(inner), Type::Tensor(_, _)) {
+        return None;
+    }
+    let own = matches!(param.mode, HirParamMode::Ex) || types.is_own_view(param.ty);
+    let mutable = matches!(param.mode, HirParamMode::In) || types.is_mut_view(param.ty);
+    if types.is_copy_view(param.ty) || mutable || mode == ParamRoots::PerParam && !own {
+        Some(param.def_id)
+    } else if own {
+        None
+    } else {
+        Some(*shared.get_or_insert(param.def_id))
+    }
 }
 
 fn is_access_intrinsic(
@@ -295,29 +430,68 @@ fn is_access_intrinsic(
     })
 }
 
-struct UnknownEffects<'a> {
-    types: &'a TypeTable,
-    interner: &'a Interner,
-    found: bool,
+/// A value-returning method of a scalar or register-class receiver. It reads
+/// its receiver and arguments and writes nothing: the in-place numeric twins
+/// were desugared to stores before this pass, and none of these families
+/// returns `vacuum` for a value method.
+fn is_pure_value_method(
+    receiver: &HirExpression,
+    name: Symbol,
+    argc: usize,
+    types: &TypeTable,
+    interner: &Interner,
+) -> bool {
+    receiver
+        .ty
+        .and_then(|ty| {
+            radix_intrinsics::lookup_method_for_type_id(ty, types, interner.resolve(name), argc)
+        })
+        .is_some_and(|entry| {
+            matches!(
+                entry.receiver,
+                IntrinsicReceiver::Numeric
+                    | IntrinsicReceiver::Fractus
+                    | IntrinsicReceiver::Vector
+                    | IntrinsicReceiver::Matrix
+                    | IntrinsicReceiver::Intervallum
+            ) && entry.return_kind != IntrinsicReturnKind::Vacuum
+        })
 }
-impl HirVisitor for UnknownEffects<'_> {
-    fn visit_expr(&mut self, expr: &HirExpression) {
-        match &expr.kind {
-            HirExpressionKind::Call(..)
-            | HirExpressionKind::Ad { .. }
-            | HirExpressionKind::CopyInto { .. }
-            | HirExpressionKind::Reddet(_)
-            | HirExpressionKind::Tacebit(_)
-            | HirExpressionKind::Conversio { route: Some(_), .. } => self.found = true,
-            HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
-                if !is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner) {
-                    self.found = true;
-                }
-            }
-            _ => {}
-        }
-        walk_expr(self, expr);
-    }
+
+/// `limes<P>` with a compiler-owned policy. A custom policy calls user
+/// methods, so it keeps the unproved-call decline.
+fn builtin_edge_policy(type_args: &[TypeId], types: &TypeTable) -> bool {
+    type_args.len() == 1 && matches!(types.get(type_args[0]), Type::TensorEdgePolicy(_))
+}
+
+/// A type whose values can alias other storage or hide a handle to it.
+fn is_aggregate(types: &TypeTable, ty: TypeId) -> bool {
+    let (_, ty) = types.peel_access_marker(ty);
+    types.is_aliasing_container(ty)
+        || matches!(
+            types.get(ty),
+            Type::Struct(_)
+                | Type::Interface(_)
+                | Type::Applied(..)
+                | Type::Param(_)
+                | Type::Record(_)
+                | Type::Tuple(_)
+                | Type::Option(_)
+                | Type::Union(_)
+                | Type::Primitive(
+                    crate::Primitive::Ignotum | crate::Primitive::Valor | crate::Primitive::Json
+                )
+        )
+}
+
+/// `vector` and `matrix` are register-class values, not tensor aliases
+/// (`docs/design/systems-shaped-values.md`): extracting a component reads a
+/// value that an earlier recorded access already produced.
+fn is_register_value(ty: Option<TypeId>, types: &TypeTable) -> bool {
+    ty.is_some_and(|ty| {
+        let (_, ty) = types.peel_access_marker(ty);
+        matches!(types.get(ty), Type::Vector(..) | Type::Matrix(..))
+    })
 }
 
 #[derive(Default)]
@@ -431,14 +605,23 @@ struct Access {
 
 struct BodyProof<'a> {
     aliases: &'a Aliases,
+    module: &'a Module<'a>,
     types: &'a TypeTable,
     interner: &'a Interner,
     /// Every `filum` loop met so far; `stack` is the chain around the cursor.
     loops: Vec<LoopCtx>,
     stack: Vec<usize>,
+    /// Helper calls being analysed as inlined, innermost last. Empty while the
+    /// cursor is in the body that owns the loop.
+    frames: Vec<Frame<'a>>,
     accesses: Vec<Access>,
     errors: Vec<SemanticError>,
     suppress_reads: bool,
+    /// Issue named by a decline: this pass's, or a reduction body's.
+    issue: &'static str,
+    /// Arguments of an inlined call are not visited (a reduction body's
+    /// own checks already own them).
+    skip_arguments: bool,
 }
 
 fn coordinates_of(defs: &[(DefId, Symbol)]) -> Vec<Coordinate> {
@@ -468,6 +651,7 @@ impl BodyProof<'_> {
             .iter()
             .flat_map(|&index| self.loops[index].coords.clone())
             .collect();
+        let coords = coords.and_then(|coords| self.map_coords(coords));
         self.accesses.push(Access {
             facts,
             coords,
@@ -486,7 +670,7 @@ impl BodyProof<'_> {
     /// An iteration's element fetch reads its source at the loop's own
     /// coordinates, even when the binder is unused.
     fn fetch(&mut self, source: &HirExpression, coords: Vec<Coordinate>) {
-        let facts = self.aliases.facts(source, self.types, self.interner);
+        let facts = self.facts_of(source);
         self.push_access(facts, Some(coords), false, source.span);
     }
 
@@ -526,7 +710,7 @@ impl BodyProof<'_> {
         self.loops.push(LoopCtx {
             coords,
             owned: owned.defs,
-            source: self.aliases.facts(source, self.types, self.interner),
+            source: self.facts_of(source),
         });
         self.stack.push(self.loops.len() - 1);
     }
@@ -534,33 +718,15 @@ impl BodyProof<'_> {
     fn decline(&mut self, span: Span, reason: &str) {
         self.errors.push(
             SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
-                .with_arg("issue", ISSUE)
+                .with_arg("issue", self.issue)
                 .with_arg("reason", reason),
         );
     }
 
     fn is_storage(&self, ty: Option<TypeId>) -> bool {
-        let Some(ty) = ty else {
-            return false;
-        };
-        let (_, ty) = self.types.peel_access_marker(ty);
-        self.types.is_aliasing_container(ty)
-            || matches!(
-                self.types.get(ty),
-                Type::Struct(_)
-                    | Type::Interface(_)
-                    | Type::Applied(..)
-                    | Type::Param(_)
-                    | Type::Record(_)
-                    | Type::Tuple(_)
-                    | Type::Option(_)
-                    | Type::Union(_)
-                    | Type::Primitive(
-                        crate::Primitive::Ignotum
-                            | crate::Primitive::Valor
-                            | crate::Primitive::Json
-                    )
-            )
+        ty.is_some_and(|ty| {
+            !is_register_value(Some(ty), self.types) && is_aggregate(self.types, ty)
+        })
     }
 
     fn access(
@@ -570,7 +736,7 @@ impl BodyProof<'_> {
         write: bool,
         span: Span,
     ) {
-        let facts = self.aliases.facts(object, self.types, self.interner);
+        let facts = self.facts_of(object);
         self.push_access(facts, index.and_then(coordinates), write, span);
     }
 
@@ -589,13 +755,13 @@ impl BodyProof<'_> {
                 self.visit_expr(index);
             }
             HirExpressionKind::Path(def) => {
-                let borrowed = self.aliases.bindings.iter().any(|local| {
+                let borrowed = self.current().bindings.iter().any(|local| {
                     local.def_id == *def
                         && local.ty.is_some_and(|ty| {
                             self.types.is_mut_view(ty) || self.types.is_ref_view(ty)
                         })
                 });
-                let facts = self.aliases.facts(target, self.types, self.interner);
+                let facts = self.facts_of(target);
                 let owned = &self.owner().owned;
                 if !owned.contains(def)
                     || borrowed
@@ -607,7 +773,7 @@ impl BodyProof<'_> {
                 }
             }
             HirExpressionKind::Field(object, _) => {
-                let facts = self.aliases.facts(object, self.types, self.interner);
+                let facts = self.facts_of(object);
                 let owned = &self.owner().owned;
                 if facts.unknown
                     || facts.storage.is_empty()
@@ -655,7 +821,10 @@ impl HirVisitor for BodyProof<'_> {
                 self.decline(expr.span, "unproved_conversion_effect");
             }
             HirExpressionKind::Index(object, index) => {
-                self.access(object, Some(index), false, expr.span);
+                // A component of a register-class value is no storage access.
+                if !is_register_value(object.ty, self.types) {
+                    self.access(object, Some(index), false, expr.span);
+                }
                 self.receiver(object);
                 self.visit_expr(index);
             }
@@ -667,9 +836,14 @@ impl HirVisitor for BodyProof<'_> {
                     self.receiver(object);
                 }
             }
-            HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
+            // A scalar or register-class field is a value: reading it does not
+            // read the storage of the object that holds it.
+            HirExpressionKind::Field(object, _) => self.receiver(object),
+            HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
                 let intrinsic =
                     is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner);
+                let pure =
+                    is_pure_value_method(receiver, *name, args.len(), self.types, self.interner);
                 let name = self.interner.resolve(*name);
                 if !intrinsic {
                     self.decline(expr.span, "unproved_call_effect");
@@ -683,7 +857,14 @@ impl HirVisitor for BodyProof<'_> {
                     "ponde" if args.len() == 2 => {
                         self.access(receiver, Some(&args[0].expr), true, expr.span)
                     }
-                    "transpone" | "__faber_glyph_transpose" | "sectio" | "forma" | "expande" => {}
+                    "transpone"
+                    | "__faber_glyph_transpose"
+                    | "sectio"
+                    | "forma"
+                    | "expande"
+                    | "disloco" => {}
+                    "limes" if builtin_edge_policy(type_args, self.types) => {}
+                    _ if pure => {}
                     _ => self.decline(expr.span, "unproved_call_effect"),
                 }
                 self.receiver(receiver);
@@ -694,8 +875,8 @@ impl HirVisitor for BodyProof<'_> {
                 }
                 self.suppress_reads = before;
             }
-            HirExpressionKind::Call(..)
-            | HirExpressionKind::Ad { .. }
+            HirExpressionKind::Call(callee, _, args, _) => self.call(expr, callee, args),
+            HirExpressionKind::Ad { .. }
             | HirExpressionKind::CopyInto { .. }
             | HirExpressionKind::Gradient { .. }
             | HirExpressionKind::Reddet(_)
@@ -705,6 +886,17 @@ impl HirVisitor for BodyProof<'_> {
             | HirExpressionKind::Conversio { route: Some(_), .. } => {
                 self.decline(expr.span, "unproved_call_effect");
                 walk_expr(self, expr);
+            }
+            HirExpressionKind::Itera {
+                filum,
+                coordinates,
+                binding,
+                iter,
+                body,
+                ..
+            } if filum.is_some() && !self.frames.is_empty() => {
+                // A parallel loop inside a helper would nest under the call.
+                self.decline(expr.span, "unproved_loop_form");
             }
             HirExpressionKind::Itera {
                 filum,
@@ -765,19 +957,11 @@ fn prove(
     coords: &[(DefId, Symbol)],
     binding: DefId,
     aliases: &Aliases,
+    module: &Module,
     types: &TypeTable,
     interner: &Interner,
 ) -> Vec<SemanticError> {
-    let mut proof = BodyProof {
-        aliases,
-        types,
-        interner,
-        loops: Vec::new(),
-        stack: Vec::new(),
-        accesses: Vec::new(),
-        errors: Vec::new(),
-        suppress_reads: false,
-    };
+    let mut proof = BodyProof::new(aliases, module, types, interner, ISSUE);
     let own = coordinates_of(coords);
     proof.enter_loop(own.clone(), binding, source, body);
     proof.fetch(source, own);
@@ -872,6 +1056,7 @@ fn issue(span: Span, reason: &str) -> SemanticError {
 
 struct Loops<'a> {
     aliases: &'a Aliases,
+    module: &'a Module<'a>,
     types: &'a TypeTable,
     interner: &'a Interner,
     errors: Vec<SemanticError>,
@@ -893,6 +1078,7 @@ impl HirVisitor for Loops<'_> {
                 coordinates,
                 *binding,
                 self.aliases,
+                self.module,
                 self.types,
                 self.interner,
             ));
@@ -902,11 +1088,16 @@ impl HirVisitor for Loops<'_> {
     }
 }
 
+/// Whether a body holds a `filum` loop or a reduction with a term body.
 #[derive(Default)]
-struct HasFilum(bool);
-impl HirVisitor for HasFilum {
+struct NeedsProof(bool);
+impl HirVisitor for NeedsProof {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if matches!(expr.kind, HirExpressionKind::Itera { filum: Some(_), .. }) {
+        if matches!(
+            expr.kind,
+            HirExpressionKind::Itera { filum: Some(_), .. }
+                | HirExpressionKind::Reduction { body: Some(_), .. }
+        ) {
             self.0 = true;
         }
         if !self.0 {
@@ -916,26 +1107,42 @@ impl HirVisitor for HasFilum {
 }
 
 struct Scopes<'a> {
+    module: &'a Module<'a>,
     types: &'a TypeTable,
     interner: &'a Interner,
     errors: Vec<SemanticError>,
 }
 impl Scopes<'_> {
     fn check_body(&mut self, params: &[HirParam], body: &HirBlock) {
-        let mut finder = HasFilum::default();
+        let mut finder = NeedsProof::default();
         finder.visit_block(body);
         if !finder.0 {
             return;
         }
-        let aliases = Aliases::build(params, body, self.types, self.interner);
+        let aliases = Aliases::build(
+            params,
+            body,
+            self.types,
+            self.interner,
+            ParamRoots::Classes,
+            Some(self.module),
+        );
         let mut loops = Loops {
             aliases: &aliases,
+            module: self.module,
             types: self.types,
             interner: self.interner,
             errors: Vec::new(),
         };
         loops.visit_block(body);
         self.errors.extend(loops.errors);
+        self.errors.extend(calls::reduction_term_errors(
+            body,
+            &aliases,
+            self.module,
+            self.types,
+            self.interner,
+        ));
     }
 }
 impl HirVisitor for Scopes<'_> {
@@ -957,7 +1164,9 @@ impl HirVisitor for Scopes<'_> {
 
 /// All targets share this admission before target-sensitive HIR rewrites.
 pub(crate) fn check(hir: &HirModule, types: &TypeTable, interner: &Interner) -> Vec<SemanticError> {
+    let module = Module::build(hir, types, interner);
     let mut scopes = Scopes {
+        module: &module,
         types,
         interner,
         errors: Vec::new(),

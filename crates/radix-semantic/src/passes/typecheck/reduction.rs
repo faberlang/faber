@@ -703,14 +703,19 @@ impl ReductionBodyState {
     }
 
     /// Callee classification shared with the fragment definition rules:
-    /// device intrinsics and `@ nucleum fragment` calls are admitted; entry
-    /// kernels, graphics stages, and ordinary host callables are not.
+    /// device intrinsics, `@ nucleum fragment` calls and private kernel
+    /// helpers are admitted; public entry kernels, graphics stages, and
+    /// ordinary host callables are not.
     fn classify_callee(&mut self, checker: &mut TypeChecker<'_>, def_id: DefId, span: Span) {
         if checker.resolver.gpu_builtin(def_id).is_some() {
             return;
         }
         match checker.nucleum_roles.get(&def_id).copied() {
             Some(NucleumRole::Fragment) => {}
+            // Rule 12.7 inlines a private kernel into its caller, so it is a
+            // term function here; its body is proved write-free after
+            // typecheck (`filum_independence`).
+            Some(NucleumRole::Entry) if checker.private_kernels.contains(&def_id) => {}
             Some(NucleumRole::Entry) => context(checker, span, "entry_callee"),
             None => context(checker, span, "host_callable"),
         }

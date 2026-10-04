@@ -3171,6 +3171,14 @@ help = "hãy để mỗi lựa chọn aut liên kết cùng tên với cùng ki�
 message = "không thể chứng minh tính độc lập của vòng lặp luồng: {reason}"
 help = "dùng vòng lặp thường, hoặc chỉ ghi tại tọa độ của lượt và đọc vùng đã ghi tại cùng tọa độ; không sửa biến ngoài hay gọi hiệu ứng chưa được chứng minh"
 
+[diagnostics.SEM010.issues.reducta_body_context]
+message = "thân phép rút gọn chỉ được gọi hàm nội tại của thiết bị, đoạn mã và hàm trợ giúp nhân riêng: {reason}"
+help = "chuyển lời gọi ra ngoài phép rút gọn, hoặc gọi hàm trợ giúp nhân riêng"
+
+[diagnostics.SEM010.issues.reducta_body_effect]
+message = "thân phép rút gọn không được ghi hay gọi hiệu ứng ngoài giá trị của chính nó: {reason}"
+help = "giữ số hạng thuần túy: chỉ ghi biến cục bộ do thân khai báo, và chỉ gọi hàm trợ giúp không ghi gì"
+
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "cần '>' sau các đối số kiểu"
 

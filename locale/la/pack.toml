@@ -4227,6 +4227,14 @@ help = "fac ut unaquaeque alternativa aut eadem nomina eisdem generibus liget"
 message = "independentia iterationis filum probari non potest: {reason}"
 help = "utere iteratione ordinaria, aut scribe et lege repositorium scriptum tantum apud coordinatam propriam; ne muta locales exteriores nec voca effectus non probatos"
 
+[diagnostics.SEM010.issues.reducta_body_context]
+message = "corpus reductionis vocare potest tantum intrinseca machinae, fragmenta, et adiutores nuclei privatos: {reason}"
+help = "voca extra reductionem, aut voca adiutorem nuclei privatum"
+
+[diagnostics.SEM010.issues.reducta_body_effect]
+message = "corpus reductionis nihil scribere nec effectus extra valores proprios vocare debet: {reason}"
+help = "serva terminum purum: scribe tantum locales a corpore declaratos, et voca tantum adiutores qui nihil scribunt"
+
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "expected '>' after type arguments"
 

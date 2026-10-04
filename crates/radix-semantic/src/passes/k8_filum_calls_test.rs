@@ -1,0 +1,654 @@
+//! K8 look-through of private kernel helper calls (gpu-reset rule 12.7).
+//!
+//! A call inside a `filum` body (or a reduction term) to a private `@ nucleum`
+//! helper is analysed as if inlined: the helper's tensor parameters take the
+//! argument storage, its coordinate parameters take the argument coordinates,
+//! and its reads and writes meet the rules of the enclosing body. Anything
+//! the analysis cannot see through keeps the named decline.
+
+use crate::test_support::{analyze_source, assert_accepts, assert_rejects_with_issue};
+use std::fmt::Write;
+
+const ISSUE: &str = "filum_independence_unproven";
+const GRID: &str = "tensor<f32, [4]>";
+
+fn accepted(source: &str) {
+    let result = analyze_source(source);
+    assert!(result.success(), "{:?}", result.diagnostics);
+}
+
+fn rejected(source: &str, reason: &str) {
+    let result = analyze_source(source);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(!errors.is_empty(), "body unexpectedly certified");
+    assert!(
+        errors.iter().all(|d| d.issue() == Some(ISSUE)),
+        "not independence errors: {errors:?}"
+    );
+    assert!(
+        errors.iter().any(|d| d
+            .args
+            .iter()
+            .any(|arg| arg.name == "reason" && arg.value == reason)),
+        "missing reason {reason}: {errors:?}"
+    );
+}
+
+/// A public kernel whose `filum` body is `statement`; `out` is written, `src`
+/// drives the loop, `value` is the element.
+fn kernel(helpers: &str, statement: &str) -> String {
+    format!(
+        r"{helpers}
+@ nucleum
+@ publica
+functio k(in {GRID} out, de {GRID} src) → vacuum {{
+    itera ex src apud [i] filum lane fixum value {{
+        {statement}
+    }}
+}}
+"
+    )
+}
+
+// =============================================================================
+// Writes and reads through a helper
+// =============================================================================
+
+const STORE: &str = r"
+@ nucleum
+functio store(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum {
+    target[at] ← v
+}
+";
+
+#[test]
+fn helper_writing_through_a_mut_param_at_the_loop_coordinate_is_accepted() {
+    accepted(&kernel(STORE, "store(out, i, value + 1.0)"));
+}
+
+#[test]
+fn helper_scalar_value_arguments_and_returns_are_accepted() {
+    accepted(&kernel(
+        r"
+@ nucleum
+functio twice(f32 x) → f32 { redde x * 2.0 }
+",
+        "out[i] ← twice(value)",
+    ));
+}
+
+#[test]
+fn helper_reading_a_neighbour_of_the_written_tensor_is_rejected() {
+    let peek = r"
+@ nucleum
+functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
+";
+    rejected(
+        &kernel(peek, "out[i] ← peek(out, i)"),
+        "written_storage_neighbor_read",
+    );
+}
+
+#[test]
+fn helper_reading_a_neighbour_of_an_unwritten_tensor_is_accepted() {
+    let peek = r"
+@ nucleum
+functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
+";
+    accepted(&kernel(peek, "out[i] ← peek(src, i)"));
+}
+
+#[test]
+fn helper_reading_the_written_tensor_at_the_own_coordinate_is_accepted() {
+    let read = r"
+@ nucleum
+functio read(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at] }
+";
+    accepted(&kernel(read, "out[i] ← read(out, i) + value"));
+}
+
+#[test]
+fn helper_writing_at_another_coordinate_is_rejected() {
+    let poke = r"
+@ nucleum
+functio poke(in tensor<f32, [4]> target, f32 v) → vacuum { target[0] ← v }
+";
+    rejected(
+        &kernel(poke, "poke(out, value)"),
+        "write_not_own_coordinate",
+    );
+    // A coordinate the analysis cannot map is not the own coordinate.
+    let shifted = r"
+@ nucleum
+functio poke(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum { target[at + 1] ← v }
+";
+    rejected(
+        &kernel(shifted, "poke(out, i, value)"),
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
+fn helper_argument_that_is_not_the_loop_coordinate_is_not_an_own_write() {
+    rejected(
+        &kernel(STORE, "store(out, 0, value)"),
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
+fn two_mut_params_given_one_tensor_are_a_borrow_error_not_an_independence_one() {
+    let both = r"
+@ nucleum
+functio both(in tensor<f32, [4]> left, in tensor<f32, [4]> right, numerus at) → vacuum {
+    left[at] ← 1.0
+    right[at] ← 2.0
+}
+";
+    let result = analyze_source(&kernel(both, "both(out, out, i)"));
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors.iter().any(|d| d
+            .issue()
+            .is_some_and(|issue| issue.contains("borrow_conflict"))),
+        "{errors:?}"
+    );
+    assert!(
+        errors.iter().all(|d| d.issue() != Some(ISSUE)),
+        "borrow owns the overlap: {errors:?}"
+    );
+}
+
+#[test]
+fn helper_reading_a_neighbour_through_an_alias_argument_is_rejected() {
+    let peek = r"
+@ nucleum
+functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
+";
+    let source = kernel(peek, "out[i] ← peek(alias, i)").replace(
+        "    itera ex src",
+        &format!("    varia {GRID} alias ← out\n    itera ex src"),
+    );
+    rejected(&source, "written_storage_neighbor_read");
+}
+
+#[test]
+fn helper_local_alias_of_a_parameter_keeps_the_parameter_storage() {
+    let aliased = r"
+@ nucleum
+functio peek(de tensor<f32, [4]> t, numerus at) → f32 {
+    fixum tensor<f32, [4]> view ← t
+    redde view[at + 1]
+}
+";
+    rejected(
+        &kernel(aliased, "out[i] ← peek(out, i)"),
+        "written_storage_neighbor_read",
+    );
+    accepted(&kernel(aliased, "out[i] ← peek(src, i)"));
+}
+
+#[test]
+fn unmarked_helper_params_given_one_class_of_caller_params_still_overlap() {
+    // Both arguments are unmarked parameters of the caller, so they share one
+    // root class there; the helper's two parameters map into that one root.
+    let copy = r"
+@ nucleum
+functio copy(tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum {
+    to[at] ← from[at + 1]
+}
+";
+    let source = format!(
+        r"{copy}
+@ nucleum
+@ publica
+functio k({GRID} out, {GRID} src) → vacuum {{
+    itera ex src apud [i] filum lane fixum value {{
+        copy(out, src, i)
+    }}
+}}
+"
+    );
+    rejected(&source, "written_storage_neighbor_read");
+    // A `mut` caller parameter never overlaps an unmarked one.
+    accepted(&kernel(copy, "copy(out, src, i)"));
+}
+
+#[test]
+fn a_write_and_a_neighbour_read_in_two_helper_calls_are_rejected() {
+    let peek = r"
+@ nucleum
+functio peek(de tensor<f32, [4]> t, numerus at) → f32 { redde t[at + 1] }
+";
+    let both = format!("{STORE}{peek}");
+    rejected(
+        &kernel(
+            &both,
+            "store(out, i, value)\n        fixum f32 next ← peek(out, i)",
+        ),
+        "written_storage_neighbor_read",
+    );
+}
+
+// =============================================================================
+// Depth, recursion and the callees that stay declined
+// =============================================================================
+
+#[test]
+fn nested_helper_calls_are_accepted() {
+    let nested = format!(
+        "{STORE}
+@ nucleum
+functio outer(in tensor<f32, [4]> target, numerus at, f32 v) → vacuum {{
+    store(target, at, v + 1.0)
+}}
+"
+    );
+    accepted(&kernel(&nested, "outer(out, i, value)"));
+}
+
+#[test]
+fn nested_helper_that_writes_elsewhere_is_rejected() {
+    let nested = format!(
+        "{STORE}
+@ nucleum
+functio outer(in tensor<f32, [4]> target, f32 v) → vacuum {{
+    store(target, 0, v)
+}}
+"
+    );
+    rejected(
+        &kernel(&nested, "outer(out, value)"),
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
+fn direct_recursion_is_declined_by_name() {
+    let spin = r"
+@ nucleum
+functio spin(f32 x) → f32 { redde spin(x) }
+";
+    rejected(&kernel(spin, "out[i] ← spin(value)"), "recursive_call");
+}
+
+#[test]
+fn mutual_recursion_is_declined_by_name() {
+    let pingpong = r"
+@ nucleum
+functio ping(f32 x) → f32 { redde pong(x) }
+@ nucleum
+functio pong(f32 x) → f32 { redde ping(x) }
+";
+    rejected(&kernel(pingpong, "out[i] ← ping(value)"), "recursive_call");
+}
+
+#[test]
+fn chain_past_the_inline_depth_is_declined_by_name() {
+    let mut helpers = String::from("@ nucleum\nfunctio h0(f32 x) → f32 { redde x }\n");
+    for level in 1..=9 {
+        writeln!(
+            helpers,
+            "@ nucleum\nfunctio h{level}(f32 x) → f32 {{ redde h{}(x) }}",
+            level - 1
+        )
+        .expect("write to a string");
+    }
+    accepted(&kernel(&helpers, "out[i] ← h7(value)"));
+    rejected(
+        &kernel(&helpers, "out[i] ← h9(value)"),
+        "inline_depth_exceeded",
+    );
+}
+
+#[test]
+fn host_function_call_stays_declined() {
+    let host = r"
+functio host(f32 x) → f32 { redde x }
+";
+    rejected(
+        &kernel(host, "out[i] ← host(value)"),
+        "unproved_call_effect",
+    );
+}
+
+#[test]
+fn public_kernel_call_stays_declined() {
+    let public = r"
+@ nucleum
+@ publica
+functio shown(f32 x) → f32 { redde x }
+";
+    rejected(
+        &kernel(public, "out[i] ← shown(value)"),
+        "unproved_call_effect",
+    );
+}
+
+#[test]
+fn helper_with_a_host_call_inside_is_declined_at_that_call() {
+    let leaky = r"
+functio host(f32 x) → f32 { redde x }
+@ nucleum
+functio leaky(f32 x) → f32 { redde host(x) }
+";
+    rejected(
+        &kernel(leaky, "out[i] ← leaky(value)"),
+        "unproved_call_effect",
+    );
+}
+
+#[test]
+fn helper_with_a_parallel_loop_is_declined() {
+    let looped = r"
+@ nucleum
+functio sweep(in tensor<f32, [4]> target) → vacuum {
+    itera ex target apud [j] filum inner fixum cell { target[j] ← cell }
+}
+";
+    rejected(&kernel(looped, "sweep(out)"), "unproved_loop_form");
+}
+
+// =============================================================================
+// Callee locals
+// =============================================================================
+
+#[test]
+fn helper_locals_are_iteration_local() {
+    accepted(&kernel(
+        r"
+@ nucleum
+functio ramp(f32 x) → f32 {
+    varia f32 acc ← x
+    acc ← acc + 1.0
+    acc ← acc * 2.0
+    redde acc
+}
+",
+        "out[i] ← ramp(value)",
+    ));
+}
+
+#[test]
+fn helper_reassigning_a_tensor_parameter_is_declined() {
+    let swap = r"
+@ nucleum
+functio swap(in tensor<f32, [4]> target, de tensor<f32, [4]> other) → vacuum {
+    target ← other
+}
+";
+    let result = analyze_source(&kernel(swap, "swap(out, src)"));
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors.iter().any(|d| {
+            d.issue() == Some(ISSUE)
+                && d.args
+                    .iter()
+                    .any(|arg| arg.name == "reason" && arg.value == "outer_local_mutation")
+        }),
+        "{errors:?}"
+    );
+}
+
+// =============================================================================
+// Reduction terms
+// =============================================================================
+
+const SQUARE: &str = r"
+@ nucleum
+functio square(f32 x) → f32 { redde x * x }
+";
+
+#[test]
+fn reduction_term_may_call_a_pure_private_helper() {
+    assert_accepts(&format!(
+        r"{SQUARE}
+@ nucleum
+functio k(tensor<f32, [32]> xs) → f32 {{
+    redde reducta via summa ex xs apud [i] filum f fixum s {{ redde square(s) }}
+}}
+"
+    ));
+    assert_accepts(&format!(
+        r"{SQUARE}
+@ nucleum
+functio k(tensor<f32, [4]> xs) → f32 {{
+    redde reducta via summa ex xs apud [i] fixum s {{ redde square(s) }}
+}}
+"
+    ));
+}
+
+#[test]
+fn reduction_term_may_call_a_helper_that_reads_a_tensor() {
+    assert_accepts(
+        r"
+@ nucleum
+functio at(de tensor<f32, [4]> t, numerus j) → f32 { redde t[j] }
+@ nucleum
+functio k(tensor<f32, [4]> xs, tensor<f32, [4]> ys) → f32 {
+    redde reducta via summa ex xs apud [i] fixum s { redde s + at(ys, i + 1) }
+}
+",
+    );
+}
+
+#[test]
+fn reduction_term_calling_a_host_function_is_still_rejected() {
+    assert_rejects_with_issue(
+        r"
+functio host(f32 x) → f32 { redde x }
+@ nucleum
+functio k(tensor<f32, [32]> xs) → f32 {
+    redde reducta via summa ex xs apud [i] filum f fixum s { redde host(s) }
+}
+",
+        "reducta_body_context",
+    );
+}
+
+#[test]
+fn reduction_term_calling_a_public_kernel_is_still_rejected() {
+    assert_rejects_with_issue(
+        r"
+@ nucleum
+@ publica
+functio shown(f32 x) → f32 { redde x }
+@ nucleum
+functio k(tensor<f32, [32]> xs) → f32 {
+    redde reducta via summa ex xs apud [i] filum f fixum s { redde shown(s) }
+}
+",
+        "reducta_body_context",
+    );
+}
+
+#[test]
+fn reduction_term_helper_that_writes_is_rejected() {
+    let result = analyze_source(
+        r"
+@ nucleum
+functio dirty(in tensor<f32, [32]> t, f32 x) → f32 {
+    t[0] ← x
+    redde x
+}
+@ nucleum
+functio k(in tensor<f32, [32]> xs) → f32 {
+    redde reducta via summa ex xs apud [i] filum f fixum s { redde dirty(xs, s) }
+}
+",
+    );
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.issue() == Some("reducta_body_effect")
+                && d.args
+                    .iter()
+                    .any(|arg| arg.name == "reason" && arg.value == "captured_mut_host")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn reduction_term_helper_with_a_host_call_inside_is_rejected() {
+    let result = analyze_source(
+        r"
+functio host(f32 x) → f32 { redde x }
+@ nucleum
+functio leaky(f32 x) → f32 { redde host(x) }
+@ nucleum
+functio k(tensor<f32, [32]> xs) → f32 {
+    redde reducta via summa ex xs apud [i] filum f fixum s { redde leaky(s) }
+}
+",
+    );
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.issue() == Some("reducta_body_effect")),
+        "{errors:?}"
+    );
+}
+
+// =============================================================================
+// What a call outside the loop can disturb
+// =============================================================================
+
+fn host_function(statements: &str) -> String {
+    format!(
+        r"
+functio log(f32 x) → vacuum {{ }}
+functio log_grid(de {GRID} t) → vacuum {{ }}
+genus Counter {{
+    varia numerus count
+    functio bump() → vacuum {{ ego.count ← ego.count + 1 }}
+}}
+functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
+    varia tensor<f32, []> seed ← vacua
+    varia {GRID} scratch ← seed.crea(0.0, [4])
+    varia Counter counter ← Counter {{ count = 0 }}
+    {statements}
+    itera ex src apud [i] filum lane fixum value {{
+        out[i] ← value
+    }}
+}}
+incipit {{
+}}"
+    )
+}
+
+#[test]
+fn host_call_before_the_loop_keeps_parameter_roots() {
+    accepted(&host_function("log(1.0)"));
+    // Only the argument's own storage is in reach of the call.
+    accepted(&host_function("log_grid(scratch)"));
+}
+
+#[test]
+fn inert_helper_call_before_the_loop_keeps_parameter_roots() {
+    let total = r"
+@ nucleum
+functio total(de tensor<f32, [4]> t) → f32 { redde t[0] }
+";
+    for argument in ["src", "out"] {
+        accepted(&kernel(total, "out[i] ← value + z").replace(
+            "    itera ex src",
+            &format!("    fixum f32 z ← total({argument})\n    itera ex src"),
+        ));
+    }
+}
+
+#[test]
+fn host_call_taking_the_written_parameter_poisons_it() {
+    rejected(&host_function("log_grid(out)"), "unknown_storage_identity");
+}
+
+#[test]
+fn opaque_effect_before_the_loop_still_poisons_the_function() {
+    rejected(&host_function("counter.bump()"), "unknown_storage_identity");
+}
+
+// =============================================================================
+// Register-class components and views
+// =============================================================================
+
+#[test]
+fn vector_component_of_the_element_binder_is_a_value_read() {
+    accepted(
+        r"
+functio k(de tensor<vector<f32, 4>, [4]> state, in tensor<f32, [4]> depth) → vacuum {
+    itera ex state apud [i] filum lane fixum c {
+        depth[i] ← c[0]
+    }
+}
+incipit {
+}",
+    );
+}
+
+#[test]
+fn vector_tensor_written_in_place_still_rejects_neighbour_reads() {
+    rejected(
+        r"
+functio k(in tensor<vector<f32, 4>, [4]> state) → vacuum {
+    itera ex state apud [i] filum lane fixum c {
+        state[i] ← state[i + 1]
+    }
+}
+incipit {
+}",
+        "written_storage_neighbor_read",
+    );
+}
+
+/// Unmarked tensor parameters: a shifted view needs a plain tensor receiver.
+fn view_kernel(statement: &str) -> String {
+    format!(
+        r"
+functio k(in {GRID} out, {GRID} src) → vacuum {{
+    itera ex src apud [i] filum lane fixum value {{
+        {statement}
+    }}
+}}
+incipit {{
+}}"
+    )
+}
+
+#[test]
+fn edge_view_of_an_unwritten_tensor_is_accepted() {
+    accepted(&view_kernel(
+        "fixum tensor<f32, [4]> west ← src.disloco([1]).limes<clampa>()\n        out[i] ← west[i] + value",
+    ));
+    accepted(
+        r"
+functio k(in tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
+    fixum tensor<f32, [4]> west ← src.disloco([1]).limes<reflexa>()
+    itera ex src apud [i] filum lane fixum value {
+        out[i] ← west[i] + value
+    }
+}
+incipit {
+}",
+    );
+}
+
+#[test]
+fn edge_view_of_the_written_tensor_is_rejected() {
+    // Unmarked parameters share one root class, so the view reaches the
+    // tensor the body writes.
+    rejected(
+        r"
+functio k(tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
+    fixum tensor<f32, [4]> west ← src.disloco([1]).limes<clampa>()
+    itera ex src apud [i] filum lane fixum value {
+        out[i] ← west[i] + value
+    }
+}
+incipit {
+}",
+        "written_storage_neighbor_read",
+    );
+}

@@ -311,6 +311,11 @@ pub(crate) struct TypeChecker<'a> {
     /// fragment calls.
     pub nucleum_roles: FxHashMap<DefId, NucleumRole>,
 
+    /// Entry-role functions that are not `publica`: the private kernel helpers
+    /// that rule 12.7 inlines into their callers. A reduction body may call
+    /// them; the filum pass proves the callee body writes nothing.
+    pub private_kernels: FxHashSet<DefId>,
+
     /// Method nucleum roles keyed by (struct-or-interface def, method name).
     pub method_nucleum_roles: FxHashMap<(DefId, Symbol), NucleumRole>,
 
@@ -717,6 +722,7 @@ impl<'a> TypeChecker<'a> {
             binding_names: FxHashMap::default(),
             functions: FxHashMap::default(),
             nucleum_roles: FxHashMap::default(),
+            private_kernels: FxHashSet::default(),
             method_nucleum_roles: FxHashMap::default(),
             method_defs: FxHashMap::default(),
             instance_method_defs: FxHashSet::default(),

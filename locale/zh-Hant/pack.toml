@@ -3171,6 +3171,14 @@ help = "讓每個 aut 分支以相同型別繫結相同名稱"
 message = "無法證明執行緒迭代的獨立性：{reason}"
 help = "使用普通迴圈，或僅寫入本次迭代的座標，並僅在同一座標讀取已寫入的儲存；不要修改外部區域變數或呼叫未經證明的副作用"
 
+[diagnostics.SEM010.issues.reducta_body_context]
+message = "歸約體只能呼叫裝置內建函式、片段與私有核心輔助函式：{reason}"
+help = "把呼叫移出歸約，或呼叫私有核心輔助函式"
+
+[diagnostics.SEM010.issues.reducta_body_effect]
+message = "歸約體不能寫入或呼叫其自身取值之外的副作用：{reason}"
+help = "保持項為純：只寫入歸約體宣告的區域變數，只呼叫不寫任何東西的輔助函式"
+
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "型別實參後需要 '>'"
 
