@@ -528,6 +528,20 @@ fn itera_coordinates_survive_reemission() {
 }
 
 #[test]
+fn nested_filum_metadata_survives_reemission() {
+    // K8-R: each `filum` lane binder rides its own loop head; dropping or
+    // moving one changes which iterations the independence proof composes.
+    let code = assert_idempotent(
+        "incipit {\n    varia tensor<numerus, [2]> rows ← vacua\n    varia tensor<numerus, [3]> cols ← vacua\n    varia tensor<numerus, [2, 3]> grid ← vacua\n    itera ex rows apud [i] filum outer fixum row {\n        itera ex cols apud [j] filum inner fixum col {\n            grid[[i, j]] ← row + col\n        }\n    }\n}\n",
+    );
+    assert!(
+        code.contains("itera ex rows apud [i] filum outer fixum row")
+            && code.contains("itera ex cols apud [j] filum inner fixum col"),
+        "nested filum lane binders must survive:\n{code}"
+    );
+}
+
+#[test]
 fn reduction_sum_reemits_source_shape() {
     let code = assert_idempotent(
         "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] fixum s { redde s }\n}\n",

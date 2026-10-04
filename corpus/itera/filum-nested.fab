@@ -1,0 +1,63 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "apud_clause", "filum_clause", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "A `thread` loop nested in a `thread` loop writes the composed coordinate and runs as the plain nest."
+syntax = "for from rows at [i] thread a const r { for from cols at [j] thread b const c { grid[[i, j]] ← r + c } }"
+related = ["apud", "itera", "ex", "filum", "thread"]
+locale = "en"
++++
+
+# =============================================================================
+# nested filum — independent `thread` loops compose their coordinates.
+# =============================================================================
+#
+# What this teaches:
+#   • a `thread` body must not depend on the order of its iterations: it writes
+#     only its own coordinate and reads a written tensor only at that same
+#     coordinate
+#   • in a nest the own coordinate is the outer coordinates followed by the
+#     inner ones, so `grid[[i, j]]` is the one cell this `(i, j)` iteration owns
+#   • the nest still runs sequentially, outer loop first, and prints exactly
+#     what the same nest of plain loops prints
+#
+# Common mistakes:
+#   • writing `grid[[i + 1, j]]` or `grid[[i, 0]]` from the inner loop — another
+#     iteration owns or also writes that cell, so the body is declined with an
+#     independence diagnostic
+#   • updating an outer iteration's `var` from an inner `thread` loop — a plain
+#     inner loop may do it, a `thread` loop may not
+#
+# See also: apud, itera, ex, filum, thread
+# =============================================================================
+
+# Nested `at [i] thread a` and `at [j] thread b` over two lists of lanes
+#
+# EXPECTED OUTPUT:
+#   the 2×3 grid of sums twice, flat in row-major order — first from the nested
+#   thread loops, then from the plain loops; the two lines are identical.
+
+main {
+    const tf32[] seed ← empty
+    const tf32[2] rows ← seed.from_flat([1.0, 2.0], [2])
+    const tf32[3] cols ← seed.from_flat([10.0, 20.0, 30.0], [3])
+    var tf32[2, 3] grid ← seed.create(0.0, [2, 3])
+    var tf32[2, 3] plain ← seed.create(0.0, [2, 3])
+
+    for from rows at [i] thread outer const row {
+        for from cols at [j] thread inner const col {
+            grid[[i, j]] ← row + col
+        }
+    }
+
+    for from rows at [i] const row {
+        for from cols at [j] const col {
+            plain[[i, j]] ← row + col
+        }
+    }
+
+    print grid
+    print plain
+}

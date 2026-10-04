@@ -147,6 +147,15 @@ impl Aliases {
     ) -> Facts {
         match &expr.kind {
             HirExpressionKind::Vacua | HirExpressionKind::Array(_) => Facts::fresh(root),
+            // `crea` and `strue` are the tensor factories: their contract
+            // (`docs/design/tensor-intrinsics.md`) and every MIR lowering
+            // allocate a new buffer, never a view of the receiver.
+            HirExpressionKind::MethodCall(receiver, name, _, args, _)
+                if matches!(interner.resolve(*name), "crea" | "strue")
+                    && is_access_intrinsic(receiver, *name, args.len(), types, interner) =>
+            {
+                Facts::fresh(root)
+            }
             HirExpressionKind::Struct(_, fields) => {
                 for (name, value) in fields {
                     let facts = self.facts(value, types, interner);
@@ -358,24 +367,131 @@ fn mapped(storage: &Storage, mut coords: Vec<Coordinate>) -> Option<Vec<Coordina
     Some(coords)
 }
 
+/// One `filum` loop of a nest: its own coordinates, the defs its body owns,
+/// and the storage its element fetch reads.
+struct LoopCtx {
+    coords: Vec<Coordinate>,
+    owned: FxHashSet<DefId>,
+    source: Facts,
+}
+
 struct Access {
     facts: Facts,
     coords: Option<Vec<Coordinate>>,
     write: bool,
     span: Span,
+    /// Innermost enclosing `filum` loop (index into `BodyProof::loops`).
+    owner: usize,
+    /// Enclosing `filum` loop count; the coordinates of the whole chain,
+    /// outermost first, form the one coordinate an iteration of the innermost
+    /// loop owns.
+    depth: usize,
+    composed: Vec<Coordinate>,
+    every_loop_has_coordinates: bool,
 }
 
 struct BodyProof<'a> {
     aliases: &'a Aliases,
     types: &'a TypeTable,
     interner: &'a Interner,
-    owned: FxHashSet<DefId>,
+    /// Every `filum` loop met so far; `stack` is the chain around the cursor.
+    loops: Vec<LoopCtx>,
+    stack: Vec<usize>,
     accesses: Vec<Access>,
     errors: Vec<SemanticError>,
     suppress_reads: bool,
 }
 
+fn coordinates_of(defs: &[(DefId, Symbol)]) -> Vec<Coordinate> {
+    defs.iter()
+        .map(|(def, _)| Coordinate {
+            variable: Some(*def),
+            scale: 1,
+            offset: 0,
+        })
+        .collect()
+}
+
 impl BodyProof<'_> {
+    fn owner(&self) -> &LoopCtx {
+        &self.loops[*self.stack.last().expect("inside a filum loop")]
+    }
+
+    fn push_access(
+        &mut self,
+        facts: Facts,
+        coords: Option<Vec<Coordinate>>,
+        write: bool,
+        span: Span,
+    ) {
+        let composed = self
+            .stack
+            .iter()
+            .flat_map(|&index| self.loops[index].coords.clone())
+            .collect();
+        self.accesses.push(Access {
+            facts,
+            coords,
+            write,
+            span,
+            owner: *self.stack.last().expect("inside a filum loop"),
+            depth: self.stack.len(),
+            composed,
+            every_loop_has_coordinates: self
+                .stack
+                .iter()
+                .all(|&index| !self.loops[index].coords.is_empty()),
+        });
+    }
+
+    /// An iteration's element fetch reads its source at the loop's own
+    /// coordinates, even when the binder is unused.
+    fn fetch(&mut self, source: &HirExpression, coords: Vec<Coordinate>) {
+        let facts = self.aliases.facts(source, self.types, self.interner);
+        self.push_access(facts, Some(coords), false, source.span);
+    }
+
+    /// A nested `filum` loop composes its coordinates after the enclosing
+    /// chain and owns the locals its body declares; a plain nested loop is
+    /// sequential inside the iteration and owns nothing new.
+    fn nested_loop(
+        &mut self,
+        filum: bool,
+        coordinates: &[(DefId, Symbol)],
+        binding: DefId,
+        source: &HirExpression,
+        body: &HirBlock,
+    ) {
+        let coords = coordinates_of(coordinates);
+        self.fetch(source, coords.clone());
+        self.receiver(source);
+        if !filum {
+            self.visit_block(body);
+            return;
+        }
+        self.enter_loop(coords, binding, source, body);
+        self.visit_block(body);
+        self.stack.pop();
+    }
+
+    fn enter_loop(
+        &mut self,
+        coords: Vec<Coordinate>,
+        binding: DefId,
+        source: &HirExpression,
+        body: &HirBlock,
+    ) {
+        let mut owned = Owned::default();
+        owned.visit_block(body);
+        owned.defs.insert(binding);
+        self.loops.push(LoopCtx {
+            coords,
+            owned: owned.defs,
+            source: self.aliases.facts(source, self.types, self.interner),
+        });
+        self.stack.push(self.loops.len() - 1);
+    }
+
     fn decline(&mut self, span: Span, reason: &str) {
         self.errors.push(
             SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
@@ -415,12 +531,8 @@ impl BodyProof<'_> {
         write: bool,
         span: Span,
     ) {
-        self.accesses.push(Access {
-            facts: self.aliases.facts(object, self.types, self.interner),
-            coords: index.and_then(coordinates),
-            write,
-            span,
-        });
+        let facts = self.aliases.facts(object, self.types, self.interner);
+        self.push_access(facts, index.and_then(coordinates), write, span);
     }
 
     fn receiver(&mut self, object: &HirExpression) {
@@ -445,20 +557,22 @@ impl BodyProof<'_> {
                         })
                 });
                 let facts = self.aliases.facts(target, self.types, self.interner);
-                if !self.owned.contains(def)
+                let owned = &self.owner().owned;
+                if !owned.contains(def)
                     || borrowed
                         && (facts.unknown
                             || facts.storage.is_empty()
-                            || facts.storage.iter().any(|s| !self.owned.contains(&s.root)))
+                            || facts.storage.iter().any(|s| !owned.contains(&s.root)))
                 {
                     self.decline(target.span, "outer_local_mutation");
                 }
             }
             HirExpressionKind::Field(object, _) => {
                 let facts = self.aliases.facts(object, self.types, self.interner);
+                let owned = &self.owner().owned;
                 if facts.unknown
                     || facts.storage.is_empty()
-                    || facts.storage.iter().any(|s| !self.owned.contains(&s.root))
+                    || facts.storage.iter().any(|s| !owned.contains(&s.root))
                 {
                     self.decline(target.span, "outer_storage_mutation");
                 }
@@ -553,11 +667,36 @@ impl HirVisitor for BodyProof<'_> {
                 self.decline(expr.span, "unproved_call_effect");
                 walk_expr(self, expr);
             }
-            HirExpressionKind::Itera { .. }
-            | HirExpressionKind::IteraLockstep { .. }
-            | HirExpressionKind::IteraRange { .. }
-            | HirExpressionKind::Reduction { .. } => {
-                self.decline(expr.span, "nested_or_reduction_integration_pending");
+            HirExpressionKind::Itera {
+                filum,
+                coordinates,
+                binding,
+                iter,
+                body,
+                ..
+            } => self.nested_loop(filum.is_some(), coordinates, *binding, iter, body),
+            // A reduction folds inside the iteration: its accumulator is not
+            // loop-carried state, and its pure term reads the source at the
+            // reduction's own coordinates, so a written source still fails.
+            HirExpressionKind::Reduction {
+                source,
+                coordinates,
+                group,
+                body,
+                identity,
+                ..
+            } => {
+                self.fetch(source, coordinates_of(coordinates));
+                self.receiver(source);
+                for part in group.iter().chain(identity.iter()) {
+                    self.visit_expr(part);
+                }
+                if let Some(body) = body {
+                    self.visit_block(body);
+                }
+            }
+            HirExpressionKind::IteraLockstep { .. } | HirExpressionKind::IteraRange { .. } => {
+                self.decline(expr.span, "unproved_loop_form");
             }
             HirExpressionKind::Clausura(..)
             | HirExpressionKind::Handled { .. }
@@ -590,35 +729,20 @@ fn prove(
     types: &TypeTable,
     interner: &Interner,
 ) -> Vec<SemanticError> {
-    let mut owned = Owned::default();
-    owned.visit_block(body);
-    owned.defs.insert(binding);
     let mut proof = BodyProof {
         aliases,
         types,
         interner,
-        owned: owned.defs,
+        loops: Vec::new(),
+        stack: Vec::new(),
         accesses: Vec::new(),
         errors: Vec::new(),
         suppress_reads: false,
     };
+    let own = coordinates_of(coords);
+    proof.enter_loop(own.clone(), binding, source, body);
+    proof.fetch(source, own);
     proof.visit_block(body);
-    let own: Vec<_> = coords
-        .iter()
-        .map(|(def, _)| Coordinate {
-            variable: Some(*def),
-            scale: 1,
-            offset: 0,
-        })
-        .collect();
-    let source_facts = aliases.facts(source, types, interner);
-    // The iteration's element fetch is a read even when its binder is unused.
-    proof.accesses.push(Access {
-        facts: source_facts.clone(),
-        coords: Some(own.clone()),
-        write: false,
-        span: source.span,
-    });
     let mut writes: FxHashMap<DefId, Vec<Coordinate>> = FxHashMap::default();
     for access in proof.accesses.iter().filter(|a| a.write) {
         if access.facts.unknown || access.facts.storage.is_empty() {
@@ -626,27 +750,37 @@ fn prove(
                 .errors
                 .push(issue(access.span, "unknown_storage_identity"));
         }
+        let owner = &proof.loops[access.owner];
         for storage in &access.facts.storage {
-            if proof.owned.contains(&storage.root) {
+            if owner.owned.contains(&storage.root) {
                 continue;
             }
             let physical = access
                 .coords
                 .clone()
                 .and_then(|coords| mapped(storage, coords));
-            let expected: Vec<_> = source_facts
-                .storage
-                .iter()
-                .filter(|s| s.root == storage.root)
-                .map(|s| mapped(s, own.clone()))
-                .collect();
-            let valid = !own.is_empty()
-                && physical.is_some()
-                && if expected.is_empty() {
-                    physical == Some(own.clone())
-                } else {
-                    !source_facts.unknown && expected.iter().all(|e| e.is_some() && *e == physical)
-                };
+            // One loop keeps its element fetch as the expected address. In a
+            // nest the address must be the whole chain's composed coordinate,
+            // so no inner iteration repeats a cell an outer one also writes.
+            let valid = if access.depth == 1 {
+                let source_facts = &owner.source;
+                let expected: Vec<_> = source_facts
+                    .storage
+                    .iter()
+                    .filter(|s| s.root == storage.root)
+                    .map(|s| mapped(s, access.composed.clone()))
+                    .collect();
+                !access.composed.is_empty()
+                    && physical.is_some()
+                    && if expected.is_empty() {
+                        physical.as_ref() == Some(&access.composed)
+                    } else {
+                        !source_facts.unknown
+                            && expected.iter().all(|e| e.is_some() && *e == physical)
+                    }
+            } else {
+                access.every_loop_has_coordinates && physical.as_ref() == Some(&access.composed)
+            };
             if !valid {
                 proof
                     .errors
