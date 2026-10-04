@@ -131,7 +131,7 @@ fn corpus_suite_rooted_input_uses_explicit_golden_and_original_working_directory
         case.join("stdout.expected"),
     )
     .expect("copy suite golden");
-    let product_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../product-corpus");
+    let product_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-product");
     fs::write(
         suite.join("corpus.toml"),
         format!(

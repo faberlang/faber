@@ -89,7 +89,7 @@ impl ParseResult {
 /// 8 MiB stack between 128 and 144 (tens of KB of parser stack per level in a
 /// debug build), so a budget above 32 could not be reached before that abort on
 /// the smallest stack this front end runs on. It is ~3x the deepest bracket
-/// nesting in the corpus (`product-corpus/format/long-lines.fab`, 11 levels),
+/// nesting in the corpus (`corpus-product/format/long-lines.fab`, 11 levels),
 /// and it leaves the shared 8 MiB compile stacks (`faber` main thread, package
 /// analysis) room to lower and walk the admitted tree.
 pub const MAX_PARSE_DEPTH: u32 = 32;

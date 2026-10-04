@@ -1,0 +1,10 @@
+# Plane geometry helpers.
+#
+# The file is planum.fab, but it names itself `geometry`: an import that
+# spells no binding binds the declared name, not the path segment (D7.7).
+module geometry
+
+@ public
+fn area(int width, int height) → int {
+    return width * height
+}

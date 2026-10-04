@@ -1,0 +1,8 @@
++++
+locale = "la"
++++
+functio gradus(numerus x) → numerus {
+    si x ≻ 0 ergo redde x
+    sin x ≡ 0 ergo redde 0
+    secus ergo redde 0 - x
+}

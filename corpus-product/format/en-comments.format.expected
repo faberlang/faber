@@ -1,0 +1,16 @@
++++
+locale = "en"
++++
+# file header comment
+fn compute(int x) → int {
+    # inner comment before statement
+    var int y ← x + 1
+
+    # comment between statements
+    return y * 2
+}
+
+fn empty() → int {
+    # only a comment
+    return 0
+}

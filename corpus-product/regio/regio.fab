@@ -1,0 +1,11 @@
+# `module` default import name (DECISIONS D7.7).
+#
+# `import from "./planum"` spells no binding, and planum.fab declares
+# `module geometry`, so the import binds `geometry`. A file without a
+# `module` declaration keeps today's default: the last path segment.
+
+import from "./planum"
+
+main {
+    print geometry.area(3, 4)
+}

@@ -1,0 +1,21 @@
++++
+locale = "en"
++++
+class Point {
+    var int x
+    var float y
+
+    fn doubled() → int {
+        return self.x * 2
+    }
+}
+
+fn make(int x, float y) → Point {
+    return Point { x = x, y = y }
+}
+
+fn show() → string {
+    var Point p ← make(21, 1.5)
+    print p.doubled()
+    return "ok"
+}

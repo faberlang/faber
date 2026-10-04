@@ -1,0 +1,47 @@
++++
+locale = "en"
++++
+@ public
+import from "norma:console" console
+
+@ public
+fn exported_fn() → int {
+    return 1
+}
+
+@ public
+class ExportedClass {
+    var int value
+}
+
+@ public
+union ExportedUnion {
+    Good {
+        int value
+    },
+    Bad {
+        string message
+    }
+}
+
+@ public
+enum ExportedEnum {
+    first,
+    second
+}
+
+@ public
+interface ExportedInterface {
+    fn value() → int
+}
+
+@ public
+type Alias = (int) → string
+
+@ public
+schema ExportedSchema {
+    column int id
+}
+
+@ public
+const int EXPORTED_VALUE = 1

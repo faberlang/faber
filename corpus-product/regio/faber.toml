@@ -1,0 +1,8 @@
+[package]
+name = "regio"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "."
+entry = "regio.fab"

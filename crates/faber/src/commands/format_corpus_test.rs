@@ -1,6 +1,6 @@
 //! Format golden corpus harness (faber-owned).
 //!
-//! Reads every `product-corpus/format/*.fab` fixture and formats it through
+//! Reads every `corpus-product/format/*.fab` fixture and formats it through
 //! the exact CLI path FR-2 will install: [`super::format::format_session`] +
 //! [`radix::module::codegen::faber::reemit_faber`] +
 //! [`super::format::formatted_source_for_write`]. Output must match
@@ -23,13 +23,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn corpus_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../product-corpus/format")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-product/format")
 }
 
 /// Fixture sources in the corpus (one `*.fab` per pinned expectation).
 fn fixture_sources() -> Vec<PathBuf> {
     let mut fixtures = fs::read_dir(corpus_dir())
-        .expect("read product-corpus/format")
+        .expect("read corpus-product/format")
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.path())
         .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("fab"))
@@ -395,13 +395,13 @@ fn format_corpus_is_byte_exact_idempotent_and_reparses() {
 #[test]
 fn format_corpus_has_no_policy_pin_filenames() {
     let leftover: Vec<_> = fs::read_dir(corpus_dir())
-        .expect("read product-corpus/format")
+        .expect("read corpus-product/format")
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .filter(|name| name.contains("normalise-v1") || name.contains("pretty-v1"))
         .collect();
     assert!(
         leftover.is_empty(),
-        "product-corpus/format must not keep policy pin filenames: {leftover:?}"
+        "corpus-product/format must not keep policy pin filenames: {leftover:?}"
     );
 }

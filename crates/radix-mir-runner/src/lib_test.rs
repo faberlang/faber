@@ -4448,7 +4448,7 @@ fn dense_float_tensor(rows: i64, cols: i64, fill: impl Fn(i64, i64) -> f64) -> V
 
 #[test]
 fn tensor_matmul_float_2x3_by_3x4() {
-    // Same contraction as product-corpus/tensor-package/fmir-matmul.
+    // Same contraction as corpus-product/tensor-package/fmir-matmul.
     let left = dense_float_tensor(2, 3, |i, j| (i * 3 + j + 1) as f64);
     let right = dense_float_tensor(3, 4, |i, j| (i * 4 + j + 1) as f64);
     let result = eval_tensor_matmul(left, right).expect("float matmul");
