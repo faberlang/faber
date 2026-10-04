@@ -1,10 +1,10 @@
 +++
 term = "summa"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "summa_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "reducta_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
 category = "collection"
-summary = "Distributed sum-reduce kernel admit: sum from … at [i] thread f const s { return <term> } inside @ kernel."
-syntax = "sum from <tf32[32]> at [i] thread f const s { return <term> }"
+summary = "Distributed `reduce via sum from … thread …` kernel inside @ kernel."
+syntax = "reduce via sum from <tf32[32]> at [i] thread f const s { return <term> }"
 related = ["summa", "filum", "tensor"]
 locale = "en"
 +++
@@ -13,8 +13,8 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Declared distributed sum — the `thread` spelling lowers to the
-#     DistributedSum plan entry: cyclic per-lane term-body fold with exactly
+#   • Declared distributed sum — `reduce via sum from … thread …` lowers to
+#     the DistributedSum plan entry: cyclic per-lane term-body fold with exactly
 #     one lane collective at group exit and a broadcast result.
 #   • Term body — per-lane scalar computation with exactly one valued
 #     `return`; local mutation of term-local bindings is allowed.
@@ -27,7 +27,7 @@ locale = "en"
 @ kernel
 @ public { }
 fn column_dot(tensor<f32, [32]> a, tensor<f32, [1]> out) → void {
-    const f32 total ← sum from a at [i] thread f const s {
+    const f32 total ← reduce via sum from a at [i] thread f const s {
         var f32 t ← s * 1.4140625
         return t
     }

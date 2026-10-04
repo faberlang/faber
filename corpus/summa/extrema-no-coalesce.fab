@@ -3,8 +3,8 @@ term = "summa"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "expression", "literal", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "collection"
-summary = "Maximum and minimum reductions without a coalesce tail on a non-empty tensor."
-syntax = "max from <tensor> | min from <tensor>"
+summary = "Non-empty tensor extrema without coalesce: reduce via max from <tensor> | reduce via min from <tensor>."
+syntax = "reduce via max from <tensor> | reduce via min from <tensor>"
 related = ["summa", "max", "min", "tensor"]
 locale = "en"
 +++
@@ -14,8 +14,8 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `max from` and `min from` return scalar extrema directly when the source
-#     shape is statically non-empty.
+#   • `reduce via max from` and `reduce via min from` return scalar extrema
+#     directly when the source shape is statically non-empty.
 #   • `coalesce` is only needed when the caller chooses an empty-result policy.
 #
 # Common mistakes:
@@ -23,8 +23,8 @@ locale = "en"
 #     identity tail.
 
 fn extrema(tf32[4] values) → list<f32> {
-    const f32 hi ← max from values
-    const f32 lo ← min from values
+    const f32 hi ← reduce via max from values
+    const f32 lo ← reduce via min from values
     return [hi, lo]
 }
 

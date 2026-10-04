@@ -222,8 +222,7 @@ fn perge_sites(statements: &[HirStatement], tail: Option<&HirExpression>) -> Vec
                     | HirExpressionKind::Itera { .. }
                     | HirExpressionKind::IteraLockstep { .. }
                     | HirExpressionKind::IteraRange { .. }
-                    | HirExpressionKind::Summa { .. }
-                    | HirExpressionKind::Extremum { .. }
+                    | HirExpressionKind::Reduction { .. }
                     | HirExpressionKind::FirstMatch { .. }
                     | HirExpressionKind::Ad { .. }
                     | HirExpressionKind::Clausura(..)

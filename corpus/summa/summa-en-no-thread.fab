@@ -1,10 +1,10 @@
 +++
 term = "summa"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "fixum_decl", "expression", "summa_expr", "apud_clause", "literal", "nota_stmt", "conversio_expr"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "fixum_decl", "expression", "reducta_expr", "apud_clause", "literal", "nota_stmt", "conversio_expr"]
 category = "collection"
-summary = "Sequential English sum reduction without the distributed thread clause."
-syntax = "sum from <tensor> at [i] const s { return <term> }"
+summary = "Sequential English `reduce via sum from` without the distributed thread clause."
+syntax = "reduce via sum from <tensor> at [i] const s { return <term> }"
 related = ["summa", "sum", "at", "tensor"]
 locale = "en"
 +++
@@ -13,7 +13,8 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `sum from` is the English surface for the sequential reduction.
+#   • `reduce via sum from` is the English surface for the sequential
+#     reduction.
 #   • Omitting `thread` selects the host-lane fold; the body returns one term
 #     for each bound element.
 #
@@ -22,7 +23,7 @@ locale = "en"
 #     kernel form, while this cell intentionally stays sequential.
 
 fn total(tensor<float, [4]> a) → float {
-    return sum from a at [i] const s {
+    return reduce via sum from a at [i] const s {
         return s
     }
 }

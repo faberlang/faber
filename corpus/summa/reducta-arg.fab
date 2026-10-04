@@ -1,0 +1,51 @@
++++
+locale = "la"
+term = "reducta-arg"
+kind = "concept"
+category = "collection"
+grammar = ["reducta_expr", "reducta_op", "reducta_group", "reducta_body", "reducta_identity"]
+canonical = true
++++
+
+functio optimum(tensor<f32, [4]> a) → numerus { redde reducta via argmaxima ex a }
+functio infimum(tensor<f32, [4]> a) → numerus { redde reducta via argminima ex a }
+functio optimum_corpus(tensor<f32, [4]> a) → numerus {
+    redde reducta via argmaxima ex a apud [i] fixum s { redde 0.0 - s }
+}
+functio optimum_nan(tensor<f64, [4]> a) → numerus { redde reducta via argmaxima ex a }
+functio optimum_plana(tensor<f32, [2, 3]> m) → iuncta<numerus, numerus> {
+    redde reducta via argmaxima ex m apud [i, j]
+}
+functio infimum_plana(tensor<f32, [2, 3]> m) → iuncta<numerus, numerus> {
+    redde reducta via argminima ex m apud [i, j]
+}
+functio optimum_vacua() → numerus ∪ nihil {
+    fixum tf32[0] v ← vacua
+    redde reducta via argmaxima ex v apud [i]
+}
+functio optimum_vacua_vel() → numerus {
+    fixum tf32[0] v ← vacua
+    redde reducta via argmaxima ex v apud [i] vel 7
+}
+incipit {
+    fixum lista<f32> flat ← [3.0, 1.0, 3.0, 2.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[4] a ← seed.strue(flat, [4])
+    nota optimum(a)
+    nota infimum(a)
+    nota optimum_corpus(a)
+    fixum lista<f64> flat_nan ← [nonnumerus, 3.0, 1.0, 3.0]
+    fixum tf64[] seed_nan ← vacua
+    fixum tf64[4] a_nan ← seed_nan.strue(flat_nan, [4])
+    nota optimum_nan(a_nan)
+    fixum lista<f32> flat2 ← [1.0, 5.0, 2.0, 5.0, 0.0, 1.0]
+    fixum tf32[2, 3] m ← seed.strue(flat2, [2, 3])
+    fixum iuncta<numerus, numerus> hi ← optimum_plana(m)
+    fixum iuncta<numerus, numerus> lo ← infimum_plana(m)
+    nota hi[0]
+    nota hi[1]
+    nota lo[0]
+    nota lo[1]
+    nota optimum_vacua()
+    nota optimum_vacua_vel()
+}

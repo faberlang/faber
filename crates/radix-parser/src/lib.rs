@@ -1771,6 +1771,10 @@ mod comma_law_matrix_test;
 mod summa_disambiguation_test;
 
 #[cfg(test)]
+#[path = "reducta_test.rs"]
+mod reducta_test;
+
+#[cfg(test)]
 #[path = "max_min_disambiguation_test.rs"]
 mod max_min_disambiguation_test;
 

@@ -1275,35 +1275,33 @@ fn collect_expr_defs(
         | HirExpressionKind::Vacua
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
-        HirExpressionKind::Summa {
+        HirExpressionKind::Reduction {
             source,
             coordinates,
+            group,
             filum,
             binding,
             body,
+            identity,
             ..
         } => {
             collect_expr_defs(source, registry);
-            for (def_id, _) in coordinates {
-                registry.insert(*def_id);
+            for (id, _) in coordinates {
+                registry.insert(*id);
             }
-            if let Some((def_id, _)) = filum {
-                registry.insert(*def_id);
+            if let Some((id, _)) = filum {
+                registry.insert(*id);
             }
-            registry.insert(binding.0);
-            collect_block_defs(body, registry);
-        }
-        HirExpressionKind::Extremum {
-            source,
-            coordinates,
-            coalesce,
-            ..
-        } => {
-            collect_expr_defs(source, registry);
-            for (def_id, _) in coordinates {
-                registry.insert(*def_id);
+            if let Some((id, _)) = binding {
+                registry.insert(*id);
             }
-            if let Some(identity) = coalesce {
+            if let Some(group) = group {
+                collect_expr_defs(group, registry);
+            }
+            if let Some(body) = body {
+                collect_block_defs(body, registry);
+            }
+            if let Some(identity) = identity {
                 collect_expr_defs(identity, registry);
             }
         }
@@ -1677,15 +1675,21 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
     fn collect_expr(expr: &radix_hir::HirExpression, registry: &mut FxHashSet<radix_hir::HirId>) {
         registry.insert(expr.id);
         match &expr.kind {
-            HirExpressionKind::Summa { source, body, .. } => {
-                collect_expr(source, registry);
-                collect_block(body, registry);
-            }
-            HirExpressionKind::Extremum {
-                source, coalesce, ..
+            HirExpressionKind::Reduction {
+                source,
+                group,
+                body,
+                identity,
+                ..
             } => {
                 collect_expr(source, registry);
-                if let Some(identity) = coalesce {
+                if let Some(group) = group {
+                    collect_expr(group, registry);
+                }
+                if let Some(body) = body {
+                    collect_block(body, registry);
+                }
+                if let Some(identity) = identity {
                     collect_expr(identity, registry);
                 }
             }
@@ -2640,39 +2644,36 @@ pub(crate) fn validate_referential_integrity(
             checks.check_type(ty)?;
         }
         match &expr.kind {
-            HirExpressionKind::Summa {
+            HirExpressionKind::Reduction {
                 source,
                 coordinates,
+                group,
                 filum,
                 binding,
                 body,
+                identity,
                 ..
             } => {
                 validate_expr(source, checks)?;
-                for (def_id, name) in coordinates {
-                    checks.check_def(*def_id)?;
+                for (id, name) in coordinates {
+                    checks.check_def(*id)?;
                     checks.check_symbol(*name)?;
                 }
-                if let Some((def_id, name)) = filum {
-                    checks.check_def(*def_id)?;
+                if let Some((id, name)) = filum {
+                    checks.check_def(*id)?;
                     checks.check_symbol(*name)?;
                 }
-                checks.check_def(binding.0)?;
-                checks.check_symbol(binding.1)?;
-                validate_block(body, checks)?;
-            }
-            HirExpressionKind::Extremum {
-                source,
-                coordinates,
-                coalesce,
-                ..
-            } => {
-                validate_expr(source, checks)?;
-                for (def_id, name) in coordinates {
-                    checks.check_def(*def_id)?;
+                if let Some((id, name)) = binding {
+                    checks.check_def(*id)?;
                     checks.check_symbol(*name)?;
                 }
-                if let Some(identity) = coalesce {
+                if let Some(group) = group {
+                    validate_expr(group, checks)?;
+                }
+                if let Some(body) = body {
+                    validate_block(body, checks)?;
+                }
+                if let Some(identity) = identity {
                     validate_expr(identity, checks)?;
                 }
             }

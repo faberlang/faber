@@ -1620,33 +1620,41 @@ impl Parser {
         matches!(self.peek().kind, TokenKind::Ident(sym) if self.keyword_claim_key(sym) == Some(key))
     }
 
-    /// Return whether the current expression head is the contextual `summa`.
-    fn is_summa_expr_head(&self) -> bool {
-        self.is_keyword_key("summa") && self.keyword_ident_at(1) == Some(TokenKind::Ex)
-    }
-
-    /// Parse the contextual `summa ex` term-fold expression.
-    ///
-    /// `summa` remains an ordinary identifier unless it is the expression
-    /// head immediately followed by `ex`. The optional `apud` clause delegates
-    /// to the same production used by `itera`; `filum` is claimed by its
-    /// registry identity only in this production's optional clause.
-    ///
-    /// GRAMMAR:
-    ///   summa-expr := `summa` `ex` expression [apud-clause] [filum-clause]
-    ///                 (`fixum` | `varia`) IDENTIFIER block
-    ///   filum-clause := `filum` IDENTIFIER
-    fn parse_summa_expr(&mut self) -> Result<Expr, ParseError> {
+    /// Parse the `reducta via Op` expression.
+    fn parse_reducta_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        debug_assert!(self.is_keyword_key("summa"));
         self.advance();
-        self.expect_keyword_ident(TokenKind::Ex, "expected 'ex' after 'summa'")?;
-
-        let source = Box::new(self.parse_expression()?);
+        if !self.eat_keyword_ident(TokenKind::Via) {
+            return Err(self.reducta_operator_error("reducta_requires_via"));
+        }
+        let op = match self.peek().kind {
+            TokenKind::Ident(sym) => match self.keyword_claim_key(sym) {
+                Some("summa") => ReductaOp::Sum,
+                Some("factum") => ReductaOp::Product,
+                Some("maxima") => ReductaOp::Max,
+                Some("minima") => ReductaOp::Min,
+                Some("argmaxima") => ReductaOp::ArgMax,
+                Some("argminima") => ReductaOp::ArgMin,
+                Some("omnia") => ReductaOp::All,
+                Some("quilibet") => ReductaOp::Any,
+                Some("numeratio") => ReductaOp::Count,
+                _ => return Err(self.reducta_operator_error("reducta_unknown_operator")),
+            },
+            _ => return Err(self.reducta_operator_error("reducta_unknown_operator")),
+        };
+        self.advance();
+        self.expect_keyword_ident(TokenKind::Ex, "expected reduction source")?;
+        let mut source = self.parse_expression()?;
         let apud = if self.eat_keyword_ident(TokenKind::Apud) {
             self.parse_apud_clause()?
         } else {
             Vec::new()
+        };
+        let group = if self.is_keyword_key("pro") {
+            self.advance();
+            Some(Box::new(self.parse_expression()?))
+        } else {
+            None
         };
         let filum = if self.is_keyword_key("filum") {
             self.advance();
@@ -1654,103 +1662,124 @@ impl Parser {
         } else {
             None
         };
-        let mutability = self.parse_mutability()?;
-        let binding = self.parse_ident()?;
-        let body = self.parse_block()?;
-
+        let has_body = matches!(
+            self.keyword_ident_at(0),
+            Some(TokenKind::Fixum | TokenKind::Varia)
+        ) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+            && self.peek_at(2).kind == TokenKind::LBrace;
+        let (mutability, binding, body) = if has_body {
+            (
+                self.parse_mutability()?,
+                Some(self.parse_ident()?),
+                Some(self.parse_block()?),
+            )
+        } else {
+            (AstMutability::Immutable, None, None)
+        };
+        let mut identity = if body.is_none() && self.eat_keyword_ident(TokenKind::Vel) {
+            Some(Box::new(self.parse_expression()?))
+        } else {
+            None
+        };
+        if identity.is_none() && body.is_none() && group.is_none() && apud.is_empty()
+            && let ExprKind::Binary(BinaryExpr {
+                op: BinOp::Coalesce,
+                lhs,
+                rhs,
+            }) = source.kind
+        {
+            source = *lhs;
+            identity = Some(rhs);
+        }
         Ok(Expr {
             id: self.next_id(),
-            kind: ExprKind::Summa(Box::new(SummaExpr {
-                source,
+            kind: ExprKind::Reducta(Box::new(ReductaExpr {
+                op,
+                source: Box::new(source),
                 apud,
+                group,
                 filum,
                 mutability,
                 binding,
                 body,
+                identity,
             })),
             span: start.merge(self.previous_span()),
         })
     }
 
-    /// Return whether the current expression head is a contextual extrema
-    /// reduction (`maxima ex` or `minima ex`).
-    fn is_extremum_expr_head(&self) -> Option<bool> {
-        if self.is_keyword_key("maxima") && self.keyword_ident_at(1) == Some(TokenKind::Ex) {
-            Some(true)
-        } else if self.is_keyword_key("minima") && self.keyword_ident_at(1) == Some(TokenKind::Ex) {
-            Some(false)
-        } else {
-            None
-        }
+    fn reducta_operator_error(&self, issue: &'static str) -> ParseError {
+        let operators = [
+            "summa",
+            "factum",
+            "maxima",
+            "minima",
+            "argmaxima",
+            "argminima",
+            "omnia",
+            "quilibet",
+            "numeratio",
+        ]
+        .iter()
+        .map(|key| {
+            self.reader_keyword_surfaces
+                .get(*key)
+                .map_or(*key, String::as_str)
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+        ParseError::structured(ParseErrorKind::Expected, self.current_span())
+            .with_arg("issue", issue)
+            .with_arg("operators", operators)
     }
 
-    /// Parse the sibling `maxima ex` / `minima ex` reduction expression.
+    /// Return whether a former reduction head occurs in its old expression shape.
     ///
-    /// The source is a complete expression, with an optional shared `apud`
-    /// coordinate clause. The `vel`/coalesce tail is owned by this reduction
-    /// and supplies the caller-stated identity; there is deliberately no
-    /// `filum` or term-body tail in this v1 grammar.
-    ///
-    /// GRAMMAR:
-    ///   extrema-expr := (`maxima` | `minima`) `ex` expression [apud-clause]
-    ///                   [`vel` expression]
-    fn parse_extremum_expr(&mut self, is_maximum: bool) -> Result<Expr, ParseError> {
+    /// The words remain ordinary identifiers everywhere else. Only the old
+    /// head-plus-source-keyword pair is claimed, so the diagnostic can point
+    /// directly to the migration site without reserving the operator word.
+    fn is_retired_reduction_expr_head(&self) -> bool {
+        matches!(
+            self.peek().kind,
+            TokenKind::Ident(sym)
+                if matches!(self.keyword_claim_key(sym), Some("summa" | "maxima" | "minima"))
+        ) && self.keyword_ident_at(1) == Some(TokenKind::Ex)
+    }
+
+    /// Consume a former reduction expression and report its named migration issue.
+    fn parse_retired_reduction_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        debug_assert!(
-            self.is_extremum_expr_head()
-                .is_some_and(|maximum| maximum == is_maximum)
-        );
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            unreachable!("retired reduction head was checked before dispatch");
+        };
+        let head = self.interner.resolve(sym).to_owned();
         self.advance();
-        self.expect_keyword_ident(TokenKind::Ex, "expected 'ex' after reduction head")?;
-
-        let parsed_source = self.parse_expression()?;
-        let apud = if self.eat_keyword_ident(TokenKind::Apud) {
-            self.parse_apud_clause()?
-        } else {
-            Vec::new()
-        };
-
-        let mut source = parsed_source;
-        let mut coalesce = if self.eat_keyword_ident(TokenKind::Vel) {
-            Some(Box::new(self.parse_expression()?))
-        } else {
-            None
-        };
-
-        // With no coordinate delimiter, the ordinary expression parser may
-        // have already built the explicit `source vel identity` tail. Peel
-        // only that root form; parenthesized source coalescing remains inside
-        // the operand as intended.
-        if coalesce.is_none()
-            && apud.is_empty()
-            && let Expr {
-                kind:
-                    ExprKind::Binary(BinaryExpr {
-                        op: BinOp::Coalesce,
-                        lhs,
-                        rhs,
-                    }),
-                ..
-            } = source
-        {
-            source = *lhs;
-            coalesce = Some(rhs);
+        self.expect_keyword_ident(TokenKind::Ex, "expected reduction source")?;
+        let _source = self.parse_expression()?;
+        if self.eat_keyword_ident(TokenKind::Apud) {
+            let _ = self.parse_apud_clause()?;
         }
-
-        let extremum = ExtremumExpr {
-            source: Box::new(source),
-            apud,
-            coalesce,
-        };
-        Ok(Expr {
-            id: self.next_id(),
-            kind: if is_maximum {
-                ExprKind::Maxima(Box::new(extremum))
-            } else {
-                ExprKind::Minima(Box::new(extremum))
-            },
-            span: start.merge(self.previous_span()),
-        })
+        if self.is_keyword_key("filum") {
+            self.advance();
+            let _ = self.parse_ident()?;
+        }
+        let has_term_body = matches!(
+            self.keyword_ident_at(0),
+            Some(TokenKind::Fixum | TokenKind::Varia)
+        ) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+            && self.peek_at(2).kind == TokenKind::LBrace;
+        if has_term_body {
+            let _ = self.parse_mutability()?;
+            let _ = self.parse_ident()?;
+            let _ = self.parse_block()?;
+        } else if self.eat_keyword_ident(TokenKind::Vel) {
+            let _ = self.parse_expression()?;
+        }
+        Err(
+            ParseError::structured(ParseErrorKind::DeclarationInvalid, start)
+                .with_arg("issue", "reducta_legacy_head")
+                .with_arg("head", head),
+        )
     }
 
     /// Return whether the current expression head is the dedicated
@@ -1828,11 +1857,16 @@ impl Parser {
     /// object initialization. Anything that starts with a non-primary token must
     /// be introduced by an earlier precedence layer.
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
-        if let Some(is_maximum) = self.is_extremum_expr_head() {
-            return self.parse_extremum_expr(is_maximum);
+        if self.is_keyword_key("reducta")
+            && matches!(
+                self.keyword_ident_at(1),
+                Some(TokenKind::Via | TokenKind::Ex)
+            )
+        {
+            return self.parse_reducta_expr();
         }
-        if self.is_summa_expr_head() {
-            return self.parse_summa_expr();
+        if self.is_retired_reduction_expr_head() {
+            return self.parse_retired_reduction_expr();
         }
         if self.is_first_match_expr_head() {
             return self.parse_first_match_expr();
@@ -2058,7 +2092,7 @@ impl Parser {
     }
 
     /// Two-token lookahead for the expression-position `ratio` constructor
-    /// claim (mirrors `is_summa_expr_head`): commit only when the tokens after
+    /// claim (mirrors the contextual reduction-head check): commit only when the tokens after
     /// `<` open a labeled element (`IDENT/Tag` then `:`), the same
     /// `is_label` shape `parse_ratio_type_argument` requires. Anything else
     /// (`ratio < 5`) is an ordinary identifier followed by a comparison.

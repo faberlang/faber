@@ -1,10 +1,7 @@
-//! SFR-2 (summa-filum-reduction) parser pins: `summa ex` is a contextual
-//! expression head, while every non-head `summa` spelling stays an ordinary
-//! identifier or call. The source shape is admitted here; semantic admission
-//! and lowering remain follow-up units.
+//! K3 parser pins: a `summa` operator word stays an ordinary identifier,
+//! call, receiver, or intrinsic method outside the owned `reducta via` form.
 
-use crate::test_support::{parse_ok, parse_program};
-use radix_syntax::{ExprKind, StmtKind};
+use crate::test_support::{assert_parse_error_issue, parse_ok};
 
 /// Kernel source from `examples/training/device-summa/src/device_summa.fab`,
 /// verbatim. Used as the live-file fallback in lane worktrees where the
@@ -31,53 +28,6 @@ fn exemplar_source(relative: &str, fallback: &str) -> String {
         );
         fallback.to_string()
     })
-}
-
-#[test]
-fn summa_ex_expression_is_admitted_in_both_forms() {
-    let sequential = "functio t(numerus a) → numerus { summa ex a fixum s { s } }";
-    let distributed =
-        "functio t(numerus a) → numerus { summa ex a apud [i] filum f fixum s { s } }";
-    for source in [sequential, distributed] {
-        assert!(
-            parse_program(source).success(),
-            "`summa ex …` must parse in SFR-2: {source}"
-        );
-    }
-}
-
-#[test]
-fn summa_expr_preserves_apud_filum_and_term_body() {
-    let result = parse_program(
-        "functio t(numerus a) → numerus { summa ex a apud [i, j] filum f varia s { s } }",
-    );
-    assert!(
-        result.success(),
-        "unexpected parse errors: {:?}",
-        result.errors
-    );
-    let program = result.program.as_ref().expect("program");
-    let StmtKind::Func(function) = &program.statements[0].kind else {
-        panic!("expected function");
-    };
-    let body = function.body.as_ref().expect("function body");
-    let StmtKind::Expr(statement) = &body.statements[0].kind else {
-        panic!("expected expression statement");
-    };
-    let ExprKind::Summa(summa) = &statement.expr.kind else {
-        panic!("expected summa expression");
-    };
-    assert_eq!(summa.apud.len(), 2);
-    assert_eq!(
-        result.interner.resolve(summa.filum.as_ref().unwrap().name),
-        "f"
-    );
-    assert_eq!(result.interner.resolve(summa.binding.name), "s");
-    assert!(matches!(
-        summa.mutability,
-        radix_syntax::AstMutability::Mutable
-    ));
-    assert_eq!(summa.body.statements.len(), 1);
 }
 
 #[test]
@@ -114,4 +64,15 @@ fn non_head_summa_identifiers_stay_ordinary() {
     // Known-good lambda spelling named `summa` (closure parameter position).
     let _ = parse_ok("fixum _ summa ← (numerus a, numerus b) ∴ a + b");
     let _ = parse_ok("functio g(numerus summa) → numerus { redde summa }");
+}
+
+#[test]
+fn legacy_reduction_heads_report_the_named_migration_issue() {
+    for source in [
+        "functio f(tensor<numerus, [4]> xs) → numerus { redde summa ex xs }",
+        "functio f(tensor<numerus, [4]> xs) → numerus { redde maxima ex xs }",
+        "functio f(tensor<numerus, [4]> xs) → numerus { redde minima ex xs vel 0 }",
+    ] {
+        assert_parse_error_issue(source, "reducta_legacy_head");
+    }
 }

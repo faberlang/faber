@@ -1132,19 +1132,8 @@ pub enum ExprKind {
     TypeCheck(TypeCheckExpr),
     /// `iuncta<A, B> [a, b]` tuple construction.
     Iuncta(IunctaExpr),
-    /// Contextual term-fold reduction: `summa ex source ...`.
-    ///
-    /// The parser claims this spelling only in expression-head position when
-    /// `summa` is immediately followed by `ex`; ordinary identifiers, calls,
-    /// and receivers keep their existing meaning.
-    Summa(Box<SummaExpr>),
-    /// Contextual maximum reduction: `maxima ex source ...`.
-    ///
-    /// Maxima/minima are sibling reductions, not summa configuration. Their
-    /// optional coalesce expression is the caller-stated identity.
-    Maxima(Box<ExtremumExpr>),
-    /// Contextual minimum reduction: `minima ex source ...`.
-    Minima(Box<ExtremumExpr>),
+    /// Owned reduction expression: `reducta via Op ex source ...`.
+    Reducta(Box<ReductaExpr>),
     /// Dedicated first-match selection: `primus_quem(source, ubi binder { predicate })`.
     ///
     /// The parser claims this spelling only in expression-head position when
@@ -1224,32 +1213,32 @@ pub struct CopyIntoExpr {
     pub value: Box<Expr>,
 }
 
-/// Source shape for the contextual `summa ex` term-fold expression.
+/// Source-owned clauses for the closed contextual reduction family.
 #[derive(Debug)]
-pub struct SummaExpr {
-    /// Iterable expression whose elements feed the term body.
+pub struct ReductaExpr {
+    pub op: ReductaOp,
     pub source: Box<Expr>,
-    /// Optional coordinate names from the shared `apud` production.
     pub apud: Vec<Ident>,
-    /// Optional lane binder from the contextual `filum` clause.
+    pub group: Option<Box<Expr>>,
     pub filum: Option<Ident>,
-    /// Mutability marker for the term binder.
     pub mutability: AstMutability,
-    /// Term binder introduced for the block body.
-    pub binding: Ident,
-    /// Term body evaluated for each source element.
-    pub body: BlockStmt,
+    pub binding: Option<Ident>,
+    pub body: Option<BlockStmt>,
+    pub identity: Option<Box<Expr>>,
 }
 
-/// Source shape shared by the contextual `maxima ex` and `minima ex` heads.
-#[derive(Debug)]
-pub struct ExtremumExpr {
-    /// Iterable expression whose elements feed the reduction.
-    pub source: Box<Expr>,
-    /// Optional coordinate names from the shared `apud` production.
-    pub apud: Vec<Ident>,
-    /// Caller-stated identity supplied by the coalesce/`vel` tail.
-    pub coalesce: Option<Box<Expr>>,
+/// The nine operations; surface spellings belong to the active locale pack.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReductaOp {
+    Sum,
+    Product,
+    Max,
+    Min,
+    ArgMax,
+    ArgMin,
+    All,
+    Any,
+    Count,
 }
 
 #[derive(Debug)]

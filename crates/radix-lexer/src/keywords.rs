@@ -352,14 +352,8 @@ const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
 const REDUCTION_HEAD: &[KeywordOwner] = &[KeywordOwner::ReductionHead];
 const REDUCTION_OPERATOR: &[KeywordOwner] = &[KeywordOwner::ReductionOperator];
 const REDUCTION_GROUP: &[KeywordOwner] = &[KeywordOwner::ReductionGroup];
-// WHY: `summa`/`maxima`/`minima` keep their expression-head owner until the
-// retired `summa ex` / `max ex` productions are removed; `omnia` keeps its
-// declaration-marker owner; `via` keeps its convert-hint owner. Each gains the
-// reduction owner for its new slot.
-const EXPRESSION_INTRODUCER_OR_REDUCTION_OPERATOR: &[KeywordOwner] = &[
-    KeywordOwner::ExpressionIntroducer,
-    KeywordOwner::ReductionOperator,
-];
+// WHY: `omnia` keeps its declaration-marker owner and `via` keeps its
+// convert-hint owner. Each also gains the reduction owner for its new slot.
 const DECLARATION_MARKER_OR_REDUCTION_OPERATOR: &[KeywordOwner] = &[
     KeywordOwner::DeclarationMarker,
     KeywordOwner::ReductionOperator,
@@ -863,14 +857,13 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Literal,
     },
-    // === Keywords: Sum-reduce expression ===
-    // `summa` opens the contextual expression and `filum` names its optional
-    // distributed clause. Both remain tokenless so parser-owned claims stay
-    // pack-driven without adding grammar-table token variants.
+    // === Keywords: Reduction operators ===
+    // `summa` is an operator only after `reducta via`; `filum` names the
+    // optional sum carrier. Both remain tokenless and pack-driven.
     KeywordSpec {
         text: "summa",
         token_kind: None,
-        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER_OR_REDUCTION_OPERATOR),
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
         category: KeywordKind::Misc,
     },
     KeywordSpec {
@@ -879,19 +872,17 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Misc,
     },
-    // `maxima`/`minima` are sibling contextual reduction heads. Their
-    // combine is the verb itself; the parser claims only `head ex` and never
-    // reserves the words for calls, receivers, or mid-expression names.
+    // `maxima`/`minima` are reduction operators only after `reducta via`.
     KeywordSpec {
         text: "maxima",
         token_kind: None,
-        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER_OR_REDUCTION_OPERATOR),
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
         category: KeywordKind::Misc,
     },
     KeywordSpec {
         text: "minima",
         token_kind: None,
-        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER_OR_REDUCTION_OPERATOR),
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
         category: KeywordKind::Misc,
     },
     // === Keywords: Reduction expression (`reducta via Op ex source`) ===

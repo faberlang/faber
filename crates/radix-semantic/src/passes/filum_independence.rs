@@ -556,8 +556,7 @@ impl HirVisitor for BodyProof<'_> {
             HirExpressionKind::Itera { .. }
             | HirExpressionKind::IteraLockstep { .. }
             | HirExpressionKind::IteraRange { .. }
-            | HirExpressionKind::Summa { .. }
-            | HirExpressionKind::Extremum { .. } => {
+            | HirExpressionKind::Reduction { .. } => {
                 self.decline(expr.span, "nested_or_reduction_integration_pending");
             }
             HirExpressionKind::Clausura(..)

@@ -10,6 +10,72 @@ fn hir_artifact_round_trip() {
     assert_eq!(original, deserialized);
 }
 
+#[test]
+fn reduction_node_round_trips_through_fhir_validation() {
+    use radix_hir::{
+        HirBlock, HirExpression, HirExpressionKind, HirId, HirLiteral, HirReductionOp,
+        HirStatement, HirStatementKind,
+    };
+    use radix_types::{Primitive, TypeTable};
+
+    let mut artifact = stub_artifact();
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    artifact.types = types.snapshot();
+
+    let expression = HirExpression {
+        id: HirId(2),
+        kind: HirExpressionKind::Reduction {
+            op: HirReductionOp::Sum,
+            source: Box::new(HirExpression {
+                id: HirId(3),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+                ty: Some(numerus),
+                span: Span::default(),
+            }),
+            coordinates: Vec::new(),
+            group: None,
+            filum: None,
+            binding: None,
+            body: None,
+            identity: None,
+            mutable: false,
+        },
+        ty: Some(numerus),
+        span: Span::default(),
+    };
+    let body = HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Expr(expression),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    );
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact must contain a function");
+    };
+    function.body = Some(body);
+
+    let bytes = crate::decode::encode(&artifact).expect("encode Reduction artifact");
+    let decoded = crate::decode::decode(&bytes).expect("validate Reduction artifact");
+    let radix_hir::HirItemKind::Function(function) = &decoded.hir.items[0].kind else {
+        panic!("decoded artifact must contain a function");
+    };
+    let HirStatementKind::Expr(expression) = &function.body.as_ref().unwrap().statements[0].kind
+    else {
+        panic!("decoded body must contain an expression");
+    };
+    assert!(matches!(
+        expression.kind,
+        HirExpressionKind::Reduction {
+            op: HirReductionOp::Sum,
+            ..
+        }
+    ));
+}
+
 /// IL-3 FHIR inventory row: this crate owns binary postcard/MessagePack
 /// artifacts, not a JSON emitter. The binary artifact path preserves an IEEE
 /// non-finite carrier; any JSON-facing boundary must reject it explicitly
@@ -128,8 +194,9 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // carries runtime shape-boundary obligations; schema 32 carries inferred
     // per-target kernel requirements; schema 33 carries tensor edge policies;
     // schema 34 carries runtime shape guards in provider units; schema 36
-    // reshapes `HirExpressionKind::Transfer` into `CopyInto`.
-    assert_eq!(SCHEMA_VERSION, 36);
+    // reshapes `HirExpressionKind::Transfer` into `CopyInto`; schema 37 removes
+    // the legacy `Summa` and `Extremum` variants in favor of `Reduction`.
+    assert_eq!(SCHEMA_VERSION, 37);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

@@ -4414,6 +4414,84 @@ incipit {
 }
 
 #[test]
+fn reducta_arg_extrema_keep_first_index_for_all_nan_sources() {
+    let source = r"functio maximum(tensor<f64, [3]> values) → numerus {
+  redde reducta via argmaxima ex values
+}
+functio minimum(tensor<f64, [3]> values) → numerus {
+  redde reducta via argminima ex values
+}
+incipit {
+  fixum lista<f64> flat ← [nonnumerus, nonnumerus, nonnumerus]
+  fixum tf64[] seed ← vacua
+  fixum tf64[3] values ← seed.strue(flat, [3])
+  nota maximum(values)
+  nota minimum(values)
+}";
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "reducta-arg-all-nan.fab",
+        source,
+        &mut host,
+    )
+    .expect("all-NaN arg-extrema should execute");
+    assert_eq!(host.stdout_lines, ["0", "0"]);
+}
+
+#[test]
+fn reducta_grouping_preserves_source_and_key_tensors() {
+    let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
+  redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
+}
+incipit {
+  fixum tensor<bivalens, []> seed_values ← vacua
+  fixum tensor<bivalens, [3]> values ← seed_values.strue([verum, falsum, verum], [3])
+  fixum tensor<numerus, []> seed_keys ← vacua
+  fixum tensor<numerus, [3]> keys ← seed_keys.strue([0, 1, 0], [3])
+  nota count(values, keys)
+  nota values[0]
+  nota keys[0]
+}";
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "reducta-group-immutable.fab",
+        source,
+        &mut host,
+    )
+    .expect("grouped reduction should execute");
+    assert_eq!(host.stdout_lines, ["[2, 0]", "verum", "0"]);
+}
+
+#[test]
+fn reducta_group_out_of_range_uses_existing_tensor_write_failure() {
+    let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
+  redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
+}
+incipit {
+  fixum tensor<bivalens, []> seed_values ← vacua
+  fixum tensor<bivalens, [3]> values ← seed_values.strue([verum, falsum, verum], [3])
+  fixum tensor<numerus, []> seed_keys ← vacua
+  fixum tensor<numerus, [3]> keys ← seed_keys.strue([0, 1, 2], [3])
+  nota count(values, keys)
+}";
+    let mut host = crate::mir::BufferHost::default();
+    let errors = crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "reducta-group-out-of-range.fab",
+        source,
+        &mut host,
+    )
+    .expect_err("an out-of-range bucket must use the existing tensor write failure");
+    let crate::mir::RunSourceError::Stepper(errors) = errors else {
+        panic!("out-of-range grouped key should reach the runner: {errors:?}");
+    };
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0].issue, "runner_tensor_ponde_invalid_index");
+}
+
+#[test]
 fn cumulata_does_not_overwrite_its_initial_value() {
     // The scan rewrites its accumulator at each step; its initial value is a
     // caller binding and must read the same after the call.
@@ -6714,16 +6792,16 @@ fn conversio_assign_chain_lowers_inner_then_outer_conversion() {
 }
 
 // ---------------------------------------------------------------------------
-// SFR-4: sequential `summa ex` MIR fold over the apud tensor-iteration arm
+// SFR-4: sequential `reducta via summa ex` MIR fold over the apud tensor-iteration arm
 // ---------------------------------------------------------------------------
 
 #[test]
-fn sequential_summa_identity_term_lowers_to_a_fold() {
+fn sequential_reduction_sum_identity_term_lowers_to_a_fold() {
     // Identity term: every element folds with `+` from a zero accumulator —
-    // the sequential spelling of `a.summa()`.
+    // matching `a.summa()` for this tensor.
     let dump = dump_source(
         r"functio total(tensor<f32, [8]> a) → f32 {
-    redde summa ex a apud [i] fixum s { redde s }
+    redde reducta via summa ex a apud [i] fixum s { redde s }
 }",
     );
     assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
@@ -6732,27 +6810,27 @@ fn sequential_summa_identity_term_lowers_to_a_fold() {
 }
 
 #[test]
-fn sequential_summa_without_apud_lowers_rank1() {
+fn sequential_reduction_sum_without_apud_lowers_rank1() {
     let dump = dump_source(
         r"functio total(tensor<f32, [8]> a) → f32 {
-    redde summa ex a fixum s { redde s }
+    redde reducta via summa ex a fixum s { redde s }
 }",
     );
     assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
 }
 
 #[test]
-fn binderless_extremum_runner_matches_apud_form() {
+fn reduction_max_without_apud_matches_apud_form() {
     let source = r#"+++
 locale = "en"
 +++
 
 fn maximum_without_apud(tf32[3] values) → f32 {
-    return max from values
+    return reduce via max from values
 }
 
 fn maximum_with_apud(tf32[3] values) → f32 {
-    return max from values at [i]
+    return reduce via max from values at [i]
 }
 
 main {
@@ -6766,19 +6844,19 @@ main {
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
         &Session::new(Config::default().with_target(Target::HirTypeScript)),
-        "binderless-extremum.fab",
+        "reduction-max.fab",
         source,
         &mut host,
     )
-    .unwrap_or_else(|error| panic!("binderless and apud extrema must run: {error:?}"));
+    .unwrap_or_else(|error| panic!("binderless and apud max reductions must run: {error:?}"));
     assert_eq!(host.stdout_lines, ["4.0", "4.0"]);
 }
 
 #[test]
-fn sequential_summa_numerus_term_folds_int_zero() {
+fn sequential_reduction_sum_numerus_term_folds_int_zero() {
     let dump = dump_source(
         r"functio total(tensor<i32, [4]> a) → i32 {
-    redde summa ex a apud [i] fixum s { redde s }
+    redde reducta via summa ex a apud [i] fixum s { redde s }
 }",
     );
     assert!(!dump.contains("unsupported"), "no unsupported surface:\n{dump}");
@@ -6789,12 +6867,12 @@ fn sequential_summa_numerus_term_folds_int_zero() {
 }
 
 #[test]
-fn sequential_summa_transformed_term_folds_per_element_body() {
+fn sequential_reduction_sum_transformed_term_folds_per_element_body() {
     // Non-identity term: the body's local mutation still folds once per
     // element — term `s + 1.0` over 8 lanes.
     let dump = dump_source(
         r"functio total(tensor<f32, [8]> a) → f32 {
-    redde summa ex a apud [i] fixum s {
+    redde reducta via summa ex a apud [i] fixum s {
         varia f32 t ← s
         t ← t + 1.0
         redde t
@@ -6809,13 +6887,13 @@ fn sequential_summa_transformed_term_folds_per_element_body() {
 }
 
 #[test]
-fn filum_summa_lowers_to_declared_plan_entry() {
+fn filum_reduction_sum_lowers_to_declared_plan_entry() {
     // SFR-5: the `filum` spelling lowers to the `FilumSum` declaration (the
     // kernel-plan entry), never inline base-lane MIR.
     let mut unit = analyze(
         r"@ nucleum
 functio k(tensor<f32, [256]> a) → f32 {
-    redde summa ex a apud [i] filum f fixum s { redde s }
+    redde reducta via summa ex a apud [i] filum f fixum s { redde s }
 }",
     );
     let dump = dump_analyzed_unit(&mut unit).expect("filum summa lowers to the SFR-5 declaration");

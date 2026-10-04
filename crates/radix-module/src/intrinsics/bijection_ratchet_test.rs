@@ -737,7 +737,7 @@ fn bijection_ratchet_equals_probe_derived_gap_set() {
 /// The permanent lists are design facts (goal mir-completeness §1): the four
 /// array operator variants and `IntervalMaterialize` are conversion/operator
 /// surfaces; the six device-internal tensors are target-lane vocabulary. The
-/// AIR statement path (`maxima ex … at [i]` etc.) lowers via `HirExtremumOp`
+/// AIR statement path (`reducta via maxima ex … apud [i]` etc.) lowers via `HirReductionOp`
 /// and the runner twins `TensorMax`/`TensorMin`/`TensorSumAxis`.
 #[test]
 fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
@@ -889,9 +889,9 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::TensorSsmConv1d,
         MirCollectionOp::TensorSsmScan,
     ];
-    // AIR/statement-path reachable: statement heads (`maxima ex … at [i]`,
-    // `summa ex … apud [k]`) and device fragments lower through
-    // `HirExtremumOp`/runner twins, not the method allowlist.
+    // AIR/statement-path reachable: statement heads (`reducta via maxima ex … apud [i]`,
+    // `reducta via summa ex … apud [k]`) and device fragments lower through
+    // `HirReductionOp`/runner twins, not the method allowlist.
     let air_statement_path: &[MirCollectionOp] = &[
         MirCollectionOp::TensorMax,
         MirCollectionOp::TensorMin,

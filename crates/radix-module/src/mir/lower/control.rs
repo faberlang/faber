@@ -587,82 +587,712 @@ impl FunctionBuilder<'_> {
         Some(MirOperand::Constant(MirConstant::Unit))
     }
 
-    /// Lower the sequential `summa ex` spelling to a MIR fold over the shared
+    /// Lower a sequential `reducta via summa` expression to a MIR fold over the shared
     /// apud tensor-iteration arm (SFR-4).
     ///
     /// The accumulator starts at the `+` identity; a valued `redde` in the
-    /// term body adds its value into the accumulator (through the summa fold
+    /// term body adds its value into the accumulator (through the reduction fold
     /// context, never as a function return) and continues the iteration loop.
     /// The distributed `filum` spelling lowers here to the declared kernel-
     /// plan entry (SFR-5): a `FilumSum` runtime call carrying the filum
     /// metadata, the captured term-body MIR, and the coordinate facts —
     /// the plan pass resolves it to `DistributedSum`, never inline MIR.
-    pub(super) fn lower_summa_expr(
+    /// Sequential row-major reduction; each bucket owns exact running temps.
+    pub(super) fn lower_reduction_expr(
         &mut self,
+        op: radix_hir::HirReductionOp,
         source: &HirExpression,
         coordinates: &[(DefId, Symbol)],
+        group: Option<&HirExpression>,
         filum: Option<&(DefId, Symbol)>,
-        binding: &(DefId, Symbol),
-        body: &HirBlock,
+        binding: Option<&(DefId, Symbol)>,
+        body: Option<&HirBlock>,
+        identity: Option<&HirExpression>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        use radix_hir::HirReductionOp as Op;
         if let Some(filum) = filum {
-            return self.lower_filum_summa_expr(source, coordinates, filum, binding, body, expr);
+            if op != Op::Sum || group.is_some() {
+                self.errors
+                    .push(MirError::unsupported(expr.span, "reducta_filum_op_not_lowered"));
+                return None;
+            }
+            return self.lower_filum_summa_expr(source, coordinates, filum, binding?, body?, expr);
         }
-        let Some(term_ty) = expr.ty else {
-            self.errors
-                .push(MirError::missing_type(expr.span, "summa term type"));
-            return None;
+        let source_ty = source.ty?;
+        let (element, shape, matrix) = match self.normalized_type(source_ty) {
+            Type::Tensor(element, shape) => (*element, *shape, false),
+            Type::Matrix(element, shape) => (*element, *shape, true),
+            _ => return None,
         };
-        let term_mir_ty = MirType::semantic(term_ty);
-        let zero = match self.types.get(term_ty) {
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => MirConstant::Float(0.0),
-            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => MirConstant::Int(0),
+        let dimensions = i64s_from_literal_index(shape, self.types);
+        let rank = match self.types.get_index(shape) {
+            radix_types::IndexExpr::Tuple(dims) => dims.len(),
+            radix_types::IndexExpr::Literal(_)
+            | radix_types::IndexExpr::Param(_)
+            | radix_types::IndexExpr::Runtime(_)
+            | radix_types::IndexExpr::Affine { .. }
+            | radix_types::IndexExpr::Divide { .. } => 1,
             _ => {
-                self.errors.push(MirError::unsupported(
-                    expr.span,
-                    "summa term before numeric scalar MIR lowering",
-                ));
+                self.errors
+                    .push(MirError::unsupported(expr.span, "reducta_source_rank_unknown"));
                 return None;
             }
         };
-        // A temp, not a local: every writer is an exact op or copy, so the
-        // backends keep the running total exact and check only at the store
-        // that consumes the fold result.
-        let accumulator = FoldAccumulator::Temp(self.push_temp(term_mir_ty, expr.span));
-        self.assign(accumulator.place(), MirOperand::Constant(zero), term_mir_ty, expr.span);
-        let previous_fold = self
-            .summa_fold
-            .replace(SummaFoldContext { accumulator, ty: term_mir_ty });
-        let lowered = self.lower_array_itera(ArrayIteraLowering {
-            mode: HirIteraMode::Ex,
-            coordinates,
-            binding: binding.0,
-            name: binding.1,
-            iter: source,
-            body,
+        if group.is_none() && body.is_none() {
+            let collection = match op {
+                Op::Max => Some(MirCollectionOp::TensorMax),
+                Op::Min => Some(MirCollectionOp::TensorMin),
+                _ => None,
+            };
+            if let Some(collection) = collection {
+                let mut args = vec![self.lower_expr_value(source)?];
+                if let Some(identity) = identity {
+                    args.push(self.lower_expr_value(identity)?);
+                }
+                return Some(self.runtime_call_value(
+                    MirIntrinsic::Collection(collection),
+                    args,
+                    MirType::semantic(expr.ty?),
+                    expr.span,
+                ));
+            }
+        }
+        let result_ty = MirType::semantic(expr.ty?);
+        let term = if let Some(body) = body {
+            struct TermType(Option<TypeId>);
+            impl HirVisitor for TermType {
+                fn visit_stmt(&mut self, stmt: &HirStatement) {
+                    if let HirStatementKind::Redde(Some(value)) = &stmt.kind {
+                        self.0 = value.ty;
+                    }
+                    crate::hir::visit::walk_stmt(self, stmt);
+                }
+            }
+            let mut term = TermType(None);
+            term.visit_block(body);
+            term.0?
+        } else {
+            element
+        };
+        let term_ty = MirType::semantic(term);
+        let integer = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let accumulator_ty = match op {
+            Op::Sum if group.is_some() => match self.normalized_type(expr.ty?) {
+                Type::Tensor(element, _) => MirType::semantic(*element),
+                _ => return None,
+            },
+            Op::Sum => result_ty,
+            Op::Count => integer,
+            Op::All | Op::Any => boolean,
+            _ => term_ty,
+        };
+        let source_value = self.lower_expr_value(source)?;
+        let source_place = self.materialize_operand_place(source_value, MirType::semantic(source_ty), expr.span);
+        let identity = match identity {
+            Some(identity) => Some(self.lower_expr_value(identity)?),
+            None => None,
+        };
+        let bucket_count = if group.is_some() {
+            let Type::Tensor(_, shape) = self.normalized_type(expr.ty?) else {
+                return None;
+            };
+            usize::try_from(*i64s_from_literal_index(*shape, self.types)?.first()?).ok()?
+        } else {
+            1
+        };
+        let zero = match self.types.get(accumulator_ty.semantic_id()) {
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => MirConstant::Float(0.0),
+            Type::Primitive(Primitive::Bivalens) => MirConstant::Bool(false),
+            _ => MirConstant::Int(0),
+        };
+        let initial = match op {
+            Op::Product => match zero {
+                MirConstant::Float(_) => MirConstant::Float(1.0),
+                _ => MirConstant::Int(1),
+            },
+            Op::All => MirConstant::Bool(true),
+            _ => zero.clone(),
+        };
+        let mut buckets = Vec::with_capacity(bucket_count);
+        for _ in 0..bucket_count {
+            let accumulator = self.push_temp(accumulator_ty, expr.span);
+            self.assign(
+                MirPlace::temp(accumulator),
+                MirOperand::Constant(initial.clone()),
+                accumulator_ty,
+                expr.span,
+            );
+            let score = self.push_temp(term_ty, expr.span);
+            let score_zero = match self.types.get(term) {
+                Type::Primitive(Primitive::Bivalens) => MirConstant::Bool(false),
+                Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
+                    MirConstant::Float(0.0)
+                }
+                _ => MirConstant::Int(0),
+            };
+            self.assign(MirPlace::temp(score), MirOperand::Constant(score_zero), term_ty, expr.span);
+            let seen = self.push_temp(boolean, expr.span);
+            self.assign(
+                MirPlace::temp(seen),
+                MirOperand::Constant(MirConstant::Bool(false)),
+                boolean,
+                expr.span,
+            );
+            let mut winner = Vec::new();
+            if matches!(op, Op::ArgMax | Op::ArgMin) {
+                for _ in 0..rank {
+                    let temp = self.push_temp(integer, expr.span);
+                    self.assign(
+                        MirPlace::temp(temp),
+                        MirOperand::Constant(MirConstant::Int(0)),
+                        integer,
+                        expr.span,
+                    );
+                    winner.push(temp);
+                }
+            }
+            buckets.push(ReductionBucket { accumulator, score, seen, coordinates: winner });
+        }
+        let error_tensor = if group.is_some() {
+            Some(self.reduction_tensor(&buckets, result_ty, accumulator_ty, bucket_count, expr.span)?)
+        } else {
+            None
+        };
+        let mut coordinate_locals = Vec::new();
+        let saved_bindings = self.bindings.clone();
+        for axis in 0..rank {
+            let local = self.next_local_id();
+            self.locals.push(MirLocalDecl {
+                id: local,
+                name: coordinates.get(axis).map(|(_, name)| *name),
+                ty: integer,
+                mutable: true,
+                span: expr.span,
+            });
+            if let Some((id, _)) = coordinates.get(axis) {
+                self.bindings
+                    .insert(*id, LocalBinding { local, ty: integer });
+            }
+            coordinate_locals.push(local);
+        }
+        let element_local = self.next_local_id();
+        self.locals.push(MirLocalDecl {
+            id: element_local,
+            name: binding.map(|(_, name)| *name),
+            ty: MirType::semantic(element),
+            mutable: true,
             span: expr.span,
         });
-        self.summa_fold = previous_fold;
-        lowered?;
-        Some(accumulator.operand())
+        if let Some((id, _)) = binding {
+            self.bindings
+                .insert(*id, LocalBinding { local: element_local, ty: MirType::semantic(element) });
+        }
+        let array_ty = MirType::semantic(self.types.find_array(integer.semantic_id())?);
+        let bounds = if let Some(dimensions) = &dimensions {
+            dimensions
+                .iter()
+                .map(|n| MirOperand::Constant(MirConstant::Int(*n)))
+                .collect::<Vec<_>>()
+        } else {
+            let shape_value = self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::TensorShape),
+                vec![MirOperand::Place(source_place.clone())],
+                array_ty,
+                expr.span,
+            );
+            let option_ty = MirType::semantic(
+                self.types
+                    .find_equal(&Type::Option(integer.semantic_id()))?,
+            );
+            let mut bounds = Vec::new();
+            for axis in 0..rank {
+                let bound = self.runtime_call_value(
+                    MirIntrinsic::Collection(MirCollectionOp::Index),
+                    vec![shape_value.clone(), MirOperand::Constant(MirConstant::Int(axis as i64))],
+                    option_ty,
+                    expr.span,
+                );
+                bounds.push(self.assign_temp(
+                    MirValueKind::Option(MirOptionOp::Unwrap { value: bound, mode: MirOptionUnwrapMode::Assume }),
+                    integer,
+                    expr.span,
+                ));
+            }
+            bounds
+        };
+        let fold = ReductionFoldContext {
+            op,
+            term_ty,
+            accumulator_ty,
+            buckets: buckets.clone(),
+            coordinates: coordinate_locals.clone(),
+            group: group.cloned(),
+            error_tensor,
+        };
+        let previous = self.reduction_fold.replace(fold);
+        let after = self.fresh_block(expr.span);
+        self.lower_reduction_axis(
+            &source_place,
+            &bounds,
+            &coordinate_locals,
+            element_local,
+            element,
+            matrix,
+            dimensions.as_deref(),
+            body,
+            0,
+            after,
+            expr.span,
+        )?;
+        self.switch_to(after);
+        self.reduction_fold = previous;
+        self.bindings = saved_bindings;
+        if group.is_some() {
+            if matches!(op, Op::Max | Op::Min) {
+                for bucket in &buckets {
+                    self.reduction_empty_identity(bucket, identity.clone()?, accumulator_ty, expr.span);
+                }
+            }
+            return self.reduction_tensor(&buckets, result_ty, accumulator_ty, bucket_count, expr.span);
+        }
+        let bucket = &buckets[0];
+        let result = if matches!(op, Op::ArgMax | Op::ArgMin) {
+            if rank == 1 {
+                MirOperand::Temp(bucket.coordinates[0])
+            } else {
+                let inner = match self.types.get(result_ty.semantic_id()) {
+                    Type::Option(inner) => *inner,
+                    _ => result_ty.semantic_id(),
+                };
+                self.construct_temp(
+                    MirAggregateKind::Tuple,
+                    MirAggregateFields::Ordered(
+                        bucket
+                            .coordinates
+                            .iter()
+                            .map(|t| MirAggregateItem::Operand(MirOperand::Temp(*t)))
+                            .collect(),
+                    ),
+                    MirType::semantic(inner),
+                    expr.span,
+                )
+            }
+        } else {
+            MirOperand::Temp(bucket.accumulator)
+        };
+        if matches!(op, Op::Max | Op::Min | Op::ArgMax | Op::ArgMin) {
+            if identity.is_none()
+                && dimensions
+                    .as_ref()
+                    .is_some_and(|d| !d.is_empty() && d.iter().all(|n| *n > 0))
+            {
+                return Some(result);
+            }
+            let destination = self.push_temp(result_ty, expr.span);
+            let nonempty = self.fresh_block(expr.span);
+            let empty = self.fresh_block(expr.span);
+            let join = self.fresh_block(expr.span);
+            self.terminate_current(
+                MirTerminatorKind::Branch {
+                    condition: MirOperand::Temp(bucket.seen),
+                    then_block: nonempty,
+                    else_block: empty,
+                },
+                expr.span,
+            );
+            self.switch_to(nonempty);
+            let result = if matches!(self.types.get(result_ty.semantic_id()), Type::Option(_)) {
+                self.assign_temp(MirValueKind::Option(MirOptionOp::Some(result)), result_ty, expr.span)
+            } else {
+                result
+            };
+            self.assign(MirPlace::temp(destination), result, result_ty, expr.span);
+            self.terminate_current(MirTerminatorKind::Goto(join), expr.span);
+            self.switch_to(empty);
+            let empty_result = identity.unwrap_or_else(|| MirOperand::Constant(MirConstant::Nil));
+            self.assign(MirPlace::temp(destination), empty_result, result_ty, expr.span);
+            self.terminate_current(MirTerminatorKind::Goto(join), expr.span);
+            self.switch_to(join);
+            return Some(MirOperand::Temp(destination));
+        }
+        Some(result)
     }
 
-    /// Frozen filum lane width `W` (SFR-5 settled default: W=32 cyclic; tails
-    /// fail closed at admission — `K % W ≠ 0` is rejected by typecheck).
+    fn reduction_tensor(
+        &mut self,
+        buckets: &[ReductionBucket],
+        result_ty: MirType,
+        element_ty: MirType,
+        extent: usize,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let flat_ty = MirType::semantic(self.types.find_array(element_ty.semantic_id())?);
+        let integer = self.types.primitive(Primitive::Numerus);
+        let dimensions_ty = MirType::semantic(self.types.find_array(integer)?);
+        let flat = self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(
+                buckets
+                    .iter()
+                    .map(|b| MirAggregateItem::Operand(MirOperand::Temp(b.accumulator)))
+                    .collect(),
+            ),
+            flat_ty,
+            span,
+        );
+        let dimensions = self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(
+                extent as i64,
+            )))]),
+            dimensions_ty,
+            span,
+        );
+        let seed = self.construct_temp(
+            MirAggregateKind::Tensor,
+            MirAggregateFields::Ordered(Vec::new()),
+            result_ty,
+            span,
+        );
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat),
+            vec![seed, flat, dimensions],
+            result_ty,
+            span,
+        ))
+    }
+
+    fn reduction_empty_identity(&mut self, bucket: &ReductionBucket, identity: MirOperand, ty: MirType, span: Span) {
+        let empty = self.fresh_block(span);
+        let join = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: MirOperand::Temp(bucket.seen), then_block: join, else_block: empty },
+            span,
+        );
+        self.switch_to(empty);
+        self.assign(MirPlace::temp(bucket.accumulator), identity, ty, span);
+        self.terminate_current(MirTerminatorKind::Goto(join), span);
+        self.switch_to(join);
+    }
+
+    /// Nested loops visit every coordinate once in row-major order.
+    fn lower_reduction_axis(
+        &mut self,
+        source: &MirPlace,
+        bounds: &[MirOperand],
+        coordinates: &[MirLocalId],
+        element_local: MirLocalId,
+        element: TypeId,
+        matrix: bool,
+        dimensions: Option<&[i64]>,
+        body: Option<&HirBlock>,
+        axis: usize,
+        continuation: MirBlockId,
+        span: Span,
+    ) -> Option<()> {
+        if axis >= coordinates.len() {
+            self.errors
+                .push(MirError::unsupported(span, "reducta_rank_zero_not_lowered"));
+            return None;
+        }
+        let integer = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let coordinate = coordinates[axis];
+        self.assign(
+            MirPlace::local(coordinate),
+            MirOperand::Constant(MirConstant::Int(0)),
+            integer,
+            span,
+        );
+        let condition_block = self.fresh_block(span);
+        let body_block = self.fresh_block(span);
+        let increment = self.fresh_block(span);
+        let after = self.fresh_block(span);
+        self.terminate_current(MirTerminatorKind::Goto(condition_block), span);
+        self.switch_to(condition_block);
+        let condition = self.binary_temp(
+            MirBinOp::Lt,
+            MirOperand::Place(MirPlace::local(coordinate)),
+            bounds[axis].clone(),
+            boolean,
+            span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition, then_block: body_block, else_block: after },
+            span,
+        );
+        self.switch_to(body_block);
+        if axis + 1 < coordinates.len() {
+            self.lower_reduction_axis(
+                source,
+                bounds,
+                coordinates,
+                element_local,
+                element,
+                matrix,
+                dimensions,
+                body,
+                axis + 1,
+                increment,
+                span,
+            )?;
+        } else {
+            let element_ty = MirType::semantic(element);
+            if matrix {
+                let dimensions = dimensions?;
+                let columns = u8::try_from(dimensions[1]).ok()?;
+                let rows = u8::try_from(dimensions[0]).ok()?;
+                let offset = self.binary_temp(
+                    MirBinOp::Mul,
+                    MirOperand::Place(MirPlace::local(coordinates[0])),
+                    MirOperand::Constant(MirConstant::Int(i64::from(columns))),
+                    integer,
+                    span,
+                );
+                let offset = self.binary_temp(
+                    MirBinOp::Add,
+                    offset,
+                    MirOperand::Place(MirPlace::local(coordinates[1])),
+                    integer,
+                    span,
+                );
+                let ready = self.fresh_block(span);
+                let cases = (0..u16::from(rows) * u16::from(columns))
+                    .map(|offset| MirSwitchCase {
+                        value: MirConstant::Int(i64::from(offset)),
+                        target: self.fresh_block(span),
+                    })
+                    .collect::<Vec<_>>();
+                let blocks = cases.iter().map(|c| c.target).collect::<Vec<_>>();
+                self.terminate_current(MirTerminatorKind::Switch { value: offset, cases, default: increment }, span);
+                for (offset, block) in blocks.into_iter().enumerate() {
+                    self.switch_to(block);
+                    let mut cell = source.clone();
+                    cell.projections.push(MirProjection::MatrixCell {
+                        row: (offset / usize::from(columns)) as u8,
+                        column: (offset % usize::from(columns)) as u8,
+                    });
+                    self.assign(MirPlace::local(element_local), MirOperand::Place(cell), element_ty, span);
+                    self.terminate_current(MirTerminatorKind::Goto(ready), span);
+                }
+                self.switch_to(ready);
+            } else {
+                let indices = self.reduction_indices(
+                    coordinates
+                        .iter()
+                        .map(|c| MirOperand::Place(MirPlace::local(*c)))
+                        .collect(),
+                    span,
+                )?;
+                let option_ty = MirType::semantic(self.types.find_equal(&Type::Option(element))?);
+                let value = self.runtime_call_value(
+                    MirIntrinsic::Collection(MirCollectionOp::TensorGet),
+                    vec![MirOperand::Place(source.clone()), indices],
+                    option_ty,
+                    span,
+                );
+                let value = self.assign_temp(
+                    MirValueKind::Option(MirOptionOp::Unwrap { value, mode: MirOptionUnwrapMode::Assume }),
+                    element_ty,
+                    span,
+                );
+                self.assign(MirPlace::local(element_local), value, element_ty, span);
+            }
+            self.breakables.push(BreakableContext {
+                perge_target: Some(increment),
+                rumpe_target: after,
+                rumpe_used: false,
+            });
+            if let Some(body) = body {
+                self.visit_block(body);
+            } else {
+                self.fold_reduction_value(MirOperand::Place(MirPlace::local(element_local)), span);
+            }
+            self.breakables.pop();
+            self.terminate_open_current(MirTerminatorKind::Goto(increment), span);
+        }
+        self.switch_to(increment);
+        let next = self.binary_temp(
+            MirBinOp::Add,
+            MirOperand::Place(MirPlace::local(coordinate)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            integer,
+            span,
+        );
+        self.assign(MirPlace::local(coordinate), next, integer, span);
+        self.terminate_current(MirTerminatorKind::Goto(condition_block), span);
+        self.switch_to(after);
+        self.terminate_current(MirTerminatorKind::Goto(continuation), span);
+        Some(())
+    }
+
+    fn reduction_indices(&mut self, indices: Vec<MirOperand>, span: Span) -> Option<MirOperand> {
+        let integer = self.types.primitive(Primitive::Numerus);
+        let ty = MirType::semantic(self.types.find_array(integer)?);
+        Some(self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(indices.into_iter().map(MirAggregateItem::Operand).collect()),
+            ty,
+            span,
+        ))
+    }
+
+    pub(super) fn fold_reduction_value(&mut self, value: MirOperand, span: Span) {
+        let Some(fold) = self.reduction_fold.clone() else {
+            return;
+        };
+        if let Some(group) = &fold.group {
+            let Some(key) = self.lower_expr_value(group) else {
+                return;
+            };
+            let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+            let join = self.fresh_block(span);
+            for (index, bucket) in fold.buckets.iter().enumerate() {
+                let selected = self.fresh_block(span);
+                let next = self.fresh_block(span);
+                let condition = self.binary_temp(
+                    MirBinOp::Eq,
+                    key.clone(),
+                    MirOperand::Constant(MirConstant::Int(index as i64)),
+                    boolean,
+                    span,
+                );
+                self.terminate_current(
+                    MirTerminatorKind::Branch { condition, then_block: selected, else_block: next },
+                    span,
+                );
+                self.switch_to(selected);
+                self.combine_reduction_bucket(&fold, bucket, value.clone(), span);
+                self.terminate_open_current(MirTerminatorKind::Goto(join), span);
+                self.switch_to(next);
+            }
+            if let (Some(tensor), Some(indices)) = (fold.error_tensor.clone(), self.reduction_indices(vec![key], span))
+            {
+                // Preserve the existing write failure, never reinterpret a bad key.
+                self.runtime_call_value(
+                    MirIntrinsic::Collection(MirCollectionOp::TensorSet),
+                    vec![tensor, indices, MirOperand::Constant(MirConstant::Int(0))],
+                    MirType::semantic(self.types.primitive(Primitive::Vacuum)),
+                    span,
+                );
+            }
+            self.terminate_open_current(MirTerminatorKind::Unreachable, span);
+            self.switch_to(join);
+        } else if let Some(bucket) = fold.buckets.first() {
+            self.combine_reduction_bucket(&fold, bucket, value, span);
+        }
+    }
+
+    fn combine_reduction_bucket(
+        &mut self,
+        fold: &ReductionFoldContext,
+        bucket: &ReductionBucket,
+        value: MirOperand,
+        span: Span,
+    ) {
+        use radix_hir::HirReductionOp as Op;
+        let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        if matches!(fold.op, Op::Max | Op::Min | Op::ArgMax | Op::ArgMin) {
+            let absent = self.binary_temp(
+                MirBinOp::Eq,
+                MirOperand::Temp(bucket.seen),
+                MirOperand::Constant(MirConstant::Bool(false)),
+                boolean,
+                span,
+            );
+            let comparison = if matches!(fold.op, Op::Max | Op::ArgMax) {
+                MirBinOp::Gt
+            } else {
+                MirBinOp::Lt
+            };
+            let better = self.binary_temp(comparison, value.clone(), MirOperand::Temp(bucket.score), boolean, span);
+            let score_nan = self.binary_temp(
+                MirBinOp::NotEq,
+                MirOperand::Temp(bucket.score),
+                MirOperand::Temp(bucket.score),
+                boolean,
+                span,
+            );
+            let value_number = self.binary_temp(MirBinOp::Eq, value.clone(), value.clone(), boolean, span);
+            let replaces_nan = self.binary_temp(MirBinOp::And, score_nan, value_number, boolean, span);
+            let better = self.binary_temp(MirBinOp::Or, better, replaces_nan, boolean, span);
+            let take = self.binary_temp(MirBinOp::Or, absent, better, boolean, span);
+            let selected = self.fresh_block(span);
+            let join = self.fresh_block(span);
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition: take, then_block: selected, else_block: join },
+                span,
+            );
+            self.switch_to(selected);
+            self.assign(MirPlace::temp(bucket.score), value.clone(), fold.term_ty, span);
+            self.assign(MirPlace::temp(bucket.accumulator), value, fold.accumulator_ty, span);
+            for (winner, coordinate) in bucket.coordinates.iter().zip(&fold.coordinates) {
+                let integer = MirType::semantic(self.types.primitive(Primitive::Numerus));
+                self.assign(
+                    MirPlace::temp(*winner),
+                    MirOperand::Place(MirPlace::local(*coordinate)),
+                    integer,
+                    span,
+                );
+            }
+            self.assign(
+                MirPlace::temp(bucket.seen),
+                MirOperand::Constant(MirConstant::Bool(true)),
+                boolean,
+                span,
+            );
+            self.terminate_current(MirTerminatorKind::Goto(join), span);
+            self.switch_to(join);
+            return;
+        }
+        if fold.op == Op::Count {
+            let selected = self.fresh_block(span);
+            let join = self.fresh_block(span);
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition: value, then_block: selected, else_block: join },
+                span,
+            );
+            self.switch_to(selected);
+            let next = self.new_value(
+                MirValueKind::Binary {
+                    op: MirBinOp::Add,
+                    lhs: MirOperand::Temp(bucket.accumulator),
+                    rhs: MirOperand::Constant(MirConstant::Int(1)),
+                },
+                fold.accumulator_ty,
+                span,
+            );
+            self.append_stmt(MirStatement {
+                kind: MirStatementKind::Assign { place: MirPlace::temp(bucket.accumulator), value: next },
+                span,
+            });
+            self.terminate_current(MirTerminatorKind::Goto(join), span);
+            self.switch_to(join);
+            return;
+        }
+        let op = match fold.op {
+            Op::Sum => MirBinOp::Add,
+            Op::Product => MirBinOp::Mul,
+            Op::All => MirBinOp::And,
+            Op::Any => MirBinOp::Or,
+            _ => return,
+        };
+        let next = self.new_value(
+            MirValueKind::Binary { op, lhs: MirOperand::Temp(bucket.accumulator), rhs: value },
+            fold.accumulator_ty,
+            span,
+        );
+        self.append_stmt(MirStatement {
+            kind: MirStatementKind::Assign { place: MirPlace::temp(bucket.accumulator), value: next },
+            span,
+        });
+    }
+
+    /// Frozen cyclic `filum` width for the distributed sum kernel-plan entry.
     const FILUM_LANE_WIDTH: u32 = 32;
 
-    /// Lower the distributed `summa … filum` spelling to the declared
-    /// kernel-plan entry (SFR-5): one `FilumSum` runtime call carrying the
-    /// filum metadata, the captured term-body MIR, and the coordinate
-    /// facts. The plan pass (`kernel_plan_for_function`) resolves the call
-    /// to `CollectionKernelPlan::DistributedSum`; backends without a native
-    /// arm lower it through the shared-memory tree floor the plan pins.
-    ///
-    /// The term body is lowered once into scratch blocks with the binder and
-    /// coordinate locals bound; the emitted statements are captured into the
-    /// declaration and the scratch blocks are dropped, so nothing of the
-    /// term body runs inline in the base lane.
     fn lower_filum_summa_expr(
         &mut self,
         source: &HirExpression,
@@ -762,7 +1392,7 @@ impl FunctionBuilder<'_> {
         });
         let previous_capture = self
             .filum_capture
-            .replace(SummaFoldContext { accumulator: FoldAccumulator::Local(term_result), ty: term_mir_ty });
+            .replace(FilumCapture { term_result, ty: term_mir_ty });
         self.visit_block(body);
         self.filum_capture = previous_capture;
         self.breakables.pop();

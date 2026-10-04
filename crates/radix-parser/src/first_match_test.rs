@@ -27,7 +27,7 @@ fn first_match_head_parses_into_a_dedicated_expression() {
 #[test]
 fn first_match_head_supports_filum_bounded_sources() {
     // Contract row: bounded-source routes include per-axis (`apud [i]`)
-    // filum forms, mirroring the `summa ex … apud …` shape.
+    // filum forms, mirroring the `reducta via summa ex … apud …` shape.
     let _ = parse_ok(
         "functio t(tf32[2, 2] a) → fractus ∪ nihil { redde primus_quem(a apud [i], ubi x { x > 0.0 }) }",
     );

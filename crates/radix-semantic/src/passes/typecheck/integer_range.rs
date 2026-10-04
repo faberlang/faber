@@ -711,7 +711,7 @@ impl TypeChecker<'_> {
         let ty = ty.or(expr.ty)?;
         let leaf = || Self::operand_range(self.classify_operand(expr, ty));
         match &expr.kind {
-            HirExpressionKind::Summa { .. } => Some(self.cap_or_declared(ty)),
+            HirExpressionKind::Reduction { .. } => Some(self.cap_or_declared(ty)),
             HirExpressionKind::Binary(op, lhs, rhs) => Self::binary_value_range(
                 *op,
                 self.value_range(lhs, None)?,

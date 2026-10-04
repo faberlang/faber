@@ -1147,25 +1147,26 @@ impl super::FaberCodegen<'_> {
                 writer.write(" ");
                 self.write_expr(inner, names, surface, writer);
             }
-            HirExpressionKind::Summa {
+            HirExpressionKind::Reduction {
+                op,
                 source,
                 coordinates,
+                group,
                 filum,
                 binding,
                 body,
+                identity,
                 mutable,
-                ..
             } => {
-                // `summa ex src apud [i] filum f fixum s { … }` — the SFR-2
-                // source shape; every clause head is surface-projected.
-                writer.write(surface.contextual_keyword("summa"));
+                writer.write(surface.contextual_keyword("reducta"));
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Via));
+                writer.write(" ");
+                writer.write(surface.contextual_keyword(op.keyword_key()));
                 writer.write(" ");
                 writer.write(surface.keyword(TokenKind::Ex));
                 writer.write(" ");
-                // Reduction operand precedence: binary children (`row ⊙
-                // scale`) must stay grouped or the tail clauses capture the
-                // loose operand on re-parse.
-                self.write_expr_prec(source, 10, names, surface, writer);
+                self.write_expr_prec(source, 12, names, surface, writer);
                 if !coordinates.is_empty() {
                     writer.write(" ");
                     writer.write(surface.keyword(TokenKind::Apud));
@@ -1177,6 +1178,12 @@ impl super::FaberCodegen<'_> {
                         writer.write(&self.symbol_to_string(*name));
                     }
                     writer.write("]");
+                }
+                if let Some(group) = group {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword("pro"));
+                    writer.write(" ");
+                    self.write_expr_prec(group, 12, names, surface, writer);
                 }
                 if let Some((_, lane)) = filum {
                     writer.write(" ");
@@ -1184,51 +1191,19 @@ impl super::FaberCodegen<'_> {
                     writer.write(" ");
                     writer.write(&self.symbol_to_string(*lane));
                 }
-                writer.write(" ");
-                writer.write(loop_binder_keyword(*mutable, surface));
-                writer.write(" ");
-                writer.write(&self.symbol_to_string(binding.1));
-                writer.writeln(" {");
-                writer.indented(|writer| {
-                    self.write_block(body, names, surface, writer);
-                    self.write_block_end_trivia(body, writer);
-                });
-                writer.write("}");
-            }
-            HirExpressionKind::Extremum {
-                op,
-                source,
-                coordinates,
-                coalesce,
-            } => {
-                writer.write(surface.contextual_keyword(match op {
-                    radix_hir::HirExtremumOp::Max => "maxima",
-                    radix_hir::HirExtremumOp::Min => "minima",
-                }));
-                writer.write(" ");
-                writer.write(surface.keyword(TokenKind::Ex));
-                writer.write(" ");
-                // With a `vel` identity tail the source must bind tighter
-                // than the infix `vel` operator; primary-level precedence
-                // parenthesizes any operator source (`(row ⊙ scale) vel …`).
-                if coalesce.is_some() {
-                    self.write_expr_prec(source, 12, names, surface, writer);
-                } else {
-                    self.write_expr_prec(source, 10, names, surface, writer);
-                }
-                if !coordinates.is_empty() {
+                if let (Some(binding), Some(body)) = (binding, body) {
                     writer.write(" ");
-                    writer.write(surface.keyword(TokenKind::Apud));
-                    writer.write(" [");
-                    for (index, (_, name)) in coordinates.iter().enumerate() {
-                        if index > 0 {
-                            writer.write(", ");
-                        }
-                        writer.write(&self.symbol_to_string(*name));
-                    }
-                    writer.write("]");
+                    writer.write(loop_binder_keyword(*mutable, surface));
+                    writer.write(" ");
+                    writer.write(&self.symbol_to_string(binding.1));
+                    writer.writeln(" {");
+                    writer.indented(|writer| {
+                        self.write_block(body, names, surface, writer);
+                        self.write_block_end_trivia(body, writer);
+                    });
+                    writer.write("}");
                 }
-                if let Some(identity) = coalesce {
+                if let Some(identity) = identity {
                     writer.write(" ");
                     writer.write(surface.contextual_keyword("vel"));
                     writer.write(" ");

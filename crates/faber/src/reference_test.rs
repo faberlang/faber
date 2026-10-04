@@ -102,9 +102,9 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     assert!(primus.contains("first live"));
     assert!(primus.contains("SEM059"));
 
-    // filum is the distributed sum-reduce grammar reduction, not a list op.
+    // filum is the distributed `reducta via summa ex` reduction, not a list op.
     let filum = render_plain(&registry.lookup("filum").expect("filum"));
-    assert!(filum.contains("summa ex"));
+    assert!(filum.contains("reducta via summa ex"));
     assert!(filum.contains("@ nucleum"));
 
     // Bits lists the four exact pairs, including both u16 rows.
@@ -123,7 +123,7 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     let summa_lookup = registry.lookup("summa").expect("summa resolves");
     let summa = render_plain(&summa_lookup);
     assert!(
-        summa.contains("summa ex"),
+        summa.contains("reducta via summa ex"),
         "summa entry is the reduce grammar"
     );
     assert!(!summa.contains(".sum()"));

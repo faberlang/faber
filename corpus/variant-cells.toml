@@ -360,13 +360,13 @@ expected = true
 note = "batch 3: rank-4 coordinate iteration; .expected pinned from runner stdout"
 
 # =============================================================================
-# summa / maxima / minima (16 cells: 16 direct / 0 bare)
+# reducta reductions (19 cells: 19 direct / 0 bare)
 # =============================================================================
 
 [[cells]]
-id = "summa.ex-fixum"
+id = "summa.reducta-body"
 family = "summa"
-cell = "sequential summa ex … apud [i] fixum s"
+cell = "sequential reducta via summa … apud [i] fixum s"
 status = "direct"
 exemplum = "summa/summa.fab"
 expected = true
@@ -375,7 +375,7 @@ note = "runner runs the fold (SFR-4); rust lane fails closed at codegen by class
 [[cells]]
 id = "summa.filum"
 family = "summa"
-cell = "filum/thread distributed sum-reduce (@ nucleum la + @ kernel en)"
+cell = "reducta via summa … filum distributed sum-reduce (@ nucleum la + @ kernel en)"
 status = "direct"
 exemplum = "summa/filum.fab"
 expected = false
@@ -391,18 +391,45 @@ expected = true
 decline = true
 
 [[cells]]
-id = "summa.combine-refusal"
+id = "summa.reducta-unknown-op"
 family = "summa"
-cell = "REJECT: summa combine-refusal (PARSE001)"
+cell = "REJECT: reducta via unknown operator (PARSE001)"
 status = "direct"
-exemplum = "summa/summa-combine-refusal.fab"
+exemplum = "summa/reducta-unknown-op.fab"
+expected = true
+decline = true
+
+[[cells]]
+id = "summa.reducta-bare"
+family = "summa"
+cell = "REJECT: reducta without via (PARSE001)"
+status = "direct"
+exemplum = "summa/reducta-bare.fab"
+expected = true
+decline = true
+
+[[cells]]
+id = "summa.summa-ex-retired"
+family = "summa"
+cell = "REJECT: retired summa ex head (PARSE010)"
+status = "direct"
+exemplum = "summa/summa-ex-retired.fab"
+expected = true
+decline = true
+
+[[cells]]
+id = "summa.extrema-ex-retired"
+family = "summa"
+cell = "REJECT: retired maxima/minima ex heads (PARSE010)"
+status = "direct"
+exemplum = "summa/extrema-ex-retired.fab"
 expected = true
 decline = true
 
 [[cells]]
 id = "summa.max-at-coalesce"
 family = "summa"
-cell = "max from … at [i] coalesce"
+cell = "reducta via maxima … apud [i] vel identity"
 status = "direct"
 exemplum = "summa/max-min.fab"
 expected = true
@@ -411,7 +438,7 @@ note = "batch 2: .expected pinned from runner stdout"
 [[cells]]
 id = "summa.min-at-coalesce"
 family = "summa"
-cell = "min from … at [i] coalesce"
+cell = "reducta via minima … apud [i] vel identity"
 status = "direct"
 exemplum = "summa/max-min.fab"
 expected = true
@@ -420,7 +447,7 @@ note = "batch 2: .expected pinned from runner stdout"
 [[cells]]
 id = "summa.max-apud-absent"
 family = "summa"
-cell = "max from (row ⊙ scale) coalesce (apud-absent)"
+cell = "reducta via maxima from a transformed source (apud absent)"
 status = "direct"
 exemplum = "summa/max-min.fab"
 expected = true
@@ -429,7 +456,7 @@ note = "batch 2: .expected pinned from runner stdout"
 [[cells]]
 id = "summa.empty-identity"
 family = "summa"
-cell = "empty -∞ coalesce identity"
+cell = "empty extrema use the caller's vel identity"
 status = "direct"
 exemplum = "summa/max-min.fab"
 expected = true
@@ -464,7 +491,7 @@ expected = true
 [[cells]]
 id = "summa.no-apud"
 family = "summa"
-cell = "summa without apud (plain fold)"
+cell = "reducta via summa without apud (rank-1 fold)"
 status = "direct"
 exemplum = "summa/no-apud.fab"
 expected = true
@@ -482,7 +509,7 @@ note = "batch 4: check-proven declaration-only kernel; runner has no entry funct
 [[cells]]
 id = "summa.varia-binder"
 family = "summa"
-cell = "varia binder on summa"
+cell = "varia binder on reducta via summa"
 status = "direct"
 exemplum = "summa/varia-binder.fab"
 expected = true
@@ -491,7 +518,7 @@ note = "batch 4: mutable reduction binder; .expected pinned from runner stdout"
 [[cells]]
 id = "summa.en-no-thread"
 family = "summa"
-cell = "en sequential sum from WITHOUT thread"
+cell = "English reduce via sum from WITHOUT thread"
 status = "direct"
 exemplum = "summa/summa-en-no-thread.fab"
 expected = true
@@ -500,7 +527,7 @@ note = "batch 4: English host-lane reduction without thread; .expected pinned fr
 [[cells]]
 id = "summa.extrema-no-coalesce"
 family = "summa"
-cell = "maxima/minima WITHOUT coalesce tail"
+cell = "reducta via maxima/minima WITHOUT vel for non-empty inputs"
 status = "direct"
 exemplum = "summa/extrema-no-coalesce.fab"
 expected = true

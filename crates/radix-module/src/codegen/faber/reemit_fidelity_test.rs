@@ -41,6 +41,82 @@ fn assert_idempotent(source: &str) -> String {
 }
 
 #[test]
+fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
+    let cases = [
+        (
+            "la",
+            "reducta via summa ex",
+            "functio total(tf32[4] xs) → f32 { redde reducta via summa ex xs }\n",
+            "functio total(tf32[4] xs) → f32 { redde reducta via unknown ex xs }\n",
+            "functio total(tf32[4] xs) → f32 { redde reducta ex xs }\n",
+            "summa, factum, maxima, minima, argmaxima, argminima, omnia, quilibet, numeratio",
+        ),
+        (
+            "en",
+            "reduce via sum from",
+            "fn total(tf32[4] xs) → f32 { return reduce via sum from xs }\n",
+            "fn total(tf32[4] xs) → f32 { return reduce via unknown from xs }\n",
+            "fn total(tf32[4] xs) → f32 { return reduce from xs }\n",
+            "sum, product, max, min, argmax, argmin, all, any, count",
+        ),
+        (
+            "zh-Hans",
+            "归约 经由 求和 取自",
+            "函数 total(tf32[4] xs) → f32 { 返回 归约 经由 求和 取自 xs }\n",
+            "函数 total(tf32[4] xs) → f32 { 返回 归约 经由 unknown 取自 xs }\n",
+            "函数 total(tf32[4] xs) → f32 { 返回 归约 取自 xs }\n",
+            "求和, 求积, 最大, 最小, 最大值索引, 最小值索引, 全部, 任一, 计数",
+        ),
+    ];
+    for (locale, surface, source, invalid_source, missing_via_source, operators) in cases {
+        let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
+            .unwrap_or_else(|error| panic!("{locale} pack loads: {error:?}"));
+        let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+        let emit = |input: &str| {
+            let result = reemit_faber(&session, &pack, "reducta.fab", input);
+            assert!(
+                result.success(),
+                "{locale}: {:?}",
+                result
+                    .diagnostics
+                    .iter()
+                    .map(|diagnostic| (diagnostic.code, diagnostic.issue(), diagnostic.args.clone()))
+                    .collect::<Vec<_>>()
+            );
+            result.output.expect("re-emitted program").code
+        };
+        let first = emit(source);
+        assert!(first.contains(surface), "{locale}: {first}");
+        assert_eq!(emit(&first), first, "{locale} reduction output is not idempotent");
+
+        for (invalid, issue) in [
+            (invalid_source, "reducta_unknown_operator"),
+            (missing_via_source, "reducta_requires_via"),
+        ] {
+            let diagnostics = match analyze_source(&session, "reducta-invalid.fab", invalid, AnalyzeRequest::default())
+            {
+                Ok(unit) => unit.diagnostics,
+                Err(diagnostics) => diagnostics,
+            };
+            let diagnostic = diagnostics
+                .iter()
+                .find(|diagnostic| diagnostic.issue() == Some(issue))
+                .unwrap_or_else(|| panic!("{locale}: missing {issue} parse diagnostic: {diagnostics:?}"));
+            assert_eq!(diagnostic.code, Some("PARSE001"), "{locale}: {issue}");
+            assert_eq!(
+                diagnostic
+                    .args
+                    .iter()
+                    .find(|arg| arg.name == "operators")
+                    .map(|arg| arg.value.as_str()),
+                Some(operators),
+                "{locale} {issue} operator list"
+            );
+        }
+    }
+}
+
+#[test]
 fn trap_body_comments_survive_round_trip() {
     for source in [
         "functio f() { fixum ∪ r ← capta {\n# trap body\n1\n} }\n",
@@ -452,23 +528,23 @@ fn itera_coordinates_survive_reemission() {
 }
 
 #[test]
-fn summa_reduction_reemits_source_shape() {
+fn reduction_sum_reemits_source_shape() {
     let code = assert_idempotent(
-        "functio total(tensor<f32, [8]> a) → f32 {\n    redde summa ex a apud [i] fixum s { redde s }\n}\n",
+        "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] fixum s { redde s }\n}\n",
     );
     assert!(
-        code.contains("summa ex a apud [i] fixum s"),
-        "summa reduction must re-emit its source shape:\n{code}"
+        code.contains("reducta via summa ex a apud [i] fixum s"),
+        "sum reduction must re-emit its source shape:\n{code}"
     );
 }
 
 #[test]
-fn extremum_coalesce_parenthesizes_binary_source() {
+fn reduction_max_coalesce_parenthesizes_binary_source() {
     let code = assert_idempotent(
-        "functio peak(tensor<f32, [4]> row, tensor<f32, [4]> scale) → f32 {\n    redde maxima ex (row ⊙ scale) vel 0.0\n}\n",
+        "functio peak(tensor<f32, [4]> row, tensor<f32, [4]> scale) → f32 {\n    redde reducta via maxima ex (row ⊙ scale) vel 0.0\n}\n",
     );
     assert!(
-        code.contains("maxima ex (row ⊙ scale) vel 0.0"),
+        code.contains("reducta via maxima ex (row ⊙ scale) vel 0.0"),
         "extremum source must stay grouped before the vel tail:\n{code}"
     );
 }

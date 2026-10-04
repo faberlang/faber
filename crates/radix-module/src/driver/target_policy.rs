@@ -421,13 +421,15 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_go_expr(&call_default.call, file, diagnostics);
             scan_go_expr(&call_default.default, file, diagnostics);
         }
-        ExprKind::Summa(summa) => {
-            scan_go_expr(&summa.source, file, diagnostics);
-            scan_go_block(&summa.body, file, diagnostics);
-        }
-        ExprKind::Maxima(extremum) | ExprKind::Minima(extremum) => {
-            scan_go_expr(&extremum.source, file, diagnostics);
-            if let Some(identity) = &extremum.coalesce {
+        ExprKind::Reducta(reduction) => {
+            scan_go_expr(&reduction.source, file, diagnostics);
+            if let Some(group) = &reduction.group {
+                scan_go_expr(group, file, diagnostics);
+            }
+            if let Some(body) = &reduction.body {
+                scan_go_block(body, file, diagnostics);
+            }
+            if let Some(identity) = &reduction.identity {
                 scan_go_expr(identity, file, diagnostics);
             }
         }
@@ -794,13 +796,15 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_rust_expr(&call_default.call, file, diagnostics);
             scan_rust_expr(&call_default.default, file, diagnostics);
         }
-        ExprKind::Summa(summa) => {
-            scan_rust_expr(&summa.source, file, diagnostics);
-            scan_rust_block(&summa.body, file, diagnostics);
-        }
-        ExprKind::Maxima(extremum) | ExprKind::Minima(extremum) => {
-            scan_rust_expr(&extremum.source, file, diagnostics);
-            if let Some(identity) = &extremum.coalesce {
+        ExprKind::Reducta(reduction) => {
+            scan_rust_expr(&reduction.source, file, diagnostics);
+            if let Some(group) = &reduction.group {
+                scan_rust_expr(group, file, diagnostics);
+            }
+            if let Some(body) = &reduction.body {
+                scan_rust_block(body, file, diagnostics);
+            }
+            if let Some(identity) = &reduction.identity {
                 scan_rust_expr(identity, file, diagnostics);
             }
         }

@@ -301,17 +301,22 @@ impl FragmentDefinitionChecker<'_> {
                 }
                 self.check_block(body);
             }
-            HirExpressionKind::Summa { source, body, .. } => {
-                self.effect(expr.span, "unapproved_effect");
-                self.check_expr(source);
-                self.check_block(body);
-            }
-            HirExpressionKind::Extremum {
-                source, coalesce, ..
+            HirExpressionKind::Reduction {
+                source,
+                group,
+                body,
+                identity,
+                ..
             } => {
                 self.effect(expr.span, "unapproved_effect");
                 self.check_expr(source);
-                if let Some(identity) = coalesce {
+                if let Some(group) = group {
+                    self.check_expr(group);
+                }
+                if let Some(body) = body {
+                    self.check_block(body);
+                }
+                if let Some(identity) = identity {
                     self.check_expr(identity);
                 }
             }

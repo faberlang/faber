@@ -534,13 +534,12 @@ fn cap_typed_sum_into_int_is_checked_at_every_store_position() {
 }
 
 #[test]
-fn summa_at_the_cap_is_checked_at_the_return_store() {
-    // f1s (ruling 21): `summa` over signed integers is typed `i64` at the
-    // cap, and its element count is unbounded, so returning it as `int` is a
-    // checked store. Unsigned terms give `u64`, which narrows into `int`.
+fn reducta_summa_is_range_typed_at_the_integer_cap() {
+    // Ruling 21: an integer sum has an unbounded term count, so its result
+    // type reaches the signed or unsigned 64-bit cap before the return store.
     for term in ["i64", "i8", "u8"] {
         let source = format!(
-            "functio total(tensor<{term}, [2]> a) → numerus {{\n  redde summa ex a fixum s {{\n    redde s\n  }}\n}}\n"
+            "functio total(tensor<{term}, [2]> a) → numerus {{\n  redde reducta via summa ex a fixum s {{\n    redde s\n  }}\n}}\n"
         );
         assert_eq!(kinds(&source), vec![HirStoreKind::Return], "{term}");
     }

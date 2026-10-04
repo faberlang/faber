@@ -1,10 +1,10 @@
 +++
 term = "summa"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "expression", "summa_expr", "apud_clause", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "expression", "reducta_expr", "apud_clause", "literal", "nota_stmt"]
 category = "collection"
-summary = "Sequential sum-reduce with a mutable varia binder: summa ex … apud [i] varia s { redde <term> }."
-syntax = "summa ex <tensor> apud [i] varia s { redde <term> }"
+summary = "Sequential sum-reduce with a mutable varia binder: reducta via summa ex … apud [i] varia s { redde <term> }."
+syntax = "reducta via summa ex <tensor> apud [i] varia s { redde <term> }"
 related = ["summa", "apud", "varia", "tensor"]
 locale = "la"
 +++
@@ -22,7 +22,7 @@ locale = "la"
 #     changes the local binding's mutability.
 
 functio total(tensor<f32, [4]> a) → f32 {
-    redde summa ex a apud [i] varia s { redde s }
+    redde reducta via summa ex a apud [i] varia s { redde s }
 }
 
 incipit {

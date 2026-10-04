@@ -36,7 +36,7 @@ use crate::driver::AnalyzedModule;
 use crate::hir::visit::{HirVisitor, walk_expr, walk_program};
 use crate::hir::{
     DefId, HirAnnotationValue, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget,
-    HirExpression, HirExpressionKind, HirExtremumOp, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode,
+    HirExpression, HirExpressionKind, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode,
     HirLiteral, HirLocal, HirMethod, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirParamMode,
     HirPattern, HirRangeKind, HirScribeKind, HirStatement, HirStatementKind, HirStruct, HirTypeParam, HirUnOp,
 };
@@ -1090,10 +1090,9 @@ fn ensure_itera_coordinate_array_types(hir: &crate::hir::HirModule, types: &mut 
                 HirExpressionKind::Itera { coordinates, iter, .. } if !coordinates.is_empty() => {
                     self.collect_shaped_element(iter);
                 }
-                // The sequential `summa ex` fold rides the shaped itera arm
-                // (SFR-4), so its coordinate list needs the same array types.
-                HirExpressionKind::Summa { source, coordinates, .. } if !coordinates.is_empty() => {
+                HirExpressionKind::Reduction { source, .. } => {
                     self.collect_shaped_element(source);
+                    self.collect_shaped_element(expr);
                 }
                 _ => {}
             }
@@ -1124,7 +1123,9 @@ fn ensure_itera_coordinate_array_types(hir: &crate::hir::HirModule, types: &mut 
     if !elements.is_empty() {
         let numerus = types.primitive(Primitive::Numerus);
         types.ensure_array(numerus);
+        types.intern(Type::Option(numerus));
         for element in elements {
+            types.ensure_array(element);
             types.intern(Type::Option(element));
         }
     }
@@ -1994,38 +1995,33 @@ struct BreakableContext {
     rumpe_used: bool,
 }
 
-/// Active `summa ex` sequential fold (SFR-4): a valued `redde` inside the
+/// Active `reducta via summa` sequential fold: a valued `redde` inside the
 /// term body adds into `accumulator` with `+` and continues the iteration
 /// loop instead of returning from the enclosing function.
+/// Exact temporaries for one bucket; no per-operation store policy applies.
+#[derive(Clone)]
+struct ReductionBucket {
+    accumulator: MirTempId,
+    score: MirTempId,
+    seen: MirTempId,
+    coordinates: Vec<MirTempId>,
+}
+
+#[derive(Clone)]
+struct ReductionFoldContext {
+    op: radix_hir::HirReductionOp,
+    term_ty: MirType,
+    accumulator_ty: MirType,
+    buckets: Vec<ReductionBucket>,
+    coordinates: Vec<MirLocalId>,
+    group: Option<HirExpression>,
+    error_tensor: Option<MirOperand>,
+}
+
 #[derive(Debug, Clone, Copy)]
-struct SummaFoldContext {
-    accumulator: FoldAccumulator,
+struct FilumCapture {
+    term_result: MirLocalId,
     ty: MirType,
-}
-
-/// Where a fold keeps its running value. The sequential `summa` fold uses a
-/// temp so every writer is an exact integer operation or copy and backends
-/// keep the running total exact; the filum capture keeps a plain local.
-#[derive(Debug, Clone, Copy)]
-enum FoldAccumulator {
-    Local(MirLocalId),
-    Temp(MirTempId),
-}
-
-impl FoldAccumulator {
-    fn place(self) -> MirPlace {
-        match self {
-            Self::Local(id) => MirPlace::local(id),
-            Self::Temp(id) => MirPlace::temp(id),
-        }
-    }
-
-    fn operand(self) -> MirOperand {
-        match self {
-            Self::Local(id) => MirOperand::Place(MirPlace::local(id)),
-            Self::Temp(id) => MirOperand::Temp(id),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -2267,12 +2263,13 @@ struct FunctionBuilder<'a> {
     blocks: Vec<OpenBlock>,
     current: Option<MirBlockId>,
     breakables: Vec<BreakableContext>,
-    summa_fold: Option<SummaFoldContext>,
-    /// Active `summa … filum` term capture (SFR-5): a valued `redde` inside
-    /// the captured term body stores the term value into `accumulator` and
+    reduction_fold: Option<ReductionFoldContext>,
+    /// Active `reducta via summa … filum` term capture (SFR-5): a valued
+    /// `redde` inside the captured term body stores the term value into
+    /// `term_result` and
     /// exits the body — the statements land in the filum plan entry, not the
     /// kernel's inline flow.
-    filum_capture: Option<SummaFoldContext>,
+    filum_capture: Option<FilumCapture>,
     handlers: Vec<HandlerContext>,
     /// Active `capta` trap boundaries (UT); see [`TrapContext`].
     traps: Vec<TrapContext>,
@@ -2348,7 +2345,7 @@ impl<'a> FunctionBuilder<'a> {
             blocks: Vec::new(),
             current: None,
             breakables: Vec::new(),
-            summa_fold: None,
+            reduction_fold: None,
             filum_capture: None,
             handlers: Vec::new(),
             traps: Vec::new(),
@@ -4503,8 +4500,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::IteraRange { .. } => {
             "range-product itera before ordered-walk MIR lowering"
         }
-        HirExpressionKind::Summa { .. } => "summa before term-fold MIR lowering",
-        HirExpressionKind::Extremum { .. } => "max/min before extrema MIR lowering",
+        HirExpressionKind::Reduction { .. } => "reducta_not_lowered",
         // Unreachable from the lowering dispatcher (first-match lowers through
         // `collection_higher_order`); kept so this naming match stays exhaustive.
         HirExpressionKind::FirstMatch { .. } => "primus_quem before first-match MIR lowering",

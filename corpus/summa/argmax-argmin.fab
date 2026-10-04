@@ -19,8 +19,8 @@ locale = "en"
 #   • Empty source → nihil — the twins return `int ∪ null`, never a −1
 #     sentinel; a caller that needs an int composes `coalesce` (`vel`) at
 #     the call site.
-#   • NaN law — aligned with `max from`'s implemented fold: NaN never wins
-#     while a number participates; an all-NaN source keeps index 0.
+#   • NaN law — aligned with `reduce via max from`'s implemented fold: NaN
+#     never wins while a number participates; an all-NaN source keeps index 0.
 #   • argmin mirrors argmax exactly (least value, first index).
 #
 # EBNF determination (LSR-W0-CORPUS): no new production — the twins ride
@@ -49,8 +49,9 @@ fn tie_min(list<int> xs) → int {
     return winner
 }
 
-# Contract 3 — NaN loses to numbers (the `max from` fold law). [nan, 3.0,
-# 1.0, 3.0]: NaN never wins, and the first 3.0 keeps the tie at index 1.
+# Contract 3 — NaN loses to numbers (the `reduce via max from` fold law).
+# [nan, 3.0, 1.0, 3.0]: NaN never wins, and the first 3.0 keeps the tie at
+# index 1.
 fn nan_max(list<f64> xs) → int {
     const int winner ← xs.argmax() coalesce 0
     return winner

@@ -1896,28 +1896,12 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
-        HirExpressionKind::Summa { source, body, .. } => {
-            rewrite_expr(
-                unit_path,
-                source,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            );
-            rewrite_block(
-                unit_path,
-                body,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            );
-        }
-        HirExpressionKind::Extremum {
-            source, coalesce, ..
+        HirExpressionKind::Reduction {
+            source,
+            group,
+            body,
+            identity,
+            ..
         } => {
             rewrite_expr(
                 unit_path,
@@ -1928,7 +1912,29 @@ pub(super) fn rewrite_expr(
                 namespaces,
                 diagnostics,
             );
-            if let Some(identity) = coalesce {
+            if let Some(group) = group {
+                rewrite_expr(
+                    unit_path,
+                    group,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
+            }
+            if let Some(body) = body {
+                rewrite_block(
+                    unit_path,
+                    body,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
+            }
+            if let Some(identity) = identity {
                 rewrite_expr(
                     unit_path,
                     identity,

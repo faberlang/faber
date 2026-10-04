@@ -1325,41 +1325,6 @@ pub enum HirExpressionKind {
         mutable: bool,
     },
 
-    /// Contextual `summa ex` term-fold expression.
-    ///
-    /// This is a source-declaration node only in SFR-2. Typecheck deliberately
-    /// declines it until the SFR-3 admission rules and SFR-4 lowering land.
-    Summa {
-        /// Iterable expression supplying the terms.
-        source: Box<HirExpression>,
-        /// Coordinate bindings inherited from the shared `apud` production.
-        coordinates: Vec<(DefId, Symbol)>,
-        /// Optional lane binder from `filum`.
-        filum: Option<(DefId, Symbol)>,
-        /// Term binding visible in the body.
-        binding: (DefId, Symbol),
-        /// Term body evaluated for each source element.
-        body: HirBlock,
-        /// Whether the source declared the term binder `varia`.
-        mutable: bool,
-    },
-
-    /// Sibling extrema reduction with a caller-stated optional identity.
-    ///
-    /// Unlike `Summa`, this node has no term binder or body: the selected
-    /// operation is the combine. Typecheck chooses `T` for statically
-    /// non-empty shapes and `Option<T>` otherwise.
-    Extremum {
-        /// Maximum or minimum operation selected by the source head.
-        op: HirExtremumOp,
-        /// Iterable expression supplying the values.
-        source: Box<HirExpression>,
-        /// Coordinate bindings inherited from the shared `apud` production.
-        coordinates: Vec<(DefId, Symbol)>,
-        /// Caller-stated identity from the `vel`/coalesce tail.
-        coalesce: Option<Box<HirExpression>>,
-    },
-
     /// Dedicated `primus_quem` first-match selection.
     ///
     /// This is a source-declaration node only in AFM-2. Typecheck deliberately
@@ -1593,6 +1558,49 @@ pub enum HirExpressionKind {
 
     /// Error placeholder that keeps the tree traversable after a diagnostic.
     Error,
+    /// Closed reduction family. Body and binder are jointly present or absent.
+    Reduction {
+        op: HirReductionOp,
+        source: Box<HirExpression>,
+        coordinates: Vec<(DefId, Symbol)>,
+        group: Option<Box<HirExpression>>,
+        filum: Option<(DefId, Symbol)>,
+        binding: Option<(DefId, Symbol)>,
+        body: Option<HirBlock>,
+        identity: Option<Box<HirExpression>>,
+        mutable: bool,
+    },
+}
+
+/// Reduction identities are stable; locale packs own their words.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirReductionOp {
+    Sum,
+    Product,
+    Max,
+    Min,
+    ArgMax,
+    ArgMin,
+    All,
+    Any,
+    Count,
+}
+
+impl HirReductionOp {
+    #[must_use]
+    pub const fn keyword_key(self) -> &'static str {
+        match self {
+            Self::Sum => "summa",
+            Self::Product => "factum",
+            Self::Max => "maxima",
+            Self::Min => "minima",
+            Self::ArgMax => "argmaxima",
+            Self::ArgMin => "argminima",
+            Self::All => "omnia",
+            Self::Any => "quilibet",
+            Self::Count => "numeratio",
+        }
+    }
 }
 
 /// Diagnostic output channel selected by source syntax.
@@ -1672,13 +1680,6 @@ pub enum HirNonNullKind {
 
     /// Assert then call.
     Call(Vec<HirCallArg>),
-}
-
-/// Maximum/minimum operation selected by an extrema reduction head.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum HirExtremumOp {
-    Max,
-    Min,
 }
 
 /// Iteration source mode lowered from `itera` syntax.

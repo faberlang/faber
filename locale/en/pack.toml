@@ -811,6 +811,10 @@ help = "move `{regio} {name}` to the top of the file, directly after the frontma
 message = "a file declares {regio} at most once"
 help = "delete the second `{regio} {name}`"
 
+[diagnostics.PARSE010.issues.reducta_legacy_head]
+message = "the old `{head} {ex}` reduction form was removed; use `{reducta} {via} <operator> {ex} …`"
+help = "choose one of the active locale's reduction operators after `{reducta} {via}`"
+
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"
 help = "add a function name after '{functio}'"
@@ -4077,10 +4081,6 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" rejects this function body: `tacet` is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
-
-[diagnostics.SEM059.issues.summa_expression_unsupported]
-message = "@ radix lane \"{lane}\" rejects this function body: the {summa} reduce expression is outside the v1 AIR subset by design (device admission only)"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM060]

@@ -1,0 +1,3 @@
+# Reject oracle: a reducta via clause with an unknown operator.
+# Tokens: stable parser issue identity.
+PARSE001:reducta_unknown_operator

@@ -1048,9 +1048,6 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         }
         "loop" => "loops are outside the v1 AIR subset".to_owned(),
         "loop_control" => "loop control is outside the v1 AIR subset".to_owned(),
-        "summa_expression_unsupported" => {
-            "the summa reduce expression is outside the v1 AIR subset by design (device admission only)".to_owned()
-        }
         "method_call" => {
             let method = arg_value(args, "method")?;
             format!("method call `{method}` is outside the v1 AIR subset")
@@ -1064,6 +1061,9 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         }
         "optional_null_chain" => {
             "optional/null assertion chains are outside the v1 AIR subset".to_owned()
+        }
+        "reducta_expression_unsupported" => {
+            "reduction expressions are outside the v1 AIR subset".to_owned()
         }
         "recoverable_handler" => "recoverable handlers are outside the v1 AIR subset".to_owned(),
         "reference_place_op" => {

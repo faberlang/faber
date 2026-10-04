@@ -414,14 +414,14 @@ fn summa_at_the_cap_is_a_checked_store() {
     // f1s (ruling 21): a `summa` sits at the 64-bit cap, so returning it as
     // `int` checks the store; a small sum returns fine.
     let functions =
-        "functio total(tensor<i64, [3]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
+        "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a fixum s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
         let session = Session::new(Config::default().with_target(Target::HirTypeScript));
         let source = format!(
             "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nfixum tensor<i64, []> seed ← vacua\nnota \"a\"\nnota total(seed.strue(v, [3]))\n}}\n"
         );
         let mut host = BufferHost::default();
-        let result = run_source(&session, "summa.fab", &source, &mut host);
+        let result = run_source(&session, "reducta.fab", &source, &mut host);
         (host.stdout_lines, result)
     };
     let (out, result) = run_total("1, 2, 0");
@@ -436,18 +436,41 @@ fn summa_at_the_cap_is_a_checked_store() {
 }
 
 #[test]
+fn reducta_summa_widens_narrow_integer_terms_before_accumulating() {
+    // Ruling 21 types an integer sum at the 64-bit cap before the final store.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let source = "functio total(tensor<i8, [2]> a) → numerus {\n  redde reducta via summa ex a\n}\n\
+                  incipit {\nfixum tensor<i8, []> seed ← vacua\nfixum tensor<i8, [2]> a ← seed.strue([100, 100], [2])\nnota total(a)\n}\n";
+    let mut host = BufferHost::default();
+    let result = run_source(&session, "reducta.fab", source, &mut host);
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(host.stdout_lines, ["200"]);
+}
+
+#[test]
+fn grouped_reducta_summa_widens_narrow_integer_terms_before_accumulating() {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let source = "functio grouped(tensor<i8, [2]> values, tensor<numerus, [2]> keys) → tensor<i64, [1]> {\n  redde reducta via summa ex values apud [i] pro keys[i]\n}\n\
+                  incipit {\nfixum tensor<i8, []> value_seed ← vacua\nfixum tensor<numerus, []> key_seed ← vacua\nfixum tensor<i8, [2]> values ← value_seed.strue([100, 100], [2])\nfixum tensor<numerus, [2]> keys ← key_seed.strue([0, 0], [2])\nnota grouped(values, keys)\n}\n";
+    let mut host = BufferHost::default();
+    let result = run_source(&session, "reducta-group.fab", source, &mut host);
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(host.stdout_lines, ["[200]"]);
+}
+
+#[test]
 fn summa_accumulates_exactly_and_checks_at_the_store() {
     // sm1: the running total is exact (2^64 - 2 is inside the exact range);
     // only the store of the result into its slot applies the slot policy.
     let functions =
-        "functio total(tensor<i64, [3]> a) → numerus {\n  redde summa ex a fixum s {\n    redde s\n  }\n}\n";
+        "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a fixum s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
         let session = Session::new(Config::default().with_target(Target::HirTypeScript));
         let source = format!(
             "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nfixum tensor<i64, []> seed ← vacua\nnota total(seed.strue(v, [3]))\n}}\n"
         );
         let mut host = BufferHost::default();
-        let result = run_source(&session, "summa.fab", &source, &mut host);
+        let result = run_source(&session, "reducta.fab", &source, &mut host);
         (host.stdout_lines, result)
     };
     let max = "9223372036854775807";

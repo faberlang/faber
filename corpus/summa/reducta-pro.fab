@@ -1,0 +1,27 @@
++++
+locale = "la"
+term = "reducta-pro"
+kind = "concept"
+category = "collection"
+grammar = ["reducta_expr", "reducta_op", "reducta_group", "reducta_body", "reducta_identity"]
+canonical = true
++++
+
+functio per_alveum(tf32[6] altitudo, tensor<numerus, [6]> alveus) → tf32[3] {
+    redde reducta via summa ex altitudo apud [i] pro alveus[i] fixum s { redde s }
+}
+functio numera_alveum(tf32[6] altitudo, tensor<numerus, [6]> alveus) → tensor<numerus, [3]> {
+    redde reducta via numeratio ex altitudo apud [i] pro alveus[i] fixum s { redde s ≻ 2.5 }
+}
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[6] altitudo ← seed.strue(flat, [6])
+    fixum tensor<numerus, []> iseed ← vacua
+    fixum tensor<numerus, [6]> aequalis ← iseed.strue([0, 1, 2, 0, 1, 2], [6])
+    fixum tensor<numerus, [6]> inaequalis ← iseed.strue([0, 0, 1, 1, 0, 1], [6])
+    nota per_alveum(altitudo, aequalis)
+    nota per_alveum(altitudo, inaequalis)
+    nota numera_alveum(altitudo, aequalis)
+    nota numera_alveum(altitudo, inaequalis)
+}

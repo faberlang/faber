@@ -68,7 +68,7 @@ const ISSUE_GRADIENT_EXPRESSION_UNSUPPORTED: &str = "gradient_expression_unsuppo
 /// `Literal` and `Param` shapes are rank-1 (`[N]` parses as a one-element
 /// `Tuple`); compound shapes contribute their dimension count. Inference
 /// holes and the pre-grammar unspecified bridge carry no static rank.
-fn tensor_shape_rank(types: &TypeTable, shape: crate::IndexId) -> Option<u64> {
+pub(super) fn tensor_shape_rank(types: &TypeTable, shape: crate::IndexId) -> Option<u64> {
     match types.get_index(shape) {
         IndexExpr::Literal(_) => Some(1),
         IndexExpr::Tuple(dims) => Some(dims.len() as u64),
@@ -80,7 +80,7 @@ fn tensor_shape_rank(types: &TypeTable, shape: crate::IndexId) -> Option<u64> {
     }
 }
 
-/// Shared `apud` arity law (AC-5; reused by the `summa ex` admission, SFR-3):
+/// Shared `apud` arity law (AC-5; reused by `reducta via` admission, SFR-3):
 /// the coordinate count must equal the iterable's rank — tensor shape length
 /// or matrix 2 — never a partial bind. A rank >= 2 iterable without an `apud`
 /// clause is arity 0 != rank. Non-shaped iterables reject coordinates
@@ -475,33 +475,26 @@ impl TypeChecker<'_> {
                 body,
                 ..
             } => super::range::check_range_product_expr(self, ranges, bindings, body, expr.span),
-            HirExpressionKind::Summa {
-                source,
-                coordinates,
-                filum,
-                binding,
-                body,
-                ..
-            } => super::summa::check_summa_expr(
-                self,
-                source,
-                coordinates,
-                *filum,
-                *binding,
-                body,
-                expr.span,
-            ),
-            HirExpressionKind::Extremum {
+            HirExpressionKind::Reduction {
                 op,
                 source,
                 coordinates,
-                coalesce,
-            } => super::extremum::check_extremum_expr(
+                group,
+                filum,
+                binding,
+                body,
+                identity,
+                ..
+            } => super::reduction::check_reduction_expr(
                 self,
                 *op,
                 source,
                 coordinates,
-                coalesce.as_mut(),
+                group.as_mut(),
+                *filum,
+                *binding,
+                body.as_mut(),
+                identity.as_mut(),
                 expected,
                 expr.span,
             ),

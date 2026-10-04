@@ -1282,8 +1282,11 @@ fn resolve_expr(
             }
             resolver.exit_scope();
         }
-        ExprKind::Summa(expr) => {
+        ExprKind::Reducta(expr) => {
             resolve_expr(resolver, interner, &expr.source, errors);
+            if let Some(identity) = &expr.identity {
+                resolve_expr(resolver, interner, identity, errors);
+            }
             resolver.enter_scope(ScopeKind::Block);
             for coordinate in &expr.apud {
                 define_symbol(
@@ -1295,6 +1298,9 @@ fn resolve_expr(
                     errors,
                 );
             }
+            if let Some(group) = &expr.group {
+                resolve_expr(resolver, interner, group, errors);
+            }
             if let Some(filum) = &expr.filum {
                 define_symbol(
                     resolver,
@@ -1305,24 +1311,20 @@ fn resolve_expr(
                     errors,
                 );
             }
-            define_symbol(
-                resolver,
-                expr.binding.name,
-                expr.binding.span,
-                SymbolKind::Local,
-                expr.mutability == radix_syntax::AstMutability::Mutable,
-                errors,
-            );
-            resolve_block(resolver, interner, &expr.body, errors);
-            resolver.exit_scope();
-        }
-        ExprKind::Maxima(expr) | ExprKind::Minima(expr) => {
-            // M1 admits only the source shape. The reduction identity is an
-            // ordinary caller expression; no term/body scope exists to bind.
-            resolve_expr(resolver, interner, &expr.source, errors);
-            if let Some(identity) = &expr.coalesce {
-                resolve_expr(resolver, interner, identity, errors);
+            if let Some(binding) = &expr.binding {
+                define_symbol(
+                    resolver,
+                    binding.name,
+                    binding.span,
+                    SymbolKind::Local,
+                    expr.mutability == radix_syntax::AstMutability::Mutable,
+                    errors,
+                );
             }
+            if let Some(body) = &expr.body {
+                resolve_block(resolver, interner, body, errors);
+            }
+            resolver.exit_scope();
         }
         ExprKind::FirstMatch(expr) => {
             resolve_expr(resolver, interner, &expr.source, errors);

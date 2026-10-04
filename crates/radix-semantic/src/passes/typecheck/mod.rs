@@ -99,7 +99,6 @@ pub mod convert;
 #[path = "enum_access_honesty_test.rs"]
 mod enum_access_honesty_test;
 pub mod expr;
-pub mod extremum;
 #[cfg(test)]
 #[path = "field_modifier_write_test.rs"]
 mod field_modifier_write_test;
@@ -164,12 +163,15 @@ mod ordering_test;
 pub mod ordo_conversio;
 pub mod pattern;
 pub mod range;
+pub mod reduction;
+#[cfg(test)]
+#[path = "reduction_test.rs"]
+mod reduction_test;
 #[cfg(test)]
 pub mod relations_test;
 pub mod scalar_text;
 pub mod sermo_route;
 pub mod stmt;
-pub mod summa;
 pub mod tensor_index;
 pub mod tensor_type_directed;
 #[cfg(test)]
@@ -1115,20 +1117,12 @@ mod tuple_key_index_test;
 mod itera_element_test;
 
 #[cfg(test)]
-#[path = "summa_test.rs"]
-mod summa_test;
-
-#[cfg(test)]
 #[path = "argmaxima_test.rs"]
 mod argmaxima_test;
 
 #[cfg(test)]
 #[path = "predicate_twins_test.rs"]
 mod predicate_twins_test;
-
-#[cfg(test)]
-#[path = "extremum_test.rs"]
-mod extremum_test;
 
 #[cfg(test)]
 #[path = "literal_inference_test.rs"]

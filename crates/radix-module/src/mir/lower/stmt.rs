@@ -60,7 +60,7 @@ impl HirVisitor for FunctionBuilder<'_> {
             }
             HirStatementKind::Expr(expr) => self.visit_expr(expr),
             HirStatementKind::Redde(Some(expr)) => {
-                // Inside a `summa … filum` captured term body (SFR-5),
+                // Inside a `reducta via summa … filum` captured term body (SFR-5),
                 // `redde` yields the term value: store it into the capture
                 // local and exit the body — the statements belong to the
                 // filum kernel-plan entry, never the inline kernel flow.
@@ -68,7 +68,7 @@ impl HirVisitor for FunctionBuilder<'_> {
                     let Some(value) = self.lower_expr_value(expr) else {
                         return;
                     };
-                    self.assign(capture.accumulator.place(), value, capture.ty, stmt.span);
+                    self.assign(MirPlace::local(capture.term_result), value, capture.ty, stmt.span);
                     match self
                         .breakables
                         .last()
@@ -83,35 +83,13 @@ impl HirVisitor for FunctionBuilder<'_> {
                     }
                     return;
                 }
-                // Inside a `summa ex` term body (SFR-4), `redde` yields the
-                // term value: fold it into the accumulator and continue the
-                // iteration loop rather than returning from the function.
-                if let Some(fold) = self.summa_fold {
+                if self.reduction_fold.is_some() {
                     let Some(value) = self.lower_expr_value(expr) else {
                         return;
                     };
-                    // The add writes the accumulator temp directly, so its
-                    // only writers are exact ops (and the zero-copy init).
-                    let sum = self.new_value(
-                        MirValueKind::Binary { op: MirBinOp::Add, lhs: fold.accumulator.operand(), rhs: value },
-                        fold.ty,
-                        stmt.span,
-                    );
-                    self.append_stmt(MirStatement {
-                        kind: MirStatementKind::Assign { place: fold.accumulator.place(), value: sum },
-                        span: stmt.span,
-                    });
-                    match self
-                        .breakables
-                        .last()
-                        .and_then(|context| context.perge_target)
-                    {
-                        Some(continue_target) => {
-                            self.terminate_current(MirTerminatorKind::Goto(continue_target), stmt.span);
-                        }
-                        None => self
-                            .errors
-                            .push(MirError::unsupported(stmt.span, "summa redde outside its iteration loop")),
+                    self.fold_reduction_value(value, stmt.span);
+                    if let Some(target) = self.breakables.last().and_then(|c| c.perge_target) {
+                        self.terminate_open_current(MirTerminatorKind::Goto(target), stmt.span);
                     }
                     return;
                 }
@@ -121,9 +99,9 @@ impl HirVisitor for FunctionBuilder<'_> {
                 }
             }
             HirStatementKind::Redde(None) => {
-                if self.summa_fold.is_some() || self.filum_capture.is_some() {
+                if self.filum_capture.is_some() {
                     self.errors
-                        .push(MirError::unsupported(stmt.span, "summa redde without a term value"));
+                        .push(MirError::unsupported(stmt.span, "filum reduction redde without a term value"));
                     return;
                 }
                 self.terminate_current(MirTerminatorKind::Return(None), stmt.span);

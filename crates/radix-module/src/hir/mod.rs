@@ -44,7 +44,7 @@ pub use lower::{LowerError, LowerRequest, lower};
 pub use nodes::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirArrayElement, HirAvailability, HirBinOp, HirBlock,
     HirBlockEnd, HirBreakableKind, HirCallArg, HirCape, HirCasuArm, HirConst, HirConversioRoute, HirConversioTarget,
-    HirCustodi, HirCustodiClause, HirEnum, HirExpression, HirExpressionKind, HirExtremumOp, HirField, HirFunction,
+    HirCustodi, HirCustodiClause, HirEnum, HirExpression, HirExpressionKind, HirField, HirFunction,
     HirId, HirImport, HirImportItem, HirIncDec, HirIncDecOp, HirInterface, HirInterfaceMethod, HirItem, HirItemKind,
     HirIteraMode, HirLiteral, HirLocal, HirMethod, HirModule, HirModuleEnd, HirNonNullKind, HirObjectField,
     HirObjectKey, HirOptionalChainKind, HirOrdoRouteMember, HirOrdoRow, HirOwnerRef, HirParam, HirParamMode,

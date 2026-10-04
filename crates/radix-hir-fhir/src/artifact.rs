@@ -574,7 +574,10 @@ pub struct FunctionProvenanceTableWire {
 /// Version 36 reshapes `HirExpressionKind::Transfer { sink, payloads }` into
 /// `CopyInto { target, value }` (the `⇇` copy-into statement); schema-v35
 /// artifacts fail closed because the serialized variant payload changed.
-pub const SCHEMA_VERSION: u32 = 36;
+/// Version 37 removes the legacy `HirExpressionKind::Summa` and `Extremum`
+/// variants in favor of `Reduction`; schema-v36 artifacts fail closed because
+/// the serialized enum ordinals changed.
+pub const SCHEMA_VERSION: u32 = 37;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

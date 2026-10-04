@@ -1,85 +1,63 @@
-//! SFR-3 (summa-filum-reduction): `summa ex` admission laws.
-//!
-//! Replaces the SFR-2 fail-closed gate (`summa_expression_unsupported`) with
-//! the real admission rules: coordinate count = iterable rank (the shared apud
-//! rule from `expr`), term type = numeric scalar (`fractus`/`numerus`),
-//! exactly-one-`redde` pure body (the fragment-compatible effect subset),
-//! `filum` only inside `@ nucleum` kernels, and the v1 tail gate
-//! (`K % W ≠ 0` fails closed at admission).
-//!
-//! The expression type is the term type: the sum-only combine reduces terms
-//! of the iterable's element type to a result of that same type. The term body
-//! is checked under a term return contract so every `redde` in the body is
-//! unified against the term type rather than the enclosing function's return.
-
+//! Admission and pure term laws for the closed reduction family.
+//! Arithmetic retains its exact intermediate; only a consuming store narrows.
 use super::expr::{ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH, apud_arity};
 #[allow(clippy::wildcard_imports)]
-// parent module provides shared imports for typechecking
 use super::*;
 use crate::passes::fragment_definition::{
     is_allowed_device_method, is_device_value_type, struct_def_from_type,
 };
-use radix_hir::HirCallArg;
+use radix_hir::{HirCallArg, HirReductionOp};
 use radix_lexer::Span;
 
-const ISSUE_SUMMA_REQUIRES_SHAPED_ITERABLE: &str = "summa_requires_shaped_iterable";
-const ISSUE_SUMMA_TERM_TYPE_NON_SCALAR: &str = "summa_term_type_non_scalar";
-const ISSUE_SUMMA_FILUM_REQUIRES_NUCLEUM_KERNEL: &str = "summa_filum_requires_nucleum_kernel";
-const ISSUE_SUMMA_TAIL_NOT_ALIGNED: &str = "summa_tail_not_aligned";
-const ISSUE_SUMMA_BODY_REQUIRES_SINGLE_REDDE: &str = "summa_body_requires_single_redde";
-const ISSUE_SUMMA_BODY_FORBIDS_RUMPE: &str = "summa_body_forbids_rumpe";
-const ISSUE_SUMMA_BODY_FORBIDS_CEDE: &str = "summa_body_forbids_cede";
-const ISSUE_SUMMA_BODY_FORBIDS_CAPE: &str = "summa_body_forbids_cape";
-const ISSUE_SUMMA_BODY_FORBIDS_IACE: &str = "summa_body_forbids_iace";
-const ISSUE_SUMMA_BODY_EFFECT: &str = "summa_body_effect";
-const ISSUE_SUMMA_BODY_CONTEXT: &str = "summa_body_context";
+const ISSUE_REDUCTA_REQUIRES_SHAPED_ITERABLE: &str = "reducta_requires_shaped_iterable";
+const ISSUE_REDUCTA_TERM_TYPE_NON_SCALAR: &str = "reducta_term_type_non_scalar";
+const ISSUE_REDUCTA_FILUM_REQUIRES_NUCLEUM_KERNEL: &str = "reducta_filum_requires_nucleum_kernel";
+const ISSUE_REDUCTA_TAIL_NOT_ALIGNED: &str = "reducta_tail_not_aligned";
+const ISSUE_REDUCTA_BODY_REQUIRES_SINGLE_REDDE: &str = "reducta_body_requires_single_redde";
+const ISSUE_REDUCTA_BODY_FORBIDS_RUMPE: &str = "reducta_body_forbids_rumpe";
+const ISSUE_REDUCTA_BODY_FORBIDS_CEDE: &str = "reducta_body_forbids_cede";
+const ISSUE_REDUCTA_BODY_FORBIDS_CAPE: &str = "reducta_body_forbids_cape";
+const ISSUE_REDUCTA_BODY_FORBIDS_IACE: &str = "reducta_body_forbids_iace";
+const ISSUE_REDUCTA_BODY_EFFECT: &str = "reducta_body_effect";
+const ISSUE_REDUCTA_BODY_CONTEXT: &str = "reducta_body_context";
 
-/// v1 cyclic lane width for the `filum` schedule (Metal simdgroup width,
-/// CUDA warp size). Tails (`K % W ≠ 0`) fail closed at admission.
-const SUMMA_LANE_WIDTH: u64 = 32;
-
-/// Check one `summa ex` expression and produce its term type.
-pub(super) fn check_summa_expr(
+/// Type one reduction from its source, body term, and expected bucket extent.
+pub(super) fn check_reduction_expr(
     checker: &mut TypeChecker<'_>,
+    op: HirReductionOp,
     source: &mut HirExpression,
     coordinates: &[(DefId, Symbol)],
+    group: Option<&mut Box<HirExpression>>,
     filum: Option<(DefId, Symbol)>,
-    binding: (DefId, Symbol),
-    body: &mut HirBlock,
+    binding: Option<(DefId, Symbol)>,
+    body: Option<&mut HirBlock>,
+    identity: Option<&mut Box<HirExpression>>,
+    expected: Option<TypeId>,
     span: Span,
 ) -> TypeId {
     let source_ty = checker.check_expr(source);
-    let dispatch_ty = checker
+    let dispatch = checker
         .types
         .peel_access_marker(checker.resolve_inferred_type(source_ty))
         .1;
-
-    // v1 iterable surface (settled contract): tensor and matrix only; lista
-    // and bounded buffers stay with the `.summa()` method / `reducta`.
-    let elem_ty = match checker.types.get(dispatch_ty) {
-        Type::Tensor(elem, _) | Type::Matrix(elem, _) => checker.resolve_inferred_type(*elem),
+    let (element, shape) = match checker.types.get(dispatch) {
+        Type::Tensor(element, shape) | Type::Matrix(element, shape) => (*element, *shape),
         _ => {
             checker.error_issue(
                 SemanticErrorKind::TypeMismatch,
-                ISSUE_SUMMA_REQUIRES_SHAPED_ITERABLE,
+                ISSUE_REDUCTA_REQUIRES_SHAPED_ITERABLE,
                 span,
-            );
-            check_summa_body(
-                checker,
-                coordinates,
-                filum,
-                binding,
-                body,
-                checker.error_type,
             );
             return checker.error_type;
         }
     };
-
-    // Shared apud arity rule: coordinate count must equal the iterable rank.
+    let element = checker.resolve_inferred_type(element);
+    let dimensions = crate::i64s_from_literal_index(shape, checker.types);
+    let rank = super::expr::tensor_shape_rank(checker.types, shape)
+        .map_or(coordinates.len().max(1), |n| n as usize);
     match apud_arity(
         checker.types,
-        dispatch_ty,
+        dispatch,
         !coordinates.is_empty(),
         coordinates.len(),
     ) {
@@ -96,62 +74,185 @@ pub(super) fn check_summa_expr(
                 .with_arg("actual", actual.to_string()),
         ),
     }
-
-    // Term-type law: the term is the iterable element and must be a numeric
-    // scalar (`fractus`/`numerus` family), matching the sum-only combine.
-    if !is_numeric_scalar(checker.types, elem_ty) {
-        checker.error_issue(
-            SemanticErrorKind::TypeMismatch,
-            ISSUE_SUMMA_TERM_TYPE_NON_SCALAR,
-            source.span,
-        );
-    }
-
-    // Placement law: the distributed `filum` form admits only inside an
-    // `@ nucleum` device-entry kernel. The sequential form is an ordinary
-    // host/device expression.
-    if filum.is_some() && !checker.current_nucleum_entry {
-        checker.error_issue(
-            SemanticErrorKind::TypeMismatch,
-            ISSUE_SUMMA_FILUM_REQUIRES_NUCLEUM_KERNEL,
-            span,
-        );
-    }
-
-    // Tail gate: the cyclic schedule is `k ≡ f (mod W)` with W = 32; a
-    // statically known element count K with `K % W ≠ 0` fails closed at
-    // admission. Only the distributed form has lanes.
-    if filum.is_some()
-        && let Some(dims) = summa_source_extent(checker, dispatch_ty)
-    {
-        let k: u64 = dims
-            .iter()
-            .map(|d| u64::try_from(*d).unwrap_or(u64::MAX))
-            .product();
-        if !k.is_multiple_of(SUMMA_LANE_WIDTH) {
+    if filum.is_some() {
+        if !checker.current_nucleum_entry {
             checker.error_issue(
                 SemanticErrorKind::TypeMismatch,
-                ISSUE_SUMMA_TAIL_NOT_ALIGNED,
+                ISSUE_REDUCTA_FILUM_REQUIRES_NUCLEUM_KERNEL,
+                span,
+            );
+        }
+        if body.is_none() {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "reducta_filum_requires_body",
+                span,
+            );
+        }
+        if let Some(dimensions) = &dimensions {
+            let extent = dimensions
+                .iter()
+                .try_fold(1u64, |n, d| n.checked_mul(u64::try_from(*d).ok()?));
+            if extent.is_some_and(|k| !k.is_multiple_of(32)) {
+                checker.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_REDUCTA_TAIL_NOT_ALIGNED,
+                    span,
+                );
+            }
+        }
+    }
+    checker.push_scope();
+    let integer = checker.numerus_type();
+    for (id, _) in coordinates {
+        checker.insert_binding(*id, integer);
+    }
+    if let Some((id, _)) = filum {
+        checker.insert_binding(id, integer);
+    }
+    let expected_group = expected.and_then(|ty| {
+        let ty = checker.resolve_inferred_type(ty);
+        match checker.types.get(ty) {
+            Type::Tensor(element, shape) => Some((*element, *shape)),
+            _ => None,
+        }
+    });
+    let grouped = group.is_some();
+    if let Some(group) = group {
+        if coordinates.is_empty() {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "reducta_group_requires_apud",
+                span,
+            );
+        }
+        let key_ty = checker.check_expr(group);
+        let key_ty = checker.resolve_inferred_type(key_ty);
+        if !matches!(
+            checker.types.get(key_ty),
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+        ) {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "reducta_group_key_not_integer",
+                group.span,
+            );
+        }
+        if expected_group.is_none_or(|(_, shape)| {
+            crate::i64s_from_literal_index(shape, checker.types)
+                .is_none_or(|d| d.len() != 1 || d[0] < 0)
+        }) {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "reducta_group_extent_unknown",
+                span,
+            );
+        }
+        if matches!(op, HirReductionOp::ArgMax | HirReductionOp::ArgMin)
+            || (matches!(op, HirReductionOp::Max | HirReductionOp::Min) && identity.is_none())
+        {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "reducta_group_op_unsupported",
                 span,
             );
         }
     }
-
-    check_summa_body(checker, coordinates, filum, binding, body, elem_ty);
-    checker.summa_result_type(elem_ty)
-}
-
-/// Literal element-count `K` of a shaped summa source, when every dimension
-/// is a compile-time natural literal. Symbolic shapes admit (no proven tail).
-fn summa_source_extent(checker: &TypeChecker<'_>, dispatch_ty: TypeId) -> Option<Vec<i64>> {
-    let shape = match checker.types.get(dispatch_ty) {
-        Type::Tensor(_, shape) | Type::Matrix(_, shape) => *shape,
-        _ => return None,
+    let term_ty = if let (Some(binding), Some(body)) = (binding, body) {
+        checker.insert_binding(binding.0, element);
+        let prev_return = checker.current_return.take();
+        let prev_inferred = checker.inferred_return.take();
+        let prev_allow = checker.allow_inferred_return;
+        checker.allow_inferred_return = true;
+        checker.check_block(body, None);
+        let term = checker.inferred_return.unwrap_or(checker.error_type);
+        checker.current_return = prev_return;
+        checker.inferred_return = prev_inferred;
+        checker.allow_inferred_return = prev_allow;
+        check_reducta_body_laws(checker, coordinates, filum, binding, body);
+        checker.resolve_inferred_type(term)
+    } else {
+        element
     };
-    crate::i64s_from_literal_index(shape, checker.types)
+    checker.pop_scope();
+    let boolean = checker.types.primitive(Primitive::Bivalens);
+    let bool_op = matches!(
+        op,
+        HirReductionOp::All | HirReductionOp::Any | HirReductionOp::Count
+    );
+    if bool_op {
+        if term_ty != boolean {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "reducta_term_type_not_bool",
+                span,
+            );
+        }
+    } else if !is_numeric_scalar(checker.types, term_ty) {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_REDUCTA_TERM_TYPE_NON_SCALAR,
+            span,
+        );
+    }
+    let result = match op {
+        HirReductionOp::Count => integer,
+        HirReductionOp::All | HirReductionOp::Any => boolean,
+        HirReductionOp::ArgMax | HirReductionOp::ArgMin if rank > 1 => {
+            checker.types.tuple(vec![integer; rank])
+        }
+        HirReductionOp::ArgMax | HirReductionOp::ArgMin => integer,
+        HirReductionOp::Sum => checker.summa_result_type(term_ty),
+        _ => term_ty,
+    };
+    let extremum = matches!(
+        op,
+        HirReductionOp::Max | HirReductionOp::Min | HirReductionOp::ArgMax | HirReductionOp::ArgMin
+    );
+    if let Some(identity) = identity {
+        if !extremum {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "reducta_identity_not_applicable",
+                identity.span,
+            );
+        }
+        let identity_ty = checker.check_expr_with_expected(identity, Some(result));
+        checker.unify_assign_issue(
+            identity_ty,
+            result,
+            identity.span,
+            "reducta_identity_type_mismatch",
+        );
+    } else if extremum
+        && !grouped
+        && dimensions.is_none_or(|d| d.is_empty() || d.iter().any(|x| *x == 0))
+    {
+        let nullable = checker.types.option(result);
+        if let Some(expected) = expected {
+            let expected = checker.resolve_inferred_type(expected);
+            if !matches!(
+                checker.types.get(expected),
+                Type::Option(_) | Type::Union(_)
+            ) {
+                checker.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    "reducta_nullable_result_requires_coalesce",
+                    span,
+                );
+            }
+        }
+        return nullable;
+    }
+    if grouped {
+        if let Some((_, shape)) = expected_group {
+            return checker.types.tensor_with_shape(result, shape);
+        }
+        return checker.error_type;
+    }
+    result
 }
 
-/// Term-type law helper: `fractus`/`numerus` family scalars only.
 fn is_numeric_scalar(types: &TypeTable, ty: TypeId) -> bool {
     matches!(
         types.get(ty),
@@ -160,47 +261,7 @@ fn is_numeric_scalar(types: &TypeTable, ty: TypeId) -> bool {
     )
 }
 
-/// Bind the term body scope and check it under the term return contract.
-///
-/// The body is typed first (so expression types are available to the body-law
-/// walker's device-receiver classification), then the structural body laws
-/// run on the typed tree.
-fn check_summa_body(
-    checker: &mut TypeChecker<'_>,
-    coordinates: &[(DefId, Symbol)],
-    filum: Option<(DefId, Symbol)>,
-    binding: (DefId, Symbol),
-    body: &mut HirBlock,
-    term_ty: TypeId,
-) {
-    checker.push_scope();
-    let numerus = checker.numerus_type();
-    for (def_id, _) in coordinates {
-        checker.insert_binding(*def_id, numerus);
-    }
-    if let Some((def_id, _)) = filum {
-        checker.insert_binding(def_id, numerus);
-    }
-    checker.insert_binding(binding.0, term_ty);
-
-    let prev_return = checker.current_return;
-    let prev_allow_inferred = checker.allow_inferred_return;
-    checker.current_return = Some(term_ty);
-    checker.allow_inferred_return = false;
-    checker.check_block(body, None);
-    checker.current_return = prev_return;
-    checker.allow_inferred_return = prev_allow_inferred;
-
-    check_summa_body_laws(checker, coordinates, filum, binding, body);
-    checker.pop_scope();
-}
-
-/// One structural pass over the term body enforcing the SFR-3 body laws:
-/// exactly one valued `redde` and the fragment-compatible pure device-safe
-/// subset (fragment calls and device intrinsics allowed; no
-/// `rumpe`/`cede`/`cape`/`iace`; no host allocation, I/O, alternate exit,
-/// dynamic function, or address taking).
-struct SummaBodyState {
+struct ReductionBodyState {
     /// Bindings the body owns: coordinates, term binder, filum binder, and
     /// body-declared locals. Writes to any other binding are captured-state
     /// mutation (impure) — `captured_mut_host` in the fragment vocabulary.
@@ -211,14 +272,14 @@ struct SummaBodyState {
     valued_redde: usize,
 }
 
-fn check_summa_body_laws(
+fn check_reducta_body_laws(
     checker: &mut TypeChecker<'_>,
     coordinates: &[(DefId, Symbol)],
     filum: Option<(DefId, Symbol)>,
     binding: (DefId, Symbol),
     body: &HirBlock,
 ) {
-    let mut state = SummaBodyState {
+    let mut state = ReductionBodyState {
         own_ids: coordinates
             .iter()
             .map(|(def_id, _)| *def_id)
@@ -232,13 +293,13 @@ fn check_summa_body_laws(
     if state.redde_count != 1 || state.valued_redde != 1 {
         checker.error_issue(
             SemanticErrorKind::TypeMismatch,
-            ISSUE_SUMMA_BODY_REQUIRES_SINGLE_REDDE,
+            ISSUE_REDUCTA_BODY_REQUIRES_SINGLE_REDDE,
             body.span,
         );
     }
 }
 
-impl SummaBodyState {
+impl ReductionBodyState {
     fn walk_block(&mut self, checker: &mut TypeChecker<'_>, block: &HirBlock) {
         for stmt in &block.statements {
             self.walk_stmt(checker, stmt);
@@ -266,7 +327,7 @@ impl SummaBodyState {
             HirStatementKind::Expr(expr) => self.walk_expr(checker, expr),
             HirStatementKind::Rumpe => checker.error_issue(
                 SemanticErrorKind::TypeMismatch,
-                ISSUE_SUMMA_BODY_FORBIDS_RUMPE,
+                ISSUE_REDUCTA_BODY_FORBIDS_RUMPE,
                 stmt.span,
             ),
             HirStatementKind::Perge | HirStatementKind::Tacet => {}
@@ -376,12 +437,11 @@ impl SummaBodyState {
                 }
                 self.walk_block(checker, body);
             }
-            // Nested summa nodes are admitted/declined by their own admission
+            // Nested reductions are admitted/declined by their own admission
             // check under the ordinary expression path; the fragment subset
             // treats the nested node as an unapproved effect, so the outer
             // body walk does not descend into it.
-            HirExpressionKind::Summa { .. } => effect(checker, expr.span, "unapproved_effect"),
-            HirExpressionKind::Extremum { .. } => effect(checker, expr.span, "unapproved_effect"),
+            HirExpressionKind::Reduction { .. } => effect(checker, expr.span, "unapproved_effect"),
             // Same fragment-subset posture for the dedicated first-match
             // head: unadmitted until AFM-3/AFM-4, so never descended into.
             HirExpressionKind::FirstMatch { .. } => effect(checker, expr.span, "unapproved_effect"),
@@ -460,7 +520,7 @@ impl SummaBodyState {
             HirExpressionKind::Throw(value) => {
                 checker.error_issue(
                     SemanticErrorKind::TypeMismatch,
-                    ISSUE_SUMMA_BODY_FORBIDS_IACE,
+                    ISSUE_REDUCTA_BODY_FORBIDS_IACE,
                     expr.span,
                 );
                 self.walk_expr(checker, value);
@@ -468,7 +528,7 @@ impl SummaBodyState {
             HirExpressionKind::Handled { body, catch } => {
                 checker.error_issue(
                     SemanticErrorKind::TypeMismatch,
-                    ISSUE_SUMMA_BODY_FORBIDS_CAPE,
+                    ISSUE_REDUCTA_BODY_FORBIDS_CAPE,
                     expr.span,
                 );
                 self.walk_block(checker, body);
@@ -479,7 +539,7 @@ impl SummaBodyState {
             HirExpressionKind::Trap(body) => {
                 checker.error_issue(
                     SemanticErrorKind::TypeMismatch,
-                    ISSUE_SUMMA_BODY_FORBIDS_CAPE,
+                    ISSUE_REDUCTA_BODY_FORBIDS_CAPE,
                     expr.span,
                 );
                 self.walk_block(checker, body);
@@ -487,7 +547,7 @@ impl SummaBodyState {
             HirExpressionKind::CallDefault { body, default, .. } => {
                 checker.error_issue(
                     SemanticErrorKind::TypeMismatch,
-                    ISSUE_SUMMA_BODY_FORBIDS_CAPE,
+                    ISSUE_REDUCTA_BODY_FORBIDS_CAPE,
                     expr.span,
                 );
                 self.walk_block(checker, body);
@@ -505,7 +565,7 @@ impl SummaBodyState {
             HirExpressionKind::Cede(value) | HirExpressionKind::Yield(value) => {
                 checker.error_issue(
                     SemanticErrorKind::TypeMismatch,
-                    ISSUE_SUMMA_BODY_FORBIDS_CEDE,
+                    ISSUE_REDUCTA_BODY_FORBIDS_CEDE,
                     expr.span,
                 );
                 self.walk_expr(checker, value);
@@ -577,7 +637,7 @@ impl SummaBodyState {
     fn walk_cape(&mut self, checker: &mut TypeChecker<'_>, cape: &HirCape) {
         checker.error_issue(
             SemanticErrorKind::TypeMismatch,
-            ISSUE_SUMMA_BODY_FORBIDS_CAPE,
+            ISSUE_REDUCTA_BODY_FORBIDS_CAPE,
             cape.span,
         );
         self.walk_block(checker, &cape.body);
@@ -657,27 +717,27 @@ impl SummaBodyState {
     }
 }
 
-/// Fragment-compatible effect rejection (`summa_body_effect`).
+/// Fragment-compatible effect rejection (`reducta_body_effect`).
 fn effect(checker: &mut TypeChecker<'_>, span: Span, reason: &'static str) {
     checker.errors.push(
         SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
-            .with_arg("issue", ISSUE_SUMMA_BODY_EFFECT)
+            .with_arg("issue", ISSUE_REDUCTA_BODY_EFFECT)
             .with_arg("reason", reason),
     );
 }
 
-/// Fragment-compatible call-context rejection (`summa_body_context`).
+/// Fragment-compatible call-context rejection (`reducta_body_context`).
 fn context(checker: &mut TypeChecker<'_>, span: Span, reason: &'static str) {
     checker.errors.push(
         SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
-            .with_arg("issue", ISSUE_SUMMA_BODY_CONTEXT)
+            .with_arg("issue", ISSUE_REDUCTA_BODY_CONTEXT)
             .with_arg("reason", reason),
     );
 }
 
 /// Resolve a method call's nucleum role via the method role table. Methods
 /// without a nucleum role fall through to the device-intrinsic and
-/// host-callable checks in [`SummaBodyState::walk_method_call`].
+/// host-callable checks in [`ReductionBodyState::walk_method_call`].
 fn resolve_method_role(
     checker: &TypeChecker<'_>,
     receiver: &HirExpression,

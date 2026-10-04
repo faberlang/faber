@@ -1,0 +1,3 @@
+# Reject oracle: the retired `summa ex` reduction spelling has a named migration issue.
+# Tokens: stable parser issue identity.
+PARSE010:reducta_legacy_head

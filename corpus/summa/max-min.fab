@@ -3,8 +3,8 @@ term = "summa"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "apud_clause", "fixum_decl", "redde_stmt", "expression", "incipit_stmt", "literal"]
 category = "collection"
-summary = "Maximum and minimum reductions over shaped tensors, optionally carrying coordinates for index-aware operands, with caller-stated coalesce identities and nihil on empty."
-syntax = "max from <tensor> [at [i]] [coalesce <identity>]"
+summary = "Maximum/minimum reducta over shaped tensors with optional coordinates, coalesce identities and nihil on empty."
+syntax = "reduce via max from <tensor> [at [i]] [coalesce <identity>] | reduce via min from <tensor> [at [i]] [coalesce <identity>]"
 related = ["summa", "tensor", "nihil"]
 locale = "en"
 +++
@@ -14,8 +14,8 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Sibling reductions — `max from` and `min from` are dedicated reductions,
-#     not configuration flags on `sum from`.
+#   • Sibling reductions — `reduce via max from` and `reduce via min from` are
+#     dedicated reductions, not configuration flags on `reduce via sum from`.
 #   • Binderless default — omit `at [...]` when the operand needs no index.
 #   • Static shape — a non-empty `tf32[4]` result is plain `f32`.
 #   • Caller identity — `coalesce` accepts a runtime value when the shape may
@@ -24,7 +24,7 @@ locale = "en"
 #     stated, so a caller that needs `f32` must state `coalesce` explicitly.
 #
 # Common mistakes:
-#   • hand-rolling a max loop instead of using the dedicated reduction head
+#   • hand-rolling a max loop instead of using the dedicated reduction form
 #   • treating `coalesce` as a declaration default rather than the empty-result
 #     identity at the call site
 #
@@ -32,29 +32,29 @@ locale = "en"
 # =============================================================================
 
 fn max_static(tf32[4] values) → f32 {
-    const f32 result ← max from values
+    const f32 result ← reduce via max from values
     return result
 }
 
 # The `at`-binder is for bodies that use the index.
 fn max_scaled(tf32[4] row, tf32[4] scale) → f32 {
-    const f32 result ← max from (row ⊙ scale) coalesce 0.0
+    const f32 result ← reduce via max from (row ⊙ scale) coalesce 0.0
     return result
 }
 
 fn min_with_identity(tf32[4] values, f32 floor) → f32 {
-    const f32 result ← min from values at [i] coalesce floor
+    const f32 result ← reduce via min from values at [i] coalesce floor
     return result
 }
 
 fn max_dynamic<size Figura>(tensor<f32, Figura> values, f32 fallback) → f32 {
-    const f32 result ← max from values at [i] coalesce fallback
+    const f32 result ← reduce via max from values at [i] coalesce fallback
     return result
 }
 
 fn max_empty() → f32 {
     const tf32[0] values ← empty
-    const f32 result ← max from values at [i] coalesce -∞
+    const f32 result ← reduce via max from values at [i] coalesce -∞
     return result
 }
 

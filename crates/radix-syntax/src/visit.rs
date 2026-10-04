@@ -546,23 +546,24 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        ExprKind::Summa(summa) => {
-            visitor.visit_expr(&summa.source);
-            for coordinate in &summa.apud {
+        ExprKind::Reducta(reduction) => {
+            visitor.visit_expr(&reduction.source);
+            for coordinate in &reduction.apud {
                 visitor.visit_ident(coordinate);
             }
-            if let Some(filum) = &summa.filum {
+            if let Some(group) = &reduction.group {
+                visitor.visit_expr(group);
+            }
+            if let Some(filum) = &reduction.filum {
                 visitor.visit_ident(filum);
             }
-            visitor.visit_ident(&summa.binding);
-            visitor.visit_block(&summa.body);
-        }
-        ExprKind::Maxima(extremum) | ExprKind::Minima(extremum) => {
-            visitor.visit_expr(&extremum.source);
-            for coordinate in &extremum.apud {
-                visitor.visit_ident(coordinate);
+            if let Some(binding) = &reduction.binding {
+                visitor.visit_ident(binding);
             }
-            if let Some(identity) = &extremum.coalesce {
+            if let Some(body) = &reduction.body {
+                visitor.visit_block(body);
+            }
+            if let Some(identity) = &reduction.identity {
                 visitor.visit_expr(identity);
             }
         }

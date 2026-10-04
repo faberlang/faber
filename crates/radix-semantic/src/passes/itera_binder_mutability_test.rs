@@ -1,6 +1,6 @@
 //! IB-1: the authored iteration-binder mutability (`varia` / `fixum`) is
 //! carried on every HIR loop node that introduces a binder: `Itera`,
-//! `IteraLockstep`, `IteraRange` and `Summa`.
+//! `IteraLockstep`, `IteraRange` and `Reduction`.
 
 use crate::test_support::{self, AnalyzedFixture};
 use radix_hir::{HirExpressionKind, HirItemKind, HirStatementKind};
@@ -29,7 +29,7 @@ fn first_loop_flag(unit: &AnalyzedFixture) -> (&'static str, bool) {
         HirExpressionKind::Itera { mutable, .. } => ("Itera", *mutable),
         HirExpressionKind::IteraLockstep { mutable, .. } => ("IteraLockstep", *mutable),
         HirExpressionKind::IteraRange { mutable, .. } => ("IteraRange", *mutable),
-        HirExpressionKind::Summa { mutable, .. } => ("Summa", *mutable),
+        HirExpressionKind::Reduction { mutable, .. } => ("Reduction", *mutable),
         other => panic!("expected a loop node, got: {other:?}"),
     }
 }
@@ -86,9 +86,9 @@ fn summa_carries_binder_mutability() {
         assert_flag(
             &format!(
                 "functio t(tensor<f32, [8]> a) → vacuum {{ \
-                 summa ex a apud [i] {modifier} s {{ redde s }} }}"
+                 reducta via summa ex a apud [i] {modifier} s {{ redde s }} }}"
             ),
-            "Summa",
+            "Reduction",
             mutable,
         );
     }

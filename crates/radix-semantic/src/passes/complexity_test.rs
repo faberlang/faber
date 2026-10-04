@@ -3,7 +3,7 @@
 //! One test per contract row in
 //! `docs/factory/complexity-diagnostics/goal.md` §Proposal, including the
 //! three audit-added rows (`Conversio { recovery }`, `Rumpe`/`Perge`, and
-//! the fold-family `vel` tail via `Extremum.coalesce`). Emission tests
+//! the fold-family `vel` tail via `Reduction.identity`). Emission tests
 //! assert diagnostic identity — kind, `issue`, named args — never rendered
 //! text.
 
@@ -16,8 +16,8 @@ use crate::catalog_semantic::semantic_spec;
 use crate::test_support::{args_have_no_legacy_message, test_span};
 use radix_hir::{
     DefId, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConversioTarget, HirCustodi,
-    HirCustodiClause, HirExpression, HirExpressionKind, HirExtremumOp, HirFunction, HirId, HirItem,
-    HirItemKind, HirIteraMode, HirLiteral, HirModule, HirNonNullKind, HirOptionalChainKind,
+    HirCustodiClause, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem,
+    HirItemKind, HirIteraMode, HirLiteral, HirModule, HirReductionOp, HirNonNullKind, HirOptionalChainKind,
     HirPattern, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Interner, Symbol};
@@ -417,16 +417,19 @@ fn row_conversio_expression_recovery_counts_when_present() {
 fn row_body_carrying_folds_count() {
     let binding = (DefId(1), Symbol(1));
     assert_eq!(
-        score(vec![expr(HirExpressionKind::Summa {
+        score(vec![expr(HirExpressionKind::Reduction {
+            op: HirReductionOp::Sum,
             source: boxed(HirExpressionKind::Literal(HirLiteral::Nil)),
             coordinates: Vec::new(),
+            group: None,
             filum: None,
-            binding: binding.clone(),
-            body: block(vec![]),
+            binding: Some(binding.clone()),
+            body: Some(block(vec![])),
+            identity: None,
             mutable: false,
         })]),
         2,
-        "Summa per-element body"
+        "Reduction per-element body"
     );
     assert_eq!(
         score(vec![expr(HirExpressionKind::FirstMatch {
@@ -441,30 +444,40 @@ fn row_body_carrying_folds_count() {
 }
 
 #[test]
-fn row_extremum_without_body_counts_zero() {
+fn row_reduction_without_body_counts_zero() {
     assert_eq!(
-        score(vec![expr(HirExpressionKind::Extremum {
-            op: HirExtremumOp::Max,
+        score(vec![expr(HirExpressionKind::Reduction {
+            op: HirReductionOp::Max,
             source: boxed(HirExpressionKind::Literal(HirLiteral::Nil)),
             coordinates: Vec::new(),
-            coalesce: None,
+            group: None,
+            filum: None,
+            binding: None,
+            body: None,
+            identity: None,
+            mutable: false,
         })]),
         1,
-        "no-body fold: 0"
+        "no-body reduction: 0"
     );
 }
 
 #[test]
-fn row_extremum_coalesce_tail_counts_when_present() {
+fn row_reduction_identity_tail_counts_when_present() {
     assert_eq!(
-        score(vec![expr(HirExpressionKind::Extremum {
-            op: HirExtremumOp::Max,
+        score(vec![expr(HirExpressionKind::Reduction {
+            op: HirReductionOp::Max,
             source: boxed(HirExpressionKind::Literal(HirLiteral::Nil)),
             coordinates: Vec::new(),
-            coalesce: Some(boxed(HirExpressionKind::Literal(HirLiteral::Int(0)))),
+            group: None,
+            filum: None,
+            binding: None,
+            body: None,
+            identity: Some(boxed(HirExpressionKind::Literal(HirLiteral::Int(0)))),
+            mutable: false,
         })]),
         2,
-        "fold-family vel tail: +1"
+        "reduction identity tail: +1"
     );
 }
 

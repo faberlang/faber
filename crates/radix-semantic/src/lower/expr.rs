@@ -33,7 +33,7 @@ use crate::{Primitive, SemanticErrorKind, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
-    HirExtremumOp, HirId, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey,
+    HirId, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey,
     HirOptionalChainKind, HirUnOp,
 };
 use radix_syntax::{
@@ -119,9 +119,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check, id),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
-        ExprKind::Summa(summa) => lower_summa(lowerer, summa),
-        ExprKind::Maxima(extremum) => lower_extremum(lowerer, extremum, HirExtremumOp::Max),
-        ExprKind::Minima(extremum) => lower_extremum(lowerer, extremum, HirExtremumOp::Min),
+        ExprKind::Reducta(reduction) => lower_reducta(lowerer, reduction),
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.
         ExprKind::CopyInto(copy) => lowerer.lower_copy_into(copy),
@@ -144,75 +142,80 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
     }
 }
 
-/// Lower the source shape of `summa ex` while preserving its declaration in HIR.
+/// Lower the source shape of `reducta via <Op>` while preserving its declaration in HIR.
 ///
-/// The node is intentionally not normalized to `Itera`: `summa` is an
+/// The node is intentionally not normalized to `Itera`: a reduction is an
 /// expression with a term body, while `itera` remains a statement with its own
-/// control-flow and mutation semantics. SFR-3/SFR-4 own the admission and
-/// lowering rules after this source-shaped node lands.
-fn lower_summa(lowerer: &mut Lowerer, summa: &radix_syntax::SummaExpr) -> HirExpressionKind {
-    let source = lower_expr(lowerer, &summa.source);
-
+/// control-flow and mutation semantics. K3 owns the admission and lowering
+/// rules after this source-shaped node lands.
+/// Lower owned reduction scopes without desugaring away their identity.
+fn lower_reducta(
+    lowerer: &mut Lowerer,
+    reduction: &radix_syntax::ReductaExpr,
+) -> HirExpressionKind {
+    let source = Box::new(lower_expr(lowerer, &reduction.source));
+    let identity = reduction
+        .identity
+        .as_ref()
+        .map(|e| Box::new(lower_expr(lowerer, e)));
     lowerer.push_scope();
-    let coordinates = summa
+    let coordinates = reduction
         .apud
         .iter()
         .map(|ident| {
-            let def_id = lowerer.next_def_id();
-            lowerer.bind_local(ident.name, def_id);
-            (def_id, ident.name)
+            let id = lowerer.next_def_id();
+            lowerer.bind_local(ident.name, id);
+            (id, ident.name)
         })
         .collect();
-    let filum = summa.filum.as_ref().map(|ident| {
-        let def_id = lowerer.next_def_id();
-        lowerer.bind_local(ident.name, def_id);
-        (def_id, ident.name)
-    });
-    let binding_def_id = lowerer.next_def_id();
-    lowerer.bind_local(summa.binding.name, binding_def_id);
-    let body = lowerer.lower_block(&summa.body);
-    lowerer.pop_scope();
-
-    HirExpressionKind::Summa {
-        source: Box::new(source),
-        coordinates,
-        filum,
-        binding: (binding_def_id, summa.binding.name),
-        body,
-        mutable: summa.mutability == radix_syntax::AstMutability::Mutable,
-    }
-}
-
-/// Lower the sibling extrema source shape without inventing a term body.
-fn lower_extremum(
-    lowerer: &mut Lowerer,
-    extremum: &radix_syntax::ExtremumExpr,
-    op: HirExtremumOp,
-) -> HirExpressionKind {
-    let source = lower_expr(lowerer, &extremum.source);
-    let coordinates = extremum
-        .apud
-        .iter()
-        .map(|ident| (lowerer.next_def_id(), ident.name))
-        .collect();
-    let coalesce = extremum
-        .coalesce
+    let group = reduction
+        .group
         .as_ref()
-        .map(|identity| Box::new(lower_expr(lowerer, identity)));
-
-    HirExpressionKind::Extremum {
+        .map(|e| Box::new(lower_expr(lowerer, e)));
+    let filum = reduction.filum.as_ref().map(|ident| {
+        let id = lowerer.next_def_id();
+        lowerer.bind_local(ident.name, id);
+        (id, ident.name)
+    });
+    let binding = reduction.binding.as_ref().map(|ident| {
+        let id = lowerer.next_def_id();
+        lowerer.bind_local(ident.name, id);
+        (id, ident.name)
+    });
+    let body = reduction
+        .body
+        .as_ref()
+        .map(|body| lowerer.lower_block(body));
+    lowerer.pop_scope();
+    let op = match reduction.op {
+        radix_syntax::ReductaOp::Sum => radix_hir::HirReductionOp::Sum,
+        radix_syntax::ReductaOp::Product => radix_hir::HirReductionOp::Product,
+        radix_syntax::ReductaOp::Max => radix_hir::HirReductionOp::Max,
+        radix_syntax::ReductaOp::Min => radix_hir::HirReductionOp::Min,
+        radix_syntax::ReductaOp::ArgMax => radix_hir::HirReductionOp::ArgMax,
+        radix_syntax::ReductaOp::ArgMin => radix_hir::HirReductionOp::ArgMin,
+        radix_syntax::ReductaOp::All => radix_hir::HirReductionOp::All,
+        radix_syntax::ReductaOp::Any => radix_hir::HirReductionOp::Any,
+        radix_syntax::ReductaOp::Count => radix_hir::HirReductionOp::Count,
+    };
+    HirExpressionKind::Reduction {
         op,
-        source: Box::new(source),
+        source,
         coordinates,
-        coalesce,
+        group,
+        filum,
+        binding,
+        body,
+        identity,
+        mutable: reduction.mutability == radix_syntax::AstMutability::Mutable,
     }
 }
 
 /// Lower the source shape of `primus_quem` while preserving its declaration
 /// in HIR.
 ///
-/// The node keeps its own shape — it is never normalized onto `Itera` or the
-/// `Summa` reduce tail, and no `rumpe` control transfer is involved. AFM-3/4
+/// The node keeps its own shape — it is never normalized onto `Itera` or a
+/// reduction expression, and no `rumpe` control transfer is involved. AFM-3/4
 /// own the base-lane admission and the AIR first-live mask after this
 /// source-shaped node lands.
 fn lower_first_match(
