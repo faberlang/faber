@@ -1,0 +1,673 @@
+//! Suite-configured target toolchains and compiler inspection lanes.
+
+use super::{Case, Outcome, SuiteTarget, fail, ms};
+use serde_json::{Value, json};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output, Stdio};
+use std::time::Instant;
+
+struct Paths<'a> {
+    suite: &'a Path,
+    workspace: &'a Path,
+    runtime: Option<&'a Path>,
+    case_dir: &'a Path,
+    source: &'a Path,
+    artifact: &'a Path,
+}
+
+pub(super) fn execute(
+    cases: &[Case],
+    suite: &Path,
+    target: &str,
+    recipe: &SuiteTarget,
+    faber: &Path,
+    discover_ms: f64,
+    started: Instant,
+) {
+    if !target
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+    {
+        fail("target name must contain only letters, digits, '-' or '_'");
+    }
+    let mode = recipe.mode.as_deref().unwrap_or("external");
+    if !matches!(mode, "external" | "emit" | "roundtrip" | "mir" | "none") {
+        fail(&format!("unsupported target mode {mode}"));
+    }
+    if matches!(mode, "external" | "emit") && recipe.emit.is_none() {
+        fail(&format!("[targets.{target}] requires emit"));
+    }
+    if mode == "external" && (recipe.extension.is_none() || recipe.run.is_empty()) {
+        fail(&format!("[targets.{target}] requires extension and run"));
+    }
+    let workspace = suite.join("target/corpus").join(target);
+    if cases
+        .iter()
+        .any(|case| !matches!(case.target.outcome, Outcome::NotApplicable))
+    {
+        fs::create_dir_all(&workspace)
+            .unwrap_or_else(|error| fail(&format!("cannot create target workspace: {error}")));
+    }
+    let preparation = Instant::now();
+    let prepare_paths = Paths {
+        suite,
+        workspace: &workspace,
+        runtime: recipe.runtime.as_deref(),
+        case_dir: &workspace,
+        source: &workspace,
+        artifact: &workspace,
+    };
+    let prepare = if recipe.prepare.is_empty()
+        || cases
+            .iter()
+            .all(|case| matches!(case.target.outcome, Outcome::NotApplicable))
+    {
+        None
+    } else {
+        Some(run_command(
+            &recipe.prepare,
+            &prepare_paths,
+            &workspace,
+            None,
+        ))
+    };
+    let prepare_ms = ms(preparation);
+    let mut passed = 0;
+    let mut expected_failures = 0;
+    let mut not_applicable = 0;
+    let mut failed = 0;
+    let mut build_ms = 0.0;
+    for (index, case) in cases.iter().enumerate() {
+        let case_started = Instant::now();
+        let mut row = if matches!(case.target.outcome, Outcome::NotApplicable) {
+            json!({"schema":1,"type":"case","case":case.id,"target":target,
+                "status":"not-applicable","reason":case.target.reason,
+                "timing_ms":{"total":ms(case_started)}})
+        } else if let Some(Err(reason)) = &prepare {
+            result(
+                case,
+                target,
+                "fail",
+                "prepare",
+                Some(reason.clone()),
+                None,
+                case_started,
+            )
+        } else if let Some(Ok((argv, output))) = &prepare {
+            if !output.status.success() {
+                let mut row = result(
+                    case,
+                    target,
+                    "fail",
+                    "prepare",
+                    Some(format!(
+                        "target preparation failed: {}{}",
+                        String::from_utf8_lossy(&output.stderr),
+                        String::from_utf8_lossy(&output.stdout)
+                    )),
+                    Some(argv),
+                    case_started,
+                );
+                row["command"]["cwd"] = json!(workspace);
+                row
+            } else {
+                run_case(
+                    case,
+                    index,
+                    target,
+                    mode,
+                    recipe,
+                    faber,
+                    suite,
+                    &workspace,
+                    case_started,
+                    &mut build_ms,
+                )
+            }
+        } else {
+            run_case(
+                case,
+                index,
+                target,
+                mode,
+                recipe,
+                faber,
+                suite,
+                &workspace,
+                case_started,
+                &mut build_ms,
+            )
+        };
+        match row["status"].as_str() {
+            Some("pass") => passed += 1,
+            Some("expected-fail") => expected_failures += 1,
+            Some("not-applicable") => not_applicable += 1,
+            _ => failed += 1,
+        }
+        row["timing_ms"]["total"] = json!(ms(case_started));
+        println!("{row}");
+    }
+    let no_applicable_cases = passed == 0 && expected_failures == 0;
+    println!(
+        "{}",
+        json!({
+            "schema":1,"type":"summary","target":target,"cases":cases.len(),
+            "passed":passed,"expected_failures":expected_failures,
+            "not_applicable":not_applicable,"failed":failed,
+            "status":if no_applicable_cases { "no-applicable-cases" } else if failed != 0 { "fail" } else { "pass" },
+            "prepare_command":prepare.as_ref().and_then(|item| item.as_ref().ok())
+                .map(|item| json!({"argv":&item.0,"cwd":workspace})),
+            "timing_ms":{"discover":discover_ms,"prepare":prepare_ms,"build":build_ms,"total":ms(started)}
+        })
+    );
+    if failed != 0 || no_applicable_cases {
+        std::process::exit(1);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_case(
+    case: &Case,
+    index: usize,
+    target: &str,
+    mode: &str,
+    recipe: &SuiteTarget,
+    faber: &Path,
+    suite: &Path,
+    workspace: &Path,
+    started: Instant,
+    build_total_ms: &mut f64,
+) -> Value {
+    if mode == "none" {
+        return result(
+            case,
+            target,
+            "fail",
+            "setup",
+            Some("applicable case has no target recipe".to_owned()),
+            None,
+            started,
+        );
+    }
+    let case_dir = workspace.join(format!("case_{index:04}"));
+    if let Err(error) = fs::create_dir_all(&case_dir) {
+        return result(
+            case,
+            target,
+            "fail",
+            "setup",
+            Some(format!("cannot create case workspace: {error}")),
+            None,
+            started,
+        );
+    }
+    let extension = recipe.extension.as_deref().unwrap_or("txt");
+    if !extension.chars().all(|ch| ch.is_ascii_alphanumeric()) {
+        return result(
+            case,
+            target,
+            "fail",
+            "setup",
+            Some("invalid source extension".to_owned()),
+            None,
+            started,
+        );
+    }
+    let source = case_dir.join(format!("main.{extension}"));
+    let artifact = case_dir.join("program");
+    let paths = Paths {
+        suite,
+        workspace,
+        runtime: recipe.runtime.as_deref(),
+        case_dir: &case_dir,
+        source: &source,
+        artifact: &artifact,
+    };
+    let emit_args = match mode {
+        "mir" => vec![
+            faber.display().to_string(),
+            "mir".to_owned(),
+            case.input.display().to_string(),
+        ],
+        "roundtrip" => vec![
+            faber.display().to_string(),
+            "emit".to_owned(),
+            "-t".to_owned(),
+            "faber".to_owned(),
+            case.input.display().to_string(),
+        ],
+        _ => vec![
+            faber.display().to_string(),
+            "emit".to_owned(),
+            "-t".to_owned(),
+            recipe.emit.as_deref().unwrap_or("").to_owned(),
+            case.input.display().to_string(),
+        ],
+    };
+    let emitting = Instant::now();
+    let emitted = Command::new(faber)
+        .args(&emit_args[1..])
+        .current_dir(&case.dir)
+        .output();
+    let emit_ms = ms(emitting);
+    let output = match emitted {
+        Ok(output) => output,
+        Err(error) => {
+            return result(
+                case,
+                target,
+                "fail",
+                "emit",
+                Some(format!("cannot start Faber: {error}")),
+                Some(&emit_args),
+                started,
+            );
+        }
+    };
+    if (case.target.phase.as_deref() == Some("emit") && mode != "roundtrip")
+        || !output.status.success()
+    {
+        let (status, reason) = judge_phase(case, "emit", &output);
+        let mut row = result(
+            case,
+            target,
+            status,
+            "emit",
+            reason,
+            Some(&emit_args),
+            started,
+        );
+        row["exit"] = json!(output.status.code());
+        row["timing_ms"]["emit"] = json!(emit_ms);
+        return row;
+    }
+    if mode == "roundtrip" {
+        if let Err(error) = fs::write(&source, &output.stdout) {
+            return result(
+                case,
+                target,
+                "fail",
+                "emit",
+                Some(format!("cannot write re-emitted Faber: {error}")),
+                Some(&emit_args),
+                started,
+            );
+        }
+        let second_args = vec![
+            faber.display().to_string(),
+            "emit".to_owned(),
+            "-t".to_owned(),
+            "faber".to_owned(),
+            source.display().to_string(),
+        ];
+        let second = Command::new(faber)
+            .args(&second_args[1..])
+            .current_dir(&case_dir)
+            .output();
+        let (status, reason) = match second {
+            Ok(second) if second.status.success() && second.stdout == output.stdout => {
+                ("pass", None)
+            }
+            Ok(second) if !second.status.success() => (
+                "fail",
+                Some(format!(
+                    "second Faber emission failed: {}",
+                    String::from_utf8_lossy(&second.stderr)
+                )),
+            ),
+            Ok(_) => (
+                "fail",
+                Some("Faber re-emission did not stabilize".to_owned()),
+            ),
+            Err(error) => (
+                "fail",
+                Some(format!("cannot start second Faber emission: {error}")),
+            ),
+        };
+        let mut row = result(
+            case,
+            target,
+            status,
+            "emit",
+            reason,
+            Some(&second_args),
+            started,
+        );
+        row["timing_ms"]["emit"] = json!(ms(emitting));
+        row["emit_command"] = json!({"argv":emit_args,"cwd":case.dir});
+        return row;
+    }
+    if mode != "external" {
+        let mut row = result(
+            case,
+            target,
+            "pass",
+            "emit",
+            None,
+            Some(&emit_args),
+            started,
+        );
+        row["timing_ms"]["emit"] = json!(emit_ms);
+        return row;
+    }
+    if let Err(error) = prepare_files(recipe, &paths, &output.stdout) {
+        return result(
+            case,
+            target,
+            "fail",
+            "setup",
+            Some(error),
+            Some(&emit_args),
+            started,
+        );
+    }
+    let mut row = result(case, target, "fail", "build", None, None, started);
+    row["emit_command"] = json!({"argv":emit_args,"cwd":case.dir});
+    row["timing_ms"]["emit"] = json!(emit_ms);
+    if !recipe.build.is_empty() {
+        let building = Instant::now();
+        let build = run_command(&recipe.build, &paths, &case_dir, None);
+        let build_ms = ms(building);
+        *build_total_ms += build_ms;
+        row["timing_ms"]["build"] = json!(build_ms);
+        let (argv, output) = match build {
+            Ok(item) => item,
+            Err(reason) => {
+                row["reason"] = json!(reason);
+                return row;
+            }
+        };
+        row["build_command"] = json!({"argv":argv,"cwd":case_dir});
+        if case.target.phase.as_deref() == Some("build") || !output.status.success() {
+            let (status, reason) = judge_phase(case, "build", &output);
+            row["status"] = json!(status);
+            row["reason"] = json!(reason);
+            row["exit"] = json!(output.status.code());
+            return row;
+        }
+    } else if case.target.phase.as_deref() == Some("build") {
+        row["reason"] = json!("case expects build failure but target has no build step");
+        return row;
+    }
+    row["phase"] = json!("run");
+    let running = Instant::now();
+    let run = run_command(&recipe.run, &paths, &case_dir, case.stdin.as_deref());
+    row["timing_ms"]["run"] = json!(ms(running));
+    let (argv, mut output) = match run {
+        Ok(item) => item,
+        Err(reason) => {
+            row["reason"] = json!(reason);
+            return row;
+        }
+    };
+    normalize_stdout_lines(&mut output, &recipe.stdout_lines);
+    row["command"] = json!({"argv":argv,"cwd":case_dir});
+    row["exit"] = json!(output.status.code());
+    let comparing = Instant::now();
+    let (status, reason) = judge_phase(case, "run", &output);
+    row["status"] = json!(status);
+    row["reason"] = json!(reason);
+    row["timing_ms"]["compare"] = json!(ms(comparing));
+    row
+}
+
+fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Option<String>) {
+    if case
+        .target
+        .phase
+        .as_deref()
+        .is_some_and(|expected| expected != phase)
+    {
+        return (
+            "fail",
+            Some(format!(
+                "{phase} failed before expected {} phase",
+                case.target.phase.as_deref().unwrap_or("run")
+            )),
+        );
+    }
+    let diagnostics = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+    if matches!(case.target.outcome, Outcome::KnownFail) {
+        if output.status.success() {
+            return (
+                "fail",
+                Some("unexpected pass; update target expectation".to_owned()),
+            );
+        }
+        let fragment = case
+            .target
+            .diagnostic_contains
+            .as_deref()
+            .expect("validated known failure");
+        return if diagnostics.contains(fragment) {
+            ("expected-fail", None)
+        } else {
+            (
+                "fail",
+                Some(format!("known failure diagnostic changed: {diagnostics}")),
+            )
+        };
+    }
+    let expected = case.expect.as_ref();
+    if phase == "emit" {
+        if let Some(expected) = expected {
+            if output.status.code() != Some(expected.exit) {
+                return (
+                    "fail",
+                    Some(format!(
+                        "emit exit mismatch: expected {}, got {}",
+                        expected.exit, output.status
+                    )),
+                );
+            }
+        } else if !output.status.success() {
+            return ("fail", Some(format!("emit failed: {diagnostics}")));
+        }
+        if let Some(fragment) = case.target.diagnostic_contains.as_deref() {
+            if !diagnostics.contains(fragment) {
+                return ("fail", Some("expected emit diagnostic changed".to_owned()));
+            }
+        }
+        if let Some(path) = expected
+            .filter(|item| item.exit != 0)
+            .and_then(|item| item.stdout.as_ref())
+        {
+            match fs::read(path) {
+                Ok(bytes) if bytes == output.stdout => {}
+                Ok(_) => return ("fail", Some("emit stdout mismatch".to_owned())),
+                Err(error) => return ("fail", Some(format!("cannot read emit golden: {error}"))),
+            }
+        }
+        return ("pass", None);
+    }
+    if phase == "build" {
+        return if output.status.success() {
+            (
+                "fail",
+                Some("unexpected pass; update target expectation".to_owned()),
+            )
+        } else {
+            ("fail", Some(format!("build failed: {diagnostics}")))
+        };
+    }
+    let expected = expected.expect("validated runnable case");
+    if output.status.code() != Some(expected.exit) {
+        return (
+            "fail",
+            Some(format!(
+                "exit mismatch: expected {}, got {}",
+                expected.exit, output.status
+            )),
+        );
+    }
+    for (name, path, actual) in [
+        ("stdout", expected.stdout.as_ref(), output.stdout.as_slice()),
+        ("stderr", expected.stderr.as_ref(), output.stderr.as_slice()),
+    ] {
+        let golden = match path.map(fs::read).transpose() {
+            Ok(bytes) => bytes.unwrap_or_default(),
+            Err(error) => return ("fail", Some(format!("cannot read {name} golden: {error}"))),
+        };
+        if golden != actual {
+            return ("fail", Some(format!("{name} mismatch")));
+        }
+    }
+    ("pass", None)
+}
+
+fn result(
+    case: &Case,
+    target: &str,
+    status: &str,
+    phase: &str,
+    reason: Option<String>,
+    argv: Option<&Vec<String>>,
+    started: Instant,
+) -> Value {
+    json!({"schema":1,"type":"case","case":case.id,"target":target,
+        "status":status,"phase":phase,"reason":reason,
+        "command":argv.map(|argv| json!({"argv":argv,"cwd":case.dir})),
+        "timing_ms":{"total":ms(started)}})
+}
+
+fn prepare_files(recipe: &SuiteTarget, paths: &Paths<'_>, bytes: &[u8]) -> Result<(), String> {
+    write_if_changed(paths.source, bytes)?;
+    for (relative, template) in &recipe.files {
+        let path = super::relative_path(paths.case_dir, relative)?;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        write_if_changed(&path, expand(template, paths).as_bytes())?;
+    }
+    for (relative, template) in &recipe.links {
+        let path = super::relative_path(paths.case_dir, relative)?;
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        let destination = PathBuf::from(expand(template, paths));
+        if !destination.exists() {
+            return Err(format!(
+                "runtime link target is missing: {}",
+                destination.display()
+            ));
+        }
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                let old = fs::read_link(&path).map_err(|error| error.to_string())?;
+                if old == destination {
+                    continue;
+                }
+                fs::remove_file(&path).map_err(|error| error.to_string())?;
+            }
+            Ok(_) => {
+                return Err(format!(
+                    "runtime link path is not a symlink: {}",
+                    path.display()
+                ));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.to_string()),
+        }
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&destination, &path).map_err(|error| error.to_string())?;
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&destination, &path)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    match fs::read(path) {
+        Ok(old) if old == bytes => Ok(()),
+        _ => fs::write(path, bytes)
+            .map_err(|error| format!("cannot write {}: {error}", path.display())),
+    }
+}
+
+fn normalize_stdout_lines(
+    output: &mut Output,
+    replacements: &std::collections::BTreeMap<String, String>,
+) {
+    if replacements.is_empty() {
+        return;
+    }
+    let Ok(stdout) = std::str::from_utf8(&output.stdout) else {
+        return;
+    };
+    let mut result = String::with_capacity(stdout.len());
+    for segment in stdout.split_inclusive('\n') {
+        let (line, ending) = segment
+            .strip_suffix('\n')
+            .map_or((segment, ""), |line| (line, "\n"));
+        result.push_str(replacements.get(line).map_or(line, String::as_str));
+        result.push_str(ending);
+    }
+    output.stdout = result.into_bytes();
+}
+
+fn expand(template: &str, paths: &Paths<'_>) -> String {
+    let runtime = paths
+        .runtime
+        .map(|path| path.display().to_string())
+        .unwrap_or_default();
+    template
+        .replace("{suite}", &paths.suite.display().to_string())
+        .replace("{workspace}", &paths.workspace.display().to_string())
+        .replace("{runtime}", &runtime)
+        .replace("{case_dir}", &paths.case_dir.display().to_string())
+        .replace("{source}", &paths.source.display().to_string())
+        .replace("{artifact}", &paths.artifact.display().to_string())
+}
+
+fn run_command(
+    argv: &[String],
+    paths: &Paths<'_>,
+    cwd: &Path,
+    stdin: Option<&Path>,
+) -> Result<(Vec<String>, Output), String> {
+    let mut expanded = Vec::new();
+    for arg in argv {
+        let value = expand(arg, paths);
+        if let Some((parent, suffix)) = value.rsplit_once("/*") {
+            let mut matches = fs::read_dir(parent)
+                .map_err(|error| format!("cannot expand {value}: {error}"))?
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    path.is_file()
+                        && path
+                            .file_name()
+                            .is_some_and(|name| name.to_string_lossy().ends_with(suffix))
+                })
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>();
+            matches.sort();
+            if matches.is_empty() {
+                return Err(format!("no files match {value}"));
+            }
+            expanded.extend(matches);
+        } else {
+            expanded.push(value);
+        }
+    }
+    let Some(program) = expanded.first() else {
+        return Err("empty target command".to_owned());
+    };
+    let input = stdin
+        .map(fs::File::open)
+        .transpose()
+        .map_err(|error| format!("cannot read stdin fixture: {error}"))?;
+    let output = Command::new(program)
+        .args(&expanded[1..])
+        .current_dir(cwd)
+        .stdin(input.map_or_else(Stdio::null, Stdio::from))
+        .output()
+        .map_err(|error| format!("cannot start {program}: {error}"))?;
+    Ok((expanded, output))
+}

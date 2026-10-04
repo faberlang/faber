@@ -1,5 +1,7 @@
 //! Verify explicit corpus cases against a selected execution target.
 
+mod canonical;
+mod external;
 mod rust;
 
 use crate::cli::CorpusArgs;
@@ -21,15 +23,30 @@ struct SuiteManifest {
     targets: BTreeMap<String, SuiteTarget>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SuiteTarget {
     runtime: Option<PathBuf>,
+    mode: Option<String>,
+    emit: Option<String>,
+    extension: Option<String>,
+    #[serde(default)]
+    prepare: Vec<String>,
+    #[serde(default)]
+    build: Vec<String>,
+    #[serde(default)]
+    run: Vec<String>,
+    #[serde(default)]
+    files: BTreeMap<PathBuf, String>,
+    #[serde(default)]
+    links: BTreeMap<PathBuf, String>,
+    #[serde(default)]
+    stdout_lines: BTreeMap<String, String>,
 }
 
 struct LoadedSuite {
     cases: Vec<Case>,
-    rust_runtime: Option<PathBuf>,
+    recipe: Option<SuiteTarget>,
 }
 
 #[derive(Deserialize)]
@@ -82,9 +99,6 @@ struct Case {
 
 pub(super) fn cmd_corpus(args: &CorpusArgs) {
     let started = Instant::now();
-    if !matches!(args.target.as_str(), "runner" | "rust") {
-        fail(&format!("target {} is not implemented", args.target));
-    }
     let input = package::absolutize_path(&args.input);
     let discovering = Instant::now();
     let suite = if input.is_dir() && input.join("corpus.toml").is_file() {
@@ -93,15 +107,15 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         }
         load_suite(&input, &args.target).unwrap_or_else(|message| fail(&message))
     } else {
-        if args.target == "rust" {
-            fail("the rust target requires a suite with [targets.rust] runtime");
+        if args.target != "runner" {
+            fail("non-runner targets require a suite with a target recipe");
         }
         LoadedSuite {
             cases: vec![
                 single_case(&input, args.expected.as_deref())
                     .unwrap_or_else(|message| fail(&message)),
             ],
-            rust_runtime: None,
+            recipe: None,
         }
     };
     let discover_ms = ms(discovering);
@@ -112,7 +126,38 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         rust::execute(
             &suite.cases,
             &input,
-            suite.rust_runtime.as_deref().expect("validated Rust suite"),
+            suite
+                .recipe
+                .as_ref()
+                .and_then(|item| item.runtime.as_deref())
+                .expect("validated Rust suite"),
+            &faber,
+            discover_ms,
+            started,
+        );
+        return;
+    }
+    if args.target == "canonical" {
+        canonical::execute(
+            &suite.cases,
+            &input,
+            suite
+                .recipe
+                .as_ref()
+                .and_then(|item| item.runtime.as_deref())
+                .expect("validated canonical suite"),
+            &faber,
+            discover_ms,
+            started,
+        );
+        return;
+    }
+    if args.target != "runner" {
+        external::execute(
+            &suite.cases,
+            &input,
+            &args.target,
+            suite.recipe.as_ref().expect("validated external suite"),
             &faber,
             discover_ms,
             started,
@@ -218,31 +263,44 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
         .iter()
         .map(|path| load_case(path, &cases_root, target))
         .collect::<Result<Vec<_>, _>>()?;
-    let rust_runtime =
-        if target == "rust" {
-            let configured = suite
+    let recipe = if target == "runner" {
+        None
+    } else {
+        Some(
+            suite
                 .targets
-                .get("rust")
-                .and_then(|item| item.runtime.as_deref())
-                .ok_or("rust target requires [targets.rust] runtime in corpus.toml")?;
+                .get(target)
+                .ok_or_else(|| format!("suite has no [targets.{target}] recipe"))?
+                .clone(),
+        )
+    };
+    let recipe = if let Some(mut recipe) = recipe {
+        if matches!(target, "rust" | "canonical") && recipe.runtime.is_none() {
+            return Err(format!(
+                "{target} target requires [targets.{target}] runtime in corpus.toml"
+            ));
+        }
+        if let Some(configured) = recipe.runtime.as_deref() {
             let path = if configured.is_absolute() {
                 configured.to_path_buf()
             } else {
                 root.join(configured)
             };
-            if !path.join("Cargo.toml").is_file() {
+            if !path.is_dir() {
+                return Err(format!("target runtime is missing: {}", path.display()));
+            }
+            if matches!(target, "rust" | "canonical") && !path.join("Cargo.toml").is_file() {
                 return Err(format!("Rust runtime crate is missing: {}", path.display()));
             }
-            Some(path.canonicalize().map_err(|error| {
-                format!("cannot resolve Rust runtime {}: {error}", path.display())
-            })?)
-        } else {
-            None
-        };
-    Ok(LoadedSuite {
-        cases,
-        rust_runtime,
-    })
+            recipe.runtime = Some(path.canonicalize().map_err(|error| {
+                format!("cannot resolve target runtime {}: {error}", path.display())
+            })?);
+        }
+        Some(recipe)
+    } else {
+        None
+    };
+    Ok(LoadedSuite { cases, recipe })
 }
 
 fn find_cases(dir: &Path, manifests: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -299,27 +357,30 @@ fn load_case(manifest_path: &Path, cases_root: &Path, target: &str) -> Result<Ca
         .ok_or_else(|| format!("{id}: target {target} has no expectation in case.toml"))?;
     match expectation.outcome {
         Outcome::Pass
-            if manifest
-                .expect
-                .as_ref()
-                .is_none_or(|item| item.stdout.is_none()) =>
+            if expectation.phase.as_deref() != Some("emit")
+                && manifest
+                    .expect
+                    .as_ref()
+                    .is_none_or(|item| item.stdout.is_none()) =>
         {
             return Err(format!("{id}: a passing case requires expect.stdout"));
         }
         Outcome::KnownFail
-            if !matches!(
-                (target, expectation.phase.as_deref()),
-                ("runner", Some("run")) | ("rust", Some("emit" | "build" | "run"))
-            ) || expectation
-                .diagnostic_contains
-                .as_ref()
-                .is_none_or(String::is_empty) =>
+            if !matches!(expectation.phase.as_deref(), Some("emit" | "build" | "run"))
+                || (target == "runner" && expectation.phase.as_deref() != Some("run"))
+                || expectation
+                    .diagnostic_contains
+                    .as_ref()
+                    .is_none_or(String::is_empty) =>
         {
             return Err(format!(
                 "{id}: known-fail requires a supported phase and diagnostic_contains"
             ));
         }
-        Outcome::Pass if target == "rust" && expectation.phase.as_deref() == Some("emit") => {
+        Outcome::Pass
+            if expectation.phase.as_deref() == Some("emit")
+                && manifest.expect.as_ref().is_some_and(|item| item.exit != 0) =>
+        {
             if manifest.expect.as_ref().is_none_or(|item| item.exit == 0)
                 || expectation
                     .diagnostic_contains
@@ -332,7 +393,8 @@ fn load_case(manifest_path: &Path, cases_root: &Path, target: &str) -> Result<Ca
             }
         }
         Outcome::Pass
-            if expectation.phase.is_some() && expectation.phase.as_deref() != Some("run") =>
+            if expectation.phase.is_some()
+                && !matches!(expectation.phase.as_deref(), Some("emit" | "run")) =>
         {
             return Err(format!("{id}: passing case has unsupported phase"));
         }

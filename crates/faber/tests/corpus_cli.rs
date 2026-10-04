@@ -471,3 +471,68 @@ fn corpus_requires_each_case_to_classify_the_selected_target() {
             .is_some_and(|message| message.contains("target runner has no expectation"))
     );
 }
+
+#[test]
+fn corpus_external_recipe_builds_and_checks_the_program_golden() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases").join("probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[targets.native]\nemit = \"rust\"\nextension = \"rs\"\nbuild = [\"rustc\", \"--edition=2024\", \"{source}\", \"-o\", \"{artifact}\"]\nrun = [\"{artifact}\"]\n",
+    )
+    .expect("write suite");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[expect]\nstdout = \"stdout.expected\"\n\n[targets.native]\noutcome = \"pass\"\n",
+    )
+    .expect("write case");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+    fs::copy(
+        smoke_case().with_extension("expected"),
+        case.join("stdout.expected"),
+    )
+    .expect("copy golden");
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_faber"))
+            .args(["corpus", "--target", "native"])
+            .arg(temp.path())
+            .output()
+            .expect("run native corpus recipe")
+    };
+    let pass = run();
+    assert!(
+        pass.status.success(),
+        "{}",
+        String::from_utf8_lossy(&pass.stdout)
+    );
+    let pass_rows = records(&pass.stdout);
+    assert_eq!(pass_rows[0]["status"], "pass");
+    assert_eq!(pass_rows[0]["phase"], "run");
+    assert_eq!(pass_rows[1]["passed"], 1);
+
+    fs::write(case.join("stdout.expected"), "wrong output\n").expect("write wrong golden");
+    let mismatch = run();
+    assert!(
+        !mismatch.status.success(),
+        "a wrong target golden must fail"
+    );
+    assert_eq!(records(&mismatch.stdout)[0]["reason"], "stdout mismatch");
+}
+
+#[test]
+fn corpus_does_not_report_an_all_inapplicable_target_as_green() {
+    let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "gpu"])
+        .arg(suite)
+        .output()
+        .expect("run inapplicable GPU pilot");
+    assert!(!output.status.success(), "GPU pilot has no kernel cases");
+    let rows = records(&output.stdout);
+    assert_eq!(rows.last().expect("summary")["not_applicable"], 6);
+    assert_eq!(
+        rows.last().expect("summary")["status"],
+        "no-applicable-cases"
+    );
+}
