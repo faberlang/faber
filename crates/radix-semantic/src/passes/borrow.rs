@@ -286,10 +286,12 @@ struct BorrowChecker<'a> {
     /// Read-only tensor views and their backing place. Chained views and
     /// immutable aliases retain the original root until materialize().
     tensor_view_roots: FxHashMap<DefId, FxHashSet<DefId>>,
-    /// Tensor bindings bound by `←` to another tensor place: the binding shares
-    /// that place's storage (reference model), so a write through either name
-    /// reaches both. Closed transitively when the alias is recorded.
-    tensor_alias_roots: FxHashMap<DefId, FxHashSet<DefId>>,
+    /// Bindings of an aliasing type (genus, contract, collection, tensor, each
+    /// also through `T ∪ nihil`) bound by `←` to another place: the binding
+    /// shares that place's storage (reference model), so a write through
+    /// either name reaches both. Closed transitively when the alias is
+    /// recorded. Value types (scalars, text) copy and never enter this table.
+    bind_alias_roots: FxHashMap<DefId, FxHashSet<DefId>>,
     /// Parameters declared `mut` (`in` mode or a `mut` access marker).
     mut_params: FxHashSet<DefId>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
@@ -344,7 +346,7 @@ impl<'a> BorrowChecker<'a> {
             unmarked_own_binds: FxHashMap::default(),
             de_aliases: FxHashSet::default(),
             tensor_view_roots: FxHashMap::default(),
-            tensor_alias_roots: FxHashMap::default(),
+            bind_alias_roots: FxHashMap::default(),
             mut_params: FxHashSet::default(),
             func_params: FxHashMap::default(),
             regions,
@@ -457,7 +459,7 @@ impl<'a> BorrowChecker<'a> {
         self.unmarked_own_binds.clear();
         self.de_aliases.clear();
         self.tensor_view_roots.clear();
-        self.tensor_alias_roots.clear();
+        self.bind_alias_roots.clear();
         self.mut_params.clear();
         self.stmt_node = None;
     }
@@ -564,7 +566,7 @@ impl<'a> BorrowChecker<'a> {
                         self.check_expr(init);
                     }
                     self.note_de_alias(local.def_id, local.ty, init);
-                    self.note_tensor_alias(local.def_id, local.ty, init);
+                    self.note_bind_alias(local.def_id, local.ty, init);
                 }
             }
             HirStatementKind::Expr(expr) => self.check_expr(expr),
@@ -870,31 +872,33 @@ impl<'a> BorrowChecker<'a> {
         })
     }
 
-    /// Record that a binding initialized from a tensor place shares that
-    /// place's storage. `c ← a` makes `c` another name for `a`'s tensor, so
-    /// `c` and `a` overlap for the `⇇` alias rule. Exclusive (`own`/`copy`)
-    /// bindings duplicate and do not alias.
-    fn note_tensor_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
-        self.tensor_alias_roots.remove(&local);
-        if ty.is_some_and(|ty| self.types.is_exclusive_value(ty)) || !self.is_tensor_typed(init) {
+    /// Record that a binding initialized from a place of an aliasing type
+    /// shares that place's storage. `c ← a` makes `c` another name for `a`'s
+    /// value, so `c` and `a` overlap for the call-site borrow rule and the
+    /// `⇇` alias rule. Exclusive (`own`/`copy`) bindings duplicate and do not
+    /// alias, and value types copy.
+    fn note_bind_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
+        self.bind_alias_roots.remove(&local);
+        let Some(ty) = ty.or(init.ty) else { return };
+        if self.types.is_exclusive_value(ty) || !self.is_aliasing_type(ty) {
             return;
         }
         let Some((source, _)) = Self::place_key(init) else {
             return;
         };
         let mut roots = self
-            .tensor_alias_roots
+            .bind_alias_roots
             .get(&source)
             .cloned()
             .unwrap_or_default();
         roots.insert(source);
-        self.tensor_alias_roots.insert(local, roots);
+        self.bind_alias_roots.insert(local, roots);
     }
 
     /// The bindings whose storage a binding names: itself plus its aliases.
     fn storage_names(&self, def_id: DefId) -> FxHashSet<DefId> {
         let mut names = self
-            .tensor_alias_roots
+            .bind_alias_roots
             .get(&def_id)
             .cloned()
             .unwrap_or_default();
@@ -1887,7 +1891,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.check_mut_tensor_param_rebind(target);
                 }
                 if let HirExpressionKind::Path(def_id) = &target.kind {
-                    self.note_tensor_alias(*def_id, target.ty, value);
+                    self.note_bind_alias(*def_id, target.ty, value);
                 }
                 if target.ty.is_some_and(|ty| self.types.is_copy_view(ty))
                     || Self::root_def_id(target).is_some_and(|id| self.copy_roots.contains(&id))

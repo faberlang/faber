@@ -140,6 +140,10 @@ mod borrow_non_null_receiver_test;
 mod borrow_alias_call_test;
 
 #[cfg(test)]
+#[path = "borrow_alias_call_types_test.rs"]
+mod borrow_alias_call_types_test;
+
+#[cfg(test)]
 #[path = "borrow_alias_container_test.rs"]
 mod borrow_alias_container_test;
 
