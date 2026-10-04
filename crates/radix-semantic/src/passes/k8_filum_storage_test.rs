@@ -2,7 +2,8 @@
 //!
 //! `crea` and `strue` allocate new storage, so a tensor they build is its own
 //! storage root. Any other call result keeps the named unknown-identity
-//! decline.
+//! decline. Tensor parameters carry storage roots by mode (see the section
+//! below).
 
 use crate::test_support::analyze_source;
 
@@ -71,5 +72,216 @@ fn other_call_result_keeps_unknown_identity() {
             "grid[i] ← value",
         ),
         "unknown_storage_identity",
+    );
+}
+
+// =============================================================================
+// Tensor parameters
+//
+// The call-site borrow check judges overlap on storage, so a `mut` (`in`)
+// parameter is distinct from every other parameter; `ref` (`de`) and unmarked
+// parameters may name one another's tensor and share one root class.
+// =============================================================================
+
+const GRID: &str = "tensor<numerus, [4]>";
+
+/// `statement` runs once per lane of `src` inside a `filum` body; `params` are
+/// the kernel's parameters.
+fn kernel_fn(params: &str, statement: &str) -> String {
+    format!(
+        r"functio kernel({params}) → vacuum {{
+    itera ex src apud [i] filum lane fixum value {{
+        {statement}
+    }}
+}}
+incipit {{
+}}"
+    )
+}
+
+fn with_src(extra: &str, statement: &str) -> String {
+    kernel_fn(&format!("{extra}, de {GRID} src"), statement)
+}
+
+/// A kernel with a `varia` alias of its `out` parameter declared before the loop.
+fn with_out_alias(statement: &str) -> String {
+    with_src(&format!("in {GRID} out"), statement).replace(
+        "    itera ex src",
+        &format!("    varia {GRID} alias ← out\n    itera ex src"),
+    )
+}
+
+#[test]
+fn mut_param_written_at_own_coordinate_is_accepted() {
+    accepted(&with_src(&format!("in {GRID} out"), "out[i] ← value + 1"));
+    accepted(&with_src(
+        &format!("in {GRID} out"),
+        "out.ponde([i], value + 1)",
+    ));
+}
+
+#[test]
+fn mut_param_written_while_read_param_is_read_at_a_neighbour_is_accepted() {
+    accepted(&with_src(&format!("in {GRID} out"), "out[i] ← src[i + 1]"));
+}
+
+#[test]
+fn two_read_params_at_neighbours_and_one_mut_written_is_accepted() {
+    accepted(&kernel_fn(
+        &format!("in {GRID} out, de {GRID} src, de {GRID} other"),
+        "out[i] ← src[i + 1] + other[i + 2]",
+    ));
+}
+
+#[test]
+fn mut_param_written_then_read_at_a_neighbour_is_rejected() {
+    rejected(
+        &with_src(&format!("in {GRID} out"), "out[i] ← out[i + 1]"),
+        "written_storage_neighbor_read",
+    );
+    rejected(
+        &with_src(
+            &format!("in {GRID} out"),
+            "out[i] ← value\n        fixum numerus next ← out[i + 1]",
+        ),
+        "written_storage_neighbor_read",
+    );
+}
+
+#[test]
+fn read_param_read_at_neighbours_and_never_written_is_accepted() {
+    accepted(&kernel_fn(
+        &format!("de {GRID} src"),
+        "fixum numerus next ← src[i + 1]",
+    ));
+    // Paired with a local that owns its storage.
+    accepted(&format!(
+        r"functio kernel(de {GRID} src) → vacuum {{
+    varia tensor<numerus, []> seed ← vacua
+    varia {GRID} grid ← seed.crea(0, [4])
+    itera ex src apud [i] filum lane fixum value {{
+        grid[i] ← src[i + 1]
+    }}
+}}
+incipit {{
+}}"
+    ));
+}
+
+#[test]
+fn two_mut_params_written_at_own_coordinates_are_accepted() {
+    accepted(&with_src(
+        &format!("in {GRID} left, in {GRID} right"),
+        "left[i] ← value\n        right[i] ← value + 1",
+    ));
+}
+
+#[test]
+fn bind_alias_of_a_mut_param_joins_its_root() {
+    rejected(
+        &with_out_alias("alias[i] ← value\n        fixum numerus next ← out[i + 1]"),
+        "written_storage_neighbor_read",
+    );
+    accepted(&with_out_alias("alias[i] ← src[i + 1]"));
+}
+
+#[test]
+fn unmarked_params_share_one_possibly_aliased_root_class() {
+    // Unmarked params are writable and may name one another's tensor: a write
+    // through one is checked against neighbour reads through the other.
+    rejected(
+        &kernel_fn(&format!("{GRID} left, {GRID} src"), "left[i] ← src[i + 1]"),
+        "written_storage_neighbor_read",
+    );
+    accepted(&kernel_fn(
+        &format!("{GRID} left, {GRID} src"),
+        "left[i] ← value + src[i]",
+    ));
+    // A `mut` param never overlaps an unmarked one (the call-site rule).
+    accepted(&kernel_fn(
+        &format!("in {GRID} out, {GRID} src"),
+        "out[i] ← src[i + 1]",
+    ));
+}
+
+#[test]
+fn own_param_has_no_known_storage() {
+    // `k(own a, mut b)` is not rejected at the call site for a non-exclusive
+    // argument, so an `own` parameter keeps the unknown-identity decline.
+    rejected(
+        &with_src(&format!("own {GRID} out"), "out[i] ← value"),
+        "unknown_storage_identity",
+    );
+}
+
+#[test]
+fn list_param_write_keeps_unknown_identity() {
+    rejected(
+        &with_src("in lista<numerus> xs", "xs[i] ← value"),
+        "unknown_storage_identity",
+    );
+}
+
+#[test]
+fn call_from_the_body_stays_declined_with_param_roots() {
+    rejected(
+        &format!(
+            r"functio inner(in {GRID} out) → vacuum {{
+}}
+functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
+    itera ex src apud [i] filum lane fixum value {{
+        inner(out)
+        out[i] ← value
+    }}
+}}
+incipit {{
+}}"
+        ),
+        "unproved_call_effect",
+    );
+}
+
+#[test]
+fn write_through_a_read_param_is_a_borrow_error_not_an_independence_one() {
+    let result = analyze_source(&with_src(&format!("in {GRID} out"), "src[i] ← value"));
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.issue() == Some("assign_to_de_parameter")),
+        "{errors:?}"
+    );
+    assert!(
+        errors.iter().all(|d| d.issue() != Some(ISSUE)),
+        "filum owns a borrow error: {errors:?}"
+    );
+}
+
+#[test]
+fn aliasing_call_is_a_borrow_error_while_the_kernel_is_certified() {
+    let source = format!(
+        r"functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
+    itera ex src apud [i] filum lane fixum value {{
+        out[i] ← src[i + 1]
+    }}
+}}
+incipit {{
+    varia tensor<numerus, []> seed ← vacua
+    varia {GRID} grid ← seed.crea(0, [4])
+    varia {GRID} alias ← grid
+    kernel(grid, alias)
+}}"
+    );
+    let result = analyze_source(&source);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.issue() == Some("shared_borrow_conflict")),
+        "{errors:?}"
+    );
+    assert!(
+        errors.iter().all(|d| d.issue() != Some(ISSUE)),
+        "kernel should be certified: {errors:?}"
     );
 }

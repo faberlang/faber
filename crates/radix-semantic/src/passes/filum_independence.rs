@@ -8,7 +8,7 @@ use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirLocal,
-    HirModule, HirObjectKey, HirStatement, HirStatementKind,
+    HirModule, HirObjectKey, HirParam, HirParamMode, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -74,7 +74,7 @@ struct Aliases {
 }
 
 impl Aliases {
-    fn build(body: &HirBlock, types: &TypeTable, interner: &Interner) -> Self {
+    fn build(params: &[HirParam], body: &HirBlock, types: &TypeTable, interner: &Interner) -> Self {
         let mut effects = UnknownEffects {
             types,
             interner,
@@ -86,6 +86,7 @@ impl Aliases {
         let mut result = Self {
             bindings: declarations.bindings,
             stores: declarations.stores,
+            values: parameter_roots(params, types),
             ..Self::default()
         };
         // Acyclic propagation needs at most one round per equation. A cycle
@@ -241,6 +242,44 @@ impl Aliases {
             _ => Facts::unknown(),
         }
     }
+}
+
+/// Storage roots of the tensor parameters of the function that owns the body.
+///
+/// The call-site borrow check (`borrow.rs`, `borrow_arg_storage`) judges
+/// overlap on storage: a `mut` argument cannot name the same tensor as any
+/// other argument, by name, `←` alias or view. So within the body:
+/// - a `mut` parameter, and a `copy` parameter (duplicated at the call), each
+///   own a root distinct from every other parameter;
+/// - `ref` and unmarked parameters may name one another's tensor, so they share
+///   one root class, represented by its first member. An unmarked parameter is
+///   writable, which keeps a write through it checked against reads through
+///   its siblings;
+/// - an `own` parameter gets no root: the call site registers no borrow for a
+///   non-exclusive argument passed to it, so `k(own a, mut b)` may overlap;
+/// - a parameter that is not a bare tensor (list, genus, map, alias-typed
+///   tensor, optional) gets no root, because the call-site rule is tensor-typed
+///   only. Its accesses keep the unknown-identity decline.
+fn parameter_roots(params: &[HirParam], types: &TypeTable) -> FxHashMap<DefId, Facts> {
+    let mut roots = FxHashMap::default();
+    let mut shared: Option<DefId> = None;
+    for param in params {
+        let (_, inner) = types.peel_access_marker(param.ty);
+        if !matches!(types.get(inner), Type::Tensor(_, _)) {
+            continue;
+        }
+        let own = matches!(param.mode, HirParamMode::Ex) || types.is_own_view(param.ty);
+        let mutable = matches!(param.mode, HirParamMode::In) || types.is_mut_view(param.ty);
+        let root = if types.is_copy_view(param.ty) || mutable {
+            param.def_id
+        } else if own {
+            continue;
+        } else {
+            *shared.get_or_insert(param.def_id)
+        };
+        roots.insert(param.def_id, Facts::fresh(root));
+    }
+    roots
 }
 
 fn is_access_intrinsic(
@@ -882,13 +921,13 @@ struct Scopes<'a> {
     errors: Vec<SemanticError>,
 }
 impl Scopes<'_> {
-    fn check_body(&mut self, body: &HirBlock) {
+    fn check_body(&mut self, params: &[HirParam], body: &HirBlock) {
         let mut finder = HasFilum::default();
         finder.visit_block(body);
         if !finder.0 {
             return;
         }
-        let aliases = Aliases::build(body, self.types, self.interner);
+        let aliases = Aliases::build(params, body, self.types, self.interner);
         let mut loops = Loops {
             aliases: &aliases,
             types: self.types,
@@ -901,7 +940,7 @@ impl Scopes<'_> {
 }
 impl HirVisitor for Scopes<'_> {
     fn visit_block(&mut self, body: &HirBlock) {
-        self.check_body(body);
+        self.check_body(&[], body);
     }
 
     fn visit_function(&mut self, function: &HirFunction) {
@@ -911,7 +950,7 @@ impl HirVisitor for Scopes<'_> {
             }
         }
         if let Some(body) = &function.body {
-            self.check_body(body);
+            self.check_body(&function.params, body);
         }
     }
 }
@@ -927,7 +966,7 @@ pub(crate) fn check(hir: &HirModule, types: &TypeTable, interner: &Interner) -> 
         scopes.visit_item(item);
     }
     if let Some(entry) = &hir.entry {
-        scopes.check_body(entry);
+        scopes.check_body(&[], entry);
     }
     scopes.errors
 }
