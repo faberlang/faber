@@ -14,7 +14,8 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Comparisons — `< > ≤ ≥ ≡ ≠ ≅ ≇` on tensors give `tensor<bool, S>`, one verdict per element
+#   • Comparisons — `< > ≤ ≥ ≅ ≇` on tensors give `tensor<bool, S>`, one verdict per element
+#   • Whole values — `≡` and `≠` compare the whole tensor and give one bool (see equality-whole)
 #   • Logic — `and`, `or`, `not` act per element on bool tensors and always evaluate both sides
 #   • Select — `mask ✓ a ✗ b` takes `a` where the mask is true and `b` elsewhere; both branches are evaluated
 #   • vel (spelled `coalesce` in English) — `t coalesce fallback` fills the `none` elements of a `T ∪ none` tensor
@@ -25,7 +26,7 @@ locale = "en"
 #   • expecting `and` to skip its right side on a mask — both sides run
 #   • using `coalesce` on a tensor whose elements can never be none
 #
-# See also: tensor, vel, ✓ ✗
+# See also: tensor, vel, ✓ ✗, equality-whole
 # =============================================================================
 
 # tensor lift — comparisons, logic, select, vel
@@ -36,6 +37,8 @@ locale = "en"
 # EXPECTED stdout:
 #   [falsum, falsum, verum, verum]
 #   [verum, verum, falsum, falsum]
+#   [falsum, verum, falsum, falsum]
+#   [verum, verum, verum, verum]
 #   [falsum, falsum, verum, verum]
 #   [verum, falsum, falsum, verum]
 #   [falsum, verum, falsum, falsum]
@@ -57,6 +60,12 @@ main {
     const tensor<bool, [2, 2]> small ← a ≤ 2.0
     const list<bool> small_out ← small.flatten()
     print small_out
+    const tensor<bool, [2, 2]> level ← a ≅ 2.0
+    const list<bool> level_out ← level.flatten()
+    print level_out
+    const tensor<bool, [2, 2]> unlike ← a ≇ b
+    const list<bool> unlike_out ← unlike.flatten()
+    print unlike_out
     const tensor<bool, [2, 2]> not_small ← not small
     const list<bool> not_small_out ← not_small.flatten()
     print not_small_out

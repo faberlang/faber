@@ -1,7 +1,9 @@
 //! Operators lifted over a register `vector` or `matrix` (gpu-reset rule 15.1, K4).
 //!
 //! The typechecker admits `+ - * / % ÷` between a register and a scalar (either
-//! side), unary `-`, and `÷`, `⤒`, `⤓` between two registers of one shape. The
+//! side), unary `-`, `÷`, `⤒`, `⤓`, the comparisons `< > ≤ ≥ ≅ ≇` and `et`/`aut`
+//! between two registers of one shape (the last two over bool registers, with
+//! `non` and the `✓ ✗` select over a bool mask). The
 //! scalar operator is applied per lane by one rule, [`LaneOp`], so a register
 //! gets no second arithmetic model:
 //!
@@ -24,9 +26,27 @@ use super::runtime::matrix_cell_operand;
 use super::*;
 use radix_mir::lane_op::{LaneSink, lane_conversion, stored_lane};
 
+/// Whether an operator takes two registers of one kind and shape (`÷` and the
+/// comparison and logic lanes); `+ -` keep their `addita` route and `⊙ ⊘` their
+/// glyph route.
+fn pairs_registers(lane: MirLaneOp) -> bool {
+    matches!(
+        lane,
+        MirLaneOp::TrueDiv
+            | MirLaneOp::Lt
+            | MirLaneOp::Gt
+            | MirLaneOp::LtEq
+            | MirLaneOp::GtEq
+            | MirLaneOp::Eq
+            | MirLaneOp::NotEq
+            | MirLaneOp::And
+            | MirLaneOp::Or
+    )
+}
+
 /// What an operand is to the register lift.
 #[derive(PartialEq, Eq)]
-enum LiftOperand {
+pub(super) enum LiftOperand {
     Vector,
     Matrix,
     Scalar,
@@ -79,7 +99,7 @@ impl LaneSink for MatrixLanes<'_, '_> {
 }
 
 impl FunctionBuilder<'_> {
-    fn lift_operand(&self, expr: &HirExpression) -> LiftOperand {
+    pub(super) fn lift_operand(&self, expr: &HirExpression) -> LiftOperand {
         let Some(ty) = expr.ty else {
             return LiftOperand::Other;
         };
@@ -87,7 +107,9 @@ impl FunctionBuilder<'_> {
         match self.normalized_type(payload) {
             Type::Vector(..) => LiftOperand::Vector,
             Type::Matrix(..) => LiftOperand::Matrix,
-            Type::Primitive(Primitive::Numerus | Primitive::Fractus) | Type::SizedNumeric(..) => LiftOperand::Scalar,
+            Type::Primitive(Primitive::Numerus | Primitive::Fractus | Primitive::Bivalens) | Type::SizedNumeric(..) => {
+                LiftOperand::Scalar
+            }
             _ => LiftOperand::Other,
         }
     }
@@ -121,20 +143,25 @@ impl FunctionBuilder<'_> {
             HirBinOp::Div => MirLaneOp::Div,
             HirBinOp::Mod => MirLaneOp::Mod,
             HirBinOp::TrueDiv => MirLaneOp::TrueDiv,
+            HirBinOp::Lt => MirLaneOp::Lt,
+            HirBinOp::Gt => MirLaneOp::Gt,
+            HirBinOp::LtEq => MirLaneOp::LtEq,
+            HirBinOp::GtEq => MirLaneOp::GtEq,
+            HirBinOp::ApproxEq => MirLaneOp::Eq,
+            HirBinOp::ApproxNotEq => MirLaneOp::NotEq,
+            HirBinOp::And => MirLaneOp::And,
+            HirBinOp::Or => MirLaneOp::Or,
             _ => return None,
         };
+        let pairs = pairs_registers(lane);
         match (self.lift_operand(lhs), self.lift_operand(rhs)) {
             (LiftOperand::Vector, LiftOperand::Scalar) => Some(self.lower_vector_lift(lane, (lhs, rhs), false, expr)),
             (LiftOperand::Scalar, LiftOperand::Vector) => Some(self.lower_vector_lift(lane, (rhs, lhs), true, expr)),
-            (LiftOperand::Vector, LiftOperand::Vector) if lane == MirLaneOp::TrueDiv => {
-                Some(self.lower_vector_pair(lane, lhs, rhs, expr))
-            }
+            (LiftOperand::Vector, LiftOperand::Vector) if pairs => Some(self.lower_vector_pair(lane, lhs, rhs, expr)),
             (LiftOperand::Matrix, LiftOperand::Scalar) | (LiftOperand::Scalar, LiftOperand::Matrix) => {
                 Some(self.lower_matrix_lift(lane, lhs, rhs, expr))
             }
-            (LiftOperand::Matrix, LiftOperand::Matrix) if lane == MirLaneOp::TrueDiv => {
-                Some(self.lower_matrix_lift(lane, lhs, rhs, expr))
-            }
+            (LiftOperand::Matrix, LiftOperand::Matrix) if pairs => Some(self.lower_matrix_lift(lane, lhs, rhs, expr)),
             _ => None,
         }
     }
@@ -182,7 +209,26 @@ impl FunctionBuilder<'_> {
                 let checked = self.register_lanes_are_checked(expr);
                 Some(self.vector_lift_call(MirVectorOp::Negate { checked }, vec![(value, operand)], expr))
             }
-            LiftOperand::Matrix => Some(self.lower_matrix_negate(operand, expr)),
+            LiftOperand::Matrix => Some(self.lower_matrix_unary(MirUnOp::Neg, operand, expr)),
+            _ => None,
+        }
+    }
+
+    /// Lower `non` over a bool register to one deferred [`MirVectorOp::Not`]
+    /// (a `vector`) or negated cells (a `matrix`).
+    pub(super) fn lower_register_not(
+        &mut self,
+        operand: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<Option<MirOperand>> {
+        match self.lift_operand(operand) {
+            LiftOperand::Vector => {
+                let Some(value) = self.lower_expr_value(operand) else {
+                    return Some(None);
+                };
+                Some(self.vector_lift_call(MirVectorOp::Not, vec![(value, operand)], expr))
+            }
+            LiftOperand::Matrix => Some(self.lower_matrix_unary(MirUnOp::Not, operand, expr)),
             _ => None,
         }
     }
@@ -269,24 +315,118 @@ impl FunctionBuilder<'_> {
     /// The element and literal shape of a matrix result, within the 4x4 CPU
     /// register subset; records a diagnostic and returns `None` otherwise.
     fn matrix_lift_shape(&mut self, expr: &HirExpression) -> Option<(TypeId, u8, u8)> {
-        let ty = expr.ty?;
+        self.matrix_shape_of(expr.ty?, expr.span)
+    }
+
+    /// [`Self::matrix_lift_shape`] for a matrix type.
+    fn matrix_shape_of(&mut self, ty: TypeId, span: Span) -> Option<(TypeId, u8, u8)> {
         let payload = self.types.peel_access_marker(ty).1;
         let Type::Matrix(element, shape) = self.normalized_type(payload).clone() else {
             return None;
         };
         let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types) else {
             self.errors.push(MirError::unsupported(
-                expr.span,
+                span,
                 "matrix lift with non-literal shape before MIR lowering",
             ));
             return None;
         };
         if rows > 4 || columns > 4 {
             self.errors
-                .push(MirError::unsupported(expr.span, "matrix lift exceeds 4x4 CPU subset"));
+                .push(MirError::unsupported(span, "matrix lift exceeds 4x4 CPU subset"));
             return None;
         }
         Some((element, rows, columns))
+    }
+
+    /// Whether an expression-valued `si` is a select over a bool vector or
+    /// matrix mask.
+    pub(super) fn is_register_select(&self, cond: &HirExpression) -> bool {
+        matches!(self.lift_operand(cond), LiftOperand::Vector | LiftOperand::Matrix)
+    }
+
+    /// Lower the `✓ ✗` select over a bool register mask: the mask and both
+    /// branch values are evaluated, then each lane takes the branch its mask
+    /// lane selects. A `vector` is one deferred [`MirVectorOp::Select`]; a
+    /// `matrix` has a literal shape, so each cell branches here.
+    pub(super) fn lower_register_select(
+        &mut self,
+        cond: &HirExpression,
+        (then_block, else_block): (&HirBlock, &HirBlock),
+        destination: MirPlace,
+        ty: MirType,
+        span: Span,
+    ) -> Option<()> {
+        let (Some(then_value), Some(else_value)) = (then_block.expr.as_deref(), else_block.expr.as_deref()) else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "register select branch without a value before MIR lowering",
+            ));
+            return None;
+        };
+        let value = if self.lift_operand(cond) == LiftOperand::Vector {
+            let mask = self.lower_expr_value(cond)?;
+            let then_operand = self.lower_expr_value(then_value)?;
+            let else_operand = self.lower_expr_value(else_value)?;
+            let mut args = Vec::with_capacity(3);
+            for (operand, source) in [(mask, cond), (then_operand, then_value), (else_operand, else_value)] {
+                let operand_ty = source.ty.map_or(ty, MirType::semantic);
+                args.push(self.vector_operand_place(operand, operand_ty, source.span));
+            }
+            self.runtime_call_value(MirIntrinsic::VectorOp(MirVectorOp::Select), args, ty, span)
+        } else {
+            self.lower_matrix_select(cond, (then_value, else_value), ty, span)?
+        };
+        self.assign(destination, value, ty, span);
+        Some(())
+    }
+
+    /// `mask ✓ then ✗ else` over a bool matrix: for each cell a branch picks
+    /// the then cell (or the shared scalar) or the else cell, into a new
+    /// matrix.
+    fn lower_matrix_select(
+        &mut self,
+        cond: &HirExpression,
+        (then_value, else_value): (&HirExpression, &HirExpression),
+        ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let (element, rows, columns) = self.matrix_shape_of(ty.semantic_id(), span)?;
+        let element = MirType::semantic(element);
+        let mask_ty = self.lift_lane_ty(cond)?;
+        let LaneSource::Cells(mask) = self.matrix_lift_source(cond)? else {
+            return None;
+        };
+        let then_source = self.matrix_lift_source(then_value)?;
+        let else_source = self.matrix_lift_source(else_value)?;
+        let cell = |source: &LaneSource, row: u8, column: u8| match source {
+            LaneSource::Cells(place) => matrix_cell_operand(place, row, column),
+            LaneSource::Scalar(value) => value.clone(),
+        };
+        let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(columns));
+        for row in 0..rows {
+            for column in 0..columns {
+                let result = self.push_temp(element, span);
+                let result_place = MirPlace::temp(result);
+                let condition =
+                    self.assign_temp(MirValueKind::Operand(matrix_cell_operand(&mask, row, column)), mask_ty, span);
+                let then_id = self.fresh_block(span);
+                let else_id = self.fresh_block(span);
+                let join_id = self.fresh_block(span);
+                self.terminate_current(
+                    MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
+                    span,
+                );
+                for (arm_id, source) in [(then_id, &then_source), (else_id, &else_source)] {
+                    self.switch_to(arm_id);
+                    self.assign(result_place.clone(), cell(source, row, column), element, span);
+                    self.terminate_current(MirTerminatorKind::Goto(join_id), span);
+                }
+                self.switch_to(join_id);
+                fields.push(MirAggregateItem::Operand(MirOperand::Temp(result)));
+            }
+        }
+        Some(self.construct_temp(MirAggregateKind::Matrix, MirAggregateFields::Ordered(fields), ty, span))
     }
 
     /// Lower one operand of a matrix lift: a matrix as a place its cells can
@@ -324,9 +464,9 @@ impl FunctionBuilder<'_> {
         Some(self.matrix_lane_cells(&lane_op, (rows, columns), (&lhs_source, &rhs_source), result_ty, expr.span))
     }
 
-    /// Unary `-` over a matrix: each cell negated and stored under the
-    /// element type, as a new matrix.
-    fn lower_matrix_negate(&mut self, operand: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+    /// A unary operator over a matrix (`-`, or `non` over a bool matrix): each
+    /// cell transformed and stored under the element type, as a new matrix.
+    fn lower_matrix_unary(&mut self, op: MirUnOp, operand: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
         let (element, rows, columns) = self.matrix_lift_shape(expr)?;
         let source = self.matrix_lift_source(operand)?;
         let LaneSource::Cells(place) = source else {
@@ -339,8 +479,7 @@ impl FunctionBuilder<'_> {
         for row in 0..rows {
             for column in 0..columns {
                 let cell = matrix_cell_operand(&place, row, column);
-                let value =
-                    self.assign_temp(MirValueKind::Unary { op: MirUnOp::Neg, operand: cell }, element, expr.span);
+                let value = self.assign_temp(MirValueKind::Unary { op, operand: cell }, element, expr.span);
                 let mut lanes = MatrixLanes { builder: self, span: expr.span };
                 fields.push(MirAggregateItem::Operand(stored_lane(&mut lanes, value, element, checked)));
             }

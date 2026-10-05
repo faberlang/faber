@@ -1,0 +1,15 @@
+verum
+falsum
+verum
+falsum
+[verum, verum, verum, falsum]
+[falsum, falsum, falsum, verum]
+falsum
+verum
+3
+[NaN, 1.0, 1.0, 1.0]
+falsum
+verum
+falsum
+verum
+verum

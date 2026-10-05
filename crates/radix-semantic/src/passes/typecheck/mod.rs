@@ -1274,6 +1274,10 @@ mod scalar_math_test;
 mod tensor_math_test;
 
 #[cfg(test)]
+#[path = "aggregate_compare_test.rs"]
+mod aggregate_compare_test;
+
+#[cfg(test)]
 #[path = "matrix_lift_test.rs"]
 mod matrix_lift_test;
 

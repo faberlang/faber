@@ -1917,6 +1917,18 @@ help = "استخدم ⊘ لـ `/` عنصرًا بعنصر أو ÷ للقسمة �
 message = "{kind} `%` {kind} غير مدعوم؛ `%` تقبل scalar في أحد الجانبين"
 help = "طبّق % مع scalar؛ لا يوجد باقٍ عنصرًا بعنصر بين قيمتين من {kind}"
 
+[diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
+message = "`≡` تقارن القيم كاملة، و{kind} لا يساوي رقمًا أبدًا"
+help = "استخدم `≅` للحصول على قناع عنصرًا بعنصر (`a ≅ 2.0`) أو قارن نتيجة اختزال"
+
+[diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
+message = "أشكال {kind} مختلفة: `{left}` و`{right}`؛ `≡` تتطلب أنواعًا متطابقة"
+help = "`≡` تتطلب أنواعًا متطابقة؛ قارن مجمّعات بالشكل نفسه"
+
+[diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
+message = "{kind} من bool ليست قيمة صدق"
+help = "اختزلها أولًا: `{reducta} {via} {omnia} {ex} mask` أو `{reducta} {via} {quilibet} {ex} mask`"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "عدم تطابق في argument type"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"

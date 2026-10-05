@@ -1094,7 +1094,8 @@ pub enum MirIntrinsic {
 /// integer lanes to the result float first and traps an integer zero divisor;
 /// `Max` and `Min` (`⤒`, `⤓`) pick the larger or smaller lane (IEEE
 /// `maximum`/`minimum`). Every other operator is the plain [`MirBinOp`] of the
-/// same name.
+/// same name. The comparisons (`Lt Gt LtEq GtEq`, and `Eq`/`NotEq` for `≅`/`≇`)
+/// and `And`/`Or` give a bool lane; both lanes are always evaluated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirLaneOp {
     Add,
@@ -1105,6 +1106,14 @@ pub enum MirLaneOp {
     TrueDiv,
     Max,
     Min,
+    Lt,
+    Gt,
+    LtEq,
+    GtEq,
+    Eq,
+    NotEq,
+    And,
+    Or,
 }
 
 impl MirLaneOp {
@@ -1117,6 +1126,14 @@ impl MirLaneOp {
             Self::Mul => Some(MirBinOp::Mul),
             Self::Div => Some(MirBinOp::Div),
             Self::Mod => Some(MirBinOp::Mod),
+            Self::Lt => Some(MirBinOp::Lt),
+            Self::Gt => Some(MirBinOp::Gt),
+            Self::LtEq => Some(MirBinOp::LtEq),
+            Self::GtEq => Some(MirBinOp::GtEq),
+            Self::Eq => Some(MirBinOp::Eq),
+            Self::NotEq => Some(MirBinOp::NotEq),
+            Self::And => Some(MirBinOp::And),
+            Self::Or => Some(MirBinOp::Or),
             Self::TrueDiv | Self::Max | Self::Min => None,
         }
     }
@@ -1124,7 +1141,7 @@ impl MirLaneOp {
 
 /// The vector method a [`MirIntrinsic::VectorOp`] defers.
 ///
-/// Arity: `Length`, `Normalized`, `Negate`, `Crea` and `Swizzle` take one
+/// Arity: `Length`, `Normalized`, `Negate`, `Not`, `Crea` and `Swizzle` take one
 /// operand (the receiver; `Crea` uses only its declared shape), everything else takes two
 /// (receiver, peer). `Swizzle` carries resolved lane indices, never a symbol,
 /// so symbol remapping needs no rewrite.
@@ -1151,6 +1168,13 @@ pub enum MirVectorOp {
     Negate {
         checked: bool,
     },
+    /// Lane-wise boolean negation (`non m`) of a bool vector.
+    Not,
+    /// `mask ✓ then ✗ else` over a bool vector: lane `i` takes the then lane
+    /// where the mask lane is true, else the else lane. Operands are
+    /// `[mask, then, else]`; then and else are each a vector of the mask's
+    /// width or one scalar every lane shares. All three are evaluated.
+    Select,
     Dot,
     Cross,
     Length,
@@ -1168,11 +1192,13 @@ impl MirVectorOp {
             Self::Length
             | Self::Normalized
             | Self::Negate { .. }
+            | Self::Not
             | Self::Crea
             | Self::Swizzle(_) => 1,
             Self::Elementwise { .. } | Self::ElementwiseScalar { .. } | Self::Dot | Self::Cross => {
                 2
             }
+            Self::Select => 3,
         }
     }
 
@@ -1183,6 +1209,8 @@ impl MirVectorOp {
             Self::Elementwise { .. } => "elementwise",
             Self::ElementwiseScalar { .. } => "elementwise_scalar",
             Self::Negate { .. } => "negate",
+            Self::Not => "not",
+            Self::Select => "select",
             Self::Dot => "dot",
             Self::Cross => "cross",
             Self::Length => "length",
@@ -1202,7 +1230,9 @@ impl MirVectorOp {
 /// The scalar operator a [`MirIntrinsic::TensorLift`] applies per element.
 ///
 /// Arity: `Neg` and `Not` take one operand, `Select` takes three (mask,
-/// then-value, else-value), everything else takes two.
+/// then-value, else-value), everything else takes two. `WholeEq` and
+/// `WholeNotEq` (`≡`/`≠` over two tensors) are the exception to the lift: they
+/// compare the two whole tensors and yield one scalar `bivalens`, not a tensor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirLiftOp {
     Add,
@@ -1231,6 +1261,12 @@ pub enum MirLiftOp {
     /// `⤓`: the smaller element.
     Min,
     Select,
+    /// `a ≡ b` over two tensors: one verdict. True when both have the same
+    /// shape and every element pair is `≡` (NaN is never `≡`); a shape
+    /// difference is `false`, not an error.
+    WholeEq,
+    /// `a ≠ b` over two tensors: `not (a ≡ b)`.
+    WholeNotEq,
 }
 
 impl MirLiftOp {
@@ -1242,6 +1278,13 @@ impl MirLiftOp {
             Self::Select => 3,
             _ => 2,
         }
+    }
+
+    /// `true` when the result is a tensor; `WholeEq`/`WholeNotEq` give one
+    /// `bivalens`.
+    #[must_use]
+    pub fn returns_tensor(self) -> bool {
+        !matches!(self, Self::WholeEq | Self::WholeNotEq)
     }
 
     /// Stable lowercase name for dumps and diagnostics.
@@ -1268,6 +1311,8 @@ impl MirLiftOp {
             Self::Max => "max",
             Self::Min => "min",
             Self::Select => "select",
+            Self::WholeEq => "whole_eq",
+            Self::WholeNotEq => "whole_not_eq",
         }
     }
 }

@@ -254,6 +254,22 @@ fn expand_site(
             shape.element,
             site.return_ty,
         ),
+        MirVectorOp::Not => not_lanes(&mut head, lhs, shape.width, shape.element, site.return_ty),
+        MirVectorOp::Select => {
+            let split = SelectSplit {
+                block,
+                index,
+                shape: &shape,
+                site,
+                picks: [
+                    is_vector_ty(types, operand_tys[1]),
+                    is_vector_ty(types, operand_tys[2]),
+                ],
+                mask_lane: lane_ty(types, operand_tys[0]),
+            };
+            select(&mut function.blocks, head, &places, &split);
+            return Ok(Expansion::Split);
+        }
         MirVectorOp::Dot => dot(&mut head, lhs, rhs, shape.width, shape.element),
         MirVectorOp::Cross => cross(&mut head, lhs, rhs, shape.element, site.return_ty),
         MirVectorOp::Length => longitudo(&mut head, lhs, shape.width, shape.element),
@@ -724,6 +740,173 @@ pub fn numeric_zero_constant(element: TypeId, types: &TypeTable) -> MirConstant 
 fn swizzle(b: &mut Lanes<'_>, source: &MirPlace, lanes: &[u8], vector: MirType) -> MirOperand {
     let fields = lanes.iter().map(|index| lane(source, *index)).collect();
     b.construct_vector(fields, vector)
+}
+
+/// Each lane boolean-negated, as a new vector.
+fn not_lanes(
+    b: &mut Lanes<'_>,
+    vector: &MirPlace,
+    width: u8,
+    element: MirType,
+    result: MirType,
+) -> MirOperand {
+    let fields = (0..width)
+        .map(|i| {
+            b.assign_temp(
+                MirValueKind::Unary {
+                    op: MirUnOp::Not,
+                    operand: lane(vector, i),
+                },
+                element,
+            )
+        })
+        .collect();
+    b.construct_vector(fields, result)
+}
+
+/// Whether a type is a vector (aliases peeled): a select operand is a vector
+/// or a scalar that every lane shares.
+fn is_vector_ty(types: &TypeTable, ty: MirType) -> bool {
+    matches!(unalias(types, ty.semantic_id()), Type::Vector(..))
+}
+
+struct SelectSplit<'a> {
+    block: usize,
+    index: usize,
+    shape: &'a Shape,
+    site: &'a Site,
+    /// Whether the then and else operands are vectors (else one shared scalar).
+    picks: [bool; 2],
+    mask_lane: MirType,
+}
+
+/// One lane's pick: the lane of a vector operand, or the shared scalar.
+fn picked_lane(place: &MirPlace, is_vector: bool, index: u8) -> MirOperand {
+    if is_vector {
+        lane(place, index)
+    } else {
+        MirOperand::Place(place.clone())
+    }
+}
+
+/// `mask ✓ then ✗ else` over a bool vector: result lane `i` is the then lane
+/// when the mask lane is true, else the else lane; a scalar operand feeds every
+/// lane. Both branches are already evaluated values, so only the pick
+/// branches. The call's block splits once per lane into a then block, an else
+/// block and a join; the last join builds the result vector, assigns the
+/// destination and takes everything that followed the call, including the
+/// original terminator.
+fn select(
+    blocks: &mut Vec<MirBlock>,
+    mut head: Lanes<'_>,
+    places: &[MirPlace],
+    split: &SelectSplit<'_>,
+) {
+    let SelectSplit {
+        block,
+        index,
+        shape,
+        site,
+        picks,
+        mask_lane,
+    } = *split;
+    let (width, element, vector_ty, span) = (shape.width, shape.element, site.return_ty, site.span);
+    let results: Vec<MirTempId> = (0..width).map(|_| head.temp(element)).collect();
+
+    // Per lane: the mask read (with the condition it defines) and the two arms.
+    let mut reads: Vec<(Vec<MirStatement>, MirOperand)> = Vec::new();
+    let mut arms: Vec<[Vec<MirStatement>; 2]> = Vec::new();
+    for i in 0..width {
+        let mut read = head.fork();
+        let condition = read.assign_temp(MirValueKind::Operand(lane(&places[0], i)), mask_lane);
+        reads.push((read.statements, condition));
+        let mut pair = [Vec::new(), Vec::new()];
+        for (slot, statements) in pair.iter_mut().enumerate() {
+            let mut arm = head.fork();
+            let source = picked_lane(&places[slot + 1], picks[slot], i);
+            arm.assign(MirPlace::temp(results[usize::from(i)]), source, element);
+            *statements = arm.statements;
+        }
+        arms.push(pair);
+    }
+    let final_statements = {
+        let mut b = head.fork();
+        let fields = results.iter().map(|id| MirOperand::Temp(*id)).collect();
+        let result = b.construct_vector(fields, vector_ty);
+        if let Some(destination) = &site.destination {
+            b.assign(destination.clone(), result, vector_ty);
+        }
+        b.statements
+    };
+
+    let first_new = blocks
+        .iter()
+        .map(|existing| existing.id.0 + 1)
+        .max()
+        .unwrap_or(0);
+    // Lane `i` owns the ids `then = 3i`, `else = 3i + 1`, `join = 3i + 2`.
+    let ids = |lane_index: u8| {
+        let base = first_new + u32::from(lane_index) * 3;
+        (MirBlockId(base), MirBlockId(base + 1), MirBlockId(base + 2))
+    };
+    let branch = |condition: MirOperand, lane_index: u8| {
+        let (then_block, else_block, _) = ids(lane_index);
+        MirTerminator {
+            kind: MirTerminatorKind::Branch {
+                condition,
+                then_block,
+                else_block,
+            },
+            span,
+        }
+    };
+
+    let mut tail = blocks[block].statements.split_off(index);
+    tail.remove(0);
+    let original_terminator = blocks[block].terminator.clone();
+    blocks[block].statements.extend(head.statements);
+    let mut reads = reads.into_iter();
+    let Some((first_read, first_condition)) = reads.next() else {
+        return;
+    };
+    blocks[block].statements.extend(first_read);
+    blocks[block].terminator = branch(first_condition, 0);
+
+    let mut pending_reads: Vec<Option<(Vec<MirStatement>, MirOperand)>> = reads.map(Some).collect();
+    for (i, [then_statements, else_statements]) in (0..width).zip(arms) {
+        let (then_id, else_id, join_id) = ids(i);
+        let goto_join = || MirTerminator {
+            kind: MirTerminatorKind::Goto(join_id),
+            span,
+        };
+        blocks.push(MirBlock {
+            id: then_id,
+            statements: then_statements,
+            terminator: goto_join(),
+            span,
+        });
+        blocks.push(MirBlock {
+            id: else_id,
+            statements: else_statements,
+            terminator: goto_join(),
+            span,
+        });
+        let (statements, terminator) =
+            match pending_reads.get_mut(usize::from(i)).and_then(Option::take) {
+                Some((read, condition)) => (read, branch(condition, i + 1)),
+                None => {
+                    let mut last = final_statements.clone();
+                    last.append(&mut tail);
+                    (last, original_terminator.clone())
+                }
+            };
+        blocks.push(MirBlock {
+            id: join_id,
+            statements,
+            terminator,
+            span,
+        });
+    }
 }
 
 struct NormalizedSplit<'a> {

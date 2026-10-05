@@ -49,6 +49,11 @@ const LIFTED: &[&str] = &[
     "fixum vector<f32, 3> r ← a ÷ b",
     "fixum vector<f32, 3> r ← a ⤒ s",
     "fixum vector<f32, 3> r ← a ⤓ b",
+    "fixum vector<bivalens, 3> r ← a < b",
+    "fixum vector<bivalens, 3> r ← a ≥ s",
+    "fixum vector<bivalens, 3> r ← s > a",
+    "fixum vector<bivalens, 3> r ← a ≅ b",
+    "fixum vector<bivalens, 3> r ← a ≇ s",
 ];
 
 const LIFTED_MATRIX: &[&str] = &[
@@ -62,7 +67,93 @@ const LIFTED_MATRIX: &[&str] = &[
     "fixum matrix<f32, [2, 2]> r ← m ÷ n",
     "fixum matrix<f32, [2, 2]> r ← m ⤒ s",
     "fixum matrix<f32, [2, 2]> r ← m ⤓ n",
+    "fixum matrix<bivalens, [2, 2]> r ← m < n",
+    "fixum matrix<bivalens, [2, 2]> r ← m ≥ s",
+    "fixum matrix<bivalens, [2, 2]> r ← s > m",
+    "fixum matrix<bivalens, [2, 2]> r ← m ≅ n",
+    "fixum matrix<bivalens, [2, 2]> r ← m ≇ s",
 ];
+
+/// The logic and select forms over a bool register mask, with the masks
+/// taken as parameters so each form is the first one the gate meets.
+const MASKED: &[(&str, &str)] = &[
+    ("fixum vector<bivalens, 3> r ← k et k", VECTOR_ISSUE),
+    ("fixum vector<bivalens, 3> r ← k aut verum", VECTOR_ISSUE),
+    ("fixum vector<bivalens, 3> r ← non k", VECTOR_ISSUE),
+    ("fixum vector<f32, 3> r ← k ✓ a ✗ b", VECTOR_ISSUE),
+    ("fixum matrix<bivalens, [2, 2]> r ← j et j", MATRIX_ISSUE),
+    ("fixum matrix<bivalens, [2, 2]> r ← j aut verum", MATRIX_ISSUE),
+    ("fixum matrix<bivalens, [2, 2]> r ← non j", MATRIX_ISSUE),
+    ("fixum matrix<f32, [2, 2]> r ← j ✓ m ✗ n", MATRIX_ISSUE),
+];
+
+fn masked_issues(target: Target, body: &str) -> (Vec<String>, bool) {
+    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let source = format!(
+        "functio masked(vector<bivalens, 3> k, vector<f32, 3> a, vector<f32, 3> b, matrix<bivalens, [2, 2]> j, matrix<f32, [2, 2]> m, matrix<f32, [2, 2]> n) {{\n{body}\n}}\nincipit {{\n}}\n"
+    );
+    let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
+    let issues = result
+        .diagnostics
+        .iter()
+        .flat_map(|diagnostic| diagnostic.args.iter())
+        .filter(|arg| arg.name == "issue")
+        .map(|arg| arg.value.clone())
+        .collect();
+    (issues, result.output.is_some())
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn typescript_rejects_register_logic_and_select_by_name() {
+    for (body, issue) in MASKED {
+        let (found, _) = masked_issues(Target::HirTypeScript, body);
+        assert!(found.iter().any(|found| found == issue), "`{body}`: {found:?}");
+    }
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn go_rejects_register_logic_and_select_by_name() {
+    for (body, issue) in MASKED {
+        let (found, _) = masked_issues(Target::HirGo, body);
+        assert!(found.iter().any(|found| found == issue), "`{body}`: {found:?}");
+    }
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_rejects_register_logic_and_select_by_name() {
+    for (body, issue) in MASKED {
+        let (found, _) = masked_issues(Target::HirRust, body);
+        assert!(found.iter().any(|found| found == issue), "`{body}`: {found:?}");
+    }
+}
+
+#[cfg(feature = "hir-swift")]
+#[test]
+fn swift_python_and_haskell_never_emit_register_logic_and_select() {
+    for target in [Target::HirSwift, Target::HirPython, Target::HirHaskell] {
+        for (body, _) in MASKED {
+            let (_, emitted) = masked_issues(target, body);
+            assert!(!emitted, "{target:?} `{body}` emitted code");
+        }
+    }
+}
+
+#[cfg(feature = "hir-faber")]
+#[test]
+fn faber_reemission_keeps_register_logic_and_select() {
+    for (body, _) in MASKED {
+        let (found, _) = masked_issues(Target::HirFaber, body);
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == VECTOR_ISSUE || issue == MATRIX_ISSUE),
+            "`{body}`: {found:?}"
+        );
+    }
+}
 
 #[cfg(feature = "hir-ts")]
 #[test]

@@ -121,3 +121,78 @@ fn rust_admits_scalar_coalesce_over_a_shifted_view() {
 fn typescript_still_rejects_coalesce_over_a_shifted_view() {
     assert_rejected(Target::HirTypeScript, "fixum tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
 }
+
+/// `≡ ≠` between two tensors compare whole values; the runner is their only
+/// executor, so every HIR-backed target names `tensor_equality_unsupported_on_target`.
+const WHOLE_EQUALITY: &[&str] = &[
+    "fixum bivalens r ← a ≡ b",
+    "fixum bivalens r ← a ≠ b",
+    "fixum bivalens r ← a ≡ a",
+];
+
+fn assert_equality_rejected(target: Target, body: &str) {
+    let found = issues(target, body);
+    assert!(
+        found
+            .iter()
+            .any(|issue| issue == "tensor_equality_unsupported_on_target"),
+        "{target:?} `{body}` was not rejected by the equality gate: {found:?}"
+    );
+    assert!(
+        !found
+            .iter()
+            .any(|issue| issue == "tensor_lift_unsupported_on_target"),
+        "{target:?} `{body}` is not an elementwise lift: {found:?}"
+    );
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn typescript_rejects_whole_tensor_equality_by_name() {
+    for body in WHOLE_EQUALITY {
+        assert_equality_rejected(Target::HirTypeScript, body);
+    }
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn go_rejects_whole_tensor_equality_by_name() {
+    for body in WHOLE_EQUALITY {
+        assert_equality_rejected(Target::HirGo, body);
+    }
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_rejects_whole_tensor_equality_by_name() {
+    for body in WHOLE_EQUALITY {
+        assert_equality_rejected(Target::HirRust, body);
+    }
+}
+
+#[cfg(feature = "hir-swift")]
+#[test]
+fn swift_python_and_haskell_never_emit_whole_tensor_equality() {
+    for target in [Target::HirSwift, Target::HirPython, Target::HirHaskell] {
+        for body in WHOLE_EQUALITY {
+            let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+            let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
+            let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
+            assert!(result.output.is_none(), "{target:?} `{body}` emitted code");
+        }
+    }
+}
+
+#[cfg(feature = "hir-faber")]
+#[test]
+fn faber_reemission_keeps_whole_tensor_equality() {
+    for body in WHOLE_EQUALITY {
+        let found = issues(Target::HirFaber, body);
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == "tensor_equality_unsupported_on_target"),
+            "`{body}`: {found:?}"
+        );
+    }
+}

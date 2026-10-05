@@ -464,8 +464,18 @@ impl Validator<'_, '_> {
                 for arg in &call.args {
                     self.validate_operand(scope, arg, span);
                 }
-                if !matches!(self.type_kind(call.return_ty), Type::Tensor(..)) {
-                    self.error(span, "tensor lift runtime call does not return a tensor");
+                if op.returns_tensor() {
+                    if !matches!(self.type_kind(call.return_ty), Type::Tensor(..)) {
+                        self.error(span, "tensor lift runtime call does not return a tensor");
+                    }
+                } else if !matches!(
+                    self.type_kind(call.return_ty),
+                    Type::Primitive(Primitive::Bivalens)
+                ) {
+                    self.error(
+                        span,
+                        "tensor equality runtime call does not return bivalens",
+                    );
                 }
             }
             // Deferred vector method: operand arity and result shape are

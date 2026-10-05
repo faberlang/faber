@@ -67,7 +67,7 @@ fn approx_glyph(op: HirBinOp) -> &'static str {
 }
 
 /// How one operand takes part in a lifted operator.
-enum LiftSide {
+pub(super) enum LiftSide {
     Tensor {
         elem: TypeId,
         shape: IndexId,
@@ -79,17 +79,17 @@ enum LiftSide {
 
 /// Which register a lifted form operates on.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum RegisterKind {
+pub(super) enum RegisterKind {
     Vector,
     Matrix,
 }
 
 /// A `vector` or `matrix` operand of a lifted form: the `extent` is the width
 /// index of a vector or the shape index of a matrix.
-struct RegisterOperand {
-    kind: RegisterKind,
-    elem: TypeId,
-    extent: IndexId,
+pub(super) struct RegisterOperand {
+    pub(super) kind: RegisterKind,
+    pub(super) elem: TypeId,
+    pub(super) extent: IndexId,
 }
 
 /// The operands of a lifted operator with their shared shape.
@@ -108,7 +108,7 @@ enum LiftPairing {
 }
 
 impl TypeChecker<'_> {
-    fn lift_side(&mut self, ty: TypeId) -> LiftSide {
+    pub(super) fn lift_side(&mut self, ty: TypeId) -> LiftSide {
         let resolved = self.value_carrier_type(ty);
         let (_, payload) = self.types.peel_access_marker(resolved);
         match self.types.get(payload).clone() {
@@ -123,7 +123,7 @@ impl TypeChecker<'_> {
 
     /// A register operand: its kind, element and width (vector) or shape
     /// (matrix).
-    fn register_operand(&mut self, ty: TypeId) -> Option<RegisterOperand> {
+    pub(super) fn register_operand(&mut self, ty: TypeId) -> Option<RegisterOperand> {
         let resolved = self.value_carrier_type(ty);
         let (_, payload) = self.types.peel_access_marker(resolved);
         match self.types.get(payload).clone() {
@@ -142,7 +142,7 @@ impl TypeChecker<'_> {
     }
 
     /// The register type of `register`'s kind and extent holding `elem`.
-    fn register_result(&mut self, register: &RegisterOperand, elem: TypeId) -> TypeId {
+    pub(super) fn register_result(&mut self, register: &RegisterOperand, elem: TypeId) -> TypeId {
         match register.kind {
             RegisterKind::Vector => self.types.vector_with_width(elem, register.extent),
             RegisterKind::Matrix => self.types.matrix_with_shape(elem, register.extent),
@@ -285,7 +285,7 @@ impl TypeChecker<'_> {
 
     /// A register element must be a numeric, non-decimal scalar (the matrix
     /// register keeps its own diagnostic for it).
-    fn register_element_admitted(
+    pub(super) fn register_element_admitted(
         &mut self,
         register: &RegisterOperand,
         span: radix_lexer::Span,
@@ -312,11 +312,11 @@ impl TypeChecker<'_> {
         Some(self.value_carrier_type(operand_ty))
     }
 
-    fn lift_result(&mut self, elem: TypeId, shape: IndexId) -> TypeId {
+    pub(super) fn lift_result(&mut self, elem: TypeId, shape: IndexId) -> TypeId {
         self.types.tensor_with_shape(elem, shape)
     }
 
-    fn lift_bool_result(&mut self, shape: IndexId) -> TypeId {
+    pub(super) fn lift_bool_result(&mut self, shape: IndexId) -> TypeId {
         let bivalens = self.bool_type();
         self.lift_result(bivalens, shape)
     }
@@ -560,7 +560,7 @@ impl TypeChecker<'_> {
         operand_ty: TypeId,
     ) -> Option<TypeId> {
         let LiftSide::Tensor { elem, shape } = self.lift_side(operand_ty) else {
-            return None;
+            return self.check_register_lift_not(operand, operand_ty);
         };
         if !self.is_bool(elem) {
             self.invalid_operand_types(BOOLEAN_OPERAND_REQUIRED, operand.span);
@@ -578,6 +578,9 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
     ) -> Option<TypeId> {
         let span = lhs.span;
+        if let Some(result) = self.check_register_lift_logic(lhs, lhs_ty, rhs_ty) {
+            return Some(result);
+        }
         let pair = match self.lift_pairing(lhs_ty, rhs_ty, span, true) {
             LiftPairing::NotLifted => return None,
             LiftPairing::Failed => return Some(self.error_type),
@@ -596,9 +599,13 @@ impl TypeChecker<'_> {
         Some(self.lift_bool_result(pair.shape))
     }
 
-    /// Comparisons over tensors produce `tensor<bivalens, S>`. The element rule
-    /// is the scalar rule for the glyph: ordering and `≅ ≇` join by value,
-    /// `≡ ≠` need identical elements. `≈ ≉` wait for the numeric contract.
+    /// Comparisons over aggregates (advisor rulings 2026-10-04). `≡ ≠` compare
+    /// whole values on every type and give one `bivalens` (see
+    /// `check_aggregate_equality`); `< > ≤ ≥ ≅ ≇` lift per element like `+`, over
+    /// a tensor or a register `vector`/`matrix` against a scalar or a same-shape
+    /// peer, giving a bool aggregate of the same kind and shape. The element rule
+    /// is the scalar rule for the glyph (ordering and `≅ ≇` join by value).
+    /// `≈ ≉` wait for the numeric contract (L7).
     pub(in crate::passes::typecheck) fn check_tensor_lift_compare(
         &mut self,
         op: HirBinOp,
@@ -608,9 +615,19 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
     ) -> Option<TypeId> {
         let span = lhs.span;
-        // `≈ ≉` over a register waits for the same L7 ruling as over a tensor.
+        if matches!(
+            op,
+            HirBinOp::Eq | HirBinOp::NotEq | HirBinOp::StrictEq | HirBinOp::StrictNotEq
+        ) {
+            return self.check_aggregate_equality(lhs, rhs, lhs_ty, rhs_ty);
+        }
+        // `≈ ≉` over a register or a sparsa waits for the same L7 ruling as
+        // over a tensor.
         if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq)
-            && (self.register_operand(lhs_ty).is_some() || self.register_operand(rhs_ty).is_some())
+            && (self.register_operand(lhs_ty).is_some()
+                || self.register_operand(rhs_ty).is_some()
+                || self.is_sparsa_operand(lhs_ty)
+                || self.is_sparsa_operand(rhs_ty))
         {
             self.invalid_operand_types_with_args(
                 ISSUE_TENSOR_APPROX_COMPARISON_DEFERRED,
@@ -618,6 +635,9 @@ impl TypeChecker<'_> {
                 &[("op", approx_glyph(op).to_owned())],
             );
             return Some(self.error_type);
+        }
+        if let Some(result) = self.check_register_lift_compare(op, lhs, lhs_ty, rhs_ty) {
+            return Some(result);
         }
         let pair = match self.lift_pairing(lhs_ty, rhs_ty, span, true) {
             LiftPairing::NotLifted => return None,
@@ -632,15 +652,7 @@ impl TypeChecker<'_> {
             );
             return Some(self.error_type);
         }
-        let exact = matches!(
-            op,
-            HirBinOp::Eq | HirBinOp::NotEq | HirBinOp::StrictEq | HirBinOp::StrictNotEq
-        );
-        let bool_equality = exact
-            && [(pair.l_tensor, pair.l_elem), (pair.r_tensor, pair.r_elem)]
-                .iter()
-                .all(|(is_tensor, elem)| !is_tensor || self.is_bool(*elem));
-        if !bool_equality && !self.lift_pair_elements_admitted(&pair, span) {
+        if !self.lift_pair_elements_admitted(&pair, span) {
             return Some(self.error_type);
         }
         let before = self.errors.len();
@@ -651,11 +663,7 @@ impl TypeChecker<'_> {
             HirBinOp::ApproxEq | HirBinOp::ApproxNotEq => {
                 self.numeric_value_equality_types(pair.l_elem, pair.r_elem, span);
             }
-            _ => {
-                if !self.equality_constant_exempt(lhs, pair.l_elem, rhs, pair.r_elem) {
-                    self.exact_equality_types(pair.l_elem, pair.r_elem, span);
-                }
-            }
+            _ => return None,
         }
         if self.errors.len() != before {
             return Some(self.error_type);
@@ -836,6 +844,8 @@ impl TypeChecker<'_> {
 
     /// The `✓ ✗` value conditional over a `bivalens` mask: both branches are
     /// evaluated and each element takes the branch its mask element selects.
+    /// The mask is a bool tensor, vector or matrix, and so is the result: a
+    /// branch is a scalar or an aggregate of the mask's kind and shape.
     /// `mask_ty` is the already-checked condition type.
     pub(in crate::passes::typecheck) fn check_tensor_select(
         &mut self,
@@ -845,19 +855,19 @@ impl TypeChecker<'_> {
         else_block: Option<&mut HirBlock>,
         expected: Option<TypeId>,
     ) -> TypeId {
-        let LiftSide::Tensor {
-            elem: mask_elem,
-            shape,
-        } = self.lift_side(mask_ty)
-        else {
-            return self.error_type;
+        let (mask_elem, frame) = match self.lift_side(mask_ty) {
+            LiftSide::Tensor { elem, shape } => (elem, SelectFrame::Tensor(shape)),
+            _ => match self.register_operand(mask_ty) {
+                Some(register) => (register.elem, SelectFrame::Register(register)),
+                None => return self.error_type,
+            },
         };
         let span = cond.span;
         let plain_branch = |block: &HirBlock| block.statements.is_empty() && block.expr.is_some();
         let Some(else_block) =
             else_block.filter(|block| plain_branch(block) && plain_branch(then_block))
         else {
-            self.invalid_operand_types(ISSUE_CONDITION_MUST_BE_BIVALENS, span);
+            self.report_mask_not_truth_value(mask_ty, span);
             return self.error_type;
         };
         if !self.is_bool(mask_elem) {
@@ -866,10 +876,10 @@ impl TypeChecker<'_> {
         }
         let hint = expected.and_then(|ty| match self.lift_side(ty) {
             LiftSide::Tensor { elem, .. } => Some(elem),
-            _ => None,
+            _ => self.register_operand(ty).map(|register| register.elem),
         });
-        let then_side = self.check_select_branch(then_block, hint, shape, span);
-        let else_side = self.check_select_branch(else_block, hint, shape, span);
+        let then_side = self.check_select_branch(then_block, hint, &frame, span);
+        let else_side = self.check_select_branch(else_block, hint, &frame, span);
         let (Some((then_elem, then_const)), Some((else_elem, else_const))) = (then_side, else_side)
         else {
             return self.error_type;
@@ -888,17 +898,20 @@ impl TypeChecker<'_> {
         if self.is_error(joined) {
             return self.error_type;
         }
-        self.lift_result(joined, shape)
+        match frame {
+            SelectFrame::Tensor(shape) => self.lift_result(joined, shape),
+            SelectFrame::Register(register) => self.register_result(&register, joined),
+        }
     }
 
     /// Check one select branch (a lone tail expression) and return the element
-    /// type it contributes with its integer-constant value, if any. A tensor
-    /// branch must have the mask's shape.
+    /// type it contributes with its integer-constant value, if any. An
+    /// aggregate branch must be the mask's kind and shape.
     fn check_select_branch(
         &mut self,
         block: &mut HirBlock,
         hint: Option<TypeId>,
-        shape: IndexId,
+        frame: &SelectFrame,
         span: radix_lexer::Span,
     ) -> Option<(TypeId, Option<i128>)> {
         let literal = block.expr.as_deref().is_some_and(is_numeric_literal);
@@ -907,13 +920,26 @@ impl TypeChecker<'_> {
             return None;
         }
         let konst = block.expr.as_deref().and_then(const_int_value);
+        if let (SelectFrame::Register(mask), Some(branch)) = (frame, self.register_operand(ty)) {
+            if branch.kind != mask.kind {
+                self.invalid_operand_types(COMMON_TYPE_MISMATCH, span);
+                return None;
+            }
+            let before = self.errors.len();
+            self.constrain_index_equal(mask.extent, branch.extent, span);
+            return (self.errors.len() == before).then_some((branch.elem, None));
+        }
         match self.lift_side(ty) {
             LiftSide::Tensor {
                 elem,
                 shape: branch_shape,
             } => {
+                let SelectFrame::Tensor(shape) = frame else {
+                    self.invalid_operand_types(COMMON_TYPE_MISMATCH, span);
+                    return None;
+                };
                 let before = self.errors.len();
-                self.constrain_index_equal(shape, branch_shape, span);
+                self.constrain_index_equal(*shape, branch_shape, span);
                 (self.errors.len() == before).then_some((elem, None))
             }
             LiftSide::Register => {
@@ -923,4 +949,11 @@ impl TypeChecker<'_> {
             LiftSide::Scalar(scalar) => Some((scalar, konst)),
         }
     }
+}
+
+/// What a select mask ranges over: a tensor's shape or a register's kind and
+/// extent.
+enum SelectFrame {
+    Tensor(IndexId),
+    Register(RegisterOperand),
 }

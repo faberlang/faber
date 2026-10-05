@@ -1917,6 +1917,18 @@ help = "dùng ⊘ cho `/` theo phần tử hoặc ÷ cho phép chia thật; `/` 
 message = "không hỗ trợ {kind} `%` {kind}; `%` cần một scalar ở một vế"
 help = "dùng % với scalar; không có phép lấy dư theo phần tử giữa hai giá trị {kind}"
 
+[diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
+message = "`≡` so sánh toàn bộ giá trị, và {kind} không bao giờ bằng một số"
+help = "dùng `≅` để lấy mặt nạ theo phần tử (`a ≅ 2.0`) hoặc so sánh kết quả của một phép rút gọn"
+
+[diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
+message = "hình dạng của {kind} khác nhau: `{left}` và `{right}`; `≡` yêu cầu các kiểu giống hệt nhau"
+help = "`≡` yêu cầu các kiểu giống hệt nhau; so sánh các tập hợp cùng hình dạng"
+
+[diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
+message = "{kind} của bool không phải là giá trị chân lý"
+help = "hãy rút gọn trước: `{reducta} {via} {omnia} {ex} mask` hoặc `{reducta} {via} {quilibet} {ex} mask`"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "không khớp kiểu đối số"
 help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"

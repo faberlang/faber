@@ -25,6 +25,7 @@ use super::store::StoreSite;
 // parent module provides shared imports for typechecking
 use super::*;
 
+mod aggregate_compare;
 mod lista_lift;
 mod tensor_lift;
 

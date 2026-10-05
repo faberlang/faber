@@ -1917,6 +1917,18 @@ help = "逐元素 `/` 请用 ⊘，逐元素真除法请用 ÷；`/` 的一侧�
 message = "不支持 {kind} `%` {kind}；`%` 的一侧必须是标量"
 help = "对标量使用 %；两个 {kind} 之间没有逐元素取余"
 
+[diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
+message = "`≡` 比较整个值，{kind} 永远不等于一个数"
+help = "用 `≅` 得到逐元素掩码（`a ≅ 2.0`），或比较归约结果"
+
+[diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
+message = "{kind} 的形状不同：`{left}` 与 `{right}`；`≡` 要求类型完全一致"
+help = "`≡` 要求类型完全一致；请比较形状相同的聚合"
+
+[diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
+message = "bool 的 {kind} 不是真值"
+help = "先归约：`{reducta} {via} {omnia} {ex} mask` 或 `{reducta} {via} {quilibet} {ex} mask`"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "argument 类型不匹配"
 help = "使表达式类型与期望类型一致"

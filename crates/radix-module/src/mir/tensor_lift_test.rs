@@ -202,10 +202,50 @@ fn comparisons_produce_a_bivalens_tensor() {
     assert_eq!(mask_result("a < b"), ["[verum, verum, falsum, falsum]"]);
     assert_eq!(mask_result("a ≤ 2.0"), ["[verum, verum, falsum, falsum]"]);
     assert_eq!(mask_result("a ≥ b"), ["[falsum, falsum, verum, verum]"]);
-    assert_eq!(mask_result("a ≡ a"), ["[verum, verum, verum, verum]"]);
-    assert_eq!(mask_result("a ≠ b"), ["[verum, verum, verum, verum]"]);
+    assert_eq!(mask_result("a ≅ a"), ["[verum, verum, verum, verum]"]);
     assert_eq!(mask_result("a ≅ b"), ["[falsum, falsum, falsum, falsum]"]);
     assert_eq!(mask_result("a ≇ b"), ["[verum, verum, verum, verum]"]);
+    assert_eq!(mask_result("a ≅ 2.0"), ["[falsum, verum, falsum, falsum]"]);
+}
+
+/// `≡ ≠` compare whole tensors (advisor rulings 2026-10-04): one `bivalens`,
+/// where the numeric comparisons give a mask.
+fn whole_result(expr: &str) -> Vec<String> {
+    ok(&format!(
+        "incipit {{
+fixum tensor<f32, []> seed ← vacua
+fixum tensor<f32, [2, 2]> a ← seed.strue([1.0, 2.0, 3.0, 4.0], [2, 2])
+fixum tensor<f32, [2, 2]> b ← seed.strue([4.0, 3.0, 2.0, 1.0], [2, 2])
+fixum tensor<f32, [2, 2]> c ← seed.strue([1.0, 2.0, 3.0, 4.0], [2, 2])
+fixum bivalens r ← {expr}
+nota r
+}}"
+    ))
+}
+
+#[test]
+fn equality_compares_whole_tensors_to_one_verdict() {
+    assert_eq!(whole_result("a ≡ c"), ["verum"]);
+    assert_eq!(whole_result("a ≡ a"), ["verum"]);
+    assert_eq!(whole_result("a ≡ b"), ["falsum"]);
+    assert_eq!(whole_result("a ≠ b"), ["verum"]);
+    assert_eq!(whole_result("a ≠ c"), ["falsum"]);
+}
+
+#[test]
+fn whole_equality_differs_across_run_time_shapes_without_an_error() {
+    let program = "functio extent(numerus n) → numerus { redde n }
+incipit {
+fixum numerus n ← extent(2)
+fixum numerus m ← extent(3)
+fixum tensor<f32, []> seed ← vacua
+fixum tensor<f32, [n]> short ← seed.strue([1.0, 2.0], [n])
+fixum tensor<f32, [m]> long ← seed.strue([1.0, 2.0, 3.0], [m])
+nota short ≡ long
+nota short ≠ long
+nota short ≡ short
+}";
+    assert_eq!(ok(program), ["falsum", "verum", "verum"]);
 }
 
 #[test]
@@ -215,16 +255,29 @@ fixum tensor<f32, []> seed ← vacua
 fixum tensor<f32, [2]> z ← seed.strue([0.0, 1.0], [2])
 fixum tensor<f32, [2]> n ← z ÷ z
 fixum tensor<bivalens, [2]> lt ← n < n
-fixum tensor<bivalens, [2]> eq ← n ≡ n
-fixum tensor<bivalens, [2]> ne ← n ≠ n
+fixum tensor<bivalens, [2]> eq ← n ≅ n
+fixum tensor<bivalens, [2]> ne ← n ≇ n
+fixum bivalens same ← n ≡ n
+fixum bivalens apart ← n ≠ n
 nota n.planata()
 nota lt.planata()
 nota eq.planata()
 nota ne.planata()
+nota same
+nota apart
 }";
+    // Per element a NaN is unequal to itself; whole-value, a tensor holding
+    // one is not `≡` to itself either (IEEE, no special case).
     assert_eq!(
         ok(program),
-        ["[NaN, 1.0]", "[falsum, falsum]", "[falsum, verum]", "[verum, falsum]"]
+        [
+            "[NaN, 1.0]",
+            "[falsum, falsum]",
+            "[falsum, verum]",
+            "[verum, falsum]",
+            "falsum",
+            "verum"
+        ]
     );
 }
 

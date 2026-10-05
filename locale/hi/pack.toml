@@ -1929,6 +1929,18 @@ help = "तत्ववार `/` के लिए ⊘ या सच्चे �
 message = "{kind} `%` {kind} समर्थित नहीं है; `%` के एक ओर scalar चाहिए"
 help = "% को scalar के साथ लगाएँ; दो {kind} मानों के बीच तत्ववार शेषफल नहीं है"
 
+[diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
+message = "`≡` पूरे मानों की तुलना करता है, और {kind} कभी किसी संख्या के बराबर नहीं होता"
+help = "तत्ववार मास्क के लिए `≅` का उपयोग करें (`a ≅ 2.0`), या किसी रिडक्शन की तुलना करें"
+
+[diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
+message = "{kind} के आकार अलग हैं: `{left}` और `{right}`; `≡` के लिए समान प्रकार आवश्यक हैं"
+help = "`≡` के लिए समान प्रकार आवश्यक हैं; एक ही आकार के समुच्चयों की तुलना करें"
+
+[diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
+message = "bool का {kind} सत्य-मान नहीं है"
+help = "पहले घटाएँ: `{reducta} {via} {omnia} {ex} mask` या `{reducta} {via} {quilibet} {ex} mask`"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "तर्क प्रकार असंगति"
 help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"

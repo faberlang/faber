@@ -1,5 +1,7 @@
 [falsum, falsum, verum, verum]
 [verum, verum, falsum, falsum]
+[falsum, verum, falsum, falsum]
+[verum, verum, verum, verum]
 [falsum, falsum, verum, verum]
 [verum, falsum, falsum, verum]
 [falsum, verum, falsum, falsum]

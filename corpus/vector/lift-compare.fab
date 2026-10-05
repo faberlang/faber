@@ -1,0 +1,81 @@
++++
+term = "vector"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "redde_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "comparison", "equality", "et_expr", "aut_expr", "unary_expr", "ternary", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "Numeric comparisons lift per lane over a vector (a bool vector), and/or/not and the ✓ ✗ select work on bool vectors, and ≡ stays whole-value."
+syntax = "v < w | v ≥ 2.0 | 2.0 > v | v ≅ w | mask and mask | not mask | mask ✓ v ✗ w"
+related = ["vector", "tensor", "bivalens"]
+locale = "en"
++++
+# =============================================================================
+# vector — Comparisons per lane
+# =============================================================================
+#
+# What this teaches:
+#   • Comparisons — `< > ≤ ≥ ≅ ≇` act on each lane and give a bool vector of the same width
+#   • A scalar may stand on either side; an untyped literal adopts the vector's element type
+#   • Logic — `and`, `or`, `not` act per lane on bool vectors and always evaluate both sides
+#   • Select — `mask ✓ v ✗ w` takes `v` where the mask is true and `w` elsewhere
+#   • Whole values — `≡` and `≠` still give one bool for the whole vector
+#
+# Common mistakes:
+#   • writing `v ≡ w` for a mask — it is one yes/no; write `v ≅ w`
+#   • using a bool vector as an `if` condition — reduce it or select with it
+#   • comparing vectors of different widths — that is a compile error
+#
+# See also: vector, tensor, bivalens
+# =============================================================================
+
+# vector — lane comparisons, logic and select
+#
+# WHY: rule 15.1 lifts the numeric comparisons over a vector exactly as over a
+# tensor. The result is a vector of bool, the same width as its operands.
+#
+# EXPECTED stdout: see lift-compare.expected
+
+fn below(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
+    return a < b
+}
+
+fn at_least(vector<f32, 3> a, f32 s) → vector<bool, 3> {
+    return a ≥ s
+}
+
+fn bigger_than(f32 s, vector<f32, 3> a) → vector<bool, 3> {
+    return s > a
+}
+
+fn lane_equal(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
+    return a ≅ b
+}
+
+fn lane_apart(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
+    return a ≇ b
+}
+
+fn clamped(vector<f32, 3> a, f32 limit) → vector<f32, 3> {
+    return (a > limit) ✓ limit ✗ a
+}
+
+main {
+    const vector<f32, 3> a ← [1.0, 5.0, 3.0] ↦ vector<f32, 3>
+    const vector<f32, 3> b ← [4.0, 5.0, 2.0] ↦ vector<f32, 3>
+    const vector<bool, 3> lt ← below(a, b)
+    print lt
+    const vector<bool, 3> big ← at_least(a, 3.0)
+    print big
+    print bigger_than(3.0, a)
+    print lane_equal(a, b)
+    print lane_apart(a, b)
+    print lt and big
+    print lt or big
+    print not lt
+    print lt ✓ a ✗ b
+    print lt ✓ 9.0 ✗ a
+    print clamped(a, 4.0)
+    print a ≡ b
+    print a ≠ b
+    print a ≡ a
+}

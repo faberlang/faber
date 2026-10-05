@@ -41,6 +41,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .iter()
             .map(|arg| self.eval_operand(arg, span))
             .collect::<Result<Vec<_>, _>>()?;
+        if matches!(op, MirLiftOp::WholeEq | MirLiftOp::WholeNotEq) {
+            let same = self.tensors_whole_equal(&operands, span)?;
+            return Ok(Value::Bool(same == (op == MirLiftOp::WholeEq)));
+        }
         let shape = lift_shape(&operands, span)?;
         let count = lift_count(&operands, span)?;
         let element = self.lift_result_element(return_ty);
@@ -62,6 +66,36 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         TensorValue::try_contiguous(data, shape)
             .map(|tensor| Value::Tensor(Rc::new(RefCell::new(tensor))))
             .ok_or_else(|| RunnerError::internal(span, "tensor shape has unrepresentable strides"))
+    }
+
+    /// `≡` over two whole tensors: the same shape and every element pair `≡`.
+    /// A shape difference is `false`, never an error; NaN is not `≡` to
+    /// anything, so a tensor holding one is not `≡` to itself.
+    fn tensors_whole_equal(&mut self, operands: &[Value], span: Span) -> Result<bool, RunnerError> {
+        let [Value::Tensor(left), Value::Tensor(right)] = operands else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor equality needs two tensor operands",
+            ));
+        };
+        if left.borrow().shape != right.borrow().shape {
+            return Ok(false);
+        }
+        let count = lift_count(operands, span)?;
+        for index in 0..count {
+            let l = self.tensor_read_at(left, index, span)?;
+            let r = self.tensor_read_at(right, index, span)?;
+            let (Some(l), Some(r)) = (l, r) else {
+                return Err(RunnerError::internal(
+                    span,
+                    "tensor equality layout is invalid",
+                ));
+            };
+            if !values_equal(&l, &r) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// The element type of the tensor result type.
@@ -149,6 +183,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 } else {
                     v[2].clone()
                 }
+            }
+            MirLiftOp::WholeEq | MirLiftOp::WholeNotEq => {
+                return Err(RunnerError::internal(
+                    span,
+                    "whole-tensor equality is not an elementwise lift",
+                ));
             }
         };
         let Some(element) = element else {

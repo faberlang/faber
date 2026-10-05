@@ -1,11 +1,13 @@
 //! Elementwise operator lift over tensors (gpu-reset rule 15, K4).
 //!
-//! The typechecker admits `+ - * / % ÷`, unary `-`, comparisons, `et`/`aut`/
-//! `non`, `vel` and the `✓ ✗` select on tensors, against a scalar or a
-//! same-shape tensor. They lower to one `MirIntrinsic::TensorLift(op)` whose
-//! operands are all evaluated first, so nothing short-circuits (a documented
-//! deviation from the scalar meaning). Tensor `+ -` against a tensor keeps its
-//! `addita`/`subtrahe` lowering and `⊙ ⊘` their glyph lowering.
+//! The typechecker admits `+ - * / % ÷`, unary `-`, the numeric comparisons
+//! `< > ≤ ≥ ≅ ≇`, `et`/`aut`/`non`, `vel` and the `✓ ✗` select on tensors,
+//! against a scalar or a same-shape tensor. They lower to one
+//! `MirIntrinsic::TensorLift(op)` whose operands are all evaluated first, so
+//! nothing short-circuits (a documented deviation from the scalar meaning).
+//! `≡ ≠` over two tensors compare whole values and lower to the same call with
+//! `WholeEq`/`WholeNotEq`, which yields one `bivalens`. Tensor `+ -` against a
+//! tensor keeps its `addita`/`subtrahe` lowering and `⊙ ⊘` their glyph lowering.
 
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
@@ -40,8 +42,12 @@ impl FunctionBuilder<'_> {
             HirBinOp::Div if against_scalar => MirLiftOp::Div,
             HirBinOp::Mod if against_scalar => MirLiftOp::Mod,
             HirBinOp::TrueDiv => MirLiftOp::TrueDiv,
-            HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq => MirLiftOp::Eq,
-            HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq => MirLiftOp::NotEq,
+            // `≡ ≠` compare whole tensors (one verdict); the typechecker rejects
+            // a scalar peer, so only a tensor pair reaches here.
+            HirBinOp::Eq | HirBinOp::StrictEq if !against_scalar => MirLiftOp::WholeEq,
+            HirBinOp::NotEq | HirBinOp::StrictNotEq if !against_scalar => MirLiftOp::WholeNotEq,
+            HirBinOp::ApproxEq => MirLiftOp::Eq,
+            HirBinOp::ApproxNotEq => MirLiftOp::NotEq,
             HirBinOp::Lt => MirLiftOp::Lt,
             HirBinOp::Gt => MirLiftOp::Gt,
             HirBinOp::LtEq => MirLiftOp::LtEq,

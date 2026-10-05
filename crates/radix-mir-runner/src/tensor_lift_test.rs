@@ -295,3 +295,96 @@ fn f32_results_round_at_the_element_width() {
     .unwrap();
     assert_eq!(data(&out), vec![Value::Float(f64::from(1.0_f32 / 3.0_f32))]);
 }
+
+#[test]
+fn whole_equality_is_one_verdict_over_shape_and_every_element() {
+    let a = floats(&[1.0, 2.0, 3.0, 4.0], &[2, 2]);
+    let same = floats(&[1.0, 2.0, 3.0, 4.0], &[2, 2]);
+    let other = floats(&[1.0, 2.0, 3.0, 5.0], &[2, 2]);
+    let verdict = |op, left: &Value, right: &Value| {
+        lift(op, bool_element(), vec![left.clone(), right.clone()]).unwrap()
+    };
+    assert_eq!(verdict(MirLiftOp::WholeEq, &a, &same), Value::Bool(true));
+    assert_eq!(
+        verdict(MirLiftOp::WholeNotEq, &a, &same),
+        Value::Bool(false)
+    );
+    assert_eq!(verdict(MirLiftOp::WholeEq, &a, &other), Value::Bool(false));
+    assert_eq!(
+        verdict(MirLiftOp::WholeNotEq, &a, &other),
+        Value::Bool(true)
+    );
+}
+
+#[test]
+fn whole_equality_across_shapes_is_false_never_an_error() {
+    let flat = floats(&[1.0, 2.0, 3.0, 4.0], &[4]);
+    let square = floats(&[1.0, 2.0, 3.0, 4.0], &[2, 2]);
+    let shorter = floats(&[1.0, 2.0], &[2]);
+    for other in [&square, &shorter] {
+        let eq = lift(
+            MirLiftOp::WholeEq,
+            bool_element(),
+            vec![flat.clone(), other.clone()],
+        )
+        .unwrap();
+        assert_eq!(eq, Value::Bool(false));
+        let ne = lift(
+            MirLiftOp::WholeNotEq,
+            bool_element(),
+            vec![flat.clone(), other.clone()],
+        )
+        .unwrap();
+        assert_eq!(ne, Value::Bool(true));
+    }
+}
+
+#[test]
+fn whole_equality_follows_ieee_nan_and_compares_holes_and_bools() {
+    // A tensor holding NaN is not equal to itself (IEEE, no special case).
+    let nan = floats(&[f64::NAN, 1.0], &[2]);
+    let eq = lift(
+        MirLiftOp::WholeEq,
+        bool_element(),
+        vec![nan.clone(), nan.clone()],
+    )
+    .unwrap();
+    assert_eq!(eq, Value::Bool(false));
+    let ne = lift(
+        MirLiftOp::WholeNotEq,
+        bool_element(),
+        vec![nan.clone(), nan],
+    )
+    .unwrap();
+    assert_eq!(ne, Value::Bool(true));
+    let holes = tensor(vec![Value::Int(4), Value::Nil], &[2]);
+    let eq = lift(
+        MirLiftOp::WholeEq,
+        bool_element(),
+        vec![holes.clone(), holes],
+    )
+    .unwrap();
+    assert_eq!(eq, Value::Bool(true));
+    let mask = tensor(vec![Value::Bool(true), Value::Bool(false)], &[2]);
+    let flipped = tensor(vec![Value::Bool(false), Value::Bool(false)], &[2]);
+    let eq = lift(
+        MirLiftOp::WholeEq,
+        bool_element(),
+        vec![mask.clone(), flipped],
+    )
+    .unwrap();
+    assert_eq!(eq, Value::Bool(false));
+    let eq = lift(MirLiftOp::WholeEq, bool_element(), vec![mask.clone(), mask]).unwrap();
+    assert_eq!(eq, Value::Bool(true));
+}
+
+#[test]
+fn whole_equality_needs_two_tensors() {
+    let err = lift(
+        MirLiftOp::WholeEq,
+        bool_element(),
+        vec![floats(&[1.0], &[1]), Value::Float(1.0)],
+    )
+    .expect_err("a scalar is not a whole tensor");
+    assert!(err.message.contains("two tensor operands"), "{err:?}");
+}

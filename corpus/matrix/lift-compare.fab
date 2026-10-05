@@ -1,0 +1,82 @@
++++
+term = "matrix"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "redde_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "comparison", "equality", "et_expr", "aut_expr", "unary_expr", "ternary", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "Numeric comparisons lift per cell over a matrix (a bool matrix), and/or/not and the ✓ ✗ select work on bool matrices, and ≡ stays whole-value."
+syntax = "m < n | m ≥ 2.0 | 2.0 > m | m ≅ n | mask and mask | not mask | mask ✓ m ✗ n"
+related = ["matrix", "vector", "tensor", "bivalens"]
+locale = "en"
++++
+# =============================================================================
+# matrix — Comparisons per cell
+# =============================================================================
+#
+# What this teaches:
+#   • Comparisons — `< > ≤ ≥ ≅ ≇` act on each cell and give a bool matrix of the same shape
+#   • A scalar may stand on either side; an untyped literal adopts the matrix's element type
+#   • Logic — `and`, `or`, `not` act per cell on bool matrices and always evaluate both sides
+#   • Select — `mask ✓ m ✗ n` takes `m` where the mask is true and `n` elsewhere
+#   • Whole values — `≡` and `≠` still give one bool for the whole matrix
+#
+# Common mistakes:
+#   • writing `m ≡ n` for a mask — it is one yes/no; write `m ≅ n`
+#   • using a bool matrix as an `if` condition — reduce it or select with it
+#   • comparing matrices of different shapes — that is a compile error
+#
+# See also: matrix, vector, tensor, bivalens
+# =============================================================================
+
+# matrix — cell comparisons, logic and select
+#
+# WHY: rule 15.1 lifts the numeric comparisons over a matrix exactly as over a
+# vector or a tensor. The result is a matrix of bool, the same shape as its
+# operands.
+#
+# EXPECTED stdout: see lift-compare.expected
+
+fn below(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<bool, [2, 2]> {
+    return a < b
+}
+
+fn at_least(matrix<f32, [2, 2]> a, f32 s) → matrix<bool, [2, 2]> {
+    return a ≥ s
+}
+
+fn bigger_than(f32 s, matrix<f32, [2, 2]> a) → matrix<bool, [2, 2]> {
+    return s > a
+}
+
+fn cell_equal(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<bool, [2, 2]> {
+    return a ≅ b
+}
+
+fn cell_apart(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<bool, [2, 2]> {
+    return a ≇ b
+}
+
+fn clamped(matrix<f32, [2, 2]> a, f32 limit) → matrix<f32, [2, 2]> {
+    return (a > limit) ✓ limit ✗ a
+}
+
+main {
+    const matrix<f32, [2, 2]> a ← [[1.0, 5.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    const matrix<f32, [2, 2]> b ← [[4.0, 5.0], [2.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    const matrix<bool, [2, 2]> lt ← below(a, b)
+    print lt
+    const matrix<bool, [2, 2]> big ← at_least(a, 3.0)
+    print big
+    print bigger_than(3.0, a)
+    print cell_equal(a, b)
+    print cell_apart(a, b)
+    print lt and big
+    print lt or big
+    print not lt
+    print lt ✓ a ✗ b
+    print lt ✓ 9.0 ✗ a
+    print clamped(a, 3.5)
+    print a ≡ b
+    print a ≠ b
+    print a ≡ a
+}

@@ -1917,6 +1917,18 @@ help = "逐元素 `/` 請用 ⊘，逐元素真除法請用 ÷；`/` 的一側�
 message = "不支援 {kind} `%` {kind}；`%` 的一側必須是純量"
 help = "對純量使用 %；兩個 {kind} 之間沒有逐元素取餘"
 
+[diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
+message = "`≡` 比較整個值，{kind} 永遠不等於一個數"
+help = "用 `≅` 取得逐元素遮罩（`a ≅ 2.0`），或比較歸約結果"
+
+[diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
+message = "{kind} 的形狀不同：`{left}` 與 `{right}`；`≡` 要求型別完全相同"
+help = "`≡` 要求型別完全相同；請比較形狀相同的聚合"
+
+[diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
+message = "bool 的 {kind} 不是真值"
+help = "先歸約：`{reducta} {via} {omnia} {ex} mask` 或 `{reducta} {via} {quilibet} {ex} mask`"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "引數型別不相符"
 help = "使運算式型別符合預期型別"

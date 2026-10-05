@@ -2663,6 +2663,18 @@ help = "use ⊘ for elementwise `/` or ÷ for elementwise true division; `/` tak
 message = "{kind} `%` {kind} is unsupported; `%` takes a scalar on one side"
 help = "apply % against a scalar; there is no elementwise remainder between two {kind} values"
 
+[diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
+message = "`≡` compares whole values, and a {kind} is never equal to a number"
+help = "use `≅` for a per-element mask (`a ≅ 2.0`), or compare a reduction"
+
+[diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
+message = "{kind} shapes differ: `{left}` and `{right}`; `≡` requires identical types"
+help = "`≡` requires identical types; compare aggregates of one shape"
+
+[diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
+message = "a {kind} of bool is not a truth value"
+help = "reduce it first: `{reducta} {via} {omnia} {ex} mask` or `{reducta} {via} {quilibet} {ex} mask`"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "argument type mismatch"
 help = "make the expression type match the expected type"

@@ -243,7 +243,9 @@ functio i(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u16, [2]> { redde a 
 
 #[test]
 fn comparisons_produce_a_bivalens_tensor() {
-    for op in ["<", ">", "≤", "≥", "≡", "≠", "≅", "≇"] {
+    // Numeric comparisons lift per element; `≡ ≠` compare whole values and are
+    // pinned in `aggregate_compare_test`.
+    for op in ["<", ">", "≤", "≥", "≅", "≇"] {
         accepts(&format!(
             "functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<bivalens, [2, 2]> {{ redde a {op} b }}"
         ));
@@ -269,7 +271,7 @@ fn comparisons_produce_a_bivalens_tensor() {
 #[test]
 fn exact_equality_needs_identical_elements_and_value_equality_does_not() {
     rejects(
-        "functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<bivalens, [2]> { redde a ≡ b }",
+        "functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → bivalens { redde a ≡ b }",
         SemanticErrorKind::TypeMismatch,
         EXACT_EQUALITY,
         &[],

@@ -696,6 +696,15 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         ),
         "boolean_operand_required" => Some("use a bivalens operand for this operator".to_owned()),
         "condition_must_be_bivalens" => Some("use a bivalens expression as the condition".to_owned()),
+        "aggregate_equality_scalar_operand" => Some(
+            "use ≅ for a per-element mask (a ≅ 2.0), or compare a reduction".to_owned(),
+        ),
+        "aggregate_equality_shape_mismatch" => {
+            Some("≡ requires identical types; compare aggregates of one shape".to_owned())
+        }
+        "aggregate_mask_not_truth_value" => Some(
+            "reduce the mask first with reduce via all or reduce via any".to_owned(),
+        ),
         "integer_operand_required" => Some("use an integer operand for this operator".to_owned()),
         "range_operand_must_be_numeric" => Some("compare numeric values with intervallum ranges".to_owned()),
         "scalar_text_operands_required" => Some("compare single-scalar textus or ascii operands".to_owned()),

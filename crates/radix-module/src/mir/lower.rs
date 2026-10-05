@@ -3380,6 +3380,11 @@ impl<'a> FunctionBuilder<'a> {
         {
             return lowered;
         }
+        if op == HirUnOp::Not
+            && let Some(lowered) = self.lower_register_not(operand, expr)
+        {
+            return lowered;
+        }
         if op == HirUnOp::Neg
             && let Some(lowered) = self.lower_lista_negate(operand, expr)
         {

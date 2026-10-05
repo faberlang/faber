@@ -1929,6 +1929,18 @@ help = "ใช้ ⊘ แทน `/` รายองค์ประกอบ ห�
 message = "ไม่รองรับ {kind} `%` {kind}; `%` ต้องมี scalar ด้านใดด้านหนึ่ง"
 help = "ใช้ % กับ scalar; ไม่มีเศษรายองค์ประกอบระหว่าง {kind} สองค่า"
 
+[diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
+message = "`≡` เปรียบเทียบค่าทั้งก้อน และ {kind} ไม่เคยเท่ากับตัวเลข"
+help = "ใช้ `≅` เพื่อได้มาสก์รายองค์ประกอบ (`a ≅ 2.0`) หรือเปรียบเทียบผลของการลดค่า"
+
+[diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
+message = "รูปร่างของ {kind} ต่างกัน: `{left}` และ `{right}`; `≡` ต้องใช้ชนิดเดียวกัน"
+help = "`≡` ต้องใช้ชนิดเดียวกัน; เปรียบเทียบชุดข้อมูลที่มีรูปร่างเดียวกัน"
+
+[diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
+message = "{kind} ของ bool ไม่ใช่ค่าความจริง"
+help = "ลดค่าก่อน: `{reducta} {via} {omnia} {ex} mask` หรือ `{reducta} {via} {quilibet} {ex} mask`"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "ชนิดของอาร์กิวเมนต์ไม่ตรงกัน"
 help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"

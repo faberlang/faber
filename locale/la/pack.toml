@@ -2435,6 +2435,18 @@ help = "utere ⊘ ad `/` elementwise aut ÷ ad divisionem veram elementwise; `/`
 message = "{kind} `%` {kind} non licet; `%` scalar ex altera parte accipit"
 help = "applica % contra scalar; inter duo {kind} nulla reliquia elementwise est"
 
+[diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
+message = "`≡` totum valorem comparat, et {kind} numero numquam aequale est"
+help = "utere `≅` ad larvam per elementum (`a ≅ 2.0`), aut reductionem compara"
+
+[diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
+message = "figurae {kind} differunt: `{left}` et `{right}`; `≡` genera identica requirit"
+help = "`≡` genera identica requirit; compara aggregata eiusdem figurae"
+
+[diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
+message = "{kind} bivalentium non est valor veritatis"
+help = "prius reduce: `{reducta} {via} {omnia} {ex} larva` aut `{reducta} {via} {quilibet} {ex} larva`"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "argument type mismatch"
 help = "make the expression type match the expected type"

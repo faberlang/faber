@@ -2374,6 +2374,9 @@ impl FunctionBuilder<'_> {
         if self.is_tensor_select(cond) {
             return self.lower_tensor_select(cond, then_block, else_block, destination, ty, span);
         }
+        if self.is_register_select(cond) {
+            return self.lower_register_select(cond, (then_block, else_block), destination, ty, span);
+        }
         let condition = self.lower_expr_value(cond)?;
         let then_id = self.fresh_block(then_block.span);
         let else_id = self.fresh_block(else_block.span);

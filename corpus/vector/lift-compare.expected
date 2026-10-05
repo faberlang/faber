@@ -1,0 +1,14 @@
+[verum, falsum, falsum]
+[falsum, verum, verum]
+[verum, falsum, falsum]
+[falsum, verum, falsum]
+[verum, falsum, verum]
+[falsum, falsum, falsum]
+[verum, verum, verum]
+[falsum, verum, verum]
+[1.0, 5.0, 2.0]
+[9.0, 5.0, 3.0]
+[1.0, 4.0, 3.0]
+falsum
+verum
+verum

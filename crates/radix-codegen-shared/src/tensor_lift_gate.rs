@@ -10,12 +10,18 @@
 //! them silently. Tensor `+ -` against a tensor of the same element type and
 //! the `⊙ ⊘` products keep their emitters.
 //!
+//! `≡ ≠` between two tensors compare whole values and are one `bivalens`, not a
+//! lift; they are gated under `tensor_equality_unsupported_on_target` because
+//! only the MIR runner executes them.
+//!
 //! The register forms are gated the same way under their own issues,
 //! `vector_lift_unsupported_on_target` and `matrix_lift_unsupported_on_target`:
-//! `+ - * / % ÷` between a register and a scalar, unary `-`, `÷` between two
-//! registers, and `⤒ ⤓` against a scalar or a register peer. Their per-lane
-//! unrolling happens in MIR, so only the MIR-backed targets execute them;
-//! register with register `+ -` and the `⊙ ⊘` products keep their emitters.
+//! `+ - * / % ÷` between a register and a scalar, unary `-` and `non`, `÷`, the
+//! comparisons `< > ≤ ≥ ≅ ≇` and `et`/`aut` between two registers or against a
+//! scalar, `⤒ ⤓` against a scalar or a register peer, and the `✓ ✗` select over
+//! a register mask. Their per-lane unrolling happens in MIR, so only the
+//! MIR-backed targets execute them; register with register `+ -`, `≡ ≠` and the
+//! `⊙ ⊘` products keep their emitters.
 
 use crate::CodegenError;
 use radix_diagnostics::DiagnosticArg;
@@ -28,11 +34,25 @@ use radix_types::{Type, TypeId, TypeTable};
 const ISSUE: &str = "tensor_lift_unsupported_on_target";
 const VECTOR_ISSUE: &str = "vector_lift_unsupported_on_target";
 const MATRIX_ISSUE: &str = "matrix_lift_unsupported_on_target";
+const EQUALITY_ISSUE: &str = "tensor_equality_unsupported_on_target";
+
+/// How the operands of a gated register form are written.
+#[derive(Clone, Copy)]
+enum Operands {
+    /// A register against a scalar.
+    Scalar,
+    /// Two registers of one kind.
+    Pair,
+    /// One register (`-v`, `non m`, the mask of `✓ ✗`).
+    Single,
+}
 
 /// Which container a lifted form operates on.
 #[derive(Clone, Copy)]
 enum Family {
     Tensor,
+    /// `≡ ≠` between two tensors: one whole-value verdict.
+    TensorEquality,
     Vector,
     Matrix,
 }
@@ -50,7 +70,7 @@ pub fn reject_tensor_lift(
         types: &'a TypeTable,
         interner: &'a Interner,
         target: Target,
-        found: Option<(Family, String, bool)>,
+        found: Option<(Family, String, Operands)>,
     }
     impl HirVisitor for Gate<'_> {
         fn visit_expr(&mut self, expr: &HirExpression) {
@@ -58,7 +78,7 @@ pub fn reject_tensor_lift(
                 return;
             }
             self.found = lifted_form(self.types, self.interner, self.target, expr)
-                .map(|label| (Family::Tensor, label, false))
+                .map(|(family, label)| (family, label, Operands::Scalar))
                 .or_else(|| register_form(self.types, self.interner, expr));
             if self.found.is_none() {
                 walk_expr(self, expr);
@@ -79,6 +99,17 @@ pub fn reject_tensor_lift(
     walk_program(&mut gate, hir);
     match gate.found {
         None => Ok(()),
+        Some((Family::TensorEquality, label, _)) => Err(CodegenError {
+            message: format!(
+                "tensor {label} is not supported on the {target:?} target: \
+                 whole-tensor equality has only the MIR runner as its executor"
+            ),
+            args: vec![
+                DiagnosticArg::new("issue", EQUALITY_ISSUE),
+                DiagnosticArg::new("op", label),
+                DiagnosticArg::new("target", format!("{target:?}")),
+            ],
+        }),
         Some((Family::Tensor, label, _)) => Err(CodegenError {
             message: format!(
                 "tensor elementwise {label} is not supported on the {target:?} target: \
@@ -90,20 +121,20 @@ pub fn reject_tensor_lift(
                 DiagnosticArg::new("target", format!("{target:?}")),
             ],
         }),
-        Some((family @ (Family::Vector | Family::Matrix), label, pair)) => {
-            let (name, issue) = if matches!(family, Family::Vector) {
-                ("vector", VECTOR_ISSUE)
+        Some((family @ (Family::Vector | Family::Matrix), label, operands)) => {
+            let (name, plural, issue) = if matches!(family, Family::Vector) {
+                ("vector", "vectors", VECTOR_ISSUE)
             } else {
-                ("matrix", MATRIX_ISSUE)
+                ("matrix", "matrices", MATRIX_ISSUE)
             };
-            let operands = if pair {
-                format!("between two {name}s")
-            } else {
-                "against a scalar".to_owned()
+            let operands = match operands {
+                Operands::Pair => format!(" between two {plural}"),
+                Operands::Scalar => " against a scalar".to_owned(),
+                Operands::Single => String::new(),
             };
             Err(CodegenError {
                 message: format!(
-                    "{name} {label} {operands} is not supported on the {target:?} target: \
+                    "{name} {label}{operands} is not supported on the {target:?} target: \
                      the lanes are unrolled only on MIR-backed targets"
                 ),
                 args: vec![
@@ -147,7 +178,7 @@ fn register_form(
     types: &TypeTable,
     interner: &Interner,
     expr: &HirExpression,
-) -> Option<(Family, String, bool)> {
+) -> Option<(Family, String, Operands)> {
     let same_family = |lhs: Option<Family>, rhs: Option<Family>| {
         matches!(
             (lhs, rhs),
@@ -164,6 +195,14 @@ fn register_form(
                 HirBinOp::Div => "/",
                 HirBinOp::Mod => "%",
                 HirBinOp::TrueDiv => "÷",
+                HirBinOp::Lt => "<",
+                HirBinOp::Gt => ">",
+                HirBinOp::LtEq => "≤",
+                HirBinOp::GtEq => "≥",
+                HirBinOp::ApproxEq => "≅",
+                HirBinOp::ApproxNotEq => "≇",
+                HirBinOp::And => "et",
+                HirBinOp::Or => "aut",
                 _ => return None,
             };
             let (left, right) = (
@@ -171,10 +210,12 @@ fn register_form(
                 register_family(types, rhs.ty),
             );
             // Register with register `+ -` keeps its emitters, and `* / %`
-            // between two registers never type-check; only `÷` pairs them.
+            // between two registers never type-check; `÷`, the comparisons and
+            // the logic pair them.
             if same_family(left, right) {
-                return (*op == HirBinOp::TrueDiv)
-                    .then(|| left.map(|family| (family, spelling.to_owned(), true)))
+                let retained = matches!(op, HirBinOp::Add | HirBinOp::Sub);
+                return (!retained)
+                    .then(|| left.map(|family| (family, spelling.to_owned(), Operands::Pair)))
                     .flatten();
             }
             let scalar = |operand: &HirExpression| {
@@ -182,14 +223,22 @@ fn register_form(
                     && register_family(types, operand.ty).is_none()
             };
             match (left, right) {
-                (Some(family), None) if scalar(rhs) => Some((family, spelling.to_owned(), false)),
-                (None, Some(family)) if scalar(lhs) => Some((family, spelling.to_owned(), false)),
+                (Some(family), None) if scalar(rhs) => {
+                    Some((family, spelling.to_owned(), Operands::Scalar))
+                }
+                (None, Some(family)) if scalar(lhs) => {
+                    Some((family, spelling.to_owned(), Operands::Scalar))
+                }
                 _ => None,
             }
         }
-        HirExpressionKind::Unary(HirUnOp::Neg, operand) => {
-            register_family(types, operand.ty).map(|family| (family, "-".to_owned(), false))
+        HirExpressionKind::Unary(op @ (HirUnOp::Neg | HirUnOp::Not), operand) => {
+            let spelling = if *op == HirUnOp::Neg { "-" } else { "non" };
+            register_family(types, operand.ty)
+                .map(|family| (family, spelling.to_owned(), Operands::Single))
         }
+        HirExpressionKind::Si { cond, .. } => register_family(types, cond.ty)
+            .map(|family| (family, "✓ ✗".to_owned(), Operands::Single)),
         HirExpressionKind::MethodCall(receiver, name, _, args, _)
             if matches!(interner.resolve(*name), "maximus" | "minimus") =>
         {
@@ -197,7 +246,12 @@ fn register_form(
             let peer = args.first()?;
             tensor_element(types, peer.expr.ty).is_none().then(|| {
                 let pair = register_family(types, peer.expr.ty).is_some();
-                (family, "⤒ ⤓".to_owned(), pair)
+                let operands = if pair {
+                    Operands::Pair
+                } else {
+                    Operands::Scalar
+                };
+                (family, "⤒ ⤓".to_owned(), operands)
             })
         }
         _ => None,
@@ -221,7 +275,8 @@ fn lifted_form(
     interner: &Interner,
     target: Target,
     expr: &HirExpression,
-) -> Option<String> {
+) -> Option<(Family, String)> {
+    let tensor = |label: String| Some((Family::Tensor, label));
     match &expr.kind {
         // The Rust runtime carries `vel` over a nullable-element tensor (a
         // shifted edge view) with a scalar fallback as `Tensor::coalesce`.
@@ -232,23 +287,40 @@ fn lifted_form(
         {
             None
         }
+        // `≡ ≠` between two tensors compare whole values: one verdict, gated
+        // under its own issue.
+        HirExpressionKind::Binary(
+            op @ (HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::NotEq | HirBinOp::StrictNotEq),
+            lhs,
+            rhs,
+        ) => {
+            tensor_element(types, lhs.ty)?;
+            tensor_element(types, rhs.ty)?;
+            let spelling = if matches!(op, HirBinOp::Eq | HirBinOp::StrictEq) {
+                "≡"
+            } else {
+                "≠"
+            };
+            Some((Family::TensorEquality, spelling.to_owned()))
+        }
         HirExpressionKind::Binary(op, lhs, rhs) => binary_label(
             types,
             *op,
             tensor_element(types, lhs.ty),
             tensor_element(types, rhs.ty),
-        ),
+        )
+        .and_then(tensor),
         HirExpressionKind::Unary(op, operand) => {
             tensor_element(types, operand.ty)?;
             match op {
-                HirUnOp::Neg => Some("-".to_owned()),
-                HirUnOp::Not => Some("non".to_owned()),
+                HirUnOp::Neg => tensor("-".to_owned()),
+                HirUnOp::Not => tensor("non".to_owned()),
                 HirUnOp::BitNot => None,
             }
         }
         HirExpressionKind::Si { cond, .. } => {
             tensor_element(types, cond.ty)?;
-            Some("✓ ✗".to_owned())
+            tensor("✓ ✗".to_owned())
         }
         HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
             let extremum = matches!(interner.resolve(*name), "maximus" | "minimus");
@@ -257,7 +329,7 @@ fn lifted_form(
                 && args
                     .first()
                     .is_some_and(|arg| tensor_element(types, arg.expr.ty).is_some()))
-            .then(|| "⤒ ⤓".to_owned())
+            .then(|| (Family::Tensor, "⤒ ⤓".to_owned()))
         }
         _ => None,
     }
@@ -276,8 +348,6 @@ fn binary_label(
         HirBinOp::Div => "/",
         HirBinOp::Mod => "%",
         HirBinOp::TrueDiv => "÷",
-        HirBinOp::Eq | HirBinOp::StrictEq => "≡",
-        HirBinOp::NotEq | HirBinOp::StrictNotEq => "≠",
         HirBinOp::ApproxEq => "≅",
         HirBinOp::ApproxNotEq => "≇",
         HirBinOp::FuzzyEq => "≈",

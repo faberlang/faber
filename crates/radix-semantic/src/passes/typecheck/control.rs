@@ -329,12 +329,12 @@ impl TypeChecker<'_> {
             return;
         }
         if !self.is_bool(cond_ty) {
-            self.invalid_operand_types("condition_must_be_bivalens", cond.span);
+            self.report_mask_not_truth_value(cond_ty, cond.span);
         }
     }
 
     /// [`Self::check_condition`] for a condition that may be a select mask: a
-    /// `tensor<_, S>` condition is returned checked and unreported, so the
+    /// tensor, vector or matrix condition is returned checked and unreported, so the
     /// caller can treat it as the mask of a `✓ ✗` select; any other condition
     /// is checked as `bivalens` and yields `None`.
     fn check_condition_or_mask(&mut self, cond: &mut HirExpression) -> Option<TypeId> {
@@ -350,7 +350,7 @@ impl TypeChecker<'_> {
         if self.is_bool(cond_ty) {
             return None;
         }
-        if matches!(self.types.get(resolved), Type::Tensor(..)) {
+        if self.is_aggregate_mask_type(cond_ty) {
             return Some(cond_ty);
         }
         // Same report as the hinted check: an open hole binds to `bivalens`,
@@ -390,7 +390,7 @@ impl TypeChecker<'_> {
         // (K4), not a branch condition: both branches are evaluated.
         if let Some(mask_ty) = self.check_condition_or_mask(cond) {
             if then_catch.is_some() {
-                self.invalid_operand_types("condition_must_be_bivalens", cond.span);
+                self.report_mask_not_truth_value(mask_ty, cond.span);
                 return self.error_type;
             }
             return self.check_tensor_select(cond, mask_ty, then_block, else_block, expected);
