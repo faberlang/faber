@@ -47,6 +47,10 @@ mod bounded_itera_test;
 #[path = "runtime_extent_itera_test.rs"]
 mod runtime_extent_itera_test;
 
+#[cfg(all(test, feature = "runner"))]
+#[path = "reducta_filum_test.rs"]
+mod reducta_filum_test;
+
 #[cfg(test)]
 #[path = "interface_dispatch_test.rs"]
 mod interface_dispatch_test;

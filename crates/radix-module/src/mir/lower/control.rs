@@ -598,10 +598,13 @@ impl FunctionBuilder<'_> {
     /// The accumulator starts at the `+` identity; a valued `redde` in the
     /// term body adds its value into the accumulator (through the reduction fold
     /// context, never as a function return) and continues the iteration loop.
-    /// The distributed `filum` spelling lowers here to the declared kernel-
+    /// The ungrouped distributed `filum` sum lowers to the declared kernel-
     /// plan entry (SFR-5): a `FilumSum` runtime call carrying the filum
     /// metadata, the captured term-body MIR, and the coordinate facts —
     /// the plan pass resolves it to `DistributedSum`, never inline MIR.
+    /// Every other `filum` reduction (other operators, grouped sums) lowers as
+    /// this same sequential fold; the lane binder is declared metadata only,
+    /// exactly as on the `filum` loop, and is not bound inside the body.
     /// Sequential row-major reduction; each bucket owns exact running temps.
     pub(super) fn lower_reduction_expr(
         &mut self,
@@ -616,12 +619,13 @@ impl FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         use radix_hir::HirReductionOp as Op;
-        if let Some(filum) = filum {
-            if op != Op::Sum || group.is_some() {
-                self.errors
-                    .push(MirError::unsupported(expr.span, "reducta_filum_op_not_lowered"));
-                return None;
-            }
+        // The ungrouped `sum` is the one reduction with a declared device recipe;
+        // every other `filum` reduction is the plain fold below, because `filum`
+        // only permits parallel evaluation and carries no sequential meaning.
+        if let Some(filum) = filum
+            && op == Op::Sum
+            && group.is_none()
+        {
             return self.lower_filum_summa_expr(source, coordinates, filum, binding?, body?, expr);
         }
         let source_ty = source.ty?;
