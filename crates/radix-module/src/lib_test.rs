@@ -94,13 +94,13 @@ fn shape_generic_tensor_reple_value_emits_filled_copy() {
         panic!("expected Rust output");
     };
     assert!(
-        output.code.contains("param.clone()"),
-        "reple in value position must fill a fresh clone, got:\n{}",
+        output.code.contains("crea(&param.magnitudines()"),
+        "reple in value position must construct a fresh filled tensor, got:\n{}",
         output.code
     );
     assert!(
-        !output.code.contains("= param.reple("),
-        "reple value must never be a bare in-place call (E0308), got:\n{}",
+        !output.code.contains("= param.reple(") && !output.code.contains("param.clone()"),
+        "reple value must never be a bare in-place call or an aliasing clone (E0308 / fill-aliasing), got:\n{}",
         output.code
     );
 }

@@ -1,2 +1,3 @@
 # Borrowed tensor views require materialize() at an ownership boundary.
-SEM057:tensor_view_escape
+error: SEM057.tensor_view_escape
+error: SEM057.tensor_view_escape
