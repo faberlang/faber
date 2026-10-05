@@ -1,11 +1,14 @@
 //! Package-MIR run/build route API: route selection, image loading, and the stdio entry.
 
+use radix_module::mir::KernelLowering;
+use std::borrow::Cow;
+
 use super::{
     AnalyzedProgram, BTreeMap, CliPlanningMode, Config, DeviceSelection, Diagnostic,
     FMIR_BIN_ARTIFACT_DIR, FMIR_BIN_ENTRYPOINT_FILE, FMIR_IMAGE_FILE, FMIR_TEXT_IMAGE_FILE,
     FmirPackageImage, FmirPackageImageFormat, Host, MirSeams, PACKAGE_MIR_MANIFEST_FILE,
     PackageFmirBinaryBundle, PackageFmirImage, PackageFmirTextImage, PackageMirArtifact, Path,
-    PathBuf, RunnerStats, fmir_package_image_from_lowered, fs, load_fmir_image,
+    PathBuf, RunnerKernelPolicy, RunnerStats, fmir_package_image_from_lowered, fs, load_fmir_image,
     load_fmir_text_image, mir_diag, package_artifact_dir, package_artifact_root,
     package_fmir_binary_image, package_fmir_text_image, package_mir_manifest,
     run_fmir_package_image, run_fmir_package_image_with_stats, validate_package_mir_manifest,
@@ -22,6 +25,15 @@ use super::{
 pub struct PackageRunStats {
     pub stats: RunnerStats,
     pub result: Result<(), Vec<Diagnostic>>,
+}
+
+/// The lowering config a selection runs under: `cpu` lowers kernels as
+/// ordinary host functions, every other selection leaves the config alone.
+fn config_for_selection(config: &Config, selection: DeviceSelection) -> Cow<'_, Config> {
+    match selection.kernel_lowering() {
+        KernelLowering::Device => Cow::Borrowed(config),
+        KernelLowering::Host => Cow::Owned(config.clone().with_host_kernels()),
+    }
 }
 
 /// # Errors
@@ -69,7 +81,8 @@ pub fn run_package_mir_with_selection<H: Host + ?Sized>(
         .argumenta()
         .map_err(|e| vec![mir_diag(input, e.message)])?
         .to_vec();
-    with_prepared_package_mir(config, input, &argumenta, seams, |prepared, lowered| {
+    let config = config_for_selection(config, selection);
+    with_prepared_package_mir(&config, input, &argumenta, seams, |prepared, lowered| {
         let image = fmir_package_image_from_lowered(
             prepared,
             lowered,
@@ -101,7 +114,8 @@ pub fn run_package_mir_with_selection_and_stats<H: Host + ?Sized>(
         .argumenta()
         .map_err(|e| vec![mir_diag(input, e.message)])?
         .to_vec();
-    with_prepared_package_mir(config, input, &argumenta, seams, |prepared, lowered| {
+    let config = config_for_selection(config, selection);
+    with_prepared_package_mir(&config, input, &argumenta, seams, |prepared, lowered| {
         let image = fmir_package_image_from_lowered(
             prepared,
             lowered,
@@ -150,7 +164,7 @@ pub fn run_package_mir_from_loaded<H: Host + ?Sized>(
                 FmirPackageImageFormat::Source,
                 seams,
             )?;
-            run_fmir_package_image(image, host)
+            run_fmir_package_image(image, host, RunnerKernelPolicy::Refuse)
         },
     )
 }
@@ -430,7 +444,7 @@ pub(super) fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
     if (seams.host_route)(&image, selection, false)?.is_some() {
         return Ok(());
     }
-    run_fmir_package_image(image, host)
+    run_fmir_package_image(image, host, selection.kernel_policy())
 }
 
 /// [`run_loaded_fmir_image_route_with_selection`] with the opt-in diagnostic
@@ -451,7 +465,7 @@ pub(super) fn run_loaded_fmir_image_route_with_selection_and_stats<H: Host + ?Si
             result: Ok(()),
         });
     }
-    run_fmir_package_image_with_stats(image, host)
+    run_fmir_package_image_with_stats(image, host, selection.kernel_policy())
 }
 
 /// # Errors
@@ -555,5 +569,5 @@ pub fn run_fmir_image_bytes_with_stdio(
         return Ok(());
     }
     let mut host = radix_module::mir::StdioHost::with_argumenta(argumenta);
-    run_fmir_package_image(loaded, &mut host)
+    run_fmir_package_image(loaded, &mut host, selection.kernel_policy())
 }

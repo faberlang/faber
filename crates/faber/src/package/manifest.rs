@@ -81,14 +81,15 @@ pub struct FaberManifest {
 
 /// The `faber run --device` / `[device] device` value set.
 ///
-/// `cpu` is an explicit choice; the CPU device itself is not built yet, so
-/// every route that resolves it fails closed (`E_DEVICE_CPU_UNAVAILABLE`).
+/// `cpu` is an explicit choice: kernels lower as ordinary functions and run
+/// single-threaded on the MIR runner. It is never substituted for another
+/// choice.
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeviceChoice {
     /// Resolve against host capability probes; fail closed when the machine
     /// admits zero or more than one device.
     Auto,
-    /// Select the CPU device explicitly; never substituted silently.
+    /// Select the CPU device explicitly: run kernels on the MIR runner.
     Cpu,
     /// Select Metal explicitly; never silently falls back.
     Metal,
@@ -120,35 +121,17 @@ impl DeviceChoice {
         }
     }
 
-    /// The route-selection request, or `None` for `cpu` (no CPU device
-    /// route exists yet; callers fail closed).
+    /// The route-selection request for this choice.
     #[must_use]
     #[cfg(feature = "runner")]
-    pub const fn selection(self) -> Option<DeviceSelection> {
+    pub const fn selection(self) -> DeviceSelection {
         match self {
-            Self::Auto => Some(DeviceSelection::Auto),
-            Self::Cpu => None,
-            Self::Metal => Some(DeviceSelection::Metal),
-            Self::Cuda => Some(DeviceSelection::Cuda),
+            Self::Auto => DeviceSelection::Auto,
+            Self::Cpu => DeviceSelection::Cpu,
+            Self::Metal => DeviceSelection::Metal,
+            Self::Cuda => DeviceSelection::Cuda,
         }
     }
-}
-
-/// Stable code for an explicit `cpu` device request while no CPU device
-/// exists. Same spelling as `radix-device-core`'s registry refusal.
-pub const E_DEVICE_CPU_UNAVAILABLE: &str = "E_DEVICE_CPU_UNAVAILABLE";
-
-/// Fail-closed diagnostic for an explicit `cpu` request (no CPU device yet;
-/// never a silent substitute).
-#[must_use]
-pub fn device_cpu_unavailable() -> Diagnostic {
-    Diagnostic::error(
-        "the cpu device is not available yet (`--device cpu` / `[device] device = \"cpu\"`); \
-         selection fails closed rather than substituting another device",
-    )
-    .with_arg("issue", E_DEVICE_CPU_UNAVAILABLE.to_owned())
-    .with_arg("code", E_DEVICE_CPU_UNAVAILABLE.to_owned())
-    .with_arg("selection", "cpu".to_owned())
 }
 
 /// `[device]` metadata for package runner device selection (N1.1), the

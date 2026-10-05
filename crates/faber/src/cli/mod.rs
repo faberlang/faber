@@ -596,9 +596,10 @@ pub struct RunArgs {
     /// silently falls back: it fails closed before launch
     /// (`E_BACKEND_UNAVAILABLE`) when the device is not admitted on this
     /// machine, and a package with no device program fails closed ("package
-    /// has no device program"). `cpu` fails closed (`E_DEVICE_CPU_UNAVAILABLE`)
-    /// until the CPU device exists. Device programs execute through the host
-    /// driver (the first-party target runtime).
+    /// has no device program"). `cpu` lowers `@ kernel` functions as ordinary
+    /// functions and runs them single-threaded on the MIR runner; without it
+    /// a program that calls a kernel is refused. Device programs execute
+    /// through the host driver (the first-party target runtime).
     #[arg(long = "device", value_enum, value_name = "DEVICE")]
     pub device: Option<DeviceChoice>,
 

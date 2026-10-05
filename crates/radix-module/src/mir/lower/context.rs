@@ -359,6 +359,7 @@ impl<'a> LoweringContextMaps<'a> {
             cli_record_fields_by_local,
             cli_record_fields_by_type,
             cli_adapter_active,
+            kernel_lowering: KernelLowering::Device,
         }
     }
 

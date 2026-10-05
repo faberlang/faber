@@ -24,7 +24,7 @@ use super::{
     source_nominal_names, with_library_cached_analysis_mut,
 };
 use radix_module::file_interface::FileInterface;
-use radix_module::mir::{MirDeviceFunctionMetadataMap, MirFunctionSignature};
+use radix_module::mir::{KernelLowering, MirDeviceFunctionMetadataMap, MirFunctionSignature};
 
 /// Struct/enum/function validation metadata remapped from a sibling or
 /// library unit into the entry's `DefId` / `TypeId` / Symbol space.
@@ -871,6 +871,7 @@ pub(super) fn lower_package_units<'a>(
     library_cache: &mut LibraryInterfaceCache,
     cli_plan: &CliPackagePlan,
     no_fuse: bool,
+    kernel_lowering: KernelLowering,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     struct PendingUnit<'a> {
         lowered: LoweredMirUnit<'a>,
@@ -1052,14 +1053,16 @@ pub(super) fn lower_package_units<'a>(
         // same `source_rewrites` map `rewrite_program_sources` applies to
         // this unit's lowered program, so they join the merged program's
         // synthetic template sources.
-        collect_consumer_device_facts(
-            &unit.analysis,
-            &unit_path,
-            Some(&source_rewrites),
-            &mut consumer_device_roles,
-            &mut consumer_launch_entries,
-        );
-        let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
+        if kernel_lowering == KernelLowering::Device {
+            collect_consumer_device_facts(
+                &unit.analysis,
+                &unit_path,
+                Some(&source_rewrites),
+                &mut consumer_device_roles,
+                &mut consumer_launch_entries,
+            );
+        }
+        let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse, kernel_lowering)?;
         // Remap from the post-lowering table: lowering appends runtime and
         // diagnostic text (format templates, the lockstep length-mismatch
         // message, …) that the pre-lowering analysis interner never held
@@ -1307,7 +1310,10 @@ pub(super) fn lower_package_units<'a>(
                 };
                 let mut lowered = match lower_analyzed_unit(
                     analysis,
-                    radix_module::mir::MirLoweringOptions::default(),
+                    radix_module::mir::MirLoweringOptions {
+                        kernel_lowering,
+                        ..Default::default()
+                    },
                 ) {
                     Ok(lowered) => lowered,
                     Err(errors) => {
@@ -1535,14 +1541,16 @@ pub(super) fn lower_package_units<'a>(
     // CDC-1: the entry unit's own device facts join the consumer-local
     // collection the same way (identity-keyed: the merged program never
     // source-rewrites the entry's own definitions).
-    collect_consumer_device_facts(
-        &entry.analysis,
-        &entry_path,
-        None,
-        &mut consumer_device_roles,
-        &mut consumer_launch_entries,
-    );
-    let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse)?;
+    if kernel_lowering == KernelLowering::Device {
+        collect_consumer_device_facts(
+            &entry.analysis,
+            &entry_path,
+            None,
+            &mut consumer_device_roles,
+            &mut consumer_launch_entries,
+        );
+    }
+    let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse, kernel_lowering)?;
     ensure_unique_definition_sources(&merged.validated.program(), &entry_path)?;
     // Generic limes templates from future library units are already offered
     // to the incremental linker below. Make their portable policy sites
@@ -1578,8 +1586,14 @@ pub(super) fn lower_package_units<'a>(
 
     let mut generic_templates = std::mem::take(&mut merged.generic_templates);
     let mut generic_params = std::mem::take(&mut merged.generic_params);
-    let imported_device_index =
-        radix_module::mir::ImportedDeviceIndex::from_routes(imported_device_routes.clone());
+    // Host kernel lowering has no device routes: imported kernels are plain
+    // functions, so the composition inputs stay empty.
+    let imported_device_index = match kernel_lowering {
+        KernelLowering::Device => {
+            radix_module::mir::ImportedDeviceIndex::from_routes(imported_device_routes.clone())
+        }
+        KernelLowering::Host => radix_module::mir::ImportedDeviceIndex::default(),
+    };
     let mut planning_program = merged.validated.program().clone();
     let mut planning_environments = merged.closure_environments.clone();
     for unit in &pending {
@@ -3494,6 +3508,7 @@ pub(super) fn lower_unit<'a>(
     unit: &'a mut AnalyzedProgramNode,
     cli_entry_records: &CliEntryRecords,
     no_fuse: bool,
+    kernel_lowering: KernelLowering,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     let bundle = super::air_backward::prepare(&mut unit.analysis)
         .map_err(|message| vec![mir_lowering_diag(&unit.path, message)])?;
@@ -3507,13 +3522,17 @@ pub(super) fn lower_unit<'a>(
             &unit.analysis,
             radix_module::mir::MirLoweringOptions {
                 cli_record_fields_by_local: std::sync::Arc::new(fields.into_iter().collect()),
+                kernel_lowering,
                 ..Default::default()
             },
         )
     } else {
         lower_analyzed_unit(
             &unit.analysis,
-            radix_module::mir::MirLoweringOptions::default(),
+            radix_module::mir::MirLoweringOptions {
+                kernel_lowering,
+                ..Default::default()
+            },
         )
     };
     let mut lowered = result.map_err(|errors| {

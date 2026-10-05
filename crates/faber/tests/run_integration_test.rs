@@ -2581,3 +2581,110 @@ fn run_negative_integer_exponent_trap_prints_reason_to_stderr() {
         "expected trap reason on stderr:\n{stderr}"
     );
 }
+
+const KERNEL_SOURCE: &str = r#"
+@ kernel
+@ public
+fn bump(f32 x) → f32 {
+    return x + 1.0
+}
+
+main {
+    print bump(1.0)
+}
+"#;
+
+#[test]
+fn run_kernel_file_is_refused_by_default_and_runs_on_the_cpu_device() {
+    let file = write_single_file("run-kernel-cpu-device", KERNEL_SOURCE);
+    let path = file.to_str().expect("utf8 source path");
+
+    // Default route: refused, and the refusal text names the CPU route.
+    let (stdout, stderr, status) = run_faber_status(&["run", path]);
+    assert_eq!(
+        status.code(),
+        Some(1),
+        "the default route refuses a kernel:\n{stderr}"
+    );
+    assert_eq!(stdout, "", "refused code must not execute");
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: the CLI stderr text is the contract for the `--device cpu` hint.
+    assert!(
+        stderr.contains("--device cpu"),
+        "the refusal must name `--device cpu`:\n{stderr}"
+    );
+    let (_, auto_stderr, auto_status) = run_faber_status(&["run", "--device", "auto", path]);
+    assert_eq!(
+        auto_status.code(),
+        Some(1),
+        "`--device auto` stays refused:\n{auto_stderr}"
+    );
+
+    // CPU device: the kernel runs with its sequential meaning.
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
+    assert!(
+        status.success(),
+        "`--device cpu` must run the kernel:\n{stderr}"
+    );
+    assert_eq!(stdout, "2.0\n");
+}
+
+#[test]
+fn run_kernel_package_runs_on_the_cpu_device_by_flag_manifest_and_with_stats() {
+    let package = write_basic_package("run-kernel-package-cpu-device", KERNEL_SOURCE);
+    let path = package.to_str().expect("utf8 package path");
+
+    let (_, stderr, status) = run_faber_status(&["run", path]);
+    assert_eq!(
+        status.code(),
+        Some(1),
+        "the default route refuses a kernel:\n{stderr}"
+    );
+    // ALLOW_DIAGNOSTIC_RENDER_TEXT: the CLI stderr text is the contract for the `--device cpu` hint.
+    assert!(
+        stderr.contains("--device cpu"),
+        "the refusal must name `--device cpu`:\n{stderr}"
+    );
+
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
+    assert!(
+        status.success(),
+        "`--device cpu` must run the package kernel:\n{stderr}"
+    );
+    assert_eq!(stdout, "2.0\n");
+
+    // `--device cpu --stats` works like the default route: the program output
+    // and the framed statistics artifact both arrive.
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", "--stats", path]);
+    assert!(
+        status.success(),
+        "`--device cpu --stats` must run:\n{stderr}"
+    );
+    assert!(
+        stdout.starts_with("2.0\n"),
+        "program output first:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("--- faber-run-stats ---"),
+        "stats artifact framed on stdout:\n{stdout}"
+    );
+
+    // The manifest selects the CPU device; an explicit flag still wins.
+    let manifest = fs::read_to_string(package.join("faber.toml")).expect("read manifest");
+    fs::write(
+        package.join("faber.toml"),
+        format!("{manifest}\n[device]\ndevice = \"cpu\"\n"),
+    )
+    .expect("write manifest with a cpu device");
+    let (stdout, stderr, status) = run_faber_status(&["run", path]);
+    assert!(
+        status.success(),
+        "a manifest `cpu` device must run the kernel:\n{stderr}"
+    );
+    assert_eq!(stdout, "2.0\n");
+    let (_, stderr, status) = run_faber_status(&["run", "--device", "auto", path]);
+    assert_eq!(
+        status.code(),
+        Some(1),
+        "`--device auto` overrides the manifest:\n{stderr}"
+    );
+}

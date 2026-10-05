@@ -232,9 +232,10 @@ fn interpret_path(
         );
         std::process::exit(1);
     }
-    // An explicit device request can never be served here (N1.1 fail closed:
-    // "package has no device program").
-    if selection != DeviceSelection::Auto {
+    // An explicit GPU request can never be served here (N1.1 fail closed:
+    // "package has no device program"). `cpu` needs no device program: it runs
+    // the file's kernels on the MIR runner.
+    if !matches!(selection, DeviceSelection::Auto | DeviceSelection::Cpu) {
         eprintln!(
             "error: explicit device selection `{}` cannot be served: a single `.fab` file carries no package device program; device execution requires a package with a `[device]` section",
             selection.spelling()
@@ -253,6 +254,10 @@ fn interpret_path(
             super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
             std::process::exit(1);
         }
+    };
+    let config = match selection.kernel_lowering() {
+        radix::module::mir::KernelLowering::Host => config.with_host_kernels(),
+        radix::module::mir::KernelLowering::Device => config,
     };
     let session = radix::module::driver::Session::new(config);
     let mut host = StdioHost::with_argumenta(program_args.to_vec());
@@ -353,18 +358,18 @@ pub(super) fn is_single_fab_file(path: &Path) -> bool {
 /// Resolve the effective device selection for `faber run` (N1.1): CLI
 /// `--device` > manifest `[device] device` > default `auto`. An invalid
 /// manifest value fails closed with a structured diagnostic (never silently
-/// ignored). `cpu` fails closed until the CPU device exists. An explicit
-/// device combined with a stats request refuses here, during route
-/// resolution (RSM-4): the device route never runs the interpreter the meter
-/// measures.
+/// ignored). An explicit GPU device combined with a stats request refuses
+/// here, during route resolution (RSM-4): the device route never runs the
+/// interpreter the meter measures. `cpu` runs the interpreter, so its stats
+/// are the ordinary runner stats.
 fn resolve_route_selection(
     args: &RunArgs,
     input_path: &Path,
 ) -> Result<DeviceSelection, Box<Diagnostic>> {
     let stats_requested = args.stats || args.stats_file.is_some();
     if let Some(device) = args.device {
-        let selection = device_selection(device)?;
-        if stats_requested && selection != DeviceSelection::Auto {
+        let selection = device.selection();
+        if stats_requested && !matches!(selection, DeviceSelection::Auto | DeviceSelection::Cpu) {
             return Err(Box::new(
                 faber_cli::package_diagnostic_error(format!(
                     "run statistics (`--stats`/`--stats-file`) require the interpreted CPU route; `--device {}` executes a device route that never runs the interpreter, so the stats request is refused",
@@ -388,16 +393,7 @@ fn resolve_route_selection(
         package::manifest_device_choice(manifest.device.device.as_deref(), &layout.manifest_path)?;
     // CLI already returned above. Manifest device or portable `auto`.
     // In-process host_factory is parked; this fold does not need it.
-    manifest_device.map_or(Ok(DeviceSelection::Auto), device_selection)
-}
-
-/// The route-selection request for a device choice. `cpu` has no route yet:
-/// it fails closed with the named `E_DEVICE_CPU_UNAVAILABLE`, never a silent
-/// substitute.
-fn device_selection(device: DeviceChoice) -> Result<DeviceSelection, Box<Diagnostic>> {
-    device
-        .selection()
-        .ok_or_else(|| Box::new(package::device_cpu_unavailable()))
+    Ok(manifest_device.map_or(DeviceSelection::Auto, DeviceChoice::selection))
 }
 
 /// Render route diagnostics with their stable host codes (N1.4). The
@@ -520,13 +516,9 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
             std::process::exit(1);
         }
     };
-    let selection = match args.device.map(device_selection).transpose() {
-        Ok(selection) => selection.unwrap_or(decision.declared_selection),
-        Err(diagnostic) => {
-            eprint_route_diagnostics(&[*diagnostic]);
-            std::process::exit(1);
-        }
-    };
+    let selection = args
+        .device
+        .map_or(decision.declared_selection, DeviceChoice::selection);
     let mut host = StdioHost::with_argumenta(args.args);
     // The route function applies the one host-construction policy: a
     // device-bearing image runs through the composite host's device route

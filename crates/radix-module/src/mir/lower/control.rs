@@ -622,9 +622,12 @@ impl FunctionBuilder<'_> {
         // The ungrouped `sum` is the one reduction with a declared device recipe;
         // every other `filum` reduction is the plain fold below, because `filum`
         // only permits parallel evaluation and carries no sequential meaning.
+        // Host kernel lowering has no device recipe at all: the `sum` is the
+        // same plain fold, the sequential meaning of the `filum` clause.
         if let Some(filum) = filum
             && op == Op::Sum
             && group.is_none()
+            && !self.is_host_kernel_lowering()
         {
             return self.lower_filum_summa_expr(source, coordinates, filum, binding?, body?, expr);
         }

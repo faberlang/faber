@@ -597,8 +597,31 @@ fn portable_tensor_edge_shape_identity(types: &TypeTable, shape: IndexId) -> Opt
     }
 }
 
+/// How `@ kernel` (and nucleum fragment) functions lower.
+///
+/// `Device` is the form the device translators consume: device views for
+/// tensors, device-checked arithmetic, `⇇` as the output-buffer store,
+/// kernel-to-kernel calls composed (inlined) into their callers, and the
+/// `filum` reduction recipe. `Host` lowers every kernel exactly as an
+/// ordinary function: tensor brackets are `TensorGet`/`TensorSet`, integer
+/// and vector-lane stores keep the host store checks, `⇇` keeps its
+/// storage-preserving host copy, a call to a helper kernel stays a plain
+/// call, and a `thread` reduction is the sequential fold. The CPU route
+/// (`faber run --device cpu`) selects `Host`; the selection is a property of
+/// the route, never of a source name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum KernelLowering {
+    /// Device-translatable form (the default).
+    #[default]
+    Device,
+    /// Ordinary host-function form, run by the MIR runner on the CPU.
+    Host,
+}
+
 #[derive(Default)]
 pub struct MirLoweringOptions {
+    /// How `@ kernel` functions lower; see [`KernelLowering`].
+    pub kernel_lowering: KernelLowering,
     pub cli_record_fields_by_local: Arc<FxHashMap<Symbol, Vec<MirRuntimeRecordField>>>,
     /// Descriptor-derived CLI record fields keyed by the `argumenta` record
     /// type (entry + `@ imperium` command surfaces), used by the shared
@@ -693,6 +716,7 @@ pub fn lower_analyzed_unit(
         potentia_negative_exponent: interner.intern("numerus potentia failed: negative exponent"),
         range_step_not_positive: interner.intern("range step must be positive"),
     };
+    let kernel_lowering = options.kernel_lowering;
     let mut lowerer = MirLowerer {
         unit,
         types: &types,
@@ -747,56 +771,68 @@ pub fn lower_analyzed_unit(
         let roles = crate::mir::device_roles_from_hir(&unit.hir);
         // `⇇` on a device function lowers as the output-buffer store the
         // recipes already write; the host keeps the storage-preserving copy.
-        for function in &mut program.functions {
-            if function
-                .source
-                .is_some_and(|source| roles.contains_key(&source))
-            {
-                radix_mir::device_copy_into::lower_device_copy_into(function);
+        // Host kernel lowering keeps the host copy for every function.
+        if kernel_lowering == KernelLowering::Device {
+            for function in &mut program.functions {
+                if function
+                    .source
+                    .is_some_and(|source| roles.contains_key(&source))
+                {
+                    radix_mir::device_copy_into::lower_device_copy_into(function);
+                }
             }
         }
-        // DFV2-4: launch entries are the public `@ nucleum` sources — the
-        // only device functions that stay program symbols when device code
-        // also calls them; composed private helpers are pruned.
-        let launch_entries = crate::mir::device_entry_roles_from_hir(&unit.hir, &interner)
-            .into_iter()
-            .filter(|(_, role)| *role == crate::mir::MirDeviceRole::Kernel)
-            .map(|(source, _)| source)
-            .collect::<FxHashSet<_>>();
-        let layouts = MirLayoutTable::from_types(&types);
-        let summaries =
-            crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, &types, &interner).summaries;
-        let instantiation_errors = super::fragment_instantiation::check_with_metadata(
-            &program.functions,
-            &monomorphizations,
-            &layouts,
-            &types,
-            &roles,
-            Some(&summaries),
-            &device_function_metadata,
-        );
-        if !instantiation_errors.is_empty() {
-            return Err(instantiation_errors.into_iter().map(MirError::from).collect());
-        }
-        let composition_errors = super::fragment_composition::compose_with_metadata(
-            &mut program.functions,
-            &monomorphizations,
-            &roles,
-            &device_function_metadata,
-            super::fragment_composition::active_budget(),
-            Some(&interner),
-            &launch_entries,
-        );
-        if !composition_errors.is_empty() {
-            return Err(composition_errors
+        // Device fragment checking and composition are device-form machinery.
+        // Host kernel lowering skips both: a kernel is an ordinary function,
+        // and a call to a helper kernel stays a plain call.
+        if kernel_lowering == KernelLowering::Device {
+            // DFV2-4: launch entries are the public `@ nucleum` sources — the
+            // only device functions that stay program symbols when device
+            // code also calls them; composed private helpers are pruned.
+            let launch_entries = crate::mir::device_entry_roles_from_hir(&unit.hir, &interner)
                 .into_iter()
-                .map(|error| MirError {
-                    message: error.message(),
-                    issue: error.issue.to_owned(),
-                    span: error.span,
-                    definition_span: error.definition_span,
-                })
-                .collect());
+                .filter(|(_, role)| *role == crate::mir::MirDeviceRole::Kernel)
+                .map(|(source, _)| source)
+                .collect::<FxHashSet<_>>();
+            let layouts = MirLayoutTable::from_types(&types);
+            let summaries =
+                crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, &types, &interner)
+                    .summaries;
+            let instantiation_errors = super::fragment_instantiation::check_with_metadata(
+                &program.functions,
+                &monomorphizations,
+                &layouts,
+                &types,
+                &roles,
+                Some(&summaries),
+                &device_function_metadata,
+            );
+            if !instantiation_errors.is_empty() {
+                return Err(instantiation_errors
+                    .into_iter()
+                    .map(MirError::from)
+                    .collect());
+            }
+            let composition_errors = super::fragment_composition::compose_with_metadata(
+                &mut program.functions,
+                &monomorphizations,
+                &roles,
+                &device_function_metadata,
+                super::fragment_composition::active_budget(),
+                Some(&interner),
+                &launch_entries,
+            );
+            if !composition_errors.is_empty() {
+                return Err(composition_errors
+                    .into_iter()
+                    .map(|error| MirError {
+                        message: error.message(),
+                        issue: error.issue.to_owned(),
+                        span: error.span,
+                        definition_span: error.definition_span,
+                    })
+                    .collect());
+            }
         }
         let mut maps = LoweringContextMaps::collect(unit);
         // KPC-WIRE done_when (c): the module-owned route map is transferred
@@ -1581,6 +1617,7 @@ impl<'a> MirLowerer<'a> {
         context.function_size_bindings = Arc::new(self.unit.shape_obligations.function_size_bindings.clone());
         context.tensor_edge_policies = Arc::new(self.unit.tensor_edge_policies.clone());
         context.pending_tensor_limes = Arc::clone(&self.pending_tensor_limes);
+        context.kernel_lowering = self.options.kernel_lowering;
         context
     }
 
@@ -2158,6 +2195,8 @@ struct FunctionBuilderContext<'a> {
     /// temps the emitted LLVM adapter seeds from the static descriptor parse
     /// table (the compile-time field values are only shape placeholders).
     cli_adapter_active: bool,
+    /// How kernels lower for this lowering call (see [`KernelLowering`]).
+    kernel_lowering: KernelLowering,
 }
 
 impl<'a> FunctionBuilderContext<'a> {
@@ -2224,6 +2263,7 @@ impl<'a> FunctionBuilderContext<'a> {
             cli_record_fields_by_local: Arc::new(FxHashMap::default()),
             cli_record_fields_by_type: Arc::new(FxHashMap::default()),
             cli_adapter_active: false,
+            kernel_lowering: KernelLowering::Device,
         }
     }
 }
@@ -2381,8 +2421,17 @@ impl<'a> FunctionBuilder<'a> {
         }
     }
 
+    /// Whether this body lowers in the device-translatable form: it is a
+    /// device function and the route does not ask for host kernel lowering.
     fn is_device_lowering(&self) -> bool {
-        self.device_role.is_some()
+        self.device_role.is_some() && self.context.kernel_lowering == KernelLowering::Device
+    }
+
+    /// Whether the route lowers kernels as ordinary host functions. Unlike
+    /// [`Self::is_device_lowering`], this holds for every body of the
+    /// lowering call, kernel or not.
+    fn is_host_kernel_lowering(&self) -> bool {
+        self.context.kernel_lowering == KernelLowering::Host
     }
 
     /// The innermost active `capta` trap when it is the innermost capture

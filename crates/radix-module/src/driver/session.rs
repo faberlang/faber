@@ -109,6 +109,12 @@ pub struct Config {
     /// Disable the AIR-level op-fusion pass (on by default in all builds).
     pub no_fuse: bool,
 
+    /// How `@ kernel` functions lower for the in-process run routes. `Device`
+    /// (the default) keeps the device-translatable form; `Host` lowers
+    /// kernels as ordinary functions for the CPU route (`--device cpu`).
+    /// Emit and build routes never read it.
+    pub kernel_lowering: crate::mir::KernelLowering,
+
     /// When true, `llvm-text` emit for modules with device roles writes the
     /// NVVM device module (kernel bodies, `; @nucleum device-entry`) instead
     /// of the host-partition CPU stub. Set by `radix emit --cuda-descriptor`.
@@ -167,6 +173,7 @@ impl Default for Config {
             output_mode: OutputMode::Application,
             module_name: None,
             no_fuse: false,
+            kernel_lowering: crate::mir::KernelLowering::Device,
             emit_nvvm_device_module: false,
             import_path_templates: None,
             complexity_budget: None,
@@ -290,6 +297,14 @@ impl Config {
     #[must_use]
     pub fn with_no_fuse(mut self) -> Self {
         self.no_fuse = true;
+        self
+    }
+
+    /// Lower `@ kernel` functions as ordinary host functions, for the CPU
+    /// route that runs them on the MIR runner.
+    #[must_use]
+    pub fn with_host_kernels(mut self) -> Self {
+        self.kernel_lowering = crate::mir::KernelLowering::Host;
         self
     }
 

@@ -158,6 +158,7 @@ pub(crate) fn link_package_functions<R>(
         library_cache,
         &cli_plan,
         config.no_fuse,
+        config.kernel_lowering,
     )?;
     lowered = canonicalize_direct_definition_callees(lowered, &anchor_path)?;
     validate_program(lowered.validated.program(), lowered.validated.validation()).map_err(
@@ -326,6 +327,7 @@ fn prepare_package_mir<R>(
         &mut library_cache,
         &cli_plan,
         config.no_fuse,
+        config.kernel_lowering,
     )?;
     // The radix-air lowering emits every call as a `Definition` edge; the
     // boundary-ABI lane only admits direct-call shapes, so unambiguous

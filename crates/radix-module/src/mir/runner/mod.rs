@@ -5,10 +5,11 @@
 //! / `run_analyzed` (needs driver `AnalyzedModule`).
 
 pub use radix_mir_runner::{
-    BufferHost, Host, RunnerDispatchStatus, RunnerError, RunnerRunOutcome, RunnerStats, StdioHost, Value,
-    classify_runner_lowerability, reset_execution_state, run_entry, run_entry_with_stats, run_function,
-    run_function_with_limits, run_function_with_stats_and_limits, run_function_with_step_budget,
-    runner_dispatch_status,
+    BufferHost, Host, RUNNER_KERNEL_REFUSED_ISSUE, RunnerDispatchStatus, RunnerError, RunnerKernelPolicy,
+    RunnerRunOutcome, RunnerStats, StdioHost, Value, classify_runner_lowerability, reset_execution_state, run_entry,
+    run_entry_with_kernel_policy, run_entry_with_stats, run_entry_with_stats_and_kernel_policy, run_function,
+    run_function_with_kernel_policy, run_function_with_limits, run_function_with_stats_and_limits,
+    run_function_with_step_budget, runner_dispatch_status,
 };
 
 #[cfg(test)]
@@ -41,7 +42,7 @@ mod lazy_cursor_tests;
 
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Session};
-use crate::mir::lower_analyzed_unit;
+use crate::mir::{KernelLowering, lower_analyzed_unit};
 use crate::program::analyze_prepared_program_name;
 
 /// Failure modes for the analyzed-source run routes.
@@ -58,6 +59,10 @@ pub enum RunSourceError {
 
 /// Analyze, lower, and interpret one Faber source unit.
 ///
+/// Kernels follow the session's [`crate::driver::Config::kernel_lowering`]:
+/// the default refuses them, a host-kernel session runs them on the CPU (see
+/// [`run_analyzed_with_kernel_lowering`]).
+///
 /// # Errors
 /// Returns [`RunSourceError::Frontend`] for source-level analysis failures, or
 /// [`RunSourceError::Stepper`] for lowering and interpretation-time failures
@@ -69,20 +74,43 @@ pub fn run_source<H: Host + ?Sized>(
     host: &mut H,
 ) -> Result<(), RunSourceError> {
     let mut analysis = analyze_prepared_program_name(session, name, source).map_err(RunSourceError::Frontend)?;
-    run_analyzed(&mut analysis, host).map_err(RunSourceError::Stepper)
+    run_analyzed_with_kernel_lowering(&mut analysis, session.config.kernel_lowering, host)
+        .map_err(RunSourceError::Stepper)
 }
 
-/// Lower and interpret an already-analyzed unit.
+/// Lower and interpret an already-analyzed unit. `@ kernel` functions are
+/// refused ([`RunnerKernelPolicy::Refuse`]).
 ///
 /// # Errors
 /// Returns [`RunnerError`] values for MIR lowering failures and
 /// interpretation-time failures.
 pub fn run_analyzed<H: Host + ?Sized>(unit: &mut AnalyzedModule, host: &mut H) -> Result<(), Vec<RunnerError>> {
-    let lowered = lower_analyzed_unit(unit, crate::mir::MirLoweringOptions::default()).map_err(|errors| {
+    run_analyzed_with_kernel_lowering(unit, KernelLowering::Device, host)
+}
+
+/// [`run_analyzed`] with the kernel route named. `Device` lowers kernels in
+/// the device form and refuses to run them; `Host` lowers them as ordinary
+/// functions and runs them single-threaded on the runner
+/// ([`RunnerKernelPolicy::Execute`]).
+///
+/// # Errors
+/// Returns [`RunnerError`] values for MIR lowering failures and
+/// interpretation-time failures.
+pub fn run_analyzed_with_kernel_lowering<H: Host + ?Sized>(
+    unit: &mut AnalyzedModule,
+    kernel_lowering: KernelLowering,
+    host: &mut H,
+) -> Result<(), Vec<RunnerError>> {
+    let options = crate::mir::MirLoweringOptions { kernel_lowering, ..Default::default() };
+    let lowered = lower_analyzed_unit(unit, options).map_err(|errors| {
         errors
             .into_iter()
             .map(|error| RunnerError::internal(error.span, error.message))
             .collect::<Vec<_>>()
     })?;
-    run_entry(&lowered.validated, host)
+    let policy = match kernel_lowering {
+        KernelLowering::Device => RunnerKernelPolicy::Refuse,
+        KernelLowering::Host => RunnerKernelPolicy::Execute,
+    };
+    run_entry_with_kernel_policy(&lowered.validated, host, policy)
 }

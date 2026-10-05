@@ -1,0 +1,231 @@
+//! `KernelLowering::Host` lowers `@ kernel` functions as ordinary functions.
+//!
+//! The CPU route (`faber run --device cpu`) selects host kernel lowering and
+//! runs the result on the MIR runner under `RunnerKernelPolicy::Execute`. These
+//! tests prove, per divergence, that the host form differs from the device
+//! form and that the host form computes the sequential meaning of the kernel.
+//! Device-form output is pinned by the existing device tests and by the
+//! byte-identity check recorded with the unit.
+
+use crate::codegen::Target;
+use crate::driver::{AnalyzedModule, Config, Session};
+use crate::mir::{BufferHost, KernelLowering, MirLoweringOptions, RunSourceError, lower_analyzed_unit, run_source};
+use crate::program::analyze_prepared_program_name;
+use radix_mir::dump::dump_program;
+use radix_mir_runner::RUNNER_KERNEL_REFUSED_ISSUE;
+
+/// Corpus-style English source: the TOML head selects the code locale.
+fn english(source: &str) -> String {
+    format!("+++\nlocale = \"en\"\n+++\n{source}")
+}
+
+fn analyze(source: &str) -> AnalyzedModule {
+    analyze_prepared_program_name(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "kernel-host-lowering.fab",
+        &english(source),
+    )
+    .unwrap_or_else(|errors| panic!("source must analyze: {errors:?}"))
+}
+
+fn dump(source: &str, kernel_lowering: KernelLowering) -> String {
+    let unit = analyze(source);
+    let options = MirLoweringOptions { kernel_lowering, ..Default::default() };
+    let lowered = lower_analyzed_unit(&unit, options)
+        .unwrap_or_else(|errors| panic!("{kernel_lowering:?} lowering must succeed: {errors:?}"));
+    dump_program(lowered.validated.program())
+}
+
+/// The dump text of the function with the given printed id (`f0`, `f1`, ...).
+fn function_dump<'a>(dump: &'a str, id: &str) -> &'a str {
+    let header = format!("function {id} ");
+    let start = dump
+        .find(&header)
+        .unwrap_or_else(|| panic!("no {id} in the dump:\n{dump}"));
+    let rest = &dump[start..];
+    rest[1..]
+        .find("\nfunction ")
+        .map_or(rest, |end| &rest[..=end])
+}
+
+/// Run on the CPU route: host kernel lowering and the `Execute` policy.
+fn run_on_cpu(source: &str) -> Vec<String> {
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_host_kernels(),
+    );
+    let mut host = BufferHost::default();
+    run_source(&session, "kernel-host-run.fab", &english(source), &mut host)
+        .unwrap_or_else(|error| panic!("the CPU route must run the kernels: {error:?}"));
+    host.stdout_lines
+}
+
+/// Run on the default route: device kernel lowering and the `Refuse` policy.
+fn run_on_default_route(source: &str) -> Result<Vec<String>, RunSourceError> {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let mut host = BufferHost::default();
+    run_source(&session, "kernel-device-run.fab", &english(source), &mut host).map(|()| host.stdout_lines)
+}
+
+const TENSOR_READ_KERNEL: &str = r"
+@ kernel
+@ public
+fn k(tf32[8] a, mut tf32[8] o) → void {
+    for from a at [i] thread lane const c {
+        o[i] ← a[i] * 2.0
+    }
+}
+main {
+    const tf32[] seed ← empty
+    const tf32[8] a ← seed.create(1.5, [8])
+    var tf32[8] b ← seed.create(0.0, [8])
+    k(a, b)
+    print b[3]
+}
+";
+
+#[test]
+fn host_kernel_lowering_reads_and_writes_tensors_through_tensor_get_and_set() {
+    // `f0` is the kernel; `main` (`f1`) reads `b[3]` on the host either way.
+    // The `for … at [i] const c` binder gathers its element with `tensor_get`
+    // in both forms; the brackets `a[i]` / `o[i]` are what differs.
+    let host = dump(TENSOR_READ_KERNEL, KernelLowering::Host);
+    let host_kernel = function_dump(&host, "f0");
+    assert!(
+        host_kernel.contains("tensor_set") && host_kernel.matches("tensor_get").count() == 2,
+        "host form must use the collection ops for tensor brackets:\n{host_kernel}"
+    );
+    let device = dump(TENSOR_READ_KERNEL, KernelLowering::Device);
+    let device_kernel = function_dump(&device, "f0");
+    assert!(
+        !device_kernel.contains("tensor_set")
+            && device_kernel.matches("tensor_get").count() == 1
+            && device_kernel.contains("_1[_3] = ")
+            && device_kernel.contains("_0[_3] * "),
+        "device form keeps the device-view projection, not the collection ops:\n{device_kernel}"
+    );
+}
+
+#[test]
+fn cpu_route_runs_a_kernel_the_default_route_refuses() {
+    let errors = match run_on_default_route(TENSOR_READ_KERNEL) {
+        Err(RunSourceError::Stepper(errors)) => errors,
+        other => panic!("the default route must refuse the kernel call: {other:?}"),
+    };
+    assert_eq!(errors[0].issue, RUNNER_KERNEL_REFUSED_ISSUE);
+    assert_eq!(run_on_cpu(TENSOR_READ_KERNEL), ["3.0"]);
+}
+
+const HELPER_KERNEL: &str = r"
+@ kernel
+fn bump(f32 x) → f32 {
+    return x + 1.0
+}
+@ kernel
+@ public
+fn k(f32 x) → f32 {
+    return bump(x) * 2.0
+}
+main {
+    print k(1.5)
+}
+";
+
+#[test]
+fn host_kernel_lowering_keeps_a_helper_kernel_call_as_a_plain_call() {
+    let host = dump(HELPER_KERNEL, KernelLowering::Host);
+    assert_eq!(host.matches("\nfunction ").count() + 1, 3, "bump, k and main all stay:\n{host}");
+    assert_eq!(host.matches("call def#").count(), 2, "main calls k and k calls bump:\n{host}");
+    let device = dump(HELPER_KERNEL, KernelLowering::Device);
+    assert_eq!(
+        device.matches("call def#").count(),
+        1,
+        "device form composes (inlines) the helper; only main's launch call remains:\n{device}"
+    );
+    assert_eq!(run_on_cpu(HELPER_KERNEL), ["5.0"]);
+}
+
+#[test]
+fn host_kernel_lowering_runs_a_rank_two_size_generic_kernel_with_a_helper_call() {
+    let source = r"
+@ kernel
+fn sum2<size H, size W>(tensor<f32, [H, W]> t, int x, int y) → f32 {
+    return t[[y, x]] + 1.0
+}
+@ kernel
+@ public
+fn k<size H, size W>(tensor<f32, [H, W]> t, mut tensor<f32, [H, W]> o) → void {
+    for from t at [i, j] thread lane const c {
+        o[[i, j]] ← sum2(t, j, i) * 2.0
+    }
+}
+main {
+    const int n ← 4
+    const tf32[] seed ← empty
+    const tf32[n, n] a ← seed.create(1.5, [n, n])
+    var tf32[n, n] b ← seed.create(0.0, [n, n])
+    k(a, b)
+    print b[[2, 3]]
+}
+";
+    assert_eq!(run_on_cpu(source), ["5.0"]);
+}
+
+#[test]
+fn host_kernel_lowering_folds_a_thread_sum_sequentially() {
+    let source = r"
+@ kernel
+@ public
+fn total<size N>(tf32[N] a) → f32 {
+    return reduce via sum from a at [i] thread lane const s { return s * 2.0 }
+}
+main {
+    const tf32[] seed ← empty
+    const tf32[4] a ← seed.from_flat([3.0, 1.0, 4.0, 2.0], [4])
+    print total(a)
+}
+";
+    assert_eq!(run_on_cpu(source), ["20.0"]);
+    let device = dump(source, KernelLowering::Device);
+    assert!(
+        device.contains("filum_sum"),
+        "device lowering keeps the FilumSum recipe for the ungrouped thread sum:\n{device}"
+    );
+    let host = dump(source, KernelLowering::Host);
+    assert!(
+        !host.contains("filum_sum"),
+        "host lowering folds the thread sum like any reduction:\n{host}"
+    );
+}
+
+#[test]
+fn host_kernel_lowering_reduces_a_wave_speed_shaped_thread_max_to_the_sequential_maximum() {
+    // The shape of the A2 `wave_speed` kernel: a `reduce via max … thread` over
+    // a rank-2 state tensor with a helper kernel in the body, written into a
+    // device-resident clock tensor.
+    let source = r"
+@ kernel
+fn speed_of(f32 scale, vector<f32, 4> s) → f32 {
+    return (s[1] + s[2]) * scale
+}
+@ kernel
+@ public
+fn wave_speed<size H, size W>(f32 scale, tensor<vector<f32, 4>, [H, W]> state, mut tensor<f32, [4]> clock) → void {
+    clock[[1]] ← reduce via max from state at [i, j] thread lane const s { return speed_of(scale, s) } coalesce 0.0
+}
+main {
+    const tensor<vector<f32, 4>, []> cell_seed ← empty
+    const tf32[] f32_seed ← empty
+    const vector<f32, 4> low ← [0.0, 1.0, 1.0, 0.0] ↦ vector<f32, 4>
+    var tensor<vector<f32, 4>, [5, 5]> state ← cell_seed.create(low, [5, 5])
+    state[[3, 2]] ← [0.0, 2.0, 5.0, 0.0] ↦ vector<f32, 4>
+    state[[0, 4]] ← [0.0, 1.0, 3.0, 0.0] ↦ vector<f32, 4>
+    var tf32[4] clock ← f32_seed.create(0.0, [4])
+    wave_speed(0.5, state, clock)
+    print clock[[1]]
+}
+";
+    // max over cells of (hu + hv) * 0.5: the cell at [3, 2] gives (2 + 5) * 0.5.
+    assert_eq!(run_on_cpu(source), ["3.5"]);
+}

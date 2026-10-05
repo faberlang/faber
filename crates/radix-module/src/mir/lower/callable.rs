@@ -367,6 +367,7 @@ impl FunctionBuilder<'_> {
             cli_record_fields_by_local: Arc::clone(&context.cli_record_fields_by_local),
             cli_record_fields_by_type: Arc::clone(&context.cli_record_fields_by_type),
             cli_adapter_active: context.cli_adapter_active,
+            kernel_lowering: context.kernel_lowering,
         }
     }
 

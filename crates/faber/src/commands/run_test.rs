@@ -218,23 +218,30 @@ fn route_selection_invalid_manifest_with_cli_flag_is_ignored() {
 }
 
 #[test]
-fn route_selection_cpu_fails_closed_with_named_code() {
+fn route_selection_cpu_flag_selects_the_cpu_route() {
     let dir = temp_dir("device-cpu-cli");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, None);
     let args = run_args(dir.clone(), Some(DeviceChoice::Cpu));
-    let err = resolve_route_selection(&args, &dir).expect_err("cpu has no device yet");
-    assert_eq!(err.issue(), Some("E_DEVICE_CPU_UNAVAILABLE"));
+    let selection = resolve_route_selection(&args, &dir).expect("cpu resolves");
+    assert_eq!(selection, DeviceSelection::Cpu);
 }
 
 #[test]
-fn route_selection_manifest_cpu_fails_closed_with_named_code() {
+fn route_selection_manifest_cpu_selects_the_cpu_route() {
     let dir = temp_dir("device-cpu-manifest");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, Some("cpu"));
     let args = run_args(dir.clone(), None);
-    let err = resolve_route_selection(&args, &dir).expect_err("cpu has no device yet");
-    assert_eq!(err.issue(), Some("E_DEVICE_CPU_UNAVAILABLE"));
+    let selection = resolve_route_selection(&args, &dir).expect("manifest cpu resolves");
+    assert_eq!(selection, DeviceSelection::Cpu);
+
+    // The CLI flag still wins over a manifest `cpu`.
+    let cuda_args = run_args(dir.clone(), Some(DeviceChoice::Cuda));
+    assert_eq!(
+        resolve_route_selection(&cuda_args, &dir).expect("CLI flag wins"),
+        DeviceSelection::Cuda
+    );
 }
 
 #[test]
@@ -314,6 +321,14 @@ fn route_selection_allows_stats_with_auto_or_absent_device() {
     assert_eq!(
         resolve_route_selection(&manifest_args, &dir).expect("absent device resolves"),
         DeviceSelection::Auto
+    );
+
+    // `cpu` runs the interpreter the meter measures, so stats are allowed.
+    let mut cpu_args = run_args(dir.clone(), Some(DeviceChoice::Cpu));
+    cpu_args.stats = true;
+    assert_eq!(
+        resolve_route_selection(&cpu_args, &dir).expect("cpu keeps the interpreted route"),
+        DeviceSelection::Cpu
     );
 }
 

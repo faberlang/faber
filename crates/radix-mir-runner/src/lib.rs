@@ -85,6 +85,25 @@ pub(crate) const RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH: &str =
 /// not on source names or rendered diagnostic text.
 pub const RUNNER_KERNEL_REFUSED_ISSUE: &str = "runner_kernel_refused";
 
+/// Whether the runner executes functions carrying the compute shader stage
+/// (`@ kernel`).
+///
+/// Every entry point runs under [`RunnerKernelPolicy::Refuse`] unless the
+/// caller names [`RunnerKernelPolicy::Execute`], so a route that is not the
+/// CPU device never runs a kernel by accident. `Execute` runs a kernel with
+/// its sequential meaning: the same code a host function would run, one
+/// thread, a `thread`/`filum` loop as the plain loop. The policy keys on the
+/// MIR shader-stage metadata, never on a source name or on message text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RunnerKernelPolicy {
+    /// A call to a compute-stage function stops the run with
+    /// [`RUNNER_KERNEL_REFUSED_ISSUE`].
+    #[default]
+    Refuse,
+    /// A compute-stage function runs like any other function.
+    Execute,
+}
+
 /// Stable diagnostic identity for a step-budget stop. The step count is a
 /// message fact and never part of the identity: a caller that bounds an
 /// execution keys on this, not on the rendered wording.
@@ -213,7 +232,7 @@ impl RunnerError {
 fn kernel_refused(span: Span) -> RunnerError {
     RunnerError::internal_with_issue(
         span,
-        "runner refuses execution of @ kernel function",
+        "runner refuses execution of @ kernel function; this route does not run kernels, pass `--device cpu` to run them on the CPU",
         RUNNER_KERNEL_REFUSED_ISSUE,
     )
 }
@@ -355,6 +374,9 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Value-id static types per function (`MirStatementKind::Assign`), for
     /// display-width resolution at diagnostics.
     value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
+    /// Whether a call to a compute-stage (`@ kernel`) function runs or stops
+    /// the run. Defaults to [`RunnerKernelPolicy::Refuse`].
+    kernel_policy: RunnerKernelPolicy,
     /// Last conversation id handed out by `SermoOpen` (§2.7 record).
     next_conversation_id: u64,
     /// Router slots held by open conversations (D8.3); each conversation
@@ -415,6 +437,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             textus_literals: RefCell::new(FxHashMap::default()),
             ascii_literals: RefCell::new(FxHashMap::default()),
             value_types: index_value_types(program),
+            kernel_policy: RunnerKernelPolicy::Refuse,
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
             field_float_widths,
@@ -600,8 +623,38 @@ pub fn run_entry<H: Host + ?Sized>(
     validated: &ValidatedMir<'_>,
     host: &mut H,
 ) -> Result<(), Vec<RunnerError>> {
+    run_entry_with_kernel_policy(validated, host, RunnerKernelPolicy::Refuse)
+}
+
+/// [`run_entry`] under an explicit [`RunnerKernelPolicy`]: the CPU device
+/// route passes [`RunnerKernelPolicy::Execute`]; every other route uses
+/// [`run_entry`], which refuses kernels.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed.
+pub fn run_entry_with_kernel_policy<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    host: &mut H,
+    kernel_policy: RunnerKernelPolicy,
+) -> Result<(), Vec<RunnerError>> {
     let entry = explicit_entry_id(validated)?;
-    run_function_unbounded(validated, entry, host)
+    run_function_with_kernel_policy(validated, entry, host, kernel_policy)
+}
+
+/// Run a specific MIR function to completion, unbounded, under an explicit
+/// [`RunnerKernelPolicy`].
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed.
+pub fn run_function_with_kernel_policy<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    kernel_policy: RunnerKernelPolicy,
+) -> Result<(), Vec<RunnerError>> {
+    run_function_with_explicit_limits(validated, function_id, host, None, None, kernel_policy)
 }
 
 /// Run the entry (`incipit`) function under explicit interpreter limits.
@@ -664,6 +717,20 @@ pub fn run_entry_with_stats<H: Host + ?Sized>(
     validated: &ValidatedMir<'_>,
     host: &mut H,
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_entry_with_stats_and_kernel_policy(validated, host, RunnerKernelPolicy::Refuse)
+}
+
+/// [`run_entry_with_stats`] under an explicit [`RunnerKernelPolicy`].
+///
+/// # Errors
+///
+/// Returns pre-execution runner errors when the validation context has no
+/// interner or the MIR has no explicit entry function.
+pub fn run_entry_with_stats_and_kernel_policy<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    host: &mut H,
+    kernel_policy: RunnerKernelPolicy,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
     let interner = context.interner.as_interner().ok_or_else(|| {
@@ -679,7 +746,15 @@ pub fn run_entry_with_stats<H: Host + ?Sized>(
             "no entry function in MIR program",
         )]);
     };
-    run_function_with_stats(validated, entry.id, host)
+    run_function_with_explicit_limits_and_stats(
+        validated,
+        entry.id,
+        host,
+        None,
+        None,
+        true,
+        kernel_policy,
+    )
 }
 
 /// Run a specific MIR function with the diagnostic meter armed.
@@ -697,7 +772,15 @@ pub fn run_function_with_stats<H: Host + ?Sized>(
     function_id: MirFunctionId,
     host: &mut H,
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
-    run_function_with_explicit_limits_and_stats(validated, function_id, host, None, None, true)
+    run_function_with_explicit_limits_and_stats(
+        validated,
+        function_id,
+        host,
+        None,
+        None,
+        true,
+        RunnerKernelPolicy::Refuse,
+    )
 }
 
 /// Run a specific MIR function with the diagnostic meter armed and explicit
@@ -722,6 +805,7 @@ pub fn run_function_with_stats_and_limits<H: Host + ?Sized>(
         Some(step_budget.unwrap_or(DEFAULT_TEST_STEP_BUDGET)),
         deadline,
         true,
+        RunnerKernelPolicy::Refuse,
     )
 }
 
@@ -773,7 +857,14 @@ pub fn run_function_unbounded<H: Host + ?Sized>(
     function_id: MirFunctionId,
     host: &mut H,
 ) -> Result<(), Vec<RunnerError>> {
-    run_function_with_explicit_limits(validated, function_id, host, None, None)
+    run_function_with_explicit_limits(
+        validated,
+        function_id,
+        host,
+        None,
+        None,
+        RunnerKernelPolicy::Refuse,
+    )
 }
 
 /// Default step budget applied to test executions when the caller passes no
@@ -824,6 +915,7 @@ pub fn run_function_with_limits<H: Host + ?Sized>(
         host,
         Some(step_budget.unwrap_or(DEFAULT_TEST_STEP_BUDGET)),
         deadline,
+        RunnerKernelPolicy::Refuse,
     )
 }
 
@@ -835,6 +927,7 @@ fn run_function_with_explicit_limits<H: Host + ?Sized>(
     host: &mut H,
     step_limit: Option<u64>,
     deadline: Option<Instant>,
+    kernel_policy: RunnerKernelPolicy,
 ) -> Result<(), Vec<RunnerError>> {
     let outcome = run_function_with_explicit_limits_and_stats(
         validated,
@@ -843,6 +936,7 @@ fn run_function_with_explicit_limits<H: Host + ?Sized>(
         step_limit,
         deadline,
         false,
+        kernel_policy,
     )?;
     outcome.result
 }
@@ -854,6 +948,7 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
     step_limit: Option<u64>,
     deadline: Option<Instant>,
     collect_stats: bool,
+    kernel_policy: RunnerKernelPolicy,
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
@@ -869,7 +964,8 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
             format!("no MIR function with id {}", function_id.0),
         )]);
     }
-    if let Some(function) = validated.function_by_id(function_id)
+    if kernel_policy == RunnerKernelPolicy::Refuse
+        && let Some(function) = validated.function_by_id(function_id)
         && function.shader_stage == Some(MirKernelShaderStage::Compute)
     {
         return Err(vec![kernel_refused(function.span)]);
@@ -883,6 +979,7 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
     let mut runner = Runner::new(program, context, context.types.as_table(), interner, host);
     runner.step_limit = step_limit;
     runner.deadline = deadline;
+    runner.kernel_policy = kernel_policy;
     if collect_stats {
         runner.stats = Some(stats::StatsCollector::new(program, context, interner));
     }
@@ -1170,13 +1267,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     /// Refuse execution of a function carrying the device `@ kernel`
-    /// annotation. The annotation survives HIR→MIR as the compute shader
-    /// stage; no source-name or prose matching belongs in this policy gate.
+    /// annotation unless the run's [`RunnerKernelPolicy`] is `Execute`. The
+    /// annotation survives HIR→MIR as the compute shader stage; no
+    /// source-name or prose matching belongs in this policy gate.
     fn refuse_kernel_execution(
         &self,
         function_id: MirFunctionId,
         span: Span,
     ) -> Result<(), RunnerError> {
+        if self.kernel_policy == RunnerKernelPolicy::Execute {
+            return Ok(());
+        }
         let function = self.function_by_id(function_id, span)?;
         if function.shader_stage == Some(MirKernelShaderStage::Compute) {
             return Err(kernel_refused(span));

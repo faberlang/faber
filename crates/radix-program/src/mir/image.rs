@@ -6,11 +6,12 @@ use super::{
     FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
     FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection, HashMap, HashSet, Host,
     LoweredMirUnit, MirClosureEnvironment, MirProgram, MirSeams, MirType,
-    PACKAGE_MIR_ARTIFACT_VERSION, PackageRunStats, Path, PathBuf, PreparedPackageMir, Symbol,
-    TypeTable, TypeTableSnapshot, bind_fmir_text_runtime_cli, check_fmir_runtime_requirements,
-    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image, fnv64_hex, fs,
-    mir_diag, mir_issue_diag, relative_or_display, run_entry, run_entry_with_stats,
-    runner_diagnostics, source_identity,
+    PACKAGE_MIR_ARTIFACT_VERSION, PackageRunStats, Path, PathBuf, PreparedPackageMir,
+    RunnerKernelPolicy, Symbol, TypeTable, TypeTableSnapshot, bind_fmir_text_runtime_cli,
+    check_fmir_runtime_requirements, decode_binary_image, decode_text_image, encode_binary_image,
+    encode_text_image, fnv64_hex, fs, mir_diag, mir_issue_diag, relative_or_display,
+    run_entry_with_kernel_policy, run_entry_with_stats_and_kernel_policy, runner_diagnostics,
+    source_identity,
 };
 
 /// Struct, variant, and closure validation metadata carried by in-memory package FMIR
@@ -274,6 +275,7 @@ pub(super) fn fmir_package_image_from_lowered(
 pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
     mut image: FmirPackageImage,
     host: &mut H,
+    kernel_policy: RunnerKernelPolicy,
 ) -> Result<(), Vec<Diagnostic>> {
     check_fmir_runtime_requirements(&image)?;
     let types = TypeTable::from_snapshot(image.types).map_err(|error| {
@@ -308,7 +310,7 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
                 .map(|error| mir_diag(&image.diagnostic_path, error.message))
                 .collect::<Vec<_>>()
         })?;
-    run_entry(&validated, host)
+    run_entry_with_kernel_policy(&validated, host, kernel_policy)
         .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors))?;
     if let Some(code) = image.exit_code {
         host.exit(code);
@@ -326,6 +328,7 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
 pub(super) fn run_fmir_package_image_with_stats<H: Host + ?Sized>(
     mut image: FmirPackageImage,
     host: &mut H,
+    kernel_policy: RunnerKernelPolicy,
 ) -> Result<PackageRunStats, Vec<Diagnostic>> {
     check_fmir_runtime_requirements(&image)?;
     let types = TypeTable::from_snapshot(image.types).map_err(|error| {
@@ -360,7 +363,7 @@ pub(super) fn run_fmir_package_image_with_stats<H: Host + ?Sized>(
                 .map(|error| mir_diag(&image.diagnostic_path, error.message))
                 .collect::<Vec<_>>()
         })?;
-    let outcome = run_entry_with_stats(&validated, host)
+    let outcome = run_entry_with_stats_and_kernel_policy(&validated, host, kernel_policy)
         .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors))?;
     let result = outcome
         .result

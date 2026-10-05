@@ -224,6 +224,12 @@ fn host_route(
     selection: DeviceSelection,
     stats_requested: bool,
 ) -> Result<Option<()>, Vec<Diagnostic>> {
+    // The cpu selection runs the program on the MIR runner: no device route is
+    // taken even when the image carries a device section, and stats are the
+    // ordinary runner stats.
+    if selection == DeviceSelection::Cpu {
+        return Ok(None);
+    }
     if stats_requested && (image.device.is_some() || selection != DeviceSelection::Auto) {
         return Err(vec![mir_issue_diag(
             &image.diagnostic_path,

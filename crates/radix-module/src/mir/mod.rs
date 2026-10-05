@@ -51,6 +51,10 @@ mod runtime_extent_itera_test;
 #[path = "reducta_filum_test.rs"]
 mod reducta_filum_test;
 
+#[cfg(all(test, feature = "runner"))]
+#[path = "kernel_host_lowering_test.rs"]
+mod kernel_host_lowering_test;
+
 #[cfg(test)]
 #[path = "interface_dispatch_test.rs"]
 mod interface_dispatch_test;
@@ -92,8 +96,8 @@ pub use llvm_text::{
 };
 pub use lower::prepare_mir_lowering_interner;
 pub use lower::{
-    ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, LoweredMirUnit, MirError, MirGenericParam,
-    MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue, MirTensorEdgeAppliedArg,
+    ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, KernelLowering, LoweredMirUnit, MirError,
+    MirGenericParam, MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue, MirTensorEdgeAppliedArg,
     MirTensorEdgePolicyMetadata, MirTensorEdgePolicyProvider, MirTensorEdgePolicySelector, MirTensorEdgeShapeIdentity,
     MirTensorEdgeTypeIdentity, MirTensorLimesTemplate, PackageStructMetadata, dump_analyzed_unit,
     instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
@@ -209,10 +213,12 @@ pub use radix_mir::{
 };
 #[cfg(feature = "runner")]
 pub use runner::{
-    BufferHost, Host, RunSourceError, RunnerDispatchStatus, RunnerError, RunnerRunOutcome, RunnerStats, StdioHost,
-    Value, classify_runner_lowerability, reset_execution_state, run_analyzed, run_entry, run_entry_with_stats,
-    run_function, run_function_with_limits, run_function_with_stats_and_limits, run_function_with_step_budget,
-    run_source, runner_dispatch_status,
+    BufferHost, Host, RUNNER_KERNEL_REFUSED_ISSUE, RunSourceError, RunnerDispatchStatus, RunnerError,
+    RunnerKernelPolicy, RunnerRunOutcome, RunnerStats, StdioHost, Value, classify_runner_lowerability,
+    reset_execution_state, run_analyzed, run_analyzed_with_kernel_lowering, run_entry, run_entry_with_kernel_policy,
+    run_entry_with_stats, run_entry_with_stats_and_kernel_policy, run_function, run_function_with_kernel_policy,
+    run_function_with_limits, run_function_with_stats_and_limits, run_function_with_step_budget, run_source,
+    runner_dispatch_status,
 };
 #[cfg(feature = "mir-sexp")]
 pub use sexp_text::{MirSexpTextProbeError, classify_sexp_lowerability, emit_sexp_text};

@@ -168,8 +168,9 @@ use radix_module::mir::{
     MirPlace, MirProgram, MirProjection, MirProviderKind, MirRuntimeCall, MirRuntimeRecordField,
     MirRuntimeRecordValue, MirStatement, MirStatementKind, MirSwitchCase,
     MirTensorEdgePolicyMetadata, MirTensorEdgePolicySelector, MirTerminator, MirTerminatorKind,
-    MirType, MirValue, MirValueKind, RunnerError, RunnerStats, lower_analyzed_unit, run_entry,
-    run_entry_with_stats, validate_program,
+    MirType, MirValue, MirValueKind, RunnerError, RunnerKernelPolicy, RunnerStats,
+    lower_analyzed_unit, run_entry_with_kernel_policy, run_entry_with_stats_and_kernel_policy,
+    validate_program,
 };
 use radix_module::semantic::{
     IndexExpr, Primitive, Resolver, SymbolKind, Type, TypeId, TypeTable, TypeTableSnapshot,
@@ -244,6 +245,10 @@ pub enum DeviceSelection {
     /// Resolve against host capability probes; fail closed when the machine
     /// admits zero or more than one backend.
     Auto,
+    /// Select the CPU device explicitly: kernels lower as ordinary functions
+    /// and run single-threaded on the MIR runner. Never a silent fallback of
+    /// another selection.
+    Cpu,
     /// Select Metal explicitly; never silently falls back.
     Metal,
     /// Select CUDA explicitly; never silently falls back.
@@ -251,11 +256,13 @@ pub enum DeviceSelection {
 }
 
 impl DeviceSelection {
-    /// Parse a selection from its stable spelling (`auto` / `metal` / `cuda`).
+    /// Parse a selection from its stable spelling (`auto` / `cpu` / `metal` /
+    /// `cuda`).
     #[must_use]
     pub fn from_spelling(spelling: &str) -> Option<Self> {
         match spelling {
             "auto" => Some(Self::Auto),
+            "cpu" => Some(Self::Cpu),
             "metal" => Some(Self::Metal),
             "cuda" => Some(Self::Cuda),
             _ => None,
@@ -267,8 +274,28 @@ impl DeviceSelection {
     pub const fn spelling(self) -> &'static str {
         match self {
             Self::Auto => "auto",
+            Self::Cpu => "cpu",
             Self::Metal => "metal",
             Self::Cuda => "cuda",
+        }
+    }
+
+    /// How kernels lower under this selection: `cpu` lowers them as ordinary
+    /// host functions, every other selection keeps the device form.
+    #[must_use]
+    pub const fn kernel_lowering(self) -> radix_module::mir::KernelLowering {
+        match self {
+            Self::Cpu => radix_module::mir::KernelLowering::Host,
+            Self::Auto | Self::Metal | Self::Cuda => radix_module::mir::KernelLowering::Device,
+        }
+    }
+
+    /// Whether the runner executes `@ kernel` functions under this selection.
+    #[must_use]
+    pub const fn kernel_policy(self) -> RunnerKernelPolicy {
+        match self {
+            Self::Cpu => RunnerKernelPolicy::Execute,
+            Self::Auto | Self::Metal | Self::Cuda => RunnerKernelPolicy::Refuse,
         }
     }
 }

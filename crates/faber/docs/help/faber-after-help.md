@@ -43,8 +43,8 @@ Common flows:
     faber run --device metal <device-package>   # Apple Metal
     faber run --device cuda  <device-package>   # NVIDIA CUDA
     faber run --device auto  <device-package>   # exactly one admitted device
-    faber run --device cpu   <device-package>   # fails closed: the CPU device
-                                                # is not available yet
+    faber run --device cpu   <input>            # run `@ kernel` code on the CPU
+                                                # (MIR runner, single thread)
 
     `--device` takes auto|cpu|metal|cuda. Precedence: `--device` > manifest
     `[device] device` > auto.
@@ -55,7 +55,7 @@ Common flows:
     (host driver) runs the kernel on a real Metal/CUDA session and reports the
     selected device + artifact hash + outputs. Explicit GPU requests never
     silently fall back; failures carry stable codes (E_BACKEND_UNAVAILABLE,
-    E_DEVICE_*, E_NO_DEVICE_PROGRAM; E_DEVICE_CPU_UNAVAILABLE for `cpu`).
+    E_DEVICE_*, E_NO_DEVICE_PROGRAM).
     See `faber targets` (metal-text/llvm-text rows).
 
   Native host executables (llvm-host-parity, Stage 9):

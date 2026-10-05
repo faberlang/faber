@@ -107,8 +107,8 @@ pub(crate) use manifest::manifest_device_inputs;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     DeviceChoice, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
-    ManifestProductShaders, device_cpu_unavailable,
-    manifest_package_build_target as manifest_build_target_for_input, read_manifest,
+    ManifestProductShaders, manifest_package_build_target as manifest_build_target_for_input,
+    read_manifest,
 };
 #[cfg(feature = "runner")]
 pub use mir::run_fmir_image_bytes_with_stdio;

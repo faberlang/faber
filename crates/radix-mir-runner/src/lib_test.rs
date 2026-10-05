@@ -6058,7 +6058,7 @@ fn explicit_unbounded_variant_does_not_stop_on_default_guard() {
 }
 
 #[test]
-fn direct_kernel_function_run_refuses_with_stable_identity() {
+fn direct_kernel_function_run_follows_the_kernel_policy() {
     let mut interner = Interner::new();
     let marked = interner.intern("marked");
     let types = radix_types::TypeTable::new();
@@ -6097,10 +6097,29 @@ fn direct_kernel_function_run_refuses_with_stable_identity() {
     .expect("kernel refusal fixture validates");
     let mut host = BufferHost::default();
 
+    // Default policy: the run is refused, with the stable identity.
     let errors = run_function(&validated, MirFunctionId(0), &mut host)
         .expect_err("the runner must refuse direct kernel execution");
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0].issue, RUNNER_KERNEL_REFUSED_ISSUE);
+    assert_eq!(RunnerKernelPolicy::default(), RunnerKernelPolicy::Refuse);
+    let explicit = run_function_with_kernel_policy(
+        &validated,
+        MirFunctionId(0),
+        &mut host,
+        RunnerKernelPolicy::Refuse,
+    )
+    .expect_err("an explicit Refuse policy refuses like the default");
+    assert_eq!(explicit[0].issue, RUNNER_KERNEL_REFUSED_ISSUE);
+
+    // CPU policy: the same program runs to completion.
+    run_function_with_kernel_policy(
+        &validated,
+        MirFunctionId(0),
+        &mut host,
+        RunnerKernelPolicy::Execute,
+    )
+    .expect("the Execute policy runs a compute-stage function");
 }
 
 fn eval_tensor_intrinsic(
