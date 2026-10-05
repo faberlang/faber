@@ -432,6 +432,11 @@ pub(crate) struct TypeChecker<'a> {
     /// Locals declared `fixum T x = e` (D5.10): their initializer is an `=`
     /// position, a compile-time store.
     compile_time_locals: FxHashSet<DefId>,
+    /// Static `const size N = 3` values keyed by binding DefId (Z1): figura
+    /// references to a declared size lower as `Runtime(ScalarBinding(def))`,
+    /// so the fold keys on the binding; an affine extent over a static size
+    /// that folds provably negative fails its lift obligation at the store.
+    pub(crate) static_size_values: FxHashMap<radix_hir::DefId, u64>,
     /// Node ids of expressions desugared from numeric twin methods (operator,
     /// assignment, or effect-hoisted block), handed to the presentation
     /// sidecar when the check finishes.
@@ -770,6 +775,7 @@ impl<'a> TypeChecker<'a> {
             tensor_edge_policy_imported_requirements: FxHashMap::default(),
             tensor_edge_policy_runtime_params: FxHashSet::default(),
             compile_time_locals: FxHashSet::default(),
+            static_size_values: FxHashMap::default(),
             numeric_twin_ids: Vec::new(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),

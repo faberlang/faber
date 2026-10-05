@@ -40,7 +40,7 @@ const ISSUE_CANNOT_INFER_TENSOR_SHAPE: &str = "cannot_infer_tensor_shape";
 /// obligation is checked there. A negative compile-time constant is rejected
 /// with this issue; a negative runtime value raises it where MIR consumes the
 /// sidecar binding.
-const ISSUE_SIZE_LIFT_NEGATIVE: &str = "size_lift_negative";
+pub(super) const ISSUE_SIZE_LIFT_NEGATIVE: &str = "size_lift_negative";
 
 impl TypeChecker<'_> {
     /// Whether `ty` names one of the active function's type parameters.
@@ -423,6 +423,21 @@ impl TypeChecker<'_> {
                         let total = i128::from(*value) + *offset;
                         (total < 0).then_some(total)
                     }
+                    // Z1: a static `const size N = <literal>` folds here, so
+                    // `N - 1` with `N = 0` fails the same lift obligation.
+                    // Declared sizes reach figura terms as
+                    // Runtime(ScalarBinding(def)); forwarded params resolve
+                    // through the scope stack.
+                    IndexExpr::Param(sym) => self
+                        .hir_value_binding_def(*sym)
+                        .and_then(|def| self.static_size_values.get(&def).copied())
+                        .map(|value| i128::from(value) + *offset)
+                        .filter(|total| *total < 0),
+                    IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def)) => self
+                        .static_size_values
+                        .get(def)
+                        .map(|value| i128::from(*value) + *offset)
+                        .filter(|total| *total < 0),
                     _ => None,
                 },
                 _ => None,
@@ -433,6 +448,45 @@ impl TypeChecker<'_> {
                     span,
                     &[("value", total.to_string())],
                 );
+            }
+        }
+    }
+
+    /// Z1: fold static `const size` values into a store annotation's affine
+    /// extents. `N - 1` under `const size N = 0` is provably negative, so the
+    /// store's lift obligation fails here, mirroring the call-slot rule above.
+    pub(crate) fn reject_negative_static_affine_extents(
+        &mut self,
+        shape: IndexId,
+        span: radix_lexer::Span,
+    ) {
+        let mut work = vec![shape];
+        while let Some(id) = work.pop() {
+            match self.types.get_index(id).clone() {
+                IndexExpr::Tuple(dims) => work.extend(dims.iter().rev().copied()),
+                IndexExpr::Affine { base, offset } => {
+                    // A declared size reaches figura terms as
+                    // Runtime(ScalarBinding(def)); a forwarded size param
+                    // stays Param(sym) and resolves through the scope stack.
+                    let binding = match self.types.get_index(base).clone() {
+                        IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def)) => Some(def),
+                        IndexExpr::Param(sym) => self.hir_value_binding_def(sym),
+                        _ => None,
+                    };
+                    let Some(total) = binding
+                        .and_then(|def| self.static_size_values.get(&def).copied())
+                        .map(|value| i128::from(value) + offset)
+                        .filter(|total| *total < 0)
+                    else {
+                        continue;
+                    };
+                    self.invalid_operand_types_with_args(
+                        ISSUE_SIZE_LIFT_NEGATIVE,
+                        span,
+                        &[("value", total.to_string())],
+                    );
+                }
+                _ => {}
             }
         }
     }

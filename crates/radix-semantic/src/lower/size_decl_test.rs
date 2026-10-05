@@ -78,13 +78,10 @@ fn static_size_affine_extent_checks() {
     );
 }
 
-// Known gap (Z1 affine store): a provably negative static affine extent
-// (`const size N = 0` then `tf32[N - 1, 2]`) must raise size_lift_negative
-// at this store. The static value lives only in the HIR local's init, so the
-// check needs static-size value capture in lowering (lower/stmt.rs) or the
-// checker store path (typecheck/generic.rs) — both outside this unit's write
-// scope. Ignored, not deleted: this is the successor's falsifiable oracle.
-#[ignore = "static size value never reaches the annotation term; needs lower/stmt.rs or generic.rs (out of scope)"]
+// Z1 affine store: a provably negative static affine extent
+// (`const size N = 0` then `tf32[N - 1, 2]`) raises size_lift_negative
+// at this store. The checker folds the static value (typecheck static_size_values)
+// into the affine extent's lift obligation.
 #[test]
 fn static_size_affine_extent_rejects_provably_negative() {
     let mut config = PassConfig::for_target(Target::HirRust);

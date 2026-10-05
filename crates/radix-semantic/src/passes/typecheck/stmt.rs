@@ -113,6 +113,17 @@ impl TypeChecker<'_> {
     /// and declarations without either side receive a fresh inference variable
     /// that must be resolved before finalization.
     pub fn check_local(&mut self, local: &mut HirLocal) {
+        // Z1: a static `const size N = 3` records its literal value so affine
+        // extents over `N` fold at the stores that name it.
+        if local.size_decl && local.size_static {
+            if let Some(radix_hir::HirExpression {
+                kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)),
+                ..
+            }) = local.init.as_ref()
+            {
+                self.static_size_values.insert(local.def_id, *value);
+            }
+        }
         if let Some(ty) = local.ty {
             let span = local
                 .init
@@ -150,6 +161,13 @@ impl TypeChecker<'_> {
                 // annotation's named size terms instead of failing the check.
                 let prev_store_expr = self.current_store_expr.replace(init.id);
                 let init_ty = self.check_store_expr(init, *ty, site);
+                // Z1: an annotated declaration store folds static
+                // `const size` values into its affine extents; a provably
+                // negative extent fails the size lift at this store.
+                if let Type::Tensor(_, shape) = self.types.get(*ty) {
+                    let shape = *shape;
+                    self.reject_negative_static_affine_extents(shape, init.span);
+                }
                 if inferred_slot {
                     self.inferred_slot_sources.insert(local.def_id, init.span);
                 }
