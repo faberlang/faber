@@ -1615,6 +1615,15 @@ impl Parser {
 
     // PRIMARY EXPRESSIONS
 
+    fn extent_constructor_head(&self) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else { return false; };
+        if self.peek_at(1).kind != TokenKind::LBracket { return false; }
+        let name = self.interner.resolve(sym);
+        let latin = self.reader_type_latin_keys.get(name).map_or(name, String::as_str);
+        radix_types::numeric_width::is_numeric_width_type_sugar(latin)
+            || radix_types::numeric_width::vector_sugar_width_marker(latin).is_some()
+    }
+
     /// Return whether the current token claims a registry keyword identity.
     fn is_keyword_key(&self, key: &str) -> bool {
         matches!(self.peek().kind, TokenKind::Ident(sym) if self.keyword_claim_key(sym) == Some(key))
@@ -1879,6 +1888,19 @@ impl Parser {
         }
 
         let start = self.current_span();
+        if self.extent_constructor_head() {
+            if self.expression_contexts > 1 {
+                return Err(ParseError::structured(ParseErrorKind::ExpressionInvalid, start)
+                    .with_arg("issue", "constructor_store_position_only"));
+            }
+            let ty = self.parse_type()?;
+            if matches!(self.peek().kind, TokenKind::Plus | TokenKind::Minus | TokenKind::Star | TokenKind::Slash | TokenKind::LParen) {
+                return Err(ParseError::structured(ParseErrorKind::ExpressionInvalid, start)
+                    .with_arg("issue", "constructor_store_position_only"));
+            }
+            let id = self.next_id();
+            return Ok(Expr { id, kind: ExprKind::Construct(ty), span: start.merge(self.previous_span()) });
+        }
         let id = self.next_id();
 
         let kind = match self.peek().kind.clone() {

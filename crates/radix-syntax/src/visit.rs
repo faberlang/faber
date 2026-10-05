@@ -542,6 +542,7 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
         ExprKind::Paren(inner) => {
             visitor.visit_expr(inner);
         }
+        ExprKind::Construct(ty) => visitor.visit_type_expr(ty),
         ExprKind::Iuncta(iuncta) => {
             for ty in &iuncta.type_args {
                 visitor.visit_type_expr(ty);

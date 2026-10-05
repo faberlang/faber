@@ -1143,6 +1143,8 @@ pub enum ExprKind {
     TypeCheck(TypeCheckExpr),
     /// `iuncta<A, B> [a, b]` tuple construction.
     Iuncta(IunctaExpr),
+    /// Extent-bearing type expression used as a value constructor.
+    Construct(TypeExpr),
     /// Owned reduction expression: `reducta via Op ex source ...`.
     Reducta(Box<ReductaExpr>),
     /// Dedicated first-match selection: `primus_quem(source, ubi binder { predicate })`.

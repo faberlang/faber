@@ -391,6 +391,7 @@ help = "start the body item with '{proba}', '{probandum}', or '{setup}'"
 message = "expected integer after '{modifier}'"
 help = "put an integer literal after '{modifier}'"
 
+
 [diagnostics.PARSE001.issues.tensor_figura_after_element]
 message = "tensor requires a Figura shape after element type"
 help = "add a comma and Figura shape, such as tensor<T, []>"
@@ -758,6 +759,10 @@ help = "use a valid case expression"
 [diagnostics.PARSE030]
 message = "invalid expression"
 help = "check expression syntax"
+
+[diagnostics.PARSE030.issues.constructor_store_position_only]
+message = "constructores expressionis generis tantum in locis repositionis licent"
+help = "prius liga constructionem: const tf32[2, 3] a ← tf32[2, 3]"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
@@ -1666,6 +1671,10 @@ help = "fix the AST construct for lowering"
 [diagnostics.SEM008.issues.unknown_lowering_error]
 message = "HIR lowering failed"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.construction_synthesis_pending]
+message = "constructio per expressionem generis nondum in semanticam reductionem sustinetur"
+help = "exspecta subsidium synthesis constructionis"
 
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "unknown namespace"

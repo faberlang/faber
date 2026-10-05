@@ -118,6 +118,10 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check, id),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
+        ExprKind::Construct(_) => {
+            lowerer.error_with_args(issue_args("construction_synthesis_pending"));
+            HirExpressionKind::Error
+        }
         ExprKind::Reducta(reduction) => lower_reducta(lowerer, reduction),
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.

@@ -1485,6 +1485,10 @@ fn resolve_expr(
         // `⇇` copy-into: name resolution walks target and value so ordinary
         // binding-wins lookup applies to both.
         ExprKind::Format(format) => resolve_expr(resolver, interner, &format.value, errors),
+        // Constructor claim (size-type Z2): the claimed surface is a type
+        // expression, so its extent figuras resolve like an annotation's.
+        // Synthesis is the follow-up unit; the placeholder lowering errors.
+        ExprKind::Construct(ty) => resolve_type_expr(resolver, interner, ty, errors),
         ExprKind::CopyInto(expr) => {
             resolve_expr(resolver, interner, &expr.target, errors);
             resolve_expr(resolver, interner, &expr.value, errors);

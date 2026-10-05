@@ -655,6 +655,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             "size arguments are lift stores checked at the call; pass a non-negative value"
                 .to_owned(),
         ),
+        "construction_synthesis_pending" => Some(
+            "type-expression construction is not yet supported by semantic lowering".to_owned(),
+        ),
         "gpu_builtin_device_function_required" => {
             Some("call GPU builtins only inside @ nucleum or @ nucleum fragment functions".to_owned())
         }
