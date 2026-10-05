@@ -44,7 +44,7 @@ pub struct FaberManifest {
     #[serde(default)]
     pub build: ManifestBuild,
 
-    /// Device settings used by the package runner (backend selection, N1.1).
+    /// Device settings used by the package runner (device selection, N1.1).
     #[serde(default)]
     pub device: ManifestDevice,
 
@@ -79,26 +79,104 @@ pub struct FaberManifest {
     pub check: ManifestCheck,
 }
 
-/// `[device]` metadata for package runner backend selection (N1.1), the
+/// The `faber run --device` / `[device] device` value set.
+///
+/// `cpu` is an explicit choice; the CPU device itself is not built yet, so
+/// every route that resolves it fails closed (`E_DEVICE_CPU_UNAVAILABLE`).
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DeviceChoice {
+    /// Resolve against host capability probes; fail closed when the machine
+    /// admits zero or more than one device.
+    Auto,
+    /// Select the CPU device explicitly; never substituted silently.
+    Cpu,
+    /// Select Metal explicitly; never silently falls back.
+    Metal,
+    /// Select CUDA explicitly; never silently falls back.
+    Cuda,
+}
+
+impl DeviceChoice {
+    /// Parse a choice from its stable spelling.
+    #[must_use]
+    pub fn from_spelling(spelling: &str) -> Option<Self> {
+        match spelling {
+            "auto" => Some(Self::Auto),
+            "cpu" => Some(Self::Cpu),
+            "metal" => Some(Self::Metal),
+            "cuda" => Some(Self::Cuda),
+            _ => None,
+        }
+    }
+
+    /// Stable command and diagnostic spelling.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Cpu => "cpu",
+            Self::Metal => "metal",
+            Self::Cuda => "cuda",
+        }
+    }
+
+    /// The route-selection request, or `None` for `cpu` (no CPU device
+    /// route exists yet; callers fail closed).
+    #[must_use]
+    #[cfg(feature = "runner")]
+    pub const fn selection(self) -> Option<DeviceSelection> {
+        match self {
+            Self::Auto => Some(DeviceSelection::Auto),
+            Self::Cpu => None,
+            Self::Metal => Some(DeviceSelection::Metal),
+            Self::Cuda => Some(DeviceSelection::Cuda),
+        }
+    }
+}
+
+/// Stable code for an explicit `cpu` device request while no CPU device
+/// exists. Same spelling as `radix-device-core`'s registry refusal.
+pub const E_DEVICE_CPU_UNAVAILABLE: &str = "E_DEVICE_CPU_UNAVAILABLE";
+
+/// Fail-closed diagnostic for an explicit `cpu` request (no CPU device yet;
+/// never a silent substitute).
+#[must_use]
+pub fn device_cpu_unavailable() -> Diagnostic {
+    Diagnostic::error(
+        "the cpu device is not available yet (`--device cpu` / `[device] device = \"cpu\"`); \
+         selection fails closed rather than substituting another device",
+    )
+    .with_arg("issue", E_DEVICE_CPU_UNAVAILABLE.to_owned())
+    .with_arg("code", E_DEVICE_CPU_UNAVAILABLE.to_owned())
+    .with_arg("selection", "cpu".to_owned())
+}
+
+/// `[device]` metadata for package runner device selection (N1.1), the
 /// S1-6 vertical-slice host inputs, and the S5-U5b declared training step
 /// count.
 ///
-/// Mirrors `[build] target` for `-t/--target`: the package-level default is
-/// overridden by the CLI `--backend` flag; both are overridden by the
-/// portable default `auto`.
+/// Mirrors `[locale] locale` / `[build] target`: the manifest key is the CLI
+/// flag name. The package-level default is overridden by the CLI `--device`
+/// flag; both are overridden by the portable default `auto`.
 #[derive(Debug, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ManifestDevice {
-    /// Backend selection default: `"auto"` | `"metal"` | `"cuda"`.
+    /// Device selection default: `"auto"` | `"cpu"` | `"metal"` | `"cuda"`.
     /// `None` selects the portable default `auto`.
     #[serde(default)]
-    pub backend: Option<String>,
+    pub device: Option<String>,
+
+    /// Retired spelling of [`Self::device`]. Parsed only so [`read_manifest`]
+    /// can refuse it with a diagnostic naming the new key; never read
+    /// otherwise.
+    #[serde(default)]
+    pub backend: Option<toml::Value>,
 
     /// Host input values for the package's device-program input buffers
     /// (S1-6 vertical slice). Keys are the kernel functions' buffer names
     /// (parameter names); values are flat f32 element lists, row-major.
     /// Carried into the packaged FMIR image's canonical device payload so
-    /// the ordinary `faber run --backend <metal|cuda>` command can copy them
+    /// the ordinary `faber run --device <metal|cuda>` command can copy them
     /// in at launch.
     #[serde(default)]
     pub inputs: BTreeMap<String, Vec<f64>>,
@@ -276,26 +354,26 @@ pub(crate) fn manifest_check_section(input: &Path) -> Option<ManifestCheck> {
         .map(|manifest| manifest.check)
 }
 
-/// Map a manifest `[device] backend` value to a backend selection request
-/// (N1.1). `None` when the key is absent — the caller applies the portable
-/// default `auto`. An unsupported spelling fails closed with a structured
-/// diagnostic (never silently ignored).
+/// Map a manifest `[device] device` value to a device choice (N1.1). `None`
+/// when the key is absent — the caller applies the portable default `auto`.
+/// An unsupported spelling fails closed with a structured diagnostic (never
+/// silently ignored).
 #[cfg(feature = "runner")]
-pub fn manifest_backend_selection(
-    backend: Option<&str>,
+pub fn manifest_device_choice(
+    device: Option<&str>,
     path: &Path,
-) -> Result<Option<DeviceSelection>, Box<Diagnostic>> {
-    match backend.map(str::trim) {
+) -> Result<Option<DeviceChoice>, Box<Diagnostic>> {
+    match device.map(str::trim) {
         None => Ok(None),
-        Some(spelling) => match DeviceSelection::from_spelling(spelling) {
-            Some(selection) => Ok(Some(selection)),
+        Some(spelling) => match DeviceChoice::from_spelling(spelling) {
+            Some(choice) => Ok(Some(choice)),
             None => Err(Box::new(
                 crate::package_diagnostic_error(format!(
-                    "faber.toml device.backend '{spelling}' is not supported; use 'auto', 'metal', or 'cuda'"
+                    "faber.toml device.device '{spelling}' is not supported; use 'auto', 'cpu', 'metal', or 'cuda'"
                 ))
                 .with_file(path.display().to_string())
-                .with_arg("issue", "package_device_backend_unsupported")
-                .with_arg("backend", spelling.to_owned()),
+                .with_arg("issue", "package_device_unsupported")
+                .with_arg("device", spelling.to_owned()),
             )),
         }
     }
@@ -327,13 +405,23 @@ pub(crate) fn manifest_device_inputs(
 pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
     let source =
         fs::read_to_string(path).map_err(|err| Box::new(Diagnostic::io_error(path, &err)))?;
-    toml::from_str::<FaberManifest>(&source).map_err(|err| {
+    let manifest = toml::from_str::<FaberManifest>(&source).map_err(|err| {
         Box::new(
             crate::package_diagnostic_error(format!("invalid faber.toml manifest: {err}"))
                 .with_file(path.display().to_string())
                 .with_arg("issue", "invalid_package_manifest"),
         )
-    })
+    })?;
+    if manifest.device.backend.is_some() {
+        return Err(Box::new(
+            crate::package_diagnostic_error(
+                "faber.toml [device] backend was renamed: use `device = \"auto\" | \"cpu\" | \"metal\" | \"cuda\"` under [device]",
+            )
+            .with_file(path.display().to_string())
+            .with_arg("issue", "package_device_backend_renamed"),
+        ));
+    }
+    Ok(manifest)
 }
 
 /// Read the validated manifest for a package spec, if the package is
@@ -464,11 +552,11 @@ pub(crate) fn validate_manifest(
 
     validate_target_tables(&manifest.target, path)?;
 
-    // N1.1: the `[device] backend` selection default is validated at package
+    // N1.1: the `[device] device` selection default is validated at package
     // load so an unsupported spelling fails closed early, never silently
     // ignored.
     #[cfg(feature = "runner")]
-    manifest_backend_selection(manifest.device.backend.as_deref(), path)?;
+    manifest_device_choice(manifest.device.device.as_deref(), path)?;
 
     // S5-U5b: the `[device] steps` declared training step count is validated
     // at package load — a zero count is a contradiction (a RepeatingStep

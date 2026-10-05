@@ -4881,7 +4881,7 @@ name = "device-steps-valid"
 entry = "main.fab"
 
 [device]
-backend = "auto"
+device = "auto"
 steps = 250
 "#,
     )
@@ -4922,7 +4922,7 @@ target = "fmir"
 kind = "bin"
 
 [device]
-backend = "auto"
+device = "auto"
 steps = 250
 "#,
     )

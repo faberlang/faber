@@ -281,12 +281,12 @@ pub struct PreparedPackageMir<'a> {
     pub fmir_text_cli: Option<FmirTextCliSection>,
     /// S1-6 vertical-slice device inputs (`[device] inputs`, mapped to f32).
     pub device_inputs: BTreeMap<String, Vec<f32>>,
-    /// S1-6 device backend request (`[device] backend`), if declared.
-    pub device_backend: Option<DeviceSelection>,
+    /// S1-6 device request (`[device] device`), if declared.
+    pub device_selection: Option<DeviceSelection>,
     /// S5-U5b declared training step count (`[device] steps`), if declared.
     /// Absent selects the portable default [`DEFAULT_TRAINING_STEPS`].
     pub device_steps: Option<u32>,
-    /// Whether the package declared any `[device]` surface (backend or
+    /// Whether the package declared any `[device]` surface (device or
     /// inputs) — the opt-in that constructs a device payload.
     pub device_declared: bool,
     _marker: std::marker::PhantomData<&'a ()>,
@@ -295,7 +295,7 @@ pub struct PreparedPackageMir<'a> {
 #[derive(Default)]
 pub struct DeviceManifestConfig {
     pub inputs: BTreeMap<String, Vec<f32>>,
-    pub backend: Option<DeviceSelection>,
+    pub selection: Option<DeviceSelection>,
     pub steps: Option<u32>,
     pub declared: bool,
 }

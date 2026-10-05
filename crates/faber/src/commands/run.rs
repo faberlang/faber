@@ -12,12 +12,12 @@
 //!
 //! The `-c` one-liner and `faber repl` are the other runner entry modes.
 
-use crate::cli::{BackendSelection, FmirRunArgs, ReplArgs, RunArgs};
+use crate::cli::{FmirRunArgs, ReplArgs, RunArgs};
 use crate::script::{
     interpret_source, interpret_source_or_exit, print_run_source_error, raw_exit_code,
 };
 use faber_cli::input_shape::locale_without_package_error;
-use faber_cli::package;
+use faber_cli::package::{self, DeviceChoice};
 use radix::module::diagnostics::Diagnostic;
 use radix::module::mir::StdioHost;
 use radix::program::mir::DeviceSelection;
@@ -43,7 +43,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         std::process::exit(1);
     }
 
-    // N1.1 precedence: CLI `--backend` > manifest `[device] backend` > `auto`.
+    // N1.1 precedence: CLI `--device` > manifest `[device] device` > `auto`.
     // An invalid manifest value fails closed with a structured diagnostic
     // (never silently ignored).
     let selection = match resolve_route_selection(&args, &input_path) {
@@ -232,11 +232,11 @@ fn interpret_path(
         );
         std::process::exit(1);
     }
-    // An explicit backend request can never be served here (N1.1 fail closed:
+    // An explicit device request can never be served here (N1.1 fail closed:
     // "package has no device program").
     if selection != DeviceSelection::Auto {
         eprintln!(
-            "error: explicit backend selection `{}` cannot be served: a single `.fab` file carries no package device program; device execution requires a package with a `[device]` section",
+            "error: explicit device selection `{}` cannot be served: a single `.fab` file carries no package device program; device execution requires a package with a `[device]` section",
             selection.spelling()
         );
         std::process::exit(1);
@@ -350,28 +350,29 @@ pub(super) fn is_single_fab_file(path: &Path) -> bool {
     path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("fab")
 }
 
-/// Resolve the effective backend selection for `faber run` (N1.1): CLI
-/// `--backend` > manifest `[device] backend` > default `auto`. An invalid
+/// Resolve the effective device selection for `faber run` (N1.1): CLI
+/// `--device` > manifest `[device] device` > default `auto`. An invalid
 /// manifest value fails closed with a structured diagnostic (never silently
-/// ignored). An explicit device backend combined with a stats request
-/// refuses here, during route resolution (RSM-4): the device route never
-/// runs the interpreter the meter measures.
+/// ignored). `cpu` fails closed until the CPU device exists. An explicit
+/// device combined with a stats request refuses here, during route
+/// resolution (RSM-4): the device route never runs the interpreter the meter
+/// measures.
 fn resolve_route_selection(
     args: &RunArgs,
     input_path: &Path,
 ) -> Result<DeviceSelection, Box<Diagnostic>> {
     let stats_requested = args.stats || args.stats_file.is_some();
-    if let Some(backend) = args.backend {
-        let selection = backend.selection();
+    if let Some(device) = args.device {
+        let selection = device_selection(device)?;
         if stats_requested && selection != DeviceSelection::Auto {
             return Err(Box::new(
                 faber_cli::package_diagnostic_error(format!(
-                    "run statistics (`--stats`/`--stats-file`) require the interpreted CPU route; `--backend {}` executes a device route that never runs the interpreter, so the stats request is refused",
+                    "run statistics (`--stats`/`--stats-file`) require the interpreted CPU route; `--device {}` executes a device route that never runs the interpreter, so the stats request is refused",
                     selection.spelling()
                 ))
                 .with_file(input_path.display().to_string())
                 .with_arg("issue", "run_stats_device_route_unsupported")
-                .with_arg("backend", selection.spelling().to_owned()),
+                .with_arg("device", selection.spelling().to_owned()),
             ));
         }
         return Ok(selection);
@@ -383,13 +384,20 @@ fn resolve_route_selection(
         return Ok(DeviceSelection::Auto);
     }
     let manifest = package::read_manifest(&layout.manifest_path)?;
-    let manifest_backend = package::manifest_backend_selection(
-        manifest.device.backend.as_deref(),
-        &layout.manifest_path,
-    )?;
-    // CLI already returned above. Manifest backend or portable `auto`.
+    let manifest_device =
+        package::manifest_device_choice(manifest.device.device.as_deref(), &layout.manifest_path)?;
+    // CLI already returned above. Manifest device or portable `auto`.
     // In-process host_factory is parked; this fold does not need it.
-    Ok(manifest_backend.unwrap_or(DeviceSelection::Auto))
+    manifest_device.map_or(Ok(DeviceSelection::Auto), device_selection)
+}
+
+/// The route-selection request for a device choice. `cpu` has no route yet:
+/// it fails closed with the named `E_DEVICE_CPU_UNAVAILABLE`, never a silent
+/// substitute.
+fn device_selection(device: DeviceChoice) -> Result<DeviceSelection, Box<Diagnostic>> {
+    device
+        .selection()
+        .ok_or_else(|| Box::new(package::device_cpu_unavailable()))
 }
 
 /// Render route diagnostics with their stable host codes (N1.4). The
@@ -499,7 +507,7 @@ pub(super) fn cmd_repl(args: ReplArgs) {
 pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     // The one host-construction policy on the image-runner route (N1.1/N1.5):
     // the image's device section decides whether the route carries a device
-    // program, and the selection request is the CLI `--backend` override
+    // program, and the selection request is the CLI `--device` override
     // falling back to the image's recorded selection.
     let decision = match radix::program::mir::fmir_image_route_decision(
         &args.image,
@@ -512,10 +520,13 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
             std::process::exit(1);
         }
     };
-    let selection = args
-        .backend
-        .map(BackendSelection::selection)
-        .unwrap_or(decision.declared_selection);
+    let selection = match args.device.map(device_selection).transpose() {
+        Ok(selection) => selection.unwrap_or(decision.declared_selection),
+        Err(diagnostic) => {
+            eprint_route_diagnostics(&[*diagnostic]);
+            std::process::exit(1);
+        }
+    };
     let mut host = StdioHost::with_argumenta(args.args);
     // The route function applies the one host-construction policy: a
     // device-bearing image runs through the composite host's device route

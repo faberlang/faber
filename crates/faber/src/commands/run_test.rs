@@ -1,5 +1,6 @@
 use super::*;
-use crate::cli::{BackendSelection, RunArgs};
+use crate::cli::RunArgs;
+use faber_cli::package::DeviceChoice;
 use radix::module::mir::RunSourceError;
 use radix::program::mir::DeviceSelection;
 use std::path::{Path, PathBuf};
@@ -16,12 +17,12 @@ fn temp_dir(label: &str) -> PathBuf {
     dir
 }
 
-fn run_args(path: PathBuf, backend: Option<BackendSelection>) -> RunArgs {
+fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
     RunArgs {
         path,
         locale: None,
         diagnostics_locale: None,
-        backend,
+        device,
         stats: false,
         stats_file: None,
         deny_warnings: false,
@@ -138,17 +139,17 @@ fn is_package_interpret_input_accepts_directory_without_manifest_or_entry_for_pa
     assert!(is_package_interpret_input(&dir));
 }
 
-// ── S1-5 backend selection: precedence (CLI > manifest > auto) ───────────
+// ── S1-5 device selection: precedence (CLI > manifest > auto) ────────────
 
-fn write_manifest(dir: &Path, device_backend: Option<&str>) {
-    let backend_line = match device_backend {
-        Some(backend) => format!("backend = \"{backend}\"\n"),
+fn write_manifest(dir: &Path, device_value: Option<&str>) {
+    let device_line = match device_value {
+        Some(device) => format!("device = \"{device}\"\n"),
         None => String::new(),
     };
     std::fs::write(
         dir.join("faber.toml"),
         format!(
-            "[package]\nname = \"backend-precedence\"\nversion = \"0.1.0\"\nedition = \"1\"\n\n[paths]\nentry = \"main.fab\"\n\n[build]\nkind = \"bin\"\n\n[device]\n{backend_line}"
+            "[package]\nname = \"device-precedence\"\nversion = \"0.1.0\"\nedition = \"1\"\n\n[paths]\nentry = \"main.fab\"\n\n[build]\nkind = \"bin\"\n\n[device]\n{device_line}"
         ),
     )
     .expect("write manifest");
@@ -156,17 +157,17 @@ fn write_manifest(dir: &Path, device_backend: Option<&str>) {
 
 #[test]
 fn route_selection_cli_flag_overrides_manifest() {
-    let dir = temp_dir("backend-cli-overrides-manifest");
+    let dir = temp_dir("device-cli-overrides-manifest");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, Some("metal"));
-    let args = run_args(dir.clone(), Some(BackendSelection::Auto));
+    let args = run_args(dir.clone(), Some(DeviceChoice::Auto));
     let selection = resolve_route_selection(&args, &dir).expect("resolves");
     assert_eq!(selection, DeviceSelection::Auto);
 }
 
 #[test]
 fn route_selection_manifest_used_when_no_cli_flag() {
-    let dir = temp_dir("backend-manifest-used");
+    let dir = temp_dir("device-manifest-used");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, Some("cuda"));
     let args = run_args(dir.clone(), None);
@@ -176,7 +177,7 @@ fn route_selection_manifest_used_when_no_cli_flag() {
 
 #[test]
 fn route_selection_defaults_to_auto_without_manifest_key() {
-    let dir = temp_dir("backend-default-auto");
+    let dir = temp_dir("device-default-auto");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, None);
     let args = run_args(dir.clone(), None);
@@ -186,7 +187,7 @@ fn route_selection_defaults_to_auto_without_manifest_key() {
 
 #[test]
 fn route_selection_defaults_to_auto_without_manifest() {
-    let dir = temp_dir("backend-no-manifest");
+    let dir = temp_dir("device-no-manifest");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     let args = run_args(dir.clone(), None);
     let selection = resolve_route_selection(&args, &dir).expect("resolves");
@@ -194,40 +195,92 @@ fn route_selection_defaults_to_auto_without_manifest() {
 }
 
 #[test]
-fn route_selection_rejects_invalid_manifest_backend() {
-    let dir = temp_dir("backend-invalid-manifest");
+fn route_selection_rejects_invalid_manifest_device() {
+    let dir = temp_dir("device-invalid-manifest");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, Some("rocm"));
     let args = run_args(dir.clone(), None);
     let err = resolve_route_selection(&args, &dir).expect_err("invalid value must fail closed");
     assert!(err.message.contains("rocm"));
-    assert!(err.message.contains("device.backend"));
+    assert!(err.message.contains("device.device"));
 }
 
 #[test]
 fn route_selection_invalid_manifest_with_cli_flag_is_ignored() {
     // Precedence: the CLI flag wins, so an invalid manifest value never
-    // blocks a package run that names the backend explicitly.
-    let dir = temp_dir("backend-cli-overrides-invalid-manifest");
+    // blocks a package run that names the device explicitly.
+    let dir = temp_dir("device-cli-overrides-invalid-manifest");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, Some("rocm"));
-    let args = run_args(dir.clone(), Some(BackendSelection::Auto));
+    let args = run_args(dir.clone(), Some(DeviceChoice::Auto));
     let selection = resolve_route_selection(&args, &dir).expect("CLI flag wins");
     assert_eq!(selection, DeviceSelection::Auto);
+}
+
+#[test]
+fn route_selection_cpu_fails_closed_with_named_code() {
+    let dir = temp_dir("device-cpu-cli");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let args = run_args(dir.clone(), Some(DeviceChoice::Cpu));
+    let err = resolve_route_selection(&args, &dir).expect_err("cpu has no device yet");
+    assert_eq!(err.issue(), Some("E_DEVICE_CPU_UNAVAILABLE"));
+}
+
+#[test]
+fn route_selection_manifest_cpu_fails_closed_with_named_code() {
+    let dir = temp_dir("device-cpu-manifest");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, Some("cpu"));
+    let args = run_args(dir.clone(), None);
+    let err = resolve_route_selection(&args, &dir).expect_err("cpu has no device yet");
+    assert_eq!(err.issue(), Some("E_DEVICE_CPU_UNAVAILABLE"));
+}
+
+#[test]
+fn route_selection_retired_backend_key_is_refused_naming_device() {
+    let dir = temp_dir("device-retired-backend-key");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    std::fs::write(
+        dir.join("faber.toml"),
+        "[package]\nname = \"retired-key\"\nversion = \"0.1.0\"\nedition = \"1\"\n\n[paths]\nentry = \"main.fab\"\n\n[build]\nkind = \"bin\"\n\n[device]\nbackend = \"auto\"\n",
+    )
+    .expect("write manifest");
+    let args = run_args(dir.clone(), None);
+    let err = resolve_route_selection(&args, &dir).expect_err("retired key must fail closed");
+    assert_eq!(err.issue(), Some("package_device_backend_renamed"));
+    assert!(
+        err.message.contains("device = "),
+        "names the new key: {}",
+        err.message
+    );
+}
+
+#[test]
+fn run_rejects_the_retired_backend_flag() {
+    let dir = temp_dir("device-retired-backend-flag");
+    std::fs::write(dir.join("main.fab"), "main { print 1 }\n").expect("write entry");
+    let output = run_faber_binary(&dir, &["--backend", "metal"]);
+    assert_eq!(output.status.code(), Some(2), "clap usage error");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unexpected argument '--backend'"),
+        "unknown-argument error: {stderr}"
+    );
 }
 
 // ── RSM-4: fail-closed stats + device-route refusal (CLI hook) ───────────
 
 #[test]
-fn route_selection_refuses_stats_with_explicit_device_backend() {
-    let dir = temp_dir("stats-backend-refused");
+fn route_selection_refuses_stats_with_explicit_device() {
+    let dir = temp_dir("stats-device-refused");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, Some("metal"));
 
-    let mut args = run_args(dir.clone(), Some(BackendSelection::Metal));
+    let mut args = run_args(dir.clone(), Some(DeviceChoice::Metal));
     args.stats = true;
     let err = resolve_route_selection(&args, &dir)
-        .expect_err("stats + explicit device backend must refuse during route resolution");
+        .expect_err("stats + explicit device must refuse during route resolution");
     assert_eq!(err.issue(), Some("run_stats_device_route_unsupported"));
     assert!(
         err.message.contains("run statistics") && err.message.contains("metal"),
@@ -236,20 +289,20 @@ fn route_selection_refuses_stats_with_explicit_device_backend() {
     );
 
     // The file-sink spelling refuses with the same identity.
-    let mut file_args = run_args(dir.clone(), Some(BackendSelection::Cuda));
+    let mut file_args = run_args(dir.clone(), Some(DeviceChoice::Cuda));
     file_args.stats_file = Some(dir.join("refused.json"));
     let err = resolve_route_selection(&file_args, &dir)
-        .expect_err("stats-file + explicit device backend must refuse identically");
+        .expect_err("stats-file + explicit device must refuse identically");
     assert_eq!(err.issue(), Some("run_stats_device_route_unsupported"));
 }
 
 #[test]
-fn route_selection_allows_stats_with_auto_or_absent_backend() {
+fn route_selection_allows_stats_with_auto_or_absent_device() {
     let dir = temp_dir("stats-auto-allowed");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, None);
 
-    let mut auto_args = run_args(dir.clone(), Some(BackendSelection::Auto));
+    let mut auto_args = run_args(dir.clone(), Some(DeviceChoice::Auto));
     auto_args.stats = true;
     assert_eq!(
         resolve_route_selection(&auto_args, &dir).expect("auto stays on the CPU route"),
@@ -259,7 +312,7 @@ fn route_selection_allows_stats_with_auto_or_absent_backend() {
     let mut manifest_args = run_args(dir.clone(), None);
     manifest_args.stats = true;
     assert_eq!(
-        resolve_route_selection(&manifest_args, &dir).expect("absent backend resolves"),
+        resolve_route_selection(&manifest_args, &dir).expect("absent device resolves"),
         DeviceSelection::Auto
     );
 }
@@ -298,19 +351,19 @@ fn assert_refusal_names_stats_device_incompatibility(stderr: &str) {
 }
 
 #[test]
-fn route_stats_cli_backend_refusal_exits_nonzero_without_artifact() {
-    let dir = temp_dir("stats-cli-backend-metal-cli-refused");
+fn route_stats_cli_device_refusal_exits_nonzero_without_artifact() {
+    let dir = temp_dir("stats-cli-device-metal-cli-refused");
     std::fs::write(dir.join("main.fab"), "main { print 1 }\n").expect("write entry");
 
     let stats_file = dir.join("refused.json");
     let file_arg = stats_file.to_str().expect("UTF-8 stats path");
     let output = run_faber_binary(
         &dir,
-        &["--stats", "--stats-file", file_arg, "--backend", "metal"],
+        &["--stats", "--stats-file", file_arg, "--device", "metal"],
     );
     assert!(
         !output.status.success(),
-        "stats + explicit device backend must exit nonzero: {:?}",
+        "stats + explicit device must exit nonzero: {:?}",
         output.status
     );
     assert_refusal_names_stats_device_incompatibility(&String::from_utf8_lossy(&output.stderr));
@@ -318,8 +371,8 @@ fn route_stats_cli_backend_refusal_exits_nonzero_without_artifact() {
 }
 
 #[test]
-fn route_stats_manifest_backend_refusal_exits_nonzero_without_artifact() {
-    // No CLI `--backend`: the manifest-declared selection reaches the seam,
+fn route_stats_manifest_device_refusal_exits_nonzero_without_artifact() {
+    // No CLI `--device`: the manifest-declared selection reaches the seam,
     // which refuses before any device callback/launch (the seam is observed
     // refusing, not the device failing).
     let dir = temp_dir("stats-manifest-metal-seam-refused");
@@ -340,7 +393,7 @@ entry = "main.fab"
 kind = "bin"
 
 [device]
-backend = "metal"
+device = "metal"
 "#,
     )
     .expect("write manifest");
@@ -356,7 +409,7 @@ backend = "metal"
     assert_refusal_names_stats_device_incompatibility(&String::from_utf8_lossy(&output.stderr));
     assert_no_stats_artifact(&output, &stats_file);
 
-    // No-stats callers keep the existing device/backend semantics (here: the
+    // No-stats callers keep the existing device semantics (here: the
     // fail-closed device refusal of a build without `device-runtime`), and
     // the refusal identity is the device one, not the stats one.
     let unstatsed = run_faber_binary(&dir, &[]);

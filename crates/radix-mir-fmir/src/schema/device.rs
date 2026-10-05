@@ -46,7 +46,7 @@ pub struct FmirDeviceSection {
     /// legacy/generated-only programs and old WIRE v8 payloads remain valid.
     #[serde(default)]
     pub executor_plan: Option<FmirExecutorPlanSection>,
-    /// Backend selection request (from `--backend` / manifest / `auto`).
+    /// Backend selection request (from `--device` / manifest / `auto`).
     pub selection: FmirDeviceSelection,
     /// Declared backend artifacts (Metal MSL, CUDA PTX) — each a versioned
     /// `DeviceArtifact` packet with its `content_sha256`/`packet_sha256`

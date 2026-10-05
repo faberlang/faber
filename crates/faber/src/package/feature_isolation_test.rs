@@ -42,7 +42,7 @@ fn default_build_has_no_public_runtime_or_host_leaf() {
 
 #[test]
 fn route_selection_spellings_parse_without_runtime() {
-    // Manifest `[device] backend` spellings parse against the local selection
+    // Manifest `[device] device` spellings parse against the local selection
     // type; unknown spellings fail closed (never silently guessed), matching
     // the packaged runtime's spelling surface.
     assert_eq!(

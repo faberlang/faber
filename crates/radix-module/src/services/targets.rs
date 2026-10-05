@@ -358,21 +358,21 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
         },
         // Faber device execution uses runtime backends rather than
         // target-specific text emitters. These rows describe the runtime
-        // surface: `faber run --backend <metal|cuda>` or a compiled FMIR
+        // surface: `faber run --device <metal|cuda>` or a compiled FMIR
         // image runner; `-t metal-text` / `-t llvm-text` remain emit-only.
         crate::codegen::Target::MirMetal => TargetCapabilities {
             check: true,
             build: true,
             run: true,
             package: true,
-            note: "Metal device execution via `faber run --backend metal` or a compiled FMIR image runner; `-t metal-text` remains emit-only",
+            note: "Metal device execution via `faber run --device metal` or a compiled FMIR image runner; `-t metal-text` remains emit-only",
         },
         crate::codegen::Target::MirLlvm => TargetCapabilities {
             check: true,
             build: true,
             run: true,
             package: true,
-            note: "CUDA device execution via `faber run --backend cuda` or a compiled FMIR image runner; `-t llvm-text` remains emit-only",
+            note: "CUDA device execution via `faber run --device cuda` or a compiled FMIR image runner; `-t llvm-text` remains emit-only",
         },
         crate::codegen::Target::HirRust => capabilities,
         // Stage 9 (llvm-host-parity product slice): llvm-host is the native

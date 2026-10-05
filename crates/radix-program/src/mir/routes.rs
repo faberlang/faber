@@ -54,7 +54,7 @@ pub fn run_package_mir<H: Host + ?Sized>(
 }
 
 /// [`run_package_mir`] with an explicit selection override (the CLI
-/// `--backend` flag, N1.1 precedence: CLI > image's declared selection >
+/// `--device` flag, N1.1 precedence: CLI > image's declared selection >
 /// `auto`).
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
@@ -413,7 +413,7 @@ pub(super) fn run_loaded_fmir_image_route<H: Host + ?Sized>(
 }
 
 /// The same policy with an explicit selection override (the image-runner
-/// route's `--backend` flag, N1.1 precedence: CLI > image's declared
+/// route's `--device` flag, N1.1 precedence: CLI > image's declared
 /// selection > `auto`).
 pub(super) fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
     image: FmirPackageImage,
@@ -465,7 +465,7 @@ pub fn run_fmir_image_path<H: Host + ?Sized>(
 }
 
 /// Run an FMIR image file under the one host-construction policy, with an
-/// optional selection override (the image-runner `--backend` flag).
+/// optional selection override (the image-runner `--device` flag).
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
 pub fn run_fmir_image_path_with_selection<H: Host + ?Sized>(

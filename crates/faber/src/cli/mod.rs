@@ -4,8 +4,7 @@ mod emit;
 
 use clap::{Parser, Subcommand, ValueEnum};
 pub use emit::{EmitArgs, FaberCliTarget};
-#[cfg(feature = "runner")]
-use radix::program::mir::DeviceSelection;
+use faber_cli::package::DeviceChoice;
 use std::path::PathBuf;
 
 const FABER_AFTER_HELP: &str = include_str!("../../docs/help/faber-after-help.md");
@@ -590,17 +589,18 @@ pub struct RunArgs {
     #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
     pub diagnostics_locale: Option<String>,
 
-    /// Backend selection for device-capable packages (differentiable-GPU
-    /// campaign N1.1). When omitted, the manifest `[device] backend` wins;
-    /// otherwise the default `auto` applies. Precedence: CLI > manifest >
-    /// `auto`. An explicit `metal`/`cuda` request never silently falls back:
-    /// it fails closed before launch (`E_BACKEND_UNAVAILABLE`) when the
-    /// backend is not admitted on this machine, and a package with no device
-    /// program fails closed ("package has no device program"). Device
-    /// programs execute through the host driver (the first-party target
-    /// runtime).
-    #[arg(long = "backend", value_enum, value_name = "BACKEND")]
-    pub backend: Option<BackendSelection>,
+    /// Device selection for device-capable packages (differentiable-GPU
+    /// campaign N1.1): `auto`, `cpu`, `metal`, or `cuda`. When omitted, the
+    /// manifest `[device] device` wins; otherwise the default `auto` applies.
+    /// Precedence: CLI > manifest > `auto`. An explicit device request never
+    /// silently falls back: it fails closed before launch
+    /// (`E_BACKEND_UNAVAILABLE`) when the device is not admitted on this
+    /// machine, and a package with no device program fails closed ("package
+    /// has no device program"). `cpu` fails closed (`E_DEVICE_CPU_UNAVAILABLE`)
+    /// until the CPU device exists. Device programs execute through the host
+    /// driver (the first-party target runtime).
+    #[arg(long = "device", value_enum, value_name = "DEVICE")]
+    pub device: Option<DeviceChoice>,
 
     /// Emit diagnostic runner statistics after a package run.
     #[arg(long)]
@@ -623,46 +623,17 @@ pub struct RunArgs {
     pub args: Vec<String>,
 }
 
-/// Device backend selection for `faber run --backend` (N1.1).
-///
-/// Mirrors the frozen FMIR `device.selection` surface
-/// (`DeviceSelection: auto | metal | cuda`); the CLI converts
-/// through [`BackendSelection::selection`].
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BackendSelection {
-    /// Resolve against host capability probes; fail closed when the machine
-    /// admits zero or more than one backend.
-    Auto,
-    /// Select Metal explicitly; never silently falls back.
-    Metal,
-    /// Select CUDA explicitly; never silently falls back.
-    Cuda,
-}
-
-impl BackendSelection {
-    /// Convert to the shared route-selection request.
-    #[must_use]
-    #[cfg(feature = "runner")]
-    pub fn selection(self) -> DeviceSelection {
-        match self {
-            Self::Auto => DeviceSelection::Auto,
-            Self::Metal => DeviceSelection::Metal,
-            Self::Cuda => DeviceSelection::Cuda,
-        }
-    }
-}
-
 /// Arguments for the hidden FMIR image runner.
 #[derive(clap::Args, Debug)]
 pub struct FmirRunArgs {
     /// FMIR image path to execute.
     pub image: PathBuf,
 
-    /// Backend selection override for the image-runner route (N1.1). When
+    /// Device selection override for the image-runner route (N1.1). When
     /// omitted, the image's declared `device.selection` wins; otherwise
     /// `auto` applies.
-    #[arg(long = "backend", value_enum, value_name = "BACKEND")]
-    pub backend: Option<BackendSelection>,
+    #[arg(long = "device", value_enum, value_name = "DEVICE")]
+    pub device: Option<DeviceChoice>,
 
     /// Arguments passed to the FMIR program.
     #[arg(allow_hyphen_values = true, last = true)]

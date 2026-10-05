@@ -102,13 +102,13 @@ pub use llvm_host::{
     host_triple_for,
 };
 #[cfg(feature = "runner")]
-pub use manifest::manifest_backend_selection;
+pub use manifest::manifest_device_choice;
 pub(crate) use manifest::manifest_device_inputs;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
-    FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
-    ManifestProductShaders, manifest_package_build_target as manifest_build_target_for_input,
-    read_manifest,
+    DeviceChoice, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
+    ManifestProductShaders, device_cpu_unavailable,
+    manifest_package_build_target as manifest_build_target_for_input, read_manifest,
 };
 #[cfg(feature = "runner")]
 pub use mir::run_fmir_image_bytes_with_stdio;

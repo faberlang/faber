@@ -352,7 +352,7 @@ fn prepare_package_mir<R>(
         cli_exit_code: cli_plan.exit_code,
         fmir_text_cli: cli_plan.fmir_text_cli.clone(),
         device_inputs: device_config.inputs,
-        device_backend: device_config.backend,
+        device_selection: device_config.selection,
         device_steps: device_config.steps,
         device_declared: device_config.declared,
         _marker: std::marker::PhantomData,

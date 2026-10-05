@@ -523,7 +523,7 @@ entry = "main.fab"
 kind = "bin"
 
 [device]
-backend = "metal"
+device = "metal"
 "#,
     )
     .expect("write device manifest");

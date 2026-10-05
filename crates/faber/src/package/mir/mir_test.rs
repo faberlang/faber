@@ -330,7 +330,7 @@ fn host_route_seam_no_stats_callers_pass_false_and_keep_device_semantics() {
     assert_eq!(host.stdout_lines, vec!["1".to_owned()]);
 
     // The stats-capable route with an explicit `false` reproduces the
-    // unstatsed device/backend semantics: the fail-closed refusal keeps the
+    // unstatsed device semantics: the fail-closed refusal keeps the
     // device identity, never the stats identity.
     let mut device_host = radix::module::mir::BufferHost::default();
     let err = radix::program::mir::run_package_mir_with_selection_and_stats(

@@ -14,7 +14,7 @@ use radix::module::diagnostics::Diagnostic;
 use radix::program::mir::DeviceManifestConfig;
 
 /// Read the package's `[device]` surface for the S1-6 device payload:
-/// `[device] inputs` (typed f32 host inputs), `[device] backend` (the
+/// `[device] inputs` (typed f32 host inputs), `[device] device` (the
 /// selection request recorded in the image), and `[device] steps` (the
 /// S5-U5b declared training step count). Absent manifest → no device
 /// declaration.
@@ -29,11 +29,14 @@ pub(super) fn manifest_device_config(
     let manifest = super::super::read_manifest(&layout.manifest_path)
         .map_err(|diagnostic| vec![*diagnostic])?;
     let inputs = super::super::manifest_device_inputs(&manifest.device.inputs);
-    let backend = super::super::manifest_backend_selection(
-        manifest.device.backend.as_deref(),
+    // `cpu` records no device section (the CPU device builds none): it
+    // projects to no selection here, and `faber run` refuses it earlier.
+    let selection = super::super::manifest_device_choice(
+        manifest.device.device.as_deref(),
         &layout.manifest_path,
     )
-    .map_err(|diagnostic| vec![*diagnostic])?;
+    .map_err(|diagnostic| vec![*diagnostic])?
+    .and_then(super::super::DeviceChoice::selection);
     // S5-U5b: a zero declared step count is a contradiction (a RepeatingStep
     // program must drive at least one step) — fail closed at the point of
     // use, never treated as "absent".
@@ -45,10 +48,10 @@ pub(super) fn manifest_device_config(
                 .with_arg("issue", "package_device_steps_zero"),
         ]);
     }
-    let declared = !inputs.is_empty() || backend.is_some();
+    let declared = !inputs.is_empty() || selection.is_some();
     Ok(DeviceManifestConfig {
         inputs,
-        backend,
+        selection,
         steps,
         declared,
     })

@@ -187,7 +187,7 @@ fn device_section_builder(
         for (name, values) in upstream_seeds {
             device_inputs.insert(name, values);
         }
-        let selection = prepared.device_backend.unwrap_or(DeviceSelection::Auto);
+        let selection = prepared.device_selection.unwrap_or(DeviceSelection::Auto);
         let section = super::device::device_section_for_program(
             &program,
             &semantics,
@@ -216,7 +216,7 @@ fn device_section_builder(
 /// `stats_requested` is the explicit CLI-originated fact transported by the
 /// radix-program route (RSM-2); a stats request on a route that will not run
 /// the interpreter — a device-bearing image (device route) or an explicit
-/// backend selection — refuses here before any device callback/launch
+/// device selection — refuses here before any device callback/launch
 /// (RSM-4, fail closed; never silently empty numbers).
 #[cfg(feature = "runner")]
 fn host_route(
@@ -232,7 +232,7 @@ fn host_route(
         )]);
     }
     // DDPP1-U2 (C2 feature isolation): the device route is compiled only under
-    // `device-runtime`; without it an explicit backend request or a
+    // `device-runtime`; without it an explicit device request or a
     // device-bearing image fails closed (never silently runs CPU).
     #[cfg(feature = "device-runtime")]
     {
@@ -243,7 +243,7 @@ fn host_route(
         if selection != DeviceSelection::Auto {
             return Err(vec![mir_diag(
                 &image.diagnostic_path,
-                "explicit backend selection requires a device image; CPU-only images never silently fall back",
+                "explicit device selection requires a device image; CPU-only images never silently fall back",
             )]);
         }
         Ok(None)
@@ -254,7 +254,7 @@ fn host_route(
         if selection != DeviceSelection::Auto || requires_device {
             return Err(vec![mir_diag(
                 &image.diagnostic_path,
-                "device section or explicit backend selection present, but this faber build compiles no `device-runtime`; rebuild with the `device-runtime` feature to execute device routes",
+                "device section or explicit device selection present, but this faber build compiles no `device-runtime`; rebuild with the `device-runtime` feature to execute device routes",
             )]);
         }
         Ok(None)

@@ -96,7 +96,7 @@ fn projection_tolerates_product_only_sections() {
 name = "demo"
 
 [device]
-backend = "auto"
+device = "auto"
 steps = 250
 
 [product]
@@ -158,7 +158,7 @@ fn read_manifest_parses_projection_from_disk() {
     let manifest_path = root.join("faber.toml");
     fs::write(
         &manifest_path,
-        "[package]\nname = \"demo\"\n\n[device]\nbackend = \"auto\"\n",
+        "[package]\nname = \"demo\"\n\n[device]\ndevice = \"auto\"\n",
     )
     .expect("write manifest");
     let manifest = read_manifest(&manifest_path).expect("read compiler projection");
