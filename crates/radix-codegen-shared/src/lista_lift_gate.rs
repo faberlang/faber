@@ -97,7 +97,7 @@ fn lista_form(types: &TypeTable, expr: &HirExpression) -> Option<&'static str> {
                     // that same type; a join to a wider element is new.
                     let result = lista_element(types, expr.ty)?;
                     let operand = left.or(right)?;
-                    return (!types.equals(result, operand)).then(|| match op {
+                    return (!types.equals(result, operand)).then_some(match op {
                         HirBinOp::Add => "+",
                         HirBinOp::Sub => "-",
                         HirBinOp::Mul => "*",

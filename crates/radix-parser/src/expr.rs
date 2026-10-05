@@ -1681,7 +1681,10 @@ impl Parser {
         } else {
             None
         };
-        if identity.is_none() && body.is_none() && group.is_none() && apud.is_empty()
+        if identity.is_none()
+            && body.is_none()
+            && group.is_none()
+            && apud.is_empty()
             && let ExprKind::Binary(BinaryExpr {
                 op: BinOp::Coalesce,
                 lhs,

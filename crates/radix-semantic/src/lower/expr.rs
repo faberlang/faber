@@ -33,8 +33,7 @@ use crate::{Primitive, SemanticErrorKind, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
-    HirId, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey,
-    HirOptionalChainKind, HirUnOp,
+    HirId, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirUnOp,
 };
 use radix_syntax::{
     BinaryExpr, Expr, ExprKind, GenericArgExpr, Literal, TypeExpr, TypeExprKind, UnaryExpr,

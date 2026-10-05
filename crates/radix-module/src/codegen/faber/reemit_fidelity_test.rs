@@ -554,14 +554,10 @@ fn scalar_math_and_vector_lift_survive_reemission() {
         "scalar math methods must survive:\n{code}"
     );
     assert!(
-        code.contains("x.radix() - (v * x.sinus()) / x")
-            || code.contains("x.radix() - v * x.sinus() / x"),
+        code.contains("x.radix() - (v * x.sinus()) / x") || code.contains("x.radix() - v * x.sinus() / x"),
         "vector lift operand order must survive:\n{code}"
     );
-    assert!(
-        code.contains("-(v + x)"),
-        "negated sum keeps its parentheses:\n{code}"
-    );
+    assert!(code.contains("-(v + x)"), "negated sum keeps its parentheses:\n{code}");
 }
 
 #[test]

@@ -34,14 +34,14 @@ mod cli_bind;
 pub(crate) mod cli_plan;
 pub(crate) mod cli_values;
 pub(crate) mod diag;
+#[cfg(test)]
+mod diag_test;
 pub(crate) mod driver;
 pub(crate) mod image;
 pub(crate) mod link;
 pub(crate) mod lower;
 pub(crate) mod manifest;
 pub(crate) mod remap;
-#[cfg(test)]
-mod diag_test;
 
 #[cfg(test)]
 mod remap_test;

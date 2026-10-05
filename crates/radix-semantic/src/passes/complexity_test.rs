@@ -16,9 +16,9 @@ use crate::catalog_semantic::semantic_spec;
 use crate::test_support::{args_have_no_legacy_message, test_span};
 use radix_hir::{
     DefId, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConversioTarget, HirCustodi,
-    HirCustodiClause, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem,
-    HirItemKind, HirIteraMode, HirLiteral, HirModule, HirReductionOp, HirNonNullKind, HirOptionalChainKind,
-    HirPattern, HirStatement, HirStatementKind,
+    HirCustodiClause, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
+    HirIteraMode, HirLiteral, HirModule, HirNonNullKind, HirOptionalChainKind, HirPattern,
+    HirReductionOp, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Interner, Symbol};
 use radix_syntax::CallablePosture;
