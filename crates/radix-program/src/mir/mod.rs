@@ -41,6 +41,9 @@ pub(crate) mod lower;
 pub(crate) mod manifest;
 pub(crate) mod remap;
 #[cfg(test)]
+mod diag_test;
+
+#[cfg(test)]
 mod remap_test;
 
 #[cfg(test)]
@@ -566,7 +569,7 @@ use cli_values::{
     is_package_mir_supported_option, matching_cli_command, package_mir_cli_exit_code,
     plan_cli_command_records, push_cli_option_default_diagnostic, unsupported_cli_diagnostic,
 };
-use diag::{mir_issue_diag, mir_lowering_diag, runner_diagnostics};
+use diag::{mir_error_diag, mir_issue_diag, mir_lowering_diag, runner_diagnostics};
 use driver::{
     is_bridged_norma_import_path, with_prepared_package_mir, with_prepared_package_mir_from_loaded,
     with_prepared_package_mir_with_cli_mode,

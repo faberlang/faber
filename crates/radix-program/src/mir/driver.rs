@@ -164,7 +164,7 @@ pub(crate) fn link_package_functions<R>(
         |errors| {
             errors
                 .into_iter()
-                .map(|error| mir_lowering_diag(&anchor_path, error.message))
+                .map(|error| mir_lowering_diag(&anchor_path, error.message).with_span(error.span))
                 .collect::<Vec<_>>()
         },
     )?;
@@ -336,7 +336,7 @@ fn prepare_package_mir<R>(
         |errors| {
             errors
                 .into_iter()
-                .map(|error| mir_lowering_diag(&entry_path, error.message))
+                .map(|error| mir_lowering_diag(&entry_path, error.message).with_span(error.span))
                 .collect::<Vec<_>>()
         },
     )?;

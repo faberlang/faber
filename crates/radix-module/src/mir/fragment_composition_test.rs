@@ -1694,3 +1694,248 @@ fn uncarrid_synthetic_compute_is_not_a_device_callee() {
         "an uncarried function is never pruned as a composed helper"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Depth is nesting, not the number of calls: sibling calls in one block share
+// their enclosing depth; only a true call chain deepens it.
+// ---------------------------------------------------------------------------
+
+const CHAIN_BASE_SOURCE: u32 = 100;
+const CHAIN_BASE_FUNCTION: u32 = 10;
+
+fn chain_roles(links: u32) -> FxHashMap<DefId, MirDeviceRole> {
+    let mut roles = roles();
+    for link in 1..=links {
+        roles.insert(DefId(CHAIN_BASE_SOURCE + link), MirDeviceRole::Fragment);
+    }
+    roles
+}
+
+/// A caller block that calls `callee` once per local `1..=calls` in sequence,
+/// then returns the last result.
+fn sequential_calls_block(calls: u32, callee: u32) -> (Vec<MirLocal>, MirBlock) {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let locals = (1..=calls)
+        .map(|local| MirLocal { id: MirLocalId(local), name: None, ty, mutable: false, span: test_span() })
+        .collect();
+    let statements = (1..=calls)
+        .map(|local| {
+            call_stmt(
+                Some(MirPlace::local(MirLocalId(local))),
+                MirFunctionId(callee),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+            )
+        })
+        .collect();
+    let block = MirBlock {
+        id: MirBlockId(0),
+        statements,
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(calls))))),
+            span: test_span(),
+        },
+        span: test_span(),
+    };
+    (locals, block)
+}
+
+fn compose_with_roles(
+    functions: &mut Vec<MirFunction>,
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+) -> Vec<FragmentCompositionError> {
+    compose(
+        functions,
+        &[],
+        roles,
+        ExpansionBudget::DOCUMENTED_DEFAULTS,
+        None,
+        &launch_entries(),
+    )
+}
+
+#[test]
+fn sequential_single_block_calls_do_not_count_as_nesting() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let (locals, block) = sequential_calls_block(20, 1);
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, ty)],
+        ty,
+        locals,
+        vec![block],
+        Some(MirKernelShaderStage::Compute),
+    );
+    let mut functions = vec![entry, identity_fragment(1, FRAGMENT, ty)];
+    assert_eq!(
+        ExpansionBudget::DOCUMENTED_DEFAULTS.max_depth,
+        16,
+        "test premise: the documented depth limit"
+    );
+    let errors = compose_fns(&mut functions);
+    assert!(errors.is_empty(), "20 sequential calls are depth 1, not depth 20: {errors:?}");
+    assert_eq!(fragment_call_count(&functions), 0, "every sequential call composes");
+}
+
+#[test]
+fn sequential_calls_inside_a_called_fragment_nest_one_level() {
+    // entry -> wrapper -> (20 sequential identity calls): depth 2, not 21.
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let (locals, block) = sequential_calls_block(20, 2);
+    let wrapper = function(1, FRAGMENT, vec![param(0, ty)], ty, locals, vec![block], None);
+    let identity = identity_fragment(2, FRAGMENT_INNER, ty);
+    let entry = entry_calling(1, 1, ty, Vec::new(), Vec::new());
+    let mut functions = vec![entry, wrapper, identity];
+    let errors = compose_fns(&mut functions);
+    assert!(
+        errors.is_empty(),
+        "sequential siblings in a callee are one nesting level: {errors:?}"
+    );
+    assert_eq!(fragment_call_count(&functions), 0);
+}
+
+#[test]
+fn sequential_calls_do_not_hide_a_real_depth_overflow() {
+    // The same 20-wide caller, but its callee is itself a depth-limit-deep
+    // chain: nesting is still charged along the chain, siblings add nothing.
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let (mut functions, roles) = chain_program(ty, 16);
+    // Replace the entry body: 20 sequential calls into the head of a 16-link
+    // chain reach depth 16 each time (at the limit).
+    let (locals, block) = sequential_calls_block(20, CHAIN_BASE_FUNCTION + 1);
+    functions[0] = function(
+        0,
+        ENTRY,
+        vec![param(0, ty)],
+        ty,
+        locals,
+        vec![block],
+        Some(MirKernelShaderStage::Compute),
+    );
+    let errors = compose_with_roles(&mut functions, &roles);
+    assert!(
+        errors.is_empty(),
+        "16 nested levels reached 20 times in sequence still fit: {errors:?}"
+    );
+    let (mut functions, roles) = chain_program(ty, 17);
+    let (locals, block) = sequential_calls_block(20, CHAIN_BASE_FUNCTION + 1);
+    functions[0] = function(
+        0,
+        ENTRY,
+        vec![param(0, ty)],
+        ty,
+        locals,
+        vec![block],
+        Some(MirKernelShaderStage::Compute),
+    );
+    let errors = compose_with_roles(&mut functions, &roles);
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.issue == ISSUE_EXPANSION && err.reason == "depth"),
+        "a 17-deep chain overflows however many siblings precede it: {errors:?}"
+    );
+}
+
+/// `entry -> f1 -> f2 -> ... -> f<links>`, every link a single-block fragment
+/// and the last an identity. The call to `f<k>` sits at depth `k`.
+fn chain_program(ty: MirType, links: u32) -> (Vec<MirFunction>, FxHashMap<DefId, MirDeviceRole>) {
+    let mut functions = vec![entry_calling(1, CHAIN_BASE_FUNCTION + 1, ty, Vec::new(), Vec::new())];
+    for link in 1..=links {
+        let id = CHAIN_BASE_FUNCTION + link;
+        let source = DefId(CHAIN_BASE_SOURCE + link);
+        if link == links {
+            functions.push(identity_fragment(id, source, ty));
+        } else {
+            functions.push(function(
+                id,
+                source,
+                vec![param(0, ty)],
+                ty,
+                vec![MirLocal { id: MirLocalId(1), name: None, ty, mutable: false, span: test_span() }],
+                vec![MirBlock {
+                    id: MirBlockId(0),
+                    statements: vec![call_stmt(
+                        Some(MirPlace::local(MirLocalId(1))),
+                        MirFunctionId(id + 1),
+                        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                    )],
+                    terminator: MirTerminator {
+                        kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(1))))),
+                        span: test_span(),
+                    },
+                    span: test_span(),
+                }],
+                None,
+            ));
+        }
+    }
+    (functions, chain_roles(links))
+}
+
+#[test]
+fn sixteen_deep_chain_composes() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let (mut functions, roles) = chain_program(ty, 16);
+    let errors = compose_with_roles(&mut functions, &roles);
+    assert!(errors.is_empty(), "a chain exactly at the limit composes: {errors:?}");
+    assert_eq!(functions[0].blocks.len(), 1, "single-block hops splice in place");
+}
+
+#[test]
+fn seventeen_deep_chain_is_rejected_with_the_chain_named() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let (mut functions, roles) = chain_program(ty, 17);
+    let errors = compose_with_roles(&mut functions, &roles);
+    let err = errors
+        .iter()
+        .find(|err| err.issue == ISSUE_EXPANSION && err.reason == "depth")
+        .unwrap_or_else(|| panic!("a 17-deep chain must overflow the depth limit, got {errors:?}"));
+    let arg = |name: &str| {
+        err.args
+            .iter()
+            .find(|arg| arg.name == name)
+            .map(|arg| arg.value.clone())
+    };
+    assert_eq!(arg("observed").as_deref(), Some("17"));
+    assert_eq!(arg("limit").as_deref(), Some("16"));
+    let chain = arg("chain").expect("chain named");
+    assert!(chain.starts_with("#1 → #101 → #102"), "chain starts at the entry: {chain}");
+    assert!(chain.ends_with("#116 → #117"), "chain names the overflowing call: {chain}");
+}
+
+#[test]
+fn multi_block_chain_still_counts_nesting_along_the_goto_join() {
+    // A multi-block middle link takes the Goto-join splice; the chain below
+    // it is still charged one level per hop (tail depth is restored, callee
+    // blocks stay deeper).
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let (mut functions, roles) = chain_program(ty, 17);
+    // Link 2 (function 12) gets a second block: Goto(1) then Return(local1).
+    let link = functions
+        .iter_mut()
+        .find(|function| function.id == MirFunctionId(CHAIN_BASE_FUNCTION + 2))
+        .expect("link 2");
+    let mut tail = link.blocks.remove(0);
+    let ret = std::mem::replace(
+        &mut tail.terminator,
+        MirTerminator { kind: MirTerminatorKind::Goto(MirBlockId(1)), span: test_span() },
+    );
+    link.blocks.push(tail);
+    link.blocks
+        .push(MirBlock { id: MirBlockId(1), statements: Vec::new(), terminator: ret, span: test_span() });
+    let errors = compose_with_roles(&mut functions, &roles);
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.issue == ISSUE_EXPANSION && err.reason == "depth"),
+        "a 17-deep chain through a Goto-join link must still overflow: {errors:?}"
+    );
+}

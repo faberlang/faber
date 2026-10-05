@@ -120,6 +120,17 @@ pub struct MirError {
     pub definition_span: Option<Span>,
 }
 
+impl From<super::fragment_instantiation::FragmentInstantiationError> for MirError {
+    fn from(error: super::fragment_instantiation::FragmentInstantiationError) -> Self {
+        Self {
+            message: error.message(),
+            issue: error.issue.to_owned(),
+            span: error.span,
+            definition_span: error.definition_span,
+        }
+    }
+}
+
 /// Expand the deferred vector ops of one executable function (every shape
 /// size already literal), recording any site that cannot expand. Every place
 /// a function becomes executable calls this, so a surviving op is a producer
@@ -763,15 +774,7 @@ pub fn lower_analyzed_unit(
             &device_function_metadata,
         );
         if !instantiation_errors.is_empty() {
-            return Err(instantiation_errors
-                .into_iter()
-                .map(|error| MirError {
-                    message: error.message(),
-                    issue: error.issue.to_owned(),
-                    span: error.span,
-                    definition_span: None,
-                })
-                .collect());
+            return Err(instantiation_errors.into_iter().map(MirError::from).collect());
         }
         let composition_errors = super::fragment_composition::compose_with_metadata(
             &mut program.functions,

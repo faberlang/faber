@@ -31,6 +31,7 @@ use radix_mir::device::MirDeviceFunctionMetadataMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 #[cfg(test)]
 use std::cell::Cell;
+use std::rc::Rc;
 
 pub const ISSUE_CYCLE: &str = "nucleum_fragment_cycle";
 pub const ISSUE_EXPANSION: &str = "nucleum_fragment_expansion";
@@ -414,13 +415,14 @@ impl CompositionPass<'_> {
 
     fn expand_function(&mut self, caller_id: MirFunctionId) {
         let mut account = Account::new();
-        let mut block_depth = FxHashMap::default();
-        let mut block_chain = FxHashMap::default();
+        // Nesting is tracked per statement, not per block: sibling calls in
+        // one block share their enclosing depth, and only the statements a
+        // splice introduces sit one level deeper than the call they replace.
+        let root = Rc::new(vec![caller_id]);
+        let mut nesting: FxHashMap<MirBlockId, BlockNesting> = FxHashMap::default();
         if let Some(function) = self.function(caller_id) {
-            let root = vec![caller_id];
             for block in &function.blocks {
-                block_depth.insert(block.id, 0);
-                block_chain.insert(block.id, root.clone());
+                nesting.insert(block.id, BlockNesting::root(block.statements.len(), &root));
             }
         }
         let mut steps = 0;
@@ -492,15 +494,13 @@ impl CompositionPass<'_> {
                     return;
                 }
             }
-            let depth = block_depth
+            let enclosing = nesting
                 .get(&site.block_id)
-                .copied()
-                .unwrap_or(0u32)
-                .saturating_add(1);
-            let mut chain = block_chain
-                .get(&site.block_id)
+                .and_then(|block| block.site(site.stmt_index))
                 .cloned()
-                .unwrap_or_else(|| vec![caller_id]);
+                .unwrap_or_else(|| Nesting { depth: 0, chain: Rc::clone(&root) });
+            let depth = enclosing.depth.saturating_add(1);
+            let mut chain = enclosing.chain.as_ref().clone();
             chain.push(callee.id);
             if depth > self.budget.max_depth {
                 self.push_expansion("depth", site.span, depth, self.budget.max_depth, &chain);
@@ -555,23 +555,9 @@ impl CompositionPass<'_> {
             account.instances = account.instances.saturating_add(1);
             account.sites.insert(site_key, inlines);
             self.inlined.insert(callee.id);
-            for block_id in new_blocks.cloned {
-                block_depth.insert(block_id, depth);
-                block_chain.insert(block_id, chain.clone());
-            }
-            match new_blocks.continue_id {
-                Some(continue_id) => {
-                    block_depth.insert(continue_id, depth.saturating_sub(1));
-                    block_chain.insert(continue_id, chain[..chain.len() - 1].to_vec());
-                }
-                // No-new-blocks splice: the caller block now carries the
-                // callee's depth/chain so nested call sites keep counting —
-                // conservative for later tail sites in the same block, never
-                // lower than the Goto-join splice's accounting.
-                None => {
-                    block_depth.insert(site.block_id, depth);
-                    block_chain.insert(site.block_id, chain);
-                }
+            let spliced = Nesting { depth, chain: Rc::new(chain) };
+            if let Some(function) = self.function(caller_id) {
+                splice_nesting(&mut nesting, function, &site, &new_blocks, &spliced);
             }
         }
     }
@@ -797,8 +783,15 @@ impl CompositionPass<'_> {
     }
 
     fn push_expansion(&mut self, reason: &'static str, span: Span, observed: u32, limit: u32, chain: &[MirFunctionId]) {
+        // The innermost chain link is the callee that tripped the budget; its
+        // definition is the secondary span. A one-link chain names only the
+        // caller, which has no callee to point at.
+        let definition_span = match chain {
+            [_, .., callee] => self.function(*callee).map(|function| function.span),
+            _ => None,
+        };
         let chain = self.chain_labels(chain);
-        self.errors.push(error(
+        let mut diagnostic = error(
             ISSUE_EXPANSION,
             reason,
             span,
@@ -808,7 +801,9 @@ impl CompositionPass<'_> {
                 DiagnosticArg::new("limit", limit.to_string()),
                 DiagnosticArg::new("chain", &chain),
             ],
-        ));
+        );
+        diagnostic.definition_span = definition_span;
+        self.errors.push(diagnostic);
     }
 
     fn chain_labels(&self, ids: &[MirFunctionId]) -> String {
@@ -965,6 +960,91 @@ struct InlineBlocks {
     /// the splice added no blocks (the caller's own block continues in
     /// place).
     continue_id: Option<MirBlockId>,
+}
+
+/// Call-nesting context of one statement (or terminator): how many calls
+/// deep the code sits, and the call chain that put it there.
+#[derive(Clone)]
+struct Nesting {
+    depth: u32,
+    chain: Rc<Vec<MirFunctionId>>,
+}
+
+/// Per-block nesting, parallel to the block's statements plus its terminator.
+struct BlockNesting {
+    statements: Vec<Nesting>,
+    terminator: Nesting,
+}
+
+impl BlockNesting {
+    fn root(statements: usize, root: &Rc<Vec<MirFunctionId>>) -> Self {
+        let at_root = Nesting { depth: 0, chain: Rc::clone(root) };
+        Self { statements: vec![at_root.clone(); statements], terminator: at_root }
+    }
+
+    /// The nesting of a call site: its statement, or the terminator for a
+    /// `TryCall`.
+    fn site(&self, stmt_index: Option<usize>) -> Option<&Nesting> {
+        match stmt_index {
+            Some(index) => self.statements.get(index),
+            None => Some(&self.terminator),
+        }
+    }
+}
+
+/// Update the per-statement nesting after `site` was inlined. Only the
+/// statements the splice introduced take `spliced`; the caller's own tail and
+/// terminator keep the nesting they already had.
+fn splice_nesting(
+    nesting: &mut FxHashMap<MirBlockId, BlockNesting>,
+    caller: &MirFunction,
+    site: &CallSite,
+    new_blocks: &InlineBlocks,
+    spliced: &Nesting,
+) {
+    let Some(stmt_index) = site.stmt_index else {
+        return;
+    };
+    let Some(block) = caller.blocks.get(site.block_index) else {
+        return;
+    };
+    let Some(entry) = nesting.get_mut(&site.block_id) else {
+        return;
+    };
+    let inserted = |kept: usize| vec![spliced.clone(); block.statements.len().saturating_sub(kept)];
+    match new_blocks.continue_id {
+        // No-new-blocks splice: binds and the callee body replace the call
+        // statement in place; the caller's tail follows unchanged.
+        None => {
+            let tail = entry.statements.split_off(stmt_index + 1);
+            entry.statements.truncate(stmt_index);
+            let kept = stmt_index + tail.len();
+            entry.statements.extend(inserted(kept));
+            entry.statements.extend(tail);
+        }
+        // Goto-join splice: the block keeps its head and the argument binds,
+        // the caller's tail and terminator move to the continue block, and
+        // the cloned callee blocks sit at the spliced nesting.
+        Some(continue_id) => {
+            let mut tail = entry.statements.split_off(stmt_index);
+            tail.remove(0);
+            entry.statements.truncate(stmt_index);
+            entry.statements.extend(inserted(stmt_index));
+            let old_terminator = std::mem::replace(&mut entry.terminator, spliced.clone());
+            nesting.insert(continue_id, BlockNesting { statements: tail, terminator: old_terminator });
+            for cloned_id in &new_blocks.cloned {
+                let len = caller
+                    .blocks
+                    .iter()
+                    .find(|block| block.id == *cloned_id)
+                    .map_or(0, |block| block.statements.len());
+                nesting.insert(
+                    *cloned_id,
+                    BlockNesting { statements: vec![spliced.clone(); len], terminator: spliced.clone() },
+                );
+            }
+        }
+    }
 }
 
 struct Account {

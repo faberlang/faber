@@ -17,7 +17,7 @@ use super::{
     SourceRewrites, Symbol, Type, TypeId, TypeTable, build_nominal_remap, build_variant_remap,
     exported_nominal_names, extend_unmapped_library_sources, import_semantic_type_with_nominal,
     library_cached_analysis, library_cached_file_interface, lower_analyzed_unit, mir_diag,
-    mir_issue_diag, mir_lowering_diag, push_type_rewrite, record_shared_nominals,
+    mir_error_diag, mir_issue_diag, mir_lowering_diag, push_type_rewrite, record_shared_nominals,
     remap_function_text_symbols, remap_optional_symbol, remap_program_text_symbols,
     rewrite_analysis_namespace_calls, rewrite_closure_environment_sources,
     rewrite_generic_param_sources, rewrite_program_sources, rewrite_templates_sources,
@@ -1314,7 +1314,7 @@ pub(super) fn lower_package_units<'a>(
                         diagnostics.extend(
                             errors
                                 .into_iter()
-                                .map(|error| mir_lowering_diag(&library.path, error.message)),
+                                .map(|error| mir_error_diag(&library.path, error)),
                         );
                         return Ok(());
                     }
@@ -3064,17 +3064,10 @@ fn instantiate_package_generics<'a>(
         .map_err(|errors| {
             errors
                 .into_iter()
-                .map(|error| {
-                    // Preserve the named fail-closed issue (KPC-WIRE done_when
-                    // (e)): `imported_device_body_missing` and its siblings are
-                    // machine-readable identities, not message prose.
-                    let diagnostic = mir_lowering_diag(diagnostic_path, error.message);
-                    if error.issue.is_empty() {
-                        diagnostic
-                    } else {
-                        diagnostic.with_arg("issue", error.issue)
-                    }
-                })
+                // Preserve the named fail-closed issue (KPC-WIRE done_when
+                // (e)): `imported_device_body_missing` and its siblings are
+                // machine-readable identities, not message prose.
+                .map(|error| mir_error_diag(diagnostic_path, error))
                 .collect::<Vec<_>>()
         })?;
     merged.monomorphizations.extend(extra);
@@ -3526,7 +3519,7 @@ pub(super) fn lower_unit<'a>(
     let mut lowered = result.map_err(|errors| {
         errors
             .into_iter()
-            .map(|error| mir_lowering_diag(&unit.path, error.message))
+            .map(|error| mir_error_diag(&unit.path, error))
             .collect::<Vec<Diagnostic>>()
     })?;
 
@@ -3636,14 +3629,7 @@ fn append_shifted_program<'merged, 'incoming>(
             .map_err(|errors| {
                 errors
                     .into_iter()
-                    .map(|error| {
-                        let diagnostic = mir_lowering_diag(diagnostic_path, error.message);
-                        if error.issue.is_empty() {
-                            diagnostic
-                        } else {
-                            diagnostic.with_arg("issue", error.issue)
-                        }
-                    })
+                    .map(|error| mir_error_diag(diagnostic_path, error))
                     .collect::<Vec<_>>()
             })?;
         merged.monomorphizations.extend(monomorphizations);
@@ -3721,14 +3707,7 @@ fn append_shifted_library_parts<'a>(
             .map_err(|errors| {
                 errors
                     .into_iter()
-                    .map(|error| {
-                        let diagnostic = mir_lowering_diag(diagnostic_path, error.message);
-                        if error.issue.is_empty() {
-                            diagnostic
-                        } else {
-                            diagnostic.with_arg("issue", error.issue)
-                        }
-                    })
+                    .map(|error| mir_error_diag(diagnostic_path, error))
                     .collect::<Vec<_>>()
             })?;
         merged.monomorphizations.extend(monomorphizations);

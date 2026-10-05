@@ -186,10 +186,18 @@ pub(super) fn validate_deny_codes(codes: &[String]) {
 /// Print package compile diagnostics in the normal CLI style.
 pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix::module::diagnostics::Diagnostic]) {
     for diag in diagnostics {
-        if diag.is_error() {
-            eprintln!("error: {}", diag.message);
+        // A diagnostic that mapped a physical source line names `file:line`;
+        // byte-offset-only spans stay off the plain surface (they are not
+        // lines and would mislead).
+        let location = if diag.line.is_some() {
+            format!("{}: ", diag.display_location())
         } else {
-            eprintln!("warning: {}", diag.message);
+            String::new()
+        };
+        if diag.is_error() {
+            eprintln!("error: {location}{}", diag.message);
+        } else {
+            eprintln!("warning: {location}{}", diag.message);
         }
     }
 }

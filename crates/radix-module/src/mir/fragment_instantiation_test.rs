@@ -933,3 +933,218 @@ fn kernel_caller_to_uncarried_compute_rejects_host_callable() {
     let errors = check_fns_with_metadata(&[entry, uncarried], &types, &MirDeviceFunctionMetadataMap::default());
     expect_issue(&errors, ISSUE_CONTEXT, "host_callable");
 }
+
+// ---------------------------------------------------------------------------
+// Projected call arguments: `v[0]`, `p.axis`, `t[i]` are typed by their
+// projection result, never by their base.
+// ---------------------------------------------------------------------------
+
+fn lower_source(source: &str) -> Result<(), Vec<crate::mir::MirError>> {
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("load English locale pack");
+    let session = Session::new(Config::default().with_resolved_locale_pack(pack));
+    let mut analysis = driver::analyze_source(&session, "projected.fab", source, AnalyzeRequest::default())
+        .unwrap_or_else(|diagnostics| {
+            panic!(
+                "analyze source: {:?}",
+                diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+            )
+        });
+    crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).map(|_| ())
+}
+
+#[test]
+fn vector_lane_arguments_instantiate() {
+    let source = r"
+@ kernel
+fn vec3(f32 x, f32 y, f32 z) → vector<f32, 3> {
+    return [x, y, z] ↦ vector<f32, 3>
+}
+
+@ kernel
+fn xyz(vector<f32, 4> v) → vector<f32, 3> {
+    return vec3(v[0], v[1], v[2])
+}
+";
+    lower_source(source).unwrap_or_else(|errors| panic!("lane projections must instantiate: {errors:?}"));
+}
+
+#[test]
+fn genus_field_arguments_instantiate() {
+    let source = r"
+class Params {
+    const f32 scale
+    const vector<f32, 3> axis
+}
+
+@ kernel
+fn scaled(f32 s, vector<f32, 3> axis) → vector<f32, 3> {
+    return axis * s
+}
+
+@ kernel
+fn use_field(Params p) → vector<f32, 3> {
+    return scaled(p.scale, p.axis)
+}
+";
+    lower_source(source).unwrap_or_else(|errors| panic!("field projections must instantiate: {errors:?}"));
+}
+
+#[test]
+fn tensor_element_arguments_instantiate() {
+    let source = r"
+@ kernel
+fn twice(f32 x) → f32 {
+    return x * 2.0
+}
+
+@ kernel
+fn pick(tensor<f32, [24]> clock, int i) → f32 {
+    return twice(clock[i])
+}
+";
+    lower_source(source).unwrap_or_else(|errors| panic!("tensor element projections must instantiate: {errors:?}"));
+}
+
+/// Entry `k(vector<f32, 4> v)` calling `helper(v[0])`, where `helper` takes
+/// one `param_ty` parameter.
+fn lane_argument_program(types: &mut TypeTable, param_ty: Option<MirType>) -> (Vec<MirFunction>, MirType) {
+    use crate::semantic::{IndexExpr, NumericWidth, Primitive, Type};
+    let f32_elem = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let width = types.intern_index(IndexExpr::Literal(4));
+    let vec4 = MirType::semantic(types.intern(Type::Vector(f32_elem, width)));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let helper_param = param_ty.unwrap_or(MirType::semantic(f32_elem));
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![param(0, helper_param, MirParamMode::Owned)],
+        vacuum,
+        None,
+        Vec::new(),
+        None,
+        None,
+    );
+    let mut lane = MirPlace::local(MirLocalId(0));
+    lane.projections
+        .push(crate::mir::MirProjection::VectorLane(0));
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, vec4, MirParamMode::Owned)],
+        vacuum,
+        Some(MirCallee::Function(MirFunctionId(1))),
+        vec![MirOperand::Place(lane)],
+        None,
+        Some(MirKernelShaderStage::Compute),
+    );
+    (vec![entry, helper], vec4)
+}
+
+#[test]
+fn matching_projected_argument_instantiates_and_validates() {
+    let mut types = TypeTable::new();
+    let (functions, _) = lane_argument_program(&mut types, None);
+    let errors = check_fns(&functions, &types);
+    assert!(errors.is_empty(), "v[0] must not be typed as the whole vector: {errors:?}");
+    crate::mir::ValidatedMir::new(
+        crate::mir::MirProgram { functions },
+        crate::mir::MirValidationContext::new(&types),
+    )
+    .unwrap_or_else(|errors| panic!("lane-to-f32 call must validate: {errors:?}"));
+}
+
+#[test]
+fn mismatched_projected_argument_is_rejected_by_mir_validation() {
+    // The instantiation checker defers projected places; the lane `v[0]` is an
+    // f32 passed where the callee wants the whole vector, and MIR validation,
+    // which types the projection, rejects it with a call-argument diagnostic.
+    let mut types = TypeTable::new();
+    let (_, vec4) = lane_argument_program(&mut types, None);
+    let (functions, _) = lane_argument_program(&mut types, Some(vec4));
+    assert!(
+        check_fns(&functions, &types).is_empty(),
+        "instantiation defers projected places to MIR validation"
+    );
+    let Err(errors) = crate::mir::ValidatedMir::new(
+        crate::mir::MirProgram { functions },
+        crate::mir::MirValidationContext::new(&types),
+    ) else {
+        panic!("a lane (f32) passed for a vector parameter must not validate");
+    };
+    assert!(
+        errors
+            .iter()
+            .any(|error| format!("{error:?}").contains("call argument type mismatch")),
+        "expected a call argument type mismatch, got {errors:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Lowering errors keep their span, issue and definition span.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn instantiation_error_converts_with_span_issue_and_definition_span() {
+    let mut types = TypeTable::new();
+    let f32 = f32_ty(&mut types);
+    let u32 = crate::mir::test_support::u32_type(&mut types);
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![param(0, f32, MirParamMode::Owned)],
+        f32,
+        None,
+        Vec::new(),
+        None,
+        None,
+    );
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, u32, MirParamMode::Owned)],
+        f32,
+        Some(MirCallee::Function(MirFunctionId(1))),
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+        None,
+        Some(MirKernelShaderStage::Compute),
+    );
+    let errors = check_fns(&[entry, helper], &types);
+    let error = expect_issue(&errors, ISSUE_TYPE, "argument").clone();
+    let lowered = crate::mir::MirError::from(error);
+    assert_eq!(lowered.issue, ISSUE_TYPE);
+    assert_eq!(lowered.span, CALL_SPAN());
+    assert_eq!(
+        lowered.definition_span,
+        Some(DEF_SPAN()),
+        "the callee definition span reaches the lowering error"
+    );
+}
+
+#[test]
+fn composition_error_from_source_carries_span_and_definition_span() {
+    // An entry that starts a 17-call-deep chain overflows the depth limit; the lowering error
+    // names the issue, points at the overflowing call, and carries the callee
+    // definition span.
+    // `f1` is the public launch entry, expanded first, so it meets the whole
+    // chain uncomposed.
+    let mut source = String::new();
+    for level in 1..18 {
+        let visibility = if level == 1 { "@ public\n" } else { "" };
+        source.push_str(&format!(
+            "@ kernel\n{visibility}fn f{level}(f32 x) → f32 {{\n    return f{}(x)\n}}\n",
+            level + 1
+        ));
+    }
+    source.push_str("@ kernel\nfn f18(f32 x) → f32 {\n    return x\n}\n");
+    let errors = lower_source(&source).expect_err("a 17-call-deep chain must overflow the depth limit");
+    let depth = errors
+        .iter()
+        .find(|error| error.issue == super::super::fragment_composition::ISSUE_EXPANSION)
+        .unwrap_or_else(|| panic!("expected the expansion issue, got {errors:?}"));
+    assert_ne!(depth.span, Span::default(), "the overflowing call keeps its span");
+    assert!(
+        depth.definition_span.is_some(),
+        "the callee definition span is carried: {depth:?}"
+    );
+}

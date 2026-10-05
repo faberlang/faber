@@ -516,7 +516,16 @@ impl<'a> InstantiationChecker<'a> {
         }
     }
 
+    /// Type of a projection-free place. A projected place (`v[0]`, `p.axis`,
+    /// `t[i]`) has the type of its projection result, not of its base; this
+    /// checker carries no field-type or element-type table, so it answers
+    /// `None` (skip the check) and leaves projected places to MIR validation,
+    /// which types every projection (`validate_place`) and checks call
+    /// arguments against the callee signature.
     fn place_ty(&self, function: &MirFunction, place: &MirPlace) -> Option<MirType> {
+        if !place.projections.is_empty() {
+            return None;
+        }
         match place.base {
             MirPlaceBase::Local(id) => function
                 .params
