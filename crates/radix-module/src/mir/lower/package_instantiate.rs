@@ -28,7 +28,8 @@ use crate::mir::{
     MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirStatementKind,
     MirTerminatorKind, MirType, type_contains_param,
 };
-use crate::semantic::{IndexExpr, Primitive, Type, TypeId, TypeTable};
+use crate::semantic::{IndexExpr, IndexId, Primitive, Type, TypeId, TypeTable};
+use radix_types::RuntimeExtentId;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::HashMap;
 
@@ -909,7 +910,21 @@ impl PackageInstantiate<'_> {
                 let contains_runtime =
                     super::index_contains_runtime_extent(self.types, bound, &mut FxHashSet::default());
                 let concrete = if contains_runtime {
-                    param.runtime_witness
+                    if runtime_extents_are_caller_formal_axes(self.types, bound, &mut FxHashSet::default()) {
+                        // A nested size-generic call: package linking pre-resolves
+                        // forwarded size args through the calling instance's shape
+                        // bindings, so the binding already names the caller's own
+                        // formal tensor axes. Key by it — per-caller instances whose
+                        // signatures match the caller's argument types — mirroring
+                        // the same-unit monomorphizer (GSF-1), which keys nested
+                        // calls by the parent-resolved extent. Collapsing to the
+                        // callee's formal witness here would validate every caller
+                        // whose argument sits at a different parameter slot as a
+                        // type mismatch.
+                        Some(bound)
+                    } else {
+                        param.runtime_witness
+                    }
                 } else {
                     super::monomorphize::resolve_parent_shape_binding(self.types, bound, parent_shapes)
                 };
@@ -1508,6 +1523,30 @@ fn tensor_type_element_and_rank(types: &TypeTable, mut ty: TypeId) -> Option<(Ty
         IndexExpr::Infer(_) | IndexExpr::Unspecified => return None,
     };
     Some((*element, rank))
+}
+
+/// Whether every runtime extent in an index expression names a *formal*
+/// function-parameter axis (the caller's own parameter slot), as opposed to a
+/// caller-local binding extent. Nested size-generic calls resolved through the
+/// calling instance's shape bindings land here; top-level calls with
+/// runtime-shaped arguments (whose extents are local bindings guarded by a
+/// `TensorShapeCheck` at the call site) do not.
+fn runtime_extents_are_caller_formal_axes(types: &TypeTable, index: IndexId, seen: &mut FxHashSet<IndexId>) -> bool {
+    if !seen.insert(index) {
+        return true;
+    }
+    match types.get_index(index) {
+        IndexExpr::Runtime(
+            RuntimeExtentId::FunctionParameterAxis { .. } | RuntimeExtentId::FunctionParameterFieldAxis { .. },
+        ) => true,
+        IndexExpr::Runtime(_) => false,
+        IndexExpr::Affine { base, .. } => runtime_extents_are_caller_formal_axes(types, *base, seen),
+        IndexExpr::Divide { numerator, .. } => runtime_extents_are_caller_formal_axes(types, *numerator, seen),
+        IndexExpr::Tuple(dimensions) => dimensions
+            .iter()
+            .all(|dimension| runtime_extents_are_caller_formal_axes(types, *dimension, seen)),
+        IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => true,
+    }
 }
 
 fn tensor_edge_provider_matches(

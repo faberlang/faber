@@ -1424,3 +1424,84 @@ fn minted_instance_substitutes_shape_size_param_to_concrete_integer() {
         "the shared template keeps its symbolic operand (copy-not-move): {template_rope_dim:?}"
     );
 }
+
+#[test]
+fn runtime_shape_key_distinguishes_caller_formal_axes_from_local_bindings() {
+    // A nested size-generic call arrives at the key derivation with its size
+    // argument already resolved to the calling instance's formal tensor axis;
+    // a top-level call with a runtime-shaped argument arrives with a local
+    // binding extent guarded by a call-site TensorShapeCheck. The first keys
+    // per caller (the instance signature then matches the caller's argument
+    // type); the second collapses to the callee's formal carrier witness.
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let height = interner.intern("H");
+    let caller_axis = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+        parameter: 1,
+        axis: 0,
+    }));
+    let local_binding = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::TensorBindingAxis {
+        binding: DefId(3),
+        axis: 0,
+    }));
+    let formal_witness = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+        parameter: 0,
+        axis: 0,
+    }));
+    let mut state = PackageInstantiate {
+        types: &mut types,
+        interner: &interner,
+        struct_metadata: None,
+        templates: FxHashMap::default(),
+        generic_params: FxHashMap::default(),
+        tensor_limes_templates: FxHashMap::default(),
+        tensor_edge_policy_providers: Vec::new(),
+        function_ids_by_source: FxHashMap::default(),
+        require_tensor_edge_resolution: true,
+        instance_index: FxHashMap::default(),
+        monomorphizations: Vec::new(),
+        next_id: MirFunctionId(1),
+        errors: Vec::new(),
+        created: Vec::new(),
+        imported_devices: ImportedDeviceIndex::default(),
+        device_registrations: Vec::new(),
+        registered_device_keys: FxHashSet::default(),
+    };
+    let params = vec![MirGenericParam { name: height, is_shape: true, runtime_witness: Some(formal_witness) }];
+
+    let mut nested_bindings = MirShapeBindings::default();
+    nested_bindings.insert(height, caller_axis);
+    let nested_key = state
+        .key_from_bindings(
+            DefId(7),
+            &params,
+            &MirGenericBindings::default(),
+            &nested_bindings,
+            &MirShapeBindings::default(),
+            Span::default(),
+        )
+        .expect("nested caller-axis binding keys without error");
+    assert_eq!(
+        nested_key.shape_args,
+        vec![caller_axis],
+        "a caller formal-axis binding keys the instance by that axis"
+    );
+
+    let mut top_level_bindings = MirShapeBindings::default();
+    top_level_bindings.insert(height, local_binding);
+    let top_level_key = state
+        .key_from_bindings(
+            DefId(7),
+            &params,
+            &MirGenericBindings::default(),
+            &top_level_bindings,
+            &MirShapeBindings::default(),
+            Span::default(),
+        )
+        .expect("local runtime binding keys without error");
+    assert_eq!(
+        top_level_key.shape_args,
+        vec![formal_witness],
+        "a local runtime binding collapses to the callee's formal witness"
+    );
+}
