@@ -1,0 +1,60 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "package"
+canonical = false
+summary = "A rank-1 tensor bracket index may be an imported module constant: t[constantia.BASE]."
+syntax = "tensor[<namespace>.<CONST>] | tensor[<namespace>.<CONST>] ← value"
+related = ["importa", "tensor", "publica"]
+locale = "en"
++++
+
+# =============================================================================
+# importa — an imported module constant is a scalar tensor bracket index
+# =============================================================================
+#
+# What this teaches:
+#   • `t[module.CONST]` reads and writes a rank-1 tensor exactly like `t[[module.CONST]]`
+#   • The index is an ordinary integer value: a bare imported constant, a constant
+#     plus a local, and the double-bracket spelling all name the same element
+#
+# Common mistakes:
+#   • indexing a rank-2 tensor with one scalar — a scalar index needs rank 1; use
+#     `t[[r, c]]` for rank-N (`tensor_scalar_index_rank`)
+#
+# See also: importa, tensor, publica
+# =============================================================================
+
+# importa imported-constant-index — tensor bracket access with an imported constant index
+#
+# Requires module layout: imported-constant-index.fab imports
+# constantia.fab (BASE is 5) in package or module mode.
+#
+# EXPECTED OUTPUT:
+#   imported-constant-index.expected (7.0, 7.0, 8.0, 8.0)
+
+import from "./constantia" constantia
+
+fn read(tensor<f32, [8]> t) → f32 {
+    return t[constantia.BASE]
+}
+
+main {
+    const tf32[] seed ← empty
+    var tf32[8] cells ← seed.create(0.0, [8])
+
+    cells[constantia.BASE] ← 7.0
+    const f32 direct ← read(cells)
+    const f32 doubled ← cells[[constantia.BASE]]
+
+    const u32 step ← 1
+    cells[constantia.BASE + step] ← 8.0
+    const f32 shifted ← cells[constantia.BASE + step]
+    const f32 shiftedDoubled ← cells[[constantia.BASE + step]]
+
+    print direct
+    print doubled
+    print shifted
+    print shiftedDoubled
+}

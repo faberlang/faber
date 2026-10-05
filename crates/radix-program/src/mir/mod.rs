@@ -760,3 +760,7 @@ mod lowering_symbol_remap_tests;
 #[cfg(test)]
 #[path = "praefixum_clone_link_test.rs"]
 mod praefixum_clone_link_tests;
+
+#[cfg(test)]
+#[path = "const_index_link_test.rs"]
+mod const_index_link_tests;

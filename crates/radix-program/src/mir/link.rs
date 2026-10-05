@@ -1638,7 +1638,10 @@ pub(super) fn rewrite_expr(
             // (`Field(Path(namespace), member)`), not a call. When the linker
             // registered a data-member target for the member, rewrite the
             // reference to the member's synthetic def so the entry lowering
-            // materializes the const through the top-level-const seam.
+            // materializes the const through the top-level-const seam. The
+            // node keeps its typecheck type: lowering reads `expr.ty` for
+            // the value (a scalar tensor bracket index types its wrapper list
+            // by it), and a cleared type silently dropped the function body.
             if let Some(target_def) = namespace_data_member_target(
                 unit_path,
                 object,
@@ -1647,7 +1650,6 @@ pub(super) fn rewrite_expr(
                 data_member_targets,
             ) {
                 expr.kind = HirExpressionKind::Path(target_def);
-                expr.ty = None;
                 return;
             }
             rewrite_expr(
