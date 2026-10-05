@@ -1851,7 +1851,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(Value::Nil)
             };
         };
-        match self.tensor_read_at(&tensor, offset, span)? {
+        // Dense row-major read: the flat offset already is the physical
+        // offset, so read the cell directly instead of handing it to
+        // `tensor_read_at`, which re-unravels it into coordinates.
+        let dense = {
+            let borrow = tensor.borrow();
+            borrow.is_dense_row_major() && borrow.logical_len().is_some_and(|count| offset < count)
+        };
+        let read = if dense {
+            tensor.borrow().data.borrow().get(offset).cloned()
+        } else {
+            self.tensor_read_at(&tensor, offset, span)?
+        };
+        match read {
             Some(value) => Ok(value),
             None if checked => Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX)),
             None => Ok(Value::Nil),
@@ -2046,9 +2058,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
             return Err(RunnerError::internal(span, ERR_PONDE_INVALID_INDEX));
         };
-        if borrow.value_at(offset).is_none() {
-            return Err(RunnerError::internal(span, ERR_PONDE_INVALID_INDEX));
-        }
+        // `set_value_at` refuses exactly the cells the old `value_at` probe
+        // refused: for affine layouts its `None` cases are the same bounds
+        // checks, and every edge tensor is refused outright — either way the
+        // probe's full cloning read could not change the outcome. A plain
+        // `offset < data.len()` test would NOT be equivalent: it would break
+        // writes through expanded views, whose physical offset is not the
+        // logical ordinal.
         borrow
             .set_value_at(offset, value)
             .ok_or_else(|| RunnerError::internal(span, ERR_PONDE_INVALID_INDEX))?;
@@ -2583,14 +2599,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         tensor: &Rc<RefCell<TensorValue>>,
         span: Span,
     ) -> Result<Vec<Value>, RunnerError> {
-        let snapshot = tensor.borrow().clone();
-        if snapshot.has_contiguous_backing_mismatch() {
-            return Err(RunnerError::internal(
-                span,
-                "tensor backing-length mismatch",
-            ));
-        }
-        if !snapshot.edge_ops.iter().any(|operation| {
+        let borrow = tensor.borrow();
+        if !borrow.edge_ops.iter().any(|operation| {
             matches!(
                 operation,
                 TensorEdgeOp::Shift {
@@ -2602,10 +2612,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
             )
         }) {
-            return snapshot
+            if borrow.has_contiguous_backing_mismatch() {
+                return Err(RunnerError::internal(
+                    span,
+                    "tensor backing-length mismatch",
+                ));
+            }
+            // No custom policy can reenter the runner mid-read, so the
+            // values are read through the borrowed tensor; only the
+            // custom-edge chain below needs the reentrancy clone.
+            return borrow
                 .logical_values()
                 .ok_or_else(|| RunnerError::internal(span, "tensor logical layout is invalid"));
         }
+        drop(borrow);
+        let snapshot = tensor.borrow().clone();
         let count = snapshot
             .logical_len()
             .ok_or_else(|| RunnerError::internal(span, "tensor logical shape overflows"))?;
@@ -2958,20 +2979,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
         return_ty: MirType,
     ) -> Result<Value, RunnerError> {
-        let result = self.tensor_elementwise_exact(args, span, label, op)?;
-        if let (Value::Tensor(cell), Some(element)) = (&result, self.tensor_element_type(return_ty))
-        {
-            let tensor = cell.borrow();
-            let values = tensor
-                .logical_values()
-                .ok_or_else(|| RunnerError::internal(span, "tensor result layout is invalid"))?;
-            let values = values
-                .into_iter()
-                .map(|value| self.store_tensor_element(element, value, span))
-                .collect::<Result<Vec<_>, _>>()?;
-            tensor.data.borrow_mut().clone_from(&values);
-        }
-        Ok(result)
+        let element = self.tensor_element_type(return_ty);
+        self.tensor_elementwise_exact(args, span, label, op, element)
     }
 
     /// The element type of a tensor or matrix result type.
@@ -2988,6 +2997,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
         label: &'static str,
         op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
+        element: Option<TypeId>,
     ) -> Result<Value, RunnerError> {
         let [left, right] = args else {
             return Err(RunnerError::internal(span, format!("{label} arity")));
@@ -3060,6 +3070,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             }
                         })
                         .collect::<Result<Vec<_>, _>>()?;
+                    let data = self.store_elementwise_data(element, data, span)?;
                     return tensor_value(data, higher_shape.clone(), span);
                 }
                 // Equal shapes with unequal backing lengths would silently
@@ -3075,6 +3086,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .zip(right_data.iter())
                     .map(|(a, b)| op(a, b, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
+                let data = self.store_elementwise_data(element, data, span)?;
                 tensor_value(data, left_shape, span)
             }
             (Value::Tensor(cell), scalar) => {
@@ -3085,6 +3097,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|elem| op(elem, scalar, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
+                let data = self.store_elementwise_data(element, data, span)?;
                 tensor_value(data, shape, span)
             }
             (scalar, Value::Tensor(cell)) => {
@@ -3095,6 +3108,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|elem| op(scalar, elem, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
+                let data = self.store_elementwise_data(element, data, span)?;
                 tensor_value(data, shape, span)
             }
             _ => op(&left_val, &right_val, width, span),
@@ -3706,6 +3720,22 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .into_iter()
             .map(|value| self.store_tensor_element(element, value, span))
             .collect()
+    }
+
+    /// Slot-store a freshly computed elementwise buffer before it is wrapped
+    /// in a tensor, so the built result is never re-read out of its own
+    /// backing and cloned back. The op pass still completes before the first
+    /// store runs, matching the prior two-pass error precedence.
+    fn store_elementwise_data(
+        &self,
+        element: Option<TypeId>,
+        data: Vec<Value>,
+        span: Span,
+    ) -> Result<Vec<Value>, RunnerError> {
+        match element {
+            Some(element) => self.store_tensor_elements(element, data, span),
+            None => Ok(data),
+        }
     }
 
     /// Layer normalization with manual shape-loops.
@@ -4455,10 +4485,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
         negative_message: &'static str,
     ) -> Result<Vec<i64>, RunnerError> {
-        self.array_arg(operand, span)?
-            .into_iter()
+        let value = self.eval_operand(operand, span)?;
+        let Value::Array(cell) = &value else {
+            return Err(RunnerError::internal(
+                span,
+                format!("tensor lista argument type mismatch: {value:?}"),
+            ));
+        };
+        // Map the borrowed lista straight to extents instead of cloning the
+        // whole `Vec<Value>` through `array_arg`.
+        cell.borrow()
+            .iter()
             .map(|value| match value {
-                Value::Int(dim) if tensor_dim_non_negative(dim) => Ok(dim),
+                Value::Int(dim) if tensor_dim_non_negative(*dim) => Ok(*dim),
                 Value::Int(_) => Err(RunnerError::internal(span, negative_message)),
                 other => Err(RunnerError::internal(
                     span,

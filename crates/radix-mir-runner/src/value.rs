@@ -663,8 +663,29 @@ impl TensorValue {
         Some(view)
     }
 
+    /// Dense read gate: true when logical order is exactly the backing order
+    /// — no lazy edge ops, zero origin, and strides equal to the row-major
+    /// strides for the shape, so a logical ordinal is its physical offset.
+    /// `edge_ops.is_empty()` alone does NOT imply this: sectio and transpose
+    /// views permute strides and expanded views carry zero strides, so the
+    /// strides must be compared against the shape's row-major strides.
+    #[must_use]
+    pub(crate) fn is_dense_row_major(&self) -> bool {
+        if !self.edge_ops.is_empty() || self.offset != 0 {
+            return false;
+        }
+        Self::try_contiguous_strides(&self.shape).is_some_and(|strides| strides == self.strides)
+    }
+
     #[must_use]
     pub fn value_at(&self, logical_index: usize) -> Option<Value> {
+        if self.is_dense_row_major() {
+            let count = self.logical_len()?;
+            if logical_index >= count {
+                return None;
+            }
+            return self.data.borrow().get(logical_index).cloned();
+        }
         let coordinates = self.logical_coordinates(logical_index)?;
         self.value_at_coordinates(&coordinates)
     }
@@ -747,6 +768,18 @@ impl TensorValue {
 
     #[must_use]
     pub fn logical_values(&self) -> Option<Vec<Value>> {
+        if self.is_dense_row_major() {
+            let count = self.logical_len()?;
+            let data = self.data.borrow();
+            // Ordinal == physical offset here, so the slice prefix is the
+            // logical read; a short backing fails exactly where the
+            // per-element read would.
+            return if data.len() >= count {
+                Some(data[..count].to_vec())
+            } else {
+                None
+            };
+        }
         (0..self.logical_len()?)
             .map(|index| self.value_at(index))
             .collect()
