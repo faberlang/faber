@@ -891,7 +891,7 @@ impl FunctionBuilder<'_> {
             self.assign(MirPlace::temp(destination), result, result_ty, expr.span);
             self.terminate_current(MirTerminatorKind::Goto(join), expr.span);
             self.switch_to(empty);
-            let empty_result = identity.unwrap_or_else(|| MirOperand::Constant(MirConstant::Nil));
+            let empty_result = identity.unwrap_or(MirOperand::Constant(MirConstant::Nil));
             self.assign(MirPlace::temp(destination), empty_result, result_ty, expr.span);
             self.terminate_current(MirTerminatorKind::Goto(join), expr.span);
             self.switch_to(join);

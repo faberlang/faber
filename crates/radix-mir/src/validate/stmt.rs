@@ -203,13 +203,11 @@ impl Validator<'_, '_> {
                 }
             }
             MirTerminatorKind::Return(Some(value)) => {
-                if let Some(value_ty) = self.validate_operand(scope, value, terminator.span) {
-                    if !self.assignable(value_ty, scope.function.return_ty)
-                        && !self
-                            .return_shape_relation_assignable(value_ty, scope.function.return_ty)
-                    {
-                        self.error(terminator.span, "return type mismatch");
-                    }
+                if let Some(value_ty) = self.validate_operand(scope, value, terminator.span)
+                    && !self.assignable(value_ty, scope.function.return_ty)
+                    && !self.return_shape_relation_assignable(value_ty, scope.function.return_ty)
+                {
+                    self.error(terminator.span, "return type mismatch");
                 }
             }
             MirTerminatorKind::ReturnError(value) => {
@@ -370,6 +368,11 @@ impl Validator<'_, '_> {
                 .iter()
                 .zip(to_dimensions.iter())
                 .all(|(from, to)| {
+                    // Equal terms bind; a literal may pin a runtime-derived
+                    // term (the recorded relation enforces it at runtime);
+                    // but two affine terms over the SAME base with DIFFERENT
+                    // offsets are a derived-witness mismatch and fail here
+                    // (the matching-derived-witness rule).
                     types.index_equals(*from, *to)
                         || (!matches!(types.get_index(*from), IndexExpr::Literal(_))
                             || !matches!(types.get_index(*to), IndexExpr::Literal(_)))
