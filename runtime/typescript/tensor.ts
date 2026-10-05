@@ -7,19 +7,15 @@ export class Tensor<T> {
         this.shape = shape.slice();
     }
     private static elementCount(shape: number[]): number {
-        if (shape.some((dim) => dim < 0)) {
-            throw new Error("tensor shape dimension must be non-negative");
-        }
-        return shape.reduce((total, dim) => total * dim, 1);
-    }
-    private static coordinates(flat: number, shape: number[]): number[] {
-        const coords = new Array(shape.length).fill(0);
-        for (let axis = shape.length - 1; axis >= 0; axis--) {
+        let count = 1;
+        for (let axis = 0; axis < shape.length; axis++) {
             const dim = shape[axis];
-            coords[axis] = dim === 0 ? 0 : flat % dim;
-            flat = dim === 0 ? 0 : Math.floor(flat / dim);
+            if (dim < 0) {
+                throw new Error("tensor shape dimension must be non-negative");
+            }
+            count *= dim;
         }
-        return coords;
+        return count;
     }
     private static offset(shape: number[], indices: number[]): number | null {
         if (indices.some((idx) => idx < 0)) {
@@ -54,23 +50,28 @@ export class Tensor<T> {
         }
         return shape;
     }
-    private static broadcastOffset(sourceShape: number[], resultCoords: number[]): number | null {
-        const offset = resultCoords.length - sourceShape.length;
-        const coords = sourceShape.map((dim, axis) => dim === 1 ? 0 : resultCoords[axis + offset]);
-        return Tensor.offset(sourceShape, coords);
-    }
-    private static flatten(source: unknown): any[] {
+    // flatMap skips holes at every level; the `in` guards keep that exact behavior.
+    private static flatten(source: unknown, out: any[]): void {
         if (!Array.isArray(source)) {
-            return [source];
+            out.push(source);
+            return;
         }
-        return source.flatMap((value) => Tensor.flatten(value));
+        for (let axis = 0; axis < source.length; axis++) {
+            if (axis in source) {
+                Tensor.flatten(source[axis], out);
+            }
+        }
     }
     static empty<T>(shape: number[] = []): Tensor<T> {
         return new Tensor<T>([], shape);
     }
     static fromArray<T>(source: unknown, shape: number[], convert: (value: any) => T = (value) => value as T, fallback?: Tensor<T>): Tensor<T> {
         try {
-            const data = Tensor.flatten(source).map(convert);
+            const data: any[] = [];
+            Tensor.flatten(source, data);
+            for (let i = 0; i < data.length; i++) {
+                data[i] = convert(data[i]);
+            }
             if (Tensor.elementCount(shape) !== data.length) {
                 throw new Error("tensor conversio element count does not match shape");
             }
@@ -134,11 +135,43 @@ export class Tensor<T> {
     private elementwise(other: Tensor<T>, op: (left: any, right: any) => any): Tensor<T> {
         const shape = Tensor.broadcastShape(this.shape, other.shape);
         const data = new Array(Tensor.elementCount(shape));
+        const rank = shape.length;
+        if (this.shape.length === rank && other.shape.length === rank &&
+            this.shape.every((dim, axis) => dim === shape[axis]) &&
+            other.shape.every((dim, axis) => dim === shape[axis])) {
+            for (let i = 0; i < data.length; i++) {
+                data[i] = op(this.data[i], other.data[i]);
+            }
+            return new Tensor<T>(data as T[], shape);
+        }
+        // Per-result-axis source strides; 0 marks a stretched (broadcast) axis.
+        const leftStrides = new Array(rank);
+        const rightStrides = new Array(rank);
+        for (let axis = 0; axis < rank; axis++) {
+            let stride = 1;
+            for (let inner = axis + 1; inner < rank; inner++) {
+                stride *= shape[inner];
+            }
+            const leftAxis = axis - (rank - this.shape.length);
+            leftStrides[axis] = leftAxis >= 0 && this.shape[leftAxis] !== 1 ? stride : 0;
+            const rightAxis = axis - (rank - other.shape.length);
+            rightStrides[axis] = rightAxis >= 0 && other.shape[rightAxis] !== 1 ? stride : 0;
+        }
+        const counters = new Array(rank).fill(0);
+        let left = 0;
+        let right = 0;
         for (let i = 0; i < data.length; i++) {
-            const coords = Tensor.coordinates(i, shape);
-            const left = Tensor.broadcastOffset(this.shape, coords);
-            const right = Tensor.broadcastOffset(other.shape, coords);
-            data[i] = op(this.data[left ?? 0], other.data[right ?? 0]);
+            data[i] = op(this.data[left], other.data[right]);
+            for (let axis = rank - 1; axis >= 0; axis--) {
+                if (++counters[axis] < shape[axis]) {
+                    left += leftStrides[axis];
+                    right += rightStrides[axis];
+                    break;
+                }
+                counters[axis] = 0;
+                left -= leftStrides[axis] * (shape[axis] - 1);
+                right -= rightStrides[axis] * (shape[axis] - 1);
+            }
         }
         return new Tensor<T>(data as T[], shape);
     }
@@ -168,12 +201,14 @@ export class Tensor<T> {
         }
         const data = new Array(m * n).fill(0);
         for (let row = 0; row < m; row++) {
-            for (let column = 0; column < n; column++) {
-                let total: any = 0;
-                for (let k = 0; k < k1; k++) {
-                    total += (this.accipe([row, k]) as any) * (other.accipe([k, column]) as any);
+            const leftBase = row * k1;
+            const outBase = row * n;
+            for (let k = 0; k < k1; k++) {
+                const left = this.data[leftBase + k] as any;
+                const rightBase = k * n;
+                for (let column = 0; column < n; column++) {
+                    data[outBase + column] += left * (other.data[rightBase + column] as any);
                 }
-                data[row * n + column] = total;
             }
         }
         return new Tensor<T>(data as T[], [m, n]);
@@ -189,7 +224,7 @@ export class Tensor<T> {
         const data = new Array(rows * cols);
         for (let col = 0; col < cols; col++) {
             for (let row = 0; row < rows; row++) {
-                data[col * rows + row] = this.accipe([row, col]);
+                data[col * rows + row] = this.data[row * cols + col];
             }
         }
         return new Tensor<T>(data as T[], [cols, rows]);
@@ -201,6 +236,7 @@ export class Tensor<T> {
         const lastDim = this.shape[this.shape.length - 1];
         const batch = this.data.length / lastDim;
         const data = new Array(this.data.length);
+        const row = new Float64Array(lastDim);
         for (let b = 0; b < batch; b++) {
             const base = b * lastDim;
             let maxVal = -Infinity;
@@ -210,16 +246,16 @@ export class Tensor<T> {
                     throw new Error("softmax non-finite input");
                 }
                 if (value > maxVal) maxVal = value;
+                row[i] = value;
             }
             let expSum = 0;
-            const exps = new Array(lastDim);
             for (let i = 0; i < lastDim; i++) {
-                const expVal = Math.exp(Number(this.data[base + i]) - maxVal);
-                exps[i] = expVal;
+                const expVal = Math.exp(row[i] - maxVal);
+                row[i] = expVal;
                 expSum += expVal;
             }
             for (let i = 0; i < lastDim; i++) {
-                data[base + i] = (exps[i] / expSum) as T;
+                data[base + i] = (row[i] / expSum) as T;
             }
         }
         return new Tensor<T>(data as T[], this.shape);

@@ -10,13 +10,21 @@ export class Matrix<T> {
         if (this.shape.length !== other.shape.length || this.shape.some((dim, idx) => dim !== other.shape[idx])) {
             throw new Error("matrix addita shape mismatch");
         }
-        return new Matrix<T>(this.data.map((value: any, idx) => value + (other.data[idx] as any)) as T[], this.shape);
+        const data = new Array<T>(this.data.length);
+        for (let idx = 0; idx < data.length; idx++) {
+            if (idx in this.data) data[idx] = ((this.data[idx] as any) + (other.data[idx] as any)) as T; // map preserves holes
+        }
+        return new Matrix<T>(data as T[], this.shape);
     }
     subtrahe(other: Matrix<T>): Matrix<T> {
         if (this.shape.length !== other.shape.length || this.shape.some((dim, idx) => dim !== other.shape[idx])) {
             throw new Error("matrix subtrahe shape mismatch");
         }
-        return new Matrix<T>(this.data.map((value: any, idx) => value - (other.data[idx] as any)) as T[], this.shape);
+        const data = new Array<T>(this.data.length);
+        for (let idx = 0; idx < data.length; idx++) {
+            if (idx in this.data) data[idx] = ((this.data[idx] as any) - (other.data[idx] as any)) as T; // map preserves holes
+        }
+        return new Matrix<T>(data as T[], this.shape);
     }
     accipe(indices: number[]): T {
         if (indices.length !== this.shape.length || indices.some((idx, axis) => idx < 0 || idx >= this.shape[axis])) {

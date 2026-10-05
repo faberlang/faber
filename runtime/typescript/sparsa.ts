@@ -4,14 +4,18 @@ import * as tensor from "./tensor.ts";
 
 export class Sparsa<T> {
     shape: number[];
-    entries: Map<string, T>;
+    entries: Map<number, T>;
     defaultValue: T;
-    constructor(shape: number[], entries: Map<string, T> = new Map(), defaultValue: T = 0 as T) {
+    constructor(shape: number[], entries: Map<string, T> | Map<number, T> = new Map(), defaultValue: T = 0 as T) {
         if (shape.some((dim) => dim < 0)) {
             throw new Error("sparsa shape dimension must be non-negative");
         }
         this.shape = shape.slice();
-        this.entries = new Map(entries);
+        // Keys are flat row-major offsets; legacy string keys (JSON coordinates) normalize here.
+        this.entries = new Map<number, T>();
+        for (const [key, value] of entries) {
+            this.entries.set(typeof key === "string" ? Sparsa.offset(shape, JSON.parse(key) as number[]) : key, value);
+        }
         this.defaultValue = defaultValue;
     }
     private static elementCount(shape: number[]): number {
@@ -19,18 +23,6 @@ export class Sparsa<T> {
             throw new Error("sparsa shape dimension must be non-negative");
         }
         return shape.reduce((total, dim) => total * dim, 1);
-    }
-    private static coordinates(flat: number, shape: number[]): number[] {
-        const coords = new Array(shape.length).fill(0);
-        for (let axis = shape.length - 1; axis >= 0; axis--) {
-            const dim = shape[axis];
-            coords[axis] = dim === 0 ? 0 : flat % dim;
-            flat = dim === 0 ? 0 : Math.floor(flat / dim);
-        }
-        return coords;
-    }
-    private static key(indices: number[]): string {
-        return JSON.stringify(indices);
     }
     private static offset(shape: number[], indices: number[]): number {
         let offset = 0;
@@ -45,12 +37,12 @@ export class Sparsa<T> {
         return new Sparsa<T>(shape, new Map(), defaultValue);
     }
     static fromTensor<T>(dense: tensor.Tensor<T>, defaultValue: T = 0 as T): Sparsa<T> {
-        const entries = new Map<string, T>();
-        const data = dense.planata();
+        const entries = new Map<number, T>();
+        const data = dense.data;
         for (let i = 0; i < data.length; i++) {
             const value = data[i];
             if (value !== defaultValue) {
-                entries.set(Sparsa.key(Sparsa.coordinates(i, dense.shape)), value);
+                entries.set(i, value);
             }
         }
         return new Sparsa<T>(dense.shape, entries, defaultValue);
@@ -80,11 +72,11 @@ export class Sparsa<T> {
     }
     accipe(indices: number[]): T {
         this.validate(indices);
-        return this.entries.get(Sparsa.key(indices)) ?? this.defaultValue;
+        return this.entries.get(Sparsa.offset(this.shape, indices)) ?? this.defaultValue;
     }
     ponde(indices: number[], value: T): void {
         this.validate(indices);
-        const key = Sparsa.key(indices);
+        const key = Sparsa.offset(this.shape, indices);
         if (value === this.defaultValue) {
             this.entries.delete(key);
         } else {
@@ -94,8 +86,7 @@ export class Sparsa<T> {
     densata(): tensor.Tensor<T> {
         const data = new Array(Sparsa.elementCount(this.shape)).fill(this.defaultValue);
         for (const [key, value] of this.entries) {
-            const indices = JSON.parse(key) as number[];
-            data[Sparsa.offset(this.shape, indices)] = value;
+            data[key] = value;
         }
         return new tensor.Tensor<T>(data, this.shape);
     }

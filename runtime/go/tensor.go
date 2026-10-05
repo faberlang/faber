@@ -3,14 +3,16 @@ package rt
 // The Faber `tensor` carrier for generated Go programs (codegen-readability
 // T1-G7): a dense row-major n-dimensional array with a runtime shape.
 //
-// A tensor is a flat data slice plus a shape. Go generics cannot bound `T` to
-// the numeric operators across the full primitive set a tensor carries, so the
-// arithmetic helpers dispatch on the element type. Every method copies on the
-// way in and out: a tensor value never aliases the slice a caller passed or
-// received. The operations are methods carrying the Latin names the call sites
-// use (`Crea`, `Addita`, `Matmul`, ...); the exported free functions and the
-// carrier type are spelled by the compiler's canonical helper table
-// (`rt.TensorTensor`, `rt.TensorElementCount`, `rt.TensorToSparsa`).
+// A tensor is a flat data slice plus a shape. The arithmetic kernels are
+// generic over the `num` union constraint, so `l + r` compiles monomorphically
+// (no interface boxes, no per-element type switch); the `any`-typed entry
+// points hoist one type switch per op, in the `tensorMean` shape. Every method
+// copies on the way in and out: a tensor value never aliases the slice a
+// caller passed or received. The operations are methods carrying the Latin
+// names the call sites use (`Crea`, `Addita`, `Matmul`, ...); the exported
+// free functions and the carrier type are spelled by the compiler's canonical
+// helper table (`rt.TensorTensor`, `rt.TensorElementCount`,
+// `rt.TensorToSparsa`).
 //
 // No operation here is a store: arithmetic computes in the element type, and a
 // width limit applies only where a result leaves into a bounded cell.
@@ -38,11 +40,13 @@ func TensorElementCount(shape []int) int {
 	return total
 }
 
-// indexSlice reads a numeric index list of any element width into []int.
+// indexSlice reads a numeric index list of any element width into []int. A
+// []int list is borrowed, not copied: callers use the result only within the
+// call and never retain or mutate it.
 func indexSlice(indices any) []int {
 	switch values := indices.(type) {
 	case []int:
-		return append([]int{}, values...)
+		return values
 	case []uint32:
 		out := make([]int, len(values))
 		for i, value := range values {
@@ -72,13 +76,16 @@ func indexSlice(indices any) []int {
 	}
 }
 
-// tensorOffset is the row-major offset of an index list, or nil when the rank
-// differs or an index is out of bounds.
-func tensorOffset(shape []int, rawIndices any) *int {
+// tensorOffset is the row-major offset of a normalized []int index list, with
+// false when the rank differs, an index is out of bounds, or the arithmetic
+// overflows. The offset is never negative by construction: it starts at 0 and
+// each addend idx*stride has idx >= 0 and stride >= 1 (stride grows only
+// through the guarded stride *= dim), and the guard below bounds the running
+// sum by maxInt, so callers need no negative re-check.
+func tensorOffset(shape []int, indices []int) (int, bool) {
 	const maxInt = int(^uint(0) >> 1)
-	indices := indexSlice(rawIndices)
 	if len(indices) != len(shape) {
-		return nil
+		return 0, false
 	}
 	offset := 0
 	stride := 1
@@ -86,18 +93,18 @@ func tensorOffset(shape []int, rawIndices any) *int {
 		idx := indices[axis]
 		dim := shape[axis]
 		if dim < 0 || idx < 0 || idx >= dim {
-			return nil
+			return 0, false
 		}
 		if idx > 0 && stride > (maxInt-offset)/idx {
-			return nil
+			return 0, false
 		}
 		offset += idx * stride
 		if dim > 0 && stride > maxInt/dim {
-			return nil
+			return 0, false
 		}
 		stride *= dim
 	}
-	return &offset
+	return offset, true
 }
 
 func (t TensorTensor[T]) Crea(fill T, shape []int) TensorTensor[T] {
@@ -125,70 +132,187 @@ func (t TensorTensor[T]) Materialize() TensorTensor[T] {
 	return TensorTensor[T]{data: append([]T{}, t.data...), shape: append([]int{}, t.shape...)}
 }
 
-func tensorAdd[T any](left T, right T) T {
-	switch value := any(left).(type) {
-	case int:
-		return any(value + any(right).(int)).(T)
-	case int32:
-		return any(value + any(right).(int32)).(T)
-	case int64:
-		return any(value + any(right).(int64)).(T)
-	case uint:
-		return any(value + any(right).(uint)).(T)
-	case uint32:
-		return any(value + any(right).(uint32)).(T)
-	case uint64:
-		return any(value + any(right).(uint64)).(T)
-	case float32:
-		return any(value + any(right).(float32)).(T)
-	case float64:
-		return any(value + any(right).(float64)).(T)
+// num bounds the numeric element set the arithmetic kernels accept. A union
+// constraint lets `l + r` compile monomorphically: no interface boxes and no
+// per-element type switch.
+type num interface {
+	~int | ~int32 | ~int64 | ~uint | ~uint32 | ~uint64 | ~float32 | ~float64
+}
+
+func numAdd[T num](l T, r T) T { return l + r }
+
+func numSub[T num](l T, r T) T { return l - r }
+
+func numMul[T num](l T, r T) T { return l * r }
+
+func zipNumAdd[T num](dst []T, a []T, b []T) {
+	for i := range dst {
+		dst[i] = numAdd(a[i], b[i])
+	}
+}
+
+func zipNumSub[T num](dst []T, a []T, b []T) {
+	for i := range dst {
+		dst[i] = numSub(a[i], b[i])
+	}
+}
+
+func zipNumMul[T num](dst []T, a []T, b []T) {
+	for i := range dst {
+		dst[i] = numMul(a[i], b[i])
+	}
+}
+
+// tensorAddWise fills dst with a+b elementwise. The switch runs once per op,
+// in the tensorMean shape; it matches exact slice types, exactly as the old
+// per-element switches matched exact element types, so the traps and the
+// non-numeric fall-through are unchanged. An empty list returns without
+// touching the switch, as the old per-element loops never reached the switch.
+func tensorAddWise[T any](dst []T, a []T, b []T) {
+	if len(dst) == 0 {
+		return
+	}
+	switch any(a).(type) {
+	case []int:
+		zipNumAdd(any(dst).([]int), any(a).([]int), any(b).([]int))
+	case []int32:
+		zipNumAdd(any(dst).([]int32), any(a).([]int32), any(b).([]int32))
+	case []int64:
+		zipNumAdd(any(dst).([]int64), any(a).([]int64), any(b).([]int64))
+	case []uint:
+		zipNumAdd(any(dst).([]uint), any(a).([]uint), any(b).([]uint))
+	case []uint32:
+		zipNumAdd(any(dst).([]uint32), any(a).([]uint32), any(b).([]uint32))
+	case []uint64:
+		zipNumAdd(any(dst).([]uint64), any(a).([]uint64), any(b).([]uint64))
+	case []float32:
+		zipNumAdd(any(dst).([]float32), any(a).([]float32), any(b).([]float32))
+	case []float64:
+		zipNumAdd(any(dst).([]float64), any(a).([]float64), any(b).([]float64))
 	default:
 		panic("tensor arithmetic requires numeric elements")
 	}
 }
 
-func tensorMul[T any](left T, right T) T {
-	switch value := any(left).(type) {
-	case int:
-		return any(value * any(right).(int)).(T)
-	case int32:
-		return any(value * any(right).(int32)).(T)
-	case int64:
-		return any(value * any(right).(int64)).(T)
-	case uint:
-		return any(value * any(right).(uint)).(T)
-	case uint32:
-		return any(value * any(right).(uint32)).(T)
-	case uint64:
-		return any(value * any(right).(uint64)).(T)
-	case float32:
-		return any(value * any(right).(float32)).(T)
-	case float64:
-		return any(value * any(right).(float64)).(T)
+// tensorSubWise is tensorAddWise around numSub.
+func tensorSubWise[T any](dst []T, a []T, b []T) {
+	if len(dst) == 0 {
+		return
+	}
+	switch any(a).(type) {
+	case []int:
+		zipNumSub(any(dst).([]int), any(a).([]int), any(b).([]int))
+	case []int32:
+		zipNumSub(any(dst).([]int32), any(a).([]int32), any(b).([]int32))
+	case []int64:
+		zipNumSub(any(dst).([]int64), any(a).([]int64), any(b).([]int64))
+	case []uint:
+		zipNumSub(any(dst).([]uint), any(a).([]uint), any(b).([]uint))
+	case []uint32:
+		zipNumSub(any(dst).([]uint32), any(a).([]uint32), any(b).([]uint32))
+	case []uint64:
+		zipNumSub(any(dst).([]uint64), any(a).([]uint64), any(b).([]uint64))
+	case []float32:
+		zipNumSub(any(dst).([]float32), any(a).([]float32), any(b).([]float32))
+	case []float64:
+		zipNumSub(any(dst).([]float64), any(a).([]float64), any(b).([]float64))
 	default:
 		panic("tensor arithmetic requires numeric elements")
 	}
 }
 
-func tensorSub[T any](left T, right T) T {
-	switch value := any(left).(type) {
-	case int:
-		return any(value - any(right).(int)).(T)
-	case int32:
-		return any(value - any(right).(int32)).(T)
-	case int64:
-		return any(value - any(right).(int64)).(T)
-	case uint:
-		return any(value - any(right).(uint)).(T)
-	case uint32:
-		return any(value - any(right).(uint32)).(T)
-	case uint64:
-		return any(value - any(right).(uint64)).(T)
-	case float32:
-		return any(value - any(right).(float32)).(T)
-	case float64:
-		return any(value - any(right).(float64)).(T)
+// tensorMulWise is tensorAddWise around numMul.
+func tensorMulWise[T any](dst []T, a []T, b []T) {
+	if len(dst) == 0 {
+		return
+	}
+	switch any(a).(type) {
+	case []int:
+		zipNumMul(any(dst).([]int), any(a).([]int), any(b).([]int))
+	case []int32:
+		zipNumMul(any(dst).([]int32), any(a).([]int32), any(b).([]int32))
+	case []int64:
+		zipNumMul(any(dst).([]int64), any(a).([]int64), any(b).([]int64))
+	case []uint:
+		zipNumMul(any(dst).([]uint), any(a).([]uint), any(b).([]uint))
+	case []uint32:
+		zipNumMul(any(dst).([]uint32), any(a).([]uint32), any(b).([]uint32))
+	case []uint64:
+		zipNumMul(any(dst).([]uint64), any(a).([]uint64), any(b).([]uint64))
+	case []float32:
+		zipNumMul(any(dst).([]float32), any(a).([]float32), any(b).([]float32))
+	case []float64:
+		zipNumMul(any(dst).([]float64), any(a).([]float64), any(b).([]float64))
+	default:
+		panic("tensor arithmetic requires numeric elements")
+	}
+}
+
+func sumNum[N num](data []N) N {
+	var total N
+	for _, value := range data {
+		total = numAdd(total, value)
+	}
+	return total
+}
+
+// tensorSumWise folds a numeric element list left to right, switching on the
+// element type once.
+func tensorSumWise[T any](data []T) T {
+	switch any(data).(type) {
+	case []int:
+		return any(sumNum(any(data).([]int))).(T)
+	case []int32:
+		return any(sumNum(any(data).([]int32))).(T)
+	case []int64:
+		return any(sumNum(any(data).([]int64))).(T)
+	case []uint:
+		return any(sumNum(any(data).([]uint))).(T)
+	case []uint32:
+		return any(sumNum(any(data).([]uint32))).(T)
+	case []uint64:
+		return any(sumNum(any(data).([]uint64))).(T)
+	case []float32:
+		return any(sumNum(any(data).([]float32))).(T)
+	case []float64:
+		return any(sumNum(any(data).([]float64))).(T)
+	default:
+		panic("tensor arithmetic requires numeric elements")
+	}
+}
+
+func matmulNum[N num](a []N, b []N, dst []N, rows int, inner int, cols int) {
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			var sum N
+			for k := 0; k < inner; k++ {
+				sum = numAdd(sum, numMul(a[row*inner+k], b[k*cols+col]))
+			}
+			dst[row*cols+col] = sum
+		}
+	}
+}
+
+// tensorMatmulWise runs matmulNum on the typed slices, in the original
+// row-col-k order so float results are bit-identical.
+func tensorMatmulWise[T any](a []T, b []T, dst []T, rows int, inner int, cols int) {
+	switch any(a).(type) {
+	case []int:
+		matmulNum(any(a).([]int), any(b).([]int), any(dst).([]int), rows, inner, cols)
+	case []int32:
+		matmulNum(any(a).([]int32), any(b).([]int32), any(dst).([]int32), rows, inner, cols)
+	case []int64:
+		matmulNum(any(a).([]int64), any(b).([]int64), any(dst).([]int64), rows, inner, cols)
+	case []uint:
+		matmulNum(any(a).([]uint), any(b).([]uint), any(dst).([]uint), rows, inner, cols)
+	case []uint32:
+		matmulNum(any(a).([]uint32), any(b).([]uint32), any(dst).([]uint32), rows, inner, cols)
+	case []uint64:
+		matmulNum(any(a).([]uint64), any(b).([]uint64), any(dst).([]uint64), rows, inner, cols)
+	case []float32:
+		matmulNum(any(a).([]float32), any(b).([]float32), any(dst).([]float32), rows, inner, cols)
+	case []float64:
+		matmulNum(any(a).([]float64), any(b).([]float64), any(dst).([]float64), rows, inner, cols)
 	default:
 		panic("tensor arithmetic requires numeric elements")
 	}
@@ -230,10 +354,10 @@ func tensorMean[T any](data []T) T {
 
 func (t TensorTensor[T]) Summa() T {
 	var total T
-	for _, value := range t.data {
-		total = tensorAdd(total, value)
+	if len(t.data) == 0 {
+		return total
 	}
-	return total
+	return tensorSumWise(t.data)
 }
 
 func (t TensorTensor[T]) Media() T { return tensorMean(t.data) }
@@ -243,9 +367,7 @@ func (a TensorTensor[T]) Addita(b TensorTensor[T]) TensorTensor[T] {
 		panic("tensor elementwise arithmetic requires equal shapes")
 	}
 	data := make([]T, len(a.data))
-	for i := range data {
-		data[i] = tensorAdd(a.data[i], b.data[i])
-	}
+	tensorAddWise(data, a.data, b.data)
 	return TensorTensor[T]{data: data, shape: append([]int{}, a.shape...)}
 }
 
@@ -254,9 +376,7 @@ func (a TensorTensor[T]) Subtrahe(b TensorTensor[T]) TensorTensor[T] {
 		panic("tensor elementwise arithmetic requires equal shapes")
 	}
 	data := make([]T, len(a.data))
-	for i := range data {
-		data[i] = tensorSub(a.data[i], b.data[i])
-	}
+	tensorSubWise(data, a.data, b.data)
 	return TensorTensor[T]{data: data, shape: append([]int{}, a.shape...)}
 }
 
@@ -265,9 +385,7 @@ func (a TensorTensor[T]) Multiplica(b TensorTensor[T]) TensorTensor[T] {
 		panic("tensor elementwise arithmetic requires equal shapes")
 	}
 	data := make([]T, len(a.data))
-	for i := range data {
-		data[i] = tensorMul(a.data[i], b.data[i])
-	}
+	tensorMulWise(data, a.data, b.data)
 	return TensorTensor[T]{data: data, shape: append([]int{}, a.shape...)}
 }
 
@@ -277,14 +395,8 @@ func (a TensorTensor[T]) Matmul(b TensorTensor[T]) TensorTensor[T] {
 	}
 	rows, inner, cols := a.shape[0], a.shape[1], b.shape[1]
 	data := make([]T, rows*cols)
-	for row := 0; row < rows; row++ {
-		for col := 0; col < cols; col++ {
-			var sum T
-			for k := 0; k < inner; k++ {
-				sum = tensorAdd(sum, tensorMul(a.data[row*inner+k], b.data[k*cols+col]))
-			}
-			data[row*cols+col] = sum
-		}
+	if rows > 0 && cols > 0 && inner > 0 {
+		tensorMatmulWise(a.data, b.data, data, rows, inner, cols)
 	}
 	return TensorTensor[T]{data: data, shape: []int{rows, cols}}
 }
@@ -297,11 +409,11 @@ func (t TensorTensor[T]) Forma(shape []int) TensorTensor[T] {
 }
 
 func (t TensorTensor[T]) Accipe(indices any) *T {
-	offset := tensorOffset(t.shape, indices)
-	if offset == nil || *offset < 0 || *offset >= len(t.data) {
+	offset, ok := tensorOffset(t.shape, indexSlice(indices))
+	if !ok || offset >= len(t.data) {
 		return nil
 	}
-	return &t.data[*offset]
+	return &t.data[offset]
 }
 
 // ReadAt is the bracket read: `T` or a trap (like a lista index); `Accipe` stays
@@ -315,11 +427,11 @@ func (t TensorTensor[T]) ReadAt(indices any) T {
 }
 
 func (t *TensorTensor[T]) Ponde(indices any, value T) {
-	offset := tensorOffset(t.shape, indices)
-	if offset == nil || *offset < 0 || *offset >= len(t.data) {
+	offset, ok := tensorOffset(t.shape, indexSlice(indices))
+	if !ok || offset >= len(t.data) {
 		panic("tensor ponde invalid index")
 	}
-	t.data[*offset] = value
+	t.data[offset] = value
 }
 
 func (t *TensorTensor[T]) Reple(value T) {
