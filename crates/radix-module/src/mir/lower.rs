@@ -2962,6 +2962,13 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Lower conversion-directed assignment (`target ↤ source`, U+21A4).
     ///
+    /// `↤` is derived sugar for an explicit conversion — `x ↤ e` ≡
+    /// `x ← e ↦ typeof(x)` — per the 2026-10-05 operator ruling
+    /// (`docs/factory/tensor-conversions/goal.md`, C2). The shared `↦`
+    /// conversion owner `lower_conversio` is the single conversion
+    /// implementation; no parallel path exists or may be added (the C2
+    /// equivalence tests in `lower/conversion_check_test.rs` pin that).
+    ///
     /// Eval order matches ordinary `←` exactly, with the conversion inserted
     /// between source evaluation and the store:
     ///   1. destination place evaluated once (receiver/index once),

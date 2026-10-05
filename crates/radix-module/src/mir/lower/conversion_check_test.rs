@@ -18,6 +18,29 @@ main {
 }
 "#;
 
+/// C2 equivalence fixture: the derived `↤` spelling. The explicit spelling
+/// swaps only the declaration line ([`conversio_assign_explicit_source`]), so
+/// outcome equality between the two is a real derivation check, not a fixture
+/// artifact.
+const CONVERSIO_ASSIGN_DERIVED: &str = r#"+++
+locale = "en"
++++
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    var int n ← 3
+    var tf32[2, size n] a ↤ flat
+    print a.shape().get(0)
+    print a.shape().get(1)
+}
+"#;
+
+fn conversio_assign_explicit_source(derived: &str) -> String {
+    derived.replace(
+        "var tf32[2, size n] a ↤ flat",
+        "const tf32[2, size n] a ← flat ↦ tf32[2, size n]",
+    )
+}
+
 #[test]
 fn conversion_check_runtime_target_axes_run() {
     let mut host = BufferHost::default();
@@ -77,4 +100,74 @@ fn conversion_check_length_mismatch_is_named_with_counts() {
         .expect("named issue");
     assert_eq!(error.arg("expected"), Some("6"));
     assert_eq!(error.arg("actual"), Some("3"));
+}
+
+#[test]
+fn conversio_assign_tensor_row_runs() {
+    let mut host = BufferHost::default();
+    run_source(
+        &session(),
+        "conversio-assign-tensor-row.fab",
+        CONVERSIO_ASSIGN_DERIVED,
+        &mut host,
+    )
+    .expect("derived conversion assignment runs");
+    assert_eq!(host.stdout_lines, ["2", "3"]);
+}
+
+#[test]
+fn conversio_assign_equivalent_to_explicit() {
+    let explicit = conversio_assign_explicit_source(CONVERSIO_ASSIGN_DERIVED);
+    let mut derived_host = BufferHost::default();
+    run_source(
+        &session(),
+        "conversio-assign-derived.fab",
+        CONVERSIO_ASSIGN_DERIVED,
+        &mut derived_host,
+    )
+    .expect("derived conversion assignment runs");
+    let mut explicit_host = BufferHost::default();
+    run_source(&session(), "conversio-assign-explicit.fab", &explicit, &mut explicit_host)
+        .expect("explicit conversion runs");
+    assert_eq!(derived_host.stdout_lines, explicit_host.stdout_lines);
+    // `pending_stdout` is the host's unclosed raw-stdout fragment; with
+    // `stdout_lines` it covers every stdout byte either run captured.
+    assert_eq!(derived_host.pending_stdout, explicit_host.pending_stdout);
+}
+
+#[test]
+fn conversio_assign_failure_matches_explicit() {
+    let derived = CONVERSIO_ASSIGN_DERIVED.replace("[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]", "[1.0, 2.0, 3.0]");
+    let explicit = conversio_assign_explicit_source(&derived);
+    let mut derived_host = BufferHost::default();
+    let derived_error = run_source(&session(), "conversio-assign-mismatch.fab", &derived, &mut derived_host)
+        .expect_err("length mismatch fails in the derived spelling");
+    let mut explicit_host = BufferHost::default();
+    let explicit_error = run_source(
+        &session(),
+        "conversio-assign-explicit-mismatch.fab",
+        &explicit,
+        &mut explicit_host,
+    )
+    .expect_err("length mismatch fails in the explicit spelling");
+    let RunSourceError::Stepper(derived_errors) = derived_error else {
+        panic!("expected runner failure: {derived_error:?}")
+    };
+    let RunSourceError::Stepper(explicit_errors) = explicit_error else {
+        panic!("expected runner failure: {explicit_error:?}")
+    };
+    let derived_error = derived_errors
+        .iter()
+        .find(|error| error.issue == "conversion_length_mismatch")
+        .expect("derived spelling names the mismatch");
+    let explicit_error = explicit_errors
+        .iter()
+        .find(|error| error.issue == "conversion_length_mismatch")
+        .expect("explicit spelling names the mismatch");
+    assert_eq!(derived_error.arg("expected"), Some("6"));
+    assert_eq!(derived_error.arg("actual"), Some("3"));
+    // Spans legitimately differ (the declaration lines have different
+    // columns); the rendered text and structured facts must not.
+    assert_eq!(derived_error.message, explicit_error.message);
+    assert_eq!(derived_error.args, explicit_error.args);
 }
