@@ -405,7 +405,7 @@ impl Lowerer<'_> {
     /// Type checking resolves intrinsic method names through the active pack
     /// (non-`la` packs reject the canonical Latin spelling), so synthesized
     /// calls use the same surface an author would write.
-    fn intrinsic_surface_symbol(&mut self, canonical: &str) -> radix_lexer::Symbol {
+    pub(super) fn intrinsic_surface_symbol(&mut self, canonical: &str) -> radix_lexer::Symbol {
         let surface = self
             .locale_pack
             .map_or(canonical, |pack| pack.intrinsic_surface(canonical))

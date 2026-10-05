@@ -656,8 +656,17 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             "size arguments are lift stores checked at the call; pass a non-negative value"
                 .to_owned(),
         ),
-        "construction_synthesis_pending" => Some(
-            "type-expression construction is not yet supported by semantic lowering".to_owned(),
+        "constructor_requires_extent_type" => Some(
+            "construction applies to extent-bearing tensor types; spell the shape, as in tf32[2, 3]"
+                .to_owned(),
+        ),
+        "constructor_extent_requires_term" => Some(
+            "a constructor extent must name a size or a literal; the `_` hole belongs in the annotation"
+                .to_owned(),
+        ),
+        "constructor_affine_extent_unsupported" => Some(
+            "constructor extents admit literals, size names, and spelled size lifts; parenthesize affine terms once supported"
+                .to_owned(),
         ),
         "gpu_builtin_device_function_required" => {
             Some("call GPU builtins only inside @ nucleum or @ nucleum fragment functions".to_owned())

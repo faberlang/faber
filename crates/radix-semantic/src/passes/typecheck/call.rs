@@ -552,7 +552,18 @@ impl TypeChecker<'_> {
         ) {
             return ret;
         }
-        let receiver_ty = self.check_expr(receiver);
+        // Constructor seed (size-type Z2): the synthesized `create` call on a
+        // vacua receiver carries the claimed tensor type pre-lowered on the
+        // receiver. Typing adopts it instead of re-checking the vacua
+        // literal, whose expected-context route would constrain `_`
+        // annotation holes to rank 0.
+        let receiver_ty = if matches!(receiver.kind, HirExpressionKind::Vacua)
+            && let Some(claimed) = receiver.ty
+        {
+            claimed
+        } else {
+            self.check_expr(receiver)
+        };
         if let Some(def_id) = self
             .struct_def_from_type(receiver_ty)
             .or_else(|| self.interface_def_from_type(receiver_ty))

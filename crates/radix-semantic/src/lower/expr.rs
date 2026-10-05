@@ -118,10 +118,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check, id),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
-        ExprKind::Construct(_) => {
-            lowerer.error_with_args(issue_args("construction_synthesis_pending"));
-            HirExpressionKind::Error
-        }
+        ExprKind::Construct(ty) => lowerer.lower_construct(ty, expr.span),
         ExprKind::Reducta(reduction) => lower_reducta(lowerer, reduction),
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.
@@ -565,6 +562,136 @@ impl Lowerer<'_> {
                 let args = self.lower_call_args(&call.args);
                 HirExpressionKind::Call(Box::new(callee), type_args, args, None)
             }
+        }
+    }
+
+    /// Type-expression constructor (size-type Z2): the claimed tensor type
+    /// mints a zero-filled value. Synthesizes the same HIR shape as the
+    /// corpus surface `seed.create(0.0, [extents])` — a `create` method call
+    /// on a vacua receiver pre-typed with the claimed type — so typing, MIR
+    /// lowering, and the runtime create path all reuse the existing
+    /// machinery. The receiver's pre-lowered `ty` is what
+    /// `check_method_call` reads instead of re-checking the vacua literal.
+    fn lower_construct(
+        &mut self,
+        ty: &radix_syntax::TypeExpr,
+        span: radix_lexer::Span,
+    ) -> HirExpressionKind {
+        let radix_syntax::TypeExprKind::Tensor(_, figura) = &ty.kind else {
+            self.error_with_args_at(vec![DiagnosticArg::new("issue", "constructor_requires_extent_type")], span);
+            return HirExpressionKind::Error;
+        };
+        let claimed = self.lower_type(ty);
+        let elem_is_float = match self.types.get(claimed) {
+            crate::Type::Tensor(element, _) => {
+                radix_types::numeric_width::is_tensor_float_element(self.types, *element)
+            }
+            _ => false,
+        };
+        let fill_kind = if elem_is_float {
+            HirExpressionKind::Literal(HirLiteral::Float(0.0))
+        } else {
+            HirExpressionKind::Literal(HirLiteral::Int(0))
+        };
+        let fill = HirExpression {
+            id: self.next_hir_id(),
+            kind: fill_kind,
+            ty: None,
+            span,
+        };
+        let dims: &[radix_syntax::FiguraExpr] = match figura {
+            radix_syntax::FiguraExpr::Tuple(dims) => dims,
+            single => std::slice::from_ref(single),
+        };
+        let extents = dims
+            .iter()
+            .map(|dim| self.construct_extent_expr(dim, span))
+            .collect::<Vec<_>>();
+        let extents_array = HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::Array(
+                extents.into_iter().map(HirArrayElement::Expr).collect(),
+            ),
+            ty: None,
+            span,
+        };
+        let receiver = HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::Vacua,
+            ty: Some(claimed),
+            span,
+        };
+        HirExpressionKind::MethodCall(
+            Box::new(receiver),
+            self.intrinsic_surface_symbol("crea"),
+            Vec::new(),
+            vec![
+                HirCallArg {
+                    name: None,
+                    spread: false,
+                    expr: fill,
+                    span,
+                },
+                HirCallArg {
+                    name: None,
+                    spread: false,
+                    expr: extents_array,
+                    span,
+                },
+            ],
+            None,
+        )
+    }
+
+    /// One constructor extent term as a value expression. Extents admit
+    /// literals, size names, and spelled size lifts; a `_` hole belongs in
+    /// the annotation, and affine extent terms are a named residual.
+    fn construct_extent_expr(
+        &mut self,
+        dim: &radix_syntax::FiguraExpr,
+        span: radix_lexer::Span,
+    ) -> HirExpression {
+        let kind = match dim {
+            radix_syntax::FiguraExpr::Literal(value) => {
+                HirExpressionKind::Literal(HirLiteral::Int(*value))
+            }
+            radix_syntax::FiguraExpr::Var(ident) => self.lower_nomen(ident),
+            radix_syntax::FiguraExpr::Lift(extent) => match &**extent {
+                radix_syntax::LiftExtent::Literal(value) => {
+                    HirExpressionKind::Literal(HirLiteral::Int(*value))
+                }
+                radix_syntax::LiftExtent::Name(ident) => self.lower_nomen(ident),
+                radix_syntax::LiftExtent::Negative { value, .. } => {
+                    self.error_with_args_at(
+                        vec![
+                            DiagnosticArg::new("issue", "size_lift_negative"),
+                            DiagnosticArg::new("value", format!("-{value}")),
+                        ],
+                        span,
+                    );
+                    HirExpressionKind::Error
+                }
+                radix_syntax::LiftExtent::Paren(term) => {
+                    return self.construct_extent_expr(term, span);
+                }
+            },
+            radix_syntax::FiguraExpr::Infer => {
+                self.error_with_args_at(vec![DiagnosticArg::new("issue", "constructor_extent_requires_term")], span);
+                HirExpressionKind::Error
+            }
+            radix_syntax::FiguraExpr::Add(_, _)
+            | radix_syntax::FiguraExpr::Subtract(_, _)
+            | radix_syntax::FiguraExpr::Divide(_, _)
+            | radix_syntax::FiguraExpr::Tuple(_) => {
+                self.error_with_args_at(vec![DiagnosticArg::new("issue", "constructor_affine_extent_unsupported")], span);
+                HirExpressionKind::Error
+            }
+        };
+        HirExpression {
+            id: self.next_hir_id(),
+            kind,
+            ty: None,
+            span,
         }
     }
 

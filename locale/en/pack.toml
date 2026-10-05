@@ -1900,9 +1900,18 @@ help = "fix the AST construct for lowering"
 message = "HIR lowering failed"
 help = "fix the AST construct for lowering"
 
-[diagnostics.SEM008.issues.construction_synthesis_pending]
-message = "type-expression construction is not yet supported by semantic lowering"
-help = "wait for construction synthesis support"
+[diagnostics.SEM008.issues.constructor_requires_extent_type]
+message = "construction applies to extent-bearing tensor types"
+help = "spell the shape, as in tf32[2, 3]"
+
+[diagnostics.SEM008.issues.constructor_extent_requires_term]
+message = "a constructor extent must name a size or a literal"
+help = "the `_` hole belongs in the annotation, not the constructor"
+
+[diagnostics.SEM008.issues.constructor_affine_extent_unsupported]
+message = "constructor extents admit literals, size names, and spelled size lifts"
+help = "affine extent terms in constructors are not supported yet"
+
 
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "unknown namespace"

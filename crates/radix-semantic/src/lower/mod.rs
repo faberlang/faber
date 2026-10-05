@@ -1308,6 +1308,9 @@ mod destructure_test;
 #[path = "size_decl_test.rs"]
 mod size_decl_test;
 #[cfg(test)]
+#[path = "construct_test.rs"]
+mod construct_test;
+#[cfg(test)]
 #[path = "template_holes_test.rs"]
 mod template_holes_test;
 #[cfg(test)]
