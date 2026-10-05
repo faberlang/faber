@@ -206,9 +206,32 @@ fn resolve_stmt(
 ) {
     let stmt_span = stmt.span;
     match &stmt.kind {
-        // size-type Z1 lift half owns SizeDecl name resolution; a no-op arm
-        // keeps the exhaustive match compiling until that lands.
-        StmtKind::SizeDecl(_) => {}
+        StmtKind::SizeDecl(decl) => {
+            // A lifted size is immutable and snapshots its source expression
+            // before its own name enters scope. A size is a natural, so a
+            // negative literal fails the lift store at compile time; runtime
+            // negatives are checked at the store in MIR (size-type Z1).
+            resolve_expr(resolver, interner, &decl.init, errors);
+            if let radix_syntax::ExprKind::Unary(unary) = &decl.init.kind
+                && unary.op == radix_syntax::UnOp::Neg
+                && matches!(unary.operand.kind, radix_syntax::ExprKind::Literal(..))
+            {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::ConversionInvalid, decl.init.span)
+                        .with_arg("issue", "size_lift_negative"),
+                );
+            }
+            if !matches!(resolver.current().kind, ScopeKind::Global) {
+                define_symbol(
+                    resolver,
+                    decl.name.name,
+                    decl.name.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+            }
+        }
         StmtKind::Var(decl) => {
             if let Some(ty) = &decl.ty {
                 resolve_type_expr(resolver, interner, ty, errors);

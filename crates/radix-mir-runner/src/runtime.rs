@@ -1073,7 +1073,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .map(|argument| self.eval_operand(argument, span))
             .collect::<Result<Vec<_>, _>>()?;
         for binding in &check.size_bindings {
-            recoverable_shape_expression_value(&binding.witness, &arguments, span)?;
+            // size-type Z1: the size slot is a lift store, so a witness that
+            // fails here is the lift failing its `>= 0` check — name it as
+            // such (shape-expression relation failures keep their own issue).
+            recoverable_shape_expression_value(&binding.witness, &arguments, span).map_err(
+                |error| RunnerError::internal_with_issue(span, error.message, "size_lift_negative"),
+            )?;
         }
         for relation in &check.relations {
             let left = recoverable_shape_expression_value(&relation.left, &arguments, span)?;

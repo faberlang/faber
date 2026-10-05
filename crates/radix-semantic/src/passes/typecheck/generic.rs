@@ -36,6 +36,12 @@ const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
 /// missing tensor shape witness, so it shares the code the goal text pins.
 const ISSUE_CANNOT_INFER_TENSOR_SHAPE: &str = "cannot_infer_tensor_shape";
 
+/// Z1: a size-slot argument is a lift store at the call, so its `>= 0`
+/// obligation is checked there. A negative compile-time constant is rejected
+/// with this issue; a negative runtime value raises it where MIR consumes the
+/// sidecar binding.
+const ISSUE_SIZE_LIFT_NEGATIVE: &str = "size_lift_negative";
+
 impl TypeChecker<'_> {
     /// Whether `ty` names one of the active function's type parameters.
     ///
@@ -333,6 +339,12 @@ impl TypeChecker<'_> {
         {
             let runtime_size_symbols =
                 self.capture_runtime_call_size_bindings(&sig.type_params, &shape_vars, span);
+            self.reject_negative_constant_size_args(
+                &sig.type_params,
+                &shape_vars,
+                &runtime_size_symbols,
+                span,
+            );
             // Runtime extent identity belongs in the sidecar operand map, not
             // in the instance key. Keep the callee's formal generic symbol as
             // the key witness while its instantiated signature above retains
@@ -381,6 +393,48 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
         self.resolve_inferred_type(sig.ret)
+    }
+
+    /// Z1: reject a size-slot argument whose compile-time value is negative.
+    ///
+    /// The size law's lift rule makes a runtime int in a generic call's size
+    /// slot a lift store, so its `>= 0` obligation fires at the call. A
+    /// constant witness already below zero can never satisfy the store, so it
+    /// is a compile error here; runtime witnesses keep the sidecar binding
+    /// consumed by MIR call lowering.
+    fn reject_negative_constant_size_args(
+        &mut self,
+        params: &[radix_types::GenericParamDescriptor],
+        shape_vars: &FxHashMap<Symbol, IndexId>,
+        runtime_symbols: &FxHashSet<Symbol>,
+        span: radix_lexer::Span,
+    ) {
+        for param in params {
+            if param.sort != GenericParamSort::Magnitudo || runtime_symbols.contains(&param.name) {
+                continue;
+            }
+            let Some(witness) = shape_vars.get(&param.name).copied() else {
+                continue;
+            };
+            let witness = self.resolve_index(witness);
+            let negative = match self.types.get_index(witness) {
+                IndexExpr::Affine { base, offset } => match self.types.get_index(*base) {
+                    IndexExpr::Literal(value) => {
+                        let total = i128::from(*value) + *offset;
+                        (total < 0).then_some(total)
+                    }
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some(total) = negative {
+                self.invalid_operand_types_with_args(
+                    ISSUE_SIZE_LIFT_NEGATIVE,
+                    span,
+                    &[("value", total.to_string())],
+                );
+            }
+        }
     }
 
     /// Returns the shared error type when explicit args are invalid for `sig`.
@@ -1313,5 +1367,118 @@ mod size_default_unify_test {
             checker.first_index_arithmetic_error_in_type(tensor),
             Some(radix_types::IndexArithmeticError::NonIntegral)
         );
+    }
+}
+
+#[cfg(test)]
+mod size_lift_negative_test {
+    use super::*;
+    use radix_lexer::{Interner, Span};
+    use radix_target::Target;
+
+    fn magnitudo_params(names: &[radix_lexer::Symbol]) -> Vec<radix_types::GenericParamDescriptor> {
+        names
+            .iter()
+            .map(|name| radix_types::GenericParamDescriptor {
+                name: *name,
+                sort: radix_types::GenericParamSort::Magnitudo,
+                constraint: radix_types::TypeParamConstraint::Any,
+                default: None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn negative_constant_size_arg_is_a_compile_error_at_the_call() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let mut interner = Interner::new();
+        let h = interner.intern("h");
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let zero = checker.types.intern_index(IndexExpr::Literal(0));
+        let witness = checker.types.intern_index(IndexExpr::Affine {
+            base: zero,
+            offset: -1,
+        });
+        checker.current_shape_call = Some(HirId(7));
+        let mut shape_vars = FxHashMap::default();
+        shape_vars.insert(h, witness);
+        let params = magnitudo_params(&[h]);
+
+        let runtime_symbols =
+            checker.capture_runtime_call_size_bindings(&params, &shape_vars, Span::default());
+        checker.reject_negative_constant_size_args(
+            &params,
+            &shape_vars,
+            &runtime_symbols,
+            Span::default(),
+        );
+
+        assert!(runtime_symbols.is_empty());
+        assert!(
+            checker
+                .shape_obligations
+                .call_size_bindings
+                .get(&HirId(7))
+                .is_none()
+        );
+        assert!(
+            checker
+                .errors
+                .iter()
+                .any(|error| { error.issue() == Some(ISSUE_SIZE_LIFT_NEGATIVE) })
+        );
+    }
+
+    #[test]
+    fn positive_constant_and_runtime_size_args_stay_clean() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let mut interner = Interner::new();
+        let h = interner.intern("h");
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let positive = checker.types.intern_index(IndexExpr::Literal(3));
+        let scalar =
+            checker
+                .types
+                .intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarParameter {
+                    parameter: 2,
+                }));
+        let runtime_witness = radix_types::add_index_constant(&mut checker.types, scalar, -1)
+            .expect("runtime affine extent");
+        checker.current_shape_call = Some(HirId(7));
+        let params = magnitudo_params(&[h]);
+
+        let mut shape_vars = FxHashMap::default();
+        shape_vars.insert(h, positive);
+        let positive_symbols =
+            checker.capture_runtime_call_size_bindings(&params, &shape_vars, Span::default());
+        checker.reject_negative_constant_size_args(
+            &params,
+            &shape_vars,
+            &positive_symbols,
+            Span::default(),
+        );
+        assert!(positive_symbols.is_empty());
+        assert!(checker.errors.is_empty());
+
+        shape_vars.insert(h, runtime_witness);
+        let runtime_symbols =
+            checker.capture_runtime_call_size_bindings(&params, &shape_vars, Span::default());
+        checker.reject_negative_constant_size_args(
+            &params,
+            &shape_vars,
+            &runtime_symbols,
+            Span::default(),
+        );
+        assert!(runtime_symbols.contains(&h));
+        assert!(checker.errors.is_empty());
+        let binding = checker
+            .shape_obligations
+            .call_size_bindings
+            .get(&HirId(7))
+            .and_then(|rows| rows.first())
+            .expect("runtime witness keeps the sidecar binding");
+        assert_eq!(binding.witness, runtime_witness);
     }
 }

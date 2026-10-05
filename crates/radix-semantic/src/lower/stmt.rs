@@ -110,6 +110,20 @@ pub fn lower_stmt(lowerer: &mut Lowerer, stmt: &Stmt) -> HirStatement {
 
     let kind = match &stmt.kind {
         StmtKind::Var(decl) => lowerer.lower_var_stmt(decl),
+        StmtKind::SizeDecl(decl) => {
+            let def_id = lowerer.next_def_id();
+            lowerer.bind_local(decl.name.name, def_id);
+            HirStatementKind::Local(radix_hir::HirLocal {
+                def_id,
+                name: decl.name.name,
+                ty: None,
+                init: Some(lowerer.lower_expr(&decl.init)),
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+                await_store: None,
+            })
+        }
         StmtKind::Expr(expr) => lowerer.lower_expr_stmt(expr),
         StmtKind::IncDec(inc_dec) => lowerer.lower_inc_dec_stmt(inc_dec),
         StmtKind::Si(if_stmt) => lowerer.lower_si(if_stmt),
