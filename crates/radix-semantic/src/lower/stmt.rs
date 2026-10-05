@@ -122,6 +122,8 @@ pub fn lower_stmt(lowerer: &mut Lowerer, stmt: &Stmt) -> HirStatement {
                 is_await: false,
                 runtime_provided: false,
                 await_store: None,
+                size_decl: true,
+                size_static: decl.is_static,
             })
         }
         StmtKind::Expr(expr) => lowerer.lower_expr_stmt(expr),
@@ -385,6 +387,8 @@ impl Lowerer<'_> {
                 is_await,
                 runtime_provided: false,
                 await_store: None,
+                size_decl: false,
+                size_static: false,
             }),
             span,
         };
@@ -429,6 +433,8 @@ impl Lowerer<'_> {
                 is_await: false,
                 runtime_provided: false,
                 await_store: None,
+                size_decl: false,
+                size_static: false,
             }),
             span,
         }
@@ -644,6 +650,8 @@ impl Lowerer<'_> {
                 is_await: false,
                 runtime_provided: false,
                 await_store: None,
+                size_decl: false,
+                size_static: false,
             };
             out.push(HirStatement {
                 id: self.next_hir_id(),
@@ -664,6 +672,8 @@ impl Lowerer<'_> {
                 is_await: false,
                 runtime_provided: false,
                 await_store: None,
+                size_decl: false,
+                size_static: false,
             };
             out.push(HirStatement {
                 id: self.next_hir_id(),
@@ -727,6 +737,8 @@ impl Lowerer<'_> {
                     is_await: decl.is_await(),
                     runtime_provided: false,
                     await_store: None,
+                    size_decl: false,
+                    size_static: false,
                 })
             }
             radix_syntax::BindingPattern::Wildcard(span) => {
@@ -1294,6 +1306,8 @@ impl Lowerer<'_> {
                         is_await: false,
                         runtime_provided: true,
                         await_store: None,
+                        size_decl: false,
+                        size_static: false,
                     }),
                     span,
                 },

@@ -692,6 +692,27 @@ impl super::FaberCodegen<'_> {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
+        if local.size_decl {
+            // `const size H ← h` / static `const size N = 3` (la `magnitudo`):
+            // the declaration spelling is the whole statement — no type
+            // annotation, no generic params; the glyph law picks `=` for the
+            // compile-time natural and `←` for the runtime lift.
+            writer.write(surface.contextual_keyword("fixum"));
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Magnitudo));
+            writer.write(" ");
+            writer.write(&self.symbol_to_string(local.name));
+            if let Some(init) = &local.init {
+                if local.size_static {
+                    writer.write(" = ");
+                } else {
+                    writer.write(" ← ");
+                }
+                self.write_expr(init, names, surface, writer);
+            }
+            writer.newline();
+            return;
+        }
         let await_assignment = self.await_assignment_bindings.contains(&local.def_id);
         let keyword = match (local.is_await, await_assignment, local.mutable) {
             (true, true, false) | (false, _, false) => surface.contextual_keyword("fixum"),

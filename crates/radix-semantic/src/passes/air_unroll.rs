@@ -1775,6 +1775,8 @@ fn emit_unrolled_lanes(
                     is_await: false,
                     runtime_provided: false,
                     await_store: None,
+                    size_decl: false,
+                    size_static: false,
                 };
                 out.push(HirStatement {
                     id: ids.next_hir(),
@@ -1835,6 +1837,8 @@ fn emit_unrolled_lanes(
                 is_await: false,
                 runtime_provided: false,
                 await_store: None,
+                size_decl: false,
+                size_static: false,
             };
             out.push(HirStatement {
                 id: ids.next_hir(),
@@ -1969,6 +1973,8 @@ fn ssa_local(
             is_await: false,
             runtime_provided: false,
             await_store: None,
+            size_decl: false,
+            size_static: false,
         }),
         span,
     }

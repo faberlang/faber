@@ -430,6 +430,8 @@ impl<'a> Lowerer<'a> {
                                 is_await: false,
                                 runtime_provided: true,
                                 await_store: None,
+                                size_decl: false,
+                                size_static: false,
                             }),
                             span,
                         },

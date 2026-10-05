@@ -253,6 +253,8 @@ fn admitted_constructor_shapes_are_fresh() {
             is_await: false,
             runtime_provided: false,
             await_store: None,
+            size_decl: false,
+            size_static: false,
         };
         let hir = HirModule {
             items: Vec::new(),

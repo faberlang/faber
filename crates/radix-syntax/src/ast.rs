@@ -194,11 +194,13 @@ pub struct VarDecl {
     pub compile_time: bool,
 }
 
-/// Size-type declaration surface. Its meaning is assigned by later semantic work.
+/// `const size NAME ← expr` runtime lift or `const size NAME = natural` static size.
 #[derive(Debug)]
 pub struct SizeDecl {
     pub name: Ident,
     pub init: Box<Expr>,
+    /// `=` binds a static natural; `←` lifts a runtime snapshot.
+    pub is_static: bool,
 }
 
 impl VarDecl {

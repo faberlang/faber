@@ -1046,6 +1046,8 @@ fn generate_local_hole_uses_authored_form_without_legacy_flags() {
         is_await: false,
         runtime_provided: false,
         await_store: None,
+        size_decl: false,
+        size_static: false,
     };
     let hir = HirModule {
         items: Vec::new(),

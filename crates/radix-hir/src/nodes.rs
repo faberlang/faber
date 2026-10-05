@@ -1066,6 +1066,16 @@ pub struct HirLocal {
     /// result is assignable to the slot.
     #[serde(default)]
     pub await_store: Option<HirStoreSite>,
+
+    /// Source declared this binding with the `size` (la `magnitudo`) form.
+    /// Presentation-only: the Faber re-emitter prints the declaration
+    /// spelling instead of an ordinary immutable binding.
+    #[serde(default)]
+    pub size_decl: bool,
+    /// Static `const size N = 3` (compile-time natural) versus the runtime
+    /// `←` lift; only meaningful when `size_decl` is set. Serde-defaulted so
+    /// older interface snapshots keep loading.
+    pub size_static: bool,
 }
 
 impl HirLocal {

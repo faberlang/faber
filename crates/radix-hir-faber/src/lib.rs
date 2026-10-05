@@ -31,6 +31,9 @@ mod fac_omnia_emit_test;
 mod comma_law_test;
 
 #[cfg(test)]
+mod size_decl_emit_test;
+
+#[cfg(test)]
 mod generic_default_emit_test;
 
 #[cfg(test)]

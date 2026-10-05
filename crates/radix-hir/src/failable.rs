@@ -420,6 +420,8 @@ mod tests {
                 mutable: false,
                 runtime_provided: false,
                 await_store: None,
+                size_decl: false,
+                size_static: false,
                 is_await: false,
             }),
             span,

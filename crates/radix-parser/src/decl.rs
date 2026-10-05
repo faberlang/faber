@@ -75,7 +75,19 @@ impl Parser {
             TokenKind::Ident(_) => match self.current_keyword_ident() {
                 Some(TokenKind::Discretio) => self.parse_union_decl()?,
                 Some(TokenKind::Fixum | TokenKind::Varia) => self.parse_var_decl()?,
-                Some(TokenKind::Magnitudo) => self.parse_size_decl()?,
+                Some(TokenKind::Magnitudo) => {
+                    let suggestion = match self.peek_at(1).kind {
+                        TokenKind::Ident(symbol) => {
+                            format!("const size {}", self.interner.resolve(symbol))
+                        }
+                        _ => "const size".to_owned(),
+                    };
+                    return Err(
+                        ParseError::structured(ParseErrorKind::DeclarationInvalid, start)
+                            .with_arg("issue", "size_requires_const")
+                            .with_arg("suggestion", suggestion),
+                    );
+                }
                 // `generis` is a genus-member modifier. At statement start the
                 // retired module-level static shape (modifier + type + name)
                 // is diagnosed; any other use stays an ordinary identifier.
@@ -189,6 +201,10 @@ impl Parser {
         } else {
             return Err(Self::expected_error("fixum or varia", self.current_span()));
         };
+
+        if self.check_keyword_ident(TokenKind::Magnitudo) {
+            return self.parse_size_decl(mutability);
+        }
 
         let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
             None
@@ -429,13 +445,36 @@ impl Parser {
         Ok(StmtKind::Tacebit(TacebitStmt { future, span }))
     }
 
-    /// Parse `magnitudo H ← expr` (en `size H ← expr`) as syntax only.
-    fn parse_size_decl(&mut self) -> Result<StmtKind, ParseError> {
+    /// Parse `const size H ← expr` or `const size N = natural`.
+    fn parse_size_decl(&mut self, mutability: AstMutability) -> Result<StmtKind, ParseError> {
+        let size_span = self.current_span();
         self.expect_keyword_ident(TokenKind::Magnitudo, "expected 'magnitudo'")?;
+        if mutability == AstMutability::Mutable {
+            return Err(
+                ParseError::structured(ParseErrorKind::DeclarationInvalid, size_span)
+                    .with_arg("issue", "size_is_write_once"),
+            );
+        }
         let name = self.parse_ident()?;
-        self.expect_issue(&TokenKind::Assign, "size_declaration_assignment")?;
+        let is_static = if self.eat(&TokenKind::Eq) {
+            if !matches!(self.peek().kind, TokenKind::Integer(_)) {
+                return Err(ParseError::structured(
+                    ParseErrorKind::DeclarationInvalid,
+                    self.current_span(),
+                )
+                .with_arg("issue", "size_static_requires_literal"));
+            }
+            true
+        } else {
+            self.expect_issue(&TokenKind::Assign, "size_declaration_assignment")?;
+            false
+        };
         let init = Box::new(self.parse_expression()?);
-        Ok(StmtKind::SizeDecl(radix_syntax::SizeDecl { name, init }))
+        Ok(StmtKind::SizeDecl(radix_syntax::SizeDecl {
+            name,
+            init,
+            is_static,
+        }))
     }
 
     /// Parse `sit` inferred immutable binding declarations.

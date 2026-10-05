@@ -226,7 +226,11 @@ fn resolve_stmt(
                     resolver,
                     decl.name.name,
                     decl.name.span,
-                    SymbolKind::Local,
+                    if decl.is_static {
+                        SymbolKind::IndexParam
+                    } else {
+                        SymbolKind::Local
+                    },
                     false,
                     errors,
                 );

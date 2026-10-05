@@ -10,8 +10,10 @@ fn size_decl_binds_immutable_value() {
         LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
             .expect("load English locale pack"),
     );
-    let result =
-        analyze_source_with_config("fn main() {\n    size H ← 3\n    print H\n}\n", config);
+    let result = analyze_source_with_config(
+        "fn main() {\n    const size H ← 3\n    print H\n}\n",
+        config,
+    );
     assert!(
         result.is_ok(),
         "expected green, got: {:?}",
@@ -26,14 +28,34 @@ fn size_decl_rejects_negative_literal() {
         LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
             .expect("load English locale pack"),
     );
-    let result =
-        analyze_source_with_config("fn main() {\n    size H ← -3\n    print H\n}\n", config);
+    let result = analyze_source_with_config(
+        "fn main() {\n    const size H ← -3\n    print H\n}\n",
+        config,
+    );
     assert!(
         result.diagnostics.iter().any(|diag| diag
             .args
             .iter()
             .any(|arg| arg.name == "issue" && arg.value == "size_lift_negative")),
         "expected size_lift_negative, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn static_size_folds_in_tensor_shape() {
+    let mut config = PassConfig::for_target(Target::HirRust);
+    config.locale_pack = Some(
+        LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    let result = analyze_source_with_config(
+        "fn main() {\n    const size N = 3\n    const tf32[] seed ← empty\n    var tf32[N, 2] values ← seed.create(0.0, [N, 2])\n}\n",
+        config,
+    );
+    assert!(
+        result.is_ok(),
+        "expected static size to fold, got: {:?}",
         result.diagnostics
     );
 }

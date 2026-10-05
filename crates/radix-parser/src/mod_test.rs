@@ -5174,7 +5174,12 @@ impl KeywordPack for EnSizePack {
     }
 
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
-        (text == "size").then_some("magnitudo")
+        match text {
+            "size" => Some("magnitudo"),
+            "const" => Some("fixum"),
+            "var" => Some("varia"),
+            _ => None,
+        }
     }
 
     fn keyword_suggestion(&self, _text: &str) -> Option<String> {
@@ -5183,9 +5188,9 @@ impl KeywordPack for EnSizePack {
 }
 
 #[test]
-fn size_declaration_parses_in_both_locales_and_stays_contextual() {
-    for (source, english) in [("{ size H ← 3 }", true), ("{ magnitudo H ← 3 }", false)] {
-        let result = if english {
+fn const_size_declaration_parses_and_bare_or_var_forms_are_rejected() {
+    for source in ["{ const size H ← 3 }", "{ fixum magnitudo H ← 3 }"] {
+        let result = if source.contains(" size ") {
             parse(lex_with_locale_pack(source, &EnSizePack))
         } else {
             parse_ok(source)
@@ -5193,18 +5198,61 @@ fn size_declaration_parses_in_both_locales_and_stays_contextual() {
         assert!(result.success(), "{source}: {:?}", result.errors);
         let program = result.program.as_ref().expect("program");
         let StmtKind::Block(body) = &program.statements[0].kind else {
-            panic!("expected block, got {:?}", program.statements[0].kind);
+            panic!("expected block");
         };
         let StmtKind::SizeDecl(decl) = &body.statements[0].kind else {
-            panic!(
-                "expected size declaration, got {:?}",
-                body.statements[0].kind
-            );
+            panic!("expected size declaration");
         };
         assert_eq!(symbol_name(&result, decl.name.name), "H");
-        assert!(matches!(decl.init.kind, ExprKind::Literal(Literal::Int(3))));
+        assert!(!decl.is_static);
     }
 
+    for (source, issue) in [
+        ("{ size H ← 3 }", "size_requires_const"),
+        ("{ var size H ← 3 }", "size_is_write_once"),
+    ] {
+        let result = parse(lex_with_locale_pack(source, &EnSizePack));
+        assert!(
+            result.errors.iter().any(|error| error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == issue)),
+            "expected {issue} for {source}, got {:?}",
+            result.errors
+        );
+        if issue == "size_requires_const" {
+            assert!(
+                result.errors[0]
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "suggestion" && arg.value == "const size H")
+            );
+        }
+    }
+
+    let static_result = parse(lex_with_locale_pack("{ const size N = 3 }", &EnSizePack));
+    assert!(
+        static_result.success(),
+        "static size: {:?}",
+        static_result.errors
+    );
+    let StmtKind::Block(body) = &static_result.program.unwrap().statements[0].kind else {
+        panic!("expected block");
+    };
+    let StmtKind::SizeDecl(decl) = &body.statements[0].kind else {
+        panic!("expected size declaration");
+    };
+    assert!(decl.is_static);
+    let nonliteral = parse(lex_with_locale_pack(
+        "{ const size N = other }",
+        &EnSizePack,
+    ));
+    assert!(nonliteral.errors.iter().any(|error| {
+        error
+            .args
+            .iter()
+            .any(|arg| arg.value == "size_static_requires_literal")
+    }));
     let lexed = lex_with_locale_pack("size", &EnSizePack);
     assert!(matches!(lexed.tokens[0].kind, TokenKind::Ident(_)));
 }
