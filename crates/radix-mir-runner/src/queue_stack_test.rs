@@ -131,8 +131,7 @@ fn bounded_push_at_capacity_uses_the_recoverable_capacity_pin() {
         .frames
         .last_mut()
         .expect("bounded queue frame")
-        .locals
-        .insert(
+        .seed_local(
             radix_mir::MirLocalId(0),
             Value::Array(Rc::new(RefCell::new(vec![Value::Int(7)]))),
         );

@@ -61,7 +61,7 @@ fn shape_size_reads_runtime_formal_axes_and_checks_affine_division() {
     let mut host = BufferHost::default();
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     runner.push_frame(MirFunctionId(0), MirBlockId(0));
-    runner.frames[0].locals.insert(
+    runner.frames[0].seed_local(
         MirLocalId(0),
         Value::Tensor(Rc::new(RefCell::new(value::TensorValue::contiguous(
             vec![Value::Float(0.0); 15],
@@ -111,7 +111,7 @@ fn shape_size_rejects_non_integral_runtime_dimension_division() {
     let mut host = BufferHost::default();
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     runner.push_frame(MirFunctionId(0), MirBlockId(0));
-    runner.frames[0].locals.insert(
+    runner.frames[0].seed_local(
         MirLocalId(0),
         Value::Tensor(Rc::new(RefCell::new(value::TensorValue::contiguous(
             vec![Value::Float(0.0); 5],

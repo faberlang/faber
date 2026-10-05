@@ -35,7 +35,7 @@
 //! `Rc` of an unreleased conversation releases it exactly then (the runner is
 //! reference counted), and any error it carried is lost.
 
-use super::{CallOutcome, Host, MirBlockId, MirFunctionId, Runner, RunnerError, Value};
+use super::{CallOutcome, Host, MirBlockId, MirFunctionId, Runner, RunnerError, Value, write_slot};
 use crate::conversio::MissingFieldPolicy;
 use crate::cursor::{GeneratorCursor, GeneratorStep};
 use radix_hir::DefId;
@@ -382,7 +382,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         if is_generator {
             let mut frame = self.new_frame(handler, MirBlockId(0));
             frame.is_generator = true;
-            frame.locals.extend(locals);
+            for (local, value) in locals {
+                write_slot(&mut frame.locals, local.0 as usize, value, span, "local")?;
+            }
             return Ok((Vec::new(), None, Some(GeneratorCursor::new(frame))));
         }
         match self.call_with_locals(handler, locals)? {
@@ -408,7 +410,15 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.return_value = None;
         self.return_error = None;
         let mut frame = self.new_frame(function, MirBlockId(0));
-        frame.locals.extend(locals);
+        for (local, value) in locals {
+            write_slot(
+                &mut frame.locals,
+                local.0 as usize,
+                value,
+                Span::default(),
+                "local",
+            )?;
+        }
         self.resume_frame(frame);
         self.run_until_depth(depth);
         let error = self.errors.pop();

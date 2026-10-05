@@ -42,7 +42,7 @@ use super::value::{
 };
 use super::{
     CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
-    RunnerError, gelu_f64, host::provider_identity,
+    RunnerError, gelu_f64, host::provider_identity, write_slot,
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
@@ -427,7 +427,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let mut frame = self.new_frame(func_id, MirBlockId(0));
         frame.is_generator = true;
         for (local, arg) in param_locals.into_iter().zip(arg_values) {
-            frame.locals.insert(local, arg);
+            write_slot(&mut frame.locals, local.0 as usize, arg, span, "local")?;
         }
         let cursor = GeneratorCursor::new(frame);
         if stream.stepped {
@@ -4162,30 +4162,17 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Some(frame) = self.frames.last() else {
             return Ok(None);
         };
-        let function = self.function_by_id(frame.function, span)?;
+        let Some(slots) = self.slot_types.get(&frame.function) else {
+            return Ok(None);
+        };
         let ty = match &place.base {
-            MirPlaceBase::Local(id) => function
-                .locals
-                .iter()
-                .find(|local| local.id == *id)
-                .map(|local| local.ty)
-                .or_else(|| {
-                    function
-                        .params
-                        .iter()
-                        .find(|param| param.local == *id)
-                        .map(|param| param.ty)
-                }),
-            MirPlaceBase::Temp(id) => function
-                .temps
-                .iter()
-                .find(|temp| temp.id == *id)
-                .map(|temp| temp.ty),
+            MirPlaceBase::Local(id) => slots.local_ty(*id),
+            MirPlaceBase::Temp(id) => slots.temp_ty(*id),
         };
         let Some(ty) = ty else {
             return Ok(None);
         };
-        let capacity = match self.types.get(ty.semantic_id()) {
+        let capacity = match self.types.get(ty) {
             Type::BoundedArray { capacity, .. }
             | Type::BoundedQueue { capacity, .. }
             | Type::BoundedStack { capacity, .. } => *capacity,
@@ -5075,32 +5062,17 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn operand_semantic_type(&self, operand: &MirOperand, span: Span) -> Option<TypeId> {
+    fn operand_semantic_type(&self, operand: &MirOperand, _span: Span) -> Option<TypeId> {
         let MirOperand::Place(place) = operand else {
             return None;
         };
         let frame = self.frames.last()?;
-        let function = self.function_by_id(frame.function, span).ok()?;
+        let slots = self.slot_types.get(&frame.function)?;
         let ty = match place.base {
-            radix_mir::MirPlaceBase::Local(id) => function
-                .locals
-                .iter()
-                .find(|local| local.id == id)
-                .map(|local| local.ty)
-                .or_else(|| {
-                    function
-                        .params
-                        .iter()
-                        .find(|param| param.local == id)
-                        .map(|param| param.ty)
-                }),
-            radix_mir::MirPlaceBase::Temp(id) => function
-                .temps
-                .iter()
-                .find(|temp| temp.id == id)
-                .map(|temp| temp.ty),
+            radix_mir::MirPlaceBase::Local(id) => slots.local_ty(id),
+            radix_mir::MirPlaceBase::Temp(id) => slots.temp_ty(id),
         }?;
-        Some(ty.semantic_id())
+        Some(ty)
     }
 
     fn eval_option_chain(

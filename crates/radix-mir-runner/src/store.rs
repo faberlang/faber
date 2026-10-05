@@ -257,24 +257,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     pub(crate) fn operand_plain_type(&self, operand: &radix_mir::MirOperand) -> Option<TypeId> {
         use radix_mir::{MirOperand, MirPlaceBase};
         let function_id = self.frames.last()?.function;
-        let function = self
-            .program
-            .indexed_function(&self.function_index, function_id)?;
+        let slots = self.slot_types.get(&function_id)?;
         let ty = match operand {
-            MirOperand::Temp(id) => function.temps.iter().find(|t| t.id == *id).map(|t| t.ty),
+            MirOperand::Temp(id) => slots.temp_ty(*id),
             MirOperand::Place(place) if place.projections.is_empty() => match place.base {
-                MirPlaceBase::Temp(id) => function.temps.iter().find(|t| t.id == id).map(|t| t.ty),
-                MirPlaceBase::Local(id) => function
-                    .locals
-                    .iter()
-                    .find(|l| l.id == id)
-                    .map(|l| l.ty)
-                    .or_else(|| function.params.iter().find(|p| p.local == id).map(|p| p.ty)),
+                MirPlaceBase::Temp(id) => slots.temp_ty(id),
+                MirPlaceBase::Local(id) => slots.local_ty(id),
             },
-            MirOperand::Value(id) => self.value_types.get(&(function_id, *id)).copied(),
+            MirOperand::Value(id) => self
+                .value_types
+                .get(&(function_id, *id))
+                .map(|ty| ty.semantic_id()),
             _ => None,
         }?;
-        let mut ty = self.types.peel_access_marker(ty.semantic_id()).1;
+        let mut ty = self.types.peel_access_marker(ty).1;
         while let Type::Alias(_, inner) = self.types.get(ty) {
             ty = *inner;
         }

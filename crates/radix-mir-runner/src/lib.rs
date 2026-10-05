@@ -288,11 +288,14 @@ struct PlaceAlias {
 
 struct Frame {
     function: MirFunctionId,
-    locals: FxHashMap<MirLocalId, Value>,
+    /// Slot-indexed by `MirLocalId` (dense per function; `None` = never
+    /// written). A hash map here measured -5.4% cycles to remove on A2.
+    locals: Vec<Option<Value>>,
     /// `in` parameter locals that borrow a caller place instead of owning a
     /// cloned scalar value.
     aliases: FxHashMap<MirLocalId, PlaceAlias>,
-    temps: FxHashMap<MirTempId, Value>,
+    /// Slot-indexed by `MirTempId` (`None` = never written).
+    temps: Vec<Option<Value>>,
     /// Statement results readable through `MirOperand::Value`. Filled by
     /// `Assign` only when `records_values` is set, and by the edge-callback
     /// argument slots.
@@ -315,6 +318,105 @@ struct Frame {
 enum CallOutcome {
     Ok(Value),
     Err(Value),
+}
+
+#[cfg(test)]
+impl Frame {
+    /// Test-frame seeding: grow the slot storage to hold `id` (hand-built
+    /// fixtures may not declare every written slot).
+    fn seed_local(&mut self, id: MirLocalId, value: Value) {
+        let index = id.0 as usize;
+        if self.locals.len() <= index {
+            self.locals.resize(index + 1, None);
+        }
+        self.locals[index] = Some(value);
+    }
+}
+
+/// Write one slot of a frame's slot-indexed storage. An id outside the
+/// function's declared layout is an internal error (validation guarantees the
+/// layout covers every written id).
+pub(crate) fn write_slot(
+    slots: &mut [Option<Value>],
+    index: usize,
+    value: Value,
+    span: Span,
+    kind: &str,
+) -> Result<(), RunnerError> {
+    match slots.get_mut(index) {
+        Some(slot) => {
+            *slot = Some(value);
+            Ok(())
+        }
+        None => Err(RunnerError::internal(
+            span,
+            format!("write to undeclared {kind} slot {index}"),
+        )),
+    }
+}
+
+/// Per-function slot layout: the declared static type of every local and temp
+/// id, indexed by the id (locals also cover `in`-parameter slots), plus the
+/// parameter local ids a frame pre-seeds. Built once at construction so the
+/// hot paths index a `Vec` instead of scanning the function's declarations
+/// (the linear scan was 8.5% of A2 samples).
+pub(crate) struct FunctionSlots {
+    locals: Vec<Option<TypeId>>,
+    temps: Vec<Option<TypeId>>,
+    param_locals: Vec<MirLocalId>,
+}
+
+impl FunctionSlots {
+    pub(crate) fn local_ty(&self, id: MirLocalId) -> Option<TypeId> {
+        self.locals.get(id.0 as usize).copied().flatten()
+    }
+
+    pub(crate) fn temp_ty(&self, id: MirTempId) -> Option<TypeId> {
+        self.temps.get(id.0 as usize).copied().flatten()
+    }
+}
+
+fn slot_table_len(ids: impl Iterator<Item = u32>) -> usize {
+    ids.map(|id| id as usize + 1).max().unwrap_or(0)
+}
+
+fn index_slot_types(program: &MirProgram) -> FxHashMap<MirFunctionId, FunctionSlots> {
+    let mut table = FxHashMap::default();
+    for function in &program.functions {
+        let mut locals = vec![
+            None;
+            slot_table_len(
+                function
+                    .locals
+                    .iter()
+                    .map(|local| local.id.0)
+                    .chain(function.params.iter().map(|param| param.local.0))
+            )
+        ];
+        // Params first: a declared local wins the slot, matching the
+        // locals-then-params lookup order this table replaces.
+        let mut param_locals = Vec::with_capacity(function.params.len());
+        for param in &function.params {
+            locals[param.local.0 as usize] = Some(param.ty.semantic_id());
+            param_locals.push(param.local);
+        }
+        for local in &function.locals {
+            locals[local.id.0 as usize] = Some(local.ty.semantic_id());
+        }
+        let mut temps = vec![None; slot_table_len(function.temps.iter().map(|temp| temp.id.0))];
+        for temp in &function.temps {
+            temps[temp.id.0 as usize] = Some(temp.ty.semantic_id());
+        }
+        table.insert(
+            function.id,
+            FunctionSlots {
+                locals,
+                temps,
+                param_locals,
+            },
+        );
+    }
+    table
 }
 
 enum StatementOutcome {
@@ -383,6 +485,8 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Functions whose body reads a `MirOperand::Value`; only their frames
     /// record `Assign` results.
     value_reading_functions: FxHashSet<MirFunctionId>,
+    /// Declared local/temp slot types per function (O(1) id lookups).
+    slot_types: FxHashMap<MirFunctionId, FunctionSlots>,
     /// Whether a call to a compute-stage (`@ kernel`) function runs or stops
     /// the run. Defaults to [`RunnerKernelPolicy::Refuse`].
     kernel_policy: RunnerKernelPolicy,
@@ -447,6 +551,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             ascii_literals: RefCell::new(FxHashMap::default()),
             value_types: index_value_types(program),
             value_reading_functions: index_value_reading_functions(program),
+            slot_types: index_slot_types(program),
             kernel_policy: RunnerKernelPolicy::Refuse,
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
@@ -1225,24 +1330,24 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn new_frame(&self, function_id: MirFunctionId, entry_block: MirBlockId) -> Frame {
-        let locals = match self
-            .program
-            .indexed_function(&self.function_index, function_id)
-        {
-            Some(function) => {
-                let mut locals = FxHashMap::default();
-                for param in &function.params {
-                    locals.insert(param.local, Value::Unit);
+        let (mut locals, temps_len) = match self.slot_types.get(&function_id) {
+            Some(slots) => {
+                let mut locals = vec![None; slots.locals.len()];
+                for param in slots.param_locals.iter().copied() {
+                    if let Some(slot) = locals.get_mut(param.0 as usize) {
+                        *slot = Some(Value::Unit);
+                    }
                 }
-                locals
+                (locals, slots.temps.len())
             }
-            None => FxHashMap::default(),
+            None => (Vec::new(), 0),
         };
+        locals.shrink_to_fit();
         Frame {
             function: function_id,
             locals,
             aliases: FxHashMap::default(),
-            temps: FxHashMap::default(),
+            temps: vec![None; temps_len],
             values: FxHashMap::default(),
             records_values: self.value_reading_functions.contains(&function_id),
             block: entry_block,
@@ -1722,22 +1827,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let Some(frame) = self.frames.last() else {
             return Err(RunnerError::internal(span, "no active frame"));
         };
-        let caller = self.function_by_id(frame.function, span)?;
         let error_place_ty = match &error_place.base {
-            MirPlaceBase::Local(id) => caller
-                .locals
-                .iter()
-                .find(|local| local.id == *id)
-                .map(|local| local.ty),
-            MirPlaceBase::Temp(id) => caller
-                .temps
-                .iter()
-                .find(|temp| temp.id == *id)
-                .map(|temp| temp.ty),
+            MirPlaceBase::Local(id) => self
+                .slot_types
+                .get(&frame.function)
+                .and_then(|slots| slots.local_ty(*id)),
+            MirPlaceBase::Temp(id) => self
+                .slot_types
+                .get(&frame.function)
+                .and_then(|slots| slots.temp_ty(*id)),
         };
         Ok(error_place_ty.is_some_and(|ty| {
             matches!(
-                self.types.get(ty.semantic_id()),
+                self.types.get(ty),
                 Type::Primitive(Primitive::Textus | Primitive::Ignotum)
             )
         }))
@@ -1837,7 +1939,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.push_frame(func_id, MirBlockId(0));
         if let Some(frame) = self.frames.last_mut() {
             if let Some((local, value)) = closure_environment {
-                frame.locals.insert(local, value);
+                write_slot(&mut frame.locals, local.0 as usize, value, span, "local")?;
             }
             for ((local, mode), (arg, operand)) in param_modes
                 .into_iter()
@@ -1861,7 +1963,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         },
                     );
                 } else {
-                    frame.locals.insert(local, arg);
+                    write_slot(&mut frame.locals, local.0 as usize, arg, span, "local")?;
                 }
             }
         }
@@ -2082,7 +2184,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             ));
         };
         let function_id = frame.function;
-        if frame.temps.contains_key(destination) {
+        if frame
+            .temps
+            .get(destination.0 as usize)
+            .is_some_and(Option::is_some)
+        {
             // A temp the main flow already computed is a pure recovery operand.
             return self.eval_operand(recovery, span);
         }
@@ -2431,10 +2537,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .ok_or_else(|| RunnerError::internal(span, "no active frame"))?;
         match base {
             MirPlaceBase::Local(id) => {
-                frame.locals.insert(*id, value);
+                write_slot(&mut frame.locals, id.0 as usize, value, span, "local")?;
             }
             MirPlaceBase::Temp(id) => {
-                frame.temps.insert(*id, value);
+                write_slot(&mut frame.temps, id.0 as usize, value, span, "temp")?;
             }
         }
         Ok(())
@@ -2586,7 +2692,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
         self.frames
             .get(frame_index)
-            .and_then(|frame| frame.locals.get(&id))
+            .and_then(|frame| frame.locals.get(id.0 as usize))
+            .and_then(|slot| slot.as_ref())
             .cloned()
             .ok_or_else(|| RunnerError::internal(span, format!("uninitialized local l{}", id.0)))
     }
@@ -2602,7 +2709,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             MirPlaceBase::Temp(id) => self
                 .frames
                 .get(frame_index)
-                .and_then(|frame| frame.temps.get(id))
+                .and_then(|frame| frame.temps.get(id.0 as usize))
+                .and_then(|slot| slot.as_ref())
                 .cloned()
                 .ok_or_else(|| {
                     RunnerError::internal(span, format!("uninitialized temp t{}", id.0))
@@ -2613,7 +2721,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     fn read_temp(&self, id: MirTempId, span: Span) -> Result<Value, RunnerError> {
         self.frames
             .last()
-            .and_then(|frame| frame.temps.get(&id))
+            .and_then(|frame| frame.temps.get(id.0 as usize))
+            .and_then(|slot| slot.as_ref())
             .cloned()
             .ok_or_else(|| RunnerError::internal(span, format!("uninitialized temp t{}", id.0)))
     }

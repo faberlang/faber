@@ -179,8 +179,7 @@ fn scalar_mut_param_propagates_through_runner_frames() {
         .frames
         .last_mut()
         .expect("caller frame")
-        .locals
-        .insert(MirLocalId(0), Value::Int(3));
+        .seed_local(MirLocalId(0), Value::Int(3));
 
     runner
         .invoke_call(
@@ -5285,11 +5284,11 @@ fn tensor_shape_guard_before_try_call_uses_the_call_error_block() {
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     runner.push_frame(MirFunctionId(0), MirBlockId(0));
     let frame = runner.frames.last_mut().expect("caller frame");
-    frame.locals.insert(
+    frame.seed_local(
         MirLocalId(0),
         tensor_value(vec![Value::Int(1), Value::Int(2)], vec![2]),
     );
-    frame.locals.insert(
+    frame.seed_local(
         MirLocalId(1),
         tensor_value(vec![Value::Int(1), Value::Int(2), Value::Int(3)], vec![3]),
     );
@@ -6727,6 +6726,17 @@ fn run_two_assigns(read_value: bool) -> (Option<Value>, bool) {
     };
     let second = assign_statement(MirTempId(1), MirValueId(1), second_operand);
     let mut function = make_function();
+    // The slot-indexed frame sizes itself from the declared temps, so the
+    // fixture declares the ids its statements write (validated MIR always
+    // does).
+    function.temps = [MirTempId(0), MirTempId(1)]
+        .into_iter()
+        .map(|id| radix_mir::MirTemp {
+            id,
+            ty: MirType::semantic(TypeId(0)),
+            span: Span::default(),
+        })
+        .collect();
     function.blocks.push(MirBlock {
         id: MirBlockId(0),
         statements: vec![first.clone(), second.clone()],
@@ -6745,7 +6755,7 @@ fn run_two_assigns(read_value: bool) -> (Option<Value>, bool) {
     runner.execute_statement(&second).expect("second assign");
     let frame = runner.frames.last().expect("frame");
     (
-        frame.temps.get(&MirTempId(1)).cloned(),
+        frame.temps.get(1).cloned().flatten(),
         frame.values.is_empty(),
     )
 }
