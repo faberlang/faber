@@ -56,15 +56,16 @@ fn construct_inline_spelled_lift_checks() {
 fn construct_literal_mismatch_stays_red() {
     let found = issues("fn main() {\n    const tf32[3, 2] a ← tf32[2, 3]\n}\n");
     assert!(
-        found.iter().any(|issue| issue == "initializer_annotation_mismatch"),
+        found
+            .iter()
+            .any(|issue| issue == "initializer_annotation_mismatch"),
         "expected initializer mismatch, got: {found:?}"
     );
 }
 
 #[test]
 fn construct_negative_spelled_lift_rejects() {
-    let found =
-        issues("fn main() {\n    const tf32[2, size -1] b ← tf32[2, size -1]\n}\n");
+    let found = issues("fn main() {\n    const tf32[2, size -1] b ← tf32[2, size -1]\n}\n");
     assert!(
         found.iter().any(|issue| issue == "size_lift_negative"),
         "expected size_lift_negative, got: {found:?}"
@@ -75,7 +76,9 @@ fn construct_negative_spelled_lift_rejects() {
 fn construct_extent_hole_is_refused() {
     let found = issues("fn main() {\n    const tf32[2, 3] a ← tf32[2, _]\n}\n");
     assert!(
-        found.iter().any(|issue| issue == "constructor_extent_requires_term"),
+        found
+            .iter()
+            .any(|issue| issue == "constructor_extent_requires_term"),
         "expected constructor_extent_requires_term, got: {found:?}"
     );
 }

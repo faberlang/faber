@@ -579,7 +579,12 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             None
         })?;
 
-        let caller_source = self.lowerer.functions.iter().find(|candidate| candidate.id == function).and_then(|f| f.source);
+        let caller_source = self
+            .lowerer
+            .functions
+            .iter()
+            .find(|candidate| candidate.id == function)
+            .and_then(|f| f.source);
         let witness = CallWitness {
             caller_source,
             args: &args,
@@ -631,7 +636,14 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         let mut shape_bindings = MirShapeBindings::default();
         let source = template.source?;
         let params = self.generic_param_order.get(&source)?.clone();
-        self.bind_explicit_type_args(caller_source, source, explicit_type_args, &mut bindings, &mut shape_bindings, span)?;
+        self.bind_explicit_type_args(
+            caller_source,
+            source,
+            explicit_type_args,
+            &mut bindings,
+            &mut shape_bindings,
+            span,
+        )?;
         for (index, arg) in args.iter().enumerate() {
             let Some(expected) = template.params.get(index) else {
                 continue;
@@ -878,7 +890,12 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     /// rigid param node (GSF-1 forwarding) — the key derivation resolves it
     /// through the calling instance's shape bindings. Anything else fails
     /// closed so wrong-kind rejection is preserved.
-    fn explicit_shape_witness(&mut self, caller_source: Option<DefId>, concrete: MirType, span: Span) -> Option<IndexId> {
+    fn explicit_shape_witness(
+        &mut self,
+        caller_source: Option<DefId>,
+        concrete: MirType,
+        span: Span,
+    ) -> Option<IndexId> {
         let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
             return None;
         };
@@ -893,21 +910,42 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
             return index;
         }
-        struct LocalFinder { name: Symbol, found: Option<DefId> }
+        struct LocalFinder {
+            name: Symbol,
+            found: Option<DefId>,
+        }
         impl crate::hir::visit::HirVisitor for LocalFinder {
             fn visit_param(&mut self, param: &crate::hir::HirParam) {
-                if param.name == self.name { self.found = Some(param.def_id); }
+                if param.name == self.name {
+                    self.found = Some(param.def_id);
+                }
             }
             fn visit_local(&mut self, local: &crate::hir::HirLocal) {
-                if local.name == self.name { self.found = Some(local.def_id); }
+                if local.name == self.name {
+                    self.found = Some(local.def_id);
+                }
                 crate::hir::visit::walk_local(self, local);
             }
         }
         let mut finder = LocalFinder { name: sym, found: None };
         finder.visit_program(&self.lowerer.unit.hir);
         let value_binding = finder.found.or_else(|| {
-            caller_source.and_then(|source| self.lowerer.unit.hir.items.iter().find(|item| item.def_id == source)
-                .and_then(|item| match &item.kind { crate::hir::HirItemKind::Function(function) => function.params.iter().find(|p| p.name == sym).map(|p| p.def_id), _ => None }))
+            caller_source.and_then(|source| {
+                self.lowerer
+                    .unit
+                    .hir
+                    .items
+                    .iter()
+                    .find(|item| item.def_id == source)
+                    .and_then(|item| match &item.kind {
+                        crate::hir::HirItemKind::Function(function) => function
+                            .params
+                            .iter()
+                            .find(|p| p.name == sym)
+                            .map(|p| p.def_id),
+                        _ => None,
+                    })
+            })
         });
         if let Some(binding) = value_binding {
             return self.lowerer.unit.shape_obligations.call_size_bindings.values().flatten()

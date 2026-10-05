@@ -344,7 +344,11 @@ impl Validator<'_, '_> {
     /// Runtime-dependent tensor extents are checked by the recorded
     /// FunctionReturn shape obligation. MIR validation still rejects rank,
     /// element, and fully literal mismatches here.
-    pub(crate) fn return_shape_relation_assignable(&self, from: crate::MirType, to: crate::MirType) -> bool {
+    pub(crate) fn return_shape_relation_assignable(
+        &self,
+        from: crate::MirType,
+        to: crate::MirType,
+    ) -> bool {
         let types = self.context.types.as_table();
         let (Type::Tensor(from_element, from_shape), Type::Tensor(to_element, to_shape)) =
             (types.get(from.semantic_id()), types.get(to.semantic_id()))

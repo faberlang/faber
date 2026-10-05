@@ -4430,7 +4430,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .collect()
     }
 
-    fn conversion_shape_arg(&mut self, operand: &MirOperand, span: Span) -> Result<Vec<i64>, RunnerError> {
+    fn conversion_shape_arg(
+        &mut self,
+        operand: &MirOperand,
+        span: Span,
+    ) -> Result<Vec<i64>, RunnerError> {
         self.array_arg(operand, span)?
             .into_iter()
             .map(|value| match value {
@@ -4461,13 +4465,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<(), RunnerError> {
         match tensor_shape_element_count(shape) {
             Some(expected) if expected == actual => Ok(()),
-            Some(expected) if message == radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG => {
+            Some(expected)
+                if message
+                    == radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG =>
+            {
                 let mut error = RunnerError::internal_with_issue(
                     span,
                     format!("tensor conversion expected {expected} elements, got {actual}"),
                     "conversion_length_mismatch",
                 );
-                error.args = vec![("expected".to_owned(), expected.to_string()), ("actual".to_owned(), actual.to_string())];
+                error.args = vec![
+                    ("expected".to_owned(), expected.to_string()),
+                    ("actual".to_owned(), actual.to_string()),
+                ];
                 Err(error)
             }
             Some(_) => Err(RunnerError::internal(span, message)),

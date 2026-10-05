@@ -578,7 +578,13 @@ impl Lowerer<'_> {
         span: radix_lexer::Span,
     ) -> HirExpressionKind {
         let radix_syntax::TypeExprKind::Tensor(_, figura) = &ty.kind else {
-            self.error_with_args_at(vec![DiagnosticArg::new("issue", "constructor_requires_extent_type")], span);
+            self.error_with_args_at(
+                vec![DiagnosticArg::new(
+                    "issue",
+                    "constructor_requires_extent_type",
+                )],
+                span,
+            );
             return HirExpressionKind::Error;
         };
         let claimed = self.lower_type(ty);
@@ -676,14 +682,26 @@ impl Lowerer<'_> {
                 }
             },
             radix_syntax::FiguraExpr::Infer => {
-                self.error_with_args_at(vec![DiagnosticArg::new("issue", "constructor_extent_requires_term")], span);
+                self.error_with_args_at(
+                    vec![DiagnosticArg::new(
+                        "issue",
+                        "constructor_extent_requires_term",
+                    )],
+                    span,
+                );
                 HirExpressionKind::Error
             }
             radix_syntax::FiguraExpr::Add(_, _)
             | radix_syntax::FiguraExpr::Subtract(_, _)
             | radix_syntax::FiguraExpr::Divide(_, _)
             | radix_syntax::FiguraExpr::Tuple(_) => {
-                self.error_with_args_at(vec![DiagnosticArg::new("issue", "constructor_affine_extent_unsupported")], span);
+                self.error_with_args_at(
+                    vec![DiagnosticArg::new(
+                        "issue",
+                        "constructor_affine_extent_unsupported",
+                    )],
+                    span,
+                );
                 HirExpressionKind::Error
             }
         };
@@ -1893,7 +1911,9 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
             crate::IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(_))
                 if spelled_runtime_lift.is_some() =>
             {
-                lowerer.types.intern(crate::Type::Param(spelled_runtime_lift.unwrap()))
+                lowerer
+                    .types
+                    .intern(crate::Type::Param(spelled_runtime_lift.unwrap()))
             }
             crate::IndexExpr::Runtime(_)
             | crate::IndexExpr::Affine { .. }
@@ -1937,7 +1957,12 @@ fn call_arg_names_scalar_value(lowerer: &Lowerer<'_>, name: radix_lexer::Symbol)
             .resolver
             .lookup(name)
             .and_then(|def_id| lowerer.resolver.get_symbol(def_id))
-            .is_some_and(|symbol| matches!(symbol.kind, crate::SymbolKind::Local | crate::SymbolKind::Param))
+            .is_some_and(|symbol| {
+                matches!(
+                    symbol.kind,
+                    crate::SymbolKind::Local | crate::SymbolKind::Param
+                )
+            })
 }
 
 fn call_arg_names_caller_size_param(lowerer: &Lowerer<'_>, name: radix_lexer::Symbol) -> bool {

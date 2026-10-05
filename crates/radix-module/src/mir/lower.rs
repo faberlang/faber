@@ -77,11 +77,11 @@ mod context;
 mod control;
 mod conversio_route;
 #[cfg(test)]
-#[path = "lower/entry_args_test.rs"]
-mod entry_args_tests;
-#[cfg(test)]
 #[path = "lower/conversion_check_test.rs"]
 mod conversion_check_tests;
+#[cfg(test)]
+#[path = "lower/entry_args_test.rs"]
+mod entry_args_tests;
 mod expr;
 #[cfg(test)]
 #[path = "lower/first_match_test.rs"]
@@ -2782,10 +2782,7 @@ impl<'a> FunctionBuilder<'a> {
                 );
                 self.assign(MirPlace::local(id), value, mir_ty, span);
             } else if self.context.shape_stores.contains_key(&init.id)
-                && !matches!(
-                    init.kind,
-                    HirExpressionKind::Call(..) | HirExpressionKind::MethodCall(..)
-                )
+                && !matches!(init.kind, HirExpressionKind::Call(..) | HirExpressionKind::MethodCall(..))
             {
                 let value = self.lower_expr_value(init)?;
                 self.emit_store_shape_check(init.id, value.clone(), span)?;

@@ -74,6 +74,13 @@ fn slot_pin_negative_call_slot_lift_is_recoverable() {
     let source = SLOT_LIFT.replace("w ← 4", "w ← -1");
     let mut host = BufferHost::default();
     let error = run_source(&session(), "negative-slot-lift.fab", &source, &mut host).expect_err("negative lift fails");
-    let RunSourceError::Stepper(errors) = error else { panic!("expected runner error: {error:?}") };
-    assert!(errors.iter().any(|error| error.issue == "size_lift_negative"), "{errors:?}");
+    let RunSourceError::Stepper(errors) = error else {
+        panic!("expected runner error: {error:?}")
+    };
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "size_lift_negative"),
+        "{errors:?}"
+    );
 }

@@ -1018,12 +1018,10 @@ impl TypeChecker<'_> {
             None if self.is_size_param_symbol(sym) => {
                 Some(self.types.intern_index(IndexExpr::Param(sym)))
             }
-            None => self
-                .hir_value_binding_def(sym)
-                .map(|def_id| {
-                    self.types
-                        .intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)))
-                }),
+            None => self.hir_value_binding_def(sym).map(|def_id| {
+                self.types
+                    .intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)))
+            }),
         }
     }
 

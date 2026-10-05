@@ -6,8 +6,8 @@
 //! green and the extent equality is recorded as a runtime-recoverable store
 //! obligation. Literal mismatches stay red.
 
-use crate::test_support::{AnalyzedFixture, analyze_source_with_config};
 use crate::PassConfig;
+use crate::test_support::{AnalyzedFixture, analyze_source_with_config};
 use radix_target::Target;
 
 fn analyze(source: &str) -> AnalyzedFixture {
@@ -21,7 +21,11 @@ fn analyze(source: &str) -> AnalyzedFixture {
 
 fn accepts(source: &str) {
     let result = analyze(source);
-    assert!(result.is_ok(), "diagnostics: {:?}\n{source}", result.diagnostics);
+    assert!(
+        result.is_ok(),
+        "diagnostics: {:?}\n{source}",
+        result.diagnostics
+    );
 }
 
 fn rejects_with_issue(source: &str, issue: &str) {

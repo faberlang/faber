@@ -1302,14 +1302,14 @@ fn attached_doc_lines(trivia: &[Trivia]) -> Vec<Symbol> {
 #[path = "authored_form_test.rs"]
 mod authored_form_test;
 #[cfg(test)]
+#[path = "construct_test.rs"]
+mod construct_test;
+#[cfg(test)]
 #[path = "destructure_test.rs"]
 mod destructure_test;
 #[cfg(test)]
 #[path = "size_decl_test.rs"]
 mod size_decl_test;
-#[cfg(test)]
-#[path = "construct_test.rs"]
-mod construct_test;
 #[cfg(test)]
 #[path = "template_holes_test.rs"]
 mod template_holes_test;

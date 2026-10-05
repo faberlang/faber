@@ -148,7 +148,12 @@ impl FunctionBuilder<'_> {
         value: MirOperand,
         span: Span,
     ) -> Option<()> {
-        let relations = self.context.shape_stores.get(&expression).cloned().unwrap_or_default();
+        let relations = self
+            .context
+            .shape_stores
+            .get(&expression)
+            .cloned()
+            .unwrap_or_default();
         if relations.is_empty() {
             return Some(());
         }
@@ -3944,12 +3949,16 @@ impl FunctionBuilder<'_> {
                         let axis_id = i64::try_from(axis).ok()?;
                         let dimension = *dimensions.get(axis)?;
                         let direct = match self.types.get_index(dimension) {
-                            IndexExpr::Literal(value) => Some(MirOperand::Constant(MirConstant::Int(i64::try_from(*value).ok()?))),
+                            IndexExpr::Literal(value) => {
+                                Some(MirOperand::Constant(MirConstant::Int(i64::try_from(*value).ok()?)))
+                            }
                             IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(binding)) => {
                                 if let Some(place) = self.captured_bindings.get(binding) {
                                     Some(MirOperand::Place(place.clone()))
                                 } else {
-                                    self.bindings.get(binding).map(|binding| MirOperand::Place(MirPlace::local(binding.local)))
+                                    self.bindings
+                                        .get(binding)
+                                        .map(|binding| MirOperand::Place(MirPlace::local(binding.local)))
                                 }
                             }
                             _ => None,
@@ -3957,31 +3966,31 @@ impl FunctionBuilder<'_> {
                         let dim = if let Some(direct) = direct {
                             direct
                         } else {
-                            let scalar = if index_contains_runtime_extent(self.types, dimension, &mut FxHashSet::default())
-                        {
-                            let mut shape_arguments = Vec::new();
-                            let expression = match self.lower_shape_expr(
-                                dimension,
-                                &mut shape_arguments,
-                                expression_value,
-                                ShapeRelationBoundary::FunctionEntry,
-                                0,
-                            ) {
-                                Ok(expression) => expression,
-                                Err(message) => {
-                                    self.errors.push(MirError::unsupported(span, message));
-                                    return None;
-                                }
-                            };
-                            self.runtime_call_value(
-                                MirIntrinsic::TensorShapeSize(expression),
-                                shape_arguments,
-                                MirType::semantic(self.types.primitive(Primitive::Fractus)),
-                                span,
-                            )
-                        } else {
-                            MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis_id) })
-                        };
+                            let scalar =
+                                if index_contains_runtime_extent(self.types, dimension, &mut FxHashSet::default()) {
+                                    let mut shape_arguments = Vec::new();
+                                    let expression = match self.lower_shape_expr(
+                                        dimension,
+                                        &mut shape_arguments,
+                                        expression_value,
+                                        ShapeRelationBoundary::FunctionEntry,
+                                        0,
+                                    ) {
+                                        Ok(expression) => expression,
+                                        Err(message) => {
+                                            self.errors.push(MirError::unsupported(span, message));
+                                            return None;
+                                        }
+                                    };
+                                    self.runtime_call_value(
+                                        MirIntrinsic::TensorShapeSize(expression),
+                                        shape_arguments,
+                                        MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                                        span,
+                                    )
+                                } else {
+                                    MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis_id) })
+                                };
                             let numerus = self.types.primitive(Primitive::Numerus);
                             self.runtime_call_value(
                                 MirIntrinsic::Convert(MirConversion {

@@ -365,7 +365,9 @@ fn index_contains_runtime(types: &TypeTable, index: IndexId) -> bool {
         IndexExpr::Runtime(_) | IndexExpr::Infer(_) => true,
         IndexExpr::Affine { base, .. } => index_contains_runtime(types, *base),
         IndexExpr::Divide { numerator, .. } => index_contains_runtime(types, *numerator),
-        IndexExpr::Tuple(items) => items.iter().any(|item| index_contains_runtime(types, *item)),
+        IndexExpr::Tuple(items) => items
+            .iter()
+            .any(|item| index_contains_runtime(types, *item)),
         _ => false,
     }
 }
@@ -446,8 +448,7 @@ fn try_bind_index_witness(
             // Structural equality first. A pair whose caller-side axis is
             // runtime-origin carries its equality in the emitted runtime
             // shape check (store/call obligation), so binding accepts it.
-            types.index_equals(expected, actual)
-                || index_contains_runtime(types, actual)
+            types.index_equals(expected, actual) || index_contains_runtime(types, actual)
         }
     }
 }

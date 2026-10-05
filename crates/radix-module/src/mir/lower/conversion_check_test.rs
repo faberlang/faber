@@ -32,8 +32,15 @@ fn conversion_check_negative_lift_is_named() {
     let mut host = BufferHost::default();
     let error = run_source(&session(), "conversion-negative-lift.fab", &source, &mut host)
         .expect_err("negative size lift fails");
-    let RunSourceError::Stepper(errors) = error else { panic!("expected runner failure: {error:?}") };
-    assert!(errors.iter().any(|error| error.issue == "size_lift_negative"), "{errors:?}");
+    let RunSourceError::Stepper(errors) = error else {
+        panic!("expected runner failure: {error:?}")
+    };
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "size_lift_negative"),
+        "{errors:?}"
+    );
 }
 
 #[test]
@@ -49,7 +56,9 @@ main {
     let mut host = BufferHost::default();
     let error = run_source(&session(), "conversion-element-mismatch.fab", source, &mut host)
         .expect_err("integer list cannot convert to float tensor");
-    let RunSourceError::Frontend(errors) = error else { panic!("expected check failure: {error:?}") };
+    let RunSourceError::Frontend(errors) = error else {
+        panic!("expected check failure: {error:?}")
+    };
     assert!(format!("{errors:?}").contains("lista_to_tensor_element_mismatch"), "{errors:?}");
 }
 
@@ -59,8 +68,13 @@ fn conversion_check_length_mismatch_is_named_with_counts() {
     let mut host = BufferHost::default();
     let error = run_source(&session(), "conversion-length-mismatch.fab", &source, &mut host)
         .expect_err("wrong element count fails");
-    let RunSourceError::Stepper(errors) = error else { panic!("expected runner failure: {error:?}") };
-    let error = errors.iter().find(|error| error.issue == "conversion_length_mismatch").expect("named issue");
+    let RunSourceError::Stepper(errors) = error else {
+        panic!("expected runner failure: {error:?}")
+    };
+    let error = errors
+        .iter()
+        .find(|error| error.issue == "conversion_length_mismatch")
+        .expect("named issue");
     assert_eq!(error.arg("expected"), Some("6"));
     assert_eq!(error.arg("actual"), Some("3"));
 }
