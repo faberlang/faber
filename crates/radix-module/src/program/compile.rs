@@ -2454,6 +2454,17 @@ fn interface_index_snapshot(figura: &FiguraExpr, interner: &crate::lexer::Intern
             .map(|dim| interface_index_snapshot(dim, interner))
             .collect::<Option<Vec<_>>>()
             .map(InterfaceIndexSnapshot::Tuple),
+        FiguraExpr::Lift(lift) => match &**lift {
+            // A spelled size lift snapshots like its payload: a literal
+            // folds, a name stays symbolic (same as `Var`), and a negative
+            // literal is rejected at resolve (no static snapshot).
+            radix_syntax::LiftExtent::Literal(value) => Some(InterfaceIndexSnapshot::Literal(*value)),
+            radix_syntax::LiftExtent::Name(ident) => {
+                Some(InterfaceIndexSnapshot::Param(interner.resolve(ident.name).to_owned()))
+            }
+            radix_syntax::LiftExtent::Negative { .. } => None,
+            radix_syntax::LiftExtent::Paren(inner) => interface_index_snapshot(inner, interner),
+        },
         FiguraExpr::Infer => None,
     }
 }

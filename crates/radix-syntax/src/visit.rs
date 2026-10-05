@@ -749,6 +749,12 @@ fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &crate::FiguraExpr) {
         crate::FiguraExpr::Add(value, _)
         | crate::FiguraExpr::Subtract(value, _)
         | crate::FiguraExpr::Divide(value, _) => walk_figura_expr(visitor, value),
+        crate::FiguraExpr::Lift(extent) => match &**extent {
+            crate::LiftExtent::Literal(_) => {}
+            crate::LiftExtent::Name(ident) => visitor.visit_ident(ident),
+            crate::LiftExtent::Negative { .. } => {}
+            crate::LiftExtent::Paren(term) => walk_figura_expr(visitor, term),
+        },
         crate::FiguraExpr::Tuple(dims) => {
             for dim in dims {
                 walk_figura_expr(visitor, dim);

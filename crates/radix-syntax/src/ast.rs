@@ -1802,8 +1802,26 @@ pub enum FiguraExpr {
     Subtract(Box<FiguraExpr>, u64),
     /// Divide an index term exactly by a positive natural constant (`D / 2`).
     Divide(Box<FiguraExpr>, u64),
+    /// Spelled size lift in an extent position: `size <primary>` (la
+    /// `magnitudo <primary>`). The lift is a store, so its value is checked
+    /// at that extent (size-type Z2).
+    Lift(Box<LiftExtent>),
     /// Rank-n shape `[d0, d1, …]`; empty tuple is rank-0 `[]`.
     Tuple(Vec<FiguraExpr>),
+}
+
+/// Primary payload of a spelled size lift extent (`size <primary>`).
+#[derive(Debug, Clone)]
+pub enum LiftExtent {
+    /// Natural literal: `size 3` folds statically.
+    Literal(u64),
+    /// Value or size name: `size n`.
+    Name(Ident),
+    /// Negative integer literal: `size -1`. Rejected at resolve
+    /// (`size_lift_negative`), like the size-declaration lift store.
+    Negative { value: u64, span: Span },
+    /// Parenthesized figura term: `size (H + 1)`.
+    Paren(Box<FiguraExpr>),
 }
 
 /// Syntactic variants inside [`TypeExpr`].

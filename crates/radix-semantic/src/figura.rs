@@ -6,7 +6,7 @@
 use super::index::{IndexExpr, IndexId};
 use super::{Resolver, SymbolKind, TypeTable};
 use radix_lexer::Interner;
-use radix_syntax::FiguraExpr;
+use radix_syntax::{FiguraExpr, LiftExtent};
 use radix_types::{
     IndexArithmeticError, compose_index_affine_constant, divide_index_exact,
     evaluate_index_dimension,
@@ -77,6 +77,16 @@ pub fn lower_figura_expr(
                 _ => Err(FIGURA_NOT_INDEX_PARAM_MSG),
             }
         }
+        FiguraExpr::Lift(extent) => match &**extent {
+            LiftExtent::Literal(value) => Ok(types.intern_index(IndexExpr::Literal(*value))),
+            LiftExtent::Name(ident) => {
+                // The spelled lift lowers to the same index term as its
+                // payload; the negative-literal refusal ran at resolve.
+                lower_figura_expr(&FiguraExpr::Var(ident.clone()), resolver, types)
+            }
+            LiftExtent::Paren(term) => lower_figura_expr(term, resolver, types),
+            LiftExtent::Negative { .. } => Err(FIGURA_NOT_INDEX_PARAM_MSG),
+        },
         FiguraExpr::Add(_, _) | FiguraExpr::Subtract(_, _) => {
             lower_figura_affine_expr(figura, resolver, types)
         }

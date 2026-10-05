@@ -1739,6 +1739,10 @@ mod construction_source_test;
 mod tests;
 
 #[cfg(test)]
+#[path = "size_extent_test.rs"]
+mod size_extent_test;
+
+#[cfg(test)]
 #[path = "itera_binder_regression_test.rs"]
 mod itera_binder_regression_test;
 

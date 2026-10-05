@@ -1654,19 +1654,19 @@ fn resolve_type_expr(
         TypeExprKind::UnionHole => {}
         TypeExprKind::Tensor(elem, figura) => {
             resolve_type_expr(resolver, interner, elem, errors);
-            resolve_figura_expr(resolver, figura, errors);
+            resolve_figura_expr(resolver, interner, figura, errors);
         }
         TypeExprKind::Vector(elem, figura) => {
             resolve_type_expr(resolver, interner, elem, errors);
-            resolve_figura_expr(resolver, figura, errors);
+            resolve_figura_expr(resolver, interner, figura, errors);
         }
         TypeExprKind::Matrix(elem, figura) => {
             resolve_type_expr(resolver, interner, elem, errors);
-            resolve_figura_expr(resolver, figura, errors);
+            resolve_figura_expr(resolver, interner, figura, errors);
         }
         TypeExprKind::Sparsa(elem, figura) => {
             resolve_type_expr(resolver, interner, elem, errors);
-            resolve_figura_expr(resolver, figura, errors);
+            resolve_figura_expr(resolver, interner, figura, errors);
         }
         TypeExprKind::Atomic(elem) => resolve_type_expr(resolver, interner, elem, errors),
         TypeExprKind::PromissumFailable(success, alternate) => {
@@ -1832,7 +1832,7 @@ fn resolve_generic_arg(
             }
             _ => resolve_type_expr(resolver, interner, ty, errors),
         },
-        GenericArgExpr::Size(figura) => resolve_figura_expr(resolver, figura, errors),
+        GenericArgExpr::Size(figura) => resolve_figura_expr(resolver, interner, figura, errors),
         GenericArgExpr::Name(ident) => {
             resolve_named_generic_arg_ident(resolver, interner, ident, errors);
         }
@@ -1874,7 +1874,8 @@ fn resolve_named_generic_arg_ident(
 }
 
 fn resolve_figura_expr(
-    resolver: &Resolver,
+    resolver: &mut Resolver,
+    interner: &Interner,
     figura: &radix_syntax::FiguraExpr,
     errors: &mut Vec<SemanticError>,
 ) {
@@ -1883,11 +1884,11 @@ fn resolve_figura_expr(
         radix_syntax::FiguraExpr::Add(value, _)
         | radix_syntax::FiguraExpr::Subtract(value, _)
         | radix_syntax::FiguraExpr::Divide(value, _) => {
-            resolve_figura_expr(resolver, value, errors);
+            resolve_figura_expr(resolver, interner, value, errors);
         }
         radix_syntax::FiguraExpr::Tuple(dims) => {
             for dim in dims {
-                resolve_figura_expr(resolver, dim, errors);
+                resolve_figura_expr(resolver, interner, dim, errors);
             }
         }
         radix_syntax::FiguraExpr::Var(ident) => {
@@ -1911,6 +1912,40 @@ fn resolve_figura_expr(
                 ));
             }
         }
+        radix_syntax::FiguraExpr::Lift(extent) => {
+            resolve_lift_extent(resolver, interner, extent, errors);
+        }
+    }
+}
+
+/// Resolve a spelled size lift payload. The lift is a store: a negative
+/// literal fails at compile time (`size_lift_negative`), mirroring the
+/// size-declaration check.
+fn resolve_lift_extent(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    extent: &radix_syntax::LiftExtent,
+    errors: &mut Vec<SemanticError>,
+) {
+    match extent {
+        radix_syntax::LiftExtent::Literal(_) => {}
+        radix_syntax::LiftExtent::Negative { span, .. } => {
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::ConversionInvalid, *span)
+                    .with_arg("issue", "size_lift_negative"),
+            );
+        }
+        radix_syntax::LiftExtent::Name(ident) => {
+            resolve_figura_expr(
+                resolver,
+                interner,
+                &radix_syntax::FiguraExpr::Var(ident.clone()),
+                errors,
+            );
+        }
+        radix_syntax::LiftExtent::Paren(term) => {
+            resolve_figura_expr(resolver, interner, term, errors);
+        }
     }
 }
 
@@ -1921,6 +1956,7 @@ fn generic_arg_span(arg: &GenericArgExpr) -> radix_lexer::Span {
             radix_lexer::Span::default()
         }
         GenericArgExpr::Size(FiguraExpr::Var(ident)) => ident.span,
+        GenericArgExpr::Size(FiguraExpr::Lift(extent)) => lift_extent_span(extent),
         GenericArgExpr::Size(
             FiguraExpr::Add(value, _)
             | FiguraExpr::Subtract(value, _)
@@ -1937,10 +1973,20 @@ fn generic_figura_span(figura: &FiguraExpr) -> radix_lexer::Span {
     match figura {
         FiguraExpr::Infer | FiguraExpr::Literal(_) => radix_lexer::Span::default(),
         FiguraExpr::Var(ident) => ident.span,
+        FiguraExpr::Lift(extent) => lift_extent_span(extent),
         FiguraExpr::Add(value, _)
         | FiguraExpr::Subtract(value, _)
         | FiguraExpr::Divide(value, _) => generic_figura_span(value),
         FiguraExpr::Tuple(dims) => dims.first().map(generic_figura_span).unwrap_or_default(),
+    }
+}
+
+fn lift_extent_span(extent: &radix_syntax::LiftExtent) -> radix_lexer::Span {
+    match extent {
+        radix_syntax::LiftExtent::Name(ident) => ident.span,
+        radix_syntax::LiftExtent::Negative { span, .. } => *span,
+        radix_syntax::LiftExtent::Literal(_) => radix_lexer::Span::default(),
+        radix_syntax::LiftExtent::Paren(term) => generic_figura_span(term),
     }
 }
 
@@ -2015,6 +2061,11 @@ fn capacity_index_issue(
         GenericArgExpr::Size(FiguraExpr::Var(ident)) | GenericArgExpr::Name(ident) => {
             (ident, false)
         }
+        GenericArgExpr::Size(FiguraExpr::Lift(extent)) => match &**extent {
+            // A spelled lift as a capacity behaves like its name payload.
+            radix_syntax::LiftExtent::Name(ident) => (ident, false),
+            _ => return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
+        },
         GenericArgExpr::Size(FiguraExpr::Tuple(_)) => {
             return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
         }

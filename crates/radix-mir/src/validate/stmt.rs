@@ -9,7 +9,7 @@ use crate::{
     MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirIntrinsic, MirOperand,
     MirPlaceBase, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind,
 };
-use radix_types::Primitive;
+use radix_types::{IndexExpr, Primitive, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 impl Validator<'_, '_> {
@@ -197,12 +197,12 @@ impl Validator<'_, '_> {
             }
             MirTerminatorKind::Return(Some(value)) => {
                 if let Some(value_ty) = self.validate_operand(scope, value, terminator.span) {
-                    self.require_assignable(
-                        value_ty,
-                        scope.function.return_ty,
-                        terminator.span,
-                        "return type mismatch",
-                    );
+                    if !self.assignable(value_ty, scope.function.return_ty)
+                        && !self
+                            .return_shape_relation_assignable(value_ty, scope.function.return_ty)
+                    {
+                        self.error(terminator.span, "return type mismatch");
+                    }
                 }
             }
             MirTerminatorKind::ReturnError(value) => {
@@ -332,6 +332,37 @@ impl Validator<'_, '_> {
             }
             MirTerminatorKind::Unreachable => {}
         }
+    }
+
+    /// Runtime-dependent tensor extents are checked by the recorded
+    /// FunctionReturn shape obligation. MIR validation still rejects rank,
+    /// element, and fully literal mismatches here.
+    fn return_shape_relation_assignable(&self, from: crate::MirType, to: crate::MirType) -> bool {
+        let types = self.context.types.as_table();
+        let (Type::Tensor(from_element, from_shape), Type::Tensor(to_element, to_shape)) =
+            (types.get(from.semantic_id()), types.get(to.semantic_id()))
+        else {
+            return false;
+        };
+        if !types.is_assignable(*from_element, *to_element) {
+            return false;
+        }
+        let dimensions = |shape| match types.get_index(shape) {
+            IndexExpr::Tuple(items) => items.clone(),
+            IndexExpr::Unspecified => Vec::new(),
+            _ => vec![shape],
+        };
+        let from_dimensions = dimensions(*from_shape);
+        let to_dimensions = dimensions(*to_shape);
+        from_dimensions.len() == to_dimensions.len()
+            && from_dimensions
+                .iter()
+                .zip(to_dimensions.iter())
+                .all(|(from, to)| {
+                    types.index_equals(*from, *to)
+                        || (!matches!(types.get_index(*from), IndexExpr::Literal(_))
+                            || !matches!(types.get_index(*to), IndexExpr::Literal(_)))
+                })
     }
 
     /// Validate CFG invariants: entry block existence, reachability, and

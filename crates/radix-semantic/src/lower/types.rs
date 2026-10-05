@@ -33,6 +33,9 @@ use crate::{
     SemanticGenericParamDefault, SemanticParamMode, Type, TypeId,
 };
 use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
+
+const FIGURA_LIFT_PRIMARY_MSG: &str =
+    "size lift extent expects a natural literal, a name, or a parenthesized expression";
 use radix_types::{AppliedArg, BuiltinTensorEdgePolicy};
 use radix_types::{compose_index_affine_constant, divide_index_exact, evaluate_index_dimension};
 
@@ -1449,6 +1452,7 @@ impl Lowerer<'_> {
                     }
                 }
             },
+            FiguraExpr::Lift(expr) => self.lower_figura_lift(expr),
             FiguraExpr::Add(_, _) | FiguraExpr::Subtract(_, _) => {
                 self.lower_figura_affine_expr(figura)
             }
@@ -1465,6 +1469,21 @@ impl Lowerer<'_> {
                 Ok(self.types.intern_index(IndexExpr::Tuple(lowered)))
             }
         }
+    }
+
+    fn lower_figura_lift(
+        &mut self,
+        extent: &radix_syntax::LiftExtent,
+    ) -> Result<IndexId, &'static str> {
+        // The spelled lift lowers to the same index term as its payload; the
+        // negative-literal refusal already ran at resolve.
+        let figura = match extent {
+            radix_syntax::LiftExtent::Literal(value) => FiguraExpr::Literal(*value),
+            radix_syntax::LiftExtent::Name(ident) => FiguraExpr::Var(ident.clone()),
+            radix_syntax::LiftExtent::Paren(term) => (**term).clone(),
+            radix_syntax::LiftExtent::Negative { .. } => return Err(FIGURA_LIFT_PRIMARY_MSG),
+        };
+        self.lower_figura_expr(&figura)
     }
 
     fn lower_figura_affine_expr(&mut self, figura: &FiguraExpr) -> Result<IndexId, &'static str> {

@@ -749,6 +749,59 @@ fn tuple_aggregate_valid() {
 }
 
 #[test]
+fn return_accepts_runtime_dependent_tensor_shape_relation() {
+    let mut types = TypeTable::new();
+    let element = types.primitive(Primitive::Fractus);
+    let runtime = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarExpression {
+        expression: 7,
+    }));
+    let from = MirType::semantic(types.tensor_with_shape(element, runtime));
+    let literal = types.intern_index(IndexExpr::Literal(3));
+    let to = MirType::semantic(types.tensor_with_shape(element, literal));
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: from,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace {
+                        base: MirPlaceBase::Local(MirLocalId(0)),
+                        projections: vec![],
+                    }))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: to,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let errors = validate(&program, &types);
+    assert!(
+        !errors
+            .iter()
+            .any(|error| error.contains("return type mismatch")),
+        "unexpected return mismatch: {errors:?}"
+    );
+}
+
+#[test]
 fn tuple_aggregate_element_count_mismatch() {
     let mut types = TypeTable::new();
     let bivalens = types.primitive(Primitive::Bivalens);

@@ -21,8 +21,8 @@
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{KeywordOwner, Span, Symbol, TokenKind};
 use radix_syntax::{
-    FiguraExpr, FuncTypeExpr, GenericArgExpr, Ident, TypeExpr, TypeExprKind, TypeFormLevel,
-    TypeMode,
+    FiguraExpr, FuncTypeExpr, GenericArgExpr, Ident, LiftExtent, TypeExpr, TypeExprKind,
+    TypeFormLevel, TypeMode,
 };
 use std::collections::HashSet;
 
@@ -827,6 +827,9 @@ impl Parser {
         {
             return Ok(GenericArgExpr::Size(self.parse_figura()?));
         }
+        if self.check_keyword_ident(TokenKind::Magnitudo) {
+            return Ok(GenericArgExpr::Size(self.parse_figura()?));
+        }
         Ok(GenericArgExpr::Type(self.parse_type()?))
     }
 
@@ -866,6 +869,9 @@ impl Parser {
         {
             return Ok(GenericArgExpr::Size(self.parse_figura()?));
         }
+        if self.check_keyword_ident(TokenKind::Magnitudo) {
+            return Ok(GenericArgExpr::Size(self.parse_figura()?));
+        }
         Ok(GenericArgExpr::Type(self.parse_type()?))
     }
 
@@ -875,6 +881,13 @@ impl Parser {
     ///                       | figura (`+` | `-`) natural
     ///                       | [ figura (, figura)* ]
     pub(super) fn parse_figura(&mut self) -> Result<FiguraExpr, ParseError> {
+        if self.eat_keyword_ident(TokenKind::Magnitudo) {
+            // Spelled lift: `size <primary>` (la `magnitudo <primary>`) in an
+            // extent position; the value is checked at that store.
+            let extent = self.parse_figura_lift_extent()?;
+            return Ok(FiguraExpr::Lift(Box::new(extent)));
+        }
+
         if matches!(self.peek().kind, TokenKind::Underscore(_)) {
             self.advance();
             return Ok(FiguraExpr::Infer);
@@ -930,6 +943,29 @@ impl Parser {
             value = FiguraExpr::Divide(Box::new(value), divisor);
         }
         Ok(value)
+    }
+
+    /// Parse the primary payload of a spelled lift: an integer literal
+    /// (optionally negated), a name, or a parenthesized figura term.
+    fn parse_figura_lift_extent(&mut self) -> Result<LiftExtent, ParseError> {
+        if self.eat(&TokenKind::Minus) {
+            let TokenKind::Integer(value) = self.peek().kind else {
+                return Err(self.invalid_type_error("figura_arithmetic_requires_natural_constant"));
+            };
+            let span = self.current_span();
+            self.advance();
+            return Ok(LiftExtent::Negative { value, span });
+        }
+        if let TokenKind::Integer(value) = self.peek().kind {
+            self.advance();
+            return Ok(LiftExtent::Literal(value));
+        }
+        if self.eat(&TokenKind::LParen) {
+            let term = self.parse_figura()?;
+            self.expect_issue(&TokenKind::RParen, "shape_parenthesis_end")?;
+            return Ok(LiftExtent::Paren(Box::new(term)));
+        }
+        Ok(LiftExtent::Name(self.parse_ident()?))
     }
 
     fn parse_figura_atom(&mut self) -> Result<FiguraExpr, ParseError> {
