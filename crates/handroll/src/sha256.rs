@@ -166,7 +166,8 @@ impl Sha256 {
         self.buffer[56..64].copy_from_slice(&bit_len.to_be_bytes());
         compress(&mut self.state, &self.buffer);
         let mut digest = [0_u8; 32];
-        for (out, &word) in digest.chunks_exact_mut(4).zip(&self.state) {
+        let (outs, _) = digest.as_chunks_mut::<4>();
+        for (out, &word) in outs.iter_mut().zip(&self.state) {
             out.copy_from_slice(&word.to_be_bytes());
         }
         digest

@@ -809,10 +809,8 @@ impl Magnus {
         while !padded.len().is_multiple_of(4) {
             padded.push(fill);
         }
-        let limbs = padded
-            .chunks_exact(4)
-            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-            .collect();
+        let (chunks, _) = padded.as_chunks::<4>();
+        let limbs = chunks.iter().map(|c| u32::from_le_bytes(*c)).collect();
         Magnus::from_twos(limbs)
     }
 

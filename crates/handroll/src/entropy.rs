@@ -49,18 +49,15 @@ impl Rng {
     /// If the OS source is unreachable, falls back to a documented degraded
     /// seed ([`degraded_seed`]) — never time-based sampling inside the
     /// generator itself.
-    ///
-    /// # Panics
-    ///
-    /// Only if the entropy buffer's length stops matching `chunks_exact(8)`
-    /// — a programming error, not a runtime condition.
     #[must_use]
     pub fn from_entropy() -> Self {
         let mut seed = [0_u8; 32];
         let mut state = [0_u64; 4];
         if os_entropy(&mut seed).is_ok() {
-            for (word, bytes) in state.iter_mut().zip(seed.chunks_exact(8)) {
-                *word = u64::from_le_bytes(bytes.try_into().expect("8-byte entropy chunks"));
+            // 32 bytes split into four exact 8-byte words; no remainder.
+            let (words, _) = seed.as_chunks::<8>();
+            for (word, bytes) in state.iter_mut().zip(words) {
+                *word = u64::from_le_bytes(*bytes);
             }
         }
         if state == [0_u64; 4] {
@@ -89,11 +86,10 @@ impl Rng {
 
     /// Fill `buf` with uniform bytes from the generator.
     pub fn fill_bytes(&mut self, buf: &mut [u8]) {
-        let mut chunks = buf.chunks_exact_mut(8);
-        for chunk in &mut chunks {
+        let (chunks, remainder) = buf.as_chunks_mut::<8>();
+        for chunk in chunks {
             chunk.copy_from_slice(&self.next_u64().to_le_bytes());
         }
-        let remainder = chunks.into_remainder();
         if !remainder.is_empty() {
             let bytes = self.next_u64().to_le_bytes();
             remainder.copy_from_slice(&bytes[..remainder.len()]);
