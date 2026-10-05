@@ -40,11 +40,10 @@ locale = "en"
 #   thread loops, then from the plain loops; the two lines are identical.
 
 main {
-    const tf32[] seed ← empty
-    const tf32[2] rows ← seed.from_flat([1.0, 2.0], [2])
-    const tf32[3] cols ← seed.from_flat([10.0, 20.0, 30.0], [3])
-    var tf32[2, 3] grid ← seed.create(0.0, [2, 3])
-    var tf32[2, 3] plain ← seed.create(0.0, [2, 3])
+    const tf32[2] rows ← [1.0, 2.0] ↦ tf32[2]
+    const tf32[3] cols ← [10.0, 20.0, 30.0] ↦ tf32[3]
+    var tf32[2, 3] grid ← tf32[2, 3]
+    var tf32[2, 3] plain ← tf32[2, 3]
 
     for from rows at [i] thread outer const row {
         for from cols at [j] thread inner const col {

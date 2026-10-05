@@ -17,8 +17,9 @@ pub(crate) use calls::is_inlinable_kernel;
 use calls::{EffectScan, Frame, Module, Receiver};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
-    DefId, HirArrayElement, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirLocal,
-    HirModule, HirObjectKey, HirParam, HirParamMode, HirStatement, HirStatementKind,
+    DefId, HirArrayElement, HirBlock, HirConversioTarget, HirExpression, HirExpressionKind,
+    HirFunction, HirLocal, HirModule, HirObjectKey, HirParam, HirParamMode, HirStatement,
+    HirStatementKind,
 };
 use radix_intrinsics::{IntrinsicReceiver, IntrinsicReturnKind};
 use radix_lexer::{Interner, Span, Symbol};
@@ -275,10 +276,34 @@ impl Aliases {
             HirExpressionKind::Vacua | HirExpressionKind::Array(_) => Facts::fresh(root),
             // `crea` and `strue` are the tensor factories: their contract
             // (`docs/design/tensor-intrinsics.md`) and every MIR lowering
-            // allocate a new buffer, never a view of the receiver.
+            // allocate a new buffer, never a view of the receiver. The
+            // `tf32[…]` constructor spelling reaches this arm as the
+            // synthesized `crea` call of `lower_construct`.
             HirExpressionKind::MethodCall(receiver, name, _, args, _)
                 if matches!(interner.resolve(*name), "crea" | "strue")
                     && is_access_intrinsic(receiver, *name, args.len(), types, interner) =>
+            {
+                Facts::fresh(root)
+            }
+            // The `↦` tensor conversion mints the same fresh storage: its
+            // lowering is the `TensorFromFlat` collection op shared with
+            // explicit tensor construction (`lower_lista_to_tensor_conversio`).
+            // Fresh storage at creation is a property of the lowering, not
+            // the spelling, so the fact shape mirrors the factories' above.
+            // Only the flat-lista sources prove: the three `lower_conversio`
+            // arms that lower through a fresh tensor aggregate. A tensor
+            // source converts by sharing its buffer, and a routed row or `⊥`
+            // recovery can yield an aliased value: unknown decline.
+            HirExpressionKind::Conversio {
+                source,
+                target: HirConversioTarget::Type(target),
+                route: None,
+                recovery: None,
+                implicit: None,
+                ..
+            } if source.ty.is_some_and(|source_ty| {
+                lowers_lista_to_fresh_tensor(source, source_ty, *target, types)
+            }) =>
             {
                 Facts::fresh(root)
             }
@@ -433,6 +458,25 @@ fn param_root(
     } else {
         Some(*shared.get_or_insert(param.def_id))
     }
+}
+
+/// Whether this conversion is one of the `lower_conversio` arms that
+/// constructs a fresh tensor aggregate and fills it through
+/// `TensorFromFlat`: the padded bounded-lista snapshot, the flat lista, or
+/// the rectangular lista literal. The same predicates the lowering arm
+/// dispatches on, so the fact cannot outrun the lowering.
+fn lowers_lista_to_fresh_tensor(
+    source: &HirExpression,
+    source_ty: TypeId,
+    target: TypeId,
+    types: &TypeTable,
+) -> bool {
+    crate::lista_tensor_conversio::resolve_bounded_lista_padded_shape(source_ty, target, types)
+        .is_some()
+        || crate::lista_tensor_conversio::validate_lista_to_tensor_source(source_ty, target, types)
+            .is_ok()
+        || crate::lista_tensor_conversio::analyze_rectangular_lista_literal(source, target, types)
+            .is_ok()
 }
 
 fn is_access_intrinsic(

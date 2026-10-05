@@ -188,6 +188,51 @@ fn explicit_copied_storage_accepted() {
 }
 
 #[test]
+fn tensor_conversio_initializer_proves_fresh_storage() {
+    // `flat ↦ tensor` lowers through `TensorFromFlat` on a fresh aggregate,
+    // so the conversion initializer proves like the factory methods do.
+    accepted(
+        r"incipit {
+    fixum tensor<numerus, [4]> lanes ← [1, 2, 3, 4] ↦ tensor<numerus, [4]>
+    varia tensor<numerus, [4]> grid ← vacua
+    itera ex lanes apud [i] filum lane fixum value {
+        grid[i] ← value
+    }
+}",
+    );
+}
+
+#[test]
+fn tensor_constructor_initializer_proves_fresh_storage() {
+    // The `tf32[4]` constructor lowers to the synthesized `crea` call, so it
+    // proves without the seed-method costume.
+    accepted(
+        r"incipit {
+    varia tf32[4] grid ← tf32[4]
+    itera ex grid apud [i] filum lane fixum value {
+        grid[i] ← value
+    }
+}",
+    );
+}
+
+#[test]
+fn tensor_source_conversio_keeps_unknown_decline() {
+    // A tensor source shares its buffer across the conversion, so the
+    // result is not fresh and the unknown-identity decline stands.
+    rejected(
+        r"incipit {
+    varia tensor<numerus, [4]> lanes ← vacua
+    varia tensor<numerus, [4]> copy ← lanes ↦ tensor<numerus, [4]>
+    itera ex lanes apud [i] filum lane fixum value {
+        copy[i] ← value
+    }
+}",
+        "unknown_storage_identity",
+    );
+}
+
+#[test]
 fn outer_local_update_rejected() {
     rejected(
         r"incipit {
