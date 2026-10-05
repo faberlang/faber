@@ -1692,6 +1692,10 @@ help = "fix the AST construct for lowering"
 message = "unknown tuple element label"
 help = "use a label declared on the iuncta annotation, or index by position"
 
+[diagnostics.SEM008.issues.size_slot_bare_value_name]
+message = "nomen valoris locum magnitudinis tenere non potest"
+help = "scribe `magnitudo w` ut valor ut testimonium magnitudinis utatur"
+
 [diagnostics.SEM008.issues.unknown_type_name]
 message = "unknown type name"
 help = "fix the AST construct for lowering"

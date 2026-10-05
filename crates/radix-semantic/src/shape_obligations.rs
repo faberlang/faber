@@ -45,6 +45,9 @@ pub enum ShapeRelationBoundary {
     FunctionEntry,
     /// Before returning an expression-produced value.
     FunctionReturn,
+    /// At a declaration store pinning opaque initializer axes to the
+    /// annotation's named size terms.
+    Store,
 }
 
 /// Runtime shape checks produced by typechecking.
@@ -61,6 +64,9 @@ pub struct ShapeObligationTable {
     pub call_size_bindings: FxHashMap<HirId, Vec<RuntimeSizeBinding>>,
     /// Relations checked at function entry or before returning a value.
     pub functions: FxHashMap<DefId, Vec<ShapeRelation>>,
+    /// Relations checked when a declaration store pins opaque initializer
+    /// axes to the annotation's size terms; keyed by initializer expression.
+    pub stores: FxHashMap<HirId, Vec<ShapeRelation>>,
     /// Function-generic size values witnessed by formal tensor/record axes.
     pub function_size_bindings: FxHashMap<DefId, Vec<RuntimeSizeBinding>>,
 }

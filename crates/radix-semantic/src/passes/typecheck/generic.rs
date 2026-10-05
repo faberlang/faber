@@ -928,7 +928,9 @@ impl TypeChecker<'_> {
                 .iter()
                 .all(|ty| match self.types.get(*ty) {
                     Type::Param(sym) => {
-                        self.magnitudo_literal_of(*ty).is_some() || self.is_size_param_symbol(*sym)
+                        self.magnitudo_literal_of(*ty).is_some()
+                            || self.is_size_param_symbol(*sym)
+                            || self.hir_value_binding_def(*sym).is_some()
                     }
                     _ => false,
                 })
@@ -962,8 +964,24 @@ impl TypeChecker<'_> {
             None if self.is_size_param_symbol(sym) => {
                 Some(self.types.intern_index(IndexExpr::Param(sym)))
             }
-            None => None,
+            None => self
+                .hir_value_binding_def(sym)
+                .map(|def_id| {
+                    self.types
+                        .intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)))
+                }),
         }
+    }
+
+    /// DefId of the in-scope HIR value binding spelled `sym`, if any. HIR
+    /// locals and parameters are keyed in the scope stack, not the resolver,
+    /// so a spelled size-lift slot argument encoded as `Type::Param(sym)`
+    /// resolves its runtime witness here.
+    fn hir_value_binding_def(&self, sym: radix_lexer::Symbol) -> Option<radix_hir::DefId> {
+        self.binding_shadow
+            .keys()
+            .copied()
+            .find(|def_id| self.binding_names.get(def_id) == Some(&sym))
     }
 
     fn bind_explicit_magnitudo_args(

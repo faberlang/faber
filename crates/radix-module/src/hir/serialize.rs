@@ -360,6 +360,9 @@ fn shape_obligations_wire(
                     crate::semantic::ShapeRelationBoundary::Call => ShapeRelationBoundaryWire::Call,
                     crate::semantic::ShapeRelationBoundary::FunctionEntry => ShapeRelationBoundaryWire::FunctionEntry,
                     crate::semantic::ShapeRelationBoundary::FunctionReturn => ShapeRelationBoundaryWire::FunctionReturn,
+                    // Store pins are not serialized; only calls/functions rows
+                    // reach this mapper, so the arm is unreachable today.
+                    crate::semantic::ShapeRelationBoundary::Store => ShapeRelationBoundaryWire::FunctionReturn,
                 },
             })
             .collect()

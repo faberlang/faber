@@ -651,6 +651,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "generic_type_arg_domain" => {
             Some("choose one of the allowed type arguments for this generic parameter".to_owned())
         }
+        "size_slot_bare_value_name" => Some("write `size ` followed by the value name to use it as a size witness".to_owned()),
         "size_lift_negative" => Some(
             "size arguments are lift stores checked at the call; pass a non-negative value"
                 .to_owned(),

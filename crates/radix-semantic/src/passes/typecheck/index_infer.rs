@@ -35,6 +35,9 @@ impl TypeChecker<'_> {
             ShapeRelationBoundary::FunctionEntry | ShapeRelationBoundary::FunctionReturn => self
                 .current_function_def
                 .map(|def_id| self.shape_obligations.functions.entry(def_id).or_default()),
+            ShapeRelationBoundary::Store => self
+                .current_store_expr
+                .map(|expr| self.shape_obligations.stores.entry(expr).or_default()),
         };
         let Some(rows) = rows else {
             return;
@@ -76,6 +79,12 @@ impl TypeChecker<'_> {
                 }
             };
             Some((source, ShapeRelationBoundary::FunctionReturn))
+        } else if let Some(expression) = self.current_store_expr {
+            let source = RuntimeExtentId::ExpressionAxis {
+                expression: expression.0,
+                axis,
+            };
+            Some((source, ShapeRelationBoundary::Store))
         } else {
             None
         }?;
@@ -122,6 +131,8 @@ impl TypeChecker<'_> {
             ShapeRelationBoundary::Call
         } else if self.current_shape_return_expr.is_some() {
             ShapeRelationBoundary::FunctionReturn
+        } else if self.current_store_expr.is_some() {
+            ShapeRelationBoundary::Store
         } else {
             return None;
         };

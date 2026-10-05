@@ -662,6 +662,8 @@ fn map_shape_obligations(wire: radix_hir_fhir::ShapeObligationTableWire) -> crat
             .into_iter()
             .map(|entry| (entry.function, map_relations(entry.relations)))
             .collect(),
+        // Store pins are not serialized yet; decoded artifacts carry none.
+        stores: FxHashMap::default(),
         function_size_bindings: wire
             .function_size_bindings
             .into_iter()

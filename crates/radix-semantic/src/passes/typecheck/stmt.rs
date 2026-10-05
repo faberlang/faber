@@ -145,6 +145,10 @@ impl TypeChecker<'_> {
                 } else {
                     site
                 };
+                // Z2: a declaration store is a pin boundary — opaque
+                // initializer axes record runtime obligations against the
+                // annotation's named size terms instead of failing the check.
+                let prev_store_expr = self.current_store_expr.replace(init.id);
                 let init_ty = self.check_store_expr(init, *ty, site);
                 if inferred_slot {
                     self.inferred_slot_sources.insert(local.def_id, init.span);
@@ -155,6 +159,7 @@ impl TypeChecker<'_> {
                     init.span,
                     ISSUE_INITIALIZER_ANNOTATION_MISMATCH,
                 );
+                self.current_store_expr = prev_store_expr;
                 if self.types.is_own_view(*ty) {
                     self.check_own_bind_rhs(init);
                 }

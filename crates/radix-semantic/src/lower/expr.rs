@@ -1739,11 +1739,22 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
     // forwarded magnitudo witness (`sink<T, D>(x)` inside
     // `forward<magnitudo T, magnitudo D>`), not a type — the ordinary type
     // path would report unknown_type_name at the symbolic argument.
-    if let Some(name) = call_arg_bare_name(arg)
-        && call_arg_names_caller_size_param(lowerer, name)
-    {
-        return lowerer.types.intern(crate::Type::Param(name));
+    if let Some(name) = call_arg_bare_name(arg) {
+        if call_arg_names_caller_size_param(lowerer, name) {
+            return lowerer.types.intern(crate::Type::Param(name));
+        }
+        if matches!(arg, GenericArgExpr::Type(_)) && call_arg_names_scalar_value(lowerer, name) {
+            lowerer.error("size_slot_bare_value_name");
+            return lowerer.types.intern(crate::Type::Error);
+        }
     }
+    let spelled_runtime_lift = match arg {
+        GenericArgExpr::Size(radix_syntax::FiguraExpr::Lift(lift)) => match lift.as_ref() {
+            radix_syntax::LiftExtent::Name(ident) => Some(ident.name),
+            _ => None,
+        },
+        _ => None,
+    };
     match lowerer.lower_applied_arg(arg) {
         radix_types::AppliedArg::Type(id) => id,
         radix_types::AppliedArg::Size(id) => match lowerer.types.get_index(id).clone() {
@@ -1752,6 +1763,11 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
                 lowerer.types.intern(crate::Type::Param(symbol))
             }
             crate::IndexExpr::Param(symbol) => lowerer.types.intern(crate::Type::Param(symbol)),
+            crate::IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(_))
+                if spelled_runtime_lift.is_some() =>
+            {
+                lowerer.types.intern(crate::Type::Param(spelled_runtime_lift.unwrap()))
+            }
             crate::IndexExpr::Runtime(_)
             | crate::IndexExpr::Affine { .. }
             | crate::IndexExpr::Divide { .. }
@@ -1781,6 +1797,22 @@ fn call_arg_bare_name(arg: &GenericArgExpr) -> Option<radix_lexer::Symbol> {
 /// True when `name` denotes a caller-owned compile-time size — a lexical
 /// `magnitudo` param or a resolved index param. Typus params keep the type
 /// path so wrong-kind rejection stays intact.
+fn call_arg_names_scalar_value(lowerer: &Lowerer<'_>, name: radix_lexer::Symbol) -> bool {
+    // HIR-local and parameter bindings live in the lowerer's scope stack, not
+    // the resolver (mirrors the figura Var arm's runtime-extent lookup);
+    // module-scope values keep the resolver path.
+    lowerer
+        .local_scopes
+        .iter()
+        .rev()
+        .any(|scope| scope.contains_key(&name))
+        || lowerer
+            .resolver
+            .lookup(name)
+            .and_then(|def_id| lowerer.resolver.get_symbol(def_id))
+            .is_some_and(|symbol| matches!(symbol.kind, crate::SymbolKind::Local | crate::SymbolKind::Param))
+}
+
 fn call_arg_names_caller_size_param(lowerer: &Lowerer<'_>, name: radix_lexer::Symbol) -> bool {
     if matches!(
         lowerer.lexical_generic_param_kind(name),

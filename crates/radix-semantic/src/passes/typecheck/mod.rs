@@ -117,6 +117,9 @@ mod register_shape_finalize_test;
 #[cfg(test)]
 #[path = "shape_obligations_test.rs"]
 mod shape_obligations_test;
+#[cfg(test)]
+#[path = "slot_lift_test.rs"]
+mod slot_lift_test;
 mod tensor_edge_policy_generic;
 
 mod closing;
@@ -373,6 +376,9 @@ pub(crate) struct TypeChecker<'a> {
     /// consumed by the next `check_expr_with_expected` so only that node, not
     /// its operands, is treated as landing in the slot.
     pending_store: Option<store::StoreSite>,
+    /// Initializer expression of the declaration store being checked; set by
+    /// `check_local` so opaque axes can pin to the annotation's terms there.
+    pub(crate) current_store_expr: Option<radix_hir::HirId>,
     /// Ring operators of a store into a `wrapping<W>` slot, keyed by the id of
     /// their first operand and mapped to the slot's word type. Where both
     /// operands are that word, the operator is typed in the word and reduces
@@ -744,6 +750,7 @@ impl<'a> TypeChecker<'a> {
             next_hir_id: u32::MAX / 2,
             next_synthetic_def: radix_types::HIR_SYNTHETIC_DEF_ID_BASE,
             pending_store: None,
+            current_store_expr: None,
             word_ring: FxHashMap::default(),
             last_synthesized_type: None,
             inferred_slot_sources: FxHashMap::default(),
@@ -1381,3 +1388,7 @@ mod conversio_extra_width_argument_test;
 #[cfg(test)]
 #[path = "sermo_route_typing_test.rs"]
 mod sermo_route_typing_test;
+
+#[cfg(test)]
+#[path = "pin_store_test.rs"]
+mod pin_store_test;
