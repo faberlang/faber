@@ -104,12 +104,19 @@ impl Validator<'_, '_> {
                 let place_ty = self.validate_place(scope, place, stmt.span);
                 self.validate_value(scope, value);
                 if let Some(place_ty) = place_ty {
-                    self.require_assignable(
-                        value.ty,
-                        place_ty,
-                        value.span,
-                        "assigned value type does not match destination",
-                    );
+                    let recorded_store_relation = previous.is_some_and(|statement| {
+                        let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                            return false;
+                        };
+                        matches!(&call.intrinsic, crate::MirIntrinsic::TensorShapeCheck(check)
+                            if !check.relations.is_empty() && call.args.contains(&crate::MirOperand::Value(value.id)))
+                    });
+                    if !self.assignable(value.ty, place_ty)
+                        && !(recorded_store_relation
+                            && self.return_shape_relation_assignable(value.ty, place_ty))
+                    {
+                        self.error(value.span, "assigned value type does not match destination");
+                    }
                 }
                 scope.values.insert(value.id, value.ty);
             }
@@ -337,7 +344,7 @@ impl Validator<'_, '_> {
     /// Runtime-dependent tensor extents are checked by the recorded
     /// FunctionReturn shape obligation. MIR validation still rejects rank,
     /// element, and fully literal mismatches here.
-    fn return_shape_relation_assignable(&self, from: crate::MirType, to: crate::MirType) -> bool {
+    pub(crate) fn return_shape_relation_assignable(&self, from: crate::MirType, to: crate::MirType) -> bool {
         let types = self.context.types.as_table();
         let (Type::Tensor(from_element, from_shape), Type::Tensor(to_element, to_shape)) =
             (types.get(from.semantic_id()), types.get(to.semantic_id()))

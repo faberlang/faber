@@ -332,6 +332,7 @@ impl<'a> LoweringContextMaps<'a> {
             shape_calls: Arc::new(FxHashMap::default()),
             shape_functions: Arc::new(FxHashMap::default()),
             call_size_bindings: Arc::new(FxHashMap::default()),
+            shape_stores: Arc::new(FxHashMap::default()),
             function_size_bindings: Arc::new(FxHashMap::default()),
             structs,
             struct_field_types,

@@ -62,6 +62,7 @@ struct FunctionTypeScope {
 }
 
 struct CallWitness<'a> {
+    caller_source: Option<DefId>,
     args: &'a [MirOperand],
     destination: Option<&'a MirPlace>,
     error_place: Option<&'a MirPlace>,
@@ -578,7 +579,9 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             None
         })?;
 
+        let caller_source = self.lowerer.functions.iter().find(|candidate| candidate.id == function).and_then(|f| f.source);
         let witness = CallWitness {
+            caller_source,
             args: &args,
             destination: destination.as_ref(),
             error_place: error_place.as_ref(),
@@ -623,12 +626,12 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         witness: CallWitness<'_>,
         parent_shape_bindings: &MirShapeBindings,
     ) -> Option<MirMonomorphizationKey> {
-        let CallWitness { args, destination, error_place, span, scope, shape_check } = witness;
+        let CallWitness { caller_source, args, destination, error_place, span, scope, shape_check } = witness;
         let mut bindings = MirGenericBindings::default();
         let mut shape_bindings = MirShapeBindings::default();
         let source = template.source?;
         let params = self.generic_param_order.get(&source)?.clone();
-        self.bind_explicit_type_args(source, explicit_type_args, &mut bindings, &mut shape_bindings, span)?;
+        self.bind_explicit_type_args(caller_source, source, explicit_type_args, &mut bindings, &mut shape_bindings, span)?;
         for (index, arg) in args.iter().enumerate() {
             let Some(expected) = template.params.get(index) else {
                 continue;
@@ -759,6 +762,9 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                     let contains_runtime =
                         super::index_contains_runtime_extent(self.types(), bound, &mut FxHashSet::default());
                     let concrete = if contains_runtime {
+                        // A runtime-bearing bound without a formal carrier
+                        // witness stays fail-closed: the origin key would be
+                        // unstable across monomorphization sites.
                         param.runtime_witness
                     } else {
                         resolve_parent_shape_binding(self.types(), bound, parent_shape_bindings)
@@ -783,6 +789,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
 
     fn bind_explicit_type_args(
         &mut self,
+        caller_source: Option<DefId>,
         source: DefId,
         explicit_type_args: &[MirType],
         bindings: &mut MirGenericBindings,
@@ -820,7 +827,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 return None;
             }
             for (param, concrete) in shape_params.iter().zip(explicit_type_args.iter().copied()) {
-                let Some(index) = self.explicit_shape_witness(concrete, span) else {
+                let Some(index) = self.explicit_shape_witness(caller_source, concrete, span) else {
                     self.lowerer.errors.push(MirError::validation(
                         span,
                         "generic call type argument does not match parameter kind",
@@ -871,7 +878,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     /// rigid param node (GSF-1 forwarding) — the key derivation resolves it
     /// through the calling instance's shape bindings. Anything else fails
     /// closed so wrong-kind rejection is preserved.
-    fn explicit_shape_witness(&mut self, concrete: MirType, span: Span) -> Option<IndexId> {
+    fn explicit_shape_witness(&mut self, caller_source: Option<DefId>, concrete: MirType, span: Span) -> Option<IndexId> {
         let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
             return None;
         };
@@ -885,6 +892,27 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 ));
             }
             return index;
+        }
+        struct LocalFinder { name: Symbol, found: Option<DefId> }
+        impl crate::hir::visit::HirVisitor for LocalFinder {
+            fn visit_param(&mut self, param: &crate::hir::HirParam) {
+                if param.name == self.name { self.found = Some(param.def_id); }
+            }
+            fn visit_local(&mut self, local: &crate::hir::HirLocal) {
+                if local.name == self.name { self.found = Some(local.def_id); }
+                crate::hir::visit::walk_local(self, local);
+            }
+        }
+        let mut finder = LocalFinder { name: sym, found: None };
+        finder.visit_program(&self.lowerer.unit.hir);
+        let value_binding = finder.found.or_else(|| {
+            caller_source.and_then(|source| self.lowerer.unit.hir.items.iter().find(|item| item.def_id == source)
+                .and_then(|item| match &item.kind { crate::hir::HirItemKind::Function(function) => function.params.iter().find(|p| p.name == sym).map(|p| p.def_id), _ => None }))
+        });
+        if let Some(binding) = value_binding {
+            return self.lowerer.unit.shape_obligations.call_size_bindings.values().flatten()
+                .find(|row| matches!(self.types().get_index(row.witness), IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(found)) if *found == binding))
+                .map(|row| row.witness);
         }
         let index = find_param_index(self.types(), sym);
         if index.is_none() {

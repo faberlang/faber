@@ -688,12 +688,11 @@ impl Validator<'_, '_> {
                         shape_bindings,
                         span,
                     ) {
-                        self.require_assignable(
-                            expected_ty,
-                            destination_ty,
-                            span,
-                            "destination type mismatch",
-                        );
+                        if !self.assignable(expected_ty, destination_ty)
+                            && !self.return_shape_relation_assignable(expected_ty, destination_ty)
+                        {
+                            self.error(span, "destination type mismatch");
+                        }
                     }
                 }
             }

@@ -93,6 +93,9 @@ mod runtime;
 #[cfg(test)]
 #[path = "lower/runtime_shape_test.rs"]
 mod runtime_shape_tests;
+#[cfg(test)]
+#[path = "lower/slot_pin_run_test.rs"]
+mod slot_pin_run_tests;
 mod stmt;
 mod tensor_lift;
 mod union_dispatch;
@@ -1614,6 +1617,7 @@ impl<'a> MirLowerer<'a> {
         context.shape_calls = Arc::new(self.unit.shape_obligations.calls.clone());
         context.shape_functions = Arc::new(self.unit.shape_obligations.functions.clone());
         context.call_size_bindings = Arc::new(self.unit.shape_obligations.call_size_bindings.clone());
+        context.shape_stores = Arc::new(self.unit.shape_obligations.stores.clone());
         context.function_size_bindings = Arc::new(self.unit.shape_obligations.function_size_bindings.clone());
         context.tensor_edge_policies = Arc::new(self.unit.tensor_edge_policies.clone());
         context.pending_tensor_limes = Arc::clone(&self.pending_tensor_limes);
@@ -2146,6 +2150,7 @@ struct FunctionBuilderContext<'a> {
     shape_calls: Arc<FxHashMap<crate::hir::HirId, Vec<ShapeRelation>>>,
     shape_functions: Arc<FxHashMap<DefId, Vec<ShapeRelation>>>,
     call_size_bindings: Arc<FxHashMap<crate::hir::HirId, Vec<RuntimeSizeBinding>>>,
+    shape_stores: Arc<FxHashMap<crate::hir::HirId, Vec<ShapeRelation>>>,
     function_size_bindings: Arc<FxHashMap<DefId, Vec<RuntimeSizeBinding>>>,
     structs: Arc<FxHashMap<DefId, Vec<&'a HirField>>>,
     /// Producer-side defaults for imported class fields.
@@ -2236,6 +2241,7 @@ impl<'a> FunctionBuilderContext<'a> {
             shape_calls: Arc::new(FxHashMap::default()),
             shape_functions: Arc::new(FxHashMap::default()),
             call_size_bindings: Arc::new(FxHashMap::default()),
+            shape_stores: Arc::new(FxHashMap::default()),
             function_size_bindings: Arc::new(FxHashMap::default()),
             structs: Arc::new(FxHashMap::default()),
             imported_struct_defaults: Arc::new(FxHashMap::default()),
@@ -2771,6 +2777,15 @@ impl<'a> FunctionBuilder<'a> {
                     MirType::semantic(self.types.primitive(Primitive::Vacuum)),
                     span,
                 );
+                self.assign(MirPlace::local(id), value, mir_ty, span);
+            } else if self.context.shape_stores.contains_key(&init.id)
+                && !matches!(
+                    init.kind,
+                    HirExpressionKind::Call(..) | HirExpressionKind::MethodCall(..)
+                )
+            {
+                let value = self.lower_expr_value(init)?;
+                self.emit_store_shape_check(init.id, value.clone(), span)?;
                 self.assign(MirPlace::local(id), value, mir_ty, span);
             } else if copy_bind {
                 // `copy` bind (D-6): deep-duplicate the initializer; the

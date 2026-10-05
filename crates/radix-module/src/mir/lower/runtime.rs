@@ -142,6 +142,27 @@ impl FunctionBuilder<'_> {
         )
     }
 
+    pub(super) fn emit_store_shape_check(
+        &mut self,
+        expression: crate::hir::HirId,
+        value: MirOperand,
+        span: Span,
+    ) -> Option<()> {
+        let relations = self.context.shape_stores.get(&expression).cloned().unwrap_or_default();
+        if relations.is_empty() {
+            return Some(());
+        }
+        self.emit_shape_check(
+            &relations,
+            &[],
+            ShapeRelationBoundary::Store,
+            &[],
+            Some((expression.0, value)),
+            0,
+            span,
+        )
+    }
+
     pub(super) fn emit_function_entry_shape_check(&mut self, span: Span) -> Option<()> {
         let relations = self.function_shape_relations.clone();
         self.emit_shape_check(&relations, &[], ShapeRelationBoundary::FunctionEntry, &[], None, 0, span)

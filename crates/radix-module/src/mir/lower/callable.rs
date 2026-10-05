@@ -338,6 +338,7 @@ impl FunctionBuilder<'_> {
             shape_calls: Arc::clone(&context.shape_calls),
             shape_functions: Arc::clone(&context.shape_functions),
             call_size_bindings: Arc::clone(&context.call_size_bindings),
+            shape_stores: Arc::clone(&context.shape_stores),
             function_size_bindings: Arc::clone(&context.function_size_bindings),
             function_async: Arc::clone(&context.function_async),
             function_generator: Arc::clone(&context.function_generator),
