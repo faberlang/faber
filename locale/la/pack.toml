@@ -3235,6 +3235,10 @@ help = "convert explicitly with `↦`, as in `flat ↦ tensor<fractus, [8]>`"
 message = "`∷` states a fact the compiler can prove; this numeric ascription narrows, loses float precision, or crosses numerus↔fractus, so it is a conversion"
 help = "convert explicitly with `↦`, as in `n ↦ u8`"
 
+[diagnostics.SEM016.issues.size_lift_negative]
+message = "argumentum magnitudinis negativum"
+help = "argumenta magnitudinis sunt depositiones lift quae ad invocationem cohibentur; valorem non negativum mitte"
+
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"
 help = "use an explicit stdlib conversion verb"

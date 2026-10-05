@@ -3463,6 +3463,10 @@ help = "convert explicitly with `↦`, as in `flat ↦ tensor<f32, [8]>`"
 message = "`∷` states a fact the compiler can prove; this numeric ascription narrows, loses float precision, or crosses int↔float, so it is a conversion"
 help = "convert explicitly with `↦`, as in `n ↦ u8`"
 
+[diagnostics.SEM016.issues.size_lift_negative]
+message = "negative size argument"
+help = "size arguments are lift stores checked at the call; pass a non-negative value"
+
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"
 help = "use an explicit stdlib conversion verb"
