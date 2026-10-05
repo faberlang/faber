@@ -40,10 +40,11 @@ pub use value::{FieldOrder, MapKey, Value};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{
-    MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId,
-    MirFunctionIndex, MirKernelShaderStage, MirLocalId, MirOperand, MirParamMode, MirPlace,
-    MirPlaceBase, MirProgram, MirProjection, MirStatementKind, MirTempId, MirTerminatorKind,
-    MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
+    MirBinOp, MirBlock, MirBlockId, MirCallee, MirCollectionOp, MirConstant, MirFunction,
+    MirFunctionId, MirFunctionIndex, MirKernelShaderStage, MirLocalId, MirOperand, MirParamMode,
+    MirPlace, MirPlaceBase, MirProgram, MirProjection, MirStatementKind, MirTempId,
+    MirTerminatorKind, MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
+    ValidatedMir,
 };
 use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
 use regex_program::RegexProgram;
@@ -276,6 +277,126 @@ fn shape_guard_precedes_try_call(
         &call.intrinsic,
         radix_mir::MirIntrinsic::TensorShapeCheck(_)
     ) && call.args.get(..args.len()) == Some(args.as_slice())
+}
+
+/// Whether the tensor-fill result is dropped: the statement posture of
+/// `t.fill(v);`. The MIR lowering gives every value-returning call a temp
+/// destination, so the posture is the temp's liveness — a destination the
+/// rest of the block never mentions (and the terminator never returns) is
+/// the discarded fill, and the documented mutation statement applies. The
+/// scan is conservative: any later mention keeps the bound fresh-result
+/// posture.
+fn fill_result_is_dropped(
+    statement: &radix_mir::MirStatement,
+    block: &radix_mir::MirBlock,
+    index: usize,
+) -> bool {
+    let MirStatementKind::RuntimeCall { destination, call } = &statement.kind else {
+        return false;
+    };
+    if !matches!(
+        &call.intrinsic,
+        radix_mir::MirIntrinsic::Collection(MirCollectionOp::TensorFill)
+    ) {
+        return false;
+    }
+    let Some(place) = destination else {
+        return true;
+    };
+    // A named local or projected destination is a real binding.
+    let MirPlaceBase::Temp(dest) = place.base else {
+        return false;
+    };
+    if !place.projections.is_empty() {
+        return false;
+    }
+    let read_later = block
+        .statements
+        .iter()
+        .skip(index + 1)
+        .any(|later| statement_mentions_temp(later, dest));
+    !read_later && !terminator_mentions_temp(&block.terminator.kind, dest)
+}
+
+fn statement_mentions_temp(statement: &radix_mir::MirStatement, temp: MirTempId) -> bool {
+    match &statement.kind {
+        MirStatementKind::Assign { place, value } => {
+            place_mentions_temp(place, temp) || value_mentions_temp(&value.kind, temp)
+        }
+        MirStatementKind::Call {
+            destination, args, ..
+        }
+        | MirStatementKind::RuntimeCall {
+            destination,
+            call: radix_mir::MirRuntimeCall { args, .. },
+        } => {
+            destination
+                .as_ref()
+                .is_some_and(|place| place_mentions_temp(place, temp))
+                || args
+                    .iter()
+                    .any(|operand| operand_mentions_temp(operand, temp))
+        }
+        MirStatementKind::Construct {
+            destination,
+            aggregate,
+        } => place_mentions_temp(destination, temp) || aggregate_mentions_temp(aggregate, temp),
+    }
+}
+
+fn place_mentions_temp(place: &MirPlace, temp: MirTempId) -> bool {
+    matches!(place.base, MirPlaceBase::Temp(base) if base == temp)
+}
+
+fn operand_mentions_temp(operand: &MirOperand, temp: MirTempId) -> bool {
+    match operand {
+        MirOperand::Place(place) => place_mentions_temp(place, temp),
+        MirOperand::Temp(id) => *id == temp,
+        MirOperand::Value(_) | MirOperand::Constant(_) => false,
+    }
+}
+
+fn value_mentions_temp(value: &MirValueKind, temp: MirTempId) -> bool {
+    match value {
+        MirValueKind::Operand(operand) => operand_mentions_temp(operand, temp),
+        MirValueKind::Closure(_) | MirValueKind::Option(_) => false,
+        MirValueKind::Unary { operand, .. } => operand_mentions_temp(operand, temp),
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            operand_mentions_temp(lhs, temp) || operand_mentions_temp(rhs, temp)
+        }
+    }
+}
+
+fn aggregate_mentions_temp(aggregate: &radix_mir::MirAggregate, temp: MirTempId) -> bool {
+    let mentions = |operand: &MirOperand| operand_mentions_temp(operand, temp);
+    match &aggregate.fields {
+        radix_mir::MirAggregateFields::Ordered(items) => items.iter().any(|item| match item {
+            radix_mir::MirAggregateItem::Operand(element)
+            | radix_mir::MirAggregateItem::Spread(element) => mentions(element),
+        }),
+        radix_mir::MirAggregateFields::Named(fields) => {
+            fields.iter().any(|field| mentions(&field.value))
+        }
+        radix_mir::MirAggregateFields::Keyed(entries) => entries
+            .iter()
+            .any(|entry| mentions(&entry.key) || mentions(&entry.value)),
+    }
+}
+
+fn terminator_mentions_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> bool {
+    match terminator {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            operand_mentions_temp(operand, temp)
+        }
+        MirTerminatorKind::Branch { condition, .. } => operand_mentions_temp(condition, temp),
+        MirTerminatorKind::Switch { value, .. } => operand_mentions_temp(value, temp),
+        MirTerminatorKind::TryCall { args, .. } => args
+            .iter()
+            .any(|operand| operand_mentions_temp(operand, temp)),
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => false,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1478,7 +1599,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             for (index, statement) in block_data.statements.iter().enumerate().skip(resume_at) {
                 let shape_guard_for_try_call = index + 1 == block_data.statements.len()
                     && shape_guard_precedes_try_call(statement, &block_data.terminator.kind);
-                let result = self.execute_statement_inner(statement, shape_guard_for_try_call);
+                let fill_result_dropped = fill_result_is_dropped(statement, &block_data, index);
+                let result = self.execute_statement_inner(
+                    statement,
+                    shape_guard_for_try_call,
+                    fill_result_dropped,
+                );
                 match result {
                     Ok(StatementOutcome::Continue) => {
                         if self.yielded.is_some() {
@@ -1667,13 +1793,30 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         &mut self,
         statement: &radix_mir::MirStatement,
     ) -> Result<StatementOutcome, RunnerError> {
-        self.execute_statement_inner(statement, false)
+        // Standalone statement execution has no surrounding block: the
+        // posture scan runs against an empty block, so a temp destination
+        // counts as dropped (nothing can read it later).
+        let block = radix_mir::MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: radix_mir::MirTerminator {
+                kind: MirTerminatorKind::Unreachable,
+                span: Span::default(),
+            },
+            span: Span::default(),
+        };
+        self.execute_statement_inner(
+            statement,
+            false,
+            fill_result_is_dropped(statement, &block, 0),
+        )
     }
 
     fn execute_statement_inner(
         &mut self,
         statement: &radix_mir::MirStatement,
         shape_failure_belongs_to_try_call: bool,
+        fill_result_dropped: bool,
     ) -> Result<StatementOutcome, RunnerError> {
         match &statement.kind {
             MirStatementKind::Assign { place, value } => {
@@ -1704,6 +1847,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                             }
                             Err(error) => Err(error),
                         }
+                    }
+                    // WHY: the fill statement (dropped result) is the
+                    // in-place mutation posture — the bound form builds a
+                    // fresh tensor instead of touching the source. Mirrors
+                    // the HIR→Rust emit lane's split at the same posture
+                    // boundary.
+                    radix_mir::MirIntrinsic::Collection(MirCollectionOp::TensorFill)
+                        if fill_result_dropped =>
+                    {
+                        self.tensor_fill_in_place(&call.args, statement.span)
+                            .map(|_| Some(Value::Unit))
                     }
                     _ => match self.eval_runtime_call(call, statement.span) {
                         Ok(value) => Ok(Some(value)),
@@ -2204,7 +2358,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         loop {
             let block = self.block_snapshot(function_id, current)?;
             for statement in &block.statements {
-                self.execute_statement_inner(statement, false)?;
+                self.execute_statement_inner(statement, false, false)?;
             }
             let next = match &block.terminator.kind {
                 MirTerminatorKind::Goto(target) => {
@@ -3296,6 +3450,10 @@ mod lib_test;
 #[cfg(test)]
 #[path = "copy_into_test.rs"]
 mod copy_into_test;
+
+#[cfg(test)]
+#[path = "tensor_fill_test.rs"]
+mod tensor_fill_test;
 
 #[cfg(test)]
 #[path = "tensor_math_test.rs"]

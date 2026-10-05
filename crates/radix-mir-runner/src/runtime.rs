@@ -2061,6 +2061,45 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let tensor = self.tensor_arg(receiver, span)?;
         let value = self.eval_operand(value, span)?;
+        let values = self.tensor_fill_values(&tensor, value, span)?;
+        let shape = tensor.borrow().shape.clone();
+        tensor_value(values, shape, span)
+    }
+
+    /// Statement posture: the dropped fill result is the in-place mutation
+    /// statement — the same law the HIR→Rust emit lane's dropped arm spells
+    /// as a direct receiver `reple`. The bound form (`tensor_fill`) builds
+    /// a fresh tensor instead of touching the source.
+    pub(crate) fn tensor_fill_in_place(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let [receiver, value] = args else {
+            return Err(RunnerError::internal(span, "tensor fill arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let value = self.eval_operand(value, span)?;
+        let values = self.tensor_fill_values(&tensor, value, span)?;
+        // Write-through mirror of `tensor_copy_into`: the cloned snapshot
+        // shares the flat allocation, so `set_value_at` mutates the receiver.
+        let snapshot = tensor.borrow().clone();
+        for (index, value) in values.into_iter().enumerate() {
+            snapshot.set_value_at(index, value).ok_or_else(|| {
+                RunnerError::internal(span, "tensor fill receiver is a lazy edge view")
+            })?;
+        }
+        Ok(Value::Unit)
+    }
+
+    /// Filled element values for `value` broadcast across the receiver's
+    /// shape (shared by both fill postures).
+    fn tensor_fill_values(
+        &mut self,
+        tensor: &Rc<RefCell<TensorValue>>,
+        value: Value,
+        span: Span,
+    ) -> Result<Vec<Value>, RunnerError> {
         let borrow = tensor.borrow();
         let shape = borrow.shape.clone();
         let count = borrow
@@ -2070,10 +2109,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // to fill the receiver shape. This supports the backward companion's
         // broadcasts: filling [B,D] with [B] (prefix repeat each element)
         // or with [D] (suffix cycle the block).
-        match &value {
+        match value {
             Value::Tensor(fill_cell) => {
                 let fill_shape = fill_cell.borrow().shape.clone();
-                let fill_data = self.tensor_logical_values(fill_cell, span)?;
+                let fill_data = self.tensor_logical_values(&fill_cell, span)?;
                 let fill_count = fill_data.len();
                 if fill_count == 0 || count % fill_count != 0 {
                     return Err(RunnerError::internal(
@@ -2082,22 +2121,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     ));
                 }
                 let repeats = count / fill_count;
-                let data: Vec<Value> = if shape.starts_with(&fill_shape) {
+                if shape.starts_with(&fill_shape) {
                     // Fill shape is a prefix (e.g. [B] → [B,D]):
                     // repeat each element to fill suffix dimensions.
-                    fill_data
+                    Ok(fill_data
                         .iter()
                         .flat_map(|v| std::iter::repeat_n(v, repeats))
                         .cloned()
-                        .collect()
+                        .collect())
                 } else {
                     // Fill shape is a suffix (e.g. [D] → [B,D])
                     // or neither prefix nor suffix: cycle the entire block.
-                    fill_data.iter().cycle().take(count).cloned().collect()
-                };
-                tensor_value(data, shape, span)
+                    Ok(fill_data.iter().cycle().take(count).cloned().collect())
+                }
             }
-            _ => tensor_value(vec![value; count], shape, span),
+            _ => Ok(vec![value; count]),
         }
     }
 

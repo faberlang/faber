@@ -1,0 +1,47 @@
++++
+term = "tensor"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Bound tensor fill materializes a fresh tensor; the source keeps its values."
+syntax = "const filled ← t.fill(value)"
+related = ["tensor", "fractus", "lista"]
+locale = "en"
++++
+
+# =============================================================================
+# tensor — bound fill (reple) materializes fresh, source stays immutable.
+# =============================================================================
+#
+# What this teaches:
+#   • The bound form `filled ← t.reple(v)` yields a NEW tensor of the
+#     receiver's shape, filled with `v`.
+#   • The receiver keeps its original values — the bound form never aliases
+#     or overwrites its source.
+#   • The statement form `t.reple(v);` is the opposite posture: the
+#     documented in-place mutation (this file statement-forms nothing).
+#
+# Common mistakes:
+#   • expecting the bound form to mutate `t` — rebind with `t ← t.reple(v)`
+#     when in-place update is wanted, or use the statement form.
+#
+# See also: tensor, lista
+# =============================================================================
+
+# WHY: pins the fill aliasing law across lanes. The MIR runner always built
+# the bound result fresh; the Rust emit lane once repl-ed a clone of the
+# receiver — a clone that shared the flat storage, so `t` was overwritten.
+# The `t` line below is the parity pin.
+
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    const tf32[2, 2] t ← flat ↦ tf32[2, 2]
+
+    const tf32[2, 2] filled ← t.fill(0.0)
+
+    const list<f32> source ← t.flatten()
+    const list<f32> got ← filled.flatten()
+    print source
+    print got
+}
