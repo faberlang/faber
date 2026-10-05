@@ -80,11 +80,9 @@ fn gather_selects_rows_for_repeated_and_out_of_order_ids() {
     let source = r"
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0, 1000.0, 2000.0, 3000.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[4, 3] table ← seed.strue(flat, [4, 3])
+    fixum tf32[4, 3] table ← flat ↦ tf32[4, 3]
     fixum lista<u32> rows ← [3, 0, 2, 0]
-    fixum tensor<u32, []> iseed ← vacua
-    fixum tensor<u32, [4]> ids ← iseed.strue(rows, [4])
+    fixum tensor<u32, [4]> ids ← rows ↦ tensor<u32, [4]>
     fixum tf32[4, 3] out ← table.gather(ids)
     fixum f32 v00 ← out.accipe([0, 0]) vel 0.0
     fixum f32 e00 ← 1000.0
@@ -150,11 +148,9 @@ fn gather_out_of_range_id_is_a_hard_runner_error() {
     let source = r"
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0, 1000.0, 2000.0, 3000.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[4, 3] table ← seed.strue(flat, [4, 3])
+    fixum tf32[4, 3] table ← flat ↦ tf32[4, 3]
     fixum lista<u32> rows ← [3, 0, 4]
-    fixum tensor<u32, []> iseed ← vacua
-    fixum tensor<u32, [3]> ids ← iseed.strue(rows, [3])
+    fixum tensor<u32, [3]> ids ← rows ↦ tensor<u32, [3]>
     fixum tf32[3, 3] out ← table.gather(ids)
     nota out.magnitudines()
 }
@@ -220,8 +216,7 @@ fn exact_tensor_dynamic_read_oob_is_hard_error() {
     let source = r"
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[3] input ← seed.strue(flat, [3])
+    fixum tf32[3] input ← flat ↦ tf32[3]
     fixum numerus i ← 3
     fixum f32 bad ← input.accipe([i]) vel 99.0
     nota bad
@@ -287,8 +282,7 @@ functio lege<magnitudo N>(tensor<f32, [N]> input, numerus i) → f32 {
 
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[3] input ← seed.strue(flat, [3])
+    fixum tf32[3] input ← flat ↦ tf32[3]
     fixum f32 missing ← lege(input, 3)
     nota missing
 }
@@ -305,8 +299,7 @@ fn exact_tensor_dynamic_read_in_bounds_is_handler_free() {
     let source = r"
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[3] input ← seed.strue(flat, [3])
+    fixum tf32[3] input ← flat ↦ tf32[3]
     fixum numerus i ← 1
     fixum f32 value ← input.accipe([i]) vel 99.0
     nota value
@@ -342,8 +335,7 @@ fn tensor_get_and_tensor_slice_compile_and_run_unchanged() {
     let source = r"
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[3, 3] table ← seed.strue(flat, [3, 3])
+    fixum tf32[3, 3] table ← flat ↦ tf32[3, 3]
     fixum f32 cell ← table.accipe([1, 2]) vel 0.0
     fixum tf32[1, 3] slice ← table.sectio(1, 2)
     nota cell
@@ -391,11 +383,9 @@ fn gather_empty_ids_tensor_yields_empty_result() {
     let source = r"
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0, 1000.0, 2000.0, 3000.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[4, 3] table ← seed.strue(flat, [4, 3])
+    fixum tf32[4, 3] table ← flat ↦ tf32[4, 3]
     fixum lista<u32> rows ← []
-    fixum tensor<u32, []> iseed ← vacua
-    fixum tensor<u32, [0]> ids ← iseed.strue(rows, [0])
+    fixum tensor<u32, [0]> ids ← rows ↦ tensor<u32, [0]>
     fixum tf32[0, 3] out ← table.gather(ids)
     nota out.magnitudines()
 }

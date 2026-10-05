@@ -417,7 +417,7 @@ fn summa_at_the_cap_is_a_checked_store() {
     let run_total = |values: &str| {
         let session = Session::new(Config::default().with_target(Target::HirTypeScript));
         let source = format!(
-            "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nfixum tensor<i64, []> seed ← vacua\nnota \"a\"\nnota total(seed.strue(v, [3]))\n}}\n"
+            "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nnota \"a\"\nnota total(v ↦ tensor<i64, [3]>)\n}}\n"
         );
         let mut host = BufferHost::default();
         let result = run_source(&session, "reducta.fab", &source, &mut host);
@@ -439,7 +439,7 @@ fn reducta_summa_widens_narrow_integer_terms_before_accumulating() {
     // Ruling 21 types an integer sum at the 64-bit cap before the final store.
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let source = "functio total(tensor<i8, [2]> a) → numerus {\n  redde reducta via summa ex a\n}\n\
-                  incipit {\nfixum tensor<i8, []> seed ← vacua\nfixum tensor<i8, [2]> a ← seed.strue([100, 100], [2])\nnota total(a)\n}\n";
+                  incipit {\nfixum tensor<i8, [2]> a ← [100, 100] ↦ tensor<i8, [2]>\nnota total(a)\n}\n";
     let mut host = BufferHost::default();
     let result = run_source(&session, "reducta.fab", source, &mut host);
     assert!(result.is_ok(), "{result:?}");
@@ -450,7 +450,7 @@ fn reducta_summa_widens_narrow_integer_terms_before_accumulating() {
 fn grouped_reducta_summa_widens_narrow_integer_terms_before_accumulating() {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let source = "functio grouped(tensor<i8, [2]> values, tensor<numerus, [2]> keys) → tensor<i64, [1]> {\n  redde reducta via summa ex values apud [i] pro keys[i]\n}\n\
-                  incipit {\nfixum tensor<i8, []> value_seed ← vacua\nfixum tensor<numerus, []> key_seed ← vacua\nfixum tensor<i8, [2]> values ← value_seed.strue([100, 100], [2])\nfixum tensor<numerus, [2]> keys ← key_seed.strue([0, 0], [2])\nnota grouped(values, keys)\n}\n";
+                  incipit {\nfixum tensor<i8, [2]> values ← [100, 100] ↦ tensor<i8, [2]>\nfixum tensor<numerus, [2]> keys ← [0, 0] ↦ tensor<numerus, [2]>\nnota grouped(values, keys)\n}\n";
     let mut host = BufferHost::default();
     let result = run_source(&session, "reducta-group.fab", source, &mut host);
     assert!(result.is_ok(), "{result:?}");
@@ -464,9 +464,8 @@ fn summa_accumulates_exactly_and_checks_at_the_store() {
     let functions = "functio total(tensor<i64, [3]> a) → numerus {\n  redde reducta via summa ex a fixum s {\n    redde s\n  }\n}\n";
     let run_total = |values: &str| {
         let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-        let source = format!(
-            "{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nfixum tensor<i64, []> seed ← vacua\nnota total(seed.strue(v, [3]))\n}}\n"
-        );
+        let source =
+            format!("{functions}incipit {{\nfixum lista<i64> v ← [{values}]\nnota total(v ↦ tensor<i64, [3]>)\n}}\n");
         let mut host = BufferHost::default();
         let result = run_source(&session, "reducta.fab", &source, &mut host);
         (host.stdout_lines, result)
@@ -688,13 +687,13 @@ fn list_sum_at_the_cap_is_a_checked_store() {
 #[test]
 fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
     // Partial sum 200 leaves `i8`; the finished cell 0 fits and is stored.
-    let setup = "fixum tensor<i8, []> seed ← vacua\nfixum tensor<i8, [1, 3]> l ← seed.strue([100, 100, 100], [1, 3])\n";
+    let setup = "fixum lista<i8> l_data ← [100, 100, 100]\nfixum tensor<i8, [1, 3]> l ← l_data ↦ tensor<i8, [1, 3]>\n";
     let fits = format!(
-        "{setup}fixum tensor<i8, [3, 1]> r ← seed.strue([1, 1, -2], [3, 1])\nfixum tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
+        "{setup}fixum lista<i8> r_data ← [1, 1, -2]\nfixum tensor<i8, [3, 1]> r ← r_data ↦ tensor<i8, [3, 1]>\nfixum tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
     );
     assert_eq!(ok(&fits), ["0"]);
     let too_big = format!(
-        "{setup}fixum tensor<i8, [3, 1]> r ← seed.strue([1, 1, 1], [3, 1])\nfixum tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
+        "{setup}fixum lista<i8> r_data ← [1, 1, 1]\nfixum tensor<i8, [3, 1]> r ← r_data ↦ tensor<i8, [3, 1]>\nfixum tensor<i8, [1, 1]> p ← l.matmul(r)\nnota p.summa()"
     );
     let (_, issue, message) = trap(&too_big);
     assert_eq!(issue, "implicit_store_out_of_range");
@@ -704,16 +703,16 @@ fn tensor_matmul_dot_products_are_exact_and_store_per_element() {
 #[test]
 fn tensor_elementwise_stores_each_element_under_the_element_type() {
     // ts1 (rulings 17, 19): each element is exact and stored per element.
-    let setup = "fixum tensor<i8, []> seed ← vacua\nfixum tensor<i8, [3]> a ← seed.strue([100, 100, -100], [3])\n";
+    let setup = "fixum tensor<i8, [3]> a ← [100, 100, -100] ↦ tensor<i8, [3]>\n";
     let sum = format!(
-        "{setup}fixum tensor<i8, [3]> b ← seed.strue([100, 1, -100], [3])\nfixum tensor<i8, [3]> s ← a + b\nnota s.summa()"
+        "{setup}fixum tensor<i8, [3]> b ← [100, 1, -100] ↦ tensor<i8, [3]>\nfixum tensor<i8, [3]> s ← a + b\nnota s.summa()"
     );
     let (out, issue, message) = trap(&sum);
     assert!(out.is_empty());
     assert_eq!(issue, "implicit_store_out_of_range");
     assert!(message.contains("200 does not fit in `i8`"), "{message}");
     let prod = format!(
-        "{setup}fixum tensor<i8, [3]> b ← seed.strue([1, 1, 1], [3])\nfixum tensor<i8, [3]> s ← a ⊙ b\nnota s.summa()"
+        "{setup}fixum tensor<i8, [3]> b ← [1, 1, 1] ↦ tensor<i8, [3]>\nfixum tensor<i8, [3]> s ← a ⊙ b\nnota s.summa()"
     );
     assert_eq!(ok(&prod), ["100"]);
 }

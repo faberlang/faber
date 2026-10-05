@@ -80,10 +80,10 @@ fn rt(int v) → int { return v }
 main {
     const int n ← rt(0)
     const int m ← rt(2)
-    const tf32[] seed ← empty
-    const tf32[2, n] a ← seed.create(7.0, [2, n])
-    const tf32[n] b ← seed.create(7.0, [n])
-    const tf32[m, 0] e ← seed.create(7.0, [m, 0])
+    const list<f32> none ← []
+    const tf32[2, n] a ← none ↦ tf32[2, size n]
+    const tf32[n] b ← none ↦ tf32[size n]
+    const tf32[m, 0] e ← none ↦ tf32[size m, 0]
     var int rank2 ← 0
     for from a at [i, j] const c { rank2 ← rank2 + 1 }
     var int rank1 ← 0

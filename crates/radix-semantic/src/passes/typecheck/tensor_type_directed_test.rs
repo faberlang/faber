@@ -54,8 +54,7 @@ fn static_tensor_formata_accepts_complete_type_arg() {
     accepts(
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-  fixum tf32[] seed ← vacua
-  fixum tf32[2, 3] data ← seed.strue(flat, [2, 3])
+  fixum tf32[2, 3] data ← flat ↦ tf32[2, 3]
   fixum tf32[3, 2] view ← data.formata<tf32[3, 2]>()
   nota view.longitudo()
 }",
@@ -172,8 +171,7 @@ fn rejects_formata_without_complete_type_arg() {
     rejects_with_issue(
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-  fixum tf32[] seed ← vacua
-  fixum tf32[2, 2] data ← seed.strue(flat, [2, 2])
+  fixum tf32[2, 2] data ← flat ↦ tf32[2, 2]
   fixum _ view ← data.formata()
 }",
         "tensor_formata_complete_type_arg_required",
@@ -185,8 +183,7 @@ fn rejects_formata_value_args() {
     rejects_with_issue(
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-  fixum tf32[] seed ← vacua
-  fixum tf32[2, 2] data ← seed.strue(flat, [2, 2])
+  fixum tf32[2, 2] data ← flat ↦ tf32[2, 2]
   fixum _ view ← data.formata<tf32[4]>([4])
 }",
         "tensor_formata_forbids_value_args",
@@ -209,8 +206,7 @@ fn rejects_formata_element_type_mismatch_with_structured_issue_arg() {
     rejects_with_issue(
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-  fixum tf32[] seed ← vacua
-  fixum tf32[2, 2] data ← seed.strue(flat, [2, 2])
+  fixum tf32[2, 2] data ← flat ↦ tf32[2, 2]
   fixum _ view ← data.formata<tensor<numerus, [4]>>()
 }",
         "tensor_formata_element_type_mismatch",

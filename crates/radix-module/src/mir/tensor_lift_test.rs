@@ -38,9 +38,8 @@ fn trap(body: &str) -> (Vec<String>, String, String) {
 fn f32_program(expr: &str) -> String {
     format!(
         "incipit {{
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [2, 2]> a ← seed.strue([1.0, 2.0, 3.0, 4.0], [2, 2])
-fixum tensor<f32, [2, 2]> b ← seed.strue([4.0, 3.0, 2.0, 1.0], [2, 2])
+fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+fixum tensor<f32, [2, 2]> b ← [[4.0, 3.0], [2.0, 1.0]] ↦ tensor<f32, [2, 2]>
 fixum tensor<f32, [2, 2]> r ← {expr}
 nota r.planata()
 }}"
@@ -55,9 +54,8 @@ fn f32_result(expr: &str) -> Vec<String> {
 fn mask_result(expr: &str) -> Vec<String> {
     ok(&format!(
         "incipit {{
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [2, 2]> a ← seed.strue([1.0, 2.0, 3.0, 4.0], [2, 2])
-fixum tensor<f32, [2, 2]> b ← seed.strue([4.0, 3.0, 2.0, 1.0], [2, 2])
+fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+fixum tensor<f32, [2, 2]> b ← [[4.0, 3.0], [2.0, 1.0]] ↦ tensor<f32, [2, 2]>
 fixum tensor<bivalens, [2, 2]> r ← {expr}
 nota r.planata()
 }}"
@@ -86,8 +84,7 @@ fn times_divide_and_remainder_lift_against_a_scalar() {
 #[test]
 fn integer_division_and_remainder_floor_per_element() {
     let program = "incipit {
-fixum tensor<i32, []> seed ← vacua
-fixum tensor<i32, [4]> a ← seed.strue([7, -7, 9, -9], [4])
+fixum tensor<i32, [4]> a ← [7, -7, 9, -9] ↦ tensor<i32, [4]>
 fixum tensor<i32, [4]> q ← a / 2
 fixum tensor<i32, [4]> r ← a % 2
 fixum tensor<i32, [4]> s ← a % -2
@@ -102,8 +99,7 @@ nota s.planata()
 fn a_zero_integer_divisor_traps_and_a_zero_float_divisor_is_ieee() {
     let (out, issue, message) = trap(
         "incipit {
-fixum tensor<i32, []> seed ← vacua
-fixum tensor<i32, [2]> a ← seed.strue([4, 8], [2])
+fixum tensor<i32, [2]> a ← [4, 8] ↦ tensor<i32, [2]>
 nota \"a\"
 fixum tensor<i32, [2]> r ← a / 0
 nota r.planata()
@@ -113,8 +109,7 @@ nota r.planata()
     assert_eq!(issue, "runner_numerus_division_failed");
     assert!(message.contains("division failed"), "{message}");
     let program = "incipit {
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [3]> a ← seed.strue([1.0, -1.0, 0.0], [3])
+fixum tensor<f32, [3]> a ← [1.0, -1.0, 0.0] ↦ tensor<f32, [3]>
 fixum tensor<f32, [3]> r ← a / 0.0
 nota r.planata()
 }";
@@ -123,8 +118,7 @@ nota r.planata()
 
 #[test]
 fn u8_elements_are_stored_per_element_and_trap_past_the_type() {
-    let setup = "fixum tensor<u8, []> seed ← vacua
-fixum tensor<u8, [3]> a ← seed.strue([200, 1, 100], [3])\n";
+    let setup = "fixum tensor<u8, [3]> a ← [200, 1, 100] ↦ tensor<u8, [3]>\n";
     // Fits: each element is stored under `u8`.
     let fits = format!("incipit {{\n{setup}fixum tensor<u8, [3]> r ← a + 50\nnota r.planata()\n}}");
     assert_eq!(ok(&fits), ["[250, 51, 150]"]);
@@ -149,8 +143,7 @@ fixum tensor<u8, [3]> a ← seed.strue([200, 1, 100], [3])\n";
 fn a_constant_beyond_the_element_widens_the_join() {
     // `a + 300` joins `u8` with the constant's range: elements are `u16`.
     let program = "incipit {
-fixum tensor<u8, []> seed ← vacua
-fixum tensor<u8, [3]> a ← seed.strue([200, 1, 100], [3])
+fixum tensor<u8, [3]> a ← [200, 1, 100] ↦ tensor<u8, [3]>
 fixum tensor<u16, [3]> r ← a + 300
 nota r.planata()
 }";
@@ -160,10 +153,10 @@ nota r.planata()
 #[test]
 fn mixed_integer_widths_join_losslessly_between_tensors() {
     let program = "incipit {
-fixum tensor<u8, []> s8 ← vacua
-fixum tensor<u16, []> s16 ← vacua
-fixum tensor<u8, [2]> a ← s8.strue([200, 100], [2])
-fixum tensor<u16, [2]> b ← s16.strue([1000, 2], [2])
+fixum lista<u8> a_data ← [200, 100]
+fixum tensor<u8, [2]> a ← a_data ↦ tensor<u8, [2]>
+fixum lista<u16> b_data ← [1000, 2]
+fixum tensor<u16, [2]> b ← b_data ↦ tensor<u16, [2]>
 fixum tensor<u16, [2]> r ← a + b
 nota r.planata()
 fixum tensor<u16, [2]> m ← a ⤒ b
@@ -175,9 +168,8 @@ nota m.planata()
 #[test]
 fn true_division_takes_ruling_23_widths_and_traps_an_integer_zero_divisor() {
     let program = "incipit {
-fixum tensor<u8, []> seed ← vacua
-fixum tensor<u8, [3]> a ← seed.strue([1, 2, 3], [3])
-fixum tensor<u8, [3]> b ← seed.strue([2, 4, 4], [3])
+fixum tensor<u8, [3]> a ← [1, 2, 3] ↦ tensor<u8, [3]>
+fixum tensor<u8, [3]> b ← [2, 4, 4] ↦ tensor<u8, [3]>
 fixum tensor<f32, [3]> r ← a ÷ 2
 fixum tensor<f32, [3]> s ← a ÷ b
 nota r.planata()
@@ -186,9 +178,8 @@ nota s.planata()
     assert_eq!(ok(program), ["[0.5, 1.0, 1.5]", "[0.5, 0.5, 0.75]"]);
     let (_, issue, _) = trap(
         "incipit {
-fixum tensor<i32, []> seed ← vacua
-fixum tensor<i32, [2]> a ← seed.strue([1, 2], [2])
-fixum tensor<i32, [2]> z ← seed.strue([1, 0], [2])
+fixum tensor<i32, [2]> a ← [1, 2] ↦ tensor<i32, [2]>
+fixum tensor<i32, [2]> z ← [1, 0] ↦ tensor<i32, [2]>
 fixum tensor<f64, [2]> r ← a ÷ z
 nota r.planata()
 }",
@@ -213,10 +204,9 @@ fn comparisons_produce_a_bivalens_tensor() {
 fn whole_result(expr: &str) -> Vec<String> {
     ok(&format!(
         "incipit {{
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [2, 2]> a ← seed.strue([1.0, 2.0, 3.0, 4.0], [2, 2])
-fixum tensor<f32, [2, 2]> b ← seed.strue([4.0, 3.0, 2.0, 1.0], [2, 2])
-fixum tensor<f32, [2, 2]> c ← seed.strue([1.0, 2.0, 3.0, 4.0], [2, 2])
+fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+fixum tensor<f32, [2, 2]> b ← [[4.0, 3.0], [2.0, 1.0]] ↦ tensor<f32, [2, 2]>
+fixum tensor<f32, [2, 2]> c ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 fixum bivalens r ← {expr}
 nota r
 }}"
@@ -238,9 +228,10 @@ fn whole_equality_differs_across_run_time_shapes_without_an_error() {
 incipit {
 fixum numerus n ← extent(2)
 fixum numerus m ← extent(3)
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [n]> short ← seed.strue([1.0, 2.0], [n])
-fixum tensor<f32, [m]> long ← seed.strue([1.0, 2.0, 3.0], [m])
+fixum lista<f32> short_data ← [1.0, 2.0]
+fixum lista<f32> long_data ← [1.0, 2.0, 3.0]
+fixum tensor<f32, [n]> short ← short_data ↦ tensor<f32, [n]>
+fixum tensor<f32, [m]> long ← long_data ↦ tensor<f32, [m]>
 nota short ≡ long
 nota short ≠ long
 nota short ≡ short
@@ -251,8 +242,7 @@ nota short ≡ short
 #[test]
 fn nan_compares_false_everywhere_and_unequal_to_itself() {
     let program = "incipit {
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [2]> z ← seed.strue([0.0, 1.0], [2])
+fixum tensor<f32, [2]> z ← [0.0, 1.0] ↦ tensor<f32, [2]>
 fixum tensor<f32, [2]> n ← z ÷ z
 fixum tensor<bivalens, [2]> lt ← n < n
 fixum tensor<bivalens, [2]> eq ← n ≅ n
@@ -288,9 +278,10 @@ fn logic_and_select_evaluate_both_sides() {
     redde m
 }
 incipit {
-fixum tensor<bivalens, []> seed ← vacua
-fixum tensor<bivalens, [2]> yes ← seed.strue([verum, verum], [2])
-fixum tensor<bivalens, [2]> mix ← seed.strue([verum, falsum], [2])
+fixum lista<bivalens> yes_data ← [verum, verum]
+fixum tensor<bivalens, [2]> yes ← yes_data ↦ tensor<bivalens, [2]>
+fixum lista<bivalens> mix_data ← [verum, falsum]
+fixum tensor<bivalens, [2]> mix ← mix_data ↦ tensor<bivalens, [2]>
 fixum tensor<bivalens, [2]> r ← yes aut noisy(mix, \"rhs-or\")
 nota r.planata()
 fixum tensor<bivalens, [2]> s ← non yes et noisy(mix, \"rhs-and\")
@@ -302,9 +293,8 @@ nota s.planata()
     redde v
 }
 incipit {
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [2]> a ← seed.strue([1.0, 5.0], [2])
-fixum tensor<f32, [2]> b ← seed.strue([9.0, 2.0], [2])
+fixum tensor<f32, [2]> a ← [1.0, 5.0] ↦ tensor<f32, [2]>
+fixum tensor<f32, [2]> b ← [9.0, 2.0] ↦ tensor<f32, [2]>
 fixum tensor<f32, [2]> r ← (a > b) ✓ pick(a, \"then\") ✗ pick(b, \"else\")
 nota r.planata()
 }";
@@ -326,10 +316,10 @@ fn extrema_lift_tensor_against_tensor_and_scalar() {
 
 #[test]
 fn vel_fills_the_nihil_elements() {
-    let setup = "fixum tensor<numerus ∪ nihil, []> seed ← vacua
-fixum tensor<numerus ∪ nihil, [2, 2]> t ← seed.strue([1, nihil, 3, nihil], [2, 2])
-fixum tensor<numerus, []> dseed ← vacua
-fixum tensor<numerus, [2, 2]> d ← dseed.strue([10, 20, 30, 40], [2, 2])\n";
+    let setup = "fixum lista<numerus ∪ nihil> t_data ← [1, nihil, 3, nihil]
+fixum tensor<numerus ∪ nihil, [2, 2]> t ← t_data ↦ tensor<numerus ∪ nihil, [2, 2]>
+fixum lista<numerus> d_data ← [10, 20, 30, 40]
+fixum tensor<numerus, [2, 2]> d ← d_data ↦ tensor<numerus, [2, 2]>\n";
     let scalar = format!("incipit {{\n{setup}fixum tensor<numerus, [2, 2]> r ← t vel 0\nnota r.planata()\n}}");
     assert_eq!(ok(&scalar), ["[1, 0, 3, 0]"]);
     let tensor = format!("incipit {{\n{setup}fixum tensor<numerus, [2, 2]> r ← t vel d\nnota r.planata()\n}}");
@@ -339,8 +329,8 @@ fixum tensor<numerus, [2, 2]> d ← dseed.strue([10, 20, 30, 40], [2, 2])\n";
 #[test]
 fn ranks_one_to_three_lift() {
     let rank3 = "incipit {
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [2, 2, 2]> a ← seed.strue([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [2, 2, 2])
+fixum lista<f32> cube_data ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+fixum tensor<f32, [2, 2, 2]> a ← cube_data ↦ tensor<f32, [2, 2, 2]>
 fixum tensor<f32, [2, 2, 2]> r ← a * 2.0
 fixum tensor<bivalens, [2, 2, 2]> m ← a > 4.5
 nota r.planata()
@@ -354,8 +344,7 @@ nota m.planata()
         ]
     );
     let rank1 = "incipit {
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [3]> a ← seed.strue([1.0, 2.0, 3.0], [3])
+fixum tensor<f32, [3]> a ← [1.0, 2.0, 3.0] ↦ tensor<f32, [3]>
 fixum tensor<f32, [3]> r ← a - 1.0
 nota r.planata()
 }";
@@ -365,9 +354,8 @@ nota r.planata()
 #[test]
 fn an_empty_tensor_lifts_to_an_empty_tensor() {
     let program = "incipit {
-fixum tensor<f32, []> seed ← vacua
 fixum lista<f32> none ← []
-fixum tensor<f32, [0]> a ← seed.strue(none, [0])
+fixum tensor<f32, [0]> a ← none ↦ tensor<f32, [0]>
 fixum tensor<f32, [0]> r ← a + 1.0
 fixum tensor<bivalens, [0]> m ← a > 0.0
 nota r.planata()
@@ -381,8 +369,7 @@ fn tensor_times_tensor_is_still_rejected_without_a_hint() {
     // K10 owns this decision; K4 pins the status quo.
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let source = "incipit {
-fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [2]> a ← seed.strue([1.0, 2.0], [2])
+fixum tensor<f32, [2]> a ← [1.0, 2.0] ↦ tensor<f32, [2]>
 fixum tensor<f32, [2]> r ← a * a
 nota r.planata()
 }\n";

@@ -3997,13 +3997,12 @@ fn lowers_tensor_intrinsic_methods_to_collection_ops() {
         r"
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    fixum tf32[] seed ← vacua
-    varia tf32[2, 2] grid ← seed.strue(flat, [2, 2])
+    varia tf32[2, 2] grid ← flat ↦ tf32[2, 2]
     nota grid.magnitudines()
     fixum tf32[4] reshaped ← grid.forma([4]).materialize()
     grid.ponde([0, 0], 9.0)
     fixum f32 corner ← grid.accipe([0, 0]) vel 0.0
-    varia tf32[2, 2] filler ← grid.crea(1.0, [2, 2])
+    varia tf32[2, 2] filler ← tf32[2, 2].reple(1.0)
     filler.reple(4.0)
     fixum tf32[1, 2] slice ← grid.sectio(0, 1)
     fixum lista<f32> out ← slice.planata()
@@ -4461,8 +4460,7 @@ functio minimum(tensor<f64, [3]> values) → numerus {
 }
 incipit {
   fixum lista<f64> flat ← [nonnumerus, nonnumerus, nonnumerus]
-  fixum tf64[] seed ← vacua
-  fixum tf64[3] values ← seed.strue(flat, [3])
+  fixum tf64[3] values ← flat ↦ tf64[3]
   nota maximum(values)
   nota minimum(values)
 }";
@@ -4483,10 +4481,10 @@ fn reducta_grouping_preserves_source_and_key_tensors() {
   redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
 }
 incipit {
-  fixum tensor<bivalens, []> seed_values ← vacua
-  fixum tensor<bivalens, [3]> values ← seed_values.strue([verum, falsum, verum], [3])
-  fixum tensor<numerus, []> seed_keys ← vacua
-  fixum tensor<numerus, [3]> keys ← seed_keys.strue([0, 1, 0], [3])
+  fixum lista<bivalens> values_data ← [verum, falsum, verum]
+  fixum tensor<bivalens, [3]> values ← values_data ↦ tensor<bivalens, [3]>
+  fixum lista<numerus> keys_data ← [0, 1, 0]
+  fixum tensor<numerus, [3]> keys ← keys_data ↦ tensor<numerus, [3]>
   nota count(values, keys)
   nota values[0]
   nota keys[0]
@@ -4508,10 +4506,10 @@ fn reducta_group_out_of_range_uses_existing_tensor_write_failure() {
   redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
 }
 incipit {
-  fixum tensor<bivalens, []> seed_values ← vacua
-  fixum tensor<bivalens, [3]> values ← seed_values.strue([verum, falsum, verum], [3])
-  fixum tensor<numerus, []> seed_keys ← vacua
-  fixum tensor<numerus, [3]> keys ← seed_keys.strue([0, 1, 2], [3])
+  fixum lista<bivalens> values_data ← [verum, falsum, verum]
+  fixum tensor<bivalens, [3]> values ← values_data ↦ tensor<bivalens, [3]>
+  fixum lista<numerus> keys_data ← [0, 1, 2]
+  fixum tensor<numerus, [3]> keys ← keys_data ↦ tensor<numerus, [3]>
   nota count(values, keys)
 }";
     let mut host = crate::mir::BufferHost::default();
@@ -6873,8 +6871,7 @@ fn maximum_with_apud(tf32[3] values) → f32 {
 
 main {
     const list<f32> flat ← [1.0, 4.0, 2.0]
-    const tf32[] seed ← empty
-    const tf32[3] values ← seed.from_flat(flat, [3])
+    const tf32[3] values ← flat ↦ tf32[3]
     print maximum_without_apud(values)
     print maximum_with_apud(values)
 }
@@ -7014,8 +7011,7 @@ incipit {
     nota clamped.summa()
 
     fixum lista<f32> flat ← [-1.0, 0.5, 2.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[3] values_tensor ← seed.strue(flat, [3])
+    fixum tf32[3] values_tensor ← flat ↦ tf32[3]
     fixum tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
     nota clamped_tensor.summa()
 }

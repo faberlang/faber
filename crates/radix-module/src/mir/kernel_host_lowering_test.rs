@@ -77,8 +77,7 @@ fn k(tf32[8] a, mut tf32[8] o) → void {
     }
 }
 main {
-    const tf32[] seed ← empty
-    const tf32[8] a ← seed.create(1.5, [8])
+    const tf32[8] a ← tf32[8].fill(1.5)
     var tf32[8] b ← tf32[8]
     k(a, b)
     print b[3]
