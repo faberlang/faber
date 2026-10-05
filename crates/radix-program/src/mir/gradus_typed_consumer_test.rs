@@ -26,10 +26,9 @@ fn cancel_offset<size N>(tensor<f32, [N - 1 + 1]> value) → tensor<f32, [N - 1 
 fn runtime_size(int value) → int { return value }
 
 main {
-    const tensor<f32, []> seed ← empty
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
     const int n ← data.length() / 2
-    const tensor<f32, [n, n]> source ← seed.from_flat(data, [n, n])
+    const tensor<f32, [n, n]> source ← data ↦ tensor<f32, [size n, size n]>
     const tensor<f32, [n, n]> materialized ← sourceᵀ.materialize()
     const tensor<f32, [n, n]> sum ← math.add(materialized, source)
     const f32 error ← loss.mse(sum, source)
@@ -52,11 +51,13 @@ main {
     const tensor<f32, [4]> four ← four_values ↦ tensor<f32, [4]>
     const tensor<f32, [4]> half ← half_width(four)
     print half.shape()[0]
-    const tensor<f32, [0]> zero ← seed.from_flat([], [0])
+    const list<f32> empty_flat ← []
+    const tensor<f32, [0]> zero ← empty_flat ↦ tensor<f32, [0]>
     const tensor<f32, [0]> canceled ← cancel_offset(zero)
     print canceled.shape()[0]
     const int extent ← runtime_size(4)
-    const tensor<f32, [extent - 1]> dynamic ← seed.from_flat([1.0, 2.0, 3.0], [extent - 1])
+    const list<f32> dynamic_flat ← [1.0, 2.0, 3.0]
+    const tensor<f32, [extent - 1]> dynamic ← dynamic_flat ↦ tensor<f32, [size (extent - 1)]>
     const tensor<f32, [extent - 1]> dynamic_tail ← drop_one(dynamic)
     print dynamic_tail.shape()[0]
 }
