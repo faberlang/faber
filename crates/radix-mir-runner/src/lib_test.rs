@@ -6688,3 +6688,84 @@ fn tensor_expand_static_tensor_witness_matches_list_shape_and_shares_storage() {
             .collect::<Vec<_>>()
     );
 }
+
+fn assign_statement(
+    destination: MirTempId,
+    value_id: MirValueId,
+    operand: MirOperand,
+) -> radix_mir::MirStatement {
+    radix_mir::MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::temp(destination),
+            value: MirValue {
+                id: value_id,
+                kind: MirValueKind::Operand(operand),
+                ty: MirType::semantic(TypeId(0)),
+                span: Span::default(),
+            },
+        },
+        span: Span::default(),
+    }
+}
+
+/// Run two `Assign` statements in one frame. The second reads the first
+/// statement's value id when `read_value` is set. Returns the second temp and
+/// whether the frame recorded no statement results.
+fn run_two_assigns(read_value: bool) -> (Option<Value>, bool) {
+    let types = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let first = assign_statement(
+        MirTempId(0),
+        MirValueId(0),
+        MirOperand::Constant(MirConstant::Int(7)),
+    );
+    let second_operand = if read_value {
+        MirOperand::Value(MirValueId(0))
+    } else {
+        MirOperand::Temp(MirTempId(0))
+    };
+    let second = assign_statement(MirTempId(1), MirValueId(1), second_operand);
+    let mut function = make_function();
+    function.blocks.push(MirBlock {
+        id: MirBlockId(0),
+        statements: vec![first.clone(), second.clone()],
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(None),
+            span: Span::default(),
+        },
+        span: Span::default(),
+    });
+    let mut program = MirProgram::new();
+    program.functions.push(function);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner.execute_statement(&first).expect("first assign");
+    runner.execute_statement(&second).expect("second assign");
+    let frame = runner.frames.last().expect("frame");
+    (
+        frame.temps.get(&MirTempId(1)).cloned(),
+        frame.values.is_empty(),
+    )
+}
+
+#[test]
+fn assign_results_are_readable_through_value_operands() {
+    let (read, recorded_nothing) = run_two_assigns(true);
+    assert_eq!(read, Some(Value::Int(7)));
+    assert!(
+        !recorded_nothing,
+        "a value-reading function records Assign results"
+    );
+}
+
+#[test]
+fn functions_without_value_operands_record_no_assign_results() {
+    let (read, recorded_nothing) = run_two_assigns(false);
+    assert_eq!(read, Some(Value::Int(7)));
+    assert!(
+        recorded_nothing,
+        "no Value operand, so no per-Assign value record"
+    );
+}

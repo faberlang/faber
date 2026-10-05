@@ -293,7 +293,13 @@ struct Frame {
     /// cloned scalar value.
     aliases: FxHashMap<MirLocalId, PlaceAlias>,
     temps: FxHashMap<MirTempId, Value>,
+    /// Statement results readable through `MirOperand::Value`. Filled by
+    /// `Assign` only when `records_values` is set, and by the edge-callback
+    /// argument slots.
     values: FxHashMap<MirValueId, Value>,
+    /// `true` when the frame's function reads a `MirOperand::Value`; every
+    /// other function skips the per-`Assign` value record.
+    records_values: bool,
     block: MirBlockId,
     /// First statement of `block` to run: nonzero only for a generator frame
     /// resumed after the yielding statement it was parked on.
@@ -374,6 +380,9 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Value-id static types per function (`MirStatementKind::Assign`), for
     /// display-width resolution at diagnostics.
     value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
+    /// Functions whose body reads a `MirOperand::Value`; only their frames
+    /// record `Assign` results.
+    value_reading_functions: FxHashSet<MirFunctionId>,
     /// Whether a call to a compute-stage (`@ kernel`) function runs or stops
     /// the run. Defaults to [`RunnerKernelPolicy::Refuse`].
     kernel_policy: RunnerKernelPolicy,
@@ -437,6 +446,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             textus_literals: RefCell::new(FxHashMap::default()),
             ascii_literals: RefCell::new(FxHashMap::default()),
             value_types: index_value_types(program),
+            value_reading_functions: index_value_reading_functions(program),
             kernel_policy: RunnerKernelPolicy::Refuse,
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
@@ -1234,6 +1244,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             aliases: FxHashMap::default(),
             temps: FxHashMap::default(),
             values: FxHashMap::default(),
+            records_values: self.value_reading_functions.contains(&function_id),
             block: entry_block,
             resume_at: 0,
             resumed: false,
@@ -1918,7 +1929,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         // WHY: Value::Float is an f64 carrier. Declared f32 (and other
         // non-f64 float) width has to land at this store, not at `≡`.
         let computed = self.apply_declared_float_width(computed, value.ty.semantic_id());
-        if let Some(frame) = self.frames.last_mut() {
+        if let Some(frame) = self.frames.last_mut()
+            && frame.records_values
+        {
             frame.values.insert(value.id, computed.clone());
         }
         Ok(computed)
@@ -3015,6 +3028,33 @@ fn index_value_types(program: &MirProgram) -> FxHashMap<(MirFunctionId, MirValue
         }
     }
     map
+}
+
+/// Functions that read a `MirOperand::Value` anywhere in their body.
+fn index_value_reading_functions(program: &MirProgram) -> FxHashSet<MirFunctionId> {
+    struct ValueReaders {
+        current: Option<MirFunctionId>,
+        readers: FxHashSet<MirFunctionId>,
+    }
+    impl radix_mir::visit::MirVisitor for ValueReaders {
+        fn visit_function(&mut self, function: &MirFunction) {
+            self.current = Some(function.id);
+            radix_mir::visit::walk_function(self, function);
+        }
+
+        fn visit_operand(&mut self, operand: &MirOperand) {
+            if let (MirOperand::Value(_), Some(function)) = (operand, self.current) {
+                self.readers.insert(function);
+            }
+            radix_mir::visit::walk_operand(self, operand);
+        }
+    }
+    let mut visitor = ValueReaders {
+        current: None,
+        readers: FxHashSet::default(),
+    };
+    radix_mir::visit::walk_program(&mut visitor, program);
+    visitor.readers
 }
 
 /// Whether a statement writes `temp` through a plain temp place.
