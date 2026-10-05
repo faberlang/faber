@@ -941,8 +941,27 @@ fn resolve_return_type(
                     | radix_intrinsics::IntrinsicReceiver::Sparsa
             ) && entry.faber_name == "magnitudines"
             {
+                // WHY: K14 gives a tensor a static rank with run-time extents,
+                // so the shape list has a compile-time length — the rank — and
+                // is the bounded `lista<numerus, R>` whose elements are the
+                // run-time dimension values. A receiver without a static rank
+                // (an inference hole, or a bare `size` parameter standing for a
+                // whole shape of any rank) keeps the unbounded list.
                 let numerus = checker.numerus_type();
-                return checker.types.array(numerus);
+                let rank = ctx
+                    .receiver_ty
+                    .and_then(|receiver| match checker.types.get(receiver) {
+                        Type::Tensor(_, shape) | Type::Sparsa(_, shape) => {
+                            let shape = checker.resolve_index(*shape);
+                            static_shape_rank(checker.types, shape)
+                        }
+                        _ => None,
+                    });
+                let Some(rank) = rank else {
+                    return checker.types.array(numerus);
+                };
+                let capacity = checker.types.intern_index(IndexExpr::Literal(rank as u64));
+                return checker.types.bounded_array(numerus, capacity);
             }
             let Some(inner) = ctx.inner else {
                 return checker.error_type;
@@ -1442,6 +1461,16 @@ fn check_tensor_limes(
             .insert(call, shift_context);
     }
     checker.types.tensor_with_shape(element, shape)
+}
+
+/// The rank a tensor shape fixes at check time. A bare `size` parameter in
+/// shape position binds a whole shape at instantiation, so it fixes no rank,
+/// unlike `tensor_shape_rank_from_index`, which reads it as one dimension.
+fn static_shape_rank(types: &crate::TypeTable, shape: IndexId) -> Option<usize> {
+    match types.get_index(shape) {
+        IndexExpr::Param(_) => None,
+        _ => tensor_shape_rank_from_index(types, shape),
+    }
 }
 
 pub(super) fn tensor_shape_rank_from_index(

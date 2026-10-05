@@ -36,7 +36,7 @@ main {
         [1.0, 2.0, 0.0],
         [0.0, 0.0, 0.0]
     ] ↦ tf32[3, 3]
-    const list<int> dims ← grid.shape()
+    const list<int, _> dims ← grid.shape()
     const list<f32> flat ← grid.flatten()
 
     print dims

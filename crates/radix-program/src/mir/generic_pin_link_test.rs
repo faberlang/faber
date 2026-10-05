@@ -28,7 +28,7 @@ main {
     const list<int> ids ← [0, 1, 2]
     do {
         const tensor<f32, [3, 4]> r ← utilModule.gather<3, 4, 3>(t, ids)
-        const list<int> s ← r.shape()
+        const list<int, _> s ← r.shape()
         print s.length()
         print s[0]
         print s[1]
@@ -46,7 +46,7 @@ main {
     const list<int> ids ← [0, 1]
     do {
         const tensor<f32, [2, 4]> r ← utilModule.gather<3, 4, 2>(t, ids)
-        const list<int> s ← r.shape()
+        const list<int, _> s ← r.shape()
         print s.length()
     }
     catch err {

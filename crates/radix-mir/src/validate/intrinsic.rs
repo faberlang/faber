@@ -1709,7 +1709,12 @@ impl Validator<'_, '_> {
                 ) {
                     self.error(span, "tensor shape receiver is not tensor or sparsa");
                 }
-                if !matches!(self.type_kind(call.return_ty), Type::Array(_)) {
+                // A tensor of static rank yields the bounded `lista<numerus, R>`;
+                // one without a static rank yields the unbounded list.
+                if !matches!(
+                    self.type_kind(call.return_ty),
+                    Type::Array(_) | Type::BoundedArray { .. }
+                ) {
                     self.error(span, "tensor collection result is not lista");
                 }
             }

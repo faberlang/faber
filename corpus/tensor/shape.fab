@@ -52,7 +52,7 @@ main {
 
     const tf32[] seed ← empty
     var tf32[2, 3] grid ← seed.from_flat(plana, shape)
-    const list<int> dims ← grid.shape()
+    const list<int, _> dims ← grid.shape()
 
     const list<int> newshape ← [3, 2]
     const tf32[3, 2] reshaped ← grid.reshape(newshape).materialize()

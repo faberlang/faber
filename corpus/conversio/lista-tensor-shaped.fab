@@ -34,7 +34,7 @@ locale = "en"
 main {
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
     const tf32[2, 2] grid ← flat ↦ tf32[2, 2]
-    const list<int> dims ← grid.shape()
+    const list<int, _> dims ← grid.shape()
     const list<f32> out ← grid.flatten()
 
     print dims

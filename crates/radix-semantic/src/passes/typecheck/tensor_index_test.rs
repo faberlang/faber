@@ -1002,3 +1002,76 @@ main {
     );
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
+
+#[test]
+fn tensor_shape_of_static_rank_is_a_bounded_list_of_the_rank() {
+    // K14: rank is static even when an extent is a run-time value, so the
+    // shape list has a compile-time length. The capacity hole infers from it.
+    accepts(
+        r"functio runtime_extent(numerus value) → numerus {
+    redde value
+}
+
+incipit {
+  fixum tf32[2, 3] grid ← vacua
+  fixum numerus n ← runtime_extent(3)
+  fixum tf32[2, n] dynamic ← vacua
+  fixum lista<numerus, 2> exact ← grid.magnitudines()
+  fixum lista<numerus, _> inferred ← dynamic.magnitudines()
+  fixum numerus second ← grid.magnitudines()[1] vel 0
+  nota exact.longitudo(), inferred.longitudo(), second
+}",
+    );
+}
+
+#[test]
+fn tensor_shape_literal_index_past_the_rank_rejects() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tf32[2, 3] grid ← vacua
+  fixum _ bad ← grid.magnitudines()[5]
+  nota bad
+}",
+        "index_provably_out_of_bounds",
+    );
+}
+
+#[test]
+fn tensor_shape_does_not_widen_to_an_unbounded_list_implicitly() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tf32[2, 3] grid ← vacua
+  fixum lista<numerus> dims ← grid.magnitudines()
+  nota dims.longitudo()
+}",
+        "initializer_annotation_mismatch",
+    );
+}
+
+#[test]
+fn tensor_shape_widens_to_an_unbounded_list_through_explicit_conversio() {
+    accepts(
+        r"incipit {
+  fixum tf32[2, 3] grid ← vacua
+  fixum lista<numerus> dims ← grid.magnitudines() ↦ lista<numerus>
+  nota dims.longitudo()
+}",
+    );
+}
+
+#[test]
+fn tensor_shape_without_a_static_rank_stays_an_unbounded_list() {
+    // A bare `magnitudo` parameter in shape position binds a whole shape of
+    // any rank at instantiation, and `tf32[]` is the shapeless seed; neither
+    // fixes a rank, so both keep the unbounded list (and `[1]` is not judged
+    // against a guessed length).
+    accepts(
+        r#"functio second_extent<magnitudo S>(tensor<f32, S> value) → numerus {
+    fixum lista<numerus> dims ← value.magnitudines()
+    redde dims[1] vel 0
+}
+
+nota "generic shape keeps the unbounded list"
+"#,
+    );
+}
