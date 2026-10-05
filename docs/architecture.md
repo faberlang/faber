@@ -46,7 +46,7 @@ flowchart LR
 
 Lane split: the **application lane** (HIR) emits source languages; the
 **systems lane** (MIR) emits IR and device artifacts. Real device execution
-runs through `faber run --backend metal` / `--backend cuda` on the packaged
+runs through `faber run --device metal` / `--device cuda` on the packaged
 image — it is not a text-emit product surface.
 
 ## Repository ecosystem
