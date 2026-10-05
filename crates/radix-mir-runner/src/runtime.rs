@@ -40,14 +40,17 @@ use super::value::{
     format_template_shaped, inverse_view_coordinate, modular_operand, modular_word_reduce,
     modular_word_result, round_float, uint_width_checked_add, values_equal, width_checked_add,
 };
-use super::{CallOutcome, Runner, RunnerError, gelu_f64, host::provider_identity};
+use super::{
+    CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
+    RunnerError, gelu_f64, host::provider_identity,
+};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
     MirBuiltinEdgePolicy, MirCallee, MirCollectionOp, MirConstant, MirConversion,
-    MirConversionFlavor, MirEdgePolicy, MirFunctionId, MirGradientOp, MirIntrinsic, MirOperand,
-    MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirPlaceBase, MirProvider,
+    MirConversionFlavor, MirEdgePolicy, MirFunctionId, MirGradientOp, MirIntrinsic, MirLiftOp,
+    MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirPlaceBase, MirProvider,
     MirProviderKind, MirRuntimeCall, MirSermoOp, MirShapeCheck, MirShapeExpr, MirType,
     MirTypeCheckOp, MirValueId,
 };
@@ -1575,18 +1578,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
             MirCollectionOp::ArgMax => self.arg_extremum_index(args, span, true),
             MirCollectionOp::ArgMin => self.arg_extremum_index(args, span, false),
-            MirCollectionOp::ArrayAdd => {
-                self.array_elementwise(args, span, "lista add", numeric_add, return_ty)
+            MirCollectionOp::ArrayAdd => self.array_lift(args, span, MirLiftOp::Add, return_ty),
+            MirCollectionOp::ArraySub => self.array_lift(args, span, MirLiftOp::Sub, return_ty),
+            MirCollectionOp::ArrayMul => self.array_lift(args, span, MirLiftOp::Mul, return_ty),
+            MirCollectionOp::ArrayDiv => self.array_lift(args, span, MirLiftOp::Div, return_ty),
+            MirCollectionOp::ArrayMod => self.array_lift(args, span, MirLiftOp::Mod, return_ty),
+            MirCollectionOp::ArrayTrueDiv => {
+                self.array_lift(args, span, MirLiftOp::TrueDiv, return_ty)
             }
-            MirCollectionOp::ArraySub => {
-                self.array_elementwise(args, span, "lista sub", numeric_sub, return_ty)
-            }
-            MirCollectionOp::ArrayMul => {
-                self.array_elementwise(args, span, "lista mul", numeric_mul, return_ty)
-            }
-            MirCollectionOp::ArrayDiv => {
-                self.array_elementwise(args, span, "lista div", numeric_div, return_ty)
-            }
+            MirCollectionOp::ArrayNeg => self.array_lift(args, span, MirLiftOp::Neg, return_ty),
             MirCollectionOp::TensorSumAxis => self.tensor_sum_axis(args, span, return_ty),
             MirCollectionOp::TensorShape => self.tensor_shape(args, span),
             MirCollectionOp::TensorReshape => self.tensor_reshape(args, span),
@@ -2758,6 +2758,82 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             },
         );
         Ok(Value::Tensor(Rc::new(RefCell::new(view))))
+    }
+
+    /// The arithmetic and unary operators of a numeric `lista` (or queue/stack):
+    /// each element is computed exactly and stored under the result element
+    /// type (ruling 19(g)); the live lengths of the collection operands pair.
+    fn array_lift(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        op: MirLiftOp,
+        return_ty: MirType,
+    ) -> Result<Value, RunnerError> {
+        let label = lista_label(op);
+        let operands = args
+            .iter()
+            .map(|arg| self.eval_operand(arg, span))
+            .collect::<Result<Vec<_>, _>>()?;
+        if operands.len() != op.arity() {
+            return Err(RunnerError::internal(span, format!("{label} arity")));
+        }
+        let (element_ty, bounded) = match self.types.get(return_ty.semantic_id()) {
+            Type::Array(element)
+            | Type::Queue(element)
+            | Type::BoundedQueue { element, .. }
+            | Type::Stack(element)
+            | Type::BoundedStack { element, .. } => (*element, false),
+            Type::BoundedArray { element, .. } => (*element, true),
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("{label} result type mismatch"),
+                ));
+            }
+        };
+        // The live length is what pairs: two collections must agree on it, a
+        // scalar broadcasts. A bounded list reports a mismatch through the
+        // recoverable runtime-failure path (D6), like a push at capacity.
+        let mut length: Option<usize> = None;
+        for operand in &operands {
+            let Value::Array(cell) = operand else {
+                continue;
+            };
+            let len = cell.borrow().len();
+            if length.is_some_and(|seen| seen != len) {
+                return Err(RunnerError::internal_with_issue(
+                    span,
+                    format!("{label} length mismatch"),
+                    if bounded {
+                        RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH
+                    } else {
+                        RUNNER_LISTA_LENGTH_MISMATCH
+                    },
+                ));
+            }
+            length = Some(len);
+        }
+        let Some(length) = length else {
+            return Err(RunnerError::internal(
+                span,
+                format!("{label} operand type mismatch"),
+            ));
+        };
+        // Each element is computed exactly and then stored under the result
+        // element type (ruling 19(g)): the range check happens at the store.
+        let mut values = Vec::with_capacity(length);
+        for index in 0..length {
+            let picked = operands
+                .iter()
+                .map(|operand| match operand {
+                    Value::Array(cell) => cell.borrow()[index].clone(),
+                    scalar => scalar.clone(),
+                })
+                .collect::<Vec<_>>();
+            values.push(self.lift_element(op, &picked, Some(element_ty), span)?);
+        }
+        Ok(array_value(values))
     }
 
     /// Elementwise array-backed collection op with scalar broadcast. Unlike
@@ -6246,3 +6322,16 @@ fn apply_math_function(function: MirMathFunction, value: f64) -> f64 {
 #[cfg(test)]
 #[path = "runtime_index_test.rs"]
 mod runtime_index_test;
+
+/// Operation label of one elementwise list operator in runner diagnostics.
+fn lista_label(op: MirLiftOp) -> &'static str {
+    match op {
+        MirLiftOp::Add => "lista add",
+        MirLiftOp::Sub => "lista sub",
+        MirLiftOp::Mul => "lista mul",
+        MirLiftOp::Div => "lista div",
+        MirLiftOp::Mod => "lista mod",
+        MirLiftOp::TrueDiv => "lista true div",
+        _ => "lista neg",
+    }
+}

@@ -808,6 +808,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorMax
             | MirCollectionOp::TensorMin
             | MirCollectionOp::TensorNeg
+            | MirCollectionOp::ArrayNeg
             | MirCollectionOp::TensorMath(_)
             | MirCollectionOp::ScalarMath(_)
             | MirCollectionOp::TensorGelu
@@ -830,6 +831,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::ArraySub
             | MirCollectionOp::ArrayMul
             | MirCollectionOp::ArrayDiv
+            | MirCollectionOp::ArrayMod
+            | MirCollectionOp::ArrayTrueDiv
             | MirCollectionOp::Append
             | MirCollectionOp::SortByKeys
             | MirCollectionOp::Compare
@@ -1792,10 +1795,40 @@ impl Validator<'_, '_> {
                     self.error(span, "tensor shift offsets are not an integer lista");
                 }
             }
+            MirCollectionOp::ArrayNeg => {
+                let Some(operand_ty) = first_arg_ty else {
+                    return;
+                };
+                let Some(kind) = self.elementwise_collection_kind(operand_ty) else {
+                    self.error(span, "elementwise operand is not a lista, queue, or stack");
+                    return;
+                };
+                let Some(result_kind) = self.elementwise_collection_kind(call.return_ty) else {
+                    self.error(span, "elementwise result is not a lista, queue, or stack");
+                    return;
+                };
+                if result_kind != kind {
+                    self.error(span, "elementwise result must preserve the collection kind");
+                }
+                let (Some(element), Some(result_element)) = (
+                    self.collection_element_ty(operand_ty),
+                    self.collection_element_ty(call.return_ty),
+                ) else {
+                    return;
+                };
+                self.require_assignable(
+                    element,
+                    result_element,
+                    span,
+                    "elementwise result element type mismatch",
+                );
+            }
             MirCollectionOp::ArrayAdd
             | MirCollectionOp::ArraySub
             | MirCollectionOp::ArrayMul
-            | MirCollectionOp::ArrayDiv => {
+            | MirCollectionOp::ArrayDiv
+            | MirCollectionOp::ArrayMod
+            | MirCollectionOp::ArrayTrueDiv => {
                 let Some(left_ty) = first_arg_ty else {
                     return;
                 };
@@ -1825,6 +1858,21 @@ impl Validator<'_, '_> {
                         return;
                     }
                 };
+                let Some(result_kind) = self.elementwise_collection_kind(call.return_ty) else {
+                    self.error(span, "elementwise result is not a lista, queue, or stack");
+                    return;
+                };
+                if result_kind != collection_kind {
+                    self.error(span, "elementwise result must preserve the collection kind");
+                }
+                let Some(result_element) = self.collection_element_ty(call.return_ty) else {
+                    return;
+                };
+                // The operands flow into the result element (ruling 19(g): the
+                // exact result is stored under it), so a wider result element
+                // is fine and a narrower one is not. `÷` converts integers to
+                // a float first, so its result element is any numeric type.
+                let flows = op != MirCollectionOp::ArrayTrueDiv;
                 match (left_kind, right_kind) {
                     (Some(left_kind), Some(right_kind)) => {
                         if left_kind != right_kind {
@@ -1843,36 +1891,34 @@ impl Validator<'_, '_> {
                             "elementwise collection element types differ",
                         );
                     }
-                    (Some(_), None) => self.require_assignable(
+                    (Some(_), None) if flows => self.require_assignable_or_fitting_constant(
+                        right,
                         right_ty,
-                        collection_element,
+                        result_element,
                         span,
                         "elementwise scalar type mismatch",
                     ),
-                    (None, Some(_)) => self.require_assignable(
-                        left_ty,
-                        collection_element,
-                        span,
-                        "elementwise scalar type mismatch",
-                    ),
+                    (None, Some(_)) if flows => {
+                        let left = &call.args[0];
+                        self.require_assignable_or_fitting_constant(
+                            left,
+                            left_ty,
+                            result_element,
+                            span,
+                            "elementwise scalar type mismatch",
+                        );
+                    }
+                    (Some(_), None) | (None, Some(_)) => {}
                     (None, None) => unreachable!("elementwise collection kind selected above"),
                 }
-                let Some(result_kind) = self.elementwise_collection_kind(call.return_ty) else {
-                    self.error(span, "elementwise result is not a lista, queue, or stack");
-                    return;
-                };
-                if result_kind != collection_kind {
-                    self.error(span, "elementwise result must preserve the collection kind");
+                if flows {
+                    self.require_assignable(
+                        collection_element,
+                        result_element,
+                        span,
+                        "elementwise result element type mismatch",
+                    );
                 }
-                let Some(result_element) = self.collection_element_ty(call.return_ty) else {
-                    return;
-                };
-                self.require_assignable(
-                    result_element,
-                    collection_element,
-                    span,
-                    "elementwise result element type mismatch",
-                );
             }
             MirCollectionOp::TensorReshape
             | MirCollectionOp::TensorCreate

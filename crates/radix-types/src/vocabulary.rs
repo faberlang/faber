@@ -171,6 +171,13 @@ pub enum MirCollectionOp {
     ArraySub,
     ArrayMul,
     ArrayDiv,
+    /// Elementwise `%` over a `lista`: the scalar remainder per element.
+    ArrayMod,
+    /// Elementwise `÷` over a `lista`: integers convert to the result float
+    /// first (ruling 23); the result element type is that float.
+    ArrayTrueDiv,
+    /// Elementwise unary `-` over a `lista`: one operand.
+    ArrayNeg,
     Append,
     AppendImmutable,
     Put,

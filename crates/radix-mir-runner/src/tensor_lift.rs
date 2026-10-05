@@ -72,7 +72,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn lift_element(
+    pub(crate) fn lift_element(
         &self,
         op: MirLiftOp,
         v: &[Value],

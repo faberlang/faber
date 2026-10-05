@@ -6919,20 +6919,24 @@ fn lista_elementwise_dynamic_pair_lowers_to_array_mir_op() {
     assert!(!dump.contains("invalid MIR"), "dynamic lista arithmetic must validate:\n{dump}");
 }
 
+// A literal capacity is a storage limit, never the live length: expanding the
+// operation over `N` cells read past the live length of any list shorter than
+// `N` (the audit defect), so a bounded pair takes the runtime op like any other
+// pair and the runner pairs the live lengths.
 #[test]
-fn lista_elementwise_literal_bounds_expand_without_runtime_check() {
+fn lista_elementwise_literal_bounds_take_the_runtime_op() {
     let dump = dump_source(
         r"functio addita(lista<numerus, 3> a, lista<numerus, 3> b) → lista<numerus, 3> {
     redde a + b
 }",
     );
     assert!(
-        dump.contains("construct array"),
-        "literal-bounded lista arithmetic must construct the result:\n{dump}"
+        dump.contains("runtime collection array_add"),
+        "literal-bounded lista arithmetic must pair live lengths at run time:\n{dump}"
     );
     assert!(
-        !dump.contains("runtime collection array_add"),
-        "literal-bounded lista arithmetic must skip the dynamic check:\n{dump}"
+        !dump.contains("construct array"),
+        "a capacity must not be expanded into cells:\n{dump}"
     );
 }
 

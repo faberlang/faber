@@ -68,6 +68,8 @@ pub fn reject_tensor_lift(
     if matches!(target, Target::HirFaber) {
         return Ok(());
     }
+    // The elementwise list forms only the MIR runner executes fail closed too.
+    crate::lista_lift_gate::reject_lista_lift(hir, types, target)?;
     let mut gate = Gate {
         types,
         interner,

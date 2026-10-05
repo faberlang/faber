@@ -1877,6 +1877,26 @@ help = "目前 longitudo 使用 numerus intervallum bounds"
 message = "需要 numeric operands"
 help = "为此运算符使用 numeric operands"
 
+[diagnostics.SEM011.issues.lista_multiply_requires_glyph]
+message = "不支持 list `*` list；逐元素乘法请用 ⊙"
+help = "两个列表的逐元素乘法请用 ⊙；`*` 的一侧须为标量"
+
+[diagnostics.SEM011.issues.lista_divide_requires_glyph]
+message = "不支持 list `/` list；请用 ⊘（逐元素，同 `/`）或 ÷（逐元素真除法）"
+help = "逐对相除（同 `/`）请用 ⊘，真除法请用 ÷"
+
+[diagnostics.SEM011.issues.lista_scalar_required]
+message = "不支持 list `{operator}` list；`{operator}` 的一侧须为标量"
+help = "请将列表与标量配对"
+
+[diagnostics.SEM011.issues.lista_capacity_mismatch]
+message = "list `{operator}` 要求容量相等；发现容量 {lhs} 与容量 {rhs}"
+help = "固定容量不同的列表是不同的类型；请用 ↦ 把一个操作数转换为另一个的容量"
+
+[diagnostics.SEM011.issues.lista_decimal_element_unsupported]
+message = "列表上的逐元素 `÷` 暂不支持十进制元素"
+help = "请先用转换把元素转为浮点或整数类型"
+
 [diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
 message = "不支持 tensor `*` tensor；逐元素乘法请用 ⊙，缩并请用 ·"
 help = "逐元素乘法请用 ⊙，缩并请用 ·"

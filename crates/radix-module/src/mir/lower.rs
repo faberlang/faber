@@ -3331,6 +3331,11 @@ impl<'a> FunctionBuilder<'a> {
         {
             return lowered;
         }
+        if op == HirUnOp::Neg
+            && let Some(lowered) = self.lower_lista_negate(operand, expr)
+        {
+            return lowered;
+        }
         let Some(mir_op) = mir_un_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "unary operator without a MIR primitive"));
@@ -3404,6 +3409,15 @@ impl<'a> FunctionBuilder<'a> {
         if let Some(lowered) = self.lower_register_lift_binary(op, lhs, rhs, expr) {
             return lowered;
         }
+        // List `% ÷ ⊙ ⊘` are elementwise collection ops, not scalar or glyph
+        // products.
+        if matches!(
+            op,
+            HirBinOp::Mod | HirBinOp::TrueDiv | HirBinOp::Hadamard | HirBinOp::HadamardDiv
+        ) && self.is_lista_or_queue_stack_arithmetic_operand(lhs, rhs)
+        {
+            return self.lower_lista_elementwise(op, lhs, rhs, expr);
+        }
         if matches!(op, HirBinOp::And | HirBinOp::Or) {
             return self.lower_logical_short_circuit(op, lhs, rhs, expr);
         }
@@ -3461,9 +3475,8 @@ impl<'a> FunctionBuilder<'a> {
             ));
         }
         // A1/C5 numeric collection laws have a dedicated MIR collection-op
-        // seam. Dynamic pairs reach the runner for the hard live-length check;
-        // literal-bounded lista pairs may still expand to indexed MIR cells,
-        // while queue/stack capacities never stand in for their live lengths.
+        // seam: every pair reaches the runner, which pairs the live lengths
+        // (a capacity never stands in for one).
         if matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div)
             && self.is_lista_or_queue_stack_arithmetic_operand(lhs, rhs)
         {

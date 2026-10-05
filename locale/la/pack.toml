@@ -2385,7 +2385,7 @@ help = "use numerus intervallum bounds for longitudo today"
 
 [diagnostics.SEM011.issues.numeric_lista_operator_law]
 message = "operator listae numericae {operator} per elementa agit; scalaria utrimque propagantur, listae parem longitudinem requirunt; utere ↦ ad latitudinem convertendam"
-help = "applica +, -, *, vel / per elementa; utere ↦ ad latitudines numericas concordandas"
+help = "applica +, - vel ÷ per elementa inter duas listas, ⊙ vel ⊘ ad producta et quotientes, aut quodlibet ex + - * / % ÷ inter listam et scalare; utere ↦ ad latitudines numericas concordandas"
 
 [diagnostics.SEM011.issues.numeric_queue_stack_operator_law]
 message = "operator {collection} numerica {operator} per elementa agit; scalaria utrimque propagantur, {collection} parem longitudinem requirit; operanda queue/stack mixta invalida sunt; utere ↦ ad latitudinem convertendam"
@@ -2394,6 +2394,26 @@ help = "applica +, -, *, vel / per elementa in queue vel stack; utere generibus 
 [diagnostics.SEM011.issues.numeric_operands_required]
 message = "numeric operands required"
 help = "use numeric operands for this operator"
+
+[diagnostics.SEM011.issues.lista_multiply_requires_glyph]
+message = "lista `*` lista non licet; utere ⊙ (elementwise)"
+help = "utere ⊙ ad multiplicationem duarum listarum per elementa; `*` scalare ex una parte requirit"
+
+[diagnostics.SEM011.issues.lista_divide_requires_glyph]
+message = "lista `/` lista non licet; utere ⊘ (elementwise, ut `/`) aut ÷ (divisio vera per elementa)"
+help = "utere ⊘ ad singula paria sicut `/` dividenda, aut ÷ ad divisionem veram"
+
+[diagnostics.SEM011.issues.lista_scalar_required]
+message = "lista `{operator}` lista non licet; `{operator}` scalare ex una parte requirit"
+help = "lista cum scalari coniungenda est"
+
+[diagnostics.SEM011.issues.lista_capacity_mismatch]
+message = "lista `{operator}` capacitates pares requirit; inventae sunt capacitas {lhs} et capacitas {rhs}"
+help = "listae capacitatum fixarum diversarum sunt genera diversa; alterum operandum ad capacitatem alterius per ↦ converte"
+
+[diagnostics.SEM011.issues.lista_decimal_element_unsupported]
+message = "÷ per elementa in listis elementa decimalia nondum accipit"
+help = "elementa prius in typum fractus aut numerus converte"
 
 [diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
 message = "tensor `*` tensor non licet; utere ⊙ (elementwise) aut · (contractio)"

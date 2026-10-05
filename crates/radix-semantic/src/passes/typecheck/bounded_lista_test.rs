@@ -223,7 +223,7 @@ fn explicit_bounded_lista_literal_checks_capacity() {
 fn unannotated_literal_pair_length_mismatch_rejects_at_typecheck() {
     assert_rejects_with_issue(
         "incipit { fixum _ xs ← [1, 2] + [3] }",
-        "numeric_lista_operator_law",
+        "lista_capacity_mismatch",
     );
 }
 

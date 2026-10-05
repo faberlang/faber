@@ -25,6 +25,7 @@ use super::store::StoreSite;
 // parent module provides shared imports for typechecking
 use super::*;
 
+mod lista_lift;
 mod tensor_lift;
 
 const INSTANS_ORDERING_OPERANDS_REQUIRED: &str = "instans_ordering_operands_required";
@@ -346,108 +347,6 @@ impl TypeChecker<'_> {
                 )))
             }
         }
-    }
-
-    /// Check the A1 elementwise list arithmetic law.
-    ///
-    /// `None` means neither operand is a `lista`, so the scalar/tensor caller
-    /// continues with its existing arithmetic rule. `Some` means a list pair
-    /// or list/scalar broadcast was handled, including a deliberate error.
-    fn check_lista_arithmetic_bin(
-        &mut self,
-        op: HirBinOp,
-        lhs: TypeId,
-        rhs: TypeId,
-        span: radix_lexer::Span,
-    ) -> Option<TypeId> {
-        let lhs_lista = self.lista_arithmetic_shape(lhs);
-        let rhs_lista = self.lista_arithmetic_shape(rhs);
-        if lhs_lista.is_none() && rhs_lista.is_none() {
-            return None;
-        }
-
-        let operator = lista_operator_spelling(op);
-        let law_error = |checker: &mut Self| {
-            checker.invalid_operand_types_with_args(
-                NUMERIC_LISTA_OPERATOR_LAW,
-                span,
-                &[("operator", operator.to_owned())],
-            );
-            checker.error_type
-        };
-
-        let (result_element, result_capacity) = match (lhs_lista, rhs_lista) {
-            (Some(lhs), Some(rhs)) => {
-                if !self.is_numeric_lista_element(lhs.element)
-                    || !self.is_numeric_lista_element(rhs.element)
-                {
-                    return Some(law_error(self));
-                }
-                if !self.numeric_shapes_match(lhs.element, rhs.element) {
-                    return Some(law_error(self));
-                }
-                if let (Some(lhs_capacity), Some(rhs_capacity)) = (lhs.capacity, rhs.capacity) {
-                    let lhs_capacity = self.resolve_index(lhs_capacity);
-                    let rhs_capacity = self.resolve_index(rhs_capacity);
-                    let lhs_static =
-                        matches!(self.types.get_index(lhs_capacity), IndexExpr::Literal(_));
-                    let rhs_static =
-                        matches!(self.types.get_index(rhs_capacity), IndexExpr::Literal(_));
-                    if lhs_static
-                        && rhs_static
-                        && !self.types.index_equals(lhs_capacity, rhs_capacity)
-                    {
-                        return Some(law_error(self));
-                    }
-                }
-                (lhs.element, lhs.capacity)
-            }
-            (Some(lhs), None) => {
-                if !self.is_numeric_lista_element(lhs.element) || !self.is_numeric_scalar(rhs) {
-                    return Some(law_error(self));
-                }
-                if !self.numeric_shapes_match(lhs.element, rhs) {
-                    return Some(law_error(self));
-                }
-                (lhs.element, lhs.capacity)
-            }
-            (None, Some(rhs)) => {
-                if !self.is_numeric_lista_element(rhs.element) || !self.is_numeric_scalar(lhs) {
-                    return Some(law_error(self));
-                }
-                if !self.numeric_shapes_match(lhs, rhs.element) {
-                    return Some(law_error(self));
-                }
-                (rhs.element, rhs.capacity)
-            }
-            (None, None) => unreachable!("list arithmetic arm requires a lista operand"),
-        };
-
-        let result = match result_capacity {
-            Some(capacity) => self.types.bounded_array(result_element, capacity),
-            None => self.types.array(result_element),
-        };
-        Some(result)
-    }
-
-    fn lista_arithmetic_shape(&mut self, ty: TypeId) -> Option<ListaArithmeticShape> {
-        let resolved = self.resolve_inferred_type(ty);
-        match self.types.get(resolved).clone() {
-            Type::Array(element) => Some(ListaArithmeticShape {
-                element,
-                capacity: None,
-            }),
-            Type::BoundedArray { element, capacity } => Some(ListaArithmeticShape {
-                element,
-                capacity: Some(capacity),
-            }),
-            Type::Alias(_, target) => self.lista_arithmetic_shape(target),
-            _ => None,
-        }
-    }
-
-    fn is_numeric_lista_element(&self, ty: TypeId) -> bool {
-        self.numeric_shape(ty).is_some()
     }
 
     fn is_numeric_scalar(&mut self, ty: TypeId) -> bool {
@@ -1183,6 +1082,9 @@ impl TypeChecker<'_> {
                         NUMERIC_OPERAND_REQUIRED,
                     );
                 }
+                if let Some(result) = self.check_lista_neg(operand, operand_ty) {
+                    return result;
+                }
                 if let Some(result) = self.check_tensor_lift_neg(operand, operand_ty) {
                     return result;
                 }
@@ -1267,12 +1169,12 @@ impl TypeChecker<'_> {
             (true, true) => (self.check_const_operand(lhs), self.check_const_operand(rhs)),
             (true, false) => {
                 let rhs_ty = self.check_expr(rhs);
-                let peer = self.scalar_peer_type(rhs_ty);
+                let peer = self.arith_peer_type(rhs_ty);
                 (self.check_const_beside(lhs, peer, expected), rhs_ty)
             }
             (false, true) => {
                 let lhs_ty = self.check_expr(lhs);
-                let peer = self.scalar_peer_type(lhs_ty);
+                let peer = self.arith_peer_type(lhs_ty);
                 (lhs_ty, self.check_const_beside(rhs, peer, expected))
             }
             (false, false) => self.check_arithmetic_operands_legacy(lhs, rhs, expected),
@@ -1297,7 +1199,7 @@ impl TypeChecker<'_> {
             }
             (Some(_), None) => {
                 let rhs_ty = self.check_expr(rhs);
-                let peer = self.scalar_peer_type(rhs_ty);
+                let peer = self.arith_peer_type(rhs_ty);
                 let lhs_expected = self
                     .literal_numeric_expected_from_peer(lhs, peer)
                     .or_else(|| self.literal_numeric_expected(lhs, expected));
@@ -1306,7 +1208,7 @@ impl TypeChecker<'_> {
             }
             (None, Some(_)) => {
                 let lhs_ty = self.check_expr(lhs);
-                let peer = self.scalar_peer_type(lhs_ty);
+                let peer = self.arith_peer_type(lhs_ty);
                 let rhs_expected = self
                     .literal_numeric_expected_from_peer(rhs, peer)
                     .or_else(|| self.literal_numeric_expected(rhs, expected));
@@ -1409,7 +1311,7 @@ impl TypeChecker<'_> {
                 {
                     result
                 } else if let Some(result) =
-                    self.check_lista_arithmetic_bin(HirBinOp::Add, lhs_ty, rhs_ty, lhs.span)
+                    self.check_lista_arithmetic_bin(HirBinOp::Add, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     result
                 } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
@@ -1430,7 +1332,7 @@ impl TypeChecker<'_> {
                 {
                     result
                 } else if let Some(result) =
-                    self.check_lista_arithmetic_bin(HirBinOp::Sub, lhs_ty, rhs_ty, lhs.span)
+                    self.check_lista_arithmetic_bin(HirBinOp::Sub, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     result
                 } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
@@ -1452,7 +1354,7 @@ impl TypeChecker<'_> {
                 {
                     result
                 } else if let Some(result) =
-                    self.check_lista_arithmetic_bin(op, lhs_ty, rhs_ty, lhs.span)
+                    self.check_lista_arithmetic_bin(op, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     result
                 } else if let Some(result) =
@@ -1465,6 +1367,10 @@ impl TypeChecker<'_> {
             }
             HirBinOp::Mod => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.check_lista_arithmetic_bin(op, lhs, rhs, lhs_ty, rhs_ty)
+                {
+                    return result;
+                }
                 if let Some(result) = self.check_tensor_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
@@ -1472,6 +1378,10 @@ impl TypeChecker<'_> {
             }
             HirBinOp::TrueDiv => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.check_lista_arithmetic_bin(op, lhs, rhs, lhs_ty, rhs_ty)
+                {
+                    return result;
+                }
                 if let Some(result) = self.check_tensor_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
@@ -2003,6 +1913,12 @@ impl TypeChecker<'_> {
                     }
                 }
             }
+            (
+                Type::Array(..) | Type::BoundedArray { .. },
+                Type::Array(..) | Type::BoundedArray { .. },
+            ) => self
+                .check_lista_hadamard(op, lhs_resolved, rhs_resolved, lhs.span)
+                .unwrap_or(self.error_type),
             _ => {
                 self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
                 self.error_type
@@ -2570,18 +2486,16 @@ struct QueueStackArithmeticShape {
     capacity: Option<radix_types::IndexId>,
 }
 
-#[derive(Clone, Copy)]
-struct ListaArithmeticShape {
-    element: TypeId,
-    capacity: Option<radix_types::IndexId>,
-}
-
 fn lista_operator_spelling(op: HirBinOp) -> &'static str {
     match op {
         HirBinOp::Add => "+",
         HirBinOp::Sub => "-",
         HirBinOp::Mul => "*",
         HirBinOp::Div => "/",
+        HirBinOp::Mod => "%",
+        HirBinOp::TrueDiv => "÷",
+        HirBinOp::Hadamard => "⊙",
+        HirBinOp::HadamardDiv => "⊘",
         _ => unreachable!("non-list arithmetic operator"),
     }
 }

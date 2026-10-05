@@ -542,7 +542,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("use bare numerus intervallum bounds for expansion helpers today".to_owned())
         }
         "numeric_lista_operator_law" => Some(
-            "apply +, -, *, or / elementwise to numeric lists; use ↦ to align numeric widths"
+            "apply +, - or ÷ elementwise between two lists, ⊙ or ⊘ for products and quotients, or any of + - * / % ÷ between a list and a scalar; use ↦ to align numeric widths"
                 .to_owned(),
         ),
         "numeric_operands_required" => Some("use numeric operands for this operator".to_owned()),

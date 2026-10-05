@@ -4,8 +4,8 @@ kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "Elementwise +, -, *, and / on numeric lists, with scalar broadcast on either side."
-syntax = "<numeric-list> (+ | - | * | /) (<numeric-list> | <scalar>)"
+summary = "Elementwise + and - between numeric lists, and + - * / against a scalar on either side."
+syntax = "<numeric-list> (+ | -) <numeric-list> | <numeric-list> (+ | - | * | /) <scalar> | <scalar> (+ | - | * | /) <numeric-list>"
 related = ["+", "-", "*", "/", "↦"]
 locale = "en"
 +++
@@ -14,7 +14,9 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `+`, `-`, `*`, and `/` apply elementwise to numeric lists.
+#   • `+` and `-` apply elementwise between two numeric lists; `+`, `-`, `*`, `/` apply
+#     elementwise between a list and a scalar.
+#   • Two lists with `*` or `/` are errors that name `⊙` and `⊘` (see lift-scalar.fab).
 #   • A scalar broadcasts on either side: `xs * 2` and `2 * xs` are list results.
 #   • List operands are paired by position and must have equal length.
 #   • The result is a fresh list; `*` is not Python-style list repetition.

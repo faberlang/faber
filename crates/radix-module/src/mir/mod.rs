@@ -55,6 +55,9 @@ mod reducta_filum_test;
 #[path = "interface_dispatch_test.rs"]
 mod interface_dispatch_test;
 #[cfg(test)]
+#[path = "lista_lift_test.rs"]
+mod lista_lift_test;
+#[cfg(test)]
 #[path = "optional_vector_literal_test.rs"]
 mod optional_vector_literal_tests;
 #[cfg(test)]

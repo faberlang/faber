@@ -79,6 +79,9 @@ mod statica_emit_test;
 mod copy_into_emit_test;
 
 #[cfg(test)]
+#[path = "lista_lift_gate_test.rs"]
+mod lista_lift_gate_test;
+#[cfg(test)]
 #[path = "tensor_lift_gate_test.rs"]
 mod tensor_lift_gate_test;
 

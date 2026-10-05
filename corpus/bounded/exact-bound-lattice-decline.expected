@@ -1,3 +1,3 @@
 # Reject oracle for the exact-bound lista lattice.
 # Tokens: stable diagnostic identities (faber check output); one per line.
-SEM011:numeric_lista_operator_law
+SEM011:lista_capacity_mismatch

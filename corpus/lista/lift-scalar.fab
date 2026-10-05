@@ -1,0 +1,113 @@
++++
+term = "lista"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "unary_expr", "multiplicative_expr", "additive_expr", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Numeric lists take % and ÷ against a scalar, unary minus, and the glyphs ⊙ ⊘ ÷ between two lists; * and / between two lists are errors that name the glyphs; a bounded list pairs its live length, never its capacity."
+syntax = "xs % s | s ÷ xs | -xs | xs ⊙ ys | xs ⊘ ys | xs ÷ ys"
+related = ["lista", "⊙", "⊘", "÷", "%", "longitudo"]
+locale = "en"
++++
+# =============================================================================
+# lista — % ÷ ⊙ ⊘ and unary minus over numeric lists
+# =============================================================================
+#
+# What this teaches:
+#   • `%` takes a list and a scalar on either side; `÷` takes a scalar or a list
+#   • Unary minus — `-xs` negates each element
+#   • Between two lists `⊙` multiplies and `⊘` divides per element; `xs * ys` and
+#     `xs / ys` are errors that name them, as they are for vectors and tensors
+#   • An untyped literal adopts the list's element type — `xs * 2.0` stays `f32`
+#   • Operand order is kept — `0.5 - xs` is `0.5 - xs[i]` for each element
+#   • The sum is exact — `list<u8> + list<u8>` stores into a `list<u16>`; the range
+#     check happens only at the store (a `list<u8>` target would trap)
+#   • A `list<T, N>` has `len` live elements and N slots: an operator pairs the
+#     `len` elements, so a list shorter than N works, and two bounded lists with
+#     different `len` leave through the recoverable path (like `append` past
+#     capacity), which `do … catch` handles in a caller with a `⇥` channel
+#   • Different capacities (`list<T, 4> + list<T, 8>`) are a check-time error;
+#     convert one operand with `↦`
+#
+# Common mistakes:
+#   • writing `xs * ys` for two lists — use `⊙`
+#   • writing `xs / ys` for two lists — use `⊘` (like `/`) or `÷` (true division)
+#   • pairing lists of different lengths — the live lengths must be equal
+#   • reading the capacity N as the number of elements an operator visits
+#
+# See also: lista, ⊙, ⊘, ÷, longitudo
+# =============================================================================
+
+# lista — elementwise forms
+#
+# WHY: a scalar with a list keeps `+ - * / %` in either order, and the two-list
+# products are spelled with their own glyphs.
+#
+# EXPECTED stdout: see lift-scalar.expected
+
+fn scaled(list<f32> xs) → list<f32> {
+    return xs * 2.0
+}
+
+fn shifted(list<f32> xs) → list<f32> {
+    return 0.5 - xs
+}
+
+fn products(list<int> xs, list<int> ys) → list<int> {
+    return xs ⊙ ys
+}
+
+fn quotients(list<int> xs, list<int> ys) → list<int> {
+    return xs ⊘ ys
+}
+
+fn total(list<f32, 4> x, list<f32, 4> y) → int ⇥ string {
+    const list<f32, 4> sum ← x + y
+    return sum.length()
+}
+
+main {
+    const list<f32> a ← [1.5, 2.5, 4.0]
+    const list<f32> b ← [2.0, 4.0, 8.0]
+    print scaled(a)
+    print shifted(a)
+    print a % 2.0
+    print 9.0 % b
+    print a ÷ b
+    print 3.0 ÷ b
+    print -a
+    const list<int> n ← [7, 8, -9]
+    const list<int> m ← [2, 3, 4]
+    print products(n, m)
+    print quotients(n, m)
+    print n % 4
+    print n ÷ m
+    print -n
+    const list<u8> bytes ← [200, 100, 50]
+    const list<u8> more ← [100, 100, 100]
+    const list<u16> wide ← bytes + more
+    print wide
+
+    var list<f32, 4> p ← empty
+    p.append(1.0)
+    p.append(2.0)
+    var list<f32, 4> q ← empty
+    q.append(4.0)
+    q.append(5.0)
+    const list<f32, 4> sum ← p + q
+    print sum
+    print sum.length()
+    print 10.0 - p
+    var list<f32, 4> r ← empty
+    r.append(1.0)
+    r.append(2.0)
+    r.append(3.0)
+    do {
+        print total(p, q)
+        print total(p, r)
+        print "not reached"
+    }
+    catch err {
+        print "lengths differ"
+    }
+}

@@ -1,0 +1,318 @@
+//! Elementwise arithmetic over numeric lists (A1 and the 2026-10-04 aggregate
+//! operator rulings).
+//!
+//! `+ - * / % ÷` take a list and a scalar on either side (operand order is
+//! kept) and unary `-` negates each element. Two lists pair by position:
+//! `+ - ÷` and the glyph forms `⊙ ⊘` apply per element, while `*` and `/`
+//! between two lists are errors that name `⊙` and `⊘`, exactly as for a
+//! vector or a tensor. `%` takes a scalar on one side only.
+//!
+//! The element type of a list/scalar pair is the F9 join of the list element
+//! and the scalar, so an untyped literal adopts the list's element type and a
+//! constant joins by value; two typed lists keep the strict rule that their
+//! elements are one type (`↦` aligns widths). `÷` takes its width from ruling
+//! 23. A fixed capacity is part of the type (D4): two lists of different
+//! literal capacities are a check-time error, and the live lengths pair at run
+//! time (a capacity never stands in for a length). Every other target either
+//! runs the form or fails closed (`lista_lift_gate`).
+
+use super::*;
+use crate::passes::typecheck::integer_range::const_int_value;
+
+/// `list * list` is not elementwise; the glyph says which product is meant.
+const ISSUE_LISTA_MULTIPLY_REQUIRES_GLYPH: &str = "lista_multiply_requires_glyph";
+/// `list / list` is not elementwise; the glyphs name the two divisions.
+const ISSUE_LISTA_DIVIDE_REQUIRES_GLYPH: &str = "lista_divide_requires_glyph";
+/// `list % list` has no pairing; `%` takes a scalar on one side.
+const ISSUE_LISTA_SCALAR_REQUIRED: &str = "lista_scalar_required";
+/// Two lists with different literal capacities are different types (D4).
+const ISSUE_LISTA_CAPACITY_MISMATCH: &str = "lista_capacity_mismatch";
+/// Decimal elements have no `÷` yet.
+const ISSUE_LISTA_DECIMAL_ELEMENT: &str = "lista_decimal_element_unsupported";
+
+#[derive(Clone, Copy)]
+struct ListaArithmeticShape {
+    element: TypeId,
+    capacity: Option<radix_types::IndexId>,
+}
+
+impl TypeChecker<'_> {
+    /// The type a literal beside a list or a tensor/vector takes as its peer:
+    /// the numeric element, so `xs * 0.5` on an `f32` list stays `f32`.
+    pub(in crate::passes::typecheck) fn arith_peer_type(&mut self, ty: TypeId) -> TypeId {
+        match self.lista_arithmetic_shape(ty) {
+            Some(shape) if self.is_numeric_lista_element(shape.element) => {
+                self.resolve_inferred_type(shape.element)
+            }
+            _ => self.scalar_peer_type(ty),
+        }
+    }
+
+    /// Check the elementwise list arithmetic law for `+ - * / % ÷`.
+    ///
+    /// `None` means neither operand is a `lista`, so the scalar/tensor caller
+    /// continues with its existing arithmetic rule. `Some` means a list pair
+    /// or list/scalar broadcast was handled, including a deliberate error.
+    pub(in crate::passes::typecheck) fn check_lista_arithmetic_bin(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+    ) -> Option<TypeId> {
+        let lhs_lista = self.lista_arithmetic_shape(lhs_ty);
+        let rhs_lista = self.lista_arithmetic_shape(rhs_ty);
+        if lhs_lista.is_none() && rhs_lista.is_none() {
+            return None;
+        }
+        let span = lhs.span;
+        let operator = lista_operator_spelling(op);
+        let law_error = |checker: &mut Self| {
+            checker.invalid_operand_types_with_args(
+                NUMERIC_LISTA_OPERATOR_LAW,
+                span,
+                &[("operator", operator.to_owned())],
+            );
+            checker.error_type
+        };
+
+        let (result_element, result_capacity) = match (lhs_lista, rhs_lista) {
+            (Some(left), Some(right)) => {
+                match op {
+                    HirBinOp::Mul => {
+                        self.invalid_operand_types(ISSUE_LISTA_MULTIPLY_REQUIRES_GLYPH, span);
+                        return Some(self.error_type);
+                    }
+                    HirBinOp::Div => {
+                        self.invalid_operand_types(ISSUE_LISTA_DIVIDE_REQUIRES_GLYPH, span);
+                        return Some(self.error_type);
+                    }
+                    HirBinOp::Mod => {
+                        self.invalid_operand_types_with_args(
+                            ISSUE_LISTA_SCALAR_REQUIRED,
+                            span,
+                            &[("operator", operator.to_owned())],
+                        );
+                        return Some(self.error_type);
+                    }
+                    _ => {}
+                }
+                let Some(capacity) = self.lista_pair_capacity(left, right, span, op) else {
+                    return Some(self.error_type);
+                };
+                let Some(element) =
+                    self.lista_pair_element(op, lhs, rhs, left.element, right.element, span)
+                else {
+                    return Some(law_error(self));
+                };
+                if self.is_error(element) {
+                    return Some(self.error_type);
+                }
+                (element, capacity)
+            }
+            (Some(list), None) | (None, Some(list)) => {
+                let list_first = lhs_lista.is_some();
+                let scalar_ty = if list_first { rhs_ty } else { lhs_ty };
+                if !self.is_numeric_lista_element(list.element)
+                    || !self.is_numeric_scalar(scalar_ty)
+                {
+                    return Some(law_error(self));
+                }
+                let element = self.lista_scalar_element(
+                    op,
+                    (lhs, lhs_ty),
+                    (rhs, rhs_ty),
+                    list.element,
+                    list_first,
+                );
+                if self.is_error(element) {
+                    return Some(self.error_type);
+                }
+                if op == HirBinOp::TrueDiv
+                    && self.lista_decimal_true_div(list.element, scalar_ty, span)
+                {
+                    return Some(self.error_type);
+                }
+                (element, list.capacity)
+            }
+            (None, None) => unreachable!("list arithmetic arm requires a lista operand"),
+        };
+        Some(self.lista_result(result_element, result_capacity))
+    }
+
+    /// `⊙` and `⊘` over two lists: the element is the shared element type and
+    /// the result keeps the list shape. `None` means the operands are not two
+    /// lists, so the caller reports the glyph's own operand diagnostic.
+    pub(in crate::passes::typecheck) fn check_lista_hadamard(
+        &mut self,
+        op: HirBinOp,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let (left, right) = (
+            self.lista_arithmetic_shape(lhs_ty)?,
+            self.lista_arithmetic_shape(rhs_ty)?,
+        );
+        let Some(capacity) = self.lista_pair_capacity(left, right, span, op) else {
+            return Some(self.error_type);
+        };
+        if !self.is_numeric_lista_element(left.element)
+            || !self.is_numeric_lista_element(right.element)
+        {
+            self.glyph_invalid_operand(op, GLYPH_OP_NUMERIC_ELEMENT_REQUIRED, span);
+            return Some(self.error_type);
+        }
+        if !self.numeric_shapes_match(left.element, right.element) {
+            self.glyph_invalid_operand(op, GLYPH_ELEMENT_TYPE_MISMATCH, span);
+            return Some(self.error_type);
+        }
+        Some(self.lista_result(left.element, capacity))
+    }
+
+    /// Unary `-` over a list keeps the element type and the list shape; each
+    /// element is stored under it, so negating the minimum of a signed width
+    /// traps at the store.
+    pub(in crate::passes::typecheck) fn check_lista_neg(
+        &mut self,
+        operand: &HirExpression,
+        operand_ty: TypeId,
+    ) -> Option<TypeId> {
+        let shape = self.lista_arithmetic_shape(operand_ty)?;
+        if !self.is_numeric_lista_element(shape.element) {
+            self.invalid_operand_types(NUMERIC_OPERAND_REQUIRED, operand.span);
+            return Some(self.error_type);
+        }
+        Some(self.lista_result(shape.element, shape.capacity))
+    }
+
+    fn lista_arithmetic_shape(&mut self, ty: TypeId) -> Option<ListaArithmeticShape> {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.get(resolved).clone() {
+            Type::Array(element) => Some(ListaArithmeticShape {
+                element,
+                capacity: None,
+            }),
+            Type::BoundedArray { element, capacity } => Some(ListaArithmeticShape {
+                element,
+                capacity: Some(capacity),
+            }),
+            Type::Alias(_, target) => self.lista_arithmetic_shape(target),
+            _ => None,
+        }
+    }
+
+    fn is_numeric_lista_element(&self, ty: TypeId) -> bool {
+        self.numeric_shape(ty).is_some()
+    }
+
+    fn lista_result(&mut self, element: TypeId, capacity: Option<radix_types::IndexId>) -> TypeId {
+        match capacity {
+            Some(capacity) => self.types.bounded_array(element, capacity),
+            None => self.types.array(element),
+        }
+    }
+
+    /// The capacity of a list pair's result. Two literal capacities that
+    /// differ are different types (D4): a named check-time error, `None`.
+    fn lista_pair_capacity(
+        &mut self,
+        left: ListaArithmeticShape,
+        right: ListaArithmeticShape,
+        span: radix_lexer::Span,
+        op: HirBinOp,
+    ) -> Option<Option<radix_types::IndexId>> {
+        if let (Some(left_capacity), Some(right_capacity)) = (left.capacity, right.capacity) {
+            let left_capacity = self.resolve_index(left_capacity);
+            let right_capacity = self.resolve_index(right_capacity);
+            if let (IndexExpr::Literal(left_n), IndexExpr::Literal(right_n)) = (
+                self.types.get_index(left_capacity).clone(),
+                self.types.get_index(right_capacity).clone(),
+            ) && !self.types.index_equals(left_capacity, right_capacity)
+            {
+                self.invalid_operand_types_with_args(
+                    ISSUE_LISTA_CAPACITY_MISMATCH,
+                    span,
+                    &[
+                        ("operator", lista_operator_spelling(op).to_owned()),
+                        ("lhs", left_n.to_string()),
+                        ("rhs", right_n.to_string()),
+                    ],
+                );
+                return None;
+            }
+        }
+        Some(left.capacity)
+    }
+
+    /// The element of two typed lists: one numeric type on both sides. `÷`
+    /// takes its width from ruling 23. `None` is the list law error.
+    fn lista_pair_element(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        left: TypeId,
+        right: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !self.is_numeric_lista_element(left)
+            || !self.is_numeric_lista_element(right)
+            || !self.numeric_shapes_match(left, right)
+        {
+            return None;
+        }
+        if op != HirBinOp::TrueDiv {
+            return Some(left);
+        }
+        if self.lista_decimal_true_div(left, right, span) {
+            return Some(self.error_type);
+        }
+        Some(self.true_division_type(lhs, rhs, left, right, span))
+    }
+
+    /// The element of a list against a scalar: the F9 join of the list
+    /// element and the scalar (a constant joins by value, an untyped literal
+    /// has already adopted the element type), `÷` by ruling 23.
+    fn lista_scalar_element(
+        &mut self,
+        op: HirBinOp,
+        (lhs, lhs_ty): (&HirExpression, TypeId),
+        (rhs, rhs_ty): (&HirExpression, TypeId),
+        element: TypeId,
+        list_first: bool,
+    ) -> TypeId {
+        let span = lhs.span;
+        let element = self.resolve_inferred_type(element);
+        let (left, right) = if list_first {
+            ((element, None), (rhs_ty, const_int_value(rhs)))
+        } else {
+            ((lhs_ty, const_int_value(lhs)), (element, None))
+        };
+        if op == HirBinOp::TrueDiv {
+            return self.true_division_type(lhs, rhs, left.0, right.0, span);
+        }
+        self.lift_join_element(left, right, span)
+    }
+
+    /// `÷` over a decimal element is rejected: the runner's true division
+    /// converts carriers to floats and would drop the scale.
+    fn lista_decimal_true_div(
+        &mut self,
+        left: TypeId,
+        right: TypeId,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let decimal = |checker: &Self, ty: TypeId| {
+            checker
+                .numeric_shape(checker.resolve_inferred_type(ty))
+                .is_some_and(|shape| shape.width.is_decimal())
+        };
+        if decimal(self, left) || decimal(self, right) {
+            self.invalid_operand_types(ISSUE_LISTA_DECIMAL_ELEMENT, span);
+            return true;
+        }
+        false
+    }
+}

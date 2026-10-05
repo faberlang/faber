@@ -1877,6 +1877,26 @@ help = "استخدم {numerus} intervallum bounds لـ longitudo حاليا"
 message = "numeric operands مطلوبة"
 help = "استخدم numeric operands لهذا العامل"
 
+[diagnostics.SEM011.issues.lista_multiply_requires_glyph]
+message = "list `*` list غير مدعوم؛ استخدم ⊙ (عنصرًا بعنصر)"
+help = "استخدم ⊙ لضرب قائمتين عنصرًا بعنصر؛ يأخذ `*` عددًا قياسيًا في أحد الجانبين"
+
+[diagnostics.SEM011.issues.lista_divide_requires_glyph]
+message = "list `/` list غير مدعوم؛ استخدم ⊘ (عنصرًا بعنصر مثل `/`) أو ÷ (قسمة حقيقية عنصرًا بعنصر)"
+help = "استخدم ⊘ لقسمة كل زوج مثل `/` أو ÷ للقسمة الحقيقية"
+
+[diagnostics.SEM011.issues.lista_scalar_required]
+message = "list `{operator}` list غير مدعوم؛ يأخذ `{operator}` عددًا قياسيًا في أحد الجانبين"
+help = "اربط القائمة بعدد قياسي"
+
+[diagnostics.SEM011.issues.lista_capacity_mismatch]
+message = "list `{operator}` تتطلب سعات متساوية؛ وُجدت السعة {lhs} والسعة {rhs}"
+help = "القوائم ذات السعات الثابتة المختلفة أنواع مختلفة؛ حوّل أحد المعاملين إلى سعة الآخر باستخدام ↦"
+
+[diagnostics.SEM011.issues.lista_decimal_element_unsupported]
+message = "لا يدعم ÷ عنصرًا بعنصر على القوائم العناصر العشرية بعد"
+help = "حوّل العناصر أولًا إلى نوع عائم أو صحيح بتحويل صريح"
+
 [diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
 message = "tensor `*` tensor غير مدعوم؛ استخدم ⊙ (ضرب عنصرًا بعنصر) أو · (الانكماش)"
 help = "استخدم ⊙ للضرب عنصرًا بعنصر أو · للانكماش"

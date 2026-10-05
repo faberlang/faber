@@ -1877,6 +1877,26 @@ help = "hiện dùng bound numerus cho intervallum longitudo"
 message = "cần các toán hạng số"
 help = "dùng các toán hạng số cho toán tử này"
 
+[diagnostics.SEM011.issues.lista_multiply_requires_glyph]
+message = "không hỗ trợ list `*` list; dùng ⊙ (theo phần tử)"
+help = "dùng ⊙ để nhân hai danh sách theo phần tử; `*` nhận một số vô hướng ở một phía"
+
+[diagnostics.SEM011.issues.lista_divide_requires_glyph]
+message = "không hỗ trợ list `/` list; dùng ⊘ (theo phần tử, như `/`) hoặc ÷ (chia thực theo phần tử)"
+help = "dùng ⊘ để chia từng cặp như `/`, hoặc ÷ để chia thực"
+
+[diagnostics.SEM011.issues.lista_scalar_required]
+message = "không hỗ trợ list `{operator}` list; `{operator}` nhận một số vô hướng ở một phía"
+help = "ghép danh sách với một số vô hướng"
+
+[diagnostics.SEM011.issues.lista_capacity_mismatch]
+message = "list `{operator}` cần dung lượng bằng nhau; gặp dung lượng {lhs} và dung lượng {rhs}"
+help = "các danh sách có dung lượng cố định khác nhau là các kiểu khác nhau; chuyển một toán hạng sang dung lượng của toán hạng kia bằng ↦"
+
+[diagnostics.SEM011.issues.lista_decimal_element_unsupported]
+message = "÷ theo phần tử trên danh sách chưa hỗ trợ phần tử thập phân"
+help = "hãy chuyển các phần tử sang kiểu float hoặc integer bằng phép chuyển đổi trước"
+
 [diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
 message = "không hỗ trợ tensor `*` tensor; dùng ⊙ (nhân theo phần tử) hoặc · (tích co)"
 help = "dùng ⊙ để nhân theo phần tử hoặc · để lấy tích co"

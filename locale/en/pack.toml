@@ -2613,7 +2613,7 @@ help = "use int intervallum bounds for longitudo today"
 
 [diagnostics.SEM011.issues.numeric_lista_operator_law]
 message = "numeric list operator {operator} is elementwise; scalars broadcast on either side, lists must have equal length; use ↦ for explicit width conversion"
-help = "apply +, -, *, or / elementwise to numeric lists; use ↦ to align numeric widths"
+help = "apply +, - or ÷ elementwise between two lists, ⊙ or ⊘ for products and quotients, or any of + - * / % ÷ between a list and a scalar; use ↦ to align numeric widths"
 
 [diagnostics.SEM011.issues.numeric_queue_stack_operator_law]
 message = "numeric {collection} operator {operator} is elementwise; scalars broadcast on either side, {collection}s must have equal length; mixed queue/stack operands are invalid; use ↦ for explicit width conversion"
@@ -2622,6 +2622,26 @@ help = "apply +, -, *, or / elementwise to numeric queues or stacks; use matchin
 [diagnostics.SEM011.issues.numeric_operands_required]
 message = "numeric operands required"
 help = "use numeric operands for this operator"
+
+[diagnostics.SEM011.issues.lista_multiply_requires_glyph]
+message = "list `*` list is unsupported; use ⊙ (elementwise)"
+help = "use ⊙ for elementwise multiplication of two lists; `*` takes a scalar on one side"
+
+[diagnostics.SEM011.issues.lista_divide_requires_glyph]
+message = "list `/` list is unsupported; use ⊘ (elementwise, like `/`) or ÷ (elementwise true division)"
+help = "use ⊘ to divide each pair of elements like `/`, or ÷ for true division"
+
+[diagnostics.SEM011.issues.lista_scalar_required]
+message = "list `{operator}` list is unsupported; `{operator}` takes a scalar on one side"
+help = "pair the list with a scalar"
+
+[diagnostics.SEM011.issues.lista_capacity_mismatch]
+message = "list `{operator}` needs equal capacities; found capacity {lhs} and capacity {rhs}"
+help = "lists of different fixed capacities are different types; convert one operand to the other's capacity with ↦"
+
+[diagnostics.SEM011.issues.lista_decimal_element_unsupported]
+message = "elementwise `÷` on lists does not support decimal elements yet"
+help = "convert the elements to a float or integer type with a conversion first"
 
 [diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
 message = "tensor `*` tensor is unsupported; use ⊙ (elementwise) or · (contraction)"

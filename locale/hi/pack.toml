@@ -1889,6 +1889,26 @@ help = "अभी longitudo के लिए numerus intervallum सीमाओ
 message = "संख्यात्मक ऑपरेंड आवश्यक हैं"
 help = "इस ऑपरेटर के लिए संख्यात्मक ऑपरेंड का उपयोग करें"
 
+[diagnostics.SEM011.issues.lista_multiply_requires_glyph]
+message = "list `*` list समर्थित नहीं है; तत्ववार गुणन के लिए ⊙ का उपयोग करें"
+help = "दो सूचियों के तत्ववार गुणन के लिए ⊙ का उपयोग करें; `*` एक ओर अदिश लेता है"
+
+[diagnostics.SEM011.issues.lista_divide_requires_glyph]
+message = "list `/` list समर्थित नहीं है; ⊘ (तत्ववार, `/` की तरह) या ÷ (तत्ववार वास्तविक भाग) का उपयोग करें"
+help = "हर जोड़ी को `/` की तरह भाग देने के लिए ⊘, या वास्तविक भाग के लिए ÷ का उपयोग करें"
+
+[diagnostics.SEM011.issues.lista_scalar_required]
+message = "list `{operator}` list समर्थित नहीं है; `{operator}` एक ओर अदिश लेता है"
+help = "सूची को अदिश के साथ जोड़ें"
+
+[diagnostics.SEM011.issues.lista_capacity_mismatch]
+message = "list `{operator}` के लिए समान क्षमता चाहिए; क्षमता {lhs} और क्षमता {rhs} मिली"
+help = "भिन्न निश्चित क्षमता वाली सूचियाँ भिन्न प्रकार हैं; एक ऑपरेंड को ↦ से दूसरे की क्षमता में बदलें"
+
+[diagnostics.SEM011.issues.lista_decimal_element_unsupported]
+message = "सूचियों पर तत्ववार ÷ अभी दशमलव तत्वों का समर्थन नहीं करता"
+help = "पहले तत्वों को रूपांतरण से float या integer प्रकार में बदलें"
+
 [diagnostics.SEM011.issues.tensor_multiply_requires_glyph]
 message = "tensor `*` tensor समर्थित नहीं है; तत्ववार गुणन के लिए ⊙ या contraction के लिए · का उपयोग करें"
 help = "तत्ववार गुणन के लिए ⊙ या contraction के लिए · का उपयोग करें"

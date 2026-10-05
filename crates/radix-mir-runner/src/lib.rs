@@ -73,6 +73,12 @@ pub(crate) const RUNNER_CODE_CONVERSION: &str = "runner_conversion";
 
 /// Malformed input to the failable JSON parser follows its text alternate exit.
 pub(crate) const RUNNER_JSON_PARSE_FAILED: &str = "runner_json_parse_failed";
+/// Two live lists of an elementwise operator differ in length (hard error).
+pub(crate) const RUNNER_LISTA_LENGTH_MISMATCH: &str = "runner_lista_elementwise_length_mismatch";
+/// The same mismatch between two bounded lists is a recoverable runtime
+/// failure (D6), like a push at capacity.
+pub(crate) const RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH: &str =
+    "runner_bounded_lista_elementwise_length_mismatch";
 
 /// Stable diagnostic identity for refusing execution of a device-annotated
 /// function. The runner's execution policy keys on MIR shader-stage metadata,
@@ -1494,6 +1500,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                             if matches!(
                                 error.issue.as_str(),
                                 "runner_collection_push_capacity"
+                                    | RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH
                                     | RUNNER_JSON_PARSE_FAILED
                                     | "runner_tensor_shape_mismatch"
                                     | "runner_tensor_shape_invalid_extent"

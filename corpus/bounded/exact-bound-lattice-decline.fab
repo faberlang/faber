@@ -16,10 +16,10 @@ locale = "en"
 #
 # The two unannotated literals are exact witnesses of capacities 2 and 1.
 # Elementwise `+` therefore rejects this mismatch at typecheck with the
-# numeric_lista_operator_law issue. Dynamic `list<T>` operands defer their
+# lista_capacity_mismatch issue. Dynamic `list<T>` operands defer their
 # equal-length check to runtime; these literal operands do not.
 #
-# EXPECTED DECLINE: SEM011:numeric_lista_operator_law
+# EXPECTED DECLINE: SEM011:lista_capacity_mismatch
 # =============================================================================
 
 main {

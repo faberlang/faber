@@ -941,13 +941,13 @@ impl FunctionBuilder<'_> {
         Some(MirOperand::Constant(MirConstant::ShapeSize { shape, axis: None }))
     }
 
-    /// Lower A1/C5 numeric collection arithmetic.
+    /// Lower A1/C5 numeric collection arithmetic and the list-only `% ÷ ⊙ ⊘`.
     ///
-    /// Dynamic pairs use a dedicated collection runtime op so the runner can
-    /// enforce the hard same-live-length error. A pair whose two lista extents
-    /// are literal `BoundedArray` capacities is expanded into indexed MIR
-    /// cells; queue/stack capacities always remain storage limits, never live
-    /// lengths.
+    /// Every pair reaches one collection runtime op, so the runner pairs the
+    /// live lengths (a mismatch is an error) and stores each exact result under
+    /// the result element type. A literal `BoundedArray` capacity is a storage
+    /// limit, never the live length, so it never stands in for one; queue/stack
+    /// capacities are the same.
     pub(super) fn lower_lista_elementwise(
         &mut self,
         op: HirBinOp,
@@ -955,26 +955,13 @@ impl FunctionBuilder<'_> {
         rhs: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        let lhs_shape = lhs.ty.and_then(|ty| self.lista_shape(ty));
-        let rhs_shape = rhs.ty.and_then(|ty| self.lista_shape(ty));
-        let queue_stack_operand = [lhs.ty, rhs.ty].into_iter().flatten().any(|ty| {
-            matches!(
-                self.normalized_type(ty),
-                Type::Queue(_) | Type::BoundedQueue { .. } | Type::Stack(_) | Type::BoundedStack { .. }
-            )
-        });
-        if lhs_shape.is_none() && rhs_shape.is_none() && !queue_stack_operand {
-            self.errors.push(MirError::unsupported(
-                expr.span,
-                "lista arithmetic without a collection operand",
-            ));
-            return None;
-        }
         let collection_op = match op {
             HirBinOp::Add => MirCollectionOp::ArrayAdd,
             HirBinOp::Sub => MirCollectionOp::ArraySub,
-            HirBinOp::Mul => MirCollectionOp::ArrayMul,
-            HirBinOp::Div => MirCollectionOp::ArrayDiv,
+            HirBinOp::Mul | HirBinOp::Hadamard => MirCollectionOp::ArrayMul,
+            HirBinOp::Div | HirBinOp::HadamardDiv => MirCollectionOp::ArrayDiv,
+            HirBinOp::Mod => MirCollectionOp::ArrayMod,
+            HirBinOp::TrueDiv => MirCollectionOp::ArrayTrueDiv,
             _ => {
                 self.errors.push(MirError::unsupported(
                     expr.span,
@@ -986,107 +973,37 @@ impl FunctionBuilder<'_> {
         let lhs_value = self.lower_expr_value(lhs)?;
         let rhs_value = self.lower_expr_value(rhs)?;
         let result_ty = self.expr_ty(expr)?;
-
-        // Queue/stack capacities are storage limits, not live lengths. Keep
-        // every queue/stack operation on the ArrayAdd family runtime seam so
-        // Collection(Index) observes the current window and the runtime
-        // enforces same-length pairs.
-        if queue_stack_operand {
-            return Some(self.runtime_call_value(
-                MirIntrinsic::Collection(collection_op),
-                vec![lhs_value, rhs_value],
-                result_ty,
-                expr.span,
-            ));
-        }
-
-        let static_capacity = match (lhs_shape, rhs_shape) {
-            (Some((_, Some(lhs_capacity))), Some((_, Some(rhs_capacity)))) if lhs_capacity == rhs_capacity => {
-                Some(lhs_capacity)
-            }
-            (Some((_, Some(capacity))), None) | (None, Some((_, Some(capacity)))) => Some(capacity),
-            _ => None,
-        };
-        let Some(capacity) = static_capacity else {
-            return Some(self.runtime_call_value(
-                MirIntrinsic::Collection(collection_op),
-                vec![lhs_value, rhs_value],
-                result_ty,
-                expr.span,
-            ));
-        };
-
-        let lhs_place = if lhs_shape.is_some() {
-            Some(self.value_base_place(lhs_value.clone(), MirType::semantic(lhs.ty?), lhs.span)?)
-        } else {
-            None
-        };
-        let rhs_place = if rhs_shape.is_some() {
-            Some(self.value_base_place(rhs_value.clone(), MirType::semantic(rhs.ty?), rhs.span)?)
-        } else {
-            None
-        };
-        let scalar = if lhs_shape.is_none() { lhs_value } else { rhs_value };
-        let element_ty = lhs_shape
-            .map(|(element, _)| element)
-            .or_else(|| rhs_shape.map(|(element, _)| element))?;
-        let mir_op = match collection_op {
-            MirCollectionOp::ArrayAdd => MirBinOp::Add,
-            MirCollectionOp::ArraySub => MirBinOp::Sub,
-            MirCollectionOp::ArrayMul => MirBinOp::Mul,
-            MirCollectionOp::ArrayDiv => MirBinOp::Div,
-            _ => {
-                self.errors.push(MirError::unsupported(
-                    expr.span,
-                    "lista elementwise lowering cannot map the collection operator",
-                ));
-                return None;
-            }
-        };
-        let mut fields = Vec::with_capacity(capacity);
-        for index in 0..capacity {
-            let lhs = if let Some(place) = lhs_place.as_ref() {
-                lista_index_operand(place, index)?
-            } else {
-                scalar.clone()
-            };
-            let rhs = if let Some(place) = rhs_place.as_ref() {
-                lista_index_operand(place, index)?
-            } else {
-                scalar.clone()
-            };
-            let value = self.assign_temp(
-                MirValueKind::Binary { op: mir_op, lhs, rhs },
-                MirType::semantic(element_ty),
-                expr.span,
-            );
-            fields.push(MirAggregateItem::Operand(value));
-        }
-        Some(self.construct_temp(
-            MirAggregateKind::Array,
-            MirAggregateFields::Ordered(fields),
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(collection_op),
+            vec![lhs_value, rhs_value],
             result_ty,
             expr.span,
         ))
     }
 
-    fn lista_shape(&self, ty: TypeId) -> Option<(TypeId, Option<usize>)> {
-        match self.normalized_type(ty) {
-            Type::Array(element) => Some((*element, None)),
-            Type::BoundedArray { element, capacity } => {
-                let IndexExpr::Literal(capacity) = self.types.get_index(*capacity) else {
-                    return Some((*element, None));
-                };
-                let Some(capacity) = usize::try_from(*capacity).ok() else {
-                    return Some((*element, None));
-                };
-                if i64::try_from(capacity).is_err() {
-                    return Some((*element, None));
-                }
-                Some((*element, Some(capacity)))
-            }
-            _ => None,
+    /// Lower unary `-` over a `lista` to the elementwise negation op. `None`
+    /// means the operand is not a list.
+    pub(super) fn lower_lista_negate(
+        &mut self,
+        operand: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<Option<MirOperand>> {
+        let ty = operand.ty?;
+        let payload = self.types.peel_access_marker(ty).1;
+        if !matches!(self.normalized_type(payload), Type::Array(_) | Type::BoundedArray { .. }) {
+            return None;
         }
+        let lowered = (|| {
+            let value = self.lower_expr_value(operand)?;
+            let result_ty = self.expr_ty(expr)?;
+            Some(self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::ArrayNeg),
+                vec![value],
+                result_ty,
+                expr.span,
+            ))
+        })();
+        Some(lowered)
     }
 
     /// Lower a glyph-product binop (`·` `×` `⊗` `⊙` `⊘`) by operand family,
@@ -4213,15 +4130,6 @@ fn mir_diagnostic_kind(kind: HirScribeKind) -> MirDiagnosticKind {
         HirScribeKind::Mone => MirDiagnosticKind::Mone,
         HirScribeKind::Scribe => MirDiagnosticKind::Scribe,
     }
-}
-
-fn lista_index_operand(place: &MirPlace, index: usize) -> Option<MirOperand> {
-    let index = i64::try_from(index).ok()?;
-    let mut place = place.clone();
-    place
-        .projections
-        .push(MirProjection::Index(MirOperand::Constant(MirConstant::Int(index))));
-    Some(MirOperand::Place(place))
 }
 
 #[derive(Clone, Copy)]

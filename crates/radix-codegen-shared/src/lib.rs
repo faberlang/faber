@@ -43,6 +43,7 @@ pub mod frame;
 pub mod hints;
 pub mod hygiene;
 pub mod ident;
+pub mod lista_lift_gate;
 pub mod names;
 pub mod runtime_api;
 pub mod tensor_lift_gate;
