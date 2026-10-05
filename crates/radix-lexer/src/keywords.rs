@@ -322,7 +322,10 @@ const ENTRY_FUNCTION_OR_PARAM_OR_MEMBER: &[KeywordOwner] = &[
     KeywordOwner::MemberIdentifier,
 ];
 const ANNOTATION_NAME: &[KeywordOwner] = &[KeywordOwner::AnnotationName];
-const TYPE_PARAMETER: &[KeywordOwner] = &[KeywordOwner::TypeParameter];
+const TYPE_PARAMETER_OR_DECLARATION: &[KeywordOwner] = &[
+    KeywordOwner::TypeParameter,
+    KeywordOwner::DeclarationIntroducer,
+];
 const REST_PATTERN: &[KeywordOwner] =
     &[KeywordOwner::RestPattern, KeywordOwner::AnnotationModifier];
 const FUNCTION_MODIFIER: &[KeywordOwner] = &[KeywordOwner::FunctionModifier];
@@ -559,7 +562,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "magnitudo",
         token_kind: Some(TokenKind::Magnitudo),
-        scope: KeywordScope::Contextual(TYPE_PARAMETER),
+        scope: KeywordScope::Contextual(TYPE_PARAMETER_OR_DECLARATION),
         category: KeywordKind::Modifier,
     },
     KeywordSpec {

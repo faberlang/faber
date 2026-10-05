@@ -52,9 +52,17 @@ impl TypeChecker<'_> {
                 } else if let Some(ty) = self.consts.get(def_id).copied() {
                     self.immutable_assignment("assignment_to_constant", target.span);
                     ty
+                } else if self.current_size_param_defs.contains(def_id) {
+                    // A lexical `magnitudo` param is read-only (size-type Z1).
+                    self.immutable_assignment("assignment_to_size_param", target.span);
+                    self.types.primitive(Primitive::Numerus)
                 } else if let Some(symbol) = self.resolver.get_symbol(*def_id) {
+                    // A size param is read-only (size-type Z1 force).
+                    if symbol.kind == crate::SymbolKind::IndexParam {
+                        self.immutable_assignment("assignment_to_size_param", target.span);
+                        self.types.primitive(Primitive::Numerus)
                     // Resolver-registered builtins (e.g. @vertex out_position).
-                    if let Some(ty) = symbol.ty {
+                    } else if let Some(ty) = symbol.ty {
                         self.insert_binding(*def_id, ty);
                         ty
                     } else {
@@ -1269,6 +1277,11 @@ impl TypeChecker<'_> {
                 crate::SymbolKind::Module => {
                     return self.types.primitive(Primitive::Ignotum);
                 }
+                // Size-type Z1 force: a size name reads as a read-only int
+                // (safe widening at use); assignment is rejected in check_lvalue.
+                crate::SymbolKind::IndexParam => {
+                    return self.types.primitive(Primitive::Numerus);
+                }
                 _ => {}
             }
 
@@ -1283,6 +1296,13 @@ impl TypeChecker<'_> {
             }
         } else if self.import_receivers.contains(&def_id) {
             return self.types.primitive(Primitive::Ignotum);
+        }
+
+        // Size-type Z1 force: a lexical `magnitudo` param of the active
+        // function has a HirTypeParam def and no resolver symbol; it reads
+        // as a read-only int (assignment is rejected in check_lvalue).
+        if self.current_size_param_defs.contains(&def_id) {
+            return self.types.primitive(Primitive::Numerus);
         }
 
         // A selective import that binds a type (D22.5) names no value.

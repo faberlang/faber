@@ -346,6 +346,22 @@ impl Lowerer<'_> {
         if let Some(def_id) = self.lookup_name(ident.name) {
             return HirExpressionKind::Path(def_id);
         }
+        // Size-type Z1 force: a `magnitudo` param names a read-only int
+        // value. Its DefId lowers as a path; MIR resolves it through
+        // size_param_sources (sgr C2a) and converts to numerus.
+        if let Some((def_id, radix_syntax::GenericParamKind::Magnitudo)) =
+            self.lexical_type_param(ident.name)
+        {
+            return HirExpressionKind::Path(def_id);
+        }
+        if let Some(def_id) = self.resolver.lookup(ident.name)
+            && self
+                .resolver
+                .get_symbol(def_id)
+                .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
+        {
+            return HirExpressionKind::Path(def_id);
+        }
         match self.resolver.lookup_variant_bare(ident.name) {
             crate::BareVariantLookup::Single(def_id) => HirExpressionKind::Path(def_id),
             crate::BareVariantLookup::Ambiguous { .. } => {

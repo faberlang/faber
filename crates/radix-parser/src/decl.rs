@@ -75,6 +75,7 @@ impl Parser {
             TokenKind::Ident(_) => match self.current_keyword_ident() {
                 Some(TokenKind::Discretio) => self.parse_union_decl()?,
                 Some(TokenKind::Fixum | TokenKind::Varia) => self.parse_var_decl()?,
+                Some(TokenKind::Magnitudo) => self.parse_size_decl()?,
                 // `generis` is a genus-member modifier. At statement start the
                 // retired module-level static shape (modifier + type + name)
                 // is diagnosed; any other use stays an ordinary identifier.
@@ -426,6 +427,15 @@ impl Parser {
         let future = Box::new(self.parse_expression()?);
         let span = start.merge(self.previous_span());
         Ok(StmtKind::Tacebit(TacebitStmt { future, span }))
+    }
+
+    /// Parse `magnitudo H ← expr` (en `size H ← expr`) as syntax only.
+    fn parse_size_decl(&mut self) -> Result<StmtKind, ParseError> {
+        self.expect_keyword_ident(TokenKind::Magnitudo, "expected 'magnitudo'")?;
+        let name = self.parse_ident()?;
+        self.expect_issue(&TokenKind::Assign, "size_declaration_assignment")?;
+        let init = Box::new(self.parse_expression()?);
+        Ok(StmtKind::SizeDecl(radix_syntax::SizeDecl { name, init }))
     }
 
     /// Parse `sit` inferred immutable binding declarations.

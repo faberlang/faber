@@ -103,6 +103,8 @@ pub type AnnotatedStmt = Stmt;
 pub enum StmtKind {
     /// `fixum` / `varia` binding.
     Var(VarDecl),
+    /// `magnitudo H ← expr` / en `size H ← expr`; syntax only.
+    SizeDecl(SizeDecl),
     Func(FuncDecl),
     /// `genus` declaration.
     Class(ClassDecl),
@@ -190,6 +192,13 @@ pub struct VarDecl {
     /// with `=` rather than `←`. At module level it is the module constant
     /// (st1). Never set together with an await form.
     pub compile_time: bool,
+}
+
+/// Size-type declaration surface. Its meaning is assigned by later semantic work.
+#[derive(Debug)]
+pub struct SizeDecl {
+    pub name: Ident,
+    pub init: Box<Expr>,
 }
 
 impl VarDecl {

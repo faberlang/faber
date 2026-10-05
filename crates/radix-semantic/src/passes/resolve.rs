@@ -206,6 +206,9 @@ fn resolve_stmt(
 ) {
     let stmt_span = stmt.span;
     match &stmt.kind {
+        // size-type Z1 lift half owns SizeDecl name resolution; a no-op arm
+        // keeps the exhaustive match compiling until that lands.
+        StmtKind::SizeDecl(_) => {}
         StmtKind::Var(decl) => {
             if let Some(ty) = &decl.ty {
                 resolve_type_expr(resolver, interner, ty, errors);
@@ -1141,9 +1144,12 @@ fn resolve_expr(
                 return;
             };
             // Type-kind names (structs, enums, interfaces, type aliases, type
-            // params, index params) must not be accepted in expression position.
+            // params, schemas) must not be accepted in expression position.
+            // A size param (`magnitudo`) is the one exception: it names a
+            // read-only int value (size-type Z1 force).
             if let Some(symbol) = resolver.get_symbol(def_id)
                 && !symbol.kind.is_value_name()
+                && symbol.kind != SymbolKind::IndexParam
             {
                 errors.push(
                     SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)

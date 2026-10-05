@@ -3212,10 +3212,28 @@ impl<'a> FunctionBuilder<'a> {
                             return None;
                         }
                     };
-                    return Some(self.runtime_call_value(
+                    let scalar = self.runtime_call_value(
                         MirIntrinsic::TensorShapeSize(expression),
                         arguments,
                         MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                        expr.span,
+                    );
+                    // Size-type Z1 force: the size name reads as an int, so
+                    // convert the Fractus shape-size operand (same pattern as
+                    // lower/runtime.rs rope shape arguments).
+                    let numerus = self.types.primitive(Primitive::Numerus);
+                    return Some(self.runtime_call_value(
+                        MirIntrinsic::Convert(MirConversion {
+                            store: None,
+                            flavor: MirConversionFlavor::Runtime,
+                            source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                            target_ty: MirType::semantic(numerus),
+                            params: Vec::new(),
+                            recovery: None,
+                            struct_defaults: Vec::new(),
+                        }),
+                        vec![scalar],
+                        MirType::semantic(numerus),
                         expr.span,
                     ));
                 }

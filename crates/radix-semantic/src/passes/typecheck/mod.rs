@@ -466,6 +466,11 @@ pub(crate) struct TypeChecker<'a> {
     /// a caller-owned `magnitudo` witness from a caller-owned type parameter.
     pub current_generic_param_kinds: FxHashMap<Symbol, radix_syntax::GenericParamKind>,
 
+    /// DefIds of the active function's `magnitudo` (size) generic params.
+    /// A size name in value position lowers as a Path on its HirTypeParam
+    /// def, which has no resolver symbol; this set types it (size-type Z1).
+    pub current_size_param_defs: FxHashSet<DefId>,
+
     /// Declared return type while checking a function body.
     pub current_return: Option<TypeId>,
 
@@ -768,6 +773,7 @@ impl<'a> TypeChecker<'a> {
             ordo_members: FxHashMap::default(),
             type_params_by_def: FxHashMap::default(),
             current_generic_param_kinds: FxHashMap::default(),
+            current_size_param_defs: FxHashSet::default(),
             current_return: None,
             current_error: None,
             in_main_frame: false,

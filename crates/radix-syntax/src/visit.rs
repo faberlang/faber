@@ -161,6 +161,10 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(init);
             }
         }
+        StmtKind::SizeDecl(decl) => {
+            visitor.visit_ident(&decl.name);
+            visitor.visit_expr(&decl.init);
+        }
         StmtKind::Func(decl) => {
             visitor.visit_ident(&decl.name);
             for param in &decl.params {

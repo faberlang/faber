@@ -8,7 +8,7 @@ use crate::test_support::{
     assert_parse_error_matches, has_arg, parse_ok, parse_program, span_for, symbol_name,
 };
 use crate::{ParseErrorKind, ParseResult, parse};
-use radix_lexer::{KeywordPack, lex_with_locale_pack};
+use radix_lexer::{KeywordPack, TokenKind, lex_with_locale_pack};
 use radix_syntax::{
     AnnotationKind, AstMutability, AstParamMode, AwaitBindingForm, BindingPattern, CallablePosture,
     ClassMemberKind, ClausuraBody, ExprKind, IfBody, ImportKind, IteraMode, JsonValue, Literal,
@@ -5160,4 +5160,51 @@ fn eot_transfer_missing_payload_rejected() {
         r#"output ⇇ "a" ⇇"#,
         ParseExpectation::Issue("copy_into_chain"),
     );
+}
+
+struct EnSizePack;
+
+impl KeywordPack for EnSizePack {
+    fn pack_id(&self) -> &'static str {
+        "en-size-test"
+    }
+
+    fn keyword_token_kind(&self, _text: &str) -> Option<radix_lexer::TokenKind> {
+        None
+    }
+
+    fn keyword_latin_key(&self, text: &str) -> Option<&str> {
+        (text == "size").then_some("magnitudo")
+    }
+
+    fn keyword_suggestion(&self, _text: &str) -> Option<String> {
+        None
+    }
+}
+
+#[test]
+fn size_declaration_parses_in_both_locales_and_stays_contextual() {
+    for (source, english) in [("{ size H ← 3 }", true), ("{ magnitudo H ← 3 }", false)] {
+        let result = if english {
+            parse(lex_with_locale_pack(source, &EnSizePack))
+        } else {
+            parse_ok(source)
+        };
+        assert!(result.success(), "{source}: {:?}", result.errors);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Block(body) = &program.statements[0].kind else {
+            panic!("expected block, got {:?}", program.statements[0].kind);
+        };
+        let StmtKind::SizeDecl(decl) = &body.statements[0].kind else {
+            panic!(
+                "expected size declaration, got {:?}",
+                body.statements[0].kind
+            );
+        };
+        assert_eq!(symbol_name(&result, decl.name.name), "H");
+        assert!(matches!(decl.init.kind, ExprKind::Literal(Literal::Int(3))));
+    }
+
+    let lexed = lex_with_locale_pack("size", &EnSizePack);
+    assert!(matches!(lexed.tokens[0].kind, TokenKind::Ident(_)));
 }

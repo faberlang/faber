@@ -137,6 +137,7 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
             }
         }
         StmtKind::Var(_)
+        | StmtKind::SizeDecl(_)
         | StmtKind::TypeAlias(_)
         | StmtKind::Import(_)
         | StmtKind::Ex(_)

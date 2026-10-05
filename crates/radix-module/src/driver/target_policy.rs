@@ -215,6 +215,7 @@ fn scan_go_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 scan_go_expr(init, file, diagnostics);
             }
         }
+        StmtKind::SizeDecl(decl) => scan_go_expr(&decl.init, file, diagnostics),
         StmtKind::Ex(stmt) => scan_go_expr(&stmt.source, file, diagnostics),
         StmtKind::Reddet(stmt) => scan_go_expr(&stmt.future, file, diagnostics),
         StmtKind::Tacebit(stmt) => scan_go_expr(&stmt.future, file, diagnostics),
@@ -601,6 +602,7 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         | StmtKind::Perge(_)
         | StmtKind::Tacet(_) => {}
         StmtKind::Reddet(stmt) => scan_rust_expr(&stmt.future, file, diagnostics),
+        StmtKind::SizeDecl(decl) => scan_rust_expr(&decl.init, file, diagnostics),
         StmtKind::Tacebit(stmt) => scan_rust_expr(&stmt.future, file, diagnostics),
         StmtKind::Ex(stmt) => scan_rust_expr(&stmt.source, file, diagnostics),
     }

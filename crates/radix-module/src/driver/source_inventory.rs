@@ -122,6 +122,7 @@ fn bump(inv: &mut Inventory, suite: &str, construct: String, span: Span) {
 fn kind_name(kind: &StmtKind) -> &'static str {
     match kind {
         StmtKind::Var(_) => "var",
+        StmtKind::SizeDecl(_) => "size-decl",
         StmtKind::Func(_) => "func",
         StmtKind::Class(_) => "class",
         StmtKind::Interface(_) => "interface",
