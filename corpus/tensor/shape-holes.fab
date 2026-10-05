@@ -10,14 +10,14 @@ locale = "en"
 +++
 
 # A whole-shape type hole inherits static rank from the constructor's shape
-# list. A single shape-list hole in from_flat is solved from the flat count;
-# reshape solves its hole from the receiver's element count.
+# list. A single shape-list hole in the conversion target is solved from the
+# flat count; reshape solves its hole from the receiver's element count.
 main {
     const tf32[] seed ← empty
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
 
-    const tensor<f32, _> from_flat ← seed.from_flat(flat, [2, _])
-    const tensor<f32, _> reshaped ← from_flat.reshape([_, 2])
+    const tensor<f32, _> shaped ← flat ↦ tensor<f32, [2, _]>
+    const tensor<f32, _> reshaped ← shaped.reshape([_, 2])
 
     # The canonical generic form uses a whole-shape `_`; the shape argument
     # supplies a tuple and therefore a static rank witness.
@@ -32,7 +32,7 @@ main {
     const tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
     const tf32[2, 3] witnessed ← row.expanded([_, 3])
 
-    print from_flat.shape()
+    print shaped.shape()
     print reshaped.shape()
     print whole_shape.shape()
     print mapped.shape()

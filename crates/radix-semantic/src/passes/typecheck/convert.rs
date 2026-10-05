@@ -1855,6 +1855,19 @@ impl TypeChecker<'_> {
         let source_resolved = self.resolve_inferred_type(source_ty);
         match validate_lista_to_tensor_source(source_resolved, target_resolved, self.types) {
             Ok(()) => {
+                // The target type is authoritative: a single `_` extent in the
+                // target figura infers from the flat source's element count,
+                // the same solver the from_flat row uses. Unsolvable hole
+                // forms stay unsolved for the finalize hole check.
+                let target_shape = match self.types.get(target_resolved) {
+                    Type::Tensor(_, shape) => Some(*shape),
+                    _ => None,
+                };
+                if let Some(shape) = target_shape {
+                    super::tensor_index::constrain_conversio_target_hole_from_flat_count(
+                        self, source, shape, span,
+                    );
+                }
                 self.register_lista_to_tensor_conversio_prereqs();
                 return None;
             }

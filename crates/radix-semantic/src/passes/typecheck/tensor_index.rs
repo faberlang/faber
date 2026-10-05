@@ -598,6 +598,23 @@ fn constrain_from_flat_result_shape(
     checker.constrain_index_equal(result_shape, shape, span);
 }
 
+/// Conversion-row twin of [`constrain_from_flat_result_shape`]: in
+/// `flat ↦ tensor<…, [.., _]>` the target type is authoritative, so a single
+/// `_` extent in the target figura is solved from the flat source's static
+/// element count, exactly like the method form. Count-less sources and
+/// multi-hole or whole-shape holes stay unsolved for the finalize hole check
+/// (`cannot_infer_tensor_shape`).
+pub(super) fn constrain_conversio_target_hole_from_flat_count(
+    checker: &mut TypeChecker<'_>,
+    flat_expr: &HirExpression,
+    target_shape: IndexId,
+    span: Span,
+) {
+    if let Some(count) = static_collection_length(checker, flat_expr) {
+        infer_single_shape_hole_from_count(checker, target_shape, count, span);
+    }
+}
+
 fn constrain_reshape_result_shape(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,

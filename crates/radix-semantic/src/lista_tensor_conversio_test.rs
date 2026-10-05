@@ -10,6 +10,7 @@ use super::lista_tensor_conversio::{
     resolve_bounded_lista_padded_shape, resolve_lista_to_tensor_shape,
     validate_lista_to_tensor_source,
 };
+use crate::test_support::{assert_accepts, assert_rejects_with_issue};
 use crate::{IndexExpr, Primitive, Type, TypeId, TypeTable};
 use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind, HirId, HirLiteral};
 use radix_lexer::Span;
@@ -280,5 +281,48 @@ fn lista_tensor_conversio_keeps_unbounded_source_on_flat_path() {
     assert_eq!(
         resolve_bounded_lista_padded_shape(lista, tensor, &types),
         None
+    );
+}
+
+// Check-level coverage for the conversion target's `_` extents: the target
+// type is authoritative, so one hole infers from the flat element count.
+
+#[test]
+fn lista_tensor_conversio_solves_single_target_hole_from_flat_count() {
+    // 4 flat elements over the declared extent [2, _] pin the hole to 2.
+    assert_accepts(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  fixum tensor<f32, _> shaped ← flat ↦ tensor<f32, [2, _]>
+  nota shaped.longitudo()
+}",
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_names_indivisible_flat_count_for_target_hole() {
+    // 4 flat elements do not divide over [3, _]; the index contradiction is
+    // named at the conversion like every other tensor count mismatch.
+    assert_rejects_with_issue(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  fixum tensor<f32, _> shaped ← flat ↦ tensor<f32, [3, _]>
+  nota shaped.longitudo()
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_refuses_multi_hole_target() {
+    // Two holes admit no unique division; the target stays unsolved and the
+    // finalize hole check names it.
+    assert_rejects_with_issue(
+        r"incipit {
+  fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+  fixum tensor<f32, _> shaped ← flat ↦ tensor<f32, [_, _]>
+  nota shaped.longitudo()
+}",
+        "cannot_infer_tensor_shape",
     );
 }
