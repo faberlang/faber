@@ -115,6 +115,7 @@ pub(crate) const ERR_LOG_NON_FINITE_RESULT: &str = "Log produced non-finite resu
 pub(crate) const ERR_SOFTMAX_NON_FINITE_INPUT: &str =
     "Softmax input must be finite; NaN or inf was given.";
 pub(crate) const ERR_SOFTMAX_EMPTY_TENSOR: &str = "Softmax requires non-empty tensor.";
+pub(crate) const ERR_SOFTMAX_RANK: &str = "Softmax requires rank-1 or rank-2 tensor.";
 // ── crux_entropia ──
 pub(crate) const ERR_CRUX_ENTROPIA_NON_FINITE_INPUT: &str =
     "Cross-entropy logits must be finite; NaN or inf was given.";
@@ -1541,17 +1542,23 @@ impl Tensor<f32> {
     /// stability. Operates on rank-1 (vector) or rank-2 (batched row-wise,
     /// axis 1 — the last axis).
     ///
-    /// Rejects non-finite inputs (NaN, inf) and empty tensors per the
-    /// domain-sensitive primitive policy. No VJP — Softmax backward is
-    /// deferred to a follow-on goal.
+    /// Rejects non-finite inputs (NaN, inf), empty tensors, and rank-0
+    /// tensors (no axis to normalize) per the domain-sensitive primitive
+    /// policy. No VJP — Softmax backward is deferred to a follow-on goal.
     ///
     /// # Errors
     ///
-    /// Returns `Err` if any element is NaN or infinite, or if the tensor
-    /// is empty.
+    /// Returns `Err` if any element is NaN or infinite, if the tensor
+    /// is empty, or if the tensor has rank 0.
     pub fn softmax(&self) -> Result<Tensor<f32>, &'static str> {
         if self.element_count() == 0 {
             return Err(ERR_SOFTMAX_EMPTY_TENSOR);
+        }
+        let rank = self.shape.len();
+        // A rank-0 tensor has one element but no axis; `shape[rank - 1]`
+        // below would underflow.
+        if rank == 0 {
+            return Err(ERR_SOFTMAX_RANK);
         }
         // Materialize once; the flat buffer feeds both the domain check and
         // every batch slice below.
@@ -1561,7 +1568,6 @@ impl Tensor<f32> {
                 return Err(ERR_SOFTMAX_NON_FINITE_INPUT);
             }
         }
-        let rank = self.shape.len();
         // v1: rank-1 (single axis) or rank-2 (axis 1 — the last axis).
         let last_dim = self.shape[rank - 1];
         let batch = self.element_count() / last_dim;
