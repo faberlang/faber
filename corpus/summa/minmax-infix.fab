@@ -35,8 +35,7 @@ main {
     print clamped.sum()
 
     const list<f32> flat ← [-1.0, 0.5, 2.0]
-    const tf32[] seed ← empty
-    const tf32[3] values_tensor ← seed.from_flat(flat, [3])
+    const tf32[3] values_tensor ← flat ↦ tf32[3]
     const tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
     print clamped_tensor.sum()
 }

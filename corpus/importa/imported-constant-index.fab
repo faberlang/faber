@@ -41,8 +41,7 @@ fn read(tensor<f32, [8]> t) → f32 {
 }
 
 main {
-    const tf32[] seed ← empty
-    var tf32[8] cells ← seed.create(0.0, [8])
+    var tf32[8] cells ← tf32[8]
 
     cells[constantia.BASE] ← 7.0
     const f32 direct ← read(cells)

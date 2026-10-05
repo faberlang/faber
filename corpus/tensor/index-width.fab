@@ -48,8 +48,7 @@ locale = "en"
 #   index-width.fab stdout contract (u32 thread-id index, rank-2 u32 origin).
 
 main {
-    const tf32[] seed ← empty
-    var tf32[4] input ← seed.create(0.0, [4])
+    var tf32[4] input ← tf32[4]
 
     # u32 thread id flowing directly into accipe — no bare-numerus detour.
     const u32 index ← 1
@@ -62,7 +61,7 @@ main {
     const f32 bound ← input.get(idx) coalesce 0.0
 
     # Rank-2 grid with a lista<u32> origin index.
-    var tf32[4, 4] grid ← seed.create(0.0, [4, 4])
+    var tf32[4, 4] grid ← tf32[4, 4]
     const u32 r ← 2
     const u32 c ← 3
     const list<u32> origin ← [r, c]

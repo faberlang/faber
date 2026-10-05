@@ -79,7 +79,7 @@ fn k(tf32[8] a, mut tf32[8] o) → void {
 main {
     const tf32[] seed ← empty
     const tf32[8] a ← seed.create(1.5, [8])
-    var tf32[8] b ← seed.create(0.0, [8])
+    var tf32[8] b ← tf32[8]
     k(a, b)
     print b[3]
 }
@@ -164,7 +164,7 @@ main {
     const int n ← 4
     const tf32[] seed ← empty
     const tf32[n, n] a ← seed.create(1.5, [n, n])
-    var tf32[n, n] b ← seed.create(0.0, [n, n])
+    var tf32[n, n] b ← tf32[n, n]
     k(a, b)
     print b[[2, 3]]
 }
@@ -181,8 +181,7 @@ fn total<size N>(tf32[N] a) → f32 {
     return reduce via sum from a at [i] thread lane const s { return s * 2.0 }
 }
 main {
-    const tf32[] seed ← empty
-    const tf32[4] a ← seed.from_flat([3.0, 1.0, 4.0, 2.0], [4])
+    const tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
     print total(a)
 }
 ";
@@ -216,12 +215,11 @@ fn wave_speed<size H, size W>(f32 scale, tensor<vector<f32, 4>, [H, W]> state, m
 }
 main {
     const tensor<vector<f32, 4>, []> cell_seed ← empty
-    const tf32[] f32_seed ← empty
     const vector<f32, 4> low ← [0.0, 1.0, 1.0, 0.0] ↦ vector<f32, 4>
     var tensor<vector<f32, 4>, [5, 5]> state ← cell_seed.create(low, [5, 5])
     state[[3, 2]] ← [0.0, 2.0, 5.0, 0.0] ↦ vector<f32, 4>
     state[[0, 4]] ← [0.0, 1.0, 3.0, 0.0] ↦ vector<f32, 4>
-    var tf32[4] clock ← f32_seed.create(0.0, [4])
+    var tf32[4] clock ← tf32[4]
     wave_speed(0.5, state, clock)
     print clock[[1]]
 }

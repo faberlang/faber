@@ -36,8 +36,7 @@ fn transpose_demo(tensor<f32, [2, 2]> input) → tensor<f32, [2, 2]> {
 
 main {
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[] seed ← empty
-    var tf32[2, 2] input ← seed.from_flat(flat, [2, 2])
+    var tf32[2, 2] input ← flat ↦ tf32[2, 2]
     var tf32[2, 2] output ← transpose_demo(input)
     print output.get([0, 0]) coalesce 0.0
     print output.get([0, 1]) coalesce 0.0

@@ -66,10 +66,9 @@ locale = "en"
 import from "twinslib:twins" twins
 
 main {
-    const tensor<f32, []> seed ← empty
-    const tensor<f32, [2, 2]> a ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
-    const tensor<f32, [2, 2]> b ← seed.from_flat([10.0, 20.0, 30.0, 40.0], [2, 2])
-    const tensor<f32, [4]> v ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [4])
+    const tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    const tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
+    const tensor<f32, [4]> v ← [1.0, 2.0, 3.0, 4.0] ↦ tensor<f32, [4]>
     const _ r ← twins.twin_add(a, b)
     print "ok"
 }
@@ -291,7 +290,7 @@ fn unmarked_twin_helper_is_module_private_and_not_importable() {
     let library = format!("{TWIN_LIB}{UNMARKED_TWIN_HELPER}");
     let main = TWIN_MAIN.replacen(
         "    print \"ok\"",
-        "    const tensor<f32, [4]> w ← seed.from_flat([4.0, 3.0, 2.0, 1.0], [4])\n    const _ h ← twins.twin_hidden(v, w)\n    print \"ok\"",
+        "    const tensor<f32, [4]> w ← [4.0, 3.0, 2.0, 1.0] ↦ tensor<f32, [4]>\n    const _ h ← twins.twin_hidden(v, w)\n    print \"ok\"",
         1,
     );
     let dir = matrix_dir("device-matrix-unmarked-helper");

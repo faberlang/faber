@@ -631,12 +631,11 @@ fn generic_tensor_call_keeps_immutable_scalar_shape_witness_and_carrier_guards()
 }
 
 main {
-    const tensor<f32, []> seed ← empty
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
     const int n ← data.length() / 2
     const int m ← data.length() / 2
-    const tensor<f32, [n, n]> source ← seed.from_flat(data, [n, n])
-    const tensor<f32, [m, n]> other ← seed.from_flat(data, [m, n])
+    const tensor<f32, [n, n]> source ← data ↦ tensor<f32, [size n, size n]>
+    const tensor<f32, [m, n]> other ← data ↦ tensor<f32, [size m, size n]>
     const tensor<f32, [n, n]> result ← keep_first(source, other)
 }
 "#,
@@ -993,9 +992,9 @@ fn tensor_constructor_shape_affine_scalar_expression_matches_annotation() {
 }
 
 main {
-    const tensor<f32, []> seed ← empty
+    const list<f32> flat ← [1.0, 2.0, 3.0]
     const int n ← runtime_size(4)
-    const tensor<f32, [n - 1]> dynamic ← seed.from_flat([1.0, 2.0, 3.0], [n - 1])
+    const tensor<f32, [n - 1]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>
 }
 "#,
         config,

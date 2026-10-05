@@ -233,8 +233,7 @@ import from "./consumer_a" consumer_a
 import from "./consumer_b" consumer_b
 
 main {
-    const tf32[] seed ← empty
-    const tf32[3] source ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    const tf32[3] source ← [1.0, 2.0, 3.0] ↦ tf32[3]
     print consumer_a.resolve_a(source).flatten()
     print consumer_b.resolve_b(source).flatten()
 }

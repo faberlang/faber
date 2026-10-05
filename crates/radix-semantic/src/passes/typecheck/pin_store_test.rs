@@ -42,8 +42,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 }
 
 const LOAD_FN: &str = "fn load(textus path) → tf32[_, _] {
-    const tf32[] seed ← empty
-    const tf32[2, 3] t ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    const tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     return t
 }
 ";
@@ -71,8 +70,7 @@ fn pin_store_literal_mismatch_initializer_stays_red() {
 }}
 
 fn seed_return() → tf32[2, 3] {{
-    const tf32[] seed ← empty
-    const tf32[2, 3] t ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    const tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     return t
 }}"
         ),

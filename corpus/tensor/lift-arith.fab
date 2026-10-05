@@ -50,9 +50,8 @@ locale = "en"
 main {
     const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
     const list<f32> flat_b ← [4.0, 3.0, 2.0, 1.0]
-    const tensor<f32, []> seed ← empty
-    var tensor<f32, [2, 2]> a ← seed.from_flat(flat_a, [2, 2])
-    var tensor<f32, [2, 2]> b ← seed.from_flat(flat_b, [2, 2])
+    var tensor<f32, [2, 2]> a ← flat_a ↦ tensor<f32, [2, 2]>
+    var tensor<f32, [2, 2]> b ← flat_b ↦ tensor<f32, [2, 2]>
 
     const tensor<f32, [2, 2]> plus ← a + 1.0
     const list<f32> plus_out ← plus.flatten()
@@ -74,8 +73,7 @@ main {
     print negated_out
 
     const list<i16> flat_n ← [1, 2, 3, 4]
-    const tensor<i16, []> nseed ← empty
-    var tensor<i16, [4]> n ← nseed.from_flat(flat_n, [4])
+    var tensor<i16, [4]> n ← flat_n ↦ tensor<i16, [4]>
     const tensor<i16, [4]> floored ← n / 2
     const list<i16> floored_out ← floored.flatten()
     print floored_out

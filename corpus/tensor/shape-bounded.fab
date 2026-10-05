@@ -30,11 +30,10 @@ fn runtime_extent(int value) → int {
 
 main {
     const list<f32> plana ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[] seed ← empty
-    const tf32[2, 3] fixed ← seed.from_flat(plana, [2, 3])
+    const tf32[2, 3] fixed ← plana ↦ tf32[2, 3]
 
     const int n ← runtime_extent(3)
-    const tf32[2, n] dynamic ← seed.from_flat(plana, [2, n])
+    const tf32[2, n] dynamic ← plana ↦ tf32[2, size n]
 
     print fixed.shape()[1]
     print dynamic.shape()[1]

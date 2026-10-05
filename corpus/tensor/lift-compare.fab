@@ -50,9 +50,8 @@ locale = "en"
 main {
     const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
     const list<f32> flat_b ← [4.0, 3.0, 2.0, 1.0]
-    const tensor<f32, []> seed ← empty
-    var tensor<f32, [2, 2]> a ← seed.from_flat(flat_a, [2, 2])
-    var tensor<f32, [2, 2]> b ← seed.from_flat(flat_b, [2, 2])
+    var tensor<f32, [2, 2]> a ← flat_a ↦ tensor<f32, [2, 2]>
+    var tensor<f32, [2, 2]> b ← flat_b ↦ tensor<f32, [2, 2]>
 
     const tensor<bool, [2, 2]> greater ← a > b
     const list<bool> greater_out ← greater.flatten()
@@ -84,14 +83,12 @@ main {
     print clipped_out
 
     const list<int ∪ none> flat_h ← [1, nihil, 3, nihil]
-    const tensor<int ∪ none, []> hseed ← empty
-    var tensor<int ∪ none, [2, 2]> holes ← hseed.from_flat(flat_h, [2, 2])
+    var tensor<int ∪ none, [2, 2]> holes ← flat_h ↦ tensor<int ∪ none, [2, 2]>
     const tensor<int, [2, 2]> zeroed ← holes coalesce 0
     const list<int> zeroed_out ← zeroed.flatten()
     print zeroed_out
     const list<int> flat_d ← [10, 20, 30, 40]
-    const tensor<int, []> dseed ← empty
-    var tensor<int, [2, 2]> defaults ← dseed.from_flat(flat_d, [2, 2])
+    var tensor<int, [2, 2]> defaults ← flat_d ↦ tensor<int, [2, 2]>
     const tensor<int, [2, 2]> filled ← holes coalesce defaults
     const list<int> filled_out ← filled.flatten()
     print filled_out

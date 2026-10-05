@@ -61,7 +61,7 @@ main {
     grid.set(origin, 9.0)
     const f32 corner ← grid.get(origin) coalesce 0.0
 
-    var tf32[2, 3] filler ← grid.create(0.0, [2, 3])
+    var tf32[2, 3] filler ← tf32[2, 3]
     filler.fill(4.0)
 
     const tf32[1, 3] slice ← grid.slice(0, 1)

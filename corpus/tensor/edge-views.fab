@@ -28,8 +28,7 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<i
 }
 
 main {
-    const tf32[] seed ← empty
-    const tf32[3] base ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    const tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
     const tf32[3] clamped ← base.shift([1]).limes<clamp>()
     const tf32[3] reflected ← base.shift([1]).limes<reflect>()
     const tf32[3] wrapped ← base.shift([1]).limes<wrap>()

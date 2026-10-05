@@ -39,8 +39,8 @@ fn runtime_extent_rank2_loop_reads_bounds_from_the_carrier() {
 fn rt(int v) → int { return v }
 main {
     const int n ← rt(3)
-    const tf32[] seed ← empty
-    const tf32[2, n] a ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, n])
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    const tf32[2, n] a ← flat ↦ tf32[2, size n]
     var f32 acc ← 0.0
     var int coords ← 0
     for from a at [i, j] const c {
@@ -60,8 +60,8 @@ fn runtime_extent_rank1_loops_run_with_and_without_a_coordinate() {
 fn rt(int v) → int { return v }
 main {
     const int n ← rt(3)
-    const tf32[] seed ← empty
-    const tf32[n] a ← seed.from_flat([1.0, 2.0, 3.0], [n])
+    const list<f32> flat ← [1.0, 2.0, 3.0]
+    const tf32[n] a ← flat ↦ tf32[size n]
     var f32 plain ← 0.0
     for from a const c { plain ← plain + c }
     var f32 coord ← 0.0
@@ -109,11 +109,11 @@ fn total<size H, size W>(tf32[H, W] src) → f32 {
     return acc
 }
 main {
-    const tf32[] seed ← empty
-    const tf32[2, 3] a ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    const tf32[2, 3] a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     print total(a)
     const int n ← rt(2)
-    const tf32[n, 2] b ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [n, 2])
+    const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0]
+    const tf32[n, 2] b ← flat_b ↦ tf32[size n, 2]
     print total(b)
 }
 ";
@@ -129,8 +129,7 @@ fn bump(mut tf32[2, 3] dst) → void {
     }
 }
 main {
-    const tf32[] seed ← empty
-    var tf32[2, 3] b ← seed.create(0.0, [2, 3])
+    var tf32[2, 3] b ← tf32[2, 3]
     bump(b)
     print b.flatten()
 }
@@ -143,8 +142,7 @@ fn literal_extent_loop_keeps_literal_bounds_and_runtime_extent_reads_the_carrier
     let literal = dump(
         r"
 main {
-    const tf32[] seed ← empty
-    const tf32[2, 3] a ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    const tf32[2, 3] a ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     var int acc ← 0
     for from a at [i, j] const c { acc ← acc + i * 10 + j }
     print acc
@@ -161,8 +159,8 @@ main {
 fn rt(int v) → int { return v }
 main {
     const int n ← rt(3)
-    const tf32[] seed ← empty
-    const tf32[2, n] a ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, n])
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    const tf32[2, n] a ← flat ↦ tf32[2, size n]
     var int acc ← 0
     for from a at [i, j] const c { acc ← acc + i * 10 + j }
     print acc

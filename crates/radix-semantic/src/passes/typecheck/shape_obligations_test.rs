@@ -272,8 +272,7 @@ fn runtime_extent(int value) → int { return value }
 main {
     const int n ← runtime_extent(2)
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[] seed ← empty
-    const tf32[n, 2] tensor ← seed.from_flat(flat, [n, 2])
+    const tf32[n, 2] tensor ← flat ↦ tf32[size n, 2]
     const tf32[n, 2] same_shape ← tensor
     print same_shape.shape()
 }
@@ -296,8 +295,7 @@ main {
     const int n ← runtime_extent(2)
     const int m ← runtime_extent(3)
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[] seed ← empty
-    const tf32[m, 2] tensor_m ← seed.from_flat(flat, [m, 2])
+    const tf32[m, 2] tensor_m ← flat ↦ tf32[size m, 2]
     const tf32[n, 2] invalid ← tensor_m
     print invalid.shape()
 }

@@ -42,9 +42,8 @@ fn program(body: &str) -> String {
         r"{PRELUDE}
 main {{
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[] seed ← empty
-    var tf32[2, 2] g ← seed.from_flat(flat, [2, 2])
-    var tf32[2, 2] fresh ← seed.from_flat(flat, [2, 2])
+    var tf32[2, 2] g ← flat ↦ tf32[2, 2]
+    var tf32[2, 2] fresh ← flat ↦ tf32[2, 2]
 {body}
 }}
 "

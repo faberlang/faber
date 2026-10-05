@@ -48,9 +48,8 @@ fn kadd<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor
 }
 
 fn main() → void {
-    const tensor<f32, []> seed ← empty
-    const _ a ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
-    const _ b ← seed.from_flat([10.0, 20.0, 30.0, 40.0], [2, 2])
+    const _ a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    const _ b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
     const _ r ← kadd(a, b)
     print "ok"
 }

@@ -32,10 +32,9 @@ locale = "en"
 import from "./nn" nn
 
 fn main() → void {
-    const tensor<f32, []> seed ← empty
-    const _ x ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
-    const _ w ← seed.from_flat([1.0, 0.0, 0.0, 1.0], [2, 2])
-    const _ b ← seed.from_flat([0.1, 0.1, 0.1, 0.1], [2, 2])
+    const _ x ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
+    const _ w ← [[1.0, 0.0], [0.0, 1.0]] ↦ tensor<f32, [2, 2]>
+    const _ b ← [[0.1, 0.1], [0.1, 0.1]] ↦ tensor<f32, [2, 2]>
     const _ r ← nn.linear(x, w, b)
     print "ok"
 }

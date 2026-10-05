@@ -32,7 +32,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 }
 
 fn tensor_seed() -> &'static str {
-    "const tf32[] seed ← empty\nconst tf32[3] base ← seed.from_flat([1.0, 2.0, 3.0], [3])"
+    "const tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]"
 }
 
 #[test]

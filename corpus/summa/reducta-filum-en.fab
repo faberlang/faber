@@ -123,8 +123,7 @@ fn p_all(tf32[4] a) → bool {
 }
 
 main {
-    const tf32[] seed ← empty
-    const tf32[4] a ← seed.from_flat([3.0, 1.0, 3.0, 2.0], [4])
+    const tf32[4] a ← [3.0, 1.0, 3.0, 2.0] ↦ tf32[4]
     print p_max(a)
     print p_min(a)
     print p_product(a)

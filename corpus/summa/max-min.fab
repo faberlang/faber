@@ -66,9 +66,8 @@ fn max_empty() → f32 {
 
 main {
     const list<f32> flat ← [4.0, 1.0, 3.0, 2.0]
-    const tf32[] seed ← empty
-    const tf32[4] values ← seed.from_flat(flat, [4])
-    const tf32[4] scale ← seed.from_flat([1.0, 1.0, 1.0, 1.0], [4])
+    const tf32[4] values ← flat ↦ tf32[4]
+    const tf32[4] scale ← [1.0, 1.0, 1.0, 1.0] ↦ tf32[4]
 
     print max_static(values)
     print min_with_identity(values, 99.0)

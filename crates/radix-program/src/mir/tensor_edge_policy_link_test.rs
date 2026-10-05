@@ -29,8 +29,7 @@ class ZeroGhost {
 }
 
 main {
-    const tf32[] seed ← empty
-    const tf32[3] source ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    const tf32[3] source ← [1.0, 2.0, 3.0] ↦ tf32[3]
     const list<f32> clamped ← utilModule.resolve_shift<clamp>(source)
     const list<f32> custom ← utilModule.resolve_shift<ZeroGhost>(source)
     print clamped

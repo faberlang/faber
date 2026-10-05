@@ -35,7 +35,7 @@ fn parse_source(source: &str) -> ParseResult {
 
 #[test]
 fn spelled_lift_extent_parses_as_lift_shape() {
-    let result = parse_source("var tf32[2, size n] a ← seed.create(0.0, [2, n])");
+    let result = parse_source("var tf32[2, size n] a ← tf32[2, size n]");
     assert!(result.success(), "{:?}", result.errors);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {
@@ -59,7 +59,7 @@ fn spelled_lift_extent_parses_as_lift_shape() {
 
 #[test]
 fn static_spelled_lift_literal_parses() {
-    let result = parse_source("var tf32[2, size 3] a ← seed.create(0.0, [2, 3])");
+    let result = parse_source("var tf32[2, size 3] a ← tf32[2, size 3]");
     assert!(result.success(), "{:?}", result.errors);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(decl) = &program.statements[0].kind else {

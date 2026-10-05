@@ -39,8 +39,7 @@ locale = "en"
 
 main {
     const list<f32> flat ← [1.0, 2.0, 3.0]
-    const tf32[] seed ← empty
-    var tf32[3] line ← seed.from_flat(flat, [3])
+    var tf32[3] line ← flat ↦ tf32[3]
 
     for from line at [i] const cell {
         print i, cell

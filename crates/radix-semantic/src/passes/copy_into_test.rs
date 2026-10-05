@@ -166,9 +166,8 @@ main {}",
 fn a_var_tensor_written_only_by_copy_into_is_not_an_unnecessary_var() {
     let source = r"main {
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[] seed ← empty
-    const tf32[2, 2] source ← seed.from_flat(flat, [2, 2])
-    var tf32[2, 2] target ← seed.from_flat(flat, [2, 2])
+    const tf32[2, 2] source ← flat ↦ tf32[2, 2]
+    var tf32[2, 2] target ← flat ↦ tf32[2, 2]
     target ⇇ source
 }";
     assert_no_issue(source, "unnecessary_varia");

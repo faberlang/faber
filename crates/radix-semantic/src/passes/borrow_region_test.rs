@@ -52,8 +52,7 @@ fn analyze_en(source: &str) -> crate::test_support::AnalyzedFixture {
 const TENSOR_VIEW_LAST_USE_SOURCE: &str = r#"
 main {
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[] seed ← empty
-    var tensor<f32, [2, 2]> base ← seed.from_flat(data, [2, 2])
+    var tensor<f32, [2, 2]> base ← data ↦ tensor<f32, [2, 2]>
     const tensor<f32, [2, 2]> view ← base.transpose()
     const int dimensions ← view.length()
     base.set([0, 0], 9.0)
@@ -92,8 +91,7 @@ fn tensor_view_base_write_is_rejected_before_later_view_use() {
 fn tensor_view_ternary_cannot_escape_through_mutable_binding() {
     let source = r#"
 main {
-    const tf32[] seed ← empty
-    var tf32[2, 2] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
+    var tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
     var tf32[2, 2] view ← true ✓ base.transpose() ✗ base.transpose()
 }
 "#;
@@ -112,8 +110,7 @@ main {
 fn tensor_view_ternary_can_be_consumed_by_materialize() {
     let source = r#"
 main {
-    const tf32[] seed ← empty
-    var tf32[2, 2] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
+    var tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
     const tf32[2, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
     base.set([0, 0], 9.0)
     print owned.length()
@@ -133,8 +130,7 @@ fn ternary_of_equal_shape_view_calls_joins_by_shape() {
     // structurally, so the result has the transposed shape [3, 2].
     let source = r#"
 main {
-    const tf32[] seed ← empty
-    var tf32[2, 3] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    var tf32[2, 3] base ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     const tf32[3, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
     print owned.length()
 }
@@ -149,8 +145,7 @@ fn ternary_of_unequal_shape_views_is_rejected_at_the_join() {
     // the shape mismatch instead of silently picking one side.
     let source = r#"
 main {
-    const tf32[] seed ← empty
-    var tf32[2, 3] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+    var tf32[2, 3] base ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     const tf32[3, 2] owned ← (true ✓ base ✗ base.transpose()).materialize()
     print owned.length()
 }
@@ -170,8 +165,7 @@ main {
 fn expanded_transpose_chain_cannot_escape_through_mutable_binding() {
     let source = r#"
 main {
-    const tf32[] seed ← empty
-    var tf32[1, 2] base ← seed.from_flat([1.0, 2.0], [1, 2])
+    var tf32[1, 2] base ← [[1.0, 2.0]] ↦ tf32[1, 2]
     var tf32[2, 1] escaped ← base.expanded([1, 2]).transpose()
 }
 "#;
@@ -207,8 +201,7 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<i
 fn shifted_limes_view_keeps_provenance_through_wrapper_and_policy_type_args() {
     let main = r#"
 main {
-    const tf32[] seed ← empty
-    var tf32[3] base ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    var tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
     var tf32[3] escaped ← true ✓ base.shift([1]).limes<ZeroGhost>() ✗ base.shift([1]).limes<ZeroGhost>()
 }
 "#;
@@ -228,8 +221,7 @@ main {
 fn custom_limes_view_conflicts_with_base_write_until_last_use() {
     let main = r#"
 main {
-    const tf32[] seed ← empty
-    var tf32[3] base ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    var tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
     const tf32[3] view ← base.shift([1]).limes<ZeroGhost>()
     base.set([0], 9.0)
     print view.length()

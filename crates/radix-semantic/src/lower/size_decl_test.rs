@@ -50,7 +50,7 @@ fn static_size_folds_in_tensor_shape() {
             .expect("load English locale pack"),
     );
     let result = analyze_source_with_config(
-        "fn main() {\n    const size N = 3\n    const tf32[] seed ← empty\n    var tf32[N, 2] values ← seed.create(0.0, [N, 2])\n}\n",
+        "fn main() {\n    const size N = 3\n    var tf32[N, 2] values ← tf32[N, 2]\n}\n",
         config,
     );
     assert!(

@@ -10,8 +10,7 @@ locale = "en"
 +++
 
 main {
-    const tf32[] seed ← empty
-    var tf32[2, 2] base ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
+    var tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
     const tf32[1, 2] view ← base.slice(0, 1)
     const tf32[1, 2] owned ← view.materialize()
     print view.flatten()

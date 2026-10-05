@@ -46,8 +46,7 @@ main {
         5.0,
         6.0
     ]
-    const tf32[] seed ← empty
-    var tf32[2, 3] grid ← seed.from_flat(flat, [2, 3])
+    var tf32[2, 3] grid ← flat ↦ tf32[2, 3]
 
     const f32 total ← grid.sum()
     const f32 mean ← grid.mean()

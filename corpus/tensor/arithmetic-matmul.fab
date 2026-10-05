@@ -49,9 +49,8 @@ locale = "en"
 main {
     const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
-    const tf32[] seed ← empty
-    const tf32[2, 3] a ← seed.from_flat(flat_a, [2, 3])
-    const tf32[3, 4] b ← seed.from_flat(flat_b, [3, 4])
+    const tf32[2, 3] a ← flat_a ↦ tf32[2, 3]
+    const tf32[3, 4] b ← flat_b ↦ tf32[3, 4]
     const tf32[2, 4] c ← a.matmul(b)
 
     # Print all elements of the 2x4 result in row-major order.

@@ -40,8 +40,7 @@ locale = "en"
 #   8.0
 
 main {
-    const tf32[] seed ← empty
-    var tf32[3] input ← seed.from_flat([1.0, 2.0, 3.0], [3])
+    var tf32[3] input ← [1.0, 2.0, 3.0] ↦ tf32[3]
 
     const f32 in_bounds ← input.get([1]) coalesce 0.0
     const int dynamic_index ← 1
