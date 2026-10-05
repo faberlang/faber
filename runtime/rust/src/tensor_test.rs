@@ -115,6 +115,60 @@ fn structa_and_planata_round_trip() {
 }
 
 #[test]
+fn planata_flattens_a_standard_layout_and_strided_views_identically() {
+    let tensor = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3])
+        .expect("shape matches data");
+    assert_eq!(
+        tensor.planata().unwrap(),
+        vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    );
+
+    // [[1, 2, 3], [4, 5, 6]] transposed is [[1, 4], [2, 5], [3, 6]].
+    let transposed = tensor.transpose_rank2().expect("rank-2 transpose");
+    assert_eq!(
+        transposed.planata().unwrap(),
+        vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
+    );
+
+    // A strides-only view with a nonzero base offset.
+    let tail = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[4])
+        .expect("shape matches data")
+        .sectio(1, 4)
+        .expect("valid slice");
+    assert_eq!(tail.planata().unwrap(), vec![2.0, 3.0, 4.0]);
+}
+
+#[test]
+fn reple_fills_a_standard_layout_in_place_and_through_view_strides() {
+    let mut dense = Tensor::crea(&[2, 2], 1.0f32).expect("valid shape");
+    let alias = dense.clone();
+    dense.reple(7.5).expect("dense fill");
+    assert_eq!(dense.planata().unwrap(), vec![7.5, 7.5, 7.5, 7.5]);
+    // The fill stays in the shared storage: every handle observes it.
+    assert_eq!(alias.planata().unwrap(), vec![7.5, 7.5, 7.5, 7.5]);
+
+    // The view covers ordinals 0, 2, 4 of the parent; odd slots stay put.
+    let mut parent =
+        Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0], &[6]).expect("shape matches data");
+    let mut strided = parent.sectio_strided(0, 6, 2).expect("valid slice");
+    strided.reple(0.0).expect("strided fill");
+    assert_eq!(
+        parent.planata().unwrap(),
+        vec![0.0, 2.0, 0.0, 4.0, 0.0, 6.0]
+    );
+}
+
+#[test]
+fn reple_on_a_truncated_slice_view_writes_only_the_view() {
+    let mut parent =
+        Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[4]).expect("shape matches data");
+    // Row-major from zero, yet only the first half of the shared buffer.
+    let mut slice = parent.sectio(0, 2).expect("valid slice");
+    slice.reple(9.0).expect("slice fill");
+    assert_eq!(parent.planata().unwrap(), vec![9.0, 9.0, 3.0, 4.0]);
+}
+
+#[test]
 fn structa_rejects_negative_shape_dimension() {
     let err = Tensor::structa(vec![1.0f32], &[-1]).unwrap_err();
     assert_eq!(err, "tensor shape dimension must be non-negative");
@@ -796,6 +850,64 @@ fn divide_rejects_broadcast_shape_mismatch() {
     let rhs = Tensor::structa(vec![1.0f32, 2.0, 3.0], &[3]).unwrap();
 
     assert_eq!(lhs.divide(&rhs).unwrap_err(), ERR_BROADCAST_SHAPE);
+}
+
+#[test]
+fn addita_zips_same_shape_standard_layouts() {
+    let a = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).expect("shape matches data");
+    let b = Tensor::structa(vec![10.0f32, 20.0, 30.0, 40.0], &[2, 2]).expect("shape matches data");
+    let c = a.addita(&b).expect("same shape");
+    assert_eq!(c.planata().unwrap(), vec![11.0, 22.0, 33.0, 44.0]);
+}
+
+#[test]
+fn addita_of_a_tensor_with_itself_reads_the_shared_buffer_under_one_guard() {
+    let a = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).expect("shape matches data");
+    let c = a.addita(&a).expect("same tensor");
+    assert_eq!(c.planata().unwrap(), vec![2.0, 4.0, 6.0, 8.0]);
+}
+
+#[test]
+fn addita_walks_a_strided_view_against_a_broadcast_operand() {
+    // lhs = [[1, 4], [2, 5], [3, 6]]; [100, 10] broadcasts over the columns.
+    let a = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0], &[2, 3])
+        .expect("shape matches data");
+    let lhs = a.transpose_rank2().expect("rank-2 transpose");
+    let b = Tensor::structa(vec![100.0f32, 10.0], &[2]).expect("shape matches data");
+    let c = lhs.addita(&b).expect("broadcast-compatible shape");
+    assert_eq!(c.magnitudines(), vec![3, 2]);
+    assert_eq!(
+        c.planata().unwrap(),
+        vec![101.0, 14.0, 102.0, 15.0, 103.0, 16.0]
+    );
+}
+
+#[test]
+fn divide_divides_same_shape_standard_layouts() {
+    let a = Tensor::structa(vec![8.0f32, 6.0, 4.0, 2.0], &[2, 2]).expect("shape matches data");
+    let b = Tensor::structa(vec![2.0f32, 3.0, 4.0, 4.0], &[2, 2]).expect("shape matches data");
+    let c = a.divide(&b).expect("same shape");
+    assert_eq!(c.planata().unwrap(), vec![4.0, 2.0, 1.0, 0.5]);
+}
+
+#[test]
+fn divide_walks_a_strided_view_and_keeps_the_first_row_major_fault() {
+    // lhs = [[1, 3], [2, 4]]; [2, 4] broadcasts over the columns.
+    let a = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).expect("shape matches data");
+    let lhs = a.transpose_rank2().expect("rank-2 transpose");
+    let b = Tensor::structa(vec![2.0f32, 4.0], &[2]).expect("shape matches data");
+    let c = lhs.divide(&b).expect("broadcast-compatible shape");
+    assert_eq!(c.planata().unwrap(), vec![0.5, 0.75, 1.0, 1.0]);
+
+    // [[1, 0], [2, 0]] transposed is [[1, 2], [0, 0]]: the first zero
+    // denominator sits at row-major ordinal 2 and wins by name.
+    let faults = Tensor::structa(vec![1.0f32, 0.0, 2.0, 0.0], &[2, 2]).expect("shape matches data");
+    let denominators = faults.transpose_rank2().expect("rank-2 transpose");
+    let numerator = Tensor::crea(&[2, 2], 4.0f32).expect("valid shape");
+    assert_eq!(
+        numerator.divide(&denominators).unwrap_err(),
+        ERR_DIVIDE_ZERO_DENOMINATOR
+    );
 }
 
 #[test]

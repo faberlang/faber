@@ -343,13 +343,39 @@ impl<T: Clone + Default> Tensor<T> {
             return Err(ERR_TENSOR_EDGE_UNRESOLVED_READ);
         }
         let count = self.element_count();
+        if self.is_standard_layout() {
+            return Ok(tensor_data(&self.data)[..count].to_vec());
+        }
         let mut values = Vec::with_capacity(count);
-        for ordinal in 0..count {
-            let index = unravel_index(ordinal, &self.shape);
+        let mut index = vec![0_usize; self.shape.len()];
+        let Some(logical_view) = &self.logical_view else {
+            // Strides-only view: one lock for the whole walk, offsets from the
+            // same checked arithmetic as `offset_for_layout`.
+            let data = tensor_data(&self.data);
+            for _ in 0..count {
+                let Some(offset) =
+                    offset_for_layout(&index, &self.shape, &self.strides, self.offset)
+                else {
+                    return Err(ERR_TENSOR_EDGE_UNRESOLVED_READ);
+                };
+                let Some(value) = data.get(offset) else {
+                    return Err(ERR_TENSOR_EDGE_UNRESOLVED_READ);
+                };
+                values.push(value.clone());
+                advance_odometer(&mut index, &self.shape);
+            }
+            return Ok(values);
+        };
+        // View layers remap coordinates (and custom policies re-enter the
+        // buffer lock inside their callbacks), so reads stay per element on
+        // the existing layer machinery; only the ordinal walk is hoisted.
+        let layer_count = logical_view.layers.len();
+        for _ in 0..count {
             values.push(
-                self.read_logical_index(&index)?
+                self.read_through_layers(logical_view, layer_count, &index)?
                     .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?,
             );
+            advance_odometer(&mut index, &self.shape);
         }
         Ok(values)
     }
@@ -431,15 +457,36 @@ impl<T: Clone + Default> Tensor<T> {
         if self.logical_view.is_some() {
             return Err(ERR_TENSOR_EDGE_READ_ONLY);
         }
-        let offsets = self.logical_offsets()?;
-        let Some((&last_offset, preceding_offsets)) = offsets.split_last() else {
+        let count = self.element_count();
+        if self.is_standard_layout() {
+            // The logical image is `data[..count]`; a truncated `sectio` view
+            // still shares trailing slots with its parent, so never fill past
+            // `count` even though the layout is row-major from zero.
+            tensor_data(&self.data)[..count].fill(value);
             return Ok(());
-        };
-        let mut data = tensor_data(&self.data);
-        for &offset in preceding_offsets {
-            data[offset] = value.clone();
         }
-        data[last_offset] = value;
+        // Strides-only view: validate every logical offset first (no element
+        // is written on error, matching the old offset-table behavior), then
+        // write under one lock in row-major order.
+        let mut index = vec![0_usize; self.shape.len()];
+        for _ in 0..count {
+            if offset_for_layout(&index, &self.shape, &self.strides, self.offset).is_none() {
+                return Err(ERR_INDEX_OUT_OF_BOUNDS);
+            }
+            advance_odometer(&mut index, &self.shape);
+        }
+        let mut data = tensor_data(&self.data);
+        for _ in 0..count.saturating_sub(1) {
+            let offset = offset_for_layout(&index, &self.shape, &self.strides, self.offset)
+                .ok_or(ERR_INDEX_OUT_OF_BOUNDS)?;
+            data[offset] = value.clone();
+            advance_odometer(&mut index, &self.shape);
+        }
+        if count > 0 {
+            let offset = offset_for_layout(&index, &self.shape, &self.strides, self.offset)
+                .ok_or(ERR_INDEX_OUT_OF_BOUNDS)?;
+            data[offset] = value;
+        }
         Ok(())
     }
 
@@ -820,6 +867,20 @@ impl<T: Clone + Default> Tensor<T> {
                 )
             })
         })
+    }
+
+    /// True when the logical row-major image of this tensor is exactly the
+    /// buffer prefix `data[offset..offset + element_count()]`, so reads and
+    /// writes can run as one dense slice under a single lock.
+    ///
+    /// The trap: `logical_view.is_none()` alone does NOT imply this layout.
+    /// `forma`, `sectio_strided` and `transpose_rank2` all produce strides-only
+    /// views with no view layers whose strides skip or reorder the buffer, and
+    /// an unshifted `expanded` view even uses zero strides.
+    fn is_standard_layout(&self) -> bool {
+        self.offset == 0
+            && self.logical_view.is_none()
+            && self.strides == row_major_strides(&self.shape)
     }
 
     fn read_logical_index(&self, index: &[usize]) -> Result<Option<T>, &'static str> {
@@ -1293,17 +1354,154 @@ fn broadcast_dim(shape: &[usize], rank: usize, axis: usize) -> usize {
     if axis < pad { 1 } else { shape[axis - pad] }
 }
 
-fn broadcast_index(index: &[usize], shape: &[usize]) -> Vec<usize> {
-    let pad = index.len() - shape.len();
-    (0..shape.len())
+/// Row-major odometer: bump the last axis, carrying into the previous axis on
+/// wrap. Leaves the index all-zero again after the final element.
+fn advance_odometer(index: &mut [usize], shape: &[usize]) {
+    for axis in (0..index.len()).rev() {
+        index[axis] += 1;
+        if index[axis] < shape[axis] {
+            return;
+        }
+        index[axis] = 0;
+    }
+}
+
+/// Per output axis, the stride to step when the broadcast output coordinate
+/// advances. Axes inserted by the broadcast or stretched from an extent of one
+/// read one fixed slot, so their stride is zero — the flat-walk equivalent of
+/// the logical index that `broadcast_index` used to build per element.
+fn broadcast_strides(shape: &[usize], strides: &[usize], out_rank: usize) -> Vec<usize> {
+    let pad = out_rank - shape.len();
+    (0..out_rank)
         .map(|axis| {
-            if shape[axis] == 1 {
+            if axis < pad || shape[axis - pad] == 1 {
                 0
             } else {
-                index[axis + pad]
+                strides[axis - pad]
             }
         })
         .collect()
+}
+
+/// Shared walk behind `tensor_elementwise` and `divide`. The two locks are
+/// taken together only here: receiver first, then argument — the fixed order
+/// every two-lock site in this file must keep so concurrent calls agree on an
+/// acquisition order. A shared buffer takes a single guard instead, because
+/// `std::sync::Mutex` is not reentrant. These reads never call user code, so
+/// no lock is ever held across a callback.
+fn elementwise_data<T>(
+    lhs: &Tensor<T>,
+    rhs: &Tensor<T>,
+    shape: &[usize],
+    count: usize,
+    mut op: impl FnMut(T, T) -> Result<T, &'static str>,
+) -> Result<Vec<T>, &'static str>
+where
+    T: Clone + Default,
+{
+    let same_dense = lhs.shape == rhs.shape && lhs.is_standard_layout() && rhs.is_standard_layout();
+    let strides_only = lhs.logical_view.is_none() && rhs.logical_view.is_none();
+    if !same_dense && !strides_only {
+        // View layers remap coordinates and custom edge policies re-enter the
+        // buffer lock inside their callbacks, so such operands stay on the
+        // per-element layer machinery with no guard held across reads.
+        return elementwise_through_layers(lhs, rhs, shape, count, op);
+    }
+
+    let lhs_guard;
+    let rhs_guard;
+    let (lhs_data, rhs_data): (&[T], &[T]) = if Arc::ptr_eq(&lhs.data, &rhs.data) {
+        lhs_guard = tensor_data(&lhs.data);
+        (&lhs_guard[..], &lhs_guard[..])
+    } else {
+        // Lock order: receiver, then argument.
+        lhs_guard = tensor_data(&lhs.data);
+        rhs_guard = tensor_data(&rhs.data);
+        (&lhs_guard[..], &rhs_guard[..])
+    };
+
+    let mut data = Vec::with_capacity(count);
+    if same_dense {
+        for (a, b) in lhs_data[..count].iter().zip(rhs_data[..count].iter()) {
+            data.push(op(a.clone(), b.clone())?);
+        }
+        return Ok(data);
+    }
+
+    // Broadcast/strided: the two stride tables are computed once, stretched
+    // axes carry stride zero, and offsets use the same checked arithmetic as
+    // `offset_for_layout`, so an unreachable offset fails like the old
+    // per-element path: `ERR_TENSOR_EDGE_UNRESOLVED_READ` at that element.
+    let rank = shape.len();
+    let lhs_strides = broadcast_strides(&lhs.shape, &lhs.strides, rank);
+    let rhs_strides = broadcast_strides(&rhs.shape, &rhs.strides, rank);
+    let mut index = vec![0_usize; rank];
+    for _ in 0..count {
+        let lhs_at = offset_for_layout(&index, shape, &lhs_strides, lhs.offset)
+            .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?;
+        let rhs_at = offset_for_layout(&index, shape, &rhs_strides, rhs.offset)
+            .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?;
+        let a = lhs_data
+            .get(lhs_at)
+            .cloned()
+            .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?;
+        let b = rhs_data
+            .get(rhs_at)
+            .cloned()
+            .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?;
+        data.push(op(a, b)?);
+        advance_odometer(&mut index, shape);
+    }
+    Ok(data)
+}
+
+/// Per-element fallback for operands carrying view layers: reads go through
+/// `value_at_logical` exactly as before, with the output and both operand
+/// indices maintained in place by the odometer instead of allocated per
+/// element. Evaluation order per element is unchanged: lhs, then rhs, then op.
+fn elementwise_through_layers<T>(
+    lhs: &Tensor<T>,
+    rhs: &Tensor<T>,
+    shape: &[usize],
+    count: usize,
+    mut op: impl FnMut(T, T) -> Result<T, &'static str>,
+) -> Result<Vec<T>, &'static str>
+where
+    T: Clone + Default,
+{
+    let rank = shape.len();
+    let lhs_pad = rank - lhs.shape.len();
+    let rhs_pad = rank - rhs.shape.len();
+    let mut index = vec![0_usize; rank];
+    let mut lhs_index = vec![0_usize; lhs.shape.len()];
+    let mut rhs_index = vec![0_usize; rhs.shape.len()];
+    let mut data = Vec::with_capacity(count);
+    for _ in 0..count {
+        for (axis, &ordinal) in index.iter().enumerate() {
+            if axis >= lhs_pad {
+                let operand_axis = axis - lhs_pad;
+                lhs_index[operand_axis] = if lhs.shape[operand_axis] == 1 {
+                    0
+                } else {
+                    ordinal
+                };
+            }
+            if axis >= rhs_pad {
+                let operand_axis = axis - rhs_pad;
+                rhs_index[operand_axis] = if rhs.shape[operand_axis] == 1 {
+                    0
+                } else {
+                    ordinal
+                };
+            }
+        }
+        data.push(op(
+            lhs.value_at_logical(&lhs_index)?,
+            rhs.value_at_logical(&rhs_index)?,
+        )?);
+        advance_odometer(&mut index, shape);
+    }
+    Ok(data)
 }
 
 fn tensor_elementwise<T, F>(
@@ -1317,16 +1515,7 @@ where
 {
     let shape = broadcast_shape(&lhs.shape, &rhs.shape)?;
     let count = checked_allocation_count::<T>(&shape)?;
-    let mut data = Vec::with_capacity(count);
-    for ordinal in 0..count {
-        let index = unravel_index(ordinal, &shape);
-        let lhs_index = broadcast_index(&index, &lhs.shape);
-        let rhs_index = broadcast_index(&index, &rhs.shape);
-        data.push(op(
-            lhs.value_at_logical(&lhs_index)?,
-            rhs.value_at_logical(&rhs_index)?,
-        ));
-    }
+    let data = elementwise_data(lhs, rhs, &shape, count, |a, b| Ok(op(a, b)))?;
     Ok(Tensor::from_contiguous(data, shape))
 }
 
@@ -1682,16 +1871,7 @@ impl Tensor<f32> {
     pub fn divide(&self, other: &Tensor<f32>) -> Result<Tensor<f32>, &'static str> {
         let shape = broadcast_shape(&self.shape, &other.shape)?;
         let count = checked_allocation_count::<f32>(&shape)?;
-        let mut data = Vec::with_capacity(count);
-        for ordinal in 0..count {
-            let index = unravel_index(ordinal, &shape);
-            let lhs_index = broadcast_index(&index, &self.shape);
-            let rhs_index = broadcast_index(&index, &other.shape);
-            data.push(checked_divide_f32(
-                self.value_at_logical(&lhs_index)?,
-                other.value_at_logical(&rhs_index)?,
-            )?);
-        }
+        let data = elementwise_data(self, other, &shape, count, checked_divide_f32)?;
         Ok(Tensor::from_contiguous(data, shape))
     }
 
