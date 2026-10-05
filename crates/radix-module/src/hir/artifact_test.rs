@@ -546,6 +546,8 @@ fn user_range_def_id_loads_ok() {
                         is_await: false,
                         runtime_provided: false,
                         await_store: None,
+                        size_decl: false,
+                        size_static: false,
                         init: Some(radix_hir::HirExpression {
                             id: radix_hir::HirId(1),
                             kind: radix_hir::HirExpressionKind::Path(radix_types::DefId(
@@ -673,6 +675,8 @@ fn serialize_load_roundtrip_ok() {
                         is_await: false,
                         runtime_provided: false,
                         await_store: None,
+                        size_decl: false,
+                        size_static: false,
                         init: None,
                     }),
                 }],

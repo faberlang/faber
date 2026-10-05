@@ -479,6 +479,10 @@ help = "use '{mori}' for the optional panic message"
 message = "expected '{mori}' before the {adfirma} message"
 help = "write {adfirma} cond {mori} message"
 
+[diagnostics.PARSE001.issues.size_declaration_assignment]
+message = "exspectabatur `←` cum valore vel `=` cum numero litterali naturali post nomen magnitudinis"
+help = "scribe `← <valorem>` ad depositionem temporis currentis vel `= <litteralem>` ad magnitudinem staticam"
+
 [diagnostics.PARSE002]
 message = "unexpected token"
 help = "remove or reposition the unexpected token"
@@ -586,6 +590,18 @@ help = "delete the second `{regio} {name}`"
 [diagnostics.PARSE010.issues.reducta_legacy_head]
 message = "vetus reductionis forma `{head} {ex}` remota est; utere `{reducta} {via} <operator> {ex} …`"
 help = "elige unum ex operatoribus reductionis linguae activae post `{reducta} {via}`"
+
+[diagnostics.PARSE010.issues.size_requires_const]
+message = "declaratio magnitudinis semper constans est; `{size_param}` nudum declarationem incipere non potest"
+help = "scribe `{suggestion}`"
+
+[diagnostics.PARSE010.issues.size_is_write_once]
+message = "declaratio magnitudinis semel scribitur; {varia} eam declarare non potest"
+help = "scribe `{fixum} {size_param} <nomen> ← valorem`; vinculum numquam denuo scribitur"
+
+[diagnostics.PARSE010.issues.size_static_requires_literal]
+message = "forma statica `=` declarationis magnitudinis numerum litteralem naturalem postulat"
+help = "scribe litteralem post `=`, vel valorem temporis currentis cum `←` depone"
 
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"

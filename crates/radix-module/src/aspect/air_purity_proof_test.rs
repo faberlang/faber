@@ -47,6 +47,8 @@ fn local(id: u32, init: HirExpression) -> HirStatement {
             is_await: false,
             runtime_provided: false,
             await_store: None,
+            size_decl: false,
+            size_static: false,
         }),
         span: Span::new(0, 1),
     }

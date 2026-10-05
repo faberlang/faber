@@ -784,6 +784,8 @@ fn gate_local(id: u32, init: HirExpression, mutate: impl FnOnce(&mut HirLocal)) 
         is_await: false,
         runtime_provided: false,
         await_store: None,
+        size_decl: false,
+        size_static: false,
     };
     mutate(&mut local);
     HirStatement { id: HirId(id), kind: HirStatementKind::Local(local), span: test_span_between(10, 20) }

@@ -2754,6 +2754,24 @@ impl<'a> FunctionBuilder<'a> {
                 )?;
             } else if let Some(site) = &local.await_store {
                 self.lower_await_store(init, MirPlace::local(id), mir_ty, site.clone(), span)?;
+            } else if local.size_decl && !local.size_static {
+                // A runtime `const size` is a lift store: evaluate its source
+                // once, check the scalar witness for non-negativity, then store.
+                let value = self.lower_expr_value(init)?;
+                self.runtime_call_to_place(
+                    None,
+                    MirIntrinsic::TensorShapeCheck(MirShapeCheck {
+                        relations: Vec::new(),
+                        size_bindings: vec![MirShapeBinding {
+                            parameter: 0,
+                            witness: MirShapeExpr::ScalarArgument { argument: 0 },
+                        }],
+                    }),
+                    vec![value.clone()],
+                    MirType::semantic(self.types.primitive(Primitive::Vacuum)),
+                    span,
+                );
+                self.assign(MirPlace::local(id), value, mir_ty, span);
             } else if copy_bind {
                 // `copy` bind (D-6): deep-duplicate the initializer; the
                 // source stays live and shares nothing with the binding.

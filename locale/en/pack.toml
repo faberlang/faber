@@ -707,6 +707,10 @@ help = "use '{mori}' for the optional panic message"
 message = "expected '{mori}' before the {adfirma} message"
 help = "write {adfirma} cond {mori} message"
 
+[diagnostics.PARSE001.issues.size_declaration_assignment]
+message = "expected `←` with a value, or `=` with a natural-number literal, after the `{size_param}` name"
+help = "write `← <value>` for a runtime lift or `= <literal>` for a static size"
+
 [diagnostics.PARSE002]
 message = "unexpected token"
 help = "remove or reposition the unexpected token"
@@ -814,6 +818,18 @@ help = "delete the second `{regio} {name}`"
 [diagnostics.PARSE010.issues.reducta_legacy_head]
 message = "the old `{head} {ex}` reduction form was removed; use `{reducta} {via} <operator> {ex} …`"
 help = "choose one of the active locale's reduction operators after `{reducta} {via}`"
+
+[diagnostics.PARSE010.issues.size_requires_const]
+message = "a `{size_param}` declaration is always a constant; a bare `{size_param}` cannot start a declaration"
+help = "write `{suggestion}`"
+
+[diagnostics.PARSE010.issues.size_is_write_once]
+message = "a `{size_param}` declaration is write-once; {varia} cannot declare one"
+help = "write `{fixum} {size_param} <name> ← value`; the binding never reassigns"
+
+[diagnostics.PARSE010.issues.size_static_requires_literal]
+message = "the static `=` form of a `{size_param}` declaration requires a natural-number literal"
+help = "write a literal after `=`, or store a runtime value with `←`"
 
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"

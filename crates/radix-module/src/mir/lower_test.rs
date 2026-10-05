@@ -460,6 +460,38 @@ incipit {
     assert_eq!(host.stdout_lines, ["mutabile", "6", "salve"]);
 }
 
+#[test]
+fn runtime_size_declaration_rejects_negative_lift_and_accepts_nonnegative() {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let negative = r#"+++
+locale = "en"
++++
+main {
+    var int h ← -1
+    const size H ← h
+    print H
+}
+"#;
+    let mut host = crate::mir::BufferHost::default();
+    let error = crate::mir::run_source(&session, "negative-size-lift.fab", negative, &mut host)
+        .expect_err("negative runtime size lift must fail");
+    let crate::mir::RunSourceError::Stepper(errors) = error else {
+        panic!("negative lift should fail in the runner: {error:?}");
+    };
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "size_lift_negative"),
+        "{errors:?}"
+    );
+
+    let positive = negative.replace("h ← -1", "h ← 2");
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(&session, "positive-size-lift.fab", &positive, &mut host)
+        .expect("nonnegative runtime size lift must succeed");
+    assert_eq!(host.stdout_lines, ["2"]);
+}
+
 // ===========================================================================
 // Section C: Matrix / vector / tensor operations
 // ===========================================================================
@@ -1267,6 +1299,8 @@ fn failed_local_initializer_does_not_bind_local() {
         is_await: false,
         runtime_provided: false,
         await_store: None,
+        size_decl: false,
+        size_static: false,
     };
 
     assert!(builder.lower_local(&local, span).is_none());
@@ -1286,6 +1320,8 @@ fn failed_local_initializer_does_not_bind_local() {
         is_await: false,
         runtime_provided: false,
         await_store: None,
+        size_decl: false,
+        size_static: false,
     };
     assert!(builder.lower_local(&deferred, span).is_some());
     assert!(builder.bindings.contains_key(&DefId(10)));
