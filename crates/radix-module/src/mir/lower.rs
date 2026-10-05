@@ -46,8 +46,8 @@ use crate::mir::{
     MirBuiltinEdgePolicy, MirCallee, MirCaptureMode, MirClosureCallee, MirClosureCapture, MirClosureEnvironment,
     MirClosureEnvironmentId, MirClosureValue, MirConstant, MirConversion, MirConversionFlavor, MirDeviceRole,
     MirDiagnosticKind, MirEdgePolicy, MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId, MirFunctionOrigin,
-    MirFunctionVisibility, MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable,
-    MirLiftOp, MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand,
+    MirFunctionVisibility, MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLaneOp,
+    MirLayoutTable, MirLiftOp, MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand,
     MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram,
     MirProjection, MirProvider, MirProviderKind, MirRuntimeCall, MirShapeBinding, MirShapeCheck, MirShapeExpr,
     MirShapeRelation, MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase,
@@ -60,9 +60,11 @@ use crate::semantic::{
     ShapeRelationBoundary, Type, TypeId, TypeTable,
 };
 use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, is_public_entry};
+use radix_mir::lane_op::LaneOp;
 use radix_mir::validate::PatchProgramError;
 use radix_mir::vector_expand::{expand_vector_ops, numeric_zero_constant};
 use radix_types::{MirCollectionOp, MirKernelBuiltin, SemanticMutability};
+use register_lift::LaneSource;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::{Arc, Mutex};
 
@@ -86,6 +88,7 @@ mod item;
 mod monomorphize;
 mod package_instantiate;
 mod place;
+mod register_lift;
 mod runtime;
 #[cfg(test)]
 #[path = "lower/runtime_shape_test.rs"]
@@ -93,7 +96,6 @@ mod runtime_shape_tests;
 mod stmt;
 mod tensor_lift;
 mod union_dispatch;
-mod vector_lift;
 
 use context::{LoweringContextMaps, function_param_map, struct_field_map};
 use expr::HirExpressionLoweringVisitor;
@@ -3325,7 +3327,7 @@ impl<'a> FunctionBuilder<'a> {
             return self.lower_tensor_lift(lift, &[operand], expr);
         }
         if op == HirUnOp::Neg
-            && let Some(lowered) = self.lower_vector_negate(operand, expr)
+            && let Some(lowered) = self.lower_register_negate(operand, expr)
         {
             return lowered;
         }
@@ -3398,8 +3400,8 @@ impl<'a> FunctionBuilder<'a> {
         if let Some(lift) = self.tensor_lift_binary_op(op, lhs, rhs) {
             return self.lower_tensor_lift(lift, &[lhs, rhs], expr);
         }
-        // A scalar operator against a register vector unrolls per lane.
-        if let Some(lowered) = self.lower_vector_scalar_binary(op, lhs, rhs, expr) {
+        // A scalar operator against a register vector or matrix unrolls per lane.
+        if let Some(lowered) = self.lower_register_lift_binary(op, lhs, rhs, expr) {
             return lowered;
         }
         if matches!(op, HirBinOp::And | HirBinOp::Or) {

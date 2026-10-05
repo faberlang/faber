@@ -10,11 +10,12 @@
 //! them silently. Tensor `+ -` against a tensor of the same element type and
 //! the `⊙ ⊘` products keep their emitters.
 //!
-//! The register-vector forms are gated the same way under their own issue,
-//! `vector_lift_unsupported_on_target`: `+ - * / %` between a vector and a
-//! scalar and unary `-` on a vector. Their per-lane unrolling happens in MIR,
-//! so only the MIR-backed targets execute them; vector with vector `+ -`
-//! keeps its own emitters.
+//! The register forms are gated the same way under their own issues,
+//! `vector_lift_unsupported_on_target` and `matrix_lift_unsupported_on_target`:
+//! `+ - * / % ÷` between a register and a scalar, unary `-`, `÷` between two
+//! registers, and `⤒ ⤓` against a scalar or a register peer. Their per-lane
+//! unrolling happens in MIR, so only the MIR-backed targets execute them;
+//! register with register `+ -` and the `⊙ ⊘` products keep their emitters.
 
 use crate::CodegenError;
 use radix_diagnostics::DiagnosticArg;
@@ -26,12 +27,14 @@ use radix_types::{Type, TypeId, TypeTable};
 
 const ISSUE: &str = "tensor_lift_unsupported_on_target";
 const VECTOR_ISSUE: &str = "vector_lift_unsupported_on_target";
+const MATRIX_ISSUE: &str = "matrix_lift_unsupported_on_target";
 
 /// Which container a lifted form operates on.
 #[derive(Clone, Copy)]
 enum Family {
     Tensor,
     Vector,
+    Matrix,
 }
 
 /// # Errors
@@ -47,7 +50,7 @@ pub fn reject_tensor_lift(
         types: &'a TypeTable,
         interner: &'a Interner,
         target: Target,
-        found: Option<(Family, String)>,
+        found: Option<(Family, String, bool)>,
     }
     impl HirVisitor for Gate<'_> {
         fn visit_expr(&mut self, expr: &HirExpression) {
@@ -55,8 +58,8 @@ pub fn reject_tensor_lift(
                 return;
             }
             self.found = lifted_form(self.types, self.interner, self.target, expr)
-                .map(|label| (Family::Tensor, label))
-                .or_else(|| vector_form(self.types, expr).map(|label| (Family::Vector, label)));
+                .map(|label| (Family::Tensor, label, false))
+                .or_else(|| register_form(self.types, self.interner, expr));
             if self.found.is_none() {
                 walk_expr(self, expr);
             }
@@ -74,7 +77,7 @@ pub fn reject_tensor_lift(
     walk_program(&mut gate, hir);
     match gate.found {
         None => Ok(()),
-        Some((Family::Tensor, label)) => Err(CodegenError {
+        Some((Family::Tensor, label, _)) => Err(CodegenError {
             message: format!(
                 "tensor elementwise {label} is not supported on the {target:?} target: \
                  the lifted operator has only the MIR runner as its executor"
@@ -85,17 +88,29 @@ pub fn reject_tensor_lift(
                 DiagnosticArg::new("target", format!("{target:?}")),
             ],
         }),
-        Some((Family::Vector, label)) => Err(CodegenError {
-            message: format!(
-                "vector {label} against a scalar is not supported on the {target:?} target: \
-                 the lanes are unrolled only on MIR-backed targets"
-            ),
-            args: vec![
-                DiagnosticArg::new("issue", VECTOR_ISSUE),
-                DiagnosticArg::new("op", label),
-                DiagnosticArg::new("target", format!("{target:?}")),
-            ],
-        }),
+        Some((family @ (Family::Vector | Family::Matrix), label, pair)) => {
+            let (name, issue) = if matches!(family, Family::Vector) {
+                ("vector", VECTOR_ISSUE)
+            } else {
+                ("matrix", MATRIX_ISSUE)
+            };
+            let operands = if pair {
+                format!("between two {name}s")
+            } else {
+                "against a scalar".to_owned()
+            };
+            Err(CodegenError {
+                message: format!(
+                    "{name} {label} {operands} is not supported on the {target:?} target: \
+                     the lanes are unrolled only on MIR-backed targets"
+                ),
+                args: vec![
+                    DiagnosticArg::new("issue", issue),
+                    DiagnosticArg::new("op", label),
+                    DiagnosticArg::new("target", format!("{target:?}")),
+                ],
+            })
+        }
     }
 }
 
@@ -111,18 +126,33 @@ fn tensor_element(types: &TypeTable, ty: Option<TypeId>) -> Option<TypeId> {
     }
 }
 
-/// Whether a type is a register vector, aliases and access markers peeled.
-fn is_vector(types: &TypeTable, ty: Option<TypeId>) -> bool {
-    let Some(ty) = ty else { return false };
-    let mut ty = types.peel_access_marker(ty).1;
+/// The register family of a type, aliases and access markers peeled.
+fn register_family(types: &TypeTable, ty: Option<TypeId>) -> Option<Family> {
+    let mut ty = types.peel_access_marker(ty?).1;
     while let Type::Alias(_, inner) = types.get(ty) {
         ty = *inner;
     }
-    matches!(types.get(ty), Type::Vector(..))
+    match types.get(ty) {
+        Type::Vector(..) => Some(Family::Vector),
+        Type::Matrix(..) => Some(Family::Matrix),
+        _ => None,
+    }
 }
 
-/// The label of a vector form lifted against a scalar, when `expr` is one.
-fn vector_form(types: &TypeTable, expr: &HirExpression) -> Option<String> {
+/// The family and label of a register form lifted over a scalar or a peer,
+/// when `expr` is one.
+fn register_form(
+    types: &TypeTable,
+    interner: &Interner,
+    expr: &HirExpression,
+) -> Option<(Family, String, bool)> {
+    let same_family = |lhs: Option<Family>, rhs: Option<Family>| {
+        matches!(
+            (lhs, rhs),
+            (Some(Family::Vector), Some(Family::Vector))
+                | (Some(Family::Matrix), Some(Family::Matrix))
+        )
+    };
     match &expr.kind {
         HirExpressionKind::Binary(op, lhs, rhs) => {
             let spelling = match op {
@@ -131,19 +161,42 @@ fn vector_form(types: &TypeTable, expr: &HirExpression) -> Option<String> {
                 HirBinOp::Mul => "*",
                 HirBinOp::Div => "/",
                 HirBinOp::Mod => "%",
+                HirBinOp::TrueDiv => "÷",
                 _ => return None,
             };
-            // Vector with vector `+ -` keeps its emitters; a pair that is not
-            // vector-with-scalar is not this form.
+            let (left, right) = (
+                register_family(types, lhs.ty),
+                register_family(types, rhs.ty),
+            );
+            // Register with register `+ -` keeps its emitters, and `* / %`
+            // between two registers never type-check; only `÷` pairs them.
+            if same_family(left, right) {
+                return (*op == HirBinOp::TrueDiv)
+                    .then(|| left.map(|family| (family, spelling.to_owned(), true)))
+                    .flatten();
+            }
             let scalar = |operand: &HirExpression| {
-                tensor_element(types, operand.ty).is_none() && !is_vector(types, operand.ty)
+                tensor_element(types, operand.ty).is_none()
+                    && register_family(types, operand.ty).is_none()
             };
-            let against_scalar = (is_vector(types, lhs.ty) && scalar(rhs))
-                || (is_vector(types, rhs.ty) && scalar(lhs));
-            against_scalar.then(|| spelling.to_owned())
+            match (left, right) {
+                (Some(family), None) if scalar(rhs) => Some((family, spelling.to_owned(), false)),
+                (None, Some(family)) if scalar(lhs) => Some((family, spelling.to_owned(), false)),
+                _ => None,
+            }
         }
         HirExpressionKind::Unary(HirUnOp::Neg, operand) => {
-            is_vector(types, operand.ty).then(|| "-".to_owned())
+            register_family(types, operand.ty).map(|family| (family, "-".to_owned(), false))
+        }
+        HirExpressionKind::MethodCall(receiver, name, _, args, _)
+            if matches!(interner.resolve(*name), "maximus" | "minimus") =>
+        {
+            let family = register_family(types, receiver.ty)?;
+            let peer = args.first()?;
+            tensor_element(types, peer.expr.ty).is_none().then(|| {
+                let pair = register_family(types, peer.expr.ty).is_some();
+                (family, "⤒ ⤓".to_owned(), pair)
+            })
         }
         _ => None,
     }

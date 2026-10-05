@@ -2631,6 +2631,22 @@ help = "use ⊙ for elementwise multiplication or · for contraction"
 message = "vector `*` vector is unsupported; use ⊙ (elementwise) or · (dot product)"
 help = "use ⊙ for elementwise multiplication or · for the dot product"
 
+[diagnostics.SEM011.issues.matrix_multiply_requires_glyph]
+message = "matrix `*` matrix is unsupported; use ⊙ (elementwise) or · (matrix product)"
+help = "use ⊙ for elementwise multiplication or · for the matrix product"
+
+[diagnostics.SEM011.issues.elementwise_division_requires_glyph]
+message = "{kind} `/` {kind} is unsupported; use ⊘ (elementwise division, floor on integers) or ÷ (elementwise true division)"
+help = "use ⊘ for elementwise `/` or ÷ for elementwise true division; `/` takes a scalar on one side"
+
+[diagnostics.SEM011.issues.elementwise_remainder_requires_scalar]
+message = "{kind} `%` {kind} is unsupported; `%` takes a scalar on one side"
+help = "apply % against a scalar; there is no elementwise remainder between two {kind} values"
+
+[diagnostics.SEM011.issues.argument_type_mismatch]
+message = "argument type mismatch"
+help = "make the expression type match the expected type"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
 help = "convert operands explicitly before applying this numeric operator"
@@ -3426,6 +3442,10 @@ help = "flatten the nested {lista} before converting to tensor"
 [diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
 message = "{lista} to tensor conversio requires matching element types; convert elements explicitly before `↦`"
 help = "convert {lista} elements to the tensor element type first"
+
+[diagnostics.SEM016.issues.lista_to_tensor_non_numeric]
+message = "{lista} to tensor conversio requires numeric elements"
+help = "convert to a tensor of numeric elements; a tensor of bivalens comes only from comparisons"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_target]
 message = "rectangular {lista} literal conversio requires a rank-2 literal tensor Figura target"

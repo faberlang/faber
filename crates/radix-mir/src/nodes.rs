@@ -1088,6 +1088,40 @@ pub enum MirIntrinsic {
     VectorOp(MirVectorOp),
 }
 
+/// The scalar operator a lane-wise [`MirVectorOp`] applies per lane.
+///
+/// `Div` floors on integers and is IEEE on floats; `TrueDiv` (`÷`) converts
+/// integer lanes to the result float first and traps an integer zero divisor;
+/// `Max` and `Min` (`⤒`, `⤓`) pick the larger or smaller lane (IEEE
+/// `maximum`/`minimum`). Every other operator is the plain [`MirBinOp`] of the
+/// same name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirLaneOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    TrueDiv,
+    Max,
+    Min,
+}
+
+impl MirLaneOp {
+    /// The plain binary operator the lane applies, when it is one.
+    #[must_use]
+    pub fn bin_op(self) -> Option<MirBinOp> {
+        match self {
+            Self::Add => Some(MirBinOp::Add),
+            Self::Sub => Some(MirBinOp::Sub),
+            Self::Mul => Some(MirBinOp::Mul),
+            Self::Div => Some(MirBinOp::Div),
+            Self::Mod => Some(MirBinOp::Mod),
+            Self::TrueDiv | Self::Max | Self::Min => None,
+        }
+    }
+}
+
 /// The vector method a [`MirIntrinsic::VectorOp`] defers.
 ///
 /// Arity: `Length`, `Normalized`, `Negate`, `Crea` and `Swizzle` take one
@@ -1096,20 +1130,24 @@ pub enum MirIntrinsic {
 /// so symbol remapping needs no rewrite.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirVectorOp {
-    /// Lane-wise binary operator (`+`, `-`, `*`, `/`, ...).
-    Elementwise(MirBinOp),
-    /// Lane-wise binary operator against one scalar operand (the peer is a
+    /// Lane-wise operator between two vectors of the same width. With
+    /// `checked`, each lane is stored under the result element type with the
+    /// integer store trap (an exact lane that leaves its range traps).
+    Elementwise {
+        op: MirLaneOp,
+        checked: bool,
+    },
+    /// Lane-wise operator against one scalar operand (the peer is a
     /// scalar, not a vector): lane `i` is `lane[i] op scalar`, or
     /// `scalar op lane[i]` when `scalar_first` (`s - v`, `s / v`). Operands
     /// are always `[vector, scalar]`, whichever side the scalar was written.
-    /// With `checked`, each lane is stored under the result element type with
-    /// the integer store trap (an exact lane that leaves its range traps).
+    /// `checked` as for [`Self::Elementwise`].
     ElementwiseScalar {
-        op: MirBinOp,
+        op: MirLaneOp,
         scalar_first: bool,
         checked: bool,
     },
-    /// Lane-wise negation (`-v`); `checked` as for [`Self::ElementwiseScalar`].
+    /// Lane-wise negation (`-v`); `checked` as for [`Self::Elementwise`].
     Negate {
         checked: bool,
     },
@@ -1132,7 +1170,9 @@ impl MirVectorOp {
             | Self::Negate { .. }
             | Self::Crea
             | Self::Swizzle(_) => 1,
-            Self::Elementwise(_) | Self::ElementwiseScalar { .. } | Self::Dot | Self::Cross => 2,
+            Self::Elementwise { .. } | Self::ElementwiseScalar { .. } | Self::Dot | Self::Cross => {
+                2
+            }
         }
     }
 
@@ -1140,7 +1180,7 @@ impl MirVectorOp {
     #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
-            Self::Elementwise(_) => "elementwise",
+            Self::Elementwise { .. } => "elementwise",
             Self::ElementwiseScalar { .. } => "elementwise_scalar",
             Self::Negate { .. } => "negate",
             Self::Dot => "dot",

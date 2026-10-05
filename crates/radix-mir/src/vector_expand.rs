@@ -25,17 +25,18 @@
 //! [`VECTOR_OP_OPERAND_UNRESOLVED`]; the producer copies such a receiver into
 //! a temp first.
 
+use crate::lane_op::{LaneOp, LaneSink, lane_conversion, stored_lane};
 use crate::local_ty::operand_ty;
 use crate::validate::MirValidationError;
 use crate::vector_width::literal_vector_width;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
-    MirBlockId, MirConstant, MirConversion, MirConversionFlavor, MirFunction, MirIntrinsic,
-    MirOperand, MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirStatement,
-    MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirUnOp,
-    MirValue, MirValueId, MirValueKind, MirVectorOp,
+    MirBlockId, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirPlace, MirPlaceBase,
+    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId,
+    MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
+    MirVectorOp,
 };
-use radix_hir::{HirStoreKind, HirStoreSite};
+use radix_hir::HirStoreSite;
 use radix_lexer::Span;
 use radix_types::{Primitive, Type, TypeId, TypeTable};
 
@@ -159,10 +160,12 @@ fn expand_site(
         ));
     }
     let mut sources = Vec::with_capacity(site.args.len());
+    let mut operand_tys = Vec::with_capacity(site.args.len());
     let mut receiver_ty = None;
     for arg in &site.args {
         let (source, ty) = resolve_source(function, arg).ok_or_else(|| unresolved(site))?;
         receiver_ty.get_or_insert(ty);
+        operand_tys.push(ty);
         sources.push(source);
     }
     let receiver_ty = receiver_ty.ok_or_else(|| unresolved(site))?;
@@ -201,28 +204,48 @@ fn expand_site(
     let rhs = places.get(1).unwrap_or(lhs);
 
     let result = match &site.op {
-        MirVectorOp::Elementwise(op) => elementwise(
-            &mut head,
-            lhs,
-            rhs,
-            shape.width,
-            *op,
-            shape.element,
-            site.return_ty,
-        ),
+        MirVectorOp::Elementwise { op, checked } => {
+            let lane_op = LaneOp {
+                op: *op,
+                checked: *checked,
+                lane_tys: (
+                    lane_ty(types, operand_tys[0]),
+                    lane_ty(types, operand_tys[1]),
+                ),
+                element: shape.element,
+                types,
+            };
+            elementwise(&mut head, lhs, rhs, shape.width, &lane_op, site.return_ty)
+        }
         MirVectorOp::ElementwiseScalar {
             op,
             scalar_first,
             checked,
-        } => elementwise_scalar(
-            &mut head,
-            lhs,
-            MirOperand::Place(rhs.clone()),
-            shape.width,
-            (*op, *scalar_first, *checked),
-            shape.element,
-            site.return_ty,
-        ),
+        } => {
+            let (vector_lane, scalar_lane) = (
+                lane_ty(types, operand_tys[0]),
+                lane_ty(types, operand_tys[1]),
+            );
+            let lane_op = LaneOp {
+                op: *op,
+                checked: *checked,
+                lane_tys: if *scalar_first {
+                    (scalar_lane, vector_lane)
+                } else {
+                    (vector_lane, scalar_lane)
+                },
+                element: shape.element,
+                types,
+            };
+            elementwise_scalar(
+                &mut head,
+                lhs,
+                &MirOperand::Place(rhs.clone()),
+                shape.width,
+                (&lane_op, *scalar_first),
+                site.return_ty,
+            )
+        }
         MirVectorOp::Negate { checked } => negate(
             &mut head,
             lhs,
@@ -455,41 +478,6 @@ impl<'a> Lanes<'a> {
         true
     }
 
-    /// `value` stored under its own integer slot type: a checked `Convert`
-    /// that traps when the exact lane leaves `ty`'s range (the same store node
-    /// the lowerer emits for an integer slot). `value` itself when unchecked.
-    fn stored(&mut self, value: MirOperand, ty: MirType, checked: bool) -> MirOperand {
-        if !checked {
-            return value;
-        }
-        let temp = self.temp(ty);
-        self.statements.push(MirStatement {
-            kind: MirStatementKind::RuntimeCall {
-                destination: Some(MirPlace::temp(temp)),
-                call: MirRuntimeCall {
-                    intrinsic: MirIntrinsic::Convert(MirConversion {
-                        store: Some(HirStoreSite {
-                            kind: HirStoreKind::Element,
-                            slot: None,
-                            inferred_from: None,
-                            inferred_text: None,
-                        }),
-                        flavor: MirConversionFlavor::Runtime,
-                        source_ty: ty,
-                        target_ty: ty,
-                        params: Vec::new(),
-                        recovery: None,
-                        struct_defaults: Vec::new(),
-                    }),
-                    args: vec![value],
-                    return_ty: ty,
-                },
-            },
-            span: self.span,
-        });
-        MirOperand::Temp(temp)
-    }
-
     fn construct_vector(&mut self, lanes: Vec<MirOperand>, ty: MirType) -> MirOperand {
         let temp = self.temp(ty);
         self.statements.push(MirStatement {
@@ -501,6 +489,57 @@ impl<'a> Lanes<'a> {
                     fields: MirAggregateFields::Ordered(
                         lanes.into_iter().map(MirAggregateItem::Operand).collect(),
                     ),
+                },
+            },
+            span: self.span,
+        });
+        MirOperand::Temp(temp)
+    }
+}
+
+impl LaneSink for Lanes<'_> {
+    fn lane_binary(
+        &mut self,
+        op: MirBinOp,
+        lhs: MirOperand,
+        rhs: MirOperand,
+        ty: MirType,
+    ) -> MirOperand {
+        self.binary(op, lhs, rhs, ty)
+    }
+
+    fn lane_read(&mut self, operand: MirOperand, ty: MirType) -> MirOperand {
+        self.assign_temp(MirValueKind::Operand(operand), ty)
+    }
+
+    fn lane_convert(
+        &mut self,
+        value: MirOperand,
+        source: MirType,
+        target: MirType,
+        store: Option<HirStoreSite>,
+    ) -> MirOperand {
+        self.lane_call(
+            MirIntrinsic::Convert(lane_conversion(source, target, store)),
+            vec![value],
+            target,
+        )
+    }
+
+    fn lane_call(
+        &mut self,
+        intrinsic: MirIntrinsic,
+        args: Vec<MirOperand>,
+        ty: MirType,
+    ) -> MirOperand {
+        let temp = self.temp(ty);
+        self.statements.push(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: Some(MirPlace::temp(temp)),
+                call: MirRuntimeCall {
+                    intrinsic,
+                    args,
+                    return_ty: ty,
                 },
             },
             span: self.span,
@@ -521,42 +560,48 @@ fn lane(place: &MirPlace, lane: u8) -> MirOperand {
     })
 }
 
+/// The type of one lane of an operand: the element of a vector, the type of
+/// a scalar.
+fn lane_ty(types: &TypeTable, ty: MirType) -> MirType {
+    match types.get(types.peel_access_marker(ty.semantic_id()).1) {
+        Type::Vector(element, _) => MirType::semantic(*element),
+        _ => ty,
+    }
+}
+
 fn elementwise(
     b: &mut Lanes<'_>,
     lhs: &MirPlace,
     rhs: &MirPlace,
     width: u8,
-    op: MirBinOp,
-    element: MirType,
+    op: &LaneOp<'_>,
     vector: MirType,
 ) -> MirOperand {
     let fields = (0..width)
-        .map(|i| b.binary(op, lane(lhs, i), lane(rhs, i), element))
+        .map(|i| op.apply(b, lane(lhs, i), lane(rhs, i)))
         .collect();
     b.construct_vector(fields, vector)
 }
 
 /// Each lane against one scalar: `lane op scalar`, or `scalar op lane` when
 /// the scalar was written first. A new vector; the operands are not touched.
-/// `checked` stores each lane under `element` with the integer store trap.
+/// A `checked` operator stores each lane under the element with the integer
+/// store trap.
 fn elementwise_scalar(
     b: &mut Lanes<'_>,
     vector: &MirPlace,
-    scalar: MirOperand,
+    scalar: &MirOperand,
     width: u8,
-    (op, scalar_first, checked): (MirBinOp, bool, bool),
-    element: MirType,
+    (op, scalar_first): (&LaneOp<'_>, bool),
     result: MirType,
 ) -> MirOperand {
     let fields = (0..width)
         .map(|i| {
-            let (lhs, rhs) = if scalar_first {
-                (scalar.clone(), lane(vector, i))
+            if scalar_first {
+                op.apply(b, scalar.clone(), lane(vector, i))
             } else {
-                (lane(vector, i), scalar.clone())
-            };
-            let value = b.binary(op, lhs, rhs, element);
-            b.stored(value, element, checked)
+                op.apply(b, lane(vector, i), scalar.clone())
+            }
         })
         .collect();
     b.construct_vector(fields, result)
@@ -580,7 +625,7 @@ fn negate(
                 },
                 element,
             );
-            b.stored(value, element, checked)
+            stored_lane(b, value, element, checked)
         })
         .collect();
     b.construct_vector(fields, result)

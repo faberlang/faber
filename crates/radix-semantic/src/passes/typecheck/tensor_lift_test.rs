@@ -88,20 +88,25 @@ functio k(tensor<numerus, [4]> a) → tensor<numerus, [4]> { redde a % 3 }",
     );
 }
 
-/// Tensor multiplication points to the rule's alternatives; division and
-/// remainder keep their general numeric-operand diagnostic.
+/// Tensor multiplication and division point to the rule's alternatives;
+/// remainder says it lifts only against a scalar.
 #[test]
 fn tensor_times_tensor_rejects_with_the_rule_alternatives() {
     operands_invalid(
         "functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> { redde a * b }",
         "tensor_multiply_requires_glyph",
     );
-    for op in ["/", "%"] {
-        operands_invalid(
+    for (op, issue) in [
+        ("/", "elementwise_division_requires_glyph"),
+        ("%", "elementwise_remainder_requires_scalar"),
+    ] {
+        rejects(
             &format!(
                 "functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {{ redde a {op} b }}"
             ),
-            NUMERIC_OPERANDS_REQUIRED,
+            SemanticErrorKind::OperandTypesInvalid,
+            issue,
+            &[("kind", "tensor")],
         );
     }
 }

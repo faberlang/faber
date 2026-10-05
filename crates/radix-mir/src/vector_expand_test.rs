@@ -8,9 +8,9 @@ use crate::vector_expand::{
 };
 use crate::{
     DEFERRED_VECTOR_OP_SURVIVED, MirAggregateFields, MirAggregateKind, MirBinOp, MirBlock,
-    MirBlockId, MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId,
-    MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirProjection, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
+    MirBlockId, MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirLaneOp, MirLocal,
+    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirProjection,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
     MirValidationContext, MirValue, MirValueId, MirValueKind, MirVectorOp, ValidatedMir,
     validate_program,
 };
@@ -203,8 +203,27 @@ const BIN_OPS: [MirBinOp; 5] = [
     MirBinOp::Mod,
 ];
 
+/// The lane operator that applies the plain binary operator `op`.
+fn lane_op(op: MirBinOp) -> MirLaneOp {
+    match op {
+        MirBinOp::Add => MirLaneOp::Add,
+        MirBinOp::Sub => MirLaneOp::Sub,
+        MirBinOp::Mul => MirLaneOp::Mul,
+        MirBinOp::Div => MirLaneOp::Div,
+        MirBinOp::Mod => MirLaneOp::Mod,
+        other => panic!("{other:?} is not a lane operator"),
+    }
+}
+
+fn elementwise_op(op: MirBinOp) -> MirVectorOp {
+    MirVectorOp::Elementwise {
+        op: lane_op(op),
+        checked: false,
+    }
+}
+
 fn ops_for(width: u64) -> Vec<MirVectorOp> {
-    let mut ops: Vec<MirVectorOp> = BIN_OPS.into_iter().map(MirVectorOp::Elementwise).collect();
+    let mut ops: Vec<MirVectorOp> = BIN_OPS.into_iter().map(elementwise_op).collect();
     ops.extend([
         MirVectorOp::Dot,
         MirVectorOp::Length,
@@ -258,7 +277,7 @@ fn lane_count_equals_the_width() {
         let fixture = fixture(width);
 
         for op in BIN_OPS {
-            let mut function = function_for(&fixture, &MirVectorOp::Elementwise(op));
+            let mut function = function_for(&fixture, &elementwise_op(op));
             assert!(expand(&fixture, &mut function).is_empty());
             assert_eq!(binaries(&function, op), w, "w{width} {op:?}");
             assert_eq!(constructs(&function), vec![w]);
@@ -543,7 +562,7 @@ fn direct_destination_is_written_by_the_final_lane_statement() {
         MirStatementKind::Assign { place: written, .. } if *written == place(2)
     ));
 
-    let mut vector = function_for(&fixture, &MirVectorOp::Elementwise(MirBinOp::Add));
+    let mut vector = function_for(&fixture, &elementwise_op(MirBinOp::Add));
     assert!(expand(&fixture, &mut vector).is_empty());
     assert_eq!(vector.temps.len(), 3);
     assert!(matches!(
@@ -605,7 +624,7 @@ fn a_scalar_peer_unrolls_one_binary_per_lane_in_written_order() {
                 let mut function = scalar_function(
                     &fixture,
                     MirVectorOp::ElementwiseScalar {
-                        op,
+                        op: lane_op(op),
                         scalar_first,
                         checked: false,
                     },
@@ -664,7 +683,7 @@ fn the_scalar_forms_check_their_arity() {
     let mut one = function_with(
         &fixture,
         MirVectorOp::ElementwiseScalar {
-            op: MirBinOp::Mul,
+            op: MirLaneOp::Mul,
             scalar_first: false,
             checked: false,
         },
@@ -688,7 +707,7 @@ fn a_destination_aliasing_the_vector_is_written_after_every_lane_read_of_a_scala
     let mut function = function_with(
         &fixture,
         MirVectorOp::ElementwiseScalar {
-            op: MirBinOp::Mul,
+            op: MirLaneOp::Mul,
             scalar_first: false,
             checked: false,
         },
@@ -744,7 +763,7 @@ fn a_checked_scalar_op_stores_every_lane_under_the_element_type() {
             let mut function = scalar_function(
                 &fixture,
                 MirVectorOp::ElementwiseScalar {
-                    op: MirBinOp::Mul,
+                    op: MirLaneOp::Mul,
                     scalar_first,
                     checked: true,
                 },
@@ -788,7 +807,7 @@ fn an_unchecked_scalar_op_carries_no_store_node() {
     let mut function = scalar_function(
         &fixture,
         MirVectorOp::ElementwiseScalar {
-            op: MirBinOp::Add,
+            op: MirLaneOp::Add,
             scalar_first: false,
             checked: false,
         },

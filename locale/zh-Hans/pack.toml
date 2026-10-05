@@ -1885,6 +1885,22 @@ help = "逐元素乘法请用 ⊙，缩并请用 ·"
 message = "不支持 vector `*` vector；逐元素乘法请用 ⊙，点积请用 ·"
 help = "逐元素乘法请用 ⊙，点积请用 ·"
 
+[diagnostics.SEM011.issues.matrix_multiply_requires_glyph]
+message = "不支持 matrix `*` matrix；逐元素乘法请用 ⊙，矩阵乘积请用 ·"
+help = "逐元素乘法请用 ⊙，矩阵乘积请用 ·"
+
+[diagnostics.SEM011.issues.elementwise_division_requires_glyph]
+message = "不支持 {kind} `/` {kind}；逐元素除法（整数向下取整）请用 ⊘，逐元素真除法请用 ÷"
+help = "逐元素 `/` 请用 ⊘，逐元素真除法请用 ÷；`/` 的一侧必须是标量"
+
+[diagnostics.SEM011.issues.elementwise_remainder_requires_scalar]
+message = "不支持 {kind} `%` {kind}；`%` 的一侧必须是标量"
+help = "对标量使用 %；两个 {kind} 之间没有逐元素取余"
+
+[diagnostics.SEM011.issues.argument_type_mismatch]
+message = "argument 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands 必须类型完全一致；请用 ↦ 显式转换"
 help = "在应用此 numeric 运算符之前显式转换 operands"
@@ -2420,6 +2436,10 @@ help = "convert 到 tensor 前先 flatten nested lista"
 [diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
 message = "lista 到 tensor conversio 需要匹配的 element types"
 help = "先把 lista elements convert 到 tensor element type"
+
+[diagnostics.SEM016.issues.lista_to_tensor_non_numeric]
+message = "lista 到 tensor conversio 需要数值 elements"
+help = "转换为数值 elements 的 tensor；bivalens 的 tensor 只来自比较"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_target]
 message = "rectangular lista literal conversio 需要 rank-2 literal tensor Figura target"

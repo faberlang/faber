@@ -4,8 +4,8 @@ kind = "method"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "redde_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "unary_expr", "multiplicative_expr", "additive_expr", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "A scalar operator against a vector: + - * / % with the scalar on either side, and unary minus."
-syntax = "v * s | s * v | v / s | s - v | v + 1.0 | -v"
+summary = "A scalar operator against a vector: + - * / % ÷ with the scalar on either side, unary minus, and ÷ ⤒ ⤓ between two vectors."
+syntax = "v * s | s * v | v / s | s - v | v + 1.0 | -v | v ÷ s | v ⤒ s | v ⤒ w"
 related = ["vector", "tensor", "fractus"]
 locale = "en"
 +++
@@ -14,13 +14,15 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Lifted arithmetic — `+ - * / %` with a scalar on either side apply to each lane
+#   • Lifted arithmetic — `+ - * / % ÷` with a scalar on either side apply to each lane
 #   • Unary minus — `-v` negates each lane
+#   • True division and extrema — `÷`, `⤒`, `⤓` also pair two vectors of one width
 #   • New values — the result is a new vector; the operand is not changed
 #   • Same rule as a tensor — an untyped literal adopts the vector's element type
 #
 # Common mistakes:
 #   • writing `a * b` for two vectors — it is not elementwise; use `⊙` or the dot `·`
+#   • writing `a / b` for two vectors — use `⊘` (floor) or `÷` (true division)
 #   • mixing an integer scalar with a float vector — convert one operand with `↦`
 #
 # See also: vector, tensor, fractus
@@ -69,6 +71,22 @@ fn halved(vector<f32, 4> a) → vector<f32, 4> {
     return a * 0.5
 }
 
+fn true_scaled(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+    return a ÷ s
+}
+
+fn true_paired(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+    return a ÷ b
+}
+
+fn raised(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+    return a ⤒ s
+}
+
+fn lowered(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+    return a ⤓ b
+}
+
 main {
     const vector<f32, 3> a ← [1.0, 2.0, 4.0] ↦ vector<f32, 3>
     print scaled(a, 2.5)
@@ -82,4 +100,9 @@ main {
     print a
     const vector<f32, 4> w ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
     print halved(w)
+    print true_scaled(a, 4.0)
+    const vector<f32, 3> b ← [4.0, 2.0, 1.0] ↦ vector<f32, 3>
+    print true_paired(a, b)
+    print raised(a, 2.0)
+    print lowered(a, b)
 }

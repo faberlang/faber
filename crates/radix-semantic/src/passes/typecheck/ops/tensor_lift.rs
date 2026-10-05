@@ -19,11 +19,14 @@
 //! The runner is the oracle for these forms (`MirLiftOp`); every other target
 //! fails closed.
 //!
-//! A register `vector` takes the same arithmetic rule against a scalar: `+ - *
-//! / %` with the scalar on either side and unary `-` (the K4 note "the same
-//! lifting rule applies to vector and matrix", rule 15.1). `vector * vector`
-//! is an error that points at `⊙` and `·`. Vectors lift no comparison, logic
-//! or select, and `÷` and the matrix register are not lifted here.
+//! A register `vector` or `matrix` takes the same arithmetic rule (the K4 note
+//! "the same lifting rule applies to vector and matrix", rule 15.1): `+ - * /
+//! % ÷` against a scalar on either side, unary `-`, and `÷`, `⤒`, `⤓` against a
+//! same-shape register. `vector * vector` and `matrix * matrix` are errors that
+//! point at `⊙` and `·`; `/` between two aggregates points at `⊘` and `÷`, and
+//! `%` between two aggregates says it lifts only against a scalar (tensors
+//! share both). `≈ ≉` on a register wait for L7 like the tensor form. Registers
+//! lift no comparison, logic or select yet.
 
 use super::*;
 use crate::IndexId;
@@ -43,6 +46,16 @@ const ISSUE_CONDITION_MUST_BE_BIVALENS: &str = "condition_must_be_bivalens";
 /// `vector * vector` is not elementwise; the glyphs say which product is meant.
 pub(in crate::passes::typecheck) const ISSUE_VECTOR_MULTIPLY_REQUIRES_GLYPH: &str =
     "vector_multiply_requires_glyph";
+/// `matrix * matrix` is not elementwise either.
+pub(in crate::passes::typecheck) const ISSUE_MATRIX_MULTIPLY_REQUIRES_GLYPH: &str =
+    "matrix_multiply_requires_glyph";
+/// `/` between two aggregates is not elementwise; `⊘` (floor) and `÷` (true)
+/// are. The `kind` argument names the aggregate.
+pub(in crate::passes::typecheck) const ISSUE_ELEMENTWISE_DIVISION_REQUIRES_GLYPH: &str =
+    "elementwise_division_requires_glyph";
+/// `%` lifts only against a scalar; there is no elementwise glyph for it.
+pub(in crate::passes::typecheck) const ISSUE_ELEMENTWISE_REMAINDER_REQUIRES_SCALAR: &str =
+    "elementwise_remainder_requires_scalar";
 
 /// Spelling of the approximate-equality glyph in a deferral diagnostic.
 fn approx_glyph(op: HirBinOp) -> &'static str {
@@ -62,6 +75,21 @@ enum LiftSide {
     /// A vector or matrix: keeps its own rules, never lifted here.
     Register,
     Scalar(TypeId),
+}
+
+/// Which register a lifted form operates on.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RegisterKind {
+    Vector,
+    Matrix,
+}
+
+/// A `vector` or `matrix` operand of a lifted form: the `extent` is the width
+/// index of a vector or the shape index of a matrix.
+struct RegisterOperand {
+    kind: RegisterKind,
+    elem: TypeId,
+    extent: IndexId,
 }
 
 /// The operands of a lifted operator with their shared shape.
@@ -93,22 +121,40 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// The element and width of a register vector operand.
-    fn vector_operand(&mut self, ty: TypeId) -> Option<(TypeId, IndexId)> {
+    /// A register operand: its kind, element and width (vector) or shape
+    /// (matrix).
+    fn register_operand(&mut self, ty: TypeId) -> Option<RegisterOperand> {
         let resolved = self.value_carrier_type(ty);
         let (_, payload) = self.types.peel_access_marker(resolved);
         match self.types.get(payload).clone() {
-            Type::Vector(elem, width) => Some((self.resolve_inferred_type(elem), width)),
+            Type::Vector(elem, extent) => Some(RegisterOperand {
+                kind: RegisterKind::Vector,
+                elem: self.resolve_inferred_type(elem),
+                extent,
+            }),
+            Type::Matrix(elem, extent) => Some(RegisterOperand {
+                kind: RegisterKind::Matrix,
+                elem: self.resolve_inferred_type(elem),
+                extent,
+            }),
             _ => None,
         }
     }
 
-    /// The type a literal beside a tensor or vector takes as its peer: the
+    /// The register type of `register`'s kind and extent holding `elem`.
+    fn register_result(&mut self, register: &RegisterOperand, elem: TypeId) -> TypeId {
+        match register.kind {
+            RegisterKind::Vector => self.types.vector_with_width(elem, register.extent),
+            RegisterKind::Matrix => self.types.matrix_with_shape(elem, register.extent),
+        }
+    }
+
+    /// The type a literal beside a tensor or register takes as its peer: the
     /// numeric element, so `x * 0.5` on an `f32` tensor stays `f32`.
     pub(in crate::passes::typecheck) fn scalar_peer_type(&mut self, ty: TypeId) -> TypeId {
         let elem = match self.lift_side(ty) {
             LiftSide::Tensor { elem, .. } => Some(elem),
-            _ => self.vector_operand(ty).map(|(elem, _)| elem),
+            _ => self.register_operand(ty).map(|register| register.elem),
         };
         match elem {
             Some(elem) if crate::numeric_width::is_tensor_numeric_element(self.types, elem) => elem,
@@ -116,11 +162,13 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// `+ - * / %` between a vector and a scalar (either side). The element
-    /// is the F9 join of the vector element and the scalar, as for a tensor,
-    /// and the result is a new vector of the same width. `vector * vector` is
-    /// the glyph diagnostic; every other vector pair keeps its own rule.
-    fn check_vector_lift_arith(
+    /// `+ - * / % ÷` between a register and a scalar (either side), and `÷`
+    /// between two registers of one kind and shape. The element is the F9
+    /// join of the register element and the scalar, as for a tensor (`÷` by
+    /// ruling 23), and the result is a new register of the same shape. Two
+    /// registers under `* / %` are the glyph diagnostics; every other pair
+    /// keeps its own rule.
+    fn check_register_lift_arith(
         &mut self,
         op: HirBinOp,
         lhs: &HirExpression,
@@ -130,29 +178,30 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         if !matches!(
             op,
-            HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod
+            HirBinOp::Add
+                | HirBinOp::Sub
+                | HirBinOp::Mul
+                | HirBinOp::Div
+                | HirBinOp::Mod
+                | HirBinOp::TrueDiv
         ) {
             return None;
         }
         let span = lhs.span;
-        let (left, right) = (self.vector_operand(lhs_ty), self.vector_operand(rhs_ty));
-        let ((v_elem, width), scalar_ty, vector_first) = match (left, right) {
-            (Some(_), Some(_)) => {
-                if op == HirBinOp::Mul {
-                    self.invalid_operand_types(ISSUE_VECTOR_MULTIPLY_REQUIRES_GLYPH, span);
-                    return Some(self.error_type);
-                }
-                return None;
+        let (left, right) = (self.register_operand(lhs_ty), self.register_operand(rhs_ty));
+        let (register, scalar_ty, register_first) = match (left, right) {
+            (Some(left), Some(right)) => {
+                return self.check_register_pair(op, (&left, &right), (lhs, rhs), span);
             }
-            (Some(vector), None) => (vector, rhs_ty, true),
-            (None, Some(vector)) => (vector, lhs_ty, false),
+            (Some(register), None) => (register, rhs_ty, true),
+            (None, Some(register)) => (register, lhs_ty, false),
             (None, None) => return None,
         };
-        // A tensor, matrix or other register beside a vector keeps its own rule.
+        // A tensor or another aggregate beside a register keeps its own rule.
         if !matches!(self.lift_side(scalar_ty), LiftSide::Scalar(_)) {
             return None;
         }
-        if self.is_error(scalar_ty) || !self.lift_element_admitted(v_elem, span) {
+        if self.is_error(scalar_ty) || !self.register_element_admitted(&register, span) {
             return Some(self.error_type);
         }
         let resolved = self.resolve_inferred_type(scalar_ty);
@@ -160,10 +209,10 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(NUMERIC_OPERANDS_REQUIRED, span);
             return Some(self.error_type);
         }
-        let (l_elem, r_elem) = if vector_first {
-            (v_elem, scalar_ty)
+        let (l_elem, r_elem) = if register_first {
+            (register.elem, scalar_ty)
         } else {
-            (scalar_ty, v_elem)
+            (scalar_ty, register.elem)
         };
         // The element is the F9 join of the operands, as for a tensor. Each
         // lane is stored under it at the operation (ruling 19(g)): an integer
@@ -172,19 +221,92 @@ impl TypeChecker<'_> {
         if self.is_error(elem) {
             return Some(self.error_type);
         }
-        Some(self.types.vector_with_width(elem, width))
+        Some(self.register_result(&register, elem))
     }
 
-    /// Unary `-` over a vector keeps the element type and width. Each lane
+    /// Two registers under an arithmetic operator: `÷` pairs them elementwise;
+    /// `* / %` are the glyph diagnostics; `+ -` keep their `addita` rule. A
+    /// vector beside a matrix keeps its own rule.
+    fn check_register_pair(
+        &mut self,
+        op: HirBinOp,
+        (left, right): (&RegisterOperand, &RegisterOperand),
+        (lhs, rhs): (&HirExpression, &HirExpression),
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if left.kind != right.kind {
+            return None;
+        }
+        let kind = match left.kind {
+            RegisterKind::Vector => "vector",
+            RegisterKind::Matrix => "matrix",
+        };
+        match op {
+            HirBinOp::Mul => {
+                let issue = match left.kind {
+                    RegisterKind::Vector => ISSUE_VECTOR_MULTIPLY_REQUIRES_GLYPH,
+                    RegisterKind::Matrix => ISSUE_MATRIX_MULTIPLY_REQUIRES_GLYPH,
+                };
+                self.invalid_operand_types(issue, span);
+                Some(self.error_type)
+            }
+            HirBinOp::Div | HirBinOp::Mod => {
+                let issue = if op == HirBinOp::Div {
+                    ISSUE_ELEMENTWISE_DIVISION_REQUIRES_GLYPH
+                } else {
+                    ISSUE_ELEMENTWISE_REMAINDER_REQUIRES_SCALAR
+                };
+                self.invalid_operand_types_with_args(issue, span, &[("kind", kind.to_owned())]);
+                Some(self.error_type)
+            }
+            HirBinOp::TrueDiv => {
+                if self.is_error(left.elem) || self.is_error(right.elem) {
+                    return Some(self.error_type);
+                }
+                if !self.register_element_admitted(left, span)
+                    || !self.register_element_admitted(right, span)
+                {
+                    return Some(self.error_type);
+                }
+                let before = self.errors.len();
+                self.constrain_index_equal(left.extent, right.extent, span);
+                if self.errors.len() != before {
+                    return Some(self.error_type);
+                }
+                let elem = self.lift_arith_element(op, lhs, rhs, left.elem, right.elem, span);
+                if self.is_error(elem) {
+                    return Some(self.error_type);
+                }
+                Some(self.register_result(left, elem))
+            }
+            _ => None,
+        }
+    }
+
+    /// A register element must be a numeric, non-decimal scalar (the matrix
+    /// register keeps its own diagnostic for it).
+    fn register_element_admitted(
+        &mut self,
+        register: &RegisterOperand,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let issue = match register.kind {
+            RegisterKind::Vector => TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED,
+            RegisterKind::Matrix => MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED,
+        };
+        self.lift_element_admitted_as(register.elem, span, issue)
+    }
+
+    /// Unary `-` over a register keeps the element type and shape. Each lane
     /// is stored under that element at the operation, so an integer lane
     /// traps where the negation leaves the range (`-i8::MIN`).
-    fn check_vector_lift_neg(
+    fn check_register_lift_neg(
         &mut self,
         operand: &HirExpression,
         operand_ty: TypeId,
     ) -> Option<TypeId> {
-        let (elem, _) = self.vector_operand(operand_ty)?;
-        if !self.lift_element_admitted(elem, operand.span) {
+        let register = self.register_operand(operand_ty)?;
+        if !self.register_element_admitted(&register, operand.span) {
             return Some(self.error_type);
         }
         Some(self.value_carrier_type(operand_ty))
@@ -264,11 +386,21 @@ impl TypeChecker<'_> {
 
     /// A tensor element must be a numeric, non-decimal scalar.
     fn lift_element_admitted(&mut self, elem: TypeId, span: radix_lexer::Span) -> bool {
+        self.lift_element_admitted_as(elem, span, TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED)
+    }
+
+    /// [`Self::lift_element_admitted`] reporting a non-numeric element as `issue`.
+    fn lift_element_admitted_as(
+        &mut self,
+        elem: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> bool {
         if self.is_error(elem) {
             return false;
         }
         if !crate::numeric_width::is_tensor_numeric_element(self.types, elem) {
-            self.invalid_operand_types(TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, span);
+            self.invalid_operand_types(issue, span);
             return false;
         }
         if self
@@ -359,16 +491,34 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
     ) -> Option<TypeId> {
         let span = lhs.span;
-        if let Some(result) = self.check_vector_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
+        if let Some(result) = self.check_register_lift_arith(op, lhs, rhs, lhs_ty, rhs_ty) {
             return Some(result);
         }
         let pair = match self.lift_pairing(lhs_ty, rhs_ty, span, op == HirBinOp::TrueDiv) {
             LiftPairing::NotLifted => {
                 let tensor_pair = matches!(self.lift_side(lhs_ty), LiftSide::Tensor { .. })
                     && matches!(self.lift_side(rhs_ty), LiftSide::Tensor { .. });
-                if op == HirBinOp::Mul && tensor_pair {
-                    self.invalid_operand_types(TENSOR_MULTIPLY_REQUIRES_GLYPH, span);
-                    return Some(self.error_type);
+                if tensor_pair {
+                    match op {
+                        HirBinOp::Mul => {
+                            self.invalid_operand_types(TENSOR_MULTIPLY_REQUIRES_GLYPH, span);
+                            return Some(self.error_type);
+                        }
+                        HirBinOp::Div | HirBinOp::Mod => {
+                            let issue = if op == HirBinOp::Div {
+                                ISSUE_ELEMENTWISE_DIVISION_REQUIRES_GLYPH
+                            } else {
+                                ISSUE_ELEMENTWISE_REMAINDER_REQUIRES_SCALAR
+                            };
+                            self.invalid_operand_types_with_args(
+                                issue,
+                                span,
+                                &[("kind", "tensor".to_owned())],
+                            );
+                            return Some(self.error_type);
+                        }
+                        _ => {}
+                    }
                 }
                 return None;
             }
@@ -395,7 +545,7 @@ impl TypeChecker<'_> {
         operand_ty: TypeId,
     ) -> Option<TypeId> {
         let LiftSide::Tensor { elem, shape } = self.lift_side(operand_ty) else {
-            return self.check_vector_lift_neg(operand, operand_ty);
+            return self.check_register_lift_neg(operand, operand_ty);
         };
         if !self.lift_element_admitted(elem, operand.span) {
             return Some(self.error_type);
@@ -458,6 +608,17 @@ impl TypeChecker<'_> {
         rhs_ty: TypeId,
     ) -> Option<TypeId> {
         let span = lhs.span;
+        // `≈ ≉` over a register waits for the same L7 ruling as over a tensor.
+        if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq)
+            && (self.register_operand(lhs_ty).is_some() || self.register_operand(rhs_ty).is_some())
+        {
+            self.invalid_operand_types_with_args(
+                ISSUE_TENSOR_APPROX_COMPARISON_DEFERRED,
+                span,
+                &[("op", approx_glyph(op).to_owned())],
+            );
+            return Some(self.error_type);
+        }
         let pair = match self.lift_pairing(lhs_ty, rhs_ty, span, true) {
             LiftPairing::NotLifted => return None,
             LiftPairing::Failed => return Some(self.error_type),
@@ -502,14 +663,68 @@ impl TypeChecker<'_> {
         Some(self.lift_bool_result(pair.shape))
     }
 
-    /// `a ⤒ b` / `a ⤓ b` with a tensor receiver: the elementwise extremum
-    /// against a scalar of the element type or a same-shape tensor.
+    /// `a ⤒ b` / `a ⤓ b` with a register receiver: the lanewise extremum
+    /// against a scalar of the element type or a register of the same kind
+    /// and shape (a tensor peer is a mismatch).
+    fn check_register_extremum(
+        &mut self,
+        register: &RegisterOperand,
+        receiver_ty: TypeId,
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let [arg] = args else {
+            return self.error_type;
+        };
+        let hint = is_numeric_literal(&arg.expr).then_some(register.elem);
+        let arg_ty = self.check_expr_with_expected(&mut arg.expr, hint);
+        if self.is_error(arg_ty) || !self.register_element_admitted(register, span) {
+            return self.error_type;
+        }
+        if let Some(other) = self.register_operand(arg_ty) {
+            if other.kind != register.kind {
+                self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
+                return self.error_type;
+            }
+            let before = self.errors.len();
+            self.constrain_index_equal(register.extent, other.extent, span);
+            if self.errors.len() != before || !self.register_element_admitted(&other, span) {
+                return self.error_type;
+            }
+            let joined = self.lift_join_element((register.elem, None), (other.elem, None), span);
+            if self.is_error(joined) {
+                return self.error_type;
+            }
+            return self.register_result(register, joined);
+        }
+        match self.lift_side(arg_ty) {
+            LiftSide::Scalar(_) => {
+                self.unify_assign_issue(
+                    arg_ty,
+                    register.elem,
+                    arg.expr.span,
+                    ARGUMENT_TYPE_MISMATCH,
+                );
+                receiver_ty
+            }
+            _ => {
+                self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
+                self.error_type
+            }
+        }
+    }
+
+    /// `a ⤒ b` / `a ⤓ b` with a tensor or register receiver: the elementwise
+    /// extremum against a scalar of the element type or a same-shape peer.
     pub(in crate::passes::typecheck) fn check_tensor_extremum(
         &mut self,
         receiver_ty: TypeId,
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) -> TypeId {
+        if let Some(register) = self.register_operand(receiver_ty) {
+            return self.check_register_extremum(&register, receiver_ty, args, span);
+        }
         let LiftSide::Tensor { elem, shape } = self.lift_side(receiver_ty) else {
             return self.error_type;
         };

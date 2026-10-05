@@ -1897,6 +1897,22 @@ help = "तत्ववार गुणन के लिए ⊙ या contracti
 message = "vector `*` vector समर्थित नहीं है; तत्ववार गुणन के लिए ⊙ या डॉट गुणनफल के लिए · का उपयोग करें"
 help = "तत्ववार गुणन के लिए ⊙ या डॉट गुणनफल के लिए · का उपयोग करें"
 
+[diagnostics.SEM011.issues.matrix_multiply_requires_glyph]
+message = "matrix `*` matrix समर्थित नहीं है; तत्ववार गुणन के लिए ⊙ या मैट्रिक्स गुणनफल के लिए · का उपयोग करें"
+help = "तत्ववार गुणन के लिए ⊙ या मैट्रिक्स गुणनफल के लिए · का उपयोग करें"
+
+[diagnostics.SEM011.issues.elementwise_division_requires_glyph]
+message = "{kind} `/` {kind} समर्थित नहीं है; तत्ववार विभाजन (पूर्णांकों पर नीचे की ओर) के लिए ⊘ या तत्ववार सच्चे विभाजन के लिए ÷ का उपयोग करें"
+help = "तत्ववार `/` के लिए ⊘ या सच्चे विभाजन के लिए ÷ का उपयोग करें; `/` के एक ओर scalar चाहिए"
+
+[diagnostics.SEM011.issues.elementwise_remainder_requires_scalar]
+message = "{kind} `%` {kind} समर्थित नहीं है; `%` के एक ओर scalar चाहिए"
+help = "% को scalar के साथ लगाएँ; दो {kind} मानों के बीच तत्ववार शेषफल नहीं है"
+
+[diagnostics.SEM011.issues.argument_type_mismatch]
+message = "तर्क प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "संख्यात्मक अंकगणितीय ऑपरेंड के प्रकार समान होने चाहिए; स्पष्ट रूप से परिवर्तित करने के लिए ↦ का उपयोग करें"
 help = "इस संख्यात्मक ऑपरेटर को लागू करने से पहले ऑपरेंड को स्पष्ट रूप से परिवर्तित करें"
@@ -2432,6 +2448,10 @@ help = "tensor में रूपांतरित करने से पह�
 [diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
 message = "lista से tensor रूपांतरण के लिए समान element प्रकार आवश्यक हैं; `↦` से पहले elements को स्पष्ट रूप से रूपांतरित करें"
 help = "पहले lista elements को tensor element प्रकार में रूपांतरित करें"
+
+[diagnostics.SEM016.issues.lista_to_tensor_non_numeric]
+message = "lista से tensor रूपांतरण के लिए संख्यात्मक elements आवश्यक हैं"
+help = "संख्यात्मक elements वाले tensor में रूपांतरित करें; bivalens का tensor केवल तुलना से बनता है"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_target]
 message = "rectangular lista literal रूपांतरण के लिए rank-2 literal tensor Figura target आवश्यक है"

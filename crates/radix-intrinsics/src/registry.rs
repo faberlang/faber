@@ -1115,6 +1115,23 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // Rank-2 transpose: [R, C] → [C, R]. The return type is specialized in
     // typecheck (SameAsReceiver would keep the receiver shape).
     intrinsic!(Matrix, "transpone", 0, &[], SameAsReceiver, CodegenOnly),
+    // Cellwise extremum (`⤒`/`⤓`) against a scalar or a same-shape matrix.
+    intrinsic!(
+        Matrix,
+        "maximus",
+        1,
+        &[IntrinsicParamKind::ReceiverSelf],
+        SameAsReceiver,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Matrix,
+        "minimus",
+        1,
+        &[IntrinsicParamKind::ReceiverSelf],
+        SameAsReceiver,
+        CodegenOnly
+    ),
     intrinsic!(
         Vector,
         "addita",
@@ -1158,6 +1175,24 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(
         Vector,
         "transversum",
+        1,
+        &[IntrinsicParamKind::ReceiverSelf],
+        SameAsReceiver,
+        CodegenOnly
+    ),
+    // Lanewise extremum (`⤒`/`⤓`) against a scalar or a same-shape vector;
+    // typecheck owns the peer rule, MIR lowering unrolls the lanes.
+    intrinsic!(
+        Vector,
+        "maximus",
+        1,
+        &[IntrinsicParamKind::ReceiverSelf],
+        SameAsReceiver,
+        CodegenOnly
+    ),
+    intrinsic!(
+        Vector,
+        "minimus",
         1,
         &[IntrinsicParamKind::ReceiverSelf],
         SameAsReceiver,

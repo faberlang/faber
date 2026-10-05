@@ -5,17 +5,20 @@
 //! assert the stable issue code and error counts, never diagnostic prose.
 
 use crate::{
-    DEFERRED_VECTOR_OP_SURVIVED, MirBinOp, MirBlock, MirBlockId, MirConstant, MirFunction,
-    MirFunctionId, MirIntrinsic, MirLocal, MirLocalId, MirOperand, MirPlace, MirPlaceBase,
-    MirProgram, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind,
-    MirType, MirValidationContext, MirVectorOp, ValidatedMir, validate_program,
+    DEFERRED_VECTOR_OP_SURVIVED, MirBlock, MirBlockId, MirConstant, MirFunction, MirFunctionId,
+    MirIntrinsic, MirLaneOp, MirLocal, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirProgram,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
+    MirValidationContext, MirVectorOp, ValidatedMir, validate_program,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, Primitive, TypeTable};
 
 fn ops() -> Vec<MirVectorOp> {
     vec![
-        MirVectorOp::Elementwise(MirBinOp::Add),
+        MirVectorOp::Elementwise {
+            op: MirLaneOp::Add,
+            checked: false,
+        },
         MirVectorOp::Dot,
         MirVectorOp::Cross,
         MirVectorOp::Length,
@@ -99,7 +102,7 @@ fn issues(program: &MirProgram, types: &TypeTable) -> Vec<String> {
 fn arity_matches_the_operand_count_each_op_takes() {
     for op in ops() {
         let want = match op {
-            MirVectorOp::Elementwise(_) | MirVectorOp::Dot | MirVectorOp::Cross => 2,
+            MirVectorOp::Elementwise { .. } | MirVectorOp::Dot | MirVectorOp::Cross => 2,
             _ => 1,
         };
         assert_eq!(op.arity(), want, "{op:?}");

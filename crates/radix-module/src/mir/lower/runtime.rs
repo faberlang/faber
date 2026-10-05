@@ -621,6 +621,11 @@ impl FunctionBuilder<'_> {
         if let Some(lowered) = self.lower_sermo_method(receiver, &method_name, args, expr) {
             return Some(lowered);
         }
+        if let [arg] = args
+            && let Some(lowered) = self.lower_register_extremum(receiver, &method_name, &arg.expr, expr)
+        {
+            return lowered;
+        }
         if let Some(lowered) = self.lower_vector_method(receiver, &method_name, args, expr) {
             return lowered;
         }
@@ -1406,7 +1411,19 @@ impl FunctionBuilder<'_> {
                     return None;
                 }
                 let op = match method {
-                    VectorMethodKind::Elementwise(op) => MirVectorOp::Elementwise(op),
+                    VectorMethodKind::Elementwise(op) => {
+                        // Each lane is stored under the element type at the
+                        // operation (ruling 19(g)), as for the scalar lift.
+                        let checked = self.register_lanes_are_checked(expr);
+                        let peer_is_vector = args[0].expr.ty.is_some_and(|ty| {
+                            matches!(self.normalized_type(self.types.peel_access_marker(ty).1), Type::Vector(..))
+                        });
+                        if peer_is_vector {
+                            MirVectorOp::Elementwise { op, checked }
+                        } else {
+                            MirVectorOp::ElementwiseScalar { op, scalar_first: false, checked }
+                        }
+                    }
                     VectorMethodKind::Cross => MirVectorOp::Cross,
                     _ => MirVectorOp::Dot,
                 };
@@ -1442,12 +1459,7 @@ impl FunctionBuilder<'_> {
     /// A vector operand the expander can read lanes from: a temp or an
     /// unprojected place. Anything else (a projected place, a value, a
     /// constant) is copied into a temp first.
-    pub(super) fn vector_operand_place(
-        &mut self,
-        operand: MirOperand,
-        ty: MirType,
-        span: Span,
-    ) -> MirOperand {
+    pub(super) fn vector_operand_place(&mut self, operand: MirOperand, ty: MirType, span: Span) -> MirOperand {
         match operand {
             MirOperand::Temp(_) => operand,
             MirOperand::Place(ref place) if place.projections.is_empty() => operand,
@@ -1602,7 +1614,7 @@ impl FunctionBuilder<'_> {
             return Some(self.lower_matrix_applica(lhs, rhs, rows, columns, elem_ty, result_ty, expr));
         }
         let op = matrix_method_kind(method_name)?;
-        Some(self.lower_matrix_elementwise_op(lhs, rhs, rows, columns, op, elem_ty, matrix_ty, expr))
+        Some(self.lower_matrix_elementwise_op(lhs, rhs, (rows, columns), op, (elem_ty, matrix_ty), expr))
     }
 
     /// Flatten nested `[[…], …]` lista literal into row-major matrix cells.
@@ -2226,31 +2238,30 @@ impl FunctionBuilder<'_> {
         &mut self,
         lhs: MirPlace,
         rhs: MirPlace,
-        rows: u8,
-        columns: u8,
-        op: MirBinOp,
-        elem_ty: MirType,
-        matrix_ty: MirType,
+        (rows, columns): (u8, u8),
+        op: MirLaneOp,
+        (elem_ty, matrix_ty): (MirType, MirType),
         expr: &HirExpression,
     ) -> MirOperand {
-        let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(columns));
-        for row in 0..rows {
-            for column in 0..columns {
-                let lhs = matrix_cell_operand(&lhs, row, column);
-                let rhs = matrix_cell_operand(&rhs, row, column);
-                let value = self.assign_temp(MirValueKind::Binary { op, lhs, rhs }, elem_ty, expr.span);
-                fields.push(MirAggregateItem::Operand(value));
-            }
-        }
-        self.construct_temp(
-            MirAggregateKind::Matrix,
-            MirAggregateFields::Ordered(fields),
+        // Each cell is exact and stored under the element type at the
+        // operation (ruling 19(g)), as for the scalar lift.
+        let lane_op = LaneOp {
+            op,
+            checked: self.register_lanes_are_checked(expr),
+            lane_tys: (elem_ty, elem_ty),
+            element: elem_ty,
+            types: self.types,
+        };
+        self.matrix_lane_cells(
+            &lane_op,
+            (rows, columns),
+            (&LaneSource::Cells(lhs), &LaneSource::Cells(rhs)),
             matrix_ty,
             expr.span,
         )
     }
 
-    fn value_base_place(&mut self, operand: MirOperand, ty: MirType, span: Span) -> Option<MirPlace> {
+    pub(super) fn value_base_place(&mut self, operand: MirOperand, ty: MirType, span: Span) -> Option<MirPlace> {
         match operand {
             MirOperand::Place(place) => Some(place),
             MirOperand::Temp(id) => Some(MirPlace::temp(id)),
@@ -4221,7 +4232,7 @@ enum VectorMethodKind {
     Longitudo,
     Normalizata,
     Crea,
-    Elementwise(MirBinOp),
+    Elementwise(MirLaneOp),
 }
 
 fn vector_method_kind(method_name: &str) -> Option<VectorMethodKind> {
@@ -4232,20 +4243,20 @@ fn vector_method_kind(method_name: &str) -> Option<VectorMethodKind> {
         "longitudo" => Some(VectorMethodKind::Longitudo),
         "normalizata" => Some(VectorMethodKind::Normalizata),
         "crea" => Some(VectorMethodKind::Crea),
-        "addita" => Some(VectorMethodKind::Elementwise(MirBinOp::Add)),
-        "subtrahe" => Some(VectorMethodKind::Elementwise(MirBinOp::Sub)),
-        "multiplica" => Some(VectorMethodKind::Elementwise(MirBinOp::Mul)),
-        "divida" => Some(VectorMethodKind::Elementwise(MirBinOp::Div)),
+        "addita" => Some(VectorMethodKind::Elementwise(MirLaneOp::Add)),
+        "subtrahe" => Some(VectorMethodKind::Elementwise(MirLaneOp::Sub)),
+        "multiplica" => Some(VectorMethodKind::Elementwise(MirLaneOp::Mul)),
+        "divida" => Some(VectorMethodKind::Elementwise(MirLaneOp::Div)),
         _ => None,
     }
 }
 
-fn matrix_method_kind(method_name: &str) -> Option<MirBinOp> {
+fn matrix_method_kind(method_name: &str) -> Option<MirLaneOp> {
     match method_name {
-        "addita" => Some(MirBinOp::Add),
-        "subtrahe" => Some(MirBinOp::Sub),
-        "multiplica" => Some(MirBinOp::Mul),
-        "divida" => Some(MirBinOp::Div),
+        "addita" => Some(MirLaneOp::Add),
+        "subtrahe" => Some(MirLaneOp::Sub),
+        "multiplica" => Some(MirLaneOp::Mul),
+        "divida" => Some(MirLaneOp::Div),
         _ => None,
     }
 }
@@ -4317,6 +4328,6 @@ fn vector_lane_operand(place: &MirPlace, lane: u8) -> MirOperand {
     projected_operand(place, MirProjection::VectorLane(lane))
 }
 
-fn matrix_cell_operand(place: &MirPlace, row: u8, column: u8) -> MirOperand {
+pub(super) fn matrix_cell_operand(place: &MirPlace, row: u8, column: u8) -> MirOperand {
     projected_operand(place, MirProjection::MatrixCell { row, column })
 }

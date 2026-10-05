@@ -29,6 +29,7 @@ pub mod inference_blocker_matrix;
 pub mod kernel_decomposition;
 pub mod kernel_module;
 pub mod kernel_plan;
+pub mod lane_op;
 pub mod layout;
 pub mod literal_indexed_access;
 mod local_ty;
@@ -58,6 +59,8 @@ mod figura;
 mod function_index_test;
 #[cfg(test)]
 mod inf_test;
+#[cfg(test)]
+mod lane_op_test;
 #[cfg(test)]
 mod layout_test;
 #[cfg(test)]

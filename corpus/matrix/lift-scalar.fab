@@ -1,0 +1,108 @@
++++
+term = "matrix"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "redde_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "unary_expr", "multiplicative_expr", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A scalar operator against a matrix: + - * / % ÷ with the scalar on either side, unary minus, and ÷ ⤒ ⤓ between two matrices."
+syntax = "m * s | s * m | m / s | s - m | m + 1.0 | -m | m ÷ s | m ⤒ s | m ⤒ n"
+related = ["matrix", "vector", "tensor", "fractus"]
+locale = "en"
++++
+# =============================================================================
+# matrix — A scalar operator against a matrix
+# =============================================================================
+#
+# What this teaches:
+#   • Lifted arithmetic — `+ - * / % ÷` with a scalar on either side apply to each cell
+#   • Unary minus — `-m` negates each cell
+#   • True division and extrema — `÷`, `⤒`, `⤓` also pair two matrices of one shape
+#   • New values — the result is a new matrix; the operand is not changed
+#   • Same rule as a vector and a tensor — an untyped literal adopts the element type
+#
+# Common mistakes:
+#   • writing `a * b` for two matrices — it is not elementwise; use `⊙` or the product `·`
+#   • writing `a / b` for two matrices — use `⊘` (floor) or `÷` (true division)
+#   • mixing an integer scalar with a float matrix — convert one operand with `↦`
+#
+# See also: matrix, vector, tensor
+# =============================================================================
+
+# matrix — scalar lifting
+#
+# WHY: rule 15.1 lifts the scalar operators over a matrix exactly as over a
+# vector or a tensor. `s - m` keeps its operand order: each cell is `s - m[i][j]`.
+#
+# EXPECTED stdout: see lift-scalar.expected
+
+fn scaled(matrix<f32, [2, 2]> a, f32 s) → matrix<f32, [2, 2]> {
+    return a * s
+}
+
+fn scaled_left(matrix<f32, [2, 2]> a, f32 s) → matrix<f32, [2, 2]> {
+    return s * a
+}
+
+fn shrunk(matrix<f32, [2, 2]> a, f32 s) → matrix<f32, [2, 2]> {
+    return a / s
+}
+
+fn inverted(matrix<f32, [2, 2]> a, f32 s) → matrix<f32, [2, 2]> {
+    return s / a
+}
+
+fn shifted(matrix<f32, [2, 2]> a, f32 s) → matrix<f32, [2, 2]> {
+    return s - a
+}
+
+fn remainder(matrix<f32, [2, 2]> a, f32 s) → matrix<f32, [2, 2]> {
+    return a % s
+}
+
+fn lifted(matrix<f32, [2, 2]> a) → matrix<f32, [2, 2]> {
+    return a + 1.0
+}
+
+fn flipped(matrix<f32, [2, 2]> a) → matrix<f32, [2, 2]> {
+    return -a
+}
+
+fn true_scaled(matrix<f32, [2, 2]> a, f32 s) → matrix<f32, [2, 2]> {
+    return a ÷ s
+}
+
+fn true_paired(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> {
+    return a ÷ b
+}
+
+fn true_ints(matrix<i32, [2, 2]> a) → matrix<f64, [2, 2]> {
+    return a ÷ 2
+}
+
+fn raised(matrix<f32, [2, 2]> a, f32 s) → matrix<f32, [2, 2]> {
+    return a ⤒ s
+}
+
+fn lowered(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> {
+    return a ⤓ b
+}
+
+main {
+    const matrix<f32, [2, 2]> a ← [[1.0, 2.0], [4.0, 8.0]] ↦ matrix<f32, [2, 2]>
+    print scaled(a, 2.5)
+    print scaled_left(a, 2.5)
+    print shrunk(a, 4.0)
+    print inverted(a, 8.0)
+    print shifted(a, 10.0)
+    print remainder(a, 3.0)
+    print lifted(a)
+    print flipped(a)
+    print a
+    print true_scaled(a, 4.0)
+    const matrix<f32, [2, 2]> b ← [[4.0, 2.0], [1.0, 16.0]] ↦ matrix<f32, [2, 2]>
+    print true_paired(a, b)
+    const matrix<i32, [2, 2]> n ← [[7, 8], [9, 10]] ↦ matrix<i32, [2, 2]>
+    print true_ints(n)
+    print raised(a, 3.0)
+    print lowered(a, b)
+}

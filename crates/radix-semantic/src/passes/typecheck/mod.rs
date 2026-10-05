@@ -1274,6 +1274,10 @@ mod scalar_math_test;
 mod tensor_math_test;
 
 #[cfg(test)]
+#[path = "matrix_lift_test.rs"]
+mod matrix_lift_test;
+
+#[cfg(test)]
 #[path = "vector_lift_test.rs"]
 mod vector_lift_test;
 

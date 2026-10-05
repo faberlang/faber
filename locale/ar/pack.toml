@@ -1885,6 +1885,22 @@ help = "استخدم ⊙ للضرب عنصرًا بعنصر أو · للانكم
 message = "vector `*` vector غير مدعوم؛ استخدم ⊙ (ضرب عنصرًا بعنصر) أو · (الضرب النقطي)"
 help = "استخدم ⊙ للضرب عنصرًا بعنصر أو · للضرب النقطي"
 
+[diagnostics.SEM011.issues.matrix_multiply_requires_glyph]
+message = "matrix `*` matrix غير مدعوم؛ استخدم ⊙ (ضرب عنصرًا بعنصر) أو · (ضرب المصفوفات)"
+help = "استخدم ⊙ للضرب عنصرًا بعنصر أو · لضرب المصفوفات"
+
+[diagnostics.SEM011.issues.elementwise_division_requires_glyph]
+message = "{kind} `/` {kind} غير مدعوم؛ استخدم ⊘ (قسمة عنصرًا بعنصر، تقريب للأسفل للأعداد الصحيحة) أو ÷ (قسمة حقيقية عنصرًا بعنصر)"
+help = "استخدم ⊘ لـ `/` عنصرًا بعنصر أو ÷ للقسمة الحقيقية؛ `/` تقبل scalar في أحد الجانبين"
+
+[diagnostics.SEM011.issues.elementwise_remainder_requires_scalar]
+message = "{kind} `%` {kind} غير مدعوم؛ `%` تقبل scalar في أحد الجانبين"
+help = "طبّق % مع scalar؛ لا يوجد باقٍ عنصرًا بعنصر بين قيمتين من {kind}"
+
+[diagnostics.SEM011.issues.argument_type_mismatch]
+message = "عدم تطابق في argument type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands يجب أن تكون أنواعها متطابقة؛ استخدم ↦ للتحويل الصريح"
 help = "حول operands صراحة قبل تطبيق هذا العامل العددي"
@@ -2420,6 +2436,10 @@ help = "flatten nested {lista} قبل التحويل إلى tensor"
 [diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
 message = "{lista} إلى tensor conversio يتطلب element types متطابقة؛ حول elements صراحة قبل `↦`"
 help = "حول {lista} elements إلى tensor element type أولا"
+
+[diagnostics.SEM016.issues.lista_to_tensor_non_numeric]
+message = "{lista} إلى tensor conversio يتطلب عناصر رقمية"
+help = "حوّل إلى tensor من عناصر رقمية؛ لا يأتي tensor من bivalens إلا من المقارنات"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_target]
 message = "rectangular {lista} literal conversio يتطلب rank-2 literal tensor Figura target"

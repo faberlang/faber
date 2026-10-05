@@ -1,11 +1,11 @@
 //! A2-LIFT (gap G02): the K4 arithmetic rule applies to a register `vector`
 //! (rule 15.1, "the same lifting rule applies to `vector` and `matrix`"):
-//! `+ - * / %` against a scalar on either side, and unary `-`. `vector *
-//! vector` is the glyph diagnostic; vector with vector `+ -` is unchanged.
-//! `÷`, the matrix register, comparisons and select are not lifted over a
-//! vector. Each lane is the scalar operation: a float lane joins as scalars
-//! do, and an integer lane takes the scalar range type (`u8 + u8` is `u16`,
-//! `-i8` is `i16`), so no lane wraps or clamps inside the expression.
+//! `+ - * / % ÷` against a scalar on either side, and unary `-`; `÷` and `⤒ ⤓`
+//! also pair two vectors of one width. `vector * vector` and `vector / vector`
+//! are the glyph diagnostics, `vector % vector` says `%` takes a scalar;
+//! vector with vector `+ -` is unchanged. Comparisons and select are not
+//! lifted over a vector. Each lane is the scalar operation, exact, and
+//! checked where it is stored into the element type (ruling 19(g)).
 
 use crate::test_support::analyze_source;
 use crate::{SemanticError, SemanticErrorKind};
@@ -175,28 +175,129 @@ fn vector_with_vector_plus_minus_and_the_glyph_products_are_unchanged() {
     ));
 }
 
+/// `a / b` and `a % b` between two vectors point at the elementwise glyphs
+/// and the scalar rule, naming the aggregate.
 #[test]
-fn vector_by_vector_division_and_remainder_stay_rejected() {
-    for op in ["/", "%"] {
-        rejects(
-            &function(
-                "vector<f32, 3> a, vector<f32, 3> b",
-                "vector<f32, 3>",
-                &format!("a {op} b"),
-            ),
-            SemanticErrorKind::OperandTypesInvalid,
-            "numeric_operands_required",
+fn vector_by_vector_division_and_remainder_point_at_the_alternatives() {
+    for (op, issue) in [
+        ("/", "elementwise_division_requires_glyph"),
+        ("%", "elementwise_remainder_requires_scalar"),
+    ] {
+        let source = function(
+            "vector<f32, 3> a, vector<f32, 3> b",
+            "vector<f32, 3>",
+            &format!("a {op} b"),
+        );
+        let result = analyze_source(&source);
+        assert!(
+            result.diagnostics.iter().any(|err| err.is_error()
+                && err.kind == SemanticErrorKind::OperandTypesInvalid
+                && issue_of(err) == Some(issue)
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "kind" && arg.value == "vector")),
+            "{issue}: {:?}",
+            result.diagnostics
         );
     }
 }
 
 #[test]
-fn true_division_is_not_lifted_over_a_vector() {
+fn true_division_lifts_over_a_vector() {
+    accepts(&function(
+        "vector<f32, 3> a, f32 s",
+        "vector<f32, 3>",
+        "a ÷ s",
+    ));
+    accepts(&function(
+        "vector<f32, 3> a, f32 s",
+        "vector<f32, 3>",
+        "s ÷ a",
+    ));
+    accepts(&function("vector<f32, 3> a", "vector<f32, 3>", "a ÷ 2"));
+    accepts(&function(
+        "vector<f32, 3> a, vector<f32, 3> b",
+        "vector<f32, 3>",
+        "a ÷ b",
+    ));
+    // Ruling 23: integers divide to a float, `i32` to `f64`, `u8` to `f32`.
+    accepts(&function("vector<i32, 3> a", "vector<f64, 3>", "a ÷ 2"));
+    accepts(&function("vector<u8, 3> a", "vector<f32, 3>", "a ÷ 2"));
     rejects(
-        &function("vector<f32, 3> a, f32 s", "vector<f32, 3>", "a ÷ s"),
-        SemanticErrorKind::OperandTypesInvalid,
-        "numeric_operands_required",
+        &function("vector<i32, 3> a", "vector<i32, 3>", "a ÷ 2"),
+        SemanticErrorKind::TypeMismatch,
+        "return_type_mismatch",
     );
+}
+
+#[test]
+fn true_division_pairs_vectors_of_one_width_only() {
+    rejects(
+        &function(
+            "vector<f32, 3> a, vector<f32, 4> b",
+            "vector<f32, 3>",
+            "a ÷ b",
+        ),
+        SemanticErrorKind::TypeMismatch,
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn the_extrema_lift_over_a_vector() {
+    for op in ["⤒", "⤓"] {
+        accepts(&function(
+            "vector<f32, 3> a, f32 s",
+            "vector<f32, 3>",
+            &format!("a {op} s"),
+        ));
+        accepts(&function(
+            "vector<f32, 3> a",
+            "vector<f32, 3>",
+            &format!("a {op} 1.0"),
+        ));
+        accepts(&function(
+            "vector<f32, 3> a, vector<f32, 3> b",
+            "vector<f32, 3>",
+            &format!("a {op} b"),
+        ));
+        rejects(
+            &function(
+                "vector<f32, 3> a, vector<f32, 4> b",
+                "vector<f32, 3>",
+                &format!("a {op} b"),
+            ),
+            SemanticErrorKind::TypeMismatch,
+            "incompatible_tensor_index",
+        );
+        rejects(
+            &function(
+                "vector<f32, 3> a, tensor<f32, [3]> t",
+                "vector<f32, 3>",
+                &format!("a {op} t"),
+            ),
+            SemanticErrorKind::OperandTypesInvalid,
+            "argument_type_mismatch",
+        );
+    }
+}
+
+#[test]
+fn approximate_equality_waits_for_the_tensor_ruling_over_a_vector() {
+    for op in ["≈", "≉"] {
+        for peer in ["vector<f32, 3> b", "f32 b"] {
+            rejects(
+                &function(
+                    &format!("vector<f32, 3> a, {peer}"),
+                    "bivalens",
+                    &format!("a {op} b"),
+                ),
+                SemanticErrorKind::OperandTypesInvalid,
+                "tensor_approx_comparison_deferred",
+            );
+        }
+    }
 }
 
 #[test]

@@ -1885,6 +1885,22 @@ help = "dùng ⊙ để nhân theo phần tử hoặc · để lấy tích co"
 message = "không hỗ trợ vector `*` vector; dùng ⊙ (nhân theo phần tử) hoặc · (tích vô hướng)"
 help = "dùng ⊙ để nhân theo phần tử hoặc · để lấy tích vô hướng"
 
+[diagnostics.SEM011.issues.matrix_multiply_requires_glyph]
+message = "không hỗ trợ matrix `*` matrix; dùng ⊙ (nhân theo phần tử) hoặc · (tích ma trận)"
+help = "dùng ⊙ để nhân theo phần tử hoặc · để lấy tích ma trận"
+
+[diagnostics.SEM011.issues.elementwise_division_requires_glyph]
+message = "không hỗ trợ {kind} `/` {kind}; dùng ⊘ (chia theo phần tử, làm tròn xuống với số nguyên) hoặc ÷ (chia thật theo phần tử)"
+help = "dùng ⊘ cho `/` theo phần tử hoặc ÷ cho phép chia thật; `/` cần một scalar ở một vế"
+
+[diagnostics.SEM011.issues.elementwise_remainder_requires_scalar]
+message = "không hỗ trợ {kind} `%` {kind}; `%` cần một scalar ở một vế"
+help = "dùng % với scalar; không có phép lấy dư theo phần tử giữa hai giá trị {kind}"
+
+[diagnostics.SEM011.issues.argument_type_mismatch]
+message = "không khớp kiểu đối số"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "các toán hạng số học phải có kiểu giống hệt nhau; dùng ↦ để chuyển đổi rõ ràng"
 help = "chuyển đổi rõ ràng các toán hạng trước khi áp dụng toán tử số học này"
@@ -2420,6 +2436,10 @@ help = "làm phẳng lista lồng nhau trước khi chuyển đổi sang tensor"
 [diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
 message = "chuyển đổi lista sang tensor yêu cầu các kiểu phần tử khớp nhau; chuyển đổi phần tử rõ ràng trước `↦`"
 help = "trước tiên chuyển đổi các phần tử lista sang kiểu phần tử tensor"
+
+[diagnostics.SEM016.issues.lista_to_tensor_non_numeric]
+message = "chuyển đổi lista sang tensor yêu cầu phần tử số"
+help = "chuyển đổi sang tensor gồm phần tử số; tensor bivalens chỉ sinh ra từ các phép so sánh"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_target]
 message = "chuyển đổi literal lista hình chữ nhật yêu cầu đích Figura tensor literal hạng 2"

@@ -1897,6 +1897,22 @@ help = "ใช้ ⊙ สำหรับการคูณรายองค์�
 message = "ไม่รองรับ vector `*` vector; ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับผลคูณจุด"
 help = "ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับผลคูณจุด"
 
+[diagnostics.SEM011.issues.matrix_multiply_requires_glyph]
+message = "ไม่รองรับ matrix `*` matrix; ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับผลคูณเมทริกซ์"
+help = "ใช้ ⊙ สำหรับการคูณรายองค์ประกอบ หรือ · สำหรับผลคูณเมทริกซ์"
+
+[diagnostics.SEM011.issues.elementwise_division_requires_glyph]
+message = "ไม่รองรับ {kind} `/` {kind}; ใช้ ⊘ (หารรายองค์ประกอบ ปัดลงสำหรับจำนวนเต็ม) หรือ ÷ (หารจริงรายองค์ประกอบ)"
+help = "ใช้ ⊘ แทน `/` รายองค์ประกอบ หรือ ÷ สำหรับการหารจริง; `/` ต้องมี scalar ด้านใดด้านหนึ่ง"
+
+[diagnostics.SEM011.issues.elementwise_remainder_requires_scalar]
+message = "ไม่รองรับ {kind} `%` {kind}; `%` ต้องมี scalar ด้านใดด้านหนึ่ง"
+help = "ใช้ % กับ scalar; ไม่มีเศษรายองค์ประกอบระหว่าง {kind} สองค่า"
+
+[diagnostics.SEM011.issues.argument_type_mismatch]
+message = "ชนิดของอาร์กิวเมนต์ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "ตัวถูกดำเนินการเลขคณิตเชิงตัวเลขต้องมีชนิดเหมือนกัน ใช้ ↦ เพื่อแปลงอย่างชัดเจน"
 help = "แปลงตัวถูกดำเนินการอย่างชัดเจนก่อนใช้ตัวดำเนินการตัวเลขนี้"
@@ -2432,6 +2448,10 @@ help = "flatten lista ซ้อนกันก่อนแปลงเป็น 
 [diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
 message = "การแปลง lista เป็น tensor ต้องการชนิดองค์ประกอบที่ตรงกัน; แปลงองค์ประกอบอย่างชัดเจนก่อน `↦`"
 help = "แปลงองค์ประกอบ lista เป็นชนิดองค์ประกอบ tensor ก่อน"
+
+[diagnostics.SEM016.issues.lista_to_tensor_non_numeric]
+message = "การแปลง lista เป็น tensor ต้องการองค์ประกอบที่เป็นตัวเลข"
+help = "แปลงเป็น tensor ขององค์ประกอบตัวเลข; tensor ของ bivalens เกิดจากการเปรียบเทียบเท่านั้น"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_target]
 message = "การแปลง lista literal แบบสี่เหลี่ยมต้องมีเป้าหมาย tensor Figura แบบ literal rank-2"
