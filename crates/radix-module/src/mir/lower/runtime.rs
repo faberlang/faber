@@ -3943,7 +3943,21 @@ impl FunctionBuilder<'_> {
                     .map(|axis| {
                         let axis_id = i64::try_from(axis).ok()?;
                         let dimension = *dimensions.get(axis)?;
-                        let scalar = if index_contains_runtime_extent(self.types, dimension, &mut FxHashSet::default())
+                        let direct = match self.types.get_index(dimension) {
+                            IndexExpr::Literal(value) => Some(MirOperand::Constant(MirConstant::Int(i64::try_from(*value).ok()?))),
+                            IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(binding)) => {
+                                if let Some(place) = self.captured_bindings.get(binding) {
+                                    Some(MirOperand::Place(place.clone()))
+                                } else {
+                                    self.bindings.get(binding).map(|binding| MirOperand::Place(MirPlace::local(binding.local)))
+                                }
+                            }
+                            _ => None,
+                        };
+                        let dim = if let Some(direct) = direct {
+                            direct
+                        } else {
+                            let scalar = if index_contains_runtime_extent(self.types, dimension, &mut FxHashSet::default())
                         {
                             let mut shape_arguments = Vec::new();
                             let expression = match self.lower_shape_expr(
@@ -3968,21 +3982,22 @@ impl FunctionBuilder<'_> {
                         } else {
                             MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis_id) })
                         };
-                        let numerus = self.types.primitive(Primitive::Numerus);
-                        let dim = self.runtime_call_value(
-                            MirIntrinsic::Convert(MirConversion {
-                                store: None,
-                                flavor: MirConversionFlavor::Runtime,
-                                source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
-                                target_ty: MirType::semantic(numerus),
-                                params: Vec::new(),
-                                recovery: None,
-                                struct_defaults: Vec::new(),
-                            }),
-                            vec![scalar],
-                            MirType::semantic(numerus),
-                            span,
-                        );
+                            let numerus = self.types.primitive(Primitive::Numerus);
+                            self.runtime_call_value(
+                                MirIntrinsic::Convert(MirConversion {
+                                    store: None,
+                                    flavor: MirConversionFlavor::Runtime,
+                                    source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                                    target_ty: MirType::semantic(numerus),
+                                    params: Vec::new(),
+                                    recovery: None,
+                                    struct_defaults: Vec::new(),
+                                }),
+                                vec![scalar],
+                                MirType::semantic(numerus),
+                                span,
+                            )
+                        };
                         Some(MirAggregateItem::Operand(dim))
                     })
                     .collect::<Option<Vec<_>>>()?

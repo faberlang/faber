@@ -79,6 +79,9 @@ mod conversio_route;
 #[cfg(test)]
 #[path = "lower/entry_args_test.rs"]
 mod entry_args_tests;
+#[cfg(test)]
+#[path = "lower/conversion_check_test.rs"]
+mod conversion_check_tests;
 mod expr;
 #[cfg(test)]
 #[path = "lower/first_match_test.rs"]

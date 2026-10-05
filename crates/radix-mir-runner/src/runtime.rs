@@ -2135,11 +2135,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return self.tensor_from_flat_exact(flat, shape, static_shape, span);
         };
         let flat = self.array_arg(flat, span)?;
-        let shape = self.shape_arg(
-            shape,
-            span,
-            radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
-        )?;
+        let shape = self.conversion_shape_arg(shape, span)?;
         let shape = static_shape.unwrap_or(shape);
         let count = tensor_shape_element_count(&shape)
             .ok_or_else(|| RunnerError::internal(span, ERR_ELEMENT_COUNT_OVERFLOW))?;
@@ -2165,11 +2161,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         let flat = self.array_arg(flat, span)?;
-        let shape = self.shape_arg(
-            shape,
-            span,
-            radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
-        )?;
+        let shape = self.conversion_shape_arg(shape, span)?;
         let shape = static_shape.unwrap_or(shape);
         self.ensure_tensor_element_count(
             &shape,
@@ -4438,6 +4430,28 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .collect()
     }
 
+    fn conversion_shape_arg(&mut self, operand: &MirOperand, span: Span) -> Result<Vec<i64>, RunnerError> {
+        self.array_arg(operand, span)?
+            .into_iter()
+            .map(|value| match value {
+                Value::Int(dim) if tensor_dim_non_negative(dim) => Ok(dim),
+                Value::Int(dim) => {
+                    let mut error = RunnerError::internal_with_issue(
+                        span,
+                        format!("size lift must be non-negative: {dim}"),
+                        "size_lift_negative",
+                    );
+                    error.args = vec![("value".to_owned(), dim.to_string())];
+                    Err(error)
+                }
+                other => Err(RunnerError::internal(
+                    span,
+                    format!("tensor shape element is not numerus: {other:?}"),
+                )),
+            })
+            .collect()
+    }
+
     fn ensure_tensor_element_count(
         &self,
         shape: &[i64],
@@ -4447,6 +4461,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<(), RunnerError> {
         match tensor_shape_element_count(shape) {
             Some(expected) if expected == actual => Ok(()),
+            Some(expected) if message == radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG => {
+                let mut error = RunnerError::internal_with_issue(
+                    span,
+                    format!("tensor conversion expected {expected} elements, got {actual}"),
+                    "conversion_length_mismatch",
+                );
+                error.args = vec![("expected".to_owned(), expected.to_string()), ("actual".to_owned(), actual.to_string())];
+                Err(error)
+            }
             Some(_) => Err(RunnerError::internal(span, message)),
             None => Err(RunnerError::internal(span, ERR_ELEMENT_COUNT_OVERFLOW)),
         }
