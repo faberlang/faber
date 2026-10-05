@@ -71,19 +71,23 @@ fn flat(int n) → list<f32> {
 
 @ public
 fn typed_seam() → int {
-    const tf32[] seed ← empty
-    const tensor<f32, [4]> ln1 ← seed.from_flat(flat(4), [4])
-    const tensor<f32, [4, 4]> wq ← seed.from_flat(flat(16), [4, 4])
-    const util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
-    const list<util.Box<4, 4>> layers ← [made]
-    const tensor<f32, [2, 4]> x ← seed.from_flat(flat(8), [2, 4])
-    var int total ← 0
-    for from layers const layer {
-        const util.Box<4, 4> typed ← util.Box { ln1 = layer.ln1, wq = layer.wq }
-        total ← util.axis0_cells<2, 4, 4>(x, typed)
-        total ← total + util.width_of(typed.wq)
+    do {
+        const tensor<f32, [4]> ln1 ← flat(4) ↦ tensor<f32, [4]>
+        const tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
+        const util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
+        const list<util.Box<4, 4>> layers ← [made]
+        const tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
+        var int total ← 0
+        for from layers const layer {
+            const util.Box<4, 4> typed ← util.Box { ln1 = layer.ln1, wq = layer.wq }
+            total ← util.axis0_cells<2, 4, 4>(x, typed)
+            total ← total + util.width_of(typed.wq)
+        }
+        return total
     }
-    return total
+    catch err {
+        return 0
+    }
 }
 "#;
 
@@ -99,12 +103,16 @@ fn flat(int n) → list<f32> {
 
 @ public
 fn typed_seam_wrong_field() → int {
-    const tf32[] seed ← empty
-    const tensor<f32, [8]> too_wide ← seed.from_flat(flat(8), [8])
-    const tensor<f32, [4, 4]> wq ← seed.from_flat(flat(16), [4, 4])
-    const util.Box<4, 4> typed ← util.Box { ln1 = too_wide, wq = wq }
-    const list<f32> data ← typed.ln1 ↦ list<f32>
-    return data.length()
+    do {
+        const tensor<f32, [8]> too_wide ← flat(8) ↦ tensor<f32, [8]>
+        const tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
+        const util.Box<4, 4> typed ← util.Box { ln1 = too_wide, wq = wq }
+        const list<f32> data ← typed.ln1 ↦ list<f32>
+        return data.length()
+    }
+    catch err {
+        return 0
+    }
 }
 "#;
 
@@ -120,12 +128,16 @@ fn flat(int n) → list<f32> {
 
 @ public
 fn typed_seam_wrong_size_arg() → int {
-    const tf32[] seed ← empty
-    const tensor<f32, [4]> ln1 ← seed.from_flat(flat(4), [4])
-    const tensor<f32, [4, 4]> wq ← seed.from_flat(flat(16), [4, 4])
-    const util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
-    const tensor<f32, [2, 4]> x ← seed.from_flat(flat(8), [2, 4])
-    return util.axis0_cells<2, 8, 4>(x, made)
+    do {
+        const tensor<f32, [4]> ln1 ← flat(4) ↦ tensor<f32, [4]>
+        const tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
+        const util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
+        const tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
+        return util.axis0_cells<2, 8, 4>(x, made)
+    }
+    catch err {
+        return 0
+    }
 }
 "#;
 

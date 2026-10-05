@@ -2170,8 +2170,8 @@ message = "matrix arithmetic يتطلب numeric element types"
 help = "استخدم numeric matrix element types"
 
 [diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
-message = "tensor receiver method structa أعيد تسميته إلى strue؛ استخدم seed.strue(data, shape)"
-help = "استخدم seed.strue(data, shape)"
+message = "tensor receiver method structa متقاعد؛ استخدم تحويل data ↦ tensor"
+help = "اكتب data ↦ tensor<T, figura>"
 
 [diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
 message = "tensor receiver creata لا يقبل type arguments؛ استخدم tensor.creata<CompleteTensorType>(fill)"

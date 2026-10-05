@@ -50,8 +50,7 @@ main {
     ]
     const list<int> shape ← [2, 3]
 
-    const tf32[] seed ← empty
-    var tf32[2, 3] grid ← seed.from_flat(plana, shape)
+    var tf32[2, 3] grid ← plana ↦ tf32[shape]
     const list<int, _> dims ← grid.shape()
 
     const list<int> newshape ← [3, 2]

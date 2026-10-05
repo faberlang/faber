@@ -62,14 +62,13 @@ fn static_tensor_formata_accepts_complete_type_arg() {
 }
 
 #[test]
-fn dynamic_tensor_receiver_methods_accept_payload_first() {
+fn dynamic_tensor_conversions_accept_payload_first() {
     accepts(
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
   fixum lista<numerus> shape ← [2, 2]
-  fixum tf32[] seed ← vacua
-  fixum tf32[2, 2] grid ← seed.crea(0.0, shape)
-  fixum tf32[2, 2] data ← seed.strue(flat, shape)
+  fixum tf32[2, 2] grid ← tf32[2, 2]
+  fixum tf32[2, 2] data ← flat ↦ tf32[shape]
   fixum tf32[4] view ← data.forma([4])
   nota view.longitudo()
 }",

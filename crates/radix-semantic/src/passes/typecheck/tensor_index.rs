@@ -615,6 +615,58 @@ pub(super) fn constrain_conversio_target_hole_from_flat_count(
     }
 }
 
+/// Conversion-row twin of the from_flat method form's shape-VALUE argument:
+/// a target figura that is a single `list<int>` value name
+/// (`data ↦ tensor<f32, shape>`) is a runtime value shape. When the binding
+/// carries a literal-list shape witness — the same fact [`shape_list_index`]
+/// recovers for the method form — the witness becomes the conversion's
+/// authoritative static extents. Runtime-computed shape lists keep their
+/// runtime extent; the conversion's runtime call checks the flat count
+/// against the value's product. `None` keeps the written target.
+pub(super) fn conversio_value_shape_target(
+    checker: &mut TypeChecker<'_>,
+    source_ty: TypeId,
+    target: TypeId,
+) -> Option<TypeId> {
+    if crate::lista_tensor_conversio::validate_lista_to_tensor_source(
+        checker.resolve_inferred_type(source_ty),
+        checker.resolve_inferred_type(target),
+        checker.types,
+    )
+    .is_err()
+    {
+        return None;
+    }
+    let resolved = checker.resolve_inferred_type(target);
+    let Type::Tensor(elem, shape) = checker.types.get(resolved) else {
+        return None;
+    };
+    let elem = *elem;
+    let shape = checker.resolve_index(*shape);
+    // The figura bracket always wraps a tuple, so the single-value form is
+    // `Tuple([extent])`; a scalar extent keeps the scalar-extent reading.
+    let shape = match checker.types.get_index(shape).clone() {
+        IndexExpr::Tuple(dims) if dims.len() == 1 => checker.resolve_index(dims[0]),
+        _ => shape,
+    };
+    let IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)) = checker.types.get_index(shape)
+    else {
+        return None;
+    };
+    let def_id = *def_id;
+    // Only a list-typed binding is a value shape; a scalar extent keeps the
+    // scalar-extent reading of the same index form.
+    let binding = checker.lookup_binding(def_id)?;
+    if !crate::numeric_width::is_integer_index_vector(
+        checker.types,
+        checker.resolve_inferred_type(binding.ty),
+    ) {
+        return None;
+    }
+    let witness = checker.shape_witnesses.get(&def_id).copied()?;
+    Some(checker.types.tensor_with_shape(elem, witness))
+}
+
 fn constrain_reshape_result_shape(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,

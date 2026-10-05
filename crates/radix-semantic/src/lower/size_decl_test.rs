@@ -68,7 +68,7 @@ fn static_size_affine_extent_checks() {
             .expect("load English locale pack"),
     );
     let result = analyze_source_with_config(
-        "fn main() {\n    const size N = 3\n    const tf32[] seed ← empty\n    var tf32[N + 1, 2] values ← seed.create(0.0, [N + 1, 2])\n}\n",
+        "fn main() {\n    const size N = 3\n    const list<f32> zeros ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]\n    do {\n        var tf32[N + 1, 2] values ← zeros ↦ tf32[N + 1, 2]\n    }\n    catch err {\n    }\n}\n",
         config,
     );
     assert!(
@@ -90,7 +90,7 @@ fn static_size_affine_extent_rejects_provably_negative() {
             .expect("load English locale pack"),
     );
     let result = analyze_source_with_config(
-        "fn main() {\n    const size N = 0\n    const tf32[] seed ← empty\n    var tf32[N - 1, 2] values ← seed.create(0.0, [N - 1, 2])\n}\n",
+        "fn main() {\n    const size N = 0\n    const list<f32> zeros ← [0.0, 0.0]\n    var tf32[N - 1, 2] values ← zeros ↦ tf32[N - 1, 2]\n}\n",
         config,
     );
     assert!(
@@ -111,7 +111,7 @@ fn runtime_size_affine_extent_checks() {
             .expect("load English locale pack"),
     );
     let result = analyze_source_with_config(
-        "fn probe(i32 h) {\n    const size H ← h\n    const tf32[] seed ← empty\n    var tf32[H + 1] values ← seed.create(0.0, [H + 1])\n}\n",
+        "fn probe(i32 h) {\n    const size H ← h\n    const list<f32> zeros ← [0.0, 0.0]\n    do {\n        var tf32[H + 1] values ← zeros ↦ tf32[H + 1]\n    }\n    catch err {\n    }\n}\n",
         config,
     );
     assert!(

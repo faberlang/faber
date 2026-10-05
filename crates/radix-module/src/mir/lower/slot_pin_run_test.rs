@@ -6,8 +6,8 @@ const SLOT_LIFT: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    const tf32[] seed ← empty
-    const tf32[H, W] out ← seed.from_flat([0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [H, W])
+    const list<f32> zeros ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    const tf32[H, W] out ← zeros ↦ tf32[H, W]
     return out
 }
 main {

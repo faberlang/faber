@@ -843,6 +843,27 @@ impl TypeChecker<'_> {
             return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
         }
 
+        if let Some(witnessed) =
+            super::tensor_index::conversio_value_shape_target(self, source_ty, *target)
+        {
+            // A value-shape target figura (`flat ↦ tensor<f32, shape>`) is
+            // authoritative through its binding's shape witness: rewrite the
+            // HIR target so check and MIR lowering share the static extents.
+            *target = witnessed;
+            let target_resolved = self.resolve_inferred_type(*target);
+            if let Some(error_ty) =
+                self.check_collection_conversio(source, source_ty, target_resolved, span)
+            {
+                return error_ty;
+            }
+            if let Some(recovery) = recovery {
+                self.note_conversio_recovery_checked(recovery, target_resolved);
+            } else {
+                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+            }
+            return target_resolved;
+        }
+
         if let Some(error_ty) =
             self.check_collection_conversio(source, source_ty, target_resolved, span)
         {

@@ -161,8 +161,7 @@ fn k<size H, size W>(tensor<f32, [H, W]> t, mut tensor<f32, [H, W]> o) → void 
 }
 main {
     const int n ← 4
-    const tf32[] seed ← empty
-    const tf32[n, n] a ← seed.create(1.5, [n, n])
+    const tf32[n, n] a ← tf32[n, n].fill(1.5)
     var tf32[n, n] b ← tf32[n, n]
     k(a, b)
     print b[[2, 3]]

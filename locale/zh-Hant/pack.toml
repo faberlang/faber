@@ -2170,8 +2170,8 @@ message = "矩陣算術需要數值元素型別"
 help = "使用數值矩陣元素型別"
 
 [diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
-message = "張量接收者方法 structa 已重新命名為 strue；請使用 seed.strue(data, shape)"
-help = "使用 seed.strue(data, shape)"
+message = "張量接收者方法 structa 已停用；請使用 data ↦ tensor 轉換"
+help = "寫作 data ↦ tensor<T, figura>"
 
 [diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
 message = "張量接收者 creata 不接受型別引數；請使用 tensor.creata<CompleteTensorType>(fill)"

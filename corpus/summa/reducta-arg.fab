@@ -29,17 +29,15 @@ functio optimum_vacua_vel() → numerus {
 }
 incipit {
     fixum lista<f32> flat ← [3.0, 1.0, 3.0, 2.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[4] a ← seed.strue(flat, [4])
+        fixum tf32[4] a ← flat ↦ tf32[4]
     nota optimum(a)
     nota infimum(a)
     nota optimum_corpus(a)
     fixum lista<f64> flat_nan ← [nonnumerus, 3.0, 1.0, 3.0]
-    fixum tf64[] seed_nan ← vacua
-    fixum tf64[4] a_nan ← seed_nan.strue(flat_nan, [4])
+        fixum tf64[4] a_nan ← flat_nan ↦ tf64[4]
     nota optimum_nan(a_nan)
     fixum lista<f32> flat2 ← [1.0, 5.0, 2.0, 5.0, 0.0, 1.0]
-    fixum tf32[2, 3] m ← seed.strue(flat2, [2, 3])
+    fixum tf32[2, 3] m ← flat2 ↦ tf32[2, 3]
     fixum iuncta<numerus, numerus> hi ← optimum_plana(m)
     fixum iuncta<numerus, numerus> lo ← infimum_plana(m)
     nota hi[0]

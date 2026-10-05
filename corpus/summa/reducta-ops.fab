@@ -35,8 +35,7 @@ functio summa_corpus(tensor<f32, [4]> a) → f32 {
 }
 incipit {
     fixum lista<f32> flat ← [3.0, 1.0, 3.0, 2.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[4] a ← seed.strue(flat, [4])
+        fixum tf32[4] a ← flat ↦ tf32[4]
     nota summa_tot(a)
     nota factum_tot(a)
     nota maxima_tot(a)

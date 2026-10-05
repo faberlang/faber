@@ -3913,6 +3913,31 @@ impl FunctionBuilder<'_> {
         self.lower_lista_to_tensor_shape_with_expression(flat, target, None, span)
     }
 
+    /// A target figura that is a single `list<int>` value name is a runtime
+    /// value shape (`data ↦ tensor<f32, shape>` with no static witness): the
+    /// shape operand is that list's value itself, and the runtime count check
+    /// validates the flat length against the value's product. Scalar extents
+    /// keep the per-axis reading below.
+    fn lower_value_shape_operand(&self, target: TypeId) -> Option<MirOperand> {
+        let Type::Tensor(_, shape) = self.normalized_type(target) else {
+            return None;
+        };
+        // The figura bracket always wraps a tuple, so the single-value form
+        // is `Tuple([extent])`.
+        let shape = match self.types.get_index(*shape) {
+            IndexExpr::Tuple(dims) if dims.len() == 1 => *dims.first()?,
+            _ => *shape,
+        };
+        let IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)) = self.types.get_index(shape) else {
+            return None;
+        };
+        let binding = self.bindings.get(def_id)?;
+        if !radix_types::numeric_width::is_integer_index_vector(self.types, binding.ty.semantic_id()) {
+            return None;
+        }
+        Some(MirOperand::Place(MirPlace::local(binding.local)))
+    }
+
     fn lower_lista_to_tensor_shape_with_expression(
         &mut self,
         flat: MirOperand,
@@ -3928,6 +3953,10 @@ impl FunctionBuilder<'_> {
             None
         })?;
         let shape_ty = MirType::semantic(shape_type);
+
+        if let Some(shape_operand) = self.lower_value_shape_operand(target) {
+            return Some(shape_operand);
+        }
 
         let fields = match resolve_lista_to_tensor_shape(target, self.types)? {
             ListaToTensorShape::Literal(dims) => dims

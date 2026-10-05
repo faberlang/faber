@@ -2170,8 +2170,8 @@ message = "phép toán matrix cần các kiểu phần tử số"
 help = "dùng các kiểu phần tử matrix số"
 
 [diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
-message = "phương thức receiver tensor structa đã được đổi tên thành strue; dùng seed.strue(data, shape)"
-help = "dùng seed.strue(data, shape)"
+message = "phương thức receiver tensor structa đã ngừng hoạt động; dùng phép chuyển đổi data ↦ tensor"
+help = "viết data ↦ tensor<T, figura>"
 
 [diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
 message = "creata của receiver tensor không nhận đối số kiểu; dùng tensor.creata<CompleteTensorType>(fill)"

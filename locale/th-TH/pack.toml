@@ -2182,8 +2182,8 @@ message = "การคำนวณ matrix ต้องมีชนิดอง�
 help = "ใช้ชนิดองค์ประกอบ matrix แบบ numeric"
 
 [diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
-message = "เมธอด structa ของตัวรับ tensor เปลี่ยนชื่อเป็น strue แล้ว; ใช้ seed.strue(data, shape)"
-help = "ใช้ seed.strue(data, shape)"
+message = "เมธอด structa ของตัวรับ tensor ถูกยกเลิกแล้ว; ใช้การแปลง data ↦ tensor"
+help = "เขียน data ↦ tensor<T, figura>"
 
 [diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
 message = "creata ของตัวรับ tensor ไม่รับอาร์กิวเมนต์ชนิดข้อมูล; ใช้ tensor.creata<CompleteTensorType>(fill)"

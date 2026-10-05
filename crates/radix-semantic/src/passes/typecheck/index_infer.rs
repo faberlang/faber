@@ -14,6 +14,28 @@ use super::*;
 pub(super) const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
 
 impl TypeChecker<'_> {
+    /// Whether an index term is a value shape: a whole-figura `list<int>`
+    /// value name (`tensor<f32, shape>` where `shape` binds a list), lowered
+    /// as `Runtime(ScalarBinding)` exactly like a scalar extent. Only the
+    /// binding's list type distinguishes the two readings.
+    pub(crate) fn extent_binding_is_value_shape(&self, index: IndexId) -> bool {
+        let index = match self.types.get_index(index) {
+            IndexExpr::Tuple(dims) if dims.len() == 1 => *dims.first().unwrap(),
+            _ => index,
+        };
+        let IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)) =
+            self.types.get_index(index)
+        else {
+            return false;
+        };
+        self.lookup_binding(*def_id).is_some_and(|binding| {
+            crate::numeric_width::is_integer_index_vector(
+                self.types,
+                self.resolve_inferred_type(binding.ty),
+            )
+        })
+    }
+
     /// Record a relation at the currently active shape boundary.
     pub(crate) fn record_shape_relation(
         &mut self,
@@ -274,7 +296,13 @@ impl TypeChecker<'_> {
                     let Some((runtime_actual, _)) = self.runtime_boundary_axis(axis as u32) else {
                         return None;
                     };
-                    self.record_shape_relation(runtime_actual, expected, span, boundary);
+                    // A value-shape extent (a whole-figura `list<int>` value
+                    // name) has no scalar read: the producing conversion's
+                    // runtime count check owns the fact, so no axis equation
+                    // is retained against it.
+                    if !self.extent_binding_is_value_shape(expected) {
+                        self.record_shape_relation(runtime_actual, expected, span, boundary);
+                    }
                     unified_dims.push(runtime_actual);
                 }
             }
@@ -433,10 +461,13 @@ impl TypeChecker<'_> {
                 // A statically known extent is a compile-time fact, and a
                 // non-scalar term (a rank tuple passed as a size argument,
                 // `Pondo<[D]>`) has no per-axis equation to check at runtime.
+                // The same holds for a value-shape extent: a whole-figura
+                // `list<int>` value name is read by the producing
+                // conversion's runtime count check, never per axis.
                 let no_entry_equation = matches!(
                     radix_types::evaluate_index_dimension(expected, self.types),
                     Ok(Some(_)) | Err(radix_types::IndexArithmeticError::NotScalar)
-                );
+                ) || self.extent_binding_is_value_shape(expected);
                 if !self.current_device_function
                     && !no_entry_equation
                     && !self.types.index_equals(actual, expected)

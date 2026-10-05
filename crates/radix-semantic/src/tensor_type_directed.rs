@@ -18,7 +18,7 @@ pub const TENSOR_STRUCTA_FORMA_OLD_FORM_MSG: &str =
     "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)";
 pub const TENSOR_RECEIVER_CREATA_TYPE_ARGS_MSG: &str = "tensor receiver creata does not accept type arguments; use tensor.creata<CompleteTensorType>(fill)";
 pub const TENSOR_STRUCTA_RENAMED_MSG: &str =
-    "tensor receiver method structa was renamed to strue; use seed.strue(data, shape)";
+    "tensor receiver method structa is retired; use the data ↦ tensor conversion";
 pub const TENSOR_CREA_ARG_ORDER_MSG: &str =
     "tensor crea expects fill then shape; use seed.crea(fill, shape)";
 pub const TENSOR_FORMA_TYPE_ARG_ELEMENT_MSG: &str =

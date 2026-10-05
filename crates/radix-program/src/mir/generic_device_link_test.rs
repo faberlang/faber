@@ -46,10 +46,10 @@ locale = "en"
 import from "optlib:devicemath" devicemath
 
 main {
-    const tensor<f32, []> seed ← empty
     const tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
     const tensor<f32, [2, 2]> b ← [[10.0, 20.0], [30.0, 40.0]] ↦ tensor<f32, [2, 2]>
-    const tensor<f32, [8, 8]> c ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [8, 8])
+    const list<f32> flat_c ← [1.0, 2.0, 3.0, 4.0]
+    const tensor<f32, [8, 8]> c ← flat_c ↦ tensor<f32, [8, 8]>
     const _ r22 ← devicemath.kadd(a, b)
     const _ again22 ← devicemath.kadd(a, b)
     const _ r88 ← devicemath.kadd(c, c)

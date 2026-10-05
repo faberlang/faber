@@ -255,13 +255,17 @@ fn rope<size D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2, D] {
 const AIR_TYPEARG_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn main() → void {
-    const tf32[] seed ← empty
     const tf32[2, 8] x ← [[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]] ↦ tf32[2, 8]
-    const tf32[2, 64] y ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 64])
+    const list<f32> y_flat ← [1.0, 2.0, 3.0, 4.0]
     const tf32[2, 4, 3] table ← empty
-    const _ a ← utilModule.rope<8>(x, table)
-    const _ b ← utilModule.rope<64>(y, table)
-    const _ c ← utilModule.rope(y, table)
+    do {
+        const tf32[2, 64] y ← y_flat ↦ tf32[2, 64]
+        const _ a ← utilModule.rope<8>(x, table)
+        const _ b ← utilModule.rope<64>(y, table)
+        const _ c ← utilModule.rope(y, table)
+    }
+    catch err {
+    }
 }
 "#;
 

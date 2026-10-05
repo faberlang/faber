@@ -758,7 +758,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
                 .to_owned(),
         ),
         "matrix_arithmetic_numeric_element_required" => Some("use numeric matrix element types".to_owned()),
-        "tensor_receiver_structa_renamed" => Some("use seed.strue(data, shape)".to_owned()),
+        "tensor_receiver_structa_renamed" => Some("write data ↦ tensor<T, figura>".to_owned()),
         "tensor_receiver_creata_type_args" => {
             Some("call tensor.creata<CompleteTensorType>(fill) for static construction".to_owned())
         }

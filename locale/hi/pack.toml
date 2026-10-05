@@ -2182,8 +2182,8 @@ message = "matrix arithmetic के लिए numeric element types आवश्
 help = "numeric matrix element types का उपयोग करें"
 
 [diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
-message = "tensor receiver method structa का नाम बदलकर strue किया गया है; seed.strue(data, shape) का उपयोग करें"
-help = "seed.strue(data, shape) का उपयोग करें"
+message = "tensor receiver method structa सेवानिवृत्त है; data ↦ tensor रूपांतरण का उपयोग करें"
+help = "data ↦ tensor<T, figura> लिखें"
 
 [diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
 message = "tensor receiver creata type arguments स्वीकार नहीं करता; tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
