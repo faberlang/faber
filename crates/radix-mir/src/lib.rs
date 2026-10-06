@@ -37,6 +37,7 @@ pub mod names;
 pub mod nodes;
 pub mod placement;
 pub mod rank2_reduction_readiness;
+pub mod result_use;
 pub mod shader_contract;
 pub mod static_shape_fold;
 pub mod store_trap;
