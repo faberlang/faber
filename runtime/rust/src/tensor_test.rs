@@ -3,12 +3,12 @@ use super::{
     ERR_CRUX_ENTROPIA_SHAPE_MISMATCH, ERR_CRUX_ENTROPIA_TARGET_NON_FINITE,
     ERR_CRUX_ENTROPIA_TARGET_RANGE, ERR_DIVIDE_NON_FINITE_INPUT, ERR_DIVIDE_NON_FINITE_RESULT,
     ERR_DIVIDE_ZERO_DENOMINATOR, ERR_ELEMENT_COUNT_OVERFLOW, ERR_FORMA_LAYOUT_NOT_VIEWABLE,
-    ERR_LAYERNORM_AXIS_OUT_OF_RANGE, ERR_LAYERNORM_BETA_NON_FINITE,
+    ERR_INDEX_OUT_OF_BOUNDS, ERR_LAYERNORM_AXIS_OUT_OF_RANGE, ERR_LAYERNORM_BETA_NON_FINITE,
     ERR_LAYERNORM_BETA_SHAPE_MISMATCH, ERR_LAYERNORM_EMPTY_TENSOR, ERR_LAYERNORM_EPSILON_INVALID,
     ERR_LAYERNORM_GAMMA_NON_FINITE, ERR_LAYERNORM_GAMMA_SHAPE_MISMATCH,
     ERR_LAYERNORM_NON_FINITE_INPUT, ERR_LAYERNORM_RANK_TOO_HIGH, ERR_MATMUL_ARGUMENT_RANK,
     ERR_MATMUL_BATCH_DIMENSION, ERR_MATMUL_INNER_DIMENSION, ERR_MATMUL_RECEIVER_RANK,
-    ERR_MEDIA_EMPTY, ERR_PERMUTE_AXIS_OUT_OF_RANGE, ERR_PERMUTE_DUPLICATE_AXIS,
+    ERR_MEDIA_EMPTY, ERR_NEGATIVE_INDEX, ERR_PERMUTE_AXIS_OUT_OF_RANGE, ERR_PERMUTE_DUPLICATE_AXIS,
     ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK, ERR_SECTIO_INVALID_SLICE_BOUNDS,
     ERR_SOFTMAX_EMPTY_TENSOR, ERR_SOFTMAX_NON_FINITE_INPUT, ERR_SOFTMAX_RANK,
     ERR_TENSOR_COALESCE_REQUIRES_OPTIONAL, ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH,
@@ -1823,6 +1823,109 @@ fn crux_entropia_rejects_shape_mismatch() {
     );
 }
 
+// ── permute / scalar access: allocation-free paths ─────────────────────────
+
+/// Reference permutation by explicit coordinates.
+fn permuted_by_coordinates(values: &[f32], shape: &[usize], axes: &[usize]) -> Vec<f32> {
+    let out_shape: Vec<usize> = axes.iter().map(|&axis| shape[axis]).collect();
+    let count: usize = out_shape.iter().product();
+    let in_strides: Vec<usize> = (0..shape.len())
+        .map(|axis| shape[axis + 1..].iter().product())
+        .collect();
+    (0..count)
+        .map(|ordinal| {
+            let mut rest = ordinal;
+            let mut offset = 0;
+            for (position, &axis) in axes.iter().enumerate().rev() {
+                let extent = out_shape[position];
+                offset += (rest % extent) * in_strides[axis];
+                rest /= extent;
+            }
+            values[offset]
+        })
+        .collect()
+}
+
+#[test]
+fn permute_reads_a_standard_layout_through_permuted_strides() {
+    let shape = [2_usize, 3, 4];
+    let values: Vec<f32> = (0..24).map(|index| index as f32).collect();
+    let tensor = Tensor::structa(values.clone(), &[2, 3, 4]).unwrap();
+    for axes in [[0, 1, 2], [2, 0, 1], [1, 2, 0], [2, 1, 0], [0, 2, 1]] {
+        let result = tensor.permute(&axes.map(|axis| axis as i64)).unwrap();
+        assert_eq!(
+            result.planata().unwrap(),
+            permuted_by_coordinates(&values, &shape, &axes),
+            "axes {axes:?}"
+        );
+    }
+}
+
+#[test]
+fn permute_of_a_strides_only_view_composes_with_its_strides() {
+    // A transposed view carries swapped strides over the same buffer.
+    let values: Vec<f32> = (0..12).map(|index| index as f32).collect();
+    let tensor = Tensor::structa(values.clone(), &[3, 4]).unwrap();
+    let transposed = tensor.transpose_rank2().unwrap(); // logical [4, 3]
+    let result = transposed.permute(&[1, 0]).unwrap(); // back to [3, 4]
+    assert_eq!(result.magnitudines(), vec![3, 4]);
+    assert_eq!(result.planata().unwrap(), values);
+}
+
+#[test]
+fn permute_of_a_sliced_view_honors_its_offset() {
+    let values: Vec<f32> = (0..12).map(|index| index as f32).collect();
+    let rows = Tensor::structa(values, &[6, 2])
+        .unwrap()
+        .sectio(2, 5)
+        .unwrap();
+    let result = rows.permute(&[1, 0]).unwrap();
+    assert_eq!(result.magnitudines(), vec![2, 3]);
+    assert_eq!(
+        result.planata().unwrap(),
+        vec![4.0, 6.0, 8.0, 5.0, 7.0, 9.0]
+    );
+}
+
+#[test]
+fn accipe_and_ponde_agree_with_each_other_at_every_rank_including_high_ranks() {
+    // Ranks up to eight index without allocating; nine takes the `Vec` path.
+    for rank in [1_usize, 2, 4, 8, 9] {
+        let shape = vec![2_i64; rank];
+        let count = 1_usize << rank;
+        let mut tensor = Tensor::structa(vec![0.0_f32; count], &shape).unwrap();
+        let last = vec![1_i64; rank];
+        tensor.ponde(&last, 7.0).unwrap();
+        assert_eq!(tensor.accipe(&last).unwrap(), Some(7.0), "rank {rank}");
+        assert_eq!(tensor.accipe(&vec![0_i64; rank]).unwrap(), Some(0.0));
+        assert_eq!(
+            tensor
+                .planata()
+                .unwrap()
+                .iter()
+                .filter(|v| **v == 7.0)
+                .count(),
+            1
+        );
+    }
+}
+
+#[test]
+fn accipe_and_ponde_reject_negative_indices_before_looking_at_bounds() {
+    let mut tensor = Tensor::structa(vec![1.0_f32, 2.0], &[2]).unwrap();
+    assert_eq!(tensor.accipe(&[-1]).unwrap_err(), ERR_NEGATIVE_INDEX);
+    assert_eq!(tensor.ponde(&[-1], 0.0).unwrap_err(), ERR_NEGATIVE_INDEX);
+    // A parseable but out-of-bounds index is a different error.
+    assert_eq!(
+        tensor.ponde(&[2], 0.0).unwrap_err(),
+        ERR_INDEX_OUT_OF_BOUNDS
+    );
+    assert_eq!(tensor.accipe(&[2]).unwrap(), None);
+    // A negative index anywhere in the list wins over an out-of-bounds one.
+    let mut matrix = Tensor::structa(vec![0.0_f32; 4], &[2, 2]).unwrap();
+    assert_eq!(matrix.ponde(&[9, -1], 0.0).unwrap_err(), ERR_NEGATIVE_INDEX);
+}
+
 // ── write_values (`target ⇇ source`) ───────────────────────────────────────
 
 #[test]
@@ -1877,6 +1980,32 @@ fn write_values_writes_through_the_destination_strides() {
     let three = Tensor::structa(vec![1.0_f32, 2.0, 3.0], &[3]).unwrap();
     every_other.write_values(&three).unwrap();
     assert_eq!(flat.planata().unwrap(), vec![1.0, 0.0, 2.0, 0.0, 3.0, 0.0]);
+}
+
+#[test]
+fn write_values_into_a_dense_prefix_view_leaves_the_rest_of_the_buffer_alone() {
+    // `sectio(0, 3)` is a standard-layout view of a longer buffer: the slice
+    // move must touch exactly its three elements.
+    let flat = Tensor::structa(vec![9.0_f32; 6], &[6]).unwrap();
+    let mut prefix = flat.sectio(0, 3).unwrap();
+    let source = Tensor::structa(vec![1.0_f32, 2.0, 3.0], &[3]).unwrap();
+    prefix.write_values(&source).unwrap();
+    assert_eq!(flat.planata().unwrap(), vec![1.0, 2.0, 3.0, 9.0, 9.0, 9.0]);
+
+    // An offset slice is strided, not standard layout, and writes in place.
+    let mut middle = flat.sectio(2, 5).unwrap();
+    middle.write_values(&source).unwrap();
+    assert_eq!(flat.planata().unwrap(), vec![1.0, 2.0, 1.0, 2.0, 3.0, 9.0]);
+}
+
+#[test]
+fn write_values_moves_a_large_dense_tensor() {
+    let count = 100_000;
+    let values: Vec<f32> = (0..count).map(|index| index as f32 * 0.5).collect();
+    let source = Tensor::structa(values.clone(), &[count as i64]).unwrap();
+    let mut dest = Tensor::structa(vec![0.0_f32; count], &[count as i64]).unwrap();
+    dest.write_values(&source).unwrap();
+    assert_eq!(dest.planata().unwrap(), values);
 }
 
 #[test]

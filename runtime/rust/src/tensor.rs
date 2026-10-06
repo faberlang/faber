@@ -223,6 +223,22 @@ fn index_dims(indices: &[i64]) -> Result<Vec<usize>, &'static str> {
         .collect()
 }
 
+/// Run `f` over the parsed index without allocating for ordinary ranks: a
+/// scalar `accipe`/`ponde` is on the hot path of every element loop, and the
+/// index `Vec` was most of its cost. Every index is parsed (and a negative one
+/// rejected) before `f` runs, so error precedence is unchanged.
+fn with_index<R>(indices: &[i64], f: impl FnOnce(&[usize]) -> R) -> Result<R, &'static str> {
+    const STACK_RANK: usize = 8;
+    if indices.len() > STACK_RANK {
+        return Ok(f(&index_dims(indices)?));
+    }
+    let mut parsed = [0_usize; STACK_RANK];
+    for (slot, &index) in parsed.iter_mut().zip(indices) {
+        *slot = parse_non_negative(index, ERR_NEGATIVE_INDEX)?;
+    }
+    Ok(f(&parsed[..indices.len()]))
+}
+
 fn parse_non_negative(value: i64, message: &'static str) -> Result<usize, &'static str> {
     if value < 0 {
         Err(message)
@@ -426,8 +442,7 @@ impl<T: Clone + Default> Tensor<T> {
     ///
     /// Returns `Err` if any index is negative.
     pub fn accipe(&self, indices: &[i64]) -> Result<Option<T>, &'static str> {
-        let index = index_dims(indices)?;
-        self.read_logical_index(&index)
+        with_index(indices, |index| self.read_logical_index(index))?
     }
 
     /// Write a value at the given indices.
@@ -439,10 +454,8 @@ impl<T: Clone + Default> Tensor<T> {
         if self.logical_view.is_some() {
             return Err(ERR_TENSOR_EDGE_READ_ONLY);
         }
-        let index = index_dims(indices)?;
-        let Some(offset) = self.offset_for_index(&index) else {
-            return Err(ERR_INDEX_OUT_OF_BOUNDS);
-        };
+        let offset = with_index(indices, |index| self.offset_for_index(index))?
+            .ok_or(ERR_INDEX_OUT_OF_BOUNDS)?;
         tensor_data(&self.data)[offset] = value;
         Ok(())
     }
@@ -512,10 +525,36 @@ impl<T: Clone + Default> Tensor<T> {
             return Err(ERR_TENSOR_COPY_INTO_SHAPE_MISMATCH);
         }
         let values = source.planata()?;
-        let offsets = self.logical_offsets()?;
         let mut data = tensor_data(&self.data);
-        for (offset, value) in offsets.into_iter().zip(values) {
+        if self.is_standard_layout() {
+            // The logical image is the buffer prefix: one slice move.
+            let target = data
+                .get_mut(..values.len())
+                .ok_or(ERR_INDEX_OUT_OF_BOUNDS)?;
+            for (slot, value) in target.iter_mut().zip(values) {
+                *slot = value;
+            }
+            return Ok(());
+        }
+        // Strided destination: validate every offset against the buffer
+        // before the first write, so an error leaves the destination
+        // untouched, then write through an odometer with no per-element
+        // allocation.
+        let mut index = vec![0_usize; self.shape.len()];
+        for _ in 0..values.len() {
+            if offset_for_layout(&index, &self.shape, &self.strides, self.offset)
+                .is_none_or(|offset| offset >= data.len())
+            {
+                return Err(ERR_INDEX_OUT_OF_BOUNDS);
+            }
+            advance_odometer(&mut index, &self.shape);
+        }
+        index.fill(0);
+        for value in values {
+            let offset = offset_for_layout(&index, &self.shape, &self.strides, self.offset)
+                .ok_or(ERR_INDEX_OUT_OF_BOUNDS)?;
             data[offset] = value;
+            advance_odometer(&mut index, &self.shape);
         }
         Ok(())
     }
@@ -803,6 +842,27 @@ impl<T: Clone + Default> Tensor<T> {
         let shape: Vec<usize> = axes.iter().map(|&axis| self.shape[axis]).collect();
         let count = checked_allocation_count::<T>(&shape)?;
         let mut data = Vec::with_capacity(count);
+        if self.logical_view.is_none() {
+            // No view layers: the permuted tensor reads the buffer through
+            // the receiver's strides taken in axis order. One lock and one
+            // odometer walk, with no index allocation per element; an offset
+            // outside the buffer fails exactly as the per-element read did.
+            let strides: Vec<usize> = axes.iter().map(|&axis| self.strides[axis]).collect();
+            let guard = tensor_data(&self.data);
+            let mut index = vec![0_usize; shape.len()];
+            for _ in 0..count {
+                let offset = offset_for_layout(&index, &shape, &strides, self.offset)
+                    .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?;
+                data.push(
+                    guard
+                        .get(offset)
+                        .cloned()
+                        .ok_or(ERR_TENSOR_EDGE_UNRESOLVED_READ)?,
+                );
+                advance_odometer(&mut index, &shape);
+            }
+            return Ok(Self::from_contiguous(data, shape));
+        }
         for ordinal in 0..count {
             let output_index = unravel_index(ordinal, &shape);
             let mut input_index = vec![0; self.shape.len()];
@@ -1023,16 +1083,6 @@ impl<T: Clone + Default> Tensor<T> {
 
     fn offset_for_index(&self, index: &[usize]) -> Option<usize> {
         offset_for_layout(index, &self.shape, &self.strides, self.offset)
-    }
-
-    fn logical_offsets(&self) -> Result<Vec<usize>, &'static str> {
-        let count = self.element_count();
-        (0..count)
-            .map(|ordinal| {
-                let index = unravel_index(ordinal, &self.shape);
-                self.offset_for_index(&index).ok_or(ERR_INDEX_OUT_OF_BOUNDS)
-            })
-            .collect()
     }
 
     fn value_at_logical(&self, index: &[usize]) -> Result<T, &'static str> {
