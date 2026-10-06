@@ -32,10 +32,16 @@ use crate::{
     CollectionKind, FuncSig, IndexExpr, IndexId, InferVar, ParamType, Primitive,
     SemanticGenericParamDefault, SemanticParamMode, Type, TypeId,
 };
+use radix_diagnostics::DiagnosticArg;
 use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
 
 const FIGURA_LIFT_PRIMARY_MSG: &str =
     "size lift extent expects a natural literal, a name, or a parenthesized expression";
+
+/// Size-type Z3: a bare value name in an annotation extent position is the
+/// invisible int→size crossing; the spelled `size <name>` lift is the
+/// did-you-mean. Locale rows live under SEM008 beside the slot refusal.
+const ISSUE_ANNOTATION_EXTENT_BARE_VALUE_NAME: &str = "annotation_extent_bare_value_name";
 use radix_types::{AppliedArg, BuiltinTensorEdgePolicy};
 use radix_types::{compose_index_affine_constant, divide_index_exact, evaluate_index_dimension};
 
@@ -132,7 +138,10 @@ impl Lowerer<'_> {
     /// are inference holes and are rejected here. Holes stay legal in local
     /// bindings (`const _ v`, `const ∪ v`).
     pub(super) fn lower_signature_type(&mut self, ty: &TypeExpr) -> TypeId {
-        self.lower_type_with_context(ty, false, true)
+        self.signature_type_nesting += 1;
+        let lowered = self.lower_type_with_context(ty, false, true);
+        self.signature_type_nesting -= 1;
+        lowered
     }
 
     /// Lower a type nested inside another type expression.
@@ -1398,9 +1407,20 @@ impl Lowerer<'_> {
 
     fn lower_vector_width_expr(&mut self, width: &FiguraExpr) -> Result<IndexId, &'static str> {
         match width {
-            FiguraExpr::Tuple(dims) if dims.len() == 1 => self.lower_figura_expr(&dims[0]),
+            // The unwrapped single dim is still an extent position.
+            FiguraExpr::Tuple(dims) if dims.len() == 1 => {
+                self.figura_extent_nesting += 1;
+                let lowered = self.lower_figura_expr(&dims[0]);
+                self.figura_extent_nesting -= 1;
+                lowered
+            }
             FiguraExpr::Tuple(_) => Err(crate::VECTOR_WIDTH_SINGLE_DIM_MSG),
-            other => self.lower_figura_expr(other),
+            other => {
+                self.figura_extent_nesting += 1;
+                let lowered = self.lower_figura_expr(other);
+                self.figura_extent_nesting -= 1;
+                lowered
+            }
         }
     }
 
@@ -1411,11 +1431,16 @@ impl Lowerer<'_> {
         if dims.len() != 2 {
             return Err(crate::MATRIX_SHAPE_TWO_DIM_MSG);
         }
-        let rows = self.lower_figura_expr(&dims[0])?;
-        let columns = self.lower_figura_expr(&dims[1])?;
-        Ok(self
-            .types
-            .intern_index(IndexExpr::Tuple(vec![rows, columns])))
+        self.figura_extent_nesting += 1;
+        let lowered = (|| {
+            let rows = self.lower_figura_expr(&dims[0])?;
+            let columns = self.lower_figura_expr(&dims[1])?;
+            Ok(self
+                .types
+                .intern_index(IndexExpr::Tuple(vec![rows, columns])))
+        })();
+        self.figura_extent_nesting -= 1;
+        lowered
     }
 
     fn lower_figura_expr(&mut self, figura: &FiguraExpr) -> Result<IndexId, &'static str> {
@@ -1442,6 +1467,30 @@ impl Lowerer<'_> {
                         .rev()
                         .find_map(|scope| scope.get(&ident.name).copied());
                     if let Some(binding) = local {
+                        // Size-type Z3: a bare value name in an extent
+                        // position is the invisible int→size crossing the
+                        // same-page test refuses. A declared size stays a
+                        // size term, a declared integer list keeps the
+                        // whole-shape value reading, a spelled `size` lift is
+                        // the spelled store, and a signature clause stands
+                        // down for the signature law's own refusal.
+                        if self.figura_extent_nesting > 0
+                            && self.figura_lift_nesting == 0
+                            && self.signature_type_nesting == 0
+                            && !self.figura_extent_admissible_locals.contains(&binding)
+                        {
+                            let name = self.interner.resolve(ident.name).to_owned();
+                            self.error_with_args_at(
+                                vec![
+                                    DiagnosticArg::new(
+                                        "issue",
+                                        ISSUE_ANNOTATION_EXTENT_BARE_VALUE_NAME,
+                                    ),
+                                    DiagnosticArg::new("name", name),
+                                ],
+                                ident.span,
+                            );
+                        }
                         let source = self.parameter_ordinals.get(&binding).copied().map_or(
                             radix_types::RuntimeExtentId::ScalarBinding(binding),
                             |parameter| radix_types::RuntimeExtentId::ScalarParameter { parameter },
@@ -1464,7 +1513,15 @@ impl Lowerer<'_> {
             FiguraExpr::Tuple(dims) => {
                 let lowered = dims
                     .iter()
-                    .map(|dim| self.lower_figura_expr(dim))
+                    .map(|dim| {
+                        // Tuple elements are the true extent positions the Z3
+                        // refusal guards; the root figura keeps the
+                        // whole-shape list reading.
+                        self.figura_extent_nesting += 1;
+                        let lowered = self.lower_figura_expr(dim);
+                        self.figura_extent_nesting -= 1;
+                        lowered
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(self.types.intern_index(IndexExpr::Tuple(lowered)))
             }
@@ -1476,14 +1533,19 @@ impl Lowerer<'_> {
         extent: &radix_syntax::LiftExtent,
     ) -> Result<IndexId, &'static str> {
         // The spelled lift lowers to the same index term as its payload; the
-        // negative-literal refusal already ran at resolve.
+        // negative-literal refusal already ran at resolve. The payload is the
+        // spelled store the same-page test requires, so it keeps its figura
+        // admission even where a bare value name is refused (Z3).
         let figura = match extent {
             radix_syntax::LiftExtent::Literal(value) => FiguraExpr::Literal(*value),
             radix_syntax::LiftExtent::Name(ident) => FiguraExpr::Var(ident.clone()),
             radix_syntax::LiftExtent::Paren(term) => (**term).clone(),
             radix_syntax::LiftExtent::Negative { .. } => return Err(FIGURA_LIFT_PRIMARY_MSG),
         };
-        self.lower_figura_expr(&figura)
+        self.figura_lift_nesting += 1;
+        let lowered = self.lower_figura_expr(&figura);
+        self.figura_lift_nesting -= 1;
+        lowered
     }
 
     fn lower_figura_affine_expr(&mut self, figura: &FiguraExpr) -> Result<IndexId, &'static str> {

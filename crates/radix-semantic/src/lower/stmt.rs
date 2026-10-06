@@ -113,6 +113,9 @@ pub fn lower_stmt(lowerer: &mut Lowerer, stmt: &Stmt) -> HirStatement {
         StmtKind::SizeDecl(decl) => {
             let def_id = lowerer.next_def_id();
             lowerer.bind_local(decl.name.name, def_id);
+            // The name is a size term: its figura uses stay admissible (Z3
+            // refuses bare *value* names, not declared sizes).
+            lowerer.figura_extent_admissible_locals.insert(def_id);
             HirStatementKind::Local(radix_hir::HirLocal {
                 def_id,
                 name: decl.name.name,
@@ -721,6 +724,12 @@ impl Lowerer<'_> {
                         false,
                     )
                 });
+                // A declared integer-list binding keeps the whole-shape value
+                // reading (`tensor<f32, shape>`); scalar value bindings do
+                // not (size-type Z3 refuses them in extent positions).
+                if ty.is_some_and(|ty| radix_types::is_integer_index_vector(self.types, ty)) {
+                    self.figura_extent_admissible_locals.insert(def_id);
+                }
                 let init = decl.init.as_ref().map(|expr| {
                     if decl.compile_time {
                         self.lower_compile_time_initializer(expr)

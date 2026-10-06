@@ -13,6 +13,12 @@ use super::*;
 
 pub(super) const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
 
+/// Size-type Z3: a value parameter's name in a signature param/return figura
+/// is a remote binding — the evidence crosses through the value slot, which
+/// the reader cannot see from the signature. The did-you-mean points at the
+/// size-typed generic slot (`<size N>`) or a spelled `size` lift.
+pub(super) const ISSUE_SIGNATURE_EXTENT_BARE_VALUE_NAME: &str = "signature_extent_bare_value_name";
+
 impl TypeChecker<'_> {
     /// Whether an index term is a value shape: a whole-figura `list<int>`
     /// value name (`tensor<f32, shape>` where `shape` binds a list), lowered
@@ -354,6 +360,38 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// Size-type Z3: refuse the value-parameter names a signature's
+    /// param/return figuras bind remotely, with a did-you-mean naming each.
+    pub(crate) fn reject_signature_value_name_extents(
+        &mut self,
+        ty: TypeId,
+        value_param_names: &[radix_lexer::Symbol],
+        span: Span,
+    ) {
+        let mut ordinals = FxHashSet::default();
+        collect_value_parameter_extents(
+            ty,
+            &self.types,
+            &mut FxHashSet::default(),
+            &mut FxHashSet::default(),
+            &mut ordinals,
+        );
+        for ordinal in ordinals {
+            let Some(symbol) = value_param_names.get(ordinal as usize).copied() else {
+                continue;
+            };
+            let name = self.interner.map_or_else(
+                || "n".to_owned(),
+                |interner| interner.resolve(symbol).to_owned(),
+            );
+            self.invalid_operand_types_with_args(
+                ISSUE_SIGNATURE_EXTENT_BARE_VALUE_NAME,
+                span,
+                &[("param", name)],
+            );
+        }
+    }
+
     /// Install the size witnesses carried by a function's formal tensor axes,
     /// then retain repeated-symbol/affine consistency checks at entry.
     ///
@@ -389,6 +427,23 @@ impl TypeChecker<'_> {
                 continue;
             };
             for (axis, dim) in dims.into_iter().enumerate() {
+                // Size-type Z3 (Q3): a `_` extent parameter is an anonymous
+                // size chosen per call. At entry the hole falls through to
+                // the carrier: the formal axis is the witness the body reads
+                // (runtime-tensors L3), and each call records its own
+                // relation against it.
+                let resolved = self.resolve_index(dim);
+                if let IndexExpr::Infer(var) = self.types.get_index(resolved) {
+                    let var = *var;
+                    let axis_witness =
+                        self.types
+                            .intern_index(IndexExpr::Runtime(runtime_formal_axis(
+                                *parameter,
+                                fields,
+                                axis as u32,
+                            )));
+                    self.index_infer.rebind(var, axis_witness);
+                }
                 let (symbol, offset) = match self.types.get_index(dim).clone() {
                     IndexExpr::Param(symbol) => (symbol, 0),
                     IndexExpr::Affine { base, offset } => match self.types.get_index(base) {
@@ -718,5 +773,148 @@ fn runtime_formal_axis(parameter: u32, fields: &[Symbol], axis: u32) -> RuntimeE
             fields: fields.to_vec(),
             axis,
         }
+    }
+}
+
+/// Collect the value-parameter ordinals named by a declared signature type's
+/// extent terms. `Runtime(ScalarParameter { parameter })` leaves exist only
+/// where the signature's own lowering recorded a value parameter's name
+/// (generic size params lower as `Param`, declared sizes as `ScalarBinding`),
+/// so every hit is a remote value→size crossing (size-type Z3).
+fn collect_value_parameter_extents(
+    ty: TypeId,
+    types: &TypeTable,
+    seen_types: &mut FxHashSet<TypeId>,
+    seen_indices: &mut FxHashSet<IndexId>,
+    out: &mut FxHashSet<u32>,
+) {
+    if !seen_types.insert(ty) {
+        return;
+    }
+    let check_type = |ty: TypeId,
+                      seen_types: &mut FxHashSet<TypeId>,
+                      seen_indices: &mut FxHashSet<IndexId>,
+                      out: &mut FxHashSet<u32>| {
+        collect_value_parameter_extents(ty, types, seen_types, seen_indices, out)
+    };
+    let check_index = |id: IndexId,
+                       seen_types: &mut FxHashSet<TypeId>,
+                       seen_indices: &mut FxHashSet<IndexId>,
+                       out: &mut FxHashSet<u32>| {
+        collect_value_parameter_extents_in_index(id, types, seen_types, seen_indices, out)
+    };
+
+    match types.get(ty) {
+        Type::Array(inner)
+        | Type::Queue(inner)
+        | Type::Stack(inner)
+        | Type::Set(inner)
+        | Type::Promissum(inner)
+        | Type::Cursor(inner)
+        | Type::Atomic(inner)
+        | Type::Intervallum(inner)
+        | Type::Option(inner)
+        | Type::Ref(_, inner)
+        | Type::Alias(_, inner) => check_type(*inner, seen_types, seen_indices, out),
+        Type::BoundedArray { element, capacity }
+        | Type::BoundedQueue { element, capacity }
+        | Type::BoundedStack { element, capacity } => {
+            check_index(*capacity, seen_types, seen_indices, out);
+            check_type(*element, seen_types, seen_indices, out);
+        }
+        Type::BoundedTextus { capacity }
+        | Type::BoundedAscii { capacity }
+        | Type::BoundedOcteti { capacity } => {
+            check_index(*capacity, seen_types, seen_indices, out);
+        }
+        Type::Map(key, value) => {
+            check_type(*key, seen_types, seen_indices, out);
+            check_type(*value, seen_types, seen_indices, out);
+        }
+        Type::Record(fields) => {
+            for field in fields.values() {
+                check_type(*field, seen_types, seen_indices, out);
+            }
+        }
+        Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
+            check_type(*success, seen_types, seen_indices, out);
+            check_type(*alternate, seen_types, seen_indices, out);
+        }
+        Type::Tensor(element, shape)
+        | Type::Vector(element, shape)
+        | Type::Matrix(element, shape)
+        | Type::Sparsa(element, shape) => {
+            check_index(*shape, seen_types, seen_indices, out);
+            check_type(*element, seen_types, seen_indices, out);
+        }
+        Type::Func(signature) => {
+            for param in &signature.params {
+                check_type(param.ty, seen_types, seen_indices, out);
+            }
+            check_type(signature.ret, seen_types, seen_indices, out);
+            if let Some(err) = signature.err {
+                check_type(err, seen_types, seen_indices, out);
+            }
+        }
+        Type::Applied(base, args) => {
+            check_type(*base, seen_types, seen_indices, out);
+            for arg in args {
+                match arg {
+                    radix_types::AppliedArg::Type(ty) => {
+                        check_type(*ty, seen_types, seen_indices, out)
+                    }
+                    radix_types::AppliedArg::Size(index) => {
+                        check_index(*index, seen_types, seen_indices, out)
+                    }
+                }
+            }
+        }
+        Type::Union(members) | Type::Intersection(members) | Type::Tuple(members) => {
+            for member in members {
+                check_type(*member, seen_types, seen_indices, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_value_parameter_extents_in_index(
+    id: IndexId,
+    types: &TypeTable,
+    seen_types: &mut FxHashSet<TypeId>,
+    seen_indices: &mut FxHashSet<IndexId>,
+    out: &mut FxHashSet<u32>,
+) {
+    if !seen_indices.insert(id) {
+        return;
+    }
+    match types.get_index(id) {
+        IndexExpr::Runtime(RuntimeExtentId::ScalarParameter { parameter }) => {
+            out.insert(*parameter);
+        }
+        IndexExpr::Tuple(dims) => {
+            for dim in dims {
+                collect_value_parameter_extents_in_index(
+                    *dim,
+                    types,
+                    seen_types,
+                    seen_indices,
+                    out,
+                );
+            }
+        }
+        IndexExpr::Affine { base, .. } => {
+            collect_value_parameter_extents_in_index(*base, types, seen_types, seen_indices, out)
+        }
+        IndexExpr::Divide { numerator, .. } => {
+            collect_value_parameter_extents_in_index(
+                *numerator,
+                types,
+                seen_types,
+                seen_indices,
+                out,
+            );
+        }
+        _ => {}
     }
 }

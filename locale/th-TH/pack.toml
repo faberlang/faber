@@ -957,6 +957,10 @@ help = "ตัดวงจรระหว่างโมดูล"
 message = "ข้อผิดพลาดระหว่าง lowering"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
+[diagnostics.SEM008.issues.annotation_extent_bare_value_name]
+message = "ชื่อค่า {name} ใช้ตำแหน่ง extent ในคำประกาศไม่ได้"
+help = "เขียน `size {name}` เพื่อระบุการยกในตำแหน่งจัดเก็บนี้ เช่น `tf32[2, size {name}]`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "การแยกโครงสร้าง array ต้องมี initializer"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1868,6 +1872,10 @@ help = "gradient selection (`∇`) เป็นเพียง parse-only ใน
 [diagnostics.SEM011]
 message = "ชนิดตัวถูกดำเนินการไม่ถูกต้อง"
 help = "ใช้ชนิดตัวถูกดำเนินการที่เข้ากันได้"
+
+[diagnostics.SEM011.issues.signature_extent_bare_value_name]
+message = "พารามิเตอร์ค่า {param} ใช้ตำแหน่ง extent ในลายเซ็นไม่ได้"
+help = "ประกาศพารามิเตอร์เจนเนอริก `<size {param}>` แล้วใช้ใน figura หรือเขียนการยก `size {param}` ในตำแหน่งที่ต้องการยกค่ารันไทม์"
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"

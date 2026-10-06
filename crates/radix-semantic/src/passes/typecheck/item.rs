@@ -68,8 +68,13 @@ impl TypeChecker<'_> {
         );
         let previous_generic_bounds = self.enter_generic_bounds(&func.type_params);
         self.push_scope();
+        // Size-type Z3: signature positions may not name value parameters in
+        // figuras; collect the spellings once for the did-you-mean.
+        let value_param_names: Vec<radix_lexer::Symbol> =
+            func.params.iter().map(|param| param.name).collect();
         for (idx, param) in func.params.iter_mut().enumerate() {
             self.reject_tensor_edge_policy_value_type(param.ty, param.span);
+            self.reject_signature_value_name_extents(param.ty, &value_param_names, param.span);
             if let Some(default) = &mut param.default {
                 let site = StoreSite::new(HirStoreKind::ParameterDefault).named(param.name);
                 let default_ty = self.check_store_expr(default, param.ty, site);
@@ -114,6 +119,13 @@ impl TypeChecker<'_> {
         self.current_generator_function = func.is_generator;
         if let Some(ret) = func.ret_ty {
             self.reject_tensor_edge_policy_value_type(ret, radix_lexer::Span::default());
+            // Z3: `→ tf32[h, w]` over value parameters is the same remote
+            // binding as a parameter figura.
+            self.reject_signature_value_name_extents(
+                ret,
+                &value_param_names,
+                radix_lexer::Span::default(),
+            );
         }
         if let Some(err) = func.err_ty {
             self.reject_tensor_edge_policy_value_type(err, radix_lexer::Span::default());

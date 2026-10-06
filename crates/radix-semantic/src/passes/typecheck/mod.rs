@@ -1269,6 +1269,18 @@ mod tensor_index_width_test;
 mod index_param_value_test;
 
 #[cfg(test)]
+#[path = "z3_signature_lift_test.rs"]
+mod z3_signature_lift_test;
+
+#[cfg(test)]
+#[path = "z3_annotation_extent_test.rs"]
+mod z3_annotation_extent_test;
+
+#[cfg(test)]
+#[path = "z3_anonymous_param_test.rs"]
+mod z3_anonymous_param_test;
+
+#[cfg(test)]
 #[path = "tensor_lattice_matrix_test.rs"]
 mod tensor_lattice_matrix_test;
 

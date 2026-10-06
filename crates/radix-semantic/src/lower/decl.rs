@@ -228,6 +228,7 @@ impl Lowerer<'_> {
     ) -> HirParam {
         let def_id = self.next_def_id();
         crate::tuple_labels::record_from_type_expr(self.resolver, self.interner, def_id, &param.ty);
+        self.signature_type_nesting += 1;
         let binding_name = if use_alias {
             param.alias.as_ref().unwrap_or(&param.name)
         } else {
@@ -245,6 +246,12 @@ impl Lowerer<'_> {
             ),
             None => self.lower_parameter_type(&param.ty),
         };
+        // A list-typed value parameter keeps the whole-shape value reading in
+        // figuras; scalar value parameters do not (size-type Z3).
+        if radix_types::is_integer_index_vector(self.types, ty) {
+            self.figura_extent_admissible_locals.insert(def_id);
+        }
+        self.signature_type_nesting -= 1;
         let mode = match param.ty.mode {
             Some(type_mode) => super::type_mode_hir_param_mode(type_mode),
             None => lower_param_mode(param.mode),
@@ -531,6 +538,7 @@ impl Lowerer<'_> {
             self.bind_local(param.name, param.def_id);
         }
 
+        self.signature_type_nesting += 1;
         let ret_ty = decl.ret.as_ref().map(|ty| {
             self.lower_authored_type(
                 radix_hir::HirTypeSite {
@@ -553,6 +561,7 @@ impl Lowerer<'_> {
                 true,
             )
         });
+        self.signature_type_nesting -= 1;
         let modifier_locals = self.bind_modifier_locals(&decl.modifiers);
 
         let is_vertex = stmt

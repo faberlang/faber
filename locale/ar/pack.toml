@@ -945,6 +945,10 @@ help = "اكسر الدورة بين الوحدات"
 message = "خطأ تخفيض"
 help = "أصلح تركيب AST للتخفيض"
 
+[diagnostics.SEM008.issues.annotation_extent_bare_value_name]
+message = "اسم القيمة {name} لا يمكن أن يشغل موضع مدى في التعليق"
+help = "اكتب `size {name}` لتهجئة الرفع في هذا الموضع، مثل `tf32[2, size {name}]`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring يتطلب initializer"
 help = "أصلح تركيب AST للتخفيض"
@@ -1856,6 +1860,10 @@ help = "gradient selection (`∇`) للتحليل فقط في Phase 2A؛ قوا�
 [diagnostics.SEM011]
 message = "أنواع operands غير صالحة"
 help = "استخدم أنواع operands متوافقة"
+
+[diagnostics.SEM011.issues.signature_extent_bare_value_name]
+message = "معامل القيمة {param} لا يمكن أن يشغل موضع مدى في التوقيع"
+help = "عرّف معاملاً عاماً `<size {param}>` واستخدمه في المدى، أو اكتب الرفع `size {param}` حيث يُقصد رفع قيمة وقت التشغيل"
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"

@@ -945,6 +945,10 @@ help = "打破模块之间的循环"
 message = "lowering 错误"
 help = "修正用于 lowering 的 AST construct"
 
+[diagnostics.SEM008.issues.annotation_extent_bare_value_name]
+message = "值名称 {name} 不能占据注解的 extent 位置"
+help = "在此存储位置写出 `size {name}` 以显式提升，例如 `tf32[2, size {name}]`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring 需要 initializer"
 help = "修正用于 lowering 的 AST construct"
@@ -1856,6 +1860,10 @@ help = "Phase 2A 中 gradient selection（`∇`）仅为 parse-only；eligibilit
 [diagnostics.SEM011]
 message = "无效 operand 类型"
 help = "使用兼容的 operand 类型"
+
+[diagnostics.SEM011.issues.signature_extent_bare_value_name]
+message = "值参数 {param} 不能占据签名的 extent 位置"
+help = "声明 `<size {param}>` 泛型参数并在 figura 中使用，或在需要运行时提升之处写出 `size {param}`"
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"

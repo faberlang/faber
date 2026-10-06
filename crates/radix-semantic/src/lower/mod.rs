@@ -183,6 +183,28 @@ pub struct Lowerer<'a> {
     /// runtime Figura references portable across file interfaces.
     parameter_ordinals: FxHashMap<radix_hir::DefId, u32>,
 
+    /// Locals whose names stay admissible in extent positions: declared-size
+    /// bindings (`const size H ← h` / `const size N = 3`) are size terms, and
+    /// declared integer-list bindings keep the whole-shape value reading
+    /// (conversions track). Other value bindings are refused there (size-type
+    /// Z3: the bare `tf32[2, n]` annotation crossing).
+    figura_extent_admissible_locals: FxHashSet<radix_hir::DefId>,
+
+    /// Figura recursion inside a tuple/width extent position. Bare value
+    /// names are refused only here; a root-position name keeps the
+    /// whole-shape list reading (conversions track).
+    figura_extent_nesting: u32,
+
+    /// Figura recursion under a spelled `size` lift. The lift is the spelled
+    /// store the same-page test requires, so its payload is admissible.
+    figura_lift_nesting: u32,
+
+    /// Type lowering inside a callable signature (parameters, return,
+    /// alternate exit). There the Z3 annotation refusal stands down: the
+    /// signature-position crossing is the signature law's diagnostic, whose
+    /// did-you-mean points at the `<size N>` slot, not at a store lift.
+    signature_type_nesting: u32,
+
     /// Lexical generic-parameter names visible while lowering signatures.
     type_param_scopes: Vec<FxHashMap<Symbol, (radix_hir::DefId, GenericParamKind)>>,
 
@@ -292,6 +314,10 @@ impl<'a> Lowerer<'a> {
             current_span: Span::default(),
             local_scopes: Vec::new(),
             parameter_ordinals: FxHashMap::default(),
+            figura_extent_admissible_locals: FxHashSet::default(),
+            figura_extent_nesting: 0,
+            figura_lift_nesting: 0,
+            signature_type_nesting: 0,
             type_param_scopes: Vec::new(),
             current_ego_struct: None,
             allow_bare_generic_construction: false,

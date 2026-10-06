@@ -1929,6 +1929,10 @@ help = "fix the AST construct for lowering"
 message = "unknown tuple element label"
 help = "use a label declared on the iuncta annotation, or index by position"
 
+[diagnostics.SEM008.issues.annotation_extent_bare_value_name]
+message = "value name {name} cannot occupy an annotation extent"
+help = "write `size {name}` to spell the lift at this store, as in `tf32[2, size {name}]`"
+
 [diagnostics.SEM008.issues.size_slot_bare_value_name]
 message = "value name cannot occupy a size slot"
 help = "write `size w` to use the value as a size witness"
@@ -2916,6 +2920,10 @@ help = "make the success type and the error channel distinguishable, or handle t
 [diagnostics.SEM011.issues.generic_type_arg_domain]
 message = "type argument {rejected} is not allowed for {param}; expected one of {accepted}"
 help = "choose one of the allowed type arguments for this generic parameter"
+
+[diagnostics.SEM011.issues.signature_extent_bare_value_name]
+message = "value parameter {param} cannot occupy a signature extent"
+help = "declare a `<size {param}>` generic parameter and use it in the figura, or spell the lift `size {param}` where a runtime lift is intended"
 
 [diagnostics.SEM011.issues.generic_type_arg_sort]
 message = "generic parameter {param} expects {expected}, but the positional argument has the other kind"

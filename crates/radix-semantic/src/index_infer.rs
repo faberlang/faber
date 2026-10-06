@@ -77,6 +77,15 @@ impl IndexInferState {
         IndexUnifier::new(types, &mut self.substitutions)
     }
 
+    /// Rebind an inference variable to a witness, replacing any earlier
+    /// substitution. Size-type Z3: a `_` extent parameter's shared hole is
+    /// authoritative at its own function entry, so a stale binding from an
+    /// earlier call's unification is overwritten with the formal runtime
+    /// axis instead of failing a equality check.
+    pub fn rebind(&mut self, var: IndexVar, id: IndexId) {
+        self.substitutions.insert(var, id);
+    }
+
     /// Resolve an index through the substitution map.
     pub fn resolve(&mut self, types: &mut TypeTable, id: IndexId) -> IndexId {
         self.unifier(types).resolve(id)

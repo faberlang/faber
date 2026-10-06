@@ -945,6 +945,10 @@ help = "phá vỡ chu trình giữa các mô-đun"
 message = "lỗi hạ mức"
 help = "sửa cấu trúc AST để hạ mức"
 
+[diagnostics.SEM008.issues.annotation_extent_bare_value_name]
+message = "tên giá trị {name} không thể chiếm vị trí extent trong chú thích kiểu"
+help = "viết `size {name}` để tường minh phép nâng tại điểm lưu này, ví dụ `tf32[2, size {name}]`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "phân rã mảng yêu cầu bộ khởi tạo"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1856,6 +1860,10 @@ help = "gradient selection (`∇`) chỉ parse-only trong Phase 2A; các quy t�
 [diagnostics.SEM011]
 message = "kiểu toán hạng không hợp lệ"
 help = "dùng các kiểu toán hạng tương thích"
+
+[diagnostics.SEM011.issues.signature_extent_bare_value_name]
+message = "tham số giá trị {param} không thể chiếm vị trí extent trong chữ ký"
+help = "khai báo tham số tổng quát `<size {param}>` và dùng nó trong figura, hoặc viết phép nâng `size {param}` nơi muốn nâng giá trị runtime"
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"

@@ -192,6 +192,17 @@ impl TypeChecker<'_> {
         policy_callee: Option<radix_hir::DefId>,
         user_function: bool,
     ) -> TypeId {
+        // Size-type Z3 (Q3): `_` extent holes in a callee signature are
+        // anonymous size parameters chosen per call. The declared signature
+        // term is interned once, so its holes must be re-instantiated at the
+        // call boundary; otherwise the first call's unification binds the
+        // shared hole program-wide (the g06/c1 first-call defect). The rigid
+        // method path keeps its signature untouched (S0-G8).
+        let sig = if solve_shape_params {
+            self.instantiate_anonymous_extents(sig)
+        } else {
+            sig.clone()
+        };
         // Magnitudo shape params are carried by the signature's generic
         // descriptors: the declared sort is authoritative, so a size param
         // is a shape param even when no signature shape mentions it.
@@ -217,13 +228,13 @@ impl TypeChecker<'_> {
                 }
             }
             let mut shape_vars = self.shape_vars_for(&shape_symbols);
-            let sig = self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars));
+            let sig = self.substitute_func_sig(&sig, &mut param_vars, Some(&mut shape_vars));
             (sig, Some(param_vars), shape_vars, FxHashSet::default())
         } else if let Some(error_ty) =
-            self.reject_invalid_explicit_type_args(sig, explicit_type_args, args, span)
+            self.reject_invalid_explicit_type_args(&sig, explicit_type_args, args, span)
         {
             return error_ty;
-        } else if self.reject_type_arg_domain_misses(sig, explicit_type_args, span) {
+        } else if self.reject_type_arg_domain_misses(&sig, explicit_type_args, span) {
             self.typecheck_call_arg_exprs(args);
             return self.error_type;
         } else {
@@ -240,7 +251,7 @@ impl TypeChecker<'_> {
                 // magnitudo param (sort-checked by the arity validator).
                 let mut shape_vars = self.shape_vars_for(&shape_symbols);
                 self.bind_explicit_magnitudo_args(
-                    sig,
+                    &sig,
                     explicit_type_args,
                     &mut shape_vars,
                     &mut explicit_bound,
@@ -252,7 +263,7 @@ impl TypeChecker<'_> {
                     }
                 }
                 (
-                    self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
+                    self.substitute_func_sig(&sig, &mut param_vars, Some(&mut shape_vars)),
                     Some(param_vars),
                     shape_vars,
                     explicit_bound,
@@ -278,7 +289,7 @@ impl TypeChecker<'_> {
                 }
                 let mut shape_vars = self.shape_vars_for(&shape_symbols);
                 (
-                    self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
+                    self.substitute_func_sig(&sig, &mut param_vars, Some(&mut shape_vars)),
                     Some(param_vars),
                     shape_vars,
                     explicit_bound,
@@ -722,6 +733,204 @@ impl TypeChecker<'_> {
         format_faber_type(ty, self.types, interner, &|def_id| {
             format!("Def{}", def_id.0)
         })
+    }
+
+    /// Size-type Z3 (Q3): give every `_` extent hole in a callee signature's
+    /// parameter figuras a fresh per-call hole. Repeated occurrences of one
+    /// declared hole share the fresh instance within this call; distinct
+    /// holes stay distinct. Return figuras keep their declared holes: an
+    /// opaque `→ tf32[_, _]` is not a per-call parameter — its witnesses come
+    /// from the callee body and are pinned at the caller's store (Z2 dw8).
+    fn instantiate_anonymous_extents(&mut self, sig: &FuncSig) -> FuncSig {
+        let mut holes: FxHashMap<radix_types::IndexVar, IndexId> = FxHashMap::default();
+        let mut freshen =
+            |this: &mut Self, ty: TypeId| this.freshen_anonymous_type_holes(ty, &mut holes);
+        FuncSig {
+            type_params: sig.type_params.clone(),
+            params: sig
+                .params
+                .iter()
+                .map(|param| ParamType {
+                    ty: freshen(self, param.ty),
+                    mode: param.mode,
+                    optional: param.optional,
+                })
+                .collect(),
+            ret: sig.ret,
+            err: sig.err,
+            is_async: sig.is_async,
+            is_generator: sig.is_generator,
+        }
+    }
+
+    /// Rewrite unresolved `IndexExpr::Infer` leaves in a signature type's
+    /// extent terms to this call's anonymous holes. Composite leaves rebuild
+    /// exactly like [`Self::substitute_type_params`; generic symbols and all
+    /// non-figura leaves keep their identity.
+    fn freshen_anonymous_type_holes(
+        &mut self,
+        ty: TypeId,
+        holes: &mut FxHashMap<radix_types::IndexVar, IndexId>,
+    ) -> TypeId {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.get(resolved).clone() {
+            Type::Param(_) => ty,
+            Type::Array(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.array(inner)
+            }
+            Type::Map(key, value) => {
+                let key = self.freshen_anonymous_type_holes(key, holes);
+                let value = self.freshen_anonymous_type_holes(value, holes);
+                self.types.map(key, value)
+            }
+            Type::Set(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.set(inner)
+            }
+            Type::Option(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.option(inner)
+            }
+            Type::Promissum(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.promissum(inner)
+            }
+            Type::PromissumFailable(success, alternate) => {
+                let success = self.freshen_anonymous_type_holes(success, holes);
+                let alternate = self.freshen_anonymous_type_holes(alternate, holes);
+                self.types.promissum_failable(success, alternate)
+            }
+            Type::Cursor(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.cursor(inner)
+            }
+            Type::AsyncCursor(item, alternate) => {
+                let item = self.freshen_anonymous_type_holes(item, holes);
+                let alternate = self.freshen_anonymous_type_holes(alternate, holes);
+                self.types.async_cursor(item, alternate)
+            }
+            Type::Intervallum(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.intervallum(inner)
+            }
+            Type::Ref(mode, inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.reference(mode, inner)
+            }
+            Type::Tensor(elem, shape) => {
+                let element = self.freshen_anonymous_type_holes(elem, holes);
+                let shape = self.freshen_anonymous_index_holes(shape, holes);
+                self.types.tensor_with_shape(element, shape)
+            }
+            Type::Vector(elem, width) => {
+                let element = self.freshen_anonymous_type_holes(elem, holes);
+                let width = self.freshen_anonymous_index_holes(width, holes);
+                self.types.vector_with_width(element, width)
+            }
+            Type::Matrix(elem, shape) => {
+                let element = self.freshen_anonymous_type_holes(elem, holes);
+                let shape = self.freshen_anonymous_index_holes(shape, holes);
+                self.types.matrix_with_shape(element, shape)
+            }
+            Type::Sparsa(elem, shape) => {
+                let element = self.freshen_anonymous_type_holes(elem, holes);
+                let shape = self.freshen_anonymous_index_holes(shape, holes);
+                self.types.sparsa_with_shape(element, shape)
+            }
+            Type::BoundedAscii { capacity } => {
+                let capacity = self.freshen_anonymous_index_holes(capacity, holes);
+                self.types.bounded_ascii(capacity)
+            }
+            Type::BoundedTextus { capacity } => {
+                let capacity = self.freshen_anonymous_index_holes(capacity, holes);
+                self.types.bounded_textus(capacity)
+            }
+            Type::BoundedOcteti { capacity } => {
+                let capacity = self.freshen_anonymous_index_holes(capacity, holes);
+                self.types.bounded_octeti(capacity)
+            }
+            Type::BoundedArray { element, capacity } => {
+                let element = self.freshen_anonymous_type_holes(element, holes);
+                let capacity = self.freshen_anonymous_index_holes(capacity, holes);
+                self.types.bounded_array(element, capacity)
+            }
+            Type::Func(sig) => {
+                let instantiated = self.instantiate_anonymous_extents(&sig);
+                self.types.function(instantiated)
+            }
+            Type::Applied(base, args) => {
+                let base = self.freshen_anonymous_type_holes(base, holes);
+                let args = args
+                    .iter()
+                    .map(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => radix_types::AppliedArg::Type(
+                            self.freshen_anonymous_type_holes(*id, holes),
+                        ),
+                        radix_types::AppliedArg::Size(id) => radix_types::AppliedArg::Size(
+                            self.freshen_anonymous_index_holes(*id, holes),
+                        ),
+                    })
+                    .collect();
+                self.types.intern(Type::Applied(base, args))
+            }
+            Type::Union(types) => {
+                let types = types
+                    .iter()
+                    .map(|member| self.freshen_anonymous_type_holes(*member, holes))
+                    .collect();
+                self.types.intern(Type::Union(types))
+            }
+            Type::Tuple(elements) => {
+                let elements = elements
+                    .iter()
+                    .map(|element| self.freshen_anonymous_type_holes(*element, holes))
+                    .collect();
+                self.types.intern(Type::Tuple(elements))
+            }
+            Type::Alias(def, inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.intern(Type::Alias(def, inner))
+            }
+            _ => ty,
+        }
+    }
+
+    fn freshen_anonymous_index_holes(
+        &mut self,
+        id: IndexId,
+        holes: &mut FxHashMap<radix_types::IndexVar, IndexId>,
+    ) -> IndexId {
+        match self.types.get_index(id).clone() {
+            IndexExpr::Infer(var) => match holes.get(&var) {
+                Some(fresh) => *fresh,
+                None => {
+                    let fresh = self.fresh_index_hole();
+                    holes.insert(var, fresh);
+                    fresh
+                }
+            },
+            IndexExpr::Tuple(dims) => {
+                let dims = dims
+                    .iter()
+                    .map(|dim| self.freshen_anonymous_index_holes(*dim, holes))
+                    .collect();
+                self.types.intern_index(IndexExpr::Tuple(dims))
+            }
+            IndexExpr::Affine { base, offset } => {
+                let base = self.freshen_anonymous_index_holes(base, holes);
+                add_index_constant(&mut self.types, base, offset)
+                    .unwrap_or_else(|_| self.types.intern_index(IndexExpr::Affine { base, offset }))
+            }
+            IndexExpr::Divide { numerator, divisor } => {
+                let numerator = self.freshen_anonymous_index_holes(numerator, holes);
+                divide_index_exact(&mut self.types, numerator, divisor).unwrap_or_else(|_| {
+                    self.types
+                        .intern_index(IndexExpr::Divide { numerator, divisor })
+                })
+            }
+            _ => id,
+        }
     }
 
     pub fn substitute_func_sig(

@@ -945,6 +945,10 @@ help = "打破模組之間的循環"
 message = "降階錯誤"
 help = "修正用於降階的 AST 結構"
 
+[diagnostics.SEM008.issues.annotation_extent_bare_value_name]
+message = "值名稱 {name} 不能佔據注記的 extent 位置"
+help = "在此儲存位置寫出 `size {name}` 以顯式提升，例如 `tf32[2, size {name}]`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "陣列解構需要初始化器"
 help = "修正用於降階的 AST 結構"
@@ -1856,6 +1860,10 @@ help = "Phase 2A 中 gradient selection（`∇`）僅為 parse-only；eligibilit
 [diagnostics.SEM011]
 message = "運算元型別無效"
 help = "使用相容的運算元型別"
+
+[diagnostics.SEM011.issues.signature_extent_bare_value_name]
+message = "值參數 {param} 不能佔據簽名的 extent 位置"
+help = "宣告 `<size {param}>` 泛型參數並在 figura 中使用，或在需要執行期提升之處寫出 `size {param}`"
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
