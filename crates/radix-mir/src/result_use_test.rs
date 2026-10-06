@@ -138,3 +138,127 @@ fn a_projected_destination_is_refused() {
     let f = function(vec![], returned(1));
     assert!(!result_only_returned(&f, &place));
 }
+
+// -- where the result is finally returned, and the write-once rule --
+
+fn local_place(id: u32) -> MirPlace {
+    MirPlace::local(MirLocalId(id))
+}
+
+#[test]
+fn a_directly_returned_result_is_returned_as_itself() {
+    let f = function(vec![], returned(1));
+    assert_eq!(
+        result_returned_as(&f, &local_place(1)),
+        Some(local_place(1))
+    );
+}
+
+#[test]
+fn a_forwarded_result_is_returned_as_the_end_of_the_chain() {
+    // `temp0 ← softmax(..)`, `local1 ← temp0`, `local2 ← local1`, `return local2`.
+    let f = function(
+        vec![
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+            ),
+            assign(
+                local_place(2),
+                MirValueKind::Operand(MirOperand::Place(local_place(1))),
+            ),
+        ],
+        returned(2),
+    );
+    assert_eq!(
+        result_returned_as(&f, &MirPlace::temp(MirTempId(0))),
+        Some(local_place(2))
+    );
+}
+
+/// `var y ← x.softmax(); y ← other; return y` returns `other`, not the recipe's
+/// result: a backend that treated `y` as the recipe's destination would skip
+/// storing `other` and return the wrong tensor.
+#[test]
+fn a_forward_target_reassigned_before_the_return_is_refused() {
+    let f = function(
+        vec![
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+            ),
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Place(local_place(9))),
+            ),
+        ],
+        returned(1),
+    );
+    assert_eq!(result_returned_as(&f, &MirPlace::temp(MirTempId(0))), None);
+}
+
+#[test]
+fn a_destination_written_twice_is_refused() {
+    let f = function(
+        vec![
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Place(local_place(8))),
+            ),
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Place(local_place(9))),
+            ),
+        ],
+        returned(1),
+    );
+    assert_eq!(result_returned_as(&f, &local_place(1)), None);
+}
+
+#[test]
+fn a_write_through_a_projection_is_refused() {
+    let mut element = local_place(1);
+    element
+        .projections
+        .push(crate::MirProjection::Index(MirOperand::Constant(
+            crate::MirConstant::Int(0),
+        )));
+    let f = function(
+        vec![assign(
+            element,
+            MirValueKind::Operand(MirOperand::Constant(crate::MirConstant::Int(1))),
+        )],
+        returned(1),
+    );
+    assert_eq!(result_returned_as(&f, &local_place(1)), None);
+}
+
+/// A recipe that writes the kernel's output parameter in a `void` kernel has no
+/// `Return` of its result. Nothing reads it, so it is "only returned" for the
+/// row mapping, but it is not a result the return can be taught to skip.
+#[test]
+fn a_result_nobody_returns_is_unread_but_not_returned_as_anything() {
+    let f = function(vec![], MirTerminatorKind::Return(None));
+    assert!(result_only_returned(&f, &local_place(1)));
+    assert_eq!(result_returned_as(&f, &local_place(1)), None);
+}
+
+/// The write-once rule applies to the shared predicate too: a forward target
+/// reassigned before the return is not the recipe's result.
+#[test]
+fn a_reassigned_forward_target_is_refused_by_the_shared_predicate_too() {
+    let f = function(
+        vec![
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+            ),
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Place(local_place(9))),
+            ),
+        ],
+        returned(1),
+    );
+    assert!(!result_only_returned(&f, &MirPlace::temp(MirTempId(0))));
+}

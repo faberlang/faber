@@ -14,21 +14,65 @@ use crate::{
     MirValueKind,
 };
 
-/// Whether a recipe's result is consumed only by the kernel's `Return`.
+/// Whether nothing but plain forwards and the kernel's `Return` reads a
+/// recipe's result.
 ///
 /// A mapping that writes a whole row from one thread means a same-kernel
 /// consumer that reads `output[index]` (the per-element binding) could read an
 /// element its owner has not written yet. Following plain forwards
-/// (`temp → local → return`), the result may be read by nothing else.
+/// (`temp → local → return`), the result may be read by nothing else. The
+/// result need not be returned at all: a recipe that writes the kernel's output
+/// parameter in a `void` kernel has no `Return` of it.
+///
+/// Every place on the chain must also be written at most once; see
+/// [`result_returned_as`].
 #[must_use]
 pub fn result_only_returned(function: &MirFunction, destination: &MirPlace) -> bool {
+    follow_result(function, destination).is_some()
+}
+
+/// The place the kernel finally returns a recipe's result as, when nothing
+/// else reads it: the destination itself for `return x.softmax()`, the local
+/// at the end of a plain forward chain for `const y ← x.softmax(); return y`.
+///
+/// A backend that lets one thread write a whole row of the output must also
+/// stop the return from re-storing the result element by element, which would
+/// race the thread that owns the row. A backend whose return recognizes the
+/// recipe's own destination can record the place returned here instead, so the
+/// forwarded forms stay on the fast path and stay correct.
+///
+/// `None` unless every step is provably the same value:
+///
+/// - the result is read by nothing but plain forwards and the return;
+/// - every place along the chain is written **at most once**, so a forward
+///   target reassigned before the return (`var y ← x.softmax(); y ← other;
+///   return y`) is refused: it would return `other` while the caller believed
+///   it was returning the recipe's result;
+/// - the chain ends in a `Return` of the last place (unlike
+///   [`result_only_returned`], a result nobody returns is not enough).
+#[must_use]
+pub fn result_returned_as(function: &MirFunction, destination: &MirPlace) -> Option<MirPlace> {
+    let (base, returned) = follow_result(function, destination)?;
+    returned.then(|| MirPlace {
+        base,
+        projections: Vec::new(),
+    })
+}
+
+/// Follow a recipe result along plain forwards. `Some((end, returned))` when no
+/// step is read by anything else and every place is written at most once;
+/// `returned` says whether the chain ends in a `Return` of `end`.
+fn follow_result(function: &MirFunction, destination: &MirPlace) -> Option<(MirPlaceBase, bool)> {
     if !destination.projections.is_empty() {
-        return false;
+        return None;
     }
     let mut base = destination.base.clone();
     // A forward chain is short (`temp → local → return`); a longer one is
     // not the shape this is meant to prove.
     for _ in 0..4 {
+        if write_count(function, &base) > 1 {
+            return None;
+        }
         let mut forwards = Vec::new();
         let mut returned = false;
         let mut other_read = false;
@@ -64,15 +108,56 @@ pub fn result_only_returned(function: &MirFunction, destination: &MirPlace) -> b
             }
         }
         if other_read {
-            return false;
+            return None;
         }
         match (forwards.as_slice(), returned) {
-            ([], _) => return true,
+            ([], returned) => return Some((base, returned)),
             ([next], false) => base = next.clone(),
-            _ => return false,
+            _ => return None,
         }
     }
-    false
+    None
+}
+
+/// How many places in the function write `base`, counting any write through a
+/// projection (`base[i] ← …`) as disqualifying.
+fn write_count(function: &MirFunction, base: &MirPlaceBase) -> usize {
+    let mut count = 0;
+    let mut note = |place: &MirPlace| {
+        if place.base == *base {
+            count += if place.projections.is_empty() {
+                1
+            } else {
+                usize::MAX / 2
+            };
+        }
+    };
+    for block in &function.blocks {
+        for statement in &block.statements {
+            match &statement.kind {
+                MirStatementKind::Assign { place, .. } => note(place),
+                MirStatementKind::Call { destination, .. }
+                | MirStatementKind::RuntimeCall { destination, .. } => {
+                    if let Some(place) = destination {
+                        note(place);
+                    }
+                }
+                MirStatementKind::Construct { destination, .. } => note(destination),
+            }
+        }
+        if let MirTerminatorKind::TryCall {
+            destination,
+            error_place,
+            ..
+        } = &block.terminator.kind
+        {
+            if let Some(place) = destination {
+                note(place);
+            }
+            note(error_place);
+        }
+    }
+    count
 }
 
 /// Whether `operand` reads exactly `base`, with no projection.
