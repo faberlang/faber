@@ -1,11 +1,13 @@
 //! `TensorFill` postures on the runner: the statement form (dropped result)
 //! is the in-place mutation, while the bound form returns a fresh tensor and
-//! leaves its source unchanged.
+//! leaves its source unchanged. The posture is read off the destination
+//! temp's liveness, so the scan itself is pinned here too.
 
 use super::*;
 
 use radix_mir::{
-    MirCollectionOp, MirIntrinsic, MirRuntimeCall, MirStatement, MirStatementKind, MirType,
+    MirCollectionOp, MirIntrinsic, MirOptionOp, MirRuntimeCall, MirStatement, MirStatementKind,
+    MirTerminator, MirType,
 };
 use radix_types::TypeId;
 
@@ -159,4 +161,135 @@ fn bound_form_fill_returns_fresh_and_leaves_source_unchanged() {
     assert!(!Rc::ptr_eq(&filled, &receiver), "bound fill is fresh");
     assert_eq!(logical(&filled), [0.0; 4]);
     assert_eq!(logical(&receiver), [1.0, 2.0, 3.0, 4.0]);
+}
+
+// -- Posture scan: a fill result is "dropped" only when nothing reads it. --
+
+fn fill_into_temp() -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::temp(MirTempId(0))),
+            call: fill_call(),
+        },
+        span: Span::default(),
+    }
+}
+
+fn assign_value(place: MirPlace, kind: MirValueKind) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place,
+            value: MirValue {
+                id: MirValueId(7),
+                kind,
+                ty: MirType::semantic(TypeId(0)),
+                span: Span::default(),
+            },
+        },
+        span: Span::default(),
+    }
+}
+
+fn block_of(statements: Vec<MirStatement>, terminator: MirTerminatorKind) -> MirBlock {
+    MirBlock {
+        id: MirBlockId(0),
+        statements,
+        terminator: MirTerminator {
+            kind: terminator,
+            span: Span::default(),
+        },
+        span: Span::default(),
+    }
+}
+
+fn dropped_after(later: Vec<MirStatement>, terminator: MirTerminatorKind) -> bool {
+    let mut statements = vec![fill_into_temp()];
+    statements.extend(later);
+    let block = block_of(statements, terminator);
+    fill_result_is_dropped(&block.statements[0], &block, 0)
+}
+
+#[test]
+fn unread_temp_destination_is_a_dropped_fill() {
+    assert!(dropped_after(vec![], MirTerminatorKind::Return(None)));
+}
+
+#[test]
+fn forwarded_temp_keeps_the_bound_posture() {
+    let forward = assign_value(
+        MirPlace::local(MirLocalId(0)),
+        MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+    );
+    assert!(!dropped_after(
+        vec![forward],
+        MirTerminatorKind::Return(None)
+    ));
+}
+
+/// `const T ∪ nihil maybe ← t.fill(v)` lowers the bound result through
+/// `Some(temp)`. The scan once skipped option values, mistook that binding for
+/// a discarded fill, and mutated the source while binding a unit.
+#[test]
+fn option_wrapped_temp_keeps_the_bound_posture() {
+    let wrapped = assign_value(
+        MirPlace::local(MirLocalId(0)),
+        MirValueKind::Option(MirOptionOp::Some(MirOperand::Temp(MirTempId(0)))),
+    );
+    assert!(!dropped_after(
+        vec![wrapped],
+        MirTerminatorKind::Return(None)
+    ));
+}
+
+#[test]
+fn coalesced_temp_keeps_the_bound_posture() {
+    let coalesced = assign_value(
+        MirPlace::local(MirLocalId(0)),
+        MirValueKind::Option(MirOptionOp::Coalesce {
+            value: MirOperand::Constant(MirConstant::Nil),
+            fallback: MirOperand::Temp(MirTempId(0)),
+        }),
+    );
+    assert!(!dropped_after(
+        vec![coalesced],
+        MirTerminatorKind::Return(None)
+    ));
+}
+
+#[test]
+fn returned_temp_keeps_the_bound_posture() {
+    assert!(!dropped_after(
+        vec![],
+        MirTerminatorKind::Return(Some(MirOperand::Temp(MirTempId(0))))
+    ));
+}
+
+#[test]
+fn temp_read_through_a_place_operand_keeps_the_bound_posture() {
+    let read = assign_value(
+        MirPlace::local(MirLocalId(0)),
+        MirValueKind::Operand(MirOperand::Place(MirPlace::temp(MirTempId(0)))),
+    );
+    assert!(!dropped_after(vec![read], MirTerminatorKind::Return(None)));
+}
+
+#[test]
+fn overwriting_the_temp_is_not_a_read() {
+    let rewrite = assign_value(
+        MirPlace::temp(MirTempId(0)),
+        MirValueKind::Operand(MirOperand::Constant(MirConstant::Unit)),
+    );
+    assert!(dropped_after(
+        vec![rewrite],
+        MirTerminatorKind::Return(None)
+    ));
+}
+
+#[test]
+fn a_different_temp_is_not_a_read() {
+    let other = assign_value(
+        MirPlace::local(MirLocalId(0)),
+        MirValueKind::Option(MirOptionOp::Some(MirOperand::Temp(MirTempId(1)))),
+    );
+    assert!(dropped_after(vec![other], MirTerminatorKind::Return(None)));
 }

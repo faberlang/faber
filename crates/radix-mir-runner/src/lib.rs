@@ -282,10 +282,9 @@ fn shape_guard_precedes_try_call(
 /// Whether the tensor-fill result is dropped: the statement posture of
 /// `t.fill(v);`. The MIR lowering gives every value-returning call a temp
 /// destination, so the posture is the temp's liveness — a destination the
-/// rest of the block never mentions (and the terminator never returns) is
-/// the discarded fill, and the documented mutation statement applies. The
-/// scan is conservative: any later mention keeps the bound fresh-result
-/// posture.
+/// rest of the block never reads (and the terminator never consumes) is the
+/// discarded fill, and the documented mutation statement applies. The scan is
+/// conservative: any later read keeps the bound fresh-result posture.
 fn fill_result_is_dropped(
     statement: &radix_mir::MirStatement,
     block: &radix_mir::MirBlock,
@@ -310,92 +309,46 @@ fn fill_result_is_dropped(
     if !place.projections.is_empty() {
         return false;
     }
-    let read_later = block
-        .statements
-        .iter()
-        .skip(index + 1)
-        .any(|later| statement_mentions_temp(later, dest));
-    !read_later && !terminator_mentions_temp(&block.terminator.kind, dest)
-}
-
-fn statement_mentions_temp(statement: &radix_mir::MirStatement, temp: MirTempId) -> bool {
-    match &statement.kind {
-        MirStatementKind::Assign { place, value } => {
-            place_mentions_temp(place, temp) || value_mentions_temp(&value.kind, temp)
-        }
-        MirStatementKind::Call {
-            destination, args, ..
-        }
-        | MirStatementKind::RuntimeCall {
-            destination,
-            call: radix_mir::MirRuntimeCall { args, .. },
-        } => {
-            destination
-                .as_ref()
-                .is_some_and(|place| place_mentions_temp(place, temp))
-                || args
-                    .iter()
-                    .any(|operand| operand_mentions_temp(operand, temp))
-        }
-        MirStatementKind::Construct {
-            destination,
-            aggregate,
-        } => place_mentions_temp(destination, temp) || aggregate_mentions_temp(aggregate, temp),
+    let mut reads = TempReads {
+        temp: dest,
+        found: false,
+    };
+    for later in block.statements.iter().skip(index + 1) {
+        radix_mir::visit::walk_stmt(&mut reads, later);
     }
+    radix_mir::visit::walk_terminator(&mut reads, &block.terminator);
+    !reads.found
 }
 
-fn place_mentions_temp(place: &MirPlace, temp: MirTempId) -> bool {
-    matches!(place.base, MirPlaceBase::Temp(base) if base == temp)
+/// Finds any read of one temp. It rides the exhaustive MIR visitor rather than
+/// re-listing every operand-bearing node: the hand-rolled predecessor skipped
+/// `Option`/`Closure` values, so a bound fill stored into a nullable binding
+/// (`Some(temp)`) was misread as a dropped statement and mutated its source.
+struct TempReads {
+    temp: MirTempId,
+    found: bool,
 }
 
-fn operand_mentions_temp(operand: &MirOperand, temp: MirTempId) -> bool {
-    match operand {
-        MirOperand::Place(place) => place_mentions_temp(place, temp),
-        MirOperand::Temp(id) => *id == temp,
-        MirOperand::Value(_) | MirOperand::Constant(_) => false,
+impl radix_mir::visit::MirVisitor for TempReads {
+    fn visit_operand(&mut self, operand: &MirOperand) {
+        let reads_temp = match operand {
+            MirOperand::Temp(id) => *id == self.temp,
+            MirOperand::Place(place) => {
+                matches!(place.base, MirPlaceBase::Temp(id) if id == self.temp)
+            }
+            MirOperand::Value(_) | MirOperand::Constant(_) => false,
+        };
+        self.found |= reads_temp;
+        radix_mir::visit::walk_operand(self, operand);
     }
-}
 
-fn value_mentions_temp(value: &MirValueKind, temp: MirTempId) -> bool {
-    match value {
-        MirValueKind::Operand(operand) => operand_mentions_temp(operand, temp),
-        MirValueKind::Closure(_) | MirValueKind::Option(_) => false,
-        MirValueKind::Unary { operand, .. } => operand_mentions_temp(operand, temp),
-        MirValueKind::Binary { lhs, rhs, .. } => {
-            operand_mentions_temp(lhs, temp) || operand_mentions_temp(rhs, temp)
-        }
-    }
-}
-
-fn aggregate_mentions_temp(aggregate: &radix_mir::MirAggregate, temp: MirTempId) -> bool {
-    let mentions = |operand: &MirOperand| operand_mentions_temp(operand, temp);
-    match &aggregate.fields {
-        radix_mir::MirAggregateFields::Ordered(items) => items.iter().any(|item| match item {
-            radix_mir::MirAggregateItem::Operand(element)
-            | radix_mir::MirAggregateItem::Spread(element) => mentions(element),
-        }),
-        radix_mir::MirAggregateFields::Named(fields) => {
-            fields.iter().any(|field| mentions(&field.value))
-        }
-        radix_mir::MirAggregateFields::Keyed(entries) => entries
-            .iter()
-            .any(|entry| mentions(&entry.key) || mentions(&entry.value)),
-    }
-}
-
-fn terminator_mentions_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> bool {
-    match terminator {
-        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
-            operand_mentions_temp(operand, temp)
-        }
-        MirTerminatorKind::Branch { condition, .. } => operand_mentions_temp(condition, temp),
-        MirTerminatorKind::Switch { value, .. } => operand_mentions_temp(value, temp),
-        MirTerminatorKind::TryCall { args, .. } => args
-            .iter()
-            .any(|operand| operand_mentions_temp(operand, temp)),
-        MirTerminatorKind::Return(None)
-        | MirTerminatorKind::Goto(_)
-        | MirTerminatorKind::Unreachable => false,
+    fn visit_place(&mut self, place: &MirPlace) {
+        // A plain destination write is not a read, but a projected write
+        // (`temp[i] ← x`) mutates the temp's own storage.
+        let writes_through = !place.projections.is_empty()
+            && matches!(place.base, MirPlaceBase::Temp(id) if id == self.temp);
+        self.found |= writes_through;
+        radix_mir::visit::walk_place(self, place);
     }
 }
 
