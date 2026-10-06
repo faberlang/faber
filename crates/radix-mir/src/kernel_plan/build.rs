@@ -1262,10 +1262,14 @@ fn layer_norm_const_facts(
     if args.len() < 3 || args.len() > 5 {
         return false;
     }
-    let MirOperand::Constant(MirConstant::Float(epsilon)) = &args[2] else {
+    // The epsilon is a const the source frontend may have materialized
+    // through a single const temp (floating-point literals are), exactly as
+    // the RMSNorm epsilon is read below; matching only a direct constant
+    // rejected every source-level layer norm.
+    let Some(MirConstant::Float(epsilon)) = literal_const_operand(function, &args[2]) else {
         return false;
     };
-    if !epsilon.is_finite() || *epsilon < 0.0 {
+    if !epsilon.is_finite() || epsilon < 0.0 {
         return false;
     }
     let Some(norm_index) = usize::try_from(axis)
@@ -1294,7 +1298,8 @@ fn layer_norm_const_facts(
 /// materialization the source frontend uses for floating-point literals.
 /// The resolver stays typed and local: it does not infer values from names or
 /// arbitrary expressions, and ambiguous/multi-assignment temps fail closed.
-fn literal_const_operand(function: &MirFunction, operand: &MirOperand) -> Option<MirConstant> {
+#[must_use]
+pub fn literal_const_operand(function: &MirFunction, operand: &MirOperand) -> Option<MirConstant> {
     if let MirOperand::Constant(constant) = operand {
         return Some(constant.clone());
     }
