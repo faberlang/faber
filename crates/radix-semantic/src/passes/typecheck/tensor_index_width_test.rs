@@ -256,8 +256,7 @@ fn gather_typechecks_with_a_tensor_u32_ids_parameter() {
 fn gather_typechecks_with_ids_built_from_a_flat_list() {
     accepts(
         r"functio select(tf32[4, 3] table) → tf32[4, 3] {
-    fixum tensor<u32, []> seed ← vacua
-    fixum tensor<u32, [4]> ids ← seed.strue([3, 0, 2, 0], [4])
+    fixum tensor<u32, [4]> ids ← [3, 0, 2, 0] ↦ tensor<u32, [4]>
     redde table.gather(ids)
 }",
     );

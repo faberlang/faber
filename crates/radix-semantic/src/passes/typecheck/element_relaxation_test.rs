@@ -33,8 +33,7 @@ fn tensor_textus_construction_and_accipe_typecheck() {
     accepts(&compile(
         r#"incipit {
   fixum lista<textus> flat ← ["a", "b", "c"]
-  fixum tensor<textus, _> seed ← vacua
-  fixum tensor<textus, [3]> grid ← seed.strue(flat, [3])
+  fixum tensor<textus, [3]> grid ← flat ↦ tensor<textus, [3]>
   fixum textus cell ← grid.accipe([0]) vel ""
   nota cell
 }"#,
@@ -47,9 +46,8 @@ fn tensor_textus_plus_rejects() {
         &compile(
             r#"incipit {
   fixum lista<textus> flat ← ["a", "b", "c"]
-  fixum tensor<textus, _> seed ← vacua
-  fixum tensor<textus, [3]> left ← seed.strue(flat, [3])
-  fixum tensor<textus, [3]> right ← seed.strue(flat, [3])
+  fixum tensor<textus, [3]> left ← flat ↦ tensor<textus, [3]>
+  fixum tensor<textus, [3]> right ← flat ↦ tensor<textus, [3]>
   fixum _ sum ← left + right
 }"#,
         ),

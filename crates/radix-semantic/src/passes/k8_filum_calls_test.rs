@@ -524,8 +524,7 @@ genus Counter {{
     functio bump() → vacuum {{ ego.count ← ego.count + 1 }}
 }}
 functio kernel(in {GRID} out, de {GRID} src) → vacuum {{
-    varia tensor<f32, []> seed ← vacua
-    varia {GRID} scratch ← seed.crea(0.0, [4])
+    varia {GRID} scratch ← tf32[4]
     varia Counter counter ← Counter {{ count = 0 }}
     {statements}
     itera ex src apud [i] filum lane fixum value {{

@@ -6,9 +6,8 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const PRELUDE: &str = "fixum tensor<f32, []> seed ← vacua
-fixum tensor<f32, [2]> a ← seed.strue([1.0, 2.0], [2])
-fixum tensor<f32, [2]> b ← seed.strue([2.0, 1.0], [2])
+const PRELUDE: &str = "fixum tensor<f32, [2]> a ← [1.0, 2.0] ↦ tensor<f32, [2]>
+fixum tensor<f32, [2]> b ← [2.0, 1.0] ↦ tensor<f32, [2]>
 ";
 
 fn issues(target: Target, body: &str) -> Vec<String> {

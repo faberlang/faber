@@ -34,7 +34,6 @@ fn rejected(source: &str, reason: &str) {
 fn kernel(grid: &str, statement: &str) -> String {
     format!(
         r"incipit {{
-    varia tensor<numerus, []> seed ← vacua
     varia tensor<numerus, [4]> grid ← {grid}
     itera ex grid apud [i] filum lane fixum value {{
         {statement}
@@ -45,9 +44,9 @@ fn kernel(grid: &str, statement: &str) -> String {
 
 #[test]
 fn created_tensor_is_fresh_storage() {
-    accepted(&kernel("seed.crea(0, [4])", "grid[i] ← value + 1"));
+    accepted(&kernel("ti64[4]", "grid[i] ← value + 1"));
     rejected(
-        &kernel("seed.crea(0, [4])", "grid[i] ← grid[i + 1]"),
+        &kernel("ti64[4]", "grid[i] ← grid[i + 1]"),
         "written_storage_neighbor_read",
     );
 }
@@ -55,21 +54,31 @@ fn created_tensor_is_fresh_storage() {
 #[test]
 fn flat_built_tensor_is_fresh_storage() {
     accepted(&kernel(
-        "seed.strue([1, 2, 3, 4], [4])",
+        "[1, 2, 3, 4] ↦ tensor<numerus, [4]>",
         "grid[i] ← value + 1",
     ));
     rejected(
-        &kernel("seed.strue([1, 2, 3, 4], [4])", "grid[i] ← grid[i + 1]"),
+        &kernel(
+            "[1, 2, 3, 4] ↦ tensor<numerus, [4]>",
+            "grid[i] ← grid[i + 1]",
+        ),
         "written_storage_neighbor_read",
     );
 }
 
 #[test]
 fn other_call_result_keeps_unknown_identity() {
+    // The factory constructors only sit in store position, so the unknown
+    // root rides an `addita` result over a fresh local.
     rejected(
-        &kernel(
-            "seed.crea(0, [4]).addita(seed.crea(1, [4]))",
-            "grid[i] ← value",
+        &format!(
+            r"incipit {{
+    varia tensor<numerus, [4]> fresh ← ti64[4]
+    varia tensor<numerus, [4]> grid ← fresh.addita(fresh)
+    itera ex grid apud [i] filum lane fixum value {{
+        grid[i] ← value
+    }}
+}}"
         ),
         "unknown_storage_identity",
     );
@@ -157,8 +166,7 @@ fn read_param_read_at_neighbours_and_never_written_is_accepted() {
     // Paired with a local that owns its storage.
     accepted(&format!(
         r"functio kernel(de {GRID} src) → vacuum {{
-    varia tensor<numerus, []> seed ← vacua
-    varia {GRID} grid ← seed.crea(0, [4])
+    varia {GRID} grid ← ti64[4]
     itera ex src apud [i] filum lane fixum value {{
         grid[i] ← src[i + 1]
     }}
@@ -266,8 +274,7 @@ fn aliasing_call_is_a_borrow_error_while_the_kernel_is_certified() {
     }}
 }}
 incipit {{
-    varia tensor<numerus, []> seed ← vacua
-    varia {GRID} grid ← seed.crea(0, [4])
+    varia {GRID} grid ← ti64[4]
     varia {GRID} alias ← grid
     kernel(grid, alias)
 }}"

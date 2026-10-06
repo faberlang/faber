@@ -75,8 +75,7 @@ fn tensor_structa_infers_shape_from_literal_shape_binding() {
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0]
   fixum lista<numerus> shape ← [2, 1]
-  fixum tensor<f32, _> seed ← vacua
-  fixum tensor<f32, _> grid ← seed.strue(flat, shape)
+  fixum tensor<f32, _> grid ← flat ↦ tensor<f32, shape>
   nota grid.longitudo()
 }",
     );
@@ -127,8 +126,7 @@ fn tensor_sugar_tf32_typechecks_with_inferred_shape() {
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0]
   fixum lista<numerus> shape ← [2, 1]
-  fixum tf32 seed ← vacua
-  sit grid ← seed.strue(flat, shape)
+  sit grid ← flat ↦ tensor<f32, shape>
   nota grid.longitudo()
 }",
     );
@@ -174,8 +172,7 @@ fn lista_f32_literal_uses_declared_element_width() {
     accepts(
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0]
-  fixum tf32[] seed ← vacua
-  fixum tf32[1, 2] grid ← seed.strue(flat, [1, 2])
+  fixum tf32[1, 2] grid ← flat ↦ tf32[1, 2]
   fixum f32 first ← grid.accipe([0, 0]) vel 0.0
   nota first
 }",

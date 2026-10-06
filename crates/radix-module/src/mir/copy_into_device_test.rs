@@ -80,7 +80,9 @@ fn host_tensor(name: &str, values: &[f32], shape: &str) -> String {
         .map(|value| format!("{value:?}"))
         .collect::<Vec<_>>()
         .join(", ");
-    format!("fixum tensor<f32, {shape}> {name} ← seed.strue([{literal}], {shape})\n")
+    format!(
+        "fixum lista<f32> {name}_data ← [{literal}]\nfixum tensor<f32, {shape}> {name} ← {name}_data ↦ tensor<f32, {shape}>\n"
+    )
 }
 
 /// A view source (`input.transpose()`) written through into the output buffer.
@@ -92,7 +94,7 @@ fn a_transpose_view_copied_into_the_output_matches_the_runner() {
         12,
     );
     let runner = runner_values(&format!(
-        "incipit {{\nfixum tensor<f32, []> seed ← vacua\n{}varia tensor<f32, [4, 3]> t ← seed.strue([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [4, 3])\nt ⇇ a.transpone()\nnota t.planata()\n}}",
+        "incipit {{\n{}varia tensor<f32, [4, 3]> t ← tf32[4, 3]\nt ⇇ a.transpone()\nnota t.planata()\n}}",
         host_tensor("a", &A, "[3, 4]")
     ));
     assert_eq!(device, runner);
@@ -108,7 +110,7 @@ fn a_plain_buffer_copied_into_the_output_matches_the_runner() {
         12,
     );
     let runner = runner_values(&format!(
-        "incipit {{\nfixum tensor<f32, []> seed ← vacua\n{}varia tensor<f32, [3, 4]> b ← seed.strue([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [3, 4])\nb ⇇ a\nnota b.planata()\n}}",
+        "incipit {{\n{}varia tensor<f32, [3, 4]> b ← tf32[3, 4]\nb ⇇ a\nnota b.planata()\n}}",
         host_tensor("a", &A, "[3, 4]")
     ));
     assert_eq!(device, runner);
@@ -126,7 +128,7 @@ fn an_elementwise_result_copied_into_the_output_matches_the_runner() {
         12,
     );
     let runner = runner_values(&format!(
-        "incipit {{\nfixum tensor<f32, []> seed ← vacua\n{}{}varia tensor<f32, [3, 4]> c ← seed.strue([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [3, 4])\nc ⇇ a + b\nnota c.planata()\n}}",
+        "incipit {{\n{}{}varia tensor<f32, [3, 4]> c ← tf32[3, 4]\nc ⇇ a + b\nnota c.planata()\n}}",
         host_tensor("a", &A, "[3, 4]"),
         host_tensor("b", &B, "[3, 4]")
     ));

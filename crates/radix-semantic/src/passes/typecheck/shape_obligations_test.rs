@@ -640,7 +640,7 @@ fn rank_tuple_size_argument_records_no_entry_shape_relation() {
 
 #[test]
 fn unresolved_actual_shape_binds_to_a_whole_shape_expectation() {
-    // `return seed.from_flat(data, shape)` in `fn f<size Shape>(...) →
+    // `return data ↦ tensor<T, Shape>` in `fn f<size Shape>(...) →
     // tensor<T, Shape>`: the intrinsic's root hole meets the rigid whole-shape
     // parameter, which has no rank either. Ordinary unification binds it.
     let resolver = Resolver::new();

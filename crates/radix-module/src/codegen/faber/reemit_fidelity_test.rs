@@ -1221,7 +1221,7 @@ fn same_precedence_left_chain_re_emits_without_parens() {
 /// (the meaning gate would refuse the file as `hir_meaning_diverged`).
 #[test]
 fn latin_forma_method_name_is_not_a_forma_genus_use() {
-    let source = "incipit {\n    fixum tf32[] seed ← vacua\n    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]\n    fixum tf32[2, 2] grid ← seed.strue(flat, [2, 2])\n    fixum tensor<f32, [2, 2]> reshaped ← grid.forma([_, 2])\n    nota reshaped.magnitudines()\n}\n";
+    let source = "incipit {\n    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]\n    fixum tf32[2, 2] grid ← flat ↦ tf32[2, 2]\n    fixum tensor<f32, [2, 2]> reshaped ← grid.forma([_, 2])\n    nota reshaped.magnitudines()\n}\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("grid.forma([_, 2])"), "{emitted}");
 }

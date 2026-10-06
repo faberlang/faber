@@ -1981,11 +1981,10 @@ functio forward(
 }
 
 incipit {
-    fixum tensor<f32, []> seed ← vacua
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    fixum tensor<f32, [2,2]> x ← seed.strue(flat, [2, 2])
-    fixum tensor<f32, [2,2]> w ← seed.strue(flat, [2, 2])
-    fixum tensor<f32, [2,2]> b ← seed.strue(flat, [2, 2])
+    fixum tensor<f32, [2,2]> x ← flat ↦ tensor<f32, [2,2]>
+    fixum tensor<f32, [2,2]> w ← flat ↦ tensor<f32, [2,2]>
+    fixum tensor<f32, [2,2]> b ← flat ↦ tensor<f32, [2,2]>
     fixum numerus steps ← 2
     itera ab 0‥steps fixum step {
         fixum tensor<f32, [2,2]> pred ← forward(x, w, b)
