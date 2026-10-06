@@ -23,8 +23,8 @@ main {
     const int m ← runtime_extent(3)
     const list<f32> flat_left ← [1.0, 2.0, 3.0, 4.0]
     const list<f32> flat_right ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[n, 2] left ← flat_left ↦ tf32[size n, 2]
-    const tf32[m, 2] right ← flat_right ↦ tf32[size m, 2]
+    const tf32[size n, 2] left ← flat_left ↦ tf32[size n, 2]
+    const tf32[size m, 2] right ← flat_right ↦ tf32[size m, 2]
     do {
         print same_rows(left, left)
         print same_rows(left, right)

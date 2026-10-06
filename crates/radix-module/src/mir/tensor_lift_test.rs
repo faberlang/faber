@@ -230,8 +230,8 @@ fixum numerus n ← extent(2)
 fixum numerus m ← extent(3)
 fixum lista<f32> short_data ← [1.0, 2.0]
 fixum lista<f32> long_data ← [1.0, 2.0, 3.0]
-fixum tensor<f32, [n]> short ← short_data ↦ tensor<f32, [n]>
-fixum tensor<f32, [m]> long ← long_data ↦ tensor<f32, [m]>
+fixum tensor<f32, [magnitudo n]> short ← short_data ↦ tensor<f32, [magnitudo n]>
+fixum tensor<f32, [magnitudo m]> long ← long_data ↦ tensor<f32, [magnitudo m]>
 nota short ≡ long
 nota short ≠ long
 nota short ≡ short

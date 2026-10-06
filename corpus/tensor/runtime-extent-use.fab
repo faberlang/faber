@@ -11,7 +11,7 @@ locale = "en"
 +++
 
 # =============================================================================
-# runtime extent loop — `at [i, j]` over `tf32[2, n]` with `n` known at run time.
+# runtime extent loop — `at [i, j]` over `tf32[2, size n]` with `n` known at run time.
 # =============================================================================
 #
 # What this teaches:
@@ -32,7 +32,7 @@ fn runtime_extent(int value) → int {
 main {
     const int n ← runtime_extent(3)
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, n] a ← flat ↦ tf32[2, size n]
+    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
     var f32 total ← 0.0
     var int coordinates ← 0
     for from a at [i, j] const c {

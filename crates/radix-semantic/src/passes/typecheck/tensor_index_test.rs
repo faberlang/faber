@@ -631,9 +631,9 @@ main {
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
     const int n ← data.length() / 2
     const int m ← data.length() / 2
-    const tensor<f32, [n, n]> source ← data ↦ tensor<f32, [size n, size n]>
-    const tensor<f32, [m, n]> other ← data ↦ tensor<f32, [size m, size n]>
-    const tensor<f32, [n, n]> result ← keep_first(source, other)
+    const tensor<f32, [size n, size n]> source ← data ↦ tensor<f32, [size n, size n]>
+    const tensor<f32, [size m, size n]> other ← data ↦ tensor<f32, [size m, size n]>
+    const tensor<f32, [size n, size n]> result ← keep_first(source, other)
 }
 "#,
         config,
@@ -991,7 +991,7 @@ fn tensor_constructor_shape_affine_scalar_expression_matches_annotation() {
 main {
     const list<f32> flat ← [1.0, 2.0, 3.0]
     const int n ← runtime_size(4)
-    const tensor<f32, [n - 1]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>
+    const tensor<f32, [size (n - 1)]> dynamic ← flat ↦ tensor<f32, [size (n - 1)]>
 }
 "#,
         config,
@@ -1011,7 +1011,7 @@ fn tensor_shape_of_static_rank_is_a_bounded_list_of_the_rank() {
 incipit {
   fixum tf32[2, 3] grid ← vacua
   fixum numerus n ← runtime_extent(3)
-  fixum tf32[2, n] dynamic ← vacua
+  fixum tf32[2, magnitudo n] dynamic ← vacua
   fixum lista<numerus, 2> exact ← grid.magnitudines()
   fixum lista<numerus, _> inferred ← dynamic.magnitudines()
   fixum numerus second ← grid.magnitudines()[1] vel 0

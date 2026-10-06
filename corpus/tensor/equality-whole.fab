@@ -67,8 +67,8 @@ main {
     const int m ← runtime_extent(3)
     const list<f32> flat_short ← [1.0, 2.0]
     const list<f32> flat_long ← [1.0, 2.0, 3.0]
-    const tensor<f32, [n]> short ← flat_short ↦ tensor<f32, [size n]>
-    const tensor<f32, [m]> long ← flat_long ↦ tensor<f32, [size m]>
+    const tensor<f32, [size n]> short ← flat_short ↦ tensor<f32, [size n]>
+    const tensor<f32, [size m]> long ← flat_long ↦ tensor<f32, [size m]>
     print short ≡ long
     print short ≠ long
     print short ≡ short

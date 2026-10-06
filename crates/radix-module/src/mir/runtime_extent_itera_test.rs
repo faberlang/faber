@@ -40,7 +40,7 @@ fn rt(int v) → int { return v }
 main {
     const int n ← rt(3)
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, n] a ← flat ↦ tf32[2, size n]
+    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
     var f32 acc ← 0.0
     var int coords ← 0
     for from a at [i, j] const c {
@@ -61,7 +61,7 @@ fn rt(int v) → int { return v }
 main {
     const int n ← rt(3)
     const list<f32> flat ← [1.0, 2.0, 3.0]
-    const tf32[n] a ← flat ↦ tf32[size n]
+    const tf32[size n] a ← flat ↦ tf32[size n]
     var f32 plain ← 0.0
     for from a const c { plain ← plain + c }
     var f32 coord ← 0.0
@@ -81,9 +81,9 @@ main {
     const int n ← rt(0)
     const int m ← rt(2)
     const list<f32> none ← []
-    const tf32[2, n] a ← none ↦ tf32[2, size n]
-    const tf32[n] b ← none ↦ tf32[size n]
-    const tf32[m, 0] e ← none ↦ tf32[size m, 0]
+    const tf32[2, size n] a ← none ↦ tf32[2, size n]
+    const tf32[size n] b ← none ↦ tf32[size n]
+    const tf32[size m, 0] e ← none ↦ tf32[size m, 0]
     var int rank2 ← 0
     for from a at [i, j] const c { rank2 ← rank2 + 1 }
     var int rank1 ← 0
@@ -113,7 +113,7 @@ main {
     print total(a)
     const int n ← rt(2)
     const list<f32> flat_b ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[n, 2] b ← flat_b ↦ tf32[size n, 2]
+    const tf32[size n, 2] b ← flat_b ↦ tf32[size n, 2]
     print total(b)
 }
 ";
@@ -160,7 +160,7 @@ fn rt(int v) → int { return v }
 main {
     const int n ← rt(3)
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    const tf32[2, n] a ← flat ↦ tf32[2, size n]
+    const tf32[2, size n] a ← flat ↦ tf32[2, size n]
     var int acc ← 0
     for from a at [i, j] const c { acc ← acc + i * 10 + j }
     print acc
