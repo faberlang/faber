@@ -3642,6 +3642,17 @@ fn finish_subchain_emission_signature(
         if bound.contains(&param.local) {
             continue;
         }
+        // The recipe's own destination param (the mut-out surface,
+        // `out ⇇ a.matmul(b)`) is the output buffer the contract shape
+        // already carries. Binding it AGAIN as a data-flow input
+        // double-binds the buffer, shifts the output binding past what the
+        // descriptor records, and the plan pass' operand-count law
+        // (`signature_matches_matmul`'s single extra input) refuses the
+        // signature — so the mut-out whole-function seam fails closed. The
+        // param stays the output resource.
+        if signature.output.source_local == Some(param.local) {
+            continue;
+        }
         let (element_ty, count) = data_flow_element_ty_and_count(param.ty, validation)?;
         // S6-P1 seam repair (widened d8518267): a data-flow input that is a
         // `TensorSumAxis` result of an EARLIER subchain binds at the REDUCED
@@ -3796,8 +3807,8 @@ fn recipe_destination_local_for(function: &MirFunction, op: MirCollectionOp) -> 
     if !place.projections.is_empty() {
         return None;
     }
-    match place.base {
-        MirPlaceBase::Local(local) => Some(local),
+    let (mut identity, cursor) = match place.base {
+        MirPlaceBase::Local(local) => (local, statement_index),
         MirPlaceBase::Temp(temp) => {
             // The assign-then-use forward: the next statement copies the
             // recipe's result temp into the declared stage local.
@@ -3818,9 +3829,49 @@ fn recipe_destination_local_for(function: &MirFunction, op: MirCollectionOp) -> 
             let MirValueKind::Operand(MirOperand::Temp(forwarded_temp)) = &value.kind else {
                 return None;
             };
-            (*forwarded_temp == temp).then_some(local)
+            if *forwarded_temp != temp {
+                return None;
+            }
+            (local, statement_index + 1)
+        }
+    };
+    // The mut-out tail: one plain copy of the identity into a declared
+    // param (projected or not) is the recipe's host-visible output buffer
+    // (`out ⇇ a.matmul(b)` forwards to the param directly;
+    // `const total ← a.sum(); out[0] ← total` forwards through the stage
+    // local). The param — not the intermediate local — is what the ABI
+    // output resource binds, so the emitters' output-write suppression laws
+    // key on it.
+    if let Some(next) = function
+        .blocks
+        .get(block_index)
+        .and_then(|block| block.statements.get(cursor + 1))
+    {
+        let MirStatementKind::Assign { place, value } = &next.kind else {
+            return Some(identity);
+        };
+        let MirValueKind::Operand(MirOperand::Place(source)) = &value.kind else {
+            return Some(identity);
+        };
+        if !source.projections.is_empty() {
+            return Some(identity);
+        }
+        let MirPlaceBase::Local(source_local) = source.base else {
+            return Some(identity);
+        };
+        if source_local != identity {
+            return Some(identity);
+        }
+        if let MirPlaceBase::Local(param_local) = place.base
+            && function
+                .params
+                .iter()
+                .any(|param| param.local == param_local)
+        {
+            identity = param_local;
         }
     }
+    Some(identity)
 }
 
 /// The recipe statement's operand locals, in operand order (the read inputs
