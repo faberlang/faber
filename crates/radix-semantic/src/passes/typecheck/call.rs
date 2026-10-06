@@ -657,7 +657,9 @@ impl TypeChecker<'_> {
             return result;
         }
         if let Some(result) = self.check_tensor_receiver_method_call(
+            receiver,
             receiver_ty,
+            name,
             &method_name,
             explicit_type_args,
             args,

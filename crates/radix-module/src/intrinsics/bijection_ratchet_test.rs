@@ -883,6 +883,12 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         // over the matches in a lowered loop, then joins the results (RX-5);
         // the registry row of `muta` names the literal op, not this one.
         MirCollectionOp::RegexReplaceEach,
+        // Constructor + conversion surface (tensor-conversions C3): the
+        // type-expression constructor dispatches its `crea`-shaped call
+        // without a registry row, and the `lista ↦ tensor` rows emit the op
+        // directly — the retired Tensor receiver rows no longer carry them.
+        MirCollectionOp::TensorCreate,
+        MirCollectionOp::TensorFromFlat,
         // Internal device vocabulary (target-lane owned).
         MirCollectionOp::TensorRopeHalf,
         MirCollectionOp::TensorCausalMaskedSoftmax,

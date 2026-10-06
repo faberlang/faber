@@ -161,8 +161,8 @@ fn k<size H, size W>(tensor<f32, [H, W]> t, mut tensor<f32, [H, W]> o) → void 
 }
 main {
     const int n ← 4
-    const tf32[n, n] a ← tf32[n, n].fill(1.5)
-    var tf32[n, n] b ← tf32[n, n]
+    const tf32[size n, size n] a ← tf32[size n, size n].fill(1.5)
+    var tf32[size n, size n] b ← tf32[size n, size n]
     k(a, b)
     print b[[2, 3]]
 }
@@ -223,5 +223,25 @@ main {
 }
 ";
     // max over cells of (hu + hv) * 0.5: the cell at [3, 2] gives (2 + 5) * 0.5.
-    assert_eq!(run_on_cpu(source), ["3.5"]);
+    // The non-zero vector fill has no conversion or constructor spelling (a
+    // `↦` row populates from flat data; the constructor mints zeros), so the
+    // `cell_seed.create(low, [5, 5])` construction now declines at check with
+    // the named retirement. The fixture parks with the GPU device surface by
+    // operator disposition; re-pin the run when that fill surface exists.
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_host_kernels(),
+    );
+    let mut host = BufferHost::default();
+    let errors = match run_source(&session, "kernel-host-run.fab", &english(source), &mut host) {
+        Err(RunSourceError::Frontend(errors)) => errors,
+        other => panic!("the retired crea construction must decline at analysis: {other:?}"),
+    };
+    assert!(
+        errors
+            .iter()
+            .any(|diag| diag.code == Some("SEM011") && diag.issue() == Some("tensor_crea_retired")),
+        "expected the named tensor_crea_retired decline, got: {errors:?}"
+    );
 }

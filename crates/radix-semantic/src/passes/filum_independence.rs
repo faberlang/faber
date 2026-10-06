@@ -278,10 +278,13 @@ impl Aliases {
             // (`docs/design/tensor-intrinsics.md`) and every MIR lowering
             // allocate a new buffer, never a view of the receiver. The
             // `tf32[…]` constructor spelling reaches this arm as the
-            // synthesized `crea` call of `lower_construct`.
+            // synthesized vacua-receiver `crea` call of `lower_construct`;
+            // the retired receiver row no longer backs the registry probe,
+            // so the constructor shape is acknowledged directly.
             HirExpressionKind::MethodCall(receiver, name, _, args, _)
                 if matches!(interner.resolve(*name), "crea" | "strue")
-                    && is_access_intrinsic(receiver, *name, args.len(), types, interner) =>
+                    && (is_access_intrinsic(receiver, *name, args.len(), types, interner)
+                        || is_construct_call(receiver, *name, args.len(), interner)) =>
             {
                 Facts::fresh(root)
             }
@@ -490,6 +493,21 @@ fn is_access_intrinsic(
         radix_intrinsics::lookup_method_for_type_id(ty, types, interner.resolve(name), argc)
             .is_some()
     })
+}
+
+/// The type-expression constructor synthesizes a `crea` call on a vacua
+/// receiver pre-typed with the claimed type (`lower_construct`; the check
+/// lane rewrites its symbol to the canonical spelling). The retired receiver
+/// row no longer backs the registry probe, so the shape is matched directly.
+pub(super) fn is_construct_call(
+    receiver: &HirExpression,
+    name: Symbol,
+    argc: usize,
+    interner: &Interner,
+) -> bool {
+    matches!(receiver.kind, HirExpressionKind::Vacua)
+        && interner.resolve(name) == "crea"
+        && argc == 2
 }
 
 /// A value-returning method of a scalar or register-class receiver. It reads

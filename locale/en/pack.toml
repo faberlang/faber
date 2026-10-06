@@ -382,7 +382,6 @@ matmul = "matmul"
 media = "mean"
 reple = "fill"
 crea = "create"
-strue = "from_flat"
 planata = "flatten"
 gather = "gather"
 rms_norm = "rms_norm"
@@ -3133,9 +3132,13 @@ help = "write data ↦ tensor<T, figura>"
 message = "tensor receiver creata does not accept type arguments; use tensor.creata<CompleteTensorType>(fill)"
 help = "call tensor.creata<CompleteTensorType>(fill) for static construction"
 
-[diagnostics.SEM011.issues.tensor_crea_argument_order]
-message = "tensor crea expects fill then shape; use seed.crea(fill, shape)"
-help = "pass fill before shape"
+[diagnostics.SEM011.issues.tensor_strue_retired]
+message = "tensor receiver method from_flat is retired; use the ↦ conversion"
+help = "write flat ↦ tensor<T, figura>"
+
+[diagnostics.SEM011.issues.tensor_crea_retired]
+message = "tensor receiver method create is retired; use the type-expression constructor"
+help = "bind the constructor first: const tf32[2, 2] a ← tf32[2, 2]"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)"

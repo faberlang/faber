@@ -11,7 +11,7 @@ mod registry;
 pub use registry::{
     CatalogGenericDefault, CatalogGenericParam, INTRINSICS, IntrinsicMirKind, IntrinsicParamKind,
     IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic, NAMESPACE_INTRINSICS,
-    NamespaceIntrinsic, NamespaceReturnKind,
+    NamespaceIntrinsic, NamespaceReturnKind, TENSOR_CONSTRUCTOR_ENTRY,
 };
 
 use std::collections::HashMap;

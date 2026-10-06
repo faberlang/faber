@@ -2197,9 +2197,13 @@ help = "เขียน data ↦ tensor<T, figura>"
 message = "creata ของตัวรับ tensor ไม่รับอาร์กิวเมนต์ชนิดข้อมูล; ใช้ tensor.creata<CompleteTensorType>(fill)"
 help = "เรียก tensor.creata<CompleteTensorType>(fill) สำหรับการสร้างแบบคงที่"
 
-[diagnostics.SEM011.issues.tensor_crea_argument_order]
-message = "tensor crea ต้องรับ fill ก่อน shape; ใช้ seed.crea(fill, shape)"
-help = "ส่ง fill ก่อน shape"
+[diagnostics.SEM011.issues.tensor_strue_retired]
+message = "เมธอด strue ของตัวรับ tensor ถูกยกเลิกแล้ว; ใช้การแปลง ↦"
+help = "เขียน flat ↦ tensor<T, figura>"
+
+[diagnostics.SEM011.issues.tensor_crea_retired]
+message = "เมธอด crea ของตัวรับ tensor ถูกยกเลิกแล้ว; ใช้ตัวสร้าง type-expression"
+help = "ผูกตัวสร้างก่อน: const tf32[2, 2] a ← tf32[2, 2]"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma ถูกลบแล้ว; ใช้ tensor.structa<CompleteTensorType>(data)"
@@ -3196,7 +3200,6 @@ matmul = "คูณเมทริกซ์"
 media = "ค่าเฉลี่ย"
 reple = "เติม"
 crea = "สร้าง"
-strue = "สร้างจากข้อมูลแบน"
 planata = "ทําให้แบน"
 gather = "รวบรวม"
 rms_norm = "rms_norm"

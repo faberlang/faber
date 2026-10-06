@@ -38,7 +38,8 @@ const ISSUE_TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
 const ISSUE_TENSOR_MATH_FLOAT_ELEMENT_REQUIRED: &str = "tensor_math_float_element_required";
 const ISSUE_MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
     "matrix_arithmetic_numeric_element_required";
-const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str = "tensor_index_vector_integer_elements";
+pub(super) const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str =
+    "tensor_index_vector_integer_elements";
 const ISSUE_TENSOR_MEDIA_DECIMAL: &str = "tensor_media_decimal_rejected";
 const ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER: &str =
     "imperativus_operator_method_requires_varia_receiver";

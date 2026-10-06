@@ -770,7 +770,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "tensor_receiver_creata_type_args" => {
             Some("call tensor.creata<CompleteTensorType>(fill) for static construction".to_owned())
         }
-        "tensor_crea_argument_order" => Some("pass fill before shape".to_owned()),
+        "tensor_strue_retired" => Some("write flat ↦ tensor<T, figura>".to_owned()),
+        "tensor_crea_retired" => {
+            Some("bind the constructor first: const tf32[2, 2] a ← tf32[2, 2]".to_owned())
+        }
         "tensor_structa_forma_removed" => Some("use tensor.structa<CompleteTensorType>(data)".to_owned()),
         "tensor_creata_complete_type_arg_required" => Some("provide a complete tensor type argument".to_owned()),
         "tensor_formata_complete_type_arg_required" => Some("provide a complete tensor type argument".to_owned()),

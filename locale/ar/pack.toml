@@ -2185,9 +2185,13 @@ help = "اكتب data ↦ tensor<T, figura>"
 message = "tensor receiver creata لا يقبل type arguments؛ استخدم tensor.creata<CompleteTensorType>(fill)"
 help = "استدع tensor.creata<CompleteTensorType>(fill) لـ static construction"
 
-[diagnostics.SEM011.issues.tensor_crea_argument_order]
-message = "tensor crea يتوقع fill ثم shape؛ استخدم seed.crea(fill, shape)"
-help = "مرر fill قبل shape"
+[diagnostics.SEM011.issues.tensor_strue_retired]
+message = "tensor receiver method strue متقاعد؛ استخدم تحويل ↦"
+help = "اكتب flat ↦ tensor<T, figura>"
+
+[diagnostics.SEM011.issues.tensor_crea_retired]
+message = "tensor receiver method crea متقاعد؛ استخدم مُنشئ تعبير النوع"
+help = "اربط المُنشئ أولاً: const tf32[2, 2] a ← tf32[2, 2]"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma أزيل؛ استخدم tensor.structa<CompleteTensorType>(data)"
@@ -3184,7 +3188,6 @@ matmul = "ضرب_المصفوفات"
 media = "المتوسط"
 reple = "املأ"
 crea = "أنشئ"
-strue = "ابن_من_مسطح"
 planata = "سطح"
 gather = "اجمع_بالفهرس"
 rms_norm = "rms_norm"

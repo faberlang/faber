@@ -3078,6 +3078,13 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let method_name = self.resolve_method_name(method)?;
+        // The type-expression constructor (`tf32[2, 3]`) synthesizes a `crea`
+        // call on a vacua receiver (`lower_construct`; the check lane rewrites
+        // its symbol to the canonical spelling). The retired receiver row no
+        // longer dispatches it, so it lowers to the same TensorCreate op here.
+        if matches!(receiver.kind, HirExpressionKind::Vacua) && method_name == "crea" && args.len() == 2 {
+            return Some(MirCollectionOp::TensorCreate);
+        }
         let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
         let entry = crate::intrinsics::lookup_method_for_type(payload, method_name, args.len())?;
         crate::intrinsics::mir_collection_op(entry)

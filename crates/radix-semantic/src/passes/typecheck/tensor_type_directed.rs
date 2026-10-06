@@ -2,20 +2,22 @@
 //!
 //! COMPILER PHASE: Semantic typecheck
 //! INPUT: Tensor namespace method calls (creata, structa, formata) and tensor
-//! receiver methods (crea, forma) with resolved DefIds and explicit type arguments
+//! receiver methods (crea, strue, forma) with resolved DefIds and explicit type arguments
 //! OUTPUT: Checked call sites with finalized TypeIds on tensor values; structured
-//! diagnostics for stale API shapes (structa, creata type args, argument order)
+//! diagnostics for stale API shapes (structa, creata type args, retired crea/strue)
 
 use super::TypeChecker;
+use super::intrinsics::ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS;
 use crate::tensor_type_directed::complete_tensor_type;
-use crate::{Type, TypeId, numeric_width, tensor_bracket};
-use radix_hir::{HirCallArg, HirExpression};
-use radix_lexer::Span;
+use crate::{Type, TypeId, numeric_width};
+use radix_hir::{HirCallArg, HirExpression, HirExpressionKind};
+use radix_lexer::{Span, Symbol};
 
 const ISSUE_ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 const ISSUE_TENSOR_RECEIVER_STRUCTA_RENAMED: &str = "tensor_receiver_structa_renamed";
 const ISSUE_TENSOR_RECEIVER_CREATA_TYPE_ARGS: &str = "tensor_receiver_creata_type_args";
-const ISSUE_TENSOR_CREA_ARGUMENT_ORDER: &str = "tensor_crea_argument_order";
+const ISSUE_TENSOR_STRUE_RETIRED: &str = "tensor_strue_retired";
+const ISSUE_TENSOR_CREA_RETIRED: &str = "tensor_crea_retired";
 const ISSUE_TENSOR_STRUCTA_FORMA_REMOVED: &str = "tensor_structa_forma_removed";
 
 impl TypeChecker<'_> {
@@ -29,7 +31,9 @@ impl TypeChecker<'_> {
 
     pub fn check_tensor_receiver_method_call(
         &mut self,
+        receiver: &HirExpression,
         receiver_ty: TypeId,
+        name: &mut Symbol,
         method_name: &str,
         explicit_type_args: &[TypeId],
         args: &mut [HirCallArg],
@@ -52,18 +56,83 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
 
-        if method_name == "crea"
-            && explicit_type_args.is_empty()
-            && args.len() == 2
-            && self.arg_is_integer_index_list(&args[0].expr)
-            && !self.arg_is_integer_index_list(&args[1].expr)
-        {
-            self.invalid_operand_types(ISSUE_TENSOR_CREA_ARGUMENT_ORDER, span);
+        // The population methods are retired (tensor-conversions C3): the
+        // `flat ↦ tensor` conversion and the type-expression constructor own
+        // their work. The Tensor registry rows are gone, so the family-scoped
+        // surface→canonical cache no longer maps the retired spellings;
+        // compare the written name against each retired canonical's pack
+        // surface directly (canonical→surface is family-unscoped and the
+        // `crea` row stays — Vector owns the canonical now). The English
+        // `from_flat` surface retired with its pack row, so it stays as a
+        // literal here to name the retirement for un-migrated call sites.
+        // This table runs before intrinsic resolution, so a call names its
+        // retirement instead of falling through to unknown-method.
+        let crea_surface = self
+            .locale_pack
+            .map_or("crea", |pack| pack.intrinsic_surface("crea"));
+        let strue_surface = self
+            .locale_pack
+            .map_or("strue", |pack| pack.intrinsic_surface("strue"));
+        // The type-expression constructor (size-type Z2) synthesizes exactly
+        // this call — a vacua receiver pre-typed with the claimed type, the
+        // pack's surface spelling of `crea`, fill then extents
+        // (`lower_construct`). The receiver-row retirement removed the
+        // registry entry it typed and lowered through, so the constructor is
+        // recognized here by that shape; everything else on the retired
+        // names declines.
+        let is_construct = matches!(receiver.kind, HirExpressionKind::Vacua)
+            && method_name == crea_surface
+            && args.len() == 2;
+        if is_construct {
+            return Some(self.check_tensor_construct(receiver_ty, name, args, span));
+        }
+        let retired = if method_name == strue_surface || method_name == "from_flat" {
+            Some(ISSUE_TENSOR_STRUE_RETIRED)
+        } else if method_name == crea_surface || method_name == "crea" {
+            Some(ISSUE_TENSOR_CREA_RETIRED)
+        } else {
+            None
+        };
+        if let Some(issue) = retired {
+            self.invalid_operand_types(issue, span);
             self.typecheck_call_arg_exprs(args);
             return Some(self.error_type);
         }
 
         None
+    }
+
+    /// Type the type-expression constructor's synthesized `crea` call: the
+    /// claimed type is authoritative, the fill unifies against its element,
+    /// the extents stay an integer index lista. Rewrites the HIR symbol to
+    /// the canonical spelling the MIR lane and filum freshness match.
+    fn check_tensor_construct(
+        &mut self,
+        claimed: TypeId,
+        name: &mut Symbol,
+        args: &mut [HirCallArg],
+        span: Span,
+    ) -> TypeId {
+        let resolved = self.resolve_inferred_type(claimed);
+        let Some(elem) = (match self.types.get(resolved) {
+            Type::Tensor(elem, _) => Some(*elem),
+            _ => None,
+        }) else {
+            return self.error_type;
+        };
+        let fill = self.check_expr_with_expected(&mut args[0].expr, Some(elem));
+        self.unify_assign_issue(fill, elem, args[0].span, ISSUE_ARGUMENT_TYPE_MISMATCH);
+        let extents = self.check_expr(&mut args[1].expr);
+        if !numeric_width::is_integer_index_vector(self.types, extents) {
+            self.invalid_operand_types(ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS, span);
+            return self.error_type;
+        }
+        if let Some(interner) = self.interner
+            && let Some(canonical) = interner.lookup("crea")
+        {
+            *name = canonical;
+        }
+        claimed
     }
 
     pub fn check_tensor_namespace_method_call(
@@ -189,12 +258,5 @@ impl TypeChecker<'_> {
         let arg_ty = self.check_expr_with_expected(&mut args[0].expr, Some(list_ty));
         self.unify_assign_issue(arg_ty, list_ty, args[0].span, ISSUE_ARGUMENT_TYPE_MISMATCH);
         self.types.tensor_with_shape(complete.elem, complete.shape)
-    }
-
-    fn arg_is_integer_index_list(&self, expr: &HirExpression) -> bool {
-        tensor_bracket::is_bracket_index_list_expr(expr, self.types)
-            || expr
-                .ty
-                .is_some_and(|ty| numeric_width::is_integer_index_vector(self.types, ty))
     }
 }

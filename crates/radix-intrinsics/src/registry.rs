@@ -317,6 +317,20 @@ const STRUCTA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T"
 const TENSOR_EDGE_POLICY_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("Policy")];
 const SERMO_VIEW_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus_default_valor("T")];
 
+/// The type-expression constructor's dispatch row. The Tensor receiver row
+/// retired (tensor-conversions C3), but the constructor path — check lane,
+/// MIR `collection_method_op`, Rust emit — still lowers through
+/// `TensorCreate` and needs this entry's param/return contract. Not in
+/// [`INTRINSICS`]: the method surface stays retired.
+pub static TENSOR_CONSTRUCTOR_ENTRY: MethodIntrinsic = intrinsic!(
+    Tensor,
+    "crea",
+    2,
+    &[IntrinsicParamKind::Inner, IntrinsicParamKind::NumerusArray],
+    SameAsReceiver,
+    collection TensorCreate
+);
+
 /// Full promoted intrinsic catalog. Keep rows sorted by receiver, then name.
 pub static INTRINSICS: &[MethodIntrinsic] = &[
     // atomic
@@ -844,22 +858,6 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         collection TensorSet
     ),
     intrinsic!(Tensor, "reple", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection TensorFill),
-    intrinsic!(
-        Tensor,
-        "crea",
-        2,
-        &[IntrinsicParamKind::Inner, IntrinsicParamKind::NumerusArray],
-        SameAsReceiver,
-        collection TensorCreate
-    ),
-    intrinsic!(
-        Tensor,
-        "strue",
-        2,
-        &[IntrinsicParamKind::ElementArray, IntrinsicParamKind::NumerusArray],
-        SameAsReceiver,
-        collection TensorFromFlat
-    ),
     MethodIntrinsic {
         receiver: IntrinsicReceiver::Tensor,
         faber_name: "formata",

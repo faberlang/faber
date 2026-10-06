@@ -325,7 +325,8 @@ impl HirVisitor for Reach<'_> {
             | HirExpressionKind::Clausura(..)
             | HirExpressionKind::Conversio { route: Some(_), .. } => self.disturbs = true,
             HirExpressionKind::MethodCall(receiver, name, _, args, _)
-                if !is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner) =>
+                if !is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner)
+                    && !super::is_construct_call(receiver, *name, args.len(), self.interner) =>
             {
                 self.disturbs = true;
             }
@@ -860,7 +861,8 @@ impl HirVisitor for EffectScan<'_> {
             | HirExpressionKind::Tacebit(_)
             | HirExpressionKind::Conversio { route: Some(_), .. } => self.opaque = true,
             HirExpressionKind::MethodCall(receiver, name, _, args, _)
-                if !is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner) =>
+                if !is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner)
+                    && !super::is_construct_call(receiver, *name, args.len(), self.interner) =>
             {
                 self.opaque = true;
             }

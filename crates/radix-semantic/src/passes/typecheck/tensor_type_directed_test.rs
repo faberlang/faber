@@ -77,12 +77,15 @@ fn dynamic_tensor_conversions_accept_payload_first() {
 
 #[test]
 fn rejects_old_crea_argument_order() {
+    // The argument-order heuristic retired with the crea registration; the
+    // swapped-args costume now hits the retirement suggestion like every other
+    // strue/crea spelling.
     rejects_with_issue(
         r"incipit {
   fixum tf32[] seed ← vacua
   fixum _ grid ← seed.crea([2, 2], 0.0)
 }",
-        "tensor_crea_argument_order",
+        "tensor_crea_retired",
     );
 }
 

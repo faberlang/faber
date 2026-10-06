@@ -17,9 +17,7 @@ use super::*;
 const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
 pub(super) const ISSUE_PROVABLY_OUT_OF_BOUNDS: &str = "index_provably_out_of_bounds";
 
-const TENSOR_STRUE: &str = "strue";
 const TENSOR_FORMA: &str = "forma";
-const TENSOR_CREA: &str = "crea";
 const TENSOR_GATHER: &str = "gather";
 const TENSOR_SECTIO: &str = "sectio";
 const TENSOR_EXPANDE: &str = "expande";
@@ -137,12 +135,7 @@ pub(super) fn glyph_transpose_rank_issue(
 pub(super) fn tensor_intrinsic_changes_shape(method_name: &str) -> bool {
     matches!(
         method_name,
-        TENSOR_STRUE
-            | TENSOR_FORMA
-            | TENSOR_CREA
-            | TENSOR_SECTIO
-            | TENSOR_EXPANDE
-            | TENSOR_TRANSPONE
+        TENSOR_FORMA | TENSOR_SECTIO | TENSOR_EXPANDE | TENSOR_TRANSPONE
     ) || is_tensor_broadcast_elementwise(method_name)
         || is_tensor_matmul(method_name)
 }
@@ -162,20 +155,8 @@ pub(super) fn apply_tensor_intrinsic_shape_constraints(
     };
 
     match method_name {
-        TENSOR_STRUE if args.len() >= 2 => {
-            constrain_from_flat_result_shape(
-                checker,
-                result_shape,
-                &args[0].expr,
-                &args[1].expr,
-                span,
-            );
-        }
         TENSOR_FORMA if !args.is_empty() => {
             constrain_reshape_result_shape(checker, receiver_ty, result_shape, &args[0].expr, span);
-        }
-        TENSOR_CREA if args.len() >= 2 => {
-            constrain_result_from_static_list(checker, result_shape, &args[1].expr, span);
         }
         TENSOR_SECTIO if args.len() >= 2 => {
             let Some(input_shape) = tensor_shape_id(checker, receiver_ty) else {
@@ -571,37 +552,10 @@ fn tensor_shape_id(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<IndexId>
     tensor_parts(checker, ty).map(|(_, shape)| shape)
 }
 
-fn constrain_result_from_static_list(
-    checker: &mut TypeChecker<'_>,
-    result_shape: IndexId,
-    arg_expr: &HirExpression,
-    span: Span,
-) {
-    if let Some(arg_shape) = shape_list_index(checker, arg_expr) {
-        checker.constrain_index_equal(result_shape, arg_shape, span);
-    }
-}
-
-fn constrain_from_flat_result_shape(
-    checker: &mut TypeChecker<'_>,
-    result_shape: IndexId,
-    flat_expr: &HirExpression,
-    shape_expr: &HirExpression,
-    span: Span,
-) {
-    let Some(shape) = shape_list_index(checker, shape_expr) else {
-        return;
-    };
-    if let Some(count) = static_collection_length(checker, flat_expr) {
-        infer_single_shape_hole_from_count(checker, shape, count, span);
-    }
-    checker.constrain_index_equal(result_shape, shape, span);
-}
-
-/// Conversion-row twin of [`constrain_from_flat_result_shape`]: in
-/// `flat ↦ tensor<…, [.., _]>` the target type is authoritative, so a single
-/// `_` extent in the target figura is solved from the flat source's static
-/// element count, exactly like the method form. Count-less sources and
+/// Conversion-row twin of the retired `from_flat` method form's flat-count
+/// solve: in `flat ↦ tensor<…, [.., _]>` the target type is authoritative, so
+/// a single `_` extent in the target figura is solved from the flat source's
+/// static element count. Count-less sources and
 /// multi-hole or whole-shape holes stay unsolved for the finalize hole check
 /// (`cannot_infer_tensor_shape`).
 pub(super) fn constrain_conversio_target_hole_from_flat_count(

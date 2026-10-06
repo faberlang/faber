@@ -132,8 +132,7 @@ const AFFINE_RETURN: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    const tf32[] seed ← empty
-    const tf32[H + 1, W] out ← seed.create(0.0, [H + 1, W])
+    const tf32[H + 1, W] out ← tf32[H + 1, W]
     return out
 }
 main {
@@ -148,32 +147,38 @@ main {
 }
 "#;
 
-// Known gap (Z2-MIR residual, done-when 4): the `[H + 1, W]`-against-`[H, W]`
-// return does not fail recoverably yet. The callee's FunctionReturn guard
-// emits inside the callee directly before `Return`, and the runner routes a
-// `TensorShapeCheck` failure into a `TryCall` error block only when the guard
-// is the last statement of the caller's TryCall block
-// (`shape_guard_precedes_try_call`), so the mismatch escapes `fac`/`cape` as
-// a hard error. Probed at `b81752184`:
-// - this fixture (affine annotation `tf32[H + 1, W]`): check passes, but the
-//   literal-slot instance folds `H + 1` to 3 and `H` to 2, so MIR validation
-//   rejects the instance up front — `invalid MIR: return type mismatch`;
-// - hole-annotation body (`const tf32[_, _] out ← seed.from_flat(...,
-//   [H + 1, W])`): the runtime relation fires — issue
-//   `runner_tensor_shape_mismatch`, message `tensor runtime shape mismatch:
-//   3 != 2` — but escapes the catch;
-// - a concrete destination at a hole-formal callee crashes lowering
-//   (`unsupported MIR lowering: path that does not resolve to a local value`).
-// The successor unit needs the return-boundary guard routable into the
-// caller's fac/cape (sibling of the pin-store relation-coverage residual)
-// plus no-fold retention of the affine annotation.
-#[ignore = "callee-side return-boundary shape guard is not catchable by fac/cape yet"]
+// Re-pinned under the strue/crea retirement: the zero-fill re-spells to the
+// type-expression constructor, whose extent gate declines the affine `H + 1`
+// term at check (`SEM008:constructor_affine_extent_unsupported`) — so the
+// run-level return-boundary oracle this test used to carry is unreachable
+// for this fixture until a construction spelling admits affine extents.
+// Probed under the retired `seed.create` costume at `b81752184` (now
+// unreachable): the literal-slot instance folded `H + 1` to 3 and `H` to 2,
+// so MIR validation rejected the instance up front (`invalid MIR: return
+// type mismatch`); the hole-annotation `from_flat` body fired
+// `runner_tensor_shape_mismatch` (`3 != 2`) but escaped the catch — the
+// callee's FunctionReturn guard emits inside the callee directly before
+// `Return`, and the runner routes a `TensorShapeCheck` failure into a
+// `TryCall` error block only when the guard is the last statement of the
+// caller's TryCall block (`shape_guard_precedes_try_call`); a concrete
+// destination at a hole-formal callee crashed lowering. The successor unit
+// needs the return-boundary guard routable into the caller's fac/cape
+// (sibling of the pin-store relation-coverage residual) plus an admitted
+// affine-extent construction spelling.
 #[test]
-fn size_type_affine_return_mismatch_is_recoverable_at_the_return() {
+fn size_type_affine_return_zero_fill_declines_at_the_constructor_gate() {
     let mut host = BufferHost::default();
-    run_source(&session(), "affine-return.fab", AFFINE_RETURN, &mut host)
-        .expect("the [H + 1, W]-against-[H, W] return must fail recoverably into the cape handler");
-    assert_eq!(host.stdout_lines, ["caught", "after"]);
+    let error = run_source(&session(), "affine-return.fab", AFFINE_RETURN, &mut host)
+        .expect_err("the affine zero-fill must decline at the constructor extent gate");
+    let RunSourceError::Frontend(errors) = error else {
+        panic!("expected a check-level decline: {error:?}")
+    };
+    assert!(
+        errors
+            .iter()
+            .any(|diag| diag.code == Some("SEM008") && diag.issue() == Some("constructor_affine_extent_unsupported")),
+        "expected the named affine constructor decline, got: {errors:?}"
+    );
 }
 
 const ANONYMOUS_LIFT_ITERA: &str = r#"+++

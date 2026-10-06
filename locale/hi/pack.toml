@@ -2197,9 +2197,13 @@ help = "data ↦ tensor<T, figura> लिखें"
 message = "tensor receiver creata type arguments स्वीकार नहीं करता; tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
 help = "static construction के लिए tensor.creata<CompleteTensorType>(fill) call करें"
 
-[diagnostics.SEM011.issues.tensor_crea_argument_order]
-message = "tensor crea में पहले fill और फिर shape अपेक्षित है; seed.crea(fill, shape) का उपयोग करें"
-help = "shape से पहले fill दें"
+[diagnostics.SEM011.issues.tensor_strue_retired]
+message = "tensor receiver method strue सेवानिवृत्त है; ↦ रूपांतरण का उपयोग करें"
+help = "flat ↦ tensor<T, figura> लिखें"
+
+[diagnostics.SEM011.issues.tensor_crea_retired]
+message = "tensor receiver method crea सेवानिवृत्त है; टाइप-एक्सप्रेशन कंस्ट्रक्टर का उपयोग करें"
+help = "पहले कंस्ट्रक्टर बाइंड करें: const tf32[2, 2] a ← tf32[2, 2]"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma हटा दिया गया है; tensor.structa<CompleteTensorType>(data) का उपयोग करें"
@@ -3196,7 +3200,6 @@ matmul = "आव्यूह_गुणन"
 media = "माध्य"
 reple = "भरो"
 crea = "बनाओ"
-strue = "समतल_से_बनाओ"
 planata = "समतल_करो"
 gather = "एकत्र_करो"
 rms_norm = "rms_norm"

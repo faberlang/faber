@@ -2185,9 +2185,13 @@ help = "viết data ↦ tensor<T, figura>"
 message = "creata của receiver tensor không nhận đối số kiểu; dùng tensor.creata<CompleteTensorType>(fill)"
 help = "gọi tensor.creata<CompleteTensorType>(fill) để tạo tĩnh"
 
-[diagnostics.SEM011.issues.tensor_crea_argument_order]
-message = "tensor crea cần fill trước rồi đến shape; dùng seed.crea(fill, shape)"
-help = "truyền fill trước shape"
+[diagnostics.SEM011.issues.tensor_strue_retired]
+message = "phương thức receiver tensor strue đã ngừng hoạt động; dùng phép chuyển đổi ↦"
+help = "viết flat ↦ tensor<T, figura>"
+
+[diagnostics.SEM011.issues.tensor_crea_retired]
+message = "phương thức receiver tensor crea đã ngừng hoạt động; dùng trình khởi tạo type-expression"
+help = "gắn trình khởi tạo trước: const tf32[2, 2] a ← tf32[2, 2]"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma đã bị xóa; dùng tensor.structa<CompleteTensorType>(data)"
@@ -3184,7 +3188,6 @@ matmul = "nhân_ma_trận"
 media = "trung_bình"
 reple = "điền"
 crea = "tạo"
-strue = "dựng_từ_phẳng"
 planata = "làm_phẳng"
 gather = "thu_thập"
 rms_norm = "rms_norm"

@@ -5755,11 +5755,12 @@ fn require_extent<size N>(ref tf32[N] value) → int {
 }
 
 main {
-    const int short_extent ← runtime_extent(2)
-    const int long_extent ← runtime_extent(3)
-    const tf32[] seed ← empty
-    const tf32[short_extent] short_value ← seed.from_flat([1.0, 2.0], [short_extent])
-    const tf32[long_extent] long_value ← seed.from_flat([3.0, 4.0, 5.0], [long_extent])
+    const size short ← runtime_extent(2)
+    const size long ← runtime_extent(3)
+    const list<f32> short_flat ← [1.0, 2.0]
+    const list<f32> long_flat ← [3.0, 4.0, 5.0]
+    const tf32[short] short_value ← short_flat ↦ tf32[short]
+    const tf32[long] long_value ← long_flat ↦ tf32[long]
     print require_extent(short_value)
     print require_extent(long_value)
 }
@@ -5791,7 +5792,7 @@ main {
 
     let mut calls_to_instance = Vec::new();
     let mut shape_checks = Vec::new();
-    for function in &program.functions {
+    for (function_index, function) in program.functions.iter().enumerate() {
         for statement in function.blocks.iter().flat_map(|block| &block.statements) {
             match &statement.kind {
                 MirStatementKind::Call { callee: MirCallee::Function(target), .. } if *target == instance => {
@@ -5800,7 +5801,7 @@ main {
                 MirStatementKind::RuntimeCall { call, .. }
                     if matches!(call.intrinsic, MirIntrinsic::TensorShapeCheck(_)) =>
                 {
-                    shape_checks.push(call);
+                    shape_checks.push((function_index, call));
                 }
                 _ => {}
             }
@@ -5811,35 +5812,58 @@ main {
         2,
         "both runtime origins should call the shared instance"
     );
-    assert_eq!(shape_checks.len(), 2, "each runtime origin keeps its own boundary check");
-    let actual_carriers = shape_checks
+    // The conversion boundary now emits its own shape checks: each origin
+    // keeps three TensorShapeChecks where the from_flat costume folded
+    // everything into the call — the callee size-parameter binding, the
+    // conversion's extent relations, and the call boundary. Checks group by
+    // kind (even index = the short origin, odd = the long origin); the
+    // origin identity lives in the checked tensor carriers.
+    assert_eq!(
+        shape_checks.len(),
+        6,
+        "each origin keeps its size binding, conversion relations, and boundary check"
+    );
+    let checks: Vec<_> = shape_checks
         .iter()
-        .map(|call| {
-            let MirIntrinsic::TensorShapeCheck(check) = &call.intrinsic else {
-                unreachable!()
-            };
-            assert_eq!(check.size_bindings.len(), 1);
-            assert!(matches!(
-                check.size_bindings[0].witness,
-                crate::mir::MirShapeExpr::ScalarArgument { argument: 1 }
-            ));
-            assert!(
-                check.proves_equal(
-                    &check.size_bindings[0].witness,
-                    &crate::mir::MirShapeExpr::TensorAxis { argument: 0, axis: 0 },
-                ),
-                "the stable scalar witness must still guard the physical tensor extent"
-            );
-            (call.args[0].clone(), call.args[1].clone())
+        .map(|(_, call)| match &call.intrinsic {
+            MirIntrinsic::TensorShapeCheck(check) => check,
+            _ => unreachable!(),
         })
-        .collect::<Vec<_>>();
+        .collect();
+    for (short, long) in [(checks[0], checks[1]), (checks[2], checks[3]), (checks[4], checks[5])] {
+        assert_eq!(
+            short.relations.len(),
+            long.relations.len(),
+            "both origins check the same extent law"
+        );
+        for relation in short.relations.iter().chain(long.relations.iter()) {
+            // The stable scalar witness guards the physical tensor extent.
+            assert!(
+                matches!(relation.left, crate::mir::MirShapeExpr::TensorAxis { argument: 0, axis: 0 })
+                    && matches!(relation.right, crate::mir::MirShapeExpr::ScalarArgument { .. })
+            );
+        }
+        assert_eq!(
+            short.size_bindings.len(),
+            long.size_bindings.len(),
+            "both origins carry the same binding shape"
+        );
+        for binding in short.size_bindings.iter().chain(long.size_bindings.iter()) {
+            assert_eq!(binding.parameter, 0);
+            assert!(matches!(binding.witness, crate::mir::MirShapeExpr::ScalarArgument { .. }));
+        }
+    }
     assert_ne!(
-        actual_carriers[0].0, actual_carriers[1].0,
+        shape_checks[0].1.args[0], shape_checks[1].1.args[0],
         "per-call shape guards must read each call's actual tensor carrier"
     );
     assert_ne!(
-        actual_carriers[0].1, actual_carriers[1].1,
+        shape_checks[2].1.args[1], shape_checks[3].1.args[1],
         "each origin retains its own immutable scalar witness"
+    );
+    assert_ne!(
+        shape_checks[4].1.args[0], shape_checks[5].1.args[0],
+        "each origin guards its own destination local at the call boundary"
     );
 }
 

@@ -2185,9 +2185,13 @@ help = "写作 data ↦ tensor<T, figura>"
 message = "tensor receiver creata 不接受 type arguments；请使用 tensor.creata<CompleteTensorType>(fill)"
 help = "为静态 construction 调用 tensor.creata<CompleteTensorType>(fill)"
 
-[diagnostics.SEM011.issues.tensor_crea_argument_order]
-message = "tensor crea 期望 fill 在前 shape 在后；请使用 seed.crea(fill, shape)"
-help = "fill 写在 shape 之前"
+[diagnostics.SEM011.issues.tensor_strue_retired]
+message = "tensor receiver method strue 已停用；请使用 ↦ 转换"
+help = "写作 flat ↦ tensor<T, figura>"
+
+[diagnostics.SEM011.issues.tensor_crea_retired]
+message = "tensor receiver method crea 已停用；请使用类型表达式构造"
+help = "先绑定构造：const tf32[2, 2] a ← tf32[2, 2]"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma 已移除；请使用 tensor.structa<CompleteTensorType>(data)"
@@ -3184,7 +3188,6 @@ matmul = "矩阵乘法"
 media = "均值"
 reple = "填充"
 crea = "创建"
-strue = "由扁平构造"
 planata = "展平"
 gather = "收集"
 rms_norm = "rms_norm"

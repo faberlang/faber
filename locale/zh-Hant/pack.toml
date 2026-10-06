@@ -2185,9 +2185,13 @@ help = "寫作 data ↦ tensor<T, figura>"
 message = "張量接收者 creata 不接受型別引數；請使用 tensor.creata<CompleteTensorType>(fill)"
 help = "靜態建構請呼叫 tensor.creata<CompleteTensorType>(fill)"
 
-[diagnostics.SEM011.issues.tensor_crea_argument_order]
-message = "張量 crea 需要先填充值再填形狀；請使用 seed.crea(fill, shape)"
-help = "先傳入填充值，再傳入形狀"
+[diagnostics.SEM011.issues.tensor_strue_retired]
+message = "張量接收者方法 strue 已停用；請使用 ↦ 轉換"
+help = "寫作 flat ↦ tensor<T, figura>"
+
+[diagnostics.SEM011.issues.tensor_crea_retired]
+message = "張量接收者方法 crea 已停用；請使用型別表達式建構"
+help = "先綁定建構：const tf32[2, 2] a ← tf32[2, 2]"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma 已移除；請使用 tensor.structa<CompleteTensorType>(data)"
@@ -3184,7 +3188,6 @@ matmul = "矩陣乘法"
 media = "平均值"
 reple = "填充"
 crea = "建立"
-strue = "由扁平建構"
 planata = "展平"
 gather = "收集"
 rms_norm = "rms_norm"
