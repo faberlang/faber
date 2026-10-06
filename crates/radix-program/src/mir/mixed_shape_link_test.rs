@@ -13,12 +13,9 @@ locale = "en"
 +++
 @ public { }
 fn family<size Figura>(list<tensor<f32, Figura>> params, list<tensor<f32, Figura>> grads, f32 lr) → list<tensor<f32, Figura>> {
-    const list<int> shape ← params[0].shape()
-    const tensor<f32, []> seed ← empty
-    const _ lr_fill ← seed.create(lr, shape)
     var list<tensor<f32, Figura>> out ← empty
     for range 0‥params.length() const i {
-        out.append(params[i] - (grads[i] ⊙ lr_fill))
+        out.append(params[i] - grads[i] * lr)
     }
     return out
 }
