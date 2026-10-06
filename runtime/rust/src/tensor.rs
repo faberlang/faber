@@ -2106,6 +2106,147 @@ fn checked_divide_f32(numerator: f32, denominator: f32) -> Result<f32, &'static 
     Ok(result)
 }
 
+/// Shape facts of a dense `matmul`: `batches` receiver matrices of
+/// `rows × inner`, each multiplied by an argument matrix of `inner × columns`.
+/// Argument matrix `b / rhs_batch_divisor` serves receiver batch `b`, which is
+/// how trailing receiver batch axes broadcast one argument matrix.
+struct MatmulDense {
+    batches: usize,
+    rows: usize,
+    inner: usize,
+    columns: usize,
+    rhs_batch_divisor: usize,
+}
+
+/// `matmul` over two standard-layout tensors, or `None` when either operand
+/// is a view (strides, offset, view layers) and must take the per-element
+/// layer machinery.
+///
+/// i-k-j over the locked buffers: each output element still receives
+/// `((0 + p₀) + p₁) + …` with `pₖ = lhs[i,k] · rhs[k,j]` in ascending `k`, the
+/// exact sequence the per-element contraction produced, so the result is
+/// bit-identical for floats. What changes is the cost: no lock, bounds check,
+/// or offset computation per multiply-add, and the inner loop runs over
+/// contiguous memory. A buffer shared by both operands is locked once
+/// (`std::sync::Mutex` is not reentrant); distinct buffers lock receiver,
+/// then argument, the order every two-lock site in this file keeps.
+fn matmul_dense<T>(lhs: &Tensor<T>, rhs: &Tensor<T>, shape: &MatmulDense) -> Option<Vec<T>>
+where
+    T: Clone + Default + std::ops::Add<Output = T> + std::ops::Mul<Output = T>,
+{
+    if !lhs.is_standard_layout() || !rhs.is_standard_layout() {
+        return None;
+    }
+    let lhs_guard;
+    let rhs_guard;
+    let (lhs_data, rhs_data): (&[T], &[T]) = if Arc::ptr_eq(&lhs.data, &rhs.data) {
+        lhs_guard = tensor_data(&lhs.data);
+        (&lhs_guard[..], &lhs_guard[..])
+    } else {
+        lhs_guard = tensor_data(&lhs.data);
+        rhs_guard = tensor_data(&rhs.data);
+        (&lhs_guard[..], &rhs_guard[..])
+    };
+
+    let MatmulDense {
+        batches,
+        rows,
+        inner,
+        columns,
+        rhs_batch_divisor,
+    } = *shape;
+    let lhs_matrix = rows * inner;
+    let rhs_matrix = inner * columns;
+    let out_matrix = rows * columns;
+    let rhs_batches = batches.div_ceil(rhs_batch_divisor.max(1));
+    if lhs_data.len() < batches * lhs_matrix || rhs_data.len() < rhs_batches * rhs_matrix {
+        return None;
+    }
+
+    let mut out = vec![T::default(); batches * out_matrix];
+    for batch in 0..batches {
+        let lhs_rows = &lhs_data[batch * lhs_matrix..][..lhs_matrix];
+        let rhs_rows = &rhs_data[(batch / rhs_batch_divisor.max(1)) * rhs_matrix..][..rhs_matrix];
+        let out_rows = &mut out[batch * out_matrix..][..out_matrix];
+        for row in 0..rows {
+            let out_row = &mut out_rows[row * columns..][..columns];
+            for (k, a) in lhs_rows[row * inner..][..inner].iter().enumerate() {
+                for (slot, b) in out_row.iter_mut().zip(&rhs_rows[k * columns..][..columns]) {
+                    *slot = std::mem::take(slot) + a.clone() * b.clone();
+                }
+            }
+        }
+    }
+    Some(out)
+}
+
+/// `matmul` of two rank-2 operands (or a rank-2 receiver and a rank-1
+/// argument, `columns == 1`) that carry strides but no view layers: a
+/// transposed or sliced matrix.
+///
+/// The accumulation is the dense path's i-k-j, so the result is bit-identical
+/// to the per-element contraction. Every element is read through a checked
+/// offset, and any offset outside the buffer returns `None`, sending the call
+/// back to the per-element path, which fails at that element exactly as it
+/// always did. Operands with view layers (shifted or custom-edge views) are
+/// never handled here.
+fn matmul_strided_matrix<T>(
+    lhs: &Tensor<T>,
+    rhs: &Tensor<T>,
+    rows: usize,
+    inner: usize,
+    columns: usize,
+) -> Option<Vec<T>>
+where
+    T: Clone + Default + std::ops::Add<Output = T> + std::ops::Mul<Output = T>,
+{
+    if lhs.logical_view.is_some() || rhs.logical_view.is_some() || lhs.shape.len() != 2 {
+        return None;
+    }
+    // A rank-1 argument is an `inner × 1` matrix: its only stride walks `k`.
+    let (rhs_k_stride, rhs_col_stride) = match rhs.strides.as_slice() {
+        [k_stride, col_stride] => (*k_stride, *col_stride),
+        [k_stride] => (*k_stride, 0),
+        _ => return None,
+    };
+    let (lhs_row_stride, lhs_k_stride) = (lhs.strides[0], lhs.strides[1]);
+    let offset_of = |base: usize, i: usize, i_stride: usize, j: usize, j_stride: usize| {
+        i.checked_mul(i_stride)?
+            .checked_add(j.checked_mul(j_stride)?)?
+            .checked_add(base)
+    };
+
+    let lhs_guard;
+    let rhs_guard;
+    let (lhs_data, rhs_data): (&[T], &[T]) = if Arc::ptr_eq(&lhs.data, &rhs.data) {
+        lhs_guard = tensor_data(&lhs.data);
+        (&lhs_guard[..], &lhs_guard[..])
+    } else {
+        lhs_guard = tensor_data(&lhs.data);
+        rhs_guard = tensor_data(&rhs.data);
+        (&lhs_guard[..], &rhs_guard[..])
+    };
+
+    let mut out = vec![T::default(); rows * columns];
+    for row in 0..rows {
+        let out_row = &mut out[row * columns..][..columns];
+        for k in 0..inner {
+            let a = lhs_data.get(offset_of(lhs.offset, row, lhs_row_stride, k, lhs_k_stride)?)?;
+            for (column, slot) in out_row.iter_mut().enumerate() {
+                let b = rhs_data.get(offset_of(
+                    rhs.offset,
+                    k,
+                    rhs_k_stride,
+                    column,
+                    rhs_col_stride,
+                )?)?;
+                *slot = std::mem::take(slot) + a.clone() * b.clone();
+            }
+        }
+    }
+    Some(out)
+}
+
 // WHY: matmul needs both `Add` and `Mul` trait bounds since the contraction
 // sums products. Placing it in its own impl block keeps the `Add` bound
 // scoped to matmul without polluting the elementwise `Mul` block.
@@ -2113,6 +2254,22 @@ impl<T> Tensor<T>
 where
     T: Clone + Default + std::ops::Add<Output = T> + std::ops::Mul<Output = T>,
 {
+    /// The locked-slice paths of `matmul`: dense operands, or (for a rank-2
+    /// pair, `strided_ok`) strides-only views. `None` sends the call to the
+    /// per-element contraction, which owns every error and view-layer case.
+    fn matmul_fast(
+        &self,
+        other: &Tensor<T>,
+        shape: &MatmulDense,
+        strided_ok: bool,
+    ) -> Option<Vec<T>> {
+        matmul_dense(self, other, shape).or_else(|| {
+            strided_ok
+                .then(|| matmul_strided_matrix(self, other, shape.rows, shape.inner, shape.columns))
+                .flatten()
+        })
+    }
+
     /// Matrix multiply `self × other`, including leading batched axes.
     ///
     /// # Errors
@@ -2140,6 +2297,16 @@ where
                 return Err(ERR_MATMUL_INNER_DIMENSION);
             }
             let result_count = checked_allocation_count::<T>(&[rows])?;
+            let dense = MatmulDense {
+                batches: 1,
+                rows,
+                inner,
+                columns: 1,
+                rhs_batch_divisor: 1,
+            };
+            if let Some(result) = self.matmul_fast(other, &dense, true) {
+                return Ok(Tensor::from_contiguous(result, vec![rows]));
+            }
             let mut result = Vec::with_capacity(result_count);
             for row in 0..rows {
                 let mut acc = T::default();
@@ -2187,6 +2354,21 @@ where
         let receiver_batch_shape = &self.shape[..receiver_batch_rank];
         let batch_count =
             checked_element_count_usize(receiver_batch_shape).ok_or(ERR_ELEMENT_COUNT_OVERFLOW)?;
+        // The argument's batch axes are a prefix of the receiver's; the
+        // trailing receiver batch axes share one argument matrix.
+        let trailing_batches = element_count_usize(&receiver_batch_shape[argument_batch_rank..]);
+        let dense = MatmulDense {
+            batches: batch_count,
+            rows,
+            inner,
+            columns,
+            rhs_batch_divisor: trailing_batches,
+        };
+        if let Some(result) =
+            self.matmul_fast(other, &dense, receiver_rank == 2 && argument_rank == 2)
+        {
+            return Ok(Tensor::from_contiguous(result, result_shape));
+        }
         for batch_ordinal in 0..batch_count {
             let receiver_batch = unravel_index(batch_ordinal, receiver_batch_shape);
             let mut lhs_index = receiver_batch.clone();

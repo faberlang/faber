@@ -1150,6 +1150,220 @@ fn matmul_rank_four_accepts_rhs_batch_prefix() {
     );
 }
 
+/// Values spread over twelve decades, so any change in accumulation order
+/// changes the f32 bits.
+fn order_sensitive(count: usize, salt: u32) -> Vec<f32> {
+    (0..count)
+        .map(|index| {
+            let hash = (index as u32)
+                .wrapping_mul(2_654_435_761)
+                .wrapping_add(salt)
+                >> 8;
+            let magnitude = [1.0e6_f32, 1.0, 1.0e-3, 1.0e-6][(hash % 4) as usize];
+            ((hash % 20_011) as f32 - 10_005.0) * magnitude
+        })
+        .collect()
+}
+
+/// The contraction as the language defines it: for every output element, a
+/// left fold of products in ascending `k` starting from zero.
+fn sequential_matmul(lhs: &[f32], rhs: &[f32], rows: usize, inner: usize, cols: usize) -> Vec<f32> {
+    let mut out = Vec::with_capacity(rows * cols);
+    for row in 0..rows {
+        for col in 0..cols {
+            let mut acc = 0.0_f32;
+            for k in 0..inner {
+                acc += lhs[row * inner + k] * rhs[k * cols + col];
+            }
+            out.push(acc);
+        }
+    }
+    out
+}
+
+fn bits(values: &[f32]) -> Vec<u32> {
+    values.iter().map(|value| value.to_bits()).collect()
+}
+
+#[test]
+fn matmul_dense_is_bit_identical_to_the_sequential_contraction() {
+    let (rows, inner, cols) = (7, 33, 5);
+    let lhs = order_sensitive(rows * inner, 1);
+    let rhs = order_sensitive(inner * cols, 2);
+    let a = Tensor::structa(lhs.clone(), &[rows as i64, inner as i64]).unwrap();
+    let b = Tensor::structa(rhs.clone(), &[inner as i64, cols as i64]).unwrap();
+
+    let result = a.matmul(&b).unwrap();
+
+    assert_eq!(
+        bits(&result.planata().unwrap()),
+        bits(&sequential_matmul(&lhs, &rhs, rows, inner, cols))
+    );
+}
+
+#[test]
+fn matmul_dense_matrix_vector_is_bit_identical_to_the_sequential_contraction() {
+    let (rows, inner) = (9, 40);
+    let lhs = order_sensitive(rows * inner, 3);
+    let rhs = order_sensitive(inner, 4);
+    let a = Tensor::structa(lhs.clone(), &[rows as i64, inner as i64]).unwrap();
+    let v = Tensor::structa(rhs.clone(), &[inner as i64]).unwrap();
+
+    let result = a.matmul(&v).unwrap();
+
+    assert_eq!(result.magnitudines(), vec![rows as i64]);
+    assert_eq!(
+        bits(&result.planata().unwrap()),
+        bits(&sequential_matmul(&lhs, &rhs, rows, inner, 1))
+    );
+}
+
+/// `std::sync::Mutex` is not reentrant: an operand sharing its buffer with the
+/// receiver (`a·a`, or a clone) must lock it once.
+#[test]
+fn matmul_of_a_tensor_with_itself_locks_the_shared_buffer_once() {
+    let n = 12;
+    let data = order_sensitive(n * n, 5);
+    let a = Tensor::structa(data.clone(), &[n as i64, n as i64]).unwrap();
+    let alias = a.clone();
+    let expected = sequential_matmul(&data, &data, n, n, n);
+
+    assert_eq!(
+        bits(&a.matmul(&a).unwrap().planata().unwrap()),
+        bits(&expected)
+    );
+    assert_eq!(
+        bits(&a.matmul(&alias).unwrap().planata().unwrap()),
+        bits(&expected)
+    );
+}
+
+#[test]
+fn matmul_broadcasts_trailing_batches_over_one_rhs_matrix() {
+    // Receiver batches [2, 3]; the argument has one batch axis [2], so each
+    // argument matrix serves three receiver batches.
+    let (outer, trailing, rows, inner, cols) = (2, 3, 4, 6, 5);
+    let lhs = order_sensitive(outer * trailing * rows * inner, 6);
+    let rhs = order_sensitive(outer * inner * cols, 7);
+    let a = Tensor::structa(
+        lhs.clone(),
+        &[outer as i64, trailing as i64, rows as i64, inner as i64],
+    )
+    .unwrap();
+    let b = Tensor::structa(rhs.clone(), &[outer as i64, inner as i64, cols as i64]).unwrap();
+
+    let result = a.matmul(&b).unwrap();
+
+    let mut expected = Vec::new();
+    for batch in 0..outer * trailing {
+        let lhs_matrix = &lhs[batch * rows * inner..][..rows * inner];
+        let rhs_matrix = &rhs[(batch / trailing) * inner * cols..][..inner * cols];
+        expected.extend(sequential_matmul(lhs_matrix, rhs_matrix, rows, inner, cols));
+    }
+    assert_eq!(
+        result.magnitudines(),
+        vec![outer as i64, trailing as i64, rows as i64, cols as i64]
+    );
+    assert_eq!(bits(&result.planata().unwrap()), bits(&expected));
+}
+
+/// A transposed operand is a strides-only view, not a standard layout: it
+/// takes the strided path and must still match the sequential contraction.
+#[test]
+fn matmul_with_a_transposed_receiver_matches_the_sequential_contraction() {
+    let (rows, inner, cols) = (6, 11, 4);
+    let stored = order_sensitive(inner * rows, 8); // stored as [inner, rows]
+    let rhs = order_sensitive(inner * cols, 9);
+    let transposed = Tensor::structa(stored.clone(), &[inner as i64, rows as i64])
+        .unwrap()
+        .transpose_rank2()
+        .unwrap();
+    let b = Tensor::structa(rhs.clone(), &[inner as i64, cols as i64]).unwrap();
+
+    let result = transposed.matmul(&b).unwrap();
+
+    let mut lhs = vec![0.0_f32; rows * inner];
+    for row in 0..rows {
+        for k in 0..inner {
+            lhs[row * inner + k] = stored[k * rows + row];
+        }
+    }
+    assert_eq!(
+        bits(&result.planata().unwrap()),
+        bits(&sequential_matmul(&lhs, &rhs, rows, inner, cols))
+    );
+}
+
+#[test]
+fn matmul_with_a_transposed_argument_matches_the_sequential_contraction() {
+    let (rows, inner, cols) = (5, 13, 7);
+    let lhs = order_sensitive(rows * inner, 10);
+    let stored = order_sensitive(cols * inner, 11); // stored as [cols, inner]
+    let a = Tensor::structa(lhs.clone(), &[rows as i64, inner as i64]).unwrap();
+    let transposed = Tensor::structa(stored.clone(), &[cols as i64, inner as i64])
+        .unwrap()
+        .transpose_rank2()
+        .unwrap();
+
+    let result = a.matmul(&transposed).unwrap();
+
+    let mut rhs = vec![0.0_f32; inner * cols];
+    for k in 0..inner {
+        for col in 0..cols {
+            rhs[k * cols + col] = stored[col * inner + k];
+        }
+    }
+    assert_eq!(
+        bits(&result.planata().unwrap()),
+        bits(&sequential_matmul(&lhs, &rhs, rows, inner, cols))
+    );
+}
+
+#[test]
+fn matmul_with_a_strided_vector_argument_matches_the_sequential_contraction() {
+    let (rows, inner) = (4, 5);
+    let lhs = order_sensitive(rows * inner, 12);
+    let wide = order_sensitive(inner * 2, 13);
+    let a = Tensor::structa(lhs.clone(), &[rows as i64, inner as i64]).unwrap();
+    // Every other element of a ten-element buffer: a rank-1 view of length 5.
+    let strided = Tensor::structa(wide.clone(), &[(inner * 2) as i64])
+        .unwrap()
+        .sectio_strided(0, (inner * 2) as i64, 2)
+        .unwrap();
+
+    let result = a.matmul(&strided).unwrap();
+
+    let vector: Vec<f32> = wide.iter().step_by(2).copied().collect();
+    assert_eq!(
+        bits(&result.planata().unwrap()),
+        bits(&sequential_matmul(&lhs, &vector, rows, inner, 1))
+    );
+}
+
+#[test]
+fn matmul_over_an_empty_inner_dimension_yields_zeros() {
+    let a: Tensor<f32> = Tensor::structa(Vec::new(), &[2, 0]).unwrap();
+    let b: Tensor<f32> = Tensor::structa(Vec::new(), &[0, 3]).unwrap();
+
+    let result = a.matmul(&b).unwrap();
+
+    assert_eq!(result.magnitudines(), vec![2, 3]);
+    assert_eq!(result.planata().unwrap(), vec![0.0; 6]);
+}
+
+#[test]
+fn matmul_dense_works_for_non_copy_free_integer_elements() {
+    // The bound is `Clone + Default + Add + Mul`, not `Copy` or float: the
+    // fast path must hold for any such element type.
+    let a = Tensor::structa(vec![1_i64, 2, 3, 4, 5, 6], &[2, 3]).unwrap();
+    let b = Tensor::structa(vec![7_i64, 8, 9, 10, 11, 12], &[3, 2]).unwrap();
+
+    assert_eq!(
+        a.matmul(&b).unwrap().planata().unwrap(),
+        vec![58, 64, 139, 154]
+    );
+}
+
 #[test]
 fn matmul_rejects_nonmatching_batch_prefix() {
     let lhs = Tensor::structa(vec![1.0f32; 8], &[2, 2, 2]).unwrap();
