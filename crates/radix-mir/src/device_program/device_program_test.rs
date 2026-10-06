@@ -566,6 +566,158 @@ fn launch_plan_from_signature_reduction() {
     );
 }
 
+// -----------------------------------------------------------------------
+// Generic 1-D workgroup policy
+// -----------------------------------------------------------------------
+
+fn plan_launch(
+    signature: &MirKernelSignature,
+    plan: &CollectionKernelPlan,
+    op: MirCollectionOp,
+) -> KernelLaunchPlan {
+    KernelLaunchPlan::from_signature_plan_and_function(signature, plan, &body_function(op))
+}
+
+#[test]
+fn a_generic_elementwise_kernel_launches_a_real_workgroup_not_one_thread() {
+    // The ABI default is workgroup 1x1x1 with dispatch = element count, which
+    // a host launches as one thread per block (17.5 GB/s against ~596 GB/s on
+    // an RTX 5070). The launch plan widens it; the dispatch extent is the
+    // element count and the grid is the rounded-up cover.
+    let signature = elementwise_signature(1000, 1);
+    let launch = plan_launch(
+        &signature,
+        &CollectionKernelPlan::Elementwise,
+        MirCollectionOp::TensorAdd,
+    );
+    assert_eq!(launch.workgroup, MirWorkgroupSize { x: 128, y: 1, z: 1 });
+    assert_eq!(
+        launch.dispatch_size,
+        MirKernelDispatchSize {
+            x: 1000,
+            y: 1,
+            z: 1
+        }
+    );
+    assert_eq!(
+        launch.workgroup_count,
+        MirKernelWorkgroupCount { x: 8, y: 1, z: 1 },
+        "8 * 128 covers 1000; the kernel's own index guard handles the tail"
+    );
+    assert_eq!(
+        launch.work_items_x(&CollectionKernelPlan::Elementwise),
+        1000,
+        "the work-item extent stays the element count, not the rounded-up grid"
+    );
+}
+
+#[test]
+fn an_exact_multiple_needs_no_tail_workgroup() {
+    let signature = elementwise_signature(16_777_216, 1);
+    let launch = plan_launch(
+        &signature,
+        &CollectionKernelPlan::Elementwise,
+        MirCollectionOp::TensorAdd,
+    );
+    assert_eq!(launch.workgroup_count.x, 131_072);
+}
+
+#[test]
+fn a_single_work_item_stays_a_single_thread() {
+    let signature = elementwise_signature(1, 1);
+    let launch = plan_launch(
+        &signature,
+        &CollectionKernelPlan::Elementwise,
+        MirCollectionOp::TensorAdd,
+    );
+    assert_eq!(launch.workgroup, MirWorkgroupSize { x: 1, y: 1, z: 1 });
+    assert_eq!(launch.workgroup_count.x, 1);
+}
+
+#[test]
+fn the_per_element_row_softmax_body_widens_too() {
+    let signature = elementwise_signature(16_384, 1);
+    let softmax = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+        axis: 1,
+        batched: None,
+    });
+    let launch = plan_launch(&signature, &softmax, MirCollectionOp::TensorSoftmax);
+    assert_eq!(launch.workgroup.x, 128);
+    assert_eq!(launch.workgroup_count.x, 128);
+    assert_eq!(launch.work_items_x(&softmax), 16_384);
+}
+
+#[test]
+fn recipes_with_their_own_contracts_keep_their_geometry() {
+    // A contract-sized workgroup is never overridden.
+    let signature = elementwise_signature(1000, 32);
+    let launch = plan_launch(
+        &signature,
+        &CollectionKernelPlan::Elementwise,
+        MirCollectionOp::TensorAdd,
+    );
+    assert_eq!(launch.workgroup.x, 32);
+    assert_eq!(launch.workgroup_count.x, 32, "ceil(1000 / 32)");
+
+    // A plan outside the admitted list keeps its signature workgroup, and its
+    // work-item extent stays the established workgroups x lanes product.
+    let batched = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+        axis: 3,
+        batched: Some(crate::kernel_plan::RowSoftmaxBatch {
+            batch: 64,
+            width: 256,
+            mask: None,
+        }),
+    });
+    let reduction = reduction_signature(1000, 8, 125);
+    let launch = plan_launch(&reduction, &batched, MirCollectionOp::TensorSoftmax);
+    assert_eq!(launch.workgroup.x, 8);
+    assert_eq!(launch.work_items_x(&batched), 125 * 8);
+    let plain_widened = elementwise_signature(1000, 1);
+    let launch = plan_launch(&plain_widened, &batched, MirCollectionOp::TensorSoftmax);
+    assert_eq!(
+        launch.workgroup.x, 1,
+        "an unadmitted plan is never widened, whatever its signature says"
+    );
+
+    // A matmul tile grid is verbatim.
+    let matmul = matmul_signature(16, 16, 16);
+    let launch = plan_launch(
+        &matmul,
+        &CollectionKernelPlan::Elementwise,
+        MirCollectionOp::TensorMatMul,
+    );
+    assert_eq!(launch.workgroup, MirWorkgroupSize { x: 8, y: 8, z: 1 });
+}
+
+#[test]
+fn a_two_dimensional_dispatch_is_not_widened() {
+    let mut signature = elementwise_signature(64, 1);
+    signature.dispatch_size = MirKernelDispatchSize { x: 8, y: 8, z: 1 };
+    let launch = plan_launch(
+        &signature,
+        &CollectionKernelPlan::Elementwise,
+        MirCollectionOp::TensorAdd,
+    );
+    assert_eq!(launch.workgroup, MirWorkgroupSize { x: 1, y: 1, z: 1 });
+}
+
+#[test]
+fn the_batched_row_softmax_variant_is_not_admitted() {
+    // Its body is not covered by the block-size-independence evidence.
+    assert!(!is_generic_1d_plan(&CollectionKernelPlan::RowSoftmax(
+        crate::kernel_plan::RowSoftmaxPlan {
+            axis: 3,
+            batched: Some(crate::kernel_plan::RowSoftmaxBatch {
+                batch: 8,
+                width: 64,
+                mask: None,
+            }),
+        }
+    )));
+    assert!(is_generic_1d_plan(&CollectionKernelPlan::Elementwise));
+}
+
 #[test]
 fn resources_map_from_kernel_resource() {
     let mut types = TypeTable::new();

@@ -252,7 +252,88 @@ pub struct KernelLaunchPlan {
     pub workgroup_count: MirKernelWorkgroupCount,
 }
 
+/// Threads per workgroup for a generic one-dimensional kernel.
+///
+/// The ABI synthesizes every kernel without a collection-op contract with a
+/// `1×1×1` workgroup and `dispatch = element count`, which a host launches as
+/// one thread per block. Measured on an RTX 5070 (`sm_120`, driver 13.3) with
+/// the emitter's own PTX for `a + b` over 16,777,216 `f32` elements, that runs
+/// at 17.5 GB/s against ≈596 GB/s at any block from 64 to 512, with
+/// bitwise-identical output: a block holds one lane of a warp and an SM keeps
+/// only a couple of dozen blocks resident, so occupancy is a few percent.
+///
+/// 128 is a portable middle: inside WebGPU's 256-invocation limit, four Apple
+/// simdgroups, four NVIDIA warps. Bodies are index-guarded (`index < N`), so
+/// the over-dispatched tail of the last workgroup exits at once.
+pub const GENERIC_1D_WORKGROUP_X: u32 = 128;
+
+/// Whether a plan is a plain thread-per-output recipe whose body derives its
+/// index from the global invocation id and guards it, so any workgroup size
+/// computes the same bits.
+///
+/// Admission is by evidence, not by shape: a recipe joins this list once a
+/// differential test on hardware has shown identical output at a wide block.
+/// Elementwise (add, mul, silu, gelu, relu, hadamard) and the per-element
+/// rank-1/2 row-softmax body are measured; the other thread-per-output
+/// recipes keep the conservative `1×1×1` until their kernels are.
+#[must_use]
+pub fn is_generic_1d_plan(plan: &CollectionKernelPlan) -> bool {
+    match plan {
+        CollectionKernelPlan::Elementwise => true,
+        // The head-axis batched variant has its own body, which the
+        // measurements do not cover.
+        CollectionKernelPlan::RowSoftmax(softmax) => softmax.batched.is_none(),
+        _ => false,
+    }
+}
+
+/// The workgroup a kernel launches with: the signature's, except that a
+/// generic one-dimensional kernel (see [`is_generic_1d_plan`]; no resolved
+/// plan means elementwise) whose signature carries the ABI default `1×1×1`
+/// launches [`GENERIC_1D_WORKGROUP_X`] threads per workgroup.
+///
+/// The one place the policy lives: the device program's [`KernelLaunchPlan`]
+/// and the NVVM kernel descriptor both derive their geometry from it, so the
+/// two cannot drift. A kernel with a single work item, a multi-dimensional
+/// dispatch, or a contract-sized workgroup keeps its signature workgroup.
+#[must_use]
+pub fn generic_1d_workgroup(
+    signature: &MirKernelSignature,
+    plan: Option<&CollectionKernelPlan>,
+) -> MirWorkgroupSize {
+    let generic = plan.is_none_or(is_generic_1d_plan);
+    if generic
+        && signature.workgroup == (MirWorkgroupSize { x: 1, y: 1, z: 1 })
+        && signature.dispatch_size.y == 1
+        && signature.dispatch_size.z == 1
+        && signature.dispatch_size.x > 1
+    {
+        MirWorkgroupSize {
+            x: GENERIC_1D_WORKGROUP_X,
+            y: 1,
+            z: 1,
+        }
+    } else {
+        signature.workgroup
+    }
+}
+
 impl KernelLaunchPlan {
+    /// The thread coverage along `x` the launch provides, in work items.
+    ///
+    /// For a generic one-dimensional plan this is the dispatch extent (the
+    /// element count), not `workgroup_count × workgroup`, which the last
+    /// workgroup rounds up. Every other plan keeps the product, which is the
+    /// established meaning for tile grids and reduction partials.
+    #[must_use]
+    pub fn work_items_x(&self, plan: &CollectionKernelPlan) -> u64 {
+        if is_generic_1d_plan(plan) {
+            self.dispatch_size.x
+        } else {
+            self.workgroup_count.x * u64::from(self.workgroup.x)
+        }
+    }
+
     /// Build the launch plan from a live kernel signature and its MIR
     /// function, deriving the workgroup count via the shared ABI rule.
     #[must_use]
@@ -278,8 +359,10 @@ impl KernelLaunchPlan {
     /// outputs per workgroup, so its grid is `ceil(dispatch / outputs)`
     /// workgroups — the generic `ceil(dispatch / workgroup)` law
     /// under-dispatches by the partition ratio (15 workgroups published 120
-    /// of 960 logical Q). Emitters and launches must be built from the same
-    /// plan; prefer this constructor whenever the plan is at hand.
+    /// of 960 logical Q). A generic one-dimensional plan (see
+    /// [`is_generic_1d_plan`]) launches [`GENERIC_1D_WORKGROUP_X`] threads per
+    /// workgroup instead of one. Emitters and launches must be built from the
+    /// same plan; prefer this constructor whenever the plan is at hand.
     #[must_use]
     pub fn from_signature_plan_and_function(
         signature: &MirKernelSignature,
@@ -293,6 +376,13 @@ impl KernelLaunchPlan {
                 .filter(|outputs| *outputs > 0)
         {
             launch.workgroup_count.x = launch.dispatch_size.x.div_ceil(outputs);
+        } else {
+            let workgroup = generic_1d_workgroup(signature, Some(plan));
+            if workgroup != launch.workgroup {
+                launch.workgroup = workgroup;
+                launch.workgroup_count =
+                    collection_op_workgroup_count(function, launch.dispatch_size, workgroup);
+            }
         }
         launch
     }
