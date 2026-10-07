@@ -262,10 +262,33 @@ pub struct KernelLaunchPlan {
 /// bitwise-identical output: a block holds one lane of a warp and an SM keeps
 /// only a couple of dozen blocks resident, so occupancy is a few percent.
 ///
+/// The same kernel at other block sizes, bitwise-identical output in every row
+/// (`radix-device-cuda/tests/emitter_geometry.rs`):
+///
+/// | geometry | ms/launch | GB/s |
+/// | --- | --- | --- |
+/// | 1 thread/block | 11.492 | 17.5 |
+/// | 32 threads/block | 0.394 | 510.8 |
+/// | 64–512 threads/block | 0.338 | ≈596 |
+/// | 1024 threads/block | 0.345 | 583.0 |
+///
 /// 128 is a portable middle: inside WebGPU's 256-invocation limit, four Apple
 /// simdgroups, four NVIDIA warps. Bodies are index-guarded (`index < N`), so
 /// the over-dispatched tail of the last workgroup exits at once.
 pub const GENERIC_1D_WORKGROUP_X: u32 = 128;
+
+/// The largest element count a generic one-dimensional kernel spreads over
+/// [`GENERIC_1D_WORKGROUP_X`]-thread workgroups.
+///
+/// Every generated body derives its element index in 32 bits and addresses with
+/// it as a signed offset, so the index of the last launched thread, rounded up
+/// to a whole workgroup, must stay below `i32::MAX`. One thread per block
+/// capped a launch at the grid limit (2³¹−1 blocks), where a host rejected a
+/// larger grid loudly; 128 threads per block lifts that to about 2.7×10¹¹
+/// threads, past the point where the index wraps and re-passes the bounds
+/// guard. A kernel above this keeps its signature workgroup, and with it the
+/// loud failure.
+pub const GENERIC_1D_MAX_ELEMENTS: u64 = i32::MAX as u64 - (GENERIC_1D_WORKGROUP_X as u64 - 1);
 
 /// Whether a plan is a plain thread-per-output recipe whose body derives its
 /// index from the global invocation id and guards it, so any workgroup size
@@ -295,7 +318,8 @@ pub fn is_generic_1d_plan(plan: &CollectionKernelPlan) -> bool {
 /// The one place the policy lives: the device program's [`KernelLaunchPlan`]
 /// and the NVVM kernel descriptor both derive their geometry from it, so the
 /// two cannot drift. A kernel with a single work item, a multi-dimensional
-/// dispatch, or a contract-sized workgroup keeps its signature workgroup.
+/// dispatch, a contract-sized workgroup, or more than
+/// [`GENERIC_1D_MAX_ELEMENTS`] elements keeps its signature workgroup.
 #[must_use]
 pub fn generic_1d_workgroup(
     signature: &MirKernelSignature,
@@ -307,6 +331,7 @@ pub fn generic_1d_workgroup(
         && signature.dispatch_size.y == 1
         && signature.dispatch_size.z == 1
         && signature.dispatch_size.x > 1
+        && signature.dispatch_size.x <= GENERIC_1D_MAX_ELEMENTS
     {
         MirWorkgroupSize {
             x: GENERIC_1D_WORKGROUP_X,

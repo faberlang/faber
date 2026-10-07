@@ -611,6 +611,41 @@ fn a_generic_elementwise_kernel_launches_a_real_workgroup_not_one_thread() {
     );
 }
 
+/// Bodies index in 32 bits and address with the index as a signed offset. At 2³¹
+/// elements or more the launched index passes `i32::MAX`, so the wide geometry
+/// would address the wrong elements where the one-thread geometry was refused by
+/// the host's grid limit. The kernel keeps its signature workgroup past the bound.
+#[test]
+fn a_generic_kernel_too_large_for_32_bit_indexing_keeps_one_thread_per_block() {
+    let widest = GENERIC_1D_MAX_ELEMENTS;
+    let signature = elementwise_signature(widest, 1);
+    let launch = plan_launch(
+        &signature,
+        &CollectionKernelPlan::Elementwise,
+        MirCollectionOp::TensorAdd,
+    );
+    assert_eq!(launch.workgroup, MirWorkgroupSize { x: 128, y: 1, z: 1 });
+    let last_index = launch.workgroup_count.x * 128 - 1;
+    assert!(
+        last_index <= i32::MAX as u64,
+        "the last launched thread's index {last_index} must fit a signed 32-bit offset"
+    );
+
+    for elements in [widest + 1, 1 << 31, 1 << 32, 5_000_000_000] {
+        let signature = elementwise_signature(elements, 1);
+        let launch = plan_launch(
+            &signature,
+            &CollectionKernelPlan::Elementwise,
+            MirCollectionOp::TensorAdd,
+        );
+        assert_eq!(
+            launch.workgroup,
+            MirWorkgroupSize { x: 1, y: 1, z: 1 },
+            "{elements} elements must not take the wide geometry"
+        );
+    }
+}
+
 #[test]
 fn an_exact_multiple_needs_no_tail_workgroup() {
     let signature = elementwise_signature(16_777_216, 1);
