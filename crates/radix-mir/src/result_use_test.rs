@@ -340,3 +340,59 @@ fn a_void_kernel_writing_the_output_twice_does_not_qualify() {
         &MirPlace::temp(MirTempId(0))
     ));
 }
+
+// -- a place written at most once --
+
+#[test]
+fn a_forward_target_written_once_is_written_at_most_once() {
+    let f = function(
+        vec![assign(
+            local_place(1),
+            MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+        )],
+        MirTerminatorKind::Return(None),
+    );
+    assert!(written_at_most_once(&f, &local_place(1)));
+}
+
+/// `s ← temp; s ← s / n`: the second write gives `s` another value.
+#[test]
+fn a_forward_target_written_again_is_not() {
+    let f = function(
+        vec![
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+            ),
+            assign(
+                local_place(1),
+                MirValueKind::Binary {
+                    op: crate::MirBinOp::Add,
+                    lhs: MirOperand::Place(local_place(1)),
+                    rhs: MirOperand::Constant(crate::MirConstant::Int(1)),
+                },
+            ),
+        ],
+        MirTerminatorKind::Return(None),
+    );
+    assert!(!written_at_most_once(&f, &local_place(1)));
+}
+
+#[test]
+fn a_write_through_a_projection_is_not_written_at_most_once() {
+    let mut element = local_place(1);
+    element
+        .projections
+        .push(crate::MirProjection::Index(MirOperand::Constant(
+            crate::MirConstant::Int(0),
+        )));
+    let f = function(
+        vec![assign(
+            element.clone(),
+            MirValueKind::Operand(MirOperand::Constant(crate::MirConstant::Int(1))),
+        )],
+        MirTerminatorKind::Return(None),
+    );
+    assert!(!written_at_most_once(&f, &local_place(1)));
+    assert!(!written_at_most_once(&f, &element));
+}

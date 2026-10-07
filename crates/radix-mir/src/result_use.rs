@@ -78,6 +78,20 @@ pub fn result_unread_in_a_void_kernel(function: &MirFunction, destination: &MirP
     !returns_a_value && result_only_returned(function, destination)
 }
 
+/// Whether `place` is a plain place written at most once in the function: its
+/// single write is the one a forward gives it, so it still holds that value
+/// wherever it is read.
+///
+/// A backend that moves a "this result was already written to the output" mark
+/// along a forward (`s ← temp`) needs this much of [`result_returned_as`]'s proof
+/// when the chain ends somewhere other than a return (a write into the output
+/// parameter): a target written again (`s ← s / n`, `s ← 1.0`) holds another
+/// value, and marking it would skip the store of that value.
+#[must_use]
+pub fn written_at_most_once(function: &MirFunction, place: &MirPlace) -> bool {
+    place.projections.is_empty() && write_count(function, &place.base) <= 1
+}
+
 /// Follow a recipe result along plain forwards. `Some((end, returned))` when no
 /// step is read by anything else and every place is written at most once;
 /// `returned` says whether the chain ends in a `Return` of `end`.
