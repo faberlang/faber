@@ -281,10 +281,12 @@ fn shape_guard_precedes_try_call(
 
 /// Whether the tensor-fill result is dropped: the statement posture of
 /// `t.fill(v);`. The MIR lowering gives every value-returning call a temp
-/// destination, so the posture is the temp's liveness — a destination the
+/// destination, so the posture is read off the temp's uses: a destination the
 /// rest of the block never reads (and the terminator never consumes) is the
 /// discarded fill, and the documented mutation statement applies. The scan is
-/// conservative: any later read keeps the bound fresh-result posture.
+/// conservative within the block: any later read keeps the bound fresh-result
+/// posture. It is a same-block scan, not whole-function liveness: a read of the
+/// temp from another block is not seen, and this treats the fill as dropped.
 fn fill_result_is_dropped(
     statement: &radix_mir::MirStatement,
     block: &radix_mir::MirBlock,

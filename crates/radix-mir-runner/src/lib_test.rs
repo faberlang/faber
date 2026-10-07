@@ -5378,7 +5378,10 @@ fn tensor_shape_check_validates_size_bindings_without_relations() {
     };
     let error = evaluate_collection_call(&call, vec![(MirValueId(0), Value::Int(-1))])
         .expect_err("invalid unreferenced size binding");
-    assert_eq!(error.issue, "runner_tensor_shape_invalid_extent");
+    // The size slot is a lift store, so a witness that fails here is the lift
+    // failing its `>= 0` check, named as such since size-type Z1 (cb95f1807);
+    // this pinned the generic invalid-extent issue it replaced.
+    assert_eq!(error.issue, "size_lift_negative");
 }
 
 #[test]
