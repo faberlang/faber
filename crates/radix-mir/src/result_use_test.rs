@@ -262,3 +262,81 @@ fn a_reassigned_forward_target_is_refused_by_the_shared_predicate_too() {
     );
     assert!(!result_only_returned(&f, &MirPlace::temp(MirTempId(0))));
 }
+
+// -- a void kernel that writes its output parameter --
+
+/// `output ⇇ x.recipe()`: `temp0 ← recipe(..)`, `output(local1) ← temp0`, and the
+/// kernel returns nothing.
+#[test]
+fn a_void_kernel_forwarding_its_result_to_the_output_parameter_qualifies() {
+    let f = function(
+        vec![assign(
+            local_place(1),
+            MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+        )],
+        MirTerminatorKind::Return(None),
+    );
+    assert!(result_unread_in_a_void_kernel(
+        &f,
+        &MirPlace::temp(MirTempId(0))
+    ));
+    assert_eq!(result_returned_as(&f, &MirPlace::temp(MirTempId(0))), None);
+}
+
+/// A discarded result in a kernel that returns something else: the return
+/// writes `output[index]` from every thread, so a row owner's writes would race.
+#[test]
+fn a_kernel_returning_another_value_does_not_qualify() {
+    let f = function(vec![], returned(7));
+    assert!(!result_unread_in_a_void_kernel(
+        &f,
+        &MirPlace::temp(MirTempId(0))
+    ));
+}
+
+#[test]
+fn a_void_kernel_whose_result_is_read_does_not_qualify() {
+    let f = function(
+        vec![
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+            ),
+            assign(
+                local_place(2),
+                MirValueKind::Binary {
+                    op: crate::MirBinOp::Add,
+                    lhs: MirOperand::Place(local_place(1)),
+                    rhs: MirOperand::Constant(crate::MirConstant::Int(1)),
+                },
+            ),
+        ],
+        MirTerminatorKind::Return(None),
+    );
+    assert!(!result_unread_in_a_void_kernel(
+        &f,
+        &MirPlace::temp(MirTempId(0))
+    ));
+}
+
+/// The output parameter written twice is not one recipe result.
+#[test]
+fn a_void_kernel_writing_the_output_twice_does_not_qualify() {
+    let f = function(
+        vec![
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+            ),
+            assign(
+                local_place(1),
+                MirValueKind::Operand(MirOperand::Place(local_place(9))),
+            ),
+        ],
+        MirTerminatorKind::Return(None),
+    );
+    assert!(!result_unread_in_a_void_kernel(
+        &f,
+        &MirPlace::temp(MirTempId(0))
+    ));
+}

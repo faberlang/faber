@@ -59,6 +59,25 @@ pub fn result_returned_as(function: &MirFunction, destination: &MirPlace) -> Opt
     })
 }
 
+/// Whether a kernel that returns nothing leaves a recipe's result unread: the
+/// `output ⇇ x.recipe()` shape, where the recipe writes a temp, a plain forward
+/// copies it into the output parameter, and the kernel ends in `Return(None)`.
+///
+/// Unlike [`result_returned_as`] there is no return to teach to skip a
+/// re-store, so no returned place is needed; the requirement is that nothing
+/// reads the result (same-kernel consumers would see elements their owner has
+/// not written yet) and that the kernel returns nothing. A kernel that
+/// returns a *different* value does not qualify: its return writes
+/// `output[index]` from every thread, which would race a row's owner.
+#[must_use]
+pub fn result_unread_in_a_void_kernel(function: &MirFunction, destination: &MirPlace) -> bool {
+    let returns_a_value = function
+        .blocks
+        .iter()
+        .any(|block| matches!(block.terminator.kind, MirTerminatorKind::Return(Some(_))));
+    !returns_a_value && result_only_returned(function, destination)
+}
+
 /// Follow a recipe result along plain forwards. `Some((end, returned))` when no
 /// step is read by anything else and every place is written at most once;
 /// `returned` says whether the chain ends in a `Return` of `end`.
