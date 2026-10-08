@@ -1453,6 +1453,122 @@ fn lane_signature_slots(reads: &[(u32, u32)]) -> Vec<(u32, MirKernelResourceKind
     slots
 }
 
+/// Parameter order spec for [`lane_signature_bindings`]: `i` input tensor,
+/// `m` `mut` output tensor, `s` f32 scalar. A Lane parameter always follows.
+fn lane_signature_bindings(order: &str) -> Vec<(Option<String>, u32, crate::abi::MirKernelResourceRole)> {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank2_tensor_ty(&mut types, [7, 5]);
+    let scalar = f32(&mut types);
+    let u32t = u32_ty(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let mut params = Vec::new();
+    let mut locals = Vec::new();
+    for (index, kind) in order.chars().enumerate() {
+        let (ty, mode, mutable) = match kind {
+            'i' => (tensor, MirParamMode::Ref, false),
+            'm' => (tensor, MirParamMode::MutRef, true),
+            's' => (scalar, MirParamMode::Owned, false),
+            other => panic!("unknown param kind {other}"),
+        };
+        let id = index as u32;
+        params.push(MirParam {
+            local: MirLocalId(id),
+            name: Some(interner.intern(&format!("p{index}"))),
+            ty,
+            mode,
+            span: span(),
+        });
+        locals.push(MirLocal { id: MirLocalId(id), name: None, ty, mutable, span: span() });
+    }
+    let lane_id = order.len() as u32;
+    params.push(MirParam {
+        local: MirLocalId(lane_id),
+        name: Some(interner.intern("lane")),
+        ty: u32t,
+        mode: MirParamMode::Lane,
+        span: span(),
+    });
+    locals.push(MirLocal { id: MirLocalId(lane_id), name: None, ty: u32t, mutable: false, span: span() });
+    let fn_name = interner.intern("lane_order");
+    let function = MirFunction {
+        id: MirFunctionId(1),
+        source: Some(DefId(1)),
+        name: Some(fn_name),
+        params,
+        locals,
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: span() },
+            span: span(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    };
+    let validated = validated(&types, vec![function]);
+    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        &validated.program().functions[0],
+        validated.validation(),
+        &interner,
+    )
+    .expect("the lane-form shape has an ABI signature");
+    // Binding order; each entry names its source parameter.
+    signature
+        .resources_by_binding()
+        .map(|resource| (resource.source_name.clone(), resource.binding, resource.role))
+        .collect()
+}
+
+/// Assert the bindings equal the declared parameter order (`p0`, `p1`, ...)
+/// with the given roles, so the binding index IS the parameter index.
+fn assert_declared_order(order: &str) {
+    use crate::abi::MirKernelResourceRole::{Input, Output};
+    let got = lane_signature_bindings(order);
+    let want: Vec<_> = order
+        .chars()
+        .enumerate()
+        .map(|(index, kind)| {
+            (Some(format!("p{index}")), index as u32, if kind == 'm' { Output } else { Input })
+        })
+        .collect();
+    assert_eq!(got, want, "order `{order}`");
+}
+
+#[test]
+fn lane_output_may_follow_a_scalar() {
+    assert_declared_order("ism");
+}
+
+#[test]
+fn lane_scalar_may_follow_the_output() {
+    assert_declared_order("ims");
+}
+
+#[test]
+fn lane_two_scalars_interleave_with_tensors() {
+    assert_declared_order("sisim");
+    assert_declared_order("simss");
+    assert_declared_order("sism");
+    assert_declared_order("sims");
+}
+
+#[test]
+fn lane_two_inputs_with_a_scalar_between() {
+    assert_declared_order("isim");
+}
+
+#[test]
+fn lane_output_may_come_first() {
+    assert_declared_order("mi");
+    assert_declared_order("mis");
+}
+
 #[test]
 fn tensor_extent_reads_become_trailing_count_one_extent_resources() {
     // Reads arrive out of order and src axis 0 twice: the resources are

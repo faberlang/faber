@@ -29,6 +29,19 @@ struct IndexedViewKernelContext<'a> {
     builtin_inputs: Vec<MirKernelBuiltinInput>,
     interner: Option<&'a Interner>,
     allow_host_owned_tensor_entry: bool,
+    /// Declared position of the output among the resource-bearing params.
+    /// Every input resource binds at its declared position, skipping this
+    /// slot, so the binding index is the parameter order (the dispatcher and
+    /// the emitter agree on it). The positional `input*/output/index` shape
+    /// puts the output after every input.
+    output_position: u32,
+}
+
+/// Binding index of input `ordinal`, given the output's declared position.
+fn input_binding(ordinal: usize, output_position: u32) -> Result<u32, MirAbiError> {
+    let ordinal = u32::try_from(ordinal)
+        .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
+    Ok(if ordinal < output_position { ordinal } else { ordinal + 1 })
 }
 
 /// The dense matmul glyph admits BF16 weights only in the first input slot;
@@ -514,6 +527,8 @@ impl MirKernelSignature {
                     builtin_inputs: vec![builtin_input_for_index_param(index, interner)],
                     interner,
                     allow_host_owned_tensor_entry,
+                    output_position: u32::try_from(inputs.len())
+                        .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
                 };
                 if let [input] = inputs {
                     Self::indexed_view_kernel(function, input, output, index, context)
@@ -554,8 +569,33 @@ impl MirKernelSignature {
             ));
         }
 
-        let inputs = &params[..builtin_start - 1];
-        let output = &params[builtin_start - 1];
+        // The output is the `mut` tensor parameter, wherever it sits among
+        // the non-lane parameters; a kernel with no `mut` parameter keeps the
+        // legacy positional rule (the last one). Scalars and input tensors may
+        // appear before or after it, in any number and interleaving.
+        let declared = &params[..builtin_start];
+        let mut_positions: Vec<usize> = declared
+            .iter()
+            .enumerate()
+            .filter(|(_, param)| param.mode == MirParamMode::MutRef)
+            .map(|(position, _)| position)
+            .collect();
+        let output_position = match mut_positions.as_slice() {
+            [] => declared.len() - 1,
+            [position] => *position,
+            _ => {
+                return Err(MirAbiError::new(
+                    "indexed view kernel declares more than one `mut` output parameter",
+                ));
+            }
+        };
+        let output = &declared[output_position];
+        let inputs: Vec<MirParam> = declared
+            .iter()
+            .enumerate()
+            .filter(|(position, _)| *position != output_position)
+            .map(|(_, param)| param.clone())
+            .collect();
         let builtin_params = &params[builtin_start..];
         let builtin_inputs = builtin_inputs_for_named_params(builtin_params, validation, interner)?;
         let context = IndexedViewKernelContext {
@@ -563,14 +603,16 @@ impl MirKernelSignature {
             builtin_inputs,
             interner: Some(interner),
             allow_host_owned_tensor_entry,
+            output_position: u32::try_from(output_position)
+                .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
         };
-        if let [input] = inputs {
+        if let [input] = inputs.as_slice() {
             Self::indexed_view_kernel(function, input, output, &builtin_params[0], context)
                 .map(Some)
         } else {
             Self::multi_input_indexed_view_kernel(
                 function,
-                inputs,
+                &inputs,
                 output,
                 &builtin_params[0],
                 context,
@@ -1056,7 +1098,7 @@ impl MirKernelSignature {
             function: function.id,
             input: MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: 0,
+                binding: input_binding(0, context.output_position)?,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Input,
                 access: MirKernelResourceAccess::Read,
@@ -1069,7 +1111,7 @@ impl MirKernelSignature {
             extra_inputs: Vec::new(),
             output: MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: 1,
+                binding: context.output_position,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Output,
                 access: MirKernelResourceAccess::Write,
@@ -1146,8 +1188,7 @@ impl MirKernelSignature {
                 };
             input_resources.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: u32::try_from(binding)
-                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                binding: input_binding(binding, context.output_position)?,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Input,
                 access: MirKernelResourceAccess::Read,
@@ -1171,8 +1212,7 @@ impl MirKernelSignature {
             extra_inputs,
             output: MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: u32::try_from(inputs.len())
-                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                binding: context.output_position,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Output,
                 access: MirKernelResourceAccess::Write,
@@ -1217,13 +1257,23 @@ impl MirKernelSignature {
         std::iter::once(&self.output).chain(self.extra_outputs.iter())
     }
 
-    /// All storage-buffer resources in binding order: inputs, then the first
+    /// All storage-buffer resources in role order: inputs, then the first
     /// output, then the extra tuple outputs, then the accumulation buffers.
     pub fn resources(&self) -> impl Iterator<Item = &MirKernelResource> {
         self.input_resources()
             .chain(std::iter::once(&self.output))
             .chain(self.extra_outputs.iter())
             .chain(self.accumulation_buffers.iter())
+    }
+
+    /// [`Self::resources`] ordered by binding index. An indexed-view output
+    /// declared before an input binds at its declared position, so slot
+    /// consumers (the device program's resource list, the dispatcher's
+    /// argument slots) take this order, where slot `i` is parameter `i`.
+    pub fn resources_by_binding(&self) -> impl Iterator<Item = &MirKernelResource> {
+        let mut resources: Vec<&MirKernelResource> = self.resources().collect();
+        resources.sort_by_key(|resource| resource.binding);
+        resources.into_iter()
     }
 
     /// The kernel's runtime-extent count resource, when present (U2).

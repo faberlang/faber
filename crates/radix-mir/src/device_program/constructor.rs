@@ -1033,7 +1033,7 @@ impl<'a> KernelBuilder<'a> {
         // the ABI), so the update output slots can alias it.
         let mut param_buffer_by_local: BTreeMap<MirLocalId, BufferId> = BTreeMap::new();
         for resource in signature
-            .resources()
+            .resources_by_binding()
             .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
         {
             let shape = crate::abi::kernel_param_shape(
@@ -1779,7 +1779,7 @@ fn lane_grid_plan(
         return Ok(None);
     }
     let resources: Vec<_> = signature
-        .resources()
+        .resources_by_binding()
         .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
         .collect();
     if !resources
