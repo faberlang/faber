@@ -1410,6 +1410,150 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
     assert_eq!(kernel.resources[1].access, MirKernelResourceAccess::Write);
 }
 
+/// gpu-reset A2 rung 3: a void function with no `Lane` parameter, no index
+/// parameter and one `mut` tensor is sequential. It gets a signature with no
+/// builtin input and a 1x1x1 dispatch, and the constructor selects
+/// `SingleLane`; the same shape with a trailing `u32` index parameter (the
+/// positional `input*/output/index` form) is not single-lane.
+#[test]
+fn single_lane_plan_is_selected_for_a_function_with_no_lane_loop() {
+    use crate::{MirTemp, MirTempId, MirValueKind};
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank1_tensor_ty(&mut types, 8);
+    let u32t = u32_ty(&mut types);
+    let float = f32(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let temp = |id: u32| MirOperand::Temp(MirTempId(id));
+    let index = |base: u32, at: u32| MirPlace {
+        base: crate::MirPlaceBase::Local(MirLocalId(base)),
+        projections: vec![crate::MirProjection::Index(MirOperand::Constant(
+            crate::MirConstant::Int(i64::from(at)),
+        ))],
+    };
+    let body = vec![
+        lane_assign(
+            MirPlace::temp(MirTempId(0)),
+            0,
+            MirValueKind::Operand(MirOperand::Place(index(1, 3))),
+            float,
+        ),
+        lane_assign(index(1, 5), 1, MirValueKind::Operand(temp(0)), float),
+    ];
+    let make = |interner: &mut Interner, with_index: bool| {
+        let names = ["scale", "t", "i"].map(|name| interner.intern(name));
+        let param = |id: u32, ty, mode| MirParam {
+            local: MirLocalId(id),
+            name: Some(names[id as usize]),
+            ty,
+            mode,
+            span: span(),
+        };
+        let local_decl = |id: u32, ty, mutable| MirLocal {
+            id: MirLocalId(id),
+            name: None,
+            ty,
+            mutable,
+            span: span(),
+        };
+        let mut params = vec![
+            param(0, float, MirParamMode::Ref),
+            param(1, tensor, MirParamMode::MutRef),
+        ];
+        let mut locals = vec![local_decl(0, float, false), local_decl(1, tensor, true)];
+        if with_index {
+            params.push(param(2, u32t, MirParamMode::Ref));
+            locals.push(local_decl(2, u32t, false));
+        }
+        MirFunction {
+            id: MirFunctionId(1),
+            source: Some(DefId(1)),
+            name: Some(interner.intern("advance")),
+            params,
+            locals,
+            temps: vec![MirTemp {
+                id: MirTempId(0),
+                ty: float,
+                span: span(),
+            }],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: body.clone(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: span(),
+                },
+                span: span(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: Some(MirKernelShaderStage::Compute),
+            span: span(),
+        }
+    };
+
+    let indexed = make(&mut interner, true);
+    let validated_indexed = validated(&types, vec![indexed]);
+    assert!(
+        !crate::abi::MirKernelSignature::is_single_lane_form(
+            &validated_indexed.program().functions[0],
+            validated_indexed.validation()
+        ),
+        "a trailing u32 index parameter is the positional indexed form"
+    );
+
+    let function = make(&mut interner, false);
+    let validated = validated(&types, vec![function]);
+    assert!(crate::abi::MirKernelSignature::is_single_lane_form(
+        &validated.program().functions[0],
+        validated.validation()
+    ));
+    let signature =
+        crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            &validated.program().functions[0],
+            validated.validation(),
+            &interner,
+        )
+        .expect("the single-lane shape has an ABI signature");
+    assert!(signature.builtin_inputs.is_empty());
+    assert_eq!(
+        (
+            signature.dispatch_size.x,
+            signature.dispatch_size.y,
+            signature.dispatch_size.z
+        ),
+        (1, 1, 1)
+    );
+    assert_eq!(signature.output.binding, 1);
+    assert_eq!(signature.input.binding, 0);
+
+    let (program, _semantics, _steps) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("the single-lane kernel materializes");
+    assert_eq!(program.kernels.len(), 1);
+    let kernel = &program.kernels[0];
+    assert_eq!(kernel.plan, CollectionKernelPlan::SingleLane);
+    assert_eq!(
+        (
+            kernel.launch.workgroup_count.x,
+            kernel.launch.workgroup.x,
+            kernel.launch.workgroup.y,
+            kernel.launch.workgroup.z
+        ),
+        (1, 1, 1, 1),
+        "one thread"
+    );
+}
+
 /// gpu-reset C4-2e-a: the lane-copy shape (params `src`, `mut dst`, `Lane`)
 /// whose single block reads the given `(parameter local, axis)` pairs through
 /// `TensorExtent`, in the given order, and returns. Only the signature matters

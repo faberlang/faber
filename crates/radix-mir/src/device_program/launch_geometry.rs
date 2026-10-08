@@ -127,6 +127,12 @@ pub fn geometry_for_call(
             }
             generic_1d(unit, counts[*source_resource])
         }
+        // One thread, one group: the body is sequential. The call-site shapes
+        // do not shape the launch.
+        CollectionKernelPlan::SingleLane => finish(
+            MirKernelDispatchSize { x: 1, y: 1, z: 1 },
+            MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        ),
         CollectionKernelPlan::TiledMatMul(matmul) => tiled_matmul(matmul, shapes),
         CollectionKernelPlan::Transpose(transpose) => {
             let input = first_input(unit, &counts)?;
@@ -358,6 +364,7 @@ fn plan_name(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::SsmScan(_) => "SsmScan",
         CollectionKernelPlan::DistributedSum(_) => "DistributedSum",
         CollectionKernelPlan::LaneGrid { .. } => "LaneGrid",
+        CollectionKernelPlan::SingleLane => "SingleLane",
     }
 }
 

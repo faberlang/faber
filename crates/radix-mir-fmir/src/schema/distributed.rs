@@ -756,6 +756,7 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
             state_dim: plan.state_dim,
             layout: wire_packed_layout(plan.layout),
         }),
+        WireCollectionKernelPlan::SingleLane => CollectionKernelPlan::SingleLane,
         WireCollectionKernelPlan::LaneGrid(plan) => CollectionKernelPlan::LaneGrid {
             source_resource: usize::try_from(plan.source_resource).unwrap_or(usize::MAX),
             rank: plan.rank,

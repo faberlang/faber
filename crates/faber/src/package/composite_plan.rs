@@ -1280,6 +1280,7 @@ fn plan_spelling(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::SsmScan(_) => "ssm-scan",
         CollectionKernelPlan::DistributedSum(_) => "distributed-sum",
         CollectionKernelPlan::LaneGrid { .. } => "lane-grid",
+        CollectionKernelPlan::SingleLane => "single-lane",
     }
 }
 

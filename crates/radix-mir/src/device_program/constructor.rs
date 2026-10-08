@@ -825,6 +825,7 @@ impl<'a> KernelBuilder<'a> {
                         function: function.id,
                         detail,
                     })?
+                    .or_else(|| single_lane_plan(function, self.validation))
                     .unwrap_or(CollectionKernelPlan::Elementwise),
             };
             return self.emit_subchain(
@@ -1808,6 +1809,18 @@ fn lane_grid_plan(
         source_resource,
         rank,
     }))
+}
+
+/// The single-lane plan of a function (gpu-reset A2 rung 3): a void compute
+/// function with no lane loop, no recipe (the caller reaches this only when
+/// the plan pass found none) and one `mut` tensor, which is sequential and so
+/// runs as exactly one lane.
+fn single_lane_plan(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Option<CollectionKernelPlan> {
+    MirKernelSignature::is_single_lane_form(function, validation)
+        .then_some(CollectionKernelPlan::SingleLane)
 }
 
 /// The axis count of a tensor parameter's declared shape, whatever its

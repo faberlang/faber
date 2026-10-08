@@ -140,6 +140,12 @@ pub enum CollectionKernelPlan {
     /// `source_resource` (the first read tensor), `rank` axes; the launch
     /// geometry is the generic 1-D workgroup rule over its element count.
     LaneGrid { source_resource: usize, rank: u8 },
+    /// Single-lane kernel (gpu-reset A2 rung 3): a compute function with no
+    /// `thread lane` loop and no recipe is sequential, so it runs as exactly
+    /// one lane. The launch is one thread (1x1x1); there is no `Lane`
+    /// builtin and no over-launch guard, and a `mut` tensor the body writes
+    /// may also be read in the same body.
+    SingleLane,
 }
 
 /// Axis-reduction recipe plan (name frozen by S6-N1; admission, resolution,

@@ -568,6 +568,25 @@ impl MirKernelSignature {
             return Ok(signature);
         }
 
+        if Self::is_single_lane_form(function, validation) {
+            let output_position = function
+                .params
+                .iter()
+                .position(|param| param.mode == MirParamMode::MutRef)
+                .and_then(|position| u32::try_from(position).ok())
+                .ok_or_else(|| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
+            return Self::single_lane_kernel(
+                function,
+                IndexedViewKernelContext {
+                    validation,
+                    builtin_inputs: Vec::new(),
+                    interner,
+                    allow_host_owned_tensor_entry,
+                    output_position,
+                },
+            );
+        }
+
         match function.params.as_slice() {
             [param] => Self::return_buffer_kernel(
                 function,
@@ -597,7 +616,13 @@ impl MirKernelSignature {
                 if let [input] = inputs {
                     Self::indexed_view_kernel(function, input, output, index, context)
                 } else {
-                    Self::multi_input_indexed_view_kernel(function, inputs, output, index, context)
+                    Self::multi_input_indexed_view_kernel(
+                        function,
+                        inputs,
+                        output,
+                        Some(index),
+                        context,
+                    )
                 }
             }
             _ => Err(MirAbiError::new(
@@ -682,7 +707,7 @@ impl MirKernelSignature {
                 function,
                 &inputs,
                 output,
-                &builtin_params[0],
+                Some(&builtin_params[0]),
                 context,
             )
             .map(Some)
@@ -1216,14 +1241,19 @@ impl MirKernelSignature {
         function: &MirFunction,
         inputs: &[MirParam],
         output: &MirParam,
-        index: &MirParam,
+        index: Option<&MirParam>,
         context: IndexedViewKernelContext<'_>,
     ) -> Result<Self, MirAbiError> {
         let validation = context.validation;
         if !is_vacuum(function.return_ty, validation) {
             return Err(MirAbiError::new(ERR_INDEXED_VIEW_RETURNS_VACUUM));
         }
-        require_u32_index(index.ty, validation)?;
+        // No index parameter: a single-lane kernel, whose tensors are read and
+        // written at the body's own indices exactly like a lane-form kernel's.
+        if let Some(index) = index {
+            require_u32_index(index.ty, validation)?;
+        }
+        let per_lane = index.is_none() || is_lane_form(function);
 
         let output_element_ty =
             device_view_element_type(output.ty, validation, context.allow_host_owned_tensor_entry)?;
@@ -1258,7 +1288,7 @@ impl MirKernelSignature {
                 // A lane-form kernel indexes each tensor by its own lane
                 // coordinates, so inputs and the output need not share an
                 // element type or count.
-                if !is_lane_form(function) && !is_gather_ids_param(function, input, validation) {
+                if !per_lane && !is_gather_ids_param(function, input, validation) {
                     require_indexed_element_compatibility(
                         function,
                         input_element_ty,
@@ -1325,11 +1355,94 @@ impl MirKernelSignature {
             ),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
+        if index.is_none() {
+            // Single lane: one thread runs the whole body. No recipe contract
+            // applies; the body's collection-op statements are scalar math.
+            signature.dispatch_size = MirKernelDispatchSize { x: 1, y: 1, z: 1 };
+            return Ok(signature);
+        }
         // PRP-004 U3 (D1-A): reduction/matmul kernels carry a corrected
         // dispatch/workgroup/output-buffer contract (shared ABI law, all
         // compute targets).
         apply_collection_op_contract(function, &mut signature, validation)?;
         Ok(signature)
+    }
+
+    /// Whether `function` is a single-lane kernel (gpu-reset A2 rung 3): a
+    /// void compute function with no `Lane` builtin parameter and no index
+    /// parameter, one `mut` tensor parameter (the output, which the body may
+    /// also read) and at least one other parameter. Such a body has no
+    /// parallel loop, so it is sequential and runs as exactly one lane.
+    /// Positional `input*/output/index` kernels (a trailing `u32`) and every
+    /// shape with a result are not single-lane.
+    #[must_use]
+    pub fn is_single_lane_form(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+    ) -> bool {
+        if function.params.len() < 2
+            || is_lane_form(function)
+            || !is_vacuum(function.return_ty, validation)
+        {
+            return false;
+        }
+        // A body carrying a tensor recipe (matmul, reduction, softmax, ...)
+        // is that recipe's kernel, not a sequential one. The scalar `abs` /
+        // `minimum` / `floor` / `sqrt` operations are not recipes.
+        if crate::collection_ops::collection_ops_for_function(function)
+            .into_iter()
+            .any(crate::device_program_plans::is_recipe_op)
+        {
+            return false;
+        }
+        let is_tensor = |param: &MirParam| {
+            matches!(
+                validation.types.get(param.ty.semantic_id()),
+                Type::Tensor(..)
+            )
+        };
+        let mut mut_params = function
+            .params
+            .iter()
+            .filter(|param| param.mode == MirParamMode::MutRef);
+        let (Some(output), None) = (mut_params.next(), mut_params.next()) else {
+            return false;
+        };
+        is_tensor(output)
+            && function.params.iter().all(|param| {
+                is_tensor(param)
+                    || genus_param_layout(param.ty, validation).is_ok_and(|genus| genus.is_some())
+                    || Self::is_kernel_scalar_input(param.ty, validation).is_ok_and(|scalar| {
+                        scalar && require_u32_index(param.ty, validation).is_err()
+                    })
+            })
+    }
+
+    /// The single-lane kernel ABI: every parameter in declared order, the
+    /// `mut` tensor the output, no builtin inputs, a 1x1x1 dispatch.
+    fn single_lane_kernel(
+        function: &MirFunction,
+        context: IndexedViewKernelContext<'_>,
+    ) -> Result<Self, MirAbiError> {
+        let output_position = function
+            .params
+            .iter()
+            .position(|param| param.mode == MirParamMode::MutRef)
+            .ok_or_else(|| MirAbiError::new("single-lane kernel has no `mut` output parameter"))?;
+        let inputs: Vec<MirParam> = function
+            .params
+            .iter()
+            .enumerate()
+            .filter(|(position, _)| *position != output_position)
+            .map(|(_, param)| param.clone())
+            .collect();
+        Self::multi_input_indexed_view_kernel(
+            function,
+            &inputs,
+            &function.params[output_position],
+            None,
+            context,
+        )
     }
 
     pub fn input_resources(&self) -> impl Iterator<Item = &MirKernelResource> {

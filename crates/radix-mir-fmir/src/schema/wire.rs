@@ -562,6 +562,10 @@ pub enum WireCollectionKernelPlan {
     /// named by `source_resource`'s call-site shape. Mirrors
     /// `kernel_plan::CollectionKernelPlan::LaneGrid`.
     LaneGrid(WireLaneGridPlan),
+    /// Single-lane kernel (gpu-reset A2 rung 3): a body with no lane loop,
+    /// launched as one thread. Mirrors
+    /// `kernel_plan::CollectionKernelPlan::SingleLane`.
+    SingleLane,
 }
 
 /// Axis-reduction recipe plan (wire mirror of `kernel_plan::AxisReductionPlan`,

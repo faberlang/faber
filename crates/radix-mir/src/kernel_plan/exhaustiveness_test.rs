@@ -42,6 +42,7 @@ const KNOWN_VARIANTS: &[&str] = &[
     "SsmScan",
     "DistributedSum",
     "LaneGrid",
+    "SingleLane",
 ];
 
 /// Exhaustive variant naming. A new [`CollectionKernelPlan`] variant
@@ -66,6 +67,7 @@ fn variant_coverage(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::SsmScan(_) => "SsmScan",
         CollectionKernelPlan::DistributedSum(_) => "DistributedSum",
         CollectionKernelPlan::LaneGrid { .. } => "LaneGrid",
+        CollectionKernelPlan::SingleLane => "SingleLane",
     }
 }
 
@@ -231,6 +233,7 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
             source_resource: 0,
             rank: 2,
         },
+        CollectionKernelPlan::SingleLane,
     ]
 }
 

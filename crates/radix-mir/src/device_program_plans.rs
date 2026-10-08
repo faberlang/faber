@@ -202,6 +202,12 @@ pub fn kernel_plan_for_function_with_limit(
     {
         return Ok(None);
     }
+    // A single-lane kernel (no lane loop, one `mut` tensor) is a sequential
+    // body: its collection-op statements are scalar math too. The caller
+    // selects the `SingleLane` plan.
+    if MirKernelSignature::is_single_lane_form(function, validation) {
+        return Ok(None);
+    }
     // SFR-5 declared-recipe scan: a `FilumSum` declaration is the author-
     // stated recipe. The collection-op statement scan never sees it (the
     // declaration is not a collection op), so it resolves ahead of the op
@@ -440,7 +446,9 @@ pub fn carried_plan_agrees(
         // selects `LaneGrid` from its Lane parameter (`lane_grid_plan`).
         None => matches!(
             carried,
-            CollectionKernelPlan::Elementwise | CollectionKernelPlan::LaneGrid { .. }
+            CollectionKernelPlan::Elementwise
+                | CollectionKernelPlan::LaneGrid { .. }
+                | CollectionKernelPlan::SingleLane
         ),
         Some(derived) => derived == carried,
     }
@@ -587,6 +595,8 @@ pub enum RecipeKind {
     SsmScan,
     /// Lane-form kernel (gpu-reset C4): one thread per lane of the domain.
     LaneGrid,
+    /// Single-lane kernel (gpu-reset A2 rung 3): one thread.
+    SingleLane,
 }
 
 impl RecipeKind {
@@ -609,6 +619,7 @@ impl RecipeKind {
             CollectionKernelPlan::SsmConv1d(_) => Self::SsmConv1d,
             CollectionKernelPlan::SsmScan(_) => Self::SsmScan,
             CollectionKernelPlan::LaneGrid { .. } => Self::LaneGrid,
+            CollectionKernelPlan::SingleLane => Self::SingleLane,
             // SFR-5: the declared distributed sum's floor IS the tree
             // recipe — a backend with no native collective arm selects the
             // tree-reduction launch semantics here; native arms (SFR-6/7)
@@ -2098,6 +2109,7 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
         // SFR-5: the declared distributed sum's broadcast result is a flat
         // partial-slot write — same bind shape as the tree floor.
         | CollectionKernelPlan::LaneGrid { .. }
+        | CollectionKernelPlan::SingleLane
         | CollectionKernelPlan::DistributedSum(_) => (vec![output_extent.max(1)], BindLayout::Flat),
     }
 }
@@ -2351,6 +2363,11 @@ pub fn per_output_domains(kernel: &KernelUnit) -> Vec<PerOutputDomain> {
 /// own domain exceeds the dispatched lanes.
 pub fn validate_per_output_domains(program: &DeviceProgram) -> Result<(), DeviceProgramError> {
     for (kernel_index, kernel) in program.kernels.iter().enumerate() {
+        // A single-lane kernel's one thread runs the whole body and addresses
+        // every output element itself: its coverage is the body, not lanes.
+        if kernel.plan == CollectionKernelPlan::SingleLane {
+            continue;
+        }
         let dispatched = dispatched_lanes(kernel);
         for domain in per_output_domains(kernel) {
             if domain.element_count > dispatched {
@@ -2445,7 +2462,8 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         | CollectionKernelPlan::BatchedAttention(_)
         | CollectionKernelPlan::SsmConv1d(_)
         | CollectionKernelPlan::SsmScan(_)
-        | CollectionKernelPlan::LaneGrid { .. } => 0,
+        | CollectionKernelPlan::LaneGrid { .. }
+        | CollectionKernelPlan::SingleLane => 0,
         CollectionKernelPlan::TreeReduction(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }
