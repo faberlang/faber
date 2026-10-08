@@ -1,0 +1,23 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "functio_decl", "param_list", "parameter", "argument_list", "argument", "call_marker"]
+category = "type"
+summary = "A write or ownership marker on a read-only parameter is call_marker_on_read_only."
+syntax = "peek(mut a) where peek takes a read parameter"
+related = ["mut"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — call marker on read only (SEM057)
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+fn peek(list<int> xs) → void {
+    print xs.length()
+}
+
+main {
+    const list<int> a ← [1, 2, 3]
+    peek(mut a)
+}

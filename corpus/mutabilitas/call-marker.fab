@@ -1,0 +1,69 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "function_type", "type_list", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "argument_list", "argument", "call_marker", "genus_decl", "genus_member", "functio_method_decl"]
+category = "type"
+summary = "An argument carries the marker its parameter declares: mut, own, copy, optional ref; on functions, method arguments, function values and fresh values."
+syntax = "bump(mut a); eat(own a); dup(copy a); peek(ref a)"
+related = ["mut", "own", "copy", "ref"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — call-site access markers
+# =============================================================================
+# A parameter declared `mut`, `own` or `copy` receives an argument that carries
+# the same marker at the call. `ref` is optional on a read parameter. A
+# method's arguments follow the rule and its receiver carries no marker. A call
+# through a function value is checked against the modes in the function type.
+# `own` and `copy` accept a fresh value with the matching marker.
+
+fn bump(mut list<int> xs) → void {
+    xs.append(1)
+}
+
+fn eat(own list<int> xs) → void {
+    const own list<int> mine ← xs
+    print mine.length()
+}
+
+fn dup(copy list<int> xs) → void {
+    print xs.length()
+}
+
+fn peek(list<int> xs) → void {
+    print xs.length()
+}
+
+fn make() → list<int> {
+    return [7, 8, 9]
+}
+
+class Sink {
+    fn run(mut list<int> xs) → void {
+        xs.append(2)
+    }
+}
+
+fn apply((mut list<int>) → void f, mut list<int> xs) → void {
+    f(mut xs)
+}
+
+main {
+    var list<int> a ← [1]
+    bump(mut a)
+    peek(a)
+    peek(ref a)
+    dup(copy a)
+    print a.length()
+
+    const Sink s ← Sink {}
+    s.run(mut a)
+    print a.length()
+
+    apply(bump, mut a)
+    print a.length()
+
+    eat(own make())
+    dup(copy make())
+    eat(own a)
+}
