@@ -40,6 +40,7 @@ pub mod rank2_reduction_readiness;
 pub mod result_use;
 pub mod shader_contract;
 pub mod static_shape_fold;
+pub mod structurize;
 pub mod store_trap;
 pub mod tensor_expansion;
 pub mod tensor_operation_floor;
@@ -68,6 +69,8 @@ mod layout_test;
 mod packed_negative_matrix;
 #[cfg(test)]
 mod param_mode_test;
+#[cfg(test)]
+mod structurize_test;
 /// Shared statement/value read analysis for device-program lowering.
 mod read_analysis;
 #[cfg(test)]
