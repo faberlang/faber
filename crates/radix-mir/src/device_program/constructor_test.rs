@@ -1196,3 +1196,157 @@ fn elementwise_only_body_binds_resources_in_source_param_order() {
     assert_eq!(slots[2].0, 2);
     assert_eq!(slots[2].2, BufferRole::Output);
 }
+
+fn lane_assign(place: MirPlace, id: u32, kind: crate::MirValueKind, ty: MirType) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place,
+            value: crate::MirValue {
+                id: crate::MirValueId(id),
+                kind,
+                ty,
+                span: span(),
+            },
+        },
+        span: span(),
+    }
+}
+
+/// gpu-reset C4-1: the lane-form shape C4-0 produces (params `src`, `mut dst`,
+/// a `Lane` builtin; guard on the lane id against two `TensorExtent`
+/// products, div/mod binders, one Index read, one Index store, void return)
+/// gets an ABI signature, and the constructor selects `LaneGrid` by
+/// structure: the Lane parameter plus the written tensor resource.
+#[test]
+fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
+    use crate::{MirBinOp, MirTemp, MirTempId, MirValueKind};
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank2_tensor_ty(&mut types, [7, 5]);
+    let u32t = u32_ty(&mut types);
+    let boolean = MirType::semantic(types.primitive(Primitive::Bivalens));
+    let float = f32(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let local = |id: u32| MirOperand::Place(MirPlace::local(MirLocalId(id)));
+    let temp = |id: u32| MirOperand::Temp(MirTempId(id));
+    let binary = |op, lhs, rhs| MirValueKind::Binary { op, lhs, rhs };
+    let temps: Vec<MirTemp> = [(0, u32t), (1, u32t), (2, u32t), (3, boolean), (4, u32t), (5, u32t), (6, u32t), (7, float)]
+        .into_iter()
+        .map(|(id, ty)| MirTemp {
+            id: MirTempId(id),
+            ty,
+            span: span(),
+        })
+        .collect();
+    let index = |base: u32, at: MirOperand| MirPlace {
+        base: crate::MirPlaceBase::Local(MirLocalId(base)),
+        projections: vec![crate::MirProjection::Index(at)],
+    };
+    let entry = vec![
+        lane_assign(MirPlace::temp(MirTempId(0)), 0, MirValueKind::TensorExtent { tensor: local(0), axis: 0 }, u32t),
+        lane_assign(MirPlace::temp(MirTempId(1)), 1, MirValueKind::TensorExtent { tensor: local(0), axis: 1 }, u32t),
+        lane_assign(MirPlace::temp(MirTempId(2)), 2, binary(MirBinOp::Mul, temp(0), temp(1)), u32t),
+        lane_assign(MirPlace::temp(MirTempId(3)), 3, binary(MirBinOp::Lt, local(2), temp(2)), boolean),
+    ];
+    let body = vec![
+        lane_assign(MirPlace::temp(MirTempId(4)), 4, binary(MirBinOp::Div, local(2), temp(1)), u32t),
+        lane_assign(MirPlace::temp(MirTempId(5)), 5, binary(MirBinOp::Mod, local(2), temp(1)), u32t),
+        lane_assign(MirPlace::temp(MirTempId(6)), 6, binary(MirBinOp::Add, temp(4), temp(5)), u32t),
+        lane_assign(MirPlace::temp(MirTempId(7)), 7, MirValueKind::Operand(MirOperand::Place(index(0, local(2)))), float),
+        lane_assign(index(1, local(2)), 8, MirValueKind::Operand(temp(7)), float),
+    ];
+    let block = |id: u32, statements, kind| MirBlock {
+        id: MirBlockId(id),
+        statements,
+        terminator: MirTerminator {
+            kind,
+            span: span(),
+        },
+        span: span(),
+    };
+    let names = [
+        interner.intern("src"),
+        interner.intern("dst"),
+        interner.intern("lane"),
+    ];
+    let fn_name = interner.intern("lane_copy");
+    let param = |id: u32, ty, mode| MirParam {
+        local: MirLocalId(id),
+        name: Some(names[id as usize]),
+        ty,
+        mode,
+        span: span(),
+    };
+    let local_decl = |id: u32, ty, mutable| MirLocal {
+        id: MirLocalId(id),
+        name: None,
+        ty,
+        mutable,
+        span: span(),
+    };
+    let function = MirFunction {
+        id: MirFunctionId(1),
+        source: Some(DefId(1)),
+        name: Some(fn_name),
+        params: vec![
+            param(0, tensor, MirParamMode::Ref),
+            param(1, tensor, MirParamMode::MutRef),
+            param(2, u32t, MirParamMode::Lane),
+        ],
+        locals: vec![local_decl(0, tensor, false), local_decl(1, tensor, true), local_decl(2, u32t, false)],
+        temps,
+        blocks: vec![
+            block(
+                0,
+                entry,
+                MirTerminatorKind::Branch {
+                    condition: temp(3),
+                    then_block: MirBlockId(1),
+                    else_block: MirBlockId(2),
+                },
+            ),
+            block(1, body, MirTerminatorKind::Goto(MirBlockId(2))),
+            block(2, Vec::new(), MirTerminatorKind::Return(None)),
+        ],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    };
+    let validated = validated(&types, vec![function]);
+
+    // The ABI signature synthesis accepts the shape: inputs, output, builtin.
+    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        &validated.program().functions[0],
+        validated.validation(),
+        &interner,
+    )
+    .expect("the lane-form shape has an ABI signature");
+    assert_eq!(signature.builtin_inputs.len(), 1);
+    assert_eq!(signature.builtin_inputs[0].local, MirLocalId(2));
+
+    let (program, _semantics, _steps) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("the lane-form kernel materializes");
+    assert_eq!(program.kernels.len(), 1);
+    let kernel = &program.kernels[0];
+    assert_eq!(
+        kernel.plan,
+        CollectionKernelPlan::LaneGrid {
+            source_resource: 0,
+            rank: 2
+        }
+    );
+    assert_eq!(kernel.resources[0].buffer.name, "src");
+    assert_eq!(kernel.resources[0].access, MirKernelResourceAccess::Read);
+    assert_eq!(kernel.resources[1].access, MirKernelResourceAccess::Write);
+}

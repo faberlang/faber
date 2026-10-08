@@ -1090,6 +1090,8 @@ fn collection_kernel_plan_carries_no_communication_variant() {
             // SFR-5: the declared distributed sum is an in-kernel recipe —
             // no communication variant.
             CollectionKernelPlan::DistributedSum(_) => true,
+            // gpu-reset C4-1: a lane grid is an in-kernel recipe plan.
+            CollectionKernelPlan::LaneGrid { .. } => true,
         }
     }
 

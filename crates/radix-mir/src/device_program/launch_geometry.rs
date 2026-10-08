@@ -18,6 +18,7 @@
 //! | --- | --- |
 //! | `Elementwise`, unbatched `RowSoftmax` | generic 1-D over the output element count |
 //! | `TiledMatMul` (rank-2, unbatched) | tile grid `(ceil(N/tile), ceil(M/tile))`, verbatim |
+//! | `LaneGrid` | generic 1-D over the element count of the source resource's call-site shape |
 //! | `Transpose` | `plan.workgroup_x` lanes over the input element count |
 //! | every other plan | [`GeometryError`] `geometry_plan_not_covered` |
 
@@ -95,6 +96,31 @@ pub fn geometry_for_call(
         CollectionKernelPlan::Elementwise => generic_1d(unit, output_count(unit, &counts)?),
         CollectionKernelPlan::RowSoftmax(softmax) if softmax.batched.is_none() => {
             generic_1d(unit, output_count(unit, &counts)?)
+        }
+        CollectionKernelPlan::LaneGrid {
+            source_resource,
+            rank,
+        } => {
+            // The lane domain is the call-site shape of the source resource,
+            // `rank` axes, through the generic 1-D rule. Routed directly: the
+            // kind is deliberately not in `is_generic_1d_plan` (ruling P2).
+            let Some(shape) = shapes.get(*source_resource) else {
+                return Err(GeometryError::new(
+                    GEOMETRY_SHAPE_NOT_COVERED,
+                    vec![("reason", "lane source resource out of range".to_owned())],
+                ));
+            };
+            if shape.len() != usize::from(*rank) {
+                return Err(GeometryError::new(
+                    GEOMETRY_RANK_MISMATCH,
+                    vec![
+                        ("resource", source_resource.to_string()),
+                        ("expected", rank.to_string()),
+                        ("actual", shape.len().to_string()),
+                    ],
+                ));
+            }
+            generic_1d(unit, counts[*source_resource])
         }
         CollectionKernelPlan::TiledMatMul(matmul) => tiled_matmul(matmul, shapes),
         CollectionKernelPlan::Transpose(transpose) => {
@@ -184,7 +210,11 @@ fn generic_1d(unit: &KernelUnit, elements: u64) -> Result<CallGeometry, Geometry
         z: 1,
     };
     let signature = default_signature(unit, dispatch);
-    let workgroup = generic_1d_workgroup(&signature, Some(&unit.plan));
+    // Every caller (Elementwise, unbatched RowSoftmax, LaneGrid) takes the
+    // generic one-dimensional rule; `None` names that rule directly, so a
+    // plan not admitted by `is_generic_1d_plan` (LaneGrid, ruling P2) still
+    // routes here without widening the admission list.
+    let workgroup = generic_1d_workgroup(&signature, None);
     finish(dispatch, workgroup)
 }
 
@@ -316,6 +346,7 @@ fn plan_name(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::SsmConv1d(_) => "SsmConv1d",
         CollectionKernelPlan::SsmScan(_) => "SsmScan",
         CollectionKernelPlan::DistributedSum(_) => "DistributedSum",
+        CollectionKernelPlan::LaneGrid { .. } => "LaneGrid",
     }
 }
 

@@ -134,6 +134,12 @@ pub enum CollectionKernelPlan {
     /// shared-memory tree floor the plan pins (plan law by construction).
     /// See [`DistributedSumPlan`].
     DistributedSum(DistributedSumPlan),
+    /// Lane-form kernel (gpu-reset C4): a compute function with a `Lane`
+    /// builtin parameter and a written tensor resource, one thread per lane
+    /// of the lane domain. The domain is the call-site shape of resource
+    /// `source_resource` (the first read tensor), `rank` axes; the launch
+    /// geometry is the generic 1-D workgroup rule over its element count.
+    LaneGrid { source_resource: usize, rank: u8 },
 }
 
 /// Axis-reduction recipe plan (name frozen by S6-N1; admission, resolution,

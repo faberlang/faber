@@ -276,3 +276,76 @@ fn uncovered_plan_is_a_named_error() {
         Err(error(GEOMETRY_PLAN_NOT_COVERED, &[("plan", "Gather")]))
     );
 }
+
+fn lane_grid(rank: u8) -> KernelUnit {
+    use MirKernelResourceAccess::{Read, Write};
+    unit(
+        CollectionKernelPlan::LaneGrid {
+            source_resource: 0,
+            rank,
+        },
+        vec![resource(0, Read, None), resource(1, Write, None)],
+    )
+}
+
+#[test]
+fn lane_grid_geometry_is_generic_1d_over_the_source_shape() {
+    let wg = crate::device_program::GENERIC_1D_WORKGROUP_X;
+    // (shape, grid x, block x): [7,5] is 35 lanes; [1,1] is one lane; one past
+    // a workgroup multiple rounds the grid up.
+    let single_row = u64::from(wg) + 1;
+    let table: [(Vec<u64>, u32, u32); 3] = [
+        (vec![7, 5], 1, wg),
+        (vec![1, 1], 1, 1),
+        (vec![single_row, 1], 2, wg),
+    ];
+    for (shape, grid_x, block_x) in table {
+        let got = geometry_for_call(&lane_grid(2), &[shape.clone(), shape.clone()])
+            .unwrap_or_else(|error| panic!("{shape:?}: {error:?}"));
+        assert_eq!(
+            got,
+            CallGeometry {
+                grid: [grid_x, 1, 1],
+                block: [block_x, 1, 1]
+            },
+            "{shape:?}"
+        );
+    }
+}
+
+#[test]
+fn lane_grid_geometry_names_its_failures() {
+    let unit = lane_grid(2);
+    let ok = vec![7, 5];
+    assert_eq!(
+        geometry_for_call(&unit, &[vec![7, 0], ok.clone()]),
+        Err(error(GEOMETRY_ZERO_EXTENT, &[("resource", "0")]))
+    );
+    assert_eq!(
+        geometry_for_call(&unit, &[vec![35], ok.clone()]),
+        Err(error(
+            GEOMETRY_RANK_MISMATCH,
+            &[("resource", "0"), ("expected", "2"), ("actual", "1")]
+        ))
+    );
+    assert_eq!(
+        geometry_for_call(&unit, &[vec![u64::MAX, 2], ok.clone()]),
+        Err(error(GEOMETRY_EXTENT_OVERFLOW, &[("resource", "0")]))
+    );
+    // Above the 32-bit index bound the generic rule refuses.
+    let too_many = geometry_for_call(&unit, &[vec![1 << 20, 1 << 12], ok]).unwrap_err();
+    assert_eq!(too_many.code, GEOMETRY_SHAPE_NOT_COVERED);
+}
+
+#[test]
+fn lane_grid_is_not_admitted_to_the_generic_1d_list() {
+    assert!(!crate::device_program::is_generic_1d_plan(
+        &CollectionKernelPlan::LaneGrid {
+            source_resource: 0,
+            rank: 2
+        }
+    ));
+    assert!(crate::device_program::is_generic_1d_plan(
+        &CollectionKernelPlan::Elementwise
+    ));
+}

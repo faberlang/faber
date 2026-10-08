@@ -685,6 +685,9 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::SsmConv1d(plan) => validate_ssm_conv1d_plan(plan),
             CollectionKernelPlan::SsmScan(plan) => validate_ssm_scan_plan(plan),
             CollectionKernelPlan::DistributedSum(plan) => validate_distributed_sum_plan(plan),
+            // gpu-reset C4: a lane grid carries no static grid structure; the
+            // lane domain is a call-site fact checked by `geometry_for_call`.
+            CollectionKernelPlan::LaneGrid { .. } => Ok(()),
         }
     }
 }

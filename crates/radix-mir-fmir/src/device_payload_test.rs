@@ -3528,3 +3528,24 @@ fn batched_transpose_wire_plan_batch_law_fails_closed() {
         "expected the typed batch-law diagnostic, got: {error}"
     );
 }
+
+/// gpu-reset C4-1: the lane-grid plan mirror serializes and round-trips
+/// through the text codec on the accepted wire version.
+#[test]
+fn lane_grid_plan_round_trips_on_the_wire() {
+    let plan = WireCollectionKernelPlan::LaneGrid(crate::schema::WireLaneGridPlan {
+        source_resource: 0,
+        rank: 2,
+    });
+    let mut program = sample_wire_program();
+    program.kernels[0].plan = plan.clone();
+    let mut section = sample_device_section();
+    section.device_program.program = program;
+    let image = text_image_with_device(Some(section));
+    let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+        .unwrap_or_else(|error| panic!("lane grid plan must admit cleanly: {error}"));
+    assert_eq!(
+        decoded.device.unwrap().device_program.program.kernels[0].plan,
+        plan
+    );
+}

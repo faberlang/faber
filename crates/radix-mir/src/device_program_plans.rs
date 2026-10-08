@@ -569,6 +569,8 @@ pub enum RecipeKind {
     SsmConv1d,
     /// SSM linear-recurrence scan recipe (R-PACK-01A).
     SsmScan,
+    /// Lane-form kernel (gpu-reset C4): one thread per lane of the domain.
+    LaneGrid,
 }
 
 impl RecipeKind {
@@ -590,6 +592,7 @@ impl RecipeKind {
             CollectionKernelPlan::BatchedAttention(_) => Self::BatchedAttention,
             CollectionKernelPlan::SsmConv1d(_) => Self::SsmConv1d,
             CollectionKernelPlan::SsmScan(_) => Self::SsmScan,
+            CollectionKernelPlan::LaneGrid { .. } => Self::LaneGrid,
             // SFR-5: the declared distributed sum's floor IS the tree
             // recipe — a backend with no native collective arm selects the
             // tree-reduction launch semantics here; native arms (SFR-6/7)
@@ -2078,6 +2081,7 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
         | CollectionKernelPlan::SsmScan(_)
         // SFR-5: the declared distributed sum's broadcast result is a flat
         // partial-slot write — same bind shape as the tree floor.
+        | CollectionKernelPlan::LaneGrid { .. }
         | CollectionKernelPlan::DistributedSum(_) => (vec![output_extent.max(1)], BindLayout::Flat),
     }
 }
@@ -2419,7 +2423,8 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         | CollectionKernelPlan::GroupedMatMul(_)
         | CollectionKernelPlan::BatchedAttention(_)
         | CollectionKernelPlan::SsmConv1d(_)
-        | CollectionKernelPlan::SsmScan(_) => 0,
+        | CollectionKernelPlan::SsmScan(_)
+        | CollectionKernelPlan::LaneGrid { .. } => 0,
         CollectionKernelPlan::TreeReduction(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }

@@ -558,6 +558,10 @@ pub enum WireCollectionKernelPlan {
     /// `kernel_plan::SsmScanPlan`). Plan fields only; accepted wire version
     /// unchanged.
     SsmScan(WireSsmScanPlan),
+    /// Lane-form kernel (gpu-reset C4-1): one thread per lane of the domain
+    /// named by `source_resource`'s call-site shape. Mirrors
+    /// `kernel_plan::CollectionKernelPlan::LaneGrid`.
+    LaneGrid(WireLaneGridPlan),
 }
 
 /// Axis-reduction recipe plan (wire mirror of `kernel_plan::AxisReductionPlan`,
@@ -964,6 +968,17 @@ pub struct WireSsmScanPlan {
     pub state_dim: u64,
     /// Stored state/weight layout.
     pub layout: WirePackedStorageLayout,
+}
+
+/// Lane-grid plan (gpu-reset C4-1): mirror of
+/// `CollectionKernelPlan::LaneGrid`. Field-for-field; no extra facts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireLaneGridPlan {
+    /// Index of the resource whose call-site shape is the lane domain.
+    pub source_resource: u64,
+    /// Number of lane-domain axes.
+    pub rank: u8,
 }
 
 /// Rank-2 transpose recipe (`[M,N] → [N,M]`), the wire mirror of

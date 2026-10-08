@@ -34,7 +34,8 @@ use crate::layout::MirTensorStorageLayout;
 use crate::static_shape_fold::{ShapeFoldError, fold_validated_device_program};
 use crate::{
     MirCallee, MirConstant, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility,
-    MirLocalId, MirOperand, MirStatementKind, MirType, ValidatedMir,
+    MirLocalId, MirOperand, MirParamMode, MirStatementKind, MirType, MirValidationContext,
+    ValidatedMir,
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
@@ -817,7 +818,15 @@ impl<'a> KernelBuilder<'a> {
         if let Ok(signature) = &whole_signature
             && let Ok(plan) = kernel_plan_for_function(function, signature, self.validation)
         {
-            let plan = plan.unwrap_or(CollectionKernelPlan::Elementwise);
+            let plan = match plan {
+                Some(plan) => plan,
+                None => lane_grid_plan(function, signature, self.validation)
+                    .map_err(|detail| DeviceProgramBuildError::KernelAbi {
+                        function: function.id,
+                        detail,
+                    })?
+                    .unwrap_or(CollectionKernelPlan::Elementwise),
+            };
             return self.emit_subchain(
                 function,
                 function,
@@ -1749,4 +1758,49 @@ fn semantic_facts(
         initializations,
         observations: Vec::new(),
     }
+}
+
+/// The lane-form plan of a function (gpu-reset C4-1), selected by structure:
+/// a [`MirParamMode::Lane`] parameter plus a written tensor resource. The
+/// lane domain is the first read tensor resource's call-site shape; its rank
+/// is that parameter's static rank. `Ok(None)` for a function with no Lane
+/// parameter; a Lane function with no readable source tensor, no written
+/// resource, or an unranked source fails closed.
+fn lane_grid_plan(
+    function: &MirFunction,
+    signature: &MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<CollectionKernelPlan>, String> {
+    if !function
+        .params
+        .iter()
+        .any(|param| param.mode == MirParamMode::Lane)
+    {
+        return Ok(None);
+    }
+    let resources: Vec<_> = signature
+        .resources()
+        .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+        .collect();
+    if !resources
+        .iter()
+        .any(|resource| resource.access != MirKernelResourceAccess::Read)
+    {
+        return Err("lane kernel has no written tensor resource".to_owned());
+    }
+    let Some((source_resource, source)) = resources
+        .iter()
+        .enumerate()
+        .find(|(_, resource)| resource.access == MirKernelResourceAccess::Read)
+    else {
+        return Err("lane kernel has no read tensor resource to take the lane domain from".to_owned());
+    };
+    let rank = crate::abi::kernel_param_shape(source.source_local, function, validation)
+        .and_then(|shape| u8::try_from(shape.len()).ok())
+        .filter(|rank| *rank > 0)
+        .ok_or_else(|| "lane kernel source tensor has no static rank".to_owned())?;
+    Ok(Some(CollectionKernelPlan::LaneGrid {
+        source_resource,
+        rank,
+    }))
 }
