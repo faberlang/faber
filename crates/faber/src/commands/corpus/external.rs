@@ -1,7 +1,7 @@
 //! Suite-configured target toolchains and compiler inspection lanes.
 
 use super::{
-    Case, Outcome, SUITE_STEP_TIMEOUT, SuiteTarget, fail, ms, run_bounded, summary_status,
+    Case, Judged, Outcome, SUITE_STEP_TIMEOUT, SuiteTarget, fail, ms, run_bounded, summary_status,
 };
 use serde_json::{Value, json};
 use std::fs;
@@ -112,7 +112,7 @@ pub(super) fn execute(
                         break;
                     };
                     let (row, case_build_ms) = run_case_row(
-                        case, index, target, mode, recipe, faber, suite, &workspace, prepare,
+                        case, index, target, mode, recipe, faber, suite, workspace, prepare,
                     );
                     rows.push((index, row, case_build_ms));
                 }
@@ -171,10 +171,7 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
     let mut failed = 0;
     for case in cases {
         let case_started = Instant::now();
-        let (status, phase, reason) = if matches!(case.target.outcome, Outcome::NotApplicable) {
-            not_applicable += 1;
-            ("not-applicable", None, case.target.reason.clone())
-        } else {
+        let (status, phase, reason) = if let Some(outcome) = case.target.outcome.judged() {
             let source = fs::read_to_string(&case.input);
             let first = source.as_ref().map(|source| {
                 reemit_faber(
@@ -227,16 +224,16 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                     }
                 },
             };
-            match (case.target.outcome, failure) {
-                (Outcome::Pass, None) => {
+            match (outcome, failure) {
+                (Judged::Pass, None) => {
                     passed += 1;
                     ("pass", Some("emit"), None)
                 }
-                (Outcome::Pass, Some(reason)) => {
+                (Judged::Pass, Some(reason)) => {
                     failed += 1;
                     ("fail", Some("emit"), Some(reason))
                 }
-                (Outcome::KnownFail, Some(reason))
+                (Judged::KnownFail, Some(reason))
                     if case
                         .target
                         .diagnostic_contains
@@ -246,7 +243,7 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                     expected_failures += 1;
                     ("expected-fail", Some("emit"), None)
                 }
-                (Outcome::KnownFail, Some(reason)) => {
+                (Judged::KnownFail, Some(reason)) => {
                     failed += 1;
                     (
                         "fail",
@@ -254,7 +251,7 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                         Some(format!("known failure changed: {reason}")),
                     )
                 }
-                (Outcome::KnownFail, None) => {
+                (Judged::KnownFail, None) => {
                     failed += 1;
                     (
                         "fail",
@@ -262,8 +259,10 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                         Some("unexpected pass; update target expectation".to_owned()),
                     )
                 }
-                (Outcome::NotApplicable, _) => unreachable!(),
             }
+        } else {
+            not_applicable += 1;
+            ("not-applicable", None, case.target.reason.clone())
         };
         println!(
             "{}",
@@ -751,10 +750,10 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
         } else if !output.status.success() {
             return ("fail", Some(format!("emit failed: {diagnostics}")));
         }
-        if let Some(fragment) = case.target.diagnostic_contains.as_deref() {
-            if !diagnostics.contains(fragment) {
-                return ("fail", Some("expected emit diagnostic changed".to_owned()));
-            }
+        if let Some(fragment) = case.target.diagnostic_contains.as_deref()
+            && !diagnostics.contains(fragment)
+        {
+            return ("fail", Some("expected emit diagnostic changed".to_owned()));
         }
         if let Some(path) = expected
             .filter(|item| item.exit != 0)

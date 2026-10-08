@@ -340,14 +340,14 @@ pub(crate) fn resolve_prefix(
     if let Some(path) = explicit {
         return Ok(path.to_path_buf());
     }
-    if let Some(exe_path) = exe {
-        if let Some(bin_dir) = exe_path.parent() {
-            // `<prefix>/bin/faber` resolves its receipt at `<prefix>/share/faber/`.
-            if let Some(prefix) = bin_dir.parent() {
-                if prefix.join(RECEIPT_REL).is_file() {
-                    return Ok(prefix.to_path_buf());
-                }
-            }
+    if let Some(exe_path) = exe
+        && let Some(bin_dir) = exe_path.parent()
+    {
+        // `<prefix>/bin/faber` resolves its receipt at `<prefix>/share/faber/`.
+        if let Some(prefix) = bin_dir.parent()
+            && prefix.join(RECEIPT_REL).is_file()
+        {
+            return Ok(prefix.to_path_buf());
         }
     }
     let default = std::env::var_os("HOME")
@@ -387,10 +387,10 @@ pub(crate) fn derive_base_url(source: &str, target_version: &str) -> String {
     let Some((base, _archive)) = source.rsplit_once('/') else {
         return source.to_owned();
     };
-    if let Some((host, tag)) = base.rsplit_once('/') {
-        if tag.starts_with("faber-v") {
-            return format!("{host}/faber-v{target_version}");
-        }
+    if let Some((host, tag)) = base.rsplit_once('/')
+        && tag.starts_with("faber-v")
+    {
+        return format!("{host}/faber-v{target_version}");
     }
     base.to_owned()
 }

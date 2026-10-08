@@ -151,7 +151,7 @@ class Proba {
     let glyphs: Vec<String> = result
         .diagnostics
         .iter()
-        .filter(|d| d.code.as_deref() == Some("PARSE030"))
+        .filter(|d| d.code == Some("PARSE030"))
         .filter_map(|d| {
             d.args
                 .iter()

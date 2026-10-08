@@ -492,7 +492,7 @@ fn rewrite_frontmatter_locale(source: &str, locale: &str) -> Result<String, Stri
             updated.push_str(&content[..indent_len]);
             updated.push_str("locale = \"");
             updated.push_str(locale);
-            updated.push_str("\"");
+            updated.push('"');
             if line_without_newline.ends_with('\r') {
                 updated.push('\r');
             }

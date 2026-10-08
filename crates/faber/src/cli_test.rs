@@ -74,7 +74,8 @@ fn targets_table_reports_capability_truth_for_the_default_build() {
         table.contains("rust available=yes"),
         "rust host lane must be reported as available:\n{table}"
     );
-    for row_name in ["device-runtime"] {
+    {
+        let row_name = "device-runtime";
         assert!(
             table
                 .lines()

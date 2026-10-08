@@ -123,6 +123,24 @@ enum Outcome {
     NotApplicable,
 }
 
+/// An [`Outcome`] that a target actually judges; `NotApplicable` cases are
+/// reported before judging and never reach it.
+#[derive(Clone, Copy)]
+enum Judged {
+    Pass,
+    KnownFail,
+}
+
+impl Outcome {
+    fn judged(self) -> Option<Judged> {
+        match self {
+            Self::Pass => Some(Judged::Pass),
+            Self::KnownFail => Some(Judged::KnownFail),
+            Self::NotApplicable => None,
+        }
+    }
+}
+
 struct Case {
     id: String,
     dir: PathBuf,
@@ -823,13 +841,13 @@ fn relative_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
 
 fn run_case(case: &Case, faber: &Path) -> Value {
     let started = Instant::now();
-    if matches!(case.target.outcome, Outcome::NotApplicable) {
+    let Some(outcome) = case.target.outcome.judged() else {
         return json!({
             "schema": 1, "type": "case", "case": case.id, "target": "runner",
             "status": "not-applicable", "reason": case.target.reason,
             "timing_ms": {"read": 0.0, "run": 0.0, "compare": 0.0, "total": ms(started)}
         });
-    }
+    };
     let reading = Instant::now();
     let expected_stdout = match case
         .expect
@@ -887,10 +905,9 @@ fn run_case(case: &Case, faber: &Path) -> Value {
     };
     let run_ms = ms(running);
     let comparing = Instant::now();
-    let (status, reason) = match case.target.outcome {
-        Outcome::Pass => judge_pass(case, expected_stdout, expected_stderr, &output),
-        Outcome::KnownFail => judge_known_fail(case, expected_stdout, &output),
-        Outcome::NotApplicable => unreachable!(),
+    let (status, reason) = match outcome {
+        Judged::Pass => judge_pass(case, expected_stdout, expected_stderr, &output),
+        Judged::KnownFail => judge_known_fail(case, expected_stdout, &output),
     };
     let compare_ms = ms(comparing);
     json!({

@@ -157,7 +157,8 @@ fn small_build_reports_only_compiled_capabilities() {
     }
 
     // No device/host-leaf/device-runtime capability rows at all.
-    for name in ["device-runtime"] {
+    {
+        let name = "device-runtime";
         assert!(
             !rows.iter().any(|r| r.name == name),
             "{name} row must be absent in a small build (capability not compiled)"
@@ -189,7 +190,8 @@ fn default_build_reports_full_surface() {
             assert!(available, "{} must be available", spec.name);
         }
     }
-    for name in ["device-runtime"] {
+    {
+        let name = "device-runtime";
         assert!(
             rows.iter().any(|r| r.name == name),
             "{name} row must be present in the default build"
@@ -226,7 +228,8 @@ fn rendered_table_contains_capability_rows_under_full_build() {
     assert!(table.contains("rust available=yes"), "{table}");
     // Capability truth under the default build: device-runtime is compiled,
     // so it reports its row.
-    for name in ["device-runtime"] {
+    {
+        let name = "device-runtime";
         assert!(
             table
                 .lines()

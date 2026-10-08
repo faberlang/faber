@@ -1003,7 +1003,7 @@ pub(super) fn compile_package_metal_text(
     config: &radix::module::Config,
     input_path: &Path,
 ) -> Result<String, Vec<radix::module::Diagnostic>> {
-    let merged = radix::program::mir::with_interpreted_lowered_package_mir(
+    radix::program::mir::with_interpreted_lowered_package_mir(
         config,
         input_path,
         &super::mir::faber_mir_seams(),
@@ -1022,7 +1022,7 @@ pub(super) fn compile_package_metal_text(
             let device_roles = radix_mir::device::merge_imported_entry_roles(
                 local_entry_roles,
                 &radix::program::mir::imported_entry_facts(lowered),
-                &lowered.validated.program(),
+                lowered.validated.program(),
             )
             .map_err(|error| {
                 vec![
@@ -1047,8 +1047,7 @@ pub(super) fn compile_package_metal_text(
                 ]
             })
         },
-    )?;
-    merged
+    )?
 }
 
 fn compile_package_input(

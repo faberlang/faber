@@ -412,7 +412,7 @@ fn pre_execution_and_single_source_failures_emit_no_artifact() {
                 .any(|window| window == run_stats::STATS_MARKER.as_bytes())
         );
         assert!(
-            artifact_path.map_or(true, |path| !path.exists()),
+            artifact_path.is_none_or(|path| !path.exists()),
             "single-source refusal must emit no artifact"
         );
     }

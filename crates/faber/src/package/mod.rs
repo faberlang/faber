@@ -53,6 +53,8 @@ mod llvm_host;
 mod locale;
 mod manifest;
 pub mod mir;
+#[cfg(test)]
+// WHY: packed-projection seam has no production caller yet; exercised by packed_projection_test.rs
 mod packed_projection;
 mod product;
 mod runtime_dependency;

@@ -22,7 +22,7 @@ use radix::module::diagnostics::Diagnostic;
 use radix::module::mir::StdioHost;
 use radix::program::mir::DeviceSelection;
 use std::fs;
-use std::io::{self, Write as _};
+use std::io;
 use std::path::Path;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -476,7 +476,7 @@ fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
         stats_requested,
     )?;
     if let (Some(metadata), Some(run_stats_value)) = (metadata, run.stats) {
-        let _ = writeln!(out, "{DEVICE_STATS_MARKER}");
+        writeln!(out, "{DEVICE_STATS_MARKER}").ok();
         let artifact =
             RunStatsArtifact::new(metadata, run_stats_value, elapsed_wall_ms(started), 0);
         if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {

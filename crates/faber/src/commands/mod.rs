@@ -159,8 +159,7 @@ mod air_json {
                     .collect(),
                 note: row.note.clone(),
             };
-            let json = serde_json::to_string(&view)
-                .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+            let json = serde_json::to_string(&view).map_err(std::io::Error::other)?;
             writeln!(out, "{json}")?;
         }
         Ok(())
@@ -582,16 +581,14 @@ fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
     };
     radix::module::driver::apply_warn_policy(&mut result.diagnostics, &warn_policy);
     faber_cli::postprocess::print_diagnostics(&result.diagnostics, command.diagnostic_mode, None);
-    if air {
-        if let Some(rows) = check_air::advisory_rows(&name, &source) {
-            let mut out = std::io::stdout().lock();
-            if json {
-                if let Err(err) = air_json::render_json_rows(&mut out, &rows) {
-                    eprint_io_error(std::path::Path::new("<stdout>"), &err);
-                }
-            } else if let Err(err) = check_air::render_report(&mut out, &rows) {
+    if air && let Some(rows) = check_air::advisory_rows(&name, &source) {
+        let mut out = std::io::stdout().lock();
+        if json {
+            if let Err(err) = air_json::render_json_rows(&mut out, &rows) {
                 eprint_io_error(std::path::Path::new("<stdout>"), &err);
             }
+        } else if let Err(err) = check_air::render_report(&mut out, &rows) {
+            eprint_io_error(std::path::Path::new("<stdout>"), &err);
         }
     }
     let success = result.success

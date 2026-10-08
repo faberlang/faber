@@ -190,36 +190,6 @@ impl BorrowChecker<'_> {
         self.restore_marks(&FlowMarks { moved, pending });
     }
 
-    /// Run `visit` over a conditional's branches; each starts from `base`.
-    pub(super) fn visit_branches(
-        &mut self,
-        base: &FlowMarks,
-        branches: &[(Option<&HirBlock>, Option<&HirExpression>)],
-    ) {
-        let mut joined = Vec::new();
-        for (block, expr) in branches {
-            self.restore_marks(base);
-            let diverges = match (block, expr) {
-                (Some(block), _) => {
-                    self.check_block(block);
-                    block_diverges(block)
-                }
-                (None, Some(expr)) => {
-                    self.check_expr(expr);
-                    matches!(&expr.kind, HirExpressionKind::Block(block) if block_diverges(block))
-                }
-                (None, None) => false,
-            };
-            if !diverges {
-                joined.push(self.flow_marks());
-            }
-        }
-        if joined.is_empty() {
-            joined.push(base_clone(base));
-        }
-        self.join_marks(joined);
-    }
-
     pub(super) fn loop_entry(&self) -> LoopEntry {
         LoopEntry {
             known: self.states.keys().copied().collect(),
@@ -291,13 +261,6 @@ impl BorrowChecker<'_> {
                 span,
             );
         }
-    }
-}
-
-fn base_clone(base: &FlowMarks) -> FlowMarks {
-    FlowMarks {
-        moved: base.moved.clone(),
-        pending: base.pending.clone(),
     }
 }
 

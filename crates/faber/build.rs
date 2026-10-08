@@ -14,6 +14,7 @@
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use std::env;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -57,19 +58,23 @@ fn embed_reference(corpus: &Path, out_dir: &Path) {
             .to_str()
             .expect("utf-8 corpus path")
             .replace('\\', "/");
-        generated.push_str(&format!(
-            "    ({relative:?}, include_str!({:?})),\n",
+        writeln!(
+            generated,
+            "    ({relative:?}, include_str!({:?})),",
             file.to_str().expect("utf-8 corpus path")
-        ));
+        )
+        .expect("write to String");
     }
     generated.push_str("];\n");
-    generated.push_str(&format!(
-        "static EMBEDDED_LEGACY_REDIRECTS: &str = include_str!({:?});\n",
+    writeln!(
+        generated,
+        "static EMBEDDED_LEGACY_REDIRECTS: &str = include_str!({:?});",
         corpus
             .join("legacy-redirects.toml")
             .to_str()
             .expect("utf-8 corpus path")
-    ));
+    )
+    .expect("write to String");
 
     let target = out_dir.join("reference_embedded.rs");
     fs::write(&target, generated).unwrap_or_else(|err| {
@@ -122,11 +127,11 @@ fn stamp_source_revisions(manifest: &Path) {
             let trimmed = line.trim_start();
             if let Some(name) = trimmed.strip_prefix("- name:") {
                 source_name = Some(name.trim().trim_matches('"'));
-            } else if let Some(commit) = trimmed.strip_prefix("commit:") {
-                if source_name == Some(source) {
-                    source_commit = Some(commit.trim().trim_matches('"'));
-                    break;
-                }
+            } else if let Some(commit) = trimmed.strip_prefix("commit:")
+                && source_name == Some(source)
+            {
+                source_commit = Some(commit.trim().trim_matches('"'));
+                break;
             }
         }
         let commit = source_commit.unwrap_or_else(|| {

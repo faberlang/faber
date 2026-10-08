@@ -166,17 +166,17 @@ fn parse_safetensors_metadata(data: &[u8]) -> Result<SafetensorsHeader, String> 
 
     // Extract __metadata__.
     let mut metadata: Vec<(String, String)> = Vec::new();
-    if let Some(meta_val) = obj.get("__metadata__") {
-        if let Some(meta_obj) = meta_val.as_object() {
-            for (k, v) in meta_obj {
-                let value_str = match v {
-                    Value::String(s) => s.clone(),
-                    Value::Number(n) => n.to_string(),
-                    Value::Bool(b) => b.to_string(),
-                    _ => v.to_string(),
-                };
-                metadata.push((k.clone(), value_str));
-            }
+    if let Some(meta_val) = obj.get("__metadata__")
+        && let Some(meta_obj) = meta_val.as_object()
+    {
+        for (k, v) in meta_obj {
+            let value_str = match v {
+                Value::String(s) => s.clone(),
+                Value::Number(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                _ => v.to_string(),
+            };
+            metadata.push((k.clone(), value_str));
         }
     }
 

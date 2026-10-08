@@ -7,7 +7,6 @@ use super::run_stats::{
     self, FaberMetadata, FunctionMetadata, IntrinsicMetadata, MeterMetadata, PackageMetadata,
 };
 use proba::{CaseOutcome, CaseResult, ProbaReport};
-use radix_mir_runner::RunnerStats;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io;
@@ -113,7 +112,7 @@ impl TestCaseStats {
             CaseOutcome::Blocked { reason } => ("blocked", Some(reason.clone())),
             CaseOutcome::Skipped { reason } => ("skipped", Some(reason.clone())),
         };
-        let stats = result.stats.clone().unwrap_or_else(RunnerStats::default);
+        let stats = result.stats.clone().unwrap_or_default();
         let mut functions = stats
             .functions
             .into_iter()

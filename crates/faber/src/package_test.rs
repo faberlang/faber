@@ -8171,7 +8171,7 @@ locale = "zh-Hans"
         result
             .diagnostics
             .iter()
-            .any(|d| d.is_error() && d.code.as_deref() == Some("SEM001")),
+            .any(|d| d.is_error() && d.code == Some("SEM001")),
         "undeclared spelling must fail as an ordinary undefined identifier: {:?}",
         result.diagnostics
     );

@@ -115,9 +115,7 @@ pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
     if !parsed.errors.is_empty() {
         return None;
     }
-    let Some(program) = parsed.program.take() else {
-        return None;
-    };
+    let program = parsed.program.take()?;
     let mut interner = parsed.interner;
     let cli_analysis = radix::cli::analyze(&program, &interner);
     if !cli_analysis.errors.is_empty() {
@@ -279,10 +277,10 @@ struct CallFinder(Vec<DefId>);
 
 impl HirVisitor for CallFinder {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Call(callee, _, _, _) = &expr.kind {
-            if let HirExpressionKind::Path(def_id) = &callee.kind {
-                self.0.push(*def_id);
-            }
+        if let HirExpressionKind::Call(callee, _, _, _) = &expr.kind
+            && let HirExpressionKind::Path(def_id) = &callee.kind
+        {
+            self.0.push(*def_id);
         }
         walk_expr(self, expr);
     }
@@ -445,10 +443,10 @@ fn error_rule(err: &SemanticError) -> String {
         .find(|arg| arg.name == "issue")
         .map(|arg| arg.value.clone())
         .unwrap_or_else(|| "air".to_owned());
-    if issue == "itera_loop" {
-        if let Some(causa) = err.args.iter().find(|arg| arg.name == "causa") {
-            return format!("{issue}:{}", causa.value);
-        }
+    if issue == "itera_loop"
+        && let Some(causa) = err.args.iter().find(|arg| arg.name == "causa")
+    {
+        return format!("{issue}:{}", causa.value);
     }
     issue
 }

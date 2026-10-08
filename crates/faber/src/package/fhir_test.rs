@@ -556,12 +556,12 @@ fn strict_pack_rejects_unlisted_canonical_member_spelling() {
     assert!(
         diagnostics
             .iter()
-            .any(|diag| diag.code.as_deref() == Some("SEM004")
+            .any(|diag| diag.code == Some("SEM004")
                 && diag.issue() == Some("namespace_missing_export")),
         "canonical spelling must be rejected under the strict pack: {:?}",
         diagnostics
             .iter()
-            .map(|d| (d.code.as_deref(), d.issue()))
+            .map(|d| (d.code, d.issue()))
             .collect::<Vec<_>>()
     );
 }

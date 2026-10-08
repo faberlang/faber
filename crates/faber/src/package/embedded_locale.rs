@@ -30,7 +30,7 @@ use std::cell::Cell;
 
 #[cfg(test)]
 thread_local! {
-    static DECOMPRESSIONS: Cell<usize> = Cell::new(0);
+    static DECOMPRESSIONS: Cell<usize> = const { Cell::new(0) };
 }
 
 /// Failure loading one embedded reader pack.

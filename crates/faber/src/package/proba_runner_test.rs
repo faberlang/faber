@@ -568,7 +568,7 @@ test "core ok" {
     let mut absolute = PathBuf::new();
     with_package_cwd(&parent, || {
         relative = crate::package::absolutize_path(Path::new(&package_name));
-        absolute = crate::package::absolutize_path(&dir.path());
+        absolute = crate::package::absolutize_path(dir.path());
     });
 
     assert!(

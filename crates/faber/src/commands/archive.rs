@@ -57,13 +57,13 @@ pub(super) fn extract_package_archive(archive: &Path) -> ArchiveResult<Extracted
 }
 
 fn remove_dir_all_best_effort(path: &Path) {
-    if let Err(err) = fs::remove_dir_all(path) {
-        if err.kind() != io::ErrorKind::NotFound {
-            eprintln!(
-                "warning: could not remove archive extraction directory `{}`: {err}",
-                path.display()
-            );
-        }
+    if let Err(err) = fs::remove_dir_all(path)
+        && err.kind() != io::ErrorKind::NotFound
+    {
+        eprintln!(
+            "warning: could not remove archive extraction directory `{}`: {err}",
+            path.display()
+        );
     }
 }
 

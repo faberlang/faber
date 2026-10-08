@@ -47,21 +47,21 @@ pub(crate) fn doctor_report_for(
     for name in KNOWN_LIBRARIES {
         names.insert((*name).to_owned());
     }
-    if let Some(home) = library_home.as_ref() {
-        if let Ok(entries) = std::fs::read_dir(home) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.is_dir() {
-                    continue;
-                }
-                let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-                    continue;
-                };
-                if radix::program::library::is_valid_provider_segment(name)
-                    && library_availability(&path) != LibraryAvailability::NotFound
-                {
-                    names.insert(name.to_owned());
-                }
+    if let Some(home) = library_home.as_ref()
+        && let Ok(entries) = std::fs::read_dir(home)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if radix::program::library::is_valid_provider_segment(name)
+                && library_availability(&path) != LibraryAvailability::NotFound
+            {
+                names.insert(name.to_owned());
             }
         }
     }

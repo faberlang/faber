@@ -340,7 +340,7 @@ fn run_source_with_options(
     include_ignored: bool,
     focused: bool,
 ) -> Result<(ProbaReport, RunMetadata), radix::module::mir::RunSourceError> {
-    let mut analysis = radix::program::analyze_prepared_program_name(session, name, source)
+    let analysis = radix::program::analyze_prepared_program_name(session, name, source)
         .map_err(radix::module::mir::RunSourceError::Frontend)?;
     let all_cases = inventory_cases(&analysis.hir, &analysis.interner);
     let focused = focused || has_solum_cases(&all_cases);
@@ -362,7 +362,7 @@ fn run_source_with_options(
     }
 
     let lowered = radix::module::mir::lower_analyzed_unit(
-        &mut analysis,
+        &analysis,
         radix::module::mir::MirLoweringOptions {
             kernel_lowering: session.config.kernel_lowering,
             ..Default::default()
@@ -668,10 +668,10 @@ fn blocked_unit_report_with_options(
 }
 
 fn case_matches_options(unit_path: &Path, case: &ProbaCase, options: &TestRunOptions) -> bool {
-    if let Some(name) = options.name.as_deref() {
-        if case.name != name {
-            return false;
-        }
+    if let Some(name) = options.name.as_deref()
+        && case.name != name
+    {
+        return false;
     }
     if !options.suites.is_empty() && !options.suites.iter().any(|suite| suite == &case.suite_path) {
         return false;
@@ -837,10 +837,10 @@ fn blocking_gap(reason: &str) -> String {
 }
 
 fn strip_trailing_unit_path(reason: &str) -> &str {
-    if let Some(start) = reason.rfind(" (") {
-        if reason.ends_with(')') {
-            return reason[..start].trim();
-        }
+    if let Some(start) = reason.rfind(" (")
+        && reason.ends_with(')')
+    {
+        return reason[..start].trim();
     }
     reason.trim()
 }
@@ -997,26 +997,25 @@ fn render_package_analysis_diagnostics(
 ) -> String {
     let mut warning_counts = HashMap::<&str, usize>::new();
     for diag in diagnostics {
-        if diag.severity == radix::module::diagnostics::Severity::Warning {
-            if let Some(code) = diag.code {
-                *warning_counts.entry(code).or_insert(0) += 1;
-            }
+        if diag.severity == radix::module::diagnostics::Severity::Warning
+            && let Some(code) = diag.code
+        {
+            *warning_counts.entry(code).or_insert(0) += 1;
         }
     }
 
     let mut emitted_warning_codes = HashSet::<&str>::new();
     let mut lines = Vec::new();
     for diag in diagnostics {
-        if diag.severity == radix::module::diagnostics::Severity::Warning {
-            if let Some(code) = diag.code {
-                if warning_counts.get(code).copied().unwrap_or(0) > 1 {
-                    if emitted_warning_codes.insert(code) {
-                        let count = warning_counts[code];
-                        lines.push(format!("warning[{code}]: {count} occurrences"));
-                    }
-                    continue;
-                }
+        if diag.severity == radix::module::diagnostics::Severity::Warning
+            && let Some(code) = diag.code
+            && warning_counts.get(code).copied().unwrap_or(0) > 1
+        {
+            if emitted_warning_codes.insert(code) {
+                let count = warning_counts[code];
+                lines.push(format!("warning[{code}]: {count} occurrences"));
             }
+            continue;
         }
         lines.push(radix::module::diagnostics::render_plain(diag));
     }

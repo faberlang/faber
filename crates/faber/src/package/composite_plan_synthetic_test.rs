@@ -85,7 +85,6 @@ fn copy_package_dir_skipping_target(src: &Path, dest: &Path) {
 const SYNTHETIC_ANALYSIS_STACK_SIZE: usize = 4 * 1024 * 1024;
 
 /// Analyze a fresh copy of the synthetic fixture package.
-
 fn analyze_fixture() -> (TestDir, AnalyzedProgram) {
     std::thread::Builder::new()
         .name("composite-plan-synthetic".to_owned())

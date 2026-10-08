@@ -397,7 +397,7 @@ pub(crate) fn assemble_composite_plan(
     let prepared_regions = facts.semantics.derive_prepared_regions(&launches);
 
     let mut device_artifacts = facts.device_artifacts;
-    device_artifacts.sort_by(|left, right| artifact_sort_key(left).cmp(&artifact_sort_key(right)));
+    device_artifacts.sort_by_key(artifact_sort_key);
 
     let mut host_call_facts = facts.host_call_facts;
     host_call_facts.sort_by(|left, right| {
@@ -471,7 +471,8 @@ fn verify_model_identity(
     if found != expected {
         return Err(CompositePlanError::DomainMismatch {
             domain: IdentityDomain::Model,
-            detail: model_divergence_detail(found, expected),
+            detail: model_divergence_detail(found, expected)
+                .unwrap_or_else(|| "model identity differs from its typed source".to_owned()),
         });
     }
     if found.content.algorithm != "sha-256" {
@@ -505,30 +506,32 @@ fn verify_model_identity(
 }
 
 /// The first divergent field of the model domain, for the typed diagnostic.
-fn model_divergence_detail(found: &ModelIdentity, expected: &ModelIdentity) -> String {
+fn model_divergence_detail(found: &ModelIdentity, expected: &ModelIdentity) -> Option<String> {
     if found.content != expected.content {
-        return "content identity (algorithm/digest/byte length) differs from its typed source"
-            .to_owned();
+        return Some(
+            "content identity (algorithm/digest/byte length) differs from its typed source"
+                .to_owned(),
+        );
     }
     if found.architecture != expected.architecture {
-        return format!(
+        return Some(format!(
             "architecture `{}` differs from expected `{}`",
             found.architecture, expected.architecture
-        );
+        ));
     }
     if found.tokenizer_identity != expected.tokenizer_identity {
-        return "tokenizer identity differs from its typed source".to_owned();
+        return Some("tokenizer identity differs from its typed source".to_owned());
     }
     if found.admission_facts != expected.admission_facts {
-        return "admission facts differ from their typed source".to_owned();
+        return Some("admission facts differ from their typed source".to_owned());
     }
     if found.tensor_count != expected.tensor_count {
-        return format!(
+        return Some(format!(
             "tensor count {} differs from expected {}",
             found.tensor_count, expected.tensor_count
-        );
+        ));
     }
-    unreachable!("ModelIdentity inequality must diverge on a checked field")
+    None
 }
 
 /// Backend domain: selection agreement, per-artifact digest re-verification
@@ -571,8 +574,7 @@ fn verify_backend_identity(
         }
     }
     let mut expected_artifacts = source.artifacts.clone();
-    expected_artifacts
-        .sort_by(|left, right| artifact_sort_key(left).cmp(&artifact_sort_key(right)));
+    expected_artifacts.sort_by_key(artifact_sort_key);
     if plan.device_artifacts != expected_artifacts {
         return Err(CompositePlanError::DomainMismatch {
             domain: IdentityDomain::Backend,

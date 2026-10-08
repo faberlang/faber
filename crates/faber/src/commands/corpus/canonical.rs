@@ -1,6 +1,6 @@
 //! Canonical generated Rust: formatted members and one batched Clippy check.
 
-use super::{Case, Outcome, SUITE_STEP_TIMEOUT, fail, ms, run_bounded, summary_status};
+use super::{Case, Judged, Outcome, SUITE_STEP_TIMEOUT, fail, ms, run_bounded, summary_status};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -33,12 +33,12 @@ pub(super) fn execute(
     let mut members = Vec::new();
     for (index, case) in cases.iter().enumerate() {
         let case_started = Instant::now();
-        if matches!(case.target.outcome, Outcome::NotApplicable) {
+        let Some(outcome) = case.target.outcome.judged() else {
             rows[index] = Some(json!({"schema":1,"type":"case","case":case.id,
                 "target":"canonical","status":"not-applicable","reason":case.target.reason,
                 "timing_ms":{"total":ms(case_started)}}));
             continue;
-        }
+        };
         let argv = vec![
             faber.display().to_string(),
             "emit".to_owned(),
@@ -72,7 +72,7 @@ pub(super) fn execute(
             }
         };
         if case.target.phase.as_deref() == Some("emit") {
-            let (status, reason) = judge_emit(case, &emitted);
+            let (status, reason) = judge_emit(case, outcome, &emitted);
             rows[index] = Some(row(
                 case,
                 status,
@@ -430,14 +430,14 @@ fn judge_format(case: &Case, output: &Output) -> Option<(&'static str, Option<St
     })
 }
 
-fn judge_emit(case: &Case, emitted: &Output) -> (&'static str, Option<String>) {
+fn judge_emit(case: &Case, outcome: Judged, emitted: &Output) -> (&'static str, Option<String>) {
     let diagnostics = format!(
         "{}{}",
         String::from_utf8_lossy(&emitted.stderr),
         String::from_utf8_lossy(&emitted.stdout)
     );
-    match case.target.outcome {
-        Outcome::KnownFail => {
+    match outcome {
+        Judged::KnownFail => {
             // The exit status decides first: stdout carries the emitted program.
             if emitted.status.success() {
                 return (
@@ -458,7 +458,7 @@ fn judge_emit(case: &Case, emitted: &Output) -> (&'static str, Option<String>) {
                 )
             }
         }
-        Outcome::Pass => {
+        Judged::Pass => {
             let expected = match case.expected() {
                 Ok(expected) => expected,
                 Err(reason) => return ("fail", Some(reason)),
@@ -477,7 +477,6 @@ fn judge_emit(case: &Case, emitted: &Output) -> (&'static str, Option<String>) {
                 )
             }
         }
-        Outcome::NotApplicable => unreachable!(),
     }
 }
 

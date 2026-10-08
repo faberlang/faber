@@ -476,10 +476,11 @@ impl<'a> SourceLineInterner<'a> {
 
     fn intern_line(&mut self, source: &str, offset: usize) -> Arc<String> {
         for &(start, end) in &self.ranges {
-            if offset >= start && offset <= end {
-                if let Some(text) = self.by_start.get(&start) {
-                    return text.clone();
-                }
+            if offset >= start
+                && offset <= end
+                && let Some(text) = self.by_start.get(&start)
+            {
+                return text.clone();
             }
         }
         let (start, end) = line_bounds(source, offset);

@@ -302,21 +302,6 @@ pub fn manifest_package_build_target(input: &Path) -> Result<Option<Target>, Box
     manifest_build_target(manifest.build.target.as_deref(), &path).map(Some)
 }
 
-/// Like [`manifest_package_build_target`], but `Ok(None)` also when the
-/// manifest names no `[build] target`: the executed lane applies its own
-/// default (`fmir`) to an un-targeted package rather than the portable one.
-pub(crate) fn manifest_build_target_for_input(
-    input: &Path,
-) -> Result<Option<Target>, Box<Diagnostic>> {
-    let Some((manifest, path)) = input_manifest(input)? else {
-        return Ok(None);
-    };
-    match manifest.build.target.as_deref() {
-        Some(target) => manifest_build_target(Some(target), &path).map(Some),
-        None => Ok(None),
-    }
-}
-
 /// Resolve the manifest `[check]` section for an input path.
 ///
 /// `None` when no package layout is discoverable, no manifest exists, or

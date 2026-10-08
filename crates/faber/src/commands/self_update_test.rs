@@ -48,9 +48,7 @@ fn plan_requires_version() {
 fn plan_reads_receipt_relative_to_binary() {
     let tmp = tempfile::tempdir().expect("tmp");
     let prefix = tmp.path().join("prefix");
-    let source = format!(
-        "https://github.com/faberlang/releases/releases/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz"
-    );
+    let source = "https://github.com/faberlang/releases/releases/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz".to_string();
     write_receipt(&prefix, &receipt_json(&source, "1.5.0"));
     let exe = prefix.join("bin/faber");
     let plan = plan_self_update(&args("1.6.0"), Some(&exe), None).expect("plan");
@@ -309,9 +307,7 @@ fn plan_uninstall_reads_receipt_and_builds_script_url() {
     // (derived from the release-host source when the receipt records none).
     let tmp = tempfile::tempdir().expect("tmp");
     let prefix = tmp.path().join("prefix");
-    let source = format!(
-        "https://github.com/faberlang/releases/releases/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz"
-    );
+    let source = "https://github.com/faberlang/releases/releases/download/faber-v1.5.0/faber-v1.5.0-aarch64-apple-darwin.tar.gz".to_string();
     write_receipt(&prefix, &receipt_json(&source, "1.5.0"));
     let plan = plan_self_uninstall(&uninstall_args(), Some(&prefix.join("bin/faber")), None)
         .expect("plan");
