@@ -80,6 +80,9 @@ mod conversio_route;
 #[path = "lower/conversion_check_test.rs"]
 mod conversion_check_tests;
 #[cfg(test)]
+#[path = "lower/empty_dense_test.rs"]
+mod empty_dense_tests;
+#[cfg(test)]
 #[path = "lower/entry_args_test.rs"]
 mod entry_args_tests;
 mod expr;

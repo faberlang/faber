@@ -919,6 +919,16 @@ impl HirVisitor for BodyProof<'_> {
             // A scalar or register-class field is a value: reading it does not
             // read the storage of the object that holds it.
             HirExpressionKind::Field(object, _) => self.receiver(object),
+            // The typed zero `Type {}` (and the `empty` the checker rewrites
+            // into it) allocates fresh storage, as the bare `vacua` did: it
+            // writes nothing, so only its fill and extent arguments are read.
+            HirExpressionKind::MethodCall(receiver, name, _, args, _)
+                if is_construct_call(receiver, *name, args.len(), self.interner) =>
+            {
+                for arg in args {
+                    self.visit_expr(&arg.expr);
+                }
+            }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
                 let intrinsic =
                     is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner);

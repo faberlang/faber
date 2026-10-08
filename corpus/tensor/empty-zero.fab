@@ -1,0 +1,49 @@
++++
+term = "tensor"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "empty at a dense tensor, vector, or matrix type is the typed zero of that type."
+syntax = "Type name ← empty"
+related = ["tensor", "lista", "magnitudo"]
+locale = "en"
++++
+# =============================================================================
+# tensor — empty at a dense tensor, vector, or matrix type is the typed zero of that type.
+# =============================================================================
+#
+# What this teaches:
+#   • Default empty instance — `empty` is the default empty instance of the declared type
+#   • Dense zero — for a tensor, vector, or matrix that instance is the typed zero `Type {}`
+#   • Rank-0 — `tensor<T, []>` keeps its one default slot
+#
+# Common mistakes:
+#   • using empty where an extent is `_` — there is no shape to build; write every extent
+#
+# See also: tensor, lista, magnitudo
+# =============================================================================
+
+# tensor — `Type name ← empty` means `Type name ← Type {}` for a dense type
+#
+# GRAMMAR:
+#   empty_init :← type name '←' 'empty'
+#
+# EXPECTED OUTPUT:
+#   empty-zero.fab stdout contract (shape and a zero cell of the tensor, the
+#   vector-element tensor shape, a plain vector lane, the matrix, and the
+#   rank-0 tensor's rank).
+
+main {
+    const tf32[2, 3] grid ← empty
+    print grid.shape()
+    print grid[[1, 2]]
+    const tensor<vector<f32, 4>, [2]> lanes ← empty
+    print lanes.shape()
+    const vector<f32, 4> v ← empty
+    print v[3]
+    const mf32[2, 2] m ← empty
+    print m
+    const tensor<f32, []> single ← empty
+    print single.shape().length()
+}

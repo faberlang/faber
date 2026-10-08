@@ -58,9 +58,16 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
 
     let kind = match &expr.kind {
         ExprKind::Literal(lit) => lower_literal(lowerer, lit),
-        ExprKind::Vacua(ident) => lowerer
-            .lower_shadowed_builtin(expr.id, ident.name)
-            .unwrap_or(HirExpressionKind::Vacua),
+        ExprKind::Vacua(ident) => {
+            // Typecheck may rewrite this literal into the typed-zero `crea`
+            // call (`empty_dense`) and cannot intern, so the names it needs
+            // are interned here, where the interner is writable.
+            lowerer.intrinsic_surface_symbol("crea");
+            lowerer.interner.intern("crea");
+            lowerer
+                .lower_shadowed_builtin(expr.id, ident.name)
+                .unwrap_or(HirExpressionKind::Vacua)
+        }
         ExprKind::KeywordLiteral(keyword) => {
             match lowerer.lower_shadowed_builtin(expr.id, keyword.ident.name) {
                 Some(shadowed) => shadowed,

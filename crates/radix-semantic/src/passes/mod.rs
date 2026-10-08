@@ -350,6 +350,10 @@ mod k8_filum_independence_test;
 mod k8_filum_methods_test;
 
 #[cfg(test)]
+#[path = "filum_typed_zero_scratch_test.rs"]
+mod filum_typed_zero_scratch_test;
+
+#[cfg(test)]
 #[path = "k8_filum_nested_test.rs"]
 mod k8_filum_nested_test;
 

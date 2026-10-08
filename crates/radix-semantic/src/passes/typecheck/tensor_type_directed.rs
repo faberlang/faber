@@ -80,8 +80,12 @@ impl TypeChecker<'_> {
         // registry entry it typed and lowered through, so the constructor is
         // recognized here by that shape; everything else on the retired
         // names declines.
+        // The empty-literal rewrite (`empty_dense`) synthesizes the same call
+        // with whichever spelling the interner holds; only a synthesized
+        // receiver carries its tensor type, so authored `.crea(..)` stays
+        // retired.
         let is_construct = matches!(receiver.kind, HirExpressionKind::Vacua)
-            && method_name == crea_surface
+            && (method_name == crea_surface || (method_name == "crea" && receiver.ty.is_some()))
             && args.len() == 2;
         if is_construct {
             return Some(self.check_tensor_construct(receiver_ty, name, args, span));

@@ -2221,6 +2221,14 @@ pub struct HirPresentation {
     #[serde(default)]
     pub numeric_twin_ids: Vec<HirId>,
 
+    /// Ids of the expressions typecheck produced by rewriting an authored
+    /// `empty` (`vacua`) at a dense tensor, vector, or matrix slot into the
+    /// typed zero (`Type {}`) HIR. The rewrite keeps the literal's node id;
+    /// Faber re-emission prints `empty`/`vacua` for exactly these ids, so
+    /// `faber format` stays surface-faithful instead of printing `T {}`.
+    #[serde(default)]
+    pub empty_dense_ids: Vec<HirId>,
+
     /// Initializer-expression ids of wildcard-bound declarations
     /// (`fixum T _ ← expr`), which lower to bare expression statements.
     /// Emission restores the authored discard binding for exactly these.

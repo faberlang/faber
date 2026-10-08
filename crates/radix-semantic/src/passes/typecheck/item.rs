@@ -66,6 +66,14 @@ impl TypeChecker<'_> {
                 .map(|param| param.def_id)
                 .collect(),
         );
+        let previous_size_param_names = std::mem::replace(
+            &mut self.current_size_param_by_name,
+            func.type_params
+                .iter()
+                .filter(|param| matches!(param.kind, radix_syntax::GenericParamKind::Magnitudo))
+                .map(|param| (param.name, param.def_id))
+                .collect(),
+        );
         let previous_generic_bounds = self.enter_generic_bounds(&func.type_params);
         self.push_scope();
         // Size-type Z3: signature positions may not name value parameters in
@@ -173,6 +181,7 @@ impl TypeChecker<'_> {
         self.pop_scope();
         self.current_generic_param_kinds = previous_generic_param_kinds;
         self.current_size_param_defs = previous_size_param_defs;
+        self.current_size_param_by_name = previous_size_param_names;
         self.current_generic_bounds = previous_generic_bounds;
         self.current_shape_param_sources = previous_shape_sources;
         self.current_shape_param_call_sources = previous_shape_call_sources;

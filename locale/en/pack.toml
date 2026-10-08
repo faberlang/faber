@@ -3088,6 +3088,10 @@ help = "provide an explicit value for this object field"
 message = "empty requires a collection type"
 help = "give empty a list, map, set, tensor, or sparsa context"
 
+[diagnostics.SEM011.issues.vacua_requires_resolved_extents]
+message = "empty needs a shape with a value for every extent"
+help = "declare every extent as a number or a size name (no `_`), or write the typed zero of a resolved shape"
+
 [diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
 message = "string index must be int or range"
 help = "index string with int or an integer range"

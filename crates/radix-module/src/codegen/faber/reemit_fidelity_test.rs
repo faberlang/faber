@@ -512,6 +512,55 @@ fn register_target_via_clause_round_trips() {
 }
 
 #[test]
+fn empty_at_a_dense_slot_reemits_as_empty_in_each_locale() {
+    // The checker rewrites `empty` at a dense slot into the typed zero; the
+    // formatter prints what the author wrote, at the source's own locale, not
+    // the `Type {}` it became.
+    let cases = [
+        (
+            "la",
+            "functio f() → vacuum {\n    varia tf32[2, 3] blank ← vacua\n}\n",
+            "blank ← vacua",
+            "{}",
+        ),
+        (
+            "en",
+            "fn f() → void {\n    var tf32[2, 3] blank ← empty\n}\n",
+            "blank ← empty",
+            "{}",
+        ),
+        (
+            "en",
+            "fn f() → void {\n    var vf32[4] lanes ← empty\n    var mf32[2, 2] grid ← empty\n}\n",
+            "grid ← empty",
+            "{}",
+        ),
+    ];
+    for (locale, source, expected, forbidden) in cases {
+        let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
+            .unwrap_or_else(|error| panic!("{locale} pack loads: {error:?}"));
+        let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+        let emit = |input: &str| {
+            let result = reemit_faber(&session, &pack, "empty_dense.fab", input);
+            assert!(
+                result.success(),
+                "{locale}: {:?}",
+                result
+                    .diagnostics
+                    .iter()
+                    .map(|diag| (diag.code, diag.issue()))
+                    .collect::<Vec<_>>()
+            );
+            result.output.expect("emit should produce output").code
+        };
+        let first = emit(source);
+        assert!(first.contains(expected), "{locale}: `empty` must survive:\n{first}");
+        assert!(!first.contains(forbidden), "{locale}: no typed-zero braces:\n{first}");
+        assert_eq!(first, emit(&first), "{locale}: re-emission must be idempotent");
+    }
+}
+
+#[test]
 fn itera_coordinates_survive_reemission() {
     // `itera ex src apud [i] fixum x` — the coordinate binding is
     // loop-visible; dropping it breaks bodies that reference it.

@@ -277,6 +277,14 @@ impl TypeChecker<'_> {
         let store = self.pending_store.take();
         // ss1: a numeric method twin means its operator; rewrite it first.
         let in_place_twin = self.desugar_numeric_twin(expr);
+        // Ruling 2026-10-08: `empty` at a dense tensor, vector, or matrix slot
+        // is the typed zero of that slot; rewrite it before it is checked.
+        let empty_refused = matches!(expr.kind, HirExpressionKind::Vacua)
+            && expr.ty.is_none()
+            && matches!(
+                self.desugar_empty_dense(expr, expected),
+                super::empty_dense::EmptyDense::Refused
+            );
         if let (Some(_), Some(slot)) = (&store, expected) {
             self.mark_word_ring(expr, slot);
         }
@@ -287,6 +295,9 @@ impl TypeChecker<'_> {
                 self.retype_integer_constant_as_float(lit, ty);
                 ty
             }
+            // The refusal is already named; typing the node as its slot keeps
+            // the follow-on store checks from piling mismatches on top of it.
+            HirExpressionKind::Vacua if empty_refused => expected.unwrap_or(self.error_type),
             HirExpressionKind::Vacua => self.check_vacua(expected, expr.span),
             HirExpressionKind::Binary(op, lhs, rhs)
                 if matches!(*op, HirBinOp::Between | HirBinOp::NotBetween) =>
@@ -855,7 +866,7 @@ impl TypeChecker<'_> {
     }
 
     /// The collection member an empty literal (`vacua`) lands in.
-    fn vacua_collection_member(&self, slot: TypeId) -> Option<TypeId> {
+    pub(super) fn vacua_collection_member(&self, slot: TypeId) -> Option<TypeId> {
         self.single_slot_member(slot, |ty| {
             matches!(
                 ty,
@@ -869,6 +880,8 @@ impl TypeChecker<'_> {
                     | Type::Set(_)
                     | Type::Tensor(..)
                     | Type::Sparsa(..)
+                    | Type::Vector(..)
+                    | Type::Matrix(..)
             )
         })
     }

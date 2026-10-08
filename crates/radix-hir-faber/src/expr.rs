@@ -165,6 +165,12 @@ impl super::FaberCodegen<'_> {
             self.write_expr_prec(operand, parent_prec, names, surface, writer);
             return;
         }
+        // An `empty` the checker rewrote into the typed zero prints as the
+        // authored literal, not as the `Type {}` it became.
+        if self.empty_dense_ids.contains(&expr.id) {
+            writer.write(surface.contextual_keyword("vacua"));
+            return;
+        }
         let expr_prec = self.expr_precedence(expr);
         let needs_parens = expr_prec <= parent_prec && parent_prec != 0;
         if needs_parens {

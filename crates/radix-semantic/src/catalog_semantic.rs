@@ -750,6 +750,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "vacua_requires_collection_type" => {
             Some("give vacua a lista, queue, stack, tabula, copia, tensor, or sparsa context".to_owned())
         }
+        "vacua_requires_resolved_extents" => {
+            Some("give the tensor, vector, or matrix literal extents, or write the typed zero with a resolved shape".to_owned())
+        }
         "textus_index_must_be_numerus_or_range" => Some("index textus with numerus or an integer range".to_owned()),
         "format_spec_malformed" => {
             Some("write the spec as [fill][align][sign][0][width][.precision][kind], e.g. \"08.2\"".to_owned())

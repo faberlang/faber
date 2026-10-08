@@ -96,6 +96,7 @@ mod contract_bound;
 mod contract_bound_test;
 pub mod control;
 pub mod convert;
+mod empty_dense;
 #[cfg(test)]
 #[path = "enum_access_honesty_test.rs"]
 mod enum_access_honesty_test;
@@ -167,6 +168,9 @@ mod closing_test;
 #[cfg(test)]
 #[path = "discerne_closed_set_test.rs"]
 mod discerne_closed_set_test;
+#[cfg(test)]
+#[path = "empty_dense_test.rs"]
+mod empty_dense_test;
 #[cfg(test)]
 #[path = "kernel_index_warning_test.rs"]
 mod kernel_index_warning_test;
@@ -451,6 +455,9 @@ pub(crate) struct TypeChecker<'a> {
     /// assignment, or effect-hoisted block), handed to the presentation
     /// sidecar when the check finishes.
     numeric_twin_ids: Vec<HirId>,
+    /// Node ids of `empty` literals rewritten into the typed zero, handed to
+    /// the presentation sidecar when the check finishes.
+    pub(super) empty_dense_ids: Vec<HirId>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -491,6 +498,8 @@ pub(crate) struct TypeChecker<'a> {
     /// A size name in value position lowers as a Path on its HirTypeParam
     /// def, which has no resolver symbol; this set types it (size-type Z1).
     pub current_size_param_defs: FxHashSet<DefId>,
+    /// The same `size` parameters by source name, for synthesized extent values.
+    pub current_size_param_by_name: FxHashMap<Symbol, DefId>,
 
     /// Declared return type while checking a function body.
     pub current_return: Option<TypeId>,
@@ -728,6 +737,9 @@ pub(crate) fn typecheck_with_config(
         presentation
             .numeric_twin_ids
             .append(&mut checker.numeric_twin_ids);
+        presentation
+            .empty_dense_ids
+            .append(&mut checker.empty_dense_ids);
     }
     shape_obligations.clone_from(&checker.shape_obligations);
     tensor_edge_policies.clone_from(&checker.tensor_edge_policies);
@@ -797,6 +809,7 @@ impl<'a> TypeChecker<'a> {
             compile_time_locals: FxHashSet::default(),
             static_size_values: FxHashMap::default(),
             numeric_twin_ids: Vec::new(),
+            empty_dense_ids: Vec::new(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             target,
@@ -807,6 +820,7 @@ impl<'a> TypeChecker<'a> {
             type_params_by_def: FxHashMap::default(),
             current_generic_param_kinds: FxHashMap::default(),
             current_size_param_defs: FxHashSet::default(),
+            current_size_param_by_name: FxHashMap::default(),
             current_return: None,
             current_error: None,
             in_main_frame: false,

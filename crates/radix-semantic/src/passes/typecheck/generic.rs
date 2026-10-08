@@ -1301,7 +1301,10 @@ impl TypeChecker<'_> {
     /// locals and parameters are keyed in the scope stack, not the resolver,
     /// so a spelled size-lift slot argument encoded as `Type::Param(sym)`
     /// resolves its runtime witness here.
-    fn hir_value_binding_def(&self, sym: radix_lexer::Symbol) -> Option<radix_hir::DefId> {
+    pub(super) fn hir_value_binding_def(
+        &self,
+        sym: radix_lexer::Symbol,
+    ) -> Option<radix_hir::DefId> {
         self.binding_shadow
             .keys()
             .copied()
