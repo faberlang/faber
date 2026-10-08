@@ -530,8 +530,9 @@ mod tests;
 mod text_contract_tests;
 
 // DDPP1-U2 (C2 feature isolation): the small-build surface proof — these tests
-// compile and run only without `device-runtime`, exercising the CPU-only
-// route-selection plumbing in the build that excludes the device runtime.
+// compile and run only without `device-runtime` (the small build; the default
+// build includes it), exercising the CPU-only route-selection plumbing in the
+// build that excludes the device runtime.
 #[cfg(all(test, not(feature = "device-runtime")))]
 #[path = "feature_isolation_test.rs"]
 mod feature_isolation_test;

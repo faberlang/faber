@@ -1,12 +1,12 @@
-//! Small-build feature-isolation proof (DDPP1-U2, C2 gate) + default-build
-//! public-runtime-free regression (S3-U2 cut).
+//! Small-build feature-isolation proof (DDPP1-U2, C2 gate).
 //!
-//! This test module compiles and runs in every build **without**
-//! `device-runtime`:
-//!   - the C2 small build (`--no-default-features --features hir-rust`), and
-//!   - the default build after the S3-U2 cut (`device-runtime` left
-//!     `full-targets`, so the ordinary product graph has no public runtime
-//!     edge — gate bullet 1).
+//! This test module compiles and runs only in builds **without**
+//! `device-runtime`: the C2 small build
+//! (`--no-default-features --features hir-rust`). `device-runtime` is part of
+//! `full-targets` again (gpu-reset A2 closeout: the ordinary `faber run
+//! --device metal` must dispatch), so the default build does not compile this
+//! module; the default build's device-runtime row is asserted by
+//! `commands::targets_test` and `cli_test`.
 //!
 //! Its existence is the compile-level proof that the route-selection plumbing
 //! carries its own selection type and that the host leaf / GPU emitters are
@@ -17,9 +17,7 @@ use radix::program::mir::DeviceSelection;
 
 /// C2 small-build proof. Runs only outside `full-targets` (the
 /// `--no-default-features --features hir-rust` build): the GPU emitters and
-/// the wasm host leaf are also excluded there. The default build's
-/// exclusions are asserted by [`default_build_is_faber_runtime_free`]
-/// instead.
+/// the wasm host leaf are also excluded there.
 #[cfg(not(feature = "full-targets"))]
 #[test]
 fn small_build_compiles_no_device_runtime_surface() {
@@ -27,17 +25,6 @@ fn small_build_compiles_no_device_runtime_surface() {
     assert!(!cfg!(feature = "device-runtime"));
     assert!(!cfg!(feature = "mir-metal"));
     assert!(!cfg!(feature = "mir-llvm"));
-}
-
-/// S3-U2 default-build regression: under the default build the cut holds —
-/// `device-runtime` is off (no public runtime edge; the native host leaf
-/// feature was retired with gpu-reset C1-e) while the LLVM emit surface
-/// stays compiled.
-#[cfg(feature = "full-targets")]
-#[test]
-fn default_build_has_no_public_runtime_or_host_leaf() {
-    assert!(!cfg!(feature = "device-runtime"));
-    assert!(cfg!(feature = "mir-llvm"));
 }
 
 #[test]

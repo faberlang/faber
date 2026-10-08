@@ -172,10 +172,9 @@ fn default_build_reports_full_surface() {
     // table-derived expectation (that circularity hid `swift`).
     let rows = target_rows(&compiled_features());
     let specs = faber_target_row_specs();
-    // All derived emit rows; no capability rows compile under the default
-    // build (device-runtime since the S3-U2 cut) — it is opt-in and
-    // reports no row.
-    assert_eq!(rows.len(), specs.len());
+    // All derived emit rows plus the device-runtime capability row, which is
+    // part of the default build (A2 closeout).
+    assert_eq!(rows.len(), specs.len() + 1);
 
     for spec in &specs {
         let available = row(&rows, &spec.name).available;
@@ -192,8 +191,8 @@ fn default_build_reports_full_surface() {
     }
     for name in ["device-runtime"] {
         assert!(
-            !rows.iter().any(|r| r.name == name),
-            "{name} row must be absent in the default build (feature left full-targets)"
+            rows.iter().any(|r| r.name == name),
+            "{name} row must be present in the default build"
         );
     }
 
@@ -225,14 +224,14 @@ fn default_build_reports_full_surface() {
 fn rendered_table_contains_capability_rows_under_full_build() {
     let table = rendered_targets_table();
     assert!(table.contains("rust available=yes"), "{table}");
-    // Capability truth under the default build: device-runtime (opt-in
-    // since S3-U2) reports no row for an unbuilt surface.
+    // Capability truth under the default build: device-runtime is compiled,
+    // so it reports its row.
     for name in ["device-runtime"] {
         assert!(
-            !table
+            table
                 .lines()
                 .any(|line| line.starts_with(&format!("{name} "))),
-            "unexpected {name} capability row under the default build (feature left full-targets):\n{table}"
+            "missing {name} capability row under the default build:\n{table}"
         );
     }
 }
