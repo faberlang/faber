@@ -3879,3 +3879,7 @@ mod dense_test;
 #[cfg(test)]
 #[path = "value_dense_test.rs"]
 mod value_dense_test;
+
+#[cfg(test)]
+#[path = "softmax_rank_test.rs"]
+mod softmax_rank_test;

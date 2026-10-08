@@ -3366,8 +3366,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     /// Softmax: `exp(x_i` - max(x)) / `sum(exp(x_j` - max(x))) with numerical
-    /// stability. Operates on rank-1 (vector) or rank-2 (batched row-wise,
-    /// axis 1 — the last axis). Uses inline `f64::exp()` from Rust stdlib.
+    /// stability. Operates over the last axis of any rank >= 1 tensor; every
+    /// leading axis is a batch. Uses inline `f64::exp()` from Rust stdlib.
     fn tensor_softmax(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "tensor softmax arity"));
@@ -3379,12 +3379,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(
                 span,
                 "tensor softmax requires non-empty tensor",
-            ));
-        }
-        if shape.len() > 2 {
-            return Err(RunnerError::internal(
-                span,
-                "tensor softmax requires rank-1 or rank-2 tensor",
             ));
         }
         if shape.contains(&0) {

@@ -6312,11 +6312,6 @@ fn pd25_row_softmax_preserves_values_and_errors() {
         ),
         (
             MirCollectionOp::TensorSoftmax,
-            vec![tensor(vec![Value::Float(1.0)], vec![1, 1, 1])],
-            "tensor softmax requires rank-1 or rank-2 tensor",
-        ),
-        (
-            MirCollectionOp::TensorSoftmax,
             vec![tensor(vec![], vec![2, 0])],
             "tensor softmax requires all dimensions to be positive",
         ),
