@@ -1390,7 +1390,10 @@ transpose_suffix := 'ᵀ'
 optional_suffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
 non_null_suffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
 argument_list  := (argument (',' argument)*)?
-argument      := template_argument | 'sparge'? expression
+# The optional call-site marker repeats the access marker its parameter declares
+# (see the prose rule "Call-site access markers").
+argument      := template_argument | call_marker? 'sparge'? expression
+call_marker   := 'de' | 'in' | 'own' | 'copy'
 template_argument := 'sparge'? IDENTIFIER ':' expression
 
 # `∞` and `nonnumerus` are non-finite floating-point literals; `nonnumerus`

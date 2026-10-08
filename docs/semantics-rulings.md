@@ -115,3 +115,33 @@ which one it is. To copy again, write a new `var copy` declaration.
 
 Pinned by `corpus/mutabilitas/copy-bind-deep.fab` (documentation beside the
 D-6 exemplar) and the MIR runner test `copy_duplicate_test.rs`.
+
+## R8. An argument carries the marker its parameter declares (2026-10-08)
+
+A parameter declared `mut` / `own` / `copy` (la `in` / `own` / `copy`) receives
+an argument that carries the same marker at the call: `bump(mut a)`,
+`eat(own a)`, `dup(copy a)`. The read marker `ref` (la `de`) is optional and may
+be written explicitly. The reader of a call sees which arguments may be changed,
+consumed or duplicated without opening the callee.
+
+- **Where it applies.** Every function with a source signature, top-level or in
+  a class/genus. A method's arguments follow the rule (`obj.run(mut src)`); the
+  receiver carries no marker. A call through a function value or closure is
+  checked against the modes in the function type. Built-in, intrinsic and
+  provider methods are exempt: the intrinsic registry records no access mode.
+- **Diagnostics (`SEM057`).** `call_marker_missing` (parameter marked, argument
+  bare), `call_marker_mismatch` (a different marker), `call_marker_on_read_only`
+  (a marker other than `ref` on a read-only parameter).
+- **Temporaries.** A temporary passed to a `mut` parameter is rejected
+  (`SEM020 mut_argument_not_writable`): there is no place to change. `own` and
+  `copy` accept a fresh value with the matching marker (`eat(own make())`).
+- **`copy` at the call** is a plain echo of the parameter marker. It is not the
+  parked assignment-site `copy` (R7 stays as ruled).
+- **Coming, not yet enforced.** `own` and `copy` are checked for marker
+  agreement only. Three further rulings of the same date are being built: use
+  after `own` is checked at calls, `own` and `copy` parameters become writable,
+  and only a whole local binding may be passed as `own`.
+
+Pinned by `corpus/mutabilitas/call-marker.fab` and the rejection fixtures
+`call-marker-missing.fab`, `call-marker-mismatch.fab`,
+`call-marker-on-read-only.fab`.

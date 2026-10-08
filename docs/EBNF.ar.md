@@ -399,142 +399,144 @@ non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list '
 # [194] argument_list
 argument_list ::= (argument (',' argument)*)?
 # [195] argument
-argument ::= template_argument | 'انشر'? expression
-# [196] template_argument
+argument ::= template_argument | call_marker? 'انشر'? expression
+# [196] call_marker
+call_marker ::= 'عن' | 'في' | 'ملك' | 'نسخة'
+# [197] template_argument
 template_argument ::= 'انشر'? IDENTIFIER ':' expression
-# [197] literal
+# [198] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'خال' | '∞' | 'nan'
-# [198] primary
+# [199] primary
 primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
-# [199] ad_expr
+# [200] ad_expr
 ad_expr ::= 'اتصل' ASCII_STRING ad_opener?
-# [200] ad_opener
+# [201] ad_opener
 ad_opener ::= '(' expression ')'
-# [201] array_literal
+# [202] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [202] array_element_list
+# [203] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [203] array_element
+# [204] array_element
 array_element ::= argument | '_'
-# [204] iuncta_expr
+# [205] iuncta_expr
 iuncta_expr ::= 'توبل' type_arguments '[' argument_list? ']'
-# [205] json_literal
+# [206] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [206] json_member
+# [207] json_member
 json_member ::= STRING ':' json_value
-# [207] typed_constructor
+# [208] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source?
-# [208] field_list
+# [209] field_list
 field_list ::= field_init (',' field_init)*
-# [209] field_init
+# [210] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [210] field_key
+# [211] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [211] construction_source
+# [212] construction_source
 construction_source ::= 'من' call_expr
-# [212] json_value
+# [213] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [213] json_object
+# [214] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [214] json_array
+# [215] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [215] json_string
+# [216] json_string
 json_string ::= STRING
-# [216] json_number
+# [217] json_number
 json_number ::= NUMBER
-# [217] finge_expr
+# [218] finge_expr
 finge_expr ::= 'أنشئ' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [218] qualified_ident
+# [219] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [219] praefixum_expr
+# [220] praefixum_expr
 praefixum_expr ::= 'بادئة' block_stmt
-# [220] scriptum_expr
+# [221] scriptum_expr
 scriptum_expr ::= 'حرر' '(' STRING (',' expression)* ')'
-# [221] lege_expr
+# [222] lege_expr
 lege_expr ::= 'اقرأ' 'سطرا'?
-# [222] first_match_expr
+# [223] first_match_expr
 first_match_expr ::= 'أول_مطابقة' '(' expression apud_clause? ',' 'حيث' IDENTIFIER block_stmt ')'
-# [223] reducta_expr
+# [224] reducta_expr
 reducta_expr ::= 'اختزل' 'عبر' reducta_op 'من' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [224] reducta_op
+# [225] reducta_op
 reducta_op ::= 'المجموع' | 'حاصل_الضرب' | 'الأقصى' | 'الأدنى' | 'فهرس_الأكبر' | 'فهرس_الأصغر' | 'الكل' | 'أي' | 'العدّ'
-# [225] reducta_group
+# [226] reducta_group
 reducta_group ::= 'حسب' expression
-# [226] reducta_body
+# [227] reducta_body
 reducta_body ::= ('ثابت' | 'متغير') IDENTIFIER block_stmt
-# [227] reducta_identity
+# [228] reducta_identity
 reducta_identity ::= 'عوض' expression
-# [228] filum_clause
+# [229] filum_clause
 filum_clause ::= 'خيط' IDENTIFIER
-# [229] capta_expr
+# [230] capta_expr
 capta_expr ::= 'فخ' block_stmt
-# [230] object_pattern
+# [231] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [231] pattern_property
+# [232] pattern_property
 pattern_property ::= 'باقي'? IDENTIFIER ('كـ' IDENTIFIER)?
-# [232] array_pattern
+# [233] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [233] array_pattern_element
+# [234] array_pattern_element
 array_pattern_element ::= '_' | 'باقي'? IDENTIFIER
-# [234] nota_stmt
+# [235] nota_stmt
 nota_stmt ::= ('اعرض' | 'شاهد' | 'نبه' | 'اكتب') expression (',' expression)*
-# [235] entry_header
+# [236] entry_header
 entry_header ::= ('وسائط' IDENTIFIER)? ('مخرج' expression)?
-# [236] incipit_stmt
+# [237] incipit_stmt
 incipit_stmt ::= 'بداية' entry_header block_stmt
-# [237] incipiet_stmt
+# [238] incipiet_stmt
 incipiet_stmt ::= 'استهلال' entry_header block_stmt
-# [238] probandum_decl
+# [239] probandum_decl
 probandum_decl ::= 'مختبر' STRING proba_modifier* '{' probandum_body '}'
-# [239] probandum_body
+# [240] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [240] proba_stmt
+# [241] proba_stmt
 proba_stmt ::= 'اختبر' STRING proba_modifier* block_stmt
-# [241] proba_modifier
+# [242] proba_modifier
 proba_modifier ::= 'توقع_الفشل' | 'أهمل' STRING | 'مستقبلي' STRING | 'فقط' | 'وسم' STRING | 'زمني' NATURAL | 'قس' | 'معاد' NATURAL | 'هش' NATURAL | 'حصري' STRING
-# [242] praepara_block
+# [243] praepara_block
 praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'الكل'? block_stmt
-# [243] fac_stmt
+# [244] fac_stmt
 fac_stmt ::= 'افعل' block_stmt cape_clause? ('طالما' expression)?
-# [244] IDENTIFIER
+# [245] IDENTIFIER
 IDENTIFIER ::=
-# [245] NUMBER
+# [246] NUMBER
 NUMBER ::=
-# [246] NATURAL
+# [247] NATURAL
 NATURAL ::=
-# [247] STRING
+# [248] STRING
 STRING ::=
-# [248] ASCII_STRING
+# [249] ASCII_STRING
 ASCII_STRING ::=
-# [249] BACKTICK_STRING
+# [250] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [250] OCTETI_STRING
+# [251] OCTETI_STRING
 OCTETI_STRING ::=
-# [251] NEWLINE
+# [252] NEWLINE
 NEWLINE ::=
-# [252] WIDTH_MARKER
+# [253] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [253] LISTA_WIDTH_SUGAR
+# [254] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [254] TENSOR_WIDTH_SUGAR
+# [255] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [255] SPARSA_WIDTH_SUGAR
+# [256] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [256] VECTOR_WIDTH_SUGAR
+# [257] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [257] MATRIX_WIDTH_SUGAR
+# [258] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [258] FRONTMATTER_DELIMITER
+# [259] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [259] TOML_LINES
+# [260] TOML_LINES
 TOML_LINES ::=
-# [260] ANNOTATION_NAME
+# [261] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [261] ANNOTATION_FIELD_NAME
+# [262] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [262] NON_NEWLINE_TOKEN
+# [263] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [263] NO_NEWLINE
+# [264] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -757,6 +759,7 @@ NO_NEWLINE ::=
 | [`non_null_suffix`](#non-null-suffix) | `#ليس-null-suffix` | live |
 | [`argument_list`](#argument-list) | `#argument-list` | live |
 | [`argument`](#argument) | `#argument` | live |
+| [`call_marker`](#call-marker) | `#call-marker` | live |
 | [`template_argument`](#template-argument) | `#template-argument` | live |
 | [`literal`](#literal) | `#literal` | live |
 | [`primary`](#primary) | `#primary` | live |
@@ -1181,6 +1184,7 @@ The body joint keeps the existing closure law: `∴` followed by one expression,
 - Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `ارم` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `افعل { ... } التقط err { ... }` may catch `ارم` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `افعل`/`التقط` wrapper, mirroring how bare `↦` conversio and `ارم` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
 - In a signature, `⇥` only ever names an error type (`→ T ⇥ E`). It never carries a value.
 - Parameter access markers live in the type position: `عن`/`ref` (read), `في`/`mut` (mutate), `ملك` (consume), and `نسخة` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `من`/`from` remains the import/iteration/extraction token identity.
+- Call-site access markers: an argument passed to a parameter declared `mut` / `ملك` / `نسخة` carries the same marker at the call (en `mut` `ملك` `نسخة`; la `في` `ملك` `نسخة`), as in `bump(mut a)`, `eat(ملك a)`, `dup(نسخة a)`; the read marker `ref` (la `عن`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `ملك` and `نسخة` with the matching marker. Call-site `نسخة` is a plain echo of the parameter marker. Today `ملك` and `نسخة` are checked for marker agreement only; use-after-`ملك` checking at calls, writable `ملك`/`نسخة` parameters, and the restriction that only a whole local binding may be passed as `ملك` are coming.
 - Post-name marker: `اختياري` (voluntary/optional provision)
 - `باقي` marks rest parameter
 - Ordinary `دالة` declarations and genus methods require bodies. Signature-only methods belong in `عقد`.
