@@ -75,7 +75,7 @@ functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
+    varia lista<numerus> a ← [1, 2, 3]
     poke(a)
 }
 ",
@@ -213,7 +213,7 @@ functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
-    fixum lista<numerus> a ← [1, 2, 3]
+    varia lista<numerus> a ← [1, 2, 3]
     poke(a)
     nota a.longitudo()
 }

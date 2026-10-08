@@ -97,6 +97,7 @@ const ISSUE_COPY_INTO_ALIAS: &str = "copy_into_alias";
 const ISSUE_MUT_TENSOR_PARAM_REBIND: &str = "mut_tensor_param_rebind";
 const ISSUE_ASSIGN_TO_NONMUT_TENSOR_PARAM: &str = "assign_to_nonmut_tensor_param";
 const ISSUE_IMMUTABLE_SECOND_ASSIGNMENT: &str = "immutable_second_assignment";
+const ISSUE_MUT_ARGUMENT_NOT_WRITABLE: &str = "mut_argument_not_writable";
 const ISSUE_MUTATING_METHOD_ON_IMMUTABLE: &str =
     "imperativus_operator_method_requires_varia_receiver";
 
@@ -317,6 +318,12 @@ struct BorrowChecker<'a> {
     /// through them, so the alias write checks skip them (chains still pass
     /// through).
     const_agg_aliases: FxHashSet<DefId>,
+    /// Locals declared `const`/`fixum`: not a writable place, so they cannot be
+    /// passed to a `mut` parameter.
+    immutable_locals: FxHashSet<DefId>,
+    /// Parameters with no access marker (read-only to the callee): not a
+    /// writable place either.
+    unmarked_params: FxHashSet<DefId>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
@@ -376,6 +383,8 @@ impl<'a> BorrowChecker<'a> {
             nonmut_agg_params: FxHashSet::default(),
             nonmut_agg_aliases: FxHashMap::default(),
             const_agg_aliases: FxHashSet::default(),
+            immutable_locals: FxHashSet::default(),
+            unmarked_params: FxHashSet::default(),
             func_params: FxHashMap::default(),
             regions,
             stmt_node: None,
@@ -456,6 +465,9 @@ impl<'a> BorrowChecker<'a> {
                 self.mut_params.insert(param.def_id);
             }
             let (marker, inner) = self.types.peel_access_marker(param.ty);
+            if matches!(param.mode, HirParamMode::Owned) && marker.is_none() {
+                self.unmarked_params.insert(param.def_id);
+            }
             if matches!(param.mode, HirParamMode::Owned)
                 && marker.is_none()
                 && matches!(self.types.get(inner), Type::Tensor(_, _))
@@ -508,6 +520,8 @@ impl<'a> BorrowChecker<'a> {
         self.nonmut_agg_params.clear();
         self.nonmut_agg_aliases.clear();
         self.const_agg_aliases.clear();
+        self.immutable_locals.clear();
+        self.unmarked_params.clear();
         self.stmt_node = None;
     }
 
@@ -529,6 +543,9 @@ impl<'a> BorrowChecker<'a> {
         match &stmt.kind {
             HirStatementKind::Local(local) => {
                 self.names.insert(local.def_id, local.name);
+                if !local.mutable {
+                    self.immutable_locals.insert(local.def_id);
+                }
                 self.ensure_state(local.def_id);
                 if let Some(ty) = local.ty {
                     self.note_ref_root(local.def_id, ty);
@@ -754,7 +771,10 @@ impl<'a> BorrowChecker<'a> {
             self.push_scope();
         }
 
-        for (arg, param) in args.iter().zip(params.iter()) {
+        for (index, (arg, param)) in args.iter().zip(params.iter()).enumerate() {
+            if self.dest_is_mut(param) {
+                self.check_mut_argument_writable(&arg.expr, index);
+            }
             if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
                 && let Some(arg_usage) = self.param_usage.get_mut(&arg_def_id)
             {
@@ -965,6 +985,52 @@ impl<'a> BorrowChecker<'a> {
         if is_fill {
             self.nonmut_tensor_write_error(origin, expr.span);
         }
+    }
+
+    /// An argument bound to a `mut` parameter must be a writable place: a
+    /// `var` binding, a `mut` parameter of the caller, or a field/element path
+    /// rooted at one. A `const` binding, an unmarked (read-only) parameter and
+    /// a temporary are rejected. A read-only tensor or aggregate parameter (and
+    /// its `←` aliases) keeps the alias rules' own diagnostics (SEM056/SEM020)
+    /// and is not reported twice.
+    fn check_mut_argument_writable(&mut self, arg: &HirExpression, position: usize) {
+        let origin = match Self::root_def_id(arg) {
+            Some(root) => {
+                let covered = self.nonmut_tensor_origin(root).is_some()
+                    || self.nonmut_agg_origin(root).is_some();
+                if covered
+                    || !(self.immutable_locals.contains(&root)
+                        || self.unmarked_params.contains(&root))
+                {
+                    return;
+                }
+                Some(root)
+            }
+            None => {
+                if !matches!(
+                    arg.kind,
+                    HirExpressionKind::Literal(_)
+                        | HirExpressionKind::Array(_)
+                        | HirExpressionKind::Struct(..)
+                        | HirExpressionKind::Verte { .. }
+                        | HirExpressionKind::Tuple(..)
+                        | HirExpressionKind::Binary(..)
+                        | HirExpressionKind::Unary(..)
+                        | HirExpressionKind::Call(..)
+                        | HirExpressionKind::MethodCall(..)
+                ) {
+                    return;
+                }
+                None
+            }
+        };
+        let mut error = SemanticError::structured(SemanticErrorKind::ImmutableAssignment, arg.span)
+            .with_arg("issue", ISSUE_MUT_ARGUMENT_NOT_WRITABLE)
+            .with_arg("position", (position + 1).to_string());
+        if let Some(spelling) = origin.and_then(|root| self.param_spelling(root)) {
+            error = error.with_arg("binding", spelling);
+        }
+        self.errors.push(error);
     }
 
     /// The non-`mut` tensor parameter a binding is or aliases, if any.

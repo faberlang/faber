@@ -191,9 +191,9 @@ fn aliased_ref_arguments_stay_legal() {
 
 #[test]
 fn copy_bind_does_not_alias() {
-    assert_accepts("    const copy tf32[2, 2] dup ← g\n    mut_read(g, dup)");
-    assert_accepts("    const copy tf32[2, 2] dup ← g\n    mut_read(dup, g)");
-    assert_accepts("    const copy tf32[2, 2] dup ← g\n    mut_mut(g, dup)");
+    assert_accepts("    var copy tf32[2, 2] dup ← g\n    mut_read(g, dup)");
+    assert_accepts("    var copy tf32[2, 2] dup ← g\n    mut_read(dup, g)");
+    assert_accepts("    var copy tf32[2, 2] dup ← g\n    mut_mut(g, dup)");
 }
 
 #[test]

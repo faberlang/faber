@@ -1,6 +1,6 @@
 //! MU-1 unmarked-semantics invariant pins (D-1, D-8).
 //!
-//! These tests lock the unmarked laws: alias-on-bind, const→mut mutation, and
+//! These tests lock the unmarked laws: alias-on-bind, var→mut mutation (a const argument is rejected), and
 //! param mutation through `in`. The tcs1 language decision narrows D-1's
 //! shallow law for the binding form: an in-place mutating intrinsic on an
 //! immutable binding is a reassignment-class error, so the old shallow-const
@@ -36,14 +36,33 @@ incipit {
 }
 
 #[test]
-fn baseline_const_into_mut_param_is_legal() {
-    let _ = analyze_ok(
+fn baseline_const_into_mut_param_is_rejected() {
+    // The argument of a `mut` parameter must be a writable place: a `const`
+    // binding is not (a `varia` binding is, see the twin below).
+    assert_rejects_with_issue(
         r"
 functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
 }
 incipit {
     fixum lista<numerus> a ← [1, 2, 3]
+    poke(a)
+    nota a.longitudo()
+}
+",
+        "mut_argument_not_writable",
+    );
+}
+
+#[test]
+fn baseline_var_into_mut_param_is_legal() {
+    let _ = analyze_ok(
+        r"
+functio poke(in lista<numerus> xs) → vacuum {
+    xs.appende(4)
+}
+incipit {
+    varia lista<numerus> a ← [1, 2, 3]
     poke(a)
     nota a.longitudo()
 }

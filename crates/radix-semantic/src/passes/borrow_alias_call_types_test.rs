@@ -206,7 +206,7 @@ fn aliased_read_arguments_stay_legal() {
 #[test]
 fn copy_bind_does_not_alias() {
     for c in ALL {
-        let dup = format!("    const copy {} dup ← g\n", c.ty);
+        let dup = format!("    var copy {} dup ← g\n", c.ty);
         assert_accepts(c, &(dup.clone() + "    mut_read(g, dup)"));
         assert_accepts(c, &(dup.clone() + "    mut_read(dup, g)"));
         assert_accepts(c, &(dup + "    mut_mut(g, dup)"));

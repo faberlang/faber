@@ -41,6 +41,6 @@ fn summa(mut list<int> values) → int {
 }
 
 main {
-    const _ xs ← [1, 2, 3]
+    var list<int> xs ← [1, 2, 3]
     print summa(xs)
 }

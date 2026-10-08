@@ -57,7 +57,7 @@ fn fromBytes() → bytes {
 }
 
 main {
-    const bytes sig ← |de ad be ef|
+    var bytes sig ← |de ad be ef|
 
     # lista methods on an octeti receiver
     const int n ← describe(sig)

@@ -3565,6 +3565,10 @@ help = "declara `{binding}` cum `varia` ut in loco mutari possit, aut utere meth
 message = "'⇇' needs writable tensor storage on its left"
 help = "write into a mutable local or a mut parameter; a constant, a fixum binding, or a non-mut parameter cannot be written"
 
+[diagnostics.SEM020.issues.mut_argument_not_writable]
+message = "argument {position}{?binding| (`|`)} is passed to a `mut` parameter but is not a writable place"
+help = "pass a `var` binding, a `mut` parameter, or a field or element of one; a `const` binding, a non-mut parameter or a temporary cannot be written"
+
 [diagnostics.SEM021]
 message = "invalid assignment target"
 help = "assign to a valid lvalue"
