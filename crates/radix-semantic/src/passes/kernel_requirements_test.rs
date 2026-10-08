@@ -158,7 +158,7 @@ fn symbolic_apud_coordinate_is_retained_as_a_store_condition() {
 @ publica
 functio copy_coordinate<magnitudo N>(
     tensor<f32, [N]> input,
-    tensor<u32, [N]> output
+    in tensor<u32, [N]> output
 ) → vacuum {
     itera ex input apud [i] fixum value {
         output[i] ← i
@@ -270,7 +270,7 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> {
 @ public
 fn map_edges<size N>(
     tensor<f32, [N]> input,
-    tensor<f32, [N]> output
+    mut tensor<f32, [N]> output
 ) → void {
     const tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
     for from mapped at [i] const value {
@@ -344,7 +344,7 @@ fn kernel_with_static_extents_records_no_entry_shape_relation() {
         r"
 @ nucleum
 @ publica
-functio scale(tensor<f32, [5]> input, tensor<f32, [5]> output) → vacuum {
+functio scale(tensor<f32, [5]> input, in tensor<f32, [5]> output) → vacuum {
     itera ex input apud [i] fixum value {
         output[i] ← value * 2.0
     }

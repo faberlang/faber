@@ -27,7 +27,7 @@ locale = "la"
 
 @ nucleum
 @ publica { }
-functio rank2(tensor<f32, [4, 8]> a, tensor<f32, [1]> out) → vacuum {
+functio rank2(tensor<f32, [4, 8]> a, in tensor<f32, [1]> out) → vacuum {
     fixum f32 total ← reducta via summa ex a apud [i, j] filum f fixum s {
         redde s
     }
