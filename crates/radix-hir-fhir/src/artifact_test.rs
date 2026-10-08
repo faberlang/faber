@@ -195,8 +195,10 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // per-target kernel requirements; schema 33 carries tensor edge policies;
     // schema 34 carries runtime shape guards in provider units; schema 36
     // reshapes `HirExpressionKind::Transfer` into `CopyInto`; schema 37 removes
-    // the legacy `Summa` and `Extremum` variants in favor of `Reduction`.
-    assert_eq!(SCHEMA_VERSION, 38);
+    // the legacy `Summa` and `Extremum` variants in favor of `Reduction`; schema 38
+    // adds `HirTypeSlot::TypedZero`; schema 39 adds
+    // `HirPresentation::empty_dense_ids`.
+    assert_eq!(SCHEMA_VERSION, 39);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

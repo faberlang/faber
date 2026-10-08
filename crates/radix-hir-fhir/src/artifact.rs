@@ -580,7 +580,11 @@ pub struct FunctionProvenanceTableWire {
 /// Version 38 adds `HirTypeSlot::TypedZero` (the authored type of a typed zero
 /// `Type {}`); schema-v37 artifacts fail closed because the sidecar registry
 /// gained a slot variant.
-pub const SCHEMA_VERSION: u32 = 38;
+/// Version 39 adds `HirPresentation::empty_dense_ids` (which nodes typecheck
+/// rewrote from `empty` to the typed zero of a dense tensor, vector or matrix
+/// slot, so the Faber re-emitter prints `empty` again); schema-v38 artifacts
+/// fail closed.
+pub const SCHEMA_VERSION: u32 = 39;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
