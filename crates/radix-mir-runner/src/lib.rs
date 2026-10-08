@@ -15,6 +15,7 @@ mod host;
 pub mod inf;
 pub mod kernel;
 pub mod kernel_dispatch;
+pub mod kernel_lanes;
 mod regex_program;
 mod runtime;
 pub mod sermo;
@@ -2860,6 +2861,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         cell.borrow_mut().insert(key, assigned);
                         Ok(Value::Map(cell))
                     }
+                    // A device-form kernel stores through a tensor place with one scalar
+                    // linear index (`_1[%2] = v`); the tensor handle is shared, so the
+                    // write lands in the caller's storage.
+                    Value::Tensor(cell) => {
+                        let idx = index.as_index(span)?;
+                        cell.borrow().set_value_at(idx, assigned).ok_or_else(|| {
+                            RunnerError::internal(span, "tensor index out of bounds")
+                        })?;
+                        Ok(Value::Tensor(cell))
+                    }
                     _ => Err(RunnerError::internal(
                         span,
                         "index write on non-array or non-map",
@@ -3580,6 +3591,10 @@ mod tensor_fill_test;
 #[cfg(test)]
 #[path = "tensor_extent_test.rs"]
 mod tensor_extent_test;
+
+#[cfg(test)]
+#[path = "kernel_lanes_test.rs"]
+mod kernel_lanes_test;
 
 #[cfg(test)]
 #[path = "tensor_math_test.rs"]
