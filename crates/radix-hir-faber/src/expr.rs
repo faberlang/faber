@@ -1739,7 +1739,7 @@ impl super::FaberCodegen<'_> {
     ) {
         let site = HirTypeSite {
             owner: HirOwnerRef::Hir(owner),
-            slot: HirTypeSlot::AscriptionTarget,
+            slot: HirTypeSlot::TypedZero,
         };
         let rendered = self
             .type_to_faber_at(&site, ty, names, surface)

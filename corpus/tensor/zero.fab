@@ -9,7 +9,6 @@ syntax = "Type {}"
 related = ["tensor", "lista", "magnitudo"]
 locale = "en"
 +++
-
 # =============================================================================
 # tensor — The typed zero Type {}: a scalar-element tensor, a vector-element tensor, and a plain vector.
 # =============================================================================
@@ -37,10 +36,8 @@ main {
     const tf32[2, 3] grid ← tf32[2, 3] {}
     print grid.shape()
     print grid[[1, 2]]
-
     const tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
     print lanes.shape()
-
     const vector<f32, 4> v ← vector<f32, 4> {}
     print v[3]
 }

@@ -14,11 +14,15 @@ main {
     const tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}
     const tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
     const vector<f32, 4> v ← vector<f32, 4> {}
+    const vf32[4] sv ← vf32[4] {}
+    const mf32[2, 2] sm ← mf32[2, 2] {}
+    const matrix<f32, [2, 2]> lm ← matrix<f32, [2, 2]> {}
     const vf32[2] authored ← [0.0, 0.0] ∷ vf32[2]
     print grid.shape()
     print long.shape()
     print lanes.shape()
     print v[3]
+    print sv[3]
     print authored[1]
 }
 "#;
@@ -28,11 +32,17 @@ locale = "la"
 +++
 incipit {
     fixum tf32[2, 3] grid ← tf32[2, 3] {}
+    fixum tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}
     fixum tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
     fixum vector<f32, 4> v ← vector<f32, 4> {}
+    fixum vf32[4] sv ← vf32[4] {}
+    fixum mf32[2, 2] sm ← mf32[2, 2] {}
+    fixum matrix<f32, [2, 2]> lm ← matrix<f32, [2, 2]> {}
     nota grid.magnitudines()
+    nota long.magnitudines()
     nota lanes.magnitudines()
     nota v[3]
+    nota sv[3]
 }
 "#;
 
@@ -53,17 +63,19 @@ fn format_idempotent(name: &str, source: &str) -> String {
     first
 }
 
-/// The zero's type prints canonically (long form): the sidecar keeps no
-/// authored form for the expression yet.
+/// The zero's type prints as authored: the short sugar stays short and the
+/// long form stays long.
 fn assert_zero_forms(output: &str) {
     for line in [
-        "grid ← tensor<f32, [2, 3]> {}",
+        "grid ← tf32[2, 3] {}",
+        "long ← tensor<f32, [2, 3]> {}",
         "lanes ← tensor<vector<f32, 4>, [2]> {}",
         "v ← vector<f32, 4> {}",
+        "sv ← vf32[4] {}",
     ] {
         assert!(
             output.contains(line),
-            "typed zero `{line}` must round trip:\n{output}"
+            "typed zero `{line}` must round trip as authored:\n{output}"
         );
     }
     assert!(
@@ -76,10 +88,12 @@ fn assert_zero_forms(output: &str) {
 fn format_en_typed_zero_is_idempotent() {
     let output = format_idempotent("faber-typed-zero-en.fab", EN_SOURCE);
     assert_zero_forms(&output);
-    assert!(
-        output.contains("const tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}"),
-        "long-form zero must stay long:\n{output}"
-    );
+    for line in ["sm ← mf32[2, 2] {}", "lm ← matrix<f32, [2, 2]> {}"] {
+        assert!(
+            output.contains(line),
+            "matrix zero `{line}` must keep its spelling:\n{output}"
+        );
+    }
     assert!(
         output.contains("vf32[2] authored ← [0.0, 0.0] ∷ vf32[2]"),
         "an authored ascription of a zero array is not a typed zero:\n{output}"
@@ -94,6 +108,12 @@ fn format_la_typed_zero_is_idempotent() {
         output.contains("fixum ") && output.contains("incipit"),
         "la format must keep the Latin surface:\n{output}"
     );
+    for line in ["sm ← mf32[2, 2] {}", "lm ← matrix<f32, [2, 2]> {}"] {
+        assert!(
+            output.contains(line),
+            "matrix zero `{line}` must keep its spelling:\n{output}"
+        );
+    }
 }
 
 #[test]

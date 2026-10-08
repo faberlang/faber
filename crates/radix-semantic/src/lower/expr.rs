@@ -118,7 +118,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check, id),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
-        ExprKind::Construct(ty) => lowerer.lower_construct(ty, expr.span),
+        ExprKind::Construct(ty) => lowerer.lower_construct(ty, id, expr.span),
         ExprKind::Reducta(reduction) => lower_reducta(lowerer, reduction),
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.
@@ -575,9 +575,18 @@ impl Lowerer<'_> {
     fn lower_construct(
         &mut self,
         ty: &radix_syntax::TypeExpr,
+        owner: HirId,
         span: radix_lexer::Span,
     ) -> HirExpressionKind {
-        let claimed = self.lower_type(ty);
+        let claimed = self.lower_authored_type(
+            radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Hir(owner),
+                slot: radix_hir::HirTypeSlot::TypedZero,
+            },
+            ty,
+            false,
+            false,
+        );
         match &ty.kind {
             radix_syntax::TypeExprKind::Tensor(..)
             | radix_syntax::TypeExprKind::Vector(..)
@@ -615,6 +624,13 @@ impl Lowerer<'_> {
                 radix_syntax::TypeExprKind::Vector(_, width),
                 crate::Type::Vector(element, _),
             ) => {
+                // The short sugar `vf32[4]` parses its width as a one-element
+                // bracket shape; the long form `vector<f32, 4>` as the bare
+                // literal. Both spell the same width.
+                let width = match width {
+                    radix_syntax::FiguraExpr::Tuple(dims) if dims.len() == 1 => &dims[0],
+                    other => other,
+                };
                 let lanes = self.construct_literal_extent(width, span);
                 let zero = self.construct_scalar_zero(element, span);
                 let array = HirExpressionKind::Array(

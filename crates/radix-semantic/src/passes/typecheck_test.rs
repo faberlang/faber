@@ -2430,3 +2430,36 @@ incipit { tacet }"#,
         .expect("legacy import item");
     assert!(!legacy_import.selective, "namespace import stays unmarked");
 }
+
+// ===========================================================================
+// Typed zero `Type {}`: every annotation spelling is accepted before `{}`
+// ===========================================================================
+
+#[test]
+fn typed_zero_accepts_every_register_and_tensor_spelling() {
+    let result = crate::test_support::analyze_source(
+        r"
+incipit {
+    fixum vf32[4] short_vector ← vf32[4] {}
+    fixum vector<f32, 4> long_vector ← vector<f32, 4> {}
+    fixum mf32[2, 2] short_matrix ← mf32[2, 2] {}
+    fixum matrix<f32, [2, 2]> long_matrix ← matrix<f32, [2, 2]> {}
+    fixum tf32[2, 3] short_tensor ← tf32[2, 3] {}
+    fixum tensor<f32, [2, 3]> long_tensor ← tensor<f32, [2, 3]> {}
+}
+",
+    );
+    assert!(
+        result.is_ok(),
+        "every typed-zero spelling must check: {:?}",
+        result.diagnostics
+    );
+    let spelled = result
+        .result
+        .presentation
+        .authored_types
+        .iter()
+        .filter(|authored| authored.site.slot == radix_hir::HirTypeSlot::TypedZero)
+        .count();
+    assert_eq!(spelled, 6, "each typed zero records its authored type");
+}

@@ -2388,6 +2388,9 @@ pub enum HirTypeSlot {
     AscriptionTarget,
     /// Explicit conversion (`↦`) target type.
     ConversionTarget,
+    /// Authored type of a typed zero `Type {}`; the owner is the zero
+    /// expression, which lowering synthesizes into a `crea` call or a `Verte`.
+    TypedZero,
     /// Runtime type check / type-test target.
     TypeCheckTarget,
     /// Typed pattern position.

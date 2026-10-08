@@ -611,6 +611,7 @@ fn type_slot_key(slot: &HirTypeSlot) -> String {
         HirTypeSlot::TupleTypeArgument(ordinal) => format!("tuple-type-argument:{ordinal}"),
         HirTypeSlot::AscriptionTarget => "ascription-target".to_owned(),
         HirTypeSlot::ConversionTarget => "conversion-target".to_owned(),
+        HirTypeSlot::TypedZero => "typed-zero".to_owned(),
         HirTypeSlot::TypeCheckTarget => "type-check-target".to_owned(),
         HirTypeSlot::PatternType => "pattern-type".to_owned(),
         HirTypeSlot::DiscardBinding => "discard-binding".to_owned(),

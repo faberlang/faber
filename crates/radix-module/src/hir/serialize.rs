@@ -708,6 +708,12 @@ impl HirVisitor for TypeSiteRegistry {
                 register_site(
                     &mut self.sites,
                     radix_hir::HirOwnerRef::Hir(expr.id),
+                    radix_hir::HirTypeSlot::TypedZero,
+                    *target,
+                );
+                register_site(
+                    &mut self.sites,
+                    radix_hir::HirOwnerRef::Hir(expr.id),
                     radix_hir::HirTypeSlot::ConversionTarget,
                     *target,
                 );
@@ -759,6 +765,20 @@ impl HirVisitor for TypeSiteRegistry {
                         radix_hir::HirOwnerRef::Hir(expr.id),
                         radix_hir::HirTypeSlot::Error,
                         *ty,
+                    );
+                }
+            }
+            radix_hir::HirExpressionKind::MethodCall(receiver, ..)
+                if matches!(receiver.kind, radix_hir::HirExpressionKind::Vacua) =>
+            {
+                // A tensor typed zero `Type {}` lowers to a `crea` call on a
+                // `vacua` receiver pre-typed with the claimed tensor type.
+                if let Some(ty) = receiver.ty {
+                    register_site(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Hir(expr.id),
+                        radix_hir::HirTypeSlot::TypedZero,
+                        ty,
                     );
                 }
             }
