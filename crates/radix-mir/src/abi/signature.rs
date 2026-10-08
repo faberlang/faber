@@ -11,6 +11,7 @@ use super::{
     ERR_INDEXED_VIEW_REQUIRES_INPUT, ERR_INDEXED_VIEW_RETURNS_VACUUM,
     ERR_KERNEL_IO_ELEMENT_MISMATCH, ERR_KERNEL_PARAM_RETURN_MISMATCH,
     ERR_KERNEL_RESOURCE_BINDING_OVERFLOW, ERR_KERNEL_RESULT_TUPLE_REQUIRED,
+    ERR_KERNEL_TENSOR_EXTENT_OPERAND, ERR_KERNEL_TENSOR_EXTENT_U32,
     ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT, MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput,
     MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
     MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
@@ -175,6 +176,102 @@ fn maybe_append_runtime_extent(
     signature
         .extra_inputs
         .push(runtime_extent_resource(binding, extent_ty));
+}
+
+/// Collects the distinct `(tensor operand local, axis)` pairs a kernel body
+/// reads through `MirValueKind::TensorExtent`.
+struct TensorExtentReads {
+    reads: Vec<(MirLocalId, u32)>,
+    non_parameter_operand: bool,
+}
+
+impl crate::visit::MirVisitor for TensorExtentReads {
+    fn visit_value(&mut self, value: &crate::MirValue) {
+        if let crate::MirValueKind::TensorExtent { tensor, axis } = &value.kind {
+            match tensor {
+                MirOperand::Place(place)
+                    if place.projections.is_empty()
+                        && matches!(place.base, MirPlaceBase::Local(_)) =>
+                {
+                    if let MirPlaceBase::Local(local) = place.base {
+                        self.reads.push((local, *axis));
+                    }
+                }
+                _ => self.non_parameter_operand = true,
+            }
+        }
+        crate::visit::walk_value(self, value);
+    }
+}
+
+/// gpu-reset C4-2e-a: append one count-one `u32` input resource per distinct
+/// `(tensor parameter, axis)` the kernel body reads through `TensorExtent`.
+///
+/// Appended after every declared parameter resource (and the Lane builtin,
+/// which is not a resource), ordered by tensor parameter declaration order
+/// then axis ascending, deduplicated. Each carries
+/// [`MirKernelResourceKind::TensorAxisExtent`] so the host knows which tensor
+/// resource and axis it is. A kernel with no `TensorExtent` read is untouched.
+fn append_tensor_extent_resources(
+    function: &MirFunction,
+    signature: &mut MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) -> Result<(), MirAbiError> {
+    use crate::visit::MirVisitor;
+    let mut collected = TensorExtentReads {
+        reads: Vec::new(),
+        non_parameter_operand: false,
+    };
+    collected.visit_function(function);
+    if collected.non_parameter_operand {
+        return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
+    }
+    if collected.reads.is_empty() {
+        return Ok(());
+    }
+    let mut ordered = std::collections::BTreeSet::new();
+    for (local, axis) in collected.reads {
+        let Some(parameter) = function.params.iter().position(|param| param.local == local) else {
+            return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
+        };
+        ordered.insert((parameter, local, axis));
+    }
+    let extent_ty = validation
+        .types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+        .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_U32))?;
+    let mut next_binding = signature
+        .resources()
+        .map(|resource| resource.binding)
+        .max()
+        .map_or(0, |binding| binding + 1);
+    for (_, local, axis) in ordered {
+        let tensor = signature
+            .resources()
+            .find(|resource| {
+                resource.kind == MirKernelResourceKind::StorageBuffer
+                    && resource.source_local == Some(local)
+            })
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+        let tensor_binding = tensor.binding;
+        signature.extra_inputs.push(MirKernelResource {
+            group: DEFAULT_KERNEL_RESOURCE_GROUP,
+            binding: next_binding,
+            kind: MirKernelResourceKind::TensorAxisExtent {
+                tensor_binding,
+                axis,
+            },
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty: MirType::semantic(extent_ty),
+            element_count: 1,
+            source_local: None,
+            source_name: None,
+            reduced_projection: None,
+        });
+        next_binding += 1;
+    }
+    Ok(())
 }
 
 /// Build the read-input resources for a kernel's params, in binding order,
@@ -350,6 +447,8 @@ impl MirKernelSignature {
                     allow_host_owned_tensor_entry,
                 )?
             };
+        let mut signature = signature;
+        append_tensor_extent_resources(function, &mut signature, validation)?;
         // The per-kernel storage-buffer binding maximum (the active
         // per-lane `StorageBufferLimitRecord`; the shared default is the
         // minimum capacity across admitted lanes): a signature over

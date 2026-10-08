@@ -42,6 +42,10 @@ pub(crate) const ERR_INDEXED_KERNEL_DEVICE_VIEW: &str =
     "indexed kernel resource must be device view";
 pub(crate) const ERR_KERNEL_RESOURCE_BINDING_OVERFLOW: &str =
     "kernel resource binding index exceeds u32";
+pub(crate) const ERR_KERNEL_TENSOR_EXTENT_OPERAND: &str =
+    "kernel TensorExtent operand must be a tensor parameter";
+pub(crate) const ERR_KERNEL_TENSOR_EXTENT_U32: &str =
+    "kernel TensorExtent requires the u32 numeric type";
 pub(crate) const ERR_KERNEL_VECTOR_ELEMENT_COUNT: &str = "kernel vector element count";
 pub(crate) const ERR_KERNEL_DEVICE_VIEW_ELEMENT_COUNT: &str = "kernel device view element count";
 pub(crate) const ERR_KERNEL_REFLECTION_BYTE_OVERFLOW: &str =
@@ -133,6 +137,10 @@ fn abi_issue(message: &str) -> &'static str {
         "mir_kernel_reflection_byte_length_overflow"
     } else if message == ERR_INDEXED_KERNEL_DEVICE_VIEW {
         "mir_indexed_kernel_resource_not_device_view"
+    } else if message == ERR_KERNEL_TENSOR_EXTENT_OPERAND {
+        "mir_kernel_tensor_extent_operand"
+    } else if message == ERR_KERNEL_TENSOR_EXTENT_U32 {
+        "mir_kernel_tensor_extent_u32_missing"
     } else if message == ERR_KERNEL_RESOURCE_BINDING_OVERFLOW {
         "mir_kernel_resource_binding_overflow"
     } else if message == ERR_KERNEL_RESULT_TUPLE_REQUIRED {

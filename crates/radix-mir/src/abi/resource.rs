@@ -129,6 +129,15 @@ pub enum MirKernelResourceKind {
     /// `oob_guard_limit` static axis as fallback) — they must not reintroduce
     /// a static-shape guard.
     RuntimeExtent,
+    /// One runtime axis extent of a tensor parameter, read by the kernel body
+    /// through `MirValueKind::TensorExtent` (gpu-reset C4-2e-a). A count-one
+    /// `u32` input resource; the host computes it from the argument's shape and
+    /// binds it as one scalar launch argument at this resource's slot.
+    /// `tensor_binding` is the `binding` of the tensor parameter's own
+    /// storage-buffer resource; `axis` is the extent's axis in that tensor.
+    /// Distinct from [`Self::RuntimeExtent`], which is the whole-dispatch
+    /// guard count and carries no tensor identity.
+    TensorAxisExtent { tensor_binding: u32, axis: u32 },
 }
 
 impl MirKernelResourceKind {
@@ -137,6 +146,7 @@ impl MirKernelResourceKind {
         match self {
             Self::StorageBuffer => "storage-buffer",
             Self::RuntimeExtent => "runtime-extent",
+            Self::TensorAxisExtent { .. } => "tensor-axis-extent",
         }
     }
 }

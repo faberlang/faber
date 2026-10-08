@@ -1,5 +1,5 @@
 use super::build_device_program;
-use crate::abi::MirKernelResourceAccess;
+use crate::abi::{MirKernelResourceAccess, MirKernelResourceKind};
 use crate::device::MirCompanionMap;
 use crate::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use crate::device_program::{
@@ -1349,4 +1349,166 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
     assert_eq!(kernel.resources[0].buffer.name, "src");
     assert_eq!(kernel.resources[0].access, MirKernelResourceAccess::Read);
     assert_eq!(kernel.resources[1].access, MirKernelResourceAccess::Write);
+}
+
+/// gpu-reset C4-2e-a: the lane-copy shape (params `src`, `mut dst`, `Lane`)
+/// whose single block reads the given `(parameter local, axis)` pairs through
+/// `TensorExtent`, in the given order, and returns. Only the signature matters
+/// to the callers, so the body is the extent reads alone.
+fn lane_copy_with_extent_reads(reads: &[(u32, u32)]) -> (TypeTable, Interner, MirFunction) {
+    use crate::{MirTemp, MirTempId, MirValueKind};
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank2_tensor_ty(&mut types, [7, 5]);
+    let u32t = u32_ty(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let temps: Vec<MirTemp> = (0..reads.len() as u32)
+        .map(|id| MirTemp {
+            id: MirTempId(id),
+            ty: u32t,
+            span: span(),
+        })
+        .collect();
+    let statements: Vec<MirStatement> = reads
+        .iter()
+        .enumerate()
+        .map(|(index, &(tensor_local, axis))| {
+            lane_assign(
+                MirPlace::temp(MirTempId(index as u32)),
+                index as u32,
+                MirValueKind::TensorExtent {
+                    tensor: MirOperand::Place(MirPlace::local(MirLocalId(tensor_local))),
+                    axis,
+                },
+                u32t,
+            )
+        })
+        .collect();
+    let names = [
+        interner.intern("src"),
+        interner.intern("dst"),
+        interner.intern("lane"),
+    ];
+    let fn_name = interner.intern("lane_copy_extents");
+    let param = |id: u32, ty, mode| MirParam {
+        local: MirLocalId(id),
+        name: Some(names[id as usize]),
+        ty,
+        mode,
+        span: span(),
+    };
+    let local_decl = |id: u32, ty, mutable| MirLocal {
+        id: MirLocalId(id),
+        name: None,
+        ty,
+        mutable,
+        span: span(),
+    };
+    let function = MirFunction {
+        id: MirFunctionId(1),
+        source: Some(DefId(1)),
+        name: Some(fn_name),
+        params: vec![
+            param(0, tensor, MirParamMode::Ref),
+            param(1, tensor, MirParamMode::MutRef),
+            param(2, u32t, MirParamMode::Lane),
+        ],
+        locals: vec![local_decl(0, tensor, false), local_decl(1, tensor, true), local_decl(2, u32t, false)],
+        temps,
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: span(),
+            },
+            span: span(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    };
+    (types, interner, function)
+}
+
+/// The signature's resources in dispatcher-slot (binding) order, as
+/// `(binding, kind)`.
+fn lane_signature_slots(reads: &[(u32, u32)]) -> Vec<(u32, MirKernelResourceKind)> {
+    let (types, interner, function) = lane_copy_with_extent_reads(reads);
+    let validated = validated(&types, vec![function]);
+    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        &validated.program().functions[0],
+        validated.validation(),
+        &interner,
+    )
+    .expect("the lane-form shape has an ABI signature");
+    let mut slots: Vec<(u32, MirKernelResourceKind)> = signature
+        .resources()
+        .map(|resource| (resource.binding, resource.kind))
+        .collect();
+    slots.sort_by_key(|(binding, _)| *binding);
+    slots
+}
+
+#[test]
+fn tensor_extent_reads_become_trailing_count_one_extent_resources() {
+    // Reads arrive out of order and src axis 0 twice: the resources are
+    // ordered by tensor parameter then axis, and deduplicated.
+    let (types, interner, function) =
+        lane_copy_with_extent_reads(&[(1, 1), (0, 1), (0, 0), (0, 0)]);
+    let validated = validated(&types, vec![function]);
+    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        &validated.program().functions[0],
+        validated.validation(),
+        &interner,
+    )
+    .expect("signature");
+    let mut resources: Vec<_> = signature.resources().collect();
+    resources.sort_by_key(|resource| resource.binding);
+    let kinds: Vec<_> = resources.iter().map(|resource| (resource.binding, resource.kind)).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            (0, MirKernelResourceKind::StorageBuffer),
+            (1, MirKernelResourceKind::StorageBuffer),
+            (2, MirKernelResourceKind::TensorAxisExtent { tensor_binding: 0, axis: 0 }),
+            (3, MirKernelResourceKind::TensorAxisExtent { tensor_binding: 0, axis: 1 }),
+            (4, MirKernelResourceKind::TensorAxisExtent { tensor_binding: 1, axis: 1 }),
+        ]
+    );
+    for extent in &resources[2..] {
+        assert_eq!(extent.element_count, 1);
+        assert_eq!(extent.role, crate::abi::MirKernelResourceRole::Input);
+        assert_eq!(extent.access, MirKernelResourceAccess::Read);
+        assert_eq!(extent.element_ty, resources[2].element_ty);
+    }
+    assert_eq!(signature.builtin_inputs.len(), 1);
+}
+
+#[test]
+fn repeated_tensor_extent_read_is_one_resource() {
+    let slots = lane_signature_slots(&[(0, 0), (0, 0)]);
+    assert_eq!(
+        slots,
+        vec![
+            (0, MirKernelResourceKind::StorageBuffer),
+            (1, MirKernelResourceKind::StorageBuffer),
+            (2, MirKernelResourceKind::TensorAxisExtent { tensor_binding: 0, axis: 0 }),
+        ]
+    );
+}
+
+#[test]
+fn kernel_without_tensor_extent_reads_has_no_extent_resources() {
+    let slots = lane_signature_slots(&[]);
+    assert_eq!(
+        slots,
+        vec![
+            (0, MirKernelResourceKind::StorageBuffer),
+            (1, MirKernelResourceKind::StorageBuffer),
+        ]
+    );
 }
