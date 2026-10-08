@@ -1232,7 +1232,7 @@ functio countdown(f32 x) → f32 {
 fn gpu_control_device_safe_accepts_structured_indexed_switch_write() {
     let source = r"
 @ nucleum
-functio choose(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio choose(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     elige id > id {
         casu verum {
             output[id] ← input[id]
@@ -1279,7 +1279,7 @@ fn gpu_control_device_safe_accepts_structured_indexed_value_join_branch() {
     // correctly as Capable.
     let source = r"
 @ nucleum
-functio choose(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio choose(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia f32 selected ← 0.0
     si id > id {
         selected ← input[id]
@@ -1297,7 +1297,7 @@ functio choose(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 fn gpu_control_device_safe_accepts_structured_indexed_loop_write() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     dum count < 1 {
         output[id] ← input[id]
@@ -1321,7 +1321,7 @@ fn gpu_control_device_safe_accepts_transparent_indexed_loop_entry_goto() {
 fn gpu_control_device_safe_accepts_structured_indexed_loop_break() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     dum count < 2 {
         si count > 0 {
@@ -1348,7 +1348,7 @@ fn gpu_control_device_safe_accepts_transparent_indexed_loop_break_entry_goto() {
 fn gpu_control_device_safe_accepts_structured_indexed_loop_continue() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     dum count < 2 {
         si count > 0 {
@@ -1375,7 +1375,7 @@ fn gpu_control_device_safe_accepts_transparent_indexed_loop_continue_entry_goto(
 fn gpu_control_device_safe_accepts_nested_indexed_loop_branch() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     dum count < 2 {
         si count > 0 {
@@ -1394,7 +1394,7 @@ functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 fn gpu_control_device_safe_accepts_nested_indexed_loop_break() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     dum count < 3 {
         si count > 0 {
@@ -1416,7 +1416,7 @@ functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 fn gpu_control_device_safe_accepts_nested_indexed_loop_continue() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     dum count < 3 {
         si count > 0 {
@@ -1438,7 +1438,7 @@ functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 fn gpu_control_device_safe_rejects_side_effecting_nested_indexed_loop_branch() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     varia u32 side ← 0
     dum count < 2 {
@@ -1459,7 +1459,7 @@ functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 fn gpu_control_device_safe_rejects_side_effecting_nested_indexed_loop_control() {
     let source = r"
 @ nucleum
-functio fill(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     varia u32 side ← 0
     dum count < 3 {

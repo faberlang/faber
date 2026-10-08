@@ -3301,7 +3301,7 @@ functio muta() → numerus {
 fn lowers_tensor_bracket_access_to_tensor_runtime_ops() {
     let dump = dump_source(
         r"
-functio muta(tf32[4] input, tf32[4] output, u32 id) → f32 {
+functio muta(tf32[4] input, in tf32[4] output, u32 id) → f32 {
     fixum f32 value ← input[id]
     output[id] ← value
     redde value
@@ -3358,7 +3358,7 @@ fn indexed_tensor_view_kernel_lowers_device_brackets_to_projections() {
     let dump = dump_source(
         r"
 @ nucleum
-functio copy(tf32[4] input, tf32[4] output, u32 id) → vacuum {
+functio copy(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     output[id] ← input[id]
 }
 ",
