@@ -186,41 +186,46 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
             });
             let failure = match first {
                 Err(error) => Some(format!("cannot read source: {error}")),
-                Ok(first) if first.output.is_none() => Some(format!(
-                    "first Faber compile failed: {}",
-                    first
-                        .diagnostics
-                        .iter()
-                        .map(|item| item.message.as_str())
-                        .collect::<Vec<_>>()
-                        .join(" | ")
-                )),
-                Ok(first) => {
-                    let first_code = &first.output.as_ref().expect("checked output").code;
-                    let second = reemit_faber(
-                        &second_session,
-                        &emit_pack,
-                        &case.input.display().to_string(),
-                        first_code,
-                    );
-                    if second.output.is_none() {
-                        Some(format!(
-                            "second Faber compile failed: {}",
-                            second
-                                .diagnostics
-                                .iter()
-                                .map(|item| item.message.as_str())
-                                .collect::<Vec<_>>()
-                                .join(" | ")
-                        ))
-                    } else if first_code != &second.output.as_ref().expect("checked output").code {
-                        Some("faber emit did not stabilize after one round-trip".to_owned())
-                    } else if source.as_ref().is_ok_and(|source| source.trim().is_empty()) {
-                        Some("source file was unexpectedly empty".to_owned())
-                    } else {
-                        None
+                Ok(first) => match first.output.as_ref() {
+                    None => Some(format!(
+                        "first Faber compile failed: {}",
+                        first
+                            .diagnostics
+                            .iter()
+                            .map(|item| item.message.as_str())
+                            .collect::<Vec<_>>()
+                            .join(" | ")
+                    )),
+                    Some(first_output) => {
+                        let first_code = &first_output.code;
+                        let second = reemit_faber(
+                            &second_session,
+                            &emit_pack,
+                            &case.input.display().to_string(),
+                            first_code,
+                        );
+                        match second.output.as_ref() {
+                            None => Some(format!(
+                                "second Faber compile failed: {}",
+                                second
+                                    .diagnostics
+                                    .iter()
+                                    .map(|item| item.message.as_str())
+                                    .collect::<Vec<_>>()
+                                    .join(" | ")
+                            )),
+                            Some(second_output) if first_code != &second_output.code => {
+                                Some("faber emit did not stabilize after one round-trip".to_owned())
+                            }
+                            Some(_)
+                                if source.as_ref().is_ok_and(|source| source.trim().is_empty()) =>
+                            {
+                                Some("source file was unexpectedly empty".to_owned())
+                            }
+                            Some(_) => None,
+                        }
                     }
-                }
+                },
             };
             match (case.target.outcome, failure) {
                 (Outcome::Pass, None) => {
