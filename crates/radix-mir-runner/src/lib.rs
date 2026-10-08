@@ -2176,6 +2176,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .params
             .iter()
             .map(|param| (param.local, param.mode))
+            // The lane id is a builtin of the device launch, never a call
+            // argument: a dispatched lane-form kernel is called without it.
+            .filter(|(_, mode)| !(dispatched && *mode == MirParamMode::Lane))
             .collect::<Vec<_>>();
         let arg_values = args
             .iter()

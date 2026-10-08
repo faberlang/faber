@@ -425,7 +425,12 @@ pub fn carried_plan_agrees(
     derived: Option<&CollectionKernelPlan>,
 ) -> bool {
     match derived {
-        None => matches!(carried, CollectionKernelPlan::Elementwise),
+        // A lane-form function derives no collection plan; the constructor
+        // selects `LaneGrid` from its Lane parameter (`lane_grid_plan`).
+        None => matches!(
+            carried,
+            CollectionKernelPlan::Elementwise | CollectionKernelPlan::LaneGrid { .. }
+        ),
         Some(derived) => derived == carried,
     }
 }
@@ -2307,6 +2312,11 @@ pub fn per_output_domains(kernel: &KernelUnit) -> Vec<PerOutputDomain> {
                 resource.access,
                 MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
             )
+        })
+        // A runtime-shaped output has no static extent; the dispatcher checks
+        // the actual argument against the lane domain at launch (E_INVALID_ARGS).
+        .filter(|resource| {
+            resource.version.element_count != crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT
         })
         .map(|resource| PerOutputDomain {
             binding: resource.binding,

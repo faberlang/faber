@@ -382,6 +382,8 @@ pub(crate) fn signature_from_function(function: &MirFunction) -> MirFunctionSign
         params: function
             .params
             .iter()
+            // The lane id is a launch builtin, not a call argument.
+            .filter(|param| param.mode != crate::MirParamMode::Lane)
             .map(|param| MirParamSignature {
                 ty: param.ty,
                 optional: false,

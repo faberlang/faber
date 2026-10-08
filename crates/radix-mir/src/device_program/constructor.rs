@@ -39,7 +39,7 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
-use radix_types::TypeTable;
+use radix_types::{IndexExpr, Type, TypeTable};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
@@ -1795,12 +1795,30 @@ fn lane_grid_plan(
     else {
         return Err("lane kernel has no read tensor resource to take the lane domain from".to_owned());
     };
-    let rank = crate::abi::kernel_param_shape(source.source_local, function, validation)
-        .and_then(|shape| u8::try_from(shape.len()).ok())
+    let rank = source
+        .source_local
+        .and_then(|local| function.params.iter().find(|param| param.local == local))
+        .and_then(|param| tensor_param_rank(param.ty, validation))
+        .and_then(|rank| u8::try_from(rank).ok())
         .filter(|rank| *rank > 0)
         .ok_or_else(|| "lane kernel source tensor has no static rank".to_owned())?;
     Ok(Some(CollectionKernelPlan::LaneGrid {
         source_resource,
         rank,
     }))
+}
+
+/// The axis count of a tensor parameter's declared shape, whatever its
+/// dimensions are: a runtime-extent axis (`_`, a `size` generic) still counts,
+/// which `kernel_param_shape` (literal dimensions only) cannot answer.
+fn tensor_param_rank(ty: MirType, validation: &MirValidationContext<'_>) -> Option<usize> {
+    match validation.types.get(ty.semantic_id()) {
+        Type::Tensor(_, shape) => match validation.types.get_index(*shape) {
+            IndexExpr::Literal(_) => Some(1),
+            IndexExpr::Tuple(dims) => Some(dims.len()),
+            _ => None,
+        },
+        Type::Alias(_, target) => tensor_param_rank(MirType::semantic(*target), validation),
+        _ => None,
+    }
 }
