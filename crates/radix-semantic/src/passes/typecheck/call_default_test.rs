@@ -71,3 +71,38 @@ fn call_default_does_not_contain_a_failable_default() {
         "failable_call_requires_handler",
     );
 }
+
+// --- `vel` (coalesce) on a failable call: use `⊥` -----------------------------
+
+#[test]
+fn vel_on_a_failable_call_is_rejected_toward_the_call_default() {
+    test_support::assert_rejects_with_issue(
+        &format!("{FAILABLE}functio g() → numerus ⇥ textus {{\n    redde f(1) vel 0\n}}\n"),
+        "coalesce_on_failable_call",
+    );
+}
+
+#[test]
+fn vel_on_a_failable_tensor_accipe_is_rejected_even_in_main() {
+    test_support::assert_rejects_with_issue(
+        concat!(
+            "functio idx() → numerus {\n    redde 2\n}\n\n",
+            "incipit {\n    varia tensor<f32, [4]> t ← vacua\n    fixum numerus i ← idx()\n",
+            "    nota t.accipe([i]) vel 0.0\n}\n",
+        ),
+        "coalesce_on_failable_call",
+    );
+}
+
+#[test]
+fn vel_on_an_infallible_or_optional_call_is_unchanged() {
+    // An infallible call returning an optional keeps `vel`.
+    let _ = test_support::analyze_ok(concat!(
+        "functio g(numerus x) → numerus ∪ nihil {\n    redde x\n}\n\n",
+        "functio h() → numerus {\n    redde g(1) vel 0\n}\n",
+    ));
+    // A list element read (`T ∪ nihil`, not failable) keeps `vel`.
+    let _ = test_support::analyze_ok(concat!(
+        "functio h(lista<numerus> xs) → numerus {\n    redde xs.accipe(1) vel 0\n}\n",
+    ));
+}

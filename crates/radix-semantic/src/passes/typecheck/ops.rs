@@ -2188,7 +2188,24 @@ impl TypeChecker<'_> {
     }
 
     fn check_coalesce(&mut self, lhs: &mut HirExpression, rhs: &mut HirExpression) -> TypeId {
+        let failable_before = self.failable_calls_checked;
         let lhs_ty = self.check_expr(lhs);
+        // `vel`/`coalesce` supplies a value for an absent (`T ∪ none`) operand.
+        // A failable call whose success type is not optional fails through its
+        // `⇥` channel, which the optional default never handles: `⊥` does.
+        if self.failable_calls_checked > failable_before
+            && matches!(
+                lhs.kind,
+                HirExpressionKind::Call(..) | HirExpressionKind::MethodCall(..)
+            )
+            && !matches!(
+                self.types.get(self.resolve_inferred_type(lhs_ty)),
+                Type::Option(_) | Type::Primitive(Primitive::Nihil)
+            )
+            && self.resolve_inferred_type(lhs_ty) != self.error_type
+        {
+            self.invalid_operand_types(ISSUE_COALESCE_ON_FAILABLE_CALL, lhs.span);
+        }
         if let Some(result) = self.check_tensor_coalesce(lhs_ty, lhs.span, rhs) {
             return result;
         }
@@ -2430,6 +2447,7 @@ const MEMBERSHIP_REQUIRES_COLLECTION: &str = "membership_requires_collection";
 const MEMBERSHIP_OPERAND_UNRESOLVED: &str = "membership_operand_unresolved";
 const MEMBERSHIP_OVER_TEXT: &str = "membership_over_text";
 const COALESCE_FALLBACK_TYPE_MISMATCH: &str = "coalesce_fallback_type_mismatch";
+const ISSUE_COALESCE_ON_FAILABLE_CALL: &str = "coalesce_on_failable_call";
 const BOOLEAN_OPERANDS_REQUIRED: &str = "boolean_operands_required";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";
 const SAME_WIDTH_INTEGER_OPERANDS_REQUIRED: &str = "same_width_integer_operands_required";

@@ -1816,6 +1816,7 @@ impl TypeChecker<'_> {
         if sig.is_async {
             return false;
         }
+        self.failable_calls_checked += 1;
 
         match self.current_error {
             Some(ErrorSink::Local(handler_ty)) => {

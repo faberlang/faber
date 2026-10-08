@@ -641,6 +641,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "call_default_on_infallible_call" => Some(
             "remove the '⊥' default; only a call whose signature has '⇥' can fail".to_owned(),
         ),
+        "coalesce_on_failable_call" => Some(
+            "use '⊥' for a failable call: 'vel' only defaults an absent (optional) value".to_owned(),
+        ),
         "trap_member_type_mismatch" => {
             Some("check the member type flowing into the capta trap".to_owned())
         }

@@ -2693,6 +2693,10 @@ help = "give a default of the type the call returns on success"
 message = "'⊥' default on a call that cannot fail"
 help = "remove the '⊥' default; only a call whose signature has '⇥' can fail"
 
+[diagnostics.SEM011.issues.coalesce_on_failable_call]
+message = "optional default on a call that can fail; its result is not optional"
+help = "use '⊥' for a failable call: the optional default only covers an absent value, not the call's '⇥' failure"
+
 [diagnostics.SEM010.issues.trap_member_type_mismatch]
 message = "trap member type mismatch"
 help = "check the member type flowing into the {capta} trap"

@@ -4134,8 +4134,8 @@ fn nucleum_orphan_diagnostics(
             .map_or(definition_span, |annotation| annotation.span);
         diagnostics.push(
             Diagnostic::error(format!(
-                "@ nucleum function `{function_name}` yields no concrete device entry in this unit: \
-                 the annotation is orphaned (no same-unit instantiation)"
+                "@ nucleum function `{function_name}` is size-generic but has no same-unit caller \
+                 and is not exported: the annotation is orphaned (no entry reaches it)"
             ))
             .with_phase(DiagnosticPhase::Analysis)
             .with_code("ADM001")
@@ -4149,8 +4149,9 @@ fn nucleum_orphan_diagnostics(
             .with_span(annotation_span)
             .with_source_context(name, source, annotation_span)
             .with_help(
-                "instantiate the generic entry from a same-unit caller with concrete size arguments, \
-                 or link it from the unit that owns a concrete instance",
+                "call the kernel from this unit or mark it `@ public`; a kernel compiles once per \
+                 signature and its size extents are supplied per launch (they may be run-time \
+                 values), so no concrete size arguments are required",
             ),
         );
     }

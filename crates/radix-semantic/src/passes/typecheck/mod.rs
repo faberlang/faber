@@ -504,6 +504,11 @@ pub(crate) struct TypeChecker<'a> {
     /// that do not declare `⇥`.
     pub in_main_frame: bool,
 
+    /// Count of failable calls (a signature with a `⇥` channel) checked so far.
+    /// A construct that must reject a failable operand (`vel`/`coalesce`)
+    /// compares the count around the operand's check.
+    pub failable_calls_checked: u32,
+
     /// Arm selected by the innermost checked failable call for function-level
     /// propagation. The expression dispatcher consumes and restores this slot
     /// so nested calls cannot leak their marker to an enclosing call.
@@ -797,6 +802,7 @@ impl<'a> TypeChecker<'a> {
             current_return: None,
             current_error: None,
             in_main_frame: false,
+            failable_calls_checked: 0,
             pending_conversion: None,
             current_device_function: false,
             current_nucleum_entry: false,

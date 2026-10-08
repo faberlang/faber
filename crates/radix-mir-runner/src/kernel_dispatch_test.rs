@@ -183,3 +183,45 @@ fn kernel_dispatch_error_keeps_the_dispatcher_issue_code() {
     };
     assert_eq!(error.issue, "stub_device_lost");
 }
+
+/// A lane-form kernel carries a `Lane` parameter no caller supplies. Under the
+/// `Refuse` policy (plain `faber run`, device `auto`) a call to it must be the
+/// named refusal, never the arity mismatch the missing lane argument implies.
+#[test]
+fn refused_lane_form_kernel_call_is_the_named_refusal_not_an_arity_error() {
+    let types = TypeTable::new();
+    let interner = Interner::new();
+    let mut program = kernel_program(&types);
+    let scalar = MirType::semantic(types.primitive(Primitive::Numerus));
+    let span = Span::default();
+    program.functions[1].params.push(MirParam {
+        local: MirLocalId(6),
+        name: None,
+        ty: scalar,
+        mode: MirParamMode::Lane,
+        span,
+    });
+    program.functions[1].locals.push(MirLocal {
+        id: MirLocalId(6),
+        name: None,
+        ty: scalar,
+        mutable: false,
+        span,
+    });
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    assert_eq!(runner.kernel_policy, RunnerKernelPolicy::Refuse);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let frame = runner.frames.last_mut().expect("caller frame");
+    frame.seed_local(MirLocalId(0), Value::Int(3));
+    frame.seed_local(MirLocalId(1), Value::Int(5));
+    frame.seed_local(MirLocalId(2), Value::Array(Rc::default()));
+    let Err(error) =
+        runner.invoke_call(&MirCallee::Function(MirFunctionId(1)), &place_args(), span)
+    else {
+        panic!("a refused kernel call must fail");
+    };
+    assert_eq!(error.issue, RUNNER_KERNEL_REFUSED_ISSUE);
+    assert!(error.message.contains("--device cpu"), "{}", error.message);
+}

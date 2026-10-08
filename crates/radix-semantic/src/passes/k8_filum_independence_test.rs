@@ -91,7 +91,7 @@ incipit {
 #[test]
 fn same_coordinate_read_write_accepted() {
     accepted(&body("grid[i] ← grid[i] + value"));
-    accepted(&body("grid.ponde([i], (grid.accipe([i]) vel 0) + value)"));
+    accepted(&body("grid.ponde([i], grid.accipe([i]) + value)"));
 }
 
 #[test]
@@ -156,7 +156,7 @@ fn transformed_view_neighbor_rejected() {
         r"incipit {
     varia tensor<numerus, [2, 2]> grid ← vacua
     itera ex grid apud [i, j] filum lane fixum value {
-        fixum numerus neighbor ← grid.transpone().accipe([i, j]) vel 0
+        fixum numerus neighbor ← grid.transpone().accipe([i, j])
         grid.ponde([i, j], neighbor)
     }
 }",
@@ -166,7 +166,7 @@ fn transformed_view_neighbor_rejected() {
         r"incipit {
     varia tensor<numerus, [4]> grid ← vacua
     itera ex grid apud [i] filum lane fixum value {
-        fixum numerus neighbor ← grid.sectio(1, 4).accipe([i]) vel 0
+        fixum numerus neighbor ← grid.sectio(1, 4).accipe([i])
         grid[i] ← neighbor
     }
 }",
