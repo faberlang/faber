@@ -480,6 +480,35 @@ functio k(tensor<f32, [32]> xs) → f32 {
 }
 
 #[test]
+fn reduction_term_may_call_a_helper_that_calls_a_helper() {
+    assert_accepts(&format!(
+        r"{SQUARE}
+@ nucleum
+functio speed(f32 x) → f32 {{ redde square(x) + 1.0 }}
+@ nucleum
+functio k(tensor<f32, [32]> xs) → f32 {{
+    redde reducta via summa ex xs apud [i] filum f fixum s {{ redde speed(s) }}
+}}
+"
+    ));
+}
+
+#[test]
+fn reduction_term_calling_a_failable_kernel_is_rejected() {
+    assert_rejects_with_issue(
+        r"
+@ nucleum
+functio risky(f32 x) → f32 ⇥ textus { redde x }
+@ nucleum
+functio k(tensor<f32, [32]> xs) → f32 ⇥ textus {
+    redde reducta via summa ex xs apud [i] filum f fixum s { redde risky(s) }
+}
+",
+        "reducta_body_context",
+    );
+}
+
+#[test]
 fn reduction_term_helper_that_writes_is_rejected() {
     let result = analyze_source(
         r"
