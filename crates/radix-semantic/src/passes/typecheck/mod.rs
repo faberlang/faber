@@ -1229,6 +1229,9 @@ mod true_division_test;
 #[path = "octeti_endian_conversio_test.rs"]
 mod octeti_endian_conversio_test;
 #[cfg(test)]
+#[path = "octeti_tensor_conversio_test.rs"]
+mod octeti_tensor_conversio_test;
+#[cfg(test)]
 #[path = "register_conversio_test.rs"]
 mod register_conversio_test;
 

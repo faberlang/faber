@@ -61,6 +61,9 @@ const ISSUE_TEXTUS_LITERAL_TOO_LONG: &str = "textus_literal_too_long";
 const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
 const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
+const ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED: &str = "octeti_to_tensor_unspecified";
+const ISSUE_OCTETI_TO_TENSOR_ELEMENT_UNSUPPORTED: &str = "octeti_to_tensor_element_unsupported";
+const ISSUE_OCTETI_TO_TENSOR_LENGTH_MISMATCH: &str = "octeti_to_tensor_length_mismatch";
 const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
 // decimal-widths D2 (wildcard audit): the conversio `via` hints are
 // integer-family machinery. Radix text parse (Hex/Bin/Oct), endian unpack
@@ -194,6 +197,15 @@ fn endian_read_width_bytes(ty: &Type) -> Option<usize> {
         Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => Some(4),
         Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Some(8),
         _ => None,
+    }
+}
+
+/// Byte width of one element of an `octeti ↦ tensor<E, [..]> via Be|Le`
+/// reinterpretation: the scalar endian row's widths plus the one-byte kinds.
+fn octeti_tensor_element_width_bytes(ty: &Type) -> Option<usize> {
+    match ty {
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I8 | NumericWidth::U8) => Some(1),
+        other => endian_read_width_bytes(other),
     }
 }
 
@@ -782,6 +794,24 @@ impl TypeChecker<'_> {
             return result_ty;
         }
 
+        if let Some(result_ty) = self.check_octeti_to_tensor_conversio(
+            source,
+            source_ty,
+            target_resolved,
+            target_carrier,
+            params,
+            span,
+        ) {
+            if !self.types.equals(result_ty, self.error_type) {
+                if let Some(recovery) = recovery {
+                    self.note_conversio_recovery_checked(recovery, target_resolved);
+                } else {
+                    self.check_conversio_propagation_channel(source_ty, target_resolved, span);
+                }
+            }
+            return result_ty;
+        }
+
         if recovery.is_some() && self.is_infallible_truthiness_conversio(source_ty, target_resolved)
         {
             self.invalid_conversion(ISSUE_BIVALENS_RECOVERY_UNSUPPORTED, span);
@@ -1262,6 +1292,60 @@ impl TypeChecker<'_> {
         Some(self.error_type)
     }
 
+    /// `octeti ↦ tensor<E, [d1, ..]> via Be|Le` is a faithful bit
+    /// reinterpretation of the bytes (row-major, byte order from the hint).
+    /// The hint is required for every width; `E` is one of u8 i8 i16 u16 i32
+    /// u32 i64 u64 f32 f64. The byte length must equal `product(shape) x
+    /// width` exactly: checked here only when the source length is static
+    /// (an octeti literal or a constant window) and every extent is a
+    /// literal; otherwise it is a runtime check.
+    fn check_octeti_to_tensor_conversio(
+        &mut self,
+        source: &HirExpression,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        target_carrier: TypeId,
+        params: &[Symbol],
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !matches!(
+            self.types.get(self.resolve_inferred_type(source_ty)),
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. }
+        ) {
+            return None;
+        }
+        let Type::Tensor(elem, shape) = self.types.get(target_carrier).clone() else {
+            return None;
+        };
+        if !self.conversio_has_endian_hint(params) {
+            self.invalid_conversion(ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED, span);
+            return Some(self.error_type);
+        }
+        let Some(width) =
+            octeti_tensor_element_width_bytes(self.types.get(self.resolve_inferred_type(elem)))
+        else {
+            self.invalid_conversion(ISSUE_OCTETI_TO_TENSOR_ELEMENT_UNSUPPORTED, span);
+            return Some(self.error_type);
+        };
+        let expected = radix_types::i64s_from_literal_index(shape, self.types).and_then(|dims| {
+            dims.iter().try_fold(width as u128, |acc, dim| {
+                acc.checked_mul(u128::try_from(*dim).ok()?)
+            })
+        });
+        if let (Some(expected), Some(actual)) = (expected, self.static_octeti_window_len(source))
+            && expected != actual as u128
+        {
+            self.errors.push(
+                SemanticError::structured(SemanticErrorKind::ConversionInvalid, span)
+                    .with_arg("issue", ISSUE_OCTETI_TO_TENSOR_LENGTH_MISMATCH)
+                    .with_arg("expected", expected.to_string())
+                    .with_arg("actual", actual.to_string()),
+            );
+            return Some(self.error_type);
+        }
+        Some(target_resolved)
+    }
+
     fn is_numerus_u8(&self, ty: TypeId) -> bool {
         matches!(
             self.types.get(self.resolve_inferred_type(ty)),
@@ -1556,6 +1640,15 @@ impl TypeChecker<'_> {
         }
         let source = self.types.get(self.resolve_inferred_type(source_ty));
         let target = self.types.get(target_resolved);
+        // `octeti ↦ tensor` answers every hint other than Be/Le with its own
+        // `octeti_to_tensor_unspecified`, never a Bits width mismatch.
+        if matches!(
+            source,
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. }
+        ) && matches!(target, Type::Tensor(..))
+        {
+            return None;
+        }
         // decimal-widths D2 (wildcard audit): a decimal carrier never bitcasts
         // — the scaled-integer representation is not an IEEE bit pattern.
         if matches!(source, Type::SizedNumeric(Primitive::Numerus, w) if w.is_decimal())
@@ -2879,6 +2972,9 @@ impl TypeChecker<'_> {
                 (
                     Type::Array(_),
                     Type::Tensor(_, _) | Type::BoundedArray { .. }
+                ) | (
+                    Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. },
+                    Type::Tensor(_, _)
                 )
             ),
         }

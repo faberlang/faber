@@ -2272,6 +2272,8 @@ fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> 
             | crate::Type::BoundedAscii { .. }
             | crate::Type::BoundedOcteti { .. }
             | crate::Type::Vector(..)
+            // `octeti ↦ tensor<E, [shape]> via Be|Le` (byte reinterpretation).
+            | crate::Type::Tensor(..)
             | crate::Type::Param(_)
             | crate::Type::Alias(..)
             | crate::Type::Error => return true,

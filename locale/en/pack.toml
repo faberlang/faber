@@ -3432,6 +3432,18 @@ help = "convert to an unsigned numerus width before packing"
 message = "conversion from bytes to float is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead"
 help = "use chorda or explicit byte conversion helpers"
 
+[diagnostics.SEM016.issues.octeti_to_tensor_unspecified]
+message = "conversion from bytes to a tensor needs the byte order of each element; write `via Le` or `via Be`"
+help = "write bytes ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width"
+
+[diagnostics.SEM016.issues.octeti_to_tensor_element_unsupported]
+message = "bytes convert only to a tensor of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 elements"
+help = "use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type"
+
+[diagnostics.SEM016.issues.octeti_to_tensor_length_mismatch]
+message = "the byte length must equal the element count times the element width: expected {expected} bytes, found {actual}"
+help = "size the byte window to product(shape) times the element width, or change the tensor shape"
+
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only char ↦ u32 via Code (read a code point) and int ↦ char via Code (build one)"
 help = "use char ↦ u32 via Code or int ↦ char via Code; without Code a number converts to its digits"

@@ -1,0 +1,244 @@
+//! Typecheck pins for `octeti ↦ tensor<E, [shape]> via Be|Le`: a faithful
+//! bit reinterpretation of the bytes. Assertions are on code, issue, and
+//! args; never on message text.
+
+use crate::test_support::{self, analyze_source, assert_accepts, assert_rejects_with_issue};
+use crate::{SemanticError, SemanticErrorKind};
+
+const UNSPECIFIED: &str = "octeti_to_tensor_unspecified";
+const ELEMENT: &str = "octeti_to_tensor_element_unsupported";
+const LENGTH: &str = "octeti_to_tensor_length_mismatch";
+const HANDLER: &str = "failable_conversio_requires_handler";
+
+fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
+    err.args
+        .iter()
+        .find(|arg| arg.name == name)
+        .map(|arg| arg.value.as_str())
+}
+
+fn error_with_issue(source: &str, issue: &str) -> SemanticError {
+    let result = analyze_source(source);
+    result
+        .diagnostics
+        .iter()
+        .find(|err| err.is_error() && test_support::issue(err) == Some(issue))
+        .unwrap_or_else(|| panic!("expected {issue}, got {:?}", result.diagnostics))
+        .clone()
+}
+
+fn assert_no_issue(source: &str, unexpected: &str) {
+    let result = analyze_source(source);
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|err| test_support::issue(err) == Some(unexpected)),
+        "unexpected issue {unexpected:?}: {:?}",
+        result.diagnostics
+    );
+}
+
+fn read(element: &str, shape: &str, hint: &str) -> String {
+    format!("incipit {{ fixum _ t ← |00 01 02 03| ↦ tensor<{element}, {shape}> via {hint} }}")
+}
+
+// --- accepted -------------------------------------------------------------
+
+#[test]
+fn f32_le_and_be_are_accepted() {
+    assert_accepts(
+        "functio w(octeti b) → tensor<f32, [2, 3]> ⇥ textus { redde b ↦ tensor<f32, [2, 3]> via Le }",
+    );
+    assert_accepts(
+        "functio w(octeti b) → tensor<f32, [2, 3]> ⇥ textus { redde b ↦ tensor<f32, [2, 3]> via Be }",
+    );
+}
+
+#[test]
+fn every_element_width_is_accepted_with_a_matching_literal() {
+    let eight = "00 01 02 03 04 05 06 07";
+    for (element, count) in [
+        ("u8", 8),
+        ("i8", 8),
+        ("i16", 4),
+        ("u16", 4),
+        ("i32", 2),
+        ("u32", 2),
+        ("i64", 1),
+        ("u64", 1),
+        ("f32", 2),
+        ("f64", 1),
+    ] {
+        for hint in ["Le", "Be"] {
+            assert_accepts(&format!(
+                "incipit {{ fixum _ t ← |{eight}| ↦ tensor<{element}, [{count}]> via {hint} }}"
+            ));
+        }
+    }
+}
+
+#[test]
+fn bounded_octeti_source_is_accepted() {
+    assert_accepts(
+        "functio w(octeti<8> b) → tensor<f32, [2]> ⇥ textus { redde b ↦ tensor<f32, [2]> via Le }",
+    );
+}
+
+#[test]
+fn runtime_length_source_is_accepted_without_a_static_check() {
+    assert_accepts("incipit { fixum _ t ← |00 01 02 03|[0‥4] ↦ tensor<f32, [1]> via Le }");
+    assert_no_issue(
+        "functio w(octeti b) → tensor<f32, [4]> ⇥ textus { redde b ↦ tensor<f32, [4]> via Le }",
+        LENGTH,
+    );
+}
+
+#[test]
+fn non_literal_extents_are_not_rejected_here() {
+    assert_no_issue(
+        "functio w(octeti b, magnitudo N) → tensor<f32, [N]> ⇥ textus { redde b ↦ tensor<f32, [N]> via Le }",
+        UNSPECIFIED,
+    );
+    assert_no_issue(
+        "functio w(octeti b, magnitudo N) → tensor<f32, [N]> ⇥ textus { redde b ↦ tensor<f32, [N]> via Le }",
+        LENGTH,
+    );
+}
+
+#[test]
+fn handlers_cover_the_failable_conversion() {
+    assert_accepts(concat!(
+        "functio w(octeti b) → numerus {\n",
+        "    fac {\n        fixum _ t ← b ↦ tensor<f32, [2]> via Le\n        redde 1\n",
+        "    } cape err {\n        redde 0\n    }\n",
+        "}\n",
+    ));
+    assert_accepts(
+        "functio w(octeti b) → tensor<f32, [2]> ⇥ textus {\n    redde b ↦ tensor<f32, [2]> via Le\n}\n",
+    );
+    assert_accepts(
+        "functio w(octeti b, tensor<f32, [2]> d) → tensor<f32, [2]> {\n    redde b ↦ tensor<f32, [2]> via Le ⊥ d\n}\n",
+    );
+}
+
+#[test]
+fn main_body_is_exempt_from_the_handler_rule() {
+    assert_accepts("incipit { fixum _ t ← |00 01 02 03 04 05 06 07| ↦ tensor<f32, [2]> via Le }");
+}
+
+// --- rejected: hint -------------------------------------------------------
+
+#[test]
+fn missing_hint_is_unspecified() {
+    let err = error_with_issue(
+        "incipit { fixum _ t ← |00 01 02 03| ↦ tensor<f32, [1]> }",
+        UNSPECIFIED,
+    );
+    assert_eq!(err.kind, SemanticErrorKind::ConversionInvalid);
+}
+
+#[test]
+fn missing_hint_is_unspecified_for_one_byte_elements_too() {
+    assert_rejects_with_issue(
+        "incipit { fixum _ t ← |00 01| ↦ tensor<u8, [2]> }",
+        UNSPECIFIED,
+    );
+}
+
+#[test]
+fn bits_and_hex_hints_are_unspecified() {
+    for hint in ["Bits", "Hex"] {
+        assert_rejects_with_issue(&read("f32", "[1]", hint), UNSPECIFIED);
+    }
+}
+
+#[test]
+fn code_hint_is_rejected_by_the_littera_code_gate() {
+    // `Code` is claimed first by the littera row check, which names every
+    // non-code-point pair `code_hint_pair_mismatch`.
+    assert_rejects_with_issue(&read("f32", "[1]", "Code"), "code_hint_pair_mismatch");
+}
+
+#[test]
+fn misspelled_endian_hint_is_rejected_as_an_unknown_hint() {
+    // The lowering hint gate names it before typecheck sees the pair, as for
+    // every other conversion row; the checker never admits the pair.
+    assert_rejects_with_issue(&read("f32", "[1]", "LE"), "conversio_via_unknown_hint");
+}
+
+// --- rejected: element ----------------------------------------------------
+
+#[test]
+fn half_float_elements_are_unsupported() {
+    for element in ["f16", "bf16"] {
+        assert_rejects_with_issue(&read(element, "[2]", "Le"), ELEMENT);
+    }
+}
+
+#[test]
+fn vector_element_is_unsupported() {
+    assert_rejects_with_issue(
+        "incipit { fixum _ t ← |00 01 02 03| ↦ tensor<vector<f32, 4>, [2]> via Le }",
+        ELEMENT,
+    );
+}
+
+// --- rejected: static length ----------------------------------------------
+
+#[test]
+fn static_literal_length_mismatch_carries_expected_and_actual() {
+    let err = error_with_issue(&read("f32", "[2]", "Le"), LENGTH);
+    assert_eq!(err.kind, SemanticErrorKind::ConversionInvalid);
+    assert_eq!(arg(&err, "expected"), Some("8"));
+    assert_eq!(arg(&err, "actual"), Some("4"));
+}
+
+#[test]
+fn static_length_mismatch_multiplies_every_extent() {
+    let err = error_with_issue(&read("i16", "[2, 3]", "Be"), LENGTH);
+    assert_eq!(arg(&err, "expected"), Some("12"));
+    assert_eq!(arg(&err, "actual"), Some("4"));
+}
+
+#[test]
+fn static_window_length_mismatch_is_rejected() {
+    let err = error_with_issue(
+        "incipit { fixum _ t ← |00 01 02 03 04 05 06 07|[0‥8] ↦ tensor<f32, [1]> via Le }",
+        LENGTH,
+    );
+    assert_eq!(arg(&err, "expected"), Some("4"));
+    assert_eq!(arg(&err, "actual"), Some("8"));
+}
+
+// --- rejected: handler ----------------------------------------------------
+
+#[test]
+fn bare_conversion_outside_main_requires_a_handler() {
+    assert_rejects_with_issue(
+        "functio w(octeti b) → tensor<f32, [2]> {\n    redde b ↦ tensor<f32, [2]> via Le\n}\n",
+        HANDLER,
+    );
+}
+
+// --- the lowering hint gate ------------------------------------------------
+
+#[test]
+fn tensor_target_takes_a_via_hint() {
+    assert_no_issue(
+        "functio w(octeti b) → tensor<f32, [2]> ⇥ textus { redde b ↦ tensor<f32, [2]> via Le }",
+        "conversio_via_target_takes_no_hint",
+    );
+}
+
+#[test]
+fn other_non_hint_targets_still_reject_a_via_hint() {
+    assert_rejects_with_issue(
+        "functio w(octeti b) → lista<numerus> { redde b ↦ lista<numerus> via Le }",
+        "conversio_via_target_takes_no_hint",
+    );
+    assert_rejects_with_issue(
+        "functio w(octeti b) → textus { redde b ↦ textus via Le }",
+        "conversio_via_target_takes_no_hint",
+    );
+}

@@ -442,6 +442,13 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "octeti_endian_width_mismatch" => {
             Some("use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64".to_owned())
         }
+        "octeti_to_tensor_unspecified" => Some("write bytes ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width".to_owned()),
+        "octeti_to_tensor_element_unsupported" => {
+            Some("use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type".to_owned())
+        }
+        "octeti_to_tensor_length_mismatch" => {
+            Some("size the byte window to product(shape) times the element width, or change the tensor shape".to_owned())
+        }
         "bits_pair_width_mismatch" => {
             Some("convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64".to_owned())
         }
