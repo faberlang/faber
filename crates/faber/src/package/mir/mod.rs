@@ -439,6 +439,7 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
                 .map(|function| function.id)
                 .ok_or_else(|| vec![mir_diag(input, "no entry function in MIR program")])?;
             let extents = image.extents;
+            let genus_layouts = image.genus_layouts;
             let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
             let dispatcher = SessionKernelDispatcher::new(
                 session.take().expect("session is taken once"),
@@ -449,6 +450,9 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
             .map_err(|error| vec![host_error_diagnostic(&error)])?;
             dispatcher.borrow_mut().set_omissions(omissions);
             dispatcher.borrow_mut().set_extents(extents);
+            dispatcher
+                .borrow_mut()
+                .set_genus_layouts(genus_layouts, interner.clone());
             let hook: radix_mir_runner::kernel_dispatch::ResidencyHook = dispatcher.clone();
             let runner_diagnostics = |errors: Vec<radix_mir_runner::RunnerError>| {
                 errors
