@@ -547,4 +547,4 @@ impl FunctionBuilder<'_> {
 
 #[cfg(test)]
 #[path = "place_test.rs"]
-mod place_tests;
+mod tests;

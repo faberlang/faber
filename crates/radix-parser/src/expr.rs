@@ -1827,11 +1827,11 @@ impl Parser {
         self.expect_keyword_ident(TokenKind::Ex, "expected reduction source")?;
         let _source = self.parse_expression()?;
         if self.eat_keyword_ident(TokenKind::Apud) {
-            let _ = self.parse_apud_clause()?;
+            self.parse_apud_clause()?;
         }
         if self.is_keyword_key("filum") {
             self.advance();
-            let _ = self.parse_ident()?;
+            self.parse_ident()?;
         }
         let has_term_body = matches!(
             self.keyword_ident_at(0),
@@ -1839,11 +1839,11 @@ impl Parser {
         ) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
             && self.peek_at(2).kind == TokenKind::LBrace;
         if has_term_body {
-            let _ = self.parse_mutability()?;
-            let _ = self.parse_ident()?;
-            let _ = self.parse_block()?;
+            self.parse_mutability()?;
+            self.parse_ident()?;
+            self.parse_block()?;
         } else if self.eat_keyword_ident(TokenKind::Vel) {
-            let _ = self.parse_expression()?;
+            self.parse_expression()?;
         }
         Err(
             ParseError::structured(ParseErrorKind::DeclarationInvalid, start)

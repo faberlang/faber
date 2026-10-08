@@ -60,7 +60,8 @@ pub(crate) fn permute<T>(items: &mut [T], seed: u64) {
     let mut state = seed ^ (items.len() as u64).wrapping_mul(0x2545_F491_4F6C_DD1D);
     for i in (1..items.len()).rev() {
         state = splitmix64(state);
-        let j = usize::try_from(state % (i as u64 + 1)).expect("index below the slice length");
+        // The remainder is at most `i`, so the conversion cannot fail; `i` is the identity fallback.
+        let j = usize::try_from(state % (i as u64 + 1)).unwrap_or(i);
         items.swap(i, j);
     }
 }

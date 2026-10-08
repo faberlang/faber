@@ -136,7 +136,10 @@ pub(super) fn execute(
         } else {
             manifest_text
         };
-        let written = fs::create_dir_all(source.parent().expect("source parent"))
+        let written = source
+            .parent()
+            .ok_or_else(|| std::io::Error::other("source has no parent directory"))
+            .and_then(fs::create_dir_all)
             .and_then(|()| write_if_changed(&source, code.as_bytes()))
             .and_then(|()| write_if_changed(&manifest, manifest_text.as_bytes()));
         if let Err(error) = written {

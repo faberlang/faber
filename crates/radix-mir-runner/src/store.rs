@@ -17,7 +17,6 @@ use crate::value::{
 use radix_hir::{HirStoreKind, HirStoreSite};
 use radix_lexer::Span;
 use radix_types::{FloatPolicy, NumericWidth, Primitive, Type, TypeId};
-use std::fmt::Write as _;
 
 /// Stable identity of a failed implicit store: distinct from arithmetic
 /// overflow (ruling 5).
@@ -216,9 +215,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 || format!("the expression at bytes {}..{}", from.start, from.end),
                 |text| format!("`{text}`"),
             );
-            let _ = write!(
-                message,
-                "; `{name}` was inferred as `{ty}` from {origin}, declare its type"
+            message = format!(
+                "{message}; `{name}` was inferred as `{ty}` from {origin}, declare its type"
             );
             args.push((
                 "inferred_from".to_owned(),

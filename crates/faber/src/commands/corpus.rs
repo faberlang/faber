@@ -564,10 +564,18 @@ fn load_case(
             manifest_path.display()
         ));
     }
-    let manifest_dir = manifest_path.parent().expect("case.toml has a parent");
+    let manifest_dir = manifest_path
+        .parent()
+        .ok_or_else(|| format!("{} has no parent directory", manifest_path.display()))?;
     let default_id = manifest_dir
         .strip_prefix(cases_root)
-        .expect("case is inside cases root")
+        .map_err(|_| {
+            format!(
+                "{} is not inside the cases root {}",
+                manifest_path.display(),
+                cases_root.display()
+            )
+        })?
         .to_string_lossy()
         .replace('\\', "/");
     let id = manifest.id.take().unwrap_or(default_id);

@@ -448,7 +448,10 @@ impl Walker<'_> {
                 MirTerminatorKind::Goto(_) => at = self.graph.targets[at][0],
                 MirTerminatorKind::Branch { condition, .. } => {
                     let [then_at, else_at] = self.graph.targets[at][..] else {
-                        unreachable!("branch has two targets");
+                        return Err(StructurizeError::UnsupportedTerminator {
+                            block: block.id,
+                            kind: terminator_name(&block.terminator.kind),
+                        });
                     };
                     let join = self.join(then_at, else_at);
                     let arm_stop = join.or(stop);
@@ -464,7 +467,12 @@ impl Walker<'_> {
                         None => break,
                     }
                 }
-                _ => unreachable!("graph build rejects other terminators"),
+                other => {
+                    return Err(StructurizeError::UnsupportedTerminator {
+                        block: block.id,
+                        kind: terminator_name(other),
+                    });
+                }
             }
         }
         Ok(out)

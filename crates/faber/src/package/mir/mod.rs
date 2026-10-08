@@ -442,7 +442,9 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
             let genus_layouts = image.genus_layouts;
             let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
             let dispatcher = SessionKernelDispatcher::new(
-                session.take().expect("session is taken once"),
+                session
+                    .take()
+                    .ok_or_else(|| vec![mir_diag(input, "device session was already consumed")])?,
                 image.artifact,
                 units,
                 validated.validation().types.as_table(),
