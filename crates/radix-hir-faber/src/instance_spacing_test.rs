@@ -112,6 +112,7 @@ fn finge_variant_named_fields_get_inner_brace_spaces() {
     let arg = HirCallArg {
         name: Some(key),
         spread: false,
+        marker: None,
         expr: expr(HirExpressionKind::Literal(HirLiteral::String(value))),
         span: Span::new(0, 0),
     };

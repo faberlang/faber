@@ -30,15 +30,16 @@ fn unnecessary_varia(source: &str) -> usize {
 
 #[test]
 fn varia_passed_only_to_mut_param_is_not_unnecessary() {
-    let source =
-        format!("{POP}incipit {{\n    varia lista<numerus> zs ← [1, 2, 3]\n    pop_unus(zs)\n}}");
+    let source = format!(
+        "{POP}incipit {{\n    varia lista<numerus> zs ← [1, 2, 3]\n    pop_unus(in zs)\n}}"
+    );
     assert_eq!(unnecessary_varia(&source), 0);
 }
 
 #[test]
 fn varia_field_passed_only_to_mut_param_is_not_unnecessary() {
     let source = format!(
-        "genus Cumulus {{\n    varia lista<numerus> xs\n}}\n{POP}incipit {{\n    varia Cumulus c ← Cumulus {{ xs = [1, 2] }}\n    pop_unus(c.xs)\n}}"
+        "genus Cumulus {{\n    varia lista<numerus> xs\n}}\n{POP}incipit {{\n    varia Cumulus c ← Cumulus {{ xs = [1, 2] }}\n    pop_unus(in c.xs)\n}}"
     );
     assert_eq!(unnecessary_varia(&source), 0);
 }

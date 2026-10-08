@@ -99,7 +99,7 @@ fn passing_a_nonmut_tensor_param_to_a_mut_param_is_rejected() {
     dst[[0, 0]] ← 1.0
 }
 fn outer(tf32[2, 3] dst) → void {
-    inner(dst)
+    inner(mut dst)
 }
 main {
 }",
@@ -114,7 +114,7 @@ fn passing_a_mut_tensor_param_to_a_mut_param_is_accepted() {
     dst[[0, 0]] ← 1.0
 }
 fn outer(mut tf32[2, 3] dst) → void {
-    inner(dst)
+    inner(mut dst)
 }
 main {
 }",
@@ -272,7 +272,7 @@ main {
 }
 fn outer(tf32[2, 3] dst) → void {
     var tf32[2, 3] c ← dst
-    inner(c)
+    inner(mut c)
 }
 main {
 }",

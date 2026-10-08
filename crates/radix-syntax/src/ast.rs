@@ -1434,6 +1434,9 @@ pub struct Argument {
     /// Labels are parser-surface metadata and are erased before HIR lowering.
     pub label: Option<Symbol>,
     pub is_spread: bool, // sparge
+    /// Call-site access marker (`ref`/`mut`/`own`/`copy`; Latin `de`/`in`/
+    /// `own`/`copy`) written before the argument expression, when present.
+    pub marker: Option<TypeMode>,
     pub value: Box<Expr>,
     pub span: Span,
 }

@@ -270,7 +270,7 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let resolved = self.resolve_inferred_type(callee_ty);
         if let Some(sig) = self.signature_from_type(resolved) {
-            return self.check_instantiated_call(&sig, explicit_type_args, args, span, None);
+            return self.check_instantiated_call_marked(&sig, explicit_type_args, args, span, None);
         }
 
         if let Some(result) =
@@ -319,7 +319,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) {
-        self.check_call_args_lifting(sig, args, span, false);
+        self.check_call_args_lifting(sig, args, span, false, false);
     }
 
     /// [`Self::check_call_args`] for a call that may be a lifting attempt.
@@ -335,6 +335,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
         user_function: bool,
+        markers: bool,
     ) -> bool {
         let mut lifted = false;
         let required = sig.params.iter().filter(|param| !param.optional).count();
@@ -352,6 +353,9 @@ impl TypeChecker<'_> {
             let previous_shape_argument = self.current_shape_argument.replace(argument as u32);
             let site = argument_site(arg.name);
             let errors_before = self.errors.len();
+            if markers {
+                self.check_call_marker(arg, param);
+            }
             let arg_ty = self.check_store_expr(&mut arg.expr, param.ty, site);
             if self
                 .tensor_edge_policies
@@ -396,6 +400,51 @@ impl TypeChecker<'_> {
             self.current_shape_argument = previous_shape_argument;
         }
         lifted
+    }
+
+    /// Call-site marker agreement (callmark trial): a parameter declared
+    /// `mut`, `own` or `copy` requires the same marker on the argument; a
+    /// read-only parameter takes no marker except the optional explicit `ref`.
+    fn check_call_marker(&mut self, arg: &HirCallArg, param: &ParamType) {
+        use radix_hir::HirArgMarker as Written;
+        use radix_types::AccessMarker as Declared;
+        if arg.spread {
+            return;
+        }
+        let declared = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(param.ty))
+            .0;
+        let required = match declared {
+            Some(Declared::Mut) => Some(Written::Mut),
+            Some(Declared::Own) => Some(Written::Own),
+            Some(Declared::Copy) => Some(Written::Copy),
+            Some(Declared::Ref) | None => None,
+        };
+        let issue = match (required, arg.marker) {
+            (Some(_), None) => crate::ISSUE_CALL_MARKER_MISSING,
+            (Some(need), Some(got)) if need != got => crate::ISSUE_CALL_MARKER_MISMATCH,
+            (None, Some(Written::Mut | Written::Own | Written::Copy)) => {
+                crate::ISSUE_CALL_MARKER_ON_READ_ONLY
+            }
+            _ => return,
+        };
+        let name = |marker: Option<Written>| match marker {
+            Some(Written::Ref) => "ref",
+            Some(Written::Mut) => "mut",
+            Some(Written::Own) => "own",
+            Some(Written::Copy) => "copy",
+            None => "none",
+        };
+        self.error_issue_with_args(
+            SemanticErrorKind::ModeMismatch,
+            issue,
+            arg.span,
+            &[
+                ("expected", name(required).to_owned()),
+                ("found", name(arg.marker).to_owned()),
+            ],
+        );
     }
 
     /// A `mut` scalar parameter borrows the caller's cell: a store through it
@@ -703,7 +752,7 @@ impl TypeChecker<'_> {
                     expected,
                 )
             } else {
-                self.check_instantiated_call(
+                self.check_instantiated_call_marked(
                     &sig,
                     explicit_type_args,
                     args,
@@ -722,7 +771,7 @@ impl TypeChecker<'_> {
             && let Some(sig) = self.signature_from_type(field_ty)
         {
             self.check_field_visibility(receiver_ty, *name, MemberAccess::Read, receiver.span);
-            return self.check_instantiated_call(
+            return self.check_instantiated_call_marked(
                 &sig,
                 explicit_type_args,
                 args,
@@ -739,7 +788,7 @@ impl TypeChecker<'_> {
             if let Some(sig) = self.union_common_method_signature(&members, *name) {
                 self.check_method_visibility(receiver_ty, *name, receiver.span);
                 self.set_chorda_scalar_closure_context(*name);
-                let ret = self.check_instantiated_call(
+                let ret = self.check_instantiated_call_marked(
                     &sig,
                     explicit_type_args,
                     args,
@@ -1455,7 +1504,7 @@ impl TypeChecker<'_> {
 
         let resolved = self.resolve_inferred_type(callee_ty);
         if let Some(sig) = self.signature_from_type(resolved) {
-            return self.check_instantiated_call(
+            return self.check_instantiated_call_marked(
                 &sig,
                 explicit_type_args,
                 args,

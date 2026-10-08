@@ -86,6 +86,33 @@ impl TypeChecker<'_> {
             None,
             None,
             false,
+            false,
+        )
+    }
+
+    /// [`Self::check_instantiated_call`] for a callee with a source-declared
+    /// signature that is not a named function (a method without a stable id,
+    /// an interface method, a function value or a function-typed field):
+    /// call-site access markers are enforced against its parameter modes.
+    pub fn check_instantiated_call_marked(
+        &mut self,
+        sig: &FuncSig,
+        explicit_type_args: &[TypeId],
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        self.check_instantiated_call_impl(
+            sig,
+            explicit_type_args,
+            args,
+            span,
+            expected,
+            true,
+            None,
+            None,
+            false,
+            true,
         )
     }
 
@@ -109,6 +136,7 @@ impl TypeChecker<'_> {
             true,
             None,
             policy_callee,
+            true,
             true,
         )
     }
@@ -135,6 +163,7 @@ impl TypeChecker<'_> {
             Some(callee),
             Some(callee),
             true,
+            true,
         )
     }
 
@@ -160,6 +189,7 @@ impl TypeChecker<'_> {
             None,
             Some(callee),
             false,
+            true,
         )
     }
 
@@ -177,7 +207,18 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) -> TypeId {
-        self.check_instantiated_call_impl(sig, &[], args, span, None, false, None, None, false)
+        self.check_instantiated_call_impl(
+            sig,
+            &[],
+            args,
+            span,
+            None,
+            false,
+            None,
+            None,
+            false,
+            false,
+        )
     }
 
     fn check_instantiated_call_impl(
@@ -191,6 +232,7 @@ impl TypeChecker<'_> {
         callee: Option<radix_hir::DefId>,
         policy_callee: Option<radix_hir::DefId>,
         user_function: bool,
+        markers: bool,
     ) -> TypeId {
         // Size-type Z3 (Q3): `_` extent holes in a callee signature are
         // anonymous size parameters chosen per call. The declared signature
@@ -323,7 +365,7 @@ impl TypeChecker<'_> {
         // diagnosed error. The scalar result type is not the tensor the
         // caller meant, so the call takes the type its context expects
         // instead of cascading a second mismatch.
-        if self.check_call_args_lifting(&sig, args, span, user_function) {
+        if self.check_call_args_lifting(&sig, args, span, user_function, markers) {
             return expected.unwrap_or(self.error_type);
         }
         // A result that only needs a checked integer store to reach the slot

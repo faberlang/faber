@@ -2768,6 +2768,7 @@ impl LibraryMethodCallRewriter<'_> {
         new_args.push(HirCallArg {
             name: None,
             spread: false,
+            marker: None,
             expr: receiver.clone(),
             span: receiver.span,
         });

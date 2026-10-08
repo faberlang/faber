@@ -502,7 +502,7 @@ fn reduction_call(
     combine: HirExpression,
     seed: HirExpression,
 ) -> HirExpression {
-    let arg = |expr: HirExpression| HirCallArg { name: None, spread: false, span: expr.span, expr };
+    let arg = |expr: HirExpression| HirCallArg { name: None, spread: false, marker: None, span: expr.span, expr };
     HirExpression {
         id: HirId(id),
         kind: HirExpressionKind::MethodCall(
@@ -767,7 +767,7 @@ fn gate_call(id: u32, callee: HirExpression, args: Vec<HirExpression>) -> HirExp
             Box::new(callee),
             Vec::new(),
             args.into_iter()
-                .map(|arg| HirCallArg { name: None, spread: false, span: arg.span, expr: arg })
+                .map(|arg| HirCallArg { name: None, spread: false, marker: None, span: arg.span, expr: arg })
                 .collect(),
             None,
         ),

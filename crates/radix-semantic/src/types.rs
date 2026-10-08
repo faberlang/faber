@@ -44,6 +44,15 @@ pub const ISSUE_ASSIGN_THROUGH_REF: &str = "assign_through_ref";
 /// Passing a `ref` value into a `mut` or `own` position.
 pub const ISSUE_REF_TO_MUT_OR_OWN_POSITION: &str = "ref_to_mut_or_own_position";
 
+/// Call argument lacks the marker its `mut`/`own`/`copy` parameter declares.
+pub const ISSUE_CALL_MARKER_MISSING: &str = "call_marker_missing";
+
+/// Call argument marker disagrees with the parameter's declared marker.
+pub const ISSUE_CALL_MARKER_MISMATCH: &str = "call_marker_mismatch";
+
+/// Call argument carries `mut`/`own`/`copy` against a read-only parameter.
+pub const ISSUE_CALL_MARKER_ON_READ_ONLY: &str = "call_marker_on_read_only";
+
 /// Own-bind from a live unmarked source. Suggest `copy` (D-6).
 pub const ISSUE_UNMARKED_INTO_OWN: &str = "unmarked_into_own";
 

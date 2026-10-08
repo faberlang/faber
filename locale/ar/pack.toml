@@ -2773,6 +2773,18 @@ help = "طابق parameter modes بين caller و callee"
 message = "cannot pass a `ref` value to a `mut` or `own` position"
 help = "pass a `mut` or `own` value, or bind through `copy`"
 
+[diagnostics.SEM057.issues.call_marker_missing]
+message = "this argument needs the `{expected}` marker its parameter declares"
+help = "write the same access marker at the call as in the signature, for example `f(mut x)`"
+
+[diagnostics.SEM057.issues.call_marker_mismatch]
+message = "this argument is marked `{found}` but its parameter is declared `{expected}`"
+help = "use the same access marker at the call as in the signature"
+
+[diagnostics.SEM057.issues.call_marker_on_read_only]
+message = "a read-only parameter takes no `{found}` marker"
+help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"
 help = "bind through `copy` to duplicate the source"

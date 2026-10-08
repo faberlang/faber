@@ -1675,6 +1675,10 @@ mod enum_union_trivia_test;
 mod claim_test;
 
 #[cfg(test)]
+#[path = "call_marker_test.rs"]
+mod call_marker_test;
+
+#[cfg(test)]
 #[path = "generic_call_test.rs"]
 mod generic_call_test;
 

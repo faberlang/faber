@@ -326,6 +326,7 @@ impl Lowerer<'_> {
                     vec![radix_hir::HirCallArg {
                         name: None,
                         spread: false,
+                        marker: None,
                         expr: count,
                         span: rest_ident.span,
                     }],

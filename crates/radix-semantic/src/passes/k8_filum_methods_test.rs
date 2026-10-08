@@ -109,7 +109,7 @@ genus Stencil {
 
     @ nucleum
     functio put_via_function(numerus at, f32 v) → vacuum {
-        field_store(ego.data, at, v)
+        field_store(in ego.data, at, v)
     }
 
     functio host_method(f32 x) → f32 {
@@ -169,7 +169,7 @@ const OVER_SRC: &str = "varia Stencil t ← Stencil { data = src, gain = 2.0 }";
 
 #[test]
 fn method_writing_a_mut_tensor_param_at_the_loop_coordinate_is_accepted() {
-    accepted(&kernel(OVER_SRC, "t.put_into(out, i, value)"));
+    accepted(&kernel(OVER_SRC, "t.put_into(in out, i, value)"));
 }
 
 #[test]
@@ -364,13 +364,13 @@ functio k(in {GRID} out, de {GRID} src) → vacuum {{
 #[test]
 fn public_kernel_called_from_a_kernel_is_accepted() {
     accepted(&function_kernel(SHOWN, "out[i] ← shown(value)"));
-    accepted(&function_kernel(SHOWN, "shown_store(out, i, value)"));
+    accepted(&function_kernel(SHOWN, "shown_store(in out, i, value)"));
 }
 
 #[test]
 fn public_kernel_writing_elsewhere_is_rejected() {
     rejected(
-        &function_kernel(SHOWN, "shown_store(out, 0, value)"),
+        &function_kernel(SHOWN, "shown_store(in out, 0, value)"),
         "write_not_own_coordinate",
     );
 }
@@ -383,7 +383,7 @@ fn public_kernel_writing_elsewhere_is_rejected() {
 fn overlapping_mut_arguments_of_a_method_call_are_declined_by_the_pass() {
     // The call-site borrow rule does not check a user-method call's
     // arguments: the proof must not lean on it.
-    let source = kernel(OVER_OUT, "s.both(out, out, i)");
+    let source = kernel(OVER_OUT, "s.both(in out, in out, i)");
     let result = analyze_source(&source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
@@ -401,7 +401,7 @@ fn overlapping_mut_arguments_of_a_method_call_are_declined_by_the_pass() {
 functio k(in {GRID} out, in {GRID} aux, de {GRID} src) → vacuum {{
     varia Stencil s ← Stencil {{ data = src, gain = 2.0 }}
     itera ex src apud [i] filum lane fixum value {{
-        s.both(out, aux, i)
+        s.both(in out, in aux, i)
     }}
 }}
 "
@@ -411,7 +411,7 @@ functio k(in {GRID} out, in {GRID} aux, de {GRID} src) → vacuum {{
 #[test]
 fn receiver_field_overlapping_a_method_argument_is_declined() {
     rejected(
-        &kernel(OVER_OUT, "s.put_into(out, i, value)"),
+        &kernel(OVER_OUT, "s.put_into(in out, i, value)"),
         "overlapping_call_arguments",
     );
 }
@@ -426,7 +426,7 @@ functio both(in tensor<f32, [4]> left, in tensor<f32, [4]> right, numerus at) �
     right[at] ← 2.0
 }
 ",
-        "both(out, out, i)",
+        "both(in out, in out, i)",
     ));
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(

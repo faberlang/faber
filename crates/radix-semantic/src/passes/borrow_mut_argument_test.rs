@@ -47,11 +47,11 @@ fn assert_rejects(source: &str) {
 fn const_list_into_mut_param_is_rejected() {
     assert_rejects(&program(
         "",
-        "    const list<int> a ← [1, 2]\n    bl(a)\n    print a",
+        "    const list<int> a ← [1, 2]\n    bl(mut a)\n    print a",
     ));
     assert_accepts(&program(
         "",
-        "    var list<int> a ← [1, 2]\n    bl(a)\n    print a",
+        "    var list<int> a ← [1, 2]\n    bl(mut a)\n    print a",
     ));
 }
 
@@ -59,11 +59,11 @@ fn const_list_into_mut_param_is_rejected() {
 fn const_tensor_into_mut_param_is_rejected() {
     assert_rejects(&program(
         "",
-        "    const tf32[2] a ← tf32[2] {}\n    bt(a)\n    print a[0]",
+        "    const tf32[2] a ← tf32[2] {}\n    bt(mut a)\n    print a[0]",
     ));
     assert_accepts(&program(
         "",
-        "    var tf32[2] a ← tf32[2] {}\n    bt(a)\n    print a[0]",
+        "    var tf32[2] a ← tf32[2] {}\n    bt(mut a)\n    print a[0]",
     ));
 }
 
@@ -71,33 +71,39 @@ fn const_tensor_into_mut_param_is_rejected() {
 fn const_object_into_mut_param_is_rejected() {
     assert_rejects(&program(
         "",
-        "    const Counter a ← Counter {}\n    bc(a)\n    print a.n",
+        "    const Counter a ← Counter {}\n    bc(mut a)\n    print a.n",
     ));
     assert_accepts(&program(
         "",
-        "    var Counter a ← Counter {}\n    bc(a)\n    print a.n",
+        "    var Counter a ← Counter {}\n    bc(mut a)\n    print a.n",
     ));
 }
 
 #[test]
 fn const_scalar_into_mut_param_is_rejected() {
-    assert_rejects(&program("", "    const int a ← 1\n    bi(a)\n    print a"));
-    assert_accepts(&program("", "    var int a ← 1\n    bi(a)\n    print a"));
+    assert_rejects(&program(
+        "",
+        "    const int a ← 1\n    bi(mut a)\n    print a",
+    ));
+    assert_accepts(&program(
+        "",
+        "    var int a ← 1\n    bi(mut a)\n    print a",
+    ));
 }
 
 #[test]
 fn field_of_const_object_into_mut_param_is_rejected() {
-    let main = "    const Holder h ← Holder {}\n    bc(h.c)\n    bl(h.xs)";
+    let main = "    const Holder h ← Holder {}\n    bc(mut h.c)\n    bl(mut h.xs)";
     assert_rejects(&program("", main));
-    let main = "    var Holder h ← Holder {}\n    bc(h.c)\n    bl(h.xs)";
+    let main = "    var Holder h ← Holder {}\n    bc(mut h.c)\n    bl(mut h.xs)";
     assert_accepts(&program("", main));
 }
 
 #[test]
 fn element_of_const_list_into_mut_param_is_rejected() {
-    let main = "    const list<int> a ← [1, 2]\n    bi(a[0])";
+    let main = "    const list<int> a ← [1, 2]\n    bi(mut a[0])";
     assert_rejects(&program("", main));
-    let main = "    var list<int> a ← [1, 2]\n    bi(a[0])";
+    let main = "    var list<int> a ← [1, 2]\n    bi(mut a[0])";
     assert_accepts(&program("", main));
 }
 
@@ -136,7 +142,7 @@ fn unmarked_param_forwarded_to_mut_param_is_rejected() {
             NOT_WRITABLE,
         ),
     ] {
-        let fns = format!("fn fwd({ty} p) → void {{\n    {callee}(p)\n}}\n");
+        let fns = format!("fn fwd({ty} p) → void {{\n    {callee}(mut p)\n}}\n");
         let main = format!("    var {ty} a ← {value}\n    fwd(a)");
         let result = analyze_en(&program(&fns, &main));
         assert!(
@@ -147,20 +153,24 @@ fn unmarked_param_forwarded_to_mut_param_is_rejected() {
             "{ty}: expected {expected}, got: {:?}",
             result.diagnostics
         );
-        let fns = format!("fn fwd(mut {ty} p) → void {{\n    {callee}(p)\n}}\n");
+        let fns = format!("fn fwd(mut {ty} p) → void {{\n    {callee}(mut p)\n}}\n");
+        let main = format!("    var {ty} a ← {value}\n    fwd(mut a)");
         assert_accepts(&program(&fns, &main));
     }
 }
 
 #[test]
 fn mut_param_field_and_element_are_writable() {
-    let fns = "fn fwd(mut Holder h) → void {\n    bc(h.c)\n    bl(h.xs)\n}\n";
-    assert_accepts(&program(fns, "    var Holder h ← Holder {}\n    fwd(h)"));
+    let fns = "fn fwd(mut Holder h) → void {\n    bc(mut h.c)\n    bl(mut h.xs)\n}\n";
+    assert_accepts(&program(
+        fns,
+        "    var Holder h ← Holder {}\n    fwd(mut h)",
+    ));
 }
 
 #[test]
 fn temporary_into_mut_param_is_rejected() {
-    assert_rejects(&program("", "    bl([1, 2])"));
-    assert_rejects(&program("", "    bi(3)"));
-    assert_rejects(&program("", "    bc(Counter {})"));
+    assert_rejects(&program("", "    bl(mut [1, 2])"));
+    assert_rejects(&program("", "    bi(mut 3)"));
+    assert_rejects(&program("", "    bc(mut Counter {})"));
 }

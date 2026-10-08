@@ -1114,12 +1114,12 @@ impl FunctionBuilder<'_> {
         match (&lhs_ty, &rhs_ty) {
             (Type::Tensor(..), Type::Tensor(..)) => self.lower_glyph_collection_op(lhs, method_name, rhs, expr),
             (Type::Vector(..), Type::Vector(..)) => {
-                let arg = HirCallArg { name: None, spread: false, expr: rhs.clone(), span: rhs.span };
+                let arg = HirCallArg { name: None, spread: false, marker: None, expr: rhs.clone(), span: rhs.span };
                 self.lower_vector_method(lhs, method_name, std::slice::from_ref(&arg), expr)
                     .flatten()
             }
             (Type::Matrix(..), Type::Matrix(..) | Type::Vector(..)) => {
-                let arg = HirCallArg { name: None, spread: false, expr: rhs.clone(), span: rhs.span };
+                let arg = HirCallArg { name: None, spread: false, marker: None, expr: rhs.clone(), span: rhs.span };
                 self.lower_matrix_method(lhs, method_name, std::slice::from_ref(&arg), expr)
             }
             _ => {

@@ -1143,6 +1143,7 @@ fn inferred_callee_nested_argument_emits_one_argument_mismatch_diagnostic() {
             vec![HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(22),
                     kind: HirExpressionKind::Literal(HirLiteral::String(radix_lexer::Symbol(99))),
@@ -1219,6 +1220,7 @@ fn inferred_callee_nested_argument_emits_one_argument_mismatch_diagnostic() {
                     vec![HirCallArg {
                         name: None,
                         spread: false,
+                        marker: None,
                         expr: bad_call,
                         span: test_span(),
                     }],
@@ -1476,6 +1478,7 @@ fn variant_call_reports_missing_field_metadata() {
     let mut args = vec![HirCallArg {
         name: None,
         spread: false,
+        marker: None,
         expr: literal_int(1, 1),
         span: test_span(),
     }];

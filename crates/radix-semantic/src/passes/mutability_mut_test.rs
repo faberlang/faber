@@ -76,7 +76,7 @@ functio poke(in lista<numerus> xs) → vacuum {
 }
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    poke(a)
+    poke(in a)
 }
 ",
     );
@@ -185,7 +185,7 @@ functio swap(in lista<numerus> a, in lista<numerus> b) → vacuum {
 }
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    swap(xs, xs)
+    swap(in xs, in xs)
 }
 ",
         "mutable_borrow_conflict",
@@ -198,7 +198,7 @@ functio swap(in lista<numerus> a, in lista<numerus> b) → vacuum {
 }
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    swap(xs, xs)
+    swap(in xs, in xs)
 }
 ",
         "mutable_borrow_conflict",
@@ -214,7 +214,7 @@ functio poke(in lista<numerus> xs) → vacuum {
 }
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    poke(a)
+    poke(in a)
     nota a.longitudo()
 }
 ",
@@ -271,7 +271,7 @@ functio swap(in numerus a, in numerus b) → vacuum {
 incipit {
     varia numerus x ← 1
     varia numerus y ← 2
-    swap(x, y)
+    swap(in x, in y)
     nota x
     nota y
 }
@@ -289,7 +289,7 @@ functio copy_then_set(in numerus a, in numerus b) → vacuum {
 incipit {
     varia numerus x ← 1
     varia numerus y ← 2
-    copy_then_set(x, y)
+    copy_then_set(in x, in y)
 }
 ";
     let _ = analyze_ok(source);
@@ -309,7 +309,7 @@ incipit {
     varia numerus x ← 1
     varia numerus y ← 2
     varia numerus z ← 3
-    rotate(x, y, z)
+    rotate(in x, in y, in z)
 }
 ";
     let _ = analyze_ok(source);
@@ -326,7 +326,7 @@ functio swap(in numerus a, in numerus b) → vacuum {
 }
 incipit {
     varia numerus x ← 1
-    swap(x, x)
+    swap(in x, in x)
 }
 ";
     assert_rejects_with_issue(source, "mutable_borrow_conflict");
@@ -342,7 +342,7 @@ functio swap(in numerus a, in numerus b) → vacuum {
 }
 incipit {
     varia numerus x ← 1
-    swap(x, x)
+    swap(in x, in x)
 }
 ",
     );
@@ -367,7 +367,7 @@ functio setit(in numerus x) → vacuum {
 }
 incipit {
     varia u8 small ← 7
-    setit(small)
+    setit(in small)
     nota small
 }
 ";
@@ -383,7 +383,7 @@ functio setit(in u8 x) → vacuum {
 }
 incipit {
     varia u8 small ← 7
-    setit(small)
+    setit(in small)
     nota small
 }
 ",
@@ -395,7 +395,7 @@ functio setit(in numerus x) → vacuum {
 }
 incipit {
     varia numerus big ← 7
-    setit(big)
+    setit(in big)
     nota big
 }
 ",

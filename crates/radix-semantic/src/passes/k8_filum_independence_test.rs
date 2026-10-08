@@ -63,7 +63,7 @@ incipit {
     varia tensor<numerus, [4]> grid ← vacua
     itera ex grid apud [i] filum lane fixum value {
         grid[i] ← value
-        poke(grid)
+        poke(in grid)
     }
 }",
         "unproved_call_effect",

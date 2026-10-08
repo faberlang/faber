@@ -44,7 +44,7 @@ functio append(copy lista<numerus> xs) → vacuum {
 }
 incipit {
     fixum own lista<numerus> source ← [1, 2, 3]
-    append(source)
+    append(copy source)
     nota source.longitudo()
 }
 ",
@@ -61,7 +61,7 @@ functio take(own lista<numerus> xs) → vacuum {
 incipit {
     fixum lista<numerus> source ← [1, 2, 3]
     fixum copy lista<numerus> copied ← source
-    take(copied)
+    take(own copied)
     nota source.longitudo()
 }
 ",

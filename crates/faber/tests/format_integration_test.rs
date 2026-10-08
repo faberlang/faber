@@ -233,3 +233,32 @@ fn format_cmd_keeps_numeric_twin_spellings() {
         "authored twin spellings must survive a second format pass"
     );
 }
+
+#[test]
+fn format_cmd_keeps_call_site_access_markers() {
+    let temp_root = TempDir::new("faber-format", "call-markers");
+    let fixture = temp_root.join("markers.fab");
+    fs::write(
+        &fixture,
+        concat!(
+            "+++\nlocale = \"en\"\n+++\n",
+            "fn bump(mut list<int> a) → void {\n    a.append(1)\n}\n",
+            "fn dup(copy list<int> a) → void {\n    print a.length()\n}\n",
+            "fn look(list<int> a) → void {\n    print a.length()\n}\n\n",
+            "main {\n    var list<int> xs ← [1]\n",
+            "    bump(mut xs)\n    dup(copy xs)\n    look(ref xs)\n    look(xs)\n}\n",
+        ),
+    )
+    .expect("write marker fixture");
+
+    let formatted = run_faber_format_stdout(&fixture);
+    let body = body_for_parse(&formatted);
+    for authored in ["bump(mut xs)", "dup(copy xs)", "look(ref xs)", "look(xs)"] {
+        assert!(
+            body.contains(authored),
+            "format must keep the call-site marker in `{authored}`:\n{formatted}"
+        );
+    }
+    assert_canonical_reparses_with(body, "call markers CLI --stdout", Some(&english_pack()))
+        .expect("reparse");
+}

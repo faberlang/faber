@@ -270,6 +270,9 @@ mod mutability_copy_test;
 mod mutability_mut_test;
 
 #[cfg(test)]
+#[path = "call_marker_test.rs"]
+mod call_marker_test;
+#[cfg(test)]
 #[path = "param_mode_test.rs"]
 mod param_mode_test;
 

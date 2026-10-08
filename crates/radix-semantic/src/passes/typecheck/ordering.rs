@@ -262,6 +262,7 @@ impl TypeChecker<'_> {
             vec![HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: other,
                 span: arg_span,
             }],

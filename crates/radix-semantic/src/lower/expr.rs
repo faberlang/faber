@@ -404,6 +404,7 @@ impl Lowerer<'_> {
                 vec![HirCallArg {
                     name: None,
                     spread: false,
+                    marker: None,
                     span: rhs.span,
                     expr: rhs,
                 }],
@@ -706,12 +707,14 @@ impl Lowerer<'_> {
                         HirCallArg {
                             name: None,
                             spread: false,
+                            marker: None,
                             expr: fill,
                             span,
                         },
                         HirCallArg {
                             name: None,
                             spread: false,
+                            marker: None,
                             expr: extents_array,
                             span,
                         },
@@ -851,6 +854,12 @@ impl Lowerer<'_> {
                 HirCallArg {
                     name: None,
                     spread: arg.is_spread,
+                    marker: arg.marker.map(|mode| match mode {
+                        radix_syntax::TypeMode::De => radix_hir::HirArgMarker::Ref,
+                        radix_syntax::TypeMode::In => radix_hir::HirArgMarker::Mut,
+                        radix_syntax::TypeMode::Own => radix_hir::HirArgMarker::Own,
+                        radix_syntax::TypeMode::Copy => radix_hir::HirArgMarker::Copy,
+                    }),
                     expr: lower_expr(self, &arg.value),
                     span: arg.span,
                 }
@@ -1596,6 +1605,7 @@ impl Lowerer<'_> {
             .map(|field| HirCallArg {
                 name: Some(field.name.name),
                 spread: false,
+                marker: None,
                 expr: lower_expr(self, &field.value),
                 span: field.span,
             })
@@ -1942,6 +1952,7 @@ impl Lowerer<'_> {
         args.push(HirCallArg {
             name: None,
             spread: false,
+            marker: None,
             expr: HirExpression {
                 id: self.next_hir_id(),
                 kind: HirExpressionKind::Literal(HirLiteral::String(scriptum.template)),
@@ -1955,6 +1966,7 @@ impl Lowerer<'_> {
             args.push(HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr,
                 span: arg.span,
             });

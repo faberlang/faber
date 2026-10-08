@@ -48,6 +48,7 @@ impl KeywordSurface for TestSurface {
             TokenKind::Ex => "ex",
             TokenKind::Finge => "finge",
             TokenKind::Futurum => "futurum",
+            TokenKind::Copy => "copy",
             TokenKind::Importa => "importa",
             TokenKind::In => "in",
             TokenKind::Magnitudo => "magnitudo",
@@ -180,6 +181,7 @@ fn call_arg(expr: HirExpression) -> HirCallArg {
     HirCallArg {
         name: None,
         spread: false,
+        marker: None,
         expr,
         span: span(),
     }
@@ -488,12 +490,14 @@ fn expression_item_lists_emit_between_only() {
                 HirCallArg {
                     name: Some(interner.intern("x")),
                     spread: false,
+                    marker: None,
                     expr: int(&interner, 1),
                     span: span(),
                 },
                 HirCallArg {
                     name: Some(interner.intern("y")),
                     spread: false,
+                    marker: None,
                     expr: int(&interner, 2),
                     span: span(),
                 },
@@ -1003,5 +1007,41 @@ fn tuple_without_type_args_derives_iuncta_prefix_from_expression_type() {
     assert_eq!(
         render_expr(&FaberCodegen::new(&types, &interner), &untyped),
         "[1]"
+    );
+}
+
+#[test]
+fn call_site_access_markers_are_emitted_before_the_argument() {
+    let interner = Interner::new();
+    let types = TypeTable::new();
+    let marked = |marker, value| HirCallArg {
+        marker,
+        ..call_arg(int(&interner, value))
+    };
+    let call = HirExpression {
+        id: radix_hir::HirId(40),
+        kind: HirExpressionKind::Call(
+            Box::new(HirExpression {
+                id: radix_hir::HirId(41),
+                kind: HirExpressionKind::Path(DefId(31)),
+                ty: None,
+                span: span(),
+            }),
+            Vec::new(),
+            vec![
+                marked(Some(radix_hir::HirArgMarker::Mut), 1),
+                marked(Some(radix_hir::HirArgMarker::Own), 2),
+                marked(Some(radix_hir::HirArgMarker::Copy), 3),
+                marked(Some(radix_hir::HirArgMarker::Ref), 4),
+                marked(None, 5),
+            ],
+            None,
+        ),
+        ty: None,
+        span: span(),
+    };
+    assert_eq!(
+        render_expr(&FaberCodegen::new(&types, &interner), &call),
+        "def_31(in 1, own 2, copy 3, de 4, 5)"
     );
 }

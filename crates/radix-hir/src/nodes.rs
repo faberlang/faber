@@ -1179,8 +1179,25 @@ pub struct HirCallArg {
 
     /// Whether the source argument used `sparge`.
     pub spread: bool,
+
+    /// Call-site access marker written on this argument, when present.
+    #[serde(default)]
+    pub marker: Option<HirArgMarker>,
     pub expr: HirExpression,
     pub span: Span,
+}
+
+/// Access marker written at a call argument (`ref x`, `mut x`, `own x`, `copy x`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirArgMarker {
+    /// `ref` / `de`: the explicit spelling of the read-only default.
+    Ref,
+    /// `mut` / `in`.
+    Mut,
+    /// `own`.
+    Own,
+    /// `copy`.
+    Copy,
 }
 
 /// Recoverable error handler binding and body.
@@ -1827,6 +1844,7 @@ impl HirConversioRoute {
                 vec![HirCallArg {
                     name: None,
                     spread: false,
+                    marker: None,
                     expr: source.clone(),
                     span: source.span,
                 }],

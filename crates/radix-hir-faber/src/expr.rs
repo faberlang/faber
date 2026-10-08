@@ -1662,6 +1662,15 @@ impl super::FaberCodegen<'_> {
             if idx > 0 {
                 writer.write(", ");
             }
+            if let Some(marker) = arg.marker {
+                writer.write(surface.keyword(match marker {
+                    radix_hir::HirArgMarker::Ref => TokenKind::De,
+                    radix_hir::HirArgMarker::Mut => TokenKind::In,
+                    radix_hir::HirArgMarker::Own => TokenKind::Own,
+                    radix_hir::HirArgMarker::Copy => TokenKind::Copy,
+                }));
+                writer.write(" ");
+            }
             if arg.spread {
                 writer.write(surface.keyword(TokenKind::Sparge));
                 writer.write(" ");

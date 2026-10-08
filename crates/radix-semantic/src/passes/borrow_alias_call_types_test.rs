@@ -130,15 +130,15 @@ const ALL: [&Carrier; 3] = [&LIST, &MAP, &GENUS];
 #[test]
 fn direct_spelling_is_rejected() {
     for c in ALL {
-        assert_rejects(c, "    mut_read(g, g)", "use_while_mutably_borrowed");
-        assert_rejects(c, "    mut_mut(g, g)", "mutable_borrow_conflict");
+        assert_rejects(c, "    mut_read(mut g, g)", "use_while_mutably_borrowed");
+        assert_rejects(c, "    mut_mut(mut g, mut g)", "mutable_borrow_conflict");
     }
 }
 
 #[test]
 fn mut_then_aliased_read_argument_is_rejected() {
     for c in ALL {
-        let body = bind(c, "alias", "g") + "    mut_read(g, alias)";
+        let body = bind(c, "alias", "g") + "    mut_read(mut g, alias)";
         assert_rejects(c, &body, "use_while_mutably_borrowed");
     }
 }
@@ -146,7 +146,7 @@ fn mut_then_aliased_read_argument_is_rejected() {
 #[test]
 fn aliased_mut_then_read_argument_is_rejected() {
     for c in ALL {
-        let body = bind(c, "alias", "g") + "    mut_read(alias, g)";
+        let body = bind(c, "alias", "g") + "    mut_read(mut alias, g)";
         assert_rejects(c, &body, "use_while_mutably_borrowed");
     }
 }
@@ -154,9 +154,9 @@ fn aliased_mut_then_read_argument_is_rejected() {
 #[test]
 fn mut_and_ref_arguments_through_an_alias_are_shared_borrow_conflicts() {
     for c in ALL {
-        let body = bind(c, "alias", "g") + "    mut_ref(g, alias)";
+        let body = bind(c, "alias", "g") + "    mut_ref(mut g, alias)";
         assert_rejects(c, &body, "shared_borrow_conflict");
-        let body = bind(c, "alias", "g") + "    mut_ref(alias, g)";
+        let body = bind(c, "alias", "g") + "    mut_ref(mut alias, g)";
         assert_rejects(c, &body, "shared_borrow_conflict");
     }
 }
@@ -164,9 +164,9 @@ fn mut_and_ref_arguments_through_an_alias_are_shared_borrow_conflicts() {
 #[test]
 fn two_mut_arguments_through_an_alias_are_rejected() {
     for c in ALL {
-        let body = bind(c, "alias", "g") + "    mut_mut(g, alias)";
+        let body = bind(c, "alias", "g") + "    mut_mut(mut g, mut alias)";
         assert_rejects(c, &body, "mutable_borrow_conflict");
-        let body = bind(c, "alias", "g") + "    mut_mut(alias, g)";
+        let body = bind(c, "alias", "g") + "    mut_mut(mut alias, mut g)";
         assert_rejects(c, &body, "mutable_borrow_conflict");
     }
 }
@@ -174,7 +174,8 @@ fn two_mut_arguments_through_an_alias_are_rejected() {
 #[test]
 fn two_aliases_of_one_value_overlap() {
     for c in ALL {
-        let body = bind(c, "left", "g") + &bind(c, "right", "g") + "    mut_mut(left, right)";
+        let body =
+            bind(c, "left", "g") + &bind(c, "right", "g") + "    mut_mut(mut left, mut right)";
         assert_rejects(c, &body, "mutable_borrow_conflict");
     }
 }
@@ -182,9 +183,11 @@ fn two_aliases_of_one_value_overlap() {
 #[test]
 fn alias_of_an_alias_overlaps_transitively() {
     for c in ALL {
-        let body = bind(c, "alias", "g") + &bind(c, "again", "alias") + "    mut_mut(g, again)";
+        let body =
+            bind(c, "alias", "g") + &bind(c, "again", "alias") + "    mut_mut(mut g, mut again)";
         assert_rejects(c, &body, "mutable_borrow_conflict");
-        let body = bind(c, "alias", "g") + &bind(c, "again", "alias") + "    mut_read(again, g)";
+        let body =
+            bind(c, "alias", "g") + &bind(c, "again", "alias") + "    mut_read(mut again, g)";
         assert_rejects(c, &body, "use_while_mutably_borrowed");
     }
 }
@@ -207,16 +210,19 @@ fn aliased_read_arguments_stay_legal() {
 fn copy_bind_does_not_alias() {
     for c in ALL {
         let dup = format!("    var copy {} dup ← g\n", c.ty);
-        assert_accepts(c, &(dup.clone() + "    mut_read(g, dup)"));
-        assert_accepts(c, &(dup.clone() + "    mut_read(dup, g)"));
-        assert_accepts(c, &(dup + "    mut_mut(g, dup)"));
+        assert_accepts(c, &(dup.clone() + "    mut_read(mut g, dup)"));
+        assert_accepts(c, &(dup.clone() + "    mut_read(mut dup, g)"));
+        assert_accepts(c, &(dup + "    mut_mut(mut g, mut dup)"));
     }
 }
 
 #[test]
 fn own_bind_does_not_alias() {
     for c in ALL {
-        let body = format!("    const own {} taken ← g\n    mut_mut(g, taken)", c.ty);
+        let body = format!(
+            "    const own {} taken ← g\n    mut_mut(mut g, mut taken)",
+            c.ty
+        );
         let found = errors_of(&program(c, &body));
         assert!(
             !found.iter().any(|(_, issue)| matches!(
@@ -232,11 +238,11 @@ fn own_bind_does_not_alias() {
 #[test]
 fn alias_of_another_value_does_not_overlap_this_one() {
     for c in ALL {
-        let body = bind(c, "alias", "fresh") + "    mut_read(g, alias)";
+        let body = bind(c, "alias", "fresh") + "    mut_read(mut g, alias)";
         assert_accepts(c, &body);
-        let body = bind(c, "alias", "fresh") + "    mut_mut(alias, g)";
+        let body = bind(c, "alias", "fresh") + "    mut_mut(mut alias, mut g)";
         assert_accepts(c, &body);
-        let body = bind(c, "alias", "g") + "    mut_mut(alias, fresh)";
+        let body = bind(c, "alias", "g") + "    mut_mut(mut alias, mut fresh)";
         assert_accepts(c, &body);
     }
 }
@@ -245,7 +251,7 @@ fn alias_of_another_value_does_not_overlap_this_one() {
 fn sequential_calls_release_call_scoped_borrows() {
     for c in ALL {
         let body = bind(c, "alias", "g")
-            + "    mut_read(g, fresh)\n    mut_read(alias, fresh)\n    mut_mut(fresh, g)\n    mut_read(fresh, alias)";
+            + "    mut_read(mut g, fresh)\n    mut_read(mut alias, fresh)\n    mut_mut(mut fresh, mut g)\n    mut_read(mut fresh, alias)";
         assert_accepts(c, &body);
     }
 }
@@ -263,8 +269,8 @@ fn number_bind_is_a_copy_not_an_alias() {
 main {
     var int g ← 1
     var int copy_of_g ← g
-    bump(g, copy_of_g)
-    bump(copy_of_g, g)
+    bump(mut g, copy_of_g)
+    bump(mut copy_of_g, g)
 }
 ";
     let found = errors_of(source);
@@ -280,8 +286,8 @@ fn text_bind_is_a_copy_not_an_alias() {
 main {
     var string s ← "a"
     var string copy_of_s ← s
-    join(s, copy_of_s)
-    join(copy_of_s, s)
+    join(mut s, copy_of_s)
+    join(mut copy_of_s, s)
 }
 "#;
     let found = errors_of(source);

@@ -802,6 +802,7 @@ fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
     let arg = |id, value, spread| HirCallArg {
         name: None,
         spread,
+        marker: None,
         expr: HirExpression {
             id: crate::hir::HirId(id),
             kind: HirExpressionKind::Literal(HirLiteral::Int(value)),

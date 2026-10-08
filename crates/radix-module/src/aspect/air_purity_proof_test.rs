@@ -28,7 +28,7 @@ fn call(id: u32, callee: HirExpression, args: Vec<HirExpression>) -> HirExpressi
             Box::new(callee),
             Vec::new(),
             args.into_iter()
-                .map(|arg| HirCallArg { name: None, spread: false, span: arg.span, expr: arg })
+                .map(|arg| HirCallArg { name: None, spread: false, marker: None, span: arg.span, expr: arg })
                 .collect(),
             None,
         ),
@@ -221,6 +221,7 @@ fn gate_rejected_shapes_carry_no_obligation() {
             vec![HirCallArg {
                 name: Some(crate::lexer::Symbol(9)),
                 spread: false,
+                marker: None,
                 span: Span::new(0, 1),
                 expr: int_expr(10, 1),
             }],
@@ -241,7 +242,7 @@ fn gate_rejected_shapes_carry_no_obligation() {
         HirExpressionKind::Call(
             Box::new(path_expr(15, 700)),
             Vec::new(),
-            vec![HirCallArg { name: None, spread: true, span: Span::new(0, 1), expr: int_expr(16, 1) }],
+            vec![HirCallArg { name: None, spread: true, marker: None, span: Span::new(0, 1), expr: int_expr(16, 1) }],
             None,
         ),
     );

@@ -160,7 +160,7 @@ fn args_present_returns_none() {
             Box::new(receiver),
             SYM_CURSOR,
             Vec::new(),
-            vec![HirCallArg { name: None, spread: false, expr: arg, span: test_span() }],
+            vec![HirCallArg { name: None, spread: false, marker: None, expr: arg, span: test_span() }],
             None,
         ),
         ty: None,

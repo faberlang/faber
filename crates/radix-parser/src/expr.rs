@@ -2791,6 +2791,7 @@ impl Parser {
                 (None, None)
             };
 
+            let marker = self.parse_argument_marker();
             let spread = self.eat_keyword_ident(TokenKind::Sparge);
             if label.is_some() && spread {
                 return Err(ParseError::structured(
@@ -2830,6 +2831,7 @@ impl Parser {
             args.push(Argument {
                 label,
                 is_spread: spread,
+                marker,
                 value,
                 span,
             });
@@ -2840,6 +2842,45 @@ impl Parser {
         }
 
         Ok(args)
+    }
+
+    /// Parse an optional call-site access marker (`ref`/`mut`/`own`/`copy`;
+    /// Latin `de`/`in`/`own`/`copy`) before an argument expression.
+    ///
+    /// The word is a marker only when an expression start follows (an
+    /// identifier, literal or `[`) and the pair is not the head of a compact closure
+    /// (`in x ∴ body`); otherwise it stays an ordinary identifier argument.
+    fn parse_argument_marker(&mut self) -> Option<TypeMode> {
+        let mode = if self.check_keyword_ident(TokenKind::De) {
+            TypeMode::De
+        } else if self.check_keyword_ident(TokenKind::In) {
+            TypeMode::In
+        } else if self.check_keyword_ident(TokenKind::Own) {
+            TypeMode::Own
+        } else if self.check_keyword_ident(TokenKind::Copy) {
+            // Provisional: the call-site `copy` spelling follows the parked
+            // standalone-copy ruling and may change with it.
+            TypeMode::Copy
+        } else {
+            return None;
+        };
+        if !matches!(
+            self.peek_at(1).kind,
+            TokenKind::Ident(_)
+                | TokenKind::Tag
+                | TokenKind::Integer(_)
+                | TokenKind::Float(_)
+                | TokenKind::FloatText { .. }
+                | TokenKind::String(_)
+                | TokenKind::LBracket
+        ) || matches!(
+            self.peek_at(2).kind,
+            TokenKind::Therefore | TokenKind::Arrow
+        ) {
+            return None;
+        }
+        self.advance();
+        Some(mode)
     }
 
     fn argument_label_start(&self) -> bool {

@@ -2060,6 +2060,7 @@ fn finge_with_named_fields_reemits_braced_fields() {
                             vec![HirCallArg {
                                 name: Some(causa),
                                 spread: false,
+                                marker: None,
                                 expr: HirExpression {
                                     id: HirId(5),
                                     kind: HirExpressionKind::Path(DefId(9)),
@@ -2172,6 +2173,7 @@ fn intrinsic_method_call_localizes_through_surface() {
                     vec![HirCallArg {
                         name: None,
                         spread: false,
+                        marker: None,
                         expr: HirExpression {
                             id: HirId(5),
                             kind: HirExpressionKind::Literal(HirLiteral::String(

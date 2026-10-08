@@ -367,6 +367,7 @@ fn varia_local_warns_after_method_call(
                             vec![HirCallArg {
                                 name: None,
                                 spread: false,
+                                marker: None,
                                 expr: lit_expr(),
                                 span: test_span(),
                             }],

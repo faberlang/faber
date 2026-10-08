@@ -67,6 +67,7 @@ fn reports_use_after_move() {
             vec![radix_hir::HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(4),
                     kind: HirExpressionKind::Path(DefId(1)),
@@ -359,6 +360,7 @@ fn reports_use_after_move_in_assignment_index() {
             vec![radix_hir::HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(3),
                     kind: HirExpressionKind::Path(DefId(2)),
@@ -508,6 +510,7 @@ fn reports_de_passed_to_in_position() {
             vec![radix_hir::HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(3),
                     kind: HirExpressionKind::Path(DefId(1)),
@@ -753,6 +756,7 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
             vec![radix_hir::HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(4),
                     kind: HirExpressionKind::Path(DefId(1)),
@@ -878,6 +882,7 @@ fn reports_write_while_borrowed_via_mutating_method_call() {
             vec![HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(5),
                     kind: HirExpressionKind::Literal(HirLiteral::Int(5)),
@@ -980,6 +985,7 @@ fn allows_consecutive_mutating_method_calls_on_same_receiver() {
             vec![HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(arg_id),
                     kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
@@ -1092,6 +1098,7 @@ fn allows_non_mutating_method_call_while_borrowed() {
             vec![HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(5),
                     kind: HirExpressionKind::Literal(HirLiteral::Int(5)),
@@ -1189,6 +1196,7 @@ fn mutating_method_call_marks_param_as_mutated() {
             vec![HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(3),
                     kind: HirExpressionKind::Literal(HirLiteral::Int(5)),
@@ -1644,6 +1652,7 @@ fn const_into_mut_sequential_use_program(types: &mut TypeTable) -> HirModule {
             vec![HirCallArg {
                 name: None,
                 spread: false,
+                marker: None,
                 expr: HirExpression {
                     id: radix_hir::HirId(5),
                     kind: HirExpressionKind::Path(DefId(2)),

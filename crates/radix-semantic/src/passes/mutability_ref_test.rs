@@ -81,7 +81,7 @@ functio poke(in lista<numerus> xs) → vacuum {
 }
 incipit {
     fixum de lista<numerus> a ← [1, 2, 3]
-    poke(a)
+    poke(in a)
 }
 ",
         ISSUE_REF_TO_MUT_OR_OWN_POSITION,
@@ -97,7 +97,7 @@ functio take(own lista<numerus> xs) → vacuum {
 }
 incipit {
     fixum de lista<numerus> a ← [1, 2, 3]
-    take(a)
+    take(own a)
 }
 ",
         ISSUE_REF_TO_MUT_OR_OWN_POSITION,
@@ -113,7 +113,7 @@ functio poke(in lista<numerus> xs) → vacuum {
 }
 incipit {
     varia lista<numerus> a ← [1, 2, 3]
-    poke(a)
+    poke(in a)
 }
 ",
     );
