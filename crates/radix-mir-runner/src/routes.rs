@@ -17,6 +17,11 @@
 //! | `consolum:mone`     | `consolum.warn_line`        | `text` or `[text]`      |
 //! | `processus:exi`     | `processus.exit_process`    | `code` or `[code]`      |
 //!
+//! The `http:*` family (`listen`, `accept`, `respond`, `respond_open`,
+//! `respond_chunk`, `respond_finish`, `stop`) is served by `kernel/http.rs`
+//! directly: listeners and connections are runner-thread state, not a
+//! `KernelModule` verb.
+//!
 //! Unknown routes return `None` and stay unrouted (the router fails closed).
 
 use super::{Host, RunnerError, Value, kernel};
@@ -34,6 +39,13 @@ pub fn serve_route<H: Host + ?Sized>(
     opener: &Value,
     span: Span,
 ) -> Option<Result<Vec<Value>, Value>> {
+    if let Some(reply) = kernel::http::serve(route, opener, span) {
+        return Some(match reply {
+            Ok(Value::Unit | Value::Nil) => Ok(Vec::new()),
+            Ok(value) => Ok(vec![value]),
+            Err(error) => Err(Value::Str(error.message)),
+        });
+    }
     let (module, verb) = match route {
         "solum:partem" => (KernelModule::Solum, "read_range"),
         "solum:mensura" => (KernelModule::Solum, "byte_length"),

@@ -30,6 +30,10 @@ mod itera_inf_tests;
 mod route_serve_tests;
 
 #[cfg(test)]
+#[path = "http_route_test.rs"]
+mod http_route_tests;
+
+#[cfg(test)]
 #[path = "range_step_test.rs"]
 mod range_step_tests;
 

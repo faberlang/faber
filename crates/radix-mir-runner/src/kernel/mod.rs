@@ -7,6 +7,7 @@
 mod aleator;
 mod args;
 mod consolum;
+pub(crate) mod http;
 mod json;
 mod processus;
 mod solum;
@@ -19,6 +20,7 @@ use radix_mir::KernelModule;
 /// Reset process-global kernel state that must not cross program executions.
 pub fn reset_execution_state() {
     aleator::reset_seed();
+    http::reset();
 }
 
 /// Dispatch a kernel verb after operands are evaluated to [`Value`]s.
