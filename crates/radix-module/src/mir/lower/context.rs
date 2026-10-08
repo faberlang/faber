@@ -323,6 +323,7 @@ impl<'a> LoweringContextMaps<'a> {
             diagnostic_ordo_no_member: diagnostics.ordo_no_member,
             diagnostic_potentia_negative_exponent: diagnostics.potentia_negative_exponent,
             diagnostic_range_step_not_positive: diagnostics.range_step_not_positive,
+            diagnostic_ponde_invalid_index: diagnostics.ponde_invalid_index,
             function_errors: Arc::clone(&self.frozen.function_errors),
             function_async: Arc::clone(&self.frozen.function_async),
             function_generator: Arc::clone(&self.frozen.function_generator),

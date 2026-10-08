@@ -725,6 +725,7 @@ pub fn lower_analyzed_unit(
         ordo_no_member: interner.intern("no ordo member has this value"),
         potentia_negative_exponent: interner.intern("numerus potentia failed: negative exponent"),
         range_step_not_positive: interner.intern("range step must be positive"),
+        ponde_invalid_index: interner.intern(crate::runtime_contract::tensor::ERR_PONDE_INVALID_INDEX),
     };
     let kernel_lowering = options.kernel_lowering;
     let mut lowerer = MirLowerer {
@@ -1241,6 +1242,9 @@ struct DiagnosticSymbols {
     /// A range step that is zero or negative at run time (ruling 2026-10-02):
     /// the stride guard's panic textus.
     range_step_not_positive: Symbol,
+    /// The checked `ponde` store's out-of-range error textus (K11): the
+    /// runtime-contract message the fatal index form also reports.
+    ponde_invalid_index: Symbol,
 }
 
 struct MirLowerer<'a> {
@@ -2112,6 +2116,7 @@ struct FunctionBuilderContext<'a> {
     diagnostic_ordo_no_member: Symbol,
     diagnostic_potentia_negative_exponent: Symbol,
     diagnostic_range_step_not_positive: Symbol,
+    diagnostic_ponde_invalid_index: Symbol,
     function_errors: Arc<FxHashMap<DefId, MirType>>,
     function_async: Arc<FxHashMap<DefId, bool>>,
     function_generator: Arc<FxHashMap<DefId, bool>>,
@@ -2203,6 +2208,7 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_ordo_no_member: Symbol(0),
             diagnostic_potentia_negative_exponent: Symbol(0),
             diagnostic_range_step_not_positive: Symbol(0),
+            diagnostic_ponde_invalid_index: Symbol(0),
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
             function_generator: Arc::new(FxHashMap::default()),

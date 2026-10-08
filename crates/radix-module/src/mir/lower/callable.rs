@@ -331,6 +331,7 @@ impl FunctionBuilder<'_> {
             diagnostic_ordo_no_member: context.diagnostic_ordo_no_member,
             diagnostic_potentia_negative_exponent: context.diagnostic_potentia_negative_exponent,
             diagnostic_range_step_not_positive: context.diagnostic_range_step_not_positive,
+            diagnostic_ponde_invalid_index: context.diagnostic_ponde_invalid_index,
             function_errors: Arc::clone(&context.function_errors),
             function_params: Arc::clone(&context.function_params),
             tensor_edge_policies: Arc::clone(&context.tensor_edge_policies),

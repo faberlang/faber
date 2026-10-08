@@ -792,6 +792,14 @@ impl FunctionBuilder<'_> {
                 .unwrap_or(expr_ty),
             _ => expr_ty,
         };
+        if op == MirCollectionOp::TensorSet && self.is_checked_ponde(receiver, &method_name, args.len()) {
+            let (Some(index_ty), Some(value_ty), Some(receiver_ty)) =
+                (self.expr_ty(&args[0].expr), self.expr_ty(&args[1].expr), self.expr_ty(receiver))
+            else {
+                return None;
+            };
+            return self.lower_checked_tensor_set(lowered_args, [receiver_ty, index_ty, value_ty], call_ty, expr.span);
+        }
         let value = self.runtime_call_value(MirIntrinsic::Collection(op), lowered_args, call_ty, expr.span);
         if call_ty != expr_ty && self.types.nullable_inner(expr_ty.semantic_id()) == Some(call_ty.semantic_id()) {
             return Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Some(value)), expr_ty, expr.span));
@@ -4164,6 +4172,216 @@ impl FunctionBuilder<'_> {
             span,
         });
         id
+    }
+
+    /// K11: whether this tensor `ponde` method call is the checked (failable)
+    /// store. Device bodies keep the bare `TensorSet`; so does any call the
+    /// registry row does not mark failable.
+    fn is_checked_ponde(&self, receiver: &HirExpression, method_name: &str, arg_count: usize) -> bool {
+        if self.device_role.is_some() {
+            return false;
+        }
+        let Some(receiver_ty) = receiver.ty else {
+            return false;
+        };
+        let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+        crate::intrinsics::lookup_method_for_type(payload, method_name, arg_count).is_some_and(|entry| entry.failable)
+    }
+
+    /// K11: lower the checked `ponde` store as a failable call to a synthesized
+    /// helper, exactly as handled conversio helpers are. The helper compares
+    /// the index against the tensor shape in MIR; `TensorSet` keeps its single
+    /// (fatal) meaning.
+    fn lower_checked_tensor_set(
+        &mut self,
+        lowered_args: Vec<MirOperand>,
+        param_tys: [MirType; 3],
+        ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+        let helper = self.push_ponde_helper(param_tys, ty, textus, span)?;
+        self.lower_failable_call(MirCallee::Function(helper), lowered_args, ty, textus, None, span)
+    }
+
+    /// The helper body, for `(in receiver, index, value) ⇥ textus`:
+    ///
+    /// ```text
+    /// entry: shape = TensorShape(recv); rank = Length(shape)
+    ///        Length(index) == rank ? cond : fail
+    /// cond:  axis < rank ? body : ok
+    /// body:  ix = index[axis]; dim = shape[axis]
+    ///        ix < 0 ? fail : upper
+    /// upper: ix >= dim ? fail : step
+    /// step:  axis += 1; goto cond
+    /// ok:    TensorSet(recv, index, value); return
+    /// fail:  ReturnError("tensor ponde invalid index")
+    /// ```
+    fn push_ponde_helper(
+        &mut self,
+        param_tys: [MirType; 3],
+        return_ty: MirType,
+        error_ty: MirType,
+        span: Span,
+    ) -> Option<MirFunctionId> {
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let Some(array) = self.types.find_array(numerus.semantic_id()) else {
+            self.errors
+                .push(MirError::missing_type(span, "ponde bounds check shape list"));
+            return None;
+        };
+        let array_ty = MirType::semantic(array);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            Some(error_ty),
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        let modes = [MirParamMode::MutRef, MirParamMode::Owned, MirParamMode::Owned];
+        let mut locals = Vec::with_capacity(3);
+        for (ty, mode) in param_tys.into_iter().zip(modes) {
+            let local = nested.next_local_id();
+            nested
+                .params
+                .push(MirParam { local, name: None, ty, mode, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: local, name: None, ty, mutable: false, span });
+            locals.push(local);
+        }
+        let axis = nested.next_local_id();
+        nested
+            .locals
+            .push(MirLocalDecl { id: axis, name: None, ty: numerus, mutable: true, span });
+        let receiver = MirOperand::Place(MirPlace::local(locals[0]));
+        let index = MirOperand::Place(MirPlace::local(locals[1]));
+        let value = MirOperand::Place(MirPlace::local(locals[2]));
+        let axis_operand = MirOperand::Place(MirPlace::local(axis));
+
+        let entry = nested.fresh_block(span);
+        let cond = nested.fresh_block(span);
+        let body = nested.fresh_block(span);
+        let upper = nested.fresh_block(span);
+        let step = nested.fresh_block(span);
+        let ok = nested.fresh_block(span);
+        let fail = nested.fresh_block(span);
+
+        nested.switch_to(entry);
+        let shape = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorShape),
+            vec![receiver.clone()],
+            array_ty,
+            span,
+        );
+        let rank = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![shape.clone()],
+            numerus,
+            span,
+        );
+        let index_len = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![index.clone()],
+            numerus,
+            span,
+        );
+        nested.assign(MirPlace::local(axis), MirOperand::Constant(MirConstant::Int(0)), numerus, span);
+        let same_rank = nested.binary_temp(MirBinOp::Eq, index_len, rank.clone(), bivalens, span);
+        nested.terminate_current(
+            MirTerminatorKind::Branch { condition: same_rank, then_block: cond, else_block: fail },
+            span,
+        );
+
+        nested.switch_to(cond);
+        let more = nested.binary_temp(MirBinOp::Lt, axis_operand.clone(), rank, bivalens, span);
+        nested.terminate_current(
+            MirTerminatorKind::Branch { condition: more, then_block: body, else_block: ok },
+            span,
+        );
+
+        nested.switch_to(body);
+        // Both lists are in range by construction (axis < rank == both lengths),
+        // so the strict-element `Index` read cannot fault.
+        let extent_at = |nested: &mut FunctionBuilder<'_>, list: MirOperand| {
+            nested.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Index),
+                vec![list, axis_operand.clone()],
+                numerus,
+                span,
+            )
+        };
+        let coordinate = extent_at(&mut nested, index.clone());
+        let extent = extent_at(&mut nested, shape);
+        let negative = nested.binary_temp(
+            MirBinOp::Lt,
+            coordinate.clone(),
+            MirOperand::Constant(MirConstant::Int(0)),
+            bivalens,
+            span,
+        );
+        nested.terminate_current(
+            MirTerminatorKind::Branch { condition: negative, then_block: fail, else_block: upper },
+            span,
+        );
+
+        nested.switch_to(upper);
+        let past_end = nested.binary_temp(MirBinOp::GtEq, coordinate, extent, bivalens, span);
+        nested.terminate_current(
+            MirTerminatorKind::Branch { condition: past_end, then_block: fail, else_block: step },
+            span,
+        );
+
+        nested.switch_to(step);
+        let next = nested.binary_temp(
+            MirBinOp::Add,
+            axis_operand,
+            MirOperand::Constant(MirConstant::Int(1)),
+            numerus,
+            span,
+        );
+        nested.assign(MirPlace::local(axis), next, numerus, span);
+        nested.terminate_current(MirTerminatorKind::Goto(cond), span);
+
+        nested.switch_to(ok);
+        nested.runtime_call_to_place(
+            None,
+            MirIntrinsic::Collection(MirCollectionOp::TensorSet),
+            vec![receiver, index, value],
+            return_ty,
+            span,
+        );
+        nested.terminate_current(MirTerminatorKind::Return(None), span);
+
+        nested.switch_to(fail);
+        let message = MirOperand::Constant(MirConstant::String(nested.context.diagnostic_ponde_invalid_index));
+        nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
+
+        let blocks = nested.finish_blocks();
+        self.errors.extend(nested.errors);
+        self.synthetic_functions.push(MirFunction {
+            id,
+            source: None,
+            name: None,
+            params: nested.params,
+            locals: nested.locals,
+            temps: nested.temps,
+            blocks,
+            return_ty,
+            error_ty: Some(error_ty),
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        });
+        Some(id)
     }
 
     /// Emit a runtime call and return the operand shape promised by its return
