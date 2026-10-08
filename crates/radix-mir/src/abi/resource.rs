@@ -161,6 +161,23 @@ pub enum MirKernelResourceKind {
         cap: u32,
         element_bytes: u32,
     },
+    /// The element count of a tensor parameter (gpu-reset U9-2): a count-one
+    /// `u32` input resource the index bounds compare reads, sibling of
+    /// [`Self::TensorAxisExtent`]. The host supplies the product of the
+    /// argument's shape as one scalar launch argument at this resource's slot.
+    /// `tensor_binding` is the `binding` of the tensor parameter's storage
+    /// buffer.
+    TensorElementCount {
+        tensor_binding: u32,
+    },
+    /// The per-launch fault record of a kernel that has fault sites (gpu-reset
+    /// U9-2): `sites` `u32` slots, read-write, one per entry of the kernel's
+    /// `fault_sites`. NOT a host argument and NOT a tensor: the dispatcher
+    /// binds a record from its fault arena at this resource's slot, always the
+    /// LAST launch argument; a consumer that binds host arguments must skip it.
+    FaultRecord {
+        sites: u32,
+    },
 }
 
 impl MirKernelResourceKind {
@@ -172,6 +189,8 @@ impl MirKernelResourceKind {
             Self::TensorAxisExtent { .. } => "tensor-axis-extent",
             Self::GenusParam { .. } => "genus-param",
             Self::PartialsScratch { .. } => "partials-scratch",
+            Self::TensorElementCount { .. } => "tensor-element-count",
+            Self::FaultRecord { .. } => "fault-record",
         }
     }
 }

@@ -5,13 +5,13 @@ use std::collections::BTreeMap;
 use super::{
     ERR_GRAPHICS_PIPELINE_REQUIRES_COLOR_TARGETS, ERR_GRAPHICS_PIPELINE_REQUIRES_FRAGMENT,
     ERR_GRAPHICS_PIPELINE_REQUIRES_VERTEX, ERR_GRAPHICS_PIPELINE_REQUIRES_VERTEX_INPUTS,
-    ERR_GRAPHICS_PIPELINE_VARYING_MISMATCH, MirAbiError, MirColorTargetFormat,
-    MirFragmentOutputReflection, MirGraphicsPipelineReflection, MirKernelBuiltin,
-    MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBinding, MirKernelLaunchPlan,
-    MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection, MirKernelResourceReflection,
-    MirKernelShaderStage, MirKernelSignature, MirKernelWorkgroupCount, MirPrimitiveTopology,
-    MirVaryingReflection, MirVertexInputReflection, MirWorkgroupSize,
-    buffer_binding_type_for_shader_access, collection_op_workgroup_count,
+    ERR_GRAPHICS_PIPELINE_VARYING_MISMATCH, INDEX_FAULT_TEXT, MirAbiError, MirColorTargetFormat,
+    MirFaultKind, MirFaultSite, MirFragmentOutputReflection, MirGraphicsPipelineReflection,
+    MirKernelBuiltin, MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBinding,
+    MirKernelLaunchPlan, MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection,
+    MirKernelResourceKind, MirKernelResourceReflection, MirKernelShaderStage, MirKernelSignature,
+    MirKernelWorkgroupCount, MirPrimitiveTopology, MirVaryingReflection, MirVertexInputReflection,
+    MirWorkgroupSize, buffer_binding_type_for_shader_access, collection_op_workgroup_count,
     combined_builtin_dependencies, layout_entry_for_launch_binding,
     pipeline_layout_for_launch_bind_groups, reflect_kernel_builtin_input, reflect_kernel_resource,
     shader_access_for_resource, validate_fragment_output_locations, validate_varying_consistency,
@@ -51,6 +51,7 @@ impl MirKernelReflection {
                 signature.dispatch_size,
                 signature.workgroup,
             )?,
+            fault_sites: fault_sites_for_signature(signature),
         })
     }
 
@@ -107,6 +108,7 @@ impl MirKernelReflection {
             entry_name: entry_name.into(),
             shader_stage: MirKernelShaderStage::Vertex,
             resources,
+            fault_sites: Vec::new(),
             bound_resources: Vec::new(),
             vertex_inputs,
             varyings: Vec::new(),
@@ -139,6 +141,7 @@ impl MirKernelReflection {
             entry_name: entry_name.into(),
             shader_stage: MirKernelShaderStage::Fragment,
             resources,
+            fault_sites: Vec::new(),
             bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings,
@@ -171,6 +174,7 @@ impl MirKernelReflection {
             entry_name: entry_name.into(),
             shader_stage: MirKernelShaderStage::Fragment,
             resources,
+            fault_sites: Vec::new(),
             bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings,
@@ -532,4 +536,24 @@ impl MirKernelReflection {
             &self.called_builtins,
         )
     }
+}
+
+/// The fault sites a signature declares: its `FaultRecord` resource says how
+/// many, and every site is the fatal index bounds fault.
+fn fault_sites_for_signature(signature: &MirKernelSignature) -> Vec<MirFaultSite> {
+    signature
+        .resources()
+        .find_map(|resource| match resource.kind {
+            MirKernelResourceKind::FaultRecord { sites } => Some(sites),
+            _ => None,
+        })
+        .map_or_else(Vec::new, |sites| {
+            (0..sites)
+                .map(|id| MirFaultSite {
+                    id,
+                    kind: MirFaultKind::Fatal,
+                    text: INDEX_FAULT_TEXT.to_owned(),
+                })
+                .collect()
+        })
 }

@@ -89,15 +89,15 @@ pub mod matrix_shape;
 pub mod vector_width;
 
 pub use abi::{
-    MirAbiError, MirBoundResourceReflection, MirBroadcastDeclaration, MirColorTargetFormat,
-    MirDepthCompareFunction, MirDepthStencilState, MirFragmentOutputReflection, MirFunctionAbi,
-    MirFunctionAbiParam, MirGpuReflection, MirGraphicsPipelineReflection, MirInputStepMode,
-    MirKernelBufferBindingKind, MirKernelBuiltinInput, MirKernelBuiltinInputReflection,
-    MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelLaunchBindGroup,
-    MirKernelLaunchBindGroupLayoutEntry, MirKernelLaunchBinding,
-    MirKernelLaunchPipelineBindGroupLayout, MirKernelLaunchPipelineLayout, MirKernelLaunchPlan,
-    MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection, MirKernelResource,
-    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
+    INDEX_FAULT_TEXT, LaneIndexProof, MirAbiError, MirBoundResourceReflection,
+    MirBroadcastDeclaration, MirColorTargetFormat, MirDepthCompareFunction, MirDepthStencilState,
+    MirFaultKind, MirFaultSite, MirFragmentOutputReflection, MirFunctionAbi, MirFunctionAbiParam,
+    MirGpuReflection, MirGraphicsPipelineReflection, MirInputStepMode, MirKernelBufferBindingKind,
+    MirKernelBuiltinInput, MirKernelBuiltinInputReflection, MirKernelBuiltinUsage,
+    MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBindGroupLayoutEntry,
+    MirKernelLaunchBinding, MirKernelLaunchPipelineBindGroupLayout, MirKernelLaunchPipelineLayout,
+    MirKernelLaunchPlan, MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection,
+    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
     MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature,
     MirKernelWorkgroupCount, MirPrimitiveTopology, MirRankExtensionBroadcast, MirRuntimeAbi,
     MirRuntimeAbiFamily, MirRuntimeAbiKind, MirStencilFaceState, MirStencilOp,
@@ -106,8 +106,9 @@ pub use abi::{
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor,
     MirWebGpuDispatchWorkgroups, MirWebGpuLaunchAdapter, MirWebGpuPipelineLayoutDescriptor,
     MirWebGpuVertexAttributeDescriptor, MirWebGpuVertexBufferLayoutDescriptor,
-    MirWebGpuVertexStepMode, MirWorkgroupSize, collection_op_workgroup_count,
-    rank_extension_broadcast_fact, reject_kernel_matrix_abi, validate_varying_consistency,
+    MirWebGpuVertexStepMode, MirWorkgroupSize, UnprovenIndex, collection_op_workgroup_count,
+    rank_extension_broadcast_fact, reject_kernel_matrix_abi, unproven_indexes,
+    validate_varying_consistency,
 };
 pub use ai_workbench_stage5::{
     AiWorkbenchStage5Facet, AiWorkbenchStage5Row, AiWorkbenchStage5Status,

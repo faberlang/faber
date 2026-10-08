@@ -440,6 +440,7 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
                 .ok_or_else(|| vec![mir_diag(input, "no entry function in MIR program")])?;
             let extents = image.extents;
             let genus_layouts = image.genus_layouts;
+            let fault_sites = image.fault_sites;
             let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
             let dispatcher = SessionKernelDispatcher::new(
                 session
@@ -452,6 +453,9 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
             .map_err(|error| vec![host_error_diagnostic(&error)])?;
             dispatcher.borrow_mut().set_omissions(omissions);
             dispatcher.borrow_mut().set_extents(extents);
+            super::device::install_fault_sites(&fault_sites, |entry, sites| {
+                dispatcher.borrow_mut().set_fault_sites(entry, sites);
+            });
             dispatcher
                 .borrow_mut()
                 .set_genus_layouts(genus_layouts, interner.clone());

@@ -426,7 +426,35 @@ pub struct MirKernelReflection {
     pub workgroup: MirWorkgroupSize,
     pub dispatch_size: MirKernelDispatchSize,
     pub workgroup_count: MirKernelWorkgroupCount,
+    /// The kernel's device fault sites (gpu-reset U9-2), ids dense from 0: one
+    /// slot of the per-launch fault record each. Non-empty exactly when the
+    /// resource list carries a `FaultRecord` binding. Omitted from serialized
+    /// reflection when empty so existing reflection JSON is byte-identical.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fault_sites: Vec<MirFaultSite>,
 }
+
+/// What a device fault site does when it fires.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirFaultKind {
+    /// Kills the program with the device kernel fault error.
+    Fatal,
+    /// Delivers `text` as a value a handler can route.
+    Recoverable,
+}
+
+/// One fault site of a kernel: `id` is the slot in the launch's fault record
+/// (the number the device passes to its atomic min); `text` is the constant
+/// message the host reports for it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirFaultSite {
+    pub id: u32,
+    pub kind: MirFaultKind,
+    pub text: String,
+}
+
+/// The text of the index bounds fault site.
+pub const INDEX_FAULT_TEXT: &str = "index out of range";
 
 /// A bound resource whose type is an opaque library type: the group/binding
 /// slot, the stage-parameter name, and the bound type's name as the library

@@ -438,6 +438,77 @@ fn append_tensor_extent_resources(
     Ok(())
 }
 
+/// gpu-reset U9-2: a guarded lane-form kernel with at least one UNPROVEN
+/// tensor index (see [`super::LaneIndexProof`]) gets, after every other
+/// resource, one count-one `u32` [`MirKernelResourceKind::TensorElementCount`]
+/// per indexed tensor with an unproven index (tensor parameter declaration
+/// order) and then ONE [`MirKernelResourceKind::FaultRecord`] with a slot per
+/// fault site, LAST. One fatal site per unproven index form (tensor, load or
+/// store). A kernel whose every index is proven is untouched.
+fn append_fault_resources(
+    function: &MirFunction,
+    signature: &mut MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) -> Result<(), MirAbiError> {
+    let forms = super::unproven_indexes(function, validation);
+    if forms.is_empty() {
+        return Ok(());
+    }
+    let word = validation
+        .types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+        .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_U32))?;
+    let mut tensors: Vec<MirLocalId> = Vec::new();
+    for form in &forms {
+        if !tensors.contains(&form.tensor) {
+            tensors.push(form.tensor);
+        }
+    }
+    let mut next_binding = signature
+        .resources()
+        .map(|resource| resource.binding)
+        .max()
+        .map_or(0, |binding| binding + 1);
+    for tensor in tensors {
+        let resource = signature
+            .resources()
+            .find(|resource| {
+                resource.kind == MirKernelResourceKind::StorageBuffer
+                    && resource.source_local == Some(tensor)
+            })
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+        let tensor_binding = resource.binding;
+        signature.extra_inputs.push(MirKernelResource {
+            group: DEFAULT_KERNEL_RESOURCE_GROUP,
+            binding: next_binding,
+            kind: MirKernelResourceKind::TensorElementCount { tensor_binding },
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty: MirType::semantic(word),
+            element_count: 1,
+            source_local: None,
+            source_name: None,
+            reduced_projection: None,
+        });
+        next_binding += 1;
+    }
+    let sites = u32::try_from(forms.len())
+        .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
+    signature.extra_inputs.push(MirKernelResource {
+        group: DEFAULT_KERNEL_RESOURCE_GROUP,
+        binding: next_binding,
+        kind: MirKernelResourceKind::FaultRecord { sites },
+        role: MirKernelResourceRole::Output,
+        access: MirKernelResourceAccess::ReadWrite,
+        element_ty: MirType::semantic(word),
+        element_count: u64::from(sites),
+        source_local: None,
+        source_name: None,
+        reduced_projection: None,
+    });
+    Ok(())
+}
+
 /// Build the read-input resources for a kernel's params, in binding order,
 /// skipping `vacuum` params (the reverse-AD nil placeholder carries no
 /// device storage). Returns the resources and the next free binding.
@@ -614,6 +685,7 @@ impl MirKernelSignature {
         let mut signature = signature;
         append_partials_scratch_resource(function, &mut signature, validation)?;
         append_tensor_extent_resources(function, &mut signature, validation)?;
+        append_fault_resources(function, &mut signature, validation)?;
         // The per-kernel storage-buffer binding maximum (the active
         // per-lane `StorageBufferLimitRecord`; the shared default is the
         // minimum capacity across admitted lanes): a signature over

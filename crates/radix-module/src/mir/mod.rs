@@ -56,6 +56,9 @@ mod reducta_filum_test;
 mod kernel_host_lowering_test;
 
 #[cfg(test)]
+#[path = "fault_sites_test.rs"]
+mod fault_sites_test;
+
 #[path = "grid_reduce_test.rs"]
 mod grid_reduce_test;
 #[cfg(test)]
