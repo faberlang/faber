@@ -790,6 +790,13 @@ impl TensorValue {
         self.residency.take_error()
     }
 
+    /// The error for a host read of this tensor that yielded nothing: a
+    /// device fault stored by a failed residency download surfaces as itself
+    /// (the dispatcher's error and issue code); otherwise `fallback`.
+    pub(crate) fn host_read_error(&self, fallback: impl FnOnce() -> RunnerError) -> RunnerError {
+        self.take_residency_error().unwrap_or_else(fallback)
+    }
+
     pub fn set_value_at(&self, logical_index: usize, value: Value) -> Option<()> {
         if !self.edge_ops.is_empty() {
             return None;
@@ -1323,7 +1330,9 @@ impl Value {
             Value::Tensor(tensor) => {
                 let tensor = tensor.borrow();
                 let values = tensor.logical_values().ok_or_else(|| {
-                    RunnerError::internal(span, "tensor view has invalid storage layout")
+                    tensor.host_read_error(|| {
+                        RunnerError::internal(span, "tensor view has invalid storage layout")
+                    })
                 })?;
                 display_list(&values, interner, order, span, float_width)?
             }

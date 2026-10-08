@@ -1864,7 +1864,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             borrow.is_dense_row_major() && borrow.logical_len().is_some_and(|count| offset < count)
         };
         let read = if dense {
-            tensor.borrow().read_physical(offset)
+            let borrow = tensor.borrow();
+            match borrow.read_physical(offset) {
+                Some(value) => Some(value),
+                // A failed device download is the first error, not a miss.
+                None => match borrow.take_residency_error() {
+                    Some(error) => return Err(error),
+                    None => None,
+                },
+            }
         } else {
             self.tensor_read_at(&tensor, offset, span)?
         };
@@ -2468,7 +2476,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
             )
         }) {
-            return Ok(snapshot.value_at(logical_index));
+            return match snapshot.value_at(logical_index) {
+                Some(value) => Ok(Some(value)),
+                None => snapshot.take_residency_error().map_or(Ok(None), Err),
+            };
         }
         let Some(coordinate) = snapshot.logical_coordinates(logical_index) else {
             return Ok(None);
@@ -2495,7 +2506,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 base.offset,
             )
             .ok_or_else(|| RunnerError::internal(span, "tensor edge base offset is invalid"))?;
-            return Ok(tensor.read_physical(physical));
+            return match tensor.read_physical(physical) {
+                Some(value) => Ok(Some(value)),
+                None => tensor.take_residency_error().map_or(Ok(None), Err),
+            };
         }
         let operation = tensor
             .edge_ops
@@ -2628,7 +2642,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // custom-edge chain below needs the reentrancy clone.
             return borrow
                 .logical_values()
-                .ok_or_else(|| RunnerError::internal(span, "tensor logical layout is invalid"));
+                .ok_or_else(|| {
+                    borrow.host_read_error(|| {
+                        RunnerError::internal(span, "tensor logical layout is invalid")
+                    })
+                });
         }
         drop(borrow);
         let snapshot = tensor.borrow().clone();
@@ -4293,7 +4311,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn collection_index(
+    pub(crate) fn collection_index(
         &self,
         receiver: Value,
         index: Value,
@@ -4418,7 +4436,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 tensor
                     .borrow()
                     .value_at(idx)
-                    .ok_or_else(|| RunnerError::internal(span, "tensor index out of bounds"))
+                    .ok_or_else(|| {
+                        tensor.borrow().host_read_error(|| {
+                            RunnerError::internal(span, "tensor index out of bounds")
+                        })
+                    })
             }
             _ => Err(RunnerError::internal(span, "index receiver type mismatch")),
         }
