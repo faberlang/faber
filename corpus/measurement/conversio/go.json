@@ -6,9 +6,9 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "dedicated": 154,
-    "fallback": 65,
+    "fallback": 64,
     "rejected": 208,
-    "not-emitted": 14
+    "not-emitted": 15
   },
   "cells": [
     {
@@ -734,7 +734,7 @@
     {
       "src": "octeti",
       "tgt": "tensor",
-      "tier": "fallback",
+      "tier": "not-emitted",
       "measured": true
     },
     {

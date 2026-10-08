@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 395,
-    "analyzable": 400
+    "capable": 397,
+    "analyzable": 402
   },
   "terms": [
     {
@@ -888,8 +888,8 @@
     {
       "term": "tensor",
       "rule": "type",
-      "capable": 17,
-      "analyzable": 17
+      "capable": 18,
+      "analyzable": 18
     },
     {
       "term": "textus",
@@ -1044,8 +1044,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 24,
-      "analyzable": 25
+      "capable": 25,
+      "analyzable": 26
     },
     {
       "term": "⇇",

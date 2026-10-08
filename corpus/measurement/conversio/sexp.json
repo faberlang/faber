@@ -5,10 +5,10 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 43,
+    "dedicated": 42,
     "fallback": 0,
     "rejected": 208,
-    "not-emitted": 190
+    "not-emitted": 191
   },
   "cells": [
     {
@@ -734,7 +734,7 @@
     {
       "src": "octeti",
       "tgt": "tensor",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {

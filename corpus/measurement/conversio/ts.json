@@ -5,10 +5,10 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 167,
+    "dedicated": 166,
     "fallback": 11,
     "rejected": 208,
-    "not-emitted": 55
+    "not-emitted": 56
   },
   "cells": [
     {
@@ -734,7 +734,7 @@
     {
       "src": "octeti",
       "tgt": "tensor",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {

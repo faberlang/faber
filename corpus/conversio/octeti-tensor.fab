@@ -1,0 +1,73 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "range_expr", "range_tail", "conversio_expr", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "Bulk typed reinterpretation of octeti as a tensor via Be|Le."
+syntax = "<octeti> ↦ tensor<E, [shape]> via Be|Le"
+related = ["↦", "octeti", "tensor", "float"]
+locale = "en"
++++
+# =============================================================================
+# ↦ — Bulk typed reinterpretation of octeti as a tensor via Be|Le.
+# =============================================================================
+#
+# What this teaches:
+#   • Faithful reinterpretation — `bytes ↦ tensor<f32, [2]> via Le` reads each element
+#     from the next 4 bytes in the chosen byte order; nothing is converted numerically.
+#   • Shape is row-major — a `[2, 2]` target fills the last index fastest.
+#   • Exact length — the byte count must equal `product(shape) * element width`.
+#   • A wrong length is a recoverable failure: `do { } catch err { }` handles it.
+#
+# Common mistakes:
+#   • Omitting Be/Le — the byte order is never implied, for any element width.
+#   • Passing a short or long source — no truncation, no padding.
+#
+# See also: ↦, octeti, tensor
+# =============================================================================
+
+
+# conversio — octeti ↦ tensor<E, [shape]> via Be|Le
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' tensorType 'via' endian
+#
+# EXPECTED OUTPUT:
+#   1.0
+#   2.0
+#   1.0
+#   2.0
+#   1.0
+#   4.0
+#   caught
+#
+# BACKEND:
+#   The runner decodes the buffer in one pass into typed storage. Rust emits
+#   chunked from_le_bytes / from_be_bytes; TypeScript, Go and Swift decline by name.
+
+main {
+    const octeti le_bytes ← |00 00 80 3f 00 00 00 40|
+    const octeti be_bytes ← |3f 80 00 00 40 00 00 00|
+    const octeti grid_bytes ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40|
+    const octeti short_bytes ← |00 00 80|
+
+    const tensor<f32, [2]> le ← le_bytes ↦ tensor<f32, [2]> via Le
+    const tensor<f32, [2]> be ← be_bytes ↦ tensor<f32, [2]> via Be
+    const tensor<f32, [2, 2]> grid ← grid_bytes ↦ tensor<f32, [2, 2]> via Le
+
+    print le[[0]]
+    print le[[1]]
+    print be[[0]]
+    print be[[1]]
+    print grid[[0, 0]]
+    print grid[[1, 1]]
+
+    do {
+        const tensor<f32, [2]> bad ← short_bytes ↦ tensor<f32, [2]> via Le
+        print bad[[0]]
+    }
+    catch err {
+        print "caught"
+    }
+}

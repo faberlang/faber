@@ -343,7 +343,10 @@ pub fn classify_conversio_coverage(
             }
         }
         ConversioCoverageTarget::TypeScript => {
-            if driver_modular_word_blocked(src, tgt) {
+            // `octeti ↦ tensor via Le|Be` declines by name on TypeScript and Go
+            // (`ts_octeti_tensor_conversio_unsupported`,
+            // `go_octeti_tensor_conversio_unsupported`).
+            if driver_modular_word_blocked(src, tgt) || octeti_tensor_declined(src, tgt) {
                 ConversioCoverage::NotEmitted
             } else if ts_has_dedicated_conversio_arm(src, tgt) {
                 ConversioCoverage::Dedicated
@@ -354,7 +357,7 @@ pub fn classify_conversio_coverage(
         ConversioCoverageTarget::Go => {
             // No modulus block: the Go backend lowers words (measured; the
             // block now survives on TypeScript only).
-            if go_family_unrepresentable(src) || go_family_unrepresentable(tgt) {
+            if go_family_unrepresentable(src) || go_family_unrepresentable(tgt) || octeti_tensor_declined(src, tgt) {
                 // Go's `type_to_go` rejects these families outright; no
                 // lowering exists, not even the `.(T)` type-assertion fallback.
                 ConversioCoverage::NotEmitted
@@ -401,13 +404,24 @@ pub fn classify_conversio_coverage(
         // text-shaped sources, text formatting from scalar/text sources,
         // and the identity vector cell. Everything else is not emitted.
         ConversioCoverageTarget::SexpStructural | ConversioCoverageTarget::Sexp => {
-            if sexp_lowers_conversio(src, tgt) {
+            // The structural dump carries `octeti ↦ tensor via Le|Be`; the
+            // executable `sexp` emitter has no route for it ("tensor
+            // conversion contract").
+            if target == ConversioCoverageTarget::Sexp && octeti_tensor_declined(src, tgt) {
+                ConversioCoverage::NotEmitted
+            } else if sexp_lowers_conversio(src, tgt) {
                 ConversioCoverage::Dedicated
             } else {
                 ConversioCoverage::NotEmitted
             }
         }
     }
+}
+
+/// `octeti ↦ tensor<E, [shape]> via Le|Be`: the pair TypeScript and Go decline
+/// by name rather than mis-emit through the list arm.
+fn octeti_tensor_declined(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> bool {
+    src == ConversioTypeFamily::Octeti && tgt == ConversioTypeFamily::Tensor
 }
 
 /// Mirrors the mir-sexp emitter's admitted conversio surface
@@ -672,6 +686,11 @@ fn rust_dedicated_composite_arm(src: ConversioTypeFamily, tgt: ConversioTypeFami
 
     // Tensor / sparsa element bridges.
     if matches!((src, tgt), (Tensor | Sparsa, Tensor) | (Tensor, Sparsa)) {
+        return true;
+    }
+
+    // `octeti ↦ tensor<E, [shape]> via Le|Be`: chunked `from_*_bytes` decode.
+    if (src, tgt) == (Octeti, Tensor) {
         return true;
     }
 

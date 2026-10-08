@@ -2685,14 +2685,6 @@
     },
     {
       "src": "octeti",
-      "tgt": "tensor",
-      "target": "ts",
-      "predicted": "fallback",
-      "measured": "dedicated",
-      "detail": "arm:dedicated"
-    },
-    {
-      "src": "octeti",
       "tgt": "vector",
       "target": "rust",
       "predicted": "fallback",

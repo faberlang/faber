@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 59,
-    "fallback": 174,
+    "dedicated": 60,
+    "fallback": 173,
     "rejected": 208,
     "not-emitted": 0
   },
@@ -734,7 +734,7 @@
     {
       "src": "octeti",
       "tgt": "tensor",
-      "tier": "fallback",
+      "tier": "dedicated",
       "measured": true
     },
     {

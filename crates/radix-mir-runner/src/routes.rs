@@ -5,7 +5,7 @@
 //! module is the host answer for the process-capability routes a Faber
 //! application reaches without a norma wrapper. Each route reuses the native
 //! kernel verb the interpreted-package bridge dispatches, so the two paths
-//! share one implementation, including the 64 MiB `read_range` cap.
+//! share one implementation, including the 512 MiB `read_range` cap.
 //!
 //! | route               | kernel verb                 | opener                  |
 //! | ------------------- | --------------------------- | ----------------------- |
