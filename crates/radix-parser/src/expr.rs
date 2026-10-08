@@ -2858,8 +2858,8 @@ impl Parser {
         } else if self.check_keyword_ident(TokenKind::Own) {
             TypeMode::Own
         } else if self.check_keyword_ident(TokenKind::Copy) {
-            // Provisional: the call-site `copy` spelling follows the parked
-            // standalone-copy ruling and may change with it.
+            // Operator ruling 2026-10-08: call-site `copy` is a plain echo of the
+            // parameter marker, not the parked assignment-site copy.
             TypeMode::Copy
         } else {
             return None;
