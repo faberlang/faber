@@ -67,6 +67,10 @@ mod indexed_apud_emit_test;
 mod rust_half_float_cell_test;
 
 #[cfg(test)]
+#[path = "tensor_checked_method_emit_test.rs"]
+mod tensor_checked_method_emit_test;
+
+#[cfg(test)]
 #[path = "saturating_fuzzy_incdec_emit_test.rs"]
 mod saturating_fuzzy_incdec_emit_test;
 
