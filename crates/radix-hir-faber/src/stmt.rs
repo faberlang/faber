@@ -28,6 +28,23 @@ use radix_lexer::{Symbol, TokenKind};
 use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
+    /// Print ` omnia` after `fac` when the synthesized `fac … dum` loop block
+    /// carries the authored marker.
+    pub(super) fn write_fac_omnia_marker(
+        &self,
+        loop_block: &HirBlock,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        if matches!(
+            loop_block.breakable,
+            Some(radix_hir::HirBreakableKind::FacOmniaLoop)
+        ) {
+            writer.write(" ");
+            writer.write(surface.contextual_keyword("omnia"));
+        }
+    }
+
     /// Recognize the normalized HIR shape for a `fac ... dum` loop
     /// (see [`HirBlock::fac_dum_parts`]).
     pub(super) fn as_fac_loop<'a>(

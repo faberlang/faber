@@ -881,6 +881,20 @@ pub enum HirBreakableKind {
     /// `fac omnia { }` try body: same breakable semantics as [`Fac`]; the
     /// marker is surface-only and rides HIR so the re-emitter round-trips it.
     FacOmnia,
+    /// Marker on the synthesized loop block of `fac omnia { } … dum cond`. It
+    /// is **not** a breakable scope ([`HirBreakableKind::is_scope`] is false):
+    /// the loop keeps plain `fac … dum` semantics in every backend and the
+    /// marker only lets the re-emitter print `omnia`.
+    FacOmniaLoop,
+}
+
+impl HirBreakableKind {
+    /// Whether the block is a breakable scope that `rumpe` exits (every kind
+    /// except the loop-marker [`HirBreakableKind::FacOmniaLoop`]).
+    #[must_use]
+    pub fn is_scope(self) -> bool {
+        !matches!(self, Self::FacOmniaLoop)
+    }
 }
 
 /// Ordered statement block with an optional trailing expression.

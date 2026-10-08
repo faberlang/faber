@@ -543,16 +543,6 @@ impl Parser {
         let catch = self.try_parse_cape_stmt()?;
 
         let while_ = if self.eat_keyword_ident(TokenKind::Dum) {
-            if omnia {
-                // `omnia` rides the breakable try-body block in HIR; the
-                // do-while form lowers to a plain loop with no marker slot,
-                // so re-emission would silently drop it.
-                return Err(ParseError::structured(
-                    ParseErrorKind::StatementInvalid,
-                    self.previous_span(),
-                )
-                .with_arg("issue", "fac_omnia_dum"));
-            }
             if !allow_while {
                 return Err(self.invalid_expression_error("closure_fac_body_dum"));
             }

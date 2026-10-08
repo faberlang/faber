@@ -23,8 +23,8 @@ locale = "la"
 # Common mistakes:
 #   • expecting `omnia` to change behavior — it never does; recovery works
 #     exactly as in plain `fac`
-#   • writing `fac omnia { … } dum cond` — the marker belongs to the breakable
-#     try-body form only (`fac_omnia_dum`)
+#   • assuming `fac omnia { … } dum cond` is rejected — it is legal and lowers
+#     as a plain `fac … dum` loop (see fac-omnia-dum)
 #
 # See also: fac, cape, omnia
 # =============================================================================

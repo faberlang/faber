@@ -531,6 +531,7 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::Loop(block) => {
                 if let Some((body_stmts, cond)) = self.as_fac_loop(block) {
                     writer.write(surface.contextual_keyword("fac"));
+                    self.write_fac_omnia_marker(block, surface, writer);
                     writer.writeln(" {");
                     writer.indented(|writer| {
                         self.write_stmts(body_stmts, names, surface, writer);
@@ -1481,6 +1482,7 @@ impl super::FaberCodegen<'_> {
             && let Some((body_stmts, cond)) = self.as_fac_loop(loop_block)
         {
             writer.write(surface.contextual_keyword("fac"));
+            self.write_fac_omnia_marker(loop_block, surface, writer);
             writer.writeln(" {");
             writer.indented(|writer| {
                 self.write_stmts(body_stmts, names, surface, writer);

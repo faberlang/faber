@@ -89,7 +89,9 @@ impl BreakableLoopStyle {
 /// Whether [`HirBlock::breakable`] is set.
 #[must_use]
 pub fn is_breakable(block: &HirBlock) -> bool {
-    block.breakable.is_some()
+    block
+        .breakable
+        .is_some_and(radix_hir::HirBreakableKind::is_scope)
 }
 
 /// Whether the block is exactly one top-level `rumpe` (fallthrough `break` would be unreachable).
@@ -138,15 +140,26 @@ pub fn block_may_exit_early(block: &HirBlock) -> bool {
 #[must_use]
 pub fn fac_expr_body(expr: &HirExpression) -> Option<&HirBlock> {
     match &expr.kind {
-        HirExpressionKind::Block(block) if block.breakable.is_some() => Some(block),
+        HirExpressionKind::Block(block)
+            if block
+                .breakable
+                .is_some_and(radix_hir::HirBreakableKind::is_scope) =>
+        {
+            Some(block)
+        }
         HirExpressionKind::Handled { body, .. } => {
-            if body.breakable.is_some() {
+            if body
+                .breakable
+                .is_some_and(radix_hir::HirBreakableKind::is_scope)
+            {
                 return Some(body);
             }
             if body.statements.is_empty()
                 && let Some(inner) = body.expr.as_deref()
                 && let HirExpressionKind::Block(block) = &inner.kind
-                && block.breakable.is_some()
+                && block
+                    .breakable
+                    .is_some_and(radix_hir::HirBreakableKind::is_scope)
             {
                 return Some(block);
             }
@@ -404,7 +417,10 @@ pub fn write_labeled_breakable_scope<F>(
 where
     F: FnOnce(&mut CodeWriter),
 {
-    if block.breakable.is_some() {
+    if block
+        .breakable
+        .is_some_and(radix_hir::HirBreakableKind::is_scope)
+    {
         if loop_style.drops_dead_shell() && !block_may_exit_early(block) {
             // No `rumpe` and no routed `perge`: the loop would run once and
             // `break` at its end. Keep the braces (they scope the body's

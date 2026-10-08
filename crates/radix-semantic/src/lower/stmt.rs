@@ -1755,6 +1755,12 @@ impl Lowerer<'_> {
                 stmt.body.span,
             );
             loop_block.end = end;
+            // The authored `omnia` marker rides the synthesized loop block so
+            // the re-emitter prints it. `FacOmniaLoop` is a marker, not a
+            // scope: every backend and MIR lower the loop as plain `fac … dum`.
+            if stmt.omnia {
+                loop_block.breakable = Some(radix_hir::HirBreakableKind::FacOmniaLoop);
+            }
             HirExpression {
                 id: self.next_hir_id(),
                 kind: HirExpressionKind::Loop(loop_block),

@@ -1,0 +1,54 @@
++++
+term = "fac"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "dum_stmt", "cape_clause", "si_stmt", "iace_stmt", "redde_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "control-flow"
+canonical = false
+summary = "fac omnia inside dum: a caught error continues the loop"
+syntax = "dum <cond> { fac omnia <block> cape <name> <block> }"
+aliases = ["do all"]
+related = ["fac", "cape", "omnia", "dum"]
+locale = "la"
++++
+# =============================================================================
+# fac omnia inside dum: a caught error continues the loop
+# =============================================================================
+#
+# What this teaches:
+#   • `dum cond { fac omnia { … } cape err { … } }` catches per iteration: the
+#     handler runs and the outer loop continues past the caught error
+#
+# Common mistakes:
+#   • writing `fac omnia { … } cape … dum cond` and expecting per-iteration
+#     recovery — there the handler wraps the loop and ends it
+#
+# See also: fac, cape, omnia, dum
+# =============================================================================
+
+# fac omnia inside dum — the loop continues past a caught error
+#
+# GRAMMAR:
+#   dumStmt :← 'dum' expr '{' stmt* '}'
+#
+# EXPECTED OUTPUT:
+#   ok 1 / interceptum 2 / ok 3 / finis 3
+#
+# BACKEND:
+#   Runner: plain fac inside dum.
+
+incipit {
+    varia numerus i ← 0
+    dum i ≺ 3 {
+        i ← i + 1
+        fac omnia {
+            si i ≥ 2 et i ≺ 3 {
+                iace "secunda"
+            }
+            nota "ok §"(i)
+        }
+        cape err {
+            nota "interceptum §"(i)
+        }
+    }
+    nota "finis §"(i)
+}
