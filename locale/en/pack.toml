@@ -4576,6 +4576,14 @@ help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera
 message = "`{parameter}` is the lane id of kernel `{kernel}` only because it is the trailing `u32`; the positional lane form is retiring in favor of `{filum}`"
 help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
 
+[diagnostics.WARN033]
+message = "an index inside a kernel could not be proven in range; it stays checked (one compare per lane, fatal on a miss)"
+help = "convert the index with `x ↦ 0‥N` to carry its range, or read with `get`"
+
+[diagnostics.WARN033.issues.unproven_kernel_index]
+message = "an index inside a kernel could not be proven in range; it stays checked (one compare per lane, fatal on a miss)"
+help = "convert the index with `x ↦ 0‥N` to carry its range, or read with `get`"
+
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "or-pattern alternatives must bind the same names and types"

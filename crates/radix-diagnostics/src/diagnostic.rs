@@ -265,6 +265,11 @@ pub enum WarningKind {
     /// lane ABI is retiring in favor of a `filum` loop. Warn-only until
     /// `filum` ships on the runner.
     PositionalLaneParam,
+    /// A tensor index form `t[i]` inside a kernel whose index the checker
+    /// cannot prove in range. The form stays checked (one compare per lane);
+    /// the warning suggests the range type (`x ↦ 0‥N`) and `get` (gpu-reset
+    /// K11). Warn-only.
+    UnprovenKernelIndex,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

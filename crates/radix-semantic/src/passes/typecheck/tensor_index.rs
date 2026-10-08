@@ -15,6 +15,7 @@ use radix_lexer::Span;
 use super::*;
 
 const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
+const ISSUE_UNPROVEN_KERNEL_INDEX: &str = "unproven_kernel_index";
 pub(super) const ISSUE_PROVABLY_OUT_OF_BOUNDS: &str = "index_provably_out_of_bounds";
 
 const TENSOR_FORMA: &str = "forma";
@@ -822,6 +823,129 @@ pub(super) fn reject_static_bounded_index_oob(
 ) {
     let range = classify_static_index_range(checker, receiver_ty, index);
     report_static_index_oob(checker, index, &range);
+}
+
+/// Axis extents of a tensor type, resolved; `None` when the type is not a
+/// tensor or its shape is not a literal/tuple of dimensions.
+fn tensor_axis_extents(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<Vec<IndexExpr>> {
+    let resolved = checker.resolve_inferred_type(ty);
+    let (_, payload) = checker.types.peel_access_marker(resolved);
+    let Type::Tensor(_, shape) = checker.types.get(payload).clone() else {
+        return None;
+    };
+    let shape = checker.resolve_index(shape);
+    let dims = match checker.types.get_index(shape).clone() {
+        IndexExpr::Tuple(dims) => dims,
+        IndexExpr::Literal(_) => vec![shape],
+        _ => return None,
+    };
+    Some(
+        dims.into_iter()
+            .map(|dim| {
+                let dim = checker.resolve_index(dim);
+                checker.types.get_index(dim).clone()
+            })
+            .collect(),
+    )
+}
+
+/// An extent that names one definite size, so equality of two such extents
+/// is a proof (an unsolved hole or an unspecified shape proves nothing).
+fn is_definite_extent(extent: &IndexExpr) -> bool {
+    !matches!(extent, IndexExpr::Infer(_) | IndexExpr::Unspecified)
+}
+
+/// Record the extent each `apud` coordinate binder of a tensor iteration
+/// walks, so an index by that binder is provably in range of a tensor of the
+/// same axis extent.
+pub(super) fn record_coordinate_binder_extents(
+    checker: &mut TypeChecker<'_>,
+    iterable_ty: TypeId,
+    coordinates: &[(DefId, radix_lexer::Symbol)],
+) {
+    let Some(extents) = tensor_axis_extents(checker, iterable_ty) else {
+        return;
+    };
+    if extents.len() != coordinates.len() {
+        return;
+    }
+    for ((def_id, _), extent) in coordinates.iter().zip(extents) {
+        if is_definite_extent(&extent) {
+            let id = checker.types.intern_index(extent);
+            checker.coordinate_binder_extents.insert(*def_id, id);
+        }
+    }
+}
+
+/// Warn when `t[i]` inside a kernel indexes a tensor with an index the
+/// checker cannot prove in range (gpu-reset K11).
+///
+/// The form stays checked at run time; the warning suggests the range type.
+/// A component is proven when it is an in-range literal, or an `apud`
+/// coordinate binder of a tensor iteration whose same-position axis has the
+/// indexed tensor's extent on that axis. Anything else (arithmetic, a
+/// parameter, a local, a list value) is unproven. Never an error.
+pub(super) fn warn_unproven_kernel_index(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    index: &HirExpression,
+) {
+    if !checker.current_nucleum_entry {
+        return;
+    }
+    let Some(extents) = tensor_axis_extents(checker, receiver_ty) else {
+        return;
+    };
+    // A fully literal index is the static range classifier's: in range needs
+    // no warning, out of range is already an error.
+    if !matches!(
+        classify_static_index_range(checker, receiver_ty, index),
+        StaticIndexRange::Unknown
+    ) {
+        return;
+    }
+    let components: Vec<&HirExpression> = match &index.kind {
+        HirExpressionKind::Array(elements) => {
+            let mut parts = Vec::with_capacity(elements.len());
+            for element in elements {
+                let HirArrayElement::Expr(inner) = element else {
+                    return warn_kernel_index(checker, index.span);
+                };
+                parts.push(inner);
+            }
+            parts
+        }
+        _ => vec![index],
+    };
+    if components.len() != extents.len() {
+        return warn_kernel_index(checker, index.span);
+    }
+    let proven = components.iter().zip(&extents).all(|(component, extent)| {
+        if let Some(value) = static_signed_numerus_literal(component) {
+            return matches!(extent, IndexExpr::Literal(bound)
+                if u128::try_from(value).is_ok_and(|v| v < u128::from(*bound)));
+        }
+        let HirExpressionKind::Path(def_id) = &component.kind else {
+            return false;
+        };
+        let Some(binder_extent) = checker.coordinate_binder_extents.get(def_id).copied() else {
+            return false;
+        };
+        is_definite_extent(extent) && checker.types.get_index(binder_extent) == extent
+    });
+    if !proven {
+        warn_kernel_index(checker, index.span);
+    }
+}
+
+fn warn_kernel_index(checker: &mut TypeChecker<'_>, span: Span) {
+    checker.errors.push(
+        SemanticError::structured(
+            SemanticErrorKind::Warning(crate::WarningKind::UnprovenKernelIndex),
+            span,
+        )
+        .with_arg("issue", ISSUE_UNPROVEN_KERNEL_INDEX),
+    );
 }
 
 /// Check the index of a vector lane access `v[k]`.

@@ -168,6 +168,9 @@ mod closing_test;
 #[path = "discerne_closed_set_test.rs"]
 mod discerne_closed_set_test;
 #[cfg(test)]
+#[path = "kernel_index_warning_test.rs"]
+mod kernel_index_warning_test;
+#[cfg(test)]
 #[path = "ordering_test.rs"]
 mod ordering_test;
 pub mod ordo_conversio;
@@ -586,6 +589,11 @@ pub(crate) struct TypeChecker<'a> {
     /// inference when a flat source is first bound to a local.
     pub static_collection_lengths: FxHashMap<DefId, u64>,
 
+    /// Loop coordinate binders (`apud [i, j]`) of a tensor iteration, mapped
+    /// to the extent of the axis each one walks. A binder is in range of any
+    /// tensor whose same axis has that extent (K11 unproven-index warning).
+    pub(crate) coordinate_binder_extents: FxHashMap<DefId, IndexId>,
+
     /// Lowering-produced error expressions already reported during checking.
     pub errored_exprs: FxHashSet<HirId>,
 
@@ -823,6 +831,7 @@ impl<'a> TypeChecker<'a> {
             index_infer,
             shape_witnesses: FxHashMap::default(),
             static_collection_lengths: FxHashMap::default(),
+            coordinate_binder_extents: FxHashMap::default(),
             errored_exprs: FxHashSet::default(),
             error_type,
             mark_chorda_scalar_closure_param: false,

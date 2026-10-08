@@ -450,6 +450,13 @@ impl TypeChecker<'_> {
                 for ((def_id, _name), ty) in coordinate_bindings.iter().zip(coordinate_types) {
                     self.insert_binding(*def_id, ty);
                 }
+                if matches!(mode, radix_hir::HirIteraMode::Ex) {
+                    super::tensor_index::record_coordinate_binder_extents(
+                        self,
+                        dispatch_ty,
+                        coordinate_bindings,
+                    );
+                }
                 self.insert_binding(*binding, elem_ty);
                 self.check_loop_block(block);
                 self.pop_scope();

@@ -942,6 +942,7 @@ impl TypeChecker<'_> {
         };
         let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
         super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
+        super::tensor_index::warn_unproven_kernel_index(self, obj_ty, index);
         super::tensor_index::check_vector_lane_index(self, obj_ty, index);
         self.reject_static_octeti_index_oob(object, index);
         result
@@ -1062,6 +1063,7 @@ impl TypeChecker<'_> {
         if let Type::Tensor(elem, shape) = self.types.get(resolved).clone() {
             self.check_tensor_bracket_index(elem, shape, idx_ty, object.span, index.span);
             super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
+            super::tensor_index::warn_unproven_kernel_index(self, obj_ty, index);
             return elem;
         }
         if let Type::Tuple(elements) = self.types.get(resolved).clone() {

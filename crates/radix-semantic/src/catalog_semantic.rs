@@ -88,6 +88,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::LeadingUnderscore,
     WarningKind::ClosableInCycle,
     WarningKind::PositionalLaneParam,
+    WarningKind::UnprovenKernelIndex,
 ];
 
 // STABLE CODES
@@ -1323,6 +1324,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
             help: Some(
                 "bind the iteration coordinate with `apud` on a `filum` loop: `itera ex t apud [i, j] filum f fixum v`",
             ),
+        },
+        WarningKind::UnprovenKernelIndex => DiagnosticSpec {
+            code: "WARN033",
+            help: Some("convert the index with `x ↦ 0‥N` to carry its range, or read with `get`"),
         },
     }
 }
