@@ -2685,6 +2685,10 @@ help = "keep the body to scalar/tensor ops, structured control flow, locals, and
 message = "@ {nucleum} {fragment} call does not match the specialized signature{?reason| (|)}"
 help = "pass arguments whose specialized types, shapes, layouts, and modes match the {fragment} parameters"
 
+[diagnostics.SEM011.issues.nucleum_fragment_throw_caller]
+message = "@ {nucleum} {fragment} call of a throwing kernel needs a caller that declares `⇥ text`"
+help = "declare `⇥ text` on the calling kernel: the callee's constant throws become throw sites of the caller"
+
 [diagnostics.SEM011.issues.nucleum_fragment_cycle]
 message = "@ {nucleum} {fragment} call cycle{?cycle|: |}{?chain|: |}"
 help = "remove the recursive {fragment} call; composition requires an acyclic call graph"

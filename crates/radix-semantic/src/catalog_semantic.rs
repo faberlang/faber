@@ -690,6 +690,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "nucleum_fragment_context" => nucleum_fragment_context_help(args),
         "nucleum_fragment_effect" => nucleum_fragment_effect_help(args),
         "nucleum_fragment_type" => nucleum_fragment_type_help(args),
+        "nucleum_fragment_throw_caller" => Some(
+            "declare `⇥ text` on the calling kernel; the callee's constant throws become throw sites of the caller"
+                .to_owned(),
+        ),
         "nucleum_fragment_cycle" => nucleum_fragment_cycle_help(args),
         "nucleum_fragment_expansion" => nucleum_fragment_expansion_help(args),
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),

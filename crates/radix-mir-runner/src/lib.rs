@@ -1962,6 +1962,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         match &statement.kind {
             MirStatementKind::Assign { place, value } => {
                 let evaluated = self.eval_value(value, statement.span)?;
+                if matches!(
+                    self.deliver_at_host_read(statement.span)?,
+                    StatementOutcome::FrameReturned
+                ) {
+                    return Ok(StatementOutcome::FrameReturned);
+                }
                 self.write_place(place, evaluated, statement.span)?;
                 Ok(StatementOutcome::Continue)
             }
@@ -2040,6 +2046,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 let Some(result) = result? else {
                     return Ok(StatementOutcome::FrameReturned);
                 };
+                if matches!(
+                    self.deliver_at_host_read(statement.span)?,
+                    StatementOutcome::FrameReturned
+                ) {
+                    return Ok(StatementOutcome::FrameReturned);
+                }
                 if let Some(destination) = destination {
                     self.write_place(destination, result, statement.span)?;
                 }

@@ -1,9 +1,10 @@
 //! U9-5: queued kernel-error delivery for handled blocks, against a fake
 //! dispatcher that injects recoverable faults for chosen launches.
 
-use super::kernel_dispatch::{self, DeviceFault, KernelDispatcher};
+use super::kernel_dispatch::{self, DeviceFault, DeviceToken, ElementRange, KernelDispatcher};
 use super::*;
 use crate::host::BufferHost;
+use crate::value::TensorValue;
 use radix_lexer::Interner;
 use radix_mir::{
     MirBinOp, MirBlock, MirCallee, MirConstant, MirDeviceBlockOp, MirFunction, MirIntrinsic,
@@ -23,6 +24,9 @@ struct Fake {
     stash: Option<DeviceFault>,
     flushes: u32,
     delivered: Vec<String>,
+    /// Hand back a device-resident output whose host read surfaces the fault.
+    resident_output: bool,
+    me: std::rc::Weak<RefCell<Fake>>,
 }
 
 impl Fake {
@@ -51,7 +55,27 @@ impl KernelDispatcher for Fake {
         if self.surface_at == Some(self.launches) {
             self.surface();
         }
+        if self.resident_output
+            && let Some(me) = self.me.upgrade()
+        {
+            let output =
+                TensorValue::try_contiguous(vec![Value::Int(41)], vec![1]).expect("tensor");
+            output.mark_device_resident(
+                DeviceToken(1),
+                me as kernel_dispatch::ResidencyHook,
+                false,
+            );
+            return Ok(Some(Value::Tensor(Rc::new(RefCell::new(output)))));
+        }
         Ok(None)
+    }
+    fn make_host_current(
+        &mut self,
+        _token: DeviceToken,
+        _range: ElementRange,
+    ) -> Result<(), RunnerError> {
+        self.surface();
+        Ok(())
     }
     fn set_launch_owner(&mut self, owner: Option<u64>) {
         self.next_owner = owner;
@@ -76,6 +100,8 @@ const C: u32 = 2; // counter
 const TMP: u32 = 3;
 const COND: u32 = 4;
 const E2: u32 = 5;
+const OUT: u32 = 6; // a launch's device-resident output
+const READ: u32 = 7; // the host read of OUT
 
 struct Prog {
     types: TypeTable,
@@ -239,6 +265,8 @@ fn program(types: &TypeTable, main_blocks: Vec<MirBlock>, extra: Vec<MirFunction
         local(TMP, n),
         local(COND, b),
         local(E2, text),
+        local(OUT, n),
+        local(READ, n),
     ];
     let function = |id: u32, blocks: Vec<MirBlock>, error_ty, stage| MirFunction {
         id: MirFunctionId(id),
@@ -286,6 +314,7 @@ fn run(
     let context = MirValidationContext::new(&types);
     let mut host = BufferHost::default();
     let fake = Rc::new(RefCell::new(fake));
+    fake.borrow_mut().me = Rc::downgrade(&fake);
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     runner.kernel_policy = RunnerKernelPolicy::Dispatch;
     runner.kernel_dispatcher = Some(fake.clone() as kernel_dispatch::ResidencyHook);
@@ -650,4 +679,66 @@ fn deliver_markers_do_no_device_work() {
         (3, 1),
         "three launches, one flush at the block exit"
     );
+}
+
+/// omnia { out = k() ; read = out[0] ; t = 5 } cape { t = 7 }
+fn omnia_host_read() -> Vec<MirBlock> {
+    let n = num();
+    let launch = MirTerminatorKind::TryCall {
+        destination: Some(place(OUT)),
+        callee: MirCallee::Function(MirFunctionId(1)),
+        args: vec![],
+        ok_block: MirBlockId(2),
+        error_place: place(E),
+        error_block: MirBlockId(3),
+    };
+    let read = stmt(MirStatementKind::Assign {
+        place: place(READ),
+        value: val(
+            MirValueKind::Operand(MirOperand::Place(MirPlace {
+                base: radix_mir::MirPlaceBase::Local(MirLocalId(OUT)),
+                projections: vec![radix_mir::MirProjection::Index(MirOperand::Constant(
+                    MirConstant::Int(0),
+                ))],
+            })),
+            n,
+        ),
+    });
+    vec![
+        block(
+            0,
+            vec![assign_const(n, T, 0), enter(true, 3, E)],
+            vec![],
+            goto(1),
+        ),
+        block(1, vec![], vec![], launch),
+        block(2, vec![read], vec![trace(5), vec![exit()]], goto(4)),
+        block(3, vec![exit_err()], vec![trace(7)], goto(4)),
+        block(4, vec![], vec![], ret(T)),
+    ]
+}
+
+#[test]
+fn a_host_read_of_a_faulted_output_delivers_before_the_read_completes() {
+    let fake = Fake {
+        fault_launches: vec![1],
+        resident_output: true,
+        ..Fake::default()
+    };
+    let outcome = run(omnia_host_read(), |_| vec![], fake);
+    // The read surfaced the error; the handler ran at once, so the statement
+    // after the read (the 5) never did.
+    assert_eq!(int(&outcome), 7);
+    assert_eq!(outcome.fake.borrow().delivered, ["fault1"]);
+}
+
+#[test]
+fn a_host_read_without_a_fault_completes_normally() {
+    let fake = Fake {
+        resident_output: true,
+        ..Fake::default()
+    };
+    let outcome = run(omnia_host_read(), |_| vec![], fake);
+    assert_eq!(int(&outcome), 5);
+    assert!(outcome.fake.borrow().delivered.is_empty());
 }

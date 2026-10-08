@@ -171,6 +171,31 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         Ok(StatementOutcome::Continue)
     }
 
+    /// Delivery at a host read (U9-6b). A statement that read device data may
+    /// have surfaced a recoverable kernel error (`make_host_current` stashes
+    /// it); the error routes to its owner block's handler BEFORE the read
+    /// result is stored or used, so the reading statement never completes.
+    /// Returns `FrameReturned` when a handler took over, and `Continue` when
+    /// nothing was pending (or the owner is an outer frame's block, whose
+    /// delivery stays queued as a carried error).
+    ///
+    /// # Errors
+    ///
+    /// An error with no owning handler ends the run (the uncaught case); a
+    /// fatal fault surfaced by the read fails the read itself.
+    pub(crate) fn deliver_at_host_read(
+        &mut self,
+        span: Span,
+    ) -> Result<StatementOutcome, RunnerError> {
+        if self.kernel_dispatcher.is_none() {
+            return Ok(StatementOutcome::Continue);
+        }
+        match self.take_dispatcher_fault(span)? {
+            Some(fault) => self.route_fault(fault, None, span),
+            None => Ok(StatementOutcome::Continue),
+        }
+    }
+
     /// The innermost open block of the current frame, as a launch owner tag.
     pub(crate) fn launch_owner(&self) -> Option<u64> {
         self.frames.last()?.blocks.last().map(|block| block.id)

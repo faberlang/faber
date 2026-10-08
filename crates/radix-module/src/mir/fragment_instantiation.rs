@@ -24,6 +24,9 @@ use rustc_hash::FxHashMap;
 
 pub const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
 pub const ISSUE_TYPE: &str = "nucleum_fragment_type";
+/// A kernel that inlines a throwing (`⇥ text`) kernel must itself declare
+/// `⇥ text`: the callee's constant throws become throw sites of the caller.
+pub const ISSUE_THROW_CALLER: &str = "nucleum_fragment_throw_caller";
 
 /// One instantiation or matrix diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +44,9 @@ impl FragmentInstantiationError {
         let rendered = match self.issue {
             ISSUE_CONTEXT => nucleum_fragment_context_message(self.reason, &self.args),
             ISSUE_TYPE => nucleum_fragment_type_message(self.reason, &self.args),
+            ISSUE_THROW_CALLER => {
+                Some("@ nucleum caller of a throwing kernel must declare the same `⇥ text` error channel".to_owned())
+            }
             _ => None,
         };
         rendered.unwrap_or_else(|| format!("{}: {}", self.issue, self.reason))
@@ -341,7 +347,24 @@ impl<'a> InstantiationChecker<'a> {
             self.ty(caller, "return", span, definition_span, Some(&expected), Some(&actual));
             return;
         }
-        if failable || !self.effect_fits(sig) {
+        if failable && throws_text(self.types, sig) {
+            // U9-6b: a throwing kernel composes into a caller that can
+            // itself throw its text; its constant throws become the
+            // caller's throw sites.
+            if !throws_text(self.types, caller_fn) {
+                self.errors.push(FragmentInstantiationError {
+                    issue: ISSUE_THROW_CALLER,
+                    reason: "caller_not_failable",
+                    span,
+                    definition_span,
+                    args: vec![DiagnosticArg::new("caller", caller.caller_arg())],
+                });
+            } else if !self.effect_fits(sig, true) {
+                self.ty(caller, "effect", span, definition_span, None, None);
+            }
+            return;
+        }
+        if failable || !self.effect_fits(sig, false) {
             self.ty(caller, "effect", span, definition_span, None, None);
         }
     }
@@ -440,8 +463,11 @@ impl<'a> InstantiationChecker<'a> {
         None
     }
 
-    fn effect_fits(&self, sig: &MirFunction) -> bool {
-        if sig.error_ty.is_some() || sig.is_async || sig.is_generator {
+    fn effect_fits(&self, sig: &MirFunction, allow_text_throw: bool) -> bool {
+        if (sig.error_ty.is_some() && !(allow_text_throw && throws_text(self.types, sig)))
+            || sig.is_async
+            || sig.is_generator
+        {
             return false;
         }
         let Some(summaries) = self.summaries else {
@@ -621,6 +647,14 @@ impl<'a> InstantiationChecker<'a> {
         self.errors
             .push(FragmentInstantiationError { issue: ISSUE_TYPE, reason, span, definition_span, args });
     }
+}
+
+/// Whether `function` declares the text error channel (`⇥ text`), the only
+/// error a kernel can carry.
+fn throws_text(types: &TypeTable, function: &MirFunction) -> bool {
+    function
+        .error_ty
+        .is_some_and(|ty| matches!(types.get(ty.semantic_id()), Type::Primitive(Primitive::Textus)))
 }
 
 fn signature_has_unsolved_params(types: &TypeTable, sig: &MirFunction) -> bool {

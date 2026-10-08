@@ -594,7 +594,11 @@ impl CompositionPass<'_> {
                 self.push_expansion("callsite", site.span, inlines, self.budget.max_inlines_per_callsite, &chain);
                 return;
             }
-            if site.is_try_call {
+            // A failable call composes only for a callee with an error
+            // channel (U9-6b: a throwing kernel); the instantiation check has
+            // already refused any callee whose error is not a text and any
+            // caller that cannot throw.
+            if site.is_try_call && callee.error_ty.is_none() {
                 self.push_expansion("failable", site.span, 1, 0, &chain);
                 return;
             }
@@ -662,8 +666,16 @@ impl CompositionPass<'_> {
         if site.block_index >= caller.blocks.len() {
             return None;
         }
-        let stmt_index = site.stmt_index?;
-        if stmt_index >= caller.blocks[site.block_index].statements.len() {
+        let try_route = try_route_of(caller, site);
+        if site.is_try_call && try_route.is_none() {
+            return None;
+        }
+        let stmt_index = match site.stmt_index {
+            Some(index) => index,
+            None if try_route.is_some() => caller.blocks[site.block_index].statements.len(),
+            None => return None,
+        };
+        if try_route.is_none() && stmt_index >= caller.blocks[site.block_index].statements.len() {
             return None;
         }
         let mut ids = IdGen::from_function(caller);
@@ -752,21 +764,27 @@ impl CompositionPass<'_> {
             .and_then(|place| place_ty(caller, place))
             .unwrap_or(callee.return_ty);
         let block = &mut caller.blocks[site.block_index];
-        if stmt_index >= block.statements.len() {
+        if try_route.is_none() && stmt_index >= block.statements.len() {
             return None;
         }
-        let mut tail = block.statements.split_off(stmt_index);
-        if tail.is_empty() || !matches!(tail[0].kind, MirStatementKind::Call { .. }) {
-            block.statements.append(&mut tail);
-            return None;
+        let mut tail = Vec::new();
+        if try_route.is_none() {
+            tail = block.statements.split_off(stmt_index);
+            if tail.is_empty() || !matches!(tail[0].kind, MirStatementKind::Call { .. }) {
+                block.statements.append(&mut tail);
+                return None;
+            }
+            tail.remove(0);
         }
-        tail.remove(0);
         // CDC-3: a single-block Return-terminated callee splices directly
         // into the caller block — arg binds, remapped statements, result
         // assign, then the caller's own tail and original terminator. No
         // entry Goto, no continue block, no fresh block ids, so the composed
         // caller keeps the single-block shape the device-safe gate admits.
-        if callee.blocks.len() == 1 && matches!(callee.blocks[0].terminator.kind, MirTerminatorKind::Return(_)) {
+        if try_route.is_none()
+            && callee.blocks.len() == 1
+            && matches!(callee.blocks[0].terminator.kind, MirTerminatorKind::Return(_))
+        {
             let callee_block = &callee.blocks[0];
             let mut spliced: Vec<_> = callee_block
                 .statements
@@ -804,7 +822,12 @@ impl CompositionPass<'_> {
         for block in &callee.blocks {
             alpha.blocks.insert(block.id, ids.next_block());
         }
-        let continue_id = ids.next_block();
+        // A failable call continues in its own `ok` block; the callee's
+        // throws leave through the caller's error edge.
+        let continue_id = match &try_route {
+            Some(route) => route.ok_block,
+            None => ids.next_block(),
+        };
         let cloned_entry = *alpha.blocks.get(&callee.blocks[0].id)?;
         let mut cloned = Vec::new();
         let mut cloned_ids = Vec::new();
@@ -817,6 +840,9 @@ impl CompositionPass<'_> {
                 continue_id,
                 dest_ty,
                 &mut_writebacks,
+                try_route
+                    .as_ref()
+                    .map(|route| (route, callee.error_ty.unwrap_or(callee.return_ty))),
             );
             cloned_ids.push(mapped.id);
             cloned.push(mapped);
@@ -826,6 +852,13 @@ impl CompositionPass<'_> {
             MirTerminator { kind: MirTerminatorKind::Goto(cloned_entry), span: site.span },
         );
         block.statements.extend(binds);
+        if let Some(route) = &try_route {
+            caller.blocks.extend(cloned);
+            if route.propagates {
+                drop_unreferenced_block(caller, route.error_block);
+            }
+            return Some(InlineBlocks { cloned: cloned_ids, continue_id: None });
+        }
         caller
             .blocks
             .push(MirBlock { id: continue_id, statements: tail, terminator: old_term, span: site.span });
@@ -1053,13 +1086,32 @@ fn splice_nesting(
     new_blocks: &InlineBlocks,
     spliced: &Nesting,
 ) {
-    let Some(stmt_index) = site.stmt_index else {
-        return;
-    };
     let Some(block) = caller.blocks.get(site.block_index) else {
         return;
     };
     let Some(entry) = nesting.get_mut(&site.block_id) else {
+        return;
+    };
+    let Some(stmt_index) = site.stmt_index else {
+        // Failable call: the block's `TryCall` became a jump into the cloned
+        // callee blocks; only the argument binds were appended to its head.
+        let binds = block
+            .statements
+            .len()
+            .saturating_sub(entry.statements.len());
+        entry.statements.extend(vec![spliced.clone(); binds]);
+        entry.terminator = spliced.clone();
+        for cloned_id in &new_blocks.cloned {
+            let len = caller
+                .blocks
+                .iter()
+                .find(|block| block.id == *cloned_id)
+                .map_or(0, |block| block.statements.len());
+            nesting.insert(
+                *cloned_id,
+                BlockNesting { statements: vec![spliced.clone(); len], terminator: spliced.clone() },
+            );
+        }
         return;
     };
     let inserted = |kept: usize| vec![spliced.clone(); block.statements.len().saturating_sub(kept)];
@@ -1561,6 +1613,7 @@ fn rewrite_return_into(
     dest_ty: MirType,
     ids: &mut IdGen,
     mut_writebacks: &[(MirPlace, MirLocalId, MirType)],
+    error_route: Option<(&TryRoute, MirType)>,
 ) {
     match &block.terminator.kind {
         MirTerminatorKind::Return(operand) => {
@@ -1589,8 +1642,26 @@ fn rewrite_return_into(
             block.terminator =
                 MirTerminator { kind: MirTerminatorKind::Goto(continue_id), span: block.terminator.span };
         }
-        MirTerminatorKind::ReturnError(_) => {
-            block.terminator = MirTerminator { kind: MirTerminatorKind::Unreachable, span: block.terminator.span };
+        MirTerminatorKind::ReturnError(operand) => {
+            let span = block.terminator.span;
+            let Some((route, error_ty)) = error_route else {
+                block.terminator = MirTerminator { kind: MirTerminatorKind::Unreachable, span };
+                return;
+            };
+            // The caller returns the error unchanged: the clone keeps its
+            // own `ReturnError`, so a constant text stays a constant throw.
+            if route.propagates {
+                return;
+            }
+            let operand = operand.clone();
+            block.statements.push(MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: route.error_place.clone(),
+                    value: MirValue { id: ids.next_value(), kind: MirValueKind::Operand(operand), ty: error_ty, span },
+                },
+                span,
+            });
+            block.terminator = MirTerminator { kind: MirTerminatorKind::Goto(route.error_block), span };
         }
         _ => {}
     }
@@ -1604,10 +1675,85 @@ fn remap_and_connect(
     continue_id: MirBlockId,
     dest_ty: MirType,
     mut_writebacks: &[(MirPlace, MirLocalId, MirType)],
+    error_route: Option<(&TryRoute, MirType)>,
 ) -> MirBlock {
     let mut mapped = remap_block(block, alpha, ids);
-    rewrite_return_into(&mut mapped, destination, continue_id, dest_ty, ids, mut_writebacks);
+    rewrite_return_into(&mut mapped, destination, continue_id, dest_ty, ids, mut_writebacks, error_route);
     mapped
+}
+
+/// Where a failable call site continues: its `ok` block and its error edge.
+struct TryRoute {
+    ok_block: MirBlockId,
+    error_place: MirPlace,
+    error_block: MirBlockId,
+    /// The error block only returns the error place, so a callee throw can
+    /// leave the caller directly.
+    propagates: bool,
+}
+
+/// Remove `target` when no terminator reaches it any more (the error block of
+/// a failable call whose callee throws now leave the caller directly).
+fn drop_unreferenced_block(function: &mut MirFunction, target: MirBlockId) {
+    let referenced = function.blocks.iter().any(|block| {
+        let mut hit = false;
+        visit_successors(&block.terminator.kind, |successor| hit |= successor == target);
+        hit
+    });
+    if !referenced {
+        function.blocks.retain(|block| block.id != target);
+    }
+}
+
+fn visit_successors(kind: &MirTerminatorKind, mut visit: impl FnMut(MirBlockId)) {
+    match kind {
+        MirTerminatorKind::Goto(block) => visit(*block),
+        MirTerminatorKind::Branch { then_block, else_block, .. } => {
+            visit(*then_block);
+            visit(*else_block);
+        }
+        MirTerminatorKind::Switch { cases, default, .. } => {
+            cases.iter().for_each(|case| visit(case.target));
+            visit(*default);
+        }
+        MirTerminatorKind::TryCall { ok_block, error_block, .. } => {
+            visit(*ok_block);
+            visit(*error_block);
+        }
+        MirTerminatorKind::Return(_) | MirTerminatorKind::ReturnError(_) | MirTerminatorKind::Unreachable => {}
+    }
+}
+
+/// Whether `operand` reads exactly `place` (a temp operand names its temp slot).
+fn operand_is_place(operand: &MirOperand, place: &MirPlace) -> bool {
+    match operand {
+        MirOperand::Place(read) => read == place,
+        MirOperand::Temp(temp) => place.projections.is_empty() && place.base == MirPlaceBase::Temp(*temp),
+        _ => false,
+    }
+}
+
+fn try_route_of(caller: &MirFunction, site: &CallSite) -> Option<TryRoute> {
+    if !site.is_try_call {
+        return None;
+    }
+    let MirTerminatorKind::TryCall { ok_block, error_place, error_block, .. } =
+        &caller.blocks.get(site.block_index)?.terminator.kind
+    else {
+        return None;
+    };
+    let propagates = caller
+        .blocks
+        .iter()
+        .find(|block| block.id == *error_block)
+        .is_some_and(|block| {
+            block.statements.is_empty()
+                && matches!(
+                    &block.terminator.kind,
+                    MirTerminatorKind::ReturnError(operand) if operand_is_place(operand, error_place)
+                )
+        });
+    Some(TryRoute { ok_block: *ok_block, error_place: error_place.clone(), error_block: *error_block, propagates })
 }
 
 #[cfg(test)]

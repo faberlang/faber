@@ -153,3 +153,79 @@ fn a_text_channel_kernel_that_never_throws_carries_no_fault_record() {
             .all(|resource| !matches!(resource.kind, Kind::FaultRecord { .. }))
     );
 }
+
+/// A one-lane kernel (`scale`) that calls a throwing kernel (`guard`).
+const INLINED: &str = r#"
+@ kernel
+fn guard(f32 v) → f32 ⇥ string {
+    if v + 2.5 ≺ 0.0 {
+        throw "very negative lane"
+    }
+    if v ≺ 0.0 {
+        throw "negative lane"
+    }
+    return v * 2.0
+}
+
+@ kernel
+@ public
+fn scale(tensor<f32, [8]> src, mut tensor<f32, [8]> dst) → void ⇥ string {
+    for range 0‥8 const k {
+        dst[k] ← guard(src[k])
+    }
+}
+
+@ cli "kernel-throw-inline"
+main args args {
+    var tensor<f32, [8]> src ← tf32[8] {}
+    var tensor<f32, [8]> dst ← tf32[8] {}
+    do all {
+        scale(src, mut dst)
+    }
+    catch err {
+        print err
+    }
+}
+"#;
+
+#[test]
+fn an_inlined_throwing_kernel_adds_its_throws_as_caller_sites() {
+    let (function, signature, reflection) = lowered_kernel(INLINED);
+    assert!(
+        !function
+            .blocks
+            .iter()
+            .any(|block| matches!(block.terminator.kind, MirTerminatorKind::TryCall { .. })),
+        "the failable call is composed away"
+    );
+    let sites: Vec<_> = reflection
+        .fault_sites
+        .iter()
+        .map(|site| (site.id, site.kind, site.text.as_str()))
+        .collect();
+    assert_eq!(
+        sites,
+        [
+            (0, MirFaultKind::Recoverable, "very negative lane"),
+            (1, MirFaultKind::Recoverable, "negative lane"),
+        ]
+    );
+    let record = signature.resources_by_binding().last().map(|r| r.kind);
+    assert_eq!(record, Some(Kind::FaultRecord { sites: 2 }));
+}
+
+#[test]
+fn the_callers_own_throw_precedes_the_appended_callee_blocks_in_block_order() {
+    let source = INLINED.replace(
+        "        dst[k] ← guard(src[k])\n",
+        "        dst[k] ← guard(src[k])\n        if dst[k] ≻ 100.0 {\n            throw \"too large\"\n        }\n",
+    );
+    let (_, _, reflection) = lowered_kernel(&source);
+    let texts: Vec<_> = reflection
+        .fault_sites
+        .iter()
+        .map(|site| site.text.as_str())
+        .collect();
+    // The composed callee blocks are appended after the caller's own blocks.
+    assert_eq!(texts, ["too large", "very negative lane", "negative lane"]);
+}

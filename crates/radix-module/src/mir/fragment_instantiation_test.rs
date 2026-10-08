@@ -1,6 +1,6 @@
 //! Coverage for nucleum-fragment instantiation checking and the call-legality matrix.
 
-use super::{FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_TYPE, check_with_metadata};
+use super::{FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_THROW_CALLER, ISSUE_TYPE, check_with_metadata};
 use crate::diagnostics::DiagnosticArg;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
@@ -664,6 +664,61 @@ fn failable_fragment_call_does_not_fit_effect() {
         span: CALL_SPAN(),
     };
     expect_issue(&check_fns(&[entry, helper], &types), ISSUE_TYPE, "effect");
+}
+
+/// A kernel (`ENTRY`) that calls a throwing kernel (`ENTRY_INNER`, `⇥ text`)
+/// through a `TryCall`; `caller_error` is the caller's own error channel.
+fn throwing_kernel_call(types: &mut TypeTable, caller_error: bool) -> Vec<FragmentInstantiationError> {
+    let ty = f32_ty(types);
+    let text = text_ty(types);
+    let mut callee = function(
+        1,
+        ENTRY_INNER,
+        vec![param(0, ty, MirParamMode::Owned)],
+        ty,
+        None,
+        Vec::new(),
+        None,
+        Some(MirKernelShaderStage::Compute),
+    );
+    callee.error_ty = Some(text);
+    let mut entry = function(
+        0,
+        ENTRY,
+        vec![param(0, ty, MirParamMode::Owned)],
+        ty,
+        None,
+        Vec::new(),
+        None,
+        Some(MirKernelShaderStage::Compute),
+    );
+    entry.error_ty = caller_error.then_some(text);
+    entry.blocks[0].terminator = MirTerminator {
+        kind: MirTerminatorKind::TryCall {
+            destination: Some(MirPlace::local(MirLocalId(0))),
+            callee: MirCallee::Function(MirFunctionId(1)),
+            args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+            ok_block: MirBlockId(0),
+            error_place: MirPlace::local(MirLocalId(0)),
+            error_block: MirBlockId(0),
+        },
+        span: CALL_SPAN(),
+    };
+    check_fns(&[entry, callee], types)
+}
+
+#[test]
+fn a_throwing_kernel_called_from_a_text_error_caller_is_accepted() {
+    let mut types = TypeTable::new();
+    assert_eq!(throwing_kernel_call(&mut types, true), Vec::new());
+}
+
+#[test]
+fn a_throwing_kernel_called_from_a_caller_without_a_text_error_is_refused_by_name() {
+    let mut types = TypeTable::new();
+    let errors = throwing_kernel_call(&mut types, false);
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert_eq!((errors[0].issue, errors[0].reason), (ISSUE_THROW_CALLER, "caller_not_failable"));
 }
 
 #[test]
