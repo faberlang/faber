@@ -88,6 +88,7 @@ fn tail_lane_loop(expr: &HirExpression) -> Option<&HirExpression> {
 /// the left side of its `coalesce` (the source spells the identity as
 /// `reduce ... coalesce d`, which the front end keeps as a coalesce).
 fn grid_reduction(expr: &HirExpression) -> Option<&HirExpression> {
+    let expr = peel_implicit_narrowing(expr);
     let reduction = match &expr.kind {
         HirExpressionKind::Binary(HirBinOp::Coalesce, lhs, _) => lhs.as_ref(),
         _ => expr,
@@ -97,6 +98,17 @@ fn grid_reduction(expr: &HirExpression) -> Option<&HirExpression> {
         HirExpressionKind::Reduction { filum: Some(_), group: None, .. }
     )
     .then_some(reduction)
+}
+
+/// The expression under the implicit narrowing the type checker wraps around a
+/// store into a sized integer cell (`out[0] ← reduce ...` into `i32`). The
+/// narrowing is the store's width boundary (F9 ruling 27), not part of the
+/// reduction region.
+fn peel_implicit_narrowing(expr: &HirExpression) -> &HirExpression {
+    match &expr.kind {
+        HirExpressionKind::Conversio { source, implicit: Some(_), .. } => source,
+        _ => expr,
+    }
 }
 
 /// Whether a region expression is a reduction (statements after it are
@@ -175,6 +187,51 @@ impl FunctionBuilder<'_> {
     pub(super) fn is_lane_region(&self, expr: &HirExpression) -> bool {
         self.lane_region
             .is_some_and(|region| region.span == expr.span)
+    }
+
+    /// Lower a grid reduction region stored through the implicit narrowing the
+    /// type checker inserts for a sized integer cell (`out[0] ← reduce ...`
+    /// into `i32`). The kernel-requirements pass has already proven the
+    /// reduction's result range fits the cell (rule 12.1: the proof is the
+    /// narrowing), so the reduction node is typed as the cell and no 64-bit
+    /// value or checked conversion exists on the device. `None` when `source`
+    /// is not a grid reduction region.
+    pub(super) fn lower_grid_reduce_store(
+        &mut self,
+        source: &HirExpression,
+        narrowing: &HirExpression,
+    ) -> Option<Option<MirOperand>> {
+        let reduction = grid_reduction(source)?;
+        let HirExpressionKind::Reduction {
+            op,
+            source: tensor,
+            coordinates,
+            filum: Some(filum),
+            binding,
+            body,
+            identity,
+            ..
+        } = &reduction.kind
+        else {
+            return None;
+        };
+        let identity = match &source.kind {
+            HirExpressionKind::Binary(HirBinOp::Coalesce, _, identity) => Some(identity.as_ref()),
+            _ => identity.as_deref(),
+        };
+        Some(self.lower_filum_reduce_expr(
+            super::control::FilumReduceLowering {
+                op: *op,
+                form: MirFilumForm::Grid,
+                source: tensor,
+                coordinates,
+                filum,
+                binding: binding.as_ref(),
+                body: body.as_ref(),
+                identity,
+            },
+            narrowing,
+        ))
     }
 
     /// Lower a coalesced grid reduction region: `reduce ... coalesce d`

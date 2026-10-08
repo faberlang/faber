@@ -466,3 +466,93 @@ main {}
         report.failures
     );
 }
+
+fn reduction_store_report(
+    source: &str,
+    name: &str,
+) -> crate::passes::kernel_requirements::KernelTargetRequirement {
+    let fixture = analyze_en(source);
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    target_row(&fixture, name, Target::MirMetal).clone()
+}
+
+#[test]
+fn rank_one_argmax_over_a_literal_extent_stores_into_i32() {
+    let report = reduction_store_report(
+        r"
+@ kernel
+@ public
+fn peak(tensor<f32, [32]> src, mut tensor<i32, [1]> out) → void {
+    out[0] ← reduce via argmax from src at [i] thread lane const v { return v } coalesce 0
+}
+main {}
+",
+        "peak",
+    );
+    assert!(report.admitted, "{:?}", report.failures);
+    assert!(report.trapping_stores.is_empty());
+}
+
+#[test]
+fn rank_one_argmin_over_a_symbolic_extent_is_admitted_under_an_extent_condition() {
+    let report = reduction_store_report(
+        r"
+@ kernel
+@ public
+fn trough(tensor<f32, [_]> src, mut tensor<i32, [1]> out) → void {
+    out[0] ← reduce via argmin from src at [i] thread lane const v { return v } coalesce 0
+}
+main {}
+",
+        "trough",
+    );
+    assert!(report.admitted, "{:?}", report.failures);
+    assert!(
+        report
+            .extent_conditions
+            .iter()
+            .any(|condition| condition.maximum == i128::from(i32::MAX)),
+        "the symbolic extent is bounded by the cell: {:?}",
+        report.extent_conditions
+    );
+}
+
+#[test]
+fn count_over_a_literal_extent_stores_into_i32() {
+    let report = reduction_store_report(
+        r"
+@ kernel
+@ public
+fn tally(tensor<f32, [4, 32]> src, mut tensor<i32, [1]> out) → void {
+    out[0] ← reduce via count from src at [i, j] thread lane const v { return v ≻ 1.0 }
+}
+main {}
+",
+        "tally",
+    );
+    assert!(report.admitted, "{:?}", report.failures);
+}
+
+#[test]
+fn an_integer_max_reduction_into_i32_is_still_out_of_range() {
+    let report = reduction_store_report(
+        r"
+@ kernel
+@ public
+fn widest(tensor<int, [32]> src, mut tensor<i32, [1]> out) → void {
+    out[0] ← reduce via max from src at [i] thread lane const v { return v } coalesce 0
+}
+main {}
+",
+        "widest",
+    );
+    assert!(!report.admitted);
+    assert!(
+        report
+            .failures
+            .iter()
+            .any(|failure| matches!(failure, KernelRequirementFailure::StoreOutOfRange { .. })),
+        "{:?}",
+        report.failures
+    );
+}

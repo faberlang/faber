@@ -615,6 +615,13 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         implicit: Option<radix_hir::HirStoreSite>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if implicit.is_some()
+            && recovery.is_none()
+            && self.is_lane_region(expr)
+            && let Some(lowered) = self.lower_grid_reduce_store(source, expr)
+        {
+            return lowered;
+        }
         self.lower_conversio(source, target, params, recovery, implicit, expr)
     }
 

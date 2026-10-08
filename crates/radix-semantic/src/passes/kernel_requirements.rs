@@ -924,6 +924,7 @@ impl BodyFacts<'_> {
         if let Some(ty) = expr.ty
             && !(self.range_only_expression(expr) && is_range_narrowable_type(ty, self.types))
             && !self.float_constant_only(expr, ty)
+            && !self.range_proven_reduction(expr)
         {
             self.record_type(ty, expr.span);
         }
@@ -1034,7 +1035,10 @@ impl BodyFacts<'_> {
                     }
                 }
                 let modular = is_modular_binary(expr.ty, *op, self.types);
-                let output = if modular {
+                let output = if *op == HirBinOp::Coalesce {
+                    // The payload of the left side, or the right side.
+                    merge_abstract_ranges(&[left, right])
+                } else if modular {
                     AbstractRange::from_type(
                         expr.ty.expect("modular result has a type"),
                         self.types,
@@ -1145,6 +1149,25 @@ impl BodyFacts<'_> {
                 }
                 stored
             }
+            HirExpressionKind::Reduction {
+                op,
+                source,
+                coordinates,
+                group,
+                binding,
+                body,
+                identity,
+                ..
+            } => self.evaluate_reduction(
+                expr,
+                *op,
+                source,
+                coordinates,
+                group,
+                binding,
+                body,
+                identity,
+            ),
             HirExpressionKind::Array(elements) => {
                 let mut axes = Vec::with_capacity(elements.len());
                 let mut representable = true;
@@ -1346,6 +1369,79 @@ impl BodyFacts<'_> {
                     AbstractRange::from_type(ty, self.types)
                 })
             }
+        }
+    }
+
+    /// A reduction. The term body runs with the coordinate binders in
+    /// `[0, E)` exactly as a tensor loop does; the result range follows the
+    /// operation, so a narrowing store of an index or a count is proven
+    /// (the proof is the narrowing, F9 ruling 27) instead of read as a full
+    /// 64-bit integer:
+    ///
+    /// - rank-1 `argmax` / `argmin`: `[0, E0 - 1]` (a symbolic `E0` becomes an
+    ///   extent condition at the store, like a lane binder bound);
+    /// - `count`: `[0, E0 * ... * Ek]`;
+    /// - `all` / `any`: a bool, the type range;
+    /// - every other operation (and a rank above one, a tuple, or a grouped
+    ///   reduction): the result type's range, which proves nothing narrower.
+    fn evaluate_reduction(
+        &mut self,
+        expr: &HirExpression,
+        op: radix_hir::HirReductionOp,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        group: &Option<Box<HirExpression>>,
+        binding: &Option<(DefId, Symbol)>,
+        body: &Option<HirBlock>,
+        identity: &Option<Box<HirExpression>>,
+    ) -> AbstractRange {
+        use radix_hir::HirReductionOp as Op;
+        if let Some(group) = group {
+            self.evaluate(group);
+        }
+        if let Some(identity) = identity {
+            self.evaluate(identity);
+        }
+        match (binding, body) {
+            (Some((binding, _)), Some(body)) => {
+                // The term's `redde` returns the term, not the kernel result.
+                let return_type = self.return_type.take();
+                self.visit_tensor_loop(source, coordinates, *binding, body);
+                self.return_type = return_type;
+            }
+            _ => {
+                self.evaluate(source);
+            }
+        }
+        let declared = || {
+            expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                AbstractRange::from_type(ty, self.types)
+            })
+        };
+        if group.is_some() {
+            return declared();
+        }
+        let dims = source
+            .ty
+            .map_or_else(Vec::new, |ty| shape_dimensions(ty, self.types));
+        match op {
+            Op::ArgMax | Op::ArgMin if dims.len() == 1 => coordinate_range(dims[0], self.types),
+            Op::Count if !dims.is_empty() => {
+                let mut total = KernelRangeExpr::Constant(1);
+                for dim in dims {
+                    let extent = match evaluate_index_dimension(dim, self.types) {
+                        Ok(Some(extent)) => KernelRangeExpr::Constant(i128::from(extent)),
+                        Ok(None) => KernelRangeExpr::Shape(dim),
+                        Err(_) => return declared(),
+                    };
+                    total = multiply(total, extent);
+                }
+                AbstractRange(Some(KernelValueRange {
+                    minimum: KernelRangeExpr::Constant(0),
+                    maximum: total,
+                }))
+            }
+            _ => declared(),
         }
     }
 
@@ -1862,6 +1958,31 @@ impl BodyFacts<'_> {
         }
     }
 
+    /// A rank-1 `argmax` / `argmin` or a `count`: the result is an index or a
+    /// tally whose range the reduction arm of [`Self::evaluate`] bounds by the
+    /// source extent, so its `int` type is not a 64-bit device value; only the
+    /// store that consumes it names a width.
+    fn range_proven_reduction(&self, expr: &HirExpression) -> bool {
+        use radix_hir::HirReductionOp as Op;
+        let HirExpressionKind::Reduction {
+            op,
+            source,
+            group: None,
+            ..
+        } = &expr.kind
+        else {
+            return false;
+        };
+        let rank = source
+            .ty
+            .map_or(0, |ty| shape_dimensions(ty, self.types).len());
+        match op {
+            Op::ArgMax | Op::ArgMin => rank == 1,
+            Op::Count => rank > 0,
+            _ => false,
+        }
+    }
+
     fn range_only_expression(&self, expr: &HirExpression) -> bool {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.range_only_bindings.contains(def_id),
@@ -1883,6 +2004,7 @@ impl BodyFacts<'_> {
                 HirArrayElement::Expr(expr) => self.range_only_expression(expr),
                 HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => false,
             }),
+            HirExpressionKind::Reduction { .. } => self.range_proven_reduction(expr),
             _ => false,
         }
     }
