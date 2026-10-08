@@ -762,7 +762,15 @@ help = "check expression syntax"
 
 [diagnostics.PARSE030.issues.constructor_store_position_only]
 message = "constructores expressionis generis tantum in locis repositionis licent"
-help = "prius liga constructionem: const tf32[2, 3] a ← tf32[2, 3]"
+help = "prius liga constructionem: genus tf32[2, 3] cum uncis vacuis in const tf32[2, 3] a"
+
+[diagnostics.PARSE030.issues.constructor_requires_empty_braces]
+message = "nihil generis scribitur `Genus` cum uncis vacuis; forma nuda abrogata est"
+help = "scribe genus cum uncis vacuis"
+
+[diagnostics.PARSE030.issues.constructor_type_not_claimed]
+message = "nihil generis solum pro tensore, vectore et matrice est; genus collectionis ut lista non vindicatur"
+help = "scribe genus tensoris, vectoris vel matricis cum uncis vacuis, vel collectionem per litteram aedifica"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
@@ -1679,6 +1687,10 @@ help = "scribe formam, ut tf32[2, 3]"
 [diagnostics.SEM008.issues.constructor_extent_requires_term]
 message = "dimension constructionis nomen magnitudinis vel litteram numeri requirit"
 help = "foramen `_` in annotatione est, non in constructione"
+
+[diagnostics.SEM008.issues.constructor_register_extent_requires_literal]
+message = "latitudo vectoris vel dimensio matricis in constructione litteram numeri requirit"
+help = "scribe latitudinem numero, ut vector<f32, 4>"
 
 [diagnostics.SEM008.issues.constructor_affine_extent_unsupported]
 message = "dimensiones constructionis litteras, nomina magnitudinum, et sublatas scriptas admittunt"
@@ -2911,7 +2923,7 @@ help = "write flat ↦ tensor<T, figura>"
 
 [diagnostics.SEM011.issues.tensor_crea_retired]
 message = "tensor receiver method crea is retired; use the type-expression constructor"
-help = "bind the constructor first: const tf32[2, 2] a ← tf32[2, 2]"
+help = "prius liga constructionem: genus tf32[2, 2] cum uncis vacuis in const tf32[2, 2] a"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)"

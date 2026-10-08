@@ -50,7 +50,7 @@ fn signature_param_value_name_extent_is_refused_with_did_you_mean() {
 #[test]
 fn signature_return_value_name_extents_are_refused_with_did_you_mean() {
     // g14 as originally written: the return figura names the int parameters.
-    let result = analyze("fn make(int h, int w) → tf32[h, w] { return tf32[2, 3] }\nmain {}\n");
+    let result = analyze("fn make(int h, int w) → tf32[h, w] { return tf32[2, 3] {} }\nmain {}\n");
     assert!(result.is_err(), "remote return binding must refuse");
     let names = issue_args(&result, "signature_extent_bare_value_name", "param");
     assert!(

@@ -1,0 +1,46 @@
++++
+term = "tensor"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "The typed zero Type {}: a scalar-element tensor, a vector-element tensor, and a plain vector."
+syntax = "Type {}"
+related = ["tensor", "lista", "magnitudo"]
+locale = "en"
++++
+
+# =============================================================================
+# tensor — The typed zero Type {}: a scalar-element tensor, a vector-element tensor, and a plain vector.
+# =============================================================================
+#
+# What this teaches:
+#   • Typed zero — a type followed by empty braces is the zero value of that type
+#   • Element kinds — scalar elements, vector elements and a plain vector all share the one spelling
+#
+# Common mistakes:
+#   • writing the type bare (`tf32[2, 3]`) as a value — the bare form is retired; write `tf32[2, 3] {}`
+#
+# See also: tensor, lista, magnitudo
+# =============================================================================
+
+# tensor — the zero of a type is written `Type {}`
+#
+# GRAMMAR:
+#   zero :← type '{' '}'
+#
+# EXPECTED OUTPUT:
+#   zero.fab stdout contract (shape of the scalar tensor, zero cells, vector-element
+#   tensor shape, plain vector lane).
+
+main {
+    const tf32[2, 3] grid ← tf32[2, 3] {}
+    print grid.shape()
+    print grid[[1, 2]]
+
+    const tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
+    print lanes.shape()
+
+    const vector<f32, 4> v ← vector<f32, 4> {}
+    print v[3]
+}

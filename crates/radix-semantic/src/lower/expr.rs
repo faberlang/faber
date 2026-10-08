@@ -577,76 +577,188 @@ impl Lowerer<'_> {
         ty: &radix_syntax::TypeExpr,
         span: radix_lexer::Span,
     ) -> HirExpressionKind {
-        let radix_syntax::TypeExprKind::Tensor(_, figura) = &ty.kind else {
-            self.error_with_args_at(
-                vec![DiagnosticArg::new(
-                    "issue",
-                    "constructor_requires_extent_type",
-                )],
-                span,
-            );
-            return HirExpressionKind::Error;
-        };
         let claimed = self.lower_type(ty);
-        let elem_is_float = match self.types.get(claimed) {
-            crate::Type::Tensor(element, _) => {
-                radix_types::numeric_width::is_tensor_float_element(self.types, *element)
+        match &ty.kind {
+            radix_syntax::TypeExprKind::Tensor(..)
+            | radix_syntax::TypeExprKind::Vector(..)
+            | radix_syntax::TypeExprKind::Matrix(..) => self.construct_zero(ty, claimed, span).kind,
+            _ => {
+                self.error_with_args_at(
+                    vec![DiagnosticArg::new(
+                        "issue",
+                        "constructor_requires_extent_type",
+                    )],
+                    span,
+                );
+                HirExpressionKind::Error
             }
-            _ => false,
+        }
+    }
+
+    /// The zero value of a type expression: a scalar zero, a zero vector or
+    /// matrix (a literal array of zeros converted to the claimed type), or a
+    /// tensor created on the zero of its element.
+    fn construct_zero(
+        &mut self,
+        ty: &radix_syntax::TypeExpr,
+        claimed: radix_types::TypeId,
+        span: radix_lexer::Span,
+    ) -> HirExpression {
+        let hir = |this: &mut Self, kind| HirExpression {
+            id: this.next_hir_id(),
+            kind,
+            ty: None,
+            span,
         };
-        let fill_kind = if elem_is_float {
+        match (&ty.kind, self.types.get(claimed).clone()) {
+            (
+                radix_syntax::TypeExprKind::Vector(_, width),
+                crate::Type::Vector(element, _),
+            ) => {
+                let lanes = self.construct_literal_extent(width, span);
+                let zero = self.construct_scalar_zero(element, span);
+                let array = HirExpressionKind::Array(
+                    (0..lanes)
+                        .map(|_| HirArrayElement::Expr(zero.clone()))
+                        .collect(),
+                );
+                let source = hir(self, array);
+                hir(
+                    self,
+                    HirExpressionKind::Verte {
+                        source: Box::new(source),
+                        target: claimed,
+                        entries: None,
+                    },
+                )
+            }
+            (
+                radix_syntax::TypeExprKind::Matrix(_, shape),
+                crate::Type::Matrix(element, _),
+            ) => {
+                let (rows, cols) = match shape {
+                    radix_syntax::FiguraExpr::Tuple(dims) if dims.len() == 2 => (
+                        self.construct_literal_extent(&dims[0], span),
+                        self.construct_literal_extent(&dims[1], span),
+                    ),
+                    _ => (0, 0),
+                };
+                let zero = self.construct_scalar_zero(element, span);
+                let row = HirExpressionKind::Array(
+                    (0..cols)
+                        .map(|_| HirArrayElement::Expr(zero.clone()))
+                        .collect(),
+                );
+                let mut row_exprs = Vec::new();
+                for _ in 0..rows {
+                    row_exprs.push(HirArrayElement::Expr(hir(self, row.clone())));
+                }
+                let source = hir(self, HirExpressionKind::Array(row_exprs));
+                hir(
+                    self,
+                    HirExpressionKind::Verte {
+                        source: Box::new(source),
+                        target: claimed,
+                        entries: None,
+                    },
+                )
+            }
+            (
+                radix_syntax::TypeExprKind::Tensor(element_ty, figura),
+                crate::Type::Tensor(element, _),
+            ) => {
+                let fill = self.construct_zero(element_ty, element, span);
+                let dims: &[radix_syntax::FiguraExpr] = match figura {
+                    radix_syntax::FiguraExpr::Tuple(dims) => dims,
+                    single => std::slice::from_ref(single),
+                };
+                let extents = dims
+                    .iter()
+                    .map(|dim| self.construct_extent_expr(dim, span))
+                    .collect::<Vec<_>>();
+                let extents_array = hir(
+                    self,
+                    HirExpressionKind::Array(
+                        extents.into_iter().map(HirArrayElement::Expr).collect(),
+                    ),
+                );
+                let receiver = HirExpression {
+                    id: self.next_hir_id(),
+                    kind: HirExpressionKind::Vacua,
+                    ty: Some(claimed),
+                    span,
+                };
+                let kind = HirExpressionKind::MethodCall(
+                    Box::new(receiver),
+                    self.intrinsic_surface_symbol("crea"),
+                    Vec::new(),
+                    vec![
+                        HirCallArg {
+                            name: None,
+                            spread: false,
+                            expr: fill,
+                            span,
+                        },
+                        HirCallArg {
+                            name: None,
+                            spread: false,
+                            expr: extents_array,
+                            span,
+                        },
+                    ],
+                    None,
+                );
+                hir(self, kind)
+            }
+            _ => self.construct_scalar_zero(claimed, span),
+        }
+    }
+
+    fn construct_scalar_zero(
+        &mut self,
+        element: radix_types::TypeId,
+        span: radix_lexer::Span,
+    ) -> HirExpression {
+        let kind = if radix_types::numeric_width::is_tensor_float_element(self.types, element) {
             HirExpressionKind::Literal(HirLiteral::Float(0.0))
         } else {
             HirExpressionKind::Literal(HirLiteral::Int(0))
         };
-        let fill = HirExpression {
+        HirExpression {
             id: self.next_hir_id(),
-            kind: fill_kind,
+            kind,
             ty: None,
             span,
-        };
-        let dims: &[radix_syntax::FiguraExpr] = match figura {
-            radix_syntax::FiguraExpr::Tuple(dims) => dims,
-            single => std::slice::from_ref(single),
-        };
-        let extents = dims
-            .iter()
-            .map(|dim| self.construct_extent_expr(dim, span))
-            .collect::<Vec<_>>();
-        let extents_array = HirExpression {
-            id: self.next_hir_id(),
-            kind: HirExpressionKind::Array(
-                extents.into_iter().map(HirArrayElement::Expr).collect(),
-            ),
-            ty: None,
+        }
+    }
+
+    /// A vector width or matrix extent that must be a literal: the zero is
+    /// materialised as an array literal of that many zeros.
+    fn construct_literal_extent(
+        &mut self,
+        dim: &radix_syntax::FiguraExpr,
+        span: radix_lexer::Span,
+    ) -> usize {
+        match dim {
+            radix_syntax::FiguraExpr::Literal(value) => *value as usize,
+            radix_syntax::FiguraExpr::Lift(extent) => match &**extent {
+                radix_syntax::LiftExtent::Literal(value) => *value as usize,
+                radix_syntax::LiftExtent::Paren(term) => self.construct_literal_extent(term, span),
+                _ => self.construct_literal_extent_refusal(span),
+            },
+            _ => self.construct_literal_extent_refusal(span),
+        }
+    }
+
+    fn construct_literal_extent_refusal(&mut self, span: radix_lexer::Span) -> usize {
+        self.error_with_args_at(
+            vec![DiagnosticArg::new(
+                "issue",
+                "constructor_register_extent_requires_literal",
+            )],
             span,
-        };
-        let receiver = HirExpression {
-            id: self.next_hir_id(),
-            kind: HirExpressionKind::Vacua,
-            ty: Some(claimed),
-            span,
-        };
-        HirExpressionKind::MethodCall(
-            Box::new(receiver),
-            self.intrinsic_surface_symbol("crea"),
-            Vec::new(),
-            vec![
-                HirCallArg {
-                    name: None,
-                    spread: false,
-                    expr: fill,
-                    span,
-                },
-                HirCallArg {
-                    name: None,
-                    spread: false,
-                    expr: extents_array,
-                    span,
-                },
-            ],
-            None,
-        )
+        );
+        0
     }
 
     /// One constructor extent term as a value expression. Extents admit

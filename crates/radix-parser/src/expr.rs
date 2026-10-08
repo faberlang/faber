@@ -1631,6 +1631,57 @@ impl Parser {
             || radix_types::numeric_width::vector_sugar_width_marker(latin).is_some()
     }
 
+    /// Long-form built-in type word followed by `<`: `tensor<..>`,
+    /// `vector<..>`, `matrix<..>`, and `list<..>` (claimed only to refuse
+    /// `list<T, N> {}` by name). Only a claim candidate; the caller parses
+    /// the type speculatively and keeps `<` as the ASCII comparison when the
+    /// type does not parse (`vector < n`).
+    fn long_form_constructor_head(&self) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        if self.peek_at(1).kind != TokenKind::LtAscii {
+            return false;
+        }
+        let name = self.interner.resolve(sym);
+        let latin = self
+            .reader_type_latin_keys
+            .get(name)
+            .map_or(name, String::as_str);
+        matches!(latin, "tensor" | "vector" | "matrix" | "lista")
+    }
+
+    /// Speculatively parse a long-form type word as a value-position type
+    /// expression; `None` (position restored) when it is not a complete type.
+    fn try_parse_long_form_constructor_type(&mut self) -> Option<TypeExpr> {
+        let checkpoint = self.checkpoint();
+        let error_count = self.errors.len();
+        match self.parse_type() {
+            Ok(ty) if self.errors.len() == error_count && Self::is_extent_type(&ty) => Some(ty),
+            // A collection word is claimed only as `list<..> {}`; anything
+            // else keeps `<` as the ASCII comparison.
+            Ok(ty)
+                if self.errors.len() == error_count
+                    && self.check(&TokenKind::LBrace)
+                    && self.peek_at(1).kind == TokenKind::RBrace =>
+            {
+                Some(ty)
+            }
+            _ => {
+                self.errors.truncate(error_count);
+                self.restore(checkpoint);
+                None
+            }
+        }
+    }
+
+    fn is_extent_type(ty: &TypeExpr) -> bool {
+        matches!(
+            ty.kind,
+            TypeExprKind::Tensor(..) | TypeExprKind::Vector(..) | TypeExprKind::Matrix(..)
+        )
+    }
+
     /// Return whether the current token claims a registry keyword identity.
     fn is_keyword_key(&self, key: &str) -> bool {
         matches!(self.peek().kind, TokenKind::Ident(sym) if self.keyword_claim_key(sym) == Some(key))
@@ -1895,14 +1946,31 @@ impl Parser {
         }
 
         let start = self.current_span();
-        if self.extent_constructor_head() {
+        let long_form_type = if self.long_form_constructor_head() {
+            self.try_parse_long_form_constructor_type()
+        } else {
+            None
+        };
+        if long_form_type.is_some() || self.extent_constructor_head() {
             if self.expression_contexts > 1 {
                 return Err(
                     ParseError::structured(ParseErrorKind::ExpressionInvalid, start)
                         .with_arg("issue", "constructor_store_position_only"),
                 );
             }
-            let ty = self.parse_type()?;
+            let long_form = long_form_type.is_some();
+            let ty = match long_form_type {
+                Some(ty) => ty,
+                None => self.parse_type()?,
+            };
+            // `list<T, N> {}` is not claimed: only tensor, vector and matrix
+            // types have a typed zero.
+            if long_form && !Self::is_extent_type(&ty) {
+                return Err(
+                    ParseError::structured(ParseErrorKind::ExpressionInvalid, start)
+                        .with_arg("issue", "constructor_type_not_claimed"),
+                );
+            }
             if matches!(
                 self.peek().kind,
                 TokenKind::Plus
@@ -1916,6 +1984,15 @@ impl Parser {
                         .with_arg("issue", "constructor_store_position_only"),
                 );
             }
+            // The typed zero is written `Type {}`; the bare form is retired.
+            if !(self.check(&TokenKind::LBrace) && self.peek_at(1).kind == TokenKind::RBrace) {
+                return Err(
+                    ParseError::structured(ParseErrorKind::ExpressionInvalid, start)
+                        .with_arg("issue", "constructor_requires_empty_braces"),
+                );
+            }
+            self.advance();
+            self.advance();
             let id = self.next_id();
             return Ok(Expr {
                 id,

@@ -77,8 +77,8 @@ fn k(tf32[8] a, mut tf32[8] o) → void {
     }
 }
 main {
-    const tf32[8] a ← tf32[8].fill(1.5)
-    var tf32[8] b ← tf32[8]
+    const tf32[8] a ← tf32[8] {}.fill(1.5)
+    var tf32[8] b ← tf32[8] {}
     k(a, b)
     print b[3]
 }
@@ -164,8 +164,8 @@ fn k<size H, size W>(tensor<f32, [H, W]> t, mut tensor<f32, [H, W]> o) → void 
 }
 main {
     const int n ← 4
-    const tf32[size n, size n] a ← tf32[size n, size n].fill(1.5)
-    var tf32[size n, size n] b ← tf32[size n, size n]
+    const tf32[size n, size n] a ← tf32[size n, size n] {}.fill(1.5)
+    var tf32[size n, size n] b ← tf32[size n, size n] {}
     k(a, b)
     print b[[2, 3]]
 }
@@ -220,7 +220,7 @@ main {
     var tensor<vector<f32, 4>, [5, 5]> state ← cell_seed.create(low, [5, 5])
     state[[3, 2]] ← [0.0, 2.0, 5.0, 0.0] ↦ vector<f32, 4>
     state[[0, 4]] ← [0.0, 1.0, 3.0, 0.0] ↦ vector<f32, 4>
-    var tf32[4] clock ← tf32[4]
+    var tf32[4] clock ← tf32[4] {}
     wave_speed(0.5, state, clock)
     print clock[[1]]
 }

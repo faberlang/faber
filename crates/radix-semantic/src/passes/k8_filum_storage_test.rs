@@ -44,9 +44,9 @@ fn kernel(grid: &str, statement: &str) -> String {
 
 #[test]
 fn created_tensor_is_fresh_storage() {
-    accepted(&kernel("ti64[4]", "grid[i] ← value + 1"));
+    accepted(&kernel("ti64[4] {}", "grid[i] ← value + 1"));
     rejected(
-        &kernel("ti64[4]", "grid[i] ← grid[i + 1]"),
+        &kernel("ti64[4] {}", "grid[i] ← grid[i + 1]"),
         "written_storage_neighbor_read",
     );
 }
@@ -73,7 +73,7 @@ fn other_call_result_keeps_unknown_identity() {
     rejected(
         &format!(
             r"incipit {{
-    varia tensor<numerus, [4]> fresh ← ti64[4]
+    varia tensor<numerus, [4]> fresh ← ti64[4] {{}}
     varia tensor<numerus, [4]> grid ← fresh.addita(fresh)
     itera ex grid apud [i] filum lane fixum value {{
         grid[i] ← value
@@ -168,7 +168,7 @@ fn read_param_read_at_neighbours_and_never_written_is_accepted() {
     // Paired with a local that owns its storage.
     accepted(&format!(
         r"functio kernel(de {GRID} src) → vacuum {{
-    varia {GRID} grid ← ti64[4]
+    varia {GRID} grid ← ti64[4] {{}}
     itera ex src apud [i] filum lane fixum value {{
         grid[i] ← src[i + 1]
     }}
@@ -286,7 +286,7 @@ fn aliasing_call_is_a_borrow_error_while_the_kernel_is_certified() {
     }}
 }}
 incipit {{
-    varia {GRID} grid ← ti64[4]
+    varia {GRID} grid ← ti64[4] {{}}
     varia {GRID} alias ← grid
     kernel(grid, alias)
 }}"

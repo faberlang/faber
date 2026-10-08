@@ -208,7 +208,7 @@ fn tensor_constructor_initializer_proves_fresh_storage() {
     // proves without the seed-method costume.
     accepted(
         r"incipit {
-    varia tf32[4] grid ← tf32[4]
+    varia tf32[4] grid ← tf32[4] {}
     itera ex grid apud [i] filum lane fixum value {
         grid[i] ← value
     }

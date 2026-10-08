@@ -186,7 +186,7 @@ const COPY_TENSOR: &str = r#"+++
 locale = "en"
 +++
 main {
-    var tf32[4] a ← tf32[4].fill(1.5)
+    var tf32[4] a ← tf32[4] {}.fill(1.5)
     var copy tf32[4] w ← a
     w[0] ← 9.0
     const tf32[4] s ← w + a
@@ -209,7 +209,7 @@ const COPY_TENSOR_RANK2_READ: &str = r#"+++
 locale = "en"
 +++
 main {
-    var tf32[2, 3] a ← tf32[2, 3].fill(1.5)
+    var tf32[2, 3] a ← tf32[2, 3] {}.fill(1.5)
     var copy tf32[2, 3] w ← a
     a[[1, 2]] ← 7.0
     w[[0, 1]] ← 4.0

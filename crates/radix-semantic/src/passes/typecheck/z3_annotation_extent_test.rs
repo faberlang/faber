@@ -122,7 +122,7 @@ fn bare_affine_extent_is_refused_but_parenthesized_lift_stays_green() {
 fn declared_size_names_stay_admissible_in_annotations() {
     // Static fold (Z1) and the runtime lift declaration both stay green.
     let static_size =
-        analyze("main {\n    const size N = 3\n    var tf32[N, 2] values ← tf32[N, 2]\n}\n");
+        analyze("main {\n    const size N = 3\n    var tf32[N, 2] values ← tf32[N, 2] {}\n}\n");
     assert!(
         static_size.is_ok(),
         "declared static size stays a size term: {:?}",

@@ -105,7 +105,7 @@ const TN5_CREATOR_RETURN: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    var tf32[H, W] out ← tf32[H, W]
+    var tf32[H, W] out ← tf32[H, W] {}
     out[[0, 0]] ← 7.5
     return out
 }
@@ -132,7 +132,7 @@ const AFFINE_RETURN: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    const tf32[H + 1, W] out ← tf32[H + 1, W]
+    const tf32[H + 1, W] out ← tf32[H + 1, W] {}
     return out
 }
 main {
@@ -185,7 +185,7 @@ const ANONYMOUS_LIFT_ITERA: &str = r#"+++
 locale = "en"
 +++
 fn make<size H, size W>() → tf32[H, W] {
-    var tf32[H, W] out ← tf32[H, W]
+    var tf32[H, W] out ← tf32[H, W] {}
     out[[0, 0]] ← 7.5
     return out
 }

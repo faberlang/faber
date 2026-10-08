@@ -989,7 +989,15 @@ help = "check expression syntax"
 
 [diagnostics.PARSE030.issues.constructor_store_position_only]
 message = "type-expression constructors are allowed only at store positions"
-help = "bind the constructor first: const tf32[2, 3] a ← tf32[2, 3]"
+help = "bind the constructor first: const tf32[2, 3] a ← the type tf32[2, 3] followed by empty braces"
+
+[diagnostics.PARSE030.issues.constructor_requires_empty_braces]
+message = "the typed zero of a type is written `Type` followed by empty braces; the bare type form is retired"
+help = "write the zero as the type followed by empty braces"
+
+[diagnostics.PARSE030.issues.constructor_type_not_claimed]
+message = "the typed zero exists only for tensor, vector and matrix types; a collection type such as list is not claimed"
+help = "write a tensor, vector or matrix type followed by empty braces, or build the collection with a literal"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
@@ -1906,6 +1914,10 @@ help = "spell the shape, as in tf32[2, 3]"
 [diagnostics.SEM008.issues.constructor_extent_requires_term]
 message = "a constructor extent must name a size or a literal"
 help = "the `_` hole belongs in the annotation, not the constructor"
+
+[diagnostics.SEM008.issues.constructor_register_extent_requires_literal]
+message = "a vector width or matrix extent in a constructor must be a literal"
+help = "spell the width as a number, as in vector<f32, 4>"
 
 [diagnostics.SEM008.issues.constructor_affine_extent_unsupported]
 message = "constructor extents admit literals, size names, and spelled size lifts"
@@ -3138,7 +3150,7 @@ help = "write flat ↦ tensor<T, figura>"
 
 [diagnostics.SEM011.issues.tensor_crea_retired]
 message = "tensor receiver method create is retired; use the type-expression constructor"
-help = "bind the constructor first: const tf32[2, 2] a ← tf32[2, 2]"
+help = "bind the constructor first: const tf32[2, 2] a ← the type tf32[2, 2] followed by empty braces"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)"

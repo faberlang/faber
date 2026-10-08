@@ -129,7 +129,7 @@ fn bump(mut tf32[2, 3] dst) → void {
     }
 }
 main {
-    var tf32[2, 3] b ← tf32[2, 3]
+    var tf32[2, 3] b ← tf32[2, 3] {}
     bump(b)
     print b.flatten()
 }

@@ -672,6 +672,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             "a constructor extent must name a size or a literal; the `_` hole belongs in the annotation"
                 .to_owned(),
         ),
+        "constructor_register_extent_requires_literal" => Some(
+            "a vector width or matrix extent in a constructor must be a literal, as in vector<f32, 4>"
+                .to_owned(),
+        ),
         "constructor_affine_extent_unsupported" => Some(
             "constructor extents admit literals, size names, and spelled size lifts; parenthesize affine terms once supported"
                 .to_owned(),
@@ -772,7 +776,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "tensor_strue_retired" => Some("write flat ↦ tensor<T, figura>".to_owned()),
         "tensor_crea_retired" => {
-            Some("bind the constructor first: const tf32[2, 2] a ← tf32[2, 2]".to_owned())
+            Some("bind the constructor first: const tf32[2, 2] a ← tf32[2, 2] {}".to_owned())
         }
         "tensor_structa_forma_removed" => Some("use tensor.structa<CompleteTensorType>(data)".to_owned()),
         "tensor_creata_complete_type_arg_required" => Some("provide a complete tensor type argument".to_owned()),

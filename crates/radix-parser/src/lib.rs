@@ -1743,6 +1743,10 @@ mod tests;
 mod size_extent_test;
 
 #[cfg(test)]
+#[path = "typed_zero_test.rs"]
+mod typed_zero_test;
+
+#[cfg(test)]
 #[path = "itera_binder_regression_test.rs"]
 mod itera_binder_regression_test;
 

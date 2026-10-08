@@ -4002,7 +4002,7 @@ incipit {
     fixum tf32[4] reshaped ← grid.forma([4]).materialize()
     grid.ponde([0, 0], 9.0)
     fixum f32 corner ← grid.accipe([0, 0]) vel 0.0
-    varia tf32[2, 2] filler ← tf32[2, 2].reple(1.0)
+    varia tf32[2, 2] filler ← tf32[2, 2] {}.reple(1.0)
     filler.reple(4.0)
     fixum tf32[1, 2] slice ← grid.sectio(0, 1)
     fixum lista<f32> out ← slice.planata()

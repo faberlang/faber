@@ -94,7 +94,7 @@ fn a_transpose_view_copied_into_the_output_matches_the_runner() {
         12,
     );
     let runner = runner_values(&format!(
-        "incipit {{\n{}varia tensor<f32, [4, 3]> t ← tf32[4, 3]\nt ⇇ a.transpone()\nnota t.planata()\n}}",
+        "incipit {{\n{}varia tensor<f32, [4, 3]> t ← tf32[4, 3] {{}}\nt ⇇ a.transpone()\nnota t.planata()\n}}",
         host_tensor("a", &A, "[3, 4]")
     ));
     assert_eq!(device, runner);
@@ -110,7 +110,7 @@ fn a_plain_buffer_copied_into_the_output_matches_the_runner() {
         12,
     );
     let runner = runner_values(&format!(
-        "incipit {{\n{}varia tensor<f32, [3, 4]> b ← tf32[3, 4]\nb ⇇ a\nnota b.planata()\n}}",
+        "incipit {{\n{}varia tensor<f32, [3, 4]> b ← tf32[3, 4] {{}}\nb ⇇ a\nnota b.planata()\n}}",
         host_tensor("a", &A, "[3, 4]")
     ));
     assert_eq!(device, runner);
@@ -128,7 +128,7 @@ fn an_elementwise_result_copied_into_the_output_matches_the_runner() {
         12,
     );
     let runner = runner_values(&format!(
-        "incipit {{\n{}{}varia tensor<f32, [3, 4]> c ← tf32[3, 4]\nc ⇇ a + b\nnota c.planata()\n}}",
+        "incipit {{\n{}{}varia tensor<f32, [3, 4]> c ← tf32[3, 4] {{}}\nc ⇇ a + b\nnota c.planata()\n}}",
         host_tensor("a", &A, "[3, 4]"),
         host_tensor("b", &B, "[3, 4]")
     ));

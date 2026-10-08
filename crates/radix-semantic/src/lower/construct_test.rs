@@ -29,7 +29,7 @@ fn issues(source: &str) -> Vec<String> {
 #[test]
 fn construct_named_form_checks_and_synthesizes_create() {
     let result = analyze_source_with_config(
-        "fn main() {\n    const size N ← 2\n    const tf32[2, N] a ← tf32[2, N]\n}\n",
+        "fn main() {\n    const size N ← 2\n    const tf32[2, N] a ← tf32[2, N] {}\n}\n",
         config(),
     );
     assert!(
@@ -42,7 +42,7 @@ fn construct_named_form_checks_and_synthesizes_create() {
 #[test]
 fn construct_inline_spelled_lift_checks() {
     let result = analyze_source_with_config(
-        "fn main() {\n    var int n ← 3\n    const tf32[_, _] b ← tf32[2, size n]\n}\n",
+        "fn main() {\n    var int n ← 3\n    const tf32[_, _] b ← tf32[2, size n] {}\n}\n",
         config(),
     );
     assert!(
@@ -54,7 +54,7 @@ fn construct_inline_spelled_lift_checks() {
 
 #[test]
 fn construct_literal_mismatch_stays_red() {
-    let found = issues("fn main() {\n    const tf32[3, 2] a ← tf32[2, 3]\n}\n");
+    let found = issues("fn main() {\n    const tf32[3, 2] a ← tf32[2, 3] {}\n}\n");
     assert!(
         found
             .iter()
@@ -65,7 +65,7 @@ fn construct_literal_mismatch_stays_red() {
 
 #[test]
 fn construct_negative_spelled_lift_rejects() {
-    let found = issues("fn main() {\n    const tf32[2, size -1] b ← tf32[2, size -1]\n}\n");
+    let found = issues("fn main() {\n    const tf32[2, size -1] b ← tf32[2, size -1] {}\n}\n");
     assert!(
         found.iter().any(|issue| issue == "size_lift_negative"),
         "expected size_lift_negative, got: {found:?}"
@@ -74,7 +74,7 @@ fn construct_negative_spelled_lift_rejects() {
 
 #[test]
 fn construct_extent_hole_is_refused() {
-    let found = issues("fn main() {\n    const tf32[2, 3] a ← tf32[2, _]\n}\n");
+    let found = issues("fn main() {\n    const tf32[2, 3] a ← tf32[2, _] {}\n}\n");
     assert!(
         found
             .iter()

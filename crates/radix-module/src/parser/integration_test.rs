@@ -94,6 +94,22 @@ fn assert_semantic_rejection(source: &str) {
     );
 }
 
+fn assert_call_form_constructor_rejected(source: &str) {
+    // The type-expression head is claimed by the parser as a typed-zero
+    // constructor, so the retired call form is refused at parse time: a
+    // constructor is not callable.
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let result = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default());
+    let Some(diags) = result.err() else {
+        panic!("expected rejection, got ok for: {source}")
+    };
+    assert!(
+        diags.iter().any(|d| d.code == Some("PARSE030")
+            && d.issue() == Some("constructor_store_position_only")),
+        "expected PARSE030 constructor_store_position_only for: {source}, got: {diags:?}"
+    );
+}
+
 #[test]
 fn retired_prefix_predicates_emit_rewrite_diagnostics() {
     assert_retired_prefix_predicate("fixum _ x ← falsum disabled", "falsum", "value ≡ falsum");
@@ -208,17 +224,17 @@ fn lista_type_call_constructor_is_rejected() {
 
 #[test]
 fn tensor_long_constructor_is_rejected() {
-    assert_semantic_rejection("incipit { fixum _ t ← tensor<f32, [2]>([1.0, 2.0]) }");
+    assert_call_form_constructor_rejected("incipit { fixum _ t ← tensor<f32, [2]>([1.0, 2.0]) }");
 }
 
 #[test]
 fn vector_long_constructor_is_rejected() {
-    assert_semantic_rejection("incipit { fixum _ v ← vector<f32, 4>(1.0, 2.0, 3.0, 4.0) }");
+    assert_call_form_constructor_rejected("incipit { fixum _ v ← vector<f32, 4>(1.0, 2.0, 3.0, 4.0) }");
 }
 
 #[test]
 fn matrix_long_constructor_is_rejected() {
-    assert_semantic_rejection("incipit { fixum _ m ← matrix<f32, [2, 2]>(1.0, 0.0, 0.0, 1.0) }");
+    assert_call_form_constructor_rejected("incipit { fixum _ m ← matrix<f32, [2, 2]>(1.0, 0.0, 0.0, 1.0) }");
 }
 
 // =============================================================================
@@ -236,32 +252,17 @@ fn vector_long_constructor_without_width_is_rejected() {
 
 #[test]
 fn tensor_sugar_constructor_is_rejected() {
-    assert_semantic_rejection("incipit { fixum _ t ← tf32[2]([1.0, 2.0]) }");
+    assert_call_form_constructor_rejected("incipit { fixum _ t ← tf32[2]([1.0, 2.0]) }");
 }
 
 #[test]
 fn vector_sugar_constructor_is_rejected() {
-    assert_semantic_rejection("incipit { fixum _ v ← vf32[4](1.0, 2.0, 3.0, 4.0) }");
+    assert_call_form_constructor_rejected("incipit { fixum _ v ← vf32[4](1.0, 2.0, 3.0, 4.0) }");
 }
 
 #[test]
 fn matrix_sugar_constructor_is_rejected() {
-    // `mf32[2, 2](...)` fails as an ordinary parse error: an index list
-    // takes one expression, so the comma cannot appear inside the brackets.
-    let session = crate::driver::Session::new(crate::driver::Config::default());
-    let result = crate::driver::analyze_source(
-        &session,
-        "test.fab",
-        "incipit { fixum _ m ← mf32[2, 2](1.0, 0.0, 0.0, 1.0) }",
-        AnalyzeRequest::default(),
-    );
-    let Some(diags) = result.err() else {
-        panic!("expected rejection, got ok");
-    };
-    assert!(
-        diags.iter().any(|d| d.code == Some("PARSE001")),
-        "expected generic parse rejection, got: {diags:?}"
-    );
+    assert_call_form_constructor_rejected("incipit { fixum _ m ← mf32[2, 2](1.0, 0.0, 0.0, 1.0) }");
 }
 
 // =============================================================================
