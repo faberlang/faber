@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 384,
-    "analyzable": 384
+    "capable": 400,
+    "analyzable": 400
   },
   "terms": [
     {
@@ -270,8 +270,8 @@
     {
       "term": "fac",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 5,
+      "analyzable": 5
     },
     {
       "term": "falsum",
@@ -348,8 +348,8 @@
     {
       "term": "functio",
       "rule": "keyword",
-      "capable": 11,
-      "analyzable": 11
+      "capable": 15,
+      "analyzable": 15
     },
     {
       "term": "futura",
@@ -432,8 +432,8 @@
     {
       "term": "in",
       "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "incipiet",
@@ -462,8 +462,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 21,
-      "analyzable": 21
+      "capable": 22,
+      "analyzable": 22
     },
     {
       "term": "iuncta",
@@ -486,8 +486,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 8,
-      "analyzable": 8
+      "capable": 9,
+      "analyzable": 9
     },
     {
       "term": "manifest",
@@ -498,8 +498,8 @@
     {
       "term": "matrix",
       "rule": "type",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "metior",
@@ -888,8 +888,8 @@
     {
       "term": "tensor",
       "rule": "type",
-      "capable": 14,
-      "analyzable": 14
+      "capable": 17,
+      "analyzable": 17
     },
     {
       "term": "textus",
@@ -948,8 +948,8 @@
     {
       "term": "vector",
       "rule": "type",
-      "capable": 12,
-      "analyzable": 12
+      "capable": 14,
+      "analyzable": 14
     },
     {
       "term": "vel",

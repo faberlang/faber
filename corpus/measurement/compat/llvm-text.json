@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 353,
-    "analyzable": 380
+    "capable": 369,
+    "analyzable": 399
   },
   "terms": [
     {
@@ -270,8 +270,8 @@
     {
       "term": "fac",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 5,
+      "analyzable": 5
     },
     {
       "term": "falsum",
@@ -348,8 +348,8 @@
     {
       "term": "functio",
       "rule": "keyword",
-      "capable": 10,
-      "analyzable": 10
+      "capable": 15,
+      "analyzable": 15
     },
     {
       "term": "futura",
@@ -432,8 +432,8 @@
     {
       "term": "in",
       "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "incipiet",
@@ -462,8 +462,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 19,
-      "analyzable": 21
+      "capable": 20,
+      "analyzable": 22
     },
     {
       "term": "iuncta",
@@ -487,7 +487,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 7,
-      "analyzable": 8
+      "analyzable": 9
     },
     {
       "term": "manifest",
@@ -499,7 +499,7 @@
       "term": "matrix",
       "rule": "type",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 3
     },
     {
       "term": "metior",
@@ -732,8 +732,8 @@
     {
       "term": "ratio",
       "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "redde",
@@ -888,8 +888,8 @@
     {
       "term": "tensor",
       "rule": "type",
-      "capable": 11,
-      "analyzable": 14
+      "capable": 13,
+      "analyzable": 17
     },
     {
       "term": "textus",
@@ -948,8 +948,8 @@
     {
       "term": "vector",
       "rule": "type",
-      "capable": 11,
-      "analyzable": 12
+      "capable": 13,
+      "analyzable": 14
     },
     {
       "term": "vel",
@@ -990,7 +990,7 @@
     {
       "term": "·",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 2,
       "analyzable": 4
     },
     {
@@ -1074,8 +1074,8 @@
     {
       "term": "∈",
       "rule": "operator-group",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "∧",

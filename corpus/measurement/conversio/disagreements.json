@@ -5805,6 +5805,14 @@
     },
     {
       "src": "lista",
+      "tgt": "lista",
+      "target": "go",
+      "predicted": "fallback",
+      "measured": "dedicated",
+      "detail": "arm:dedicated"
+    },
+    {
+      "src": "lista",
       "tgt": "copia",
       "target": "go",
       "predicted": "fallback",
