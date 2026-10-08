@@ -129,11 +129,11 @@ fn generic_1d_geometry_table() {
     let table: [(u64, u32, u32); 6] = [
         (1, 1, 1),
         (2, 1, wg),
-        (wg as u64, 1, wg),
-        (wg as u64 + 1, 2, wg),
+        (u64::from(wg), 1, wg),
+        (u64::from(wg) + 1, 2, wg),
         (1000, 8, wg),
         // The bound itself still gets the wide workgroup.
-        (max, max.div_ceil(wg as u64) as u32, wg),
+        (max, max.div_ceil(u64::from(wg)) as u32, wg),
     ];
     for (elements, grid_x, block_x) in table {
         let got = geometry_for_call(&elementwise(), &flat(elements)).expect("covered");

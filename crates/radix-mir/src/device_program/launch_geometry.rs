@@ -63,6 +63,11 @@ impl GeometryError {
 /// Compute the launch geometry of `unit` for a call whose arguments have the
 /// given runtime `shapes`, one per entry of `unit.resources` in resource order
 /// (inputs, then outputs, exactly as the unit lists them).
+///
+/// # Errors
+///
+/// Returns a [`GeometryError`] when a shape does not match its resource or the
+/// launch dimensions cannot be derived.
 pub fn geometry_for_call(
     unit: &KernelUnit,
     shapes: &[Vec<u64>],

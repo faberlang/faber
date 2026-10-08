@@ -111,9 +111,9 @@ impl Validator<'_, '_> {
                         matches!(&call.intrinsic, crate::MirIntrinsic::TensorShapeCheck(check)
                             if !check.relations.is_empty() && call.args.contains(&crate::MirOperand::Value(value.id)))
                     });
-                    if !self.assignable(value.ty, place_ty)
-                        && !(recorded_store_relation
-                            && self.return_shape_relation_assignable(value.ty, place_ty))
+                    if !(self.assignable(value.ty, place_ty)
+                        || (recorded_store_relation
+                            && self.return_shape_relation_assignable(value.ty, place_ty)))
                     {
                         self.error(value.span, "assigned value type does not match destination");
                     }
@@ -340,7 +340,7 @@ impl Validator<'_, '_> {
     }
 
     /// Runtime-dependent tensor extents are checked by the recorded
-    /// FunctionReturn shape obligation. MIR validation still rejects rank,
+    /// `FunctionReturn` shape obligation. MIR validation still rejects rank,
     /// element, and fully literal mismatches here.
     pub(crate) fn return_shape_relation_assignable(
         &self,

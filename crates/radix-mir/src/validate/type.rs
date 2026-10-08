@@ -665,7 +665,7 @@ impl Validator<'_, '_> {
             Type::MarkerHole { .. } => self.error(span, "MIR type is unresolved marker-width hole"),
             Type::Error => self.error(span, "MIR type is semantic error recovery type"),
             Type::TensorEdgePolicy(_) => {
-                self.error(span, "MIR type is a type-only tensor edge-policy marker")
+                self.error(span, "MIR type is a type-only tensor edge-policy marker");
             }
             Type::Array(inner)
             | Type::Set(inner)

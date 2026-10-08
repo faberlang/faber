@@ -627,7 +627,7 @@ fn a_generic_kernel_too_large_for_32_bit_indexing_keeps_one_thread_per_block() {
     assert_eq!(launch.workgroup, MirWorkgroupSize { x: 128, y: 1, z: 1 });
     let last_index = launch.workgroup_count.x * 128 - 1;
     assert!(
-        last_index <= i32::MAX as u64,
+        i32::try_from(last_index).is_ok(),
         "the last launched thread's index {last_index} must fit a signed 32-bit offset"
     );
 

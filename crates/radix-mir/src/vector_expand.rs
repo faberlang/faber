@@ -891,15 +891,15 @@ fn select(
             terminator: goto_join(),
             span,
         });
-        let (statements, terminator) =
-            match pending_reads.get_mut(usize::from(i)).and_then(Option::take) {
-                Some((read, condition)) => (read, branch(condition, i + 1)),
-                None => {
-                    let mut last = final_statements.clone();
-                    last.append(&mut tail);
-                    (last, original_terminator.clone())
-                }
-            };
+        let (statements, terminator) = if let Some((read, condition)) =
+            pending_reads.get_mut(usize::from(i)).and_then(Option::take)
+        {
+            (read, branch(condition, i + 1))
+        } else {
+            let mut last = final_statements.clone();
+            last.append(&mut tail);
+            (last, original_terminator.clone())
+        };
         blocks.push(MirBlock {
             id: join_id,
             statements,

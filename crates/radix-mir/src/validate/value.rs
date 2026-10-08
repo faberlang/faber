@@ -1004,12 +1004,10 @@ fn spell_index_at_precedence(
         IndexExpr::Runtime(source) => (format!("<runtime:{source:?}>"), 3),
         IndexExpr::Affine { base, offset } => {
             let (base, _) = spell_index_at_precedence(types, *base, depth + 1, 1);
-            let text = if *offset < 0 {
-                format!("{base} - {}", offset.unsigned_abs())
-            } else if *offset > 0 {
-                format!("{base} + {offset}")
-            } else {
-                base
+            let text = match (*offset).cmp(&0) {
+                std::cmp::Ordering::Less => format!("{base} - {}", offset.unsigned_abs()),
+                std::cmp::Ordering::Greater => format!("{base} + {offset}"),
+                std::cmp::Ordering::Equal => base,
             };
             parenthesize_index(text, 1, parent_precedence)
         }

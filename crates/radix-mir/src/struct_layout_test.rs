@@ -191,8 +191,8 @@ fn vec3_then_scalar_table_only() {
 
 /// The real `class Params` of acceptance/a2-flood/src/params.fab, in source
 /// order. radix-mir cannot build a type table from source, so the field list
-/// is mirrored: width, height (int), sixteen f32 (dx .. axis_z), then
-/// geo_step, geo_w, geo_h (int).
+/// is mirrored: width, height (int), sixteen f32 (dx .. `axis_z`), then
+/// `geo_step`, `geo_w`, `geo_h` (int).
 const PARAMS_FIELDS: [(&str, bool); 21] = [
     ("width", true),
     ("height", true),

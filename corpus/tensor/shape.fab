@@ -58,7 +58,7 @@ main {
 
     const list<int> origin ← [0, 0]
     grid.set(origin, 9.0)
-    const f32 corner ← grid.get(origin) ⊥ 0.0
+    const f32 corner ← grid.get([0, 0])
 
     var tf32[2, 3] filler ← tf32[2, 3] {}
     filler.fill(4.0)

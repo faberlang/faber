@@ -346,7 +346,7 @@ impl Validator<'_, '_> {
                         .context
                         .struct_fields
                         .get(policy_def)
-                        .is_some_and(|fields| fields.is_empty())
+                        .is_some_and(std::collections::HashMap::is_empty)
                     {
                         self.error(span, "tensor limes custom policy is not a zero-field class");
                     }
@@ -357,12 +357,7 @@ impl Validator<'_, '_> {
                         );
                         return;
                     };
-                    if remap_function.params.len() != 2 {
-                        self.error(
-                            span,
-                            "tensor limes remap callback has an invalid receiver/coordinate arity",
-                        );
-                    } else {
+                    if remap_function.params.len() == 2 {
                         if !matches!(self.type_kind(remap_function.params[0].ty), Type::Struct(def) if def == policy_def)
                         {
                             self.error(
@@ -376,6 +371,11 @@ impl Validator<'_, '_> {
                         ) {
                             self.error(span, "tensor limes remap coordinate type is not preserved");
                         }
+                    } else {
+                        self.error(
+                            span,
+                            "tensor limes remap callback has an invalid receiver/coordinate arity",
+                        );
                     }
                     if let Some(transform_id) = transform {
                         let Some(transform_function) = scope.functions_by_id.get(transform_id)
@@ -386,9 +386,7 @@ impl Validator<'_, '_> {
                             );
                             return;
                         };
-                        if transform_function.params.len() != 3 {
-                            self.error(span, "tensor limes transform callback has an invalid receiver/coordinate/value arity");
-                        } else {
+                        if transform_function.params.len() == 3 {
                             if !matches!(self.type_kind(transform_function.params[0].ty), Type::Struct(def) if def == policy_def)
                             {
                                 self.error(
@@ -420,6 +418,8 @@ impl Validator<'_, '_> {
                                     "tensor limes transform result differs from tensor element",
                                 );
                             }
+                        } else {
+                            self.error(span, "tensor limes transform callback has an invalid receiver/coordinate/value arity");
                         }
                     }
                 }
@@ -1768,20 +1768,20 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                let (source_element, source_shape) = match self.type_kind(receiver_ty) {
-                    Type::Tensor(element, shape) => (*element, *shape),
-                    _ => {
+                let (source_element, source_shape) =
+                    if let Type::Tensor(element, shape) = self.type_kind(receiver_ty) {
+                        (*element, *shape)
+                    } else {
                         self.error(span, "tensor shift receiver is not tensor");
                         return;
-                    }
-                };
-                let (result_element, result_shape) = match self.type_kind(call.return_ty) {
-                    Type::Tensor(element, shape) => (*element, *shape),
-                    _ => {
+                    };
+                let (result_element, result_shape) =
+                    if let Type::Tensor(element, shape) = self.type_kind(call.return_ty) {
+                        (*element, *shape)
+                    } else {
                         self.error(span, "tensor shift result is not tensor");
                         return;
-                    }
-                };
+                    };
                 if matches!(self.context.types.get(source_element), Type::Option(_)) {
                     self.error(span, "tensor shift receiver already has nullable elements");
                 }
@@ -2320,19 +2320,19 @@ impl Validator<'_, '_> {
         let (Some(dest_ty), Some(src_ty)) = (dest_ty, src_ty) else {
             return;
         };
-        let (dest_element, dest_shape) = match self.type_kind(dest_ty) {
-            Type::Tensor(element, shape) => (*element, *shape),
-            _ => {
+        let (dest_element, dest_shape) =
+            if let Type::Tensor(element, shape) = self.type_kind(dest_ty) {
+                (*element, *shape)
+            } else {
                 self.error(span, "tensor copy-into destination is not tensor");
                 return;
-            }
-        };
-        let (src_element, src_shape) = match self.type_kind(src_ty) {
-            Type::Tensor(element, shape) => (*element, *shape),
-            _ => {
-                self.error(span, "tensor copy-into source is not tensor");
-                return;
-            }
+            };
+        let (src_element, src_shape) = if let Type::Tensor(element, shape) = self.type_kind(src_ty)
+        {
+            (*element, *shape)
+        } else {
+            self.error(span, "tensor copy-into source is not tensor");
+            return;
         };
         if !self.context.types.equals(dest_element, src_element) {
             self.error(span, "tensor copy-into element types differ");
@@ -2546,7 +2546,7 @@ impl Validator<'_, '_> {
     }
 
     /// RX-3b/RX-4a: `regex.inventa`, `regex.collecta`, `regex.divide` and the
-    /// `match` accessors. The receiver is a `regex` (find, find_all, split) or
+    /// `match` accessors. The receiver is a `regex` (find, `find_all`, split) or
     /// a `match` (accessors); results are `match ∪ nihil`, `lista<match>`,
     /// `lista<textus>`, `textus`, `numerus`, or `textus ∪ nihil` per op.
     fn validate_regex_match_call(
