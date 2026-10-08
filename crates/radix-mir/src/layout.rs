@@ -91,7 +91,7 @@ pub struct MirAggregateLayout {
 /// (`tensor<vector<f32, 4>, [H, W]>`). The vector arm admits only widths whose
 /// size equals their alignment (2 and 4); width 3 fails closed at layout time
 /// because MSL `float3` has a 16-byte stride.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirDeviceViewElement {
     Scalar(MirScalarLayout),
     Vector(MirDeviceVectorLayout),
@@ -158,7 +158,7 @@ pub enum MirTensorStrideLayout {
     Unknown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirDeviceVectorLayout {
     pub element: MirScalarLayout,
     pub width: u8,

@@ -32,7 +32,9 @@ use crate::{
     MirTemp, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator, MirTerminatorKind,
     MirType, MirValidationContext, MirValue, MirValueKind, ValidatedMir,
 };
+use crate::{MirLocalId, MirStructLayout, resolve_struct_layout};
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
+use rustc_hash::FxHashMap;
 
 const SLUG_ABI: &str = "missing-abi-fact";
 const SLUG_LAYOUT: &str = "missing-layout-fact";
@@ -52,6 +54,12 @@ const SHAPE_KERNEL_HOST_TENSOR_STORAGE: &str = "kernel tensor storage/locus requ
 /// MLC-4: fail-closed sparse admission row — same spelling as the ABI gate.
 const SHAPE_KERNEL_SPARSE_STORAGE: &str = "kernel sparse tensor storage is not admitted";
 const SHAPE_DEVICE_PLACE_PROJECTION: &str = "device place projection";
+/// C4-6b: genus (struct) kernel-parameter rows.
+const SHAPE_GENUS_PARAM: &str = "device genus parameter";
+const SHAPE_GENUS_PARAM_MUTABLE: &str = "device genus parameter: mutable (read-only only)";
+const SHAPE_GENUS_PARAM_WRITE: &str = "device genus parameter: field write";
+const SHAPE_GENUS_PARAM_PROJECTION: &str =
+    "device genus parameter: only a direct scalar or vector field read is admitted";
 const SHAPE_ASYNC_GENERATOR_DEVICE_FN: &str = "async/generator device function";
 const SHAPE_DEVICE_MULTI_BLOCK_CFG: &str = "device multi-block control flow";
 /// gpu-reset C4-2e: a lane-form kernel (a Lane builtin parameter) whose CFG is
@@ -109,6 +117,7 @@ pub fn classify_device_safe_for_target_entry(
 }
 
 struct DeviceSafeClassifier<'a> {
+    validation: &'a MirValidationContext<'a>,
     types: &'a TypeTable,
     layouts: &'a MirLayoutTable,
     device: &'a MirDeviceContext,
@@ -116,6 +125,10 @@ struct DeviceSafeClassifier<'a> {
     /// The function under check is a structurizable lane-form kernel, whose
     /// `int` coordinate binders are admitted as 64-bit locals (C4-2e).
     in_lane_form_function: bool,
+    /// C4-6b: the genus (struct) PARAMETERS of the lane-form function under
+    /// visit whose layout resolves, keyed by parameter local. A read of one
+    /// field (`p.f`) is the only admitted use.
+    genus_params: FxHashMap<MirLocalId, MirStructLayout>,
     allows_structured_return_branch: bool,
     allows_structured_indexed_write_branch: bool,
     allows_structured_indexed_write_goto: bool,
@@ -172,11 +185,13 @@ struct DeviceSafeClassifier<'a> {
 impl<'a> DeviceSafeClassifier<'a> {
     fn new(validation: &'a MirValidationContext<'a>, device: &'a MirDeviceContext) -> Self {
         Self {
+            validation,
             types: validation.types.as_table(),
             layouts: &validation.layouts,
             device,
             in_device_function: false,
             in_lane_form_function: false,
+            genus_params: FxHashMap::default(),
             allows_structured_return_branch: false,
             allows_structured_indexed_write_branch: false,
             allows_structured_indexed_write_goto: false,
@@ -438,7 +453,72 @@ impl<'a> DeviceSafeClassifier<'a> {
         )
     }
 
+    fn is_genus_type(&self, ty: MirType) -> bool {
+        matches!(self.types.get(ty.semantic_id()), Type::Struct(_))
+    }
+
+    /// The lane-form function's genus parameters whose layout resolves.
+    fn resolved_genus_params(
+        &self,
+        function: &MirFunction,
+    ) -> FxHashMap<MirLocalId, MirStructLayout> {
+        if !self.in_lane_form_function {
+            return FxHashMap::default();
+        }
+        function
+            .params
+            .iter()
+            .filter(|param| param.mode != crate::MirParamMode::MutRef)
+            .filter(|param| self.is_genus_type(param.ty))
+            .filter_map(|param| {
+                resolve_struct_layout(param.ty, self.validation)
+                    .ok()
+                    .map(|layout| (param.local, layout))
+            })
+            .collect()
+    }
+
+    /// C4-6b: a genus parameter is admitted by value and read-only when its
+    /// layout resolves; a refusal surfaces by the resolver's name.
+    fn check_genus_param(&mut self, param: &MirParam) {
+        if param.mode == crate::MirParamMode::MutRef {
+            self.record_policy(SHAPE_GENUS_PARAM_MUTABLE);
+        } else if let Err(refusal) = resolve_struct_layout(param.ty, self.validation) {
+            self.record_layout(format!("{SHAPE_GENUS_PARAM}: {}", refusal.reason()));
+        }
+    }
+
+    /// A write whose destination is rooted at a genus parameter is refused.
+    fn check_genus_write(&mut self, stmt: &MirStatement) {
+        let destination = match &stmt.kind {
+            MirStatementKind::Assign { place, .. } => Some(place),
+            MirStatementKind::Call { destination, .. }
+            | MirStatementKind::RuntimeCall { destination, .. } => destination.as_ref(),
+            MirStatementKind::Construct { destination, .. } => Some(destination),
+        };
+        if destination.is_some_and(|place| self.genus_param_base(place).is_some()) {
+            self.record_policy(SHAPE_GENUS_PARAM_WRITE);
+        }
+    }
+
+    fn genus_param_base(&self, place: &MirPlace) -> Option<&MirStructLayout> {
+        match place.base {
+            MirPlaceBase::Local(local) => self.genus_params.get(&local),
+            MirPlaceBase::Temp(_) => None,
+        }
+    }
+
     fn check_place(&mut self, place: &MirPlace) {
+        if let Some(layout) = self.genus_param_base(place) {
+            let admitted = matches!(
+                place.projections.as_slice(),
+                [MirProjection::Field(name)] if layout.fields.iter().any(|field| field.name == *name)
+            );
+            if !admitted {
+                self.record_policy(SHAPE_GENUS_PARAM_PROJECTION);
+            }
+            return;
+        }
         if !place.projections.iter().all(|projection| {
             matches!(
                 projection,
@@ -546,6 +626,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
 
         if self.in_device_function {
             self.in_lane_form_function = is_structurizable_lane_form(function);
+            self.genus_params = self.resolved_genus_params(function);
             let allows_structured_return_branch = is_structured_return_branch(function);
             let allows_structured_indexed_write_branch =
                 is_structured_indexed_write_branch(function);
@@ -671,6 +752,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         }
 
         self.in_lane_form_function = false;
+        self.genus_params.clear();
         self.dead_fold_artifact_slots = FoldArtifactSlots::default();
         self.dead_const_copy_slots = DeadConstCopySlots::default();
         self.literal_indexed_access = None;
@@ -708,12 +790,17 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
 
     fn visit_param(&mut self, param: &MirParam) {
         if self.in_device_function {
-            self.check_device_type(param.ty);
+            if self.is_genus_type(param.ty) && self.in_lane_form_function {
+                self.check_genus_param(param);
+            } else {
+                self.check_device_type(param.ty);
+            }
         }
     }
 
     fn visit_local(&mut self, local: &MirLocal) {
         if self.in_device_function
+            && !self.genus_params.contains_key(&local.id)
             && !self
                 .result_aggregation_slots
                 .contains(&MirPlaceBase::Local(local.id))
@@ -748,6 +835,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         if !self.in_device_function {
             return;
         }
+        self.check_genus_write(stmt);
         match &stmt.kind {
             MirStatementKind::Assign { place, value } => {
                 // S5-W-A1: a dead fold-artifact store — a shape-list/vacua

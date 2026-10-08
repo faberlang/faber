@@ -441,3 +441,16 @@ fn refusal_reasons_are_lowercase_and_distinct() {
         assert!(seen.insert(text));
     }
 }
+
+/// C4-6b: the layout table travels beside the artifact, so it round-trips.
+#[test]
+fn layout_table_serialization_round_trips() {
+    let mut t = Types::new();
+    let (f, i) = (t.f32(), t.i32());
+    let (v2, v4) = (t.vec(f, 2), t.vec(f, 4));
+    let layout = resolve(&t, &[f, i, v2, v4, f]).expect("layout");
+    let json = serde_json::to_string(&layout).expect("serializes");
+    let back: MirStructLayout = serde_json::from_str(&json).expect("deserializes");
+    assert_eq!(back, layout);
+    assert_eq!(back.fields[2].element, layout.fields[2].element);
+}

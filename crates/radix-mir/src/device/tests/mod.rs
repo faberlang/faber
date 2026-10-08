@@ -11,6 +11,7 @@ use rustc_hash::FxHashMap;
 mod companion;
 mod entry_roles;
 mod fold_artifact;
+mod genus_param;
 mod i64_axis_const;
 mod i64_const_copy;
 mod live_tuple;

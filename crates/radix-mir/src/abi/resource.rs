@@ -141,6 +141,16 @@ pub enum MirKernelResourceKind {
         tensor_binding: u32,
         axis: u32,
     },
+    /// A `genus` kernel parameter passed by value (gpu-reset C4-6b): a
+    /// count-one, read-only resource whose element is the struct (the
+    /// resource's `element_ty` is the genus type) and whose byte width is the
+    /// resolved struct size, `size_bytes`. It is NOT a scalar and NOT a tensor
+    /// element: a consumer that needs a scalar element must refuse it. The
+    /// byte layout table is resolved by `resolve_struct_layout` and carried to
+    /// the dispatcher beside the artifact (C4-6d packs the bytes).
+    GenusParam {
+        size_bytes: u32,
+    },
 }
 
 impl MirKernelResourceKind {
@@ -150,6 +160,7 @@ impl MirKernelResourceKind {
             Self::StorageBuffer => "storage-buffer",
             Self::RuntimeExtent => "runtime-extent",
             Self::TensorAxisExtent { .. } => "tensor-axis-extent",
+            Self::GenusParam { .. } => "genus-param",
         }
     }
 }
@@ -306,6 +317,30 @@ pub(crate) fn reflect_kernel_resource(
     resource: &MirKernelResource,
     validation: &MirValidationContext<'_>,
 ) -> Result<MirKernelResourceReflection, MirAbiError> {
+    if let MirKernelResourceKind::GenusParam { size_bytes } = resource.kind {
+        // C4-6b: a genus parameter reflects as one raw-byte cell of the struct
+        // size. `element_layout` is a placeholder (`U8`, raw bytes): a consumer
+        // that needs a scalar element must test `kind` first and refuse. The
+        // field table is the resolved struct layout, not this record.
+        let element_byte_width = u16::try_from(size_bytes)
+            .map_err(|_| MirAbiError::new(ERR_KERNEL_REFLECTION_BYTE_OVERFLOW))?;
+        return Ok(MirKernelResourceReflection {
+            group: resource.group,
+            binding: resource.binding,
+            kind: resource.kind,
+            role: resource.role,
+            access: resource.access,
+            element_ty: resource.element_ty,
+            element_layout: MirScalarLayout::U8,
+            element_byte_width,
+            element_count: resource.element_count,
+            shape: None,
+            buffer_byte_len: kernel_buffer_byte_len(element_byte_width, resource.element_count)?,
+            source_local: resource.source_local,
+            source_name: resource.source_name.clone(),
+            stage_io_role: ShaderStageIoRole::Other,
+        });
+    }
     let layout = validation
         .layouts
         .layout_for_type(resource.element_ty)
@@ -475,6 +510,26 @@ pub(crate) fn require_u32_index(
     } else {
         Err(MirAbiError::new(ERR_KERNEL_INDEX_U32))
     }
+}
+
+/// The genus layout of a kernel parameter type (gpu-reset C4-6b): `Ok(None)`
+/// when `ty` is not a `genus`, `Ok(Some(layout))` when it resolves, and a named
+/// `device genus parameter: <reason>` error when the resolver refuses it.
+pub(crate) fn genus_param_layout(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<crate::MirStructLayout>, MirAbiError> {
+    if !matches!(
+        validation.types.as_table().get(ty.semantic_id()),
+        Type::Struct(_)
+    ) {
+        return Ok(None);
+    }
+    crate::resolve_struct_layout(ty, validation)
+        .map(Some)
+        .map_err(|refusal| {
+            MirAbiError::new(format!("device genus parameter: {}", refusal.reason()))
+        })
 }
 
 pub(crate) fn buffer_element_type(

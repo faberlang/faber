@@ -19,9 +19,9 @@ use super::{
     buffer_element_type, builtin_input_for_index_param, builtin_inputs_for_named_params,
     called_builtins_for_function, collection_op_contract, combined_builtin_dependencies,
     device_view_element_count, device_view_element_count_or_runtime, device_view_element_type,
-    dispatch_size_for_1d_elements, is_vacuum, kernel_has_collection_op, named_builtin_for_param,
-    param_source_name, reject_kernel_matrix_abi, require_same_element_type, require_u32_index,
-    result_tuple_count, storage_buffer_limit_error,
+    dispatch_size_for_1d_elements, genus_param_layout, is_vacuum, kernel_has_collection_op,
+    named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
+    require_same_element_type, require_u32_index, result_tuple_count, storage_buffer_limit_error,
 };
 
 struct IndexedViewKernelContext<'a> {
@@ -614,7 +614,11 @@ impl MirKernelSignature {
             output_position: u32::try_from(output_position)
                 .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
         };
-        if let [input] = inputs.as_slice() {
+        let single_tensor_input = match inputs.as_slice() {
+            [input] if genus_param_layout(input.ty, validation)?.is_none() => Some(input),
+            _ => None,
+        };
+        if let Some(input) = single_tensor_input {
             Self::indexed_view_kernel(function, input, output, &builtin_params[0], context)
                 .map(Some)
         } else {
@@ -1168,43 +1172,52 @@ impl MirKernelSignature {
         let output_element_count = device_view_element_count_or_runtime(output.ty, validation)?;
         let mut input_resources = Vec::new();
         for (binding, input) in inputs.iter().enumerate() {
-            let (input_element_ty, input_element_count) =
-                if Self::is_kernel_scalar_input(input.ty, validation)? {
-                    // Indexed kernels may carry explicit scalar resources beside
-                    // their device-view inputs. The count-one resource is bound
-                    // and reflected like every other input; only tensor inputs
-                    // must satisfy indexed-view compatibility with the output.
-                    (
-                        buffer_element_type(
-                            input.ty,
-                            validation,
-                            context.allow_host_owned_tensor_entry,
-                        )?,
-                        buffer_element_count(input.ty, validation)?,
-                    )
-                } else {
-                    let input_element_ty = device_view_element_type(
+            let genus = genus_param_layout(input.ty, validation)?;
+            let (input_element_ty, input_element_count) = if genus.is_some() {
+                // C4-6b: a genus parameter is a count-one resource whose
+                // element is the struct itself; its layout travels beside the
+                // artifact. It does not take part in tensor compatibility.
+                (input.ty, 1)
+            } else if Self::is_kernel_scalar_input(input.ty, validation)? {
+                // Indexed kernels may carry explicit scalar resources beside
+                // their device-view inputs. The count-one resource is bound
+                // and reflected like every other input; only tensor inputs
+                // must satisfy indexed-view compatibility with the output.
+                (
+                    buffer_element_type(
                         input.ty,
                         validation,
                         context.allow_host_owned_tensor_entry,
+                    )?,
+                    buffer_element_count(input.ty, validation)?,
+                )
+            } else {
+                let input_element_ty = device_view_element_type(
+                    input.ty,
+                    validation,
+                    context.allow_host_owned_tensor_entry,
+                )?;
+                if !is_gather_ids_param(function, input, validation) {
+                    require_indexed_element_compatibility(
+                        function,
+                        input_element_ty,
+                        output_element_ty,
+                        validation,
+                        binding == 0,
                     )?;
-                    if !is_gather_ids_param(function, input, validation) {
-                        require_indexed_element_compatibility(
-                            function,
-                            input_element_ty,
-                            output_element_ty,
-                            validation,
-                            binding == 0,
-                        )?;
-                    }
-                    let input_element_count =
-                        device_view_element_count_or_runtime(input.ty, validation)?;
-                    (input_element_ty, input_element_count)
-                };
+                }
+                let input_element_count =
+                    device_view_element_count_or_runtime(input.ty, validation)?;
+                (input_element_ty, input_element_count)
+            };
             input_resources.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
                 binding: input_binding(binding, context.output_position)?,
-                kind: MirKernelResourceKind::StorageBuffer,
+                kind: genus.map_or(MirKernelResourceKind::StorageBuffer, |layout| {
+                    MirKernelResourceKind::GenusParam {
+                        size_bytes: layout.size,
+                    }
+                }),
                 role: MirKernelResourceRole::Input,
                 access: MirKernelResourceAccess::Read,
                 element_ty: input_element_ty,

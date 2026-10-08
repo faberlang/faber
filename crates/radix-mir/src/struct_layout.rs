@@ -13,8 +13,8 @@
 //! admitted yet and fails closed by name (`Vec3PackedNotYet`). The register
 //! alignment that `layout.rs` reports for width 3 (16) is never read here.
 //!
-//! This module is the law only. No gate, ABI, emitter or dispatcher reads it
-//! yet.
+//! The device gate and the kernel ABI read it (C4-6b); no emitter or dispatcher
+//! does yet.
 
 use crate::{
     MirDeviceVectorLayout, MirDeviceViewElement, MirLayoutKind, MirScalarLayout, MirType,
@@ -22,12 +22,13 @@ use crate::{
 };
 use radix_lexer::Symbol;
 use radix_types::{Primitive, Type, TypeId};
+use serde::{Deserialize, Serialize};
 
 /// Largest admitted struct, in bytes.
 pub const MAX_STRUCT_LAYOUT_BYTES: u32 = 4096;
 
 /// One field of a resolved struct layout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirStructField {
     pub name: Symbol,
     pub offset: u32,
@@ -37,7 +38,7 @@ pub struct MirStructField {
 }
 
 /// A resolved genus parameter layout: fields in declaration order.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirStructLayout {
     pub fields: Vec<MirStructField>,
     pub size: u32,
