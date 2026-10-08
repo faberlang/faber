@@ -33,6 +33,37 @@ fn pick(tf32[4, 6] input, mut tf32[4, 6] output, u32 y, u32 x) → void {
     assert!(!dump.contains("runtime collection tensor_get"), "{dump}");
 }
 
+/// A rank-1 `v[[i]]` is the integer index `i` itself: the device-form MIR is
+/// identical to the scalar spelling `v[i]` (same blocks), and it validates (the index is not
+/// a one-element list).
+#[test]
+fn device_rank1_bracket_index_lowers_like_the_scalar_index() {
+    let kernel = |read: &str, write: &str| {
+        format!(
+            r#"+++
+locale = "en"
++++
+@ kernel
+@ public
+fn pick(tf32[8] input, mut tf32[8] output, u32 x) → void {{
+    output{write} ← input{read}
+}}
+"#
+        )
+    };
+    let listed = dump_validated(&kernel("[[x]]", "[[x]]"));
+    let scalar = dump_validated(&kernel("[x]", "[x]"));
+    // Type ids differ (the list spelling interns an extra type); the blocks must not.
+    let blocks = |dump: &str| dump.split("bb0:").nth(1).map(str::to_owned);
+    assert_eq!(
+        blocks(&listed),
+        blocks(&scalar),
+        "rank-1 list and scalar index must lower identically"
+    );
+    assert!(listed.contains("_1[_2] = _0[_2]"), "access must index by the integer: {listed}");
+    assert!(!listed.contains("runtime collection tensor_get"), "{listed}");
+}
+
 #[test]
 fn device_rank3_bracket_index_lowers_to_one_linear_index() {
     let dump = dump_validated(

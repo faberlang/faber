@@ -103,7 +103,7 @@ impl FunctionBuilder<'_> {
         Some(MirProjection::Index(self.lower_expr_value(index)?))
     }
 
-    /// Under device lowering, an N-element bracket index list into a rank-N
+    /// Under device lowering, an N-element (N >= 1) bracket index list into a rank-N
     /// tensor is ONE row-major linear integer index into the device view's
     /// flat storage: `((i0 * e1 + i1) * e2 + i2) ...`, where `e_k` is the
     /// extent of axis `k`. The outer `Option` is `None` when this lowering
@@ -138,7 +138,9 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let shape = *shape;
-        if elements.len() < 2 {
+        // A rank-1 list `v[[i]]` is the linear index `i` itself, the same device
+        // form as the scalar spelling `v[i]`.
+        if elements.is_empty() {
             return None;
         }
         let extents: Vec<Option<i64>> = match self.types.get_index(shape) {
