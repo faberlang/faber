@@ -7,7 +7,7 @@
 
 use super::regex_program::RegexProgram;
 use super::value::{
-    MapKey, SermoValue, TensorValue, Value, decimal_scale_factor, float_to_numerus_width,
+    MapKey, SermoValue, Value, decimal_scale_factor, float_to_numerus_width,
     float_truncation_fits_width, int_width_range, modular_word_result, round_half_even_division,
     saturating_word_result, trapping_float_store_fails,
 };

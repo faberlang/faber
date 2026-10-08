@@ -20,6 +20,7 @@
 #![allow(dead_code)]
 
 use crate::value::Value;
+use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 use std::borrow::Cow;
 use std::cell::{Cell, UnsafeCell};
 use std::ops::Range;
@@ -160,6 +161,54 @@ fn narrow_int<T: TryFrom<i64> + TryFrom<u64>>(value: &Value) -> Option<T> {
     }
 }
 
+/// Whether storing `value` in a `kind` array and reading it back returns the
+/// same value (same carrier, bit-identical for floats up to NaN payload).
+fn reads_back_exactly(kind: DenseKind, value: &Value) -> bool {
+    match (kind, value) {
+        (DenseKind::F32, Value::Float(v)) => {
+            let rounded = f64::from(*v as f32);
+            *v == rounded || (v.is_nan() && rounded.is_nan())
+        }
+        (DenseKind::F64, Value::Float(_)) | (DenseKind::I64, Value::Int(_)) => true,
+        (DenseKind::I32, Value::Int(v)) => i32::try_from(*v).is_ok(),
+        (DenseKind::U8, Value::Int(v)) => u8::try_from(*v).is_ok(),
+        (DenseKind::U32, Value::Int(v)) => u32::try_from(*v).is_ok(),
+        (DenseKind::U64, Value::UInt(_)) | (DenseKind::Bool, Value::Bool(_)) => true,
+        _ => false,
+    }
+}
+
+/// The typed storage kind of a tensor element type, or `None` when the
+/// element stays boxed (vector, matrix, record, text, policy-integer and
+/// widths without a dense kind). Policy floats read as the bare float.
+pub fn dense_kind_of_type(types: &TypeTable, ty: TypeId) -> Option<DenseKind> {
+    match types.get(ty) {
+        Type::Alias(_, inner) => dense_kind_of_type(types, *inner),
+        Type::Primitive(Primitive::Bivalens) => Some(DenseKind::Bool),
+        Type::PolicyFloat(_, width) => float_kind(*width),
+        Type::Primitive(Primitive::Numerus) => Some(DenseKind::I64),
+        Type::Primitive(Primitive::Fractus) => Some(DenseKind::F64),
+        Type::SizedNumeric(Primitive::Numerus, width) => match width {
+            NumericWidth::I32 => Some(DenseKind::I32),
+            NumericWidth::I64 => Some(DenseKind::I64),
+            NumericWidth::U8 => Some(DenseKind::U8),
+            NumericWidth::U32 => Some(DenseKind::U32),
+            NumericWidth::U64 => Some(DenseKind::U64),
+            _ => None,
+        },
+        Type::SizedNumeric(Primitive::Fractus, width) => float_kind(*width),
+        _ => None,
+    }
+}
+
+fn float_kind(width: NumericWidth) -> Option<DenseKind> {
+    match width {
+        NumericWidth::F32 => Some(DenseKind::F32),
+        NumericWidth::F64 => Some(DenseKind::F64),
+        _ => None,
+    }
+}
+
 impl DenseStorage {
     /// `len` zero elements of `kind`.
     pub fn zeros(kind: DenseKind, len: usize) -> Self {
@@ -203,6 +252,19 @@ impl DenseStorage {
             typed
         } else {
             Self::Values(values)
+        }
+    }
+
+    /// Build storage from boxed values, typed only when the typed array reads
+    /// back exactly the boxed values (same carrier, same bits): a value that
+    /// `set` would narrow, round or re-carrier keeps the whole array `Values`.
+    /// This is the birth path of runner tensors: it never changes a read.
+    pub fn from_values_exact(values: Vec<Value>, kind: Option<DenseKind>) -> Self {
+        match kind {
+            Some(kind) if values.iter().all(|value| reads_back_exactly(kind, value)) => {
+                Self::from_values(values, Some(kind))
+            }
+            _ => Self::Values(values),
         }
     }
 

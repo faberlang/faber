@@ -307,7 +307,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             // interpret zero-valued elements as absent entries.  Keeping this
             // as a passthrough also mirrors the codegen lanes' `fromTensor`
             // contract without inventing a second runtime carrier.
-            Type::Tensor(_, _) | Type::Sparsa(_, _) => match value {
+            Type::Tensor(element, _) | Type::Sparsa(element, _) => match value {
                 // BO-M-8: Tensor→Tensor passthrough shares the Rc instead of
                 // deep-copying data/shape into a fresh RefCell.
                 Value::Tensor(cell) => Ok(Value::Tensor(cell)),
@@ -318,11 +318,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     // producers, not as a second compiler lowering path.
                     let data = cell.borrow().clone();
                     let shape = lista_to_tensor_shape(target_ty, self.types, data.len());
-                    TensorValue::try_contiguous(data, shape)
-                        .map(|tensor| Value::Tensor(Rc::new(RefCell::new(tensor))))
-                        .ok_or_else(|| {
-                            RunnerError::internal(span, "tensor shape has unrepresentable strides")
-                        })
+                    crate::runtime::tensor_value_typed(
+                        self.types,
+                        data,
+                        Some(*element),
+                        shape,
+                        span,
+                    )
                 }
                 other => Err(RunnerError::internal(
                     span,
@@ -758,11 +760,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let shape = lista_to_tensor_shape(target, self.types, data.len());
-                TensorValue::try_contiguous(data, shape)
-                    .map(|tensor| Value::Tensor(Rc::new(RefCell::new(tensor))))
-                    .ok_or_else(|| {
-                        RunnerError::internal(span, "tensor shape has unrepresentable strides")
-                    })
+                crate::runtime::tensor_value_typed(self.types, data, Some(*element), shape, span)
             }
             other => Err(RunnerError::internal(
                 span,

@@ -306,3 +306,252 @@ fn debug_borrow_flag_panics_on_overlapping_borrows() {
     assert!(cell.set(0, &Value::Float(2.0)));
     assert_eq!(cell.get(0), Some(Value::Float(2.0)));
 }
+
+// ---------------------------------------------------------------------------
+// Tensors are born typed (unit U2)
+// ---------------------------------------------------------------------------
+
+mod born_typed {
+    use crate::dense::{DenseKind, DenseStorage};
+    use crate::host::BufferHost;
+    use crate::value::{TensorValue, Value};
+    use crate::{MirBlockId, Runner};
+    use radix_lexer::{Interner, Span};
+    use radix_mir::{
+        MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirOperand, MirProgram,
+        MirRuntimeCall, MirType, MirValidationContext, MirValueId,
+    };
+    use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    fn function() -> MirFunction {
+        MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![],
+            temps: vec![],
+            blocks: vec![],
+            return_ty: MirType::semantic(TypeId(0)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }
+    }
+
+    fn array(values: Vec<Value>) -> Value {
+        Value::Array(Rc::new(RefCell::new(values)))
+    }
+
+    fn tensor_of(values: Vec<Value>, shape: Vec<i64>) -> Value {
+        Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+            values, shape,
+        ))))
+    }
+
+    /// `tensor<element, [dims]>` with literal dims.
+    fn tensor_type(types: &mut TypeTable, element: Type, dims: &[u64]) -> MirType {
+        let element = types.intern(element);
+        let dims = dims
+            .iter()
+            .map(|dim| types.intern_index(IndexExpr::Literal(*dim)))
+            .collect();
+        let shape = types.intern_index(IndexExpr::Tuple(dims));
+        MirType::semantic(types.tensor_with_shape(element, shape))
+    }
+
+    /// Run one collection call over `inputs` (value ids 0..) and return the tensor.
+    fn run(
+        types: &TypeTable,
+        op: MirCollectionOp,
+        arg_count: usize,
+        return_ty: MirType,
+        inputs: Vec<Value>,
+    ) -> Rc<RefCell<TensorValue>> {
+        let mut host = BufferHost::default();
+        let interner = Interner::new();
+        let context = MirValidationContext::new(types);
+        let mut program = MirProgram::new();
+        program.functions.push(function());
+        let mut runner = Runner::new(&program, &context, types, &interner, &mut host);
+        let fn0 = program.functions.first().unwrap();
+        runner.push_frame(fn0.id, MirBlockId(0));
+        for (index, value) in inputs.into_iter().enumerate() {
+            runner
+                .frames
+                .last_mut()
+                .unwrap()
+                .values
+                .insert(MirValueId(index as u32), value);
+        }
+        let result = runner
+            .eval_runtime_call(
+                &MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Collection(op),
+                    args: (0..arg_count)
+                        .map(|index| MirOperand::Value(MirValueId(index as u32)))
+                        .collect(),
+                    return_ty,
+                },
+                Span::default(),
+            )
+            .expect("collection call");
+        let Value::Tensor(tensor) = result else {
+            panic!("expected a tensor, got {result:?}");
+        };
+        tensor
+    }
+
+    /// `lista ↦ tensor<element, [2,2]>` through the exact `TensorFromFlat` form.
+    fn from_flat(element: Type, flat: Vec<Value>) -> Rc<RefCell<TensorValue>> {
+        let mut types = TypeTable::new();
+        let return_ty = tensor_type(&mut types, element, &[2, 2]);
+        let shape = array(vec![Value::Int(2), Value::Int(2)]);
+        // Receiver slot, flat, shape (the receiver is never read).
+        run(
+            &types,
+            MirCollectionOp::TensorFromFlat,
+            3,
+            return_ty,
+            vec![array(vec![]), array(flat), shape],
+        )
+    }
+
+    fn floats(values: &[f64]) -> Vec<Value> {
+        values.iter().copied().map(Value::Float).collect()
+    }
+
+    #[test]
+    fn lista_f32_to_tensor_is_born_f32_with_the_old_reads() {
+        // 0.5 .. 3.5 are f32-exact, so the typed reads equal the boxed reads.
+        let flat = floats(&[0.5, 1.5, 2.5, 3.5]);
+        let tensor = from_flat(
+            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
+            flat.clone(),
+        );
+        let tensor = tensor.borrow();
+        assert_eq!(tensor.shape, vec![2, 2]);
+        assert_eq!(tensor.data.kind(), Some(DenseKind::F32));
+        assert_eq!(tensor.logical_values(), Some(flat));
+    }
+
+    #[test]
+    fn a_boxed_value_that_is_not_f32_exact_keeps_boxed_storage() {
+        // Born typed never changes a read: 0.1 is not an f32, so this stays boxed.
+        let flat = floats(&[0.1, 1.5, 2.5, 3.5]);
+        let tensor = from_flat(
+            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
+            flat.clone(),
+        );
+        let tensor = tensor.borrow();
+        assert_eq!(tensor.data.kind(), None);
+        assert_eq!(tensor.logical_values(), Some(flat));
+    }
+
+    #[test]
+    fn i32_and_u8_tensors_are_born_typed() {
+        let ints = |values: &[i64]| values.iter().copied().map(Value::Int).collect::<Vec<_>>();
+        let i32_tensor = from_flat(
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32),
+            ints(&[-1, 2, 3, 4]),
+        );
+        assert_eq!(i32_tensor.borrow().data.kind(), Some(DenseKind::I32));
+        assert_eq!(
+            i32_tensor.borrow().logical_values(),
+            Some(ints(&[-1, 2, 3, 4]))
+        );
+        let u8_tensor = from_flat(
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8),
+            ints(&[0, 7, 200, 255]),
+        );
+        assert_eq!(u8_tensor.borrow().data.kind(), Some(DenseKind::U8));
+        assert_eq!(
+            u8_tensor.borrow().logical_values(),
+            Some(ints(&[0, 7, 200, 255]))
+        );
+        // Bare numerus and fractus are I64 and F64.
+        let bare = from_flat(Type::Primitive(Primitive::Numerus), ints(&[1, 2, 3, 4]));
+        assert_eq!(bare.borrow().data.kind(), Some(DenseKind::I64));
+        let bare = from_flat(Type::Primitive(Primitive::Fractus), floats(&[1.0; 4]));
+        assert_eq!(bare.borrow().data.kind(), Some(DenseKind::F64));
+    }
+
+    #[test]
+    fn vector_elements_stay_boxed() {
+        let mut types = TypeTable::new();
+        let f32_ty = types.intern(Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32));
+        let width = types.intern_index(IndexExpr::Literal(2));
+        let vector = types.vector_with_width(f32_ty, width);
+        let dim = types.intern_index(IndexExpr::Literal(2));
+        let shape = types.intern_index(IndexExpr::Tuple(vec![dim]));
+        let return_ty = MirType::semantic(types.tensor_with_shape(vector, shape));
+        let elements = vec![
+            Value::Vector(Rc::new(RefCell::new(floats(&[1.0, 2.0])))),
+            Value::Vector(Rc::new(RefCell::new(floats(&[3.0, 4.0])))),
+        ];
+        let tensor = run(
+            &types,
+            MirCollectionOp::TensorFromFlat,
+            3,
+            return_ty,
+            vec![array(vec![]), array(elements), array(vec![Value::Int(2)])],
+        );
+        assert!(matches!(
+            tensor.borrow().data.clone_storage(),
+            DenseStorage::Values(_)
+        ));
+        assert_eq!(tensor.borrow().data.kind(), None);
+    }
+
+    #[test]
+    fn matmul_of_f32_tensors_is_born_f32_with_rounded_cells() {
+        let mut types = TypeTable::new();
+        let return_ty = tensor_type(
+            &mut types,
+            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
+            &[2, 2],
+        );
+        let left = tensor_of(floats(&[0.1, 0.2, 0.3, 0.4]), vec![2, 2]);
+        let right = tensor_of(floats(&[0.5, 0.6, 0.7, 0.8]), vec![2, 2]);
+        // The unrounded f64 contraction the old path stored.
+        let old = [
+            0.1 * 0.5 + 0.2 * 0.7,
+            0.1 * 0.6 + 0.2 * 0.8,
+            0.3 * 0.5 + 0.4 * 0.7,
+            0.3 * 0.6 + 0.4 * 0.8,
+        ];
+        let tensor = run(
+            &types,
+            MirCollectionOp::TensorMatMul,
+            2,
+            return_ty,
+            vec![left, right],
+        );
+        let tensor = tensor.borrow();
+        assert_eq!(tensor.data.kind(), Some(DenseKind::F32));
+        let cells = tensor.logical_values().expect("layout");
+        for (cell, old) in cells.iter().zip(old) {
+            let Value::Float(cell) = cell else {
+                panic!("float cell, got {cell:?}");
+            };
+            assert_eq!(*cell, f64::from(old as f32), "f32-rounded old value");
+            assert_eq!(*cell, f64::from(*cell as f32), "cell is f32-representable");
+        }
+    }
+
+    #[test]
+    fn copy_keeps_the_born_kind() {
+        let tensor = from_flat(
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8),
+            vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)],
+        );
+        let Value::Tensor(copy) = Value::Tensor(tensor).deep_copy() else {
+            panic!("tensor copy stays a tensor");
+        };
+        assert_eq!(copy.borrow().data.kind(), Some(DenseKind::U8));
+    }
+}

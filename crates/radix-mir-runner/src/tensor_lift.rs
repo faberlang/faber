@@ -12,15 +12,13 @@
 
 use super::exact_int::{exact_neg, int_value};
 use super::value::{
-    TensorValue, Value, compare_values, effective_width, ieee_maximum, ieee_minimum, numeric_binop,
-    round_float, values_equal,
+    Value, compare_values, effective_width, ieee_maximum, ieee_minimum, numeric_binop, round_float,
+    values_equal,
 };
 use super::{Runner, RunnerError};
 use radix_lexer::Span;
 use radix_mir::{MirBinOp, MirLiftOp, MirOperand, MirType};
 use radix_types::{NumericWidth, Type, TypeId};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 const ISSUE_SHAPE_MISMATCH: &str = "runner_tensor_lift_shape_mismatch";
 const DIVISION_FAILED: &str = "numerus division failed";
@@ -63,9 +61,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             data.push(self.lift_element(op, &picked, element, span)?);
         }
-        TensorValue::try_contiguous(data, shape)
-            .map(|tensor| Value::Tensor(Rc::new(RefCell::new(tensor))))
-            .ok_or_else(|| RunnerError::internal(span, "tensor shape has unrepresentable strides"))
+        super::runtime::tensor_value_typed(self.types, data, element, shape, span)
     }
 
     /// `≡` over two whole tensors: the same shape and every element pair `≡`.

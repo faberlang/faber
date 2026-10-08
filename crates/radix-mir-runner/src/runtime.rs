@@ -30,6 +30,7 @@
 )]
 
 use super::cursor::GeneratorCursor;
+use super::dense::{DenseKind, DenseStorage, dense_kind_of_type};
 use super::sermo::SermoView;
 use super::tensor_edge::{
     BuiltinEdgePolicy, CustomEdgePolicyId, CustomEdgeValueError, TensorEdgeResolution,
@@ -681,7 +682,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let shape = literal_sparse_shape(self.types, *shape, span)?;
                 let zero = sparse_zero_value(self.types, *element, span)?;
                 let count = tensor_element_count(&shape, span)?;
-                tensor_value(vec![zero; count], shape, span)
+                tensor_value_typed(self.types, vec![zero; count], Some(*element), shape, span)
             }
             MirAggregateKind::Interval { inclusive } => {
                 let [start, end] = self
@@ -1602,7 +1603,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorGet => self.tensor_get(args, return_ty, span),
             MirCollectionOp::TensorSet => self.tensor_set(args, span),
             MirCollectionOp::TensorFill => self.tensor_fill(args, span),
-            MirCollectionOp::TensorCreate => self.tensor_create(args, span),
+            MirCollectionOp::TensorCreate => self.tensor_create(args, return_ty, span),
             MirCollectionOp::TensorFromFlat => self.tensor_from_flat(args, return_ty, span),
             MirCollectionOp::TensorFlatten => self.tensor_flatten(args, span),
             MirCollectionOp::TensorMaterialize => self.tensor_materialize(args, span),
@@ -2029,11 +2030,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         match self.types.get(return_ty.semantic_id()) {
             Type::Array(_) => Ok(array_value(values)),
-            Type::Tensor(_, _) => {
+            Type::Tensor(element, _) => {
+                let element = *element;
                 let len = i64::try_from(values.len()).map_err(|_| {
                     RunnerError::internal(span, "interval materialization length overflow")
                 })?;
-                tensor_value(values, vec![len], span)
+                tensor_value_typed(self.types, values, Some(element), vec![len], span)
             }
             _ => Err(RunnerError::internal(
                 span,
@@ -2091,7 +2093,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let value = self.eval_operand(value, span)?;
         let values = self.tensor_fill_values(&tensor, value, span)?;
         let shape = tensor.borrow().shape.clone();
-        tensor_value(values, shape, span)
+        tensor_value_kind(values, tensor_kind(&tensor), shape, span)
     }
 
     /// Statement posture: the dropped fill result is the in-place mutation
@@ -2167,14 +2169,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn tensor_create(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+    fn tensor_create(
+        &mut self,
+        args: &[MirOperand],
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
         let [_receiver, fill, shape] = args else {
             return Err(RunnerError::internal(span, "tensor create arity"));
         };
         let shape = self.shape_arg(shape, span, ERR_CREA_INVALID_SHAPE)?;
         let fill = self.eval_operand(fill, span)?;
         let count = tensor_element_count(&shape, span)?;
-        tensor_value(vec![fill; count], shape, span)
+        let element = self.tensor_element_type(return_ty);
+        tensor_value_typed(self.types, vec![fill; count], element, shape, span)
     }
 
     fn tensor_from_flat(
@@ -2198,7 +2206,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             let [_receiver, flat, shape] = args else {
                 return Err(RunnerError::internal(span, "tensor from flat arity"));
             };
-            return self.tensor_from_flat_exact(flat, shape, static_shape, span);
+            return self.tensor_from_flat_exact(flat, shape, static_shape, return_ty, span);
         };
         let flat = self.array_arg(flat, span)?;
         let shape = self.conversion_shape_arg(shape, span)?;
@@ -2216,7 +2224,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let fill = self.eval_operand(fill, span)?;
         let mut data = flat;
         data.resize(count, fill);
-        tensor_value(data, shape, span)
+        let element = self.tensor_element_type(return_ty);
+        tensor_value_typed(self.types, data, element, shape, span)
     }
 
     fn tensor_from_flat_exact(
@@ -2224,6 +2233,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         flat: &MirOperand,
         shape: &MirOperand,
         static_shape: Option<Vec<i64>>,
+        return_ty: MirType,
         span: Span,
     ) -> Result<Value, RunnerError> {
         let flat = self.array_arg(flat, span)?;
@@ -2235,7 +2245,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             span,
             radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
         )?;
-        tensor_value(flat, shape, span)
+        let element = self.tensor_element_type(return_ty);
+        tensor_value_typed(self.types, flat, element, shape, span)
     }
 
     fn tensor_flatten(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2270,7 +2281,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         }
         let data = self.tensor_logical_values(&tensor, span)?;
-        tensor_value(data, shape, span)
+        tensor_value_kind(data, tensor_kind(&tensor), shape, span)
     }
 
     fn tensor_expand(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2685,7 +2696,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     return Ok(Value::Tensor(tensor));
                 }
                 let data = self.tensor_logical_values(&tensor, span)?;
-                tensor_value(data, snapshot.shape, span)
+                tensor_value_kind(data, tensor.borrow().data.kind(), snapshot.shape, span)
             }
             Value::Array(items) => {
                 let items = items.borrow().clone();
@@ -3070,7 +3081,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                                 format!("{label} backing-length mismatch"),
                             ));
                         }
-                        return tensor_value(Vec::new(), higher_shape.clone(), span);
+                        return tensor_value_typed(
+                            self.types,
+                            Vec::new(),
+                            element,
+                            higher_shape.clone(),
+                            span,
+                        );
                     }
                     let expected = rows.saturating_mul(lower_data.len());
                     if higher_data.len() != expected {
@@ -3090,7 +3107,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         })
                         .collect::<Result<Vec<_>, _>>()?;
                     let data = self.store_elementwise_data(element, data, span)?;
-                    return tensor_value(data, higher_shape.clone(), span);
+                    return tensor_value_typed(
+                        self.types,
+                        data,
+                        element,
+                        higher_shape.clone(),
+                        span,
+                    );
                 }
                 // Equal shapes with unequal backing lengths would silently
                 // truncate via zip — reject explicitly (PRP-077).
@@ -3106,7 +3129,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .map(|(a, b)| op(a, b, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
                 let data = self.store_elementwise_data(element, data, span)?;
-                tensor_value(data, left_shape, span)
+                tensor_value_typed(self.types, data, element, left_shape, span)
             }
             (Value::Tensor(cell), scalar) => {
                 let shape = cell.borrow().shape.clone();
@@ -3117,7 +3140,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .map(|elem| op(elem, scalar, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
                 let data = self.store_elementwise_data(element, data, span)?;
-                tensor_value(data, shape, span)
+                tensor_value_typed(self.types, data, element, shape, span)
             }
             (scalar, Value::Tensor(cell)) => {
                 let shape = cell.borrow().shape.clone();
@@ -3128,7 +3151,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .map(|elem| op(scalar, elem, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
                 let data = self.store_elementwise_data(element, data, span)?;
-                tensor_value(data, shape, span)
+                tensor_value_typed(self.types, data, element, shape, span)
             }
             _ => op(&left_val, &right_val, width, span),
         }
@@ -3198,7 +3221,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .iter()
             .map(&mut *op)
             .collect::<Result<Vec<_>, _>>()?;
-        tensor_value(data, shape, span)
+        tensor_value_kind(data, tensor_kind(&tensor), shape, span)
     }
 
     fn tensor_neg(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -3273,7 +3296,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 None => mapped,
             });
         }
-        tensor_value(data, shape, span)
+        tensor_value_typed(self.types, data, element, shape, span)
     }
 
     /// Built-in math function on a scalar float (`x.sqrt()`, `x.sin()`).
@@ -3382,7 +3405,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             let row = row_softmax(&values, base, last_dim, RowSoftmaxAccess::Safe, span)?;
             out_data.extend(row.into_iter().map(Value::Float));
         }
-        tensor_value(out_data, shape, span)
+        tensor_value_kind(out_data, tensor_kind(&tensor), shape, span)
     }
 
     /// Categorical cross-entropy loss: `-sum(targets * log(softmax(logits) + ε)) / N`.
@@ -3602,11 +3625,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 )?);
             }
         }
-        tensor_value(
-            self.store_matmul_cells(element, cells, span)?,
-            output_shape,
-            span,
-        )
+        let mut cells = self.store_matmul_cells(element, cells, span)?;
+        // PRECISION (typed dense U2): a matmul over `tensor<f32>` keeps its
+        // dot-product cells as unrounded f64 under inferred storage. The cell
+        // is born `F32`, so each result rounds to f32 once, here, toward the
+        // device's arithmetic.
+        if element.and_then(|element| dense_kind_of_type(self.types, element))
+            == Some(DenseKind::F32)
+        {
+            for cell in &mut cells {
+                if let Value::Float(value) = cell {
+                    *value = f64::from(*value as f32);
+                }
+            }
+        }
+        tensor_value_typed(self.types, cells, element, output_shape, span)
     }
 
     fn store_matmul_cells(
@@ -3706,7 +3739,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
             }
             let result = self.store_tensor_elements(element, result, span)?;
-            tensor_value(result, vec![cols as i64], span)
+            tensor_value_typed(self.types, result, Some(element), vec![cols as i64], span)
         } else {
             // axis == 1 (last axis) — sum across columns → result has shape [rows].
             let mut result = Vec::with_capacity(rows);
@@ -3725,7 +3758,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 result.push(sum);
             }
             let result = self.store_tensor_elements(element, result, span)?;
-            tensor_value(result, vec![rows as i64], span)
+            tensor_value_typed(self.types, result, Some(element), vec![rows as i64], span)
         }
     }
 
@@ -3955,7 +3988,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             _ => normalized,
         };
 
-        tensor_value(output, shape, span)
+        tensor_value_kind(output, tensor_kind(&input), shape, span)
     }
 
     fn tensor_rms_norm(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -4047,7 +4080,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 output.push(Value::Float(x * scale * g));
             }
         }
-        tensor_value(output, shape, span)
+        tensor_value_kind(output, tensor_kind(&input), shape, span)
     }
 
     fn tensor_rope(
@@ -4141,7 +4174,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             output.extend(row_data);
         }
-        tensor_value(output, shape, span)
+        tensor_value_kind(output, tensor_kind(&input), shape, span)
     }
 
     fn tensor_gather(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -4200,7 +4233,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             output.extend(table_values[base..base + cols].iter().cloned());
         }
         let result_shape = vec![indices.len() as i64, cols as i64];
-        tensor_value(output, result_shape, span)
+        tensor_value_kind(output, tensor_kind(&table), result_shape, span)
     }
 
     fn tensor_transpose(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -5526,10 +5559,46 @@ fn array_value(items: Vec<Value>) -> Value {
     Value::Array(Rc::new(RefCell::new(items)))
 }
 
+/// Boxed-storage tensor: the shim for the long tail of construction sites.
 fn tensor_value(data: Vec<Value>, shape: Vec<i64>, span: Span) -> Result<Value, RunnerError> {
-    let tensor = TensorValue::try_contiguous(data, shape)
-        .ok_or_else(|| RunnerError::internal(span, "tensor shape has unrepresentable strides"))?;
+    tensor_value_kind(data, None, shape, span)
+}
+
+/// The single tensor constructor: `kind` is the dense element kind the tensor
+/// is born with. The array is typed only when every cell reads back as the
+/// exact same `Value` (`DenseStorage::from_values_exact`), so a read never
+/// changes; `None` keeps boxed storage.
+fn tensor_value_kind(
+    data: Vec<Value>,
+    kind: Option<DenseKind>,
+    shape: Vec<i64>,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    let tensor =
+        TensorValue::try_contiguous_typed(DenseStorage::from_values_exact(data, kind), shape)
+            .ok_or_else(|| {
+                RunnerError::internal(span, "tensor shape has unrepresentable strides")
+            })?;
     Ok(Value::Tensor(Rc::new(RefCell::new(tensor))))
+}
+
+/// Tensor born typed from its declared element type (`None` or a non-scalar
+/// element stays boxed).
+pub(crate) fn tensor_value_typed(
+    types: &TypeTable,
+    data: Vec<Value>,
+    element: Option<TypeId>,
+    shape: Vec<i64>,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    let kind = element.and_then(|element| dense_kind_of_type(types, element));
+    tensor_value_kind(data, kind, shape, span)
+}
+
+/// Dense kind of an existing tensor's backing, for results that keep the
+/// element type of their input.
+fn tensor_kind(tensor: &Rc<RefCell<TensorValue>>) -> Option<DenseKind> {
+    tensor.borrow().data.kind()
 }
 
 fn interval_value(start: Value, end: Value, inclusive: bool) -> Value {
