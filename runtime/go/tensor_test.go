@@ -123,3 +123,24 @@ func TestTensorAccess(t *testing.T) {
 		t.Fatalf("Materialize aliased the source")
 	}
 }
+
+// TestTensorCheckedMethodForms pins the failable method forms: the element or
+// the runner's text error; a store that fails leaves the tensor unchanged.
+func TestTensorCheckedMethodForms(t *testing.T) {
+	grid := tensorOf([]float32{1, 2, 3, 4}, []int{2, 2})
+	if v, err := grid.AccipeChecked([]int{1, 0}); err != nil || v != 3 {
+		t.Fatalf("AccipeChecked in range = %v, %v", v, err)
+	}
+	if _, err := grid.AccipeChecked([]int{2, 0}); err == nil || err.Error() != "tensor accipe invalid index" {
+		t.Fatalf("AccipeChecked out of range error = %v", err)
+	}
+	if err := grid.PondeChecked([]int{0, 1}, 9); err != nil {
+		t.Fatalf("PondeChecked in range = %v", err)
+	}
+	if v, _ := grid.AccipeChecked([]int{0, 1}); v != 9 {
+		t.Fatalf("PondeChecked did not store: %v", v)
+	}
+	if err := grid.PondeChecked([]int{0, 5}, 1); err == nil || err.Error() != "tensor ponde invalid index" {
+		t.Fatalf("PondeChecked out of range error = %v", err)
+	}
+}

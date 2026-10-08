@@ -1,5 +1,7 @@
 package rt
 
+import "errors"
+
 // The Faber `tensor` carrier for generated Go programs (codegen-readability
 // T1-G7): a dense row-major n-dimensional array with a runtime shape.
 //
@@ -424,6 +426,28 @@ func (t TensorTensor[T]) ReadAt(indices any) T {
 		panic("tensor accipe invalid index")
 	}
 	return *p
+}
+
+// AccipeChecked is the failable method form `t.accipe(idx)`: the element, or
+// the text error the runner reports (`tensor accipe invalid index`).
+func (t TensorTensor[T]) AccipeChecked(indices any) (T, error) {
+	p := t.Accipe(indices)
+	if p == nil {
+		var zero T
+		return zero, errors.New("tensor accipe invalid index")
+	}
+	return *p, nil
+}
+
+// PondeChecked is the failable method form `t.ponde(idx, v)`: it stores, or
+// returns the text error the runner reports (`tensor ponde invalid index`).
+func (t *TensorTensor[T]) PondeChecked(indices any, value T) error {
+	offset, ok := tensorOffset(t.shape, indexSlice(indices))
+	if !ok || offset >= len(t.data) {
+		return errors.New("tensor ponde invalid index")
+	}
+	t.data[offset] = value
+	return nil
 }
 
 func (t *TensorTensor[T]) Ponde(indices any, value T) {

@@ -2090,3 +2090,12 @@ fn index_form_read_out_of_range_is_fatal() {
     let tensor = Tensor::<f32>::crea(&[3], 0.0).unwrap();
     let _ = tensor.index_get(&[3]);
 }
+
+#[test]
+fn accipe_checked_reads_in_range_and_reports_the_text_error_otherwise() {
+    let mut tensor = Tensor::<f32>::crea(&[3], 0.0).unwrap();
+    tensor.index_set(&[1], 7.5);
+    assert_eq!(tensor.accipe_checked(&[1]), Ok(Some(7.5)));
+    assert_eq!(tensor.accipe_checked(&[3]), Err("tensor accipe invalid index"));
+    assert_eq!(tensor.accipe_checked(&[-1]), Err("tensor accipe invalid index"));
+}

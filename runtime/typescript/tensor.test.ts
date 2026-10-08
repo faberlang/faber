@@ -46,3 +46,13 @@ test("tensor conversion recovery, indexing, and original shape traps", () => {
   assert.throws(() => value.strue([1], [2]), { message: "tensor structa element count does not match shape" });
   assert.throws(() => value.addita(new tensor.Tensor([1, 2, 3], [3])), { message: "tensor broadcast shape mismatch" });
 });
+
+test("tensor checked method forms return the element or the runner's text error", () => {
+  const grid = new tensor.Tensor([1, 2, 3, 4], [2, 2]);
+  assert.deepEqual(grid.accipeChecked([1, 0]), { ok: true, value: 3 });
+  assert.deepEqual(grid.accipeChecked([2, 0]), { ok: false, error: "tensor accipe invalid index" });
+  assert.deepEqual(grid.pondeChecked([0, 1], 9), { ok: true, value: undefined });
+  assert.deepEqual(grid.accipeChecked([0, 1]), { ok: true, value: 9 });
+  assert.deepEqual(grid.pondeChecked([0, 5], 1), { ok: false, error: "tensor ponde invalid index" });
+  assert.deepEqual(grid.planata(), [1, 9, 3, 4]);
+});

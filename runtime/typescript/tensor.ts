@@ -1,3 +1,5 @@
+/** Structurally the `result.Result` generated code unwraps (kept local: no cross-module import). */
+type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
 /** Faber tensor carrier, moved from the TypeScript emitter without changing checks or traps. */
 export class Tensor<T> {
     data: T[];
@@ -107,6 +109,23 @@ export class Tensor<T> {
     accipe(indices: number[]): T | null {
         const offset = Tensor.offset(this.shape, indices);
         return offset == null ? null : this.data[offset];
+    }
+    /** The failable method form `t.accipe(idx)`: the element, or the runner's text error. */
+    accipeChecked(indices: number[]): Checked<T> {
+        const offset = Tensor.offset(this.shape, indices);
+        if (offset == null) {
+            return { ok: false, error: "tensor accipe invalid index" };
+        }
+        return { ok: true, value: this.data[offset] };
+    }
+    /** The failable method form `t.ponde(idx, v)`: stores, or the runner's text error. */
+    pondeChecked(indices: number[], value: T): Checked<void> {
+        const offset = Tensor.offset(this.shape, indices);
+        if (offset == null) {
+            return { ok: false, error: "tensor ponde invalid index" };
+        }
+        this.data[offset] = value;
+        return { ok: true, value: undefined };
     }
     ponde(indices: number[], value: T): void {
         const offset = Tensor.offset(this.shape, indices);

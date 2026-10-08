@@ -445,6 +445,20 @@ impl<T: Clone + Default> Tensor<T> {
         with_index(indices, |index| self.read_logical_index(index))?
     }
 
+    /// The failable method form `t.accipe(idx)`: the element, or the runner's
+    /// text error for a negative, out-of-bounds or view-gap index. The `Option`
+    /// layer is kept so the call shape matches `accipe`; it is always `Some`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(ERR_ACCIPE_INVALID_INDEX)` when no element is readable.
+    pub fn accipe_checked(&self, indices: &[i64]) -> Result<Option<T>, &'static str> {
+        match self.accipe(indices) {
+            Ok(Some(value)) => Ok(Some(value)),
+            _ => Err(ERR_ACCIPE_INVALID_INDEX),
+        }
+    }
+
     /// Write a value at the given indices.
     ///
     /// # Errors
