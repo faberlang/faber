@@ -52,6 +52,8 @@ handroll = { path = "../handroll" }
 [build-dependencies]
 flate2 = "1"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+
 [dev-dependencies]
 hygiene-ratchet = { path = "../hygiene-ratchet" }
 tempfile = "3"

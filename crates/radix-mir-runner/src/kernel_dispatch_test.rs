@@ -2,7 +2,7 @@
 //! function reaches the run's `KernelDispatcher` with evaluated arguments, a
 //! `mut` argument is written back, and the dispatcher's value is the call's.
 
-use super::kernel_dispatch::KernelDispatcher;
+use super::kernel_dispatch::{self, KernelDispatcher};
 use super::*;
 use crate::host::BufferHost;
 use radix_lexer::Interner;
@@ -104,15 +104,15 @@ fn kernel_dispatch_reaches_the_dispatcher_and_writes_back() {
     let program = kernel_program(&types);
     let context = MirValidationContext::new(&types);
     let mut host = BufferHost::default();
-    let mut recorder = Recorder {
+    let recorder = Rc::new(RefCell::new(Recorder {
         calls: Vec::new(),
         result: Ok(Some(Value::Int(7))),
-    };
+    }));
     let list = Rc::new(RefCell::new(vec![Value::Int(1)]));
     {
         let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
         runner.kernel_policy = RunnerKernelPolicy::Dispatch;
-        runner.kernel_dispatcher = Some(&mut recorder);
+        runner.kernel_dispatcher = Some(recorder.clone() as kernel_dispatch::ResidencyHook);
         runner.push_frame(MirFunctionId(0), MirBlockId(0));
         let frame = runner.frames.last_mut().expect("caller frame");
         frame.seed_local(MirLocalId(0), Value::Int(3));
@@ -145,10 +145,10 @@ fn kernel_dispatch_reaches_the_dispatcher_and_writes_back() {
     }
     assert_eq!(list.borrow().len(), 2);
     // (1) the dispatcher saw the right function id and argument values.
-    assert_eq!(recorder.calls.len(), 1);
-    assert_eq!(recorder.calls[0].0, MirFunctionId(1));
-    assert_eq!(recorder.calls[0].1[0], Value::Int(3));
-    assert_eq!(recorder.calls[0].1[1], Value::Int(5));
+    assert_eq!(recorder.borrow().calls.len(), 1);
+    assert_eq!(recorder.borrow().calls[0].0, MirFunctionId(1));
+    assert_eq!(recorder.borrow().calls[0].1[0], Value::Int(3));
+    assert_eq!(recorder.borrow().calls[0].1[1], Value::Int(5));
 }
 
 #[test]
@@ -158,17 +158,17 @@ fn kernel_dispatch_error_keeps_the_dispatcher_issue_code() {
     let program = kernel_program(&types);
     let context = MirValidationContext::new(&types);
     let mut host = BufferHost::default();
-    let mut recorder = Recorder {
+    let recorder = Rc::new(RefCell::new(Recorder {
         calls: Vec::new(),
         result: Err(RunnerError::internal_with_issue(
             Span::default(),
             "device lost",
             "stub_device_lost",
         )),
-    };
+    }));
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     runner.kernel_policy = RunnerKernelPolicy::Dispatch;
-    runner.kernel_dispatcher = Some(&mut recorder);
+    runner.kernel_dispatcher = Some(recorder.clone() as kernel_dispatch::ResidencyHook);
     runner.push_frame(MirFunctionId(0), MirBlockId(0));
     let frame = runner.frames.last_mut().expect("caller frame");
     frame.seed_local(MirLocalId(0), Value::Int(3));

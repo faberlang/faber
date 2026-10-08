@@ -574,7 +574,7 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// the run. Defaults to [`RunnerKernelPolicy::Refuse`].
     kernel_policy: RunnerKernelPolicy,
     /// Receives compute-stage calls under [`RunnerKernelPolicy::Dispatch`].
-    kernel_dispatcher: Option<&'a mut dyn kernel_dispatch::KernelDispatcher>,
+    kernel_dispatcher: Option<kernel_dispatch::ResidencyHook>,
     /// Last conversation id handed out by `SermoOpen` (§2.7 record).
     next_conversation_id: u64,
     /// Router slots held by open conversations (D8.3); each conversation
@@ -1152,7 +1152,7 @@ pub fn run_function_with_kernel_dispatcher<H: Host + ?Sized>(
     validated: &ValidatedMir<'_>,
     function_id: MirFunctionId,
     host: &mut H,
-    dispatcher: &mut dyn kernel_dispatch::KernelDispatcher,
+    dispatcher: &kernel_dispatch::ResidencyHook,
 ) -> Result<(), Vec<RunnerError>> {
     run_function_dispatching(
         validated,
@@ -1162,7 +1162,7 @@ pub fn run_function_with_kernel_dispatcher<H: Host + ?Sized>(
         None,
         false,
         RunnerKernelPolicy::Dispatch,
-        Some(dispatcher),
+        Some(Rc::clone(dispatcher)),
     )?
     .result
 }
@@ -1189,7 +1189,7 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run_function_dispatching<'d, H: Host + ?Sized>(
+fn run_function_dispatching<H: Host + ?Sized>(
     validated: &ValidatedMir<'_>,
     function_id: MirFunctionId,
     host: &mut H,
@@ -1197,7 +1197,7 @@ fn run_function_dispatching<'d, H: Host + ?Sized>(
     deadline: Option<Instant>,
     collect_stats: bool,
     kernel_policy: RunnerKernelPolicy,
-    dispatcher: Option<&'d mut dyn kernel_dispatch::KernelDispatcher>,
+    dispatcher: Option<kernel_dispatch::ResidencyHook>,
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
@@ -1229,11 +1229,7 @@ fn run_function_dispatching<'d, H: Host + ?Sized>(
     runner.step_limit = step_limit;
     runner.deadline = deadline;
     runner.kernel_policy = kernel_policy;
-    // Reborrow so the trait-object lifetime shrinks to the runner's.
-    runner.kernel_dispatcher = match dispatcher {
-        Some(dispatcher) => Some(&mut *dispatcher),
-        None => None,
-    };
+    runner.kernel_dispatcher = dispatcher;
     if collect_stats {
         runner.stats = Some(stats::StatsCollector::new(program, context, interner));
     }
@@ -1564,12 +1560,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         args: &mut [Value],
         span: Span,
     ) -> Result<Value, RunnerError> {
-        let Some(dispatcher) = self.kernel_dispatcher.as_mut() else {
+        let Some(dispatcher) = self.kernel_dispatcher.as_ref() else {
             return Err(RunnerError::internal(
                 span,
                 "kernel dispatch policy has no dispatcher",
             ));
         };
+        // A re-entrant host access during dispatch is an error, not a panic.
+        let mut dispatcher = dispatcher.try_borrow_mut().map_err(|_| {
+            RunnerError::internal(span, "kernel dispatcher is busy during a dispatch")
+        })?;
         Ok(dispatcher
             .dispatch(function_id, args, span)?
             .unwrap_or(Value::Unit))
