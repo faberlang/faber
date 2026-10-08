@@ -332,7 +332,28 @@ impl TypeChecker<'_> {
         if let Some(expected) = expected
             && self.store_narrowing_target(sig.ret, expected).is_none()
         {
+            // A return-only shape param (D1) leaves the return type's whole
+            // shape as the callee's own unbound inference hole. Binding it
+            // from the expected type is inference, not a run-time shape
+            // boundary of the enclosing store, return, or argument slot (those
+            // are checked on the call's result afterwards), so suspend the
+            // boundary contexts: otherwise the hole meeting a ranked
+            // expectation reports `cannot_infer_tensor_shape`. Returns whose
+            // shape is not a bare callee hole keep the boundary path.
+            let binds_return_hole = self.return_shape_is_unbound_hole(sig.ret);
+            let saved = binds_return_hole.then(|| {
+                (
+                    self.current_shape_argument.take(),
+                    self.current_shape_return_expr.take(),
+                    self.current_store_expr.take(),
+                )
+            });
             self.unify_carrier_assign(sig.ret, expected, span, ISSUE_EXPRESSION_TYPE_MISMATCH);
+            if let Some((argument, return_expr, store_expr)) = saved {
+                self.current_shape_argument = argument;
+                self.current_shape_return_expr = return_expr;
+                self.current_store_expr = store_expr;
+            }
         }
         // GPD-3: inference is complete, so declared defaults now bind every
         // still-unbound parameter and the complete ordered vector is recorded
@@ -1395,6 +1416,16 @@ impl TypeChecker<'_> {
                 None
             }
         }
+    }
+
+    /// True when `ty` is a tensor whose whole shape is still an unbound
+    /// inference hole (the callee's return-only shape param, D1).
+    fn return_shape_is_unbound_hole(&mut self, ty: TypeId) -> bool {
+        let Type::Tensor(_, shape) = self.types.get(ty).clone() else {
+            return false;
+        };
+        let shape = self.resolve_index(shape);
+        matches!(self.types.get_index(shape), IndexExpr::Infer(_))
     }
 
     /// Allocate one fresh index hole per distinct shape-param symbol (D1).
