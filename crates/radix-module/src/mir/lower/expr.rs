@@ -91,8 +91,9 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Discerne { scrutinees, arms, .. } => self.visit_discerne_expr(scrutinees, arms, expr),
             HirExpressionKind::Loop(block) => self.visit_loop_expr(block, expr),
             HirExpressionKind::Dum(cond, block) => self.visit_dum_expr(cond, block, expr),
-            // The `filum` lane binder is declared metadata only; dropping it
-            // here keeps runner semantics identical to the plain loop.
+            // The `filum` lane binder is declared metadata only for the host
+            // form (runner semantics identical to the plain loop). The device
+            // form's pre-scanned top-level lane region lowers in lane form.
             HirExpressionKind::Itera {
                 mode,
                 coordinates,

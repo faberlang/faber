@@ -56,6 +56,10 @@ mod reducta_filum_test;
 mod kernel_host_lowering_test;
 
 #[cfg(test)]
+#[path = "lane_form_test.rs"]
+mod lane_form_test;
+
+#[cfg(test)]
 #[path = "interface_dispatch_test.rs"]
 mod interface_dispatch_test;
 #[cfg(test)]

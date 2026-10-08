@@ -105,7 +105,7 @@ struct RangeProductAxis {
 }
 
 #[derive(Clone)]
-enum CollectionIteraKind {
+pub(super) enum CollectionIteraKind {
     Array(TypeId),
     /// Byte value iteration uses the opaque carrier's length and u8 index row.
     Bytes(TypeId),
@@ -551,6 +551,9 @@ impl FunctionBuilder<'_> {
         body: &HirBlock,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if self.is_lane_region(expr) {
+            return self.lower_lane_form_itera(coordinates, binding, name, iter, body, expr);
+        }
         let ty = self.expr_ty(expr)?;
         if !self.is_vacuum(ty) {
             self.errors
@@ -2982,7 +2985,7 @@ impl FunctionBuilder<'_> {
 
     /// Classify an itera receiver into the lane that walks it. A `Ref` marker
     /// is peeled and its pointee classified by this same function.
-    fn classify_collection_itera(
+    pub(super) fn classify_collection_itera(
         &self,
         ty: TypeId,
         mode: HirIteraMode,

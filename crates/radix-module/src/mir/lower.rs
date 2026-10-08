@@ -35,7 +35,7 @@ use crate::cli::{CliDefault, CliOperand, CliOption, CliType};
 use crate::driver::AnalyzedModule;
 use crate::hir::visit::{HirVisitor, walk_expr, walk_program};
 use crate::hir::{
-    DefId, HirAnnotationValue, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget,
+    DefId, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget,
     HirExpression, HirExpressionKind, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode, HirLiteral, HirLocal,
     HirMethod, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirParamMode, HirPattern,
     HirRangeKind, HirScribeKind, HirStatement, HirStatementKind, HirStruct, HirTypeParam, HirUnOp,
@@ -88,6 +88,7 @@ mod expr;
 mod first_match_tests;
 mod fractus_potentia;
 mod item;
+pub(crate) mod lane_form;
 mod monomorphize;
 mod package_instantiate;
 mod place;
@@ -1299,7 +1300,6 @@ struct CallableLoweringParts {
 }
 
 struct CallableLoweringConfig<'input> {
-    annotations: &'input [radix_hir::HirAnnotation],
     error_ty: Option<MirType>,
     parent_function_id: MirFunctionId,
     device_role: Option<MirDeviceRole>,
@@ -1546,7 +1546,6 @@ impl<'a> MirLowerer<'a> {
         } = self.lower_callable_body(
             body_ctx,
             CallableLoweringConfig {
-                annotations,
                 error_ty,
                 parent_function_id,
                 device_role: device_role_for_function(function),
@@ -1690,16 +1689,11 @@ impl<'a> MirLowerer<'a> {
                 for param in &function.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
                 }
-                let explicit_lane = lane_binding_local(function, config.annotations, self.interner);
-                if let Some((def_id, name, ty, span)) = explicit_lane {
-                    builder.add_lane_param(def_id, name, ty, span);
+                if let Some(body) = function.body.as_ref() {
+                    builder.prepare_lane_region(body);
                 }
                 if function.nucleum_fragment {
-                    for (def_id, name, ty, span) in inherited_lane_binding_locals(
-                        function,
-                        &self.unit.resolver,
-                        explicit_lane.map(|(def_id, ..)| def_id),
-                    ) {
+                    for (def_id, name, ty, span) in inherited_lane_binding_locals(function, &self.unit.resolver) {
                         builder.add_inherited_lane_param(def_id, name, ty, span);
                     }
                 }
@@ -1710,10 +1704,8 @@ impl<'a> MirLowerer<'a> {
                 for param in &method.func.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
                 }
-                if let Some((def_id, name, ty, span)) =
-                    lane_binding_local(&method.func, config.annotations, self.interner)
-                {
-                    builder.add_lane_param(def_id, name, ty, span);
+                if let Some(body) = method.func.body.as_ref() {
+                    builder.prepare_lane_region(body);
                 }
                 (method.func.body.as_ref(), None)
             }
@@ -1819,36 +1811,9 @@ impl<'a> MirLowerer<'a> {
     }
 }
 
-fn lane_binding_local(
-    function: &HirFunction,
-    annotations: &[radix_hir::HirAnnotation],
-    interner: &Interner,
-) -> Option<(DefId, Symbol, TypeId, Span)> {
-    let lane = annotations.iter().find_map(|annotation| {
-        if interner.resolve(annotation.family) != "nucleum" {
-            return None;
-        }
-        annotation
-            .fields
-            .iter()
-            .find_map(|field| (interner.resolve(field.name) == "lane").then_some(field.value.clone()))
-    })?;
-    let HirAnnotationValue::String(name) = lane else {
-        return None;
-    };
-    let body = function.body.as_ref()?;
-    body.statements.iter().find_map(|statement| {
-        let HirStatementKind::Local(local) = &statement.kind else {
-            return None;
-        };
-        (local.runtime_provided && local.name == name).then_some((local.def_id, local.name, local.ty?, statement.span))
-    })
-}
-
 fn inherited_lane_binding_locals(
     function: &HirFunction,
     resolver: &crate::semantic::Resolver,
-    explicit_lane: Option<DefId>,
 ) -> Vec<(DefId, Symbol, TypeId, Span)> {
     let Some(body) = function.body.as_ref() else {
         return Vec::new();
@@ -1859,7 +1824,7 @@ fn inherited_lane_binding_locals(
             let HirStatementKind::Local(local) = &statement.kind else {
                 return None;
             };
-            if !local.runtime_provided || Some(local.def_id) == explicit_lane {
+            if !local.runtime_provided {
                 return None;
             }
             let symbol = resolver.get_symbol(local.def_id)?;
@@ -2372,6 +2337,8 @@ struct FunctionBuilder<'a> {
     function_shape_relations: Vec<ShapeRelation>,
     formal_parameter_offset: u32,
     size_param_sources: FxHashMap<DefId, IndexId>,
+    /// The pre-scanned top-level `thread lane` region of a device kernel body.
+    lane_region: Option<lane_form::LaneRegion>,
 }
 
 impl<'a> FunctionBuilder<'a> {
@@ -2427,6 +2394,7 @@ impl<'a> FunctionBuilder<'a> {
             function_shape_relations: Vec::new(),
             formal_parameter_offset: 0,
             size_param_sources: FxHashMap::default(),
+            lane_region: None,
         }
     }
 

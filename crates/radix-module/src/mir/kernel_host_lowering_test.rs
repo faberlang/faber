@@ -88,7 +88,9 @@ main {
 fn host_kernel_lowering_reads_and_writes_tensors_through_tensor_get_and_set() {
     // `f0` is the kernel; `main` (`f1`) reads `b[3]` on the host either way.
     // The `for … at [i] const c` binder gathers its element with `tensor_get`
-    // in both forms; the brackets `a[i]` / `o[i]` are what differs.
+    // in the host form; the device form is the lane form (gpu-reset C4-0), so
+    // the binder is an Index read of the lane id too, and no collection op
+    // remains.
     let host = dump(TENSOR_READ_KERNEL, KernelLowering::Host);
     let host_kernel = function_dump(&host, "f0");
     assert!(
@@ -99,7 +101,8 @@ fn host_kernel_lowering_reads_and_writes_tensors_through_tensor_get_and_set() {
     let device_kernel = function_dump(&device, "f0");
     assert!(
         !device_kernel.contains("tensor_set")
-            && device_kernel.matches("tensor_get").count() == 1
+            && !device_kernel.contains("tensor_get")
+            && device_kernel.contains("_4 = _0[_2]")
             && device_kernel.contains("_1[_3] = ")
             && device_kernel.contains("_0[_3] * "),
         "device form keeps the device-view projection, not the collection ops:\n{device_kernel}"

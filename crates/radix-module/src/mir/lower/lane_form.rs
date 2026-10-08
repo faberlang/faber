@@ -1,0 +1,225 @@
+//! Lane-form lowering of a top-level `thread lane` loop (gpu-reset C4-0).
+//!
+//! Under `KernelLowering::Device`, a compute body's one top-level
+//! `for from t at [i, j] thread lane const v { ... }` loop is not a CFG loop:
+//! the loop *is* the launch grid. The function takes one compiler-internal
+//! `Lane` builtin parameter (the 1-D global invocation id) and the loop
+//! lowers to the lane form:
+//!
+//! ```text
+//! E_k   = TensorExtent(src, k)            (constants for literal axes)
+//! if lane >= E_0 * E_1 * ... { return }   (the grid guard)
+//! j = lane % E_1 ; i = lane / E_1          (row-major binders)
+//! v = src[lane]                            (Index place, no TensorGet)
+//! <body, inline>
+//! ```
+//!
+//! Host kernel lowering never reaches this module: the host form stays the
+//! untouched sequential oracle. A kernel with a second top-level lane loop,
+//! or any statement after the loop, depends on a whole-grid barrier that has
+//! no launch split yet and fails closed with a named issue.
+
+use super::control::CollectionIteraKind;
+use super::*;
+
+/// Issue name: a second top-level `thread lane` loop in one kernel.
+pub(crate) const LANE_FORM_SECOND_REGION_ISSUE: &str = "lane_form_second_region";
+/// Issue name: a statement after the top-level `thread lane` loop.
+pub(crate) const LANE_FORM_POST_LOOP_ISSUE: &str = "lane_form_post_loop_statement";
+
+/// The one lane region a device kernel body lowers in lane form.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct LaneRegion {
+    /// Span of the `Itera` expression that is the region.
+    pub span: Span,
+    /// The compiler-internal lane id parameter.
+    pub lane: MirLocalId,
+}
+
+/// The `Itera` expression of a top-level statement when it is a `filum` loop.
+fn lane_loop(statement: &HirStatement) -> Option<&HirExpression> {
+    let HirStatementKind::Expr(expr) = &statement.kind else {
+        return None;
+    };
+    tail_lane_loop(expr)
+}
+
+fn tail_lane_loop(expr: &HirExpression) -> Option<&HirExpression> {
+    matches!(&expr.kind, HirExpressionKind::Itera { filum: Some(_), mode: HirIteraMode::Ex, .. }).then_some(expr)
+}
+
+impl FunctionBuilder<'_> {
+    /// Pre-scan a device compute body for its lane region. Adds the `Lane`
+    /// builtin parameter when there is exactly one admissible region and
+    /// records it; fails closed on a second region or a statement after it.
+    pub(super) fn prepare_lane_region(&mut self, body: &HirBlock) {
+        if !self.is_device_lowering() {
+            return;
+        }
+        let mut regions: Vec<&HirExpression> = body.statements.iter().filter_map(lane_loop).collect();
+        if let Some(tail) = body.expr.as_deref().and_then(tail_lane_loop) {
+            regions.push(tail);
+        }
+        let Some(first) = regions.first().copied() else {
+            return;
+        };
+        if let Some(second) = regions.get(1) {
+            self.errors.push(MirError {
+                message: "a kernel with a second top-level `thread lane` loop needs a whole-grid launch split, \
+                          which does not exist yet"
+                    .to_owned(),
+                issue: LANE_FORM_SECOND_REGION_ISSUE.to_owned(),
+                span: second.span,
+                definition_span: Some(first.span),
+            });
+            return;
+        }
+        // Everything after the loop would read results of the whole grid.
+        let after_loop = body
+            .statements
+            .iter()
+            .skip_while(|statement| lane_loop(statement).is_none_or(|expr| expr.span != first.span))
+            .skip(1)
+            .find(|statement| !matches!(statement.kind, HirStatementKind::Tacet | HirStatementKind::Redde(None)));
+        let trailing = body.expr.as_deref().filter(|expr| expr.span != first.span);
+        if let Some(span) = after_loop.map(|statement| statement.span).or(trailing.map(|expr| expr.span)) {
+            self.errors.push(MirError {
+                message: "a statement after the top-level `thread lane` loop depends on the whole grid, which \
+                          needs a launch split that does not exist yet"
+                    .to_owned(),
+                issue: LANE_FORM_POST_LOOP_ISSUE.to_owned(),
+                span,
+                definition_span: Some(first.span),
+            });
+            return;
+        }
+        let HirExpressionKind::Itera { filum: Some((def_id, name)), .. } = &first.kind else {
+            return;
+        };
+        let numerus = self.types.primitive(Primitive::Numerus);
+        let lane = self.next_local_id();
+        self.add_lane_param(*def_id, *name, numerus, first.span);
+        self.lane_region = Some(LaneRegion { span: first.span, lane });
+    }
+
+    /// Whether `expr` is the pre-scanned lane region of this body.
+    pub(super) fn is_lane_region(&self, expr: &HirExpression) -> bool {
+        self.lane_region.is_some_and(|region| region.span == expr.span)
+    }
+
+    /// Lower the lane region in lane form (see the module docs).
+    pub(super) fn lower_lane_form_itera(
+        &mut self,
+        coordinates: &[(DefId, Symbol)],
+        binding: DefId,
+        name: Symbol,
+        iter: &HirExpression,
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let region = self.lane_region?;
+        let span = expr.span;
+        let iter_ty = iter.ty?;
+        let CollectionIteraKind::Shaped { element, rank, literal, matrix: false } =
+            self.classify_collection_itera(iter_ty, HirIteraMode::Ex, coordinates.len())
+        else {
+            self.errors.push(MirError::unsupported(
+                iter.span,
+                "thread lane loop over a source that is not a ranked tensor",
+            ));
+            return None;
+        };
+        if rank == 0 || rank != coordinates.len() {
+            self.errors
+                .push(MirError::unsupported(iter.span, "thread lane loop coordinate count differs from rank"));
+            return None;
+        }
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let element_ty = MirType::semantic(element);
+
+        let source = self.lower_expr_value(iter)?;
+        let tensor = self.materialize_operand_place(source, MirType::semantic(iter_ty), iter.span);
+
+        // Extents: constants for literal axes, `TensorExtent` otherwise.
+        let mut extents = Vec::with_capacity(rank);
+        for axis in 0..rank {
+            let extent = match literal.as_deref() {
+                Some(dimensions) => MirOperand::Constant(MirConstant::Int(dimensions[axis])),
+                None => self.assign_temp(
+                    MirValueKind::TensorExtent {
+                        tensor: MirOperand::Place(tensor.clone()),
+                        axis: u32::try_from(axis).ok()?,
+                    },
+                    numerus,
+                    span,
+                ),
+            };
+            extents.push(extent);
+        }
+        let lane = MirOperand::Place(MirPlace::local(region.lane));
+        let mut total = extents[0].clone();
+        for extent in &extents[1..] {
+            total = self.binary_temp(MirBinOp::Mul, total, extent.clone(), numerus, span);
+        }
+
+        // Guard: a lane past the grid writes nothing.
+        let guard = self.binary_temp(MirBinOp::GtEq, lane.clone(), total, bivalens, span);
+        let exit_id = self.fresh_block(span);
+        let body_id = self.fresh_block(body.span);
+        let done_id = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: guard, then_block: exit_id, else_block: body_id },
+            span,
+        );
+        self.switch_to(exit_id);
+        self.terminate_current(MirTerminatorKind::Return(None), span);
+        self.switch_to(body_id);
+
+        // Row-major binders: the last axis varies fastest.
+        let mut remainder = lane.clone();
+        let mut values: Vec<Option<MirOperand>> = vec![None; rank];
+        for axis in (1..rank).rev() {
+            values[axis] =
+                Some(self.binary_temp(MirBinOp::Mod, remainder.clone(), extents[axis].clone(), numerus, span));
+            remainder = self.binary_temp(MirBinOp::Div, remainder, extents[axis].clone(), numerus, span);
+        }
+        values[0] = Some(remainder);
+        for (axis, (def_id, coordinate_name)) in coordinates.iter().enumerate() {
+            let local = self.next_local_id();
+            self.locals.push(MirLocalDecl {
+                id: local,
+                name: Some(*coordinate_name),
+                ty: numerus,
+                mutable: true,
+                span,
+            });
+            self.bindings
+                .insert(*def_id, LocalBinding { local, ty: numerus });
+            let value = values[axis].take()?;
+            self.assign(MirPlace::local(local), value, numerus, span);
+        }
+
+        // Element binder: `v = src[lane]` as an Index place.
+        let element_local = self.next_local_id();
+        self.locals.push(MirLocalDecl {
+            id: element_local,
+            name: Some(name),
+            ty: element_ty,
+            mutable: true,
+            span,
+        });
+        self.bindings
+            .insert(binding, LocalBinding { local: element_local, ty: element_ty });
+        let mut read = tensor;
+        read.projections.push(MirProjection::Index(lane));
+        self.assign(MirPlace::local(element_local), MirOperand::Place(read), element_ty, span);
+
+        self.breakables.push(BreakableContext { perge_target: Some(done_id), rumpe_target: done_id, rumpe_used: false });
+        self.visit_block(body);
+        self.breakables.pop();
+        self.terminate_open_current(MirTerminatorKind::Goto(done_id), span);
+        self.switch_to(done_id);
+        Some(MirOperand::Constant(MirConstant::Unit))
+    }
+}
