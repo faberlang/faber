@@ -1,6 +1,8 @@
 //! `expand_vector_ops`: lane counts, block splitting, refusals, and the
 //! validation hand-off. Tests assert structure, issue codes and counts, never
 //! diagnostic prose.
+// Fixture casts are small known-in-range numbers.
+#![allow(clippy::cast_possible_truncation)]
 
 use crate::vector_expand::{
     VECTOR_CROSS_WIDTH, VECTOR_OP_ARITY, VECTOR_OP_OPERAND_UNRESOLVED, VECTOR_OP_WIDTH_UNSUPPORTED,

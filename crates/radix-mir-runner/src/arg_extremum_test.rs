@@ -7,6 +7,8 @@
 //! 3. NaN law pinned to `max from`'s IMPLEMENTED law (the `TensorMax`
 //!    `f64::max` fold, maxNum skip semantics);
 //! 4. argmin mirrors argmax exactly.
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(clippy::cast_precision_loss, clippy::float_cmp)]
 
 use super::*;
 use std::cell::RefCell;

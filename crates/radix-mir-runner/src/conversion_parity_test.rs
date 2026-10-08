@@ -1,4 +1,6 @@
 //! E3 runner parity for synthetic conversion-arm calls.
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(clippy::similar_names)]
 
 use super::*;
 use radix_mir::{MirFunction, MirLocal, MirParam, MirStatement, MirTemp, MirTerminator};

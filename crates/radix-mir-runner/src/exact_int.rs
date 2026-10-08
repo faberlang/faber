@@ -44,6 +44,7 @@ pub(crate) fn int_value(value: &Value) -> Option<i128> {
 
 /// The carrier of an exact value: negative values are `Int`, a `u64`-typed
 /// result is always `UInt`, and anything else is `Int` unless it does not fit.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // value is in 0..=u64::MAX here
 pub(crate) fn exact_carrier(value: i128, width: NumericWidth) -> Option<Value> {
     if !(EXACT_MIN..=EXACT_MAX).contains(&value) {
         return None;
@@ -196,11 +197,11 @@ pub(crate) fn exact_bitnot(
 /// `None` when the float is NaN.
 pub(crate) fn cmp_int_float(int: i128, float: f64) -> Option<std::cmp::Ordering> {
     use std::cmp::Ordering;
+    // 2^127 as f64: a float at or past it is beyond every exact integer.
+    const LIMIT: f64 = 170_141_183_460_469_231_731_687_303_715_884_105_728.0;
     if float.is_nan() {
         return None;
     }
-    // 2^127 as f64: a float at or past it is beyond every exact integer.
-    const LIMIT: f64 = 170_141_183_460_469_231_731_687_303_715_884_105_728.0;
     if float >= LIMIT {
         return Some(Ordering::Less);
     }
@@ -209,7 +210,9 @@ pub(crate) fn cmp_int_float(int: i128, float: f64) -> Option<std::cmp::Ordering>
     }
     let whole = float.trunc();
     // `whole` is integral and inside the i128 range, so the cast is exact.
-    match int.cmp(&(whole as i128)) {
+    #[allow(clippy::cast_possible_truncation)]
+    let whole_int = whole as i128;
+    match int.cmp(&whole_int) {
         Ordering::Equal => {
             let fraction = float - whole;
             Some(if fraction > 0.0 {
@@ -255,12 +258,12 @@ pub(crate) fn cmp_scaled_float(
     float: f64,
 ) -> Option<std::cmp::Ordering> {
     use std::cmp::Ordering;
-    if float.is_nan() {
-        return None;
-    }
     // A decimal's magnitude is below 2^127 whatever its scale, so a float
     // past that dominates.
     const HUGE: f64 = 170_141_183_460_469_231_731_687_303_715_884_105_728.0;
+    if float.is_nan() {
+        return None;
+    }
     if float >= HUGE {
         return Some(Ordering::Less);
     }
@@ -276,6 +279,7 @@ pub(crate) fn cmp_scaled_float(
     }
     let floor = float.floor();
     let fraction = float - floor; // exact, in [0, 1)
+    #[allow(clippy::cast_possible_truncation)] // `floor` is bounded by the HUGE guard above
     let whole = floor as i128;
     let (quotient, remainder) = (floor_div(scaled, scale), floor_rem(scaled, scale));
     match quotient.cmp(&whole) {

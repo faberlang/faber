@@ -2563,7 +2563,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 }
             },
             MirConstant::ShapeSize { shape, axis } => {
-                Value::Float(self.runtime_shape_size(*shape, *axis, span)? as f64)
+                #[allow(clippy::cast_precision_loss)] // shape sizes are far below 2^53
+                {
+                    Value::Float(self.runtime_shape_size(*shape, *axis, span)? as f64)
+                }
             }
             MirConstant::Regex { pattern, flags } => {
                 // WHY: the pattern symbol is the raw string-literal source; a
@@ -2729,16 +2732,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn runtime_field_value(value: Value, field: Symbol, span: Span) -> Result<Value, RunnerError> {
-        let fields = match value {
-            Value::Record(fields, _) | Value::Struct(_, fields) | Value::EnumVariant(_, fields) => {
-                fields
-            }
-            _ => {
-                return Err(RunnerError::internal(
-                    span,
-                    "runtime shape field source is not a record",
-                ));
-            }
+        let (Value::Record(fields, _) | Value::Struct(_, fields) | Value::EnumVariant(_, fields)) =
+            value
+        else {
+            return Err(RunnerError::internal(
+                span,
+                "runtime shape field source is not a record",
+            ));
         };
         fields
             .borrow()
@@ -3251,7 +3251,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             Value::Dec(carrier, scale) => Some((*carrier, *scale)),
             Value::Int(carrier) => self
                 .operand_decimal_width(operand)
-                .and_then(|width| width.decimal_scale())
+                .and_then(NumericWidth::decimal_scale)
                 .map(|scale| (i128::from(*carrier), scale)),
             _ => None,
         }
@@ -3484,20 +3484,20 @@ fn index_value_reading_functions(program: &MirProgram) -> FxHashSet<MirFunctionI
 
 /// Whether a statement writes `temp` through a plain temp place.
 fn writes_temp(statement: &radix_mir::MirStatement, temp: MirTempId) -> bool {
-    let place = match &statement.kind {
-        MirStatementKind::Assign { place, .. }
-        | MirStatementKind::RuntimeCall {
-            destination: Some(place),
-            ..
-        }
-        | MirStatementKind::Call {
-            destination: Some(place),
-            ..
-        }
-        | MirStatementKind::Construct {
-            destination: place, ..
-        } => place,
-        _ => return false,
+    let (MirStatementKind::Assign { place, .. }
+    | MirStatementKind::RuntimeCall {
+        destination: Some(place),
+        ..
+    }
+    | MirStatementKind::Call {
+        destination: Some(place),
+        ..
+    }
+    | MirStatementKind::Construct {
+        destination: place, ..
+    }) = &statement.kind
+    else {
+        return false;
     };
     matches!(&place.base, MirPlaceBase::Temp(id) if *id == temp) && place.projections.is_empty()
 }

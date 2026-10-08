@@ -248,11 +248,13 @@ pub struct MatchValue {
 
 impl MatchValue {
     /// Text of group `index`; `None` when out of range or not participating.
+    #[must_use]
     pub fn group(&self, index: usize) -> Option<&str> {
         self.groups.get(index)?.as_deref()
     }
 
     /// Text of the group named `name`; `None` when unknown or not participating.
+    #[must_use]
     pub fn named(&self, name: &str) -> Option<&str> {
         let (_, index) = self.names.iter().find(|(known, _)| known == name)?;
         self.group(*index)
@@ -794,6 +796,7 @@ impl TensorValue {
     }
 
     /// The error of the last failed residency download, if any.
+    #[must_use]
     pub fn take_residency_error(&self) -> Option<RunnerError> {
         self.residency.take_error()
     }
@@ -805,6 +808,7 @@ impl TensorValue {
         self.take_residency_error().unwrap_or_else(fallback)
     }
 
+    #[allow(clippy::must_use_candidate)] // mutates through interior cells; the result is optional to read
     pub fn set_value_at(&self, logical_index: usize, value: Value) -> Option<()> {
         if !self.edge_ops.is_empty() {
             return None;
@@ -1723,6 +1727,7 @@ pub fn display_int_at_width(value: i64, width: Option<NumericWidth>) -> String {
 /// Render a float at its declared width: non-f64 floats use the shortest
 /// round-trip repr of that width (`66.666664`), keeping the fractus `N.0`
 /// integral shape; f64 (or unknown width) uses the standard fractus display.
+#[must_use]
 pub fn display_float_at_width(value: f64, width: Option<NumericWidth>) -> String {
     match width {
         Some(width) if width.is_float() && width != NumericWidth::F64 => {
@@ -2423,6 +2428,7 @@ pub(crate) fn contract_compare_values(left: &Value, right: &Value) -> Option<std
 
 /// IEEE 754-2019 `minimum` (operator ruling 2026-09-24): NaN in either
 /// operand propagates, and -0.0 orders below +0.0.
+#[allow(clippy::float_cmp)] // IEEE ordering needs exact equality for the signed-zero tie
 pub(crate) fn ieee_minimum(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         a + b
@@ -2435,6 +2441,7 @@ pub(crate) fn ieee_minimum(a: f64, b: f64) -> f64 {
 
 /// IEEE 754-2019 `maximum` (operator ruling 2026-09-24): NaN in either
 /// operand propagates, and +0.0 orders above -0.0.
+#[allow(clippy::float_cmp)] // IEEE ordering needs exact equality for the signed-zero tie
 pub(crate) fn ieee_maximum(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         a + b

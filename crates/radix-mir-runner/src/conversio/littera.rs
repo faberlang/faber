@@ -9,7 +9,7 @@
 //! A `littera` value reaches the runner as `Value::Char`, or as the
 //! `Value::Ascii` byte of a widened `ascii<1>` literal (D10.5).
 
-use super::*;
+use super::{MirOperand, Runner, RunnerError, Span, Symbol, Value};
 
 impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     pub(crate) fn convert_to_littera(

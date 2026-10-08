@@ -1,6 +1,8 @@
 //! F9 ruling 29: `%` is the floor remainder `a - b*floor(a/b)` (sign of the
 //! divisor) on every numeric family. Pins the runner, the oracle for every
 //! backend, on `d64` carriers and on `f64`/`f32`.
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(clippy::float_cmp)]
 
 use super::*;
 use crate::value::decimal_numeric_binop;

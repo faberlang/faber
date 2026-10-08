@@ -17,6 +17,7 @@ use crate::value::{
 use radix_hir::{HirStoreKind, HirStoreSite};
 use radix_lexer::Span;
 use radix_types::{FloatPolicy, NumericWidth, Primitive, Type, TypeId};
+use std::fmt::Write as _;
 
 /// Stable identity of a failed implicit store: distinct from arithmetic
 /// overflow (ruling 5).
@@ -65,12 +66,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // `integer_slot` never yields `inf` (no range), so this is always `Some`.
         let (lo, hi) = width.integer_range()?;
         Some(match policy {
-            SlotPolicy::Trapping => match (lo..=hi).contains(&exact) {
-                true => exact_carrier(exact, width).ok_or_else(|| {
-                    self.store_trap(site, exact.to_string(), exact < 0, width, span)
-                }),
-                false => Err(self.store_trap(site, exact.to_string(), exact < 0, width, span)),
-            },
+            SlotPolicy::Trapping => {
+                if (lo..=hi).contains(&exact) {
+                    exact_carrier(exact, width).ok_or_else(|| {
+                        self.store_trap(site, exact.to_string(), exact < 0, width, span)
+                    })
+                } else {
+                    Err(self.store_trap(site, exact.to_string(), exact < 0, width, span))
+                }
+            }
             SlotPolicy::Wrapping => Ok(modular_word_result(exact, width)),
             SlotPolicy::Saturating => Ok(saturating_word_result(exact, width)),
         })
@@ -212,9 +216,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 || format!("the expression at bytes {}..{}", from.start, from.end),
                 |text| format!("`{text}`"),
             );
-            message.push_str(&format!(
+            let _ = write!(
+                message,
                 "; `{name}` was inferred as `{ty}` from {origin}, declare its type"
-            ));
+            );
             args.push((
                 "inferred_from".to_owned(),
                 format!("{}..{}", from.start, from.end),

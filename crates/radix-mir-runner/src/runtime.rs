@@ -529,8 +529,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(
                 span,
                 format!(
-                    "gradient accumulate shape mismatch {:?} vs stored {:?}",
-                    incoming_shape, stored_shape
+                    "gradient accumulate shape mismatch {incoming_shape:?} vs stored {stored_shape:?}"
                 ),
             ));
         }
@@ -3053,8 +3052,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         return Err(RunnerError::internal_with_issue(
                             span,
                             format!(
-                                "{label} tensor-tensor shape pair {:?} + {:?} is neither same-shape nor a rank-extension broadcast",
-                                left_shape, right_shape
+                                "{label} tensor-tensor shape pair {left_shape:?} + {right_shape:?} is neither same-shape nor a rank-extension broadcast"
                             ),
                             "runner_tensor_tensor_broadcast_unsupported",
                         ));
@@ -4116,10 +4114,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if table_shape != expected_table_shape {
             return Err(RunnerError::internal(
                 span,
-                format!(
-                    "tensor rope table shape {:?} must be {:?}",
-                    table_shape, expected_table_shape
-                ),
+                format!("tensor rope table shape {table_shape:?} must be {expected_table_shape:?}"),
             ));
         }
 

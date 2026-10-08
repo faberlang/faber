@@ -1,3 +1,5 @@
+// Fixture casts are small known-in-range numbers.
+#![allow(clippy::cast_possible_truncation)]
 use super::*;
 use crate::abi::{MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize};
 use crate::device_program::{

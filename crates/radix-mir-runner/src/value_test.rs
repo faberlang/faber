@@ -1,4 +1,11 @@
 //! Unit tests for runner value helpers (companion to `value.rs`).
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(
+    clippy::cloned_ref_to_slice_refs,
+    clippy::default_trait_access,
+    clippy::useless_conversion,
+    clippy::float_cmp
+)]
 
 use super::value::*;
 use radix_lexer::Span;

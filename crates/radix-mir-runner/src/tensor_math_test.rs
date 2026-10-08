@@ -2,6 +2,12 @@
 //! the correctness oracle. Each element is the scalar function, IEEE 754 per
 //! element: a domain miss is NaN, an overflow is infinity, and the result is
 //! stored at the result element width.
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::float_cmp
+)]
 
 use super::*;
 

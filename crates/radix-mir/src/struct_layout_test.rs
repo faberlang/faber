@@ -3,6 +3,8 @@
 //! Field symbols descend with declaration order (`Symbol(100_000 - i)`), so any
 //! implementation that ordered by interner Symbol would reverse the layout and
 //! fail every row.
+// Test fixture text builders; allocation cost is irrelevant.
+#![allow(clippy::format_push_string)]
 
 use crate::struct_layout::pack_table_with_packed_vec3;
 use crate::{

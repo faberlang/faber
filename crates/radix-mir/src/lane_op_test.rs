@@ -2,6 +2,8 @@
 //! through the vector expander: `÷` converts integer lanes to the result float
 //! and traps a zero divisor, `⤒`/`⤓` widen both lanes then pick one, and a
 //! `checked` operator stores every lane under the element type.
+// Fixture casts are small known-in-range numbers.
+#![allow(clippy::cast_possible_truncation)]
 
 use crate::vector_expand::expand_vector_ops;
 use crate::{

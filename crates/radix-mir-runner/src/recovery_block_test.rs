@@ -7,6 +7,8 @@
 //! reconstruction this replaces (BUG-AA50C86A) could only replay the root
 //! call, so nested calls died on an uninitialized temp and non-call roots
 //! ran eagerly on success.
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(clippy::trivially_copy_pass_by_ref)]
 
 use super::*;
 use crate::host::BufferHost;

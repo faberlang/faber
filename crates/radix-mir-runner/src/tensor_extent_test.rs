@@ -1,5 +1,7 @@
 //! `TensorExtent` on the runner: the value is the carrier's extent on the
 //! requested axis, read from the tensor's runtime shape.
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 
 use super::*;
 

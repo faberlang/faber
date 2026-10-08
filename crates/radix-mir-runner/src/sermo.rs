@@ -572,6 +572,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     /// cancelled, unread frames are dropped, and the conversation is
     /// released. Returns whether this call closed the handle; an `error`
     /// terminal is kept for [`Self::sermo_take_close_error`].
+    #[allow(clippy::unused_self)] // a Runner method like its sermo_* siblings
     pub(crate) fn sermo_close(&mut self, sermo: &Rc<RefCell<SermoValue>>) -> bool {
         let conversation = Rc::clone(&sermo.borrow().conversation);
         let mut state = conversation.borrow_mut();

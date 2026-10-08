@@ -137,6 +137,7 @@ impl ResidencySlot {
         *self.0.borrow_mut() = Some(Residency {
             token,
             device_current: true,
+            #[allow(clippy::single_range_in_vec_init)] // one whole-buffer range
             host_current: if host_current {
                 vec![0..usize::MAX]
             } else {

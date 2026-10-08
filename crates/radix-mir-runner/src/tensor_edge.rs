@@ -145,8 +145,11 @@ where
     let policy_coordinate =
         checked_policy_coordinate(&shifted).map_err(CustomEdgeValueError::Policy)?;
     let remapped = remap(&policy_coordinate).map_err(CustomEdgeValueError::Remap)?;
-    let mapped = checked_mapped_coordinate(remapped.into_iter().map(i128::from).collect(), extents)
-        .map_err(CustomEdgeValueError::Policy)?;
+    let mapped = checked_mapped_coordinate(
+        &remapped.into_iter().map(i128::from).collect::<Vec<_>>(),
+        extents,
+    )
+    .map_err(CustomEdgeValueError::Policy)?;
     let value = read(&mapped).map_err(CustomEdgeValueError::Read)?;
     transform(&policy_coordinate, value).map_err(CustomEdgeValueError::Transform)
 }
@@ -162,13 +165,13 @@ pub(crate) enum CustomEdgeValueError<E> {
 }
 
 fn checked_mapped_coordinate(
-    coordinate: Vec<i128>,
+    coordinate: &[i128],
     extents: &[usize],
 ) -> Result<Vec<usize>, CustomEdgePolicyError> {
     if coordinate.len() != extents.len() {
         return Err(CustomEdgePolicyError::MappedCoordinateRankMismatch);
     }
-    in_bounds_coordinate(&coordinate, extents)
+    in_bounds_coordinate(coordinate, extents)
         .ok_or(CustomEdgePolicyError::MappedCoordinateOutOfBounds)
 }
 

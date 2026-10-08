@@ -1,5 +1,7 @@
 //! d11-6 U5: exact integer values, floor division, unmasked shifts, `¬`,
 //! infinite two's-complement bitwise ops, and exact cross-family comparison.
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(clippy::cast_precision_loss, clippy::needless_pass_by_value)]
 
 use crate::exact_int::{
     cmp_int_float, exact_bitnot, exact_int_binop, exact_neg, floor_div, floor_rem,

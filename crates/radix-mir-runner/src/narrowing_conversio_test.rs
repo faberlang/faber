@@ -1,5 +1,7 @@
 //! D11.6 U1 / D1.11 runner pins: explicit `↦` integer narrowing is
 //! magnitude-checked against the target width, never a bare relabel.
+// Test fixtures: exact float expectations and small, known-in-range numeric casts.
+#![allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
 
 use super::*;
 use radix_lexer::{Interner, Span};

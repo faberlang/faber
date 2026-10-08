@@ -253,6 +253,7 @@ fn lift_count(operands: &[Value], span: Span) -> Result<usize, RunnerError> {
     count.ok_or_else(|| RunnerError::internal(span, "tensor lift has no tensor operand"))
 }
 
+#[allow(clippy::cast_precision_loss)] // integer to float widening is the intent
 fn as_f64(value: &Value, span: Span) -> Result<f64, RunnerError> {
     match value {
         Value::Float(f) => Ok(*f),

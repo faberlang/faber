@@ -4,7 +4,17 @@
 //! defaults, runner issue encoding, regex patterns, constant/value
 //! equality, and the F-0xx regression behaviors.
 
-#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    // Bit-pattern fixtures (f64 bit images) read better unseparated.
+    clippy::unreadable_literal,
+    clippy::similar_names,
+    clippy::approx_constant,
+    clippy::cast_possible_wrap,
+    clippy::needless_pass_by_value,
+    clippy::float_cmp
+)]
 #![expect(
     clippy::cast_precision_loss,
     reason = "test helpers promote Int elements to f64 for float comparison"
