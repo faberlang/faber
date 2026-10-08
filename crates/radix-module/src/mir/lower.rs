@@ -703,6 +703,9 @@ pub fn lower_analyzed_unit(
     ensure_map_iteration_array_types(&mut types);
     ensure_itera_coordinate_array_types(&unit.hir, &mut types);
     ensure_tensor_bracket_index_array_types(&unit.hir, &mut types);
+    if options.kernel_lowering == KernelLowering::Device {
+        lane_form::ensure_lane_word_type(&mut types);
+    }
     // The layout table is rebuilt after monomorphization's shape finalization
     // so it covers the concrete shapes/type graph the instances carry.
     prepare_mir_lowering_interner(&mut interner);

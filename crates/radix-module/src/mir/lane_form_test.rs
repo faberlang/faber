@@ -195,3 +195,47 @@ fn host_lowering_accepts_the_kernels_device_lowering_refuses() {
         lower(source, KernelLowering::Host).expect("host form is the sequential oracle and has no lane regions");
     }
 }
+
+/// Gpu-reset C4-2g: the lane id and the grid arithmetic run in the `u32`
+/// device word (the 32-bit GlobalInvocationX), not in `numerus` (i64). The
+/// program-visible binders keep their `int` meaning (F9 ruling 27).
+#[test]
+fn lane_id_and_grid_arithmetic_are_u32_while_binders_stay_int() {
+    use radix_types::{NumericWidth, Primitive, Type};
+    let unit = analyze(COPY);
+    let options = MirLoweringOptions { kernel_lowering: KernelLowering::Device, ..Default::default() };
+    let lowered = lower_analyzed_unit(&unit, options).expect("device lowering validates");
+    let types = &lowered.validated.validation().types;
+    let function = &lowered.validated.program().functions[0];
+    let u32_ty = types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+        .expect("device lowering interns the u32 word");
+    let int_ty = types.primitive(Primitive::Numerus);
+    assert!(matches!(types.get(u32_ty), Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)));
+    let lane = function.params.iter().find(|param| param.mode == MirParamMode::Lane).expect("lane parameter");
+    assert_eq!(lane.ty.semantic_id(), u32_ty, "the Lane builtin is the u32 invocation id");
+    // %0 %1 extents, %2 product, %3 guard (bool), %4 lane % E1, %5 lane / E1.
+    let temp = |index: usize| function.temps[index].ty.semantic_id();
+    for index in [0, 1, 2, 4, 5] {
+        assert_eq!(temp(index), u32_ty, "temp %{index} runs in the u32 word");
+    }
+    let binders: Vec<_> = function.locals.iter().filter(|local| local.name.is_some()).collect();
+    assert!(
+        binders.iter().any(|local| local.ty.semantic_id() == int_ty),
+        "the coordinate binders keep their `int` meaning"
+    );
+}
+
+/// Gpu-reset C4-2g: the lane-form `copy` passes the device admission gate
+/// (its linear address is bounded by an extent-product condition) and reaches
+/// the Metal emitter, whose multi-block restriction is the next unit (C4-2e).
+#[test]
+fn lane_form_copy_is_admitted_and_stops_at_the_metal_emitter() {
+    let error = crate::mir::test_support::compile_metal_text(&english(COPY)).expect_err("emitter lands in C4-2e");
+    assert!(!error.contains("kernel_target_requirements_not_met"), "admission gate rejected: {error}");
+    assert!(!error.contains("kernel_requirements_missing"), "{error}");
+    assert!(
+        error.contains("mir_metal_text_unsupported") && error.contains("shape=device multi-block control flow"),
+        "{error}"
+    );
+}

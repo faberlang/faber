@@ -417,3 +417,52 @@ fn wide(f64 x) → f64 {
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
     assert!(!target_row(&fixture, "wide", Target::MirMetal).admitted);
 }
+
+#[test]
+fn lane_loop_copy_is_admitted_under_the_extent_product_condition() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn copy(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
+    for from src at [i, j] thread lane const v {
+        dst[[i, j]] ← v
+    }
+}
+main {}
+",
+    );
+    let report = target_row(&fixture, "copy", Target::MirMetal);
+    assert!(report.admitted, "{:?}", report.failures);
+    assert!(
+        report.extent_conditions.iter().any(|condition| {
+            condition.minimum == i128::from(i32::MIN) && condition.maximum == i128::from(u32::MAX)
+        }),
+        "the linear lane address is bounded by a recorded extent condition: {:?}",
+        report.extent_conditions
+    );
+}
+
+#[test]
+fn arbitrary_scalar_coordinates_into_a_tensor_stay_rejected() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn pick(tf32[_, _] input, mut tf32[_, _] output, u32 y, u32 x) → void {
+    output[[y, x]] ← input[[y, x]]
+}
+main {}
+",
+    );
+    let report = target_row(&fixture, "pick", Target::MirMetal);
+    assert!(!report.admitted);
+    assert!(
+        report
+            .failures
+            .iter()
+            .any(|failure| matches!(failure, KernelRequirementFailure::UnsupportedIntegerRange { .. })),
+        "{:?}",
+        report.failures
+    );
+}

@@ -27,6 +27,18 @@ pub(crate) const LANE_FORM_SECOND_REGION_ISSUE: &str = "lane_form_second_region"
 /// Issue name: a statement after the top-level `thread lane` loop.
 pub(crate) const LANE_FORM_POST_LOOP_ISSUE: &str = "lane_form_post_loop_statement";
 
+/// Intern the device word (`u32`) the lane-form arithmetic runs in. Lowering
+/// holds the type table immutably, so the arena gets it before function
+/// lowering starts.
+pub(crate) fn ensure_lane_word_type(types: &mut TypeTable) {
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+}
+
+/// The device word the lane id and the grid arithmetic run in.
+fn lane_word(types: &TypeTable) -> Option<TypeId> {
+    types.find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+}
+
 /// The one lane region a device kernel body lowers in lane form.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct LaneRegion {
@@ -96,9 +108,10 @@ impl FunctionBuilder<'_> {
         let HirExpressionKind::Itera { filum: Some((def_id, name)), .. } = &first.kind else {
             return;
         };
-        let numerus = self.types.primitive(Primitive::Numerus);
+        // The lane id is the 32-bit global invocation id the device launches.
+        let lane_ty = lane_word(self.types).expect("device lowering interns the lane word");
         let lane = self.next_local_id();
-        self.add_lane_param(*def_id, *name, numerus, first.span);
+        self.add_lane_param(*def_id, *name, lane_ty, first.span);
         self.lane_region = Some(LaneRegion { span: first.span, lane });
     }
 
@@ -134,7 +147,11 @@ impl FunctionBuilder<'_> {
                 .push(MirError::unsupported(iter.span, "thread lane loop coordinate count differs from rank"));
             return None;
         }
+        // Binders keep their `int` meaning to the program (F9 ruling 27); the
+        // grid arithmetic runs in the device word, bounded by the extent-product
+        // condition the admission gate records, not by a per-operation check.
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let word = MirType::semantic(lane_word(self.types)?);
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let element_ty = MirType::semantic(element);
 
@@ -151,7 +168,7 @@ impl FunctionBuilder<'_> {
                         tensor: MirOperand::Place(tensor.clone()),
                         axis: u32::try_from(axis).ok()?,
                     },
-                    numerus,
+                    word,
                     span,
                 ),
             };
@@ -160,7 +177,7 @@ impl FunctionBuilder<'_> {
         let lane = MirOperand::Place(MirPlace::local(region.lane));
         let mut total = extents[0].clone();
         for extent in &extents[1..] {
-            total = self.binary_temp(MirBinOp::Mul, total, extent.clone(), numerus, span);
+            total = self.binary_temp(MirBinOp::Mul, total, extent.clone(), word, span);
         }
 
         // Guard: a lane past the grid writes nothing.
@@ -181,8 +198,8 @@ impl FunctionBuilder<'_> {
         let mut values: Vec<Option<MirOperand>> = vec![None; rank];
         for axis in (1..rank).rev() {
             values[axis] =
-                Some(self.binary_temp(MirBinOp::Mod, remainder.clone(), extents[axis].clone(), numerus, span));
-            remainder = self.binary_temp(MirBinOp::Div, remainder, extents[axis].clone(), numerus, span);
+                Some(self.binary_temp(MirBinOp::Mod, remainder.clone(), extents[axis].clone(), word, span));
+            remainder = self.binary_temp(MirBinOp::Div, remainder, extents[axis].clone(), word, span);
         }
         values[0] = Some(remainder);
         for (axis, (def_id, coordinate_name)) in coordinates.iter().enumerate() {

@@ -948,6 +948,9 @@ impl BodyFacts<'_> {
                 .unwrap_or_else(AbstractRange::unknown),
             HirExpressionKind::Index(base, index) => {
                 let index_range = self.evaluate(index);
+                let index_range = self
+                    .linear_tensor_index_range(base, index)
+                    .unwrap_or(index_range);
                 // Generated device address arithmetic is part of the kernel
                 // requirement even when the source never stores the lane id.
                 // In particular, an `apud` binder keeps its `int` source type
@@ -1049,6 +1052,16 @@ impl BodyFacts<'_> {
             }
             HirExpressionKind::Assign(lhs, rhs) => {
                 let value = self.evaluate(rhs);
+                // The store address of a bounded N-D tensor place is device
+                // address arithmetic too (a lane-loop write `dst[[i, j]]`).
+                if let HirExpressionKind::Index(base, index) = &lhs.kind
+                    && matches!(index.kind, HirExpressionKind::Array(_))
+                {
+                    self.evaluate(index);
+                    if let Some(address) = self.linear_tensor_index_range(base, index) {
+                        self.check_intermediate(index.span, address);
+                    }
+                }
                 let Some(slot) = lhs.ty else {
                     return value;
                 };
@@ -1334,6 +1347,54 @@ impl BodyFacts<'_> {
                 })
             }
         }
+    }
+
+    /// The device linear address of an N-D tensor index `t[[a0, a1, ...]]`
+    /// whose coordinates are bounded by a proven range, typically lane binders
+    /// over a runtime extent. It is `((a0 * E1 + a1) * E2 + a2) ...`; the
+    /// recorded range is `[0, sum(max(ak) * stride_k)]`, so a runtime extent
+    /// yields an extent condition (`E0 * E1 ... - 1 < 2^32` when the binders
+    /// iterate this tensor's own shape) rather than a rejection. Unbounded
+    /// scalar coordinates (a full-width integer parameter) are not admitted:
+    /// they keep the unknown range and are rejected.
+    fn linear_tensor_index_range(
+        &self,
+        base: &HirExpression,
+        index: &HirExpression,
+    ) -> Option<AbstractRange> {
+        if !matches!(index.kind, HirExpressionKind::Array(_)) {
+            return None;
+        }
+        let axes = self.expression_vectors.get(&index.id)?;
+        let mut base_ty = base.ty?;
+        while let Type::Ref(_, target) = self.types.get(base_ty) {
+            base_ty = *target;
+        }
+        let dims = shape_dimensions(base_ty, self.types);
+        if axes.is_empty() || axes.len() != dims.len() {
+            return None;
+        }
+        let mut maximum_index = KernelRangeExpr::Constant(0);
+        for (axis, range) in axes.iter().enumerate() {
+            let range = range.0.as_ref()?;
+            let bounded = constant(&range.maximum)
+                .map_or_else(|| contains_shape(range), |maximum| maximum <= 2_147_483_647);
+            if !constant(&range.minimum).is_some_and(|minimum| minimum >= 0) || !bounded {
+                return None;
+            }
+            let stride = dims[axis + 1..].iter().fold(KernelRangeExpr::Constant(1), |acc, dim| {
+                let extent = match evaluate_index_dimension(*dim, self.types) {
+                    Ok(Some(extent)) => KernelRangeExpr::Constant(i128::from(extent)),
+                    _ => KernelRangeExpr::Shape(*dim),
+                };
+                multiply(acc, extent)
+            });
+            maximum_index = add(maximum_index, multiply(range.maximum.clone(), stride));
+        }
+        Some(AbstractRange(Some(KernelValueRange {
+            minimum: KernelRangeExpr::Constant(0),
+            maximum: maximum_index,
+        })))
     }
 
     fn visit_tensor_loop(
@@ -2654,7 +2715,9 @@ fn shape_dimensions(ty: TypeId, types: &TypeTable) -> Vec<IndexId> {
         | Type::Vector(_, shape)
         | Type::Matrix(_, shape)
         | Type::Sparsa(_, shape) => *shape,
-        Type::Alias(_, target) => return shape_dimensions(*target, types),
+        Type::Alias(_, target) | Type::Ref(_, target) => {
+            return shape_dimensions(*target, types);
+        }
         _ => return Vec::new(),
     };
     match types.get_index(shape) {
