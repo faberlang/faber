@@ -31,6 +31,7 @@ mod inf;
 mod littera;
 #[cfg(test)]
 mod littera_test;
+mod octeti_tensor;
 mod scalar;
 
 #[derive(Clone, Copy)]
@@ -182,9 +183,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 span,
             ),
             Type::Set(_) => self.convert_to_set(value, span),
-            Type::Cursor(_) | Type::Tensor(_, _) | Type::Sparsa(_, _) => {
-                self.convert_to_eager_sequence(value, target_ty, struct_defaults, span)
-            }
+            Type::Cursor(_) | Type::Tensor(_, _) | Type::Sparsa(_, _) => match value {
+                // `octeti ↦ tensor<E, [shape]> via Le|Be`: faithful bulk
+                // reinterpretation; the `via` hint rides in `params`.
+                Value::Octeti(bytes) if matches!(target, Type::Tensor(_, _)) => {
+                    self.convert_octeti_to_tensor(bytes, target_ty, params, recovery, span)
+                }
+                value => self.convert_to_eager_sequence(value, target_ty, struct_defaults, span),
+            },
             Type::Struct(def_id) => {
                 self.convert_to_struct(value, source_ty, *def_id, recovery, struct_defaults, span)
             }
