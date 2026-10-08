@@ -3402,8 +3402,8 @@ fn lowers_non_null_method_call_with_store_back_only_for_receiver_writes() {
     // storage is re-wrapped from it; the read `xs!.longitudo()` is not.
     let write_dump = dump_source(
         r"
-functio f(lista<numerus> ∪ nihil p) → vacuum {
-    varia lista<numerus> ∪ nihil xs ← p
+functio f() → vacuum {
+    varia lista<numerus> ∪ nihil xs ← [1]
     xs!.appende(1)
 }
 ",
@@ -7216,7 +7216,7 @@ functio asserted(vector<f32, 3> ∪ nihil v) → f32 {
     redde v![2]
 }
 functio write(vector<f32, 3> v) → vector<f32, 3> {
-    varia vector<f32, 3> u ← v
+    varia copy vector<f32, 3> u ← v
     u[0] ← 4.0
     redde u
 }

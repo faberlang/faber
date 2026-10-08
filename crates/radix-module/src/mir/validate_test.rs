@@ -240,10 +240,19 @@ fn analyze(source: &str) -> crate::driver::AnalyzedModule {
 }
 
 fn device_view_projection_program(types: &TypeTable, tensor_ty: MirType, element_ty: MirType) -> MirProgram {
+    device_view_projection_program_at(types, tensor_ty, element_ty, MirConstant::Int(0))
+}
+
+fn device_view_projection_program_at(
+    types: &TypeTable,
+    tensor_ty: MirType,
+    element_ty: MirType,
+    index: MirConstant,
+) -> MirProgram {
     let mut tensor_place = MirPlace::local(MirLocalId(0));
     tensor_place
         .projections
-        .push(MirProjection::Index(MirOperand::Constant(MirConstant::Int(0))));
+        .push(MirProjection::Index(MirOperand::Constant(index)));
 
     MirProgram {
         functions: vec![MirFunction {
@@ -372,7 +381,9 @@ fn accepts_rank1_device_view_index_projection() {
 }
 
 #[test]
-fn rejects_rank2_device_view_index_projection_until_view_contract_exists() {
+fn accepts_rank2_device_view_index_projection_with_one_linear_index() {
+    // The view contract exists (85cd6cbd6): an N-element tensor index lowers to
+    // one row-major integer index, so a rank-2 device view validates.
     let mut types = TypeTable::new();
     let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     let dim2 = types.intern_index(IndexExpr::Literal(2));
@@ -382,10 +393,26 @@ fn rejects_rank2_device_view_index_projection_until_view_contract_exists() {
     let element_ty = MirType::semantic(f32_ty);
     let program = device_view_projection_program(&types, tensor_ty, element_ty);
 
-    expect_validation_error(
-        &program,
-        &types,
-        "mir_validation_device_view_index_projection_requires_rank_1_storage",
+    validate_program(&program, &MirValidationContext::new(&types))
+        .expect("rank-2 device view index projection validates");
+}
+
+#[test]
+fn rejects_rank2_device_view_index_projection_with_non_integer_index() {
+    let mut types = TypeTable::new();
+    let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim2 = types.intern_index(IndexExpr::Literal(2));
+    let dim3 = types.intern_index(IndexExpr::Literal(3));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![dim2, dim3]));
+    let tensor_ty = MirType::semantic(types.intern(Type::Tensor(f32_ty, shape)));
+    let element_ty = MirType::semantic(f32_ty);
+    let program = device_view_projection_program_at(&types, tensor_ty, element_ty, MirConstant::Bool(true));
+
+    let errors = validate_program(&program, &MirValidationContext::new(&types))
+        .expect_err("a non-integer device view index should be invalid");
+    assert!(
+        errors.iter().any(|error| error.issue.contains("device_view_index_is_not_integer")),
+        "expected a non-integer device view index error, got {errors:#?}"
     );
 }
 

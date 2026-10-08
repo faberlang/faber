@@ -121,7 +121,7 @@ locale = "la"
 +++
 @ ad 'lista:auge'
 functio auge(lista<numerus> xs) → numerus {
-    varia lista<numerus> local ← xs
+    varia copy lista<numerus> local ← xs
     local.appende(99)
     redde local.longitudo()
 }

@@ -40,7 +40,7 @@ fn queue_and_stack_accept_unbounded_or_bounded_arity_only() {
 #[test]
 fn queue_and_stack_methods_typecheck_with_empty_pop_union() {
     crate::test_support::assert_accepts(
-        r#"functio queue_ops(queue<numerus> q) → numerus ∪ nihil {
+        r#"functio queue_ops(in queue<numerus> q) → numerus ∪ nihil {
     varia queue<numerus> values ← q
     values.appende(1)
     fixum numerus ∪ nihil item ← values.decapita()
@@ -48,7 +48,7 @@ fn queue_and_stack_methods_typecheck_with_empty_pop_union() {
     redde item
 }
 
-functio stack_ops(stack<textus> s) → textus ∪ nihil {
+functio stack_ops(in stack<textus> s) → textus ∪ nihil {
     varia stack<textus> values ← s
     values.appende("top")
     fixum textus ∪ nihil item ← values.detrahe()
@@ -62,11 +62,11 @@ functio stack_ops(stack<textus> s) → textus ∪ nihil {
 #[test]
 fn bounded_queue_and_stack_push_use_alternate_exit_but_pop_stays_nullable() {
     for source in [
-        r"functio queue_push(queue<numerus, 2> q) → vacuum {
+        r"functio queue_push(in queue<numerus, 2> q) → vacuum {
     varia queue<numerus, 2> values ← q
     values.appende(1)
 }",
-        r#"functio stack_push(stack<textus, 2> s) → vacuum {
+        r#"functio stack_push(in stack<textus, 2> s) → vacuum {
     varia stack<textus, 2> values ← s
     values.appende("top")
 }"#,
@@ -74,12 +74,12 @@ fn bounded_queue_and_stack_push_use_alternate_exit_but_pop_stays_nullable() {
         assert_rejects_with_issue(source, "failable_call_requires_handler");
     }
     crate::test_support::assert_accepts(
-        r"functio queue_pop(queue<numerus, 2> q) → numerus ∪ nihil {
+        r"functio queue_pop(in queue<numerus, 2> q) → numerus ∪ nihil {
     varia queue<numerus, 2> values ← q
     redde values.decapita()
 }
 
-functio stack_pop(stack<textus, 2> s) → textus ∪ nihil {
+functio stack_pop(in stack<textus, 2> s) → textus ∪ nihil {
     varia stack<textus, 2> values ← s
     redde values.detrahe()
 }",
