@@ -234,8 +234,23 @@ impl ProgramBuffer {
     /// The cross-kernel wiring key: same declared logical name and same
     /// shape. Callers additionally guard on [`unify_roles`] before joining,
     /// so a name/shape coincidence alone never aliases two unrelated values.
-    fn matches(&self, name: &str, element_ty: MirType, element_count: u64) -> bool {
-        self.name == name && self.element_ty == element_ty && self.element_count == element_count
+    /// Equal element counts are not equal shapes: when both sides carry a
+    /// parameter shape vector the vectors must be equal, so a `[3, 8]` and a
+    /// `[4, 6]` slot of the same name never share a buffer.
+    fn matches(
+        &self,
+        name: &str,
+        element_ty: MirType,
+        element_count: u64,
+        shape: Option<&[u64]>,
+    ) -> bool {
+        self.name == name
+            && self.element_ty == element_ty
+            && self.element_count == element_count
+            && match (self.shape.as_deref(), shape) {
+                (Some(existing), Some(next)) => existing == next,
+                _ => true,
+            }
     }
 }
 
@@ -488,6 +503,7 @@ pub fn build_device_program(
     }
     let mut builder = KernelBuilder::new(
         interner,
+        folded_program,
         folded.validation(),
         companions,
         training,
@@ -720,6 +736,8 @@ pub fn build_device_program(
 /// unification table plus the training aliasing facts.
 struct KernelBuilder<'a> {
     interner: &'a Interner,
+    /// The folded program: the scope kernel entry names are unique within.
+    program: &'a crate::MirProgram,
     validation: &'a crate::MirValidationContext<'a>,
     /// `(function, local)` origins that persist across repeating steps.
     persistent_locals: BTreeSet<(MirFunctionId, MirLocalId)>,
@@ -743,6 +761,7 @@ struct KernelBuilder<'a> {
 impl<'a> KernelBuilder<'a> {
     fn new(
         interner: &'a Interner,
+        program: &'a crate::MirProgram,
         validation: &'a crate::MirValidationContext<'a>,
         companions: &MirCompanionMap,
         training: Option<&DeviceTrainingFacts>,
@@ -773,6 +792,7 @@ impl<'a> KernelBuilder<'a> {
         }
         Self {
             interner,
+            program,
             validation,
             persistent_locals,
             param_updates,
@@ -789,7 +809,8 @@ impl<'a> KernelBuilder<'a> {
     /// path when the complete ABI signature and plan resolve, else the
     /// decomposition fallback (one kernel per recipe subchain).
     fn build_function(&mut self, function: &MirFunction) -> Result<(), DeviceProgramBuildError> {
-        let base_entry = crate::host_partition::kernel_entry_name(function, self.interner);
+        let base_entry =
+            crate::host_partition::unique_kernel_entry_name(self.program, function, self.interner);
         // The source function's return-tuple field locals (in full-tuple
         // order) — the discriminator for the S5-U5 update-output aliasing.
         let return_tuple_locals = tuple_return_locals(function).unwrap_or_default();
@@ -1171,8 +1192,12 @@ impl<'a> KernelBuilder<'a> {
                 // same-name/same-shape buffer; a producer slot joins only a
                 // buffer with NO writer yet (the reverse-declared
                 // producer→consumer chain).
-                entry.matches(&name, resource.element_ty, resource.element_count)
-                    && unify_roles(entry.role, role)
+                entry.matches(
+                    &name,
+                    resource.element_ty,
+                    resource.element_count,
+                    shape.as_deref(),
+                ) && unify_roles(entry.role, role)
                     && (resource.access == MirKernelResourceAccess::Read || !entry.written)
             }) {
                 merge_slot_facts(entry, role, resource, shape.as_deref(), is_param_input);

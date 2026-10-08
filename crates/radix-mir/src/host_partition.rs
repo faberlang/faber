@@ -525,7 +525,7 @@ pub fn derive_partition_record_with_metadata(
         .chain(partition.device_kernels.iter().map(|function| {
             let entry = validated
                 .function_by_id(*function)
-                .map(|function| kernel_entry_name(function, interner));
+                .map(|function| unique_kernel_entry_name(program, function, interner));
             PartitionMember {
                 function: *function,
                 role: PartitionRole::Device,
@@ -546,7 +546,7 @@ pub fn derive_partition_record_with_metadata(
             .map(|kernel| {
                 validated.function_by_id(*kernel).map_or_else(
                     || format!("kernel{}", kernel.0),
-                    |function| kernel_entry_name(function, interner),
+                    |function| unique_kernel_entry_name(program, function, interner),
                 )
             })
             .collect();
@@ -612,6 +612,53 @@ pub fn kernel_entry_name(function: &MirFunction, interner: &Interner) -> String 
     function.name.map_or_else(
         || format!("kernel{}", function.id.0),
         |symbol| interner.resolve(symbol).to_owned(),
+    )
+}
+
+/// The specialization suffix of one kernel function within `program`.
+///
+/// Every specialization of a generic kernel is its own MIR function with the
+/// same source name, so the bare name is not an identity. The compute-stage
+/// functions that share one name are ordered by function id (lowering order,
+/// stable across runs): the first has no suffix, the n-th (n >= 1) has
+/// `__v<n>`.
+#[must_use]
+pub fn kernel_entry_suffix(program: &MirProgram, function: &MirFunction) -> String {
+    let Some(name) = function.name else {
+        return String::new();
+    };
+    let ordinal = program
+        .functions
+        .iter()
+        .filter(|other| {
+            other.name == Some(name)
+                && other.shader_stage == Some(crate::MirKernelShaderStage::Compute)
+                && other.id < function.id
+        })
+        .count();
+    if ordinal == 0 {
+        String::new()
+    } else {
+        format!("__v{ordinal}")
+    }
+}
+
+/// The entry name of one kernel function, unique across `program` and safe in
+/// C++-family device source: the source name mangled against the device
+/// reserved words ([`radix_codegen_shared::mangle_device_ident`]) plus the
+/// [`kernel_entry_suffix`]. The Metal emitter derives its entry names from the
+/// same two pieces, so the artifact, the reflection and the device program
+/// agree on every entry.
+#[must_use]
+pub fn unique_kernel_entry_name(
+    program: &MirProgram,
+    function: &MirFunction,
+    interner: &Interner,
+) -> String {
+    format!(
+        "{}{}",
+        radix_codegen_shared::mangle_device_ident(&kernel_entry_name(function, interner)),
+        kernel_entry_suffix(program, function)
     )
 }
 

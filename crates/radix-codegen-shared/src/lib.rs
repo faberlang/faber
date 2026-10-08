@@ -39,6 +39,7 @@
 pub mod breakable;
 pub mod conversio_arm;
 pub mod decimal;
+pub mod device_ident;
 pub mod frame;
 pub mod hints;
 pub mod hygiene;
@@ -274,6 +275,7 @@ pub trait Codegen {
     ) -> Result<Self::Output, CodegenError>;
 }
 
+pub use device_ident::{MANGLE_PREFIX, is_device_reserved, mangle_device_ident};
 pub use ident::{
     SCALAR_LOOP_CANDIDATES, SCALAR_LOOP_FALLBACK, VALUE_JOIN_CANDIDATES, VALUE_JOIN_FALLBACK,
     output_resource_name, sanitize_ident, sanitize_rust_module_ident, unclaimed_name,
