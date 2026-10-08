@@ -743,6 +743,10 @@ mod generic_size_forwarding_tests;
 mod generic_pin_link_tests;
 
 #[cfg(test)]
+#[path = "mut_param_link_test.rs"]
+mod mut_param_link_tests;
+
+#[cfg(test)]
 #[path = "tensor_edge_policy_link_test.rs"]
 mod tensor_edge_policy_link_tests;
 

@@ -792,7 +792,7 @@ impl FunctionBuilder<'_> {
                 .unwrap_or(expr_ty),
             _ => expr_ty,
         };
-        if op == MirCollectionOp::TensorSet && self.is_checked_tensor_method(receiver, &method_name, args.len()) {
+        if op == MirCollectionOp::TensorSet && self.is_checked_tensor_method(receiver, &method_name, args) {
             let (Some(index_ty), Some(value_ty), Some(receiver_ty)) =
                 (self.expr_ty(&args[0].expr), self.expr_ty(&args[1].expr), self.expr_ty(receiver))
             else {
@@ -806,7 +806,7 @@ impl FunctionBuilder<'_> {
                 expr.span,
             );
         }
-        if op == MirCollectionOp::TensorGet && self.is_checked_tensor_method(receiver, &method_name, args.len()) {
+        if op == MirCollectionOp::TensorGet && self.is_checked_tensor_method(receiver, &method_name, args) {
             let (Some(index_ty), Some(receiver_ty)) = (self.expr_ty(&args[0].expr), self.expr_ty(receiver)) else {
                 return None;
             };
@@ -4188,16 +4188,81 @@ impl FunctionBuilder<'_> {
 
     /// K11: whether this tensor `ponde` / `accipe` method call is the checked
     /// (failable) form. Device bodies keep the bare op; so does any call the
-    /// registry row does not mark failable.
-    fn is_checked_tensor_method(&self, receiver: &HirExpression, method_name: &str, arg_count: usize) -> bool {
+    /// registry row does not mark failable, and a call whose literal index the
+    /// checker proved in range (it cannot fail, so the call has no error
+    /// channel and a `trap` around it carries no `textus` member).
+    fn is_checked_tensor_method(&self, receiver: &HirExpression, method_name: &str, args: &[HirCallArg]) -> bool {
         if self.device_role.is_some() {
             return false;
         }
         let Some(receiver_ty) = receiver.ty else {
             return false;
         };
-        let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
-        crate::intrinsics::lookup_method_for_type(payload, method_name, arg_count).is_some_and(|entry| entry.failable)
+        let payload_id = self.method_receiver_payload_id(receiver_ty);
+        let payload = self.types.get(payload_id);
+        let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, method_name, args.len()) else {
+            return false;
+        };
+        if !entry.failable {
+            return false;
+        }
+        let proven_in_range = entry
+            .range_checked_arg
+            .and_then(|position| args.get(position))
+            .is_some_and(|arg| self.literal_index_in_static_bounds(payload_id, &arg.expr));
+        !proven_in_range
+    }
+
+    /// The checker's static range proof (`classify_static_index_range`,
+    /// literal-only): every coordinate is an integer literal inside the
+    /// tensor's literal extents. The checker types such a call as non-failable,
+    /// so lowering must not give it an error channel either.
+    fn literal_index_in_static_bounds(&self, payload: TypeId, index: &HirExpression) -> bool {
+        let Type::Tensor(_, shape) = self.types.get(payload) else {
+            return false;
+        };
+        let bounds: Option<Vec<u64>> = match self.types.get_index(*shape) {
+            IndexExpr::Literal(value) => Some(vec![*value]),
+            IndexExpr::Tuple(dims) => dims
+                .iter()
+                .map(|dim| match self.types.get_index(*dim) {
+                    IndexExpr::Literal(value) => Some(*value),
+                    _ => None,
+                })
+                .collect(),
+            _ => None,
+        };
+        let Some(bounds) = bounds else {
+            return false;
+        };
+        let literal = |expr: &HirExpression| -> Option<i128> {
+            match &expr.kind {
+                HirExpressionKind::Literal(crate::hir::HirLiteral::Int(value)) => Some(i128::from(*value)),
+                HirExpressionKind::Unary(crate::hir::HirUnOp::Neg, inner) => match &inner.kind {
+                    HirExpressionKind::Literal(crate::hir::HirLiteral::Int(value)) => i128::from(*value).checked_neg(),
+                    _ => None,
+                },
+                _ => None,
+            }
+        };
+        let coordinates: Option<Vec<i128>> = match &index.kind {
+            HirExpressionKind::Array(elements) => elements
+                .iter()
+                .map(|element| match element {
+                    crate::hir::HirArrayElement::Expr(inner) => literal(inner),
+                    _ => None,
+                })
+                .collect(),
+            _ => literal(index).map(|value| vec![value]),
+        };
+        let Some(coordinates) = coordinates else {
+            return false;
+        };
+        coordinates.len() == bounds.len()
+            && coordinates
+                .iter()
+                .zip(&bounds)
+                .all(|(value, bound)| u128::try_from(*value).is_ok_and(|value| value < u128::from(*bound)))
     }
 
     /// K11: lower the checked `ponde` store / `accipe` read as a failable call

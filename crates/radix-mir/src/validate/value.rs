@@ -366,6 +366,7 @@ impl Validator<'_, '_> {
                 .functions
                 .get(def_id)
                 .cloned()
+                .map(|signature| self.strip_param_ref_wrappers(signature))
                 .or_else(|| Self::signature_from_program_def(scope, *def_id)),
             MirCallee::Closure(closure) => self.validate_closure_callee(scope, closure, span),
             MirCallee::Value(value) => {
@@ -427,24 +428,29 @@ impl Validator<'_, '_> {
             .map(|function| signature_from_function(function))
     }
 
+    /// A semantic signature spells access intent as a `Ref` wrapper on the
+    /// parameter type (a function type, or a function lowered in another
+    /// module whose signature the context carries); MIR carries intent in
+    /// `MirParamMode` and the argument is the payload place, exactly as a
+    /// direct call to a `mut` parameter passes it.
+    fn strip_param_ref_wrappers(
+        &self,
+        mut signature: MirFunctionSignature,
+    ) -> MirFunctionSignature {
+        for param in &mut signature.params {
+            if let Type::Ref(_, inner) = self.context.types.get(param.ty.semantic_id()) {
+                param.ty = MirType::semantic(*inner);
+            }
+        }
+        signature
+    }
+
     pub(crate) fn signature_from_semantic_callable_type(
         &self,
         ty: TypeId,
     ) -> Option<MirFunctionSignature> {
         match self.context.types.get(ty) {
-            Type::Func(sig) => {
-                let mut signature = signature_from_func_sig(sig);
-                // A function type spells access intent as a `Ref` wrapper on the
-                // parameter type; MIR carries intent in `MirParamMode` and the
-                // argument is the payload place, exactly as a direct call to a
-                // `mut` parameter passes it.
-                for param in &mut signature.params {
-                    if let Type::Ref(_, inner) = self.context.types.get(param.ty.semantic_id()) {
-                        param.ty = MirType::semantic(*inner);
-                    }
-                }
-                Some(signature)
-            }
+            Type::Func(sig) => Some(self.strip_param_ref_wrappers(signature_from_func_sig(sig))),
             Type::Alias(_, inner) => self.signature_from_semantic_callable_type(*inner),
             _ => None,
         }
