@@ -431,13 +431,22 @@ fn digest_file(path: &str, span: Span) -> Result<String, RunnerError> {
     Ok(hasher.finalize_hex())
 }
 
+/// Largest single `read_range` request, in bytes (512 MiB).
+///
+/// WHY: the A1 weight loader reads each tensor's byte range with ONE call, and
+/// the largest SmolLM2 F32 tensor, `token_embd.weight`, is 49152 x 960 x 4 =
+/// 188,743,680 bytes, which the former 64 MiB ceiling refused. This is an
+/// implementation ceiling, not a language constant (numeric-model.md: resource
+/// bounds are implementation ceilings); it bounds one read's allocation. The
+/// same constant serves the raw `solum:partem` route, which dispatches here.
+pub(crate) const MAX_RANGE_READ_BYTES: usize = 512 * 1024 * 1024;
+
 fn read_byte_range(
     path: &str,
     start: i64,
     length: i64,
     span: Span,
 ) -> Result<Vec<u8>, RunnerError> {
-    const MAX_RANGE_READ_BYTES: usize = 64 * 1024 * 1024;
     let start = u64::try_from(start).map_err(|_| {
         RunnerError::internal(span, "solum.read_range initium must be non-negative")
     })?;
@@ -453,15 +462,31 @@ fn read_byte_range(
     let mut file = File::open(path).map_err(|err| {
         RunnerError::internal(span, format!("solum.read_range open failed: {err}"))
     })?;
+    // A regular file is clamped to its remaining bytes so a short read at EOF
+    // allocates only what exists; other files keep the requested length.
+    let wanted = match file.metadata() {
+        Ok(meta) if meta.is_file() => {
+            length.min(usize::try_from(meta.len().saturating_sub(start)).unwrap_or(usize::MAX))
+        }
+        _ => length,
+    };
     file.seek(SeekFrom::Start(start)).map_err(|err| {
         RunnerError::internal(span, format!("solum.read_range seek failed: {err}"))
     })?;
-    let mut bytes = Vec::with_capacity(length);
-    file.take(length as u64)
-        .read_to_end(&mut bytes)
-        .map_err(|err| {
+    // One allocation, filled in place by the kernel read: the bytes are copied
+    // once (file to this Vec) and then moved into `Value::Octeti`.
+    let mut bytes = vec![0_u8; wanted];
+    let mut filled = 0;
+    while filled < wanted {
+        let read = file.read(&mut bytes[filled..]).map_err(|err| {
             RunnerError::internal(span, format!("solum.read_range read failed: {err}"))
         })?;
+        if read == 0 {
+            break;
+        }
+        filled += read;
+    }
+    bytes.truncate(filled);
     Ok(bytes)
 }
 

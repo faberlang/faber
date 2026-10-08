@@ -66,7 +66,7 @@ fn partem_reads_the_requested_range() {
 #[test]
 fn partem_honours_the_range_cap() {
     let (_dir, path) = fixture(b"abcdefgh");
-    let over = 64 * 1024 * 1024 + 1;
+    let over = 512 * 1024 * 1024 + 1;
     let mut host = BufferHost::default();
     let errors = run_host(
         "route-partem-cap.fab",
