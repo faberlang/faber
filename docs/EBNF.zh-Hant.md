@@ -2216,7 +2216,7 @@ Retired predicate keywords are not prefix unary syntax. Use `expr ≡ 真`,
 `expr ≡ 假`, `expr ≡ 可空`, `expr 是 nihil` (the null *type* test),
 `expr ≺ 0`, or `expr ≻ 0`.
 
-The legacy ASCII spellings `<` and `>` are not productions of this grammar — both remain generic delimiters — though the shipped parser still accepts them as comparisons during the glyph migration; prefer the canonical `≺` and `≻`.
+The ASCII spellings `<` and `>` are not comparison operators — they are generic delimiters only. The parser rejects one in comparison position with `PARSE030 comparison_ascii_retired` (operator ruling TZ-2); write `≺` and `≻`.
 
 Ordering comparisons (`≺`, `≻`, `≤`, `≥`) between two `textus` values compare
 the whole strings in Unicode code-point order. They do not use locale
