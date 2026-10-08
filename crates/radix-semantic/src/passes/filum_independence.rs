@@ -1011,7 +1011,6 @@ impl HirVisitor for BodyProof<'_> {
             HirExpressionKind::Clausura(..)
             | HirExpressionKind::Handled { .. }
             | HirExpressionKind::Trap(_)
-            | HirExpressionKind::CallDefault { .. }
             | HirExpressionKind::OptionalChain(..) => {
                 self.decline(expr.span, "unproved_body_form");
             }

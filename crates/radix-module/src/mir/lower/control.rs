@@ -364,6 +364,9 @@ impl FunctionBuilder<'_> {
         err_ty: Option<TypeId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if self.device_role.is_some() {
+            return self.lower_kernel_call_default(body, default, expr);
+        }
         let ty = self.expr_ty(expr)?;
         let span = expr.span;
         let Some(err_ty) = err_ty else {
@@ -403,6 +406,163 @@ impl FunctionBuilder<'_> {
             self.seal_unreachable(join, span);
         }
         Some(MirOperand::Temp(destination_temp))
+    }
+
+    /// `call ⊥ default` inside a kernel body (operator ruling 2026-10-08): a
+    /// value select that never unwinds. The one admitted call is the checked
+    /// tensor read `t.get([i, ..]) ⊥ d`. The result is
+    ///
+    /// ```text
+    /// in = (c_0 >= 0) & (c_0 < E_0) & ... & (c_n >= 0) & (c_n < E_n)
+    /// if in { dest = <the read, bare> } else { dest = d }
+    /// ```
+    ///
+    /// with `E_k` a constant for a literal axis and a `TensorExtent` otherwise.
+    /// The same form serves the host (sequential) and device kernel lowerings,
+    /// so the oracle and the device agree. No `TryCall`, no error channel.
+    fn lower_kernel_call_default(
+        &mut self,
+        body: &HirBlock,
+        default: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let span = expr.span;
+        let ty = self.expr_ty(expr)?;
+        let Some((receiver, index)) = self.kernel_default_tensor_read(body) else {
+            self.errors.push(MirError {
+                message: "device lowering of `⊥` is pending for this call: a kernel admits only the checked \
+                          tensor read `t.get([i, ..]) ⊥ d`"
+                    .to_owned(),
+                issue: super::lane_form::KERNEL_CALL_DEFAULT_PENDING_ISSUE.to_owned(),
+                span,
+                definition_span: None,
+            });
+            return None;
+        };
+        let receiver_ty = self.method_receiver_payload_id(receiver.ty?);
+        let rank = index.len();
+        let CollectionIteraKind::Shaped { rank: tensor_rank, literal, matrix: false, .. } =
+            self.classify_collection_itera(receiver_ty, HirIteraMode::Ex, rank)
+        else {
+            self.errors
+                .push(MirError::unsupported(span, "`⊥` read of a source that is not a ranked tensor"));
+            return None;
+        };
+        if tensor_rank != rank {
+            self.errors
+                .push(MirError::unsupported(span, "`⊥` read coordinate count differs from rank"));
+            return None;
+        }
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let lowered = self.lower_expr_value(receiver)?;
+        let tensor = self.materialize_operand_place(lowered, MirType::semantic(receiver_ty), receiver.span);
+
+        let mut within: Option<MirOperand> = None;
+        for (axis, coordinate) in index.iter().enumerate() {
+            let value = self.lower_expr_value(coordinate)?;
+            let extent = match literal.as_deref() {
+                Some(dimensions) => MirOperand::Constant(MirConstant::Int(dimensions[axis])),
+                None => self.assign_temp(
+                    MirValueKind::TensorExtent {
+                        tensor: MirOperand::Place(tensor.clone()),
+                        axis: u32::try_from(axis).ok()?,
+                    },
+                    numerus,
+                    span,
+                ),
+            };
+            let low = self.binary_temp(
+                MirBinOp::GtEq,
+                value.clone(),
+                MirOperand::Constant(MirConstant::Int(0)),
+                bivalens,
+                span,
+            );
+            let high = self.binary_temp(MirBinOp::Lt, value, extent, bivalens, span);
+            let axis_in = self.binary_temp(MirBinOp::And, low, high, bivalens, span);
+            within = Some(match within {
+                Some(previous) => self.binary_temp(MirBinOp::And, previous, axis_in, bivalens, span),
+                None => axis_in,
+            });
+        }
+        let condition = within?;
+
+        let destination_temp = self.push_temp(ty, span);
+        let destination = MirPlace::temp(destination_temp);
+        let read_block = self.fresh_block(span);
+        let default_block = self.fresh_block(span);
+        let join = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition, then_block: read_block, else_block: default_block },
+            span,
+        );
+
+        self.switch_to(read_block);
+        if self.is_device_lowering() {
+            // The in-range read is the row-major linear `Index` place a
+            // bracket read uses; the bare `TensorGet` takes a host list.
+            let linear = if rank == 1 {
+                self.lower_expr_value(index[0])?
+            } else {
+                let extents: Vec<Option<i64>> = match literal.as_deref() {
+                    Some(dimensions) => dimensions.iter().copied().map(Some).collect(),
+                    None => vec![None; rank],
+                };
+                self.lower_row_major_linear_index(&tensor, &index, &extents, span)?
+            };
+            let mut read = tensor;
+            read.projections.push(MirProjection::Index(linear));
+            self.assign(destination.clone(), MirOperand::Place(read), ty, span);
+        } else {
+            self.lower_block_to_destination(body, destination.clone(), ty, span);
+        }
+        self.terminate_open_current(MirTerminatorKind::Goto(join), span);
+
+        self.switch_to(default_block);
+        self.lower_expr_to_destination(default, destination, ty)?;
+        self.terminate_open_current(MirTerminatorKind::Goto(join), default.span);
+
+        self.switch_to(join);
+        Some(MirOperand::Temp(destination_temp))
+    }
+
+    /// The receiver and coordinate expressions of a block that is exactly one
+    /// checked tensor read `t.get([c0, .., cn])`.
+    fn kernel_default_tensor_read<'h>(
+        &self,
+        body: &'h HirBlock,
+    ) -> Option<(&'h HirExpression, Vec<&'h HirExpression>)> {
+        let call = match (body.statements.as_slice(), body.expr.as_deref()) {
+            ([], Some(call)) => call,
+            ([statement], None) => match &statement.kind {
+                HirStatementKind::Expr(call) => call,
+                _ => return None,
+            },
+            _ => return None,
+        };
+        let HirExpressionKind::MethodCall(receiver, method, _, args, _) = &call.kind else {
+            return None;
+        };
+        let method_name = self.resolve_method_name(*method)?;
+        let payload = self
+            .types
+            .get(self.method_receiver_payload_id(receiver.ty?));
+        let entry = crate::intrinsics::lookup_method_for_type(payload, method_name, args.len())?;
+        if !entry.failable || args.len() != 1 || !matches!(payload, Type::Tensor(..)) {
+            return None;
+        }
+        let HirExpressionKind::Array(items) = &args[0].expr.kind else {
+            return None;
+        };
+        let coordinates: Vec<&HirExpression> = items
+            .iter()
+            .map(|item| match item {
+                HirArrayElement::Expr(expr) => Some(expr),
+                HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => None,
+            })
+            .collect::<Option<_>>()?;
+        (!coordinates.is_empty()).then_some((receiver.as_ref(), coordinates))
     }
 
     /// Lower any expression into an already-chosen destination place.

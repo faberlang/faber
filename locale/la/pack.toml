@@ -1528,6 +1528,10 @@ help = "errorem ad vocationem lancientem perveniat, ubi hospes eum tractat"
 message = "nucleum fractum saturatum nondum adhibere potest ({site}); nucleorum structio fractorum saturatorum nondum efficitur"
 help = "in nucleo latitudinem fractionis nudam adhibe et ad limitem hospitis per `↦` muta"
 
+[diagnostics.SEM008.issues.nucleum_typed_error_channel]
+message = "nucleum '{kernel}' canalem erroris typatum declarat; nucleum solum errorem textus declarare potest"
+help = "`⇥ text` declara (nuntius constans pro quovis loco defectus) et hospes lanciens eum ad suum genus erroris vertat"
+
 [diagnostics.SEM008.issues.nucleum_workgroup]
 message = "nucleum '{construct}' ({site}) nominare non potest; status greigis internus compilatoris est"
 help = "exemplar parallelum per ansam filum vel reductionem exprime"

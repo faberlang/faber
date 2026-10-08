@@ -10,8 +10,8 @@ use super::fragment_definition::struct_def_from_type;
 use super::kernel_legality::{
     Env, ISSUE_ASYNC, ISSUE_HOST_CALL, ISSUE_HOST_EFFECT, ISSUE_HOST_TYPE,
     ISSUE_POSITIONAL_LANE_PARAM, ISSUE_PRIVATE_HOST_CALL, ISSUE_RAW_LANE_ID,
-    ISSUE_RAW_LANE_ID_PARAM, ISSUE_RECOVERY, ISSUE_SATURATING_FLOAT_NOT_BUILT, ISSUE_WORKGROUP,
-    Sink,
+    ISSUE_RAW_LANE_ID_PARAM, ISSUE_RECOVERY, ISSUE_SATURATING_FLOAT_NOT_BUILT,
+    ISSUE_TYPED_ERROR_CHANNEL, ISSUE_WORKGROUP, Sink,
 };
 use super::kernel_legality_types::{FAMILY_ATOMIC, FAMILY_SATURATING_FLOAT, host_only_family};
 use crate::{
@@ -130,6 +130,16 @@ impl KernelWalk<'_, '_> {
         }
         if let Some(ret) = function.ret_ty {
             self.check_type(ret, self.function_span, "return");
+        }
+        if let Some(err) = function.err_ty
+            && !matches!(self.env.types.get(err), Type::Primitive(Primitive::Textus))
+        {
+            let kernel = self.env.interner.resolve(function.name);
+            self.sink.report(
+                ISSUE_TYPED_ERROR_CHANNEL,
+                self.function_span,
+                &[("kernel", kernel)],
+            );
         }
         if self.check_lane_abi {
             self.check_lane_parameters(function);
@@ -362,10 +372,9 @@ impl HirVisitor for KernelWalk<'_, '_> {
                 self.recovery(expr.span, "capta");
                 walk_expr(self, expr);
             }
-            HirExpressionKind::CallDefault { .. } => {
-                self.recovery(expr.span, "default");
-                walk_expr(self, expr);
-            }
+            // `call ⊥ default` selects a value and never unwinds (compare
+            // plus select on a device); it installs no handler.
+            HirExpressionKind::CallDefault { .. } => walk_expr(self, expr),
             HirExpressionKind::ConversioAssign {
                 recovery: Some(_), ..
             }

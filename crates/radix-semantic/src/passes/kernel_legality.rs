@@ -43,6 +43,9 @@ pub const ISSUE_HOST_CALL: &str = "nucleum_host_call";
 pub const ISSUE_PRIVATE_HOST_CALL: &str = "nucleum_private_host_call";
 /// A kernel body installs a local handler.
 pub const ISSUE_RECOVERY: &str = "nucleum_recovery";
+/// A kernel declares a typed error channel `⇥ E` (any `E` other than text).
+/// A kernel may declare `⇥ text` and nothing else (gpu-reset rules 9, 12.4).
+pub const ISSUE_TYPED_ERROR_CHANNEL: &str = "nucleum_typed_error_channel";
 /// User source calls a thread-id builtin (`global_invocation_id()` and its
 /// siblings). They are raw lane ids, a compiler-internal lowering surface
 /// (gpu-reset rule 12.5); the parallel pattern is a `filum` loop.

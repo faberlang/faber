@@ -520,6 +520,81 @@ functio k(f32 x) → f32 {
     );
 }
 
+#[test]
+fn a_call_default_in_a_kernel_selects_a_value_and_is_legal() {
+    // Operator ruling 2026-10-08: `⊥` is compare plus select, never a handler.
+    assert_accepts(
+        r"
+@ nucleum
+@ publica
+functio k(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
+    itera ex x apud [i] filum f fixum v {
+        out[i] ← x.accipe([i + 1]) ⊥ 0.0
+    }
+}
+",
+    );
+}
+
+#[test]
+fn a_local_do_catch_is_still_a_recovery_next_to_a_call_default() {
+    expect_kernel_error(
+        r"
+@ nucleum
+@ publica
+functio k(tensor<f32, [8]> x, numerus n) → f32 {
+    fixum f32 d ← x.accipe([n]) ⊥ 0.0
+    fac {
+        redde d
+    } cape err {
+        redde 0.0
+    }
+    redde d
+}
+",
+        "nucleum_recovery",
+        &[("construct", "cape")],
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Error channel (operator ruling 2026-10-08: `⇥ text` and nothing else)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_kernel_may_declare_a_text_error_channel() {
+    assert_accepts(
+        r"
+@ nucleum
+@ publica
+functio k(f32 x) → f32 ⇥ textus {
+    si x ≺ 0.0 {
+        iace 'negative'
+    }
+    redde x
+}
+",
+    );
+}
+
+#[test]
+fn a_typed_error_channel_on_a_kernel_is_a_named_check_error() {
+    expect_kernel_error(
+        r"
+@ nucleum
+@ publica
+functio k(f32 x) → f32 ⇥ numerus {
+    si x ≺ 0.0 {
+        iace 1
+    }
+    redde x
+}
+",
+        "nucleum_typed_error_channel",
+        &[("kernel", "k")],
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Raw lane ids (gpu-reset rule 12.5)
 // ---------------------------------------------------------------------------

@@ -164,7 +164,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// Emit `((i0 * e1 + i1) * e2 + i2) ...` over the lowered index elements.
-    fn lower_row_major_linear_index(
+    pub(super) fn lower_row_major_linear_index(
         &mut self,
         base: &MirPlace,
         elements: &[&HirExpression],

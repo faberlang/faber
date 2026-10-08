@@ -1755,6 +1755,10 @@ help = "let the error reach the launching call, where the host handles it"
 message = "a kernel cannot use a saturating float yet ({site}); device lowering of saturating floats is not built"
 help = "use the bare float width in the kernel and convert at the host boundary with `↦`"
 
+[diagnostics.SEM008.issues.nucleum_typed_error_channel]
+message = "kernel '{kernel}' declares a typed error channel; a kernel may declare only a text error"
+help = "declare `⇥ text` (a constant message per failure site) and let the launching host map it to its own error type"
+
 [diagnostics.SEM008.issues.nucleum_workgroup]
 message = "a kernel cannot name '{construct}' ({site}); workgroup state is compiler-internal"
 help = "express the parallel pattern with a filum loop or a reduction"

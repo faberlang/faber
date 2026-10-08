@@ -645,7 +645,7 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 #[test]
 fn mir_lowering_error_carries_source_span() {
     let session = test_session(Target::MirLlvm);
-    let source = "functio id(f32 a) → f32 { redde a }\nincipit { nota id }";
+    let source = "functio id<T>(T a) → T { redde a }\nincipit { nota id }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     let diag = result
         .diagnostics

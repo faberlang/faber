@@ -3110,7 +3110,7 @@ impl FunctionBuilder<'_> {
         crate::intrinsics::mir_collection_op(entry)
     }
 
-    fn resolve_method_name(&self, method: Symbol) -> Option<&str> {
+    pub(super) fn resolve_method_name(&self, method: Symbol) -> Option<&str> {
         self.context
             .interner
             .map(|interner| interner.resolve(method))
