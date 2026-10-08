@@ -68,7 +68,7 @@ fn a_mut_parameter_is_written_in_place_and_visible_to_the_caller() {
 incipit {
 fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia tensor<f32, [2, 2]> b ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
-double(a, b)
+double(a, in b)
 nota b.planata()
 }",
     );
@@ -88,7 +88,7 @@ functio fill(in Holder holder, tensor<f32, [2, 2]> source) → vacuum {
 incipit {
 fixum tensor<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
 varia Holder h ← Holder { buf = [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]> }
-fill(h, a)
+fill(in h, a)
 nota h.buf.planata()
 }");
     assert_eq!(out, ["[1.0, 2.0, 3.0, 4.0]"]);

@@ -1901,7 +1901,7 @@ functio copy_coordinate<magnitudo N>(
 @ nucleum
 @ publica
 functio copy_four(tensor<f32, [4]> input, in tensor<u32, [4]> output) → vacuum {
-    copy_coordinate(input, output)
+    copy_coordinate(input, in output)
 }
 ";
     let session = crate::driver::Session::new(crate::driver::Config::default());

@@ -121,8 +121,8 @@ main {
     var tf32[4] fixed_out ← tf32[4] {}
     const tf32[size n] sized ← tf32[size n] {}
     var tf32[size n] sized_out ← tf32[size n] {}
-    bump(fixed, fixed_out)
-    bump(sized, sized_out)
+    bump(fixed, mut fixed_out)
+    bump(sized, mut sized_out)
 }
 "#,
     );

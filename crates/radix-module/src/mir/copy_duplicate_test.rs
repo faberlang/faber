@@ -35,7 +35,7 @@ fn take(copy list<int> xs) → int {
 }
 main {
     const list<int> a ← [1, 2]
-    print take(a)
+    print take(copy a)
     print a.length()
 }
 "#;
@@ -88,7 +88,7 @@ fn bumpcopy(copy C c) → void {
 main {
     var C c ← C {}
     c.inc()
-    bumpcopy(c)
+    bumpcopy(copy c)
     print c.n
 }
 "#;

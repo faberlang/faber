@@ -208,7 +208,7 @@ main {
     a[3] ← 3
     a[4] ← 4
     var ti32[8] b ← ti32[8] {}
-    k(a, b)
+    k(a, mut b)
     print b[0]
     print b[1]
     print b[2]

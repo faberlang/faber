@@ -429,7 +429,7 @@ functio duplica(in numerus value) → vacuum {
 incipit {
     nota "mutabile"
     varia numerus value ← 3
-    duplica(value)
+    duplica(in value)
     nota value
     nota "salve"
 }

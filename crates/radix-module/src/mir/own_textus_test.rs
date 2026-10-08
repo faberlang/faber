@@ -11,7 +11,7 @@ functio consume(own textus buffer) → textus {
 }
 
 incipit {
-    nota consume("salve")
+    nota consume(own "salve")
 }
 "#;
     let mut unit = crate::driver::analyze_source(&session, "own-textus.fab", source, AnalyzeRequest::default())

@@ -88,7 +88,7 @@ const THREE: &str = "tensor<f32, [H, W]> src, tensor<f32, [H, W]> other, mut ten
 
 #[test]
 fn a_plain_lane_copy_carries_no_fault_channel() {
-    let (signature, reflection) = kernel(&program(TWO, "dst[[i, j]] ← x", "k(src, dst)"));
+    let (signature, reflection) = kernel(&program(TWO, "dst[[i, j]] ← x", "k(src, mut dst)"));
     assert!(!has_fault_channel(&signature), "{:?}", kinds(&signature));
     assert!(reflection.fault_sites.is_empty());
     let json = serde_json::to_string(&reflection).expect("reflection serializes");
@@ -97,7 +97,7 @@ fn a_plain_lane_copy_carries_no_fault_channel() {
 
 #[test]
 fn binder_indexed_loads_and_stores_carry_no_fault_channel() {
-    let (signature, reflection) = kernel(&program(THREE, "dst[[i, j]] ← x + other[[i, j]]", "k(src, other, dst)"));
+    let (signature, reflection) = kernel(&program(THREE, "dst[[i, j]] ← x + other[[i, j]]", "k(src, other, mut dst)"));
     assert!(!has_fault_channel(&signature), "{:?}", kinds(&signature));
     assert!(reflection.fault_sites.is_empty());
 }
@@ -121,7 +121,7 @@ main args args {
     const size C ← args.cols
     var tensor<vector<f32, 4>, [R, C]> state ← tensor<vector<f32, 4>, [R, C]> {}
     var tensor<f32, [R, C]> depth ← tf32[R, C] {}
-    k(state, depth)
+    k(state, mut depth)
 }
 "#;
     let (signature, reflection) = kernel(source);
@@ -131,7 +131,8 @@ main args args {
 
 #[test]
 fn a_shifted_load_counts_the_loaded_tensor_only_and_the_record_is_last() {
-    let (signature, reflection) = kernel(&program(THREE, "dst[[i, j]] ← x + other[[i, j + 1]]", "k(src, other, dst)"));
+    let (signature, reflection) =
+        kernel(&program(THREE, "dst[[i, j]] ← x + other[[i, j + 1]]", "k(src, other, mut dst)"));
     let kinds = kinds(&signature);
     let counts: Vec<Kind> = kinds
         .iter()
@@ -172,7 +173,7 @@ fn two_unproven_tensors_get_two_counts_and_two_sites() {
     let (signature, reflection) = kernel(&program(
         THREE,
         "dst[[i, j]] ← src[[i + 1, j]] + other[[i, j + 1]]",
-        "k(src, other, dst)",
+        "k(src, other, mut dst)",
     ));
     let kinds = kinds(&signature);
     let counts: Vec<Kind> = kinds

@@ -177,7 +177,7 @@ fn accepts_imperativus_on_in_parameter_receiver() {
 
 incipit {
     varia fractus x ← 2.0
-    bump(x)
+    bump(in x)
 }";
     let result = analyze_source(&session, "in-imperativus.fab", source, AnalyzeRequest::default());
     assert!(result.is_ok(), "expected in-parameter imperativus to pass: {:?}", result.err());

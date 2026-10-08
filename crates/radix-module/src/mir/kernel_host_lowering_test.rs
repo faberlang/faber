@@ -79,7 +79,7 @@ fn k(tf32[8] a, mut tf32[8] o) → void {
 main {
     const tf32[8] a ← tf32[8] {}.fill(1.5)
     var tf32[8] b ← tf32[8] {}
-    k(a, b)
+    k(a, mut b)
     print b[3]
 }
 ";
@@ -166,7 +166,7 @@ main {
     const int n ← 4
     const tf32[size n, size n] a ← tf32[size n, size n] {}.fill(1.5)
     var tf32[size n, size n] b ← tf32[size n, size n] {}
-    k(a, b)
+    k(a, mut b)
     print b[[2, 3]]
 }
 ";

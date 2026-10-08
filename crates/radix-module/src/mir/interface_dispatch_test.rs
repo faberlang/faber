@@ -79,7 +79,7 @@ incipit {{
     fixum Crescens c ← q
     c.cresce(1)
     varia numerus k ← 5
-    c.adde(k)
+    c.adde(in k)
     nota k
     nota c.mensura()
     nota q.mensura()
