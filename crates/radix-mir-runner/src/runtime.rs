@@ -2640,13 +2640,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // No custom policy can reenter the runner mid-read, so the
             // values are read through the borrowed tensor; only the
             // custom-edge chain below needs the reentrancy clone.
-            return borrow
-                .logical_values()
-                .ok_or_else(|| {
-                    borrow.host_read_error(|| {
-                        RunnerError::internal(span, "tensor logical layout is invalid")
-                    })
-                });
+            return borrow.logical_values().ok_or_else(|| {
+                borrow.host_read_error(|| {
+                    RunnerError::internal(span, "tensor logical layout is invalid")
+                })
+            });
         }
         drop(borrow);
         let snapshot = tensor.borrow().clone();
@@ -4433,14 +4431,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // only failure mode.
             Value::Tensor(tensor) => {
                 let idx = index.as_index(span)?;
-                tensor
-                    .borrow()
-                    .value_at(idx)
-                    .ok_or_else(|| {
-                        tensor.borrow().host_read_error(|| {
-                            RunnerError::internal(span, "tensor index out of bounds")
-                        })
+                tensor.borrow().value_at(idx).ok_or_else(|| {
+                    tensor.borrow().host_read_error(|| {
+                        RunnerError::internal(span, "tensor index out of bounds")
                     })
+                })
             }
             _ => Err(RunnerError::internal(span, "index receiver type mismatch")),
         }

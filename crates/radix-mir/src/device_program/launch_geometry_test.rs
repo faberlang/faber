@@ -1,7 +1,7 @@
 use super::*;
 use crate::abi::{MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize};
 use crate::device_program::{
-    BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, Binding, DeviceResource,
+    Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceResource,
     KernelLaunchPlan,
 };
 use crate::kernel_plan::{
@@ -13,7 +13,11 @@ use crate::layout::MirTensorStorageLayout;
 use crate::{MirFunctionId, MirScalarLayout, MirType};
 use radix_types::{NumericWidth, Primitive, TypeTable};
 
-fn resource(index: u32, access: MirKernelResourceAccess, shape: Option<Vec<u64>>) -> DeviceResource {
+fn resource(
+    index: u32,
+    access: MirKernelResourceAccess,
+    shape: Option<Vec<u64>>,
+) -> DeviceResource {
     let mut types = TypeTable::new();
     let element_ty = MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32));
     DeviceResource {
@@ -211,7 +215,10 @@ fn transpose_geometry_uses_plan_lanes_over_input_elements() {
         dispatch_x: 0,
         batched: None,
     });
-    let unit = unit(plan, vec![resource(0, Read, None), resource(1, Write, None)]);
+    let unit = unit(
+        plan,
+        vec![resource(0, Read, None), resource(1, Write, None)],
+    );
     assert_eq!(
         geometry_for_call(&unit, &[vec![5, 40], vec![40, 5]]),
         Ok(CallGeometry {
@@ -270,7 +277,10 @@ fn uncovered_plan_is_a_named_error() {
         table_cols: 0,
         id_count: 0,
     });
-    let unit = unit(plan, vec![resource(0, Read, None), resource(1, Write, None)]);
+    let unit = unit(
+        plan,
+        vec![resource(0, Read, None), resource(1, Write, None)],
+    );
     assert_eq!(
         geometry_for_call(&unit, &[vec![4], vec![4]]),
         Err(error(GEOMETRY_PLAN_NOT_COVERED, &[("plan", "Gather")]))

@@ -136,7 +136,9 @@ fn attach_device_tensor_layouts(validation: &mut MirValidationContext<'_>) {
     for (ty, element, rank) in device_layouts {
         let mut handle = MirDeviceViewLayout::device_handle_row_major(MirScalarLayout::F32, rank);
         handle.element = element;
-        validation.layouts.set_type_layout(ty, MirLayoutKind::DeviceView(handle));
+        validation
+            .layouts
+            .set_type_layout(ty, MirLayoutKind::DeviceView(handle));
     }
 }
 

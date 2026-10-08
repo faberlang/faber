@@ -104,8 +104,9 @@ fn assert_call_form_constructor_rejected(source: &str) {
         panic!("expected rejection, got ok for: {source}")
     };
     assert!(
-        diags.iter().any(|d| d.code == Some("PARSE030")
-            && d.issue() == Some("constructor_store_position_only")),
+        diags
+            .iter()
+            .any(|d| d.code == Some("PARSE030") && d.issue() == Some("constructor_store_position_only")),
         "expected PARSE030 constructor_store_position_only for: {source}, got: {diags:?}"
     );
 }

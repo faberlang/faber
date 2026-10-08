@@ -234,13 +234,11 @@ fn value_to_toml(value: &Value, span: Span) -> Result<toml::Value, RunnerError> 
         }
         Value::Tensor(tensor) => {
             let tensor = tensor.borrow();
-            let values = tensor
-                .logical_values()
-                .ok_or_else(|| {
-                    tensor.host_read_error(|| {
-                        RunnerError::internal(span, "tensor toml layout is invalid")
-                    })
-                })?;
+            let values = tensor.logical_values().ok_or_else(|| {
+                tensor.host_read_error(|| {
+                    RunnerError::internal(span, "tensor toml layout is invalid")
+                })
+            })?;
             let mut out = Vec::with_capacity(values.len());
             for item in &values {
                 out.push(value_to_toml(item, span)?);

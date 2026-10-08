@@ -11,10 +11,10 @@
 //! corrected census, never weakened.
 
 use crate::{
-    MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirDeviceVectorLayout, MirDeviceViewElement,
-    MirDeviceViewLayout,
-    MirLayoutKind, MirLayoutTable, MirScalarLayout, MirTensorLocusLayout, MirTensorStorageLayout,
-    MirTensorStrideLayout, MirTensorViewLayout, MirType,
+    MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirDeviceVectorLayout,
+    MirDeviceViewElement, MirDeviceViewLayout, MirLayoutKind, MirLayoutTable, MirScalarLayout,
+    MirTensorLocusLayout, MirTensorStorageLayout, MirTensorStrideLayout, MirTensorViewLayout,
+    MirType,
 };
 use radix_types::{IndexExpr, Primitive, Type, TypeTable};
 

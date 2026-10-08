@@ -11,17 +11,17 @@ use super::{
     ERR_INDEXED_VIEW_REQUIRES_INPUT, ERR_INDEXED_VIEW_RETURNS_VACUUM,
     ERR_KERNEL_IO_ELEMENT_MISMATCH, ERR_KERNEL_PARAM_RETURN_MISMATCH,
     ERR_KERNEL_RESOURCE_BINDING_OVERFLOW, ERR_KERNEL_RESULT_TUPLE_REQUIRED,
-    ERR_KERNEL_TENSOR_EXTENT_OPERAND, ERR_KERNEL_TENSOR_EXTENT_U32,
-    ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT, MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput,
+    ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT, ERR_KERNEL_TENSOR_EXTENT_OPERAND,
+    ERR_KERNEL_TENSOR_EXTENT_U32, MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput,
     MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
     MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
     StorageBufferLimitRecord, apply_collection_op_contract, buffer_element_count,
     buffer_element_type, builtin_input_for_index_param, builtin_inputs_for_named_params,
     called_builtins_for_function, collection_op_contract, combined_builtin_dependencies,
     device_view_element_count, device_view_element_count_or_runtime, device_view_element_type,
-    dispatch_size_for_1d_elements, is_vacuum,
-    kernel_has_collection_op, named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
-    require_same_element_type, require_u32_index, result_tuple_count, storage_buffer_limit_error,
+    dispatch_size_for_1d_elements, is_vacuum, kernel_has_collection_op, named_builtin_for_param,
+    param_source_name, reject_kernel_matrix_abi, require_same_element_type, require_u32_index,
+    result_tuple_count, storage_buffer_limit_error,
 };
 
 struct IndexedViewKernelContext<'a> {
@@ -41,7 +41,11 @@ struct IndexedViewKernelContext<'a> {
 fn input_binding(ordinal: usize, output_position: u32) -> Result<u32, MirAbiError> {
     let ordinal = u32::try_from(ordinal)
         .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
-    Ok(if ordinal < output_position { ordinal } else { ordinal + 1 })
+    Ok(if ordinal < output_position {
+        ordinal
+    } else {
+        ordinal + 1
+    })
 }
 
 /// The dense matmul glyph admits BF16 weights only in the first input slot;
@@ -245,7 +249,11 @@ fn append_tensor_extent_resources(
     }
     let mut ordered = std::collections::BTreeSet::new();
     for (local, axis) in collected.reads {
-        let Some(parameter) = function.params.iter().position(|param| param.local == local) else {
+        let Some(parameter) = function
+            .params
+            .iter()
+            .position(|param| param.local == local)
+        else {
             return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
         };
         ordered.insert((parameter, local, axis));
@@ -1126,7 +1134,13 @@ impl MirKernelSignature {
             builtin_inputs: context.builtin_inputs,
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
-            dispatch_size: dispatch_size_for_1d_elements(if output_element_count == super::RUNTIME_SHAPED_ELEMENT_COUNT { 1 } else { output_element_count }),
+            dispatch_size: dispatch_size_for_1d_elements(
+                if output_element_count == super::RUNTIME_SHAPED_ELEMENT_COUNT {
+                    1
+                } else {
+                    output_element_count
+                },
+            ),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
         // PRP-004 U3 (D1-A): reduction/matmul kernels carry a corrected
@@ -1183,7 +1197,8 @@ impl MirKernelSignature {
                             binding == 0,
                         )?;
                     }
-                    let input_element_count = device_view_element_count_or_runtime(input.ty, validation)?;
+                    let input_element_count =
+                        device_view_element_count_or_runtime(input.ty, validation)?;
                     (input_element_ty, input_element_count)
                 };
             input_resources.push(MirKernelResource {
@@ -1227,7 +1242,13 @@ impl MirKernelSignature {
             builtin_inputs: context.builtin_inputs,
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
-            dispatch_size: dispatch_size_for_1d_elements(if output_element_count == super::RUNTIME_SHAPED_ELEMENT_COUNT { 1 } else { output_element_count }),
+            dispatch_size: dispatch_size_for_1d_elements(
+                if output_element_count == super::RUNTIME_SHAPED_ELEMENT_COUNT {
+                    1
+                } else {
+                    output_element_count
+                },
+            ),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
         // PRP-004 U3 (D1-A): reduction/matmul kernels carry a corrected

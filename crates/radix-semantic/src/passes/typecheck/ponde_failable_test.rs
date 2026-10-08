@@ -12,9 +12,7 @@ const PARAMS: &str = "varia tensor<f32, [4]> t ← vacua\n";
 #[test]
 fn ponde_runtime_index_outside_main_without_a_handler_is_rejected() {
     test_support::assert_rejects_with_issue(
-        &format!(
-            "functio put(numerus i) → vacuum {{\n    {PARAMS}    t.ponde([i], 2.0)\n}}\n"
-        ),
+        &format!("functio put(numerus i) → vacuum {{\n    {PARAMS}    t.ponde([i], 2.0)\n}}\n"),
         "failable_call_requires_handler",
     );
 }

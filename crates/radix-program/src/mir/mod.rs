@@ -666,12 +666,12 @@ pub fn imported_entry_facts(
 }
 
 pub use routes::FmirImageRouteDecision;
-pub use routes::with_interpreted_bound_package_mir;
 /// Generated fmir-bin runner crates consume this public API through faber's
 /// re-export (`faber_cli::package::run_fmir_image_bytes_with_stdio`).
 pub use routes::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "hir-fhir")]
 pub use routes::run_package_mir_from_loaded;
+pub use routes::with_interpreted_bound_package_mir;
 #[allow(unused_imports)]
 pub use routes::{
     PackageRunStats, build_package_mir_artifact, run_package_mir, run_package_mir_artifact,

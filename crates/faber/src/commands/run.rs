@@ -462,10 +462,7 @@ fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
 ) -> Result<(), Vec<Diagnostic>> {
     let stats_requested = stats || stats_file.is_some();
     let metadata = if stats_requested {
-        Some(
-            run_stats::package_metadata(input)
-                .map_err(|diagnostic| vec![*diagnostic])?,
-        )
+        Some(run_stats::package_metadata(input).map_err(|diagnostic| vec![*diagnostic])?)
     } else {
         None
     };

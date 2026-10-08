@@ -380,7 +380,11 @@ impl Walker<'_> {
     fn main_exit(&self, header: usize, exits: &[usize]) -> Option<usize> {
         let size = |exit: usize| self.reach[exit].iter().filter(|r| **r).count();
         let longest = exits.iter().map(|&exit| size(exit)).max()?;
-        let ties: Vec<usize> = exits.iter().copied().filter(|&exit| size(exit) == longest).collect();
+        let ties: Vec<usize> = exits
+            .iter()
+            .copied()
+            .filter(|&exit| size(exit) == longest)
+            .collect();
         ties.iter()
             .copied()
             .find(|exit| self.graph.targets[header].contains(exit))

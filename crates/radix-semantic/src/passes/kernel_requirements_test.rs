@@ -458,10 +458,10 @@ main {}
     let report = target_row(&fixture, "pick", Target::MirMetal);
     assert!(!report.admitted);
     assert!(
-        report
-            .failures
-            .iter()
-            .any(|failure| matches!(failure, KernelRequirementFailure::UnsupportedIntegerRange { .. })),
+        report.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::UnsupportedIntegerRange { .. }
+        )),
         "{:?}",
         report.failures
     );

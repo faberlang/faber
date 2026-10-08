@@ -137,7 +137,11 @@ impl ResidencySlot {
         *self.0.borrow_mut() = Some(Residency {
             token,
             device_current: true,
-            host_current: if host_current { vec![0..usize::MAX] } else { Vec::new() },
+            host_current: if host_current {
+                vec![0..usize::MAX]
+            } else {
+                Vec::new()
+            },
             hook,
             error: None,
         });
@@ -151,7 +155,10 @@ impl ResidencySlot {
     }
 
     pub(crate) fn take_error(&self) -> Option<RunnerError> {
-        self.0.borrow_mut().as_mut().and_then(|residency| residency.error.take())
+        self.0
+            .borrow_mut()
+            .as_mut()
+            .and_then(|residency| residency.error.take())
     }
 
     /// Host read of `range`: download it once if the device copy is the

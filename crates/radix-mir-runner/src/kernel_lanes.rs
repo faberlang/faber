@@ -16,8 +16,8 @@
 use crate::host::Host;
 use crate::{Runner, RunnerError, RunnerKernelPolicy, Value};
 use radix_lexer::Span;
-use radix_mir::{MirFunctionId, MirKernelBuiltin, MirKernelBuiltinInput, ValidatedMir};
 use radix_mir::MirBlockId;
+use radix_mir::{MirFunctionId, MirKernelBuiltin, MirKernelBuiltinInput, ValidatedMir};
 
 /// Run `function_id`'s device form once for `lane` (`[x, y, z]` global
 /// invocation id).
@@ -54,7 +54,10 @@ pub fn run_device_form_lane<H: Host + ?Sized>(
     let mut remaining = args.iter();
     for param in &function.params {
         let slot = param.local.0 as usize;
-        if let Some(input) = builtin_inputs.iter().find(|input| input.local == param.local) {
+        if let Some(input) = builtin_inputs
+            .iter()
+            .find(|input| input.local == param.local)
+        {
             let axis = match input.builtin {
                 MirKernelBuiltin::GlobalInvocationX => 0,
                 MirKernelBuiltin::GlobalInvocationY => 1,
@@ -74,7 +77,9 @@ pub fn run_device_form_lane<H: Host + ?Sized>(
         }
     }
     if remaining.next().is_some() {
-        return Err(fail("too many arguments for the kernel's parameters".to_owned()));
+        return Err(fail(
+            "too many arguments for the kernel's parameters".to_owned(),
+        ));
     }
 
     let mut runner = Runner::new(program, context, context.types.as_table(), interner, host);

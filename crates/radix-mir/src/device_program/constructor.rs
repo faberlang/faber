@@ -1793,7 +1793,9 @@ fn lane_grid_plan(
         .enumerate()
         .find(|(_, resource)| resource.access == MirKernelResourceAccess::Read)
     else {
-        return Err("lane kernel has no read tensor resource to take the lane domain from".to_owned());
+        return Err(
+            "lane kernel has no read tensor resource to take the lane domain from".to_owned(),
+        );
     };
     let rank = source
         .source_local

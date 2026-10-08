@@ -620,10 +620,7 @@ impl Lowerer<'_> {
             span,
         };
         match (&ty.kind, self.types.get(claimed).clone()) {
-            (
-                radix_syntax::TypeExprKind::Vector(_, width),
-                crate::Type::Vector(element, _),
-            ) => {
+            (radix_syntax::TypeExprKind::Vector(_, width), crate::Type::Vector(element, _)) => {
                 // The short sugar `vf32[4]` parses its width as a one-element
                 // bracket shape; the long form `vector<f32, 4>` as the bare
                 // literal. Both spell the same width.
@@ -648,10 +645,7 @@ impl Lowerer<'_> {
                     },
                 )
             }
-            (
-                radix_syntax::TypeExprKind::Matrix(_, shape),
-                crate::Type::Matrix(element, _),
-            ) => {
+            (radix_syntax::TypeExprKind::Matrix(_, shape), crate::Type::Matrix(element, _)) => {
                 let (rows, cols) = match shape {
                     radix_syntax::FiguraExpr::Tuple(dims) if dims.len() == 2 => (
                         self.construct_literal_extent(&dims[0], span),

@@ -21,8 +21,8 @@ use super::*;
 use crate::host::BufferHost;
 use crate::value::TensorValue;
 use radix_mir::{
-    MirBlock, MirKernelBuiltin, MirKernelBuiltinInput, MirLocal, MirParam, MirStatement,
-    MirTemp, MirTerminator, MirValue,
+    MirBlock, MirKernelBuiltin, MirKernelBuiltinInput, MirLocal, MirParam, MirStatement, MirTemp,
+    MirTerminator, MirValue,
 };
 use radix_types::{IndexExpr, NumericWidth};
 
@@ -143,10 +143,18 @@ fn fixture(
     }
     let mut temps = Vec::new();
     for id in temp_ints {
-        temps.push(MirTemp { id: MirTempId(*id), ty: int, span: span() });
+        temps.push(MirTemp {
+            id: MirTempId(*id),
+            ty: int,
+            span: span(),
+        });
     }
     for id in temp_floats {
-        temps.push(MirTemp { id: MirTempId(*id), ty: float, span: span() });
+        temps.push(MirTemp {
+            id: MirTempId(*id),
+            ty: float,
+            span: span(),
+        });
     }
     temps.sort_by_key(|temp| temp.id.0);
     let function = MirFunction {
@@ -175,17 +183,24 @@ fn fixture(
     Fixture {
         types,
         interner: Interner::new(),
-        program: MirProgram { functions: vec![function] },
+        program: MirProgram {
+            functions: vec![function],
+        },
     }
 }
 
 fn tensor(values: &[f64], shape: &[i64]) -> Value {
     let data = values.iter().map(|v| Value::Float(*v)).collect();
-    Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(data, shape.to_vec()))))
+    Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+        data,
+        shape.to_vec(),
+    ))))
 }
 
 fn contents(value: &Value) -> Vec<f64> {
-    let Value::Tensor(tensor) = value else { panic!("not a tensor") };
+    let Value::Tensor(tensor) = value else {
+        panic!("not a tensor")
+    };
     let tensor = tensor.borrow();
     let data = tensor.data.borrow();
     data.iter()
@@ -212,10 +227,19 @@ fn elementwise_add_runs_per_lane_and_matches_host_form() {
             assign(
                 MirPlace::temp(MirTempId(0)),
                 0,
-                binary(MirBinOp::Add, MirOperand::Place(indexed(0, local(3))), MirOperand::Place(indexed(1, local(3)))),
+                binary(
+                    MirBinOp::Add,
+                    MirOperand::Place(indexed(0, local(3))),
+                    MirOperand::Place(indexed(1, local(3))),
+                ),
                 float,
             ),
-            assign(indexed(2, local(3)), 1, MirValueKind::Operand(temp(0)), float),
+            assign(
+                indexed(2, local(3)),
+                1,
+                MirValueKind::Operand(temp(0)),
+                float,
+            ),
         ]
     });
     let validated = fx.validated();
@@ -240,27 +264,74 @@ fn elementwise_add_runs_per_lane_and_matches_host_form() {
 
 #[test]
 fn rank2_linearized_index_with_tensor_extent_matches_host_form() {
-    let body = |int: MirType, float: MirType| vec![
-        assign(MirPlace::temp(MirTempId(0)), 0, MirValueKind::TensorExtent { tensor: local(1), axis: 1 }, int),
-        assign(MirPlace::temp(MirTempId(1)), 1, binary(MirBinOp::Mul, local(2), temp(0)), int),
-        assign(MirPlace::temp(MirTempId(2)), 2, binary(MirBinOp::Add, temp(1), local(3)), int),
-        assign(MirPlace::temp(MirTempId(3)), 3, MirValueKind::TensorExtent { tensor: local(0), axis: 1 }, int),
-        assign(MirPlace::temp(MirTempId(4)), 4, binary(MirBinOp::Mul, local(2), temp(3)), int),
-        assign(MirPlace::temp(MirTempId(5)), 5, binary(MirBinOp::Add, temp(4), local(3)), int),
-        assign(
-            MirPlace::temp(MirTempId(6)),
-            6,
-            MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(2.0))),
-            float,
-        ),
-        assign(
-            MirPlace::temp(MirTempId(7)),
-            7,
-            binary(MirBinOp::Mul, MirOperand::Place(indexed(0, temp(5))), temp(6)),
-            float,
-        ),
-        assign(indexed(1, temp(2)), 8, MirValueKind::Operand(temp(7)), float),
-    ];
+    let body = |int: MirType, float: MirType| {
+        vec![
+            assign(
+                MirPlace::temp(MirTempId(0)),
+                0,
+                MirValueKind::TensorExtent {
+                    tensor: local(1),
+                    axis: 1,
+                },
+                int,
+            ),
+            assign(
+                MirPlace::temp(MirTempId(1)),
+                1,
+                binary(MirBinOp::Mul, local(2), temp(0)),
+                int,
+            ),
+            assign(
+                MirPlace::temp(MirTempId(2)),
+                2,
+                binary(MirBinOp::Add, temp(1), local(3)),
+                int,
+            ),
+            assign(
+                MirPlace::temp(MirTempId(3)),
+                3,
+                MirValueKind::TensorExtent {
+                    tensor: local(0),
+                    axis: 1,
+                },
+                int,
+            ),
+            assign(
+                MirPlace::temp(MirTempId(4)),
+                4,
+                binary(MirBinOp::Mul, local(2), temp(3)),
+                int,
+            ),
+            assign(
+                MirPlace::temp(MirTempId(5)),
+                5,
+                binary(MirBinOp::Add, temp(4), local(3)),
+                int,
+            ),
+            assign(
+                MirPlace::temp(MirTempId(6)),
+                6,
+                MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(2.0))),
+                float,
+            ),
+            assign(
+                MirPlace::temp(MirTempId(7)),
+                7,
+                binary(
+                    MirBinOp::Mul,
+                    MirOperand::Place(indexed(0, temp(5))),
+                    temp(6),
+                ),
+                float,
+            ),
+            assign(
+                indexed(1, temp(2)),
+                8,
+                MirValueKind::Operand(temp(7)),
+                float,
+            ),
+        ]
+    };
     let mut fx = fixture(&[2, 3], 2, &[6, 7], &[0, 1, 2, 3, 4, 5], body);
     // The first scalar parameter is `y` (local 2), the second `x` (local 3).
     fx.program.functions[0].params.truncate(4);

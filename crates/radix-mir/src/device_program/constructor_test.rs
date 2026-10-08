@@ -1230,38 +1230,90 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
     let local = |id: u32| MirOperand::Place(MirPlace::local(MirLocalId(id)));
     let temp = |id: u32| MirOperand::Temp(MirTempId(id));
     let binary = |op, lhs, rhs| MirValueKind::Binary { op, lhs, rhs };
-    let temps: Vec<MirTemp> = [(0, u32t), (1, u32t), (2, u32t), (3, boolean), (4, u32t), (5, u32t), (6, u32t), (7, float)]
-        .into_iter()
-        .map(|(id, ty)| MirTemp {
-            id: MirTempId(id),
-            ty,
-            span: span(),
-        })
-        .collect();
+    let temps: Vec<MirTemp> = [
+        (0, u32t),
+        (1, u32t),
+        (2, u32t),
+        (3, boolean),
+        (4, u32t),
+        (5, u32t),
+        (6, u32t),
+        (7, float),
+    ]
+    .into_iter()
+    .map(|(id, ty)| MirTemp {
+        id: MirTempId(id),
+        ty,
+        span: span(),
+    })
+    .collect();
     let index = |base: u32, at: MirOperand| MirPlace {
         base: crate::MirPlaceBase::Local(MirLocalId(base)),
         projections: vec![crate::MirProjection::Index(at)],
     };
     let entry = vec![
-        lane_assign(MirPlace::temp(MirTempId(0)), 0, MirValueKind::TensorExtent { tensor: local(0), axis: 0 }, u32t),
-        lane_assign(MirPlace::temp(MirTempId(1)), 1, MirValueKind::TensorExtent { tensor: local(0), axis: 1 }, u32t),
-        lane_assign(MirPlace::temp(MirTempId(2)), 2, binary(MirBinOp::Mul, temp(0), temp(1)), u32t),
-        lane_assign(MirPlace::temp(MirTempId(3)), 3, binary(MirBinOp::Lt, local(2), temp(2)), boolean),
+        lane_assign(
+            MirPlace::temp(MirTempId(0)),
+            0,
+            MirValueKind::TensorExtent {
+                tensor: local(0),
+                axis: 0,
+            },
+            u32t,
+        ),
+        lane_assign(
+            MirPlace::temp(MirTempId(1)),
+            1,
+            MirValueKind::TensorExtent {
+                tensor: local(0),
+                axis: 1,
+            },
+            u32t,
+        ),
+        lane_assign(
+            MirPlace::temp(MirTempId(2)),
+            2,
+            binary(MirBinOp::Mul, temp(0), temp(1)),
+            u32t,
+        ),
+        lane_assign(
+            MirPlace::temp(MirTempId(3)),
+            3,
+            binary(MirBinOp::Lt, local(2), temp(2)),
+            boolean,
+        ),
     ];
     let body = vec![
-        lane_assign(MirPlace::temp(MirTempId(4)), 4, binary(MirBinOp::Div, local(2), temp(1)), u32t),
-        lane_assign(MirPlace::temp(MirTempId(5)), 5, binary(MirBinOp::Mod, local(2), temp(1)), u32t),
-        lane_assign(MirPlace::temp(MirTempId(6)), 6, binary(MirBinOp::Add, temp(4), temp(5)), u32t),
-        lane_assign(MirPlace::temp(MirTempId(7)), 7, MirValueKind::Operand(MirOperand::Place(index(0, local(2)))), float),
+        lane_assign(
+            MirPlace::temp(MirTempId(4)),
+            4,
+            binary(MirBinOp::Div, local(2), temp(1)),
+            u32t,
+        ),
+        lane_assign(
+            MirPlace::temp(MirTempId(5)),
+            5,
+            binary(MirBinOp::Mod, local(2), temp(1)),
+            u32t,
+        ),
+        lane_assign(
+            MirPlace::temp(MirTempId(6)),
+            6,
+            binary(MirBinOp::Add, temp(4), temp(5)),
+            u32t,
+        ),
+        lane_assign(
+            MirPlace::temp(MirTempId(7)),
+            7,
+            MirValueKind::Operand(MirOperand::Place(index(0, local(2)))),
+            float,
+        ),
         lane_assign(index(1, local(2)), 8, MirValueKind::Operand(temp(7)), float),
     ];
     let block = |id: u32, statements, kind| MirBlock {
         id: MirBlockId(id),
         statements,
-        terminator: MirTerminator {
-            kind,
-            span: span(),
-        },
+        terminator: MirTerminator { kind, span: span() },
         span: span(),
     };
     let names = [
@@ -1293,7 +1345,11 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
             param(1, tensor, MirParamMode::MutRef),
             param(2, u32t, MirParamMode::Lane),
         ],
-        locals: vec![local_decl(0, tensor, false), local_decl(1, tensor, true), local_decl(2, u32t, false)],
+        locals: vec![
+            local_decl(0, tensor, false),
+            local_decl(1, tensor, true),
+            local_decl(2, u32t, false),
+        ],
         temps,
         blocks: vec![
             block(
@@ -1318,12 +1374,13 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
     let validated = validated(&types, vec![function]);
 
     // The ABI signature synthesis accepts the shape: inputs, output, builtin.
-    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-        &validated.program().functions[0],
-        validated.validation(),
-        &interner,
-    )
-    .expect("the lane-form shape has an ABI signature");
+    let signature =
+        crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            &validated.program().functions[0],
+            validated.validation(),
+            &interner,
+        )
+        .expect("the lane-form shape has an ABI signature");
     assert_eq!(signature.builtin_inputs.len(), 1);
     assert_eq!(signature.builtin_inputs[0].local, MirLocalId(2));
 
@@ -1413,7 +1470,11 @@ fn lane_copy_with_extent_reads(reads: &[(u32, u32)]) -> (TypeTable, Interner, Mi
             param(1, tensor, MirParamMode::MutRef),
             param(2, u32t, MirParamMode::Lane),
         ],
-        locals: vec![local_decl(0, tensor, false), local_decl(1, tensor, true), local_decl(2, u32t, false)],
+        locals: vec![
+            local_decl(0, tensor, false),
+            local_decl(1, tensor, true),
+            local_decl(2, u32t, false),
+        ],
         temps,
         blocks: vec![MirBlock {
             id: MirBlockId(0),
@@ -1439,12 +1500,13 @@ fn lane_copy_with_extent_reads(reads: &[(u32, u32)]) -> (TypeTable, Interner, Mi
 fn lane_signature_slots(reads: &[(u32, u32)]) -> Vec<(u32, MirKernelResourceKind)> {
     let (types, interner, function) = lane_copy_with_extent_reads(reads);
     let validated = validated(&types, vec![function]);
-    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-        &validated.program().functions[0],
-        validated.validation(),
-        &interner,
-    )
-    .expect("the lane-form shape has an ABI signature");
+    let signature =
+        crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            &validated.program().functions[0],
+            validated.validation(),
+            &interner,
+        )
+        .expect("the lane-form shape has an ABI signature");
     let mut slots: Vec<(u32, MirKernelResourceKind)> = signature
         .resources()
         .map(|resource| (resource.binding, resource.kind))
@@ -1455,7 +1517,9 @@ fn lane_signature_slots(reads: &[(u32, u32)]) -> Vec<(u32, MirKernelResourceKind
 
 /// Parameter order spec for [`lane_signature_bindings`]: `i` input tensor,
 /// `m` `mut` output tensor, `s` f32 scalar. A Lane parameter always follows.
-fn lane_signature_bindings(order: &str) -> Vec<(Option<String>, u32, crate::abi::MirKernelResourceRole)> {
+fn lane_signature_bindings(
+    order: &str,
+) -> Vec<(Option<String>, u32, crate::abi::MirKernelResourceRole)> {
     let mut types = TypeTable::new();
     let mut interner = Interner::new();
     let tensor = rank2_tensor_ty(&mut types, [7, 5]);
@@ -1479,7 +1543,13 @@ fn lane_signature_bindings(order: &str) -> Vec<(Option<String>, u32, crate::abi:
             mode,
             span: span(),
         });
-        locals.push(MirLocal { id: MirLocalId(id), name: None, ty, mutable, span: span() });
+        locals.push(MirLocal {
+            id: MirLocalId(id),
+            name: None,
+            ty,
+            mutable,
+            span: span(),
+        });
     }
     let lane_id = order.len() as u32;
     params.push(MirParam {
@@ -1489,7 +1559,13 @@ fn lane_signature_bindings(order: &str) -> Vec<(Option<String>, u32, crate::abi:
         mode: MirParamMode::Lane,
         span: span(),
     });
-    locals.push(MirLocal { id: MirLocalId(lane_id), name: None, ty: u32t, mutable: false, span: span() });
+    locals.push(MirLocal {
+        id: MirLocalId(lane_id),
+        name: None,
+        ty: u32t,
+        mutable: false,
+        span: span(),
+    });
     let fn_name = interner.intern("lane_order");
     let function = MirFunction {
         id: MirFunctionId(1),
@@ -1501,7 +1577,10 @@ fn lane_signature_bindings(order: &str) -> Vec<(Option<String>, u32, crate::abi:
         blocks: vec![MirBlock {
             id: MirBlockId(0),
             statements: Vec::new(),
-            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: span() },
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: span(),
+            },
             span: span(),
         }],
         return_ty: vacuum,
@@ -1512,16 +1591,23 @@ fn lane_signature_bindings(order: &str) -> Vec<(Option<String>, u32, crate::abi:
         span: span(),
     };
     let validated = validated(&types, vec![function]);
-    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-        &validated.program().functions[0],
-        validated.validation(),
-        &interner,
-    )
-    .expect("the lane-form shape has an ABI signature");
+    let signature =
+        crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            &validated.program().functions[0],
+            validated.validation(),
+            &interner,
+        )
+        .expect("the lane-form shape has an ABI signature");
     // Binding order; each entry names its source parameter.
     signature
         .resources_by_binding()
-        .map(|resource| (resource.source_name.clone(), resource.binding, resource.role))
+        .map(|resource| {
+            (
+                resource.source_name.clone(),
+                resource.binding,
+                resource.role,
+            )
+        })
         .collect()
 }
 
@@ -1534,7 +1620,11 @@ fn assert_declared_order(order: &str) {
         .chars()
         .enumerate()
         .map(|(index, kind)| {
-            (Some(format!("p{index}")), index as u32, if kind == 'm' { Output } else { Input })
+            (
+                Some(format!("p{index}")),
+                index as u32,
+                if kind == 'm' { Output } else { Input },
+            )
         })
         .collect();
     assert_eq!(got, want, "order `{order}`");
@@ -1576,23 +1666,45 @@ fn tensor_extent_reads_become_trailing_count_one_extent_resources() {
     let (types, interner, function) =
         lane_copy_with_extent_reads(&[(1, 1), (0, 1), (0, 0), (0, 0)]);
     let validated = validated(&types, vec![function]);
-    let signature = crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-        &validated.program().functions[0],
-        validated.validation(),
-        &interner,
-    )
-    .expect("signature");
+    let signature =
+        crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            &validated.program().functions[0],
+            validated.validation(),
+            &interner,
+        )
+        .expect("signature");
     let mut resources: Vec<_> = signature.resources().collect();
     resources.sort_by_key(|resource| resource.binding);
-    let kinds: Vec<_> = resources.iter().map(|resource| (resource.binding, resource.kind)).collect();
+    let kinds: Vec<_> = resources
+        .iter()
+        .map(|resource| (resource.binding, resource.kind))
+        .collect();
     assert_eq!(
         kinds,
         vec![
             (0, MirKernelResourceKind::StorageBuffer),
             (1, MirKernelResourceKind::StorageBuffer),
-            (2, MirKernelResourceKind::TensorAxisExtent { tensor_binding: 0, axis: 0 }),
-            (3, MirKernelResourceKind::TensorAxisExtent { tensor_binding: 0, axis: 1 }),
-            (4, MirKernelResourceKind::TensorAxisExtent { tensor_binding: 1, axis: 1 }),
+            (
+                2,
+                MirKernelResourceKind::TensorAxisExtent {
+                    tensor_binding: 0,
+                    axis: 0
+                }
+            ),
+            (
+                3,
+                MirKernelResourceKind::TensorAxisExtent {
+                    tensor_binding: 0,
+                    axis: 1
+                }
+            ),
+            (
+                4,
+                MirKernelResourceKind::TensorAxisExtent {
+                    tensor_binding: 1,
+                    axis: 1
+                }
+            ),
         ]
     );
     for extent in &resources[2..] {
@@ -1612,7 +1724,13 @@ fn repeated_tensor_extent_read_is_one_resource() {
         vec![
             (0, MirKernelResourceKind::StorageBuffer),
             (1, MirKernelResourceKind::StorageBuffer),
-            (2, MirKernelResourceKind::TensorAxisExtent { tensor_binding: 0, axis: 0 }),
+            (
+                2,
+                MirKernelResourceKind::TensorAxisExtent {
+                    tensor_binding: 0,
+                    axis: 0
+                }
+            ),
         ]
     );
 }

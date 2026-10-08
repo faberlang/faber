@@ -35,10 +35,10 @@ use crate::cli::{CliDefault, CliOperand, CliOption, CliType};
 use crate::driver::AnalyzedModule;
 use crate::hir::visit::{HirVisitor, walk_expr, walk_program};
 use crate::hir::{
-    DefId, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget,
-    HirExpression, HirExpressionKind, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode, HirLiteral, HirLocal,
-    HirMethod, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirParamMode, HirPattern,
-    HirRangeKind, HirScribeKind, HirStatement, HirStatementKind, HirStruct, HirTypeParam, HirUnOp,
+    DefId, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget, HirExpression,
+    HirExpressionKind, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode, HirLiteral, HirLocal, HirMethod,
+    HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirParamMode, HirPattern, HirRangeKind,
+    HirScribeKind, HirStatement, HirStatementKind, HirStruct, HirTypeParam, HirUnOp,
 };
 use crate::lexer::{Interner, Span, Symbol};
 use crate::mir::{

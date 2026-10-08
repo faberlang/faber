@@ -411,7 +411,9 @@ fn rejects_rank2_device_view_index_projection_with_non_integer_index() {
     let errors = validate_program(&program, &MirValidationContext::new(&types))
         .expect_err("a non-integer device view index should be invalid");
     assert!(
-        errors.iter().any(|error| error.issue.contains("device_view_index_is_not_integer")),
+        errors
+            .iter()
+            .any(|error| error.issue.contains("device_view_index_is_not_integer")),
         "expected a non-integer device view index error, got {errors:#?}"
     );
 }

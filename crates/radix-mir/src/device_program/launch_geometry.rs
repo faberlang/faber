@@ -258,7 +258,10 @@ fn tiled_matmul(
     };
     let grid = |extent: u64| {
         u32::try_from(extent.div_ceil(tile)).map_err(|_| {
-            GeometryError::new(GEOMETRY_EXTENT_OVERFLOW, vec![("extent", extent.to_string())])
+            GeometryError::new(
+                GEOMETRY_EXTENT_OVERFLOW,
+                vec![("extent", extent.to_string())],
+            )
         })
     };
     Ok(CallGeometry {
@@ -292,7 +295,10 @@ fn finish(
 
 /// A signature carrying only what [`generic_1d_workgroup`] reads: the ABI
 /// default `1x1x1` workgroup and the call's dispatch.
-fn default_signature(unit: &KernelUnit, dispatch_size: MirKernelDispatchSize) -> MirKernelSignature {
+fn default_signature(
+    unit: &KernelUnit,
+    dispatch_size: MirKernelDispatchSize,
+) -> MirKernelSignature {
     let resource = |binding: u32, role: MirKernelResourceRole, access| MirKernelResource {
         group: 0,
         binding,

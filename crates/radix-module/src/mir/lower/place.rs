@@ -189,11 +189,8 @@ impl FunctionBuilder<'_> {
                     span,
                 ),
             };
-            let scaled = self.assign_temp(
-                MirValueKind::Binary { op: MirBinOp::Mul, lhs: linear, rhs: extent },
-                ty,
-                span,
-            );
+            let scaled =
+                self.assign_temp(MirValueKind::Binary { op: MirBinOp::Mul, lhs: linear, rhs: extent }, ty, span);
             linear = self.assign_temp(MirValueKind::Binary { op: MirBinOp::Add, lhs: scaled, rhs: index }, ty, span);
         }
         Some(linear)

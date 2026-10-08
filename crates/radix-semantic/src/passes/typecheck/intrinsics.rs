@@ -622,7 +622,10 @@ pub(super) fn check_intrinsic_method_call(
                         });
                     match range {
                         Some((_, super::tensor_index::StaticIndexRange::InRange)) => {}
-                        Some((index, range @ super::tensor_index::StaticIndexRange::OutOfRange { .. })) => {
+                        Some((
+                            index,
+                            range @ super::tensor_index::StaticIndexRange::OutOfRange { .. },
+                        )) => {
                             super::tensor_index::report_static_index_oob(checker, &index, &range);
                         }
                         _ => {

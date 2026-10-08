@@ -36,9 +36,6 @@ mod format_corpus_test;
 #[cfg(test)]
 #[path = "format_test.rs"]
 pub(crate) mod format_test;
-#[cfg(test)]
-#[path = "typed_zero_format_test.rs"]
-mod typed_zero_format_test;
 pub mod host;
 pub(crate) mod init;
 mod model;
@@ -61,6 +58,9 @@ mod test_stats;
 #[cfg(all(feature = "runner", test))]
 #[path = "test_stats_test.rs"]
 mod test_stats_test;
+#[cfg(test)]
+#[path = "typed_zero_format_test.rs"]
+mod typed_zero_format_test;
 
 use crate::cli::Command;
 use clap::Parser;

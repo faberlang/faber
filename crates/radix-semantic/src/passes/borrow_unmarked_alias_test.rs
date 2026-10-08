@@ -41,11 +41,15 @@ fn assert_rejects(source: &str, expected: &str) {
 const V3: &str = "class V3 {\n    var f64 x = 0.0\n    fn bump() → void {\n        self.x ← self.x + 1.0\n    }\n}\n";
 
 fn list_fn(mode: &str, body: &str) -> String {
-    format!("fn f({mode}list<int> xs) → void {{\n{body}\n}}\nmain {{\n    var list<int> a ← [1, 2]\n    f(a)\n}}\n")
+    format!(
+        "fn f({mode}list<int> xs) → void {{\n{body}\n}}\nmain {{\n    var list<int> a ← [1, 2]\n    f(a)\n}}\n"
+    )
 }
 
 fn obj_fn(mode: &str, body: &str) -> String {
-    format!("{V3}fn f({mode}V3 v) → void {{\n{body}\n}}\nmain {{\n    var V3 a ← V3 {{ x = 1.0 }}\n    f(a)\n}}\n")
+    format!(
+        "{V3}fn f({mode}V3 v) → void {{\n{body}\n}}\nmain {{\n    var V3 a ← V3 {{ x = 1.0 }}\n    f(a)\n}}\n"
+    )
 }
 
 #[test]
@@ -75,7 +79,9 @@ fn list_alias_mutating_method_is_rejected() {
 fn passing_a_list_alias_to_a_mut_param_is_rejected() {
     let helper = "fn g(mut list<int> zs) → void {\n    zs[0] ← 9\n}\n";
     let src = |mode: &str, arg: &str| {
-        format!("{helper}fn f({mode}list<int> xs) → void {{\n    var list<int> ys ← xs\n    g({arg})\n}}\nmain {{\n    var list<int> a ← [1, 2]\n    f(a)\n}}\n")
+        format!(
+            "{helper}fn f({mode}list<int> xs) → void {{\n    var list<int> ys ← xs\n    g({arg})\n}}\nmain {{\n    var list<int> a ← [1, 2]\n    f(a)\n}}\n"
+        )
     };
     assert_rejects(&src("", "ys"), SECOND);
     assert_accepts(&src("mut ", "ys"));
@@ -84,7 +90,9 @@ fn passing_a_list_alias_to_a_mut_param_is_rejected() {
 #[test]
 fn passing_an_unmarked_list_param_to_a_mut_param_is_rejected() {
     let src = |mode: &str| {
-        format!("fn g(mut list<int> zs) → void {{\n    zs[0] ← 9\n}}\nfn f({mode}list<int> xs) → void {{\n    g(xs)\n}}\nmain {{\n    var list<int> a ← [1, 2]\n    f(a)\n}}\n")
+        format!(
+            "fn g(mut list<int> zs) → void {{\n    zs[0] ← 9\n}}\nfn f({mode}list<int> xs) → void {{\n    g(xs)\n}}\nmain {{\n    var list<int> a ← [1, 2]\n    f(a)\n}}\n"
+        )
     };
     assert_rejects(&src(""), SECOND);
     assert_accepts(&src("mut "));
@@ -93,7 +101,9 @@ fn passing_an_unmarked_list_param_to_a_mut_param_is_rejected() {
 #[test]
 fn map_alias_index_store_is_rejected() {
     let src = |mode: &str| {
-        format!("fn f({mode}map<string, int> m) → void {{\n    var map<string, int> n ← m\n    n[\"a\"] ← 9\n}}\nmain {{\n    var map<string, int> a ← {{ \"a\": 1 }}\n    f(a)\n}}\n")
+        format!(
+            "fn f({mode}map<string, int> m) → void {{\n    var map<string, int> n ← m\n    n[\"a\"] ← 9\n}}\nmain {{\n    var map<string, int> a ← {{ \"a\": 1 }}\n    f(a)\n}}\n"
+        )
     };
     assert_rejects(&src(""), SECOND);
     assert_accepts(&src("mut "));
@@ -123,7 +133,9 @@ fn object_alias_mutating_method_is_rejected() {
 #[test]
 fn object_field_alias_store_is_rejected() {
     let src = |mode: &str| {
-        format!("class Inner {{\n    var int n = 0\n}}\nclass Outer {{\n    var Inner inner = Inner {{}}\n}}\nfn f({mode}Outer o) → void {{\n    var Inner i ← o.inner\n    i.n ← 3\n}}\nmain {{\n    var Outer a ← Outer {{}}\n    f(a)\n}}\n")
+        format!(
+            "class Inner {{\n    var int n = 0\n}}\nclass Outer {{\n    var Inner inner = Inner {{}}\n}}\nfn f({mode}Outer o) → void {{\n    var Inner i ← o.inner\n    i.n ← 3\n}}\nmain {{\n    var Outer a ← Outer {{}}\n    f(a)\n}}\n"
+        )
     };
     assert_rejects(&src(""), SECOND);
     assert_accepts(&src("mut "));

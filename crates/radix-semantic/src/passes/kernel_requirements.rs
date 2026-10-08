@@ -1382,13 +1382,15 @@ impl BodyFacts<'_> {
             if !constant(&range.minimum).is_some_and(|minimum| minimum >= 0) || !bounded {
                 return None;
             }
-            let stride = dims[axis + 1..].iter().fold(KernelRangeExpr::Constant(1), |acc, dim| {
-                let extent = match evaluate_index_dimension(*dim, self.types) {
-                    Ok(Some(extent)) => KernelRangeExpr::Constant(i128::from(extent)),
-                    _ => KernelRangeExpr::Shape(*dim),
-                };
-                multiply(acc, extent)
-            });
+            let stride = dims[axis + 1..]
+                .iter()
+                .fold(KernelRangeExpr::Constant(1), |acc, dim| {
+                    let extent = match evaluate_index_dimension(*dim, self.types) {
+                        Ok(Some(extent)) => KernelRangeExpr::Constant(i128::from(extent)),
+                        _ => KernelRangeExpr::Shape(*dim),
+                    };
+                    multiply(acc, extent)
+                });
             maximum_index = add(maximum_index, multiply(range.maximum.clone(), stride));
         }
         Some(AbstractRange(Some(KernelValueRange {

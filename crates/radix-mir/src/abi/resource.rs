@@ -137,7 +137,10 @@ pub enum MirKernelResourceKind {
     /// storage-buffer resource; `axis` is the extent's axis in that tensor.
     /// Distinct from [`Self::RuntimeExtent`], which is the whole-dispatch
     /// guard count and carries no tensor identity.
-    TensorAxisExtent { tensor_binding: u32, axis: u32 },
+    TensorAxisExtent {
+        tensor_binding: u32,
+        axis: u32,
+    },
 }
 
 impl MirKernelResourceKind {
@@ -690,9 +693,7 @@ pub(crate) fn device_view_element_count_or_runtime(
     validation: &MirValidationContext<'_>,
 ) -> Result<u64, MirAbiError> {
     match device_view_element_count(ty, validation) {
-        Err(error) if error.message == ERR_NON_LITERAL_DIMS => {
-            Ok(RUNTIME_SHAPED_ELEMENT_COUNT)
-        }
+        Err(error) if error.message == ERR_NON_LITERAL_DIMS => Ok(RUNTIME_SHAPED_ELEMENT_COUNT),
         other => other,
     }
 }
@@ -709,17 +710,13 @@ pub(crate) fn device_view_element_count_from_shape(
                 match validation.types.get_index(dim) {
                     IndexExpr::Literal(count) => product = product.saturating_mul(*count),
                     _ => {
-                        return Err(MirAbiError::new(
-                            ERR_NON_LITERAL_DIMS,
-                        ));
+                        return Err(MirAbiError::new(ERR_NON_LITERAL_DIMS));
                     }
                 }
             }
             Ok(product)
         }
-        _ => Err(MirAbiError::new(
-            ERR_NON_LITERAL_DIMS,
-        )),
+        _ => Err(MirAbiError::new(ERR_NON_LITERAL_DIMS)),
     }
 }
 

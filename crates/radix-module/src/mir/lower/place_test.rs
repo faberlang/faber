@@ -87,7 +87,10 @@ fn pick(tf32[2, _, 5] input, mut tf32[2, _, 5] output, u32 z, u32 y, u32 x) → 
 "#,
     );
     assert!(dump.contains("extent _1 axis 1"), "missing runtime axis-1 extent: {dump}");
-    assert!(!dump.contains("axis 2") && !dump.contains("axis 0"), "literal axes must not read an extent: {dump}");
+    assert!(
+        !dump.contains("axis 2") && !dump.contains("axis 0"),
+        "literal axes must not read an extent: {dump}"
+    );
     assert!(dump.contains("* const int 5"), "literal axis-2 stride: {dump}");
 }
 

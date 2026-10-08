@@ -153,7 +153,8 @@ fn existing_rows_gain_the_reduction_owner_and_keep_their_old_one() {
 fn legacy_reduction_heads_are_reduction_operator_only() {
     // 4be221b70: `summa`, `maxima`, `minima` retired their expression-introducer owner.
     for text in ["summa", "maxima", "minima"] {
-        let spec = lookup_keyword_spec(text).unwrap_or_else(|| panic!("'{text}' needs a registry row"));
+        let spec =
+            lookup_keyword_spec(text).unwrap_or_else(|| panic!("'{text}' needs a registry row"));
         let KeywordScope::Contextual(owners) = spec.scope else {
             panic!("'{text}' must be contextual");
         };

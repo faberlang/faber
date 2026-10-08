@@ -4738,21 +4738,30 @@ fn device_view_linear_read_program_typed(
             source: None,
             name: None,
             params: vec![],
-            locals: vec![local(0, tensor_ty), local(1, index_ty), local(2, element_ty)],
+            locals: vec![
+                local(0, tensor_ty),
+                local(1, index_ty),
+                local(2, element_ty),
+            ],
             temps: vec![],
             blocks: vec![MirBlock {
                 id: MirBlockId(0),
                 statements: vec![MirStatement {
                     kind: MirStatementKind::Assign {
-                        place: MirPlace { base: MirPlaceBase::Local(MirLocalId(2)), projections: vec![] },
+                        place: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(2)),
+                            projections: vec![],
+                        },
                         value: MirValue {
                             id: MirValueId(0),
                             kind: MirValueKind::Operand(MirOperand::Place(MirPlace {
                                 base: MirPlaceBase::Local(MirLocalId(0)),
-                                projections: vec![MirProjection::Index(MirOperand::Place(MirPlace {
-                                    base: MirPlaceBase::Local(MirLocalId(1)),
-                                    projections: vec![],
-                                }))],
+                                projections: vec![MirProjection::Index(MirOperand::Place(
+                                    MirPlace {
+                                        base: MirPlaceBase::Local(MirLocalId(1)),
+                                        projections: vec![],
+                                    },
+                                ))],
                             })),
                             ty: element_ty,
                             span: Span::default(),
@@ -4760,7 +4769,10 @@ fn device_view_linear_read_program_typed(
                     },
                     span: Span::default(),
                 }],
-                terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
                 span: Span::default(),
             }],
             return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
@@ -4779,7 +4791,11 @@ fn device_view_linear_index_validates_for_rank2_and_rank3_storage() {
         let mut types = TypeTable::new();
         let program = device_view_linear_read_program(&mut types, dims);
         let errors = validate(&program, &types);
-        assert!(errors.is_empty(), "rank {} linear device index must validate: {errors:?}", dims.len());
+        assert!(
+            errors.is_empty(),
+            "rank {} linear device index must validate: {errors:?}",
+            dims.len()
+        );
     }
 }
 
@@ -4801,7 +4817,10 @@ fn device_view_index_on_vector_element_view_yields_the_vector_layout() {
     let program =
         device_view_linear_read_program_typed(&mut types, tensor_ty, MirType::semantic(vector));
     let errors = validate(&program, &types);
-    assert!(errors.is_empty(), "vector-element view index must validate: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "vector-element view index must validate: {errors:?}"
+    );
 }
 
 #[test]
@@ -4855,7 +4874,10 @@ fn tensor_extent_valid_axis_passes() {
     let tensor = MirType::semantic(tensor_type(&mut types, Primitive::Fractus, &[4, 6]));
     let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
     for axis in 0..2 {
-        let errors = validate(&tensor_extent_program(&types, tensor, axis, numerus), &types);
+        let errors = validate(
+            &tensor_extent_program(&types, tensor, axis, numerus),
+            &types,
+        );
         assert!(errors.is_empty(), "axis {axis}: {errors:?}");
     }
 }

@@ -4,8 +4,8 @@ use crate::codegen::Target;
 use crate::driver::{AnalyzedModule, Config, Session};
 use crate::mir::lower::lane_form::{LANE_FORM_POST_LOOP_ISSUE, LANE_FORM_SECOND_REGION_ISSUE};
 use crate::mir::{KernelLowering, MirError, MirLoweringOptions, lower_analyzed_unit};
-use radix_mir::MirParamMode;
 use crate::program::analyze_prepared_program_name;
+use radix_mir::MirParamMode;
 use radix_mir::dump::dump_program;
 
 fn english(source: &str) -> String {
@@ -27,7 +27,11 @@ fn lower(source: &str, kernel_lowering: KernelLowering) -> Result<(String, Vec<M
     let options = MirLoweringOptions { kernel_lowering, ..Default::default() };
     lower_analyzed_unit(&unit, options).map(|lowered| {
         let program = lowered.validated.program();
-        let modes = program.functions[0].params.iter().map(|param| param.mode).collect();
+        let modes = program.functions[0]
+            .params
+            .iter()
+            .map(|param| param.mode)
+            .collect();
         (dump_program(program), modes)
     })
 }
@@ -42,7 +46,13 @@ fn blocks_of_f0(dump: &str) -> Vec<String> {
     blocks
         .lines()
         .filter(|line| *line != "}")
-        .map(|line| line.split(": ty#").next().unwrap_or(line).trim_end().to_owned())
+        .map(|line| {
+            line.split(": ty#")
+                .next()
+                .unwrap_or(line)
+                .trim_end()
+                .to_owned()
+        })
         .collect()
 }
 
@@ -95,7 +105,11 @@ fn copy_lowers_to_the_lane_form() {
 #[test]
 fn host_form_of_the_same_kernel_is_unchanged() {
     let (dump, modes) = lower(COPY, KernelLowering::Host).expect("host lowering validates");
-    assert_eq!(modes, [MirParamMode::Owned, MirParamMode::MutRef], "host form has no lane parameter");
+    assert_eq!(
+        modes,
+        [MirParamMode::Owned, MirParamMode::MutRef],
+        "host form has no lane parameter"
+    );
     let expected = [
         "  bb0:",
         "    %0 = runtime collection tensor_shape(_0) -> ty#38",
@@ -211,15 +225,26 @@ fn lane_id_and_grid_arithmetic_are_u32_while_binders_stay_int() {
         .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
         .expect("device lowering interns the u32 word");
     let int_ty = types.primitive(Primitive::Numerus);
-    assert!(matches!(types.get(u32_ty), Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)));
-    let lane = function.params.iter().find(|param| param.mode == MirParamMode::Lane).expect("lane parameter");
+    assert!(matches!(
+        types.get(u32_ty),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+    ));
+    let lane = function
+        .params
+        .iter()
+        .find(|param| param.mode == MirParamMode::Lane)
+        .expect("lane parameter");
     assert_eq!(lane.ty.semantic_id(), u32_ty, "the Lane builtin is the u32 invocation id");
     // %0 %1 extents, %2 product, %3 guard (bool), %4 lane % E1, %5 lane / E1.
     let temp = |index: usize| function.temps[index].ty.semantic_id();
     for index in [0, 1, 2, 4, 5] {
         assert_eq!(temp(index), u32_ty, "temp %{index} runs in the u32 word");
     }
-    let binders: Vec<_> = function.locals.iter().filter(|local| local.name.is_some()).collect();
+    let binders: Vec<_> = function
+        .locals
+        .iter()
+        .filter(|local| local.name.is_some())
+        .collect();
     assert!(
         binders.iter().any(|local| local.ty.semantic_id() == int_ty),
         "the coordinate binders keep their `int` meaning"

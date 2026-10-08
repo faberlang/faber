@@ -27,11 +27,10 @@ use crate::visit::MirVisitor;
 use crate::{CapabilityGap, Lowerability};
 use crate::{
     MirAggregate, MirAggregateKind, MirCollectionOp, MirDeviceViewElement, MirFunction,
-    MirIntrinsic, MirLayoutKind,
-    MirLayoutTable, MirLocal, MirOperand, MirParam, MirPlace, MirPlaceBase, MirProjection,
-    MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTensorLocusLayout,
-    MirTensorStorageLayout, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
-    MirValue, MirValueKind, ValidatedMir,
+    MirIntrinsic, MirLayoutKind, MirLayoutTable, MirLocal, MirOperand, MirParam, MirPlace,
+    MirPlaceBase, MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind,
+    MirTemp, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator, MirTerminatorKind,
+    MirType, MirValidationContext, MirValue, MirValueKind, ValidatedMir,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 
@@ -376,7 +375,8 @@ impl<'a> DeviceSafeClassifier<'a> {
                             ));
                         }
                     } else if let MirDeviceViewElement::Vector(vector) = view.element
-                        && (!is_device_view_vector(vector.width) || !is_device_vector_element(vector.element))
+                        && (!is_device_view_vector(vector.width)
+                            || !is_device_vector_element(vector.element))
                     {
                         self.record_layout(format!(
                             "kernel vector-element device view width {} element {}",

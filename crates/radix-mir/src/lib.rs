@@ -31,7 +31,6 @@ pub mod kernel_module;
 pub mod kernel_plan;
 pub mod lane_op;
 pub mod layout;
-pub mod struct_layout;
 pub mod literal_indexed_access;
 mod local_ty;
 pub mod names;
@@ -41,8 +40,9 @@ pub mod rank2_reduction_readiness;
 pub mod result_use;
 pub mod shader_contract;
 pub mod static_shape_fold;
-pub mod structurize;
 pub mod store_trap;
+pub mod struct_layout;
+pub mod structurize;
 pub mod tensor_expansion;
 pub mod tensor_operation_floor;
 pub mod tensor_operation_parity;
@@ -70,12 +70,12 @@ mod layout_test;
 mod packed_negative_matrix;
 #[cfg(test)]
 mod param_mode_test;
+/// Shared statement/value read analysis for device-program lowering.
+mod read_analysis;
 #[cfg(test)]
 mod struct_layout_test;
 #[cfg(test)]
 mod structurize_test;
-/// Shared statement/value read analysis for device-program lowering.
-mod read_analysis;
 #[cfg(test)]
 mod vector_expand_test;
 #[cfg(test)]
@@ -180,15 +180,10 @@ pub use kernel_plan::{
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,
-    MirDeviceMatrixLayout, MirDeviceVectorLayout, MirDeviceViewElement, MirDeviceViewLayout, MirLayout,
-    MirLayoutError,
-    MirLayoutKind, MirLayoutTable, MirPackedBitOrder, MirPackedNumericFormat,
-    MirPackedNumericLayout, MirScalarLayout, MirTensorLocusLayout, MirTensorStorageLayout,
-    MirTensorStrideLayout, MirTensorViewLayout,
-};
-pub use struct_layout::{
-    MAX_STRUCT_LAYOUT_BYTES, MirStructField, MirStructLayout, StructLayoutRefusal,
-    resolve_struct_layout,
+    MirDeviceMatrixLayout, MirDeviceVectorLayout, MirDeviceViewElement, MirDeviceViewLayout,
+    MirLayout, MirLayoutError, MirLayoutKind, MirLayoutTable, MirPackedBitOrder,
+    MirPackedNumericFormat, MirPackedNumericLayout, MirScalarLayout, MirTensorLocusLayout,
+    MirTensorStorageLayout, MirTensorStrideLayout, MirTensorViewLayout,
 };
 pub use names::{
     MirNames, ascii_literal_identity, external_function_import_name, octeti_literal_identity,
@@ -221,6 +216,10 @@ pub use static_shape_fold::{
     FoldedShapeFact, ShapeFactSource, ShapeFoldError, ShapeFoldKind, ShapeFoldOutcome,
     ShapeFoldReport, ShapeFoldedAdmission, admit_device_shape_materialization, fold_static_shapes,
     fold_validated_device_program,
+};
+pub use struct_layout::{
+    MAX_STRUCT_LAYOUT_BYTES, MirStructField, MirStructLayout, StructLayoutRefusal,
+    resolve_struct_layout,
 };
 pub use tensor_operation_floor::{
     TensorOperationFloorFamily, TensorOperationFloorRow, TensorOperationFloorStatus,

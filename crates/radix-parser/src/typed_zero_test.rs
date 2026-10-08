@@ -25,7 +25,10 @@ fn init_is_construct(source: &str) -> bool {
     let StmtKind::Var(decl) = &program.statements[0].kind else {
         panic!("expected a declaration: {source}");
     };
-    matches!(decl.init.as_ref().map(|e| &e.kind), Some(ExprKind::Construct(_)))
+    matches!(
+        decl.init.as_ref().map(|e| &e.kind),
+        Some(ExprKind::Construct(_))
+    )
 }
 
 #[test]
@@ -37,9 +40,15 @@ fn sugar_zero_requires_empty_braces() {
 
 #[test]
 fn long_form_zero_is_a_value_expression() {
-    assert!(init_is_construct("fixum tensor<f32, [2, 3]> a ← tensor<f32, [2, 3]> {}"));
-    assert!(init_is_construct("fixum vector<f32, 4> v ← vector<f32, 4> {}"));
-    assert!(init_is_construct("fixum matrix<f32, [2, 2]> m ← matrix<f32, [2, 2]> {}"));
+    assert!(init_is_construct(
+        "fixum tensor<f32, [2, 3]> a ← tensor<f32, [2, 3]> {}"
+    ));
+    assert!(init_is_construct(
+        "fixum vector<f32, 4> v ← vector<f32, 4> {}"
+    ));
+    assert!(init_is_construct(
+        "fixum matrix<f32, [2, 2]> m ← matrix<f32, [2, 2]> {}"
+    ));
     // A vector-element tensor.
     assert!(init_is_construct(
         "fixum tensor<vector<f32, 4>, [8]> a ← tensor<vector<f32, 4>, [8]> {}"

@@ -239,7 +239,9 @@ fn scalar_size_align(scalar: MirScalarLayout) -> Result<(u32, u32), StructLayout
         | MirScalarLayout::F16
         | MirScalarLayout::Bf16 => Err(StructLayoutRefusal::NarrowScalar),
         MirScalarLayout::F64 => Err(StructLayoutRefusal::F64),
-        MirScalarLayout::I128 | MirScalarLayout::Magnus => Err(StructLayoutRefusal::UnsupportedField),
+        MirScalarLayout::I128 | MirScalarLayout::Magnus => {
+            Err(StructLayoutRefusal::UnsupportedField)
+        }
     }
 }
 

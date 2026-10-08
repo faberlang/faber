@@ -264,7 +264,9 @@ pub fn validation_with_device_tensor_layouts(types: &TypeTable) -> MirValidation
         };
         let mut handle = MirDeviceViewLayout::device_handle_row_major(MirScalarLayout::F32, view.rank);
         handle.element = view.element;
-        validation.layouts.set_type_layout(ty, MirLayoutKind::DeviceView(handle));
+        validation
+            .layouts
+            .set_type_layout(ty, MirLayoutKind::DeviceView(handle));
     }
     validation
 }

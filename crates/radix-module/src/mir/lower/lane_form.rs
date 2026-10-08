@@ -57,7 +57,11 @@ fn lane_loop(statement: &HirStatement) -> Option<&HirExpression> {
 }
 
 fn tail_lane_loop(expr: &HirExpression) -> Option<&HirExpression> {
-    matches!(&expr.kind, HirExpressionKind::Itera { filum: Some(_), mode: HirIteraMode::Ex, .. }).then_some(expr)
+    matches!(
+        &expr.kind,
+        HirExpressionKind::Itera { filum: Some(_), mode: HirIteraMode::Ex, .. }
+    )
+    .then_some(expr)
 }
 
 impl FunctionBuilder<'_> {
@@ -94,7 +98,10 @@ impl FunctionBuilder<'_> {
             .skip(1)
             .find(|statement| !matches!(statement.kind, HirStatementKind::Tacet | HirStatementKind::Redde(None)));
         let trailing = body.expr.as_deref().filter(|expr| expr.span != first.span);
-        if let Some(span) = after_loop.map(|statement| statement.span).or(trailing.map(|expr| expr.span)) {
+        if let Some(span) = after_loop
+            .map(|statement| statement.span)
+            .or(trailing.map(|expr| expr.span))
+        {
             self.errors.push(MirError {
                 message: "a statement after the top-level `thread lane` loop depends on the whole grid, which \
                           needs a launch split that does not exist yet"
@@ -117,7 +124,8 @@ impl FunctionBuilder<'_> {
 
     /// Whether `expr` is the pre-scanned lane region of this body.
     pub(super) fn is_lane_region(&self, expr: &HirExpression) -> bool {
-        self.lane_region.is_some_and(|region| region.span == expr.span)
+        self.lane_region
+            .is_some_and(|region| region.span == expr.span)
     }
 
     /// Lower the lane region in lane form (see the module docs).
@@ -143,8 +151,10 @@ impl FunctionBuilder<'_> {
             return None;
         };
         if rank == 0 || rank != coordinates.len() {
-            self.errors
-                .push(MirError::unsupported(iter.span, "thread lane loop coordinate count differs from rank"));
+            self.errors.push(MirError::unsupported(
+                iter.span,
+                "thread lane loop coordinate count differs from rank",
+            ));
             return None;
         }
         // Binders keep their `int` meaning to the program (F9 ruling 27); the
@@ -197,8 +207,7 @@ impl FunctionBuilder<'_> {
         let mut remainder = lane.clone();
         let mut values: Vec<Option<MirOperand>> = vec![None; rank];
         for axis in (1..rank).rev() {
-            values[axis] =
-                Some(self.binary_temp(MirBinOp::Mod, remainder.clone(), extents[axis].clone(), word, span));
+            values[axis] = Some(self.binary_temp(MirBinOp::Mod, remainder.clone(), extents[axis].clone(), word, span));
             remainder = self.binary_temp(MirBinOp::Div, remainder, extents[axis].clone(), word, span);
         }
         values[0] = Some(remainder);
@@ -219,20 +228,19 @@ impl FunctionBuilder<'_> {
 
         // Element binder: `v = src[lane]` as an Index place.
         let element_local = self.next_local_id();
-        self.locals.push(MirLocalDecl {
-            id: element_local,
-            name: Some(name),
-            ty: element_ty,
-            mutable: true,
-            span,
-        });
+        self.locals
+            .push(MirLocalDecl { id: element_local, name: Some(name), ty: element_ty, mutable: true, span });
         self.bindings
             .insert(binding, LocalBinding { local: element_local, ty: element_ty });
         let mut read = tensor;
         read.projections.push(MirProjection::Index(lane));
         self.assign(MirPlace::local(element_local), MirOperand::Place(read), element_ty, span);
 
-        self.breakables.push(BreakableContext { perge_target: Some(done_id), rumpe_target: done_id, rumpe_used: false });
+        self.breakables.push(BreakableContext {
+            perge_target: Some(done_id),
+            rumpe_target: done_id,
+            rumpe_used: false,
+        });
         self.visit_block(body);
         self.breakables.pop();
         self.terminate_open_current(MirTerminatorKind::Goto(done_id), span);

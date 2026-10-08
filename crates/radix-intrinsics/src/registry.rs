@@ -259,7 +259,7 @@ macro_rules! intrinsic {
             excess_generic_issue: None,
             value_arity_issue: None,
             failable: false,
-        range_checked_arg: None,
+            range_checked_arg: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, scalar_math $function:ident) => {
@@ -277,7 +277,7 @@ macro_rules! intrinsic {
             excess_generic_issue: None,
             value_arity_issue: None,
             failable: false,
-        range_checked_arg: None,
+            range_checked_arg: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, math $function:ident) => {
@@ -295,7 +295,7 @@ macro_rules! intrinsic {
             excess_generic_issue: None,
             value_arity_issue: None,
             failable: false,
-        range_checked_arg: None,
+            range_checked_arg: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, atomic $op:ident) => {
@@ -311,7 +311,7 @@ macro_rules! intrinsic {
             excess_generic_issue: None,
             value_arity_issue: None,
             failable: false,
-        range_checked_arg: None,
+            range_checked_arg: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, $mir:ident) => {
@@ -327,7 +327,7 @@ macro_rules! intrinsic {
             excess_generic_issue: None,
             value_arity_issue: None,
             failable: false,
-        range_checked_arg: None,
+            range_checked_arg: None,
         }
     };
 }

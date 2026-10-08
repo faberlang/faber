@@ -766,7 +766,10 @@ impl TensorValue {
 
     /// Host read of one backing element: the residency sync point.
     pub(crate) fn read_physical(&self, physical: usize) -> Option<Value> {
-        if !self.residency.ensure_host(physical..physical.saturating_add(1)) {
+        if !self
+            .residency
+            .ensure_host(physical..physical.saturating_add(1))
+        {
             return None;
         }
         self.data.borrow().get(physical).cloned()
@@ -775,7 +778,12 @@ impl TensorValue {
     /// Mark this tensor's storage (and every view of it) device-resident
     /// under `token`. `host_current` says the host copy is also current (an
     /// upload) rather than stale (a kernel result).
-    pub fn mark_device_resident(&self, token: DeviceToken, hook: ResidencyHook, host_current: bool) {
+    pub fn mark_device_resident(
+        &self,
+        token: DeviceToken,
+        hook: ResidencyHook,
+        host_current: bool,
+    ) {
         self.residency.mark(token, hook, host_current);
     }
 

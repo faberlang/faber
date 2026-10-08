@@ -184,9 +184,9 @@ pub use radix_mir::{
 };
 pub use radix_mir::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout, MirDeviceMatrixLayout,
-    MirDeviceVectorLayout, MirDeviceViewElement, MirDeviceViewLayout, MirLayout, MirLayoutError, MirLayoutKind, MirLayoutTable,
-    MirPackedBitOrder, MirPackedNumericFormat, MirPackedNumericLayout, MirScalarLayout, MirTensorLocusLayout,
-    MirTensorStorageLayout, MirTensorStrideLayout, MirTensorViewLayout,
+    MirDeviceVectorLayout, MirDeviceViewElement, MirDeviceViewLayout, MirLayout, MirLayoutError, MirLayoutKind,
+    MirLayoutTable, MirPackedBitOrder, MirPackedNumericFormat, MirPackedNumericLayout, MirScalarLayout,
+    MirTensorLocusLayout, MirTensorStorageLayout, MirTensorStrideLayout, MirTensorViewLayout,
 };
 pub(crate) use radix_mir::{MirGenericBindings, instantiate_existing_generic_type, type_contains_param};
 pub use radix_mir::{

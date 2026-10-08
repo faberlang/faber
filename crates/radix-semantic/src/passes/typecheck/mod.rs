@@ -87,9 +87,6 @@ pub mod call;
 mod call_default_test;
 
 #[cfg(test)]
-#[path = "ponde_failable_test.rs"]
-mod ponde_failable_test;
-#[cfg(test)]
 #[path = "cfa_join_test.rs"]
 mod cfa_join_test;
 pub mod collect;
@@ -115,6 +112,9 @@ mod mutating_intrinsic_test;
 #[cfg(test)]
 #[path = "non_null_mutating_receiver_test.rs"]
 mod non_null_mutating_receiver_test;
+#[cfg(test)]
+#[path = "ponde_failable_test.rs"]
+mod ponde_failable_test;
 #[cfg(test)]
 #[path = "register_shape_finalize_test.rs"]
 mod register_shape_finalize_test;

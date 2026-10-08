@@ -29,7 +29,8 @@ impl Types {
     }
 
     fn f32(&mut self) -> TypeId {
-        self.table.sized_numeric(Primitive::Fractus, NumericWidth::F32)
+        self.table
+            .sized_numeric(Primitive::Fractus, NumericWidth::F32)
     }
 
     fn sized(&mut self, prim: Primitive, width: NumericWidth) -> TypeId {
@@ -256,8 +257,14 @@ fn declaration_order_not_symbol_order() {
     let (f, i) = (t.f32(), t.i32());
     let layout = resolve(&t, &[i, f]).expect("layout");
     assert_eq!(layout.fields[0].name, sym(0));
-    assert_eq!(layout.fields[0].element, scalar_element(MirScalarLayout::I32));
-    assert_eq!(layout.fields[1].element, scalar_element(MirScalarLayout::F32));
+    assert_eq!(
+        layout.fields[0].element,
+        scalar_element(MirScalarLayout::I32)
+    );
+    assert_eq!(
+        layout.fields[1].element,
+        scalar_element(MirScalarLayout::F32)
+    );
 }
 
 // --- Refusal rows: one named refusal each ------------------------------------
