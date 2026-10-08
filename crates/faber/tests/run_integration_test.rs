@@ -2594,30 +2594,45 @@ main {
 }
 "#;
 
+/// The default device route over a kernel program is host-dependent: a host
+/// with an admitted device (Metal) runs the kernel and must print exactly the
+/// CPU device's result; a host without one refuses with exit 1 and prints no
+/// result. It never prints a different result.
+fn assert_default_route_matches_cpu_or_refuses(stdout: &str, stderr: &str, code: Option<i32>) {
+    match code {
+        Some(0) => {
+            // The device route announces the selected backend ahead of the
+            // program output.
+            let program: Vec<&str> = stdout
+                .lines()
+                .filter(|line| !line.starts_with("device: "))
+                .collect();
+            assert_eq!(
+                program,
+                ["2.0"],
+                "the default route must equal the CPU result"
+            );
+        }
+        Some(1) => assert!(
+            !stdout.contains("2.0"),
+            "a refused default route prints no kernel result:\n{stdout}\n{stderr}"
+        ),
+        other => panic!("default route exit {other:?}:\n{stdout}\n{stderr}"),
+    }
+}
+
 #[test]
-fn run_kernel_file_is_refused_by_default_and_runs_on_the_cpu_device() {
+fn run_kernel_file_default_route_matches_cpu_or_refuses_and_runs_on_the_cpu_device() {
     let file = write_single_file("run-kernel-cpu-device", KERNEL_SOURCE);
     let path = file.to_str().expect("utf8 source path");
 
     // Default route: `auto` over a kernel package takes the device session and
-    // never the CPU (it fails closed with no admitted device, or on the device
-    // itself), so the kernel does not run with its sequential meaning.
+    // never the CPU: a host with an admitted device runs the kernel there (the
+    // same result), a host without one refuses.
     let (stdout, stderr, status) = run_faber_status(&["run", path]);
-    assert_eq!(
-        status.code(),
-        Some(1),
-        "the default route does not run a kernel on the CPU:\n{stderr}"
-    );
-    assert!(
-        !stdout.contains("2.0"),
-        "the default route must not produce the CPU kernel result:\n{stdout}"
-    );
-    let (_, auto_stderr, auto_status) = run_faber_status(&["run", "--device", "auto", path]);
-    assert_eq!(
-        auto_status.code(),
-        Some(1),
-        "`--device auto` does not run a kernel on the CPU:\n{auto_stderr}"
-    );
+    assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "auto", path]);
+    assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
 
     // CPU device: the kernel runs with its sequential meaning.
     let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
@@ -2629,20 +2644,12 @@ fn run_kernel_file_is_refused_by_default_and_runs_on_the_cpu_device() {
 }
 
 #[test]
-fn run_kernel_package_runs_on_the_cpu_device_by_flag_manifest_and_with_stats() {
+fn run_kernel_package_default_route_and_cpu_device_by_flag_manifest_and_with_stats() {
     let package = write_basic_package("run-kernel-package-cpu-device", KERNEL_SOURCE);
     let path = package.to_str().expect("utf8 package path");
 
     let (stdout, stderr, status) = run_faber_status(&["run", path]);
-    assert_eq!(
-        status.code(),
-        Some(1),
-        "the default route does not run a kernel on the CPU:\n{stderr}"
-    );
-    assert!(
-        !stdout.contains("2.0"),
-        "the default route must not produce the CPU kernel result:\n{stdout}"
-    );
+    assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
 
     let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
     assert!(
@@ -2680,10 +2687,8 @@ fn run_kernel_package_runs_on_the_cpu_device_by_flag_manifest_and_with_stats() {
         "a manifest `cpu` device must run the kernel:\n{stderr}"
     );
     assert_eq!(stdout, "2.0\n");
-    let (_, stderr, status) = run_faber_status(&["run", "--device", "auto", path]);
-    assert_eq!(
-        status.code(),
-        Some(1),
-        "`--device auto` overrides the manifest:\n{stderr}"
-    );
+    // `--device auto` overrides the manifest's `cpu`: the device route, so it
+    // matches the CPU result or refuses, never a different result.
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "auto", path]);
+    assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
 }

@@ -455,7 +455,18 @@ pub fn kernel_result_shape(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Option<Vec<u64>> {
-    tensor_param_shape_dims(function.return_ty, validation)
+    tensor_param_shape_dims(function.return_ty, validation).or_else(|| {
+        // A scalar result is a rank-0 value of one element: its shape is `[]`.
+        let layout = validation
+            .layouts
+            .layout_for_type(function.return_ty)
+            .ok()?;
+        matches!(
+            layout.kind,
+            MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar)
+        )
+        .then(Vec::new)
+    })
 }
 
 fn tensor_param_shape_dims(ty: MirType, validation: &MirValidationContext<'_>) -> Option<Vec<u64>> {

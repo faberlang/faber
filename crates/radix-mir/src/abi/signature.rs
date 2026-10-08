@@ -35,17 +35,34 @@ struct IndexedViewKernelContext<'a> {
     /// the emitter agree on it). The positional `input*/output/index` shape
     /// puts the output after every input.
     output_position: u32,
+    /// Declared positions of the further `mut` outputs of a lane-form kernel
+    /// (`extra_outputs`, in declaration order). Empty for every other shape.
+    extra_output_positions: Vec<u32>,
 }
 
-/// Binding index of input `ordinal`, given the output's declared position.
-fn input_binding(ordinal: usize, output_position: u32) -> Result<u32, MirAbiError> {
+/// Binding index of input `ordinal`: the `ordinal`-th declared position that
+/// is not an output position (`output_position` and `extra_output_positions`).
+fn input_binding(
+    ordinal: usize,
+    output_position: u32,
+    extra_output_positions: &[u32],
+) -> Result<u32, MirAbiError> {
     let ordinal = u32::try_from(ordinal)
         .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
-    Ok(if ordinal < output_position {
-        ordinal
-    } else {
-        ordinal + 1
-    })
+    let mut remaining = ordinal;
+    let mut position = 0u32;
+    loop {
+        let is_output = position == output_position || extra_output_positions.contains(&position);
+        if !is_output {
+            if remaining == 0 {
+                return Ok(position);
+            }
+            remaining -= 1;
+        }
+        position = position
+            .checked_add(1)
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
+    }
 }
 
 /// Whether `function` is a lane-form kernel (it carries the compiler-internal
@@ -746,6 +763,7 @@ impl MirKernelSignature {
                     interner,
                     allow_host_owned_tensor_entry,
                     output_position,
+                    extra_output_positions: Vec::new(),
                 },
             );
         }
@@ -775,6 +793,7 @@ impl MirKernelSignature {
                     allow_host_owned_tensor_entry,
                     output_position: u32::try_from(inputs.len())
                         .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                    extra_output_positions: Vec::new(),
                 };
                 if let [input] = inputs {
                     Self::indexed_view_kernel(function, input, output, index, context)
@@ -783,6 +802,7 @@ impl MirKernelSignature {
                         function,
                         inputs,
                         output,
+                        &[],
                         Some(index),
                         context,
                     )
@@ -832,9 +852,14 @@ impl MirKernelSignature {
             .filter(|(_, param)| param.mode == MirParamMode::MutRef)
             .map(|(position, _)| position)
             .collect();
-        let output_position = match mut_positions.as_slice() {
-            [] => declared.len() - 1,
-            [position] => *position,
+        // A lane-form kernel may declare several `mut` outputs: the first is
+        // the output and the rest are `extra_outputs`, each written at its own
+        // lane coordinates. Any other shape keeps the one-output rule.
+        let (output_position, extra_positions): (usize, Vec<usize>) = match mut_positions.as_slice()
+        {
+            [] => (declared.len() - 1, Vec::new()),
+            [position] => (*position, Vec::new()),
+            [first, rest @ ..] if is_lane_form(function) => (*first, rest.to_vec()),
             _ => {
                 return Err(MirAbiError::new(
                     "indexed view kernel declares more than one `mut` output parameter",
@@ -845,9 +870,21 @@ impl MirKernelSignature {
         let inputs: Vec<MirParam> = declared
             .iter()
             .enumerate()
-            .filter(|(position, _)| *position != output_position)
+            .filter(|(position, _)| {
+                *position != output_position && !extra_positions.contains(position)
+            })
             .map(|(_, param)| param.clone())
             .collect();
+        let extra_outputs: Vec<(u32, MirParam)> = extra_positions
+            .iter()
+            .map(|position| {
+                Ok((
+                    u32::try_from(*position)
+                        .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                    declared[*position].clone(),
+                ))
+            })
+            .collect::<Result<_, MirAbiError>>()?;
         let builtin_params = &params[builtin_start..];
         let builtin_inputs = builtin_inputs_for_named_params(builtin_params, validation, interner)?;
         let context = IndexedViewKernelContext {
@@ -857,9 +894,18 @@ impl MirKernelSignature {
             allow_host_owned_tensor_entry,
             output_position: u32::try_from(output_position)
                 .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+            extra_output_positions: extra_outputs
+                .iter()
+                .map(|(position, _)| *position)
+                .collect(),
         };
         let single_tensor_input = match inputs.as_slice() {
-            [input] if genus_param_layout(input.ty, validation)?.is_none() => Some(input),
+            [input]
+                if extra_outputs.is_empty()
+                    && genus_param_layout(input.ty, validation)?.is_none() =>
+            {
+                Some(input)
+            }
             _ => None,
         };
         if let Some(input) = single_tensor_input {
@@ -870,6 +916,7 @@ impl MirKernelSignature {
                 function,
                 &inputs,
                 output,
+                &extra_outputs,
                 Some(&builtin_params[0]),
                 context,
             )
@@ -1361,7 +1408,7 @@ impl MirKernelSignature {
             function: function.id,
             input: MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: input_binding(0, context.output_position)?,
+                binding: input_binding(0, context.output_position, &[])?,
                 kind: MirKernelResourceKind::StorageBuffer,
                 role: MirKernelResourceRole::Input,
                 access: MirKernelResourceAccess::Read,
@@ -1409,6 +1456,7 @@ impl MirKernelSignature {
         function: &MirFunction,
         inputs: &[MirParam],
         output: &MirParam,
+        extra_outputs: &[(u32, MirParam)],
         index: Option<&MirParam>,
         context: IndexedViewKernelContext<'_>,
     ) -> Result<Self, MirAbiError> {
@@ -1471,7 +1519,11 @@ impl MirKernelSignature {
             };
             input_resources.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: input_binding(binding, context.output_position)?,
+                binding: input_binding(
+                    binding,
+                    context.output_position,
+                    &context.extra_output_positions,
+                )?,
                 kind: genus.map_or(MirKernelResourceKind::StorageBuffer, |layout| {
                     MirKernelResourceKind::GenusParam {
                         size_bytes: layout.size,
@@ -1493,6 +1545,38 @@ impl MirKernelSignature {
             .ok_or_else(|| MirAbiError::new(ERR_INDEXED_VIEW_REQUIRES_INPUT))?;
         let extra_inputs = input_resources.into_iter().skip(1).collect();
 
+        // Further `mut` outputs of a lane-form kernel, each bound at its
+        // declared position. The dispatch covers the largest output, so no
+        // output's per-output domain is under-filled.
+        let mut extra_output_resources = Vec::with_capacity(extra_outputs.len());
+        let mut dispatch_count = output_element_count;
+        for (position, extra) in extra_outputs {
+            let element_ty = device_view_element_type(
+                extra.ty,
+                validation,
+                context.allow_host_owned_tensor_entry,
+            )?;
+            let element_count = device_view_element_count_or_runtime(extra.ty, validation)?;
+            if dispatch_count == super::RUNTIME_SHAPED_ELEMENT_COUNT
+                || (element_count != super::RUNTIME_SHAPED_ELEMENT_COUNT
+                    && element_count > dispatch_count)
+            {
+                dispatch_count = element_count;
+            }
+            extra_output_resources.push(MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: *position,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty,
+                element_count,
+                source_local: Some(extra.local),
+                source_name: param_source_name(extra, context.interner),
+                reduced_projection: None,
+            });
+        }
+
         let mut signature = Self {
             function: function.id,
             input,
@@ -1509,16 +1593,16 @@ impl MirKernelSignature {
                 source_name: param_source_name(output, context.interner),
                 reduced_projection: None,
             },
-            extra_outputs: Vec::new(),
+            extra_outputs: extra_output_resources,
             accumulation_buffers: Vec::new(),
             builtin_inputs: context.builtin_inputs,
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
             dispatch_size: dispatch_size_for_1d_elements(
-                if output_element_count == super::RUNTIME_SHAPED_ELEMENT_COUNT {
+                if dispatch_count == super::RUNTIME_SHAPED_ELEMENT_COUNT {
                     1
                 } else {
-                    output_element_count
+                    dispatch_count
                 },
             ),
         };
@@ -1608,6 +1692,7 @@ impl MirKernelSignature {
             function,
             &inputs,
             &function.params[output_position],
+            &[],
             None,
             context,
         )

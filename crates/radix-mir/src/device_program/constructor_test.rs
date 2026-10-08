@@ -1892,3 +1892,191 @@ fn kernel_without_tensor_extent_reads_has_no_extent_resources() {
         ]
     );
 }
+
+/// A lane-form kernel may declare several `mut` outputs: the first is the
+/// output, the rest are `extra_outputs`, and every resource binds at its
+/// declared parameter position `(mut a, dom, mut b, lane)` -> 0 / 1 / 2.
+#[test]
+fn lane_form_with_two_mut_outputs_binds_every_resource_at_its_declared_position() {
+    use crate::MirValueKind;
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank1_tensor_ty(&mut types, 8);
+    let u32t = u32_ty(&mut types);
+    let float = f32(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let lane = MirOperand::Place(MirPlace::local(MirLocalId(3)));
+    let index = |base: u32| MirPlace {
+        base: crate::MirPlaceBase::Local(MirLocalId(base)),
+        projections: vec![crate::MirProjection::Index(lane.clone())],
+    };
+    let read = MirValueKind::Operand(MirOperand::Place(index(1)));
+    let body = vec![
+        lane_assign(index(0), 0, read.clone(), float),
+        lane_assign(index(2), 1, read, float),
+    ];
+    let names = ["a", "dom", "b", "lane"].map(|name| interner.intern(name));
+    let param = |id: u32, ty, mode| MirParam {
+        local: MirLocalId(id),
+        name: Some(names[id as usize]),
+        ty,
+        mode,
+        span: span(),
+    };
+    let local_decl = |id: u32, ty, mutable| MirLocal {
+        id: MirLocalId(id),
+        name: None,
+        ty,
+        mutable,
+        span: span(),
+    };
+    let function = MirFunction {
+        id: MirFunctionId(1),
+        source: Some(DefId(1)),
+        name: Some(interner.intern("two_out")),
+        params: vec![
+            param(0, tensor, MirParamMode::MutRef),
+            param(1, tensor, MirParamMode::Ref),
+            param(2, tensor, MirParamMode::MutRef),
+            param(3, u32t, MirParamMode::Lane),
+        ],
+        locals: vec![
+            local_decl(0, tensor, true),
+            local_decl(1, tensor, false),
+            local_decl(2, tensor, true),
+            local_decl(3, u32t, false),
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: body,
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: span(),
+            },
+            span: span(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    };
+    let validated = validated(&types, vec![function]);
+    let signature =
+        crate::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            &validated.program().functions[0],
+            validated.validation(),
+            &interner,
+        )
+        .expect("a lane-form kernel with two `mut` outputs has an ABI signature");
+    assert_eq!(signature.output.binding, 0);
+    assert_eq!(signature.input.binding, 1);
+    assert_eq!(signature.extra_outputs.len(), 1);
+    assert_eq!(signature.extra_outputs[0].binding, 2);
+    assert_eq!(
+        signature.extra_outputs[0].access,
+        MirKernelResourceAccess::Write
+    );
+    assert_eq!(signature.extra_outputs[0].source_local, Some(MirLocalId(2)));
+    assert_eq!(signature.builtin_inputs.len(), 1);
+    assert_eq!(signature.dispatch_size.x, 8);
+}
+
+/// A single-lane kernel `name(tensor x, mut tensor y)`: both slots carry the
+/// declared names `x` and `y`, so two of them collide under the name join.
+fn single_lane_xy_kernel(
+    id: u32,
+    interner: &mut Interner,
+    name: &str,
+    tensor: MirType,
+    float: MirType,
+    vacuum: MirType,
+) -> MirFunction {
+    let read = crate::MirValueKind::Operand(MirOperand::Place(MirPlace {
+        base: crate::MirPlaceBase::Local(MirLocalId(0)),
+        projections: vec![crate::MirProjection::Index(MirOperand::Constant(
+            crate::MirConstant::Int(3),
+        ))],
+    }));
+    let store = MirPlace {
+        base: crate::MirPlaceBase::Local(MirLocalId(1)),
+        projections: vec![crate::MirProjection::Index(MirOperand::Constant(
+            crate::MirConstant::Int(5),
+        ))],
+    };
+    let names = ["x", "y"].map(|name| interner.intern(name));
+    let param = |local: u32, mode| MirParam {
+        local: MirLocalId(local),
+        name: Some(names[local as usize]),
+        ty: tensor,
+        mode,
+        span: span(),
+    };
+    let local_decl = |local: u32, mutable| MirLocal {
+        id: MirLocalId(local),
+        name: None,
+        ty: tensor,
+        mutable,
+        span: span(),
+    };
+    MirFunction {
+        id: MirFunctionId(id),
+        source: Some(DefId(id)),
+        name: Some(interner.intern(name)),
+        params: vec![param(0, MirParamMode::Ref), param(1, MirParamMode::MutRef)],
+        locals: vec![local_decl(0, false), local_decl(1, true)],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![lane_assign(store, 0, read, float)],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: span(),
+            },
+            span: span(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    }
+}
+
+/// Two SingleRun kernels that declare the same slot names and shapes own
+/// their slots: the cross-kernel name join belongs to training and
+/// device-resident programs, so four distinct buffers result.
+#[test]
+fn single_run_kernels_with_the_same_slot_names_never_share_a_buffer() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank1_tensor_ty(&mut types, 8);
+    let float = f32(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let k1 = single_lane_xy_kernel(1, &mut interner, "k1", tensor, float, vacuum);
+    let k2 = single_lane_xy_kernel(2, &mut interner, "k2", tensor, float, vacuum);
+    let validated = validated(&types, vec![k1, k2]);
+    let (program, semantics, _steps) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("both kernels materialize");
+    assert_eq!(program.kernels.len(), 2);
+    let ids: BTreeSet<BufferId> = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter().map(|resource| resource.buffer.id))
+        .collect();
+    assert_eq!(ids.len(), 4, "x and y of each kernel are their own buffers");
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the program passes the shared semantic gate");
+}

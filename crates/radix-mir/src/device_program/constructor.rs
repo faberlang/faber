@@ -208,6 +208,9 @@ struct KernelBuild {
 #[derive(Debug, Clone)]
 struct ProgramBuffer {
     id: BufferId,
+    /// The kernel source function that minted this buffer; a SingleRun
+    /// program joins same-named slots only within one function.
+    function: MirFunctionId,
     name: String,
     element_ty: MirType,
     element_count: u64,
@@ -756,6 +759,11 @@ struct KernelBuilder<'a> {
     buffers: Vec<ProgramBuffer>,
     next_buffer_id: u32,
     builds: Vec<KernelBuild>,
+    /// Whether same-named parameter slots of DIFFERENT kernels join one
+    /// buffer. Training and device-resident programs wire kernels through
+    /// shared names; a SingleRun program keys residency on host backings, so
+    /// each kernel owns its slots and a name coincidence is not a join.
+    cross_kernel_name_join: bool,
 }
 
 impl<'a> KernelBuilder<'a> {
@@ -802,6 +810,8 @@ impl<'a> KernelBuilder<'a> {
             buffers: Vec::new(),
             next_buffer_id: 1,
             builds: Vec::new(),
+            cross_kernel_name_join: training.is_some()
+                || companions.iter().any(|entry| entry.device_resident),
         }
     }
 
@@ -867,6 +877,17 @@ impl<'a> KernelBuilder<'a> {
         // elementwise-only body), with the shared contract-shaped emission
         // signature for recipe subchains and the full ABI synthesis for
         // elementwise-only subchains.
+        // A lane-form body is never decomposed: its tensors are indexed by the
+        // lane coordinates, so the whole-function ABI refusal is the real
+        // diagnostic and decomposition would only mask it.
+        if function
+            .params
+            .iter()
+            .any(|param| param.mode == MirParamMode::Lane)
+            && let Err(error) = whole_signature
+        {
+            return Err(error);
+        }
         let decomposition =
             decompose_kernel_function(function, self.validation).map_err(|error| {
                 DeviceProgramBuildError::Decomposition {
@@ -1192,12 +1213,25 @@ impl<'a> KernelBuilder<'a> {
                 // same-name/same-shape buffer; a producer slot joins only a
                 // buffer with NO writer yet (the reverse-declared
                 // producer→consumer chain).
-                entry.matches(
-                    &name,
-                    resource.element_ty,
-                    resource.element_count,
-                    shape.as_deref(),
-                ) && unify_roles(entry.role, role)
+                //
+                // A SingleRun program (no training, no device-resident
+                // companion) keeps each kernel's slots its own, except for
+                // that producer→consumer continuation across a writer and a
+                // reader: two readers, or two writers, of one name never
+                // share a buffer.
+                let continuation = if resource.access == MirKernelResourceAccess::Read {
+                    entry.written
+                } else {
+                    !entry.written && entry.consumed
+                };
+                (self.cross_kernel_name_join || entry.function == kernel_source.id || continuation)
+                    && entry.matches(
+                        &name,
+                        resource.element_ty,
+                        resource.element_count,
+                        shape.as_deref(),
+                    )
+                    && unify_roles(entry.role, role)
                     && (resource.access == MirKernelResourceAccess::Read || !entry.written)
             }) {
                 merge_slot_facts(entry, role, resource, shape.as_deref(), is_param_input);
@@ -1207,6 +1241,7 @@ impl<'a> KernelBuilder<'a> {
                 self.next_buffer_id = self.next_buffer_id.saturating_add(1);
                 self.buffers.push(ProgramBuffer {
                     id,
+                    function: kernel_source.id,
                     name,
                     element_ty: resource.element_ty,
                     element_count: resource.element_count,
