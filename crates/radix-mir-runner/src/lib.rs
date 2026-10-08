@@ -1021,6 +1021,32 @@ pub fn run_function_with_stats_and_limits<H: Host + ?Sized>(
     step_budget: Option<u64>,
     deadline: Option<Instant>,
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_function_with_stats_and_limits_and_kernel_policy(
+        validated,
+        function_id,
+        host,
+        step_budget,
+        deadline,
+        RunnerKernelPolicy::Refuse,
+    )
+}
+
+/// [`run_function_with_stats_and_limits`] under an explicit
+/// [`RunnerKernelPolicy`]: the proba CPU oracle route passes
+/// [`RunnerKernelPolicy::Execute`].
+///
+/// # Errors
+///
+/// Returns pre-execution runner errors when the validation context is missing
+/// an interner, the function id is unknown, or the MIR is refused before start.
+pub fn run_function_with_stats_and_limits_and_kernel_policy<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_budget: Option<u64>,
+    deadline: Option<Instant>,
+    kernel_policy: RunnerKernelPolicy,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     run_function_with_explicit_limits_and_stats(
         validated,
         function_id,
@@ -1028,7 +1054,7 @@ pub fn run_function_with_stats_and_limits<H: Host + ?Sized>(
         Some(step_budget.unwrap_or(DEFAULT_TEST_STEP_BUDGET)),
         deadline,
         true,
-        RunnerKernelPolicy::Refuse,
+        kernel_policy,
     )
 }
 
@@ -1132,13 +1158,38 @@ pub fn run_function_with_limits<H: Host + ?Sized>(
     step_budget: Option<u64>,
     deadline: Option<Instant>,
 ) -> Result<(), Vec<RunnerError>> {
+    run_function_with_limits_and_kernel_policy(
+        validated,
+        function_id,
+        host,
+        step_budget,
+        deadline,
+        RunnerKernelPolicy::Refuse,
+    )
+}
+
+/// [`run_function_with_limits`] under an explicit [`RunnerKernelPolicy`]: the
+/// proba CPU oracle route passes [`RunnerKernelPolicy::Execute`].
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed, the
+/// step budget is exhausted, or the wall-clock deadline passes.
+pub fn run_function_with_limits_and_kernel_policy<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_budget: Option<u64>,
+    deadline: Option<Instant>,
+    kernel_policy: RunnerKernelPolicy,
+) -> Result<(), Vec<RunnerError>> {
     run_function_with_explicit_limits(
         validated,
         function_id,
         host,
         Some(step_budget.unwrap_or(DEFAULT_TEST_STEP_BUDGET)),
         deadline,
-        RunnerKernelPolicy::Refuse,
+        kernel_policy,
     )
 }
 

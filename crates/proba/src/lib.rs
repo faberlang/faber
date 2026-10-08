@@ -13,9 +13,10 @@ mod tests;
 use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix::lexer::Interner;
 use radix::mir::{
-    BufferHost, MirFunctionId, RunSourceError, RunnerError, RunnerStats, ValidatedMir,
-    lower_analyzed_unit, reset_execution_state, run_function_with_limits,
-    run_function_with_stats_and_limits,
+    BufferHost, KernelLowering, MirFunctionId, MirLoweringOptions, RunSourceError, RunnerError,
+    RunnerKernelPolicy, RunnerStats, ValidatedMir, lower_analyzed_unit, reset_execution_state,
+    run_function_with_limits_and_kernel_policy,
+    run_function_with_stats_and_limits_and_kernel_policy,
 };
 use radix::module::{AnalyzedModule, Session};
 use radix::program::analyze_prepared_program_name;
@@ -487,6 +488,14 @@ pub fn run_proba_source(
 ) -> Result<ProbaReport, RunSourceError> {
     let mut analysis =
         analyze_prepared_program_name(session, name, source).map_err(RunSourceError::Frontend)?;
+    // The session's kernel lowering names the route: host-form kernels are the
+    // CPU oracle route and run under `Execute`; device-form kernels stay
+    // refused by the runner.
+    let kernel_lowering = session.config.kernel_lowering;
+    let kernel_policy = match kernel_lowering {
+        KernelLowering::Host => RunnerKernelPolicy::Execute,
+        KernelLowering::Device => RunnerKernelPolicy::Refuse,
+    };
     run_proba_on_analyzed_with_unit_path(
         &mut analysis,
         Path::new(name),
@@ -496,6 +505,8 @@ pub fn run_proba_source(
         include_ignored,
         default_timeout_secs,
         collect_stats,
+        kernel_lowering,
+        kernel_policy,
     )
 }
 
@@ -522,9 +533,12 @@ pub fn run_proba_on_analyzed(
         include_ignored,
         default_timeout_secs,
         collect_stats,
+        KernelLowering::Device,
+        RunnerKernelPolicy::Refuse,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_proba_on_analyzed_with_unit_path(
     unit: &mut AnalyzedModule,
     unit_path: &Path,
@@ -534,9 +548,18 @@ fn run_proba_on_analyzed_with_unit_path(
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
     collect_stats: bool,
+    kernel_lowering: KernelLowering,
+    kernel_policy: RunnerKernelPolicy,
 ) -> Result<ProbaReport, RunSourceError> {
     let cases = inventory_cases(&unit.hir, &unit.interner);
-    let lowered = lower_analyzed_unit(unit, Default::default()).map_err(RunSourceError::Mir)?;
+    let lowered = lower_analyzed_unit(
+        unit,
+        MirLoweringOptions {
+            kernel_lowering,
+            ..Default::default()
+        },
+    )
+    .map_err(RunSourceError::Mir)?;
     Ok(run_proba_on_validated_with_unit_path(
         &lowered.validated,
         unit_path,
@@ -547,6 +570,7 @@ fn run_proba_on_analyzed_with_unit_path(
         include_ignored,
         default_timeout_secs,
         collect_stats,
+        kernel_policy,
     ))
 }
 
@@ -563,6 +587,7 @@ pub fn run_proba_on_validated(
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
     collect_stats: bool,
+    kernel_policy: RunnerKernelPolicy,
 ) -> ProbaReport {
     run_proba_on_validated_with_unit_path(
         validated,
@@ -574,6 +599,7 @@ pub fn run_proba_on_validated(
         include_ignored,
         default_timeout_secs,
         collect_stats,
+        kernel_policy,
     )
 }
 
@@ -587,6 +613,7 @@ fn run_proba_on_validated_with_unit_path(
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
     collect_stats: bool,
+    kernel_policy: RunnerKernelPolicy,
 ) -> ProbaReport {
     run_proba_cases(
         validated,
@@ -598,6 +625,7 @@ fn run_proba_on_validated_with_unit_path(
         include_ignored,
         default_timeout_secs,
         collect_stats,
+        kernel_policy,
         |case| mir_function_id_from_def(validated, case.def_id),
     )
 }
@@ -620,6 +648,7 @@ pub fn run_proba_on_validated_with_function_ids(
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
     collect_stats: bool,
+    kernel_policy: RunnerKernelPolicy,
 ) -> ProbaReport {
     let module_path = module_path.to_path_buf();
     run_proba_cases(
@@ -632,6 +661,7 @@ pub fn run_proba_on_validated_with_function_ids(
         include_ignored,
         default_timeout_secs,
         collect_stats,
+        kernel_policy,
         |case| {
             function_ids
                 .get(&(module_path.clone(), case.def_id))
@@ -650,6 +680,7 @@ fn run_proba_cases(
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
     collect_stats: bool,
+    kernel_policy: RunnerKernelPolicy,
     function_id_for_case: impl Fn(&ProbaCase) -> Option<MirFunctionId>,
 ) -> ProbaReport {
     let has_solum = has_solum_cases(cases);
@@ -704,6 +735,7 @@ fn run_proba_cases(
                     repeats,
                     erratur,
                     collect_stats,
+                    kernel_policy,
                 ),
                 None => CaseExecution::without_output(CaseOutcome::Blocked {
                     reason: format!(
@@ -743,11 +775,19 @@ fn execute_case_repeated(
     repeats: u64,
     erratur: bool,
     collect_stats: bool,
+    kernel_policy: RunnerKernelPolicy,
 ) -> CaseExecution {
     execute_repeated(repeats, || {
         // Apply erratur inside each execution so a passing expected-error run
         // does not trip the repeat loop's non-Passed short-circuit.
-        execute_case(validated, function_id, timeout_secs, erratur, collect_stats)
+        execute_case(
+            validated,
+            function_id,
+            timeout_secs,
+            erratur,
+            collect_stats,
+            kernel_policy,
+        )
     })
 }
 
@@ -768,6 +808,7 @@ fn execute_case(
     timeout_secs: Option<u64>,
     erratur: bool,
     collect_stats: bool,
+    kernel_policy: RunnerKernelPolicy,
 ) -> CaseExecution {
     // A seed belongs to one program execution. Clear the runner's process-wide
     // kernel state before this case can observe an earlier program's seed.
@@ -783,19 +824,27 @@ fn execute_case(
     std::panic::set_hook(Box::new(|_| {}));
     let trapped = catch_unwind(AssertUnwindSafe(|| {
         if collect_stats {
-            match run_function_with_stats_and_limits(
+            match run_function_with_stats_and_limits_and_kernel_policy(
                 validated,
                 function_id,
                 &mut host,
                 None,
                 deadline,
+                kernel_policy,
             ) {
                 Ok(outcome) => (outcome.result, Some(outcome.stats)),
                 Err(errors) => (Err(errors), None),
             }
         } else {
             (
-                run_function_with_limits(validated, function_id, &mut host, None, deadline),
+                run_function_with_limits_and_kernel_policy(
+                    validated,
+                    function_id,
+                    &mut host,
+                    None,
+                    deadline,
+                    kernel_policy,
+                ),
                 None,
             )
         }

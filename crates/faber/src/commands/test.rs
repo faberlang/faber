@@ -11,6 +11,8 @@ use proba::{
     run_proba_on_validated_with_function_ids, source_skip_reason,
 };
 use radix::module::driver::{Config, Session};
+use radix::module::mir::RunnerKernelPolicy;
+use radix::program::mir::DeviceSelection;
 use radix::program::test_source_filter::TestSourceFilter;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
@@ -31,6 +33,9 @@ struct TestRunOptions {
     default_timeout_secs: Option<u64>,
     /// Arm the interpreter diagnostic meter for each executed case.
     collect_stats: bool,
+    /// Whether the runner executes `@ kernel` functions. `Execute` only under
+    /// `--device cpu` (rule 16.3 oracle mode); every other route refuses.
+    kernel_policy: RunnerKernelPolicy,
 }
 
 #[derive(Debug, Default)]
@@ -66,6 +71,21 @@ pub(super) fn cmd_test(args: &TestArgs) {
         std::process::exit(1);
     }
 
+    // `--device` > manifest `[device] device` > `auto`, the same precedence as
+    // `faber run`. `faber test` serves `cpu` (kernels in host form) and `auto`
+    // (kernels refused); a device selection fails closed before any case runs.
+    let selection = match package::resolve_device_selection(args.device, &input_path) {
+        Ok(selection) => selection,
+        Err(diag) => {
+            eprintln!("error: {}", diag.message);
+            std::process::exit(1);
+        }
+    };
+    if let Some(message) = gpu_selection_refusal(selection) {
+        eprintln!("{message}");
+        std::process::exit(2);
+    }
+
     let mut filters = args.filter_flag.clone();
     if let Some(filter) = args.filter.clone() {
         filters.push(filter);
@@ -83,6 +103,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         fail_fast: args.fail_fast,
         default_timeout_secs: args.test_timeout,
         collect_stats: args.stats || args.stats_file.is_some(),
+        kernel_policy: selection.kernel_policy(),
     };
 
     // A named `.proba` argument is the source selection. `--include` on
@@ -144,6 +165,13 @@ pub(super) fn cmd_test(args: &TestArgs) {
             std::process::exit(1);
         }
     };
+    // Rule 16.3: `cpu` lowers `@ kernel` functions as ordinary host functions;
+    // the runner policy in `options` then executes them.
+    let config = if selection == DeviceSelection::Cpu {
+        config.with_host_kernels()
+    } else {
+        config
+    };
 
     let started = Instant::now();
     let (report, unmatched_include, metadata) =
@@ -189,6 +217,19 @@ pub(super) fn cmd_test(args: &TestArgs) {
     let code = i32::from(!report.success());
     emit_test_stats_if_requested(args, &input_path, &report, &metadata, started, code);
     std::process::exit(code);
+}
+
+/// The fail-closed message for a device selection `faber test` does not serve
+/// (`metal` / `cuda`), or `None` for `cpu` and `auto`. Device dispatch of proba
+/// cases is a follow-on.
+fn gpu_selection_refusal(selection: DeviceSelection) -> Option<String> {
+    match selection {
+        DeviceSelection::Cpu | DeviceSelection::Auto => None,
+        DeviceSelection::Metal | DeviceSelection::Cuda => Some(
+            "error: faber test runs cases on the MIR runner; `--device` accepts `cpu` (kernels in host form) or `auto`; device dispatch of proba cases is a follow-on"
+                .to_owned(),
+        ),
+    }
 }
 
 fn emit_test_stats_if_requested(
@@ -320,8 +361,14 @@ fn run_source_with_options(
         return Ok((ProbaReport::default(), RunMetadata::default()));
     }
 
-    let lowered = radix::module::mir::lower_analyzed_unit(&mut analysis, Default::default())
-        .map_err(radix::module::mir::RunSourceError::Mir)?;
+    let lowered = radix::module::mir::lower_analyzed_unit(
+        &mut analysis,
+        radix::module::mir::MirLoweringOptions {
+            kernel_lowering: session.config.kernel_lowering,
+            ..Default::default()
+        },
+    )
+    .map_err(radix::module::mir::RunSourceError::Mir)?;
     let mut report = ProbaReport::default();
     let mut metadata = RunMetadata::default();
     for case in cases {
@@ -335,6 +382,7 @@ fn run_source_with_options(
             include_ignored,
             options.default_timeout_secs,
             options.collect_stats,
+            options.kernel_policy,
         );
         let elapsed = started.elapsed().as_millis();
         for result in &mut one.results {
@@ -555,6 +603,7 @@ fn run_package_test_unit_with_options(
                     include_ignored,
                     options.default_timeout_secs,
                     options.collect_stats,
+                    options.kernel_policy,
                 );
                 let elapsed = started.elapsed().as_millis();
                 for result in &mut one.results {

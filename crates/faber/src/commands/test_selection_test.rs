@@ -4,6 +4,7 @@
 
 use super::*;
 use clap::Parser;
+use faber_cli::package::DeviceChoice;
 use proba::{CaseOutcome, ProbaCase, ProbaModifierView};
 use radix::module::hir::DefId;
 use radix::module::lexer::Span;
@@ -266,4 +267,44 @@ fn cli_parses_selection_and_reporting_flags() {
     assert!(args.list);
     assert_eq!(args.format, crate::cli::TestOutputFormat::Json);
     assert!(args.fail_fast);
+}
+
+#[test]
+fn cli_parses_device_choice_and_defaults_to_none() {
+    let parse = |extra: &[&str]| {
+        let mut argv = vec!["faber", "test", "."];
+        argv.extend_from_slice(extra);
+        let cli = crate::cli::Cli::try_parse_from(argv).expect("parse test command");
+        let Some(crate::cli::Command::Test(args)) = cli.command else {
+            panic!("expected test command");
+        };
+        args.device
+    };
+    assert_eq!(parse(&["--device", "cpu"]), Some(DeviceChoice::Cpu));
+    assert_eq!(parse(&["--device", "metal"]), Some(DeviceChoice::Metal));
+    assert_eq!(parse(&[]), None);
+}
+
+#[test]
+fn gpu_selection_refusal_covers_only_device_selections() {
+    assert!(gpu_selection_refusal(DeviceSelection::Metal).is_some());
+    assert!(gpu_selection_refusal(DeviceSelection::Cuda).is_some());
+    assert!(gpu_selection_refusal(DeviceSelection::Cpu).is_none());
+    assert!(gpu_selection_refusal(DeviceSelection::Auto).is_none());
+}
+
+#[test]
+fn only_the_cpu_selection_executes_kernels() {
+    assert_eq!(
+        DeviceSelection::Cpu.kernel_policy(),
+        RunnerKernelPolicy::Execute
+    );
+    assert_eq!(
+        DeviceSelection::Auto.kernel_policy(),
+        RunnerKernelPolicy::Refuse
+    );
+    assert_eq!(
+        TestRunOptions::default().kernel_policy,
+        RunnerKernelPolicy::Refuse
+    );
 }

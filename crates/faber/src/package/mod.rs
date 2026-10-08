@@ -96,8 +96,6 @@ pub use llvm_host::{
     discover_llvm_host_toolchain, ensure_llvm_runtime_archive, host_llvm_target_triple,
     host_triple_for,
 };
-#[cfg(feature = "runner")]
-pub use manifest::manifest_device_choice;
 pub(crate) use manifest::manifest_device_inputs;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
@@ -105,6 +103,8 @@ pub use manifest::{
     ManifestProductShaders, manifest_package_build_target as manifest_build_target_for_input,
     read_manifest,
 };
+#[cfg(feature = "runner")]
+pub use manifest::{manifest_device_choice, resolve_device_selection};
 #[cfg(feature = "runner")]
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "runner")]

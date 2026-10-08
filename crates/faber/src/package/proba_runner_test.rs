@@ -360,6 +360,7 @@ test "double" {
                         false,
                         None,
                         false,
+                        radix_mir_runner::RunnerKernelPolicy::Refuse,
                     )
                     .results,
                 );
@@ -659,6 +660,7 @@ fn linked_package_report(package: radix::program::analyze::AnalyzedProgram) -> p
                         false,
                         None,
                         false,
+                        radix_mir_runner::RunnerKernelPolicy::Refuse,
                     )
                     .results,
                 );
@@ -784,4 +786,102 @@ fn no_package_single_file_route_cannot_resolve_in_package_import() {
     } else {
         // Frontend/MIR error on the import is also the bare-route failure.
     }
+}
+
+/// One `@ kernel` function called from a `.proba` case, run through the linked
+/// package route under the given lowering config and runner policy.
+fn run_kernel_proba_package(
+    config: &Config,
+    kernel_policy: radix_mir_runner::RunnerKernelPolicy,
+) -> proba::ProbaReport {
+    let dir = test_temp_dir("runner-kernel-proba");
+    write_minimal_lib_package(dir.path());
+    fs::write(
+        dir.join("src/k.fab"),
+        r"@ kernel
+@ public
+fn bump(f32 x) → f32 {
+    return x + 1.0
+}
+",
+    )
+    .expect("k.fab");
+    fs::write(
+        dir.join("src/k.proba"),
+        r#"import from "./k" k
+
+test "cpu" {
+    assert k.bump(1.0) ≡ (2.0 ∷ f32)
+}
+"#,
+    )
+    .expect("k.proba");
+
+    let package =
+        analyze_tests_with_faber_seams(config, dir.path(), None).expect("analyze kernel package");
+    let mut functions = Vec::new();
+    let mut test_units = Vec::new();
+    for unit in package.nodes.values() {
+        let cases = proba::inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
+        if cases.is_empty() {
+            continue;
+        }
+        functions.extend(cases.iter().map(|case| (unit.path.clone(), case.def_id)));
+        test_units.push((unit.path.clone(), cases));
+    }
+    let scope = radix::program::mir::TestPackageScope::for_program(&package, functions);
+    crate::package::mir::with_linked_test_package_mir(
+        package,
+        &scope,
+        config,
+        |validated, function_ids| {
+            let mut report = proba::ProbaReport::default();
+            for (path, cases) in &test_units {
+                report.results.extend(
+                    run_proba_on_validated_with_function_ids(
+                        validated,
+                        path,
+                        cases,
+                        function_ids,
+                        &TestSelection::default(),
+                        None,
+                        false,
+                        false,
+                        None,
+                        false,
+                        kernel_policy,
+                    )
+                    .results,
+                );
+            }
+            report
+        },
+    )
+    .expect("link kernel package test roots")
+}
+
+#[test]
+fn proba_case_calling_a_kernel_runs_under_host_kernels_and_execute() {
+    let report = run_kernel_proba_package(
+        &Config::default().with_host_kernels(),
+        radix_mir_runner::RunnerKernelPolicy::Execute,
+    );
+    assert_eq!(report.passed(), 1, "{report:?}");
+    assert_eq!(report.failed(), 0, "{report:?}");
+    assert_eq!(report.blocked(), 0, "{report:?}");
+}
+
+#[test]
+fn proba_case_calling_a_kernel_is_refused_on_the_default_route() {
+    let report = run_kernel_proba_package(
+        &Config::default(),
+        radix_mir_runner::RunnerKernelPolicy::Refuse,
+    );
+    assert_eq!(report.results.len(), 1, "{report:?}");
+    assert!(
+        matches!(report.results[0].outcome, CaseOutcome::Failed { .. }),
+        "{report:?}"
+    );
+    assert_eq!(report.passed(), 0, "{report:?}");
+    assert_eq!(report.blocked(), 0, "{report:?}");
 }

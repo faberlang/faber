@@ -362,6 +362,31 @@ pub fn manifest_device_choice(
     }
 }
 
+/// Resolve the effective device selection for a route (N1.1): CLI `--device` >
+/// manifest `[device] device` > default `auto`. One precedence for every
+/// route that takes `--device` (`faber run`, `faber test`). An invalid
+/// manifest value fails closed with a structured diagnostic (never silently
+/// ignored).
+#[cfg(feature = "runner")]
+pub fn resolve_device_selection(
+    cli: Option<DeviceChoice>,
+    input_path: &Path,
+) -> Result<DeviceSelection, Box<Diagnostic>> {
+    if let Some(device) = cli {
+        return Ok(device.selection());
+    }
+    let Ok(layout) = super::discover_build_layout(input_path) else {
+        return Ok(DeviceSelection::Auto);
+    };
+    if !layout.manifest_path.exists() {
+        return Ok(DeviceSelection::Auto);
+    }
+    let manifest = read_manifest(&layout.manifest_path)?;
+    let manifest_device =
+        manifest_device_choice(manifest.device.device.as_deref(), &layout.manifest_path)?;
+    Ok(manifest_device.map_or(DeviceSelection::Auto, DeviceChoice::selection))
+}
+
 /// Map a manifest `[device] inputs` map to typed f32 host inputs (S1-6
 /// vertical slice). `None` when the key is absent. Values are flat f32
 /// element lists; f64 manifest values are converted to f32 (the campaign

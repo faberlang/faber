@@ -236,7 +236,8 @@ pub use runner::{
     RunnerKernelPolicy, RunnerRunOutcome, RunnerStats, StdioHost, Value, classify_runner_lowerability,
     reset_execution_state, run_analyzed, run_analyzed_with_kernel_lowering, run_entry, run_entry_with_kernel_policy,
     run_entry_with_stats, run_entry_with_stats_and_kernel_policy, run_function, run_function_with_kernel_policy,
-    run_function_with_limits, run_function_with_stats_and_limits, run_function_with_step_budget, run_source,
+    run_function_with_limits, run_function_with_limits_and_kernel_policy, run_function_with_stats_and_limits,
+    run_function_with_stats_and_limits_and_kernel_policy, run_function_with_step_budget, run_source,
     runner_dispatch_status,
 };
 #[cfg(feature = "mir-sexp")]

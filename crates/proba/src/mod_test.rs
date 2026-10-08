@@ -375,6 +375,7 @@ proba "ok" {
         false,
         None,
         false,
+        radix_mir_runner::RunnerKernelPolicy::Refuse,
     )
 }
 

@@ -666,6 +666,14 @@ pub struct TestArgs {
     #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
     pub diagnostics_locale: Option<String>,
 
+    /// Device selection for cases that call `@ kernel` functions: `cpu` runs
+    /// them in host form on the MIR runner (the rule 16.3 oracle mode);
+    /// `auto` or absent keeps refusing kernels. `metal` and `cuda` are not
+    /// served by `faber test` and fail closed. Precedence: CLI > manifest
+    /// `[device] device` > `auto`.
+    #[arg(long = "device", value_enum, value_name = "DEVICE")]
+    pub device: Option<DeviceChoice>,
+
     /// Promote all warning diagnostics to errors
     #[arg(long)]
     pub deny_warnings: bool,

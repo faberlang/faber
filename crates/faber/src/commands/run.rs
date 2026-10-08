@@ -487,31 +487,15 @@ fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
     Ok(())
 }
 
-/// Resolve the effective device selection for `faber run` (N1.1): CLI
-/// `--device` > manifest `[device] device` > default `auto`. An invalid
-/// manifest value fails closed with a structured diagnostic (never silently
-/// ignored). A stats request is permitted with any selection: a
-/// dispatching run reports host rows only (gpu-reset C2-U6c, D4).
+/// Resolve the effective device selection for `faber run`: the shared
+/// precedence (CLI > manifest > `auto`) lives in
+/// [`package::resolve_device_selection`]. A stats request is permitted with any
+/// selection: a dispatching run reports host rows only (gpu-reset C2-U6c, D4).
 fn resolve_route_selection(
     args: &RunArgs,
     input_path: &Path,
 ) -> Result<DeviceSelection, Box<Diagnostic>> {
-    if let Some(device) = args.device {
-        let selection = device.selection();
-        return Ok(selection);
-    }
-    let Ok(layout) = package::discover_build_layout(input_path) else {
-        return Ok(DeviceSelection::Auto);
-    };
-    if !layout.manifest_path.exists() {
-        return Ok(DeviceSelection::Auto);
-    }
-    let manifest = package::read_manifest(&layout.manifest_path)?;
-    let manifest_device =
-        package::manifest_device_choice(manifest.device.device.as_deref(), &layout.manifest_path)?;
-    // CLI already returned above. Manifest device or portable `auto`.
-    // In-process host_factory is parked; this fold does not need it.
-    Ok(manifest_device.map_or(DeviceSelection::Auto, DeviceChoice::selection))
+    package::resolve_device_selection(args.device, input_path)
 }
 
 /// Render route diagnostics with their stable host codes (N1.4). The
