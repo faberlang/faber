@@ -361,3 +361,130 @@ fn lane_grid_is_not_admitted_to_the_generic_1d_list() {
         &CollectionKernelPlan::Elementwise
     ));
 }
+
+fn grid_reduce_unit() -> KernelUnit {
+    use MirKernelResourceAccess::{Read, Write};
+    unit(
+        CollectionKernelPlan::GridReduce {
+            source_resource: 0,
+            rank: 1,
+            workgroup: 256,
+            partials_cap: 1024,
+            partial_layout: crate::kernel_plan::GridReducePartialLayout::for_op(
+                crate::MirReduceOp::Max,
+                4,
+                1,
+            ),
+        },
+        vec![resource(0, Read, None), resource(1, Write, None)],
+    )
+}
+
+fn stages(n: u64) -> [CallGeometry; 2] {
+    let unit = grid_reduce_unit();
+    match launch_stages_for_call(&unit, &[vec![n], vec![24]]).expect("stages") {
+        LaunchStages::Staged(stages) => stages,
+        LaunchStages::Single(_) => panic!("a GridReduce call is two stages"),
+    }
+}
+
+#[test]
+fn grid_reduce_stage_grids_at_the_boundary_sizes() {
+    for (n, p) in [
+        (1, 1),
+        (255, 1),
+        (256, 1),
+        (257, 2),
+        (262_144, 1024),
+        (262_145, 1024),
+        (1_388_964, 1024),
+    ] {
+        let [first, second] = stages(n);
+        assert_eq!(
+            first,
+            CallGeometry {
+                grid: [p, 1, 1],
+                block: [256, 1, 1]
+            },
+            "stage 1 at n = {n}"
+        );
+        assert_eq!(
+            second,
+            CallGeometry {
+                grid: [1, 1, 1],
+                block: [256, 1, 1]
+            },
+            "stage 2 at n = {n}"
+        );
+    }
+}
+
+#[test]
+fn grid_reduce_n_is_the_source_tensor_not_the_destination() {
+    // A [600, 500] source reduced into a 24-element destination.
+    let unit = grid_reduce_unit();
+    let rank2 = match unit.plan.clone() {
+        CollectionKernelPlan::GridReduce {
+            workgroup,
+            partials_cap,
+            partial_layout,
+            ..
+        } => CollectionKernelPlan::GridReduce {
+            source_resource: 0,
+            rank: 2,
+            workgroup,
+            partials_cap,
+            partial_layout,
+        },
+        _ => unreachable!(),
+    };
+    let unit = KernelUnit {
+        plan: rank2,
+        ..unit
+    };
+    let got = launch_stages_for_call(&unit, &[vec![600, 500], vec![24]]).expect("stages");
+    let LaunchStages::Staged([first, _]) = got else {
+        panic!("staged");
+    };
+    assert_eq!(first.grid, [1024, 1, 1]);
+}
+
+#[test]
+fn grid_reduce_refuses_zero_extents_rank_mismatch_and_the_single_entry() {
+    let unit = grid_reduce_unit();
+    assert_eq!(
+        launch_stages_for_call(&unit, &[vec![0], vec![24]]),
+        Err(error(GEOMETRY_ZERO_EXTENT, &[("resource", "0")]))
+    );
+    assert_eq!(
+        launch_stages_for_call(&unit, &[vec![4, 4], vec![24]])
+            .unwrap_err()
+            .code,
+        GEOMETRY_RANK_MISMATCH
+    );
+    // The single-launch entry point does not pretend to cover two stages.
+    assert_eq!(
+        geometry_for_call(&unit, &[vec![256], vec![24]])
+            .unwrap_err()
+            .code,
+        GEOMETRY_PLAN_NOT_COVERED
+    );
+}
+
+#[test]
+fn every_other_plan_is_one_stage_identical_to_geometry_for_call() {
+    let unit = elementwise();
+    let shapes = [vec![35], vec![35], vec![35]];
+    assert_eq!(
+        launch_stages_for_call(&unit, &shapes),
+        geometry_for_call(&unit, &shapes).map(LaunchStages::Single)
+    );
+}
+
+#[test]
+fn grid_reduce_combine_entry_is_the_suffix_convention() {
+    assert_eq!(
+        grid_reduce_combine_entry("wave_speed"),
+        "wave_speed_combine"
+    );
+}

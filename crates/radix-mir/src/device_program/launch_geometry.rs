@@ -20,6 +20,7 @@
 //! | `TiledMatMul` (rank-2, unbatched) | tile grid `(ceil(N/tile), ceil(M/tile))`, verbatim |
 //! | `LaneGrid` | generic 1-D over the element count of the source resource's call-site shape |
 //! | `Transpose` | `plan.workgroup_x` lanes over the input element count |
+//! | `GridReduce` | two stages ([`LaunchStages::Staged`], via [`launch_stages_for_call`]): `p = min(ceil(n / workgroup), partials_cap)` workgroups, then one |
 //! | every other plan | [`GeometryError`] `geometry_plan_not_covered` |
 
 use crate::abi::{
@@ -36,6 +37,25 @@ use super::types::{GENERIC_1D_MAX_ELEMENTS, KernelUnit, generic_1d_workgroup};
 pub struct CallGeometry {
     pub grid: [u32; 3],
     pub block: [u32; 3],
+}
+
+/// The launches one call makes: one for every plan but a whole-grid
+/// reduction, which makes two back to back (stage 1 on `<entry>`, stage 2 on
+/// [`grid_reduce_combine_entry`]) through a dispatcher-owned partials scratch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LaunchStages {
+    /// One launch.
+    Single(CallGeometry),
+    /// A `GridReduce` call: stage 1 then stage 2, in this order.
+    Staged([CallGeometry; 2]),
+}
+
+/// The entry-point name of a `GridReduce` kernel's stage 2, given the name of
+/// its stage 1 entry. The one place the convention lives: the Metal emitter
+/// names the second entry point with it and the dispatcher launches it.
+#[must_use]
+pub fn grid_reduce_combine_entry(entry: &str) -> String {
+    format!("{entry}_combine")
 }
 
 /// A failed geometry derivation: a stable issue code plus named arguments.
@@ -72,39 +92,18 @@ pub fn geometry_for_call(
     unit: &KernelUnit,
     shapes: &[Vec<u64>],
 ) -> Result<CallGeometry, GeometryError> {
-    if shapes.len() != unit.resources.len() {
-        return Err(GeometryError::new(
-            GEOMETRY_SHAPE_COUNT,
-            vec![
-                ("expected", unit.resources.len().to_string()),
-                ("actual", shapes.len().to_string()),
-            ],
-        ));
-    }
-    let mut counts = Vec::with_capacity(shapes.len());
-    for (index, (resource, shape)) in unit.resources.iter().zip(shapes).enumerate() {
-        if let Some(declared) = &resource.version.shape
-            && declared.len() != shape.len()
-        {
-            return Err(GeometryError::new(
-                GEOMETRY_RANK_MISMATCH,
-                vec![
-                    ("resource", index.to_string()),
-                    ("expected", declared.len().to_string()),
-                    ("actual", shape.len().to_string()),
-                ],
-            ));
-        }
-        counts.push(element_count(index, shape)?);
-    }
+    let counts = element_counts(unit, shapes)?;
     match &unit.plan {
         CollectionKernelPlan::Elementwise => generic_1d(unit, output_count(unit, &counts)?),
         CollectionKernelPlan::RowSoftmax(softmax) if softmax.batched.is_none() => {
             generic_1d(unit, output_count(unit, &counts)?)
         }
         CollectionKernelPlan::GridReduce { .. } => Err(GeometryError::new(
-            GEOMETRY_SHAPE_NOT_COVERED,
-            vec![("reason", "GridReduce launch geometry is C4-8 U2".to_owned())],
+            GEOMETRY_PLAN_NOT_COVERED,
+            vec![(
+                "plan",
+                "GridReduce (two stages: use launch_stages_for_call)".to_owned(),
+            )],
         )),
         CollectionKernelPlan::LaneGrid {
             source_resource,
@@ -159,6 +158,121 @@ pub fn geometry_for_call(
             vec![("plan", plan_name(other).to_owned())],
         )),
     }
+}
+
+/// Per-resource element counts of a call, after the shape-count, rank and
+/// zero-extent checks every plan shares.
+fn element_counts(unit: &KernelUnit, shapes: &[Vec<u64>]) -> Result<Vec<u64>, GeometryError> {
+    if shapes.len() != unit.resources.len() {
+        return Err(GeometryError::new(
+            GEOMETRY_SHAPE_COUNT,
+            vec![
+                ("expected", unit.resources.len().to_string()),
+                ("actual", shapes.len().to_string()),
+            ],
+        ));
+    }
+    let mut counts = Vec::with_capacity(shapes.len());
+    for (index, (resource, shape)) in unit.resources.iter().zip(shapes).enumerate() {
+        if let Some(declared) = &resource.version.shape
+            && declared.len() != shape.len()
+        {
+            return Err(GeometryError::new(
+                GEOMETRY_RANK_MISMATCH,
+                vec![
+                    ("resource", index.to_string()),
+                    ("expected", declared.len().to_string()),
+                    ("actual", shape.len().to_string()),
+                ],
+            ));
+        }
+        counts.push(element_count(index, shape)?);
+    }
+    Ok(counts)
+}
+
+/// Compute every launch of a call: [`geometry_for_call`]'s single launch for
+/// each plan but `GridReduce`, whose two stages are
+/// `p = min(ceil(n / workgroup), partials_cap)` workgroups of `workgroup`
+/// lanes, then one workgroup of `workgroup` lanes. `n` is the element count of
+/// the reduced source's call-site shape; a zero extent is refused as for every
+/// plan.
+///
+/// # Errors
+///
+/// Returns a [`GeometryError`] when a shape does not match its resource or the
+/// launch dimensions cannot be derived.
+pub fn launch_stages_for_call(
+    unit: &KernelUnit,
+    shapes: &[Vec<u64>],
+) -> Result<LaunchStages, GeometryError> {
+    let CollectionKernelPlan::GridReduce {
+        source_resource,
+        rank,
+        workgroup,
+        partials_cap,
+        ..
+    } = &unit.plan
+    else {
+        return geometry_for_call(unit, shapes).map(LaunchStages::Single);
+    };
+    let counts = element_counts(unit, shapes)?;
+    let uncovered = |reason: &str| {
+        GeometryError::new(
+            GEOMETRY_SHAPE_NOT_COVERED,
+            vec![("reason", reason.to_owned())],
+        )
+    };
+    let Some(shape) = shapes.get(*source_resource) else {
+        return Err(uncovered("reduce source resource out of range"));
+    };
+    if shape.len() != usize::from(*rank) {
+        return Err(GeometryError::new(
+            GEOMETRY_RANK_MISMATCH,
+            vec![
+                ("resource", source_resource.to_string()),
+                ("expected", rank.to_string()),
+                ("actual", shape.len().to_string()),
+            ],
+        ));
+    }
+    let n = counts[*source_resource];
+    if n > i32::MAX as u64 {
+        return Err(GeometryError::new(
+            GEOMETRY_SHAPE_NOT_COVERED,
+            vec![
+                ("reason", "elements exceed 32-bit index".to_owned()),
+                ("elements", n.to_string()),
+            ],
+        ));
+    }
+    let lanes = u64::from(*workgroup);
+    if lanes == 0 {
+        return Err(uncovered("zero workgroup"));
+    }
+    let partials = n.div_ceil(lanes).min(u64::from(*partials_cap));
+    let block = MirWorkgroupSize {
+        x: *workgroup,
+        y: 1,
+        z: 1,
+    };
+    let stage1 = finish(
+        MirKernelDispatchSize {
+            x: partials * lanes,
+            y: 1,
+            z: 1,
+        },
+        block,
+    )?;
+    let stage2 = finish(
+        MirKernelDispatchSize {
+            x: lanes,
+            y: 1,
+            z: 1,
+        },
+        block,
+    )?;
+    Ok(LaunchStages::Staged([stage1, stage2]))
 }
 
 fn element_count(resource: usize, shape: &[u64]) -> Result<u64, GeometryError> {
