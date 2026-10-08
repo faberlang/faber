@@ -112,6 +112,7 @@
 mod constructor;
 mod error;
 mod helpers;
+pub mod launch_geometry;
 mod program;
 mod registry;
 mod types;
