@@ -10,6 +10,7 @@ pub mod capability;
 mod conversio;
 mod cursor;
 mod decimal;
+mod dense;
 mod device_block;
 mod exact_int;
 mod host;
@@ -3864,3 +3865,7 @@ mod vector_lane_select_test;
 #[cfg(test)]
 #[path = "residency_test.rs"]
 mod residency_test;
+
+#[cfg(test)]
+#[path = "dense_test.rs"]
+mod dense_test;
