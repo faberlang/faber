@@ -3644,3 +3644,7 @@ mod tensor_lift_test;
 #[cfg(test)]
 #[path = "vector_lane_select_test.rs"]
 mod vector_lane_select_test;
+
+#[cfg(test)]
+#[path = "residency_test.rs"]
+mod residency_test;

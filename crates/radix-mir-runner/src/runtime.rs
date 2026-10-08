@@ -1864,7 +1864,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             borrow.is_dense_row_major() && borrow.logical_len().is_some_and(|count| offset < count)
         };
         let read = if dense {
-            tensor.borrow().data.borrow().get(offset).cloned()
+            tensor.borrow().read_physical(offset)
         } else {
             self.tensor_read_at(&tensor, offset, span)?
         };
@@ -2495,7 +2495,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 base.offset,
             )
             .ok_or_else(|| RunnerError::internal(span, "tensor edge base offset is invalid"))?;
-            return Ok(tensor.data.borrow().get(physical).cloned());
+            return Ok(tensor.read_physical(physical));
         }
         let operation = tensor
             .edge_ops

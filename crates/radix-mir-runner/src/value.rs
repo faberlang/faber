@@ -22,6 +22,7 @@
 )]
 
 use super::RunnerError;
+use crate::kernel_dispatch::{DeviceToken, ResidencyHook, ResidencySlot};
 use crate::regex_program::RegexProgram;
 use crate::tensor_edge::{
     RunnerTensorEdgeDescriptor, TensorEdgeResolution, resolve_builtin, resolve_optional,
@@ -269,6 +270,8 @@ pub struct TensorValue {
     is_view: bool,
     pub(crate) edge_base: Option<TensorEdgeBase>,
     pub(crate) edge_ops: Vec<TensorEdgeOp>,
+    /// Device residency of the shared backing; absent unless a dispatcher set it.
+    residency: ResidencySlot,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -320,6 +323,7 @@ impl TensorValue {
             is_view: false,
             edge_base: None,
             edge_ops: Vec::new(),
+            residency: ResidencySlot::default(),
         }
     }
 
@@ -336,6 +340,7 @@ impl TensorValue {
             is_view: false,
             edge_base: None,
             edge_ops: Vec::new(),
+            residency: ResidencySlot::default(),
         })
     }
 
@@ -369,6 +374,7 @@ impl TensorValue {
             is_view: true,
             edge_base: self.edge_base.clone(),
             edge_ops: self.edge_ops.clone(),
+            residency: self.residency.clone(),
         })
     }
 
@@ -390,6 +396,7 @@ impl TensorValue {
             is_view: true,
             edge_base: self.edge_base.clone(),
             edge_ops: self.edge_ops.clone(),
+            residency: self.residency.clone(),
         })
     }
 
@@ -684,7 +691,7 @@ impl TensorValue {
             if logical_index >= count {
                 return None;
             }
-            return self.data.borrow().get(logical_index).cloned();
+            return self.read_physical(logical_index);
         }
         let coordinates = self.logical_coordinates(logical_index)?;
         self.value_at_coordinates(&coordinates)
@@ -704,7 +711,7 @@ impl TensorValue {
         }
         if self.edge_ops.is_empty() {
             let physical = self.physical_offset_for_coordinates(coordinates)?;
-            return self.data.borrow().get(physical).cloned();
+            return self.read_physical(physical);
         }
         let base = self.edge_base.as_ref()?;
         let mut mapped = coordinates.to_vec();
@@ -754,7 +761,33 @@ impl TensorValue {
         }
         let physical =
             Self::physical_offset_in_layout(&mapped, &base.shape, &base.strides, base.offset)?;
+        self.read_physical(physical)
+    }
+
+    /// Host read of one backing element: the residency sync point.
+    pub(crate) fn read_physical(&self, physical: usize) -> Option<Value> {
+        if !self.residency.ensure_host(physical..physical.saturating_add(1)) {
+            return None;
+        }
         self.data.borrow().get(physical).cloned()
+    }
+
+    /// Mark this tensor's storage (and every view of it) device-resident
+    /// under `token`. `host_current` says the host copy is also current (an
+    /// upload) rather than stale (a kernel result).
+    pub fn mark_device_resident(&self, token: DeviceToken, hook: ResidencyHook, host_current: bool) {
+        self.residency.mark(token, hook, host_current);
+    }
+
+    /// The device token and whether the device copy is current, if resident.
+    #[must_use]
+    pub fn device_residency(&self) -> Option<(DeviceToken, bool)> {
+        self.residency.state()
+    }
+
+    /// The error of the last failed residency download, if any.
+    pub fn take_residency_error(&self) -> Option<RunnerError> {
+        self.residency.take_error()
     }
 
     pub fn set_value_at(&self, logical_index: usize, value: Value) -> Option<()> {
@@ -762,6 +795,10 @@ impl TensorValue {
             return None;
         }
         let physical = self.physical_offset(logical_index)?;
+        let len = self.data.borrow().len();
+        if !self.residency.before_write(len) {
+            return None;
+        }
         *self.data.borrow_mut().get_mut(physical)? = value;
         Some(())
     }
@@ -770,6 +807,9 @@ impl TensorValue {
     pub fn logical_values(&self) -> Option<Vec<Value>> {
         if self.is_dense_row_major() {
             let count = self.logical_len()?;
+            if !self.residency.ensure_host(0..count) {
+                return None;
+            }
             let data = self.data.borrow();
             // Ordinal == physical offset here, so the slice prefix is the
             // logical read; a short backing fails exactly where the
