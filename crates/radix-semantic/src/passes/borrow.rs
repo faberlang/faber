@@ -298,6 +298,10 @@ struct BorrowChecker<'a> {
     /// Tensor parameters written without any access marker (not `mut`, `own`,
     /// `copy`, `ref`, `in` or `de`): read-only, so no write reaches the caller.
     nonmut_tensor_params: FxHashSet<DefId>,
+    /// Unmarked tensor `←` aliases of a non-`mut` tensor parameter (directly or
+    /// through another alias), mapped to that parameter: a write through the
+    /// alias is a write to the read-only parameter.
+    nonmut_tensor_aliases: FxHashMap<DefId, DefId>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
@@ -353,6 +357,7 @@ impl<'a> BorrowChecker<'a> {
             bind_alias_roots: FxHashMap::default(),
             mut_params: FxHashSet::default(),
             nonmut_tensor_params: FxHashSet::default(),
+            nonmut_tensor_aliases: FxHashMap::default(),
             func_params: FxHashMap::default(),
             regions,
             stmt_node: None,
@@ -474,6 +479,7 @@ impl<'a> BorrowChecker<'a> {
         self.bind_alias_roots.clear();
         self.mut_params.clear();
         self.nonmut_tensor_params.clear();
+        self.nonmut_tensor_aliases.clear();
         self.stmt_node = None;
     }
 
@@ -506,6 +512,12 @@ impl<'a> BorrowChecker<'a> {
                     }
                 }
                 if let Some(init) = &local.init {
+                    if local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
+                        && let Some(param) =
+                            Self::root_def_id(init).and_then(|d| self.nonmut_tensor_origin(d))
+                    {
+                        self.nonmut_tensor_write_error(param, init.span);
+                    }
                     if self.stores_tensor_view(init) {
                         if !self.is_tensor_view(init) {
                             self.error(
@@ -582,7 +594,10 @@ impl<'a> BorrowChecker<'a> {
                     self.note_bind_alias(local.def_id, local.ty, init);
                 }
             }
-            HirStatementKind::Expr(expr) => self.check_expr(expr),
+            HirStatementKind::Expr(expr) => {
+                self.check_statement_fill(expr);
+                self.check_expr(expr);
+            }
             HirStatementKind::Redde(value) => {
                 if let Some(expr) = value {
                     if self.stores_tensor_view(expr) {
@@ -741,11 +756,11 @@ impl<'a> BorrowChecker<'a> {
                     arg.expr.span,
                 );
             }
-            if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
-                && self.nonmut_tensor_params.contains(&arg_def_id)
+            if let Some(origin) = Self::root_def_id(&arg.expr)
+                .and_then(|arg_def_id| self.nonmut_tensor_origin(arg_def_id))
                 && self.dest_is_mut(param)
             {
-                self.nonmut_tensor_write_error(arg_def_id, arg.expr.span);
+                self.nonmut_tensor_write_error(origin, arg.expr.span);
             }
             if self.arg_is_ref_view(&arg.expr) && self.dest_is_mut_or_own(param) {
                 self.error(
@@ -864,14 +879,52 @@ impl<'a> BorrowChecker<'a> {
             );
         }
         if let Some(def_id) = Self::root_def_id(target) {
-            if Self::is_projection(target) && self.nonmut_tensor_params.contains(&def_id) {
-                self.nonmut_tensor_write_error(def_id, target.span);
+            if Self::is_projection(target)
+                && let Some(origin) = self.nonmut_tensor_origin(def_id)
+            {
+                self.nonmut_tensor_write_error(origin, target.span);
             }
             self.check_projection_inputs(target);
             self.write_use(def_id, target.span);
         } else {
             self.check_expr(target);
         }
+    }
+
+    /// Statement-form `fill` (result dropped) is the in-place tensor store; the
+    /// registry row is `TensorFill`, whose bound form returns a fresh tensor and
+    /// so is not marked receiver-mutating. The statement posture is the write.
+    fn check_statement_fill(&mut self, expr: &HirExpression) {
+        let HirExpressionKind::MethodCall(receiver, method, _, args, _) = &expr.kind else {
+            return;
+        };
+        let Some(origin) = Self::root_def_id(receiver).and_then(|d| self.nonmut_tensor_origin(d))
+        else {
+            return;
+        };
+        let is_fill = receiver
+            .ty
+            .zip(self.interner.strings().get(method.0 as usize))
+            .and_then(|(ty, name)| lookup_method_for_type_id(ty, self.types, name, args.len()))
+            .is_some_and(|entry| {
+                matches!(
+                    entry.mir_kind,
+                    radix_intrinsics::IntrinsicMirKind::Collection(
+                        radix_types::MirCollectionOp::TensorFill
+                    )
+                )
+            });
+        if is_fill {
+            self.nonmut_tensor_write_error(origin, expr.span);
+        }
+    }
+
+    /// The non-`mut` tensor parameter a binding is or aliases, if any.
+    fn nonmut_tensor_origin(&self, def_id: DefId) -> Option<DefId> {
+        if self.nonmut_tensor_params.contains(&def_id) {
+            return Some(def_id);
+        }
+        self.nonmut_tensor_aliases.get(&def_id).copied()
     }
 
     /// A write through a tensor parameter that is not marked `mut`: the
@@ -916,6 +969,7 @@ impl<'a> BorrowChecker<'a> {
     /// alias, and value types copy.
     fn note_bind_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
         self.bind_alias_roots.remove(&local);
+        self.nonmut_tensor_aliases.remove(&local);
         let Some(ty) = ty.or(init.ty) else { return };
         if self.types.is_exclusive_value(ty) || !self.is_aliasing_type(ty) {
             return;
@@ -930,6 +984,12 @@ impl<'a> BorrowChecker<'a> {
             .unwrap_or_default();
         roots.insert(source);
         self.bind_alias_roots.insert(local, roots);
+        if self.is_tensor_typed(init)
+            && let Some(origin) = self.nonmut_tensor_origin(source)
+            && origin != local
+        {
+            self.nonmut_tensor_aliases.insert(local, origin);
+        }
     }
 
     /// The bindings whose storage a binding names: itself plus its aliases.
@@ -1071,8 +1131,8 @@ impl<'a> BorrowChecker<'a> {
                 target.span,
             );
         }
-        if self.nonmut_tensor_params.contains(&root) {
-            self.nonmut_tensor_write_error(root, target.span);
+        if let Some(origin) = self.nonmut_tensor_origin(root) {
+            self.nonmut_tensor_write_error(origin, target.span);
         }
         self.check_projection_inputs(target);
         self.write_use(root, target.span);
@@ -2015,6 +2075,13 @@ impl HirVisitor for BorrowChecker<'_> {
                         ISSUE_TENSOR_VIEW_READ_ONLY,
                         expr.span,
                     );
+                }
+                if is_mutating
+                    && self.is_tensor_typed(receiver)
+                    && let Some(origin) =
+                        Self::root_def_id(receiver).and_then(|d| self.nonmut_tensor_origin(d))
+                {
+                    self.nonmut_tensor_write_error(origin, expr.span);
                 }
                 if is_mutating {
                     if let Some(receiver_root) = Self::root_def_id(receiver) {
