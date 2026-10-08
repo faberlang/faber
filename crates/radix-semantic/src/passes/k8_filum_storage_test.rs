@@ -5,7 +5,7 @@
 //! decline. Tensor parameters carry storage roots by mode (see the section
 //! below).
 
-use crate::test_support::analyze_source;
+use crate::test_support::{analyze_source, assert_rejects_with_issue};
 
 const ISSUE: &str = "filum_independence_unproven";
 
@@ -194,22 +194,32 @@ fn bind_alias_of_a_mut_param_joins_its_root() {
 }
 
 #[test]
-fn unmarked_params_share_one_possibly_aliased_root_class() {
-    // Unmarked params are writable and may name one another's tensor: a write
-    // through one is checked against neighbour reads through the other.
-    rejected(
-        &kernel_fn(&format!("{GRID} left, {GRID} src"), "left[i] ← src[i + 1]"),
-        "written_storage_neighbor_read",
-    );
-    accepted(&kernel_fn(
-        &format!("{GRID} left, {GRID} src"),
-        "left[i] ← value + src[i]",
-    ));
-    // A `mut` param never overlaps an unmarked one (the call-site rule).
+fn unmarked_params_are_read_only_and_never_overlap_a_mut_param() {
+    // Reading A: an unmarked param is shared read-only, so it can only be
+    // read; the old "write through one unmarked param, read through another"
+    // shape is gone. Reads of unmarked params at neighbours are fine, a `mut`
+    // param never overlaps an unmarked one (the call-site rule), and an
+    // attempt to write an unmarked param is rejected as SEM056.
     accepted(&kernel_fn(
         &format!("in {GRID} out, {GRID} src"),
         "out[i] ← src[i + 1]",
     ));
+    accepted(&kernel_fn(
+        &format!("in {GRID} out, {GRID} left, {GRID} src"),
+        "out[i] ← left[i + 1] + src[i + 2]",
+    ));
+    assert_rejects_with_issue(
+        &kernel_fn(
+            &format!("{GRID} left, {GRID} src"),
+            "left[i] ← value + src[i]",
+        ),
+        "assign_to_nonmut_tensor_param",
+    );
+    // The mut param itself still meets the neighbour-read rule.
+    rejected(
+        &kernel_fn(&format!("in {GRID} out, {GRID} src"), "out[i] ← out[i + 1]"),
+        "written_storage_neighbor_read",
+    );
 }
 
 #[test]

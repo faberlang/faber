@@ -67,10 +67,25 @@ functio poke(lista<numerus> xs) → vacuum {
 }
 
 #[test]
-fn baseline_summa_unmarked_out_shape_is_legal() {
-    let _ = analyze_ok(
+fn baseline_summa_unmarked_out_shape_is_rejected() {
+    // Reading A: an unmarked parameter is shared read-only, so writing `out`
+    // without `in` is SEM056.
+    assert_rejects_with_issue(
         r"
 functio summa(tf32[256] a, tf32[1] out, u32 id) → vacuum {
+    fixum f32 total ← a.summa()
+    out[id] ← total
+}
+",
+        "assign_to_nonmut_tensor_param",
+    );
+}
+
+#[test]
+fn baseline_summa_mut_out_shape_is_legal() {
+    let _ = analyze_ok(
+        r"
+functio summa(tf32[256] a, in tf32[1] out, u32 id) → vacuum {
     fixum f32 total ← a.summa()
     out[id] ← total
 }

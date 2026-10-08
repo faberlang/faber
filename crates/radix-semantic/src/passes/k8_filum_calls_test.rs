@@ -189,29 +189,47 @@ functio peek(de tensor<f32, [4]> t, numerus at) → f32 {
 }
 
 #[test]
-fn unmarked_helper_params_given_one_class_of_caller_params_still_overlap() {
-    // Both arguments are unmarked parameters of the caller, so they share one
-    // root class there; the helper's two parameters map into that one root.
+fn mut_helper_param_and_unmarked_reader_param_follow_the_caller_roots() {
+    // Reading A: an unmarked helper parameter is a shared read-only view, so
+    // only the `mut` (`in`) one is written. A `mut` caller parameter never
+    // overlaps an unmarked one, so the write and the neighbour read are
+    // independent; the helper's write still meets the neighbour-read rule.
+    let copy = r"
+@ nucleum
+functio copy(in tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum {
+    to[at] ← from[at + 1]
+}
+";
+    accepted(&kernel(copy, "copy(out, src, i)"));
+    // Reading the written parameter's own neighbour through the helper's
+    // other parameter would need the same storage twice, which the call-site
+    // borrow rule owns; the helper reading its own `mut` parameter does not.
+    let self_read = r"
+@ nucleum
+functio shift(in tensor<f32, [4]> to, numerus at) → vacuum {
+    to[at] ← to[at + 1]
+}
+";
+    rejected(
+        &kernel(self_read, "shift(out, i)"),
+        "written_storage_neighbor_read",
+    );
+}
+
+#[test]
+fn unmarked_helper_param_cannot_be_written() {
+    // The old scenario (a helper writing an unmarked parameter) is impossible
+    // by construction under reading A: it is rejected at the helper itself.
     let copy = r"
 @ nucleum
 functio copy(tensor<f32, [4]> to, tensor<f32, [4]> from, numerus at) → vacuum {
     to[at] ← from[at + 1]
 }
 ";
-    let source = format!(
-        r"{copy}
-@ nucleum
-@ publica
-functio k({GRID} out, {GRID} src) → vacuum {{
-    itera ex src apud [i] filum lane fixum value {{
-        copy(out, src, i)
-    }}
-}}
-"
+    assert_rejects_with_issue(
+        &kernel(copy, "copy(out, src, i)"),
+        "assign_to_nonmut_tensor_param",
     );
-    rejected(&source, "written_storage_neighbor_read");
-    // A `mut` caller parameter never overlaps an unmarked one.
-    accepted(&kernel(copy, "copy(out, src, i)"));
 }
 
 #[test]
@@ -634,12 +652,13 @@ incipit {
 
 #[test]
 fn edge_view_of_the_written_tensor_is_rejected() {
-    // Unmarked parameters share one root class, so the view reaches the
-    // tensor the body writes.
+    // The written parameter is `mut` (reading A), so the K8 check, not the
+    // unmarked-write error, judges the view that reaches the written tensor.
     rejected(
         r"
-functio k(tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
-    fixum tensor<f32, [4]> west ← src.disloco([1]).limes<clampa>()
+functio k(in tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
+    varia tensor<f32, [4]> alias ← out
+    fixum tensor<f32, [4]> west ← alias.disloco([1]).limes<clampa>()
     itera ex src apud [i] filum lane fixum value {
         out[i] ← west[i] + value
     }
@@ -647,5 +666,21 @@ functio k(tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
 incipit {
 }",
         "written_storage_neighbor_read",
+    );
+}
+
+#[test]
+fn edge_view_of_an_unmarked_param_cannot_launder_a_write() {
+    // Writing the unmarked tensor directly is rejected before any view matters.
+    assert_rejects_with_issue(
+        r"
+functio k(tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
+    itera ex src apud [i] filum lane fixum value {
+        out[i] ← value
+    }
+}
+incipit {
+}",
+        "assign_to_nonmut_tensor_param",
     );
 }
