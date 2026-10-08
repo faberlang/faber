@@ -508,9 +508,8 @@ impl Validator<'_, '_> {
                         "device view index projection requires materialized row-major storage",
                     );
                 }
-                if view.rank != 1 {
-                    self.error(span, "device view index projection requires rank-1 storage");
-                }
+                // WHY: the index is one integer into row-major storage of any
+                // rank; the lowerer linearizes an N-element tensor index.
                 let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
                     self.error(span, "device view projection result has no layout");
                     return;

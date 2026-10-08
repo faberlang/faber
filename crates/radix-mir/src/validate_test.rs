@@ -4706,3 +4706,70 @@ fn copy_into_rejects_a_non_vacuum_result() {
         "expected a result error, got: {errors:?}"
     );
 }
+
+// -----------------------------------------------------------------------
+// Device tensor view: one integer index into row-major storage of any rank
+// -----------------------------------------------------------------------
+
+/// One function reading `tensor[index]` where `index` is a numerus local.
+fn device_view_linear_read_program(types: &mut TypeTable, dims: &[u64]) -> MirProgram {
+    let tensor_ty = MirType::semantic(tensor_type(types, Primitive::Fractus, dims));
+    let index_ty = MirType::semantic(types.primitive(Primitive::Numerus));
+    let element_ty = MirType::semantic(types.primitive(Primitive::Fractus));
+    let local = |id: u32, ty: MirType| MirLocal {
+        id: MirLocalId(id),
+        ty,
+        name: None,
+        mutable: false,
+        span: Span::default(),
+    };
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![local(0, tensor_ty), local(1, index_ty), local(2, element_ty)],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace { base: MirPlaceBase::Local(MirLocalId(2)), projections: vec![] },
+                        value: MirValue {
+                            id: MirValueId(0),
+                            kind: MirValueKind::Operand(MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(0)),
+                                projections: vec![MirProjection::Index(MirOperand::Place(MirPlace {
+                                    base: MirPlaceBase::Local(MirLocalId(1)),
+                                    projections: vec![],
+                                }))],
+                            })),
+                            ty: element_ty,
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+                span: Span::default(),
+            }],
+            return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+#[test]
+fn device_view_linear_index_validates_for_rank2_and_rank3_storage() {
+    for dims in [&[4u64, 6][..], &[2, 3, 5][..]] {
+        let mut types = TypeTable::new();
+        let program = device_view_linear_read_program(&mut types, dims);
+        let errors = validate(&program, &types);
+        assert!(errors.is_empty(), "rank {} linear device index must validate: {errors:?}", dims.len());
+    }
+}
