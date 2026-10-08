@@ -4281,8 +4281,11 @@ fn prune_unreachable_library_functions(
         let mut new_seed = HashSet::new();
         let mut keep_sets = Vec::with_capacity(library_parts.len());
         for library in library_parts.iter() {
-            let (reachable, definitions) =
-                reachable_library_function_set(&library.program, reachable_seed);
+            let (reachable, definitions) = reachable_library_function_set(
+                &library.program,
+                &library.templates,
+                reachable_seed,
+            );
             keep_sets.push(reachable);
             new_seed.extend(definitions);
         }
@@ -4552,6 +4555,7 @@ fn remap_terminator_function_ids(
 /// functions reference (cross-library edges for the fixpoint).
 fn reachable_library_function_set(
     program: &MirProgram,
+    templates: &[MirFunction],
     reachable_seed: &HashSet<DefId>,
 ) -> (HashSet<MirFunctionId>, Vec<DefId>) {
     let mut work: Vec<MirFunctionId> = Vec::new();
@@ -4565,6 +4569,24 @@ fn reachable_library_function_set(
     let mut reachable = HashSet::new();
     let mut definitions = Vec::new();
     let mut seen_definitions = HashSet::new();
+    // A generic template has no row in `program.functions`, so its body is
+    // invisible to the function walk below. A reachable template still calls
+    // sibling-library functions (`Definition` edges) and local helpers
+    // (`Function` edges), and those must stay reachable too.
+    for template in templates {
+        if template
+            .source
+            .is_some_and(|source| reachable_seed.contains(&source))
+        {
+            let scan = scan_mir_function_body_references(template);
+            work.extend(scan.functions);
+            for definition in scan.definitions {
+                if seen_definitions.insert(definition) {
+                    definitions.push(definition);
+                }
+            }
+        }
+    }
     while let Some(function_id) = work.pop() {
         if !reachable.insert(function_id) {
             continue;
@@ -4601,6 +4623,11 @@ fn scan_mir_function_references(
     else {
         return scan;
     };
+    scan_mir_function_body_references(function)
+}
+
+fn scan_mir_function_body_references(function: &MirFunction) -> MirReferenceScan {
+    let mut scan = MirReferenceScan::default();
     for block in &function.blocks {
         for statement in &block.statements {
             scan_statement_references(statement, &mut scan);

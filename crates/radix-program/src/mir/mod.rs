@@ -699,6 +699,8 @@ mod nominal_tests;
 #[cfg(test)]
 #[path = "reachability_test.rs"]
 mod reachability_tests;
+#[path = "transitive_generic_reach_test.rs"]
+mod transitive_generic_reach_tests;
 
 #[cfg(test)]
 #[path = "lane_test.rs"]
