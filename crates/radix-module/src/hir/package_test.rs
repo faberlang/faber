@@ -259,7 +259,7 @@ discretio Event {
 
 @ publica
 functio computa(numerus x) → numerus {
-    si x > 10 {
+    si x ≻ 10 {
         redde x * 2
     }
     redde x + 1

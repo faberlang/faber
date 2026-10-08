@@ -1743,6 +1743,10 @@ mod tests;
 mod size_extent_test;
 
 #[cfg(test)]
+#[path = "comparison_ascii_retired_test.rs"]
+mod comparison_ascii_retired_test;
+
+#[cfg(test)]
 #[path = "typed_zero_test.rs"]
 mod typed_zero_test;
 

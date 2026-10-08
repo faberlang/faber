@@ -73,7 +73,7 @@ fn rejects_value_return_with_no_redde() {
 fn rejects_when_only_one_branch_returns() {
     assert_rejects(
         "functio half(numerus x) → numerus {
-            si x > 0 {
+            si x ≻ 0 {
                 redde x
             } secus {
                 nota x
@@ -86,7 +86,7 @@ fn rejects_when_only_one_branch_returns() {
 fn accepts_both_branches_returning() {
     assert_accepts(
         "functio abs(numerus x) → numerus {
-            si x > 0 {
+            si x ≻ 0 {
                 redde x
             } secus {
                 redde 0 - x
@@ -99,7 +99,7 @@ fn accepts_both_branches_returning() {
 fn accepts_if_without_else_falls_through_to_trailing_redde() {
     assert_accepts(
         "functio clamp(numerus x) → numerus {
-            si x > 10 {
+            si x ≻ 10 {
                 redde 10
             }
             redde x
@@ -197,7 +197,7 @@ fn rejects_loop_with_break_is_not_diverging() {
     // function must still return after it.
     assert_rejects(
         "functio loopy(numerus n) → numerus {
-            dum n > 0 {
+            dum n ≻ 0 {
                 n ← n - 1
             }
         }",
@@ -270,7 +270,7 @@ fn accepts_statement_bodied_closure_when_all_paths_return() {
     assert_accepts(
         "incipit {
             fixum _ abs ← (numerus x) → numerus ∴ fac {
-                si x > 0 {
+                si x ≻ 0 {
                     redde x
                 } secus {
                     redde 0 - x
@@ -374,7 +374,7 @@ fn rejects_enum_discerne_with_missing_variant_not_covered() {
 fn rejects_early_throw_but_later_fallthrough() {
     assert_rejects(
         "functio example(numerus x) → numerus ⇥ textus {
-            si x < 0 ergo iace \"negative\"
+            si x ≺ 0 ergo iace \"negative\"
         }",
     );
 }

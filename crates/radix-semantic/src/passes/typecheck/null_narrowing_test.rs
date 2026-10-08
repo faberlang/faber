@@ -167,7 +167,7 @@ fn then_form_narrows_identically() {
     // same `si` block surface, so the flow refinement applies identically to
     // the block form.
     test_support::assert_accepts(
-        "functio f(textus ∪ nihil x) → bivalens { si x non est nihil ergo redde x.longitudo() > 0 redde falsum }",
+        "functio f(textus ∪ nihil x) → bivalens { si x non est nihil ergo redde x.longitudo() ≻ 0 redde falsum }",
     );
 }
 
@@ -238,7 +238,7 @@ fn rivus_diagnostic_identity_direct_method_compiles_without_captures() {
     test_support::assert_accepts(
         "functio f(textus ∪ nihil iss) → textus {\n\
              si iss non est nihil {\n\
-                 si iss.longitudo() > 0 {\n\
+                 si iss.longitudo() ≻ 0 {\n\
                      redde iss\n\
                  }\n\
              }\n\
@@ -274,7 +274,7 @@ fn tela_shape_narrowed_list_members_compile_directly() {
              varia numerus total ← 0\n\
              varia numerus i ← 0\n\
              si nodes non est nihil {\n\
-                 dum i < nodes.longitudo() {\n\
+                 dum i ≺ nodes.longitudo() {\n\
                      total ← total + nodes[i].longitudo()\n\
                      i ← i + 1\n\
                  }\n\

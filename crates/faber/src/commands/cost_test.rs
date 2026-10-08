@@ -186,7 +186,7 @@ fn folded() → int ⇥ string {
 fn hot_cast(int n) → float {
     var _ i ← 0
     var _ acc ← 0.0
-    while i < n {
+    while i ≺ n {
         acc ← acc + (n ↦ float)
         i ← i + 1
     }

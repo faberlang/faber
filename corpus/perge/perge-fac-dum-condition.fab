@@ -34,7 +34,7 @@ main {
         n ↑
         if n ≥ 2 { continue }
         print n
-    } while n < 4
+    } while n ≺ 4
     print "done"
 
     # perge passes through two plain fac blocks to the dum test.
@@ -46,6 +46,6 @@ main {
                 if m % 2 ≡ 1 { continue } else { print m }
             }
         }
-    } while m < 6
+    } while m ≺ 6
     print "end"
 }

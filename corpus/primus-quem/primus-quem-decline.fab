@@ -34,11 +34,11 @@ locale = "la"
 # 1. unbounded — lista parameter has no static extent, declines not_bounded
 @ radix lane "air"
 functio elige_infinita(lista<f32> xs) → fractus ∪ nihil {
-    redde primus_quem(xs, ubi v { v > 0.0 })
+    redde primus_quem(xs, ubi v { v ≻ 0.0 })
 }
 
 # 2. apud coordinates — multi-axis first-match stays unsupported in v1
 @ radix lane "air"
 functio elige_apud(tf32[4] a) → fractus ∪ nihil {
-    redde primus_quem(a apud [i], ubi v { v > 0.0 })
+    redde primus_quem(a apud [i], ubi v { v ≻ 0.0 })
 }

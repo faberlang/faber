@@ -40,7 +40,7 @@ locale = "en"
 #   Sign classes, division results, grades, and search hits.
 
 fn classis(int x) → string {
-    if x < 0 then return "negativus"
+    if x ≺ 0 then return "negativus"
     if x ≡ 0 then return "nihil"
     return "positivus"
 }

@@ -70,7 +70,7 @@ fn fixum_constants_fold_to_their_values() {
         "{:?}",
         text.value.kind
     );
-    let flag = constant("fixum bivalens F = 4 > 3\n", "F");
+    let flag = constant("fixum bivalens F = 4 ≻ 3\n", "F");
     assert!(
         matches!(
             flag.value.kind,
@@ -118,7 +118,7 @@ fn underscore_infers_the_constant_type() {
 
 #[test]
 fn underscore_infers_text_and_bool() {
-    let source = "fixum _ NOMEN = \"ab\" + \"cd\"\nfixum _ F = 3 > 2\n";
+    let source = "fixum _ NOMEN = \"ab\" + \"cd\"\nfixum _ F = 3 ≻ 2\n";
     assert!(matches!(
         constant(source, "NOMEN").value.kind,
         HirExpressionKind::Literal(HirLiteral::String(_))

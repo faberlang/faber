@@ -49,9 +49,9 @@ const LIFTED: &[&str] = &[
     "fixum vector<f32, 3> r ← a ÷ b",
     "fixum vector<f32, 3> r ← a ⤒ s",
     "fixum vector<f32, 3> r ← a ⤓ b",
-    "fixum vector<bivalens, 3> r ← a < b",
+    "fixum vector<bivalens, 3> r ← a ≺ b",
     "fixum vector<bivalens, 3> r ← a ≥ s",
-    "fixum vector<bivalens, 3> r ← s > a",
+    "fixum vector<bivalens, 3> r ← s ≻ a",
     "fixum vector<bivalens, 3> r ← a ≅ b",
     "fixum vector<bivalens, 3> r ← a ≇ s",
 ];
@@ -67,9 +67,9 @@ const LIFTED_MATRIX: &[&str] = &[
     "fixum matrix<f32, [2, 2]> r ← m ÷ n",
     "fixum matrix<f32, [2, 2]> r ← m ⤒ s",
     "fixum matrix<f32, [2, 2]> r ← m ⤓ n",
-    "fixum matrix<bivalens, [2, 2]> r ← m < n",
+    "fixum matrix<bivalens, [2, 2]> r ← m ≺ n",
     "fixum matrix<bivalens, [2, 2]> r ← m ≥ s",
-    "fixum matrix<bivalens, [2, 2]> r ← s > m",
+    "fixum matrix<bivalens, [2, 2]> r ← s ≻ m",
     "fixum matrix<bivalens, [2, 2]> r ← m ≅ n",
     "fixum matrix<bivalens, [2, 2]> r ← m ≇ s",
 ];

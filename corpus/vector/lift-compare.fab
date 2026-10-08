@@ -36,7 +36,7 @@ locale = "en"
 # EXPECTED stdout: see lift-compare.expected
 
 fn below(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
-    return a < b
+    return a ≺ b
 }
 
 fn at_least(vector<f32, 3> a, f32 s) → vector<bool, 3> {
@@ -44,7 +44,7 @@ fn at_least(vector<f32, 3> a, f32 s) → vector<bool, 3> {
 }
 
 fn bigger_than(f32 s, vector<f32, 3> a) → vector<bool, 3> {
-    return s > a
+    return s ≻ a
 }
 
 fn lane_equal(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
@@ -56,7 +56,7 @@ fn lane_apart(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
 }
 
 fn clamped(vector<f32, 3> a, f32 limit) → vector<f32, 3> {
-    return (a > limit) ✓ limit ✗ a
+    return (a ≻ limit) ✓ limit ✗ a
 }
 
 main {

@@ -35,16 +35,16 @@ main {
     # Empty-list identities: all → true, any → false.
     const list<int> empty_values ← empty
     print empty_values.all(int d ∴ d ≥ 0)
-    print empty_values.any(int d ∴ d < 0)
+    print empty_values.any(int d ∴ d ≺ 0)
 
     # Decisive element: -1 makes all non-negative false and any-negative true.
     const list<int> mixed ← [2, -1, 4]
     print mixed.all(int d ∴ d ≥ 0)
-    print mixed.any(int d ∴ d < 0)
+    print mixed.any(int d ∴ d ≺ 0)
 
     # Guard-shaped reject: the true `any` result throws into this catch.
     do {
-        reject mixed.any(int d ∴ d < 0) throw "negative dimension"
+        reject mixed.any(int d ∴ d ≺ 0) throw "negative dimension"
         print "accepted"
     }
     catch err {

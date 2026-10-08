@@ -189,8 +189,8 @@ nota r.planata()
 
 #[test]
 fn comparisons_produce_a_bivalens_tensor() {
-    assert_eq!(mask_result("a > b"), ["[falsum, falsum, verum, verum]"]);
-    assert_eq!(mask_result("a < b"), ["[verum, verum, falsum, falsum]"]);
+    assert_eq!(mask_result("a ≻ b"), ["[falsum, falsum, verum, verum]"]);
+    assert_eq!(mask_result("a ≺ b"), ["[verum, verum, falsum, falsum]"]);
     assert_eq!(mask_result("a ≤ 2.0"), ["[verum, verum, falsum, falsum]"]);
     assert_eq!(mask_result("a ≥ b"), ["[falsum, falsum, verum, verum]"]);
     assert_eq!(mask_result("a ≅ a"), ["[verum, verum, verum, verum]"]);
@@ -244,7 +244,7 @@ fn nan_compares_false_everywhere_and_unequal_to_itself() {
     let program = "incipit {
 fixum tensor<f32, [2]> z ← [0.0, 1.0] ↦ tensor<f32, [2]>
 fixum tensor<f32, [2]> n ← z ÷ z
-fixum tensor<bivalens, [2]> lt ← n < n
+fixum tensor<bivalens, [2]> lt ← n ≺ n
 fixum tensor<bivalens, [2]> eq ← n ≅ n
 fixum tensor<bivalens, [2]> ne ← n ≇ n
 fixum bivalens same ← n ≡ n
@@ -295,7 +295,7 @@ nota s.planata()
 incipit {
 fixum tensor<f32, [2]> a ← [1.0, 5.0] ↦ tensor<f32, [2]>
 fixum tensor<f32, [2]> b ← [9.0, 2.0] ↦ tensor<f32, [2]>
-fixum tensor<f32, [2]> r ← (a > b) ✓ pick(a, \"then\") ✗ pick(b, \"else\")
+fixum tensor<f32, [2]> r ← (a ≻ b) ✓ pick(a, \"then\") ✗ pick(b, \"else\")
 nota r.planata()
 }";
     assert_eq!(ok(select), ["then", "else", "[9.0, 5.0]"]);
@@ -303,8 +303,8 @@ nota r.planata()
 
 #[test]
 fn select_takes_scalar_branches() {
-    assert_eq!(f32_result("(a > 2.5) ✓ 1.0 ✗ 0.0"), ["[0.0, 0.0, 1.0, 1.0]"]);
-    assert_eq!(f32_result("(a > b) ✓ a ✗ 0.0"), ["[0.0, 0.0, 3.0, 4.0]"]);
+    assert_eq!(f32_result("(a ≻ 2.5) ✓ 1.0 ✗ 0.0"), ["[0.0, 0.0, 1.0, 1.0]"]);
+    assert_eq!(f32_result("(a ≻ b) ✓ a ✗ 0.0"), ["[0.0, 0.0, 3.0, 4.0]"]);
 }
 
 #[test]
@@ -332,7 +332,7 @@ fn ranks_one_to_three_lift() {
 fixum lista<f32> cube_data ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
 fixum tensor<f32, [2, 2, 2]> a ← cube_data ↦ tensor<f32, [2, 2, 2]>
 fixum tensor<f32, [2, 2, 2]> r ← a * 2.0
-fixum tensor<bivalens, [2, 2, 2]> m ← a > 4.5
+fixum tensor<bivalens, [2, 2, 2]> m ← a ≻ 4.5
 nota r.planata()
 nota m.planata()
 }";
@@ -357,7 +357,7 @@ fn an_empty_tensor_lifts_to_an_empty_tensor() {
 fixum lista<f32> none ← []
 fixum tensor<f32, [0]> a ← none ↦ tensor<f32, [0]>
 fixum tensor<f32, [0]> r ← a + 1.0
-fixum tensor<bivalens, [0]> m ← a > 0.0
+fixum tensor<bivalens, [0]> m ← a ≻ 0.0
 nota r.planata()
 nota m.planata()
 }";

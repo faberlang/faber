@@ -921,15 +921,15 @@ fn rejects_duplicate_iuncta_labels_at_the_duplicate_label() {
 fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
     let source = "incipit { fixum _ x ← f<gx: numerus>(x) }";
     let result = parse_program(source);
+    let colon = u32::try_from(source.find(':').expect("label colon")).expect("offset fits u32");
+    // The failed type-argument attempt falls back to the (retired) ASCII
+    // comparison, which reports first; the label error is the one at the colon.
     let error = result
         .errors
-        .first()
+        .iter()
+        .find(|error| error.span.start == colon)
         .expect("call-site label must produce a parse error");
     assert_eq!(error.kind, ParseErrorKind::ExpressionInvalid);
-    assert_eq!(
-        error.span.start,
-        u32::try_from(source.find(':').expect("label colon")).expect("offset fits u32")
-    );
 }
 
 #[test]

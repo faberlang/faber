@@ -2129,12 +2129,12 @@ functio facere(vector<f32, 3> lanes) → Gen<3> {
 #[test]
 fn applied_generic_head_without_field_block_stays_comparison() {
     // The speculative argument list must restore when no constructor field
-    // block follows, so `a < b` comparison parsing stays owned by the
+    // block follows, so `a ≺ b` comparison parsing stays owned by the
     // binary operator branch (S0-G1 ambiguity guard).
     let result = parse_ok(
         r"
 functio facere(numerus a, numerus b) → boolean {
-    redde a < b
+    redde a ≺ b
 }
 ",
     );
@@ -2161,12 +2161,12 @@ functio facere(numerus a, numerus b) → boolean {
 
 #[test]
 fn applied_generic_head_without_field_block_stays_comparison_with_natural() {
-    // `flag < 3` — a natural literal argument alone must not claim the head;
+    // `flag ≺ 3` — a natural literal argument alone must not claim the head;
     // only `< … > { fields }` does.
     let result = parse_ok(
         r"
 functio facere(numerus flag) → boolean {
-    redde flag < 3
+    redde flag ≺ 3
 }
 ",
     );
@@ -4270,7 +4270,7 @@ fn mori_without_si_is_unconditional() {
 
 #[test]
 fn mori_with_si_desugars_to_si_block() {
-    let result = parse_ok(r#"incipit { mori "boom" si x < 0 }"#);
+    let result = parse_ok(r#"incipit { mori "boom" si x ≺ 0 }"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -4332,7 +4332,7 @@ fn iace_with_si_desugars_to_si_block() {
 fn mori_si_inside_function_body() {
     let result = parse_ok(
         r#"functio f(numerus x) → vacuum {
-  mori "bad" si x < 0
+  mori "bad" si x ≺ 0
   redde
 }"#,
     );
@@ -4353,7 +4353,7 @@ fn mori_si_inside_function_body() {
 
 #[test]
 fn mori_si_with_gt_comparison() {
-    let result = parse_ok(r#"incipit { mori "bad" si a > b }"#);
+    let result = parse_ok(r#"incipit { mori "bad" si a ≻ b }"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -4363,7 +4363,7 @@ fn mori_si_with_gt_comparison() {
     };
     assert!(
         matches!(body.statements[0].kind, StmtKind::Si(_)),
-        "mori si with > should desugar to Si"
+        "mori si with ≻ should desugar to Si"
     );
 }
 
@@ -4424,7 +4424,7 @@ fn mori_si_inside_ergo_body() {
 
 #[test]
 fn mori_si_with_complex_expression() {
-    let result = parse_ok(r#"incipit { mori "bad" si x < 0 aut x > 100 }"#);
+    let result = parse_ok(r#"incipit { mori "bad" si x ≺ 0 aut x ≻ 100 }"#);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -4443,7 +4443,7 @@ fn mori_si_does_not_consume_next_si_statement() {
     // Regression: mori si guard should not eat the next statement's si keyword.
     let result = parse_ok(
         r#"custodi {
-  si n ≡ 0 ergo mori "first" si n < 0
+  si n ≡ 0 ergo mori "first" si n ≺ 0
   si n ≡ 1 ergo mori "second"
 }"#,
     );

@@ -232,7 +232,7 @@ main {
     const saturating<f32> a ← 1.5
     print a + a * a
     print -a
-    print a < 2
+    print a ≺ 2
 }
 ",
     ));
@@ -245,7 +245,7 @@ fn policy_float_typed_mixes_are_rejected_with_the_mixing_issue() {
         "const f32 b ← 2.5\n const saturating<f32> s ← 1.5\n print b * s",
         "const saturating<f32> s ← 1.5\n const trapping<f32> t ← 1.5\n print s + t",
         "const trapping<f32> t ← 1.5\n const trapping<f64> u ← 1.5\n print t - u",
-        "const saturating<f32> s ← 1.5\n const saturating<f64> u ← 1.5\n print s < u",
+        "const saturating<f32> s ← 1.5\n const saturating<f64> u ← 1.5\n print s ≺ u",
     ] {
         let diagnostics = english(&format!("main {{\n{body}\n}}\n"));
         assert_issue(&diagnostics, "policy_float_family_mismatch");

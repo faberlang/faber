@@ -23,7 +23,7 @@ fn ok(body: &str) -> Vec<String> {
 fn probes(place: &str) -> String {
     format!(
         "varia fractus f ← 1.0\nvaria numerus i ← 1\n\
-         nota {place} < 1.0\nnota {place} < 1\nnota {place} > 0\nnota {place} < f\nnota i > {place}\n\
+         nota {place} ≺ 1.0\nnota {place} ≺ 1\nnota {place} ≻ 0\nnota {place} ≺ f\nnota i ≻ {place}\n\
          nota {place} ≅ 0.5\nnota {place} ≇ 0.5\nnota {place} ≈ 0.5\nnota {place} ≉ 0.5\n\
          nota {place} ≅ i\nnota {place} ≈ f"
     )
@@ -68,7 +68,7 @@ fn nested_element_compares_exactly() {
 fn two_projected_decimals_compare_by_value() {
     assert_eq!(
         ok(
-            "varia lista<d64> xs ← [0.5]\nvaria lista<d64> ys ← [1.5]\nnota xs[0] < ys[0]\nnota ys[0] > xs[0]\nnota xs[0] ≅ ys[0]\nnota xs[0] ≅ xs[0]"
+            "varia lista<d64> xs ← [0.5]\nvaria lista<d64> ys ← [1.5]\nnota xs[0] ≺ ys[0]\nnota ys[0] ≻ xs[0]\nnota xs[0] ≅ ys[0]\nnota xs[0] ≅ xs[0]"
         ),
         ["verum", "verum", "falsum", "verum"]
     );
@@ -79,12 +79,12 @@ fn projected_decimal_beside_a_huge_integer_does_not_trap() {
     // Ruling 22: the comparison is exact, so no `d64` conversion of the integer.
     assert_eq!(
         ok(
-            "varia lista<d64> xs ← [0.5]\nvaria numerus i ← 9223372036854775807\nnota xs[0] < i\nnota i > xs[0]\nnota xs[0] ≅ i"
+            "varia lista<d64> xs ← [0.5]\nvaria numerus i ← 9223372036854775807\nnota xs[0] ≺ i\nnota i ≻ xs[0]\nnota xs[0] ≅ i"
         ),
         ["verum", "verum", "falsum"]
     );
     assert_eq!(
-        ok("varia Pt p ← Pt { x = -0.5 }\nvaria u64 u ← 18446744073709551615\nnota p.x < u\nnota u < p.x"),
+        ok("varia Pt p ← Pt { x = -0.5 }\nvaria u64 u ← 18446744073709551615\nnota p.x ≺ u\nnota u ≺ p.x"),
         ["verum", "falsum"]
     );
 }
@@ -93,7 +93,7 @@ fn projected_decimal_beside_a_huge_integer_does_not_trap() {
 fn projected_decimal_above_the_operand_is_false() {
     assert_eq!(
         ok(
-            "varia lista<d64> xs ← [1.5]\nvaria fractus f ← 1.0\nvaria numerus i ← 1\nnota xs[0] < f\nnota xs[0] < i\nnota xs[0] > f\nnota xs[0] > i\nnota xs[0] ≅ f\nnota f ≅ xs[0]"
+            "varia lista<d64> xs ← [1.5]\nvaria fractus f ← 1.0\nvaria numerus i ← 1\nnota xs[0] ≺ f\nnota xs[0] ≺ i\nnota xs[0] ≻ f\nnota xs[0] ≻ i\nnota xs[0] ≅ f\nnota f ≅ xs[0]"
         ),
         ["falsum", "falsum", "verum", "verum", "falsum", "falsum"]
     );

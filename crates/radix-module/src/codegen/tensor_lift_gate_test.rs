@@ -36,9 +36,9 @@ fn assert_rejected(target: Target, body: &str) {
 const LIFTED: &[&str] = &[
     "fixum tensor<f32, [2]> r ← a * 0.5",
     "fixum tensor<f32, [2]> r ← -a",
-    "fixum tensor<bivalens, [2]> r ← a > b",
+    "fixum tensor<bivalens, [2]> r ← a ≻ b",
     "fixum tensor<f32, [2]> r ← a ⤒ b",
-    "fixum tensor<f32, [2]> r ← (a > b) ✓ a ✗ b",
+    "fixum tensor<f32, [2]> r ← (a ≻ b) ✓ a ✗ b",
     "fixum tensor<f32, [2]> r ← a ÷ b",
 ];
 

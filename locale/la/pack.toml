@@ -768,6 +768,10 @@ help = "prius liga constructionem: genus tf32[2, 3] cum uncis vacuis in const tf
 message = "nihil generis scribitur `Genus` cum uncis vacuis; forma nuda abrogata est"
 help = "scribe genus cum uncis vacuis"
 
+[diagnostics.PARSE030.issues.comparison_ascii_retired]
+message = "the ASCII `{operator}` is not a comparison operator; comparison is spelled `{glyph}`"
+help = "write `{glyph}` for `{operator}` (`≤` and `≥` for the non-strict forms); `<` and `>` are generic angle brackets only"
+
 [diagnostics.PARSE030.issues.constructor_type_not_claimed]
 message = "nihil generis solum pro tensore, vectore et matrice est; genus collectionis ut lista non vindicatur"
 help = "scribe genus tensoris, vectoris vel matricis cum uncis vacuis, vel collectionem per litteram aedifica"

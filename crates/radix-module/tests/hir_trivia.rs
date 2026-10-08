@@ -490,7 +490,7 @@ fn partitioning_preserves_attachments() {
 #[test]
 fn nested_control_flow_blocks_retain_their_end_comments() {
     let source =
-        "functio f(numerus n) → vacuum {\n  si n < 0 {\n    nota \"neg\"\n    # inner end\n  }\n  # outer end\n}\n";
+        "functio f(numerus n) → vacuum {\n  si n ≺ 0 {\n    nota \"neg\"\n    # inner end\n  }\n  # outer end\n}\n";
     let (lowered, errors, interner) = lower_source(source);
     assert!(errors.is_empty(), "lower failed: {errors:?}");
     let presentation = &lowered.presentation;

@@ -49,7 +49,7 @@ fn condition_borrow_stays_live_across_back_edge() {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia in lista<numerus> view ← xs
-    dum view.longitudo() < 5 {
+    dum view.longitudo() ≺ 5 {
         xs.appende(4)
     }
 }
@@ -68,7 +68,7 @@ fn condition_borrow_write_before_condition_use_conflicts() {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia in lista<numerus> view ← xs
-    dum xs.longitudo() < 5 {
+    dum xs.longitudo() ≺ 5 {
         xs.appende(4)
         nota view.longitudo()
     }
@@ -87,10 +87,10 @@ fn nested_loop_releases_inner_borrow_before_outer_write() {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
-    dum i < 2 {
+    dum i ≺ 2 {
         varia in lista<numerus> view ← xs
         varia numerus j ← 0
-        dum j < 2 {
+        dum j ≺ 2 {
             nota view.longitudo()
             j ← j + 1
         }
@@ -112,10 +112,10 @@ fn nested_loop_write_while_inner_borrow_live_conflicts() {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
-    dum i < 2 {
+    dum i ≺ 2 {
         varia in lista<numerus> view ← xs
         varia numerus j ← 0
-        dum j < 2 {
+        dum j ≺ 2 {
             xs.appende(4)
             nota view.longitudo()
             j ← j + 1
@@ -137,7 +137,7 @@ fn perge_back_edge_does_not_resurrect_released_borrow() {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
-    dum i < 3 {
+    dum i ≺ 3 {
         varia in lista<numerus> view ← xs
         nota view.longitudo()
         xs.appende(4)
@@ -178,7 +178,7 @@ fn shared_condition_borrow_without_body_write_stays_clean() {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia de lista<numerus> view ← xs
-    dum view.longitudo() < 5 {
+    dum view.longitudo() ≺ 5 {
         rumpe
     }
 }
@@ -195,7 +195,7 @@ fn loop_body_borrow_live_at_later_write_conflicts() {
         r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    dum xs.longitudo() < 8 {
+    dum xs.longitudo() ≺ 8 {
         varia in lista<numerus> view ← xs
         xs.appende(4)
         nota view.longitudo()

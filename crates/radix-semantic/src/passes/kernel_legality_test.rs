@@ -60,7 +60,7 @@ fn structured_control_flow_in_a_kernel_loop_is_legal() {
 @ publica
 functio relu(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
     itera ex x apud [i] fixum v {
-        si v > 0.0 {
+        si v ≻ 0.0 {
             out[i] ← v
         } secus {
             out[i] ← 0.0

@@ -68,7 +68,7 @@ fn accepts_scalar_ops_structured_control_and_locals() {
 @ nucleum fragment
 functio helper(numerus x) → numerus {
     fixum numerus doubled ← x * 2
-    si doubled > 0 {
+    si doubled ≻ 0 {
         redde doubled
     } secus {
         redde 0

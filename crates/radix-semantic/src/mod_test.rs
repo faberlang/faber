@@ -228,7 +228,7 @@ fn lowering_issues(source: &str) -> Vec<(String, usize)> {
 #[test]
 fn top_level_statements_beside_incipit_are_rejected_one_per_statement() {
     let issues = lowering_issues(
-        "fixum numerus a ← 25\nsi a > 1 {\n    scribe \"x\"\n}\nsi a > 2 {\n    scribe \"y\"\n}\nsi a > 3 {\n    scribe \"z\"\n}\nincipit {\n    scribe \"m\"\n}\n",
+        "fixum numerus a ← 25\nsi a ≻ 1 {\n    scribe \"x\"\n}\nsi a ≻ 2 {\n    scribe \"y\"\n}\nsi a ≻ 3 {\n    scribe \"z\"\n}\nincipit {\n    scribe \"m\"\n}\n",
     );
     assert_eq!(
         issues,
@@ -242,7 +242,7 @@ fn top_level_statements_beside_incipit_are_rejected_one_per_statement() {
 
 #[test]
 fn top_level_statements_without_incipit_keep_the_implicit_entry() {
-    let issues = lowering_issues("fixum numerus a ← 25\nsi a > 1 {\n    scribe \"x\"\n}\n");
+    let issues = lowering_issues("fixum numerus a ← 25\nsi a ≻ 1 {\n    scribe \"x\"\n}\n");
     assert!(issues.is_empty(), "unexpected issues: {issues:?}");
 }
 

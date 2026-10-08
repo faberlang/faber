@@ -14,7 +14,7 @@ fn rust_single_command_cli_generates_compilable_parser_and_runtime_behavior() {
     let source = r#"
 @ cli "tool"
 incipit argumenta args {
-  si args.longitudo() > 0 {
+  si args.longitudo() ≻ 0 {
     nota args[0]
   }
 }
@@ -53,7 +53,7 @@ fn rust_single_command_cli_reports_parse_errors() {
     let source = r#"
 @ cli "tool"
 incipit argumenta args {
-  si args.longitudo() > 0 {
+  si args.longitudo() ≻ 0 {
     nota args[0]
   }
 }

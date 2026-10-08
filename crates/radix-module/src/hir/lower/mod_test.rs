@@ -262,10 +262,10 @@ fn lowers_custodi_to_first_class_statement_in_source_order() {
     let source = r"
 functio probe(numerus n) → numerus {
   custodi {
-    si n < 0 {
+    si n ≺ 0 {
       redde -1
     }
-    si n > 100 {
+    si n ≻ 100 {
       redde 100
     }
   }

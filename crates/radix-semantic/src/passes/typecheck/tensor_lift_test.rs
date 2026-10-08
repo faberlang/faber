@@ -245,12 +245,12 @@ functio i(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u16, [2]> { redde a 
 fn comparisons_produce_a_bivalens_tensor() {
     // Numeric comparisons lift per element; `≡ ≠` compare whole values and are
     // pinned in `aggregate_compare_test`.
-    for op in ["<", ">", "≤", "≥", "≅", "≇"] {
+    for op in ["≺", "≻", "≤", "≥", "≅", "≇"] {
         accepts(&format!(
             "functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<bivalens, [2, 2]> {{ redde a {op} b }}"
         ));
     }
-    for op in ["<", ">", "≤", "≥", "≅", "≇"] {
+    for op in ["≺", "≻", "≤", "≥", "≅", "≇"] {
         accepts(&format!(
             "functio f(tensor<f32, [2, 2]> a) → tensor<bivalens, [2, 2]> {{ redde a {op} 0.0 }}"
         ));
@@ -258,10 +258,10 @@ fn comparisons_produce_a_bivalens_tensor() {
             "functio f(tensor<f32, [2, 2]> a) → tensor<bivalens, [2, 2]> {{ redde 1.0 {op} a }}"
         ));
     }
-    accepts("functio f(tensor<u8, [3]> a) → tensor<bivalens, [3]> { redde a > 100 }");
+    accepts("functio f(tensor<u8, [3]> a) → tensor<bivalens, [3]> { redde a ≻ 100 }");
     // The result is a tensor, never a scalar.
     rejects(
-        "functio f(tensor<f32, [2]> a, tensor<f32, [2]> b) → bivalens { redde a > b }",
+        "functio f(tensor<f32, [2]> a, tensor<f32, [2]> b) → bivalens { redde a ≻ b }",
         SemanticErrorKind::TypeMismatch,
         "return_type_mismatch",
         &[],
@@ -280,7 +280,7 @@ fn exact_equality_needs_identical_elements_and_value_equality_does_not() {
         "functio f(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<bivalens, [2]> { redde a ≅ b }",
     );
     accepts(
-        "functio f(tensor<i32, [2]> a, tensor<f32, [2]> b) → tensor<bivalens, [2]> { redde a < b }",
+        "functio f(tensor<i32, [2]> a, tensor<f32, [2]> b) → tensor<bivalens, [2]> { redde a ≺ b }",
     );
 }
 
@@ -301,7 +301,7 @@ fn approximate_comparison_is_deferred_to_the_numeric_contract() {
 #[test]
 fn comparison_shapes_must_match() {
     rejects(
-        "functio f(tensor<f32, [2, 2]> a, tensor<f32, [3, 2]> b) → tensor<bivalens, [2, 2]> { redde a > b }",
+        "functio f(tensor<f32, [2, 2]> a, tensor<f32, [3, 2]> b) → tensor<bivalens, [2, 2]> { redde a ≻ b }",
         SemanticErrorKind::TypeMismatch,
         "incompatible_tensor_index",
         &[],
@@ -317,7 +317,7 @@ fn logic_lifts_over_bivalens_tensors() {
 functio g(tensor<bivalens, [2]> a, tensor<bivalens, [2]> b) → tensor<bivalens, [2]> { redde a aut b }
 functio h(tensor<bivalens, [2]> a) → tensor<bivalens, [2]> { redde non a }
 functio i(tensor<bivalens, [2]> a) → tensor<bivalens, [2]> { redde a et verum }
-functio j(tensor<f32, [2]> a, tensor<f32, [2]> b) → tensor<bivalens, [2]> { redde (a > b) aut (a < b) }",
+functio j(tensor<f32, [2]> a, tensor<f32, [2]> b) → tensor<bivalens, [2]> { redde (a ≻ b) aut (a ≺ b) }",
     );
     operands_invalid(
         "functio f(tensor<f32, [2]> a, tensor<f32, [2]> b) → tensor<bivalens, [2]> { redde a et b }",
@@ -332,12 +332,12 @@ functio j(tensor<f32, [2]> a, tensor<f32, [2]> b) → tensor<bivalens, [2]> { re
 #[test]
 fn select_lifts_the_value_conditional_over_a_mask() {
     accepts(
-        r"functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> { redde (a > b) ✓ a ✗ b }
-functio g(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a > 0.0) ✓ a ✗ 0.0 }
-functio h(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a > 0.0) ✓ 1.0 ✗ a }
-functio i(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a > 0.0) ✓ 1.0 ✗ 0.0 }",
+        r"functio f(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> { redde (a ≻ b) ✓ a ✗ b }
+functio g(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a ≻ 0.0) ✓ a ✗ 0.0 }
+functio h(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a ≻ 0.0) ✓ 1.0 ✗ a }
+functio i(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> { redde (a ≻ 0.0) ✓ 1.0 ✗ 0.0 }",
     );
-    accepts("functio f(tensor<u8, [3]> a) → tensor<u8, [3]> { redde (a > 100) ✓ a ✗ 0 }");
+    accepts("functio f(tensor<u8, [3]> a) → tensor<u8, [3]> { redde (a ≻ 100) ✓ a ✗ 0 }");
 }
 
 #[test]
@@ -349,7 +349,7 @@ fn select_needs_a_bivalens_mask_and_same_shape_branches() {
         &[],
     );
     rejects(
-        "functio f(tensor<f32, [2, 2]> a, tensor<f32, [3, 2]> b) → tensor<f32, [2, 2]> { redde (a > a) ✓ a ✗ b }",
+        "functio f(tensor<f32, [2, 2]> a, tensor<f32, [3, 2]> b) → tensor<f32, [2, 2]> { redde (a ≻ a) ✓ a ✗ b }",
         SemanticErrorKind::TypeMismatch,
         "incompatible_tensor_index",
         &[],

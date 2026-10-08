@@ -54,7 +54,7 @@ test "adds" {
 }
 test "counts" {
     var int i ← 0
-    while i < 8 {
+    while i ≺ 8 {
         i ← i + 1
     }
     assert i ≡ 8

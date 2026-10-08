@@ -330,7 +330,7 @@ fn arg_expr(kind: IntrinsicParamKind, dtype: &Dtype, receiver_expr: &str) -> Str
         IntrinsicParamKind::NumerusIndex => "0".into(),
         IntrinsicParamKind::Textus | IntrinsicParamKind::TextusOrReplacer => "\"xy\"".into(),
         IntrinsicParamKind::SetInner => "altera".into(),
-        IntrinsicParamKind::Predicate => format!("{} x ∴ x > {}", dtype.el_ty, dtype.el),
+        IntrinsicParamKind::Predicate => format!("{} x ∴ x ≻ {}", dtype.el_ty, dtype.el),
         IntrinsicParamKind::Mapper => format!("{} x ∴ x * 2", dtype.el_ty),
         IntrinsicParamKind::Reducer => {
             format!("({} collectus, {} x) ∴ collectus + x", dtype.el_ty, dtype.el_ty)

@@ -221,7 +221,7 @@ fn a_shape_known_only_at_run_time_is_a_value_question() {
 
 #[test]
 fn a_register_comparison_gives_a_bool_register_of_the_same_shape() {
-    for op in ["<", ">", "≤", "≥", "≅", "≇"] {
+    for op in ["≺", "≻", "≤", "≥", "≅", "≇"] {
         accepts(&function(
             &format!("{V} a, {V} b"),
             "vector<bivalens, 3>",
@@ -258,7 +258,7 @@ fn a_register_comparison_gives_a_bool_register_of_the_same_shape() {
 #[test]
 fn a_register_comparison_is_never_a_scalar() {
     rejects(
-        &function(&format!("{V} a, {V} b"), "bivalens", "a < b"),
+        &function(&format!("{V} a, {V} b"), "bivalens", "a ≺ b"),
         SemanticErrorKind::TypeMismatch,
         "return_type_mismatch",
         &[],
@@ -276,12 +276,12 @@ fn register_comparisons_join_elements_by_value_as_scalars_do() {
     accepts(&function(
         "vector<i32, 3> a, vector<f32, 3> b",
         "vector<bivalens, 3>",
-        "a < b",
+        "a ≺ b",
     ));
     accepts(&function(
         "vector<u8, 3> a",
         "vector<bivalens, 3>",
-        "a > 100",
+        "a ≻ 100",
     ));
     accepts(&function(
         "matrix<u8, [2, 2]> a, matrix<u16, [2, 2]> b",
@@ -296,7 +296,7 @@ fn register_comparisons_need_the_same_shape_and_numeric_operands() {
         &function(
             "vector<f32, 3> a, vector<f32, 4> b",
             "vector<bivalens, 3>",
-            "a < b",
+            "a ≺ b",
         ),
         SemanticErrorKind::TypeMismatch,
         "incompatible_tensor_index",
@@ -316,7 +316,7 @@ fn register_comparisons_need_the_same_shape_and_numeric_operands() {
         &function(
             &format!("{V} a, bivalens s"),
             "vector<bivalens, 3>",
-            "a < s",
+            "a ≺ s",
         ),
         SemanticErrorKind::OperandTypesInvalid,
         "numeric_operands_required",
@@ -354,7 +354,7 @@ functio i(vector<bivalens, 3> a) → vector<bivalens, 3> { redde a et verum }
 functio j(vector<bivalens, 3> a) → vector<bivalens, 3> { redde falsum aut a }
 functio k(matrix<bivalens, [2, 2]> a, matrix<bivalens, [2, 2]> b) → matrix<bivalens, [2, 2]> { redde a et b }
 functio l(matrix<bivalens, [2, 2]> a) → matrix<bivalens, [2, 2]> { redde non a }
-functio m(vector<f32, 3> a, vector<f32, 3> b) → vector<bivalens, 3> { redde (a > b) aut (a < b) }",
+functio m(vector<f32, 3> a, vector<f32, 3> b) → vector<bivalens, 3> { redde (a ≻ b) aut (a ≺ b) }",
     );
 }
 
@@ -387,21 +387,21 @@ fn logic_over_registers_needs_bool_elements_and_one_shape() {
 #[test]
 fn select_lifts_over_a_bool_register_mask() {
     accepts(
-        r"functio f(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> { redde (a > b) ✓ a ✗ b }
-functio g(vector<f32, 3> a) → vector<f32, 3> { redde (a > 0.0) ✓ a ✗ 0.0 }
-functio h(vector<f32, 3> a) → vector<f32, 3> { redde (a > 0.0) ✓ 1.0 ✗ 0.0 }
-functio i(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> { redde (a > b) ✓ a ✗ b }
-functio j(matrix<f32, [2, 2]> a) → matrix<f32, [2, 2]> { redde (a > 0.0) ✓ a ✗ 0.0 }",
+        r"functio f(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> { redde (a ≻ b) ✓ a ✗ b }
+functio g(vector<f32, 3> a) → vector<f32, 3> { redde (a ≻ 0.0) ✓ a ✗ 0.0 }
+functio h(vector<f32, 3> a) → vector<f32, 3> { redde (a ≻ 0.0) ✓ 1.0 ✗ 0.0 }
+functio i(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> { redde (a ≻ b) ✓ a ✗ b }
+functio j(matrix<f32, [2, 2]> a) → matrix<f32, [2, 2]> { redde (a ≻ 0.0) ✓ a ✗ 0.0 }",
     );
     // A branch of another kind or shape is rejected.
     rejects(
-        "functio f(vector<f32, 3> a, vector<f32, 4> b) → vector<f32, 3> { redde (a > a) ✓ a ✗ b }",
+        "functio f(vector<f32, 3> a, vector<f32, 4> b) → vector<f32, 3> { redde (a ≻ a) ✓ a ✗ b }",
         SemanticErrorKind::TypeMismatch,
         "incompatible_tensor_index",
         &[],
     );
     rejects(
-        "functio f(vector<f32, 3> a, tensor<f32, [3]> b) → vector<f32, 3> { redde (a > a) ✓ a ✗ b }",
+        "functio f(vector<f32, 3> a, tensor<f32, [3]> b) → vector<f32, 3> { redde (a ≻ a) ✓ a ✗ b }",
         SemanticErrorKind::OperandTypesInvalid,
         "common_type_mismatch",
         &[],

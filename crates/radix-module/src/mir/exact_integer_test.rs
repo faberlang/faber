@@ -177,7 +177,7 @@ fn integer_float_comparison_is_exact() {
     // ruling 22.
     assert_eq!(
         ok(
-            "varia numerus a ← 9007199254740993\nvaria fractus f ← 9007199254740992.0\nnota a > f\nnota a ≅ f\nnota a ≇ f"
+            "varia numerus a ← 9007199254740993\nvaria fractus f ← 9007199254740992.0\nnota a ≻ f\nnota a ≅ f\nnota a ≇ f"
         ),
         ["verum", "falsum", "verum"]
     );
@@ -188,7 +188,7 @@ fn decimal_float_comparison_is_exact() {
     // ruling 22: 0.1d64 is below the float nearest 0.1.
     assert_eq!(
         ok(
-            "varia d64 d ← 0.1\nvaria fractus f ← 0.1\nvaria fractus g ← 0.5\nnota d < f\nnota d > f\nnota d ≅ f\nnota d ≺ g"
+            "varia d64 d ← 0.1\nvaria fractus f ← 0.1\nvaria fractus g ← 0.5\nnota d ≺ f\nnota d ≻ f\nnota d ≅ f\nnota d ≺ g"
         ),
         ["verum", "falsum", "falsum", "verum"]
     );
@@ -323,7 +323,7 @@ fn bitnot_of_u64_stores_into_int_as_a_checked_narrowing() {
 fn decimal_beside_a_nonconstant_integer_compares_exactly() {
     // f3 (ruling 22): no `d64` conversion, so a huge integer does not trap.
     assert_eq!(
-        ok("varia d64 d ← 0.5\nvaria numerus i ← 9223372036854775807\nnota d < i\nnota i > d\nnota d ≅ i\nnota i ≇ d"),
+        ok("varia d64 d ← 0.5\nvaria numerus i ← 9223372036854775807\nnota d ≺ i\nnota i ≻ d\nnota d ≅ i\nnota i ≇ d"),
         ["verum", "verum", "falsum", "verum"]
     );
     assert_eq!(
@@ -331,7 +331,7 @@ fn decimal_beside_a_nonconstant_integer_compares_exactly() {
         ["verum", "verum", "falsum", "falsum"]
     );
     assert_eq!(
-        ok("varia d64 d ← -0.5\nvaria u64 u ← 18446744073709551615\nnota d < u\nnota u < d"),
+        ok("varia d64 d ← -0.5\nvaria u64 u ← 18446744073709551615\nnota d ≺ u\nnota u ≺ d"),
         ["verum", "falsum"]
     );
 }

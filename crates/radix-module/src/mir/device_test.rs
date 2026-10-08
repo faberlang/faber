@@ -1138,7 +1138,7 @@ fn gpu_control_device_safe_accepts_structured_scalar_loop() {
 @ nucleum
 functio countdown(f32 x) → f32 {
     varia f32 y ← x
-    dum y > 0.0 {
+    dum y ≻ 0.0 {
         y ← y - 1.0
     }
     redde y
@@ -1162,8 +1162,8 @@ fn gpu_control_device_safe_accepts_structured_scalar_loop_break() {
 @ nucleum
 functio countdown(f32 x) → f32 {
     varia f32 y ← x
-    dum y > 0.0 {
-        si y < 2.0 {
+    dum y ≻ 0.0 {
+        si y ≺ 2.0 {
             rumpe
         }
         y ← y - 1.0
@@ -1189,8 +1189,8 @@ fn gpu_control_device_safe_accepts_structured_scalar_loop_continue() {
 @ nucleum
 functio countdown(f32 x) → f32 {
     varia f32 y ← x
-    dum y > 0.0 {
-        si y < 2.0 {
+    dum y ≻ 0.0 {
+        si y ≺ 2.0 {
             perge
         }
         y ← y - 1.0
@@ -1216,8 +1216,8 @@ fn gpu_control_device_safe_accepts_nested_scalar_loop_branch() {
 @ nucleum
 functio countdown(f32 x) → f32 {
     varia f32 y ← x
-    dum y > 0.0 {
-        si y > 2.0 {
+    dum y ≻ 0.0 {
+        si y ≻ 2.0 {
             y ← y - 1.0
         }
         y ← y - 1.0
@@ -1234,7 +1234,7 @@ fn gpu_control_device_safe_accepts_structured_indexed_switch_write() {
     let source = r"
 @ nucleum
 functio choose(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
-    elige id > id {
+    elige id ≻ id {
         casu verum {
             output[id] ← input[id]
         }
@@ -1282,7 +1282,7 @@ fn gpu_control_device_safe_accepts_structured_indexed_value_join_branch() {
 @ nucleum
 functio choose(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia f32 selected ← 0.0
-    si id > id {
+    si id ≻ id {
         selected ← input[id]
     } secus {
         selected ← 0.0
@@ -1300,7 +1300,7 @@ fn gpu_control_device_safe_accepts_structured_indexed_loop_write() {
 @ nucleum
 functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
-    dum count < 1 {
+    dum count ≺ 1 {
         output[id] ← input[id]
         count ↑
     }
@@ -1324,8 +1324,8 @@ fn gpu_control_device_safe_accepts_structured_indexed_loop_break() {
 @ nucleum
 functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
-    dum count < 2 {
-        si count > 0 {
+    dum count ≺ 2 {
+        si count ≻ 0 {
             rumpe
         }
         output[id] ← input[id]
@@ -1351,8 +1351,8 @@ fn gpu_control_device_safe_accepts_structured_indexed_loop_continue() {
 @ nucleum
 functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
-    dum count < 2 {
-        si count > 0 {
+    dum count ≺ 2 {
+        si count ≻ 0 {
             perge
         }
         output[id] ← input[id]
@@ -1378,8 +1378,8 @@ fn gpu_control_device_safe_accepts_nested_indexed_loop_branch() {
 @ nucleum
 functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
-    dum count < 2 {
-        si count > 0 {
+    dum count ≺ 2 {
+        si count ≻ 0 {
             count ↑
         }
         output[id] ← input[id]
@@ -1397,9 +1397,9 @@ fn gpu_control_device_safe_accepts_nested_indexed_loop_break() {
 @ nucleum
 functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
-    dum count < 3 {
-        si count > 0 {
-            si count > 1 {
+    dum count ≺ 3 {
+        si count ≻ 0 {
+            si count ≻ 1 {
                 rumpe
             }
             count ↑
@@ -1419,9 +1419,9 @@ fn gpu_control_device_safe_accepts_nested_indexed_loop_continue() {
 @ nucleum
 functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
-    dum count < 3 {
-        si count > 0 {
-            si count > 1 {
+    dum count ≺ 3 {
+        si count ≻ 0 {
+            si count ≻ 1 {
                 perge
             }
             count ↑
@@ -1442,8 +1442,8 @@ fn gpu_control_device_safe_rejects_side_effecting_nested_indexed_loop_branch() {
 functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     varia u32 side ← 0
-    dum count < 2 {
-        si count > 0 {
+    dum count ≺ 2 {
+        si count ≻ 0 {
             side ↑
             count ↑
         }
@@ -1463,9 +1463,9 @@ fn gpu_control_device_safe_rejects_side_effecting_nested_indexed_loop_control() 
 functio fill(tf32[4] input, in tf32[4] output, u32 id) → vacuum {
     varia u32 count ← 0
     varia u32 side ← 0
-    dum count < 3 {
-        si count > 0 {
-            si count > 1 {
+    dum count ≺ 3 {
+        si count ≻ 0 {
+            si count ≻ 1 {
                 rumpe
             }
             side ↑

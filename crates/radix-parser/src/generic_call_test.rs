@@ -91,7 +91,7 @@ fn parses_explicit_type_args_on_receiver_method_call() {
 
 #[test]
 fn comparison_expression_still_parses_as_binary() {
-    let result = parse_ok(
+    let result = crate::test_support::parse_recovering_ascii_comparison(
         r"incipit {
     fixum bivalens ok ← a < b
 }",

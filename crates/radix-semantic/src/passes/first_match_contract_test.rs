@@ -68,7 +68,7 @@ fn first_match_total_evaluation_observes_post_match_predicate_error() {
     let errors = base_errors(
         r"
 functio t(tf32[4] a) → fractus ∪ nihil ⇥ textus {
-    redde primus_quem(a, ubi x { (x ↦ u8) > 0 })
+    redde primus_quem(a, ubi x { (x ↦ u8) ≻ 0 })
 }
 ",
     );
@@ -82,7 +82,7 @@ fn first_match_no_match_yields_nihil() {
     let errors = base_errors(
         r"
 functio t(tf32[4] a) → fractus ∪ nihil {
-    redde primus_quem(a, ubi x { x < 0.0 })
+    redde primus_quem(a, ubi x { x ≺ 0.0 })
 }
 ",
     );
@@ -96,7 +96,7 @@ fn first_match_empty_source_yields_nihil() {
     let errors = base_errors(
         r"
 functio t(tf32[0] a) → fractus ∪ nihil {
-    redde primus_quem(a, ubi x { x > 0.0 })
+    redde primus_quem(a, ubi x { x ≻ 0.0 })
 }
 ",
     );
@@ -112,7 +112,7 @@ fn first_match_predicate_error_propagates_never_becomes_nihil() {
     let errors = base_errors(
         r"
 functio t(tf32[4] a) → fractus ∪ nihil ⇥ textus {
-    redde primus_quem(a, ubi x { (x ↦ u8) > 100 })
+    redde primus_quem(a, ubi x { (x ↦ u8) ≻ 100 })
 }
 ",
     );
@@ -130,7 +130,7 @@ fn air_lane_admits_dedicated_first_match_head() {
         r#"
 @ radix lane "air"
 functio keep(fractus x) → bivalens {
-    redde x > 0.0
+    redde x ≻ 0.0
 }
 
 @ radix lane "air"
@@ -161,7 +161,7 @@ fn filtrata_primus_composition_is_not_air_admitted_end_to_end() {
         r#"
 @ radix lane "air"
 functio keep(fractus x) → bivalens {
-    redde x > 0.0
+    redde x ≻ 0.0
 }
 
 @ radix lane "air"
@@ -211,7 +211,7 @@ fn air_first_match_literal_array_source_admits_route_t() {
         r#"
 @ radix lane "air"
 functio pick() → fractus ∪ nihil {
-    redde primus_quem([1.0, -2.0, 3.0], ubi x { x > 0.0 })
+    redde primus_quem([1.0, -2.0, 3.0], ubi x { x ≻ 0.0 })
 }
 "#,
     );
@@ -225,7 +225,7 @@ fn air_first_match_static_tensor_shape_admits_route_m() {
         r#"
 @ radix lane "air"
 functio keep(fractus x) → bivalens {
-    redde x > 0.0
+    redde x ≻ 0.0
 }
 
 @ radix lane "air"
@@ -245,7 +245,7 @@ fn air_first_match_zero_extent_tensor_admits_empty_nihil() {
         r#"
 @ radix lane "air"
 functio pick(tf32[0] x) → fractus ∪ nihil {
-    redde primus_quem(x, ubi v { v > 0.0 })
+    redde primus_quem(x, ubi v { v ≻ 0.0 })
 }
 "#,
     );
@@ -259,7 +259,7 @@ fn air_first_match_unbounded_lista_param_declines_not_bounded() {
         r#"
 @ radix lane "air"
 functio pick(lista<f32> xs) → fractus ∪ nihil {
-    redde primus_quem(xs, ubi v { v > 0.0 })
+    redde primus_quem(xs, ubi v { v ≻ 0.0 })
 }
 "#,
     );
@@ -288,7 +288,7 @@ fn air_first_match_unbounded_lista_local_path_declines_not_bounded() {
 @ radix lane "air"
 functio pick(numerus n) → fractus ∪ nihil {
     fixum lista<f32> xs ← [1.0, 2.0, 3.0]
-    redde primus_quem(xs, ubi v { v > n })
+    redde primus_quem(xs, ubi v { v ≻ n })
 }
 "#,
     );
@@ -308,7 +308,7 @@ functio pick(numerus n) → fractus ∪ nihil {
         r#"
 @ radix lane "air"
 functio pick2(numerus n) → fractus ∪ nihil {
-    redde primus_quem([1.0, 2.0, 3.0], ubi v { v > n })
+    redde primus_quem([1.0, 2.0, 3.0], ubi v { v ≻ n })
 }
 "#,
     );

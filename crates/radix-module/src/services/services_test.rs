@@ -2026,7 +2026,7 @@ fn mir_output_for_source_returns_error_for_invalid_syntax() {
 fn mir_output_for_control_flow_source_returns_deterministic_text() {
     let output = mir_output_for_source(
         "main.fab",
-        "functio signum(numerus n) → numerus { si n > 0 ergo redde n redde 0 }",
+        "functio signum(numerus n) → numerus { si n ≻ 0 ergo redde n redde 0 }",
     )
     .expect("MIR output");
 

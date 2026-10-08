@@ -71,7 +71,7 @@ main {
     print inferred
 
     # 7. Comparisons are exact, including across signedness.
-    print a > -1
+    print a ≻ -1
 
     # A trapping slot aborts on a value it cannot hold; 400 does not fit in `u8`:
     #   const u8 bad ← a + b

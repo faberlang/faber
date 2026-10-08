@@ -58,7 +58,7 @@ const OWN_AND_CALLEE_BLOCKED: &str = r#"functio impura(numerus x) → numerus {
 }
 
 functio caller(numerus x) → numerus {
-    adfirma x > 0
+    adfirma x ≻ 0
     redde impura(x)
 }
 "#;

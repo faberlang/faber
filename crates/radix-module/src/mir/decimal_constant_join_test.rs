@@ -61,7 +61,7 @@ fn approx_equality_takes_the_decimal_constant() {
 #[test]
 fn ordering_takes_the_decimal_constant() {
     assert_eq!(
-        main_body("nota d < 0.1\nnota d > 4.19\nnota d ≤ 4.2\nnota d ≥ 5"),
+        main_body("nota d ≺ 0.1\nnota d ≻ 4.19\nnota d ≤ 4.2\nnota d ≥ 5"),
         ["falsum", "verum", "verum", "falsum"]
     );
 }

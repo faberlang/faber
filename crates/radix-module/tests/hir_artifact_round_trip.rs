@@ -292,7 +292,7 @@ fn structural_end_count_parity_across_splicing_paths() {
 functio fac_dum(numerus n) → numerus {
     fac {
         nota n
-    } dum n > 0
+    } dum n ≻ 0
     redde n
 }
 

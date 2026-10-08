@@ -288,7 +288,7 @@ fn dum_back_edge_releases_mutable_borrow_before_source_write() {
     let source = r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    dum xs.longitudo() < 5 {
+    dum xs.longitudo() ≺ 5 {
         varia in lista<numerus> view ← xs
         nota view.longitudo()
         xs.appende(4)
@@ -330,7 +330,7 @@ fn cyclic_release_does_not_weaken_conflict_when_borrow_still_live() {
         r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    dum xs.longitudo() < 5 {
+    dum xs.longitudo() ≺ 5 {
         varia in lista<numerus> view ← xs
         xs.appende(4)
         nota view.longitudo()
@@ -356,7 +356,7 @@ fn production_path_consumes_the_handoff_table() {
         r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    dum xs.longitudo() < 5 {
+    dum xs.longitudo() ≺ 5 {
         varia in lista<numerus> view ← xs
         nota view.longitudo()
         xs.appende(4)
@@ -375,7 +375,7 @@ fn dum_cfg_has_condition_body_back_edge_and_exit() {
     let source = r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    dum xs.longitudo() < 5 {
+    dum xs.longitudo() ≺ 5 {
         varia in lista<numerus> view ← xs
         nota view.longitudo()
         xs.appende(4)
@@ -468,7 +468,7 @@ fn region_solver_converges_on_both_cyclic_shapes() {
         r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    dum xs.longitudo() < 5 {
+    dum xs.longitudo() ≺ 5 {
         varia in lista<numerus> view ← xs
         nota view.longitudo()
         xs.appende(4)
@@ -739,11 +739,11 @@ incipit {
     varia numerus n ← 0
     fac {
         n ← n + 1
-        si n < 3 {
+        si n ≺ 3 {
             perge
         }
         nota n
-    } dum n < 5
+    } dum n ≺ 5
 }
 ",
     );
@@ -758,12 +758,12 @@ incipit {
     fac {
         n ← n + 1
         fac {
-            si n < 3 {
+            si n ≺ 3 {
                 perge
             }
         }
         nota n
-    } dum n < 5
+    } dum n ≺ 5
 }
 ",
     );
@@ -782,12 +782,12 @@ incipit {
     varia in lista<numerus> view ← xs
     fac {
         n ← n + 1
-        si n < 3 {
+        si n ≺ 3 {
             xs.appende(4)
             perge
         }
         rumpe
-    } dum view.longitudo() < 10
+    } dum view.longitudo() ≺ 10
 }
 ",
     );

@@ -272,10 +272,10 @@ fn modular_word_compares_with_numerus_by_value() {
     test_support::assert_accepts(
         r"
 functio compare(modulus<u32> x, u32 y) → bivalens {
-    redde x > y
+    redde x ≻ y
 }
 functio constant(modulus<u8> a) → bivalens {
-    redde a > 100 et a ≅ 200 et 3 ≺ a et a ≇ 7
+    redde a ≻ 100 et a ≅ 200 et 3 ≺ a et a ≇ 7
 }
 ",
     );

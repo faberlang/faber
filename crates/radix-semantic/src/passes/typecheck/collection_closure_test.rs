@@ -18,7 +18,7 @@ fn en_pack() -> LocalePack {
 fn set_filtrata_named_predicate_returns_set_of_element() {
     crate::test_support::assert_accepts(
         r"functio keep(numerus n) → bivalens {
-    redde n > 2
+    redde n ≻ 2
 }
 
 functio large(copia<numerus> s) → copia<numerus> {
@@ -31,7 +31,7 @@ functio large(copia<numerus> s) → copia<numerus> {
 fn set_filtrata_inline_predicate_closure_typechecks() {
     crate::test_support::assert_accepts(
         r"functio large(copia<numerus> s) → copia<numerus> {
-    redde s.filtrata(_ n ∴ n > 2)
+    redde s.filtrata(_ n ∴ n ≻ 2)
 }",
     );
 }
@@ -40,7 +40,7 @@ fn set_filtrata_inline_predicate_closure_typechecks() {
 fn set_filtrata_result_is_a_set_not_a_list() {
     let unit = crate::test_support::analyze_ok(
         r"functio large(copia<numerus> s) → copia<numerus> {
-    redde s.filtrata(_ n ∴ n > 2)
+    redde s.filtrata(_ n ∴ n ≻ 2)
 }",
     );
     let hir = unit.hir.as_ref().expect("HIR");
@@ -65,7 +65,7 @@ fn set_filtrata_result_is_a_set_not_a_list() {
 fn set_filtrata_result_is_not_a_lista() {
     crate::test_support::assert_rejects_with_issue(
         r"functio bad(copia<numerus> s) → lista<numerus> {
-    redde s.filtrata(_ n ∴ n > 2)
+    redde s.filtrata(_ n ∴ n ≻ 2)
 }",
         "return_type_mismatch",
     );
@@ -75,7 +75,7 @@ fn set_filtrata_result_is_not_a_lista() {
 fn set_filtrata_rejects_wrong_element_predicate() {
     crate::test_support::assert_rejects_with_issue(
         r"functio keep(textus t) → bivalens {
-    redde t.longitudo() > 0
+    redde t.longitudo() ≻ 0
 }
 
 functio bad(copia<numerus> s) → copia<numerus> {
@@ -88,7 +88,7 @@ functio bad(copia<numerus> s) → copia<numerus> {
 #[test]
 fn en_set_filter_surface_resolves_to_filtrata() {
     let source = r"fn keep(int n) → bool {
-    return n > 2
+    return n ≻ 2
 }
 
 fn large(set<int> s) → set<int> {
@@ -103,7 +103,7 @@ fn large(set<int> s) → set<int> {
 #[test]
 fn en_set_filter_result_is_not_a_list() {
     let source = r"fn keep(int n) → bool {
-    return n > 2
+    return n ≻ 2
 }
 
 fn bad(set<int> s) → list<int> {

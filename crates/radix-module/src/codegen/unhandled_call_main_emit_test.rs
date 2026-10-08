@@ -8,19 +8,19 @@ use crate::driver::{Config, ModuleCompileRequest, Session};
 
 const DECLS: &str = r#"
 functio risky(numerus n) → numerus ⇥ textus {
-    si n < 0 { iace "negative input" }
+    si n ≺ 0 { iace "negative input" }
     redde n + 1
 }
 
 functio check(numerus n) → vacuum ⇥ textus {
-    si n < 0 { iace "check failed" }
+    si n ≺ 0 { iace "check failed" }
 }
 
 genus Konto {
     varia numerus saldo
 
     functio nimm(numerus n) → numerus ⇥ textus {
-        si n > ego.saldo { iace "insufficient funds" }
+        si n ≻ ego.saldo { iace "insufficient funds" }
         redde ego.saldo - n
     }
 }
@@ -170,7 +170,7 @@ discretio GuardError {
 }
 
 functio guarded(numerus value) → numerus ⇥ GuardError {
-    si value < 0 { iace finge Invalid { causa = "negative" } }
+    si value ≺ 0 { iace finge Invalid { causa = "negative" } }
     redde value
 }
 

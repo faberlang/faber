@@ -99,9 +99,12 @@ fn collection_type_zero_is_refused_by_name() {
 }
 
 #[test]
-fn ascii_comparison_with_a_type_word_name_still_parses() {
+fn comparison_with_a_type_word_name_still_parses() {
+    let result = parse_source("fixum int vector ← 5\nfixum bivalens b ← vector ≺ 7");
+    assert!(result.success(), "{:?}", result.errors);
+    let result = parse_source("fixum int tensor ← 5\nfixum bivalens b ← tensor ≺ 7");
+    assert!(result.success(), "{:?}", result.errors);
+    // The retired ASCII form still recovers as a comparison, reporting only itself.
     let result = parse_source("fixum int vector ← 5\nfixum bivalens b ← vector < 7");
-    assert!(result.success(), "{:?}", result.errors);
-    let result = parse_source("fixum int tensor ← 5\nfixum bivalens b ← tensor < 7");
-    assert!(result.success(), "{:?}", result.errors);
+    assert_eq!(issues(&result), vec!["comparison_ascii_retired".to_owned()]);
 }

@@ -995,6 +995,10 @@ help = "bind the constructor first: const tf32[2, 3] a ← the type tf32[2, 3] f
 message = "the typed zero of a type is written `Type` followed by empty braces; the bare type form is retired"
 help = "write the zero as the type followed by empty braces"
 
+[diagnostics.PARSE030.issues.comparison_ascii_retired]
+message = "the ASCII `{operator}` is not a comparison operator; comparison is spelled `{glyph}`"
+help = "write `{glyph}` for `{operator}` (`≤` and `≥` for the non-strict forms); `<` and `>` are generic angle brackets only"
+
 [diagnostics.PARSE030.issues.constructor_type_not_claimed]
 message = "the typed zero exists only for tensor, vector and matrix types; a collection type such as list is not claimed"
 help = "write a tensor, vector or matrix type followed by empty braces, or build the collection with a literal"

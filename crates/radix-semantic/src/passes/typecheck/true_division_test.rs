@@ -93,7 +93,7 @@ fn cross_family_comparison_is_accepted() {
         ("f32", "i64"),
         ("f64", "d64"),
     ] {
-        for glyph in ["<", ">", "≤", "≥", "≅", "≇", "≈", "≉"] {
+        for glyph in ["≺", "≻", "≤", "≥", "≅", "≇", "≈", "≉"] {
             assert_accepts(&format!(
                 "functio p({lhs} a, {rhs} b) → bivalens {{ redde a {glyph} b }}"
             ));

@@ -37,7 +37,7 @@ locale = "en"
 # EXPECTED stdout: see lift-compare.expected
 
 fn below(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<bool, [2, 2]> {
-    return a < b
+    return a ≺ b
 }
 
 fn at_least(matrix<f32, [2, 2]> a, f32 s) → matrix<bool, [2, 2]> {
@@ -45,7 +45,7 @@ fn at_least(matrix<f32, [2, 2]> a, f32 s) → matrix<bool, [2, 2]> {
 }
 
 fn bigger_than(f32 s, matrix<f32, [2, 2]> a) → matrix<bool, [2, 2]> {
-    return s > a
+    return s ≻ a
 }
 
 fn cell_equal(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<bool, [2, 2]> {
@@ -57,7 +57,7 @@ fn cell_apart(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<bool, [2,
 }
 
 fn clamped(matrix<f32, [2, 2]> a, f32 limit) → matrix<f32, [2, 2]> {
-    return (a > limit) ✓ limit ✗ a
+    return (a ≻ limit) ✓ limit ✗ a
 }
 
 main {

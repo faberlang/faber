@@ -552,7 +552,7 @@ fn evaluation_order_and_failure_lane_are_preserved() {
 functio boom(tensor<f32, [4]> x) → tensor<f32, [4]> ⇥ textus {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
-        si i > 1 {
+        si i ≻ 1 {
             iace "boom"
         }
         acc ← acc + x
@@ -768,7 +768,7 @@ fn in_region_scalar_comparison_declines_with_causa() {
 functio cmp_mask(tensor<f32, [4]> x, numerus len) → f32 ⇥ textus {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
-        si i < len {
+        si i ≺ len {
             iace "pad"
         }
         acc ← acc + x
@@ -1188,7 +1188,7 @@ fn apud_causal_body_si_i_le_j_admits_per_lane_conditions() {
 functio causal(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     varia tensor<f32, [2, 2]> acc ← x
     itera ex x apud [i, j] fixum cell {
-        si i > j { iace "upper" }
+        si i ≻ j { iace "upper" }
         acc ← acc + x
     }
     redde acc
@@ -1233,7 +1233,7 @@ functio triangular(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
     varia tensor<f32, [2, 2]> acc ← x
     itera ex x apud [i, j] fixum cell {
         fixum numerus idx ← i * 2 + j
-        si idx > 2 { iace "upper" }
+        si idx ≻ 2 { iace "upper" }
         acc ← acc + x
     }
     redde acc
@@ -1392,7 +1392,7 @@ functio nested_sum(tensor<f32, [2, 3]> x) → f32 ⇥ textus {
     varia f32 total ← 0.0
     itera ex x apud [i, j] fixum cell {
         itera ab 0‥2 fixum k {
-            si k > 0 { iace "inner" }
+            si k ≻ 0 { iace "inner" }
             total ← total + 1.0
         }
     }
@@ -1501,7 +1501,7 @@ functio nested_apud(tensor<f32, [2, 3]> x, tensor<f32, [4]> y) → f32 ⇥ textu
     varia f32 total ← 0.0
     itera ex x apud [i, j] fixum cell {
         itera ex y apud [k] fixum other {
-            si k > 0 { iace "inner" }
+            si k ≻ 0 { iace "inner" }
             total ← total + 1.0
         }
     }
@@ -1602,7 +1602,7 @@ fn si_conditioned_nested_itera_declines_fail_closed() {
 functio conditioned(tensor<f32, [2, 3]> x) → f32 {
     varia f32 total ← 0.0
     itera ex x apud [i, j] fixum cell {
-        si i > j {
+        si i ≻ j {
             itera ab 0‥2 fixum k {
                 total ← total + 1.0
             }

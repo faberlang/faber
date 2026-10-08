@@ -149,7 +149,7 @@ fn fractus_arithmetic_folds() {
 #[test]
 fn comparison_folds_to_bivalens() {
     let (konst, _) = static_const(
-        "fixum numerus A = 3\nfixum bivalens MAGNUS = A > 2\n",
+        "fixum numerus A = 3\nfixum bivalens MAGNUS = A ≻ 2\n",
         "MAGNUS",
     );
     assert!(matches!(

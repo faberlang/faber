@@ -29,7 +29,7 @@
 //! under every locale spelling.
 
 use crate::parse;
-use crate::test_support::parse_ok;
+use crate::test_support::{has_arg, parse_ok, parse_recovering_ascii_comparison};
 use radix_lexer::{KeywordPack, TokenKind, lex_with_locale_pack};
 use radix_syntax::{ExprKind, IfBody, StmtKind, TypeExprKind};
 
@@ -107,7 +107,7 @@ fn incipit_init_expr(result: &crate::ParseResult) -> &radix_syntax::Expr {
 
 fn assert_init_is_binary(cell: &str) {
     let source = format!("incipit {{\n    fixum bivalens ok ← {cell}\n}}");
-    let result = parse_ok(&source);
+    let result = parse_recovering_ascii_comparison(&source);
     let init = incipit_init_expr(&result);
     assert!(
         matches!(init.kind, ExprKind::Binary(_)),
@@ -148,7 +148,15 @@ fn ratio_identifier_less_than_parses_as_comparison() {
 fn en_like_pack_mapped_spelling_less_than_parses_as_comparison() {
     for cell in ["string < 5", "value < 5", "record < 5"] {
         let source = format!("incipit {{\n    fixum bivalens ok ← {cell}\n}}");
-        let result = parse_ok_with_en_like_pack(&source);
+        let result = parse_with_en_like_pack(&source);
+        assert!(
+            result
+                .errors
+                .iter()
+                .all(|err| has_arg(err, "issue", "comparison_ascii_retired")),
+            "{cell}: {:?}",
+            result.errors
+        );
         assert!(matches!(
             incipit_init_expr(&result).kind,
             ExprKind::Binary(_)

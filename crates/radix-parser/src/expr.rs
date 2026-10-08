@@ -418,11 +418,20 @@ impl Parser {
 
         loop {
             let op = match self.peek().kind {
-                // Canonical strict comparison is `Lt`/`Gt` (≺/≻).
-                // `LtAscii`/`GtAscii` (`<`/`>`) as comparison are legacy during
-                // the glyph migration; `<`/`>` remain generic delimiters.
-                TokenKind::Lt | TokenKind::LtAscii => BinOp::Lt,
-                TokenKind::Gt | TokenKind::GtAscii => BinOp::Gt,
+                // Canonical strict comparison is `Lt`/`Gt` (≺/≻); `<`/`>` are
+                // generic delimiters only. An ASCII one in operator position is
+                // still parsed as the comparison so recovery continues, but it
+                // records `PARSE030 comparison_ascii_retired`.
+                TokenKind::Lt => BinOp::Lt,
+                TokenKind::Gt => BinOp::Gt,
+                TokenKind::LtAscii => {
+                    self.record_retired_ascii_comparison("<", "≺");
+                    BinOp::Lt
+                }
+                TokenKind::GtAscii => {
+                    self.record_retired_ascii_comparison(">", "≻");
+                    BinOp::Gt
+                }
                 TokenKind::LtEq => BinOp::LtEq,
                 TokenKind::GtEq => BinOp::GtEq,
                 TokenKind::ElementOf => BinOp::Member,
@@ -439,6 +448,34 @@ impl Parser {
         }
 
         Ok(left)
+    }
+
+    /// Record the migration diagnostic for an ASCII `<` / `>` in comparison
+    /// position: `PARSE030 comparison_ascii_retired`, args `operator` (as
+    /// written) and `glyph` (`≺` / `≻`).
+    ///
+    /// FABER-2-SUNSET: delete with the retired-word diagnostics.
+    ///
+    /// The caller still parses the operand as the comparison, so one file
+    /// reports every site. Generic angle brackets never reach this tier.
+    fn record_retired_ascii_comparison(&mut self, operator: &str, glyph: &str) {
+        let span = self.current_span();
+        // A speculative sub-parse that is re-run must not report the same operator twice.
+        if self.errors.iter().any(|err| {
+            err.span == span
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "comparison_ascii_retired")
+        }) {
+            return;
+        }
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::ExpressionInvalid, span)
+                .with_arg("issue", "comparison_ascii_retired")
+                .with_arg("operator", operator)
+                .with_arg("glyph", glyph),
+        );
     }
 
     /// Record the migration diagnostic for a retired membership word

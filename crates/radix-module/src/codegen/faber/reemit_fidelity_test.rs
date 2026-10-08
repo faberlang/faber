@@ -1073,7 +1073,7 @@ fn closure_body_breakability_revalidation_rejects_added_fac_scope() {
 
 #[test]
 fn plain_fac_block_keeps_its_breakable_scope() {
-    let source = "incipit {\n    varia numerus m ← 0\n    fac {\n        fac {\n            m ↑\n            si m ≥ 2 {\n                rumpe\n            }\n        }\n    } dum m < 6\n    nota m\n}\n";
+    let source = "incipit {\n    varia numerus m ← 0\n    fac {\n        fac {\n            m ↑\n            si m ≥ 2 {\n                rumpe\n            }\n        }\n    } dum m ≺ 6\n    nota m\n}\n";
     let emitted = assert_idempotent(source);
     assert_eq!(emitted.matches("fac {").count(), 2, "{emitted}");
 }

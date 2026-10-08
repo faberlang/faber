@@ -20,7 +20,7 @@ fn first_match_head_parses_into_a_dedicated_expression() {
     // Contract row: dedicated expression-valued first-match head over a
     // statically bounded source with an owned predicate tail.
     let _ = parse_ok(
-        "functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, ubi x { x > 0.0 }) }",
+        "functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, ubi x { x ≻ 0.0 }) }",
     );
 }
 
@@ -29,7 +29,7 @@ fn first_match_head_supports_filum_bounded_sources() {
     // Contract row: bounded-source routes include per-axis (`apud [i]`)
     // filum forms, mirroring the `reducta via summa ex … apud …` shape.
     let _ = parse_ok(
-        "functio t(tf32[2, 2] a) → fractus ∪ nihil { redde primus_quem(a apud [i], ubi x { x > 0.0 }) }",
+        "functio t(tf32[2, 2] a) → fractus ∪ nihil { redde primus_quem(a apud [i], ubi x { x ≻ 0.0 }) }",
     );
 }
 
@@ -53,7 +53,7 @@ fn first_match_head_rejects_a_shared_reduce_tail() {
     // reduce/scan `(fixum|varia) binder block` tail. A `fixum` tail
     // parse-rejects inside the first-match head.
     let result = parse_program(
-        "functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, fixum x { x > 0.0 }) }",
+        "functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, fixum x { x ≻ 0.0 }) }",
     );
     assert!(
         !result.success(),

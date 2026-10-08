@@ -601,7 +601,7 @@ fn sum_pi(float x) → float {
 
 describe "mathesis catalog" {
     test "PI is positive" {
-        assert mathesis.PI() > 0.0
+        assert mathesis.PI() ≻ 0.0
     }
 
     test "addita composes with PI helper" {

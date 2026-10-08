@@ -50,7 +50,7 @@ fn accepts_pure_scalar_air_function() {
 @ radix lane "air"
 functio loss(i32 x, i32 y) → numerus {
     fixum numerus sum ← x + y
-    si sum > 0 {
+    si sum ≻ 0 {
         redde sum
     } secus {
         redde 0
@@ -570,7 +570,7 @@ fn air_lane_admits_named_predicate_filtrata_on_tensor_receiver() {
         r#"
 @ radix lane "air"
 functio keep(fractus x) → bivalens {
-    redde x > 0.0
+    redde x ≻ 0.0
 }
 
 @ radix lane "air"
@@ -892,7 +892,7 @@ fn ar2_dum_itera_cape_wrap_the_whole_loop_once() {
         r"
 functio h(numerus n) → numerus {
     fixum numerus total ← 0
-    dum n > 0 {
+    dum n ≻ 0 {
         total ← 1
     } cape err { redde 0 }
 
@@ -1078,7 +1078,7 @@ fn air_lane_declines_whole_loop_cape_under_loop_spectrum_causes() {
 @ radix lane "air"
 functio d(numerus n) → numerus {
     fixum numerus total ← 0
-    dum n > 0 {
+    dum n ≻ 0 {
         total ← 1
     } cape err { redde 0 }
     redde total
@@ -1108,7 +1108,7 @@ fn air_lane_iace_runtime_conversion_and_optional_chain_causes_unchanged() {
         r#"
 @ radix lane "air"
 functio f(numerus x) → numerus ⇥ textus {
-    si x < 0 { iace "neg" }
+    si x ≺ 0 { iace "neg" }
     redde x
 }
 "#,
@@ -1335,7 +1335,7 @@ fn suppresses_purity_declines_once_typecheck_has_failed() {
         r#"
 @ radix lane "air"
 functio pick(tf32[2, 2] x, bivalens flag) → fractus ∪ nihil {
-    redde primus_quem(x + flag, ubi v { v > 0.0 })
+    redde primus_quem(x + flag, ubi v { v ≻ 0.0 })
 }
 "#,
     );
@@ -1438,7 +1438,7 @@ functio pick(tensor<f32, [4, 4]> x) → tensor<f32, [4, 4]> ⇥ textus {
     varia tensor<f32, [4, 4]> acc ← x
     itera ex x apud [i, j] fixum cell {
         fixum numerus idx ← i * 2 + j
-        si idx > 20 { iace "upper" }
+        si idx ≻ 20 { iace "upper" }
         acc ← acc + x
     }
     redde acc

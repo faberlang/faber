@@ -41,7 +41,7 @@ fn lowers_decimal_ordering_on_the_shared_scaled_carrier() {
     let dump = dump_source(
         r"
 functio maior(d64 a, d64 b) → bivalens {
-    redde a > b
+    redde a ≻ b
 }
 ",
     );
@@ -61,7 +61,7 @@ fn lowers_decimal_integer_ordering_at_the_d64_scaled_carrier() {
     let dump = dump_source(
         r"
 functio maior(d64 a, numerus n) → bivalens {
-    redde a > n
+    redde a ≻ n
 }
 ",
     );
@@ -1080,8 +1080,8 @@ fn lowers_canonical_predicate_replacements_to_mir_primitives() {
     let dump = dump_source(
         r"
 functio pred(numerus n, fractus f, bivalens flag, textus ∪ nihil maybe) → bivalens {
-    fixum _ positive ← n > 0
-    fixum _ negative ← f < 0
+    fixum _ positive ← n ≻ 0
+    fixum _ negative ← f ≺ 0
     fixum _ enabled ← flag ≡ verum
     fixum _ disabled ← flag ≡ falsum
     fixum _ absent ← maybe est nihil
@@ -1379,7 +1379,7 @@ fn ignores_top_level_type_metadata_items() {
 // ===========================================================================
 
 fn lowers_si_to_branch_and_join_blocks() {
-    let dump = dump_source("functio signum(numerus n) → numerus { si n > 0 ergo redde n redde 0 }");
+    let dump = dump_source("functio signum(numerus n) → numerus { si n ≻ 0 ergo redde n redde 0 }");
 
     assert_eq!(
         dump,
@@ -1407,7 +1407,7 @@ function f0 -> ty#1 {
 
 #[test]
 fn lowers_expression_valued_si_into_shared_destination() {
-    let dump = dump_source("functio positum(numerus n) → numerus { fixum numerus x ← n > 0 ✓ 1 ✗ 0 redde x }");
+    let dump = dump_source("functio positum(numerus n) → numerus { fixum numerus x ← n ≻ 0 ✓ 1 ✗ 0 redde x }");
 
     assert_eq!(
         dump,
@@ -1512,7 +1512,7 @@ functio handle(Event event) → vacuum {
 #[test]
 fn lowers_dum_to_condition_body_and_after_blocks() {
     let dump = dump_source(
-        "functio totalis(numerus n) → numerus { varia numerus i ← 0 varia numerus total ← 0 dum i < n { total ← total + i i ← i + 1 } redde total }",
+        "functio totalis(numerus n) → numerus { varia numerus i ← 0 varia numerus total ← 0 dum i ≺ n { total ← total + i i ← i + 1 } redde total }",
     );
 
     assert_eq!(
@@ -1586,7 +1586,7 @@ fn rejects_statement_level_stream_ad_for_mir() {
 #[test]
 fn loop_rumpe_target_wins_over_enclosing_fac() {
     let dump = dump_source(
-        "functio praecedentia() → numerus { fac { varia numerus x ← 0 dum x < 3 { x ← x + 1 si x ≡ 2 ergo rumpe } redde x } cape err { redde 0 } }",
+        "functio praecedentia() → numerus { fac { varia numerus x ← 0 dum x ≺ 3 { x ← x + 1 si x ≡ 2 ergo rumpe } redde x } cape err { redde 0 } }",
     );
     // The rumpe inside the dum loop must resolve to the dum loop's exit (the
     // `redde x` after the loop, which is bb6 in this dump), not to the enclosing
@@ -1601,7 +1601,7 @@ fn loop_rumpe_target_wins_over_enclosing_fac() {
 #[test]
 fn lowers_rumpe_and_perge_to_loop_targets() {
     let dump = dump_source(
-        "functio primus(numerus n) → numerus { varia numerus i ← 0 dum i < n { i ← i + 1 si i < 3 ergo perge rumpe } redde i }",
+        "functio primus(numerus n) → numerus { varia numerus i ← 0 dum i ≺ n { i ← i + 1 si i ≺ 3 ergo perge rumpe } redde i }",
     );
 
     assert_eq!(
@@ -1646,7 +1646,7 @@ fn lowers_perge_inside_fac_to_enclosing_loop_head() {
     // Ruling R3: `perge` passes through a plain `fac` block to the enclosing
     // loop. The perge edge must goto the dum head (bb1), never the cape block.
     let dump = dump_source(
-        "functio f(numerus n) → numerus { varia numerus i ← 0 dum i < n { i ← i + 1 fac { si i ≡ 2 ergo perge } cape err { redde 0 } } redde i }",
+        "functio f(numerus n) → numerus { varia numerus i ← 0 dum i ≺ n { i ← i + 1 fac { si i ≡ 2 ergo perge } cape err { redde 0 } } redde i }",
     );
     assert!(dump.contains("bb1:\n    %0 = _1 < _0"), "dum head must be bb1: {dump}");
     let perge_edges = dump.matches("goto bb1").count();
@@ -1662,7 +1662,7 @@ fn lowers_perge_inside_fac_dum_to_the_condition_test() {
     // end of the body, so `c` is tested. The perge edge must goto the block
     // that evaluates the condition, never back to the body head.
     let dump = dump_source(
-        "functio f(numerus n) → numerus { varia numerus i ← 0 fac { i ← i + 1 si i ≡ 2 ergo perge } dum i < n redde i }",
+        "functio f(numerus n) → numerus { varia numerus i ← 0 fac { i ← i + 1 si i ≡ 2 ergo perge } dum i ≺ n redde i }",
     );
     let cond_block = dump
         .split("\n  bb")
@@ -1680,7 +1680,7 @@ fn lowers_perge_inside_fac_dum_to_the_condition_test() {
 #[test]
 fn closed_si_arms_do_not_emit_spurious_join_edges() {
     let dump = dump_source(
-        "functio opta(numerus n) → numerus { varia numerus x ← n si x > 0 { redde x } secus { x ← x + 1 } redde x }",
+        "functio opta(numerus n) → numerus { varia numerus x ← n si x ≻ 0 { redde x } secus { x ← x + 1 } redde x }",
     );
 
     assert_eq!(
@@ -1716,7 +1716,7 @@ function f0 -> ty#1 {
 
 #[test]
 fn edge_si_no_secus_lowers_to_single_arm_branch_and_join() {
-    let dump = dump_source("functio noop_if_zero(numerus n) → vacuum { si n > 0 ergo nota \"positive\" }");
+    let dump = dump_source("functio noop_if_zero(numerus n) → vacuum { si n ≻ 0 ergo nota \"positive\" }");
 
     assert!(
         dump.contains("branch %0 bb1 bb2"),
@@ -2842,7 +2842,7 @@ functio mensura(lista<numerus> x, lista<numerus> w) → numerus ⇥ FormaError {
     redde w.longitudo()
 }
 functio addendum(numerus a, numerus b) → numerus ⇥ FormaError {
-    si a < 0 {
+    si a ≺ 0 {
         iace finge FormaInvalida { causa = "shapes not broadcastable" }
     }
     redde a + b
@@ -2985,7 +2985,7 @@ functio quantitas(lista<numerus> f) → numerus ⇥ NnError {
     }
 }
 functio mensura(lista<numerus> f) → numerus ⇥ FormaError {
-    si f.longitudo() > 100 {
+    si f.longitudo() ≻ 100 {
         iace finge FormaInvalida { causa = "too many" }
     }
     redde f.longitudo()
@@ -3685,7 +3685,7 @@ fn lowers_adfirma_to_assert_runtime_intrinsics() {
     let dump = dump_source(
         r#"
 functio check(textus name, numerus count) → vacuum {
-    adfirma count > 0
+    adfirma count ≻ 0
     adfirma name ≠ "" mori "name must not be empty"
 }
 "#,
@@ -7153,7 +7153,7 @@ fn decimal_intermediate_may_leave_the_range_until_the_store() {
 fn decimal_comparison_of_intermediates_is_exact() {
     let lines = run_lines(
         "fixum d64 p ← 19.99\nfixum d64 r ← 0.0725\n\
-         nota p * r * r > p * r\nnota p * r * r < p * r\nnota p * r * r ≅ p * r * r",
+         nota p * r * r ≻ p * r\nnota p * r * r ≺ p * r\nnota p * r * r ≅ p * r * r",
     )
     .expect("runs");
     assert_eq!(lines, ["falsum", "verum", "verum"]);

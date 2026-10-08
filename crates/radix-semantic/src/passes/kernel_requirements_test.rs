@@ -74,31 +74,31 @@ fn wrapping_word_intermediates_observed_before_store_must_fit_their_carrier() {
 @ kernel
 @ public
 fn signed_sub(wrapping<i32> left, wrapping<i32> right) → bool {
-    return left - right < left
+    return left - right ≺ left
 }
 
 @ kernel
 @ public
 fn signed_mul(wrapping<i32> left, wrapping<i32> right) → bool {
-    return left * right > left
+    return left * right ≻ left
 }
 
 @ kernel
 @ public
 fn signed_neg(wrapping<i32> value, wrapping<i32> bound) → bool {
-    return -value > bound
+    return -value ≻ bound
 }
 
 @ kernel
 @ public
 fn unsigned_sub(wrapping<u32> left, wrapping<u32> right) → bool {
-    return left - right < left
+    return left - right ≺ left
 }
 
 @ kernel
 @ public
 fn nested_add_div(wrapping<i32> left, wrapping<i32> right) → bool {
-    return (left + right) / 2 > left
+    return (left + right) / 2 ≻ left
 }
 ",
     );
@@ -303,7 +303,7 @@ fn untyped_float_constants_adopt_the_float_width_they_meet() {
 @ nucleum
 @ publica
 functio relu(f32 value) → f32 {
-    si value > 0.0 {
+    si value ≻ 0.0 {
         redde value * 2.0 - 1.5
     }
     redde -0.5

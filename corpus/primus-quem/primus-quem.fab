@@ -43,22 +43,22 @@ locale = "la"
 
 # Route T — array literal source: first live lane over `> 0.0` is 1.0.
 functio elige_litteram() → fractus ∪ nihil {
-    redde primus_quem([1.0, -2.0, 3.0], ubi x { x > 0.0 })
+    redde primus_quem([1.0, -2.0, 3.0], ubi x { x ≻ 0.0 })
 }
 
 # No-match — no live lane yields nihil, never an error.
 functio elige_nullum() → fractus ∪ nihil {
-    redde primus_quem([1.0, 2.0], ubi x { x > 9.0 })
+    redde primus_quem([1.0, 2.0], ubi x { x ≻ 9.0 })
 }
 
 # Empty source — a statically zero-length array yields nihil.
 functio elige_vacuum(lista<f32> xs) → fractus ∪ nihil {
-    redde primus_quem(xs, ubi x { x > 0.0 })
+    redde primus_quem(xs, ubi x { x ≻ 0.0 })
 }
 
 # First-live — with matches at 5.0 and 3.0, the FIRST live lane wins.
 functio elige_primum_viventem(lista<f32> xs) → fractus ∪ nihil {
-    redde primus_quem(xs, ubi x { x > 2.0 })
+    redde primus_quem(xs, ubi x { x ≻ 2.0 })
 }
 
 incipit {

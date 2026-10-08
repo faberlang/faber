@@ -197,28 +197,28 @@ fn comparisons_between_inf_and_every_family_are_exact() {
     // ruling 37 (and ruling 22's rule for the other pairs): never rounded.
     assert_eq!(
         ok(&format!(
-            "fixum inf big ← {TWO_64}\nfixum u64 u ← 18446744073709551615\nnota big > u\nnota u < big\nnota big ≥ u\nnota big ≡ big"
+            "fixum inf big ← {TWO_64}\nfixum u64 u ← 18446744073709551615\nnota big ≻ u\nnota u ≺ big\nnota big ≥ u\nnota big ≡ big"
         )),
         ["verum", "verum", "verum", "verum"]
     );
     // f64: 2^64 is exactly representable, 2^64 + 1 is not — the inf is not rounded.
     assert_eq!(
         ok(&format!(
-            "fixum inf a ← {TWO_64}\nfixum inf b ← 18446744073709551617\nfixum fractus f ← 1.8446744073709552e19\nnota a ≅ f\nnota b ≅ f\nnota b > f\nnota a ≥ f"
+            "fixum inf a ← {TWO_64}\nfixum inf b ← 18446744073709551617\nfixum fractus f ← 1.8446744073709552e19\nnota a ≅ f\nnota b ≅ f\nnota b ≻ f\nnota a ≥ f"
         )),
         ["verum", "falsum", "verum", "verum"]
     );
     assert_eq!(
-        ok("fixum inf h ← 10 ⇐ 1100\nfixum fractus f ← 1.0e300\nnota h > f\nnota -h < f\nfixum inf n ← -h\nnota n < f"),
+        ok("fixum inf h ← 10 ⇐ 1100\nfixum fractus f ← 1.0e300\nnota h ≻ f\nnota -h ≺ f\nfixum inf n ← -h\nnota n ≺ f"),
         ["verum", "verum", "verum"]
     );
     assert_eq!(
-        ok("fixum inf five ← 5\nfixum d64 d ← 1.5\nnota five > d\nnota d < five\nnota five ≤ d"),
+        ok("fixum inf five ← 5\nfixum d64 d ← 1.5\nnota five ≻ d\nnota d ≺ five\nnota five ≤ d"),
         ["verum", "verum", "falsum"]
     );
     assert_eq!(
         ok(&format!(
-            "fixum inf big ← {TWO_64}\nfixum d64 d ← 1.5\nnota big > d\nnota -big < d"
+            "fixum inf big ← {TWO_64}\nfixum d64 d ← 1.5\nnota big ≻ d\nnota -big ≺ d"
         )),
         ["verum", "verum"]
     );
@@ -521,7 +521,7 @@ fn the_range_loop_binder_is_typed_by_its_bounds() {
 fn an_inf_beside_a_decimal_is_not_joined_at_d64() {
     // ruling 37: the d64 join would trap for a large value; the comparison is exact.
     assert_eq!(
-        ok("fixum inf huge ← 10 ⇐ 200\nfixum d64 d ← 1.5\nnota huge > d\nnota d < huge\nnota huge ≥ 1.5"),
+        ok("fixum inf huge ← 10 ⇐ 200\nfixum d64 d ← 1.5\nnota huge ≻ d\nnota d ≺ huge\nnota huge ≥ 1.5"),
         ["verum", "verum", "verum"]
     );
 }

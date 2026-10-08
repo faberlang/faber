@@ -50,7 +50,7 @@ class Chest implements Weighable<Chest> {
 }
 
 fn larger<T implements Weighable<T>>(T a, T b) → T {
-    if a.weigh(b) > 0 {
+    if a.weigh(b) ≻ 0 {
         return a
     }
     return b

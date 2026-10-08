@@ -1307,11 +1307,11 @@ incipit {
     varia numerus n ← 0
     fac {
         n ← n + 1
-        si n < 3 {
+        si n ≺ 3 {
             perge
         }
         rumpe
-    } dum n < 10
+    } dum n ≺ 10
 }
 ";
     assert_eq!(unreachable_count(source), 0);
@@ -1325,12 +1325,12 @@ incipit {
     fac {
         n ← n + 1
         fac {
-            si n < 3 {
+            si n ≺ 3 {
                 perge
             }
         }
         rumpe
-    } dum n < 10
+    } dum n ≺ 10
 }
 ";
     assert_eq!(unreachable_count(source), 0);
@@ -1344,7 +1344,7 @@ incipit {
     fac {
         n ← n + 1
         rumpe
-    } dum n < 10
+    } dum n ≺ 10
 }
 ";
     assert_eq!(unreachable_count(source), 1);
@@ -1357,12 +1357,12 @@ incipit {
     varia numerus n ← 0
     fac {
         n ← n + 1
-        dum n < 3 {
+        dum n ≺ 3 {
             n ← n + 1
             perge
         }
         rumpe
-    } dum n < 10
+    } dum n ≺ 10
 }
 ";
     assert_eq!(unreachable_count(source), 1);

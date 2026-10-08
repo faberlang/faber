@@ -19,7 +19,7 @@ functio adFahrenheit(Celsius c) → Fahrenheit {
 
 @ conversio
 functio adMensuram(Lectio l) → Mensura ⇥ textus {
-    si l.valor < 0 { iace \"lectio negativa\" }
+    si l.valor ≺ 0 { iace \"lectio negativa\" }
     redde Mensura { valor = l.valor }
 }
 ";

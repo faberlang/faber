@@ -50,7 +50,7 @@ fn maximum(list<int> numeri) → int {
     var int max ← numeri[0]
 
     for from numeri const n {
-        if n > max {
+        if n ≻ max {
             max ← n
         }
     }
@@ -62,7 +62,7 @@ fn supra(list<int> numeri, int limen) → int {
     var int int ← 0
 
     for from numeri const n {
-        if n > limen {
+        if n ≻ limen {
             int ← int + 1
         }
     }

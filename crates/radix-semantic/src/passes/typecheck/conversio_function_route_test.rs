@@ -50,7 +50,7 @@ genus Positiva { varia numerus valor }
 
 @ conversio
 functio adPositivam(Mensura m) → Positiva ⇥ textus {
-    si m.valor < 0 { iace \"negativa\" }
+    si m.valor ≺ 0 { iace \"negativa\" }
     redde Positiva { valor = m.valor }
 }
 ";

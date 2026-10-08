@@ -706,7 +706,7 @@ fn package_rust_emit_contains_arm_cape_throw() {
         &entry,
         r#"
 fn classify(int x) → string {
-    if x > 0 {
+    if x ≻ 0 {
         throw "positive"
     } catch e {
         return "caught"
@@ -742,7 +742,7 @@ fn package_rust_cli_emit_contains_arm_cape_throw() {
         &entry,
         r#"
 fn classify(int x) → string {
-    if x > 0 {
+    if x ≻ 0 {
         throw "positive"
     } catch e {
         return "caught"
@@ -4072,7 +4072,7 @@ fn inter_spatia(list<string> verba) → string {
   if verba.length() ≡ 0 then return ""
   var string linea ← verba[0]
   var int i ← 1
-  while i < verba.length() {
+  while i ≺ verba.length() {
     linea ← linea + " " + verba[i]
     i ← i + 1
   }

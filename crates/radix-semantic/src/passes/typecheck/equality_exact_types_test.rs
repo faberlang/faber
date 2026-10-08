@@ -54,7 +54,7 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
             name: "instans_cross_precision_order_accepts",
             source: r"
 functio before(instans<ns> fine, instans<ms> coarse) → bivalens {
-    redde fine < coarse
+    redde fine ≺ coarse
 }
 ",
             expect: EqualityExpect::Accepts,

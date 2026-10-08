@@ -620,7 +620,7 @@ fn PI() → float {
         r#"import from "./mathesis" mathesis
 
 test "PI is positive" {
-    assert mathesis.PI() > 0.0
+    assert mathesis.PI() ≻ 0.0
 }
 "#,
     )

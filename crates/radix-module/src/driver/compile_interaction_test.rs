@@ -563,15 +563,15 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = r"函数 checksum() → numerus {
-  如果 1 > 0 {
+  如果 1 ≻ 0 {
     返回 1
   } 否则 {
     返回 0
   }
   执行 {
-    如果 1 > 2 { 中断 }
+    如果 1 ≻ 2 { 中断 }
     继续
-  } 当 1 > 0
+  } 当 1 ≻ 0
   返回 0
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1020,7 +1020,7 @@ fn custodi_multi_guard_emits_guards_in_source_order() {
     let source = r#"incipit {
   fixum numerus x ← 5
   custodi {
-    si x < 0 ergo { nota "neg" }
+    si x ≺ 0 ergo { nota "neg" }
     si x ≡ 0 ergo { nota "zero" }
   }
   nota x

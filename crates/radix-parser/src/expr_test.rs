@@ -1260,10 +1260,10 @@ fn strict_comparison_glyphs_parse_as_lt_gt() {
     assert_eq!(gt.op, BinOp::Gt);
 }
 
-/// Legacy ASCII `<`/`>` still parse as comparison during the glyph migration.
+/// `≺` parses as the strict less-than comparison.
 #[test]
-fn ascii_comparison_parses_as_lt_during_migration() {
-    let result = parse_ok("fixum _ a ← x < y");
+fn glyph_comparison_parses_as_lt() {
+    let result = parse_ok("fixum _ a ← x ≺ y");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");

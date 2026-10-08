@@ -55,7 +55,7 @@ fn first_match_returns_the_first_live_element() {
         "afm3_match.fab",
         r"incipit {
     fixum lista<fractus> xs ← [5.0, 7.0, 9.0]
-    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x > 6.0 })
+    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 6.0 })
     fixum fractus out ← r vel -1.0
     nota out
 }",
@@ -69,7 +69,7 @@ fn first_match_no_match_yields_nihil() {
         "afm3_no_match.fab",
         r"incipit {
     fixum lista<fractus> xs ← [1.0, 2.0]
-    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x > 5.0 })
+    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 5.0 })
     fixum fractus out ← r vel -1.0
     nota out
 }",
@@ -83,7 +83,7 @@ fn first_match_empty_source_yields_nihil() {
         "afm3_empty.fab",
         r"incipit {
     fixum lista<fractus> xs ← vacua
-    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x > 5.0 })
+    fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x ≻ 5.0 })
     fixum fractus out ← r vel -1.0
     nota out
 }",
@@ -100,7 +100,7 @@ fn first_match_evaluates_the_predicate_after_the_first_match() {
         "afm3_total.fab",
         r#"incipit {
     fixum lista<textus> xs ← ["5", "300"]
-    fixum textus ∪ nihil r ← primus_quem(xs, ubi x { (x ↦ u8) > 2 })
+    fixum textus ∪ nihil r ← primus_quem(xs, ubi x { (x ↦ u8) ≻ 2 })
     fixum textus out ← r vel "none"
     nota out
 }"#,
@@ -119,7 +119,7 @@ fn first_match_predicate_error_propagates_before_any_match() {
         "afm3_error.fab",
         r#"incipit {
     fixum lista<textus> xs ← ["300"]
-    fixum textus ∪ nihil r ← primus_quem(xs, ubi x { (x ↦ u8) > 2 })
+    fixum textus ∪ nihil r ← primus_quem(xs, ubi x { (x ↦ u8) ≻ 2 })
     fixum textus out ← r vel "none"
     nota out
 }"#,

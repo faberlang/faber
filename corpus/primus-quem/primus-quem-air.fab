@@ -36,7 +36,7 @@ locale = "la"
 # Named AIR predicate for the ubi tail.
 @ radix lane "air"
 functio serva(fractus x) → bivalens {
-    redde x > 0.0
+    redde x ≻ 0.0
 }
 
 # Route M — statically shaped tensor parameter admits with a first-live mask.
@@ -48,11 +48,11 @@ functio elige(tf32[4] x) → fractus ∪ nihil {
 # Route M, zero extent — a statically empty source admits; result is nihil.
 @ radix lane "air"
 functio elige_vacuum(tf32[0] x) → fractus ∪ nihil {
-    redde primus_quem(x, ubi v { v > 0.0 })
+    redde primus_quem(x, ubi v { v ≻ 0.0 })
 }
 
 # Route T — per-element array literal (no spread) admits.
 @ radix lane "air"
 functio elige_litteram() → fractus ∪ nihil {
-    redde primus_quem([1.0, -2.0, 3.0], ubi v { v > 0.0 })
+    redde primus_quem([1.0, -2.0, 3.0], ubi v { v ≻ 0.0 })
 }

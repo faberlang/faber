@@ -44,6 +44,25 @@ pub fn parse_program(source: &str) -> ParseResult {
 /// # Panics
 ///
 /// Panics if parsing fails (any parse errors).
+/// Parse `source` and require that the only errors are the retired ASCII
+/// comparison diagnostic (`comparison_ascii_retired`), at least one of them.
+///
+/// For tests that exercise the `<` / `>` generics-vs-comparison split, whose
+/// ASCII comparison still recovers as a comparison but is no longer clean.
+pub fn parse_recovering_ascii_comparison(source: &str) -> ParseResult {
+    let result = parse_program(source);
+    assert!(
+        !result.errors.is_empty()
+            && result
+                .errors
+                .iter()
+                .all(|err| has_arg(err, "issue", "comparison_ascii_retired")),
+        "expected only comparison_ascii_retired errors, got: {:?}",
+        result.errors
+    );
+    result
+}
+
 #[must_use]
 pub fn parse_ok(source: &str) -> ParseResult {
     let result = parse_program(source);

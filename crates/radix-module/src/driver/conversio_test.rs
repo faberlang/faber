@@ -441,7 +441,7 @@ fn whole_string_text_order_emits_str_compare() {
 #[test]
 fn instans_cross_precision_compare_emits_partial_cmp_at_coarser() {
     let session = test_session(Target::HirRust);
-    let source = "functio before(instans<ns> fine, instans<ms> coarse) → bivalens { redde fine < coarse }";
+    let source = "functio before(instans<ns> fine, instans<ms> coarse) → bivalens { redde fine ≺ coarse }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;

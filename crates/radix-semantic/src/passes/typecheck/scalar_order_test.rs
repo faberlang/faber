@@ -35,7 +35,7 @@ fn scalar_ascii_literals_order_typechecks() {
 
 #[test]
 fn full_cord_text_order_typechecks() {
-    accepts(&compile("incipit { si \"ab\" < \"ac\" { nota \"ok\" } }"));
+    accepts(&compile("incipit { si \"ab\" ≺ \"ac\" { nota \"ok\" } }"));
 }
 
 #[test]
@@ -97,7 +97,7 @@ fn interval_helper_native_body_scalar_order_typechecks() {
     functio retenta(textus s, textus infimum sponte, textus supremum sponte) → textus {
         varia lista<textus> kept ← vacua
         varia numerus i ← 0
-        dum i < s.longitudo() {
+        dum i ≺ s.longitudo() {
             fixum textus c ← s.sectio(i, i + 1)
             si c ≥ infimum et c ≤ supremum ergo kept.appende(c)
             i ← i + 1
@@ -152,7 +152,7 @@ fn en_interval_helper_native_body_scalar_order_typechecks() {
     functio keep_between(textus s, textus infimum sponte, textus supremum sponte) → textus {
         varia lista<textus> kept ← vacua
         varia numerus i ← 0
-        dum i < s.longitudo() {
+        dum i ≺ s.longitudo() {
             fixum textus c ← s.sectio(i, i + 1)
             si c ≥ infimum et c ≤ supremum ergo kept.appende(c)
             i ← i + 1

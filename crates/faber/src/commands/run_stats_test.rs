@@ -59,7 +59,7 @@ fn bump(int n) → int {
 main {
     var int total ← 0
     var int i ← 0
-    while i < 12 {
+    while i ≺ 12 {
         total ← bump(total)
         i ← i + 1
     }

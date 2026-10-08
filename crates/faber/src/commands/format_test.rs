@@ -86,9 +86,10 @@ fn format_canonical_path_preserves_salve_munde_comments() {
     assert!(formatted.contains("print \"Salve, Munde!\""));
 }
 
-/// Strict comparison is canonicalized to the ≺/≻ glyphs; ≤/≥ stay as-is.
+/// Comparison is the glyph set `≺ ≻ ≤ ≥`; the glyphs round-trip through the
+/// canonical format unchanged.
 #[test]
-fn canonical_format_rewrites_ascii_comparison_to_glyph() {
+fn canonical_format_keeps_comparison_glyphs() {
     let dir = std::env::temp_dir().join("faber-format-canonical-cmp");
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("create scratch");
@@ -100,31 +101,65 @@ class Proba {
     var float x
     var float y
     fn compara(float other) → bool {
-        return self.x < other and self.x > other and self.x ≤ other and self.x ≥ other
+        return self.x ≺ other and self.x ≻ other and self.x ≤ other and self.x ≥ other
     }
 }
 "#;
     fs::write(&path, source).expect("write");
     let formatted = canonical_cli_pipeline(&path);
     let _ = fs::remove_dir_all(&dir);
-    assert!(
-        formatted.contains("self.x ≺ other"),
-        "strict less-than should emit the ≺ glyph: {formatted}"
+    assert!(formatted.contains("self.x ≺ other"), "{formatted}");
+    assert!(formatted.contains("self.x ≻ other"), "{formatted}");
+    assert!(formatted.contains("self.x ≤ other"), "{formatted}");
+    assert!(formatted.contains("self.x ≥ other"), "{formatted}");
+}
+
+/// ASCII `<`/`>` as comparison is a retired spelling (PARSE030): the canonical
+/// format refuses it with the named diagnostic and names the glyph; it does
+/// not migrate the source.
+#[test]
+fn canonical_format_refuses_ascii_comparison() {
+    let dir = std::env::temp_dir().join("faber-format-canonical-ascii-cmp");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create scratch");
+    let path = dir.join("proba.fab");
+    let source = r#"+++
+locale = "en"
++++
+class Proba {
+    var float x
+    var float y
+    fn compara(float other) → bool {
+        return self.x < other and self.x > other
+    }
+}
+"#;
+    fs::write(&path, source).expect("write");
+    let session = format_session(&path, None, source).expect("format session");
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("format emission locale pack"),
+        &path.display().to_string(),
+        source,
     );
-    assert!(
-        formatted.contains("self.x ≻ other"),
-        "strict greater-than should emit the ≻ glyph: {formatted}"
-    );
-    assert!(formatted.contains("self.x ≤ other"));
-    assert!(formatted.contains("self.x ≥ other"));
-    assert!(
-        !formatted.contains("< other"),
-        "ASCII < comparison must not survive: {formatted}"
-    );
-    assert!(
-        !formatted.contains("> other"),
-        "ASCII > comparison must not survive: {formatted}"
-    );
+    let _ = fs::remove_dir_all(&dir);
+    assert!(!result.success(), "ASCII comparison must be refused");
+    let glyphs: Vec<String> = result
+        .diagnostics
+        .iter()
+        .filter(|d| d.code.as_deref() == Some("PARSE030"))
+        .filter_map(|d| {
+            d.args
+                .iter()
+                .find(|arg| arg.name == "glyph")
+                .map(|arg| arg.value.clone())
+        })
+        .collect();
+    assert_eq!(glyphs, vec!["≺".to_string(), "≻".to_string()]);
 }
 
 /// `<`/`>` remain ASCII generic application delimiters; en types stay English.

@@ -30,7 +30,7 @@ genus Lapis {
 }
 
 functio maior<T implet Comparabile<T>>(T a, T b) → T {
-    si a.confer(b) > 0 { redde a }
+    si a.confer(b) ≻ 0 { redde a }
     redde b
 }
 
@@ -164,6 +164,6 @@ fn several_bounds_each_contribute_members() {
         "implendum Comparabile<T> {\n    functio confer(T alius) → numerus\n}\n\n\
          implendum Nominatum {\n    functio nomen() → textus\n}\n\n\
          functio f<T implet Comparabile<T> ∩ Nominatum>(T a, T b) → textus {\n    \
-         si a.confer(b) > 0 { redde a.nomen() }\n    redde b.nomen()\n}\n",
+         si a.confer(b) ≻ 0 { redde a.nomen() }\n    redde b.nomen()\n}\n",
     );
 }

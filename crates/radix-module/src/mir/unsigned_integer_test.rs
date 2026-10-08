@@ -66,7 +66,7 @@ fn unsigned_integer_runner_does_not_encode_upper_half_as_negative() {
         r"
 incipit {
     fixum u64 high ← 18446744073709551615
-    nota high > 9223372036854775807
+    nota high ≻ 9223372036854775807
 }
 ",
         &mut host,
@@ -155,7 +155,7 @@ incipit {{
     nota max ⇒ {shift}
     nota max / two
     nota max % two
-    nota max > zero
+    nota max ≻ zero
 
     varia modulus<{w}> inc ← max
     inc ↑

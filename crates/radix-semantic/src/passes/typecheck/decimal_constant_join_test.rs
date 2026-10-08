@@ -47,7 +47,7 @@ fn decimal_constant_arithmetic_fills_a_d64_slot() {
 
 #[test]
 fn constant_joins_in_comparisons() {
-    for op in ["<", ">", "≤", "≥", "≅", "≇", "≈", "≉"] {
+    for op in ["≺", "≻", "≤", "≥", "≅", "≇", "≈", "≉"] {
         assert_accepts(&compare(&format!("redde d {op} 0.1")));
     }
     assert_accepts(&compare("redde d ≅ 4"));

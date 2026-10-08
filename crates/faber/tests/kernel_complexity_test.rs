@@ -29,8 +29,8 @@ locale = "en"
 @ public
 fn densa(f32 x) → f32 {
     var f32 n ← 0.0
-    if x > 1.0 { n ← 1.0 }
-    if x > 2.0 { n ← 2.0 }
+    if x ≻ 1.0 { n ← 1.0 }
+    if x ≻ 2.0 { n ← 2.0 }
     return n
 }
 
@@ -38,7 +38,7 @@ fn densa(f32 x) → f32 {
 @ public
 fn quieta(f32 x) → f32 {
     var f32 n ← 0.0
-    if x > 1.0 { n ← 1.0 }
+    if x ≻ 1.0 { n ← 1.0 }
     return n
 }
 

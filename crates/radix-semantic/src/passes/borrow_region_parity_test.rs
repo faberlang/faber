@@ -102,7 +102,7 @@ fn divergence_corpus() -> Vec<(&'static str, &'static str)> {
             r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    dum xs.longitudo() < 5 {
+    dum xs.longitudo() ≺ 5 {
         varia in lista<numerus> view ← xs
         nota view.longitudo()
         xs.appende(4)
@@ -130,7 +130,7 @@ incipit {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia in lista<numerus> view ← xs
-    dum view.longitudo() < 5 {
+    dum view.longitudo() ≺ 5 {
         xs.appende(4)
     }
 }
@@ -142,10 +142,10 @@ incipit {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
-    dum i < 2 {
+    dum i ≺ 2 {
         varia in lista<numerus> view ← xs
         varia numerus j ← 0
-        dum j < 2 {
+        dum j ≺ 2 {
             nota view.longitudo()
             j ← j + 1
         }
@@ -161,7 +161,7 @@ incipit {
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
-    dum i < 3 {
+    dum i ≺ 3 {
         varia in lista<numerus> view ← xs
         nota view.longitudo()
         xs.appende(4)
@@ -189,7 +189,7 @@ incipit {
             r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
-    dum xs.longitudo() < 5 {
+    dum xs.longitudo() ≺ 5 {
         varia in lista<numerus> view ← xs
         xs.appende(4)
         nota view.longitudo()

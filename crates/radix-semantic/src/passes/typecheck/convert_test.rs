@@ -459,7 +459,7 @@ fn instans_cross_precision_ordering_typechecks() {
     test_support::assert_accepts(
         r"
 functio before(instans fine, instans<ms> coarse) → bivalens {
-    redde fine < coarse
+    redde fine ≺ coarse
 }
 ",
     );

@@ -121,7 +121,7 @@ fn fac_do_while_roundtrips_through_faber_codegen() {
   fac {
     counter ← counter + 1
     nota counter
-  } dum counter < 3
+  } dum counter ≺ 3
 }";
     let output = super::faber_roundtrip(source);
     assert!(output.contains("fac {"));
@@ -223,7 +223,7 @@ fn compact_fac_closure_body_typechecks_with_redde() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   fixum _ predicate ← numerus n → bivalens ∴ fac {
-    redde n > 1
+    redde n ≻ 1
   }
   nota predicate(2)
 }";
@@ -237,7 +237,7 @@ fn compact_fac_closure_rejects_redde_without_explicit_return_type() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   fixum _ predicate ← numerus n ∴ fac {
-    redde n > 1
+    redde n ≻ 1
   }
 }";
     let result = compile(&session, "closure-implicit-return.fab", source, ModuleCompileRequest::default());
@@ -257,7 +257,7 @@ fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   fixum (numerus) → bivalens predicate ← numerus n ∴ fac {
-    redde n > 1
+    redde n ≻ 1
   }
 }";
     let result = compile(
@@ -362,7 +362,7 @@ fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   fixum _ predicate ← clausura numerus n {
-    redde n > 1
+    redde n ≻ 1
   }
 }";
     let result = compile(
@@ -387,7 +387,7 @@ fn legacy_block_closure_body_typechecks_with_redde() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   fixum _ predicate ← clausura numerus n → bivalens {
-    redde n > 1
+    redde n ≻ 1
   }
   nota predicate(2)
 }";
@@ -540,8 +540,8 @@ fn compile_supports_extended_unary_operators() {
   nota non flag
   nota maybe est nihil
   nota maybe non est nihil
-  nota n < 0
-  nota n > 0
+  nota n ≺ 0
+  nota n ≻ 0
   nota flag ≡ verum
   nota flag ≠ verum
 }";
@@ -772,7 +772,7 @@ fn array_destructured_vars_can_be_used_in_arithmetic() {
 fn method_return_values_can_participate_in_numeric_comparisons() {
     let session = test_session(Target::HirRust);
     let source = r#"functio accessArray(lista<numerus> items, numerus index) → numerus {
-  si index < 0 aut index ≥ items.longitudo() {
+  si index ≺ 0 aut index ≥ items.longitudo() {
     mori "Index out of bounds"
   }
   redde items[index]
@@ -806,7 +806,7 @@ fn repeated_owned_calls_no_longer_report_use_after_move() {
 functio maxValue(lista<numerus> nums) → numerus {
   varia numerus max ← nums[0]
   itera ex nums fixum n {
-    si n > max {
+    si n ≻ max {
       max ← n
     }
   }
@@ -1642,8 +1642,8 @@ fn rust_output_avoids_redundant_parentheses_in_common_contexts() {
 incipit {
   varia numerus x ← 1
   x ← x + 10
-  dum x > 0 {
-    si x > 5 {
+  dum x ≻ 0 {
+    si x ≻ 5 {
       nota sum(x * 2, x + 1)
       rumpe
     }
