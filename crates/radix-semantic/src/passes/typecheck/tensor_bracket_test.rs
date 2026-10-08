@@ -64,10 +64,10 @@ fn tensor_bracket_read_is_element_for_arithmetic() {
 }
 
 #[test]
-fn tensor_accipe_method_stays_nullable() {
+fn tensor_accipe_method_is_failable_with_a_default() {
     accepts(
         r"functio pick(tf32[16] input, numerus id) → f32 {
-    redde input.accipe([id]) vel 0.0
+    redde input.accipe([id]) ⊥ 0.0
 }",
     );
 }

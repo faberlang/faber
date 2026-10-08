@@ -792,13 +792,25 @@ impl FunctionBuilder<'_> {
                 .unwrap_or(expr_ty),
             _ => expr_ty,
         };
-        if op == MirCollectionOp::TensorSet && self.is_checked_ponde(receiver, &method_name, args.len()) {
+        if op == MirCollectionOp::TensorSet && self.is_checked_tensor_method(receiver, &method_name, args.len()) {
             let (Some(index_ty), Some(value_ty), Some(receiver_ty)) =
                 (self.expr_ty(&args[0].expr), self.expr_ty(&args[1].expr), self.expr_ty(receiver))
             else {
                 return None;
             };
-            return self.lower_checked_tensor_set(lowered_args, [receiver_ty, index_ty, value_ty], call_ty, expr.span);
+            return self.lower_checked_tensor_access(
+                op,
+                lowered_args,
+                &[receiver_ty, index_ty, value_ty],
+                call_ty,
+                expr.span,
+            );
+        }
+        if op == MirCollectionOp::TensorGet && self.is_checked_tensor_method(receiver, &method_name, args.len()) {
+            let (Some(index_ty), Some(receiver_ty)) = (self.expr_ty(&args[0].expr), self.expr_ty(receiver)) else {
+                return None;
+            };
+            return self.lower_checked_tensor_access(op, lowered_args, &[receiver_ty, index_ty], expr_ty, expr.span);
         }
         let value = self.runtime_call_value(MirIntrinsic::Collection(op), lowered_args, call_ty, expr.span);
         if call_ty != expr_ty && self.types.nullable_inner(expr_ty.semantic_id()) == Some(call_ty.semantic_id()) {
@@ -4174,10 +4186,10 @@ impl FunctionBuilder<'_> {
         id
     }
 
-    /// K11: whether this tensor `ponde` method call is the checked (failable)
-    /// store. Device bodies keep the bare `TensorSet`; so does any call the
+    /// K11: whether this tensor `ponde` / `accipe` method call is the checked
+    /// (failable) form. Device bodies keep the bare op; so does any call the
     /// registry row does not mark failable.
-    fn is_checked_ponde(&self, receiver: &HirExpression, method_name: &str, arg_count: usize) -> bool {
+    fn is_checked_tensor_method(&self, receiver: &HirExpression, method_name: &str, arg_count: usize) -> bool {
         if self.device_role.is_some() {
             return false;
         }
@@ -4188,23 +4200,24 @@ impl FunctionBuilder<'_> {
         crate::intrinsics::lookup_method_for_type(payload, method_name, arg_count).is_some_and(|entry| entry.failable)
     }
 
-    /// K11: lower the checked `ponde` store as a failable call to a synthesized
-    /// helper, exactly as handled conversio helpers are. The helper compares
-    /// the index against the tensor shape in MIR; `TensorSet` keeps its single
-    /// (fatal) meaning.
-    fn lower_checked_tensor_set(
+    /// K11: lower the checked `ponde` store / `accipe` read as a failable call
+    /// to a synthesized helper, exactly as handled conversio helpers are. The
+    /// helper compares the index against the tensor shape in MIR; `TensorSet`
+    /// and `TensorGet` keep their single (fatal) meaning.
+    fn lower_checked_tensor_access(
         &mut self,
+        op: MirCollectionOp,
         lowered_args: Vec<MirOperand>,
-        param_tys: [MirType; 3],
+        param_tys: &[MirType],
         ty: MirType,
         span: Span,
     ) -> Option<MirOperand> {
         let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
-        let helper = self.push_ponde_helper(param_tys, ty, textus, span)?;
+        let helper = self.push_checked_tensor_helper(op, param_tys, ty, textus, span)?;
         self.lower_failable_call(MirCallee::Function(helper), lowered_args, ty, textus, None, span)
     }
 
-    /// The helper body, for `(in receiver, index, value) ⇥ textus`:
+    /// The helper body, for `(in receiver, index[, value]) ⇥ textus`:
     ///
     /// ```text
     /// entry: shape = TensorShape(recv); rank = Length(shape)
@@ -4214,12 +4227,14 @@ impl FunctionBuilder<'_> {
     ///        ix < 0 ? fail : upper
     /// upper: ix >= dim ? fail : step
     /// step:  axis += 1; goto cond
-    /// ok:    TensorSet(recv, index, value); return
-    /// fail:  ReturnError("tensor ponde invalid index")
+    /// ok:    TensorSet(recv, index, value); return        (ponde)
+    ///        return TensorGet(recv, index)                (accipe)
+    /// fail:  ReturnError("tensor ponde|accipe invalid index")
     /// ```
-    fn push_ponde_helper(
+    fn push_checked_tensor_helper(
         &mut self,
-        param_tys: [MirType; 3],
+        op: MirCollectionOp,
+        param_tys: &[MirType],
         return_ty: MirType,
         error_ty: MirType,
         span: Span,
@@ -4228,7 +4243,7 @@ impl FunctionBuilder<'_> {
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let Some(array) = self.types.find_array(numerus.semantic_id()) else {
             self.errors
-                .push(MirError::missing_type(span, "ponde bounds check shape list"));
+                .push(MirError::missing_type(span, "tensor bounds check shape list"));
             return None;
         };
         let array_ty = MirType::semantic(array);
@@ -4245,9 +4260,14 @@ impl FunctionBuilder<'_> {
             self.device_role,
             None,
         );
-        let modes = [MirParamMode::MutRef, MirParamMode::Owned, MirParamMode::Owned];
+        let receiver_mode = if op == MirCollectionOp::TensorSet {
+            MirParamMode::MutRef
+        } else {
+            MirParamMode::Ref
+        };
+        let modes = [receiver_mode, MirParamMode::Owned, MirParamMode::Owned];
         let mut locals = Vec::with_capacity(3);
-        for (ty, mode) in param_tys.into_iter().zip(modes) {
+        for (&ty, mode) in param_tys.iter().zip(modes) {
             let local = nested.next_local_id();
             nested
                 .params
@@ -4263,7 +4283,6 @@ impl FunctionBuilder<'_> {
             .push(MirLocalDecl { id: axis, name: None, ty: numerus, mutable: true, span });
         let receiver = MirOperand::Place(MirPlace::local(locals[0]));
         let index = MirOperand::Place(MirPlace::local(locals[1]));
-        let value = MirOperand::Place(MirPlace::local(locals[2]));
         let axis_operand = MirOperand::Place(MirPlace::local(axis));
 
         let entry = nested.fresh_block(span);
@@ -4351,17 +4370,33 @@ impl FunctionBuilder<'_> {
         nested.terminate_current(MirTerminatorKind::Goto(cond), span);
 
         nested.switch_to(ok);
-        nested.runtime_call_to_place(
-            None,
-            MirIntrinsic::Collection(MirCollectionOp::TensorSet),
-            vec![receiver, index, value],
-            return_ty,
-            span,
-        );
-        nested.terminate_current(MirTerminatorKind::Return(None), span);
+        if op == MirCollectionOp::TensorSet {
+            let value = MirOperand::Place(MirPlace::local(locals[2]));
+            nested.runtime_call_to_place(
+                None,
+                MirIntrinsic::Collection(MirCollectionOp::TensorSet),
+                vec![receiver, index, value],
+                return_ty,
+                span,
+            );
+            nested.terminate_current(MirTerminatorKind::Return(None), span);
+        } else {
+            let element = nested.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::TensorGet),
+                vec![receiver, index],
+                return_ty,
+                span,
+            );
+            nested.terminate_current(MirTerminatorKind::Return(Some(element)), span);
+        }
 
         nested.switch_to(fail);
-        let message = MirOperand::Constant(MirConstant::String(nested.context.diagnostic_ponde_invalid_index));
+        let invalid_index = if op == MirCollectionOp::TensorSet {
+            nested.context.diagnostic_ponde_invalid_index
+        } else {
+            nested.context.diagnostic_accipe_invalid_index
+        };
+        let message = MirOperand::Constant(MirConstant::String(invalid_index));
         nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
 
         let blocks = nested.finish_blocks();

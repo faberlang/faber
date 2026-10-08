@@ -63,8 +63,8 @@ fn bounded_tensor_literal_indices_in_bounds_still_accept() {
 fn tensor_param_and_dynamic_shapes_decline_static_oob_check() {
     accepts(
         r"functio read<magnitudo N>(tensor<f32, [N]> param, tf32[] dynamic) → vacuum {
-  fixum _ a ← param.accipe([9])
-  fixum _ b ← dynamic.accipe([9])
+  fixum _ a ← param.accipe([9]) ⊥ 0.0
+  fixum _ b ← dynamic.accipe([9]) ⊥ 0.0
 }",
     );
 }
@@ -173,7 +173,7 @@ fn lista_f32_literal_uses_declared_element_width() {
         r"incipit {
   fixum lista<f32> flat ← [1.0, 2.0]
   fixum tf32[1, 2] grid ← flat ↦ tf32[1, 2]
-  fixum f32 first ← grid.accipe([0, 0]) vel 0.0
+  fixum f32 first ← grid.accipe([0, 0])
   nota first
 }",
     );

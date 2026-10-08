@@ -101,6 +101,9 @@ pub mod convert;
 mod enum_access_honesty_test;
 pub mod expr;
 #[cfg(test)]
+#[path = "failable_intrinsic_typed_error_test.rs"]
+mod failable_intrinsic_typed_error_test;
+#[cfg(test)]
 #[path = "field_modifier_write_test.rs"]
 mod field_modifier_write_test;
 #[cfg(test)]

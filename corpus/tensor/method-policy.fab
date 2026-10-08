@@ -42,12 +42,12 @@ locale = "en"
 main {
     var tf32[3] input ← [1.0, 2.0, 3.0] ↦ tf32[3]
 
-    const f32 in_bounds ← input.get([1]) coalesce 0.0
+    const f32 in_bounds ← input.get([1])
     const int dynamic_index ← 1
-    const f32 dynamic_in_bounds ← input.get([dynamic_index]) coalesce 0.0
+    const f32 dynamic_in_bounds ← input.get([dynamic_index]) ⊥ 0.0
 
     input.set([2], 8.0)
-    const f32 updated ← input.get([2]) coalesce 0.0
+    const f32 updated ← input.get([2])
 
     print in_bounds
     print dynamic_in_bounds

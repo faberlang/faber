@@ -798,14 +798,21 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         collection TensorReshape
     ),
-    intrinsic!(
-        Tensor,
-        "accipe",
-        1,
-        &[IntrinsicParamKind::NumerusArray],
-        OptionInner,
-        collection TensorGet
-    ),
+    // K11-b: the method form is the checked read; an out-of-range index is
+    // reported on `⇥` (default form `⊥`). The index form (`t[i]`) shares the MIR
+    // op but has no error channel.
+    MethodIntrinsic {
+        failable: true,
+        range_checked_arg: Some(0),
+        ..intrinsic!(
+            Tensor,
+            "accipe",
+            1,
+            &[IntrinsicParamKind::NumerusArray],
+            Inner,
+            collection TensorGet
+        )
+    },
     intrinsic!(
         Tensor,
         "addita",

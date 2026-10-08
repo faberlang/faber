@@ -84,40 +84,40 @@ incipit {
     fixum lista<u32> rows ← [3, 0, 2, 0]
     fixum tensor<u32, [4]> ids ← rows ↦ tensor<u32, [4]>
     fixum tf32[4, 3] out ← table.gather(ids)
-    fixum f32 v00 ← out.accipe([0, 0]) vel 0.0
+    fixum f32 v00 ← out.accipe([0, 0])
     fixum f32 e00 ← 1000.0
     adfirma v00 ≡ e00
-    fixum f32 v01 ← out.accipe([0, 1]) vel 0.0
+    fixum f32 v01 ← out.accipe([0, 1])
     fixum f32 e01 ← 2000.0
     adfirma v01 ≡ e01
-    fixum f32 v02 ← out.accipe([0, 2]) vel 0.0
+    fixum f32 v02 ← out.accipe([0, 2])
     fixum f32 e02 ← 3000.0
     adfirma v02 ≡ e02
-    fixum f32 v10 ← out.accipe([1, 0]) vel 0.0
+    fixum f32 v10 ← out.accipe([1, 0])
     fixum f32 e10 ← 1.0
     adfirma v10 ≡ e10
-    fixum f32 v11 ← out.accipe([1, 1]) vel 0.0
+    fixum f32 v11 ← out.accipe([1, 1])
     fixum f32 e11 ← 2.0
     adfirma v11 ≡ e11
-    fixum f32 v12 ← out.accipe([1, 2]) vel 0.0
+    fixum f32 v12 ← out.accipe([1, 2])
     fixum f32 e12 ← 3.0
     adfirma v12 ≡ e12
-    fixum f32 v20 ← out.accipe([2, 0]) vel 0.0
+    fixum f32 v20 ← out.accipe([2, 0])
     fixum f32 e20 ← 100.0
     adfirma v20 ≡ e20
-    fixum f32 v21 ← out.accipe([2, 1]) vel 0.0
+    fixum f32 v21 ← out.accipe([2, 1])
     fixum f32 e21 ← 200.0
     adfirma v21 ≡ e21
-    fixum f32 v22 ← out.accipe([2, 2]) vel 0.0
+    fixum f32 v22 ← out.accipe([2, 2])
     fixum f32 e22 ← 300.0
     adfirma v22 ≡ e22
-    fixum f32 v30 ← out.accipe([3, 0]) vel 0.0
+    fixum f32 v30 ← out.accipe([3, 0])
     fixum f32 e30 ← 1.0
     adfirma v30 ≡ e30
-    fixum f32 v31 ← out.accipe([3, 1]) vel 0.0
+    fixum f32 v31 ← out.accipe([3, 1])
     fixum f32 e31 ← 2.0
     adfirma v31 ≡ e31
-    fixum f32 v32 ← out.accipe([3, 2]) vel 0.0
+    fixum f32 v32 ← out.accipe([3, 2])
     fixum f32 e32 ← 3.0
     adfirma v32 ≡ e32
     nota out.magnitudines()
@@ -218,7 +218,7 @@ incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0]
     fixum tf32[3] input ← flat ↦ tf32[3]
     fixum numerus i ← 3
-    fixum f32 bad ← input.accipe([i]) vel 99.0
+    fixum f32 bad ← input[i]
     nota bad
 }
 ";
@@ -272,12 +272,12 @@ incipit {
     );
 }
 
-/// Tier 3: dynamic-shape tensors retain nullable lookup semantics.
+/// K11-b: a dynamic-shape tensor `accipe` is the checked read; out of range it takes the `⊥` default.
 #[test]
-fn dynamic_tensor_read_oob_remains_nullable() {
+fn dynamic_tensor_read_oob_takes_the_call_default() {
     let source = r"
 functio lege<magnitudo N>(tensor<f32, [N]> input, numerus i) → f32 {
-    redde input.accipe([i]) vel 99.0
+    redde input.accipe([i]) ⊥ 99.0
 }
 
 incipit {
@@ -289,7 +289,7 @@ incipit {
 ";
     let mut host = BufferHost::default();
     run_source(&runner_session(), "dynamic_tensor_oob.fab", source, &mut host)
-        .expect("dynamic tensor OOB stays a nullable lookup");
+        .expect("dynamic tensor OOB takes the call default");
     assert_eq!(host.stdout_lines, vec!["99.0".to_owned()]);
 }
 
@@ -301,7 +301,7 @@ incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0]
     fixum tf32[3] input ← flat ↦ tf32[3]
     fixum numerus i ← 1
-    fixum f32 value ← input.accipe([i]) vel 99.0
+    fixum f32 value ← input.accipe([i]) ⊥ 99.0
     nota value
 }
 ";
@@ -336,7 +336,7 @@ fn tensor_get_and_tensor_slice_compile_and_run_unchanged() {
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 10.0, 20.0, 30.0, 100.0, 200.0, 300.0]
     fixum tf32[3, 3] table ← flat ↦ tf32[3, 3]
-    fixum f32 cell ← table.accipe([1, 2]) vel 0.0
+    fixum f32 cell ← table.accipe([1, 2])
     fixum tf32[1, 3] slice ← table.sectio(1, 2)
     nota cell
     nota slice.planata()

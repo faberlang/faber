@@ -38,7 +38,7 @@ fn accipe_accepts_lista_u32_bound_index() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
     fixum lista<u32> idx ← [id]
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
     );
 }
@@ -48,7 +48,7 @@ fn accipe_accepts_lu32_lista_sugar_index() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
     fixum lu32 idx ← [id]
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
     );
 }
@@ -57,7 +57,7 @@ fn accipe_accepts_lu32_lista_sugar_index() {
 fn accipe_accepts_inline_u32_index_literal() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
-    redde input.accipe([id]) vel 0.0
+    redde input.accipe([id]) ⊥ 0.0
 }",
     );
 }
@@ -67,7 +67,7 @@ fn accipe_accepts_lista_numerus_u32_spelling() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
     fixum lista<u32> idx ← [id]
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
     );
 }
@@ -76,7 +76,7 @@ fn accipe_accepts_lista_numerus_u32_spelling() {
 fn accipe_accepts_lista_i32_index() {
     accepts(
         r"functio check(tf32[16] input, i32 id) → f32 {
-    redde input.accipe([id]) vel 0.0
+    redde input.accipe([id]) ⊥ 0.0
 }",
     );
 }
@@ -96,7 +96,7 @@ fn accipe_rank2_accepts_lista_u32_origin() {
     accepts(
         r"functio pick(tf32[4, 4] grid, u32 r, u32 c) → f32 {
     fixum lista<u32> origin ← [r, c]
-    redde grid.accipe(origin) vel 0.0
+    redde grid.accipe(origin) ⊥ 0.0
 }",
     );
 }
@@ -116,7 +116,7 @@ fn forma_accepts_inline_shape_literal() {
 fn accipe_rejects_float_index_list() {
     rejects_with_issue(
         r"functio bad(tf32[16] input, lista<f32> idx) → f32 {
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
         REJECT_ISSUE,
     );
@@ -126,7 +126,7 @@ fn accipe_rejects_float_index_list() {
 fn accipe_rejects_textus_index_list() {
     rejects_with_issue(
         r"functio bad(tf32[16] input, lista<textus> idx) → f32 {
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
         REJECT_ISSUE,
     );
@@ -136,7 +136,7 @@ fn accipe_rejects_textus_index_list() {
 fn accipe_rejects_scalar_non_list_index() {
     rejects_with_issue(
         r"functio bad(tf32[16] input, textus idx) → f32 {
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
         REJECT_ISSUE,
     );
@@ -147,7 +147,7 @@ fn accipe_rejects_lista_u64_index() {
     rejects_with_issue(
         r"functio bad(tf32[16] input, u64 id) → f32 {
     fixum lista<u64> idx ← [id]
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
         REJECT_ISSUE,
     );
@@ -158,7 +158,7 @@ fn accipe_accepts_empty_index_list() {
     accepts(
         r"functio check(tf32[16] input) → f32 {
     fixum lista<u32> idx ← []
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
     );
 }
@@ -171,7 +171,7 @@ fn accipe_accepts_empty_index_list() {
 fn accipe_accepts_empty_inline_index_literal() {
     accepts(
         r"functio check(tf32[16] input) → f32 {
-    redde input.accipe([]) vel 0.0
+    redde input.accipe([]) ⊥ 0.0
 }",
     );
 }
@@ -181,7 +181,7 @@ fn accipe_rejects_bool_index_list() {
     rejects_with_issue(
         r"functio bad(tf32[16] input) → f32 {
     fixum lista<bivalens> idx ← [verum]
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
         REJECT_ISSUE,
     );
@@ -205,7 +205,7 @@ fn numerus_list_binding_accepts_u32_element() {
     accepts(
         r"functio check(tf32[16] input, u32 id) → f32 {
     fixum lista<numerus> idx ← [id]
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
     );
 }
@@ -218,7 +218,7 @@ fn numerus_list_binding_takes_a_u64_element_as_a_checked_store() {
     accepts(
         r"functio check(tf32[16] input, u64 id) → f32 {
     fixum lista<numerus> idx ← [id]
-    redde input.accipe(idx) vel 0.0
+    redde input.accipe(idx) ⊥ 0.0
 }",
     );
 }
