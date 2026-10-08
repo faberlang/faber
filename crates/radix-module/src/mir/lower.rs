@@ -3160,7 +3160,7 @@ impl<'a> FunctionBuilder<'a> {
             }
             HirExpressionKind::Index(object, index) => {
                 let (mut place, _) = self.lower_assignment_place_with_fallback(object, fallback_ty)?;
-                let projection = self.lower_index_projection(object.ty, index)?;
+                let projection = self.lower_index_projection(&place, object.ty, index)?;
                 place.projections.push(projection);
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);
                 Some((place, ty))

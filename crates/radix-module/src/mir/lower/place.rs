@@ -74,7 +74,7 @@ impl FunctionBuilder<'_> {
             return self.lower_tensor_bracket_get(object, index, expr);
         }
         let mut place = self.lower_projectable_place(object)?;
-        let projection = self.lower_index_projection(object.ty, index)?;
+        let projection = self.lower_index_projection(&place, object.ty, index)?;
         place.projections.push(projection);
         Some(MirOperand::Place(place))
     }
@@ -88,6 +88,7 @@ impl FunctionBuilder<'_> {
     /// as an out-of-range `lista` index).
     pub(super) fn lower_index_projection(
         &mut self,
+        base: &MirPlace,
         base_ty: Option<TypeId>,
         index: &HirExpression,
     ) -> Option<MirProjection> {
@@ -96,7 +97,7 @@ impl FunctionBuilder<'_> {
         {
             return Some(MirProjection::VectorLane(lane));
         }
-        if let Some(linear) = self.lower_device_tensor_linear_index(base_ty, index) {
+        if let Some(linear) = self.lower_device_tensor_linear_index(base, base_ty, index) {
             return Some(MirProjection::Index(linear?));
         }
         Some(MirProjection::Index(self.lower_expr_value(index)?))
@@ -108,10 +109,11 @@ impl FunctionBuilder<'_> {
     /// extent of axis `k`. The outer `Option` is `None` when this lowering
     /// does not apply (host lowering, non-tensor base, non-literal index list).
     ///
-    /// Only compile-time extents are supported; a runtime-extent tensor is a
-    /// reported lowering error rather than an invented extent-read op.
+    /// A literal axis extent folds to a constant; any other axis reads its
+    /// extent at run time through `TensorExtent { tensor: base, axis }`.
     fn lower_device_tensor_linear_index(
         &mut self,
+        base: &MirPlace,
         base_ty: Option<TypeId>,
         index: &HirExpression,
     ) -> Option<Option<MirOperand>> {
@@ -139,24 +141,34 @@ impl FunctionBuilder<'_> {
         if elements.len() < 2 {
             return None;
         }
-        let Some(extents) = crate::semantic::figura::i64s_from_literal_index(shape, self.types) else {
-            self.errors.push(MirError::unsupported(
-                index.span,
-                "multi-index device tensor read with run-time extents",
-            ));
-            return Some(None);
+        let extents: Vec<Option<i64>> = match self.types.get_index(shape) {
+            radix_types::IndexExpr::Tuple(dims) => dims
+                .iter()
+                .map(|dim| {
+                    radix_types::evaluate_index_dimension(*dim, self.types)
+                        .ok()
+                        .flatten()
+                        .and_then(|n| i64::try_from(n).ok())
+                })
+                .collect(),
+            _ => match crate::semantic::figura::i64s_from_literal_index(shape, self.types) {
+                Some(literal) => literal.into_iter().map(Some).collect(),
+                // WHY: a non-tuple symbolic shape states no rank; the index list does.
+                None => vec![None; elements.len()],
+            },
         };
         if extents.len() != elements.len() {
             return None;
         }
-        Some(self.lower_row_major_linear_index(&elements, &extents, index.span))
+        Some(self.lower_row_major_linear_index(base, &elements, &extents, index.span))
     }
 
     /// Emit `((i0 * e1 + i1) * e2 + i2) ...` over the lowered index elements.
     fn lower_row_major_linear_index(
         &mut self,
+        base: &MirPlace,
         elements: &[&HirExpression],
-        extents: &[i64],
+        extents: &[Option<i64>],
         span: Span,
     ) -> Option<MirOperand> {
         let ty = match elements[0].ty {
@@ -164,14 +176,21 @@ impl FunctionBuilder<'_> {
             None => MirType::semantic(self.types.primitive(Primitive::Numerus)),
         };
         let mut linear = self.lower_expr_value(elements[0])?;
-        for (element, extent) in elements.iter().zip(extents).skip(1) {
+        for (axis, (element, extent)) in elements.iter().zip(extents).enumerate().skip(1) {
             let index = self.lower_expr_value(element)?;
+            let extent = match extent {
+                Some(n) => MirOperand::Constant(MirConstant::Int(*n)),
+                None => self.assign_temp(
+                    MirValueKind::TensorExtent {
+                        tensor: MirOperand::Place(base.clone()),
+                        axis: u32::try_from(axis).ok()?,
+                    },
+                    ty,
+                    span,
+                ),
+            };
             let scaled = self.assign_temp(
-                MirValueKind::Binary {
-                    op: MirBinOp::Mul,
-                    lhs: linear,
-                    rhs: MirOperand::Constant(MirConstant::Int(*extent)),
-                },
+                MirValueKind::Binary { op: MirBinOp::Mul, lhs: linear, rhs: extent },
                 ty,
                 span,
             );
@@ -289,7 +308,7 @@ impl FunctionBuilder<'_> {
             }
             HirExpressionKind::Index(object, index) => {
                 let mut place = self.lower_projectable_place(object)?;
-                let projection = self.lower_index_projection(object.ty, index)?;
+                let projection = self.lower_index_projection(&place, object.ty, index)?;
                 place.projections.push(projection);
                 Some(place)
             }
@@ -364,7 +383,7 @@ impl FunctionBuilder<'_> {
                 Some(MirOperand::Place(place))
             }
             HirNonNullKind::Index(index) => {
-                let projection = self.lower_index_projection(object.ty, index)?;
+                let projection = self.lower_index_projection(&place, object.ty, index)?;
                 place.projections.push(projection);
                 Some(MirOperand::Place(place))
             }
