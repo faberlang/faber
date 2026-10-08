@@ -89,7 +89,7 @@ pub mod matrix_shape;
 pub mod vector_width;
 
 pub use abi::{
-    INDEX_FAULT_TEXT, LaneIndexProof, MirAbiError, MirBoundResourceReflection,
+    INDEX_FAULT_TEXT, IndexGuard, LaneIndexProof, MirAbiError, MirBoundResourceReflection,
     MirBroadcastDeclaration, MirColorTargetFormat, MirDepthCompareFunction, MirDepthStencilState,
     MirFaultKind, MirFaultSite, MirFragmentOutputReflection, MirFunctionAbi, MirFunctionAbiParam,
     MirGpuReflection, MirGraphicsPipelineReflection, MirInputStepMode, MirKernelBufferBindingKind,

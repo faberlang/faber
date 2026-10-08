@@ -21,7 +21,7 @@ mod types;
 pub use broadcast::*;
 pub use contract::*;
 pub use error::*;
-pub use lane_index::{LaneIndexProof, UnprovenIndex, unproven_indexes};
+pub use lane_index::{IndexGuard, LaneIndexProof, UnprovenIndex, unproven_indexes};
 pub use launch::*;
 pub use resource::*;
 pub(crate) use signature::{grid_reduce_node, grid_reduce_partial_layout};

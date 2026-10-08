@@ -15,8 +15,23 @@
 //! Everything else (offsets such as `i + 1`, parameters, gathered values) is
 //! UNPROVEN and needs a device bounds compare plus a fault site. The analysis
 //! is purely structural over the lowered MIR, so no carrier is stored on the
-//! function: the emitter asks [`LaneIndexProof::is_proven`] for each `Index`
+//! function: the emitter asks [`LaneIndexProof::guards`] for each `Index`
 //! place it writes.
+//!
+//! # Per axis (F-07)
+//!
+//! A rank-N (N >= 2) index list lowers to the row-major recombination
+//! `((c0 * e1 + c1) * e2 + c2) ...`. A flat compare against the element count
+//! lets a coordinate past the end of a row that is still inside the tensor
+//! read the next row, and a negative coordinate offset by a larger one slip
+//! through, which the host runner (per-axis) never does. So the analysis
+//! recovers the coordinates from the MIR definitions of that recombination and
+//! guards each unproven axis `k >= 1` against its own extent. Axis 0 is
+//! covered by the flat compare once every other axis holds (`0 <= c0 < e0`
+//! iff `0 <= linear < count` when `0 <= c_k < e_k` for `k >= 1`), so it needs
+//! no extent of its own. A coordinate proven by the lane binders stays
+//! unguarded. A form whose recombination cannot be recovered keeps the flat
+//! compare.
 
 use std::collections::BTreeMap;
 
@@ -52,6 +67,21 @@ pub struct UnprovenIndex {
     pub tensor: MirLocalId,
     /// `true` for a store destination, `false` for a load.
     pub store: bool,
+}
+
+/// One device bounds compare an unproven `Index` place needs.
+#[derive(Debug, Clone, PartialEq)]
+pub enum IndexGuard {
+    /// The flat index against the tensor's element count (through unsigned,
+    /// so a negative index trips too).
+    Flat(MirOperand),
+    /// The coordinate of an axis `>= 1` against that axis's extent.
+    Axis {
+        /// The coordinate operand.
+        coordinate: MirOperand,
+        /// The extent operand the recombination multiplies by.
+        extent: MirOperand,
+    },
 }
 
 /// A hashable identity of a place base.
@@ -319,26 +349,125 @@ impl<'a> LaneIndexProof<'a> {
     /// for every lane that passed the grid guard.
     #[must_use]
     pub fn is_proven(&self, place: &MirPlace, store: bool) -> bool {
+        self.guards(place, store).is_empty()
+    }
+
+    /// The bounds compares `place` needs; empty when it is proven.
+    #[must_use]
+    pub fn guards(&self, place: &MirPlace, store: bool) -> Vec<IndexGuard> {
         let Some((tensor, index)) = self.addressed_tensor(place) else {
-            return true;
+            return Vec::new();
         };
-        if self.eval_operand(index, 0) != Sym::Lane {
+        let Some(dims) = self.tensor_dims(tensor) else {
+            return Vec::new();
+        };
+        let covers_grid = factor_product(&dims) == self.guard_factors;
+        if self.eval_operand(index, 0) == Sym::Lane {
+            if store || covers_grid {
+                return Vec::new();
+            }
+            return vec![IndexGuard::Flat(index.clone())];
+        }
+        let Some(axes) = self.coordinates(index, &dims) else {
+            return vec![IndexGuard::Flat(index.clone())];
+        };
+        let mut guards = Vec::new();
+        for (axis, (coordinate, extent)) in axes.iter().enumerate().skip(1) {
+            if let Some(extent) = extent
+                && !self.axis_proven(axis, coordinate, &dims, covers_grid)
+            {
+                guards.push(IndexGuard::Axis {
+                    coordinate: coordinate.clone(),
+                    extent: extent.clone(),
+                });
+            }
+        }
+        if !self.axis_proven(0, &axes[0].0, &dims, covers_grid) {
+            guards.push(IndexGuard::Flat(index.clone()));
+        }
+        guards
+    }
+
+    /// The per-axis coordinates (and, for axes `>= 1`, the extent operand) of
+    /// the row-major recombination `index` is, for a tensor of axis extents
+    /// `dims`; `None` for rank 1 or when `index` is not that recombination.
+    fn coordinates(
+        &self,
+        index: &MirOperand,
+        dims: &[Sym],
+    ) -> Option<Vec<(MirOperand, Option<MirOperand>)>> {
+        if dims.len() < 2 {
+            return None;
+        }
+        let mut axes = Vec::with_capacity(dims.len());
+        let mut current = index.clone();
+        for axis in (1..dims.len()).rev() {
+            let (scaled, coordinate) = self.binary_parts(&current, |op| op == MirBinOp::Add)?;
+            let (prefix, extent) = self.binary_parts(&scaled, |op| op == MirBinOp::Mul)?;
+            if self.eval_operand(&extent, 0) != dims[axis] {
+                return None;
+            }
+            axes.push((coordinate, Some(extent)));
+            current = prefix;
+        }
+        axes.push((current, None));
+        axes.reverse();
+        Some(axes)
+    }
+
+    /// The operands of the single `lhs op rhs` definition of `operand`.
+    fn binary_parts(
+        &self,
+        operand: &MirOperand,
+        wanted: impl Fn(MirBinOp) -> bool,
+    ) -> Option<(MirOperand, MirOperand)> {
+        let key = operand_key(operand)?;
+        if self.defs.multi.contains(&key) {
+            return None;
+        }
+        let MirValueKind::Binary { op, lhs, rhs } = &self.defs.single.get(&key)?.kind else {
+            return None;
+        };
+        wanted(*op).then(|| (lhs.clone(), rhs.clone()))
+    }
+
+    /// Whether the lane binders bound coordinate `coordinate` of axis `axis`
+    /// in `[0, extent)`: axis `k` is `(lane / e_(k+1) / ... / e_(N-1)) % e_k`
+    /// (axis 0 without the `%`, in range only when the tensor covers the grid).
+    fn axis_proven(
+        &self,
+        axis: usize,
+        coordinate: &MirOperand,
+        dims: &[Sym],
+        covers_grid: bool,
+    ) -> bool {
+        if axis == 0 && !covers_grid {
             return false;
         }
-        if store {
-            return true;
+        let mut expected = Sym::Lane;
+        for later in (axis + 1..dims.len()).rev() {
+            expected = Sym::Div(Box::new(expected), Box::new(dims[later].clone()));
         }
-        self.tensor_dims(tensor)
-            .is_some_and(|dims| factor_product(&dims) == self.guard_factors)
+        if axis > 0 {
+            expected = Sym::Mod(Box::new(expected), Box::new(dims[axis].clone()));
+        }
+        self.eval_operand(coordinate, 0) == expected
     }
 
     /// The tensor parameter and the index operand of a one-`Index` place on a
-    /// tensor parameter; `None` for any other place (not a bounds-checked
-    /// device storage index).
+    /// tensor parameter (a vector-element tensor's lane component follows the
+    /// `Index`, and does not change what is bounds-checked); `None` for any
+    /// other place (not a bounds-checked device storage index).
     fn addressed_tensor<'p>(&self, place: &'p MirPlace) -> Option<(MirLocalId, &'p MirOperand)> {
-        let [MirProjection::Index(index)] = place.projections.as_slice() else {
+        let (MirProjection::Index(index), rest) = place.projections.split_first()? else {
             return None;
         };
+        if !rest
+            .iter()
+            .all(|projection| matches!(projection, MirProjection::VectorLane(_)))
+        {
+            return None;
+        }
         let MirPlaceBase::Local(local) = &place.base else {
             return None;
         };
