@@ -347,6 +347,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<(Vec<Value>, Option<SermoTerminal>, Option<GeneratorCursor>), RunnerError> {
         self.refuse_kernel_execution(handler, span)?;
+        let dispatched = self.dispatches_kernel(handler, span)?;
         let function = self.function_by_id(handler, span)?;
         let is_generator = function.is_generator;
         let params = function
@@ -379,6 +380,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             ));
         }
 
+        if dispatched {
+            let mut args = locals
+                .into_iter()
+                .map(|(_, value)| value)
+                .collect::<Vec<_>>();
+            return match self.dispatch_kernel_call(handler, &mut args, span)? {
+                Value::Unit => Ok((Vec::new(), Some(SermoTerminal::Done), None)),
+                reply => Ok((vec![reply.deep_copy()], Some(SermoTerminal::Done), None)),
+            };
+        }
         if is_generator {
             let mut frame = self.new_frame(handler, MirBlockId(0));
             frame.is_generator = true;

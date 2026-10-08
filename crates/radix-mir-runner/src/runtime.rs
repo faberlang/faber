@@ -407,6 +407,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Value, RunnerError> {
         let func_id = self.resolve_definition(stream.callee, span)?;
         self.refuse_kernel_execution(func_id, span)?;
+        let dispatched = self.dispatches_kernel(func_id, span)?;
         let param_locals = self
             .function_by_id(func_id, span)?
             .params
@@ -422,6 +423,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 span,
                 "cursor stream argument count mismatch",
             ));
+        }
+        if dispatched {
+            let mut arg_values = arg_values;
+            return self.dispatch_kernel_call(func_id, &mut arg_values, span);
         }
 
         let mut frame = self.new_frame(func_id, MirBlockId(0));

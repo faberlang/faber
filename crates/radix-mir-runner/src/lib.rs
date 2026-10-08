@@ -14,6 +14,7 @@ mod exact_int;
 mod host;
 pub mod inf;
 pub mod kernel;
+pub mod kernel_dispatch;
 mod regex_program;
 mod runtime;
 pub mod sermo;
@@ -103,6 +104,12 @@ pub enum RunnerKernelPolicy {
     Refuse,
     /// A compute-stage function runs like any other function.
     Execute,
+    /// A call to a compute-stage function is handed to the run's
+    /// [`kernel_dispatch::KernelDispatcher`] instead of being refused or
+    /// executed: a pure call with synchronous semantics. The entry point that
+    /// selects `Dispatch` supplies the dispatcher
+    /// ([`run_function_with_kernel_dispatcher`]).
+    Dispatch,
 }
 
 /// Stable diagnostic identity for a step-budget stop. The step count is a
@@ -566,6 +573,8 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Whether a call to a compute-stage (`@ kernel`) function runs or stops
     /// the run. Defaults to [`RunnerKernelPolicy::Refuse`].
     kernel_policy: RunnerKernelPolicy,
+    /// Receives compute-stage calls under [`RunnerKernelPolicy::Dispatch`].
+    kernel_dispatcher: Option<&'a mut dyn kernel_dispatch::KernelDispatcher>,
     /// Last conversation id handed out by `SermoOpen` (§2.7 record).
     next_conversation_id: u64,
     /// Router slots held by open conversations (D8.3); each conversation
@@ -629,6 +638,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             value_reading_functions: index_value_reading_functions(program),
             slot_types: index_slot_types(program),
             kernel_policy: RunnerKernelPolicy::Refuse,
+            kernel_dispatcher: None,
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
             field_float_widths,
@@ -1132,6 +1142,31 @@ fn run_function_with_explicit_limits<H: Host + ?Sized>(
     outcome.result
 }
 
+/// Run a specific MIR function under [`RunnerKernelPolicy::Dispatch`]: every
+/// call to a compute-stage function is handed to `dispatcher`.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed.
+pub fn run_function_with_kernel_dispatcher<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    dispatcher: &mut dyn kernel_dispatch::KernelDispatcher,
+) -> Result<(), Vec<RunnerError>> {
+    run_function_dispatching(
+        validated,
+        function_id,
+        host,
+        None,
+        None,
+        false,
+        RunnerKernelPolicy::Dispatch,
+        Some(dispatcher),
+    )?
+    .result
+}
+
 fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
     validated: &ValidatedMir<'_>,
     function_id: MirFunctionId,
@@ -1140,6 +1175,29 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
     deadline: Option<Instant>,
     collect_stats: bool,
     kernel_policy: RunnerKernelPolicy,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_function_dispatching(
+        validated,
+        function_id,
+        host,
+        step_limit,
+        deadline,
+        collect_stats,
+        kernel_policy,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_function_dispatching<'d, H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_limit: Option<u64>,
+    deadline: Option<Instant>,
+    collect_stats: bool,
+    kernel_policy: RunnerKernelPolicy,
+    dispatcher: Option<&'d mut dyn kernel_dispatch::KernelDispatcher>,
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
@@ -1171,6 +1229,11 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
     runner.step_limit = step_limit;
     runner.deadline = deadline;
     runner.kernel_policy = kernel_policy;
+    // Reborrow so the trait-object lifetime shrinks to the runner's.
+    runner.kernel_dispatcher = match dispatcher {
+        Some(dispatcher) => Some(&mut *dispatcher),
+        None => None,
+    };
     if collect_stats {
         runner.stats = Some(stats::StatsCollector::new(program, context, interner));
     }
@@ -1467,7 +1530,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         function_id: MirFunctionId,
         span: Span,
     ) -> Result<(), RunnerError> {
-        if self.kernel_policy == RunnerKernelPolicy::Execute {
+        if self.kernel_policy != RunnerKernelPolicy::Refuse {
             return Ok(());
         }
         let function = self.function_by_id(function_id, span)?;
@@ -1475,6 +1538,41 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             return Err(kernel_refused(span));
         }
         Ok(())
+    }
+
+    /// Whether a call to `function_id` goes to the kernel dispatcher: the run
+    /// is under [`RunnerKernelPolicy::Dispatch`] and the callee carries the
+    /// compute shader stage.
+    fn dispatches_kernel(
+        &self,
+        function_id: MirFunctionId,
+        span: Span,
+    ) -> Result<bool, RunnerError> {
+        if self.kernel_policy != RunnerKernelPolicy::Dispatch {
+            return Ok(false);
+        }
+        let function = self.function_by_id(function_id, span)?;
+        Ok(function.shader_stage == Some(MirKernelShaderStage::Compute))
+    }
+
+    /// Hand a kernel call to the dispatcher; the returned value is the call's
+    /// value (`Unit` when the dispatcher returns none). `args` is mutable so
+    /// the caller can write `mut` arguments back.
+    fn dispatch_kernel_call(
+        &mut self,
+        function_id: MirFunctionId,
+        args: &mut [Value],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Some(dispatcher) = self.kernel_dispatcher.as_mut() else {
+            return Err(RunnerError::internal(
+                span,
+                "kernel dispatch policy has no dispatcher",
+            ));
+        };
+        Ok(dispatcher
+            .dispatch(function_id, args, span)?
+            .unwrap_or(Value::Unit))
     }
 
     fn set_active_block(&mut self, block: MirBlockId, span: Span) {
@@ -2012,6 +2110,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             _ => (self.resolve_callee(callee, span)?, None),
         };
         self.refuse_kernel_execution(func_id, span)?;
+        let dispatched = self.dispatches_kernel(func_id, span)?;
         // BO-M-3/052: avoid cloning the entire MirFunction; collect param locals only.
         let param_modes = self
             .function_by_id(func_id, span)?
@@ -2033,6 +2132,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     "mutable parameter requires a place argument",
                 ));
             }
+        }
+        if dispatched {
+            let mut arg_values = arg_values;
+            let value = self.dispatch_kernel_call(func_id, &mut arg_values, span)?;
+            // `mut` write-back through the existing param-mode path: the
+            // dispatcher's final argument value lands in the caller's place.
+            for (((_, mode), operand), arg) in param_modes.iter().zip(args).zip(arg_values) {
+                if *mode == MirParamMode::MutRef
+                    && let MirOperand::Place(place) = operand
+                {
+                    self.write_place(place, arg, span)?;
+                }
+            }
+            return Ok(CallOutcome::Ok(value));
         }
 
         let depth = self.frames.len();
@@ -3460,6 +3573,10 @@ mod ascii_cursor_test;
 #[cfg(test)]
 #[path = "capability_test.rs"]
 mod capability_test;
+
+#[cfg(test)]
+#[path = "kernel_dispatch_test.rs"]
+mod kernel_dispatch_test;
 
 #[cfg(test)]
 #[path = "kernel_test.rs"]
