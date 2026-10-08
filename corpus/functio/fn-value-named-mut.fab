@@ -1,0 +1,47 @@
++++
+term = "functio"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "function_type", "type_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "varia_decl", "clausura_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "A named function with a mut parameter written through its value"
+syntax = "(<param-types>) → <type>"
+related = ["functio", "clausura", "mut"]
+locale = "en"
++++
+# =============================================================================
+# functio — named mut function as a value
+# =============================================================================
+#
+# What this teaches:
+#   • A named function whose parameter is `mut` keeps that mode as a value:
+#     calling it through a parameter or a binding mutates the caller's list
+#
+# See also: functio, clausura
+# =============================================================================
+
+# functio fn-value-named-mut — named mut function as a value
+#
+# EXPECTED OUTPUT:
+#   fn-value-named-mut.expected
+#
+# BACKEND:
+#   Runner: a call through a function value passes arguments exactly as a
+#   direct call does, so a `mut` parameter is written through to the caller.
+
+fn grow(mut list<int> xs) → void {
+    xs.append(9)
+}
+
+fn apply((mut list<int>) → void f, mut list<int> xs) → void {
+    f(xs)
+}
+
+main {
+    var list<int> a ← [1, 2, 3]
+    apply(grow, a)
+    print a
+    const (mut list<int>) → void g ← grow
+    g(a)
+    print a.length()
+}

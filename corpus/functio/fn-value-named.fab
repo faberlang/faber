@@ -1,0 +1,51 @@
++++
+term = "functio"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "function_type", "type_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "varia_decl", "clausura_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "A named function is a value that can be passed and called"
+syntax = "(<param-types>) → <type>"
+related = ["functio", "clausura", "mut"]
+locale = "en"
++++
+# =============================================================================
+# functio — named function as a value
+# =============================================================================
+#
+# What this teaches:
+#   • A top-level function name used as a value has the function type of its
+#     signature: it can be passed to a parameter and bound to a constant
+#
+# See also: functio, clausura
+# =============================================================================
+
+# functio fn-value-named — named function as a value
+#
+# EXPECTED OUTPUT:
+#   fn-value-named.expected
+#
+# BACKEND:
+#   Runner: a call through a function value passes arguments exactly as a
+#   direct call does, so a `mut` parameter is written through to the caller.
+
+fn peek(list<int> xs) → void {
+    print xs.length()
+}
+
+fn apply((list<int>) → void f, list<int> xs) → void {
+    f(xs)
+}
+
+fn twice(int n) → int {
+    return n * 2
+}
+
+main {
+    var list<int> a ← [1, 2, 3]
+    apply(peek, a)
+    const (list<int>) → void g ← peek
+    g(a)
+    const (int) → int t ← twice
+    print t(21)
+}

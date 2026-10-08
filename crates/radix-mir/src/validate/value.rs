@@ -432,7 +432,19 @@ impl Validator<'_, '_> {
         ty: TypeId,
     ) -> Option<MirFunctionSignature> {
         match self.context.types.get(ty) {
-            Type::Func(sig) => Some(signature_from_func_sig(sig)),
+            Type::Func(sig) => {
+                let mut signature = signature_from_func_sig(sig);
+                // A function type spells access intent as a `Ref` wrapper on the
+                // parameter type; MIR carries intent in `MirParamMode` and the
+                // argument is the payload place, exactly as a direct call to a
+                // `mut` parameter passes it.
+                for param in &mut signature.params {
+                    if let Type::Ref(_, inner) = self.context.types.get(param.ty.semantic_id()) {
+                        param.ty = MirType::semantic(*inner);
+                    }
+                }
+                Some(signature)
+            }
             Type::Alias(_, inner) => self.signature_from_semantic_callable_type(*inner),
             _ => None,
         }

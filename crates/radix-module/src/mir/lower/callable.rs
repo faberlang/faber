@@ -85,6 +85,108 @@ impl FunctionBuilder<'_> {
         Some(operand)
     }
 
+    /// A path naming a top-level function, used as a value.
+    ///
+    /// MIR function ids are assigned as items lower, so the target's id is not
+    /// known here. The value is a synthetic forwarding function with the
+    /// target's parameter modes that calls the definition; the call through the
+    /// value then behaves exactly like a direct call (mutable parameters stay
+    /// references, failable targets propagate their error).
+    pub(super) fn lower_function_value(&mut self, def_id: DefId, expr: &HirExpression) -> Option<MirOperand> {
+        if !self.context.function_params.contains_key(&def_id) {
+            return None;
+        }
+        let value_ty = expr.ty?;
+        let signature = match self.normalized_type(value_ty) {
+            Type::Func(signature) => signature.clone(),
+            _ => return None,
+        };
+        let span = expr.span;
+        if signature.is_async || signature.is_generator || !signature.type_params.is_empty() {
+            self.errors.push(MirError::unsupported(
+                span,
+                "async, generator, or generic function used as a value",
+            ));
+            return None;
+        }
+        let return_ty = MirType::semantic(signature.ret);
+        let error_ty = signature.err.map(MirType::semantic);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            error_ty,
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        let mut args = Vec::with_capacity(signature.params.len());
+        for param in &signature.params {
+            let local = nested.next_local_id();
+            let storage_ty = match self.types.get(param.ty) {
+                Type::Ref(_, inner) => *inner,
+                _ => param.ty,
+            };
+            let ty = MirType::semantic(storage_ty);
+            let (mode, mutable) = match param.mode {
+                radix_types::SemanticParamMode::Owned => (MirParamMode::Owned, false),
+                radix_types::SemanticParamMode::Ref => (MirParamMode::Ref, false),
+                radix_types::SemanticParamMode::MutRef => (MirParamMode::MutRef, true),
+                radix_types::SemanticParamMode::Move => (MirParamMode::Move, false),
+            };
+            nested
+                .params
+                .push(MirParam { local, name: None, ty, mode, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: local, name: None, ty, mutable, span });
+            args.push(MirOperand::Place(MirPlace::local(local)));
+        }
+        let entry = nested.fresh_block(span);
+        nested.switch_to(entry);
+        let callee = MirCallee::definition(def_id);
+        let result = match error_ty {
+            Some(error_ty) => nested.lower_failable_call(callee, args, return_ty, error_ty, None, span)?,
+            None => nested.emit_call(callee, args, return_ty, span),
+        };
+        let returned = if nested.is_vacuum(return_ty) {
+            None
+        } else {
+            Some(result)
+        };
+        nested.terminate_current(MirTerminatorKind::Return(returned), span);
+        let blocks = nested.finish_blocks();
+        let nested_error_count = nested.errors.len();
+        self.errors.extend(nested.errors);
+        if nested_error_count > 0 {
+            return None;
+        }
+        self.synthetic_functions.push(MirFunction {
+            id,
+            source: None,
+            name: None,
+            params: nested.params,
+            locals: nested.locals,
+            temps: nested.temps,
+            blocks,
+            return_ty,
+            error_ty,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        });
+        Some(self.assign_temp(
+            MirValueKind::Operand(MirOperand::Constant(MirConstant::Function(id))),
+            MirType::semantic(value_ty),
+            span,
+        ))
+    }
+
     pub(super) fn lower_closure_function(
         &mut self,
         closure: &HirExpression,

@@ -3262,8 +3262,13 @@ impl<'a> FunctionBuilder<'a> {
                 }
                 return Some(MirOperand::Constant(MirConstant::ShapeSize { shape, axis: None }));
             }
-            self.errors
-                .push(MirError::unsupported(expr.span, "path that does not resolve to a local value"));
+            if let Some(value) = self.lower_function_value(def_id, expr) {
+                return Some(value);
+            }
+            if !self.context.function_params.contains_key(&def_id) {
+                self.errors
+                    .push(MirError::unsupported(expr.span, "path that does not resolve to a local value"));
+            }
             return None;
         };
 
