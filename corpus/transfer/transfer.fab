@@ -71,7 +71,7 @@ main {
     print target.flatten()
 
     # Into a mut parameter, from a view: the caller sees the write.
-    fill_transposed(target, source)
+    fill_transposed(mut target, source)
     print target.flatten()
 
     # The right side is any tensor expression; the whole sum is copied.

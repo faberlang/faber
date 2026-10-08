@@ -20,18 +20,18 @@ fn poke(mut list<int> xs) → void {
 }
 
 fn viaown(own list<int> xs) → int {
-    poke(xs)
+    poke(mut xs)
     return xs.length()
 }
 
 fn viacopy(copy list<int> xs) → int {
-    poke(xs)
+    poke(mut xs)
     return xs.length()
 }
 
 main {
     const list<int> a ← [1, 2, 3]
-    print viaown([1, 2, 3])
-    print viacopy(a)
+    print viaown(own [1, 2, 3])
+    print viacopy(copy a)
     print a.length()
 }

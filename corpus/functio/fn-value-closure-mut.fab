@@ -32,7 +32,7 @@ locale = "en"
 main {
     var list<int> a ← [1, 2, 3]
     const (mut list<int>) → void grow ← mut list<int> xs ∴ xs.append(9)
-    grow(a)
+    grow(mut a)
     print a.length()
     print a
 }

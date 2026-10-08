@@ -18,6 +18,6 @@ fn poke(mut list<int> xs) → void {
 
 main {
     var list<int> a ← [1, 2, 3]
-    poke(a)
+    poke(mut a)
     print a.length()
 }

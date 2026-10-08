@@ -26,13 +26,13 @@ fn bump(mut Counter c) → void {
 }
 
 fn twice(mut Counter c) → void {
-    bump(c)
-    bump(c)
+    bump(mut c)
+    bump(mut c)
 }
 
 main {
     var Counter c ← Counter {}
-    bump(c)
-    twice(c)
+    bump(mut c)
+    twice(mut c)
     print c.n
 }

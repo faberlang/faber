@@ -41,10 +41,10 @@ fn bump(copy Counter c) → int {
 
 main {
     const list<int> a ← [1, 2]
-    print take(a)
+    print take(copy a)
     print a.length()
     var Counter c ← Counter {}
     c.inc()
-    print bump(c)
+    print bump(copy c)
     print c.n
 }

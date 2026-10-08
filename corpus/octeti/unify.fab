@@ -68,7 +68,7 @@ main {
 
     # construction + cross-assignment
     const u8 marker ← 0xff ∷ u8
-    const bytes grown ← appendByte(sig, marker)
+    const bytes grown ← appendByte(mut sig, marker)
     print grown.length()
     const bytes crossed ← fromBytes()
     print crossed.length()

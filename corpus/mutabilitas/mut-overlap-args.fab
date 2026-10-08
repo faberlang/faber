@@ -20,5 +20,5 @@ fn swap(mut list<int> a, mut list<int> b) → void {
 
 main {
     var list<int> xs ← [1, 2, 3]
-    swap(xs, xs)
+    swap(mut xs, mut xs)
 }

@@ -34,14 +34,14 @@ fn grow(mut list<int> xs) → void {
 }
 
 fn apply((mut list<int>) → void f, mut list<int> xs) → void {
-    f(xs)
+    f(mut xs)
 }
 
 main {
     var list<int> a ← [1, 2, 3]
-    apply(grow, a)
+    apply(grow, mut a)
     print a
     const (mut list<int>) → void g ← grow
-    g(a)
+    g(mut a)
     print a.length()
 }
