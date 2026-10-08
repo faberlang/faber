@@ -378,14 +378,14 @@ fn live_recipe_statements(
 /// The kernel body's `FilumSum` declarations (SFR-5): each entry is the
 /// declaration facts plus the source local its lone tensor argument reads.
 /// The caller admits exactly one per kernel (one recipe per kernel).
-fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumSumOp, MirLocalId)> {
+fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumReduceOp, MirLocalId)> {
     let mut declarations = Vec::new();
     for block in &function.blocks {
         for statement in &block.statements {
             let MirStatementKind::RuntimeCall {
                 call:
                     MirRuntimeCall {
-                        intrinsic: MirIntrinsic::FilumSum(filum),
+                        intrinsic: MirIntrinsic::FilumReduce(filum),
                         args,
                         ..
                     },
@@ -394,6 +394,9 @@ fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumSumOp, 
             else {
                 continue;
             };
+            if filum.form != crate::MirFilumForm::Declared {
+                continue;
+            }
             let Some(MirOperand::Place(place)) = args.first() else {
                 continue;
             };
@@ -449,6 +452,7 @@ pub fn carried_plan_agrees(
             CollectionKernelPlan::Elementwise
                 | CollectionKernelPlan::LaneGrid { .. }
                 | CollectionKernelPlan::SingleLane
+                | CollectionKernelPlan::GridReduce { .. }
         ),
         Some(derived) => derived == carried,
     }
@@ -597,6 +601,9 @@ pub enum RecipeKind {
     LaneGrid,
     /// Single-lane kernel (gpu-reset A2 rung 3): one thread.
     SingleLane,
+    /// Whole-grid reduction (gpu-reset C4-8): two launches through a
+    /// dispatcher-owned partials scratch.
+    GridReduce,
 }
 
 impl RecipeKind {
@@ -620,6 +627,7 @@ impl RecipeKind {
             CollectionKernelPlan::SsmScan(_) => Self::SsmScan,
             CollectionKernelPlan::LaneGrid { .. } => Self::LaneGrid,
             CollectionKernelPlan::SingleLane => Self::SingleLane,
+            CollectionKernelPlan::GridReduce { .. } => Self::GridReduce,
             // SFR-5: the declared distributed sum's floor IS the tree
             // recipe — a backend with no native collective arm selects the
             // tree-reduction launch semantics here; native arms (SFR-6/7)
@@ -2110,6 +2118,7 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
         // partial-slot write — same bind shape as the tree floor.
         | CollectionKernelPlan::LaneGrid { .. }
         | CollectionKernelPlan::SingleLane
+        | CollectionKernelPlan::GridReduce { .. }
         | CollectionKernelPlan::DistributedSum(_) => (vec![output_extent.max(1)], BindLayout::Flat),
     }
 }
@@ -2464,6 +2473,13 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         | CollectionKernelPlan::SsmScan(_)
         | CollectionKernelPlan::LaneGrid { .. }
         | CollectionKernelPlan::SingleLane => 0,
+        | CollectionKernelPlan::LaneGrid { .. } => 0,
+        // The workgroup tree: one `value_bytes + ...` partial per lane.
+        CollectionKernelPlan::GridReduce {
+            workgroup,
+            partial_layout,
+            ..
+        } => u64::from(*workgroup) * u64::from(partial_layout.element_bytes()),
         CollectionKernelPlan::TreeReduction(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }

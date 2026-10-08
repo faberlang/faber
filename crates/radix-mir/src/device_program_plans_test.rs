@@ -4649,8 +4649,11 @@ fn speculative_verification_version_skew_fails_closed() {
 // Declared distributed sum (SFR-5: `summa ex … filum …` plan entry).
 // -----------------------------------------------------------------------
 
-fn filum_declaration(lane_width: u32) -> crate::MirFilumSumOp {
-    crate::MirFilumSumOp {
+fn filum_declaration(lane_width: u32) -> crate::MirFilumReduceOp {
+    crate::MirFilumReduceOp {
+        op: crate::MirReduceOp::Sum,
+        form: crate::MirFilumForm::Declared,
+        term_ty: MirType::semantic(radix_types::TypeId(0)),
         filum_binder: None,
         term_binder: MirLocalId(2),
         term_binder_name: None,
@@ -4692,7 +4695,7 @@ fn filum_function(types: &mut TypeTable) -> MirFunction {
                 kind: MirStatementKind::RuntimeCall {
                     destination: Some(MirPlace::local(MirLocalId(1))),
                     call: MirRuntimeCall {
-                        intrinsic: MirIntrinsic::FilumSum(filum_declaration(32)),
+                        intrinsic: MirIntrinsic::FilumReduce(filum_declaration(32)),
                         args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
                         return_ty: scalar,
                     },

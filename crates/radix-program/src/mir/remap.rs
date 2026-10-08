@@ -6,7 +6,7 @@ use super::{
     MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirValue,
     MirValueKind, Symbol,
 };
-use radix_module::mir::{MirFilumSumOp, MirIntrinsic, MirSermoOp, MirShapeExpr};
+use radix_module::mir::{MirFilumReduceOp, MirIntrinsic, MirSermoOp, MirShapeExpr};
 
 /// Remap a name symbol from the lowering interner into the merged interner.
 /// A `Symbol` always means text in its named interner (ARCH2-2), so the
@@ -266,7 +266,7 @@ pub(super) fn remap_runtime_call_text_symbols(
             }
         }
         MirIntrinsic::Sermo(op) => remap_sermo_text_symbols(op, source, target),
-        MirIntrinsic::FilumSum(filum) => remap_filum_sum_text_symbols(filum, source, target),
+        MirIntrinsic::FilumReduce(filum) => remap_filum_sum_text_symbols(filum, source, target),
         MirIntrinsic::TensorShapeCheck(check) => {
             for relation in &mut check.relations {
                 remap_shape_expr_text_symbols(&mut relation.left, source, target);
@@ -356,7 +356,7 @@ fn remap_sermo_text_symbols(op: &mut MirSermoOp, source: &Interner, target: &mut
 /// plus the captured term body — real MIR whose own statements, and any
 /// intrinsic nested in them, hold lowering-interner symbols.
 fn remap_filum_sum_text_symbols(
-    filum: &mut MirFilumSumOp,
+    filum: &mut MirFilumReduceOp,
     source: &Interner,
     target: &mut Interner,
 ) {

@@ -761,6 +761,17 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
             source_resource: usize::try_from(plan.source_resource).unwrap_or(usize::MAX),
             rank: plan.rank,
         },
+        WireCollectionKernelPlan::GridReduce(plan) => CollectionKernelPlan::GridReduce {
+            source_resource: usize::try_from(plan.source_resource).unwrap_or(usize::MAX),
+            rank: plan.rank,
+            workgroup: plan.workgroup,
+            partials_cap: plan.partials_cap,
+            partial_layout: radix_mir::kernel_plan::GridReducePartialLayout {
+                value_bytes: plan.partial_value_bytes,
+                coordinates: plan.partial_coordinates,
+                seen: plan.partial_seen,
+            },
+        },
     }
 }
 

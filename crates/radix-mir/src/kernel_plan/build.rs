@@ -412,7 +412,7 @@ impl CollectionKernelPlan {
     ///
     /// Like the transformer recipes, the filum sum has **no**
     /// `CollectionOpContract` variant: the declaration facts come from the
-    /// [`MirIntrinsic::FilumSum`] runtime call the module lowering emitted
+    /// [`MirIntrinsic::FilumReduce`] runtime call the module lowering emitted
     /// (filum metadata, term-body MIR, coordinate binders), and `length` is
     /// the source buffer's element count resolved from the kernel signature
     /// — never guessed from the body. The tree-floor facts
@@ -425,7 +425,7 @@ impl CollectionKernelPlan {
     /// length); the caller fails closed with a typed diagnostic.
     #[must_use]
     pub fn from_filum_summa(
-        filum: &crate::MirFilumSumOp,
+        filum: &crate::MirFilumReduceOp,
         length: u64,
     ) -> Option<CollectionKernelPlan> {
         let workgroup_x = filum.lane_width;
@@ -688,6 +688,22 @@ impl CollectionKernelPlan {
             // gpu-reset C4: a lane grid carries no static grid structure; the
             // lane domain is a call-site fact checked by `geometry_for_call`.
             CollectionKernelPlan::LaneGrid { .. } | CollectionKernelPlan::SingleLane => Ok(()),
+            CollectionKernelPlan::LaneGrid { .. } => Ok(()),
+            CollectionKernelPlan::GridReduce {
+                workgroup,
+                partials_cap,
+                ..
+            } => {
+                if *workgroup == 0 || !workgroup.is_power_of_two() {
+                    return Err(PlanValidationError::NonPowerOfTwoWorkgroup {
+                        workgroup_x: *workgroup,
+                    });
+                }
+                if *partials_cap == 0 {
+                    return Err(PlanValidationError::GridReduceZeroPartialsCap);
+                }
+                Ok(())
+            }
         }
     }
 }

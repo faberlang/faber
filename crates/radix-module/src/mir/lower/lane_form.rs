@@ -14,6 +14,14 @@
 //! <body, inline>
 //! ```
 //!
+//! The other admitted region is a top-level whole-grid reduction (gpu-reset
+//! C4-8): `dest ← reduce via Op from t at [i, j] thread lane const v { ... }
+//! coalesce d`. It lowers to the same `Lane` parameter and extent temps, then
+//! ONE `FilumReduce` node (form `Grid`) and no grid guard: every lane must
+//! reach the node's barriers, and an out-of-range lane contributes the
+//! identity. The destination store and anything after the node stay ordinary
+//! MIR.
+//!
 //! Host kernel lowering never reaches this module: the host form stays the
 //! untouched sequential oracle. A kernel with a second top-level lane loop,
 //! or any statement after the loop, depends on a whole-grid barrier that has
@@ -26,6 +34,8 @@ use super::*;
 pub(crate) const LANE_FORM_SECOND_REGION_ISSUE: &str = "lane_form_second_region";
 /// Issue name: a statement after the top-level `thread lane` loop.
 pub(crate) const LANE_FORM_POST_LOOP_ISSUE: &str = "lane_form_post_loop_statement";
+/// Issue name: a `thread lane` reduce inside a lane region (C4-8 nested).
+pub(crate) const LANE_FORM_NESTED_REDUCE_ISSUE: &str = "lane_form_nested_reduce";
 
 /// Intern the device word (`u32`) the lane-form arithmetic runs in. Lowering
 /// holds the type table immutably, so the arena gets it before function
@@ -48,7 +58,8 @@ pub(super) struct LaneRegion {
     pub lane: MirLocalId,
 }
 
-/// The `Itera` expression of a top-level statement when it is a `filum` loop.
+/// The region expression of a top-level statement: a `filum` loop, or a
+/// `filum` reduction (bare or the right side of an assignment).
 fn lane_loop(statement: &HirStatement) -> Option<&HirExpression> {
     let HirStatementKind::Expr(expr) = &statement.kind else {
         return None;
@@ -57,11 +68,38 @@ fn lane_loop(statement: &HirStatement) -> Option<&HirExpression> {
 }
 
 fn tail_lane_loop(expr: &HirExpression) -> Option<&HirExpression> {
-    matches!(
+    if matches!(
         &expr.kind,
         HirExpressionKind::Itera { filum: Some(_), mode: HirIteraMode::Ex, .. }
+    ) {
+        return Some(expr);
+    }
+    let candidate = match &expr.kind {
+        HirExpressionKind::Assign(_, value) => value.as_ref(),
+        _ => expr,
+    };
+    grid_reduction(candidate).is_some().then_some(candidate)
+}
+
+/// The `filum` reduction of a region expression: the reduction itself, or
+/// the left side of its `coalesce` (the source spells the identity as
+/// `reduce ... coalesce d`, which the front end keeps as a coalesce).
+fn grid_reduction(expr: &HirExpression) -> Option<&HirExpression> {
+    let reduction = match &expr.kind {
+        HirExpressionKind::Binary(HirBinOp::Coalesce, lhs, _) => lhs.as_ref(),
+        _ => expr,
+    };
+    matches!(
+        &reduction.kind,
+        HirExpressionKind::Reduction { filum: Some(_), group: None, .. }
     )
-    .then_some(expr)
+    .then_some(reduction)
+}
+
+/// Whether a region expression is a reduction (statements after it are
+/// allowed: they run after the node).
+fn is_reduce_region(expr: &HirExpression) -> bool {
+    grid_reduction(expr).is_some()
 }
 
 impl FunctionBuilder<'_> {
@@ -90,7 +128,8 @@ impl FunctionBuilder<'_> {
             });
             return;
         }
-        // Everything after the loop would read results of the whole grid.
+        // Everything after the loop would read results of the whole grid. A
+        // reduction region is exempt: its node is a launch split point.
         let after_loop = body
             .statements
             .iter()
@@ -98,10 +137,14 @@ impl FunctionBuilder<'_> {
             .skip(1)
             .find(|statement| !matches!(statement.kind, HirStatementKind::Tacet | HirStatementKind::Redde(None)));
         let trailing = body.expr.as_deref().filter(|expr| expr.span != first.span);
-        if let Some(span) = after_loop
-            .map(|statement| statement.span)
-            .or(trailing.map(|expr| expr.span))
-        {
+        let post_region = if is_reduce_region(first) {
+            None
+        } else {
+            after_loop
+                .map(|statement| statement.span)
+                .or(trailing.map(|expr| expr.span))
+        };
+        if let Some(span) = post_region {
             self.errors.push(MirError {
                 message: "a statement after the top-level `thread lane` loop depends on the whole grid, which \
                           needs a launch split that does not exist yet"
@@ -112,7 +155,10 @@ impl FunctionBuilder<'_> {
             });
             return;
         }
-        let HirExpressionKind::Itera { filum: Some((def_id, name)), .. } = &first.kind else {
+        let region_kind = grid_reduction(first).map_or(&first.kind, |reduction| &reduction.kind);
+        let (HirExpressionKind::Itera { filum: Some((def_id, name)), .. }
+        | HirExpressionKind::Reduction { filum: Some((def_id, name)), .. }) = region_kind
+        else {
             return;
         };
         // The lane id is the 32-bit global invocation id the device launches.
@@ -126,6 +172,79 @@ impl FunctionBuilder<'_> {
     pub(super) fn is_lane_region(&self, expr: &HirExpression) -> bool {
         self.lane_region
             .is_some_and(|region| region.span == expr.span)
+    }
+
+    /// Lower a coalesced grid reduction region: `reduce ... coalesce d`
+    /// arrives as `Coalesce(Reduction, d)`; the reduction is the node and `d`
+    /// its identity (out-of-range lanes contribute it).
+    pub(super) fn lower_grid_reduce_coalesce(
+        &mut self,
+        reduction: &HirExpression,
+        identity: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let HirExpressionKind::Reduction { op, source, coordinates, filum: Some(filum), binding, body, .. } =
+            &reduction.kind
+        else {
+            return None;
+        };
+        self.lower_filum_reduce_expr(
+            super::control::FilumReduceLowering {
+                op: *op,
+                form: MirFilumForm::Grid,
+                source,
+                coordinates,
+                filum,
+                binding: binding.as_ref(),
+                body: body.as_ref(),
+                identity: Some(identity),
+            },
+            expr,
+        )
+    }
+
+    /// The per-axis extent operands of a ranked tensor source: constants for
+    /// literal axes, one `TensorExtent` temp otherwise. The grid reduction
+    /// node carries them so emitters compute the element count in-kernel.
+    pub(super) fn lane_form_extents(
+        &mut self,
+        tensor: &MirPlace,
+        source_ty: TypeId,
+        coordinate_count: usize,
+        span: Span,
+    ) -> Option<Vec<MirOperand>> {
+        let CollectionIteraKind::Shaped { rank, literal, matrix: false, .. } =
+            self.classify_collection_itera(source_ty, HirIteraMode::Ex, coordinate_count)
+        else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "thread lane reduce over a source that is not a ranked tensor",
+            ));
+            return None;
+        };
+        if rank == 0 || rank != coordinate_count {
+            self.errors.push(MirError::unsupported(
+                span,
+                "thread lane reduce coordinate count differs from rank",
+            ));
+            return None;
+        }
+        let word = MirType::semantic(lane_word(self.types)?);
+        let mut extents = Vec::with_capacity(rank);
+        for axis in 0..rank {
+            extents.push(match literal.as_deref() {
+                Some(dimensions) => MirOperand::Constant(MirConstant::Int(dimensions[axis])),
+                None => self.assign_temp(
+                    MirValueKind::TensorExtent {
+                        tensor: MirOperand::Place(tensor.clone()),
+                        axis: u32::try_from(axis).ok()?,
+                    },
+                    word,
+                    span,
+                ),
+            });
+        }
+        Some(extents)
     }
 
     /// Lower the lane region in lane form (see the module docs).

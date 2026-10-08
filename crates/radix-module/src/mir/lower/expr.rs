@@ -410,6 +410,9 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         rhs: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if self.is_lane_region(expr) {
+            return self.lower_grid_reduce_coalesce(lhs, rhs, expr);
+        }
         self.lower_coalesce(lhs, rhs, expr)
     }
 

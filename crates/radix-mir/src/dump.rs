@@ -454,8 +454,10 @@ fn intrinsic(value: &MirIntrinsic) -> String {
             format!("tensor_shape_size {expression:?}")
         }
         MirIntrinsic::TensorLimes(policy) => format!("tensor_limes {}", edge_policy(policy)),
-        MirIntrinsic::FilumSum(op) => format!(
-            "filum_sum lane_width={} term_binder={} coordinates={}",
+        MirIntrinsic::FilumReduce(op) => format!(
+            "filum_reduce op={} form={} lane_width={} term_binder={} coordinates={}",
+            op.op.name(),
+            op.form.name(),
             op.lane_width,
             op.term_binder_name.map_or(0, |s| s.0),
             op.coordinates.len()

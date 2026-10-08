@@ -549,7 +549,7 @@ fn filum_declaration_launch_facts(
             let MirStatementKind::RuntimeCall {
                 call:
                     MirRuntimeCall {
-                        intrinsic: MirIntrinsic::FilumSum(filum),
+                        intrinsic: MirIntrinsic::FilumReduce(filum),
                         args,
                         ..
                     },
@@ -558,6 +558,11 @@ fn filum_declaration_launch_facts(
             else {
                 continue;
             };
+            // The grid form has its own plan and launch split; it never
+            // takes the declared sum's launch facts.
+            if filum.form != crate::MirFilumForm::Declared {
+                continue;
+            }
             let Some(MirOperand::Place(place)) = args.first() else {
                 continue;
             };

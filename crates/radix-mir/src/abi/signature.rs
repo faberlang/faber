@@ -19,8 +19,8 @@ use super::{
     buffer_element_type, builtin_input_for_index_param, builtin_inputs_for_named_params,
     called_builtins_for_function, collection_op_contract, combined_builtin_dependencies,
     device_view_element_count, device_view_element_count_or_runtime, device_view_element_type,
-    dispatch_size_for_1d_elements, genus_param_layout, is_vacuum, kernel_has_collection_op,
-    named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
+    dispatch_size_for_1d_elements, genus_param_layout, is_vacuum, kernel_element_byte_width,
+    kernel_has_collection_op, named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
     require_same_element_type, require_u32_index, result_tuple_count, storage_buffer_limit_error,
 };
 
@@ -204,6 +204,93 @@ fn maybe_append_runtime_extent(
     signature
         .extra_inputs
         .push(runtime_extent_resource(binding, extent_ty));
+}
+
+/// The whole-grid reduction node of a lane-form function (C4-8): the node
+/// facts and its source parameter local (alias-resolved).
+pub(crate) fn grid_reduce_node(
+    function: &MirFunction,
+) -> Option<(&crate::MirFilumReduceOp, MirLocalId)> {
+    function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| {
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                return None;
+            };
+            let crate::MirIntrinsic::FilumReduce(filum) = &call.intrinsic else {
+                return None;
+            };
+            if filum.form != crate::MirFilumForm::Grid {
+                return None;
+            }
+            let Some(MirOperand::Place(place)) = call.args.first() else {
+                return None;
+            };
+            let MirPlaceBase::Local(local) = place.base else {
+                return None;
+            };
+            Some((filum, resolve_parameter_alias(function, local)))
+        })
+}
+
+/// The partial layout of a grid reduction node.
+pub(crate) fn grid_reduce_partial_layout(
+    filum: &crate::MirFilumReduceOp,
+    validation: &MirValidationContext<'_>,
+) -> Result<crate::kernel_plan::GridReducePartialLayout, MirAbiError> {
+    let rank = u8::try_from(filum.coordinates.len())
+        .map_err(|_| MirAbiError::new("grid reduce rank exceeds 255"))?;
+    let value_bytes = match validation.layouts.layout_for_type(filum.term_ty) {
+        Ok(layout) => match layout.kind {
+            MirLayoutKind::Scalar(scalar) => {
+                u32::from(kernel_element_byte_width(scalar).unwrap_or(4))
+            }
+            _ => 4,
+        },
+        Err(_) => 4,
+    };
+    Ok(crate::kernel_plan::GridReducePartialLayout::for_op(
+        filum.op,
+        value_bytes,
+        rank,
+    ))
+}
+
+/// C4-8: append the dispatcher-owned partials scratch of a whole-grid
+/// reduction after every declared parameter resource (and before the tensor
+/// extents, which stay last). A function with no grid reduction is untouched.
+fn append_partials_scratch_resource(
+    function: &MirFunction,
+    signature: &mut MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) -> Result<(), MirAbiError> {
+    let Some((filum, _)) = grid_reduce_node(function) else {
+        return Ok(());
+    };
+    let layout = grid_reduce_partial_layout(filum, validation)?;
+    let binding = signature
+        .resources()
+        .map(|resource| resource.binding)
+        .max()
+        .map_or(0, |binding| binding + 1);
+    signature.extra_inputs.push(MirKernelResource {
+        group: DEFAULT_KERNEL_RESOURCE_GROUP,
+        binding,
+        kind: MirKernelResourceKind::PartialsScratch {
+            cap: crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP,
+            element_bytes: layout.element_bytes(),
+        },
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::ReadWrite,
+        element_ty: filum.term_ty,
+        element_count: u64::from(crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP),
+        source_local: None,
+        source_name: None,
+        reduced_projection: None,
+    });
+    Ok(())
 }
 
 /// Collects the distinct `(tensor operand local, axis)` pairs a kernel body
@@ -525,6 +612,7 @@ impl MirKernelSignature {
                 )?
             };
         let mut signature = signature;
+        append_partials_scratch_resource(function, &mut signature, validation)?;
         append_tensor_extent_resources(function, &mut signature, validation)?;
         // The per-kernel storage-buffer binding maximum (the active
         // per-lane `StorageBufferLimitRecord`; the shared default is the
@@ -890,6 +978,11 @@ impl MirKernelSignature {
         interner: Option<&Interner>,
         allow_host_owned_tensor_entry: bool,
     ) -> Result<Option<Self>, MirAbiError> {
+        // The lane form never takes the host-combined partials ABI: a grid
+        // reduction combines through the dispatcher-owned scratch instead.
+        if is_lane_form(function) {
+            return Ok(None);
+        }
         let Some(contract) = collection_op_contract(function, validation)? else {
             return Ok(None);
         };

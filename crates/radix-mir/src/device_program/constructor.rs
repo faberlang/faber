@@ -1789,6 +1789,27 @@ fn lane_grid_plan(
     {
         return Err("lane kernel has no written tensor resource".to_owned());
     }
+    // C4-8: a whole-grid reduction region names its own source resource; it
+    // is never "the first read buffer".
+    if let Some((filum, source_local)) = crate::abi::grid_reduce_node(function) {
+        let source_resource = resources
+            .iter()
+            .position(|resource| resource.source_local == Some(source_local))
+            .ok_or_else(|| "grid reduce source tensor has no storage-buffer resource".to_owned())?;
+        let rank = u8::try_from(filum.coordinates.len())
+            .ok()
+            .filter(|rank| *rank > 0)
+            .ok_or_else(|| "grid reduce source tensor has no static rank".to_owned())?;
+        let partial_layout = crate::abi::grid_reduce_partial_layout(filum, validation)
+            .map_err(|error| error.message)?;
+        return Ok(Some(CollectionKernelPlan::GridReduce {
+            source_resource,
+            rank,
+            workgroup: crate::kernel_plan::GRID_REDUCE_WORKGROUP,
+            partials_cap: crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP,
+            partial_layout,
+        }));
+    }
     let Some((source_resource, source)) = resources
         .iter()
         .enumerate()

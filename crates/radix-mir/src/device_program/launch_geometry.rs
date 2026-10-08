@@ -102,6 +102,10 @@ pub fn geometry_for_call(
         CollectionKernelPlan::RowSoftmax(softmax) if softmax.batched.is_none() => {
             generic_1d(unit, output_count(unit, &counts)?)
         }
+        CollectionKernelPlan::GridReduce { .. } => Err(GeometryError::new(
+            GEOMETRY_SHAPE_NOT_COVERED,
+            vec![("reason", "GridReduce launch geometry is C4-8 U2".to_owned())],
+        )),
         CollectionKernelPlan::LaneGrid {
             source_resource,
             rank,
@@ -365,6 +369,7 @@ fn plan_name(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::DistributedSum(_) => "DistributedSum",
         CollectionKernelPlan::LaneGrid { .. } => "LaneGrid",
         CollectionKernelPlan::SingleLane => "SingleLane",
+        CollectionKernelPlan::GridReduce { .. } => "GridReduce",
     }
 }
 

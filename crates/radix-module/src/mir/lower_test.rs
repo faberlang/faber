@@ -6947,7 +6947,7 @@ fn sequential_reduction_sum_transformed_term_folds_per_element_body() {
 
 #[test]
 fn filum_reduction_sum_lowers_to_declared_plan_entry() {
-    // SFR-5: the `filum` spelling lowers to the `FilumSum` declaration (the
+    // SFR-5: the `filum` spelling lowers to the declared `FilumReduce` (the
     // kernel-plan entry), never inline base-lane MIR.
     let mut unit = analyze(
         r"@ nucleum
@@ -6957,8 +6957,8 @@ functio k(tensor<f32, [256]> a) → f32 {
     );
     let dump = dump_analyzed_unit(&mut unit).expect("filum summa lowers to the SFR-5 declaration");
     assert!(
-        dump.contains("filum_sum"),
-        "expected the FilumSum declaration in the MIR dump:\n{dump}"
+        dump.contains("filum_reduce op=sum form=declared"),
+        "expected the FilumReduce declaration in the MIR dump:\n{dump}"
     );
 }
 

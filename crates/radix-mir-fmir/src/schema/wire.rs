@@ -566,6 +566,9 @@ pub enum WireCollectionKernelPlan {
     /// launched as one thread. Mirrors
     /// `kernel_plan::CollectionKernelPlan::SingleLane`.
     SingleLane,
+    /// Whole-grid reduction (gpu-reset C4-8). Mirrors
+    /// `kernel_plan::CollectionKernelPlan::GridReduce`.
+    GridReduce(WireGridReducePlan),
 }
 
 /// Axis-reduction recipe plan (wire mirror of `kernel_plan::AxisReductionPlan`,
@@ -983,6 +986,27 @@ pub struct WireLaneGridPlan {
     pub source_resource: u64,
     /// Number of lane-domain axes.
     pub rank: u8,
+}
+
+/// Grid-reduce plan (gpu-reset C4-8): mirror of
+/// `CollectionKernelPlan::GridReduce`, with the partial layout flattened.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireGridReducePlan {
+    /// Index of the resource holding the reduced tensor.
+    pub source_resource: u64,
+    /// Number of source axes.
+    pub rank: u8,
+    /// Workgroup lane count of both stages.
+    pub workgroup: u32,
+    /// Maximum partial slots in the dispatcher-owned scratch.
+    pub partials_cap: u32,
+    /// Byte width of one partial's value.
+    pub partial_value_bytes: u32,
+    /// `u32` coordinates carried after the value.
+    pub partial_coordinates: u8,
+    /// Whether a `u32` `seen` flag follows.
+    pub partial_seen: bool,
 }
 
 /// Rank-2 transpose recipe (`[M,N] → [N,M]`), the wire mirror of

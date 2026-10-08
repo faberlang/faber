@@ -26,6 +26,7 @@
 // parent module provides shared imports for lowering
 use super::*;
 use crate::hir::visit::HirVisitor;
+use radix_mir::kernel_plan::GRID_REDUCE_WORKGROUP;
 use radix_types::i64s_from_literal_index;
 
 fn arm_body_returns(arm: &HirCasuArm) -> bool {
@@ -149,6 +150,18 @@ pub(super) enum CollectionIteraKind {
     // `s[i]` projection, whose `textus` row still traps on non-ASCII (F5).
     Text(TypeId),
     Unsupported,
+}
+
+/// One `filum` reduction handed to [`FunctionBuilder::lower_filum_reduce_expr`].
+pub(super) struct FilumReduceLowering<'a> {
+    pub(super) op: radix_hir::HirReductionOp,
+    pub(super) form: MirFilumForm,
+    pub(super) source: &'a HirExpression,
+    pub(super) coordinates: &'a [(DefId, Symbol)],
+    pub(super) filum: &'a (DefId, Symbol),
+    pub(super) binding: Option<&'a (DefId, Symbol)>,
+    pub(super) body: Option<&'a HirBlock>,
+    pub(super) identity: Option<&'a HirExpression>,
 }
 
 struct ArrayIteraLowering<'a> {
@@ -628,11 +641,52 @@ impl FunctionBuilder<'_> {
         // Host kernel lowering has no device recipe at all: the `sum` is the
         // same plain fold, the sequential meaning of the `filum` clause.
         if let Some(filum) = filum
+            && group.is_none()
+            && self.is_device_lowering()
+        {
+            if self.is_lane_region(expr) {
+                return self.lower_filum_reduce_expr(
+                    FilumReduceLowering {
+                        op,
+                        form: MirFilumForm::Grid,
+                        source,
+                        coordinates,
+                        filum,
+                        binding,
+                        body,
+                        identity,
+                    },
+                    expr,
+                );
+            }
+            if self.lane_region.is_some() {
+                self.errors.push(MirError {
+                    message: "lane kernel: nested reduce is not lowered yet (C4-8 nested)".to_owned(),
+                    issue: super::lane_form::LANE_FORM_NESTED_REDUCE_ISSUE.to_owned(),
+                    span: expr.span,
+                    definition_span: self.lane_region.map(|region| region.span),
+                });
+                return None;
+            }
+        }
+        if let Some(filum) = filum
             && op == Op::Sum
             && group.is_none()
             && !self.is_host_kernel_lowering()
         {
-            return self.lower_filum_summa_expr(source, coordinates, filum, binding?, body?, expr);
+            return self.lower_filum_reduce_expr(
+                FilumReduceLowering {
+                    op,
+                    form: MirFilumForm::Declared,
+                    source,
+                    coordinates,
+                    filum,
+                    binding,
+                    body,
+                    identity: None,
+                },
+                expr,
+            );
         }
         let source_ty = source.ty?;
         let (element, shape, matrix) = match self.normalized_type(source_ty) {
@@ -1276,35 +1330,34 @@ impl FunctionBuilder<'_> {
     /// Frozen cyclic `filum` width for the distributed sum kernel-plan entry.
     const FILUM_LANE_WIDTH: u32 = 32;
 
-    fn lower_filum_summa_expr(
+    pub(super) fn lower_filum_reduce_expr(
         &mut self,
-        source: &HirExpression,
-        coordinates: &[(DefId, Symbol)],
-        filum: &(DefId, Symbol),
-        binding: &(DefId, Symbol),
-        body: &HirBlock,
+        request: FilumReduceLowering<'_>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        let Some(term_ty) = expr.ty else {
+        let FilumReduceLowering { op, form, source, coordinates, filum, binding, body, identity } = request;
+        let grid = form == MirFilumForm::Grid;
+        let Some(result_ty) = expr.ty else {
             self.errors
-                .push(MirError::missing_type(expr.span, "summa term type"));
+                .push(MirError::missing_type(expr.span, "filum reduce result type"));
             return None;
         };
-        let term_mir_ty = MirType::semantic(term_ty);
-        match self.types.get(term_ty) {
+        let result_mir_ty = MirType::semantic(result_ty);
+        match self.types.get(result_ty) {
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {}
             Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {}
+            Type::Primitive(Primitive::Bivalens) if grid => {}
             _ => {
                 self.errors.push(MirError::unsupported(
                     expr.span,
-                    "filum summa before numeric scalar MIR lowering",
+                    "filum reduce before numeric scalar MIR lowering",
                 ));
                 return None;
             }
         }
         let Some(source_ty) = source.ty else {
             self.errors
-                .push(MirError::missing_type(source.span, "filum summa source type"));
+                .push(MirError::missing_type(source.span, "filum reduce source type"));
             return None;
         };
         let element_ty = if let Type::Tensor(element, _) = self.normalized_type(source_ty) {
@@ -1312,7 +1365,7 @@ impl FunctionBuilder<'_> {
         } else {
             self.errors.push(MirError::unsupported(
                 source.span,
-                "filum summa source before tensor MIR lowering",
+                "filum reduce source before tensor MIR lowering",
             ));
             return None;
         };
@@ -1320,6 +1373,13 @@ impl FunctionBuilder<'_> {
         // capture) so the declaration's argument is a live kernel value.
         let source_operand = self.lower_expr_value(source)?;
         let source_operand = self.materialize_operand_place(source_operand, MirType::semantic(source_ty), source.span);
+        let mut args = vec![MirOperand::Place(source_operand.clone())];
+        if grid {
+            args.extend(self.lane_form_extents(&source_operand, source_ty, coordinates.len(), source.span)?);
+            if let Some(identity) = identity {
+                args.push(self.lower_expr_value(identity)?);
+            }
+        }
 
         // Per-element binders: coordinates (numerus, one per axis) and the
         // term binder (the element type). They live as real locals so the
@@ -1345,28 +1405,119 @@ impl FunctionBuilder<'_> {
         }
         let binder_local = self.next_local_id();
         let binder_ty = MirType::semantic(element_ty);
+        let binder_name = binding.map(|(_, name)| *name);
         self.locals.push(MirLocalDecl {
             id: binder_local,
-            name: Some(binding.1),
+            name: binder_name,
             ty: binder_ty,
             mutable: false,
             span: expr.span,
         });
-        saved_bindings.push((
-            binding.0,
-            self.bindings
-                .insert(binding.0, LocalBinding { local: binder_local, ty: binder_ty }),
-        ));
-        let term_result = self.next_local_id();
-        self.locals
-            .push(MirLocalDecl { id: term_result, name: None, ty: term_mir_ty, mutable: true, span: expr.span });
+        if let Some((def_id, _)) = binding {
+            saved_bindings.push((
+                *def_id,
+                self.bindings
+                    .insert(*def_id, LocalBinding { local: binder_local, ty: binder_ty }),
+            ));
+        }
 
-        // Capture the term body into scratch blocks: the redde arm stores
-        // the term value into `term_result` and jumps to the capture exit.
+        // The term type: the sum's own result for the declared form; the
+        // valued `redde` type (or the element when there is no body) for the
+        // grid form.
+        let term_mir_ty = if grid {
+            match body {
+                Some(body) => {
+                    struct TermType(Option<TypeId>);
+                    impl HirVisitor for TermType {
+                        fn visit_stmt(&mut self, stmt: &HirStatement) {
+                            if let HirStatementKind::Redde(Some(value)) = &stmt.kind {
+                                self.0 = value.ty;
+                            }
+                            crate::hir::visit::walk_stmt(self, stmt);
+                        }
+                    }
+                    let mut term = TermType(None);
+                    term.visit_block(body);
+                    MirType::semantic(term.0?)
+                }
+                None => binder_ty,
+            }
+        } else {
+            result_mir_ty
+        };
+        let (term_body, term_result) = match body {
+            Some(body) => {
+                let term_result = self.next_local_id();
+                self.locals.push(MirLocalDecl {
+                    id: term_result,
+                    name: None,
+                    ty: term_mir_ty,
+                    mutable: true,
+                    span: expr.span,
+                });
+                (
+                    self.capture_filum_term_body(body, term_result, term_mir_ty, expr.span),
+                    term_result,
+                )
+            }
+            None => (Vec::new(), binder_local),
+        };
+        for (def_id, binding) in saved_bindings {
+            match binding {
+                Some(previous) => {
+                    self.bindings.insert(def_id, previous);
+                }
+                None => {
+                    self.bindings.remove(&def_id);
+                }
+            }
+        }
+
+        let declaration = MirFilumReduceOp {
+            op: match op {
+                radix_hir::HirReductionOp::Sum => MirReduceOp::Sum,
+                radix_hir::HirReductionOp::Product => MirReduceOp::Product,
+                radix_hir::HirReductionOp::Max => MirReduceOp::Max,
+                radix_hir::HirReductionOp::Min => MirReduceOp::Min,
+                radix_hir::HirReductionOp::ArgMax => MirReduceOp::ArgMax,
+                radix_hir::HirReductionOp::ArgMin => MirReduceOp::ArgMin,
+                radix_hir::HirReductionOp::All => MirReduceOp::All,
+                radix_hir::HirReductionOp::Any => MirReduceOp::Any,
+                radix_hir::HirReductionOp::Count => MirReduceOp::Count,
+            },
+            form,
+            filum_binder: Some(filum.1),
+            term_binder: binder_local,
+            term_binder_name: binder_name,
+            coordinates: coordinate_facts,
+            lane_width: if grid {
+                GRID_REDUCE_WORKGROUP
+            } else {
+                Self::FILUM_LANE_WIDTH
+            },
+            term_body,
+            term_result,
+            term_ty: term_mir_ty,
+        };
+        let call = self.runtime_call_value(MirIntrinsic::FilumReduce(declaration), args, result_mir_ty, expr.span);
+        let result = self.materialize_operand_place(call, result_mir_ty, expr.span);
+        Some(MirOperand::Place(result))
+    }
+
+    /// Capture a filum term body into scratch blocks: the `redde` arm stores
+    /// the term value into `term_result` and jumps to the capture exit. The
+    /// captured statements are returned; the scratch blocks are dropped.
+    fn capture_filum_term_body(
+        &mut self,
+        body: &HirBlock,
+        term_result: MirLocalId,
+        term_mir_ty: MirType,
+        span: Span,
+    ) -> Vec<MirStatement> {
         let blocks_mark = self.blocks.len();
         let saved_current = self.current;
-        let capture_entry = self.fresh_block(expr.span);
-        let capture_exit = self.fresh_block(expr.span);
+        let capture_entry = self.fresh_block(span);
+        let capture_exit = self.fresh_block(span);
         self.current = Some(capture_entry);
         self.breakables.push(BreakableContext {
             perge_target: Some(capture_exit),
@@ -1384,7 +1535,7 @@ impl FunctionBuilder<'_> {
             .any(|block| block.terminator.is_some())
         {
             self.errors
-                .push(MirError::unsupported(expr.span, "filum summa term body without a valued redde"));
+                .push(MirError::unsupported(span, "filum reduce term body without a valued redde"));
         }
         let term_body: Vec<MirStatement> = self.blocks[blocks_mark..]
             .iter()
@@ -1392,34 +1543,7 @@ impl FunctionBuilder<'_> {
             .collect();
         self.blocks.truncate(blocks_mark);
         self.current = saved_current;
-        for (def_id, binding) in saved_bindings {
-            match binding {
-                Some(previous) => {
-                    self.bindings.insert(def_id, previous);
-                }
-                None => {
-                    self.bindings.remove(&def_id);
-                }
-            }
-        }
-
-        let declaration = MirFilumSumOp {
-            filum_binder: Some(filum.1),
-            term_binder: binder_local,
-            term_binder_name: Some(binding.1),
-            coordinates: coordinate_facts,
-            lane_width: Self::FILUM_LANE_WIDTH,
-            term_body,
-            term_result,
-        };
-        let call = self.runtime_call_value(
-            MirIntrinsic::FilumSum(declaration),
-            vec![MirOperand::Place(source_operand)],
-            term_mir_ty,
-            expr.span,
-        );
-        let result = self.materialize_operand_place(call, term_mir_ty, expr.span);
-        Some(MirOperand::Place(result))
+        term_body
     }
 
     /// Lower the literal `elige` subset into a MIR switch.

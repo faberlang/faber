@@ -13,7 +13,7 @@ use radix_module::lexer::{Interner, Span, Symbol};
 use radix_module::mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
     MirBlockId, MirCallee, MirClosureCallee, MirClosureEnvironmentId, MirClosureValue, MirConstant,
-    MirConversion, MirConversionFlavor, MirFilumCoordinate, MirFilumSumOp, MirFunction,
+    MirConversion, MirConversionFlavor, MirFilumCoordinate, MirFilumReduceOp, MirFunction,
     MirFunctionId, MirIntrinsic, MirKeyValueOperand, MirLocal, MirLocalId, MirNamedOperand,
     MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode,
     MirPlace, MirPlaceBase, MirProgram, MirProjection, MirProvider, MirProviderKind,
@@ -327,7 +327,10 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
             kind: MirStatementKind::RuntimeCall {
                 destination: Some(simple_place()),
                 call: MirRuntimeCall {
-                    intrinsic: MirIntrinsic::FilumSum(MirFilumSumOp {
+                    intrinsic: MirIntrinsic::FilumReduce(MirFilumReduceOp {
+                        op: radix_module::mir::MirReduceOp::Sum,
+                        form: radix_module::mir::MirFilumForm::Declared,
+                        term_ty: radix_module::mir::MirType::semantic(radix_types::TypeId(0)),
                         filum_binder: Some(sym(37)),
                         term_binder: MirLocalId(5),
                         term_binder_name: Some(sym(38)),

@@ -5,9 +5,9 @@ use super::{
 };
 use crate::lista_tensor_conversio::validate_lista_to_tensor_source;
 use crate::{
-    MirAtomicOp, MirBinOp, MirCollectionOp, MirConstant, MirConversion, MirGradientOp,
-    MirIntrinsic, MirLayoutKind, MirOperand, MirPlace, MirRuntimeCall, MirSermoOp, MirShapeExpr,
-    MirType,
+    MirAtomicOp, MirBinOp, MirCollectionOp, MirConstant, MirConversion, MirFilumForm,
+    MirGradientOp, MirIntrinsic, MirLayoutKind, MirOperand, MirPlace, MirRuntimeCall, MirSermoOp,
+    MirShapeExpr, MirType,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type};
@@ -424,21 +424,43 @@ impl Validator<'_, '_> {
                     }
                 }
             }
-            // SFR-5: the filum sum declaration validates its surface shape —
-            // one source operand, a fractus broadcast result (the L7 f32
-            // device surface). The declaration facts (term body, coordinate
-            // binders, floor coherence) are the kernel-plan pass's typed
-            // checks, never re-derived here.
-            MirIntrinsic::FilumSum(op) => {
-                self.require_arg_count(call.args.len(), 1, span, "filum sum runtime call");
-                if let Some(arg) = call.args.first() {
+            // SFR-5 / C4-8: the filum reduction validates its surface shape.
+            // The declared form is one source operand and a fractus broadcast
+            // result (the L7 f32 device surface). The grid form is the source,
+            // one extent per axis, and an optional identity, with a numeric
+            // or bool scalar result. The declaration facts (term body,
+            // coordinate binders, floor coherence) are the kernel-plan pass's
+            // typed checks, never re-derived here.
+            MirIntrinsic::FilumReduce(op) => {
+                match op.form {
+                    MirFilumForm::Declared => {
+                        self.require_arg_count(call.args.len(), 1, span, "filum sum runtime call");
+                    }
+                    MirFilumForm::Grid => {
+                        let rank = op.coordinates.len();
+                        if rank == 0 || ![1 + rank, 2 + rank].contains(&call.args.len()) {
+                            self.error(
+                                span,
+                                "filum grid reduce takes the source, one extent per axis, and an optional identity",
+                            );
+                        }
+                    }
+                }
+                for arg in &call.args {
                     self.validate_operand(scope, arg, span);
                 }
-                if !matches!(
-                    self.type_kind(call.return_ty),
-                    Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
-                ) {
-                    self.error(span, "filum sum runtime call does not return fractus");
+                let scalar_result = match self.type_kind(call.return_ty) {
+                    Type::Primitive(Primitive::Fractus)
+                    | Type::SizedNumeric(Primitive::Fractus, _) => true,
+                    Type::Primitive(Primitive::Numerus | Primitive::Bivalens)
+                    | Type::SizedNumeric(Primitive::Numerus, _) => op.form == MirFilumForm::Grid,
+                    _ => false,
+                };
+                if !scalar_result {
+                    self.error(
+                        span,
+                        "filum reduce runtime call does not return a numeric scalar",
+                    );
                 }
                 if op.lane_width == 0 || !op.lane_width.is_power_of_two() {
                     self.error(span, "filum lane width must be a positive power of two");

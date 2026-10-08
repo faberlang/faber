@@ -1050,7 +1050,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             MirStatementKind::RuntimeCall {
                 call:
                     MirRuntimeCall {
-                        intrinsic: MirIntrinsic::FilumSum(_),
+                        intrinsic: MirIntrinsic::FilumReduce(_),
                         ..
                     },
                 ..

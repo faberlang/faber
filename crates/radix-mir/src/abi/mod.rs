@@ -21,6 +21,7 @@ pub use contract::*;
 pub use error::*;
 pub use launch::*;
 pub use resource::*;
+pub(crate) use signature::{grid_reduce_node, grid_reduce_partial_layout};
 // Vocabulary types moved to radix-types (re-exported at the crate root).
 pub use crate::{MirKernelAxis, MirKernelBuiltin};
 pub use types::*;

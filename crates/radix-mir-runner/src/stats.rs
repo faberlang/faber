@@ -403,7 +403,7 @@ pub(crate) fn intrinsic_name(intrinsic: &MirIntrinsic) -> String {
         MirIntrinsic::TensorShapeCheck(_) => "tensor_shape_check".to_owned(),
         MirIntrinsic::TensorShapeSize(_) => "tensor_shape_size".to_owned(),
         MirIntrinsic::TensorLimes(_) => "tensor_limes".to_owned(),
-        MirIntrinsic::FilumSum(_) => "filum_sum".to_owned(),
+        MirIntrinsic::FilumReduce(_) => "filum_sum".to_owned(),
         MirIntrinsic::Duplicate => "duplicate".to_owned(),
         MirIntrinsic::TensorLift(op) => format!("tensor_lift.{}", op.name()),
         MirIntrinsic::VectorOp(op) => format!("vector_op.{}", op.name()),

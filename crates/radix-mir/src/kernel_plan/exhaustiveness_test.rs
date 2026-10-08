@@ -43,6 +43,7 @@ const KNOWN_VARIANTS: &[&str] = &[
     "DistributedSum",
     "LaneGrid",
     "SingleLane",
+    "GridReduce",
 ];
 
 /// Exhaustive variant naming. A new [`CollectionKernelPlan`] variant
@@ -68,6 +69,7 @@ fn variant_coverage(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::DistributedSum(_) => "DistributedSum",
         CollectionKernelPlan::LaneGrid { .. } => "LaneGrid",
         CollectionKernelPlan::SingleLane => "SingleLane",
+        CollectionKernelPlan::GridReduce { .. } => "GridReduce",
     }
 }
 
@@ -234,12 +236,22 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
             rank: 2,
         },
         CollectionKernelPlan::SingleLane,
+        CollectionKernelPlan::GridReduce {
+            source_resource: 0,
+            rank: 2,
+            workgroup: super::GRID_REDUCE_WORKGROUP,
+            partials_cap: super::GRID_REDUCE_PARTIALS_CAP,
+            partial_layout: super::GridReducePartialLayout::for_op(crate::MirReduceOp::Max, 4, 2),
+        },
     ]
 }
 
 fn dummy_distributed_sum() -> DistributedSumPlan {
     DistributedSumPlan {
-        filum: crate::MirFilumSumOp {
+        filum: crate::MirFilumReduceOp {
+            op: crate::MirReduceOp::Sum,
+            form: crate::MirFilumForm::Declared,
+            term_ty: crate::MirType::semantic(radix_types::TypeId(0)),
             filum_binder: None,
             term_binder: crate::MirLocalId(0),
             term_binder_name: None,

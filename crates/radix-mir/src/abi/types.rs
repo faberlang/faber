@@ -85,7 +85,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeTensorShapeCheck,
     RuntimeTensorShapeSize,
     RuntimeTensorLimes,
-    RuntimeFilumSum,
+    RuntimeFilumReduce,
     RuntimeDuplicate,
     RuntimeTensorLift,
     RuntimeVectorOp,
@@ -199,8 +199,8 @@ impl MirRuntimeAbi {
             ),
             // SFR-5: the filum sum declaration is core semantics (the plan
             // pass resolves it); host lanes reject it by target policy.
-            MirIntrinsic::FilumSum(_) => (
-                MirRuntimeAbiFamily::RuntimeFilumSum,
+            MirIntrinsic::FilumReduce(_) => (
+                MirRuntimeAbiFamily::RuntimeFilumReduce,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),

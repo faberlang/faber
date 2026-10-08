@@ -1064,14 +1064,22 @@ pub enum MirIntrinsic {
     TensorShapeCheck(MirShapeCheck),
     /// Evaluate one runtime shape extent from explicit runtime operands.
     TensorShapeSize(MirShapeExpr),
-    /// Declared distributed sum-reduce (`summa ex … filum …`, SFR-5): the
-    /// first author-stated kernel recipe. The runtime call IS the
-    /// declaration site — the kernel-plan pass resolves it to
-    /// [`crate::kernel_plan::CollectionKernelPlan::DistributedSum`] from the
-    /// carried facts, never by pattern recognition over the body. The lone
-    /// argument is the source tensor operand; the result is the broadcast
-    /// sum.
-    FilumSum(MirFilumSumOp),
+    /// Declared `filum` reduction. The runtime call IS the declaration site;
+    /// the kernel-plan pass resolves it from the carried facts, never by
+    /// pattern recognition over the body.
+    ///
+    /// Arguments: the source tensor operand; then, for
+    /// [`MirFilumForm::Grid`] only, one extent operand per source axis
+    /// (row-major, the `TensorExtent` temps the lane lowering assigned);
+    /// then the `coalesce` identity operand when the source wrote one.
+    ///
+    /// [`MirFilumForm::Declared`] is the ungrouped `sum` (SFR-5): the plan
+    /// pass resolves it to
+    /// [`crate::kernel_plan::CollectionKernelPlan::DistributedSum`].
+    /// [`MirFilumForm::Grid`] is the whole-grid reduction lane region
+    /// (C4-8): the plan pass resolves it to
+    /// [`crate::kernel_plan::CollectionKernelPlan::GridReduce`].
+    FilumReduce(MirFilumReduceOp),
     /// Deep duplicate-then-own for the `copy` access marker (mutability
     /// engine D-6): the lone argument is the source value; the result is an
     /// independent deep copy of the same payload type — no container, field,
@@ -1325,11 +1333,73 @@ impl MirLiftOp {
     }
 }
 
-/// Filum declaration facts carried by [`MirIntrinsic::FilumSum`] (SFR-5):
-/// filum metadata (lane binder + frozen lane width), the per-element
-/// binders, and the captured term-body MIR the per-lane inliner replays.
+/// The reduction operator of a [`MirFilumReduceOp`]; mirrors the closed
+/// source family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MirReduceOp {
+    Sum,
+    Product,
+    Max,
+    Min,
+    ArgMax,
+    ArgMin,
+    All,
+    Any,
+    Count,
+}
+
+impl MirReduceOp {
+    /// Stable lowercase name (dumps, diagnostics).
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Sum => "sum",
+            Self::Product => "product",
+            Self::Max => "max",
+            Self::Min => "min",
+            Self::ArgMax => "argmax",
+            Self::ArgMin => "argmin",
+            Self::All => "all",
+            Self::Any => "any",
+            Self::Count => "count",
+        }
+    }
+}
+
+/// How a [`MirFilumReduceOp`] sits in its kernel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MirFilumForm {
+    /// The ungrouped `sum` inside an ordinary kernel body (SFR-5): the
+    /// declared distributed sum, frozen lane width, one workgroup per
+    /// `lane_width` source elements.
+    Declared,
+    /// The kernel's lane region (C4-8): the node IS the launch grid. The
+    /// function takes the `Lane` builtin; `lane_width` is the workgroup size
+    /// and out-of-range lanes contribute the identity.
+    Grid,
+}
+
+impl MirFilumForm {
+    /// Stable lowercase name (dumps, diagnostics).
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Declared => "declared",
+            Self::Grid => "grid",
+        }
+    }
+}
+
+/// Filum reduction facts carried by [`MirIntrinsic::FilumReduce`] (SFR-5,
+/// C4-8): the operator, filum metadata (lane binder + workgroup lane width),
+/// the per-element binders, and the captured term-body MIR the per-lane
+/// inliner replays. The axis count is `coordinates.len()`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MirFilumSumOp {
+pub struct MirFilumReduceOp {
+    /// The reduction operator.
+    pub op: MirReduceOp,
+    /// Declared distributed sum or whole-grid lane region.
+    pub form: MirFilumForm,
     /// The `filum f` lane binder's source name (metadata for emitters).
     pub filum_binder: Option<Symbol>,
     /// The per-element term binder local the term body reads.
@@ -1338,13 +1408,16 @@ pub struct MirFilumSumOp {
     pub term_binder_name: Option<Symbol>,
     /// The coordinate binder locals (one per source tensor axis).
     pub coordinates: Vec<MirFilumCoordinate>,
-    /// Frozen filum lane width `W` (32; tails fail closed at admission).
+    /// Workgroup lane width `W` (a power of two; tails fail closed at
+    /// admission for the declared form).
     pub lane_width: u32,
     /// The captured term-body MIR: per-element statements that produce the
     /// `redde` term value into `term_result`.
     pub term_body: Vec<MirStatement>,
     /// The local the term value lands in at term-body exit.
     pub term_result: MirLocalId,
+    /// The type of the per-element term value.
+    pub term_ty: MirType,
 }
 
 /// One coordinate binder of a filum declaration (SFR-5).
@@ -1359,7 +1432,7 @@ pub struct MirFilumCoordinate {
 // `Eq` marker for the plan-carried declaration facts — the same bitwise
 // equality stance `impl Eq for MirConstant` already takes for float-bearing
 // payloads; the kernel plan derives `Eq`.
-impl Eq for MirFilumSumOp {}
+impl Eq for MirFilumReduceOp {}
 
 impl Eq for MirFilumCoordinate {}
 

@@ -146,6 +146,80 @@ pub enum CollectionKernelPlan {
     /// builtin and no over-launch guard, and a `mut` tensor the body writes
     /// may also be read in the same body.
     SingleLane,
+    /// Whole-grid reduction (gpu-reset C4-8): the function's lane region is
+    /// one `reduce via Op from t at [...] thread lane ...` node
+    /// ([`MirFilumForm::Grid`](crate::MirFilumForm::Grid)). The dispatcher
+    /// runs two launches of two entry points emitted from the one function
+    /// (stage 1: grid-stride fold plus a workgroup tree writing one partial
+    /// per workgroup; stage 2: one workgroup combines the partials, then the
+    /// destination store runs) through a dispatcher-owned partials scratch
+    /// ([`MirKernelResourceKind::PartialsScratch`](crate::MirKernelResourceKind::PartialsScratch)).
+    /// `source_resource` names the reduced tensor's storage resource (the
+    /// node's source, never "the first read buffer"); `rank` is its axis
+    /// count.
+    GridReduce {
+        source_resource: usize,
+        rank: u8,
+        /// Workgroup lane count of both stages (a power of two).
+        workgroup: u32,
+        /// Maximum partial slots the scratch holds.
+        partials_cap: u32,
+        /// The byte layout of one partial.
+        partial_layout: GridReducePartialLayout,
+    },
+}
+
+/// Workgroup lane count of a [`CollectionKernelPlan::GridReduce`] (both
+/// stages).
+pub const GRID_REDUCE_WORKGROUP: u32 = 256;
+
+/// Partial slots in the [`CollectionKernelPlan::GridReduce`] scratch.
+pub const GRID_REDUCE_PARTIALS_CAP: u32 = 1024;
+
+/// The byte layout of one partial of a [`CollectionKernelPlan::GridReduce`].
+///
+/// Algebraic operators (sum, product, count, all, any) carry the value only.
+/// Ordered operators (max, min, argmax, argmin) also carry the `seen` flag
+/// (the combine order is "(value desc, coord asc); a number beats NaN; NaN
+/// beats unseen"), and the arg operators carry one `u32` coordinate per
+/// source axis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GridReducePartialLayout {
+    /// Byte width of the value (at least four: counts and flags widen to a
+    /// `u32`).
+    pub value_bytes: u32,
+    /// `u32` coordinates carried after the value (the source rank for
+    /// argmax/argmin, otherwise zero).
+    pub coordinates: u8,
+    /// Whether a `u32` `seen` flag follows.
+    pub seen: bool,
+}
+
+impl GridReducePartialLayout {
+    /// The layout for `op` over a `rank`-axis source whose value is
+    /// `value_bytes` wide.
+    #[must_use]
+    pub fn for_op(op: crate::MirReduceOp, value_bytes: u32, rank: u8) -> Self {
+        use crate::MirReduceOp as Op;
+        let ordered = matches!(op, Op::Max | Op::Min | Op::ArgMax | Op::ArgMin);
+        Self {
+            value_bytes: value_bytes.max(4),
+            coordinates: if matches!(op, Op::ArgMax | Op::ArgMin) {
+                rank
+            } else {
+                0
+            },
+            seen: ordered,
+        }
+    }
+
+    /// Size of one partial in bytes (a multiple of four).
+    #[must_use]
+    pub fn element_bytes(self) -> u32 {
+        self.value_bytes.div_ceil(4) * 4
+            + u32::from(self.coordinates) * 4
+            + if self.seen { 4 } else { 0 }
+    }
 }
 
 /// Axis-reduction recipe plan (name frozen by S6-N1; admission, resolution,
@@ -502,7 +576,7 @@ pub struct SsmScanPlan {
 pub struct DistributedSumPlan {
     /// The filum declaration facts: filum metadata, term-body MIR, and
     /// coordinate binders (the module lowering's captured term body).
-    pub filum: crate::MirFilumSumOp,
+    pub filum: crate::MirFilumReduceOp,
     /// True flat source length `K` (the source buffer's element count).
     pub length: u64,
     /// Workgroup lane count on `x` — equals the filum lane width `W`.

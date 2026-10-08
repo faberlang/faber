@@ -781,6 +781,8 @@ pub enum PlanValidationError {
     DistributedSumLaneWidthMismatch { lane_width: u32, workgroup_x: u32 },
     /// The filum source length `K` must be positive (SFR-5).
     DistributedSumZeroLength,
+    /// A grid reduction needs at least one partial slot (C4-8).
+    GridReduceZeroPartialsCap,
 }
 
 impl fmt::Display for PlanValidationError {
@@ -961,6 +963,9 @@ impl fmt::Display for PlanValidationError {
             ),
             Self::DistributedSumZeroLength => {
                 write!(f, "distributed sum requires a positive source length")
+            }
+            Self::GridReduceZeroPartialsCap => {
+                write!(f, "grid reduction requires at least one partial slot")
             }
         }
     }

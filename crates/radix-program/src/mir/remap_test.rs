@@ -5,7 +5,7 @@ use super::DefId;
 use super::remap::remap_runtime_call_text_symbols;
 use radix_module::lexer::{Interner, Span};
 use radix_module::mir::{
-    MirFilumCoordinate, MirFilumSumOp, MirIntrinsic, MirLocalId, MirProvider, MirProviderKind,
+    MirFilumCoordinate, MirFilumReduceOp, MirIntrinsic, MirLocalId, MirProvider, MirProviderKind,
     MirRuntimeCall, MirSermoOp, MirStatement, MirStatementKind, MirType,
 };
 use radix_types::{Primitive, TypeTable};
@@ -76,7 +76,10 @@ fn filum_declaration_symbols_keep_their_text_after_module_merge() {
     target.intern("third-entry-symbol");
     let types = TypeTable::new();
     let mut call = MirRuntimeCall {
-        intrinsic: MirIntrinsic::FilumSum(MirFilumSumOp {
+        intrinsic: MirIntrinsic::FilumReduce(MirFilumReduceOp {
+            op: radix_module::mir::MirReduceOp::Sum,
+            form: radix_module::mir::MirFilumForm::Declared,
+            term_ty: radix_module::mir::MirType::semantic(radix_types::TypeId(0)),
             filum_binder: Some(filum_binder),
             term_binder: MirLocalId(0),
             term_binder_name: Some(term_binder_name),
@@ -102,7 +105,7 @@ fn filum_declaration_symbols_keep_their_text_after_module_merge() {
         return_ty: MirType::semantic(types.primitive(Primitive::Numerus)),
     };
     remap_runtime_call_text_symbols(&mut call, &source, &mut target);
-    let MirIntrinsic::FilumSum(filum) = call.intrinsic else {
+    let MirIntrinsic::FilumReduce(filum) = call.intrinsic else {
         panic!("filum identity changed")
     };
     let filum_binder = filum.filum_binder.expect("filum binder name");

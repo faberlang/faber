@@ -189,12 +189,12 @@ main {
     assert_eq!(run_on_cpu(source), ["20.0"]);
     let device = dump(source, KernelLowering::Device);
     assert!(
-        device.contains("filum_sum"),
-        "device lowering keeps the FilumSum recipe for the ungrouped thread sum:\n{device}"
+        device.contains("filum_reduce op=sum form=declared"),
+        "device lowering keeps the declared FilumReduce recipe for the ungrouped thread sum:\n{device}"
     );
     let host = dump(source, KernelLowering::Host);
     assert!(
-        !host.contains("filum_sum"),
+        !host.contains("filum_reduce"),
         "host lowering folds the thread sum like any reduction:\n{host}"
     );
 }

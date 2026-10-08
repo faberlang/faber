@@ -1281,6 +1281,7 @@ fn plan_spelling(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::DistributedSum(_) => "distributed-sum",
         CollectionKernelPlan::LaneGrid { .. } => "lane-grid",
         CollectionKernelPlan::SingleLane => "single-lane",
+        CollectionKernelPlan::GridReduce { .. } => "grid-reduce",
     }
 }
 

@@ -56,6 +56,9 @@ mod reducta_filum_test;
 mod kernel_host_lowering_test;
 
 #[cfg(test)]
+#[path = "grid_reduce_test.rs"]
+mod grid_reduce_test;
+#[cfg(test)]
 #[path = "lane_form_test.rs"]
 mod lane_form_test;
 

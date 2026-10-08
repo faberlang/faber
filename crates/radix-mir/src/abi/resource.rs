@@ -151,6 +151,16 @@ pub enum MirKernelResourceKind {
     GenusParam {
         size_bytes: u32,
     },
+    /// The dispatcher-owned partials scratch of a whole-grid reduction
+    /// (gpu-reset C4-8): `cap` slots of `element_bytes` each, read-write,
+    /// written by stage 1 and read by stage 2. NOT a host argument and NOT a
+    /// tensor: the dispatcher allocates it once per kernel and binds it at
+    /// this resource's slot on both launches; a consumer that binds host
+    /// arguments must skip it.
+    PartialsScratch {
+        cap: u32,
+        element_bytes: u32,
+    },
 }
 
 impl MirKernelResourceKind {
@@ -161,6 +171,7 @@ impl MirKernelResourceKind {
             Self::RuntimeExtent => "runtime-extent",
             Self::TensorAxisExtent { .. } => "tensor-axis-extent",
             Self::GenusParam { .. } => "genus-param",
+            Self::PartialsScratch { .. } => "partials-scratch",
         }
     }
 }
