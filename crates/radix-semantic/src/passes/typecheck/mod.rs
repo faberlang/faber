@@ -85,6 +85,10 @@ pub mod call;
 #[cfg(test)]
 #[path = "call_default_test.rs"]
 mod call_default_test;
+
+#[cfg(test)]
+#[path = "ponde_failable_test.rs"]
+mod ponde_failable_test;
 #[cfg(test)]
 #[path = "cfa_join_test.rs"]
 mod cfa_join_test;

@@ -84,7 +84,7 @@ fn accipe_accepts_lista_i32_index() {
 #[test]
 fn ponde_accepts_lista_u32_index() {
     accepts(
-        r"functio put(in tf32[16] output, u32 id, f32 v) → vacuum {
+        r"functio put(in tf32[16] output, u32 id, f32 v) → vacuum ⇥ textus {
     fixum lista<u32> idx ← [id]
     output.ponde(idx, v)
 }",

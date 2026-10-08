@@ -123,10 +123,12 @@ fn with_out_alias(statement: &str) -> String {
 #[test]
 fn mut_param_written_at_own_coordinate_is_accepted() {
     accepted(&with_src(&format!("in {GRID} out"), "out[i] ← value + 1"));
-    accepted(&with_src(
-        &format!("in {GRID} out"),
-        "out.ponde([i], value + 1)",
-    ));
+    // The checked store is failable unless its index is proven in range (K11); a filum binder's
+    // range proof lives in the K8 passes, not in typecheck, so the function declares `⇥`.
+    accepted(
+        &with_src(&format!("in {GRID} out"), "out.ponde([i], value + 1)")
+            .replace("→ vacuum {", "→ vacuum ⇥ textus {"),
+    );
 }
 
 #[test]

@@ -225,6 +225,17 @@ pub struct MethodIntrinsic {
     pub missing_generic_issue: Option<&'static str>,
     pub excess_generic_issue: Option<&'static str>,
     pub value_arity_issue: Option<&'static str>,
+    /// The row declares a `⇥ textus` alternate exit: a call needs a handler, a
+    /// `⊥` default or an enclosing `⇥` (D17.8), exactly like a user function that
+    /// declares `⇥`. The failure value is the runtime failure text.
+    pub failable: bool,
+    /// A failable row's index-argument position. When a static range proof
+    /// shows that argument within the receiver's extents, the call cannot
+    /// fail and needs no handler (the "a literal proven to fit cannot fail"
+    /// rule of numeric conversion); a provably out-of-range index is a
+    /// compile-time `index_provably_out_of_bounds`. `None` on rows that are
+    /// not failable or have no provable range.
+    pub range_checked_arg: Option<usize>,
 }
 
 impl MethodIntrinsic {
@@ -247,6 +258,8 @@ macro_rules! intrinsic {
             missing_generic_issue: None,
             excess_generic_issue: None,
             value_arity_issue: None,
+            failable: false,
+        range_checked_arg: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, scalar_math $function:ident) => {
@@ -263,6 +276,8 @@ macro_rules! intrinsic {
             missing_generic_issue: None,
             excess_generic_issue: None,
             value_arity_issue: None,
+            failable: false,
+        range_checked_arg: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, math $function:ident) => {
@@ -279,6 +294,8 @@ macro_rules! intrinsic {
             missing_generic_issue: None,
             excess_generic_issue: None,
             value_arity_issue: None,
+            failable: false,
+        range_checked_arg: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, atomic $op:ident) => {
@@ -293,6 +310,8 @@ macro_rules! intrinsic {
             missing_generic_issue: None,
             excess_generic_issue: None,
             value_arity_issue: None,
+            failable: false,
+        range_checked_arg: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, $mir:ident) => {
@@ -307,6 +326,8 @@ macro_rules! intrinsic {
             missing_generic_issue: None,
             excess_generic_issue: None,
             value_arity_issue: None,
+            failable: false,
+        range_checked_arg: None,
         }
     };
 }
@@ -849,14 +870,21 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Tensor, "minimus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Minimum),
     intrinsic!(Tensor, "summa", 0, &[], NumericSum, collection Sum),
     intrinsic!(Tensor, "media", 0, &[], FractusFromElement, collection TensorMean),
-    intrinsic!(
-        Tensor,
-        "ponde",
-        2,
-        &[IntrinsicParamKind::NumerusArray, IntrinsicParamKind::Inner],
-        Vacuum,
-        collection TensorSet
-    ),
+    // K11: the method form is the checked store; an out-of-range index is
+    // reported on `⇥`. The index form (`t[i] ← v`) shares the MIR op but has no
+    // error channel.
+    MethodIntrinsic {
+        failable: true,
+        range_checked_arg: Some(0),
+        ..intrinsic!(
+            Tensor,
+            "ponde",
+            2,
+            &[IntrinsicParamKind::NumerusArray, IntrinsicParamKind::Inner],
+            Vacuum,
+            collection TensorSet
+        )
+    },
     intrinsic!(Tensor, "reple", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection TensorFill),
     MethodIntrinsic {
         receiver: IntrinsicReceiver::Tensor,
@@ -869,6 +897,8 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         missing_generic_issue: Some("tensor_formata_complete_type_arg_required"),
         excess_generic_issue: None,
         value_arity_issue: Some("tensor_formata_forbids_value_args"),
+        failable: false,
+        range_checked_arg: None,
     },
     intrinsic!(Tensor, "planata", 0, &[], ArrayInner, collection TensorFlatten),
     // CCI-1: the bounded common-case intrinsic rows (RMSNorm, RoPE, row
@@ -910,6 +940,8 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         missing_generic_issue: Some("rope_norm_dim_required"),
         excess_generic_issue: Some("rope_norm_generic_arity"),
         value_arity_issue: Some("rope_norm_value_arity"),
+        failable: false,
+        range_checked_arg: None,
     },
     intrinsic!(
         Tensor,
@@ -1056,6 +1088,8 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         missing_generic_issue: Some("tensor_limes_policy_required"),
         excess_generic_issue: Some("tensor_limes_policy_arity"),
         value_arity_issue: Some("tensor_limes_value_arity"),
+        failable: false,
+        range_checked_arg: None,
     },
     // matrix
     intrinsic!(

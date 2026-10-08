@@ -598,7 +598,48 @@ pub(super) fn check_intrinsic_method_call(
                 radix_intrinsics::IntrinsicReceiver::Tensor
                     | radix_intrinsics::IntrinsicReceiver::Sparsa
             ) {
-                check_tensor_method_args(checker, entry, &params, args, ret, span)
+                let checked = check_tensor_method_args(checker, entry, &params, args, ret, span);
+                if entry.failable {
+                    // A registry row that declares `⇥` is a failable call: the
+                    // same handler / `⊥` default / enclosing `⇥` rule (D17.8)
+                    // as a user function with a `⇥ textus` signature. A call
+                    // whose index argument is statically proven in range
+                    // cannot fail (the rule `numeric_conversio_can_fail`
+                    // applies to a literal that fits) and needs no handler; a
+                    // provably out-of-range index is the compile-time
+                    // `index_provably_out_of_bounds`, as the index form gives.
+                    let range = entry
+                        .range_checked_arg
+                        .and_then(|position| args.get(position))
+                        .map(|arg| {
+                            let index = arg.expr.clone();
+                            let range = super::tensor_index::classify_static_index_range(
+                                checker,
+                                receiver_ty,
+                                &index,
+                            );
+                            (index, range)
+                        });
+                    match range {
+                        Some((_, super::tensor_index::StaticIndexRange::InRange)) => {}
+                        Some((index, range @ super::tensor_index::StaticIndexRange::OutOfRange { .. })) => {
+                            super::tensor_index::report_static_index_oob(checker, &index, &range);
+                        }
+                        _ => {
+                            let err = checker.textus_type();
+                            let sig = FuncSig {
+                                type_params: Vec::new(),
+                                params: Vec::new(),
+                                ret: checked,
+                                err: Some(err),
+                                is_async: false,
+                                is_generator: false,
+                            };
+                            checker.reject_failable_call(&sig, span);
+                        }
+                    }
+                }
+                checked
             } else if bounded_appende {
                 // D6: bounded `appende` is a typed recoverable alternate exit.
                 // Unbounded `lista<T>.appende` stays vacuum with no error channel.

@@ -727,17 +727,31 @@ fn static_collection_length(checker: &TypeChecker<'_>, expr: &HirExpression) -> 
     }
 }
 
-/// Reject a literal index that contradicts a receiver's literal static bound.
+/// What a static range proof says about an index against a receiver's bounds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum StaticIndexRange {
+    /// No proof either way (runtime index, symbolic bound, rank mismatch).
+    Unknown,
+    /// Every literal coordinate is within the literal extents.
+    InRange,
+    /// A literal coordinate contradicts the extent on `axis`.
+    OutOfRange {
+        indices: Vec<i128>,
+        bound: u64,
+        axis: usize,
+    },
+}
+
+/// Classify a literal index against a receiver's literal static bound.
 ///
 /// This is deliberately literal-only. Index parameters, inference holes,
 /// dynamic shapes, and arithmetic expressions all decline here and remain
-/// runtime policy. The diagnostic span is the index expression itself so the
-/// source location identifies the proven failure.
-pub(super) fn reject_static_bounded_index_oob(
+/// runtime policy.
+pub(super) fn classify_static_index_range(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
     index: &HirExpression,
-) {
+) -> StaticIndexRange {
     let resolved = checker.resolve_inferred_type(receiver_ty);
     let (_, payload) = checker.types.peel_access_marker(resolved);
     let receiver = checker.types.get(payload).clone();
@@ -748,33 +762,66 @@ pub(super) fn reject_static_bounded_index_oob(
         | Type::BoundedOcteti { capacity } => {
             let capacity = checker.resolve_index(capacity);
             let IndexExpr::Literal(value) = checker.types.get_index(capacity) else {
-                return;
+                return StaticIndexRange::Unknown;
             };
             vec![*value]
         }
         Type::Tensor(_, shape) => static_tensor_bounds(checker, shape),
-        _ => return,
+        _ => return StaticIndexRange::Unknown,
     };
     let Some(indices) = static_index_literals(index) else {
-        return;
+        return StaticIndexRange::Unknown;
     };
     if indices.len() != bounds.len() {
-        return;
+        return StaticIndexRange::Unknown;
     }
     for (axis, (value, bound)) in indices.iter().zip(bounds).enumerate() {
         if *value < 0 || u128::try_from(*value).map_or(true, |value| value >= u128::from(bound)) {
-            checker.invalid_operand_types_with_args(
-                ISSUE_PROVABLY_OUT_OF_BOUNDS,
-                index.span,
-                &[
-                    ("index", format_static_index(&indices)),
-                    ("bound", bound.to_string()),
-                    ("axis", axis.to_string()),
-                ],
-            );
-            return;
+            return StaticIndexRange::OutOfRange {
+                indices,
+                bound,
+                axis,
+            };
         }
     }
+    StaticIndexRange::InRange
+}
+
+/// Report a provably out-of-range index at the index expression's span.
+pub(super) fn report_static_index_oob(
+    checker: &mut TypeChecker<'_>,
+    index: &HirExpression,
+    range: &StaticIndexRange,
+) {
+    if let StaticIndexRange::OutOfRange {
+        indices,
+        bound,
+        axis,
+    } = range
+    {
+        checker.invalid_operand_types_with_args(
+            ISSUE_PROVABLY_OUT_OF_BOUNDS,
+            index.span,
+            &[
+                ("index", format_static_index(indices)),
+                ("bound", bound.to_string()),
+                ("axis", axis.to_string()),
+            ],
+        );
+    }
+}
+
+/// Reject a literal index that contradicts a receiver's literal static bound.
+///
+/// The diagnostic span is the index expression itself so the source location
+/// identifies the proven failure.
+pub(super) fn reject_static_bounded_index_oob(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    index: &HirExpression,
+) {
+    let range = classify_static_index_range(checker, receiver_ty, index);
+    report_static_index_oob(checker, index, &range);
 }
 
 /// Check the index of a vector lane access `v[k]`.
