@@ -219,6 +219,12 @@ struct DeviceSafeClassifier<'a> {
     /// optional get carriers, and complete output coverage were proven by the
     /// shared MIR analysis.
     literal_indexed_access: Option<LiteralIndexedAccessPlan>,
+    /// U9-6: the slots holding the constant text of each `ReturnError` of the
+    /// function under visit, when EVERY `ReturnError` is a constant text throw
+    /// of a text-channel function (`Some`); the throw terminators and their
+    /// text slots are then fault sites, not host values. `None` keeps the
+    /// failable shapes closed.
+    throw_slots: Option<Vec<MirPlaceBase>>,
     gaps: Vec<CapabilityGap>,
 }
 
@@ -256,6 +262,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             dead_fold_artifact_slots: FoldArtifactSlots::default(),
             dead_const_copy_slots: DeadConstCopySlots::default(),
             literal_indexed_access: None,
+            throw_slots: None,
             gaps: Vec::new(),
         }
     }
@@ -583,6 +590,13 @@ impl<'a> DeviceSafeClassifier<'a> {
         self.result_aggregation_slots.contains(base)
     }
 
+    /// U9-6: whether `base` holds the constant text of a throw site.
+    fn is_throw_slot(&self, base: &MirPlaceBase) -> bool {
+        self.throw_slots
+            .as_ref()
+            .is_some_and(|slots| slots.contains(base))
+    }
+
     /// Whether the statement is a DEAD non-kernel-scalar const-copy Assign
     /// (need — mirroring the Metal emitter-side skip, 26424928f Gap
     /// 1): the CTO council constraints (5f1b1348) all hold structurally —
@@ -750,7 +764,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             {
                 self.record_policy(SHAPE_DEVICE_MULTI_BLOCK_CFG);
             }
-            if function.error_ty.is_some() {
+            self.throw_slots = crate::abi::throw_sites(function, self.types).map(|sites| {
+                sites
+                    .into_iter()
+                    .filter_map(|site| site.slot)
+                    .collect::<Vec<_>>()
+            });
+            if function.error_ty.is_some() && self.throw_slots.is_none() {
                 self.record_abi(SHAPE_FAILABLE_DEVICE_FN);
             }
             // S3-A1: a result-tuple return is the multi-output kernel contract —
@@ -766,7 +786,9 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 }
                 _ => self.check_device_type(function.return_ty),
             }
-            if let Some(error_ty) = function.error_ty {
+            if let Some(error_ty) = function.error_ty
+                && self.throw_slots.is_none()
+            {
                 self.check_device_type(error_ty);
             }
             // S5-W-A1: the dead fold-artifact slots (shape-list / vacua
@@ -796,6 +818,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         }
 
         self.in_lane_form_function = false;
+        self.throw_slots = None;
         self.genus_params.clear();
         self.dead_fold_artifact_slots = FoldArtifactSlots::default();
         self.dead_const_copy_slots = DeadConstCopySlots::default();
@@ -850,6 +873,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 .contains(&MirPlaceBase::Local(local.id))
             && !self.dead_fold_artifact_slots.locals.contains(&local.id)
             && !self.dead_const_copy_slots.locals.contains(&local.id)
+            && !self.is_throw_slot(&MirPlaceBase::Local(local.id))
             && !self.literal_indexed_access.as_ref().is_some_and(|plan| {
                 plan.is_index_slot(&MirPlace::local(local.id))
                     || plan.is_get_slot(MirSlot::Local(local.id))
@@ -866,6 +890,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 .contains(&MirPlaceBase::Temp(temp.id))
             && !self.dead_fold_artifact_slots.temps.contains(&temp.id)
             && !self.dead_const_copy_slots.temps.contains(&temp.id)
+            && !self.is_throw_slot(&MirPlaceBase::Temp(temp.id))
             && !self.literal_indexed_access.as_ref().is_some_and(|plan| {
                 plan.is_index_slot(&MirPlace::temp(temp.id))
                     || plan.is_get_slot(MirSlot::Temp(temp.id))
@@ -892,6 +917,10 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 if is_fold_artifact_type(self.types, value.ty)
                     && self.dead_fold_artifact_slots.contains(&place.base)
                 {
+                    self.visit_place(place);
+                } else if place.projections.is_empty() && self.is_throw_slot(&place.base) {
+                    // U9-6: the constant text of a throw site; the device never
+                    // materializes it, the fault site names it.
                     self.visit_place(place);
                 } else if self.is_dead_non_kernel_scalar_const_copy(place, value) {
                     // a0184031: a DEAD const-copy whose value is a scalar the
@@ -1224,6 +1253,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 crate::visit::walk_terminator(self, terminator);
             }
             MirTerminatorKind::TryCall { .. } => self.record_abi(SHAPE_TRY_CALL),
+            MirTerminatorKind::ReturnError(_) if self.throw_slots.is_some() => {}
             MirTerminatorKind::ReturnError(_) => {
                 self.record_abi(SHAPE_RETURN_ERROR_DEVICE_TERMINATOR);
             }

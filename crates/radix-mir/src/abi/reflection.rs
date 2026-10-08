@@ -55,6 +55,37 @@ impl MirKernelReflection {
         })
     }
 
+    /// Replace the signature-derived fault sites with the kernel's full list
+    /// (gpu-reset U9-6): the unproven index sites first (`Fatal`, the index
+    /// text), then one `Recoverable` site per constant throw in block order,
+    /// carrying the thrown text. The signature alone knows only how many sites
+    /// the fault record holds, so a consumer that has the function applies this
+    /// after [`Self::from_signature`]. A kernel with no fault record is
+    /// untouched.
+    pub fn apply_fault_sites(
+        &mut self,
+        function: &MirFunction,
+        validation: &crate::MirValidationContext<'_>,
+    ) {
+        if self.fault_sites.is_empty() {
+            return;
+        }
+        let indexes = super::unproven_indexes(function, validation).len();
+        let throws = super::throw_sites(function, &validation.types).unwrap_or_default();
+        if indexes + throws.len() != self.fault_sites.len() {
+            return;
+        }
+        for (site, throw) in self.fault_sites[indexes..].iter_mut().zip(&throws) {
+            site.kind = MirFaultKind::Recoverable;
+            site.text = validation
+                .interner
+                .as_interner()
+                .map_or_else(String::new, |interner| {
+                    interner.resolve(throw.text).to_owned()
+                });
+        }
+    }
+
     /// Recompute the reflection's workgroup grid and workgroup count against
     /// the effective workgroup with collection-op-aware dispatch semantics.
     ///

@@ -15,6 +15,7 @@ mod resource;
 mod signature;
 #[cfg(test)]
 mod tests;
+mod throw_sites;
 mod types;
 
 pub use broadcast::*;
@@ -24,6 +25,7 @@ pub use lane_index::{LaneIndexProof, UnprovenIndex, unproven_indexes};
 pub use launch::*;
 pub use resource::*;
 pub(crate) use signature::{grid_reduce_node, grid_reduce_partial_layout};
+pub use throw_sites::{ThrowSite, throw_sites};
 // Vocabulary types moved to radix-types (re-exported at the crate root).
 pub use crate::{MirKernelAxis, MirKernelBuiltin};
 pub use types::*;

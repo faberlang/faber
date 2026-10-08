@@ -42,8 +42,11 @@
 //!   both have to emit (a shared tail with no common join) cannot be placed
 //!   without duplication and fails closed as [`StructurizeError::SharedTail`].
 //!
-//! `Switch`, `TryCall`, `ReturnError` and `Unreachable` terminators fail closed
-//! as [`StructurizeError::UnsupportedTerminator`].
+//! A `ReturnError` terminator is a dead end like `Return`: it becomes
+//! [`Region::Fault`] carrying its THROW ORDINAL (its index among the
+//! function's `ReturnError` blocks in block order, the numbering of
+//! [`crate::throw_sites`]). `Switch`, `TryCall` and `Unreachable` terminators
+//! fail closed as [`StructurizeError::UnsupportedTerminator`].
 
 use crate::{MirBlockId, MirFunction, MirOperand, MirTerminatorKind};
 
@@ -62,6 +65,10 @@ pub enum Region {
     },
     /// Function return.
     Return(Option<MirOperand>),
+    /// A constant throw (`ReturnError`): a dead end like `Return`. The payload
+    /// is the throw ordinal among the function's `ReturnError` blocks in
+    /// block order; the ABI adds the index-site count to get the fault slot.
+    Fault(u32),
     /// A natural loop: the body repeats until it executes a `Break` or `Return`.
     /// The body starts at the loop header block.
     Loop { body: Box<Region> },
@@ -205,7 +212,7 @@ impl Graph {
         state[at] = 1;
         let block = &function.blocks[at];
         let targets: Vec<MirBlockId> = match &block.terminator.kind {
-            MirTerminatorKind::Return(_) => Vec::new(),
+            MirTerminatorKind::Return(_) | MirTerminatorKind::ReturnError(_) => Vec::new(),
             MirTerminatorKind::Goto(target) => vec![*target],
             MirTerminatorKind::Branch {
                 then_block,
@@ -535,6 +542,16 @@ impl Walker<'_> {
             match &block.terminator.kind {
                 MirTerminatorKind::Return(value) => {
                     out.push(Region::Return(value.clone()));
+                    break;
+                }
+                MirTerminatorKind::ReturnError(_) => {
+                    let ordinal = self.function.blocks[..at]
+                        .iter()
+                        .filter(|earlier| {
+                            matches!(earlier.terminator.kind, MirTerminatorKind::ReturnError(_))
+                        })
+                        .count();
+                    out.push(Region::Fault(u32::try_from(ordinal).unwrap_or(u32::MAX)));
                     break;
                 }
                 MirTerminatorKind::Goto(_) => at = self.graph.targets[at][0],

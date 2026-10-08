@@ -444,14 +444,17 @@ fn append_tensor_extent_resources(
 /// per indexed tensor with an unproven index (tensor parameter declaration
 /// order) and then ONE [`MirKernelResourceKind::FaultRecord`] with a slot per
 /// fault site, LAST. One fatal site per unproven index form (tensor, load or
-/// store). A kernel whose every index is proven is untouched.
+/// store). U9-6 adds one more slot per constant throw (see
+/// [`super::throw_sites`]), after the index sites. A kernel whose every index
+/// is proven and that throws nothing is untouched.
 fn append_fault_resources(
     function: &MirFunction,
     signature: &mut MirKernelSignature,
     validation: &MirValidationContext<'_>,
 ) -> Result<(), MirAbiError> {
     let forms = super::unproven_indexes(function, validation);
-    if forms.is_empty() {
+    let throws = super::throw_sites(function, &validation.types).map_or(0, |throws| throws.len());
+    if forms.is_empty() && throws == 0 {
         return Ok(());
     }
     let word = validation
@@ -492,7 +495,7 @@ fn append_fault_resources(
         });
         next_binding += 1;
     }
-    let sites = u32::try_from(forms.len())
+    let sites = u32::try_from(forms.len() + throws)
         .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
     signature.extra_inputs.push(MirKernelResource {
         group: DEFAULT_KERNEL_RESOURCE_GROUP,

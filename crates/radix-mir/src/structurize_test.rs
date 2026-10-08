@@ -102,7 +102,7 @@ fn collect_blocks(region: &Region, out: &mut Vec<MirBlockId>) {
             collect_blocks(else_region, out);
         }
         Region::Loop { body } => collect_blocks(body, out),
-        Region::Return(_) | Region::Break | Region::Continue => {}
+        Region::Return(_) | Region::Fault(_) | Region::Break | Region::Continue => {}
     }
 }
 
@@ -560,7 +560,7 @@ fn duplicating_tails_places_the_shared_tail_of_cross_edges_in_each_arm() {
                 blocks(else_region, seen);
             }
             Region::Loop { body } => blocks(body, seen),
-            Region::Return(_) | Region::Break | Region::Continue => {}
+            Region::Return(_) | Region::Fault(_) | Region::Break | Region::Continue => {}
         }
     }
     blocks(&region, &mut seen);
@@ -631,4 +631,41 @@ fn duplicating_tails_keeps_an_arm_that_conditionally_enters_the_other_arm_apart(
 fn empty_function_fails_by_name() {
     let f = function(Vec::new());
     assert_eq!(structurize(&f), Err(StructurizeError::EmptyFunction));
+}
+
+fn throw() -> MirTerminatorKind {
+    MirTerminatorKind::ReturnError(MirOperand::Constant(MirConstant::Int(0)))
+}
+
+#[test]
+fn a_return_error_is_a_fault_region_numbered_by_block_order() {
+    // bb0 branches to a throw (bb1) and to a second branch (bb2) whose arms are
+    // a return (bb3) and another throw (bb4): two throws, ordinals 0 and 1.
+    let f = function(vec![
+        branch(1, 1, 2),
+        throw(),
+        branch(2, 3, 4),
+        ret(None),
+        throw(),
+    ]);
+    let region = tree(&f, &[0, 1, 2, 3, 4]);
+    let mut faults = Vec::new();
+    fn collect(region: &Region, out: &mut Vec<u32>) {
+        match region {
+            Region::Seq(items) => items.iter().for_each(|item| collect(item, out)),
+            Region::If {
+                then_region,
+                else_region,
+                ..
+            } => {
+                collect(then_region, out);
+                collect(else_region, out);
+            }
+            Region::Loop { body } => collect(body, out),
+            Region::Fault(ordinal) => out.push(*ordinal),
+            Region::Block(_) | Region::Return(_) | Region::Break | Region::Continue => {}
+        }
+    }
+    collect(&region, &mut faults);
+    assert_eq!(faults, [0, 1]);
 }

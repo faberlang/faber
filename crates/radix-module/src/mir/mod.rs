@@ -60,6 +60,14 @@ mod kernel_host_lowering_test;
 mod fault_sites_test;
 
 #[cfg(test)]
+#[path = "kernel_throw_test.rs"]
+mod kernel_throw_test;
+
+#[cfg(test)]
+#[path = "device_block_erase_test.rs"]
+mod device_block_erase_test;
+
+#[cfg(test)]
 #[path = "grid_reduce_test.rs"]
 mod grid_reduce_test;
 #[cfg(test)]

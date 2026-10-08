@@ -56,13 +56,13 @@ pub struct UnprovenIndex {
 
 /// A hashable identity of a place base.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum BaseKey {
+pub(super) enum BaseKey {
     Local(u32),
     Temp(u32),
 }
 
 impl BaseKey {
-    fn of(base: &MirPlaceBase) -> Self {
+    pub(super) fn of(base: &MirPlaceBase) -> Self {
         match base {
             MirPlaceBase::Local(local) => Self::Local(local.0),
             MirPlaceBase::Temp(temp) => Self::Temp(temp.0),
@@ -71,7 +71,7 @@ impl BaseKey {
 }
 
 /// The base a projection-free operand names, if it names one.
-fn operand_key(operand: &MirOperand) -> Option<BaseKey> {
+pub(super) fn operand_key(operand: &MirOperand) -> Option<BaseKey> {
     match operand {
         MirOperand::Place(place) if place.projections.is_empty() => Some(BaseKey::of(&place.base)),
         MirOperand::Temp(temp) => Some(BaseKey::Temp(temp.0)),
