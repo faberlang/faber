@@ -1835,7 +1835,9 @@ impl<'a> BorrowChecker<'a> {
                     ISSUE_ASSIGN_TO_DE_PARAMETER,
                     span,
                 );
-            } else if matches!(usage.mode, HirParamMode::In) {
+            } else {
+                // `mut` writes the caller's value; `own`/`copy` write the
+                // callee's own value. Either way the parameter is mutated.
                 usage.mutated = true;
             }
         }
@@ -2103,7 +2105,7 @@ impl<'a> BorrowChecker<'a> {
                     }
                 }
                 Some(AccessMarker::Own) => {
-                    if !usage.passed_ex && !usage.returned && !usage.moved {
+                    if !usage.passed_ex && !usage.returned && !usage.moved && !usage.mutated {
                         warnings.push(
                             SemanticError::structured(
                                 SemanticErrorKind::Warning(WarningKind::UnusedMoveParam),

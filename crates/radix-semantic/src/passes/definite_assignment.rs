@@ -155,10 +155,12 @@ impl<'a> DefiniteAssignmentChecker<'a> {
 
     fn register_param(&mut self, param: &HirParam) {
         self.track_binding(param.def_id);
-        // WHY: only `in` parameters are mutable (they lower to Rust `mut` bindings
-        // and may be reassigned). Owned/de/ex parameters are write-once: they are
-        // already initialized by the caller, so any assignment is a reassignment.
-        if !matches!(param.mode, HirParamMode::In) {
+        // WHY: `mut` (`in`) parameters write the caller's value and `own`/`copy`
+        // parameters write the callee's own value, so all three are writable
+        // (they lower to Rust `mut` bindings). Unmarked/`ref` parameters are
+        // write-once: they are already initialized by the caller, so any
+        // assignment is a reassignment.
+        if !matches!(param.mode, HirParamMode::In) && !self.types.is_exclusive_value(param.ty) {
             self.write_once.insert(param.def_id);
         }
         if param.sponte {

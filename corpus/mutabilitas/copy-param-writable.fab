@@ -1,0 +1,62 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "expr_stmt", "call_expr", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "argument_list", "argument", "array_literal", "assignment"]
+category = "type"
+summary = "A copy parameter is a duplicate the callee may write; the caller's value is unchanged."
+syntax = "fn fill(copy list<int> xs) → int { xs.append(9) }"
+related = ["lista"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — copy parameter is writable, the caller's value is untouched
+# =============================================================================
+# `copy` duplicates the argument and the callee owns the duplicate, so every
+# write form is legal and none of them reaches the caller.
+
+class Cell {
+    var int n = 0
+
+    fn bump() → void {
+        self.n ← self.n + 1
+    }
+}
+
+fn grow(copy list<int> xs) → int {
+    xs.append(9)
+    return xs.length()
+}
+
+fn rebuild(copy list<int> xs) → int {
+    xs ← [1, 2]
+    return xs.length()
+}
+
+fn poke(copy list<int> xs) → int {
+    xs[0] ← 7
+    return xs[0]
+}
+
+fn store(copy Cell c) → int {
+    c.n ← 5
+    return c.n
+}
+
+fn step(copy Cell c) → int {
+    c.bump()
+    c.bump()
+    return c.n
+}
+
+main {
+    const list<int> a ← [1, 2, 3]
+    const Cell k ← Cell {}
+    print grow(copy a)
+    print rebuild(copy a)
+    print poke(copy a)
+    print store(copy k)
+    print step(copy k)
+    print a.length()
+    print a[0]
+    print k.n
+}

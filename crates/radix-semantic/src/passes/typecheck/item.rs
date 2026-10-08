@@ -86,7 +86,10 @@ impl TypeChecker<'_> {
                 );
             }
             let scalar_text = self.interval_bound_param_is_scalar_text(&func_name, idx, param.ty);
-            let mutable = matches!(param.mode, HirParamMode::In);
+            // `mut` writes the caller's value; `own`/`copy` write the callee's own
+            // value (OWN-A). Unmarked and `ref` stay read-only.
+            let mutable =
+                matches!(param.mode, HirParamMode::In) || self.types.is_exclusive_value(param.ty);
             self.warn_union_annotation_guardrails(param.ty, param.span);
             self.check_hashable_keys(param.ty, param.span);
             self.record_binding_name(param.def_id, param.name);

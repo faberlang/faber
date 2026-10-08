@@ -54,15 +54,23 @@ fn plain_parameter_rejects_mutating_method_call() {
 }
 
 #[test]
-fn copy_parameter_rejects_mutating_method_call_like_a_field_write() {
+fn plain_parameter_rejects_field_write() {
     assert_rejects_with_issue(
-        &with_counter("functio f(copy Contador c) → vacuum { c.cresce() }\nincipit { }\n"),
-        MUTATING_METHOD_ISSUE,
-    );
-    assert_rejects_with_issue(
-        &with_counter("functio f(copy Contador c) → vacuum { c.n ← 1 }\nincipit { }\n"),
+        &with_counter("functio f(Contador c) → vacuum { c.n ← 1 }\nincipit { }\n"),
         FIELD_WRITE_ISSUE,
     );
+}
+
+#[test]
+fn copy_parameter_accepts_mutating_method_call_and_field_write() {
+    // OWN-A (2026-10-08): `copy` and `own` parameters write the callee's own
+    // value, so the call and the field store are legal.
+    let _ = analyze_ok(&with_counter(
+        "functio f(copy Contador c) → vacuum { c.cresce() }\nincipit { }\n",
+    ));
+    let _ = analyze_ok(&with_counter(
+        "functio f(copy Contador c) → vacuum { c.n ← 1 }\nincipit { }\n",
+    ));
 }
 
 #[test]
