@@ -90,3 +90,37 @@ fn pick(tf32[2, _, 5] input, mut tf32[2, _, 5] output, u32 z, u32 y, u32 x) → 
     assert!(!dump.contains("axis 2") && !dump.contains("axis 0"), "literal axes must not read an extent: {dump}");
     assert!(dump.contains("* const int 5"), "literal axis-2 stride: {dump}");
 }
+
+/// Size-type rule 11: a `_` extent is a wildcard bound at run time, so a call
+/// passing tensors of the same rank validates whether the argument extent is
+/// a literal or a run-time value (it is not instantiated per concrete size).
+#[test]
+fn underscore_kernel_call_accepts_literal_and_runtime_extents() {
+    let _ = dump_validated(
+        r#"+++
+locale = "en"
++++
+@ kernel
+@ public
+fn bump(tf32[_] input, mut tf32[_] output) → void {
+    for from input at [i] thread lane const x {
+        output[i] ← x + 1.0
+    }
+}
+
+fn runtime_extent(int value) → int {
+    return value
+}
+
+main {
+    const int n ← runtime_extent(3)
+    const tf32[4] fixed ← tf32[4] {}
+    var tf32[4] fixed_out ← tf32[4] {}
+    const tf32[size n] sized ← tf32[size n] {}
+    var tf32[size n] sized_out ← tf32[size n] {}
+    bump(fixed, fixed_out)
+    bump(sized, sized_out)
+}
+"#,
+    );
+}

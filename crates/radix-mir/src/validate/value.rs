@@ -487,6 +487,13 @@ impl Validator<'_, '_> {
                 ) {
                     continue;
                 }
+                if self.call_argument_matches_own_axes(
+                    expected.ty,
+                    arg_ty,
+                    u32::try_from(index).unwrap_or(u32::MAX),
+                ) {
+                    continue;
+                }
                 self.bind_generic_type_witness(
                     expected.ty,
                     arg_ty,
@@ -520,6 +527,49 @@ impl Validator<'_, '_> {
                 }
             }
         }
+    }
+
+    /// A `_` extent in a parameter type falls through to the parameter's own
+    /// axis (size-type Z3 law 3), so the formal dimension is the argument's
+    /// extent by construction: it is a wildcard bound at run time and every
+    /// argument of the same element type and rank satisfies it. Axes that are
+    /// not the parameter's own formal axis must still be equal.
+    fn call_argument_matches_own_axes(
+        &self,
+        expected: MirType,
+        actual: MirType,
+        argument: u32,
+    ) -> bool {
+        let types = self.context.types.as_table();
+        if crate::generic::type_contains_param(types, expected.semantic_id()) {
+            return false;
+        }
+        let (Some((expected_element, expected_dims)), Some((actual_element, actual_dims))) = (
+            tensor_type_dims(types, expected.semantic_id()),
+            tensor_type_dims(types, actual.semantic_id()),
+        ) else {
+            return false;
+        };
+        if !types.equals(expected_element, actual_element)
+            || expected_dims.len() != actual_dims.len()
+        {
+            return false;
+        }
+        let mut wildcard = false;
+        for (axis, (expected_dim, actual_dim)) in expected_dims.iter().zip(&actual_dims).enumerate()
+        {
+            if types.index_equals(*expected_dim, *actual_dim) {
+                continue;
+            }
+            match types.get_index(*expected_dim) {
+                IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+                    parameter,
+                    axis: formal_axis,
+                }) if *parameter == argument && *formal_axis as usize == axis => wildcard = true,
+                _ => return false,
+            }
+        }
+        wildcard
     }
 
     fn call_argument_matches_shape_check(
