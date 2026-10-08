@@ -26,11 +26,11 @@ use crate::literal_indexed_access::{LiteralIndexedAccessPlan, MirSlot};
 use crate::visit::MirVisitor;
 use crate::{CapabilityGap, Lowerability};
 use crate::{
-    MirAggregate, MirAggregateKind, MirCollectionOp, MirDeviceViewElement, MirFunction,
-    MirIntrinsic, MirLayoutKind, MirLayoutTable, MirLocal, MirOperand, MirParam, MirPlace,
-    MirPlaceBase, MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind,
-    MirTemp, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator, MirTerminatorKind,
-    MirType, MirValidationContext, MirValue, MirValueKind, ValidatedMir,
+    MirAggregate, MirAggregateKind, MirCollectionOp, MirConstant, MirDeviceViewElement,
+    MirFunction, MirIntrinsic, MirLayoutKind, MirLayoutTable, MirLocal, MirOperand, MirParam,
+    MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirScalarLayout, MirStatement,
+    MirStatementKind, MirTemp, MirTensorLocusLayout, MirTensorStorageLayout, MirTerminator,
+    MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueKind, ValidatedMir,
 };
 use crate::{MirLocalId, MirStructLayout, resolve_struct_layout};
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
@@ -75,6 +75,41 @@ fn is_structurizable_lane_form(function: &MirFunction) -> bool {
         && crate::structurize::structurize(function).is_ok()
 }
 
+/// C4-8 U5: the functions a whole-grid reduction names as its term (the
+/// `MirConstant::Function` last operand of a function-term `FilumReduce`
+/// node). A term function runs inside the lane region, so it has the lane
+/// form's admissions (64-bit coordinate binders, genus parameter reads) and
+/// the structured-CFG emission, with no Lane parameter of its own.
+fn reduction_term_functions(
+    program: &crate::MirProgram,
+) -> rustc_hash::FxHashSet<crate::MirFunctionId> {
+    let mut terms = rustc_hash::FxHashSet::default();
+    for function in &program.functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                let MirStatementKind::RuntimeCall {
+                    call:
+                        MirRuntimeCall {
+                            intrinsic: MirIntrinsic::FilumReduce(filum),
+                            args,
+                            ..
+                        },
+                    ..
+                } = &statement.kind
+                else {
+                    continue;
+                };
+                if filum.term_captures.is_some()
+                    && let Some(MirOperand::Constant(MirConstant::Function(term))) = args.last()
+                {
+                    terms.insert(*term);
+                }
+            }
+        }
+    }
+    terms
+}
+
 const SHAPE_FAILABLE_DEVICE_FN: &str = "failable device function";
 const SHAPE_DEVICE_FUNCTION_CALL: &str = "device function call";
 const SHAPE_KERNEL_RUNTIME_CALL: &str = "kernel runtime call";
@@ -101,6 +136,7 @@ pub fn classify_device_safe(
     device: &MirDeviceContext,
 ) -> Lowerability {
     let mut classifier = DeviceSafeClassifier::new(validated.validation(), device);
+    classifier.reduction_terms = reduction_term_functions(validated.program());
     classifier.visit_program(validated.program());
     classifier.finish()
 }
@@ -112,6 +148,7 @@ pub fn classify_device_safe_for_target_entry(
 ) -> Lowerability {
     let mut classifier = DeviceSafeClassifier::new(validated.validation(), device);
     classifier.allow_host_owned_tensor_entry = true;
+    classifier.reduction_terms = reduction_term_functions(validated.program());
     classifier.visit_program(validated.program());
     classifier.finish()
 }
@@ -125,6 +162,9 @@ struct DeviceSafeClassifier<'a> {
     /// The function under check is a structurizable lane-form kernel, whose
     /// `int` coordinate binders are admitted as 64-bit locals (C4-2e).
     in_lane_form_function: bool,
+    /// The reduction term functions of the program (see
+    /// [`reduction_term_functions`]).
+    reduction_terms: rustc_hash::FxHashSet<crate::MirFunctionId>,
     /// C4-6b: the genus (struct) PARAMETERS of the lane-form function under
     /// visit whose layout resolves, keyed by parameter local. A read of one
     /// field (`p.f`) is the only admitted use.
@@ -191,6 +231,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             device,
             in_device_function: false,
             in_lane_form_function: false,
+            reduction_terms: rustc_hash::FxHashSet::default(),
             genus_params: FxHashMap::default(),
             allows_structured_return_branch: false,
             allows_structured_indexed_write_branch: false,
@@ -626,7 +667,9 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         self.allows_structured_nested_indexed_write_loop_continue = false;
 
         if self.in_device_function {
-            self.in_lane_form_function = is_structurizable_lane_form(function);
+            self.in_lane_form_function = is_structurizable_lane_form(function)
+                || (self.reduction_terms.contains(&function.id)
+                    && crate::structurize::structurize_duplicating_tails(function).is_ok());
             self.genus_params = self.resolved_genus_params(function);
             let allows_structured_return_branch = is_structured_return_branch(function);
             let allows_structured_indexed_write_branch =
@@ -703,7 +746,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 && !allows_structured_nested_indexed_write_loop_branch
                 && !allows_structured_nested_indexed_write_loop_break
                 && !allows_structured_nested_indexed_write_loop_continue
-                && !is_structurizable_lane_form(function)
+                && !self.in_lane_form_function
             {
                 self.record_policy(SHAPE_DEVICE_MULTI_BLOCK_CFG);
             }

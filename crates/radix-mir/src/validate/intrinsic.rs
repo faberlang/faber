@@ -438,11 +438,26 @@ impl Validator<'_, '_> {
                     }
                     MirFilumForm::Grid => {
                         let rank = op.coordinates.len();
-                        if rank == 0 || ![1 + rank, 2 + rank].contains(&call.args.len()) {
+                        // A function term appends its captures and the term
+                        // function constant after the identity.
+                        let term_operands =
+                            op.term_captures.map_or(0, |captures| captures as usize + 1);
+                        if rank == 0
+                            || ![1 + rank + term_operands, 2 + rank + term_operands]
+                                .contains(&call.args.len())
+                        {
                             self.error(
                                 span,
-                                "filum grid reduce takes the source, one extent per axis, and an optional identity",
+                                "filum grid reduce takes the source, one extent per axis, an optional identity, and a function term's captures and function",
                             );
+                        }
+                        if op.term_captures.is_some()
+                            && !matches!(
+                                call.args.last(),
+                                Some(MirOperand::Constant(MirConstant::Function(_)))
+                            )
+                        {
+                            self.error(span, "filum grid reduce function term must end with its function constant");
                         }
                     }
                 }

@@ -386,6 +386,24 @@ impl FunctionBuilder<'_> {
         collector.captures
     }
 
+    /// The outer bindings a `filum` term block reads: every referenced
+    /// definition bound in this builder that is not one of `excluded` (the
+    /// term's own coordinate and element binders).
+    pub(super) fn collect_block_captures(
+        &self,
+        excluded: FxHashSet<DefId>,
+        body: &crate::hir::HirBlock,
+    ) -> Vec<MirClosureCapture> {
+        let mut collector = ClosureCaptureCollector {
+            parent: self,
+            params: excluded,
+            seen: FxHashSet::default(),
+            captures: Vec::new(),
+        };
+        collector.visit_block(body);
+        collector.captures
+    }
+
     fn add_hidden_closure_environment_local(&mut self, ty: MirType, span: Span) -> MirLocalId {
         let id = self.next_local_id();
         self.locals

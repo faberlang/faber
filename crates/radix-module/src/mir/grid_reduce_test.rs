@@ -261,3 +261,69 @@ fn the_abi_carries_the_partials_scratch_between_the_bindings_and_the_extents() {
         "declared bindings, then the partials scratch, then the extents"
     );
 }
+
+const HELPER_TERM_SOURCE: &str = r"
+@ kernel
+fn clampabs(f32 v) → f32 {
+    if v ≺ 0.0 then return 0.0 - v
+    return v
+}
+
+@ kernel
+@ public
+fn k(f32 bias, tensor<f32, [_, _]> state, mut tensor<f32, [4]> out) → void {
+    out[0] ← reduce via max from state at [i, j] thread lane const s { return clampabs(s - bias) } coalesce 0.0
+}
+main {}
+";
+
+/// The lines of the dump's function `name` (`function f1 ...` up to the next
+/// function).
+fn function_lines(dump: &str, name: &str) -> Vec<String> {
+    let start = dump
+        .find(&format!("function {name} "))
+        .unwrap_or_else(|| panic!("{name} in the dump:\n{dump}"));
+    let body = &dump[start..];
+    let end = body[1..]
+        .find("\nfunction ")
+        .map_or(body.len(), |at| at + 1);
+    body[..end].lines().map(str::to_owned).collect()
+}
+
+#[test]
+fn a_term_with_a_helper_call_and_a_branch_lowers_to_its_own_function() {
+    let (dump, _) = lower(HELPER_TERM_SOURCE, KernelLowering::Device).expect("device lowering validates");
+    // f0 `clampabs` was inlined into the term and pruned; f1 is the kernel,
+    // f2 the term function.
+    let kernel = function_lines(&dump, "f1");
+    let node = kernel
+        .iter()
+        .find(|line| line.contains("filum_reduce"))
+        .unwrap_or_else(|| panic!("node in f1:\n{dump}"));
+    // The node names the term function (its last operand) and one capture
+    // (`bias`) before it; the kernel carries no flat term body.
+    assert!(
+        node.contains("form=grid") && node.contains("term_fn_captures=1"),
+        "{node}\n{dump}"
+    );
+    assert!(node.contains("_0, const function f2)"), "capture, then the function:\n{node}");
+    assert!(!kernel.iter().any(|line| line.contains("branch")), "{dump}");
+    // The term function: `bias`, two coordinates, and the element are its
+    // parameters; composition inlined `clampabs` into it, so it holds the
+    // branch and the early-return join itself, and returns the term value.
+    let term = function_lines(&dump, "f2");
+    assert!(term[0].starts_with("function f2 -> ty#25"), "{}", term[0]);
+    assert!(
+        term.iter().any(|line| line.contains("branch")),
+        "the helper's branch is in the term:\n{dump}"
+    );
+    assert!(
+        !term.iter().any(|line| line.contains("call")),
+        "the helper call was inlined:\n{dump}"
+    );
+    assert!(
+        term.iter()
+            .any(|line| line.trim_start().starts_with("return %")),
+        "{dump}"
+    );
+}

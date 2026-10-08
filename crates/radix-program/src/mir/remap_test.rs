@@ -99,6 +99,7 @@ fn filum_declaration_symbols_keep_their_text_after_module_merge() {
                 },
                 span: Span::default(),
             }],
+            term_captures: None,
             term_result: MirLocalId(2),
         }),
         args: vec![],

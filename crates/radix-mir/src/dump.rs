@@ -455,12 +455,16 @@ fn intrinsic(value: &MirIntrinsic) -> String {
         }
         MirIntrinsic::TensorLimes(policy) => format!("tensor_limes {}", edge_policy(policy)),
         MirIntrinsic::FilumReduce(op) => format!(
-            "filum_reduce op={} form={} lane_width={} term_binder={} coordinates={}",
+            "filum_reduce op={} form={} lane_width={} term_binder={} coordinates={}{}",
             op.op.name(),
             op.form.name(),
             op.lane_width,
             op.term_binder_name.map_or(0, |s| s.0),
-            op.coordinates.len()
+            op.coordinates.len(),
+            op.term_captures
+                .map_or_else(String::new, |captures| format!(
+                    " term_fn_captures={captures}"
+                ))
         ),
         MirIntrinsic::Duplicate => "duplicate".to_owned(),
         MirIntrinsic::TensorLift(op) => format!("tensor_lift {}", op.name()),

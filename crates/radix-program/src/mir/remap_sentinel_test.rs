@@ -348,6 +348,7 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                             *place = simple_place();
                             statement
                         }],
+                        term_captures: None,
                         term_result: MirLocalId(7),
                     }),
                     args: vec![],

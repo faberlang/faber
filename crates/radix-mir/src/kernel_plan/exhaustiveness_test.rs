@@ -258,6 +258,7 @@ fn dummy_distributed_sum() -> DistributedSumPlan {
             coordinates: Vec::new(),
             lane_width: 32,
             term_body: Vec::new(),
+            term_captures: None,
             term_result: crate::MirLocalId(1),
         },
         length: 32,

@@ -4663,6 +4663,7 @@ fn filum_declaration(lane_width: u32) -> crate::MirFilumReduceOp {
         }],
         lane_width,
         term_body: Vec::new(),
+        term_captures: None,
         term_result: MirLocalId(4),
     }
 }

@@ -1412,8 +1412,20 @@ pub struct MirFilumReduceOp {
     /// admission for the declared form).
     pub lane_width: u32,
     /// The captured term-body MIR: per-element statements that produce the
-    /// `redde` term value into `term_result`.
+    /// `redde` term value into `term_result`. Empty for a term that is a
+    /// function (see [`Self::term_captures`]).
     pub term_body: Vec<MirStatement>,
+    /// A grid-form term that is a first-class MIR function (C4-8 U5):
+    /// `Some(n)` when the call's LAST argument is the term's
+    /// `MirConstant::Function` and the `n` operands before it are the values
+    /// the term captures from before the node. The function's parameters are
+    /// those `n` captures (in order), then one per coordinate, then the
+    /// element binder; it returns the term value. The function carries its
+    /// own control flow and helper calls, which a flat statement list cannot.
+    /// `coordinates[i].local` and `term_binder` then name the term function's
+    /// own parameter locals. `None` is the flat-list form (the declared sum,
+    /// and a grid term with no body, whose term is the element binder).
+    pub term_captures: Option<u32>,
     /// The local the term value lands in at term-body exit.
     pub term_result: MirLocalId,
     /// The type of the per-element term value.
