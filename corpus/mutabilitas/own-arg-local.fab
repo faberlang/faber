@@ -1,0 +1,55 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "functio_decl", "param_list", "parameter", "argument_list", "argument", "call_marker", "genus_decl", "genus_member", "assignment"]
+category = "type"
+summary = "An own argument is a whole local binding or a fresh value; copy duplicates a field and keeps the name alive; assigning a given-away name makes it live again."
+syntax = "eat(own a); dup(copy b.xs); a ← [5]"
+related = ["own", "copy"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — own argument: whole local binding
+# =============================================================================
+
+class Box {
+    var list<int> xs
+}
+
+fn eat(own list<int> xs) → void {
+    print xs.length()
+}
+
+fn dup(copy list<int> xs) → void {
+    print xs.length()
+}
+
+fn make() → list<int> {
+    return [7, 8, 9]
+}
+
+fn relay(own list<int> p) → void {
+    eat(own p)
+}
+
+main {
+    var list<int> a ← [1, 2, 3]
+    eat(own a)
+    a ← [5, 6]
+    print a.length()
+
+    eat(own [1])
+    eat(own make())
+    relay(own make())
+
+    const Box b ← Box { xs = [1, 2, 3, 4] }
+    dup(copy b.xs)
+    print b.xs.length()
+
+    var list<int> c ← [1]
+    if a.length() ≻ 5 {
+        eat(own c)
+    } else {
+        print c.length()
+    }
+}

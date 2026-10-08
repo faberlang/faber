@@ -356,3 +356,7 @@ mod k8_filum_nested_test;
 #[cfg(test)]
 #[path = "k8_filum_storage_test.rs"]
 mod k8_filum_storage_test;
+
+#[cfg(test)]
+#[path = "borrow_own_arg_test.rs"]
+mod borrow_own_arg_test;

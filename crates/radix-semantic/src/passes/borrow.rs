@@ -56,6 +56,10 @@
 //! - Warnings produced here remain non-fatal unless the semantic driver or
 //!   diagnostic consumer treats warning-kind diagnostics as errors.
 
+#[path = "borrow_own_arg.rs"]
+mod own_arg;
+
+use self::own_arg::OwnArgState;
 use super::borrow_region::RegionFacts;
 use super::borrow_region_cfg::CfgNodeId;
 
@@ -283,6 +287,8 @@ struct BorrowChecker<'a> {
     copy_roots: FxHashSet<DefId>,
     /// Unmarked sources used as an own-bind RHS; a later use proves them live.
     unmarked_own_binds: FxHashMap<DefId, radix_lexer::Span>,
+    /// `own` call-argument rules: dead names, unpassable bindings, closures.
+    own: OwnArgState,
     /// Unmarked reference-model locals (genus, contract, collection, tensor) bound (D12.1 alias) from a `de`
     /// parameter or another such alias. The alias carries the source's
     /// read-only access, so mutation through it is rejected like direct
@@ -374,6 +380,7 @@ impl<'a> BorrowChecker<'a> {
             own_roots: FxHashSet::default(),
             copy_roots: FxHashSet::default(),
             unmarked_own_binds: FxHashMap::default(),
+            own: OwnArgState::default(),
             de_aliases: FxHashSet::default(),
             tensor_view_roots: FxHashMap::default(),
             bind_alias_roots: FxHashMap::default(),
@@ -414,6 +421,7 @@ impl<'a> BorrowChecker<'a> {
                     self.index_function(method.def_id, &method.func);
                 }
             }
+            HirItemKind::Constant(_) => self.own.note_module_const(item.def_id),
             _ => {}
         }
     }
@@ -467,6 +475,7 @@ impl<'a> BorrowChecker<'a> {
             let (marker, inner) = self.types.peel_access_marker(param.ty);
             if matches!(param.mode, HirParamMode::Owned) && marker.is_none() {
                 self.unmarked_params.insert(param.def_id);
+                self.own.note_unmarked_param(param.def_id);
             }
             if matches!(param.mode, HirParamMode::Owned)
                 && marker.is_none()
@@ -511,6 +520,7 @@ impl<'a> BorrowChecker<'a> {
         self.own_roots.clear();
         self.copy_roots.clear();
         self.unmarked_own_binds.clear();
+        self.own.reset();
         self.de_aliases.clear();
         self.tensor_view_roots.clear();
         self.bind_alias_roots.clear();
@@ -547,6 +557,14 @@ impl<'a> BorrowChecker<'a> {
                     self.immutable_locals.insert(local.def_id);
                 }
                 self.ensure_state(local.def_id);
+                if let Some(HirExpression {
+                    kind: HirExpressionKind::Clausura(_, _, _, closure_body),
+                    ..
+                }) = &local.init
+                {
+                    let known = self.states.keys().copied().collect();
+                    self.note_closure_captures(local.def_id, closure_body, &known);
+                }
                 if let Some(ty) = local.ty {
                     self.note_ref_root(local.def_id, ty);
                     self.note_mut_root(local.def_id, ty);
@@ -708,7 +726,7 @@ impl<'a> BorrowChecker<'a> {
     fn check_call_args(&mut self, callee: &HirExpression, args: &[HirCallArg]) {
         let Some(params) = self.call_params(callee) else {
             for arg in args {
-                self.check_expr(&arg.expr);
+                self.check_arg_expr(arg);
             }
             return;
         };
@@ -843,6 +861,10 @@ impl<'a> BorrowChecker<'a> {
             }
             if dest_copy {
                 self.bind_copy_from(&arg.expr);
+                continue;
+            }
+            if own_arg::is_own_marked(arg) {
+                self.own_argument(arg);
                 continue;
             }
             if dest_own && self.arg_is_exclusive(&arg.expr) {
@@ -1788,6 +1810,7 @@ impl<'a> BorrowChecker<'a> {
 
     fn read_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
         self.note_live_unmarked_own_bind(def_id);
+        self.note_live_own_arg(def_id);
         let (region_mut_live, _) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
@@ -1828,6 +1851,7 @@ impl<'a> BorrowChecker<'a> {
 
     fn write_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
         self.note_live_unmarked_own_bind(def_id);
+        self.note_live_own_arg(def_id);
         if let Some(usage) = self.param_usage.get_mut(&def_id) {
             if matches!(usage.mode, HirParamMode::De) {
                 self.error(
@@ -1854,6 +1878,7 @@ impl<'a> BorrowChecker<'a> {
 
     fn move_use(&mut self, def_id: DefId, span: radix_lexer::Span) {
         self.note_live_unmarked_own_bind(def_id);
+        self.note_live_own_arg(def_id);
         if let Some(usage) = self.param_usage.get_mut(&def_id) {
             usage.moved = true;
         }
@@ -2133,6 +2158,7 @@ impl HirVisitor for BorrowChecker<'_> {
             HirExpressionKind::Call(callee, _, args, _) => {
                 self.visit_expr(callee);
                 self.check_call_args(callee, args);
+                self.check_closure_call(callee, expr.span);
             }
             HirExpressionKind::Discerne {
                 scrutinees, arms, ..
@@ -2140,11 +2166,88 @@ impl HirVisitor for BorrowChecker<'_> {
                 for scrutinee in scrutinees {
                     self.visit_expr(scrutinee);
                 }
+                let base = self.flow_marks();
+                let mut joined = Vec::new();
                 for arm in arms {
+                    self.restore_marks(&base);
                     self.push_scope();
                     self.visit_expr(&arm.body);
                     self.pop_scope();
+                    if !matches!(&arm.body.kind, HirExpressionKind::Block(block) if own_arg::block_diverges(block))
+                    {
+                        joined.push(self.flow_marks());
+                    }
                 }
+                if joined.is_empty() {
+                    joined.push(base);
+                }
+                self.join_marks(joined);
+            }
+            HirExpressionKind::Si {
+                cond,
+                then_block,
+                then_catch,
+                else_block,
+            } => {
+                self.visit_expr(cond);
+                let base = self.flow_marks();
+                self.check_block(then_block);
+                if let Some(catch) = then_catch {
+                    self.visit_cape(catch);
+                }
+                let mut joined = Vec::new();
+                if !own_arg::block_diverges(then_block) {
+                    joined.push(self.flow_marks());
+                }
+                self.restore_marks(&base);
+                if let Some(else_block) = else_block {
+                    self.check_block(else_block);
+                    if !own_arg::block_diverges(else_block) {
+                        joined.push(self.flow_marks());
+                    }
+                } else {
+                    joined.push(self.flow_marks());
+                }
+                if joined.is_empty() {
+                    joined.push(base);
+                }
+                self.join_marks(joined);
+            }
+            HirExpressionKind::Dum(cond, block) => {
+                self.visit_expr(cond);
+                let entry = self.loop_entry();
+                self.check_block(block);
+                self.finish_loop(&entry, block);
+            }
+            HirExpressionKind::Loop(block) => {
+                let entry = self.loop_entry();
+                self.check_block(block);
+                self.finish_loop(&entry, block);
+            }
+            HirExpressionKind::IteraRange { ranges, body, .. } => {
+                for range in ranges {
+                    self.visit_expr(range);
+                }
+                let entry = self.loop_entry();
+                self.check_block(body);
+                self.finish_loop(&entry, body);
+            }
+            HirExpressionKind::IteraLockstep {
+                sources,
+                bindings,
+                body,
+                ..
+            } => {
+                for source in sources {
+                    self.visit_expr(source);
+                }
+                for (binding, _) in bindings {
+                    self.ensure_state(*binding);
+                    self.own.note_loop_binder(*binding);
+                }
+                let entry = self.loop_entry();
+                self.check_block(body);
+                self.finish_loop(&entry, body);
             }
             HirExpressionKind::Itera {
                 binding,
@@ -2154,9 +2257,13 @@ impl HirVisitor for BorrowChecker<'_> {
             } => {
                 self.visit_expr(iter);
                 self.ensure_state(*binding);
+                self.own.note_loop_binder(*binding);
+                let entry = self.loop_entry();
                 self.check_block(block);
+                self.finish_loop(&entry, block);
             }
             HirExpressionKind::Assign(target, value) => {
+                self.revive_on_assign(target);
                 self.check_lvalue(target);
                 if self.stores_tensor_view(value) {
                     self.error(
@@ -2223,6 +2330,11 @@ impl HirVisitor for BorrowChecker<'_> {
                 self.push_scope();
                 for param in params {
                     self.ensure_state(param.def_id);
+                    if matches!(param.mode, HirParamMode::Owned)
+                        && self.types.peel_access_marker(param.ty).0.is_none()
+                    {
+                        self.own.note_unmarked_param(param.def_id);
+                    }
                 }
                 self.visit_expr(body);
                 self.pop_scope();
@@ -2299,7 +2411,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.visit_expr(receiver);
                 }
                 for arg in args {
-                    self.check_expr(&arg.expr);
+                    self.check_arg_expr(arg);
                 }
             }
             _ => walk_expr(self, expr),

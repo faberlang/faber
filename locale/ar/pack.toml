@@ -2697,6 +2697,18 @@ help = "تجنب استخدام قيمة بعد نقلها"
 message = "استخدام بعد النقل"
 help = "تجنب استخدام قيمة بعد نقلها"
 
+[diagnostics.SEM050.issues.use_after_own]
+message = "this name was given away as `own` and is used later"
+help = "pass `copy` to keep using the name"
+
+[diagnostics.SEM050.issues.moved_in_loop]
+message = "this value is moved on every iteration of the loop"
+help = "pass `copy`, or move a value created inside the loop"
+
+[diagnostics.SEM050.issues.moved_name_captured_by_closure]
+message = "this closure captured a name that was given away before the call"
+help = "call the closure before the move, or pass `copy`"
+
 [diagnostics.SEM051]
 message = "استعارة قيمة منقولة"
 help = "استعر فقط من قيم لم تنقل"
@@ -2772,6 +2784,22 @@ help = "طابق parameter modes بين caller و callee"
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
 help = "pass a `mut` or `own` value, or bind through `copy`"
+
+[diagnostics.SEM057.issues.own_argument_not_local_binding]
+message = "only a whole local binding can be passed as `own`"
+help = "pass `copy` to duplicate the field or element, or bind it to a local first"
+
+[diagnostics.SEM057.issues.own_argument_unmarked_parameter]
+message = "an unmarked parameter is shared read-only and cannot be given away as `own`"
+help = "pass `copy` to duplicate it, or declare the parameter `own`"
+
+[diagnostics.SEM057.issues.own_argument_module_constant]
+message = "a module constant cannot be given away as `own`"
+help = "pass `copy` to duplicate it"
+
+[diagnostics.SEM057.issues.own_argument_loop_binder]
+message = "a loop binder aliases a live element and cannot be given away as `own`"
+help = "pass `copy` to duplicate it"
 
 [diagnostics.SEM057.issues.call_marker_missing]
 message = "this argument needs the `{expected}` marker its parameter declares"
