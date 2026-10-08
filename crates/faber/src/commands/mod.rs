@@ -36,6 +36,9 @@ mod format_corpus_test;
 #[cfg(test)]
 #[path = "format_test.rs"]
 pub(crate) mod format_test;
+#[cfg(test)]
+#[path = "typed_zero_format_test.rs"]
+mod typed_zero_format_test;
 pub mod host;
 pub(crate) mod init;
 mod model;

@@ -33,8 +33,8 @@ use crate::surface::{FrameFamily, KeywordSurface, TypeBindingKind};
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirCallArg, HirCape, HirConversioTarget, HirExpression,
-    HirExpressionKind, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind,
-    HirOwnerRef, HirStatementKind, HirTypeSite, HirTypeSlot,
+    HirExpressionKind, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey,
+    HirOptionalChainKind, HirOwnerRef, HirStatementKind, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_types::{Primitive, Type, TypeId};
@@ -259,6 +259,18 @@ impl super::FaberCodegen<'_> {
                 // receiver parenthesizes through the postfix precedence.
                 self.write_expr_prec(receiver, 13, names, surface, writer);
                 writer.write("ᵀ");
+            }
+            HirExpressionKind::MethodCall(receiver, name, type_args, args, _)
+                if self
+                    .typed_zero_tensor(receiver, *name, type_args, args)
+                    .is_some() =>
+            {
+                // The typed zero `Type {}`: lowering synthesizes a `crea`
+                // call on a pre-typed `vacua` receiver; restore the authored
+                // empty-braces spelling.
+                if let Some(ty) = self.typed_zero_tensor(receiver, *name, type_args, args) {
+                    self.write_typed_zero(expr.id, ty, names, surface, writer);
+                }
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
                 // `base!.method(..)`: the receiver is the bare assertion, so
@@ -1008,6 +1020,16 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::Verte {
                 source,
                 target,
+                entries: None,
+            } if self.is_typed_zero_register(expr.id, source, *target) => {
+                // The typed zero of a vector or matrix: lowering builds the
+                // zero array and converts it to the claimed type; no authored
+                // ascription site exists for the synthesized node.
+                self.write_typed_zero(expr.id, *target, names, surface, writer);
+            }
+            HirExpressionKind::Verte {
+                source,
+                target,
                 entries,
             } => {
                 self.write_verte_expr(
@@ -1644,6 +1666,86 @@ impl super::FaberCodegen<'_> {
             }
             self.write_expr(&arg.expr, names, surface, writer);
         }
+    }
+
+    /// The claimed tensor type of a typed-zero `Type {}` expression, when the
+    /// call has the exact shape lowering synthesizes: a `vacua` receiver
+    /// pre-typed with the tensor, the `crea` method, fill then extents.
+    /// Authored `.crea(..)` on a tensor is a retired spelling the checker
+    /// refuses, so this shape never comes from user source.
+    fn typed_zero_tensor(
+        &self,
+        receiver: &HirExpression,
+        name: Symbol,
+        type_args: &[TypeId],
+        args: &[radix_hir::HirCallArg],
+    ) -> Option<TypeId> {
+        if !matches!(receiver.kind, HirExpressionKind::Vacua)
+            || !type_args.is_empty()
+            || args.len() != 2
+        {
+            return None;
+        }
+        let ty = receiver.ty?;
+        if !matches!(self.types.get(ty), Type::Tensor(..)) {
+            return None;
+        }
+        // Typecheck rewrites the synthesized call to the canonical spelling.
+        (self.interner.resolve(name) == "crea").then_some(ty)
+    }
+
+    /// A vector or matrix zero: a `Verte` of a literal array of zeros whose
+    /// target is the register type and which carries no authored ascription
+    /// form (an authored `[0, 0] ∷ vf32[2]` records one at its site).
+    fn is_typed_zero_register(
+        &self,
+        id: radix_hir::HirId,
+        source: &HirExpression,
+        target: TypeId,
+    ) -> bool {
+        if !matches!(self.types.get(target), Type::Vector(..) | Type::Matrix(..)) {
+            return false;
+        }
+        let site = HirTypeSite {
+            owner: HirOwnerRef::Hir(id),
+            slot: HirTypeSlot::AscriptionTarget,
+        };
+        if self.authored_type_forms.contains_key(&site) {
+            return false;
+        }
+        fn zero_leaves(expr: &HirExpression) -> bool {
+            match &expr.kind {
+                HirExpressionKind::Array(items) => items.iter().all(|item| match item {
+                    HirArrayElement::Expr(inner) => zero_leaves(inner),
+                    _ => false,
+                }),
+                HirExpressionKind::Literal(HirLiteral::Int(0)) => true,
+                HirExpressionKind::Literal(HirLiteral::Float(value)) => *value == 0.0,
+                _ => false,
+            }
+        }
+        matches!(source.kind, HirExpressionKind::Array(_)) && zero_leaves(source)
+    }
+
+    /// Write `Type {}`: the type as authored where the sidecar kept a form,
+    /// else canonically, then the empty braces.
+    fn write_typed_zero(
+        &self,
+        owner: radix_hir::HirId,
+        ty: TypeId,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        let site = HirTypeSite {
+            owner: HirOwnerRef::Hir(owner),
+            slot: HirTypeSlot::AscriptionTarget,
+        };
+        let rendered = self
+            .type_to_faber_at(&site, ty, names, surface)
+            .unwrap_or_else(|error| self.record_type_emission_error(error));
+        writer.write(&rendered);
+        writer.write(" {}");
     }
 
     /// Re-emit a `finge` variant construction.
