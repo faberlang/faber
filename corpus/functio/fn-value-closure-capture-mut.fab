@@ -1,7 +1,7 @@
 +++
 term = "functio"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "function_type", "type_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "varia_decl", "clausura_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "function_type", "type_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "binding_decl", "clausura_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "expression", "literal", "nota_stmt"]
 category = "function"
 canonical = false
 summary = "A closure captures a local and writes a mut parameter"
