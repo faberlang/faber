@@ -95,6 +95,7 @@ const ISSUE_COPY_INTO_TARGET_NOT_STORAGE: &str = "copy_into_target_not_storage";
 const ISSUE_COPY_INTO_ALIAS: &str = "copy_into_alias";
 /// R6: a whole tensor is rebound into a `mut` tensor parameter by `←`.
 const ISSUE_MUT_TENSOR_PARAM_REBIND: &str = "mut_tensor_param_rebind";
+const ISSUE_ASSIGN_TO_NONMUT_TENSOR_PARAM: &str = "assign_to_nonmut_tensor_param";
 
 /// A named storage place: a binding plus the field path under it.
 type PlaceKey = (DefId, Vec<radix_lexer::Symbol>);
@@ -294,6 +295,9 @@ struct BorrowChecker<'a> {
     bind_alias_roots: FxHashMap<DefId, FxHashSet<DefId>>,
     /// Parameters declared `mut` (`in` mode or a `mut` access marker).
     mut_params: FxHashSet<DefId>,
+    /// Tensor parameters written without any access marker (not `mut`, `own`,
+    /// `copy`, `ref`, `in` or `de`): read-only, so no write reaches the caller.
+    nonmut_tensor_params: FxHashSet<DefId>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
@@ -348,6 +352,7 @@ impl<'a> BorrowChecker<'a> {
             tensor_view_roots: FxHashMap::default(),
             bind_alias_roots: FxHashMap::default(),
             mut_params: FxHashSet::default(),
+            nonmut_tensor_params: FxHashSet::default(),
             func_params: FxHashMap::default(),
             regions,
             stmt_node: None,
@@ -427,6 +432,13 @@ impl<'a> BorrowChecker<'a> {
             if matches!(param.mode, HirParamMode::In) || self.types.is_mut_view(param.ty) {
                 self.mut_params.insert(param.def_id);
             }
+            let (marker, inner) = self.types.peel_access_marker(param.ty);
+            if matches!(param.mode, HirParamMode::Owned)
+                && marker.is_none()
+                && matches!(self.types.get(inner), Type::Tensor(_, _))
+            {
+                self.nonmut_tensor_params.insert(param.def_id);
+            }
             self.param_usage.insert(
                 param.def_id,
                 ParamUsage {
@@ -461,6 +473,7 @@ impl<'a> BorrowChecker<'a> {
         self.tensor_view_roots.clear();
         self.bind_alias_roots.clear();
         self.mut_params.clear();
+        self.nonmut_tensor_params.clear();
         self.stmt_node = None;
     }
 
@@ -728,6 +741,12 @@ impl<'a> BorrowChecker<'a> {
                     arg.expr.span,
                 );
             }
+            if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
+                && self.nonmut_tensor_params.contains(&arg_def_id)
+                && self.dest_is_mut(param)
+            {
+                self.nonmut_tensor_write_error(arg_def_id, arg.expr.span);
+            }
             if self.arg_is_ref_view(&arg.expr) && self.dest_is_mut_or_own(param) {
                 self.error(
                     SemanticErrorKind::ModeMismatch,
@@ -845,11 +864,29 @@ impl<'a> BorrowChecker<'a> {
             );
         }
         if let Some(def_id) = Self::root_def_id(target) {
+            if Self::is_projection(target) && self.nonmut_tensor_params.contains(&def_id) {
+                self.nonmut_tensor_write_error(def_id, target.span);
+            }
             self.check_projection_inputs(target);
             self.write_use(def_id, target.span);
         } else {
             self.check_expr(target);
         }
+    }
+
+    /// A write through a tensor parameter that is not marked `mut`: the
+    /// diagnostic names the parameter.
+    fn nonmut_tensor_write_error(&mut self, def_id: DefId, span: radix_lexer::Span) {
+        let mut error = SemanticError::structured(SemanticErrorKind::AssignToImmutableBorrow, span)
+            .with_arg("issue", ISSUE_ASSIGN_TO_NONMUT_TENSOR_PARAM);
+        if let Some(spelling) = self
+            .names
+            .get(&def_id)
+            .and_then(|name| self.interner.strings().get(name.0 as usize))
+        {
+            error = error.with_arg("name", spelling.to_string());
+        }
+        self.errors.push(error);
     }
 
     /// The binding and field path of a named storage place (`out`, `self.buf`).
@@ -1033,6 +1070,9 @@ impl<'a> BorrowChecker<'a> {
                 ISSUE_ASSIGN_THROUGH_REF,
                 target.span,
             );
+        }
+        if self.nonmut_tensor_params.contains(&root) {
+            self.nonmut_tensor_write_error(root, target.span);
         }
         self.check_projection_inputs(target);
         self.write_use(root, target.span);

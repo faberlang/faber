@@ -3717,6 +3717,10 @@ help = "declare the parameter as '{in}' if mutation is intended"
 message = "cannot assign to `de` parameter"
 help = "declare the parameter as '{in}' if mutation is intended"
 
+[diagnostics.SEM056.issues.assign_to_nonmut_tensor_param]
+message = "cannot write through tensor parameter{?name| '|'} that is not marked `mut`"
+help = "mark the parameter `mut` if the caller's tensor should be written"
+
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
 message = "cannot call a mutating receiver through a `ref` view"
 help = "drop the `ref` marker, or use a non-mutating method"
