@@ -58,7 +58,7 @@ const SHAPE_DEVICE_MULTI_BLOCK_CFG: &str = "device multi-block control flow";
 /// gpu-reset C4-2e: a lane-form kernel (a Lane builtin parameter) whose CFG is
 /// acyclic structures into a region tree, which the target lane emitters
 /// consume instead of the single-block / shape-matcher forms above. A
-/// lane-form CFG the structurizer rejects (a loop, a switch, ...) keeps the
+/// lane-form CFG the structurizer rejects (an irreducible or multi-level loop, a switch, ...) keeps the
 /// multi-block rejection.
 fn is_structurizable_lane_form(function: &MirFunction) -> bool {
     function

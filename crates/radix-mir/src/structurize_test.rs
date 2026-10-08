@@ -71,6 +71,12 @@ fn returns(n: Option<u32>) -> Region {
     Region::Return(n.map(|n| MirOperand::Constant(MirConstant::Int(i64::from(n)))))
 }
 
+fn loop_(body: Region) -> Region {
+    Region::Loop {
+        body: Box::new(body),
+    }
+}
+
 fn seq(parts: Vec<Region>) -> Region {
     Region::Seq(parts)
 }
@@ -95,7 +101,8 @@ fn collect_blocks(region: &Region, out: &mut Vec<MirBlockId>) {
             collect_blocks(then_region, out);
             collect_blocks(else_region, out);
         }
-        Region::Return(_) => {}
+        Region::Loop { body } => collect_blocks(body, out),
+        Region::Return(_) | Region::Break | Region::Continue => {}
     }
 }
 
@@ -251,15 +258,238 @@ fn unreachable_blocks_are_ignored() {
 }
 
 #[test]
-fn loop_returns_named_error() {
-    // bb0 -> bb1; bb1 -> bb1 (back edge) | bb2.
-    let f = function(vec![goto(1), branch(1, 1, 2), ret(None)]);
+fn while_loop_becomes_loop_with_continue_and_break() {
+    // bb0 -> bb1(header); bb1 -> bb2 | bb4; bb2 -> bb3; bb3 -> bb1 (latch); bb4 returns.
+    let f = function(vec![goto(1), branch(1, 2, 4), goto(3), goto(1), ret(None)]);
+    assert_eq!(
+        tree(&f, &[0, 1, 2, 3, 4]),
+        seq(vec![
+            block(0),
+            loop_(seq(vec![
+                block(1),
+                if_(
+                    1,
+                    seq(vec![block(2), block(3), Region::Continue]),
+                    seq(vec![Region::Break]),
+                ),
+            ])),
+            block(4),
+            returns(None),
+        ])
+    );
+}
+
+#[test]
+fn break_on_a_data_dependent_condition() {
+    // bb1 header -> bb2 | bb5(exit); bb2 -> bb5 (break) | bb3; bb3 -> bb4; bb4 -> bb1.
+    let f = function(vec![
+        goto(1),
+        branch(1, 2, 5),
+        branch(2, 5, 3),
+        goto(4),
+        goto(1),
+        ret(None),
+    ]);
+    assert_eq!(
+        tree(&f, &[0, 1, 2, 3, 4, 5]),
+        seq(vec![
+            block(0),
+            loop_(seq(vec![
+                block(1),
+                if_(
+                    1,
+                    seq(vec![
+                        block(2),
+                        if_(
+                            2,
+                            seq(vec![Region::Break]),
+                            seq(vec![block(3), block(4), Region::Continue]),
+                        ),
+                    ]),
+                    seq(vec![Region::Break]),
+                ),
+            ])),
+            block(5),
+            returns(None),
+        ])
+    );
+}
+
+#[test]
+fn continue_straight_to_the_header() {
+    // bb1 header -> bb2 | bb4; bb2 -> bb1 (continue) | bb3; bb3 -> bb1; bb4 returns.
+    let f = function(vec![
+        goto(1),
+        branch(1, 2, 4),
+        branch(2, 1, 3),
+        goto(1),
+        ret(None),
+    ]);
+    assert_eq!(
+        tree(&f, &[0, 1, 2, 3, 4]),
+        seq(vec![
+            block(0),
+            loop_(seq(vec![
+                block(1),
+                if_(
+                    1,
+                    seq(vec![
+                        block(2),
+                        if_(
+                            2,
+                            seq(vec![Region::Continue]),
+                            seq(vec![block(3), Region::Continue]),
+                        ),
+                    ]),
+                    seq(vec![Region::Break]),
+                ),
+            ])),
+            block(4),
+            returns(None),
+        ])
+    );
+}
+
+#[test]
+fn continue_through_a_shared_step_block_joins_there() {
+    // bb2 -> bb4(step) (continue) | bb3; bb3 -> bb4; bb4 -> bb1.
+    let f = function(vec![
+        goto(1),
+        branch(1, 2, 5),
+        branch(2, 4, 3),
+        goto(4),
+        goto(1),
+        ret(None),
+    ]);
+    assert_eq!(
+        tree(&f, &[0, 1, 2, 3, 4, 5]),
+        seq(vec![
+            block(0),
+            loop_(seq(vec![
+                block(1),
+                if_(
+                    1,
+                    seq(vec![
+                        block(2),
+                        if_(2, seq(vec![]), seq(vec![block(3)])),
+                        block(4),
+                        Region::Continue,
+                    ]),
+                    seq(vec![Region::Break]),
+                ),
+            ])),
+            block(5),
+            returns(None),
+        ])
+    );
+}
+
+#[test]
+fn nested_loops() {
+    // outer header bb1 -> bb2 | bb7; bb2 -> bb3(inner header); bb3 -> bb4 | bb5;
+    // bb4 -> bb3; bb5 (inner exit, outer step) -> bb1; bb7 returns.
+    let f = function(vec![
+        goto(1),
+        branch(1, 2, 7),
+        goto(3),
+        branch(2, 4, 5),
+        goto(3),
+        goto(1),
+        ret(None),
+        ret(None),
+    ]);
+    assert_eq!(
+        tree(&f, &[0, 1, 2, 3, 4, 5, 7]),
+        seq(vec![
+            block(0),
+            loop_(seq(vec![
+                block(1),
+                if_(
+                    1,
+                    seq(vec![
+                        block(2),
+                        loop_(seq(vec![
+                            block(3),
+                            if_(
+                                2,
+                                seq(vec![block(4), Region::Continue]),
+                                seq(vec![Region::Break]),
+                            ),
+                        ])),
+                        block(5),
+                        Region::Continue,
+                    ]),
+                    seq(vec![Region::Break]),
+                ),
+            ])),
+            block(7),
+            returns(None),
+        ])
+    );
+}
+
+#[test]
+fn early_return_inside_a_loop_body() {
+    // bb1 header -> bb2 | bb5; bb2 -> bb3 (return) | bb4; bb4 -> bb1; bb5 returns.
+    let f = function(vec![
+        goto(1),
+        branch(1, 2, 5),
+        branch(2, 3, 4),
+        ret(None),
+        goto(1),
+        ret(None),
+    ]);
+    assert_eq!(
+        tree(&f, &[0, 1, 2, 3, 4, 5]),
+        seq(vec![
+            block(0),
+            loop_(seq(vec![
+                block(1),
+                if_(
+                    1,
+                    seq(vec![
+                        block(2),
+                        if_(
+                            2,
+                            seq(vec![block(3), returns(None)]),
+                            seq(vec![block(4), Region::Continue]),
+                        ),
+                    ]),
+                    seq(vec![Region::Break]),
+                ),
+            ])),
+            block(5),
+            returns(None),
+        ])
+    );
+}
+
+#[test]
+fn loop_with_a_second_entry_is_irreducible_by_name() {
+    // bb0 -> bb1 | bb2; bb1 -> bb2; bb2 -> bb1 (back edge) | bb3. The loop {bb1, bb2}
+    // is entered at bb1 and at bb2.
+    let f = function(vec![branch(1, 1, 2), goto(2), branch(2, 1, 3), ret(None)]);
+    assert!(matches!(
+        structurize(&f),
+        Err(StructurizeError::IrreducibleLoop { header, .. }) if header == bb(1)
+    ));
+}
+
+#[test]
+fn continue_of_an_outer_loop_from_an_inner_loop_fails_closed_by_name() {
+    // inner body bb4 jumps straight to the outer header bb1.
+    let f = function(vec![
+        goto(1),
+        branch(1, 2, 6),
+        goto(3),
+        branch(2, 4, 5),
+        branch(3, 1, 3),
+        goto(1),
+        ret(None),
+    ]);
     assert_eq!(
         structurize(&f),
-        Err(StructurizeError::Loop {
-            from: bb(1),
-            header: bb(1)
-        })
+        Err(StructurizeError::MultiLevelExit { target: bb(1) })
     );
 }
 

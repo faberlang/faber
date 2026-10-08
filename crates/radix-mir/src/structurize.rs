@@ -1,4 +1,4 @@
-//! Target-neutral structurizer: an acyclic MIR CFG becomes a region tree.
+//! Target-neutral structurizer: a reducible MIR CFG becomes a region tree.
 //!
 //! Faber has no `goto`, so every lowered CFG is reducible. Emitters that need
 //! structured control flow (Metal, WGSL) consume the [`Region`] tree instead of
@@ -7,9 +7,20 @@
 //! # Algorithm
 //!
 //! Blocks reachable from the entry (`blocks[0]`) are collected by a depth-first
-//! walk that rejects back edges ([`StructurizeError::Loop`]) and unsupported
-//! terminators. The walk yields a reverse topological order, and the set of
-//! blocks reachable from each block is computed along it. A `Branch` becomes an
+//! walk that records back edges and rejects unsupported terminators. With the
+//! back edges removed the graph is a DAG: the walk yields a reverse topological
+//! order, and the set of blocks reachable from each block is computed along it.
+//!
+//! # Loops
+//!
+//! A back-edge target is a loop header. Its natural loop (the header plus every
+//! block that reaches a back-edge source without passing the header) must be
+//! single-entry, else [`StructurizeError::IrreducibleLoop`]. The loop becomes
+//! [`Region::Loop`]; inside it an edge to the header is [`Region::Continue`] and
+//! an edge to the loop's exit block (the earliest block every exit edge reaches)
+//! is [`Region::Break`]. An edge that would leave or restart an OUTER loop from
+//! an inner one needs a labelled jump, which the targets lack, and fails closed
+//! as [`StructurizeError::MultiLevelExit`]. A `Branch` becomes an
 //! [`Region::If`] whose join is its immediate post-dominator modulo returns: the
 //! earliest block (topologically) reachable from both arms. Both arms are
 //! emitted up to the join and the walk continues there. With no join (the arms
@@ -51,6 +62,13 @@ pub enum Region {
     },
     /// Function return.
     Return(Option<MirOperand>),
+    /// A natural loop: the body repeats until it executes a `Break` or `Return`.
+    /// The body starts at the loop header block.
+    Loop { body: Box<Region> },
+    /// Leave the innermost enclosing `Loop`; control resumes after it.
+    Break,
+    /// Restart the innermost enclosing `Loop` at its header.
+    Continue,
 }
 
 /// Why a CFG cannot be structurized (yet).
@@ -63,11 +81,15 @@ pub enum StructurizeError {
         from: MirBlockId,
         target: MirBlockId,
     },
-    /// A back edge `from -> header` closes a loop (structurized by C4-4b).
-    Loop {
-        from: MirBlockId,
+    /// A loop with more than one entry: `block` inside the natural loop of
+    /// `header` is reachable without passing `header`.
+    IrreducibleLoop {
         header: MirBlockId,
+        block: MirBlockId,
     },
+    /// An edge to the header or exit of an outer loop from inside an inner
+    /// loop; structured `break` / `continue` reach only the innermost loop.
+    MultiLevelExit { target: MirBlockId },
     /// A terminator with no structured form here.
     UnsupportedTerminator {
         block: MirBlockId,
@@ -79,7 +101,7 @@ pub enum StructurizeError {
 
 const NOT_FOUND: usize = usize::MAX;
 
-/// Build the region tree for an acyclic function CFG.
+/// Build the region tree for a reducible function CFG.
 ///
 /// # Errors
 ///
@@ -90,22 +112,36 @@ pub fn structurize(function: &MirFunction) -> Result<Region, StructurizeError> {
         .first()
         .ok_or(StructurizeError::EmptyFunction)?;
     let graph = Graph::build(function, entry.id)?;
+    let start = graph.position(entry.id);
+    let loops = graph.natural_loops(start)?;
     let mut walker = Walker {
         function,
         reach: graph.reachability(),
         graph: &graph,
         emitted: vec![false; function.blocks.len()],
+        loops,
+        active: Vec::new(),
+        entering: None,
     };
-    let start = graph.position(entry.id);
     Ok(Region::Seq(walker.emit(start, None)?))
 }
 
 /// Reachable subgraph over block positions.
 struct Graph {
+    /// Forward edges without back edges (a DAG), for reachability.
     successors: Vec<Vec<usize>>,
+    /// Every edge in terminator order, back edges included, for emission.
+    targets: Vec<Vec<usize>>,
+    /// `(source, header)` for every back edge.
+    back_edges: Vec<(usize, usize)>,
     /// Reachable positions, successors before predecessors.
     postorder: Vec<usize>,
     ids: Vec<MirBlockId>,
+}
+
+/// A natural loop: its header and member blocks.
+struct NaturalLoop {
+    body: Vec<bool>,
 }
 
 impl Graph {
@@ -120,6 +156,8 @@ impl Graph {
         let count = function.blocks.len();
         let mut graph = Self {
             successors: vec![Vec::new(); count],
+            targets: vec![Vec::new(); count],
+            back_edges: Vec::new(),
             postorder: Vec::new(),
             ids: function.blocks.iter().map(|block| block.id).collect(),
         };
@@ -160,12 +198,11 @@ impl Graph {
                     target,
                 });
             }
+            self.targets[at].push(next);
             match state[next] {
                 1 => {
-                    return Err(StructurizeError::Loop {
-                        from: block.id,
-                        header: target,
-                    });
+                    self.back_edges.push((at, next));
+                    continue;
                 }
                 0 => self.visit(function, next, state)?,
                 _ => {}
@@ -175,6 +212,49 @@ impl Graph {
         state[at] = 2;
         self.postorder.push(at);
         Ok(())
+    }
+
+    /// The natural loop of every header, indexed by header position. Rejects a
+    /// loop that can be entered other than through its header.
+    fn natural_loops(&self, entry: usize) -> Result<Vec<Option<NaturalLoop>>, StructurizeError> {
+        let count = self.ids.len();
+        let mut preds = vec![Vec::new(); count];
+        for &block in &self.postorder {
+            for &target in &self.targets[block] {
+                preds[target].push(block);
+            }
+        }
+        let mut loops: Vec<Option<NaturalLoop>> = (0..count).map(|_| None).collect();
+        for &(_, header) in &self.back_edges {
+            if loops[header].is_some() {
+                continue;
+            }
+            let mut body = vec![false; count];
+            body[header] = true;
+            let mut work: Vec<usize> = self
+                .back_edges
+                .iter()
+                .filter(|(_, to)| *to == header)
+                .map(|(from, _)| *from)
+                .collect();
+            while let Some(block) = work.pop() {
+                if std::mem::replace(&mut body[block], true) {
+                    continue;
+                }
+                work.extend(preds[block].iter().copied());
+            }
+            let entered_elsewhere = (0..count)
+                .filter(|&member| body[member] && member != header)
+                .find(|&member| member == entry || preds[member].iter().any(|&pred| !body[pred]));
+            if let Some(member) = entered_elsewhere {
+                return Err(StructurizeError::IrreducibleLoop {
+                    header: self.ids[header],
+                    block: self.ids[member],
+                });
+            }
+            loops[header] = Some(NaturalLoop { body });
+        }
+        Ok(loops)
     }
 
     /// `reach[b][x]`: `x` is reachable from `b` (including `b` itself).
@@ -207,16 +287,38 @@ fn terminator_name(kind: &MirTerminatorKind) -> &'static str {
     }
 }
 
+/// A loop being emitted: where `Continue` and `Break` go.
+struct ActiveLoop {
+    header: usize,
+    exit: Option<usize>,
+}
+
 struct Walker<'a> {
     function: &'a MirFunction,
     graph: &'a Graph,
     reach: Vec<Vec<bool>>,
     emitted: Vec<bool>,
+    loops: Vec<Option<NaturalLoop>>,
+    active: Vec<ActiveLoop>,
+    /// The header whose first emission is the loop body itself, not a new loop.
+    entering: Option<usize>,
 }
 
 impl Walker<'_> {
-    /// Earliest block reachable from both arms, if any.
+    /// Whether an edge to `at` is a `Break` / `Continue` of the innermost loop.
+    fn is_jump(&self, at: usize) -> bool {
+        self.active
+            .last()
+            .is_some_and(|ctx| ctx.header == at || ctx.exit == Some(at))
+    }
+
+    /// Earliest block reachable from both arms, if any. An arm that is itself a
+    /// jump out of (or back into) the loop reaches nothing; a join that is a
+    /// jump target is no join (each arm emits its own jump).
     fn join(&self, then_at: usize, else_at: usize) -> Option<usize> {
+        if self.is_jump(then_at) || self.is_jump(else_at) {
+            return None;
+        }
         // Postorder lists successors first, so the latest entry is the earliest block.
         self.graph
             .postorder
@@ -224,13 +326,110 @@ impl Walker<'_> {
             .rev()
             .copied()
             .find(|&x| self.reach[then_at][x] && self.reach[else_at][x])
+            .filter(|&x| !self.is_jump(x))
+    }
+
+    /// The `Break` / `Continue` an edge to `at` becomes, if it is one.
+    fn jump(&self, at: usize) -> Result<Option<Region>, StructurizeError> {
+        if let Some(ctx) = self.active.last() {
+            if ctx.header == at {
+                return Ok(Some(Region::Continue));
+            }
+            if ctx.exit == Some(at) {
+                return Ok(Some(Region::Break));
+            }
+        }
+        let outer = self.active.iter().rev().skip(1);
+        for ctx in outer {
+            if ctx.header == at || ctx.exit == Some(at) {
+                return Err(StructurizeError::MultiLevelExit {
+                    target: self.graph.ids[at],
+                });
+            }
+        }
+        Ok(None)
+    }
+
+    /// The block control resumes at after the loop headed by `header`: the
+    /// single exit target, else the earliest block every exit target reaches.
+    fn loop_exit(&self, header: usize) -> Option<usize> {
+        let body = &self.loops[header].as_ref()?.body;
+        let mut exits: Vec<usize> = Vec::new();
+        for (block, _) in body.iter().enumerate().filter(|(_, member)| **member) {
+            for &target in &self.graph.targets[block] {
+                if !body[target] && !exits.contains(&target) {
+                    exits.push(target);
+                }
+            }
+        }
+        match exits[..] {
+            [] => None,
+            [only] => Some(only),
+            _ => self
+                .graph
+                .postorder
+                .iter()
+                .rev()
+                .copied()
+                .find(|&x| exits.iter().all(|&exit| self.reach[exit][x]))
+                .or_else(|| self.main_exit(header, &exits)),
+        }
+    }
+
+    /// With no block every exit reaches (the others return on their own), the
+    /// exit with the longest continuation; ties go to the header's own exit.
+    fn main_exit(&self, header: usize, exits: &[usize]) -> Option<usize> {
+        let size = |exit: usize| self.reach[exit].iter().filter(|r| **r).count();
+        let longest = exits.iter().map(|&exit| size(exit)).max()?;
+        let ties: Vec<usize> = exits.iter().copied().filter(|&exit| size(exit) == longest).collect();
+        ties.iter()
+            .copied()
+            .find(|exit| self.graph.targets[header].contains(exit))
+            .or_else(|| ties.first().copied())
+    }
+
+    /// Emit the loop headed by `header` into `out`; the block control resumes at.
+    fn emit_loop(
+        &mut self,
+        header: usize,
+        out: &mut Vec<Region>,
+    ) -> Result<Option<usize>, StructurizeError> {
+        let exit = self.loop_exit(header);
+        self.active.push(ActiveLoop { header, exit });
+        self.entering = Some(header);
+        let body = self.emit(header, None);
+        self.active.pop();
+        out.push(Region::Loop {
+            body: Box::new(Region::Seq(body?)),
+        });
+        Ok(exit)
     }
 
     /// Emit from `start` up to (not including) `stop`, or to a `Return`.
     fn emit(&mut self, start: usize, stop: Option<usize>) -> Result<Vec<Region>, StructurizeError> {
         let mut out = Vec::new();
         let mut at = start;
-        while Some(at) != stop {
+        loop {
+            if Some(at) == stop {
+                break;
+            }
+            if self.entering == Some(at) {
+                self.entering = None;
+            } else {
+                if let Some(jump) = self.jump(at)? {
+                    out.push(jump);
+                    break;
+                }
+                if self.loops[at].is_some() {
+                    match self.emit_loop(at, &mut out)? {
+                        Some(next) => {
+                            at = next;
+                            continue;
+                        }
+                        None => break,
+                    }
+                }
+            }
             if std::mem::replace(&mut self.emitted[at], true) {
                 return Err(StructurizeError::SharedTail {
                     block: self.graph.ids[at],
@@ -243,10 +442,10 @@ impl Walker<'_> {
                     out.push(Region::Return(value.clone()));
                     break;
                 }
-                MirTerminatorKind::Goto(_) => at = self.graph.successors[at][0],
+                MirTerminatorKind::Goto(_) => at = self.graph.targets[at][0],
                 MirTerminatorKind::Branch { condition, .. } => {
-                    let [then_at, else_at] = self.graph.successors[at][..] else {
-                        unreachable!("branch has two successors");
+                    let [then_at, else_at] = self.graph.targets[at][..] else {
+                        unreachable!("branch has two targets");
                     };
                     let join = self.join(then_at, else_at);
                     let arm_stop = join.or(stop);
