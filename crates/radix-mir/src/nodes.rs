@@ -594,6 +594,14 @@ pub enum MirValueKind {
         rhs: MirOperand,
     },
     Option(MirOptionOp),
+    /// Runtime extent of one axis of a tensor (`numerus`). Scalar and
+    /// device-legal: a kernel reads a runtime-shaped tensor's extent through
+    /// this value (never through a list). Emitters map it to a per-axis
+    /// scalar launch argument.
+    TensorExtent {
+        tensor: MirOperand,
+        axis: u32,
+    },
 }
 
 /// Readable input to a computation, call, projection, or terminator.

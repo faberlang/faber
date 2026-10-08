@@ -212,6 +212,9 @@ pub(super) fn rewrite_value_sources(
             rewrite_operand_sources(rhs, unit_path, source_rewrites);
         }
         MirValueKind::Option(op) => rewrite_option_sources(op, unit_path, source_rewrites),
+        MirValueKind::TensorExtent { tensor, .. } => {
+            rewrite_operand_sources(tensor, unit_path, source_rewrites);
+        }
     }
 }
 

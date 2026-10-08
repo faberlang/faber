@@ -171,6 +171,9 @@ pub(super) fn remap_value_text_symbols(
             remap_operand_text_symbols(rhs, source, target);
         }
         MirValueKind::Option(op) => remap_option_text_symbols(op, source, target),
+        MirValueKind::TensorExtent { tensor, .. } => {
+            remap_operand_text_symbols(tensor, source, target);
+        }
     }
 }
 

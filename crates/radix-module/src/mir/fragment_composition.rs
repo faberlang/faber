@@ -1305,6 +1305,9 @@ impl Alpha {
                     MirValueKind::Binary { op: *op, lhs: self.operand(lhs, ids), rhs: self.operand(rhs, ids) }
                 }
                 MirValueKind::Option(op) => MirValueKind::Option(self.option_op(op, ids)),
+                MirValueKind::TensorExtent { tensor, axis } => {
+                    MirValueKind::TensorExtent { tensor: self.operand(tensor, ids), axis: *axis }
+                }
             },
             ty: value.ty,
             span: value.span,

@@ -248,6 +248,9 @@ fn value_fmt(value: &MirValue) -> String {
             )
         }
         MirValueKind::Option(op) => format!("option {}: {}", option_op(op), ty(value.ty)),
+        MirValueKind::TensorExtent { tensor, axis } => {
+            format!("extent {} axis {}: {}", operand(tensor), axis, ty(value.ty))
+        }
     }
 }
 

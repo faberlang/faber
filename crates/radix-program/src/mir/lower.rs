@@ -331,6 +331,7 @@ fn collect_value_variant_defs(value: &MirValue, variants: &mut Vec<DefId>) {
             collect_operand_variant_defs(&closure.environment, variants);
         }
         MirValueKind::Unary { operand, .. } => collect_operand_variant_defs(operand, variants),
+        MirValueKind::TensorExtent { tensor, .. } => collect_operand_variant_defs(tensor, variants),
         MirValueKind::Binary { lhs, rhs, .. } => {
             collect_operand_variant_defs(lhs, variants);
             collect_operand_variant_defs(rhs, variants);
@@ -3346,6 +3347,9 @@ fn rewrite_value_variant_defs(value: &mut MirValue, variant_remap: &HashMap<DefI
             rewrite_operand_variant_defs(rhs, variant_remap);
         }
         MirValueKind::Option(op) => rewrite_option_variant_defs(op, variant_remap),
+        MirValueKind::TensorExtent { tensor, .. } => {
+            rewrite_operand_variant_defs(tensor, variant_remap);
+        }
     }
 }
 
@@ -4016,6 +4020,7 @@ pub(super) fn shift_value_ids(value: &mut MirValue, offset: u32) {
             shift_operand_ids(rhs, offset);
         }
         MirValueKind::Option(op) => shift_option_ids(op, offset),
+        MirValueKind::TensorExtent { tensor, .. } => shift_operand_ids(tensor, offset),
     }
 }
 
@@ -4408,6 +4413,7 @@ fn remap_value_function_ids(value: &mut MirValue, remap: &HashMap<MirFunctionId,
             remap_operand_function_ids(rhs, remap);
         }
         MirValueKind::Option(op) => remap_option_function_ids(op, remap),
+        MirValueKind::TensorExtent { tensor, .. } => remap_operand_function_ids(tensor, remap),
     }
 }
 
@@ -4673,6 +4679,7 @@ fn scan_value_references(value: &MirValue, scan: &mut MirReferenceScan) {
             scan_operand_references(rhs, scan);
         }
         MirValueKind::Option(op) => scan_option_references(op, scan),
+        MirValueKind::TensorExtent { tensor, .. } => scan_operand_references(tensor, scan),
     }
 }
 

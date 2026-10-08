@@ -2130,6 +2130,7 @@ fn rewrite_value_constants(
             rewrite_operand_constants(lhs, rewrite) && rewrite_operand_constants(rhs, rewrite)
         }
         MirValueKind::Option(op) => rewrite_option_op_constants(op, rewrite),
+        MirValueKind::TensorExtent { tensor, .. } => rewrite_operand_constants(tensor, rewrite),
     }
 }
 

@@ -317,6 +317,7 @@ fn classify_value(
     match kind {
         MirValueKind::Operand(operand) => classify_operand(operand, gaps, seen),
         MirValueKind::Unary { operand, .. } => classify_operand(operand, gaps, seen),
+        MirValueKind::TensorExtent { tensor, .. } => classify_operand(tensor, gaps, seen),
         MirValueKind::Binary { lhs, rhs, .. } => {
             classify_operand(lhs, gaps, seen);
             classify_operand(rhs, gaps, seen);

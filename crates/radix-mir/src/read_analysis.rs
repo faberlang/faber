@@ -264,7 +264,11 @@ pub(crate) fn terminator_return_local(terminator: &MirTerminatorKind) -> Option<
 /// Collect the locals a value reads into `out`.
 fn value_read_locals(value: &MirValue, out: &mut Vec<MirLocalId>) {
     match &value.kind {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+        MirValueKind::Operand(operand)
+        | MirValueKind::Unary { operand, .. }
+        | MirValueKind::TensorExtent {
+            tensor: operand, ..
+        } => {
             out.extend(operand_local(operand));
         }
         MirValueKind::Binary { lhs, rhs, .. } => {
@@ -280,7 +284,11 @@ fn value_read_locals(value: &MirValue, out: &mut Vec<MirLocalId>) {
 /// [`value_read_locals`]).
 fn value_read_slots(value: &MirValue, out: &mut Vec<MirPlaceBase>) {
     match &value.kind {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+        MirValueKind::Operand(operand)
+        | MirValueKind::Unary { operand, .. }
+        | MirValueKind::TensorExtent {
+            tensor: operand, ..
+        } => {
             out.extend(operand_slot(operand));
         }
         MirValueKind::Binary { lhs, rhs, .. } => {

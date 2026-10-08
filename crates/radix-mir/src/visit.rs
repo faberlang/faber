@@ -421,6 +421,7 @@ pub fn walk_value<V: MirVisitor>(visitor: &mut V, value: &MirValue) {
         MirValueKind::Operand(operand) => visitor.visit_operand(operand),
         MirValueKind::Closure(closure) => visitor.visit_operand(&closure.environment),
         MirValueKind::Unary { operand, .. } => visitor.visit_operand(operand),
+        MirValueKind::TensorExtent { tensor, .. } => visitor.visit_operand(tensor),
         MirValueKind::Binary { lhs, rhs, .. } => {
             visitor.visit_operand(lhs);
             visitor.visit_operand(rhs);
@@ -439,6 +440,7 @@ pub fn try_walk_value<V: FallibleMirVisitor>(
         MirValueKind::Operand(operand) => visitor.visit_operand(operand),
         MirValueKind::Closure(closure) => visitor.visit_operand(&closure.environment),
         MirValueKind::Unary { operand, .. } => visitor.visit_operand(operand),
+        MirValueKind::TensorExtent { tensor, .. } => visitor.visit_operand(tensor),
         MirValueKind::Binary { lhs, rhs, .. } => {
             visitor.visit_operand(lhs)?;
             visitor.visit_operand(rhs)

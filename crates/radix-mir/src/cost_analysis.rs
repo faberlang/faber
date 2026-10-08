@@ -752,6 +752,7 @@ fn value_is_foldable(value: &MirValue, function: &MirFunction, foldable: &Foldab
         MirValueKind::Closure(_)
         | MirValueKind::Unary { .. }
         | MirValueKind::Binary { .. }
+        | MirValueKind::TensorExtent { .. }
         | MirValueKind::Option(_) => false,
     }
 }

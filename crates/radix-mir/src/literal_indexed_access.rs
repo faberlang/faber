@@ -380,9 +380,11 @@ fn value_reads_slots(
     slots: &FxHashSet<MirSlot>,
 ) -> bool {
     match value {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
-            operand_resolves_into(operand, aliases, slots)
-        }
+        MirValueKind::Operand(operand)
+        | MirValueKind::Unary { operand, .. }
+        | MirValueKind::TensorExtent {
+            tensor: operand, ..
+        } => operand_resolves_into(operand, aliases, slots),
         MirValueKind::Binary { lhs, rhs, .. } => {
             operand_resolves_into(lhs, aliases, slots) || operand_resolves_into(rhs, aliases, slots)
         }

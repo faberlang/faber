@@ -15,6 +15,7 @@ mod i64_axis_const;
 mod i64_const_copy;
 mod live_tuple;
 mod multi_output;
+mod tensor_extent;
 mod transformer;
 
 fn test_span() -> Span {

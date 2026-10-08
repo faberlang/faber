@@ -183,6 +183,43 @@ impl Validator<'_, '_> {
                 }
             }
             MirValueKind::Option(op) => self.validate_option_op(scope, op, value.ty, value.span),
+            MirValueKind::TensorExtent { tensor, axis } => {
+                self.validate_tensor_extent(scope, tensor, *axis, value.ty, value.span);
+            }
+        }
+    }
+
+    /// `TensorExtent`: a tensor-typed operand, an axis inside its rank, and a
+    /// `numerus` result. Device-legal by construction (a scalar read).
+    fn validate_tensor_extent(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        tensor: &MirOperand,
+        axis: u32,
+        result_ty: MirType,
+        span: Span,
+    ) {
+        let tensor_ty = self.validate_operand(scope, tensor, span);
+        // `numerus` family: a kernel unit types the extent at a device-legal
+        // width (i32/u32), the host at bare `numerus`.
+        if !matches!(
+            self.type_kind(result_ty),
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+        ) {
+            self.error(span, "tensor extent result is not numerus");
+        }
+        let Some(tensor_ty) = tensor_ty else { return };
+        if !matches!(self.type_kind(tensor_ty), Type::Tensor(_, _)) {
+            self.error(span, "tensor extent operand is not a tensor");
+            return;
+        }
+        if let Some(rank) = self.static_tensor_rank(tensor_ty)
+            && axis as usize >= rank
+        {
+            self.error(
+                span,
+                format!("tensor extent axis {axis} is out of range for rank {rank}"),
+            );
         }
     }
 

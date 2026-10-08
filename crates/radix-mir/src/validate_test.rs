@@ -4773,3 +4773,90 @@ fn device_view_linear_index_validates_for_rank2_and_rank3_storage() {
         assert!(errors.is_empty(), "rank {} linear device index must validate: {errors:?}", dims.len());
     }
 }
+
+// -----------------------------------------------------------------------
+// TensorExtent
+// -----------------------------------------------------------------------
+
+/// One-function program: `local1 = TensorExtent { local0, axis }` where
+/// local 0 has `operand_ty` and local 1 has `result_ty`.
+fn tensor_extent_program(
+    types: &TypeTable,
+    operand_ty: MirType,
+    axis: u32,
+    result_ty: MirType,
+) -> MirProgram {
+    let mut program = unary_op_program(types, MirUnOp::Neg, operand_ty, result_ty);
+    let MirStatementKind::Assign { value, .. } =
+        &mut program.functions[0].blocks[0].statements[0].kind
+    else {
+        unreachable!("fixture statement is an assign");
+    };
+    value.kind = MirValueKind::TensorExtent {
+        tensor: MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(0)),
+            projections: vec![],
+        }),
+        axis,
+    };
+    program
+}
+
+#[test]
+fn tensor_extent_valid_axis_passes() {
+    let mut types = TypeTable::new();
+    let tensor = MirType::semantic(tensor_type(&mut types, Primitive::Fractus, &[4, 6]));
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    for axis in 0..2 {
+        let errors = validate(&tensor_extent_program(&types, tensor, axis, numerus), &types);
+        assert!(errors.is_empty(), "axis {axis}: {errors:?}");
+    }
+}
+
+#[test]
+fn tensor_extent_runtime_shaped_tensor_passes() {
+    let mut types = TypeTable::new();
+    let element = types.primitive(Primitive::Fractus);
+    let runtime = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarExpression {
+        expression: 3,
+    }));
+    let tensor = MirType::semantic(types.tensor_with_shape(element, runtime));
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let errors = validate(&tensor_extent_program(&types, tensor, 0, numerus), &types);
+    assert!(errors.is_empty(), "{errors:?}");
+}
+
+#[test]
+fn tensor_extent_axis_at_or_past_rank_is_rejected() {
+    let mut types = TypeTable::new();
+    let tensor = MirType::semantic(tensor_type(&mut types, Primitive::Fractus, &[4, 6]));
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let errors = validate(&tensor_extent_program(&types, tensor, 2, numerus), &types);
+    assert!(
+        errors.iter().any(|e| e.contains("out of range for rank 2")),
+        "expected an axis range error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn tensor_extent_non_tensor_operand_is_rejected() {
+    let types = TypeTable::new();
+    let numerus = MirType::semantic(types.primitive(Primitive::Numerus));
+    let errors = validate(&tensor_extent_program(&types, numerus, 0, numerus), &types);
+    assert!(
+        errors.iter().any(|e| e.contains("operand is not a tensor")),
+        "expected a non-tensor operand error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn tensor_extent_non_numerus_result_is_rejected() {
+    let mut types = TypeTable::new();
+    let tensor = MirType::semantic(tensor_type(&mut types, Primitive::Fractus, &[4]));
+    let fractus = MirType::semantic(types.primitive(Primitive::Fractus));
+    let errors = validate(&tensor_extent_program(&types, tensor, 0, fractus), &types);
+    assert!(
+        errors.iter().any(|e| e.contains("result is not numerus")),
+        "expected a result type error, got: {errors:?}"
+    );
+}

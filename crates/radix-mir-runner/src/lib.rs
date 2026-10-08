@@ -2248,6 +2248,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 self.eval_binop(*op, lhs, rhs, value.ty, span)?
             }
             MirValueKind::Option(op) => self.eval_option_value(op, span)?,
+            MirValueKind::TensorExtent { tensor, axis } => {
+                self.eval_tensor_extent(tensor, *axis, span)?
+            }
         };
         let computed = self.normalize_decimal_value(computed, value.ty.semantic_id(), span)?;
         // WHY: Value::Float is an f64 carrier. Declared f32 (and other
@@ -2259,6 +2262,25 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             frame.values.insert(value.id, computed.clone());
         }
         Ok(computed)
+    }
+
+    /// `TensorExtent`: the carrier's extent on `axis`, read from its shape.
+    fn eval_tensor_extent(
+        &mut self,
+        tensor: &MirOperand,
+        axis: u32,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Value::Tensor(tensor) = self.eval_operand(tensor, span)? else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor extent operand is not a tensor",
+            ));
+        };
+        let extent = tensor.borrow().shape.get(axis as usize).copied();
+        extent.map(Value::Int).ok_or_else(|| {
+            RunnerError::internal(span, "tensor extent axis is out of range for the carrier")
+        })
     }
 
     fn eval_operand(&mut self, operand: &MirOperand, span: Span) -> Result<Value, RunnerError> {
@@ -3522,6 +3544,10 @@ mod copy_into_test;
 #[cfg(test)]
 #[path = "tensor_fill_test.rs"]
 mod tensor_fill_test;
+
+#[cfg(test)]
+#[path = "tensor_extent_test.rs"]
+mod tensor_extent_test;
 
 #[cfg(test)]
 #[path = "tensor_math_test.rs"]
