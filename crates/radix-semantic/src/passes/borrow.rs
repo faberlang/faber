@@ -96,6 +96,9 @@ const ISSUE_COPY_INTO_ALIAS: &str = "copy_into_alias";
 /// R6: a whole tensor is rebound into a `mut` tensor parameter by `←`.
 const ISSUE_MUT_TENSOR_PARAM_REBIND: &str = "mut_tensor_param_rebind";
 const ISSUE_ASSIGN_TO_NONMUT_TENSOR_PARAM: &str = "assign_to_nonmut_tensor_param";
+const ISSUE_IMMUTABLE_SECOND_ASSIGNMENT: &str = "immutable_second_assignment";
+const ISSUE_MUTATING_METHOD_ON_IMMUTABLE: &str =
+    "imperativus_operator_method_requires_varia_receiver";
 
 /// A named storage place: a binding plus the field path under it.
 type PlaceKey = (DefId, Vec<radix_lexer::Symbol>);
@@ -302,6 +305,18 @@ struct BorrowChecker<'a> {
     /// through another alias), mapped to that parameter: a write through the
     /// alias is a write to the read-only parameter.
     nonmut_tensor_aliases: FxHashMap<DefId, DefId>,
+    /// Non-tensor aggregate parameters (list, map, set, object, contract)
+    /// without any access marker: shared read-only, like the tensor case. A
+    /// direct write is rejected by typecheck; the borrow pass owns the alias
+    /// shapes that slip past it.
+    nonmut_agg_params: FxHashSet<DefId>,
+    /// Unmarked `←` aliases of a non-`mut` aggregate parameter (directly or
+    /// through another alias), mapped to that parameter.
+    nonmut_agg_aliases: FxHashMap<DefId, DefId>,
+    /// Aggregate aliases bound `const`: typecheck already rejects every write
+    /// through them, so the alias write checks skip them (chains still pass
+    /// through).
+    const_agg_aliases: FxHashSet<DefId>,
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
@@ -358,6 +373,9 @@ impl<'a> BorrowChecker<'a> {
             mut_params: FxHashSet::default(),
             nonmut_tensor_params: FxHashSet::default(),
             nonmut_tensor_aliases: FxHashMap::default(),
+            nonmut_agg_params: FxHashSet::default(),
+            nonmut_agg_aliases: FxHashMap::default(),
+            const_agg_aliases: FxHashSet::default(),
             func_params: FxHashMap::default(),
             regions,
             stmt_node: None,
@@ -444,6 +462,13 @@ impl<'a> BorrowChecker<'a> {
             {
                 self.nonmut_tensor_params.insert(param.def_id);
             }
+            if matches!(param.mode, HirParamMode::Owned)
+                && marker.is_none()
+                && !matches!(self.types.get(inner), Type::Tensor(_, _))
+                && self.is_aliasing_type(inner)
+            {
+                self.nonmut_agg_params.insert(param.def_id);
+            }
             self.param_usage.insert(
                 param.def_id,
                 ParamUsage {
@@ -480,6 +505,9 @@ impl<'a> BorrowChecker<'a> {
         self.mut_params.clear();
         self.nonmut_tensor_params.clear();
         self.nonmut_tensor_aliases.clear();
+        self.nonmut_agg_params.clear();
+        self.nonmut_agg_aliases.clear();
+        self.const_agg_aliases.clear();
         self.stmt_node = None;
     }
 
@@ -517,6 +545,12 @@ impl<'a> BorrowChecker<'a> {
                             Self::root_def_id(init).and_then(|d| self.nonmut_tensor_origin(d))
                     {
                         self.nonmut_tensor_write_error(param, init.span);
+                    }
+                    if local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
+                        && let Some(param) =
+                            Self::root_def_id(init).and_then(|d| self.nonmut_agg_origin(d))
+                    {
+                        self.nonmut_agg_write_error(param, init.span);
                     }
                     if self.stores_tensor_view(init) {
                         if !self.is_tensor_view(init) {
@@ -592,6 +626,9 @@ impl<'a> BorrowChecker<'a> {
                     }
                     self.note_de_alias(local.def_id, local.ty, init);
                     self.note_bind_alias(local.def_id, local.ty, init);
+                    if !local.mutable {
+                        self.const_agg_aliases.insert(local.def_id);
+                    }
                 }
             }
             HirStatementKind::Expr(expr) => {
@@ -762,6 +799,12 @@ impl<'a> BorrowChecker<'a> {
             {
                 self.nonmut_tensor_write_error(origin, arg.expr.span);
             }
+            if let Some(origin) =
+                Self::root_def_id(&arg.expr).and_then(|d| self.nonmut_agg_origin(d))
+                && self.dest_is_mut(param)
+            {
+                self.nonmut_agg_write_error(origin, arg.expr.span);
+            }
             if self.arg_is_ref_view(&arg.expr) && self.dest_is_mut_or_own(param) {
                 self.error(
                     SemanticErrorKind::ModeMismatch,
@@ -884,6 +927,11 @@ impl<'a> BorrowChecker<'a> {
             {
                 self.nonmut_tensor_write_error(origin, target.span);
             }
+            if Self::is_projection(target)
+                && let Some(origin) = self.nonmut_agg_alias_origin(def_id)
+            {
+                self.nonmut_agg_write_error(origin, target.span);
+            }
             self.check_projection_inputs(target);
             self.write_use(def_id, target.span);
         } else {
@@ -925,6 +973,57 @@ impl<'a> BorrowChecker<'a> {
             return Some(def_id);
         }
         self.nonmut_tensor_aliases.get(&def_id).copied()
+    }
+
+    /// The non-`mut` aggregate parameter a binding is or aliases, if any.
+    fn nonmut_agg_origin(&self, def_id: DefId) -> Option<DefId> {
+        if self.nonmut_agg_params.contains(&def_id) {
+            return Some(def_id);
+        }
+        self.nonmut_agg_aliases.get(&def_id).copied()
+    }
+
+    /// Like `nonmut_agg_origin`, but only for aliases: a direct write through
+    /// the parameter itself is already rejected by typecheck.
+    fn nonmut_agg_alias_origin(&self, def_id: DefId) -> Option<DefId> {
+        if self.const_agg_aliases.contains(&def_id) {
+            return None;
+        }
+        self.nonmut_agg_aliases.get(&def_id).copied()
+    }
+
+    fn param_spelling(&self, def_id: DefId) -> Option<String> {
+        self.names
+            .get(&def_id)
+            .and_then(|name| self.interner.strings().get(name.0 as usize))
+            .map(ToString::to_string)
+    }
+
+    /// A write that reaches a non-`mut` aggregate parameter through an alias:
+    /// the same SEM020 a direct write gets.
+    fn nonmut_agg_write_error(&mut self, _origin: DefId, span: radix_lexer::Span) {
+        self.error(
+            SemanticErrorKind::ImmutableAssignment,
+            ISSUE_IMMUTABLE_SECOND_ASSIGNMENT,
+            span,
+        );
+    }
+
+    /// An in-place method call that reaches a non-`mut` aggregate parameter
+    /// through an alias.
+    fn nonmut_agg_method_error(
+        &mut self,
+        origin: DefId,
+        method: radix_lexer::Symbol,
+        span: radix_lexer::Span,
+    ) {
+        let mut error = SemanticError::structured(SemanticErrorKind::ImmutableAssignment, span)
+            .with_arg("issue", ISSUE_MUTATING_METHOD_ON_IMMUTABLE)
+            .with_arg("binding", self.param_spelling(origin).unwrap_or_default());
+        if let Some(name) = self.interner.strings().get(method.0 as usize) {
+            error = error.with_arg("method", name.to_string());
+        }
+        self.errors.push(error);
     }
 
     /// A write through a tensor parameter that is not marked `mut`: the
@@ -970,6 +1069,8 @@ impl<'a> BorrowChecker<'a> {
     fn note_bind_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
         self.bind_alias_roots.remove(&local);
         self.nonmut_tensor_aliases.remove(&local);
+        self.nonmut_agg_aliases.remove(&local);
+        self.const_agg_aliases.remove(&local);
         let Some(ty) = ty.or(init.ty) else { return };
         if self.types.is_exclusive_value(ty) || !self.is_aliasing_type(ty) {
             return;
@@ -989,6 +1090,11 @@ impl<'a> BorrowChecker<'a> {
             && origin != local
         {
             self.nonmut_tensor_aliases.insert(local, origin);
+        } else if !self.is_tensor_typed(init)
+            && let Some(origin) = self.nonmut_agg_origin(source)
+            && origin != local
+        {
+            self.nonmut_agg_aliases.insert(local, origin);
         }
     }
 
@@ -1133,6 +1239,9 @@ impl<'a> BorrowChecker<'a> {
         }
         if let Some(origin) = self.nonmut_tensor_origin(root) {
             self.nonmut_tensor_write_error(origin, target.span);
+        }
+        if let Some(origin) = self.nonmut_agg_alias_origin(root) {
+            self.nonmut_agg_write_error(origin, target.span);
         }
         self.check_projection_inputs(target);
         self.write_use(root, target.span);
@@ -2082,6 +2191,12 @@ impl HirVisitor for BorrowChecker<'_> {
                         Self::root_def_id(receiver).and_then(|d| self.nonmut_tensor_origin(d))
                 {
                     self.nonmut_tensor_write_error(origin, expr.span);
+                }
+                if is_mutating
+                    && let Some(origin) =
+                        Self::root_def_id(receiver).and_then(|d| self.nonmut_agg_alias_origin(d))
+                {
+                    self.nonmut_agg_method_error(origin, *method, expr.span);
                 }
                 if is_mutating {
                     if let Some(receiver_root) = Self::root_def_id(receiver) {

@@ -128,6 +128,10 @@ mod borrow_alias_test;
 mod borrow_nonmut_tensor_write_test;
 
 #[cfg(test)]
+#[path = "borrow_unmarked_alias_test.rs"]
+mod borrow_unmarked_alias_test;
+
+#[cfg(test)]
 #[path = "borrow_receiver_write_test.rs"]
 mod borrow_receiver_write_test;
 
