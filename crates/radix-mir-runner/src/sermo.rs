@@ -297,6 +297,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 conversation.handler,
             )
         };
+        // The `ad` effect boundary is a delivery point for deferred device work.
+        self.flush_dispatcher()?;
         let (tier, items, terminal, task) = if let Some(handler) = handler {
             let (items, terminal, task) = self.start_static_handler(handler, opener, span)?;
             (SermoTier::Static, items, terminal, task)

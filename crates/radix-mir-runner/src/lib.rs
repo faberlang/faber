@@ -1236,6 +1236,11 @@ fn run_function_dispatching<H: Host + ?Sized>(
     runner.push_frame(function_id, MirBlockId(0));
     runner.run_until_depth(0);
     runner.close_all_frames();
+    // Program end is a delivery point: complete device work and surface a
+    // deferred fault after any error already recorded (first in program order).
+    if let Err(error) = runner.finish_dispatcher() {
+        runner.errors.push(error);
+    }
     let result = if runner.errors.is_empty() {
         Ok(())
     } else {
@@ -1549,6 +1554,33 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
         let function = self.function_by_id(function_id, span)?;
         Ok(function.shader_stage == Some(MirKernelShaderStage::Compute))
+    }
+
+    /// Delivery point (the `ad` boundary): complete device work and surface
+    /// the first deferred fault. No-op without a dispatcher.
+    pub(crate) fn flush_dispatcher(&mut self) -> Result<(), RunnerError> {
+        let Some(dispatcher) = self.kernel_dispatcher.as_ref() else {
+            return Ok(());
+        };
+        dispatcher
+            .try_borrow_mut()
+            .map_err(|_| {
+                RunnerError::internal(Span::default(), "kernel dispatcher is busy during a flush")
+            })?
+            .flush()
+    }
+
+    /// Delivery point (program end): flush, then release the device.
+    fn finish_dispatcher(&mut self) -> Result<(), RunnerError> {
+        let Some(dispatcher) = self.kernel_dispatcher.as_ref() else {
+            return Ok(());
+        };
+        dispatcher
+            .try_borrow_mut()
+            .map_err(|_| {
+                RunnerError::internal(Span::default(), "kernel dispatcher is busy during finish")
+            })?
+            .finish()
     }
 
     /// Hand a kernel call to the dispatcher; the returned value is the call's

@@ -62,6 +62,28 @@ pub trait KernelDispatcher {
     /// The host wrote to `token`'s tensor: the device copy is now stale and
     /// must be re-uploaded on its next device use.
     fn host_wrote(&mut self, _token: DeviceToken) {}
+
+    /// Make every launched kernel complete and surface the first kernel fault
+    /// in program order. Called at the delivery points that are not a host
+    /// read: the `ad` effect boundary and program end. Never called per
+    /// launch.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first deferred device fault as a [`RunnerError`].
+    fn flush(&mut self) -> Result<(), RunnerError> {
+        Ok(())
+    }
+
+    /// Program end: [`Self::flush`], then release the device. Defaults to a
+    /// plain flush.
+    ///
+    /// # Errors
+    ///
+    /// Returns the flush error, else the release error.
+    fn finish(&mut self) -> Result<(), RunnerError> {
+        self.flush()
+    }
 }
 
 /// Device residency of one tensor storage, shared by every view of it.
