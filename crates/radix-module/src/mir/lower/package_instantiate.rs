@@ -362,7 +362,11 @@ pub fn instantiate_merged_generic_calls_with_tensor_edge_policy(
     // instance id. Without this copy, the fail-closed constructor would omit
     // an imported public kernel even though its route carried public
     // visibility. Synthetic closure rows remain keyed by their own lowered
-    // function ids and are not inferred here.
+    // function ids and are not inferred here. Every program function that
+    // instantiates a template and still lacks a row receives it, not only
+    // this pass's new instances: an instance created while a sibling unit
+    // appends (the library's own rows not yet merged) is completed by the
+    // later pass that sees the template's row.
     let template_metadata: FxHashMap<DefId, _> = templates
         .iter()
         .filter_map(|template| {
@@ -374,7 +378,7 @@ pub fn instantiate_merged_generic_calls_with_tensor_edge_policy(
     let created_metadata = program
         .functions
         .iter()
-        .filter(|function| created_ids.contains(&function.id))
+        .filter(|function| !device_function_metadata.contains_key(&function.id))
         .filter_map(|function| {
             let source = function.source?;
             let mut metadata = *template_metadata.get(&source)?;

@@ -62,6 +62,33 @@ impl RemappedValidation {
         }
     }
 
+    /// This metadata joined over the merged context's own struct facts (the
+    /// entry unit's nominals are in the context, never in the remapped
+    /// extras), so the package generic instantiator types a field projection
+    /// of an entry-owned class the same as one of a linked unit's class.
+    pub(super) fn joined_with_context(
+        &self,
+        context: &radix_module::mir::MirValidationContext<'_>,
+    ) -> Self {
+        let mut joined = Self::default();
+        for (def, fields) in &context.struct_fields {
+            joined
+                .struct_fields
+                .insert(*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect());
+        }
+        for (def, params) in &context.struct_type_params {
+            joined.struct_type_params.insert(*def, params.clone());
+        }
+        union_field_maps(&mut joined.struct_fields, &self.struct_fields);
+        for (def, params) in &self.struct_type_params {
+            joined
+                .struct_type_params
+                .entry(*def)
+                .or_insert_with(|| params.clone());
+        }
+        joined
+    }
+
     fn merge(&mut self, other: &Self) {
         union_field_maps(&mut self.struct_fields, &other.struct_fields);
         for (def, order) in &other.struct_field_order {
@@ -3059,6 +3086,8 @@ fn instantiate_package_generics<'a>(
     // consumer units' own device roles and launch entries ride the same call
     // as the leaf-tail union (no second composition pass, no dual authority).
     let (mut program, prior_context) = merged.validated.into_parts();
+    let joined_validation =
+        extra_validation.map(|validation| validation.joined_with_context(&prior_context));
     let (extra, registrations) =
         radix_module::mir::instantiate_merged_generic_calls_with_tensor_edge_policy(
             &mut program,
@@ -3066,7 +3095,8 @@ fn instantiate_package_generics<'a>(
             &generic_params,
             &mut types,
             &merged.interner,
-            extra_validation
+            joined_validation
+                .as_ref()
                 .map(|validation| validation.struct_metadata())
                 .as_ref(),
             &mut merged.device_function_metadata,
@@ -3641,7 +3671,7 @@ fn append_shifted_program<'merged, 'incoming>(
                 &generic_params,
                 &mut types,
                 &merged.interner,
-                Some(extra.struct_metadata()).as_ref(),
+                Some(extra.joined_with_context(&context).struct_metadata()).as_ref(),
                 &mut merged.device_function_metadata,
                 imported_devices,
                 consumer_device_roles,
@@ -3719,7 +3749,7 @@ fn append_shifted_library_parts<'a>(
                 &generic_params,
                 &mut types,
                 &merged.interner,
-                Some(extra.struct_metadata()).as_ref(),
+                Some(extra.joined_with_context(&context).struct_metadata()).as_ref(),
                 &mut merged.device_function_metadata,
                 imported_devices,
                 consumer_device_roles,
