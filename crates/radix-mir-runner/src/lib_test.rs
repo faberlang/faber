@@ -29,6 +29,7 @@ use radix_mir::{
     MirCollectionOp, MirDiagnosticKind, MirIntrinsic, MirLiftOp, MirProvider, MirRuntimeCall,
 };
 use radix_types::TypeId;
+use std::sync::Arc;
 
 /// Canonical test program shape: one empty function with no params, locals, or blocks.
 fn make_function() -> MirFunction {
@@ -4572,7 +4573,7 @@ fn tensor_view_composition_keeps_storage_until_materialize() {
     };
     let base_tensor = base_cell.borrow();
     let transposed_tensor = transposed_cell.borrow();
-    assert!(Rc::ptr_eq(&base_tensor.data, &transposed_tensor.data));
+    assert!(Arc::ptr_eq(&base_tensor.data, &transposed_tensor.data));
     assert_eq!(transposed_tensor.shape, vec![3, 2]);
     assert_eq!(transposed_tensor.strides, vec![1, 6]);
     assert_eq!(transposed_tensor.offset, 3);
@@ -4602,7 +4603,7 @@ fn tensor_view_composition_keeps_storage_until_materialize() {
     else {
         unreachable!();
     };
-    assert!(!Rc::ptr_eq(
+    assert!(!Arc::ptr_eq(
         &base_cell.borrow().data,
         &materialized_cell.borrow().data
     ));
@@ -4644,7 +4645,7 @@ fn tensor_expand_uses_shared_storage_and_rightmost_exact_axis_tie() {
     };
     let source = source.borrow();
     let expanded = expanded.borrow();
-    assert!(Rc::ptr_eq(&source.data, &expanded.data));
+    assert!(Arc::ptr_eq(&source.data, &expanded.data));
     assert_eq!(expanded.shape, vec![1, 1, 3]);
     assert_eq!(expanded.strides, vec![0, 3, 1]);
     assert_eq!(
@@ -4724,7 +4725,7 @@ fn tensor_shift_limes_composes_with_views_without_materializing() {
     {
         let base_tensor = base_cell.borrow();
         let transposed_tensor = transposed_cell.borrow();
-        assert!(Rc::ptr_eq(&base_tensor.data, &transposed_tensor.data));
+        assert!(Arc::ptr_eq(&base_tensor.data, &transposed_tensor.data));
         assert_eq!(transposed_tensor.shape, vec![3, 1]);
         assert_eq!(
             transposed_tensor
@@ -4746,7 +4747,7 @@ fn tensor_shift_limes_composes_with_views_without_materializing() {
     {
         let base_tensor = base_cell.borrow();
         let materialized_tensor = materialized_cell.borrow();
-        assert!(!Rc::ptr_eq(&base_tensor.data, &materialized_tensor.data));
+        assert!(!Arc::ptr_eq(&base_tensor.data, &materialized_tensor.data));
         base_tensor
             .set_value_at(0, Value::Int(100))
             .expect("base storage write");
@@ -4778,7 +4779,7 @@ fn tensor_shift_accepts_integer_array_offsets_and_keeps_validation() {
     let (Value::Tensor(base_cell), Value::Tensor(shifted_cell)) = (&base, &shifted) else {
         panic!("expected tensor values");
     };
-    assert!(Rc::ptr_eq(
+    assert!(Arc::ptr_eq(
         &base_cell.borrow().data,
         &shifted_cell.borrow().data
     ));
@@ -6688,7 +6689,7 @@ fn tensor_expand_static_tensor_witness_matches_list_shape_and_shares_storage() {
     let (Value::Tensor(source), Value::Tensor(expanded)) = (&source, &expanded) else {
         unreachable!();
     };
-    assert!(Rc::ptr_eq(&source.borrow().data, &expanded.borrow().data));
+    assert!(Arc::ptr_eq(&source.borrow().data, &expanded.borrow().data));
     assert_eq!(expanded.borrow().shape, [2, 4, 3]);
     let values = expanded.borrow().logical_values().unwrap();
     assert_eq!(

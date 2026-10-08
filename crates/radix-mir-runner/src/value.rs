@@ -22,6 +22,7 @@
 )]
 
 use super::RunnerError;
+use crate::dense::{DenseCell, DenseStorage};
 use crate::kernel_dispatch::{DeviceToken, ResidencyHook, ResidencySlot};
 use crate::regex_program::RegexProgram;
 use crate::tensor_edge::{
@@ -38,6 +39,7 @@ use radix_types::{FloatPolicy, NumericWidth, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Declaration order of each struct's instance fields, from MIR validation
 /// metadata; display renders struct fields in this order.
@@ -265,7 +267,7 @@ impl MatchValue {
 pub struct TensorValue {
     /// Shared flat allocation. Tensor views keep this identity and carry their
     /// own logical shape, strides, and origin.
-    pub data: Rc<RefCell<Vec<Value>>>,
+    pub data: Arc<DenseCell>,
     pub shape: Vec<i64>,
     pub strides: Vec<isize>,
     pub offset: isize,
@@ -318,7 +320,7 @@ impl TensorValue {
     #[must_use]
     pub fn empty() -> Self {
         Self {
-            data: Rc::new(RefCell::new(Vec::new())),
+            data: Arc::new(DenseCell::new(DenseStorage::Values(Vec::new()))),
             shape: Vec::new(),
             strides: Vec::new(),
             offset: 0,
@@ -333,9 +335,15 @@ impl TensorValue {
     /// runner's signed physical-offset representation.
     #[must_use]
     pub fn try_contiguous(data: Vec<Value>, shape: Vec<i64>) -> Option<Self> {
+        Self::try_contiguous_typed(DenseStorage::Values(data), shape)
+    }
+
+    /// Build a contiguous tensor over typed dense storage.
+    #[must_use]
+    pub fn try_contiguous_typed(storage: DenseStorage, shape: Vec<i64>) -> Option<Self> {
         let strides = Self::try_contiguous_strides(&shape)?;
         Some(Self {
-            data: Rc::new(RefCell::new(data)),
+            data: Arc::new(DenseCell::new(storage)),
             shape,
             strides,
             offset: 0,
@@ -364,12 +372,12 @@ impl TensorValue {
     #[must_use]
     pub fn view(&self, shape: Vec<i64>, strides: Vec<isize>, offset: isize) -> Option<Self> {
         if shape.len() != strides.len()
-            || !Self::layout_fits(&self.data.borrow(), &shape, &strides, offset)
+            || !Self::layout_fits(self.data.len(), &shape, &strides, offset)
         {
             return None;
         }
         Some(Self {
-            data: Rc::clone(&self.data),
+            data: Arc::clone(&self.data),
             shape,
             strides,
             offset,
@@ -391,7 +399,7 @@ impl TensorValue {
             return None;
         }
         Some(Self {
-            data: Rc::clone(&self.data),
+            data: Arc::clone(&self.data),
             shape,
             strides,
             offset,
@@ -421,7 +429,7 @@ impl TensorValue {
             // `[]` is the rank-zero shape (one scalar) when storage exists.
             // The runner also uses an empty `([], [])` tensor as an unshaped
             // seed before a shape-bearing tensor operation.
-            return Some(usize::from(!self.data.borrow().is_empty()));
+            return Some(usize::from(!self.data.is_empty()));
         }
         let count = self.shape.iter().try_fold(1_usize, |count, dimension| {
             usize::try_from(*dimension)
@@ -430,11 +438,7 @@ impl TensorValue {
         })?;
         // An empty backing is the runner's established empty-runtime tensor
         // representation, even when its shape is retained as metadata.
-        Some(if self.data.borrow().is_empty() {
-            0
-        } else {
-            count
-        })
+        Some(if self.data.is_empty() { 0 } else { count })
     }
 
     /// Detect a malformed direct contiguous tensor while allowing affine views
@@ -445,12 +449,7 @@ impl TensorValue {
             return false;
         }
         if self.is_view {
-            return !Self::layout_fits(
-                &self.data.borrow(),
-                &self.shape,
-                &self.strides,
-                self.offset,
-            );
+            return !Self::layout_fits(self.data.len(), &self.shape, &self.strides, self.offset);
         }
         if self.offset != 0 {
             return false;
@@ -468,7 +467,7 @@ impl TensorValue {
         }) else {
             return false;
         };
-        let data_len = self.data.borrow().len();
+        let data_len = self.data.len();
         data_len != 0 && data_len != expected
     }
 
@@ -686,6 +685,19 @@ impl TensorValue {
         Self::try_contiguous_strides(&self.shape).is_some_and(|strides| strides == self.strides)
     }
 
+    /// Independent copy of a fully dense typed backing; `None` for `Values`
+    /// storage or any view layout, which copy element by element.
+    fn typed_deep_copy(&self) -> Option<Self> {
+        if self.data.kind().is_none()
+            || !self.is_dense_row_major()
+            || self.logical_len()? != self.data.len()
+            || !self.residency.ensure_host(0..self.data.len())
+        {
+            return None;
+        }
+        Self::try_contiguous_typed(self.data.clone_storage(), self.shape.clone())
+    }
+
     #[must_use]
     pub fn value_at(&self, logical_index: usize) -> Option<Value> {
         if self.is_dense_row_major() {
@@ -774,7 +786,7 @@ impl TensorValue {
         {
             return None;
         }
-        self.data.borrow().get(physical).cloned()
+        self.data.get(physical)
     }
 
     /// Mark this tensor's storage (and every view of it) device-resident
@@ -814,12 +826,11 @@ impl TensorValue {
             return None;
         }
         let physical = self.physical_offset(logical_index)?;
-        let len = self.data.borrow().len();
+        let len = self.data.len();
         if !self.residency.before_write(len) {
             return None;
         }
-        *self.data.borrow_mut().get_mut(physical)? = value;
-        Some(())
+        self.data.set(physical, &value).then_some(())
     }
 
     #[must_use]
@@ -829,12 +840,11 @@ impl TensorValue {
             if !self.residency.ensure_host(0..count) {
                 return None;
             }
-            let data = self.data.borrow();
-            // Ordinal == physical offset here, so the slice prefix is the
+            // Ordinal == physical offset here, so the storage prefix is the
             // logical read; a short backing fails exactly where the
             // per-element read would.
-            return if data.len() >= count {
-                Some(data[..count].to_vec())
+            return if self.data.len() >= count {
+                Some(self.data.values_prefix(count))
             } else {
                 None
             };
@@ -918,15 +928,15 @@ impl TensorValue {
     }
 
     #[must_use]
-    fn layout_fits(data: &[Value], shape: &[i64], strides: &[isize], offset: isize) -> bool {
+    fn layout_fits(data_len: usize, shape: &[i64], strides: &[isize], offset: isize) -> bool {
         if shape.len() != strides.len() {
             return false;
         }
         if shape.is_empty() {
-            return if data.is_empty() {
+            return if data_len == 0 {
                 offset == 0
             } else {
-                usize::try_from(offset).is_ok_and(|offset| offset < data.len())
+                usize::try_from(offset).is_ok_and(|offset| offset < data_len)
             };
         }
         let Some(element_count) = shape.iter().try_fold(1_usize, |count, dimension| {
@@ -937,7 +947,7 @@ impl TensorValue {
             return false;
         };
         if element_count == 0 {
-            return usize::try_from(offset).is_ok_and(|offset| offset <= data.len());
+            return usize::try_from(offset).is_ok_and(|offset| offset <= data_len);
         }
         let Some((lowest, highest)) = shape.iter().zip(strides).try_fold(
             (offset, offset),
@@ -956,7 +966,7 @@ impl TensorValue {
             return false;
         };
         usize::try_from(lowest).is_ok()
-            && usize::try_from(highest).is_ok_and(|highest| highest < data.len())
+            && usize::try_from(highest).is_ok_and(|highest| highest < data_len)
     }
 }
 
@@ -1199,6 +1209,11 @@ impl Value {
                 memo,
                 Value::Tensor,
                 |t, m| {
+                    // Typed dense storage has scalar elements, so the typed
+                    // clone is the deep copy.
+                    if let Some(copied) = t.typed_deep_copy() {
+                        return copied;
+                    }
                     // A source whose contiguous strides do not fit holds no
                     // elements, so sharing its (empty) layout copies nothing.
                     TensorValue::try_contiguous(

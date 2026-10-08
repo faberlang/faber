@@ -14,8 +14,9 @@
 //! - the byte view is the little-endian layout of the element array, one
 //!   `bool` per byte as `0`/`1`.
 
-// WHY: nothing calls this module until U1 migrates `TensorValue`; the allow is
-// removed with the first production caller.
+// WHY: U1 migrates `TensorValue::data` onto `DenseCell` behind shims; the typed
+// constructors, slices, byte views and `Bool` kind are exercised by tests until
+// U2-U4 add production callers, so the allow stays for what is still unused.
 #![allow(dead_code)]
 
 use crate::value::Value;
@@ -25,7 +26,7 @@ use std::ops::Range;
 
 /// Element type of a typed dense array.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum DenseKind {
+pub enum DenseKind {
     F32,
     F64,
     I32,
@@ -38,7 +39,7 @@ pub(crate) enum DenseKind {
 
 impl DenseKind {
     /// Bytes per element in the little-endian view.
-    pub(crate) const fn width(self) -> usize {
+    pub const fn width(self) -> usize {
         match self {
             Self::U8 | Self::Bool => 1,
             Self::F32 | Self::I32 | Self::U32 => 4,
@@ -49,8 +50,8 @@ impl DenseKind {
 
 /// Backing array of one dense tensor. `Values` keeps today's behaviour for
 /// vector, matrix, record and unknown element kinds.
-#[derive(Clone)]
-pub(crate) enum DenseStorage {
+#[derive(Clone, Debug, PartialEq)]
+pub enum DenseStorage {
     F32(Vec<f32>),
     F64(Vec<f64>),
     I32(Vec<i32>),
@@ -63,7 +64,7 @@ pub(crate) enum DenseStorage {
 }
 
 /// A Rust element type that one `DenseStorage` variant holds.
-pub(crate) trait DenseElement: Copy + 'static {
+pub trait DenseElement: Copy + 'static {
     const KIND: DenseKind;
     fn view(storage: &DenseStorage) -> Option<&[Self]>;
     fn view_mut(storage: &mut DenseStorage) -> Option<&mut [Self]>;
@@ -161,7 +162,7 @@ fn narrow_int<T: TryFrom<i64> + TryFrom<u64>>(value: &Value) -> Option<T> {
 
 impl DenseStorage {
     /// `len` zero elements of `kind`.
-    pub(crate) fn zeros(kind: DenseKind, len: usize) -> Self {
+    pub fn zeros(kind: DenseKind, len: usize) -> Self {
         match kind {
             DenseKind::F32 => Self::F32(vec![0.0; len]),
             DenseKind::F64 => Self::F64(vec![0.0; len]),
@@ -180,7 +181,7 @@ impl DenseStorage {
     /// `Int` is `I64`, anything else (including empty) is `Values`. With a
     /// kind every value is narrowed as `set` would; if any value does not fit,
     /// nothing is lost and the result is `Values` (today's behaviour).
-    pub(crate) fn from_values(values: Vec<Value>, kind: Option<DenseKind>) -> Self {
+    pub fn from_values(values: Vec<Value>, kind: Option<DenseKind>) -> Self {
         let kind = kind.or_else(|| match values.first()? {
             Value::Float(_) if values.iter().all(|v| matches!(v, Value::Float(_))) => {
                 Some(DenseKind::F64)
@@ -206,7 +207,7 @@ impl DenseStorage {
     }
 
     /// Element type, or `None` for `Values`.
-    pub(crate) fn kind(&self) -> Option<DenseKind> {
+    pub fn kind(&self) -> Option<DenseKind> {
         match self {
             Self::F32(_) => Some(DenseKind::F32),
             Self::F64(_) => Some(DenseKind::F64),
@@ -220,16 +221,16 @@ impl DenseStorage {
         }
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         with_typed!(self, items => items.len(), values => values.len())
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// The element as the runner reads it today; `None` out of bounds.
-    pub(crate) fn get(&self, index: usize) -> Option<Value> {
+    pub fn get(&self, index: usize) -> Option<Value> {
         Some(match self {
             Self::F32(items) => Value::Float(f64::from(*items.get(index)?)),
             Self::F64(items) => Value::Float(*items.get(index)?),
@@ -247,7 +248,7 @@ impl DenseStorage {
     /// (storage unchanged) for an out-of-bounds index, a value of the wrong
     /// carrier, or an integer outside the kind's range.
     #[expect(clippy::cast_possible_truncation)]
-    pub(crate) fn set(&mut self, index: usize, value: &Value) -> bool {
+    pub fn set(&mut self, index: usize, value: &Value) -> bool {
         match (self, value) {
             (Self::F32(items), Value::Float(v)) => items.get_mut(index).map(|s| *s = *v as f32),
             (Self::F64(items), Value::Float(v)) => items.get_mut(index).map(|s| *s = *v),
@@ -264,26 +265,34 @@ impl DenseStorage {
     }
 
     /// Every element boxed, as today's `Vec<Value>` storage holds them.
-    pub(crate) fn to_values(&self) -> Vec<Value> {
+    pub fn to_values(&self) -> Vec<Value> {
         match self {
             Self::Values(items) => items.clone(),
             _ => (0..self.len()).filter_map(|i| self.get(i)).collect(),
         }
     }
 
+    /// The first `count` elements boxed; `count` must not exceed `len()`.
+    pub fn values_prefix(&self, count: usize) -> Vec<Value> {
+        match self {
+            Self::Values(items) => items[..count].to_vec(),
+            _ => (0..count).filter_map(|i| self.get(i)).collect(),
+        }
+    }
+
     /// Typed slice; `None` when `T` is not this storage's element type.
-    pub(crate) fn slice<T: DenseElement>(&self) -> Option<&[T]> {
+    pub fn slice<T: DenseElement>(&self) -> Option<&[T]> {
         T::view(self)
     }
 
-    pub(crate) fn slice_mut<T: DenseElement>(&mut self) -> Option<&mut [T]> {
+    pub fn slice_mut<T: DenseElement>(&mut self) -> Option<&mut [T]> {
         T::view_mut(self)
     }
 
     /// Run `f` over the little-endian bytes of the element `range`: borrowed
     /// (zero-copy) on little-endian hosts, an owned copy elsewhere. `None` for
     /// `Values` or a range outside the array.
-    pub(crate) fn with_le_bytes<R>(
+    pub fn with_le_bytes<R>(
         &self,
         range: Range<usize>,
         f: impl FnOnce(Cow<'_, [u8]>) -> R,
@@ -304,7 +313,7 @@ impl DenseStorage {
     /// Overwrite the element `range` from little-endian `bytes`. `false`
     /// (storage unchanged) for `Values`, a range outside the array, a byte
     /// length other than `range.len() * width`, or a non-`0`/`1` bool byte.
-    pub(crate) fn write_le_bytes(&mut self, range: Range<usize>, bytes: &[u8]) -> bool {
+    pub fn write_le_bytes(&mut self, range: Range<usize>, bytes: &[u8]) -> bool {
         match self {
             Self::F32(items) => write_le(items, range, bytes),
             Self::F64(items) => write_le(items, range, bytes),
@@ -392,7 +401,7 @@ fn write_le<T: DenseElement>(items: &mut [T], range: Range<usize>, bytes: &[u8])
 /// atomic element access over disjoint lanes and (b) refuse `Values`
 /// storage, whose `Value` elements hold `Rc` and are not thread-safe. The
 /// debug borrow flag is a plain `Cell` and is NOT meaningful across threads.
-pub(crate) struct DenseCell {
+pub struct DenseCell {
     inner: UnsafeCell<DenseStorage>,
     /// `> 0`: that many shared borrows; `-1`: one exclusive borrow. Only
     /// maintained when `debug_assertions` is on.
@@ -423,22 +432,22 @@ impl Drop for BorrowGuard<'_> {
 }
 
 impl DenseCell {
-    pub(crate) fn new(storage: DenseStorage) -> Self {
+    pub fn new(storage: DenseStorage) -> Self {
         Self {
             inner: UnsafeCell::new(storage),
             borrow: Cell::new(0),
         }
     }
 
-    pub(crate) fn zeros(kind: DenseKind, len: usize) -> Self {
+    pub fn zeros(kind: DenseKind, len: usize) -> Self {
         Self::new(DenseStorage::zeros(kind, len))
     }
 
-    pub(crate) fn from_values(values: Vec<Value>, kind: Option<DenseKind>) -> Self {
+    pub fn from_values(values: Vec<Value>, kind: Option<DenseKind>) -> Self {
         Self::new(DenseStorage::from_values(values, kind))
     }
 
-    pub(crate) fn into_inner(self) -> DenseStorage {
+    pub fn into_inner(self) -> DenseStorage {
         self.inner.into_inner()
     }
 
@@ -476,47 +485,63 @@ impl DenseCell {
         f(unsafe { &mut *self.inner.get() })
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.read(DenseStorage::len)
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Element type, or `None` for `Values`.
-    pub(crate) fn kind(&self) -> Option<DenseKind> {
+    pub fn kind(&self) -> Option<DenseKind> {
         self.read(DenseStorage::kind)
     }
 
-    pub(crate) fn get(&self, index: usize) -> Option<Value> {
+    pub fn get(&self, index: usize) -> Option<Value> {
         self.read(|storage| storage.get(index))
     }
 
     /// See [`DenseStorage::set`].
-    pub(crate) fn set(&self, index: usize, value: &Value) -> bool {
+    pub fn set(&self, index: usize, value: &Value) -> bool {
         self.write(|storage| storage.set(index, value))
     }
 
-    pub(crate) fn to_values(&self) -> Vec<Value> {
+    pub fn to_values(&self) -> Vec<Value> {
         self.read(DenseStorage::to_values)
     }
 
+    /// Run `f` over the boxed elements when the storage is `Values`; `None`
+    /// for a typed storage (use [`DenseCell::to_values`]).
+    pub fn with_values<R>(&self, f: impl FnOnce(&[Value]) -> R) -> Option<R> {
+        self.read(|storage| match storage {
+            DenseStorage::Values(items) => Some(f(items)),
+            _ => None,
+        })
+    }
+
+    /// Typed copy of the storage.
+    pub fn clone_storage(&self) -> DenseStorage {
+        self.read(DenseStorage::clone)
+    }
+
+    /// The first `count` elements boxed; `count` must not exceed `len()`.
+    pub fn values_prefix(&self, count: usize) -> Vec<Value> {
+        self.read(|storage| storage.values_prefix(count))
+    }
+
     /// Typed shared slice for the duration of `f`; `None` on a kind mismatch.
-    pub(crate) fn with_slice<T: DenseElement, R>(&self, f: impl FnOnce(&[T]) -> R) -> Option<R> {
+    pub fn with_slice<T: DenseElement, R>(&self, f: impl FnOnce(&[T]) -> R) -> Option<R> {
         self.read(|storage| storage.slice::<T>().map(f))
     }
 
     /// Typed exclusive slice for the duration of `f`; `None` on a kind mismatch.
-    pub(crate) fn with_slice_mut<T: DenseElement, R>(
-        &self,
-        f: impl FnOnce(&mut [T]) -> R,
-    ) -> Option<R> {
+    pub fn with_slice_mut<T: DenseElement, R>(&self, f: impl FnOnce(&mut [T]) -> R) -> Option<R> {
         self.write(|storage| storage.slice_mut::<T>().map(f))
     }
 
     /// See [`DenseStorage::with_le_bytes`].
-    pub(crate) fn with_le_bytes<R>(
+    pub fn with_le_bytes<R>(
         &self,
         range: Range<usize>,
         f: impl FnOnce(Cow<'_, [u8]>) -> R,
@@ -525,13 +550,26 @@ impl DenseCell {
     }
 
     /// Owned copy of the little-endian bytes of the element `range`.
-    pub(crate) fn as_le_bytes(&self, range: Range<usize>) -> Option<Vec<u8>> {
+    pub fn as_le_bytes(&self, range: Range<usize>) -> Option<Vec<u8>> {
         self.with_le_bytes(range, owned_bytes)
     }
 
     /// See [`DenseStorage::write_le_bytes`].
-    pub(crate) fn write_le_bytes(&self, range: Range<usize>, bytes: &[u8]) -> bool {
+    pub fn write_le_bytes(&self, range: Range<usize>, bytes: &[u8]) -> bool {
         self.write(|storage| storage.write_le_bytes(range, bytes))
+    }
+}
+
+impl std::fmt::Debug for DenseCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.read(|storage| storage.fmt(f))
+    }
+}
+
+impl PartialEq for DenseCell {
+    /// Equality by storage content.
+    fn eq(&self, other: &Self) -> bool {
+        self.read(|a| other.read(|b| a == b))
     }
 }
 

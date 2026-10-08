@@ -11,6 +11,7 @@ use super::value::*;
 use radix_lexer::Span;
 use radix_mir::MirBinOp;
 use radix_types::NumericWidth;
+use std::sync::Arc;
 use std::{cell::RefCell, rc::Rc};
 
 impl TensorValue {
@@ -52,7 +53,11 @@ fn affine_prefix_view_keeps_shared_backing_without_weakening_bounds_checks() {
         vec![Value::Int(1), Value::Int(2)]
     );
 
-    base.data.borrow_mut().truncate(1);
+    // The shared backing is gone short: a view whose layout no longer fits it.
+    let short = TensorValue::contiguous(vec![Value::Int(9)], vec![1]);
+    let view = short
+        .view_allowing_out_of_bounds(vec![1, 2], vec![2, 1], 0)
+        .expect("an out-of-bounds view over the short backing");
     assert!(view.has_contiguous_backing_mismatch());
     assert!(view.logical_values().is_none());
 
@@ -1044,7 +1049,7 @@ fn deep_copy_of_a_tensor_does_not_share_backing_storage() {
         copy_cell.borrow().logical_values(),
         source_cell.borrow().logical_values()
     );
-    assert!(!Rc::ptr_eq(
+    assert!(!Arc::ptr_eq(
         &source_cell.borrow().data,
         &copy_cell.borrow().data
     ));

@@ -10,7 +10,7 @@ pub mod capability;
 mod conversio;
 mod cursor;
 mod decimal;
-mod dense;
+pub mod dense;
 mod device_block;
 mod exact_int;
 mod host;
@@ -3869,3 +3869,7 @@ mod residency_test;
 #[cfg(test)]
 #[path = "dense_test.rs"]
 mod dense_test;
+
+#[cfg(test)]
+#[path = "value_dense_test.rs"]
+mod value_dense_test;

@@ -5,6 +5,7 @@ use super::*;
 
 use radix_mir::{MirCollectionOp, MirIntrinsic, MirRuntimeCall, MirType};
 use radix_types::TypeId;
+use std::sync::Arc;
 
 use crate::value::TensorValue;
 
@@ -102,11 +103,11 @@ fn copies_every_value_and_returns_unit() {
 fn the_destination_keeps_its_storage_identity() {
     let dest = contiguous(&[0.0; 4], &[2, 2]);
     let alias = Rc::new(RefCell::new(dest.borrow().clone()));
-    let storage = Rc::clone(&dest.borrow().data);
+    let storage = Arc::clone(&dest.borrow().data);
     let src = contiguous(&[1.0, 2.0, 3.0, 4.0], &[2, 2]);
     copy_into(&dest, &src).expect("copy-into runs");
     assert!(
-        Rc::ptr_eq(&storage, &dest.borrow().data),
+        Arc::ptr_eq(&storage, &dest.borrow().data),
         "the destination allocation is the same one"
     );
     assert_eq!(

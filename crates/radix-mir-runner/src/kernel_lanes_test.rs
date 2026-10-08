@@ -202,8 +202,10 @@ fn contents(value: &Value) -> Vec<f64> {
         panic!("not a tensor")
     };
     let tensor = tensor.borrow();
-    let data = tensor.data.borrow();
-    data.iter()
+    tensor
+        .data
+        .to_values()
+        .iter()
         .map(|v| match v {
             Value::Float(f) => *f,
             other => panic!("non-float element {other:?}"),
