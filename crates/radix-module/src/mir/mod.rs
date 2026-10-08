@@ -60,6 +60,10 @@ mod kernel_host_lowering_test;
 mod fault_sites_test;
 
 #[cfg(test)]
+#[path = "kernel_get_set_test.rs"]
+mod kernel_get_set_test;
+
+#[cfg(test)]
 #[path = "kernel_throw_test.rs"]
 mod kernel_throw_test;
 

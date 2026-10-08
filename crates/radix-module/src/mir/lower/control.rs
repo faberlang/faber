@@ -457,40 +457,14 @@ impl FunctionBuilder<'_> {
                 .push(MirError::unsupported(span, "`⊥` read coordinate count differs from rank"));
             return None;
         }
-        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
-        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let lowered = self.lower_expr_value(receiver)?;
         let tensor = self.materialize_operand_place(lowered, MirType::semantic(receiver_ty), receiver.span);
-
-        let mut within: Option<MirOperand> = None;
-        for (axis, coordinate) in index.iter().enumerate() {
-            let value = self.lower_expr_value(coordinate)?;
-            let extent = match literal.as_deref() {
-                Some(dimensions) => MirOperand::Constant(MirConstant::Int(dimensions[axis])),
-                None => self.assign_temp(
-                    MirValueKind::TensorExtent {
-                        tensor: MirOperand::Place(tensor.clone()),
-                        axis: u32::try_from(axis).ok()?,
-                    },
-                    numerus,
-                    span,
-                ),
-            };
-            let low = self.binary_temp(
-                MirBinOp::GtEq,
-                value.clone(),
-                MirOperand::Constant(MirConstant::Int(0)),
-                bivalens,
-                span,
-            );
-            let high = self.binary_temp(MirBinOp::Lt, value, extent, bivalens, span);
-            let axis_in = self.binary_temp(MirBinOp::And, low, high, bivalens, span);
-            within = Some(match within {
-                Some(previous) => self.binary_temp(MirBinOp::And, previous, axis_in, bivalens, span),
-                None => axis_in,
-            });
+        let extents = self.tensor_axis_extents(&tensor, literal.as_deref(), rank, span)?;
+        let mut values = Vec::with_capacity(rank);
+        for coordinate in &index {
+            values.push(self.lower_expr_value(coordinate)?);
         }
-        let condition = within?;
+        let condition = self.tensor_in_range_condition(&values, &extents, span)?;
 
         let destination_temp = self.push_temp(ty, span);
         let destination = MirPlace::temp(destination_temp);
@@ -519,7 +493,11 @@ impl FunctionBuilder<'_> {
             read.projections.push(MirProjection::Index(linear));
             self.assign(destination.clone(), MirOperand::Place(read), ty, span);
         } else {
+            // The branch above is the range check: the bare read below must
+            // not add the kernel's checked-access fault site of its own.
+            let channel = self.error_ty.take();
             self.lower_block_to_destination(body, destination.clone(), ty, span);
+            self.error_ty = channel;
         }
         self.terminate_open_current(MirTerminatorKind::Goto(join), span);
 
@@ -529,6 +507,229 @@ impl FunctionBuilder<'_> {
 
         self.switch_to(join);
         Some(MirOperand::Temp(destination_temp))
+    }
+
+    /// The extent of every axis of `tensor`: a constant for a literal axis, a
+    /// `TensorExtent` read otherwise.
+    fn tensor_axis_extents(
+        &mut self,
+        tensor: &MirPlace,
+        literal: Option<&[i64]>,
+        rank: usize,
+        span: Span,
+    ) -> Option<Vec<MirOperand>> {
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        (0..rank)
+            .map(|axis| match literal {
+                Some(dimensions) => Some(MirOperand::Constant(MirConstant::Int(dimensions[axis]))),
+                None => Some(self.assign_temp(
+                    MirValueKind::TensorExtent {
+                        tensor: MirOperand::Place(tensor.clone()),
+                        axis: u32::try_from(axis).ok()?,
+                    },
+                    numerus,
+                    span,
+                )),
+            })
+            .collect()
+    }
+
+    /// `(c_0 >= 0) & (c_0 < E_0) & ... & (c_n >= 0) & (c_n < E_n)`.
+    fn tensor_in_range_condition(
+        &mut self,
+        values: &[MirOperand],
+        extents: &[MirOperand],
+        span: Span,
+    ) -> Option<MirOperand> {
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let mut within: Option<MirOperand> = None;
+        for (value, extent) in values.iter().zip(extents) {
+            let low = self.binary_temp(
+                MirBinOp::GtEq,
+                value.clone(),
+                MirOperand::Constant(MirConstant::Int(0)),
+                bivalens,
+                span,
+            );
+            let high = self.binary_temp(MirBinOp::Lt, value.clone(), extent.clone(), bivalens, span);
+            let axis_in = self.binary_temp(MirBinOp::And, low, high, bivalens, span);
+            within = Some(match within {
+                Some(previous) => self.binary_temp(MirBinOp::And, previous, axis_in, bivalens, span),
+                None => axis_in,
+            });
+        }
+        within
+    }
+
+    /// An unhandled failable tensor `get` / `set` inside a kernel that declares
+    /// a `⇥ text` channel (gpu-reset U9-7). `None` when the call is not that
+    /// shape (the caller lowers it as before). Otherwise
+    ///
+    /// ```text
+    /// in = (c_0 >= 0) & (c_0 < E_0) & ... & (c_n >= 0) & (c_n < E_n)
+    /// if in { <the read or the store, bare> } else { ReturnError("tensor accipe|ponde invalid index") }
+    /// ```
+    ///
+    /// with `E_k` a constant for a literal axis and a `TensorExtent` otherwise,
+    /// and the text the one the checked host helper delivers
+    /// (`push_checked_tensor_helper`). The failing block is a constant-text
+    /// `ReturnError`, which the device gate reads as a recoverable throw site
+    /// (`abi/throw_sites.rs`); no `TryCall`. The host kernel lowering emits the
+    /// same compare, so `--device cpu` is the oracle for the device text.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn lower_kernel_checked_tensor_access(
+        &mut self,
+        op: MirCollectionOp,
+        lowered_receiver: &MirOperand,
+        receiver: &HirExpression,
+        method_name: &str,
+        args: &[crate::hir::HirCallArg],
+        expr_ty: MirType,
+        span: Span,
+    ) -> Option<Option<MirOperand>> {
+        if self.device_role.is_none() || !self.handlers.is_empty() || !self.traps.is_empty() {
+            return None;
+        }
+        let channel = self.error_ty?;
+        if !matches!(self.types.get(channel.semantic_id()), Type::Primitive(Primitive::Textus)) {
+            return None;
+        }
+        let is_set = op == MirCollectionOp::TensorSet;
+        if args.len() != if is_set { 2 } else { 1 } || !self.is_failable_tensor_method(receiver, method_name, args) {
+            return None;
+        }
+        let HirExpressionKind::Array(items) = &args[0].expr.kind else {
+            return None;
+        };
+        let coordinates: Vec<&HirExpression> = items
+            .iter()
+            .map(|item| match item {
+                HirArrayElement::Expr(expr) => Some(expr),
+                HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => None,
+            })
+            .collect::<Option<_>>()?;
+        let rank = coordinates.len();
+        let receiver_ty = self.method_receiver_payload_id(receiver.ty?);
+        let CollectionIteraKind::Shaped { rank: tensor_rank, literal, matrix: false, .. } =
+            self.classify_collection_itera(receiver_ty, HirIteraMode::Ex, rank)
+        else {
+            return None;
+        };
+        if rank == 0 || tensor_rank != rank {
+            return None;
+        }
+        Some(self.emit_kernel_checked_tensor_access(
+            is_set,
+            lowered_receiver,
+            MirType::semantic(receiver_ty),
+            args,
+            &coordinates,
+            literal.as_deref(),
+            expr_ty,
+            span,
+        ))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn emit_kernel_checked_tensor_access(
+        &mut self,
+        is_set: bool,
+        lowered_receiver: &MirOperand,
+        receiver_ty: MirType,
+        args: &[crate::hir::HirCallArg],
+        coordinates: &[&HirExpression],
+        literal: Option<&[i64]>,
+        expr_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let rank = coordinates.len();
+        let tensor = self.materialize_operand_place(lowered_receiver.clone(), receiver_ty, span);
+        let extents = self.tensor_axis_extents(&tensor, literal, rank, span)?;
+        let mut values = Vec::with_capacity(rank);
+        for coordinate in coordinates {
+            values.push(self.lower_expr_value(coordinate)?);
+        }
+        let stored = if is_set {
+            Some(self.lower_call_arg_value(&args[1].expr)?)
+        } else {
+            None
+        };
+        let condition = self.tensor_in_range_condition(&values, &extents, span)?;
+
+        let ok_block = self.fresh_block(span);
+        let fail_block = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition, then_block: ok_block, else_block: fail_block },
+            span,
+        );
+        self.switch_to(fail_block);
+        let text = if is_set {
+            self.context.diagnostic_ponde_invalid_index
+        } else {
+            self.context.diagnostic_accipe_invalid_index
+        };
+        self.terminate_current(
+            MirTerminatorKind::ReturnError(MirOperand::Constant(MirConstant::String(text))),
+            span,
+        );
+        self.switch_to(ok_block);
+
+        if self.is_device_lowering() {
+            // The in-range access is the row-major linear `Index` place a
+            // bracket access uses; the bare `TensorGet` / `TensorSet` take a
+            // host list.
+            let mut linear = values[0].clone();
+            for (value, extent) in values.iter().zip(&extents).skip(1) {
+                let scaled = self.assign_temp(
+                    MirValueKind::Binary { op: MirBinOp::Mul, lhs: linear, rhs: extent.clone() },
+                    numerus,
+                    span,
+                );
+                linear = self.assign_temp(
+                    MirValueKind::Binary { op: MirBinOp::Add, lhs: scaled, rhs: value.clone() },
+                    numerus,
+                    span,
+                );
+            }
+            let mut place = tensor;
+            place.projections.push(MirProjection::Index(linear));
+            return Some(match stored {
+                Some(value) => {
+                    let value_ty = MirType::semantic(args[1].expr.ty?);
+                    self.assign(place, value, value_ty, span);
+                    MirOperand::Constant(MirConstant::Unit)
+                }
+                None => {
+                    let destination = self.push_temp(expr_ty, span);
+                    self.assign(MirPlace::temp(destination), MirOperand::Place(place), expr_ty, span);
+                    MirOperand::Temp(destination)
+                }
+            });
+        }
+
+        let list_ty = MirType::semantic(args[0].expr.ty?);
+        let items = values.into_iter().map(MirAggregateItem::Operand).collect();
+        let list = self.construct_temp(MirAggregateKind::Array, MirAggregateFields::Ordered(items), list_ty, span);
+        let receiver = MirOperand::Place(tensor);
+        Some(match stored {
+            Some(value) => {
+                self.runtime_call_to_place(
+                    None,
+                    MirIntrinsic::Collection(MirCollectionOp::TensorSet),
+                    vec![receiver, list, value],
+                    expr_ty,
+                    span,
+                );
+                MirOperand::Constant(MirConstant::Unit)
+            }
+            None => self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::TensorGet),
+                vec![receiver, list],
+                expr_ty,
+                span,
+            ),
+        })
     }
 
     /// The receiver and coordinate expressions of a block that is exactly one

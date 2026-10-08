@@ -739,6 +739,19 @@ impl FunctionBuilder<'_> {
 
         let lowered_receiver = self.lower_expr_value(receiver)?;
         let expr_ty = self.expr_ty(expr)?;
+        if matches!(op, MirCollectionOp::TensorGet | MirCollectionOp::TensorSet)
+            && let Some(lowered) = self.lower_kernel_checked_tensor_access(
+                op,
+                &lowered_receiver,
+                receiver,
+                &method_name,
+                args,
+                expr_ty,
+                expr.span,
+            )
+        {
+            return lowered;
+        }
         let shape_arg = tensor_shape_hole_argument(op, args);
         let mut lowered_flat = None;
         let lowered_shape = if shape_arg.is_some() {
@@ -4192,9 +4205,18 @@ impl FunctionBuilder<'_> {
     /// checker proved in range (it cannot fail, so the call has no error
     /// channel and a `trap` around it carries no `textus` member).
     fn is_checked_tensor_method(&self, receiver: &HirExpression, method_name: &str, args: &[HirCallArg]) -> bool {
-        if self.device_role.is_some() {
-            return false;
-        }
+        self.device_role.is_none() && self.is_failable_tensor_method(receiver, method_name, args)
+    }
+
+    /// Whether this tensor `ponde` / `accipe` method call is failable at all:
+    /// the registry row marks it failable and the checker did not prove the
+    /// index in range. Ignores whether the body is a kernel.
+    pub(super) fn is_failable_tensor_method(
+        &self,
+        receiver: &HirExpression,
+        method_name: &str,
+        args: &[HirCallArg],
+    ) -> bool {
         let Some(receiver_ty) = receiver.ty else {
             return false;
         };
