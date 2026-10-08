@@ -31,6 +31,7 @@ pub mod kernel_module;
 pub mod kernel_plan;
 pub mod lane_op;
 pub mod layout;
+pub mod struct_layout;
 pub mod literal_indexed_access;
 mod local_ty;
 pub mod names;
@@ -69,6 +70,8 @@ mod layout_test;
 mod packed_negative_matrix;
 #[cfg(test)]
 mod param_mode_test;
+#[cfg(test)]
+mod struct_layout_test;
 #[cfg(test)]
 mod structurize_test;
 /// Shared statement/value read analysis for device-program lowering.
@@ -182,6 +185,10 @@ pub use layout::{
     MirLayoutKind, MirLayoutTable, MirPackedBitOrder, MirPackedNumericFormat,
     MirPackedNumericLayout, MirScalarLayout, MirTensorLocusLayout, MirTensorStorageLayout,
     MirTensorStrideLayout, MirTensorViewLayout,
+};
+pub use struct_layout::{
+    MAX_STRUCT_LAYOUT_BYTES, MirStructField, MirStructLayout, StructLayoutRefusal,
+    resolve_struct_layout,
 };
 pub use names::{
     MirNames, ascii_literal_identity, external_function_import_name, octeti_literal_identity,
