@@ -48,6 +48,16 @@ fn input_binding(ordinal: usize, output_position: u32) -> Result<u32, MirAbiErro
     })
 }
 
+/// Whether `function` is a lane-form kernel (it carries the compiler-internal
+/// `Lane` builtin parameter): tensors are read and written at lane coordinates,
+/// not elementwise over one shared element type.
+fn is_lane_form(function: &MirFunction) -> bool {
+    function
+        .params
+        .iter()
+        .any(|param| param.mode == MirParamMode::Lane)
+}
+
 /// The dense matmul glyph admits BF16 weights only in the first input slot;
 /// the result and all F32 peers retain their ordinary strict element rule.
 fn require_indexed_element_compatibility(
@@ -222,6 +232,48 @@ impl crate::visit::MirVisitor for TensorExtentReads {
     }
 }
 
+/// The parameter local `local` is a single-assignment copy chain of, or
+/// `local` itself. Composition (rule 12.7 inlining) binds a callee parameter by
+/// `callee_param = caller_value`; a tensor or genus parameter copied that way
+/// is one storage, so everything that asks which buffer a local names resolves
+/// through the copy.
+pub(crate) fn resolve_parameter_alias(function: &MirFunction, local: MirLocalId) -> MirLocalId {
+    let mut current = local;
+    // Bounded by the number of locals: a copy chain cannot be longer.
+    for _ in 0..function.locals.len() + function.params.len() {
+        if function.params.iter().any(|param| param.local == current) {
+            return current;
+        }
+        let mut sources = function
+            .blocks
+            .iter()
+            .flat_map(|block| &block.statements)
+            .filter_map(|statement| match &statement.kind {
+                crate::MirStatementKind::Assign { place, value }
+                    if place.base == MirPlaceBase::Local(current) =>
+                {
+                    Some(match (&value.kind, place.projections.is_empty()) {
+                        (crate::MirValueKind::Operand(MirOperand::Place(source)), true)
+                            if source.projections.is_empty() =>
+                        {
+                            match source.base {
+                                MirPlaceBase::Local(source) => Some(source),
+                                MirPlaceBase::Temp(_) => None,
+                            }
+                        }
+                        _ => None,
+                    })
+                }
+                _ => None,
+            });
+        match (sources.next(), sources.next()) {
+            (Some(Some(source)), None) => current = source,
+            _ => return current,
+        }
+    }
+    current
+}
+
 /// gpu-reset C4-2e-a: append one count-one `u32` input resource per distinct
 /// `(tensor parameter, axis)` the kernel body reads through `TensorExtent`.
 ///
@@ -249,6 +301,10 @@ fn append_tensor_extent_resources(
     }
     let mut ordered = std::collections::BTreeSet::new();
     for (local, axis) in collected.reads {
+        // A kernel composed from helpers binds each callee tensor parameter
+        // with one copy of the caller's value; the extent is the caller
+        // parameter's.
+        let local = resolve_parameter_alias(function, local);
         let Some(parameter) = function
             .params
             .iter()
@@ -1096,13 +1152,15 @@ impl MirKernelSignature {
             device_view_element_type(input.ty, validation, context.allow_host_owned_tensor_entry)?;
         let output_element_ty =
             device_view_element_type(output.ty, validation, context.allow_host_owned_tensor_entry)?;
-        require_indexed_element_compatibility(
-            function,
-            input_element_ty,
-            output_element_ty,
-            validation,
-            true,
-        )?;
+        if !is_lane_form(function) {
+            require_indexed_element_compatibility(
+                function,
+                input_element_ty,
+                output_element_ty,
+                validation,
+                true,
+            )?;
+        }
         let input_element_count = device_view_element_count_or_runtime(input.ty, validation)?;
         let output_element_count = device_view_element_count_or_runtime(output.ty, validation)?;
 
@@ -1197,7 +1255,10 @@ impl MirKernelSignature {
                     validation,
                     context.allow_host_owned_tensor_entry,
                 )?;
-                if !is_gather_ids_param(function, input, validation) {
+                // A lane-form kernel indexes each tensor by its own lane
+                // coordinates, so inputs and the output need not share an
+                // element type or count.
+                if !is_lane_form(function) && !is_gather_ids_param(function, input, validation) {
                     require_indexed_element_compatibility(
                         function,
                         input_element_ty,

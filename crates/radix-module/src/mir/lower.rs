@@ -825,7 +825,7 @@ pub fn lower_analyzed_unit(
                     .map(MirError::from)
                     .collect());
             }
-            let composition_errors = super::fragment_composition::compose_with_metadata(
+            let composition_errors = super::fragment_composition::compose_keeping_template_callees(
                 &mut program.functions,
                 &monomorphizations,
                 &roles,
@@ -833,6 +833,7 @@ pub fn lower_analyzed_unit(
                 super::fragment_composition::active_budget(),
                 Some(&interner),
                 &launch_entries,
+                &generic_templates,
             );
             if !composition_errors.is_empty() {
                 return Err(composition_errors

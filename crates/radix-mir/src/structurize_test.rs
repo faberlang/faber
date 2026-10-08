@@ -1,6 +1,6 @@
 //! Region-tree shape and invariants of the target-neutral structurizer.
 
-use crate::structurize::{Region, StructurizeError, structurize};
+use crate::structurize::{Region, StructurizeError, structurize, structurize_duplicating_tails};
 use crate::{
     MirBlock, MirBlockId, MirConstant, MirFunction, MirFunctionId, MirOperand, MirSwitchCase,
     MirTempId, MirTerminator, MirTerminatorKind, MirType,
@@ -531,6 +531,100 @@ fn shared_tail_without_common_join_fails_closed() {
         structurize(&f),
         Err(StructurizeError::SharedTail { .. })
     ));
+}
+
+#[test]
+fn duplicating_tails_places_the_shared_tail_of_cross_edges_in_each_arm() {
+    // The same cross edges as above: with tail duplication each arm emits its
+    // own copy of the blocks both arms reach, instead of failing closed.
+    let f = function(vec![
+        branch(1, 1, 2),
+        branch(2, 3, 5),
+        branch(3, 3, 4),
+        ret(None),
+        ret(None),
+        goto(4),
+    ]);
+    let region = structurize_duplicating_tails(&f).expect("tails duplicate");
+    let mut seen = Vec::new();
+    fn blocks(region: &Region, seen: &mut Vec<MirBlockId>) {
+        match region {
+            Region::Seq(items) => items.iter().for_each(|item| blocks(item, seen)),
+            Region::Block(id) => seen.push(*id),
+            Region::If {
+                then_region,
+                else_region,
+                ..
+            } => {
+                blocks(then_region, seen);
+                blocks(else_region, seen);
+            }
+            Region::Loop { body } => blocks(body, seen),
+            Region::Return(_) | Region::Break | Region::Continue => {}
+        }
+    }
+    blocks(&region, &mut seen);
+    // bb3 and bb4 are each reached from both arms of bb0 and appear twice.
+    assert_eq!(seen.iter().filter(|id| **id == bb(3)).count(), 2);
+    assert_eq!(seen.iter().filter(|id| **id == bb(4)).count(), 2);
+    // The default entry point still fails closed on the same shape.
+    assert!(matches!(
+        structurize(&f),
+        Err(StructurizeError::SharedTail { .. })
+    ));
+}
+
+#[test]
+fn duplicating_tails_keeps_an_arm_that_conditionally_enters_the_other_arm_apart() {
+    // bb0 branches to bb1 | bb2. bb1 branches to bb2 | bb4; bb2 -> bb3 -> bb5;
+    // bb4 -> bb5. bb2 is reachable from both arms but bb1 can bypass it, so it
+    // is not a join: bb2 is emitted once per arm and the join is bb5.
+    let f = function(vec![
+        branch(0, 1, 2),
+        branch(1, 2, 4),
+        goto(3),
+        goto(5),
+        goto(5),
+        ret(None),
+    ]);
+    let region = structurize_duplicating_tails(&f).expect("tails duplicate");
+    let Region::Seq(top) = &region else {
+        panic!("top is a Seq")
+    };
+    let Some(Region::If {
+        then_region,
+        else_region,
+        ..
+    }) = top.get(1)
+    else {
+        panic!("bb0 ends in an If: {top:?}");
+    };
+    let ids = |region: &Region| -> Vec<MirBlockId> {
+        fn walk(region: &Region, out: &mut Vec<MirBlockId>) {
+            match region {
+                Region::Seq(items) => items.iter().for_each(|item| walk(item, out)),
+                Region::Block(id) => out.push(*id),
+                Region::If {
+                    then_region,
+                    else_region,
+                    ..
+                } => {
+                    walk(then_region, out);
+                    walk(else_region, out);
+                }
+                _ => {}
+            }
+        }
+        let mut out = Vec::new();
+        walk(region, &mut out);
+        out
+    };
+    assert!(
+        ids(then_region).contains(&bb(2)),
+        "then arm carries its own bb2"
+    );
+    assert!(ids(else_region).contains(&bb(2)), "else arm carries bb2");
+    assert!(!ids(then_region).contains(&bb(5)) && !ids(else_region).contains(&bb(5)));
 }
 
 #[test]

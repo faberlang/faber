@@ -191,6 +191,17 @@ pub fn kernel_plan_for_function_with_limit(
             storage_buffer_limit_error(buffer_count, limit).message,
         ));
     }
+    // A lane-form kernel (it carries the compiler-internal `Lane` builtin) is
+    // one launch grid of independent scalar bodies; its `abs`/`maximum`/`sqrt`
+    // collection-op statements are scalar math, not tensor recipes, so the
+    // recipe scan does not apply. The caller derives the `LaneGrid` plan.
+    if function
+        .params
+        .iter()
+        .any(|param| param.mode == crate::MirParamMode::Lane)
+    {
+        return Ok(None);
+    }
     // SFR-5 declared-recipe scan: a `FilumSum` declaration is the author-
     // stated recipe. The collection-op statement scan never sees it (the
     // declaration is not a collection op), so it resolves ahead of the op

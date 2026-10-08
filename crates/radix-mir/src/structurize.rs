@@ -107,6 +107,28 @@ const NOT_FOUND: usize = usize::MAX;
 ///
 /// See [`StructurizeError`].
 pub fn structurize(function: &MirFunction) -> Result<Region, StructurizeError> {
+    structurize_with(function, false)
+}
+
+/// [`structurize`] that places a shared tail by duplicating it into every arm
+/// that reaches it (tail duplication), for emitters whose targets have no
+/// `goto`. A branch never uses one of its own arm starts as the join (an arm
+/// that merely falls into the other arm's start emits that start itself), and a
+/// block may be emitted once per exclusive path. Emitting a block twice on ONE
+/// path, or growing the tree past a fixed multiple of the block count, still
+/// fails closed as [`StructurizeError::SharedTail`].
+///
+/// # Errors
+///
+/// See [`StructurizeError`].
+pub fn structurize_duplicating_tails(function: &MirFunction) -> Result<Region, StructurizeError> {
+    structurize_with(function, true)
+}
+
+fn structurize_with(
+    function: &MirFunction,
+    duplicate_tails: bool,
+) -> Result<Region, StructurizeError> {
     let entry = function
         .blocks
         .first()
@@ -117,11 +139,18 @@ pub fn structurize(function: &MirFunction) -> Result<Region, StructurizeError> {
     let mut walker = Walker {
         function,
         reach: graph.reachability(),
+        must: if duplicate_tails {
+            graph.must_pass()
+        } else {
+            Vec::new()
+        },
         graph: &graph,
         emitted: vec![false; function.blocks.len()],
         loops,
         active: Vec::new(),
         entering: None,
+        duplicate_tails,
+        emitted_total: 0,
     };
     Ok(Region::Seq(walker.emit(start, None)?))
 }
@@ -257,6 +286,26 @@ impl Graph {
         Ok(loops)
     }
 
+    /// `must[b][x]`: every path from `b` to a function exit (forward edges
+    /// only) passes through `x`, `b` and `x == b` included.
+    fn must_pass(&self) -> Vec<Vec<bool>> {
+        let count = self.ids.len();
+        let mut must = vec![vec![false; count]; count];
+        for &block in &self.postorder {
+            let mut meet: Option<Vec<bool>> = None;
+            for &succ in &self.successors[block] {
+                meet = Some(match meet {
+                    None => must[succ].clone(),
+                    Some(acc) => acc.iter().zip(&must[succ]).map(|(a, b)| *a && *b).collect(),
+                });
+            }
+            let mut row = meet.unwrap_or_else(|| vec![false; count]);
+            row[block] = true;
+            must[block] = row;
+        }
+        must
+    }
+
     /// `reach[b][x]`: `x` is reachable from `b` (including `b` itself).
     fn reachability(&self) -> Vec<Vec<bool>> {
         let count = self.ids.len();
@@ -296,12 +345,21 @@ struct Walker<'a> {
     function: &'a MirFunction,
     graph: &'a Graph,
     reach: Vec<Vec<bool>>,
+    /// Must-pass table (tail-duplication mode only).
+    must: Vec<Vec<bool>>,
     emitted: Vec<bool>,
     loops: Vec<Option<NaturalLoop>>,
     active: Vec<ActiveLoop>,
     /// The header whose first emission is the loop body itself, not a new loop.
     entering: Option<usize>,
+    /// Tail-duplication mode (see [`structurize_duplicating_tails`]).
+    duplicate_tails: bool,
+    /// Blocks emitted so far, duplicates included (the duplication budget).
+    emitted_total: usize,
 }
+
+/// Duplicated emission may grow the tree to this multiple of the block count.
+const DUPLICATION_FACTOR: usize = 24;
 
 impl Walker<'_> {
     /// Whether an edge to `at` is a `Break` / `Continue` of the innermost loop.
@@ -319,13 +377,39 @@ impl Walker<'_> {
             return None;
         }
         // Postorder lists successors first, so the latest entry is the earliest block.
-        self.graph
-            .postorder
-            .iter()
-            .rev()
-            .copied()
-            .find(|&x| self.reach[then_at][x] && self.reach[else_at][x])
-            .filter(|&x| !self.is_jump(x))
+        let earliest = |accept: &dyn Fn(usize) -> bool| {
+            self.graph
+                .postorder
+                .iter()
+                .rev()
+                .copied()
+                .find(|&x| self.reach[then_at][x] && self.reach[else_at][x] && accept(x))
+                .filter(|&x| !self.is_jump(x))
+        };
+        if self.duplicate_tails {
+            // The immediate post-dominator of the branch: every path of both
+            // arms passes it. Without one the arms are emitted whole, tails
+            // duplicated; the weaker reachability join serves only the shapes
+            // (loop exits) where a path ends in a jump instead of a block.
+            return earliest(&|x| self.must[then_at][x] && self.must[else_at][x])
+                .or_else(|| earliest(&|x| self.joins_a_whole_arm(then_at, else_at, x)));
+        }
+        earliest(&|_| true)
+    }
+
+    /// Tail-duplication mode: `x` is a sound join only when one whole arm
+    /// cannot bypass it. An arm start is a join only when the other arm must
+    /// pass through it; any other block must be passed by at least one arm.
+    /// Otherwise `x` lies inside a tail that both arms enter at different
+    /// points, which is duplicated into each arm instead.
+    fn joins_a_whole_arm(&self, then_at: usize, else_at: usize, x: usize) -> bool {
+        if x == then_at {
+            return self.must[else_at][x];
+        }
+        if x == else_at {
+            return self.must[then_at][x];
+        }
+        self.must[then_at][x] || self.must[else_at][x]
     }
 
     /// The `Break` / `Continue` an edge to `at` becomes, if it is one.
@@ -438,6 +522,14 @@ impl Walker<'_> {
                     block: self.graph.ids[at],
                 });
             }
+            self.emitted_total += 1;
+            if self.duplicate_tails
+                && self.emitted_total > DUPLICATION_FACTOR * self.emitted.len() + 64
+            {
+                return Err(StructurizeError::SharedTail {
+                    block: self.graph.ids[at],
+                });
+            }
             let block = &self.function.blocks[at];
             out.push(Region::Block(block.id));
             match &block.terminator.kind {
@@ -455,8 +547,19 @@ impl Walker<'_> {
                     };
                     let join = self.join(then_at, else_at);
                     let arm_stop = join.or(stop);
+                    // Exclusive arms may each emit a shared tail once; the
+                    // path after the `If` has emitted the union of both.
+                    let before = self.duplicate_tails.then(|| self.emitted.clone());
                     let then_region = Region::Seq(self.emit(then_at, arm_stop)?);
+                    let after_then = before
+                        .as_ref()
+                        .map(|before| std::mem::replace(&mut self.emitted, before.clone()));
                     let else_region = Region::Seq(self.emit(else_at, arm_stop)?);
+                    if let Some(after_then) = after_then {
+                        for (mark, then_mark) in self.emitted.iter_mut().zip(after_then) {
+                            *mark |= then_mark;
+                        }
+                    }
                     out.push(Region::If {
                         cond: condition.clone(),
                         then_region: Box::new(then_region),

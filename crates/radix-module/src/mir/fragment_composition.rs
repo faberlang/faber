@@ -155,6 +155,43 @@ pub fn compose_with_metadata(
     interner: Option<&Interner>,
     launch_entries: &FxHashSet<DefId>,
 ) -> Vec<FragmentCompositionError> {
+    compose_keeping_template_callees(
+        functions,
+        monomorphizations,
+        roles,
+        metadata,
+        budget,
+        interner,
+        launch_entries,
+        &[],
+    )
+}
+
+/// [`compose_with_metadata`] for a unit that exports generic templates.
+///
+/// A generic template is not in `functions` (it instantiates at the package
+/// link), so its calls are invisible to the prune scan. A private helper the
+/// template calls must survive the unit's composition, or the instantiated
+/// kernel meets a call to a function the program no longer has. Every callee a
+/// template names is therefore treated as referenced.
+pub fn compose_keeping_template_callees(
+    functions: &mut Vec<MirFunction>,
+    monomorphizations: &[MirMonomorphization],
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    metadata: &MirDeviceFunctionMetadataMap,
+    budget: ExpansionBudget,
+    interner: Option<&Interner>,
+    launch_entries: &FxHashSet<DefId>,
+    templates: &[MirFunction],
+) -> Vec<FragmentCompositionError> {
+    let template_callees = {
+        let resolver = Resolver { functions: templates, monomorphizations, roles, metadata };
+        templates
+            .iter()
+            .flat_map(|template| resolver.all_callees(template))
+            .map(|site| site.callee)
+            .collect::<Vec<_>>()
+    };
     let mut pass = CompositionPass {
         functions,
         monomorphizations,
@@ -163,6 +200,7 @@ pub fn compose_with_metadata(
         budget,
         interner,
         launch_entries,
+        template_callees,
         inlined: FxHashSet::default(),
         errors: Vec::new(),
     };
@@ -231,6 +269,8 @@ struct CompositionPass<'a> {
     budget: ExpansionBudget,
     interner: Option<&'a Interner>,
     launch_entries: &'a FxHashSet<DefId>,
+    /// Callees named by this unit's generic templates (never pruned).
+    template_callees: Vec<MirCallee>,
     /// Functions inlined at least once during this pass (prune candidates).
     inlined: FxHashSet<MirFunctionId>,
     errors: Vec<FragmentCompositionError>,
@@ -292,6 +332,17 @@ impl CompositionPass<'_> {
         }
         let mut referenced_ids = FxHashSet::default();
         let mut referenced_sources = FxHashSet::default();
+        for callee in &self.template_callees {
+            match callee {
+                MirCallee::Function(id) => {
+                    referenced_ids.insert(*id);
+                }
+                MirCallee::Definition { source, .. } => {
+                    referenced_sources.insert(*source);
+                }
+                MirCallee::Closure(_) | MirCallee::Value(_) => {}
+            }
+        }
         for function in self.functions.iter() {
             let resolver = Resolver {
                 functions: self.functions,

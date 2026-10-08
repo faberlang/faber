@@ -383,6 +383,7 @@ impl<'a> DeviceSafeClassifier<'a> {
                                 | MirScalarLayout::F32
                                 | MirScalarLayout::I32
                                 | MirScalarLayout::U32
+                                | MirScalarLayout::U8
                         ) {
                             self.record_layout(format!(
                                 "kernel device view element {}",
