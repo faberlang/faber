@@ -26,7 +26,8 @@ use crate::literal_indexed_access::{LiteralIndexedAccessPlan, MirSlot};
 use crate::visit::MirVisitor;
 use crate::{CapabilityGap, Lowerability};
 use crate::{
-    MirAggregate, MirAggregateKind, MirCollectionOp, MirFunction, MirIntrinsic, MirLayoutKind,
+    MirAggregate, MirAggregateKind, MirCollectionOp, MirDeviceViewElement, MirFunction,
+    MirIntrinsic, MirLayoutKind,
     MirLayoutTable, MirLocal, MirOperand, MirParam, MirPlace, MirPlaceBase, MirProjection,
     MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTensorLocusLayout,
     MirTensorStorageLayout, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
@@ -374,8 +375,14 @@ impl<'a> DeviceSafeClassifier<'a> {
                                 element.spelling()
                             ));
                         }
-                    } else {
-                        self.record_layout("vector-element device view is not admitted as a kernel resource");
+                    } else if let MirDeviceViewElement::Vector(vector) = view.element
+                        && (!is_device_view_vector(vector.width) || !is_device_vector_element(vector.element))
+                    {
+                        self.record_layout(format!(
+                            "kernel vector-element device view width {} element {}",
+                            vector.width,
+                            vector.element.spelling()
+                        ));
                     }
                 }
                 MirLayoutKind::DeviceVector(vector) => {
@@ -1165,6 +1172,12 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             crate::visit::walk_aggregate(self, aggregate);
         }
     }
+}
+
+/// Packed vector widths a device view admits: the widths whose size equals
+/// their alignment (2 and 4). Width 3 stays fail-closed (operator ruling #3).
+fn is_device_view_vector(width: u8) -> bool {
+    matches!(width, 2 | 4)
 }
 
 fn is_device_vector_element(element: MirScalarLayout) -> bool {

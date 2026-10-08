@@ -307,8 +307,15 @@ pub(crate) fn reflect_kernel_resource(
         .layouts
         .layout_for_type(resource.element_ty)
         .map_err(|error| MirAbiError::new(error.message))?;
+    // G15-3: a vector-element tensor reflects its LANE scalar; the cell is
+    // `width` lanes wide (packed, width 2 or 4).
+    let mut lanes_per_cell = 1u16;
     let element_layout = match layout.kind {
         MirLayoutKind::Scalar(element_layout) => element_layout,
+        MirLayoutKind::DeviceVector(vector) if matches!(vector.width, 2 | 4) => {
+            lanes_per_cell = u16::from(vector.width);
+            vector.element
+        }
         MirLayoutKind::Atomic(atomic) => {
             return Err(MirAbiError::new(kernel_atomic_reflection_error(
                 atomic.element,
@@ -316,7 +323,7 @@ pub(crate) fn reflect_kernel_resource(
         }
         _ => return Err(MirAbiError::new(ERR_KERNEL_REFLECTION_SCALAR_ELEMENT)),
     };
-    let element_byte_width = kernel_element_byte_width(element_layout)?;
+    let element_byte_width = kernel_element_byte_width(element_layout)? * lanes_per_cell;
     // A runtime-shaped resource has no static byte length: reflection records 0
     // ("no ABI minimum"); the host sizes the binding from the argument.
     let buffer_byte_len = if resource.is_runtime_shaped() {
@@ -558,12 +565,11 @@ pub(crate) fn require_kernel_device_view(
             view.rank
         )));
     }
-    let Some(element) = view.element.scalar() else {
-        return Err(MirAbiError::with_detail(
-            "vector-element device view is not admitted as a kernel resource".to_string(),
-            "mir_kernel_device_view_vector_element_unsupported",
-            "vector-element device view",
-        ));
+    // G15-3: a packed vector element (width 2 or 4; layout time already
+    // declined width 3) is admitted when its lane element is a kernel element.
+    let element = match view.element {
+        crate::MirDeviceViewElement::Scalar(scalar) => scalar,
+        crate::MirDeviceViewElement::Vector(vector) => vector.element,
     };
     if !crate::tensor_type::is_kernel_element_layout(element) {
         return Err(MirAbiError::with_detail(
