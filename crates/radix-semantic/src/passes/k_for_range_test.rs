@@ -1,0 +1,225 @@
+//! KFOR: a counted range loop (`itera ab a‥b fixum j`) inside a `filum` body.
+//!
+//! The independence pass proves the range loop like the `while` loop: its
+//! bounds are evaluated once per lane and read nothing a lane writes, its
+//! binder is iteration-local, and its body meets the same rules as the lane
+//! body. The lockstep form keeps its decline. Every assertion is on the
+//! diagnostic code, issue and named reason arguments, never message text.
+
+use crate::test_support::analyze_source;
+
+const ISSUE: &str = "filum_independence_unproven";
+const CODE: &str = "SEM010";
+
+fn accepted(source: &str) {
+    let result = analyze_source(source);
+    assert!(result.success(), "{:?}", result.diagnostics);
+}
+
+fn rejected(source: &str, reason: &str) {
+    let result = analyze_source(source);
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(!errors.is_empty(), "body unexpectedly certified");
+    assert!(
+        errors
+            .iter()
+            .all(|d| d.issue() == Some(ISSUE) && crate::semantic_spec(d.kind).code == CODE),
+        "not independence errors: {errors:?}"
+    );
+    assert!(
+        errors.iter().any(|d| d
+            .args
+            .iter()
+            .any(|arg| arg.name == "reason" && arg.value == reason)),
+        "missing reason {reason}: {errors:?}"
+    );
+}
+
+/// A generic row kernel: lane `i` owns `out[i]`, `w` and `x` are read-only,
+/// `n` is a lane-invariant scalar, `tmp` is a second written tensor and
+/// `lens` is a written integer tensor a bound may not read.
+fn kernel(body: &str) -> String {
+    format!(
+        r"@ nucleum
+@ publica
+functio gemv<magnitudo N, magnitudo K>(
+    de tensor<f32, [N]> dom,
+    de tensor<f32, [N, K]> w,
+    de tensor<f32, [K]> x,
+    in tensor<f32, [N]> out,
+    in tensor<f32, [K]> tmp,
+    in tensor<numerus, [N]> lens,
+    numerus n
+) → vacuum {{
+    itera ex dom apud [i] filum lane fixum e {{
+        {body}
+    }}
+}}
+"
+    )
+}
+
+/// The same lane body with an outer scalar the lane may not carry state in.
+fn kernel_outer(body: &str) -> String {
+    format!(
+        r"@ nucleum
+@ publica
+functio gemv<magnitudo N, magnitudo K>(
+    de tensor<f32, [N]> dom,
+    de tensor<f32, [N, K]> w,
+    de tensor<f32, [K]> x,
+    in tensor<f32, [N]> out
+) → vacuum {{
+    varia f32 total ← 0.0
+    itera ex dom apud [i] filum lane fixum e {{
+        {body}
+    }}
+}}
+"
+    )
+}
+
+#[test]
+fn serial_row_dot_with_a_range_loop_accepted() {
+    accepted(&kernel(
+        "varia f32 acc ← 0.0
+        itera ab 0‥n fixum j {
+            acc ← acc + w[[i, j]] * x[[j]]
+        }
+        out[[i]] ← acc",
+    ));
+}
+
+#[test]
+fn nested_range_inside_a_range_accepted() {
+    accepted(&kernel(
+        "varia f32 acc ← 0.0
+        itera ab 0‥n fixum j {
+            itera ab 0‥n fixum k {
+                acc ← acc + w[[i, j]] * x[[k]]
+            }
+        }
+        out[[i]] ← acc",
+    ));
+}
+
+#[test]
+fn literal_generic_and_scalar_parameter_bounds_accepted() {
+    accepted(&kernel(
+        "varia f32 acc ← 0.0
+        itera ab 0‥3 fixum a {
+            acc ← acc + w[[i, a]]
+        }
+        itera ab 1‥n fixum b {
+            acc ← acc + x[[b]]
+        }
+        out[[i]] ← acc",
+    ));
+}
+
+#[test]
+fn range_product_inside_a_lane_accepted() {
+    accepted(&kernel(
+        "varia f32 acc ← 0.0
+        itera ab 0‥n, 0‥n fixum a, b {
+            acc ← acc + w[[i, a]] * x[[b]]
+        }
+        out[[i]] ← acc",
+    ));
+}
+
+#[test]
+fn iteration_local_scratch_inside_the_range_accepted() {
+    accepted(&kernel(
+        "varia f32 acc ← 0.0
+        itera ab 0‥n fixum j {
+            fixum f32 term ← w[[i, j]] * x[[j]]
+            acc ← acc + term
+        }
+        out[[i]] ← acc",
+    ));
+}
+
+#[test]
+fn bound_reading_a_lane_written_tensor_rejected() {
+    // `lens` is written by the lane (at a constant cell), so its value is not a
+    // lane-invariant bound.
+    rejected(
+        &kernel(
+            "lens[[0]] ← 2
+        itera ab 0‥lens[[0]] fixum j {
+            out[[i]] ← x[[j]]
+        }",
+        ),
+        "written_storage_neighbor_read",
+    );
+}
+
+#[test]
+fn bound_reading_the_lanes_own_written_cell_rejected() {
+    rejected(
+        &kernel(
+            "lens[[i]] ← 2
+        itera ab 0‥lens[[i]] fixum j {
+            out[[i]] ← x[[j]]
+        }",
+        ),
+        "written_storage_neighbor_read",
+    );
+}
+
+#[test]
+fn range_product_bound_reading_a_lane_written_tensor_rejected() {
+    rejected(
+        &kernel(
+            "lens[[i]] ← 2
+        itera ab 0‥n, 0‥lens[[i]] fixum a, b {
+            tmp[[a]] ← x[[b]]
+        }",
+        ),
+        "written_storage_neighbor_read",
+    );
+}
+
+#[test]
+fn body_storing_outer_storage_at_a_non_lane_coordinate_rejected() {
+    rejected(
+        &kernel(
+            "itera ab 0‥n fixum j {
+            out[[j]] ← x[[j]]
+        }",
+        ),
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
+fn loop_carried_write_to_outer_state_rejected() {
+    rejected(
+        &kernel_outer(
+            "itera ab 0‥3 fixum j {
+            total ← total + x[[j]]
+        }
+        out[[i]] ← total",
+        ),
+        "outer_local_mutation",
+    );
+}
+
+#[test]
+fn lockstep_loop_still_declined() {
+    rejected(
+        r"incipit {
+    varia tensor<f32, [4]> rows ← vacua
+    varia tensor<f32, [4]> out ← vacua
+    fixum lista<f32> xs ← [1.0, 2.0]
+    fixum lista<f32> ys ← [3.0, 4.0]
+    itera ex rows apud [i] filum lane fixum e {
+        itera ex xs, ys fixum a, b {
+            out[[i]] ← a + b
+        }
+    }
+}",
+        "unproved_loop_form",
+    );
+}

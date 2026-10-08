@@ -358,6 +358,10 @@ mod filum_typed_zero_scratch_test;
 mod k8_filum_nested_test;
 
 #[cfg(test)]
+#[path = "k_for_range_test.rs"]
+mod k_for_range_test;
+
+#[cfg(test)]
 #[path = "k8_filum_storage_test.rs"]
 mod k8_filum_storage_test;
 

@@ -397,6 +397,7 @@ impl<'a> BodyProof<'a> {
             accesses: Vec::new(),
             errors: Vec::new(),
             suppress_reads: false,
+            bound_depth: 0,
             issue,
             skip_arguments: false,
         }

@@ -681,6 +681,9 @@ struct Access {
     depth: usize,
     composed: Vec<Coordinate>,
     every_loop_has_coordinates: bool,
+    /// Read inside a range-loop bound: a bound is evaluated once per lane
+    /// and must read nothing the lanes write, at any coordinate.
+    bound: bool,
 }
 
 struct BodyProof<'a> {
@@ -697,6 +700,8 @@ struct BodyProof<'a> {
     accesses: Vec<Access>,
     errors: Vec<SemanticError>,
     suppress_reads: bool,
+    /// Depth of range-loop bounds around the cursor.
+    bound_depth: usize,
     /// Issue named by a decline: this pass's, or a reduction body's.
     issue: &'static str,
     /// Arguments of an inlined call are not visited (a reduction body's
@@ -744,6 +749,7 @@ impl BodyProof<'_> {
                 .stack
                 .iter()
                 .all(|&index| !self.loops[index].coords.is_empty()),
+            bound: self.bound_depth > 0,
         });
     }
 
@@ -766,6 +772,23 @@ impl BodyProof<'_> {
         body: &HirBlock,
     ) {
         let coords = coordinates_of(coordinates);
+        if let (
+            false,
+            HirExpressionKind::Intervallum {
+                start, end, step, ..
+            },
+        ) = (filum, &source.kind)
+        {
+            // A counted range yields values, not storage elements: only its
+            // bounds read, once, before the first iteration.
+            self.bounds(
+                std::iter::once(&**start)
+                    .chain(std::iter::once(&**end))
+                    .chain(step.as_deref()),
+            );
+            self.visit_block(body);
+            return;
+        }
         self.fetch(source, coords.clone());
         self.receiver(source);
         if !filum {
@@ -775,6 +798,17 @@ impl BodyProof<'_> {
         self.enter_loop(coords, binding, source, body);
         self.visit_block(body);
         self.stack.pop();
+    }
+
+    /// The bounds of a counted loop are evaluated once per lane before the
+    /// loop runs, so they may read lane-invariant data and the lane's own
+    /// locals, never storage a lane writes.
+    fn bounds<'e>(&mut self, bounds: impl Iterator<Item = &'e HirExpression>) {
+        self.bound_depth += 1;
+        for bound in bounds {
+            self.visit_expr(bound);
+        }
+        self.bound_depth -= 1;
     }
 
     fn enter_loop(
@@ -1015,7 +1049,14 @@ impl HirVisitor for BodyProof<'_> {
                     self.visit_block(body);
                 }
             }
-            HirExpressionKind::IteraLockstep { .. } | HirExpressionKind::IteraRange { .. } => {
+            // The range product walks counted ranges sequentially inside the
+            // iteration, like nested `while` loops: bounds are read once, the
+            // binders are iteration-local, and the body meets the same rules.
+            HirExpressionKind::IteraRange { ranges, body, .. } => {
+                self.bounds(ranges.iter());
+                self.visit_block(body);
+            }
+            HirExpressionKind::IteraLockstep { .. } => {
                 self.decline(expr.span, "unproved_loop_form");
             }
             HirExpressionKind::Clausura(..)
@@ -1120,6 +1161,12 @@ fn prove(
                 .push(issue(access.span, "unknown_read_storage_identity"));
         }
         for storage in &access.facts.storage {
+            if access.bound && writes.contains_key(&storage.root) {
+                proof
+                    .errors
+                    .push(issue(access.span, "written_storage_neighbor_read"));
+                continue;
+            }
             if let Some(written) = writes.get(&storage.root) {
                 let physical = access
                     .coords
