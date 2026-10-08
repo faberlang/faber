@@ -688,7 +688,6 @@ impl CollectionKernelPlan {
             // gpu-reset C4: a lane grid carries no static grid structure; the
             // lane domain is a call-site fact checked by `geometry_for_call`.
             CollectionKernelPlan::LaneGrid { .. } | CollectionKernelPlan::SingleLane => Ok(()),
-            CollectionKernelPlan::LaneGrid { .. } => Ok(()),
             CollectionKernelPlan::GridReduce {
                 workgroup,
                 partials_cap,

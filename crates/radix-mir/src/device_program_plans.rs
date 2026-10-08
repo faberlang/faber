@@ -2473,7 +2473,6 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
         | CollectionKernelPlan::SsmScan(_)
         | CollectionKernelPlan::LaneGrid { .. }
         | CollectionKernelPlan::SingleLane => 0,
-        | CollectionKernelPlan::LaneGrid { .. } => 0,
         // The workgroup tree: one `value_bytes + ...` partial per lane.
         CollectionKernelPlan::GridReduce {
             workgroup,

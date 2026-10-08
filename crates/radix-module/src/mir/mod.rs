@@ -59,6 +59,7 @@ mod kernel_host_lowering_test;
 #[path = "fault_sites_test.rs"]
 mod fault_sites_test;
 
+#[cfg(test)]
 #[path = "grid_reduce_test.rs"]
 mod grid_reduce_test;
 #[cfg(test)]
