@@ -79,27 +79,44 @@ domain policy.
   integral exponent returns the signed result, and a non-integral exponent
   returns NaN.
 
-## R6. One const/var rule for writes and mutating calls (2026-10-02)
+## R6. One write rule for fields and mutating calls; the marker decides what a parameter may write (2026-10-02, amended 2026-10-08)
 
-Once a `copy` parameter's duplicate exists, its owner may change it exactly as
-far as the binding's const/var declaration allows. A field write (`c.n ← 1`)
-and a call to a method that changes its receiver (`c.inc()`) are the same kind
-of write and follow one rule: a `var` binding allows both, an immutable binding
-(`const`, or a parameter) rejects both.
+A field write (`c.n ← 1`) and a call to a method that changes its receiver
+(`c.inc()`) are the same kind of write and follow one rule. For a local binding
+the rule is its declaration: a `var` binding allows both, a `const` binding
+rejects both. For a parameter the rule is its marker. Parameters take no `var`
+or `const`.
 
+*Amended 2026-10-08:* the 2026-10-02 wording ("an immutable binding (`const`, or
+a parameter) rejects both", "bind the `copy` parameter to a `var` local first")
+is replaced. The callee's right to write follows the marker:
+
+| Parameter | May the callee write it? | Whose value changes |
+| --- | --- | --- |
+| unmarked, `ref` (la `de`) | no (`SEM020`) | none |
+| `mut` (la `in`) | yes | the caller's own value |
+| `own` | yes | the callee's value; the caller gave it away |
+| `copy` | yes | the callee's duplicate; the caller's value is untouched |
+
+- Writing includes a field store, a method that changes its receiver, an
+  element store, a whole reassignment (`xs ← [1, 2]`) and an in-place
+  collection verb. An `own` tensor parameter may be rebound whole; a `mut`
+  tensor parameter may not (`mut_tensor_param_rebind`, write through `⇇`).
 - A method changes its receiver when its body assigns through `self`, calls an
   in-place collection verb on a place rooted at `self`, or calls another
   mutating method on such a place. Methods carry no receiver marker; the
   property is inferred from the body (and closed over sibling calls). Only
   methods declared in the same module are classified.
-- A parameter is an immutable binding, and `copy` is the only marker in its
-  type position, so no spelling makes a `copy` parameter `var`. To modify the
-  duplicate, bind it to a `var` local first (`var C mine ← c`). The `in`/`mut`
-  marker is the way to modify the caller's own value, and it duplicates nothing.
+- Binding a `copy` parameter to a `var` local first (`var C mine ← c`) is still
+  legal, and is no longer needed.
 - The `unnecessary_varia` lint counts a mutating method call as a modification.
+  `WARN009 unused_own_parameter` counts a write to an `own` parameter as a use.
 
-Pinned by `corpus/mutabilitas/copy-param.fab` (the D-6 copy-parameter
-exemplar) and the semantic tests in `method_receiver_mutation_test.rs`.
+Pinned by `corpus/mutabilitas/own-param-writable.fab` and
+`copy-param-writable.fab` (every write form on `own` and `copy`), by
+`corpus/mutabilitas/copy-param.fab` (the D-6 copy-parameter exemplar; its
+header comment still describes the 2026-10-02 rule), and by the semantic tests
+in `method_receiver_mutation_test.rs` and `own_param_writable_test.rs`.
 
 ## R7. `copy` applies at the initializer only (2026-10-02)
 
@@ -137,11 +154,23 @@ consumed or duplicated without opening the callee.
   `copy` accept a fresh value with the matching marker (`eat(own make())`).
 - **`copy` at the call** is a plain echo of the parameter marker. It is not the
   parked assignment-site `copy` (R7 stays as ruled).
-- **Coming, not yet enforced.** `own` and `copy` are checked for marker
-  agreement only. Three further rulings of the same date are being built: use
-  after `own` is checked at calls, `own` and `copy` parameters become writable,
-  and only a whole local binding may be passed as `own`.
+- **Landed 2026-10-08 (`own` and `copy`).** `own` and `copy` parameters are
+  writable by the callee (R6). Only a whole local binding may be passed as
+  `own`; `SEM057` names the refusals: `own_argument_not_local_binding` (a field
+  or element: write `copy` there instead, and `copy b.xs` does not kill `b`),
+  `own_argument_unmarked_parameter`, `own_argument_module_constant`,
+  `own_argument_loop_binder`. After `eat(own a)` the name `a` is dead and a
+  later use is `SEM050 use_after_own`, blamed on the call argument; an unmarked
+  source gets a `copy` suggestion. `moved_in_loop` (a name declared outside a
+  loop and given away inside it) and `moved_name_captured_by_closure` are the
+  loop and closure forms. An exclusive (`own`/`copy`) source keeps
+  `use_after_move` at the later read. A fresh value (`eat(own make())`) is
+  always accepted. The binding form `const own b ← a` is unchanged.
 
 Pinned by `corpus/mutabilitas/call-marker.fab` and the rejection fixtures
 `call-marker-missing.fab`, `call-marker-mismatch.fab`,
-`call-marker-on-read-only.fab`.
+`call-marker-on-read-only.fab`; for the landed items by `own-arg-local.fab`,
+`own-fresh.fab` and the rejections `own-arg-use-after.fab`,
+`own-arg-moved-in-loop.fab`, `own-arg-captured-closure.fab`,
+`own-arg-element.fab`, `own-arg-field.fab`, `own-arg-unmarked-param.fab`,
+`own-arg-module-constant.fab`, `own-arg-loop-binder.fab`.
