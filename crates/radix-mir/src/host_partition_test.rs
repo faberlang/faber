@@ -617,9 +617,27 @@ fn two_kernel_composition_derives_one_region() {
     assert_eq!(program.launches.len(), 2);
     assert_eq!(program.launches[0].kernel_index, 0);
     assert_eq!(program.launches[1].kernel_index, 1);
-    assert_eq!(program.results.len(), 2);
-    assert_eq!(program.results[0].produced_by, program.launches[0].id);
-    assert_eq!(program.results[1].produced_by, program.launches[1].id);
+    // The host passes kernel 1's result (local 30) into kernel 3: ONE host
+    // value, so ONE shared buffer (kernel 1's output slot is kernel 3's
+    // input slot — a producer→consumer edge, not two results). The
+    // intermediate is no longer an observation point; kernel 3's output is
+    // the program's one declared result.
+    let produced = program.kernels[0]
+        .resources
+        .iter()
+        .find(|resource| resource.access == crate::abi::MirKernelResourceAccess::Write)
+        .expect("kernel 1 writes its output");
+    let consumed = program.kernels[1]
+        .resources
+        .iter()
+        .find(|resource| resource.access == crate::abi::MirKernelResourceAccess::Read)
+        .expect("kernel 3 reads its input");
+    assert_eq!(
+        produced.buffer.id, consumed.buffer.id,
+        "the host value joins kernel 1's output to kernel 3's input"
+    );
+    assert_eq!(program.results.len(), 1);
+    assert_eq!(program.results[0].produced_by, program.launches[1].id);
     program
         .validate()
         .expect("the derived program passes the shared schema");

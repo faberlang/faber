@@ -5,12 +5,12 @@ use crate::abi::{MirKernelResourceAccess, MirKernelResourceKind};
 use crate::device::MirCompanionMap;
 use crate::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use crate::device_program::{
-    BufferId, BufferLifetime, BufferRole, DeviceGradientLink, DeviceProgramLifetime,
+    BufferId, BufferLifetime, BufferRole, DeviceGradientLink, DeviceProgram, DeviceProgramLifetime,
     DeviceTrainableParam, DeviceTrainingFacts, ObservationCadence,
 };
 use crate::device_semantics::{
-    LosslessMirCompanionEntry, MirCompanionSelectedInput, MirCompanionSelectedOutput,
-    SemanticValueOrigin,
+    DeviceSemantics, LosslessMirCompanionEntry, MirCompanionSelectedInput,
+    MirCompanionSelectedOutput, SemanticValueOrigin,
 };
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
@@ -678,30 +678,69 @@ fn constructor_decomposes_multi_recipe_body_into_subchain_kernels() {
 //    device_test.rs `launches_follow_carried_dependencies_not_declaration_
 //    order`) ─────────────────────────────────────────────────────────────
 
-/// The launch sequence follows the carried producer/consumer dependency
-/// graph, never kernel declaration order: a chain DECLARED backwards
-/// (consumer first) still executes producer → consumer.
-#[test]
-fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
-    let mut types = TypeTable::new();
-    let mut interner = Interner::new();
-    let r1024 = rank1_tensor_ty(&mut types, 1024);
-    let r4 = rank1_tensor_ty(&mut types, 4);
-    let r1 = rank1_tensor_ty(&mut types, 1);
-    let scalar = f32(&mut types);
-    let index = u32_ty(&mut types);
-    let vacuum = vacuum_ty(&mut types);
-    // Declared first (the faber `u4-reversed-chain` oracle shape):
-    // recollige(medius, result, id) — reduces medius and stores into result.
+/// Parameter names of the reversed-chain kernels (NAMEJOIN NJ2): buffer
+/// identity comes from the host value, never from these names, so a fixture
+/// may name them anything.
+struct ChainNames {
+    /// `recollige(medius, result, id)` and its scalar local.
+    consumer: [&'static str; 4],
+    /// `collige(a, medius, id)` and its scalar local.
+    producer: [&'static str; 4],
+}
+
+const ORIGINAL_CHAIN_NAMES: ChainNames = ChainNames {
+    consumer: ["medius", "result", "id", "total"],
+    producer: ["a", "medius", "id", "total"],
+};
+
+/// Every kernel parameter renamed (distinct from the originals AND from each
+/// other across the two kernels).
+const RENAMED_CHAIN_NAMES: ChainNames = ChainNames {
+    consumer: ["mid_in", "res_out", "lane_c", "acc_c"],
+    producer: ["src_a", "mid_out", "lane_p", "acc_p"],
+};
+
+/// A host `Call` statement of `callee` with bare-local arguments.
+fn host_call(callee: u32, args: &[u32]) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Call {
+            destination: None,
+            callee: crate::MirCallee::Function(MirFunctionId(callee)),
+            args: args
+                .iter()
+                .map(|&local| MirOperand::Place(MirPlace::local(MirLocalId(local))))
+                .collect(),
+        },
+        span: span(),
+    }
+}
+
+/// The reversed chain WITH a host (the NJ2 shape of the faber
+/// `u4-reversed-chain` oracle): kernels DECLARED consumer-first, then a host
+/// `main` with locals a[1024], medius[4], result[1] and an id that calls
+/// `collige(a, medius, id)` then `recollige(medius, result, id)`.
+fn reversed_chain_functions(
+    types: &mut TypeTable,
+    interner: &mut Interner,
+    names: &ChainNames,
+) -> Vec<MirFunction> {
+    let r1024 = rank1_tensor_ty(types, 1024);
+    let r4 = rank1_tensor_ty(types, 4);
+    let r1 = rank1_tensor_ty(types, 1);
+    let scalar = f32(types);
+    let index = u32_ty(types);
+    let vacuum = vacuum_ty(types);
+    // Declared first: recollige(medius, result, id) — reduces medius and
+    // stores into result.
     let consumer = device_function(
         1,
-        &mut interner,
+        interner,
         "recollige",
         &[
-            (0, "medius", r4),
-            (1, "result", r1),
-            (2, "id", index),
-            (3, "total", scalar),
+            (0, names.consumer[0], r4),
+            (1, names.consumer[1], r1),
+            (2, names.consumer[2], index),
+            (3, names.consumer[3], scalar),
         ],
         &[0, 1, 2],
         vec![
@@ -714,17 +753,16 @@ fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
         true,
     );
     // Declared second: collige(a, medius, id) — reduces a (1024 → 4 partials,
-    // the medius count) and stores into medius (the reverse-declared
-    // producer→consumer chain).
+    // the medius count) and stores into medius.
     let producer = device_function(
         2,
-        &mut interner,
+        interner,
         "collige",
         &[
-            (0, "a", r1024),
-            (1, "medius", r4),
-            (2, "id", index),
-            (3, "total", scalar),
+            (0, names.producer[0], r1024),
+            (1, names.producer[1], r4),
+            (2, names.producer[2], index),
+            (3, names.producer[3], scalar),
         ],
         &[0, 1, 2],
         vec![
@@ -736,8 +774,33 @@ fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
         vacuum,
         true,
     );
-    let validated = validated(&types, vec![consumer, producer]);
+    // The host passes ONE value (`medius`, local 21) as collige's output and
+    // as recollige's input: that value identity wires the buffer.
+    let main = device_function(
+        3,
+        interner,
+        "main",
+        &[
+            (20, "a", r1024),
+            (21, "medius", r4),
+            (22, "result", r1),
+            (23, "id", index),
+        ],
+        &[],
+        vec![host_call(2, &[20, 21, 23]), host_call(1, &[21, 22, 23])],
+        None,
+        Vec::new(),
+        vacuum,
+        false,
+    );
+    vec![consumer, producer, main]
+}
 
+fn build_reversed_chain(names: &ChainNames) -> (DeviceProgram, DeviceSemantics) {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let functions = reversed_chain_functions(&mut types, &mut interner, names);
+    let validated = validated(&types, functions);
     let (program, semantics, _) = build_device_program(
         &validated,
         &interner,
@@ -748,10 +811,20 @@ fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
         &fixture_metadata(&validated.program().functions),
     )
     .expect("the reversed chain builds");
+    (program, semantics)
+}
+
+/// The launch sequence follows the carried producer/consumer dependency
+/// graph, never kernel declaration order: a chain DECLARED backwards
+/// (consumer first) still executes producer → consumer. The chain is wired by
+/// the host value `medius`, which the kernels name differently.
+#[test]
+fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
+    let (program, semantics) = build_reversed_chain(&RENAMED_CHAIN_NAMES);
 
     // recollige is DECLARED first (kernel 0, launch id 1) but DEPENDS on
-    // collige's write of medius: the execution sequence runs collige's
-    // launch (id 2, kernel 1) before recollige's (id 1, kernel 0).
+    // collige's write of the host value: the execution sequence runs
+    // collige's launch (id 2, kernel 1) before recollige's (id 1, kernel 0).
     assert_eq!(
         program
             .launches
@@ -1994,6 +2067,19 @@ fn single_lane_xy_kernel(
     float: MirType,
     vacuum: MirType,
 ) -> MirFunction {
+    single_lane_named_kernel(id, interner, name, ["x", "y"], tensor, float, vacuum)
+}
+
+/// A single-lane kernel `name(tensor <names[0]>, mut tensor <names[1]>)`.
+fn single_lane_named_kernel(
+    id: u32,
+    interner: &mut Interner,
+    name: &str,
+    names: [&str; 2],
+    tensor: MirType,
+    float: MirType,
+    vacuum: MirType,
+) -> MirFunction {
     let read = crate::MirValueKind::Operand(MirOperand::Place(MirPlace {
         base: crate::MirPlaceBase::Local(MirLocalId(0)),
         projections: vec![crate::MirProjection::Index(MirOperand::Constant(
@@ -2006,7 +2092,7 @@ fn single_lane_xy_kernel(
             crate::MirConstant::Int(5),
         ))],
     };
-    let names = ["x", "y"].map(|name| interner.intern(name));
+    let names = names.map(|name| interner.intern(name));
     let param = |local: u32, mode| MirParam {
         local: MirLocalId(local),
         name: Some(names[local as usize]),
@@ -2079,4 +2165,129 @@ fn single_run_kernels_with_the_same_slot_names_never_share_a_buffer() {
     program
         .validate_with_semantics(&semantics)
         .expect("the program passes the shared semantic gate");
+}
+
+/// A kernel's `y` writer and an unrelated kernel's `y` reader never share a
+/// buffer when the host passes DIFFERENT values: buffer identity is the host
+/// value, never the parameter name. Four buffers, no dependency edge.
+#[test]
+fn writer_in_one_kernel_and_unrelated_reader_of_the_same_name_in_another_never_share_a_buffer() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank1_tensor_ty(&mut types, 8);
+    let float = f32(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let index = u32_ty(&mut types);
+    // k1(x, mut y) writes `y`; k2(y, mut z) reads a slot ALSO named `y`.
+    let k1 = single_lane_named_kernel(1, &mut interner, "k1", ["x", "y"], tensor, float, vacuum);
+    let k2 = single_lane_named_kernel(2, &mut interner, "k2", ["y", "z"], tensor, float, vacuum);
+    let main = device_function(
+        3,
+        &mut interner,
+        "main",
+        &[
+            (20, "h1", tensor),
+            (21, "h2", tensor),
+            (22, "h3", tensor),
+            (23, "h4", tensor),
+            (24, "unused", index),
+        ],
+        &[],
+        vec![host_call(1, &[20, 21]), host_call(2, &[22, 23])],
+        None,
+        Vec::new(),
+        vacuum,
+        false,
+    );
+    let validated = validated(&types, vec![k1, k2, main]);
+    let (program, semantics, _steps) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("both kernels materialize");
+    assert_eq!(program.kernels.len(), 2);
+    let ids: BTreeSet<BufferId> = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter().map(|resource| resource.buffer.id))
+        .collect();
+    assert_eq!(ids.len(), 4, "k1.y and k2.y are different host values");
+    assert!(
+        semantics.dependencies.is_empty(),
+        "no producer→consumer edge: {:?}",
+        semantics.dependencies
+    );
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the program passes the shared semantic gate");
+}
+
+/// Clear every diagnostic name a built program carries (buffer identities of
+/// kernel resources and results, semantic value names).
+fn blank_names(program: &mut DeviceProgram, semantics: &mut DeviceSemantics) {
+    for kernel in &mut program.kernels {
+        for resource in &mut kernel.resources {
+            resource.buffer.name.clear();
+        }
+    }
+    for result in &mut program.results {
+        result.buffer.name.clear();
+    }
+    for value in &mut semantics.values {
+        value.name.clear();
+    }
+}
+
+/// The acceptance test of the value-identity rule: renaming every kernel
+/// parameter changes nothing about the built program except the names in it.
+#[test]
+fn renaming_every_kernel_parameter_changes_only_names() {
+    let (original_program, original_semantics) = build_reversed_chain(&ORIGINAL_CHAIN_NAMES);
+    let (renamed_program, renamed_semantics) = build_reversed_chain(&RENAMED_CHAIN_NAMES);
+
+    let names = |program: &DeviceProgram| -> Vec<String> {
+        program
+            .kernels
+            .iter()
+            .flat_map(|kernel| kernel.resources.iter().map(|r| r.buffer.name.clone()))
+            .collect()
+    };
+    assert_ne!(
+        names(&original_program),
+        names(&renamed_program),
+        "the rename really changed the names carried by the program"
+    );
+    assert_ne!(
+        original_semantics
+            .values
+            .iter()
+            .map(|value| value.name.clone())
+            .collect::<Vec<_>>(),
+        renamed_semantics
+            .values
+            .iter()
+            .map(|value| value.name.clone())
+            .collect::<Vec<_>>(),
+        "the rename really changed the semantic value names"
+    );
+
+    let (mut program_a, mut semantics_a) = (original_program, original_semantics);
+    let (mut program_b, mut semantics_b) = (renamed_program, renamed_semantics);
+    blank_names(&mut program_a, &mut semantics_a);
+    blank_names(&mut program_b, &mut semantics_b);
+    assert_eq!(
+        program_a, program_b,
+        "the device program differs by more than names"
+    );
+    assert_eq!(
+        semantics_a, semantics_b,
+        "the device semantics differ by more than names"
+    );
+    // The chain is real in both: the medius buffer has one edge.
+    assert_eq!(semantics_a.dependencies.len(), 1);
 }

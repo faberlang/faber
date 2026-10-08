@@ -167,6 +167,28 @@ fn host_wiring_chain_value_is_one_set_for_output_and_next_input() {
 }
 
 #[test]
+fn host_wiring_resolves_definition_callees_to_the_selected_kernel() {
+    // Real lowering calls a named kernel by its source `DefId`
+    // (`MirCallee::Definition`), not by `MirCallee::Function`.
+    let mut interner = Interner::new();
+    let mut program = chain_program(&mut interner, &["src", "medius"], &["in", "result"]);
+    program.functions[0].source = Some(radix_hir::DefId(7));
+    program.functions[1].source = Some(radix_hir::DefId(8));
+    for statement in &mut program.functions[2].blocks[0].statements {
+        let MirStatementKind::Call { callee, .. } = &mut statement.kind else {
+            unreachable!("the host holds only calls");
+        };
+        let MirCallee::Function(id) = callee else {
+            unreachable!("the fixture calls by function id");
+        };
+        *callee = MirCallee::definition(radix_hir::DefId(if *id == COLLIGE { 7 } else { 8 }));
+    }
+    let wiring = collect_host_wiring(&program, &selected());
+    assert!(!wiring.is_opaque(COLLIGE));
+    assert!(wiring.same_host_values(Slot::param(COLLIGE, 1), Slot::param(RECOLLIGE, 0)));
+}
+
+#[test]
 fn host_wiring_equal_names_with_different_host_values_do_not_join() {
     // Both kernels name their parameter `medius`; the host passes different
     // locals, so the names must not matter.

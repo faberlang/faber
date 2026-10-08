@@ -74,6 +74,10 @@ mod device_block_erase_test;
 #[cfg(test)]
 #[path = "grid_reduce_test.rs"]
 mod grid_reduce_test;
+
+#[cfg(test)]
+#[path = "device_value_join_test.rs"]
+mod device_value_join_test;
 #[cfg(test)]
 #[path = "lane_form_test.rs"]
 mod lane_form_test;

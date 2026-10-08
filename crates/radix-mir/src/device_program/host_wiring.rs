@@ -26,11 +26,6 @@
 //! iteration order is stable and independent of interner symbols (renaming a
 //! kernel parameter changes nothing collected here).
 
-// WHY: the collector is consumed by the constructor's value-join in unit NJ2
-// of the NAMEJOIN chain (docs/factory/gpu-reset/namejoin-plan.md); until that
-// unit lands only the tests call it.
-#![allow(dead_code)]
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::visit::{MirVisitor, walk_callee, walk_operand, walk_stmt, walk_value};
@@ -38,6 +33,7 @@ use crate::{
     MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId, MirOperand, MirPlace,
     MirPlaceBase, MirProgram, MirStatement, MirStatementKind, MirTempId, MirValue, MirValueKind,
 };
+use radix_hir::DefId;
 
 /// The storage a host value lives in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -118,12 +114,14 @@ pub(super) struct HostWiring {
 
 impl HostWiring {
     /// The recorded sites of `slot`, when any call site touched it.
+    #[cfg(test)]
     #[must_use]
     pub(super) fn sites(&self, slot: Slot) -> Option<&SlotSites> {
         self.slots.get(&slot)
     }
 
     /// Whether `kernel` was reached other than by a direct host `Call`.
+    #[cfg(test)]
     #[must_use]
     pub(super) fn is_opaque(&self, kernel: MirFunctionId) -> bool {
         self.opaque.contains(&kernel)
@@ -166,8 +164,18 @@ pub(super) fn collect_host_wiring(
     program: &MirProgram,
     selected_kernels: &BTreeSet<MirFunctionId>,
 ) -> HostWiring {
+    // Real lowering calls a named kernel through `MirCallee::Definition`
+    // (the source `DefId`), not `MirCallee::Function`: resolve it to the
+    // selected kernel whose `source` is that definition.
+    let by_source = program
+        .functions
+        .iter()
+        .filter(|function| selected_kernels.contains(&function.id))
+        .filter_map(|function| Some((function.source?, function.id)))
+        .collect();
     let mut collector = Collector {
         selected: selected_kernels,
+        by_source,
         function: None,
         wiring: HostWiring::default(),
     };
@@ -184,6 +192,8 @@ pub(super) fn collect_host_wiring(
 
 struct Collector<'a> {
     selected: &'a BTreeSet<MirFunctionId>,
+    /// Selected kernels by their source definition.
+    by_source: Vec<(DefId, MirFunctionId)>,
     function: Option<MirFunctionId>,
     wiring: HostWiring,
 }
@@ -219,9 +229,16 @@ impl Collector<'_> {
         let id = match callee {
             MirCallee::Function(id)
             | MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => *id,
+            MirCallee::Definition { source, .. } => self.kernel_of_definition(*source)?,
             _ => return None,
         };
         self.selected.contains(&id).then_some(id)
+    }
+
+    fn kernel_of_definition(&self, source: DefId) -> Option<MirFunctionId> {
+        self.by_source
+            .iter()
+            .find_map(|&(def, id)| (def == source).then_some(id))
     }
 
     fn mark_opaque(&mut self, id: MirFunctionId) {
@@ -267,6 +284,11 @@ impl MirVisitor for Collector<'_> {
             MirCallee::Function(id)
             | MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => {
                 self.mark_opaque(*id);
+            }
+            MirCallee::Definition { source, .. } => {
+                if let Some(id) = self.kernel_of_definition(*source) {
+                    self.mark_opaque(id);
+                }
             }
             MirCallee::Closure(closure) => self.mark_opaque(closure.function),
             _ => {}

@@ -7,6 +7,7 @@
 //! the returned program, but they do not rebuild its kernels, buffers,
 //! launches, or semantic facts.
 
+use super::host_wiring::{HostWiring, Slot, collect_host_wiring};
 use super::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
     DeviceProgramError, DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit,
@@ -231,6 +232,10 @@ struct ProgramBuffer {
     /// persistent state, even when no step kernel consumes it.
     gradient: bool,
     origin: SemanticValueOrigin,
+    /// The kernel slot that minted this buffer, when the host call sites give
+    /// it a known value identity (NAMEJOIN NJ2): a later slot of ANOTHER
+    /// kernel joins by VALUE when its host-value set equals this slot's.
+    host_slot: Option<Slot>,
 }
 
 impl ProgramBuffer {
@@ -240,21 +245,43 @@ impl ProgramBuffer {
     /// Equal element counts are not equal shapes: when both sides carry a
     /// parameter shape vector the vectors must be equal, so a `[3, 8]` and a
     /// `[4, 6]` slot of the same name never share a buffer.
-    fn matches(
-        &self,
-        name: &str,
-        element_ty: MirType,
-        element_count: u64,
-        shape: Option<&[u64]>,
-    ) -> bool {
-        self.name == name
-            && self.element_ty == element_ty
-            && self.element_count == element_count
-            && match (self.shape.as_deref(), shape) {
+    ///
+    /// ACROSS KERNELS a one-sided shape joins only when it cannot be
+    /// inherited by a WRITER: a slot with no shape of its own must not take
+    /// the joined buffer's shape for its output (the dispatcher sizes a
+    /// fresh output from the buffer version's shape). A shapeless READER
+    /// slot (it only consumes) and a buffer whose own slots are all readers
+    /// (nothing writes into it) have nothing to inherit. Two shapeless slots
+    /// (scalars) join. The lenient reading survives only for a join inside
+    /// one function.
+    fn matches(&self, name: &str, slot: &SlotFacts) -> bool {
+        self.name == name && self.matches_value(slot)
+    }
+
+    /// The type/count/shape half of [`Self::matches`]: what a VALUE join
+    /// (equal host-value sets) checks, with no name involved.
+    fn matches_value(&self, slot: &SlotFacts) -> bool {
+        self.element_ty == slot.element_ty
+            && self.element_count == slot.element_count
+            && match (self.shape.as_deref(), slot.shape) {
                 (Some(existing), Some(next)) => existing == next,
-                _ => true,
+                (None, None) => true,
+                _ if !slot.cross_kernel => true,
+                (Some(_), None) => slot.reads,
+                (None, Some(_)) => !self.written,
             }
     }
+}
+
+/// The type, extent, shape and access facts of a joining slot, with whether
+/// the join crosses kernels (see [`ProgramBuffer::matches`]).
+#[derive(Clone, Copy)]
+struct SlotFacts<'a> {
+    element_ty: MirType,
+    element_count: u64,
+    shape: Option<&'a [u64]>,
+    reads: bool,
+    cross_kernel: bool,
 }
 
 /// Training-side facts intentionally stay MIR-owned.  Faber's package layer
@@ -504,6 +531,10 @@ pub fn build_device_program(
             }
         }
     }
+    // Host call-site value identity of the selected kernels (NAMEJOIN NJ2),
+    // read from the validated program's host functions: the buffer-join
+    // authority of a SingleRun program.
+    let wiring = collect_host_wiring(program, &selected_ids);
     let mut builder = KernelBuilder::new(
         interner,
         folded_program,
@@ -511,6 +542,7 @@ pub fn build_device_program(
         companions,
         training,
         param_updates,
+        wiring,
     );
     for function_id in &ordered_ids {
         let function = folded
@@ -763,7 +795,12 @@ struct KernelBuilder<'a> {
     /// buffer. Training and device-resident programs wire kernels through
     /// shared names; a SingleRun program keys residency on host backings, so
     /// each kernel owns its slots and a name coincidence is not a join.
+    ///
+    /// KNOWN VIOLATION of the value-identity rule (register V-01 training
+    /// programs, V-02 device-resident companion programs); not an exemption.
     cross_kernel_name_join: bool,
+    /// Host call-site value identity of the selected kernels' slots.
+    wiring: HostWiring,
 }
 
 impl<'a> KernelBuilder<'a> {
@@ -774,6 +811,7 @@ impl<'a> KernelBuilder<'a> {
         companions: &MirCompanionMap,
         training: Option<&DeviceTrainingFacts>,
         param_updates: BTreeMap<(MirFunctionId, MirLocalId), u32>,
+        wiring: HostWiring,
     ) -> Self {
         let mut gradient_links = BTreeMap::new();
         let persistent_locals = training
@@ -812,6 +850,7 @@ impl<'a> KernelBuilder<'a> {
             builds: Vec::new(),
             cross_kernel_name_join: training.is_some()
                 || companions.iter().any(|entry| entry.device_resident),
+            wiring,
         }
     }
 
@@ -1174,6 +1213,27 @@ impl<'a> KernelBuilder<'a> {
                 None
             };
             let name = buffer_slot_name(kernel_source, self.interner, resource);
+            // The slot's host-value identity key: a parameter slot by its
+            // parameter position, a plain-return output slot by the call
+            // destination. A decomposed kernel's intermediate slots have no
+            // host call site and so no key.
+            let host_slot = resource
+                .source_local
+                .and_then(|local| Slot::of_param_local(kernel_source, local))
+                .or_else(|| {
+                    (resource.role == MirKernelResourceRole::Output
+                        && whole_result
+                        && output_index == Some(0)
+                        && signature.extra_outputs.is_empty())
+                    .then(|| Slot::result(kernel_source.id))
+                });
+            let slot_facts = SlotFacts {
+                element_ty: resource.element_ty,
+                element_count: resource.element_count,
+                shape: shape.as_deref(),
+                reads: resource.access == MirKernelResourceAccess::Read,
+                cross_kernel: false,
+            };
             // The cross-kernel wiring: the same logical buffer appears at
             // this kernel too. The role guard ([`unify_roles`]) keeps a
             // name/shape coincidence from aliasing two unrelated values.
@@ -1208,31 +1268,47 @@ impl<'a> KernelBuilder<'a> {
                 merge_slot_facts(entry, role, resource, shape.as_deref(), is_param_input);
                 entry.id
             } else if let Some(entry) = self.buffers.iter_mut().find(|entry| {
-                // The name+shape wiring is a data-flow continuation, never a
-                // second independent writer: a consumer slot joins any
-                // same-name/same-shape buffer; a producer slot joins only a
-                // buffer with NO writer yet (the reverse-declared
-                // producer→consumer chain).
-                //
-                // A SingleRun program (no training, no device-resident
-                // companion) keeps each kernel's slots its own, except for
-                // that producer→consumer continuation across a writer and a
-                // reader: two readers, or two writers, of one name never
-                // share a buffer.
+                // Two joins reach here. The consumer/producer asymmetry is
+                // shared: a consumer slot joins a buffer that already has a
+                // writer; a producer slot joins only a buffer with NO writer
+                // yet (the reverse-declared producer→consumer chain). Two
+                // readers' slots never make a writer, two writers never share.
                 let continuation = if resource.access == MirKernelResourceAccess::Read {
                     entry.written
                 } else {
                     !entry.written && entry.consumed
                 };
-                (self.cross_kernel_name_join || entry.function == kernel_source.id || continuation)
+                // KNOWN VIOLATION of the value-identity rule (register V-01
+                // training programs, V-02 device-resident companion
+                // programs); not an exemption. A NAME join is legal only
+                // inside one function (the same kernel's own slots) or for
+                // those two program kinds.
+                let by_name = (self.cross_kernel_name_join || entry.function == kernel_source.id)
                     && entry.matches(
                         &name,
-                        resource.element_ty,
-                        resource.element_count,
-                        shape.as_deref(),
+                        &SlotFacts {
+                            cross_kernel: entry.function != kernel_source.id,
+                            ..slot_facts
+                        },
                     )
                     && unify_roles(entry.role, role)
-                    && (resource.access == MirKernelResourceAccess::Read || !entry.written)
+                    && (resource.access == MirKernelResourceAccess::Read || !entry.written);
+                // The VALUE join (NAMEJOIN NJ2): the two slots hold the same
+                // host value(s) at the host call sites, never the same
+                // parameter name. Slots of one kernel never value-join (two
+                // parameters fed one host value are that kernel's own).
+                let by_value = continuation
+                    && host_slot.is_some_and(|slot| {
+                        entry.host_slot.is_some_and(|other| {
+                            other.kernel != slot.kernel && self.wiring.same_host_values(slot, other)
+                        })
+                    })
+                    && entry.matches_value(&SlotFacts {
+                        cross_kernel: true,
+                        ..slot_facts
+                    })
+                    && unify_roles(entry.role, role);
+                by_name || by_value
             }) {
                 merge_slot_facts(entry, role, resource, shape.as_deref(), is_param_input);
                 entry.id
@@ -1260,6 +1336,7 @@ impl<'a> KernelBuilder<'a> {
                     param: is_param_input,
                     gradient: false,
                     origin: value_origin(kernel_source, resource, id),
+                    host_slot,
                 });
                 id
             };
