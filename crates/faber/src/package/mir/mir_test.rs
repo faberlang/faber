@@ -11,7 +11,6 @@ use super::bin_runner::{
     make_fmir_bin_entrypoint_executable, render_fmir_bin_runner_main_rs, toml_basic_string_path,
 };
 use super::*;
-use radix::module::diagnostics::Diagnostic;
 use radix::program::mir::DeviceSelection;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -180,48 +179,7 @@ fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     assert_eq!(seed.values, vec![1.0]);
 }
 
-// ── RSM-4: fail-closed stats + device-route refusal (seam hook) ──────────
-
-/// The `(image, selection, stats_requested)` fact observed at the faber
-/// `host_route` seam, recorded before the body's device decision.
-struct SeamObservation {
-    device_bearing: bool,
-    selection: DeviceSelection,
-    stats_requested: bool,
-}
-
-thread_local! {
-    static SEAM_OBSERVATIONS: std::cell::RefCell<Vec<SeamObservation>> =
-        const { std::cell::RefCell::new(Vec::new()) };
-}
-
-fn spying_host_route(
-    image: &radix::program::mir::FmirPackageImage,
-    selection: DeviceSelection,
-    stats_requested: bool,
-) -> Result<Option<()>, Vec<Diagnostic>> {
-    SEAM_OBSERVATIONS.with(|observations| {
-        observations.borrow_mut().push(SeamObservation {
-            device_bearing: image.device.is_some(),
-            selection,
-            stats_requested,
-        })
-    });
-    host_route(image, selection, stats_requested)
-}
-
-/// The real faber seam bundle with a recording wrapper around the seam body:
-/// the observation proves the transported fact, the forwarded body proves
-/// the faber-owned refusal decision.
-fn spying_mir_seams() -> radix::program::mir::MirSeams {
-    let mut seams = faber_mir_seams();
-    seams.host_route = spying_host_route;
-    seams
-}
-
-fn take_seam_observations() -> Vec<SeamObservation> {
-    SEAM_OBSERVATIONS.with(|observations| std::mem::take(&mut *observations.borrow_mut()))
-}
+// ── RSM-4 / gpu-reset C2 U7: the runner route and device selections ──────
 
 fn write_stats_route_package(label: &str, source: &str) -> crate::package::test_support::TestDir {
     let dir = crate::package::test_support::test_temp_dir(label);
@@ -230,40 +188,9 @@ fn write_stats_route_package(label: &str, source: &str) -> crate::package::test_
 }
 
 #[test]
-fn host_route_seam_refuses_stats_requested_before_device_route() {
-    let dir = write_stats_route_package("seam-stats-device-refused", "main { print 1 }\n");
-    let entry = dir.path().join("main.fab");
-    let mut host = radix::module::mir::BufferHost::default();
-
-    let err = radix::program::mir::run_package_mir_with_selection_and_stats(
-        &radix::module::driver::Config::default(),
-        &entry,
-        DeviceSelection::Metal,
-        true,
-        &spying_mir_seams(),
-        &mut host,
-    )
-    .expect_err("stats + a device route must refuse at the seam");
-
-    assert!(
-        err.iter()
-            .any(|diag| diag.issue() == Some("run_stats_device_route_unsupported")),
-        "the seam must refuse with the stats identity, not a device failure: {err:?}"
-    );
-
-    let observations = take_seam_observations();
-    assert_eq!(observations.len(), 1, "exactly one seam observation");
-    assert!(
-        observations[0].stats_requested,
-        "the explicit stats fact reaches the seam"
-    );
-    assert_eq!(observations[0].selection, DeviceSelection::Metal);
-}
-
-#[test]
-fn host_route_seam_stats_on_cpu_auto_keeps_interpreter_and_collects() {
+fn runner_route_stats_on_cpu_auto_keeps_interpreter_and_collects() {
     let dir = write_stats_route_package(
-        "seam-stats-cpu-collects",
+        "route-stats-cpu-collects",
         "fn labor() → int {\n    return 42\n}\n\nmain {\n    print labor()\n}\n",
     );
     let entry = dir.path().join("main.fab");
@@ -273,20 +200,10 @@ fn host_route_seam_stats_on_cpu_auto_keeps_interpreter_and_collects() {
         &radix::module::driver::Config::default(),
         &entry,
         DeviceSelection::Auto,
-        true,
-        &spying_mir_seams(),
+        &faber_mir_seams(),
         &mut host,
     )
     .expect("CPU/auto with stats stays on the interpreter");
-
-    let observations = take_seam_observations();
-    assert_eq!(observations.len(), 1, "exactly one seam observation");
-    assert!(observations[0].stats_requested);
-    assert!(
-        !observations[0].device_bearing,
-        "the CPU image carries no device route"
-    );
-    assert_eq!(observations[0].selection, DeviceSelection::Auto);
 
     assert_eq!(
         host.stdout_lines,
@@ -306,49 +223,37 @@ fn host_route_seam_stats_on_cpu_auto_keeps_interpreter_and_collects() {
 }
 
 #[test]
-fn host_route_seam_no_stats_callers_pass_false_and_keep_device_semantics() {
-    let dir = write_stats_route_package("seam-no-stats-false", "main { print 1 }\n");
+fn runner_route_explicit_gpu_selection_fails_closed_with_or_without_stats() {
+    let dir = write_stats_route_package("route-gpu-refused", "main { print 1 }\n");
     let entry = dir.path().join("main.fab");
 
-    // The unstatsed selection route is an existing caller: it passes the
-    // explicit `false` and the CPU/auto route stays on the interpreter.
-    let mut host = radix::module::mir::BufferHost::default();
-    radix::program::mir::run_package_mir_with_selection(
-        &radix::module::driver::Config::default(),
-        &entry,
-        DeviceSelection::Auto,
-        &spying_mir_seams(),
-        &mut host,
-    )
-    .expect("the unstatsed CPU/auto route keeps the interpreter");
-    let observations = take_seam_observations();
-    assert_eq!(observations.len(), 1);
-    assert!(
-        !observations[0].stats_requested,
-        "unstatsed callers pass false"
-    );
-    assert_eq!(host.stdout_lines, vec!["1".to_owned()]);
-
-    // The stats-capable route with an explicit `false` reproduces the
-    // unstatsed device semantics: the fail-closed refusal keeps the
-    // device identity, never the stats identity.
-    let mut device_host = radix::module::mir::BufferHost::default();
-    let err = radix::program::mir::run_package_mir_with_selection_and_stats(
-        &radix::module::driver::Config::default(),
-        &entry,
-        DeviceSelection::Metal,
-        false,
-        &spying_mir_seams(),
-        &mut device_host,
-    )
-    .expect_err("an explicit device selection fails closed (no `device-runtime` in this build)");
-    assert!(
-        !err.iter()
-            .any(|diag| diag.issue() == Some("run_stats_device_route_unsupported")),
-        "a false stats fact must not produce the stats refusal: {err:?}"
-    );
-    let observations = take_seam_observations();
-    assert_eq!(observations.len(), 1);
-    assert!(!observations[0].stats_requested);
-    assert_eq!(observations[0].selection, DeviceSelection::Metal);
+    for stats in [true, false] {
+        let mut host = radix::module::mir::BufferHost::default();
+        let err = if stats {
+            radix::program::mir::run_package_mir_with_selection_and_stats(
+                &radix::module::driver::Config::default(),
+                &entry,
+                DeviceSelection::Metal,
+                &faber_mir_seams(),
+                &mut host,
+            )
+            .err()
+        } else {
+            radix::program::mir::run_package_mir_with_selection(
+                &radix::module::driver::Config::default(),
+                &entry,
+                DeviceSelection::Metal,
+                &faber_mir_seams(),
+                &mut host,
+            )
+            .err()
+        }
+        .expect("the runner route cannot serve an explicit GPU selection");
+        assert!(
+            err.iter()
+                .any(|diag| diag.message.contains("explicit device selection `metal`")),
+            "stats={stats}: {err:?}"
+        );
+        assert!(host.stdout_lines.is_empty(), "the CPU leg must not run");
+    }
 }

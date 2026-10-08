@@ -31,9 +31,10 @@ const BUDGETS: Budgets = Budgets {
     unreachable: 2,
     todo: 0,
     unimplemented: 0,
-    // WHY: six documented discards — unused device-runtime cfg tuple in
-    // mir/mod.rs, three Drop best-effort cleanups in host_spawn.rs
-    // (kill, wait, workdir teardown), and the two eval bindings consumed
+    // WHY: documented discards — unused device-runtime cfg tuple in
+    // mir/mod.rs (the three Drop cleanups of the retired child-process
+    // route went with it, gpu-reset C2 U7; the budget is a ceiling),
+    // and the two eval bindings consumed
     // only under the runner feature in commands/mod.rs (b24d13148 gates the
     // runner-only MIR surface; without the feature both stay unused).
     let_underscore: 6,

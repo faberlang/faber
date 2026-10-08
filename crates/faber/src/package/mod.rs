@@ -46,7 +46,6 @@ mod fhir;
 mod go_build;
 #[cfg(feature = "device-runtime")]
 mod host_factory;
-pub(crate) mod host_spawn;
 #[cfg_attr(not(feature = "hir-rust"), path = "library_link_unavailable.rs")]
 mod library_link;
 #[cfg(feature = "mir-llvm")]
@@ -68,6 +67,7 @@ pub(crate) use binding::verify_library_binding_shapes;
 pub use binding::{load_target_bindings, verify_library_bindings};
 pub(crate) use cargo::{
     RustRuntimePlan, package_host_selection_diagnostic, rust_runtime_plan_for_package,
+    unique_temp_sibling,
 };
 #[cfg(test)]
 pub(crate) use cargo::{
@@ -84,11 +84,6 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
-#[cfg(feature = "device-runtime")]
-pub(crate) use device::execute_device_route;
-#[cfg(feature = "device-runtime")]
-#[cfg(test)]
-pub(crate) use device::host_partition_for_lowered;
 pub(crate) use dispatch::{
     ProviderManifest, load_provider_manifests, selected_providers_for_routes,
 };
@@ -513,11 +508,6 @@ mod test_support;
 
 #[cfg(test)]
 mod library_resolver_lock_test;
-
-#[cfg(test)]
-#[cfg(feature = "device-runtime")]
-#[path = "ngab1_host_partition_test.rs"]
-mod ngab1_host_partition_test;
 
 #[cfg(test)]
 mod frontmatter_integration_test;

@@ -35,8 +35,10 @@ use std::fs;
 #[cfg(feature = "runner")]
 use std::path::Path;
 
+#[cfg(feature = "device-runtime")]
+use radix::program::mir::DeviceSelection;
 #[cfg(feature = "runner")]
-use radix::program::mir::{DeviceSelection, mir_diag};
+use radix::program::mir::mir_diag;
 
 // Faber's fmir-bin runner writer is the seam body radix-program's binary
 // bundle builder receives (`MirSeams::bin_runner_writer`).
@@ -54,7 +56,6 @@ pub fn faber_mir_seams() -> radix::program::mir::MirSeams {
         library_cache_for_config: super::library_cache_with_config,
         device_config_for_input: manifest::manifest_device_config,
         device_section_builder,
-        host_route,
         bin_runner_writer: write_fmir_bin_runner,
         toolchain_version: env!("CARGO_PKG_VERSION"),
     }
@@ -209,64 +210,6 @@ fn device_section_builder(
     }
 }
 
-/// The faber host-construction policy (N1.1/N1.5, S1-6): decide whether a
-/// loaded image runs on the CPU/FMIR runner or a device route, and execute
-/// the device route when selected. `Ok(None)` runs the CPU route with the
-/// caller's host; `Ok(Some(()))` means the device route already executed.
-/// `stats_requested` is the explicit CLI-originated fact transported by the
-/// radix-program route (RSM-2); a stats request on a route that will not run
-/// the interpreter — a device-bearing image (device route) or an explicit
-/// device selection — refuses here before any device callback/launch
-/// (RSM-4, fail closed; never silently empty numbers).
-#[cfg(feature = "runner")]
-fn host_route(
-    image: &radix::program::mir::FmirPackageImage,
-    selection: DeviceSelection,
-    stats_requested: bool,
-) -> Result<Option<()>, Vec<Diagnostic>> {
-    // The cpu selection runs the program on the MIR runner: no device route is
-    // taken even when the image carries a device section, and stats are the
-    // ordinary runner stats.
-    if selection == DeviceSelection::Cpu {
-        return Ok(None);
-    }
-    if stats_requested && (image.device.is_some() || selection != DeviceSelection::Auto) {
-        return Err(vec![mir_issue_diag(
-            &image.diagnostic_path,
-            "run_stats_device_route_unsupported",
-            "run statistics (`--stats`/`--stats-file`) require the interpreted CPU route; this image executes a device route through the host driver that never runs the interpreter, so the stats request is refused",
-        )]);
-    }
-    // DDPP1-U2 (C2 feature isolation): the device route is compiled only under
-    // `device-runtime`; without it an explicit device request or a
-    // device-bearing image fails closed (never silently runs CPU).
-    #[cfg(feature = "device-runtime")]
-    {
-        if let Some(device) = &image.device {
-            super::execute_device_route(device, selection, &image.source_hashes)?;
-            return Ok(Some(()));
-        }
-        if selection != DeviceSelection::Auto {
-            return Err(vec![mir_diag(
-                &image.diagnostic_path,
-                "explicit device selection requires a device image; CPU-only images never silently fall back",
-            )]);
-        }
-        Ok(None)
-    }
-    #[cfg(not(feature = "device-runtime"))]
-    {
-        let requires_device = image.device.is_some();
-        if selection != DeviceSelection::Auto || requires_device {
-            return Err(vec![mir_diag(
-                &image.diagnostic_path,
-                "device section or explicit device selection present, but this faber build compiles no `device-runtime`; rebuild with the `device-runtime` feature to execute device routes",
-            )]);
-        }
-        Ok(None)
-    }
-}
-
 /// Public package-MIR callback for external backend harnesses: forward to the
 /// moved compiler driver with the faber seams.
 #[cfg(feature = "runner")]
@@ -415,7 +358,12 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
         MemoryBudget::new(DEVICE_RUN_MEMORY_BUDGET_BYTES),
     )
     .map_err(|diagnostic| vec![diagnostic])?
-    .ok_or_else(|| vec![mir_diag(input, "no device was admitted for the device route")])?;
+    .ok_or_else(|| {
+        vec![mir_diag(
+            input,
+            "no device was admitted for the device route",
+        )]
+    })?;
     let receipt = discovery_receipt(&opened);
     let backend = match receipt.class {
         DeviceClass::Backend(DeviceBackend::Metal) => DeviceImageBackend::Metal,
@@ -433,8 +381,8 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
             ]);
         }
     };
-    let session = DeviceSession::from_opened(opened)
-        .map_err(|error| vec![host_error_diagnostic(&error)])?;
+    let session =
+        DeviceSession::from_opened(opened).map_err(|error| vec![host_error_diagnostic(&error)])?;
     receipt.print();
 
     let mut session = Some(session);
@@ -460,9 +408,11 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
                     .with_arg("code", "E_DEVICE_NONE_ADMITTED".to_owned()),
                 ]);
             }
-            let interner = validated.validation().interner.as_interner().ok_or_else(|| {
-                vec![mir_diag(input, "device run requires interner context")]
-            })?;
+            let interner = validated
+                .validation()
+                .interner
+                .as_interner()
+                .ok_or_else(|| vec![mir_diag(input, "device run requires interner context")])?;
             let names = radix_mir::names::MirNames::new(
                 validated.program(),
                 validated.validation().types.as_table(),
@@ -543,9 +493,12 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub fn package_declares_kernels(config: &Config, input: &Path) -> Result<bool, Vec<Diagnostic>> {
     with_interpreted_lowered_package_mir(config, input, |lowered| {
-        lowered.validated.program().functions.iter().any(|function| {
-            function.shader_stage == Some(radix_mir::MirKernelShaderStage::Compute)
-        })
+        lowered
+            .validated
+            .program()
+            .functions
+            .iter()
+            .any(|function| function.shader_stage == Some(radix_mir::MirKernelShaderStage::Compute))
     })
 }
 

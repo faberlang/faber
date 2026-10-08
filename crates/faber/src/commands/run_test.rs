@@ -356,39 +356,46 @@ fn assert_no_stats_artifact(output: &std::process::Output, stats_file: &Path) {
     );
 }
 
-fn assert_refusal_names_stats_device_incompatibility(stderr: &str) {
+/// D4 (gpu-reset C2): stats with an explicit device are no longer refused for
+/// being stats. The binary either dispatches (hosts with an admitted device;
+/// host rows plus the `device: dispatched (not measured)` marker) or fails
+/// closed for the device (no admitted device, or a build without
+/// `device-runtime`); it never emits the retired stats refusal.
+fn assert_stats_device_run_follows_d4(output: &std::process::Output, stats_file: &Path) {
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("run statistics") && stderr.contains("device route"),
-        "refusal diagnostic must name the stats/device incompatibility: {stderr}"
+        !stderr.contains("run_stats_device_route_unsupported")
+            && !stderr.contains("require the interpreted CPU route"),
+        "the retired stats/device refusal must not appear: {stderr}"
     );
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("device: dispatched (not measured)") || stats_file.exists(),
+            "a dispatching stats run must report the D4 marker: {stdout}"
+        );
+    } else {
+        assert_no_stats_artifact(output, stats_file);
+    }
 }
 
 #[test]
-fn route_stats_cli_device_refusal_exits_nonzero_without_artifact() {
-    let dir = temp_dir("stats-cli-device-metal-cli-refused");
+fn route_stats_cli_device_run_follows_d4_without_the_retired_refusal() {
+    let dir = temp_dir("stats-cli-device-metal-cli-d4");
     std::fs::write(dir.join("main.fab"), "main { print 1 }\n").expect("write entry");
 
-    let stats_file = dir.join("refused.json");
+    let stats_file = dir.join("stats.json");
     let file_arg = stats_file.to_str().expect("UTF-8 stats path");
     let output = run_faber_binary(
         &dir,
         &["--stats", "--stats-file", file_arg, "--device", "metal"],
     );
-    assert!(
-        !output.status.success(),
-        "stats + explicit device must exit nonzero: {:?}",
-        output.status
-    );
-    assert_refusal_names_stats_device_incompatibility(&String::from_utf8_lossy(&output.stderr));
-    assert_no_stats_artifact(&output, &stats_file);
+    assert_stats_device_run_follows_d4(&output, &stats_file);
 }
 
 #[test]
-fn route_stats_manifest_device_refusal_exits_nonzero_without_artifact() {
-    // No CLI `--device`: the manifest-declared selection reaches the seam,
-    // which refuses before any device callback/launch (the seam is observed
-    // refusing, not the device failing).
-    let dir = temp_dir("stats-manifest-metal-seam-refused");
+fn route_stats_manifest_device_run_follows_d4_without_the_retired_refusal() {
+    let dir = temp_dir("stats-manifest-metal-d4");
     std::fs::create_dir_all(dir.join("src")).expect("create src");
     std::fs::write(dir.join("src/main.fab"), "main { print 1 }\n").expect("write entry");
     std::fs::write(
@@ -411,30 +418,10 @@ device = "metal"
     )
     .expect("write manifest");
 
-    let stats_file = dir.join("refused.json");
+    let stats_file = dir.join("stats.json");
     let file_arg = stats_file.to_str().expect("UTF-8 stats path");
     let output = run_faber_binary(&dir, &["--stats", "--stats-file", file_arg]);
-    assert!(
-        !output.status.success(),
-        "manifest-declared device selection + stats must exit nonzero: {:?}",
-        output.status
-    );
-    assert_refusal_names_stats_device_incompatibility(&String::from_utf8_lossy(&output.stderr));
-    assert_no_stats_artifact(&output, &stats_file);
-
-    // No-stats callers keep the existing device semantics (here: the
-    // fail-closed device refusal of a build without `device-runtime`), and
-    // the refusal identity is the device one, not the stats one.
-    let unstatsed = run_faber_binary(&dir, &[]);
-    assert!(
-        !unstatsed.status.success(),
-        "the no-stats device route keeps its existing fail-closed refusal"
-    );
-    let unstatsed_stderr = String::from_utf8_lossy(&unstatsed.stderr);
-    assert!(
-        !unstatsed_stderr.contains("run statistics"),
-        "the no-stats refusal must not be the stats refusal: {unstatsed_stderr}"
-    );
+    assert_stats_device_run_follows_d4(&output, &stats_file);
 }
 
 // ── run dispatch: the package-MIR runner with a selection ────────────────

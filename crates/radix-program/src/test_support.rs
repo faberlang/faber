@@ -17,7 +17,7 @@ use radix_module::driver::Config;
 use crate::analyze::AnalysisSeams;
 use crate::discovery::PackageSpec;
 use crate::library::{LibraryResolver, LockedLibraryPackage};
-use crate::mir::{DeviceManifestConfig, DeviceSelection, MirSeams, PreparedPackageMir};
+use crate::mir::{DeviceManifestConfig, MirSeams, PreparedPackageMir};
 
 /// The reader pack selected by the CLI locale or the package's `[locale]`
 /// (`[reader]` legacy alias) manifest section, loaded from the workspace
@@ -171,15 +171,6 @@ fn test_device_section_builder(
     Ok(None)
 }
 
-/// The moved mir tests run the CPU/FMIR route only (no device routing).
-fn test_host_route(
-    _image: &crate::mir::FmirPackageImage,
-    _selection: DeviceSelection,
-    _stats_requested: bool,
-) -> Result<Option<()>, Vec<Diagnostic>> {
-    Ok(None)
-}
-
 /// The moved mir tests never write an fmir-bin runner crate.
 fn test_bin_runner_writer(
     _artifact_root: &Path,
@@ -199,7 +190,6 @@ pub fn test_mir_seams() -> MirSeams {
         library_cache_for_config: test_library_cache_for_config,
         device_config_for_input: test_device_config_for_input,
         device_section_builder: test_device_section_builder,
-        host_route: test_host_route,
         bin_runner_writer: test_bin_runner_writer,
         toolchain_version: "test-toolchain",
     }

@@ -9,7 +9,7 @@ use super::{
     FmirPackageImage, FmirPackageImageFormat, Host, MirSeams, PACKAGE_MIR_MANIFEST_FILE,
     PackageFmirBinaryBundle, PackageFmirImage, PackageFmirTextImage, PackageMirArtifact, Path,
     PathBuf, RunnerKernelPolicy, RunnerStats, fmir_package_image_from_lowered, fs, load_fmir_image,
-    load_fmir_text_image, mir_diag, package_artifact_dir, package_artifact_root,
+    load_fmir_text_image, mir_diag, mir_issue_diag, package_artifact_dir, package_artifact_root,
     package_fmir_binary_image, package_fmir_text_image, package_mir_manifest,
     run_fmir_package_image, run_fmir_package_image_with_stats, validate_package_mir_manifest,
     with_prepared_package_mir, with_prepared_package_mir_from_loaded,
@@ -84,14 +84,13 @@ pub fn with_interpreted_bound_package_mir<R, H: Host + ?Sized>(
             &mut validation,
             &super::image::snapshot_validation_metadata(lowered.validated.validation()),
         );
-        let validated = radix_module::mir::ValidatedMir::new(program, validation).map_err(
-            |errors| {
+        let validated =
+            radix_module::mir::ValidatedMir::new(program, validation).map_err(|errors| {
                 errors
                     .into_iter()
                     .map(|error| mir_diag(&prepared.entry_path, error.message))
                     .collect::<Vec<_>>()
-            },
-        )?;
+            })?;
         run(lowered, &validated, prepared.cli_exit_code, host)
     })
 }
@@ -121,7 +120,7 @@ pub fn run_package_mir<H: Host + ?Sized>(
         // program, and the resolved selection applies before launch — a
         // device-bearing image runs through the composite host's device route
         // (host driver); anything else runs the CPU/FMIR runner.
-        run_loaded_fmir_image_route(image, seams, host)
+        run_loaded_fmir_image_route(image, host)
     })
 }
 
@@ -150,23 +149,20 @@ pub fn run_package_mir_with_selection<H: Host + ?Sized>(
             FmirPackageImageFormat::Source,
             seams,
         )?;
-        run_loaded_fmir_image_route_with_selection(image, selection, seams, host)
+        run_loaded_fmir_image_route_with_selection(image, selection, host)
     })
 }
 
 /// [`run_package_mir_with_selection`] with the opt-in diagnostic meter (RSM
-/// route transport): `stats_requested` is the explicit CLI-originated fact —
-/// carried through the host-route seam ahead of the device decision and
-/// arming the CPU/FMIR leg's collector. `false` reproduces the unmetered
-/// route; the single-source route is intentionally out of scope (refused by
-/// the faber CLI layer, RSM-3).
+/// route transport): the CPU/FMIR leg collects the runner summary. The
+/// single-source route is intentionally out of scope (refused by the faber CLI
+/// layer, RSM-3).
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_mir_with_selection_and_stats<H: Host + ?Sized>(
     config: &Config,
     input: &Path,
     selection: DeviceSelection,
-    stats_requested: bool,
     seams: &MirSeams,
     host: &mut H,
 ) -> Result<PackageRunStats, Vec<Diagnostic>> {
@@ -183,13 +179,7 @@ pub fn run_package_mir_with_selection_and_stats<H: Host + ?Sized>(
             FmirPackageImageFormat::Source,
             seams,
         )?;
-        run_loaded_fmir_image_route_with_selection_and_stats(
-            image,
-            selection,
-            stats_requested,
-            seams,
-            host,
-        )
+        run_loaded_fmir_image_route_with_selection_and_stats(image, selection, host)
     })
 }
 
@@ -348,7 +338,7 @@ pub fn run_package_fmir_built_image<H: Host + ?Sized>(
                 FMIR_IMAGE_FILE,
                 encoded,
             )?;
-            run_loaded_fmir_image_route_with_selection(image, selection, seams, host)
+            run_loaded_fmir_image_route_with_selection(image, selection, host)
         },
     )
 }
@@ -429,7 +419,7 @@ pub fn run_package_fmir_text_image<H: Host + ?Sized>(
         )]
     })?;
     let loaded = load_fmir_text_image(&image_text, &image.image_path, seams.toolchain_version)?;
-    run_loaded_fmir_image_route(loaded, seams, host)
+    run_loaded_fmir_image_route(loaded, host)
 }
 
 /// # Errors
@@ -447,7 +437,7 @@ pub fn run_package_fmir_text_image_with_selection<H: Host + ?Sized>(
         )]
     })?;
     let loaded = load_fmir_text_image(&image_text, &image.image_path, seams.toolchain_version)?;
-    run_loaded_fmir_image_route_with_selection(loaded, selection, seams, host)
+    run_loaded_fmir_image_route_with_selection(loaded, selection, host)
 }
 
 /// # Errors
@@ -471,19 +461,53 @@ pub fn run_package_fmir_image_with_selection<H: Host + ?Sized>(
     run_fmir_image_path_with_selection(&image.image_path, Some(selection), seams, host)
 }
 
-/// **The one host-construction policy on the image-runner routes** (N1.1/
-/// N1.5, S1-6): resolve the loaded image's selection against the machine's
-/// admitted backends; a device-bearing image that resolves runs through the
-/// composite host's device route (S1-6 launch seam), anything else runs the
-/// CPU/FMIR runner. Fail-closed diagnostics; an explicit GPU request never
-/// silently falls back. The policy body is faber's [`MirSeams::host_route`].
+/// Admit a loaded image to the CPU/FMIR runner route, or fail closed.
+///
+/// The child-process device route is retired (gpu-reset C2 U7). Device
+/// execution is the in-process session, which needs a lowered unit that a
+/// loaded image does not carry, so this route never executes a device:
+///
+/// - `cpu` runs the image on the runner (kernels in host form), even when the
+///   image carries a device section;
+/// - a device-bearing image under any other selection fails with
+///   `E_DEVICE_IMAGE_ROUTE_RETIRED`;
+/// - an explicit GPU selection with no device section fails closed.
+fn admit_runner_route(
+    image: &FmirPackageImage,
+    selection: DeviceSelection,
+) -> Result<(), Vec<Diagnostic>> {
+    if selection == DeviceSelection::Cpu {
+        return Ok(());
+    }
+    if image.device.is_some() {
+        return Err(vec![mir_issue_diag(
+            &image.diagnostic_path,
+            "E_DEVICE_IMAGE_ROUTE_RETIRED",
+            "this FMIR image carries a device section, and the child-process device route that ran such images is retired; device execution is the in-process device session, which needs the package source (`faber run <package>`), not a packaged image. Pass `--device cpu` to run the image's kernels on the host-form runner",
+        )]);
+    }
+    if selection != DeviceSelection::Auto {
+        return Err(vec![mir_diag(
+            &image.diagnostic_path,
+            format!(
+                "explicit device selection `{}` cannot run on the CPU/FMIR runner route; device execution runs through the in-process device session (`faber run` of a package built with `device-runtime`), and CPU-only images never silently fall back",
+                selection.spelling()
+            ),
+        )]);
+    }
+    Ok(())
+}
+
+/// **The runner route over a loaded image** (N1.1/N1.5): resolve the image's
+/// selection and run it on the CPU/FMIR runner. A device-bearing image never
+/// runs here (see [`admit_runner_route`]); an explicit GPU request never
+/// silently falls back.
 pub(super) fn run_loaded_fmir_image_route<H: Host + ?Sized>(
     image: FmirPackageImage,
-    seams: &MirSeams,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
     let selection = image.route_selection()?;
-    run_loaded_fmir_image_route_with_selection(image, selection, seams, host)
+    run_loaded_fmir_image_route_with_selection(image, selection, host)
 }
 
 /// The same policy with an explicit selection override (the image-runner
@@ -492,39 +516,22 @@ pub(super) fn run_loaded_fmir_image_route<H: Host + ?Sized>(
 pub(super) fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
     image: FmirPackageImage,
     selection: DeviceSelection,
-    seams: &MirSeams,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
-    // The one host-construction policy (faber-supplied seam): the faber side
-    // resolves the selection against the machine's admitted backends, runs a
-    // device-bearing image through the composite host's device route, and
-    // fails closed on unsupported requests. `Ok(Some(()))` means the device
-    // route already executed; `Ok(None)` runs the CPU/FMIR runner with the
-    // caller's host. Non-stats callers carry the explicit `false`.
-    if (seams.host_route)(&image, selection, false)?.is_some() {
-        return Ok(());
-    }
+    admit_runner_route(&image, selection)?;
     run_fmir_package_image(image, host, selection.kernel_policy())
 }
 
 /// [`run_loaded_fmir_image_route_with_selection`] with the opt-in diagnostic
-/// meter (RSM route transport): the explicit `stats_requested` fact reaches
-/// the seam ahead of the device decision; a device route executes with the
-/// composite host and records no interpreter rows (the stats+device refusal
-/// is the faber seam owner's decision, RSM-4).
+/// meter (RSM route transport): the CPU/FMIR leg arms the collector. Stats do
+/// not change the route decision; a device-bearing image or explicit GPU
+/// selection fails closed exactly as it does without stats.
 pub(super) fn run_loaded_fmir_image_route_with_selection_and_stats<H: Host + ?Sized>(
     image: FmirPackageImage,
     selection: DeviceSelection,
-    stats_requested: bool,
-    seams: &MirSeams,
     host: &mut H,
 ) -> Result<PackageRunStats, Vec<Diagnostic>> {
-    if (seams.host_route)(&image, selection, stats_requested)?.is_some() {
-        return Ok(PackageRunStats {
-            stats: RunnerStats::default(),
-            result: Ok(()),
-        });
-    }
+    admit_runner_route(&image, selection)?;
     run_fmir_package_image_with_stats(image, host, selection.kernel_policy())
 }
 
@@ -559,7 +566,7 @@ pub fn run_fmir_image_path_with_selection<H: Host + ?Sized>(
         Some(selection) => selection,
         None => loaded.route_selection()?,
     };
-    run_loaded_fmir_image_route_with_selection(loaded, selection, seams, host)
+    run_loaded_fmir_image_route_with_selection(loaded, selection, host)
 }
 
 /// S1-5 route decision for a binary FMIR image (the image-runner route of the
@@ -619,15 +626,7 @@ pub fn run_fmir_image_bytes_with_stdio(
 ) -> Result<(), Vec<Diagnostic>> {
     let loaded = load_fmir_image(image_bytes, diagnostic_path, seams.toolchain_version)?;
     let selection = loaded.route_selection()?;
-    // The one host-construction policy (faber-supplied seam): the faber side
-    // resolves the selection against the machine's admitted backends, runs a
-    // device-bearing image through the composite host's device route, and
-    // fails closed on unsupported requests. `Ok(Some(()))` means the device
-    // route already executed; `Ok(None)` runs the CPU/FMIR runner with the
-    // stdio host. The generated-runner stdio route never requests stats.
-    if (seams.host_route)(&loaded, selection, false)?.is_some() {
-        return Ok(());
-    }
+    admit_runner_route(&loaded, selection)?;
     let mut host = radix_module::mir::StdioHost::with_argumenta(argumenta);
     run_fmir_package_image(loaded, &mut host, selection.kernel_policy())
 }

@@ -92,19 +92,6 @@ pub type DeviceSectionBuilder = fn(
     &Path,
 ) -> Result<Option<FmirDeviceSection>, Vec<Diagnostic>>;
 
-/// The one host-construction policy (N1.1/N1.5, S1-6): decides whether a
-/// loaded image runs on the CPU/FMIR runner or a device route, and executes
-/// the device route when selected. `Ok(None)` runs the CPU route with the
-/// caller's host; `Ok(Some(()))` means the device route already executed.
-/// The explicit `stats_requested` fact (RSM route transport) reaches the
-/// policy before the device decision so the owner can refuse stats+device
-/// requests fail-closed; non-stats callers pass `false`.
-pub type HostRoutePolicy = fn(
-    image: &FmirPackageImage,
-    selection: DeviceSelection,
-    stats_requested: bool,
-) -> Result<Option<()>, Vec<Diagnostic>>;
-
 /// Generated fmir-bin runner crate writer (faber's `bin_runner.rs`): writes
 /// the runner crate and invokes `cargo build`. Toolchain invocation is faber
 /// product; the binary-bundle builder receives the writer.
@@ -120,7 +107,7 @@ pub type BinRunnerWriter = fn(
 ///
 /// Mirrors the RP3/RP4 `AnalysisSeams`/`EmissionSeams` posture: every faber
 /// product input (executed-lane target, library resolver/cache, `[device]`
-/// projection, device-section builder, host route policy, fmir-bin runner
+/// projection, device-section builder, fmir-bin runner
 /// writer, toolchain version) enters as an explicit function — no ambient env
 /// reads, no faber product dependency inside `radix-program`
 /// (package-api.md §3/§5).
@@ -131,7 +118,6 @@ pub struct MirSeams {
     pub library_cache_for_config: LibraryCacheForConfig,
     pub device_config_for_input: DeviceConfigForInput,
     pub device_section_builder: DeviceSectionBuilder,
-    pub host_route: HostRoutePolicy,
     pub bin_runner_writer: BinRunnerWriter,
     /// The toolchain version recorded in FMIR images (`faber_cli_version`
     /// field) and validated at decode. Faber's `CARGO_PKG_VERSION` (the

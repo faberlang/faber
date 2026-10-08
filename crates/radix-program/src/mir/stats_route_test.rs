@@ -1,13 +1,11 @@
-//! RSM-2 route-transport tests: the stats-capable package run route.
+//! RSM-2 route tests: the stats-capable package run route.
 //!
-//! Proves the explicit `stats_requested` fact reaches the widened
-//! `HostRoutePolicy` seam ahead of the device decision, that the CPU/FMIR
-//! stats leg returns the collected summary beside the started run's status,
-//! and that existing non-stats callers carry the explicit `false`.
+//! Proves the CPU/FMIR stats leg returns the collected summary beside the
+//! started run's status, and that a device-bearing image or explicit GPU
+//! selection fails closed on the runner route (gpu-reset C2 U7).
 
 use super::*;
 use radix_module::mir::BufferHost;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 
@@ -44,39 +42,6 @@ const RUNTIME_ERROR_MAIN: &str =
     "main {\n    print \"before\"\n    const list<int> base ← [1, 2]\n    print base[5]\n}\n";
 const COMPILE_ERROR_MAIN: &str = "main {\n    print numquam\n}\n";
 
-// ── seam spies ──────────────────────────────────────────────────────────────
-
-static SPY_SEEN: AtomicBool = AtomicBool::new(false);
-static SPY_STATS_REQUESTED: AtomicBool = AtomicBool::new(false);
-
-/// CPU-route spy: records the transported fact and keeps the interpreter on
-/// the route (`Ok(None)`), mirroring the production no-device posture.
-fn spy_host_route(
-    _image: &FmirPackageImage,
-    _selection: DeviceSelection,
-    stats_requested: bool,
-) -> Result<Option<()>, Vec<Diagnostic>> {
-    SPY_SEEN.store(true, Ordering::SeqCst);
-    SPY_STATS_REQUESTED.store(stats_requested, Ordering::SeqCst);
-    Ok(None)
-}
-
-/// Device-route spy: records the transported fact and reports the device
-/// route as already executed, proving the fact arrives before the route
-/// decision consumes it.
-static SPY_DEVICE_SEEN: AtomicBool = AtomicBool::new(false);
-static SPY_DEVICE_STATS_REQUESTED: AtomicBool = AtomicBool::new(false);
-
-fn spy_device_host_route(
-    _image: &FmirPackageImage,
-    _selection: DeviceSelection,
-    stats_requested: bool,
-) -> Result<Option<()>, Vec<Diagnostic>> {
-    SPY_DEVICE_SEEN.store(true, Ordering::SeqCst);
-    SPY_DEVICE_STATS_REQUESTED.store(stats_requested, Ordering::SeqCst);
-    Ok(Some(()))
-}
-
 // ── focused tests ───────────────────────────────────────────────────────────
 
 #[test]
@@ -90,7 +55,6 @@ fn stats_package_run_returns_per_function_rows_and_preserves_output() {
         &config,
         &entry,
         DeviceSelection::Auto,
-        true,
         &crate::test_support::test_mir_seams(),
         &mut host,
     )
@@ -133,7 +97,6 @@ fn stats_package_run_started_runtime_error_keeps_summary_and_status() {
         &config,
         &entry,
         DeviceSelection::Auto,
-        true,
         &crate::test_support::test_mir_seams(),
         &mut host,
     )
@@ -163,7 +126,6 @@ fn stats_package_run_compile_failure_returns_diagnostics_without_summary() {
         &config,
         &entry,
         DeviceSelection::Auto,
-        true,
         &crate::test_support::test_mir_seams(),
         &mut host,
     )
@@ -177,85 +139,25 @@ fn stats_package_run_compile_failure_returns_diagnostics_without_summary() {
 }
 
 #[test]
-fn seam_spy_proves_stats_requested_reaches_policy_and_callers_pass_explicit_false() {
-    let dir = crate::test_support::test_temp_dir("rsm2-stats-spy");
-    let entry = write_stats_package(dir.as_ref(), "spy", STATS_MAIN);
-    let config = Config::default();
-    let seams = MirSeams {
-        host_route: spy_host_route,
-        ..crate::test_support::test_mir_seams()
-    };
+fn runner_route_refuses_explicit_gpu_selection_without_a_device_image() {
+    let dir = crate::test_support::test_temp_dir("rsm2-stats-gpu-refused");
+    let entry = write_stats_package(dir.as_ref(), "gpu-refused", STATS_MAIN);
 
-    // The stats-capable route transports `true` into the policy before the
-    // device decision; `Ok(None)` keeps the CPU route and its summary.
-    SPY_SEEN.store(false, Ordering::SeqCst);
-    SPY_STATS_REQUESTED.store(false, Ordering::SeqCst);
     let mut host = BufferHost::default();
-    let outcome = run_package_mir_with_selection_and_stats(
-        &config,
+    let diagnostics = run_package_mir_with_selection_and_stats(
+        &Config::default(),
         &entry,
-        DeviceSelection::Auto,
-        true,
-        &seams,
+        DeviceSelection::Metal,
+        &crate::test_support::test_mir_seams(),
         &mut host,
     )
-    .expect("the spy seam keeps the CPU route");
-    assert!(
-        SPY_SEEN.load(Ordering::SeqCst),
-        "the policy must be consulted"
-    );
-    assert!(
-        SPY_STATS_REQUESTED.load(Ordering::SeqCst),
-        "stats_requested = true must reach HostRoutePolicy before the device decision"
-    );
-    assert!(outcome.result.is_ok());
-    assert_eq!(host.stdout_lines, vec!["42".to_owned()]);
+    .expect_err("an explicit GPU selection cannot run on the runner route");
 
-    // Existing non-stats callers carry the explicit `false`.
-    SPY_SEEN.store(false, Ordering::SeqCst);
-    SPY_STATS_REQUESTED.store(true, Ordering::SeqCst);
-    let mut host = BufferHost::default();
-    run_package_mir_with_selection(&config, &entry, DeviceSelection::Auto, &seams, &mut host)
-        .expect("the unstatsed route behavior is unchanged");
     assert!(
-        SPY_SEEN.load(Ordering::SeqCst),
-        "the policy must be consulted"
-    );
-    assert!(
-        !SPY_STATS_REQUESTED.load(Ordering::SeqCst),
-        "non-stats callers must pass the explicit false"
-    );
-    assert_eq!(host.stdout_lines, vec!["42".to_owned()]);
-
-    // A device route executes at the policy with the fact in hand; the
-    // interpreter (and its summary) never runs.
-    let device_seams = MirSeams {
-        host_route: spy_device_host_route,
-        ..crate::test_support::test_mir_seams()
-    };
-    SPY_DEVICE_SEEN.store(false, Ordering::SeqCst);
-    SPY_DEVICE_STATS_REQUESTED.store(false, Ordering::SeqCst);
-    let mut host = BufferHost::default();
-    let outcome = run_package_mir_with_selection_and_stats(
-        &config,
-        &entry,
-        DeviceSelection::Auto,
-        true,
-        &device_seams,
-        &mut host,
-    )
-    .expect("the device-route spy reports the route as executed");
-    assert!(
-        SPY_DEVICE_SEEN.load(Ordering::SeqCst),
-        "the device decision must observe the transported fact"
-    );
-    assert!(
-        SPY_DEVICE_STATS_REQUESTED.load(Ordering::SeqCst),
-        "the device decision must receive stats_requested = true"
-    );
-    assert!(
-        outcome.stats.functions.is_empty(),
-        "a device route records no interpreter rows"
+        diagnostics
+            .iter()
+            .any(|d| d.message.contains("explicit device selection `metal`")),
+        "the refusal must name the selection: {diagnostics:?}"
     );
     assert!(host.stdout_lines.is_empty(), "the CPU leg must not run");
 }

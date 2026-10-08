@@ -127,7 +127,6 @@ fn interpret_path(
                 &config,
                 archive.package_input(),
                 selection,
-                stats_requested,
                 &package::mir::faber_mir_seams(),
                 &mut host,
             ) {
@@ -211,7 +210,6 @@ fn interpret_path(
                 &config,
                 path,
                 selection,
-                stats_requested,
                 &package::mir::faber_mir_seams(),
                 &mut host,
             ) {

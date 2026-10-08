@@ -313,7 +313,7 @@ fn write_temp_rust_project_in(
 ) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
     use std::fs;
 
-    let temp_dir = crate::package::host_spawn::unique_temp_sibling(parent, "faber-lint")
+    let temp_dir = crate::package::unique_temp_sibling(parent, "faber-lint")
         .map_err(|err| format!("failed to create temp src dir: {}", err.message))?;
     let src_dir = temp_dir.join("src");
 
