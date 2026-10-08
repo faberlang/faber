@@ -54,6 +54,19 @@ const SHAPE_KERNEL_SPARSE_STORAGE: &str = "kernel sparse tensor storage is not a
 const SHAPE_DEVICE_PLACE_PROJECTION: &str = "device place projection";
 const SHAPE_ASYNC_GENERATOR_DEVICE_FN: &str = "async/generator device function";
 const SHAPE_DEVICE_MULTI_BLOCK_CFG: &str = "device multi-block control flow";
+/// gpu-reset C4-2e: a lane-form kernel (a Lane builtin parameter) whose CFG is
+/// acyclic structures into a region tree, which the target lane emitters
+/// consume instead of the single-block / shape-matcher forms above. A
+/// lane-form CFG the structurizer rejects (a loop, a switch, ...) keeps the
+/// multi-block rejection.
+fn is_structurizable_lane_form(function: &MirFunction) -> bool {
+    function
+        .params
+        .iter()
+        .any(|param| param.mode == crate::MirParamMode::Lane)
+        && crate::structurize::structurize(function).is_ok()
+}
+
 const SHAPE_FAILABLE_DEVICE_FN: &str = "failable device function";
 const SHAPE_DEVICE_FUNCTION_CALL: &str = "device function call";
 const SHAPE_KERNEL_RUNTIME_CALL: &str = "kernel runtime call";
@@ -100,6 +113,9 @@ struct DeviceSafeClassifier<'a> {
     layouts: &'a MirLayoutTable,
     device: &'a MirDeviceContext,
     in_device_function: bool,
+    /// The function under check is a structurizable lane-form kernel, whose
+    /// `int` coordinate binders are admitted as 64-bit locals (C4-2e).
+    in_lane_form_function: bool,
     allows_structured_return_branch: bool,
     allows_structured_indexed_write_branch: bool,
     allows_structured_indexed_write_goto: bool,
@@ -160,6 +176,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             layouts: &validation.layouts,
             device,
             in_device_function: false,
+            in_lane_form_function: false,
             allows_structured_return_branch: false,
             allows_structured_indexed_write_branch: false,
             allows_structured_indexed_write_goto: false,
@@ -314,6 +331,7 @@ impl<'a> DeviceSafeClassifier<'a> {
                 )
                 | MirLayoutKind::Void
                 | MirLayoutKind::Never => {}
+                MirLayoutKind::Scalar(MirScalarLayout::I64) if self.in_lane_form_function => {}
                 // Every other scalar is rejected by name — including `Magnus`
                 // (the unbounded `inf`, ruling 39(d)): "kernel scalar layout magnus".
                 MirLayoutKind::Scalar(scalar) => {
@@ -520,6 +538,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         self.allows_structured_nested_indexed_write_loop_continue = false;
 
         if self.in_device_function {
+            self.in_lane_form_function = is_structurizable_lane_form(function);
             let allows_structured_return_branch = is_structured_return_branch(function);
             let allows_structured_indexed_write_branch =
                 is_structured_indexed_write_branch(function);
@@ -595,6 +614,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 && !allows_structured_nested_indexed_write_loop_branch
                 && !allows_structured_nested_indexed_write_loop_break
                 && !allows_structured_nested_indexed_write_loop_continue
+                && !is_structurizable_lane_form(function)
             {
                 self.record_policy(SHAPE_DEVICE_MULTI_BLOCK_CFG);
             }
@@ -643,6 +663,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             crate::visit::walk_function(self, function);
         }
 
+        self.in_lane_form_function = false;
         self.dead_fold_artifact_slots = FoldArtifactSlots::default();
         self.dead_const_copy_slots = DeadConstCopySlots::default();
         self.literal_indexed_access = None;
@@ -1010,6 +1031,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         }
         match &terminator.kind {
             MirTerminatorKind::Return(_) => crate::visit::walk_terminator(self, terminator),
+            // C4-2e: a structurizable lane-form kernel's acyclic Goto/Branch
+            // edges are expressed by its region tree.
+            MirTerminatorKind::Goto(_) | MirTerminatorKind::Branch { .. }
+                if self.in_lane_form_function =>
+            {
+                crate::visit::walk_terminator(self, terminator);
+            }
             MirTerminatorKind::Branch { .. }
                 if self.allows_structured_return_branch
                     || self.allows_structured_indexed_write_branch

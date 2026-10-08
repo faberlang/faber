@@ -228,14 +228,12 @@ fn lane_id_and_grid_arithmetic_are_u32_while_binders_stay_int() {
 
 /// Gpu-reset C4-2g: the lane-form `copy` passes the device admission gate
 /// (its linear address is bounded by an extent-product condition) and reaches
-/// the Metal emitter, whose multi-block restriction is the next unit (C4-2e).
+/// the Metal lane emitter (C4-2f), which emits it.
 #[test]
-fn lane_form_copy_is_admitted_and_stops_at_the_metal_emitter() {
-    let error = crate::mir::test_support::compile_metal_text(&english(COPY)).expect_err("emitter lands in C4-2e");
-    assert!(!error.contains("kernel_target_requirements_not_met"), "admission gate rejected: {error}");
-    assert!(!error.contains("kernel_requirements_missing"), "{error}");
-    assert!(
-        error.contains("mir_metal_text_unsupported") && error.contains("shape=device multi-block control flow"),
-        "{error}"
-    );
+fn lane_form_copy_is_admitted_and_emits_on_metal() {
+    let msl = crate::mir::test_support::compile_metal_text(&english(COPY))
+        .unwrap_or_else(|error| panic!("lane-form copy must emit: {error}"));
+    assert!(msl.contains("kernel void copy("), "{msl}");
+    assert!(msl.contains("thread_position_in_grid"), "{msl}");
+    assert!(msl.contains("src_extent0"), "extent resources are declared: {msl}");
 }

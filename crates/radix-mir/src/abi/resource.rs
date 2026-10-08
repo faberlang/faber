@@ -317,7 +317,13 @@ pub(crate) fn reflect_kernel_resource(
         _ => return Err(MirAbiError::new(ERR_KERNEL_REFLECTION_SCALAR_ELEMENT)),
     };
     let element_byte_width = kernel_element_byte_width(element_layout)?;
-    let buffer_byte_len = kernel_buffer_byte_len(element_byte_width, resource.element_count)?;
+    // A runtime-shaped resource has no static byte length: reflection records 0
+    // ("no ABI minimum"); the host sizes the binding from the argument.
+    let buffer_byte_len = if resource.is_runtime_shaped() {
+        0
+    } else {
+        kernel_buffer_byte_len(element_byte_width, resource.element_count)?
+    };
     Ok(MirKernelResourceReflection {
         group: resource.group,
         binding: resource.binding,
@@ -340,6 +346,9 @@ pub(crate) fn kernel_buffer_byte_len(
     element_byte_width: u16,
     element_count: u64,
 ) -> Result<u64, MirAbiError> {
+    if element_count == RUNTIME_SHAPED_ELEMENT_COUNT {
+        return Err(MirAbiError::new(ERR_RUNTIME_SHAPED_BYTE_LEN));
+    }
     u64::from(element_byte_width)
         .checked_mul(element_count)
         .ok_or_else(|| MirAbiError::new(ERR_KERNEL_REFLECTION_BYTE_OVERFLOW))
@@ -641,6 +650,47 @@ pub(crate) fn device_view_element_count(
     }
 }
 
+/// The element count a RUNTIME-SHAPED tensor resource carries (gpu-reset
+/// C4-2f): the shape has a non-literal dimension, so the count is a launch
+/// fact (the host binds one extent per axis, rule 11), not an ABI fact. This is
+/// the one explicit marker; test it with
+/// [`MirKernelResource::is_runtime_shaped`] and never do arithmetic on it.
+/// Consumers that need a number ([`kernel_buffer_byte_len`], reflection, the
+/// launch plan) fail closed on it. `u64::MAX` is left to the byte-length
+/// overflow law (a real count that overflows stays an overflow, not a shape).
+/// A typed `Option<u64>` count is the follow-up (about 700 `element_count` use
+/// sites across 60 files).
+const ERR_NON_LITERAL_DIMS: &str = "kernel device view element count must be literal dimensions";
+const ERR_RUNTIME_SHAPED_BYTE_LEN: &str =
+    "runtime-shaped kernel resource has no ABI byte length (the extent is a launch fact)";
+
+pub const RUNTIME_SHAPED_ELEMENT_COUNT: u64 = u64::MAX - 1;
+
+impl MirKernelResource {
+    /// Whether this resource binds a tensor whose element count is only known
+    /// at launch (see [`RUNTIME_SHAPED_ELEMENT_COUNT`]).
+    #[must_use]
+    pub fn is_runtime_shaped(&self) -> bool {
+        self.element_count == RUNTIME_SHAPED_ELEMENT_COUNT
+    }
+}
+
+/// [`device_view_element_count`], except a tensor with a non-literal shape
+/// yields [`RUNTIME_SHAPED_ELEMENT_COUNT`] instead of an error. Used only by
+/// the lane-form (indexed-view) signature arms; every other kernel family keeps
+/// the fail-closed literal law.
+pub(crate) fn device_view_element_count_or_runtime(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Result<u64, MirAbiError> {
+    match device_view_element_count(ty, validation) {
+        Err(error) if error.message == ERR_NON_LITERAL_DIMS => {
+            Ok(RUNTIME_SHAPED_ELEMENT_COUNT)
+        }
+        other => other,
+    }
+}
+
 pub(crate) fn device_view_element_count_from_shape(
     shape: IndexId,
     validation: &MirValidationContext<'_>,
@@ -654,7 +704,7 @@ pub(crate) fn device_view_element_count_from_shape(
                     IndexExpr::Literal(count) => product = product.saturating_mul(*count),
                     _ => {
                         return Err(MirAbiError::new(
-                            "kernel device view element count must be literal dimensions",
+                            ERR_NON_LITERAL_DIMS,
                         ));
                     }
                 }
@@ -662,7 +712,7 @@ pub(crate) fn device_view_element_count_from_shape(
             Ok(product)
         }
         _ => Err(MirAbiError::new(
-            "kernel device view element count must be literal dimensions",
+            ERR_NON_LITERAL_DIMS,
         )),
     }
 }

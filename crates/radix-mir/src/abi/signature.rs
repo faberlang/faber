@@ -18,7 +18,8 @@ use super::{
     StorageBufferLimitRecord, apply_collection_op_contract, buffer_element_count,
     buffer_element_type, builtin_input_for_index_param, builtin_inputs_for_named_params,
     called_builtins_for_function, collection_op_contract, combined_builtin_dependencies,
-    device_view_element_count, device_view_element_type, dispatch_size_for_1d_elements, is_vacuum,
+    device_view_element_count, device_view_element_count_or_runtime, device_view_element_type,
+    dispatch_size_for_1d_elements, is_vacuum,
     kernel_has_collection_op, named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
     require_same_element_type, require_u32_index, result_tuple_count, storage_buffer_limit_error,
 };
@@ -1049,8 +1050,8 @@ impl MirKernelSignature {
             validation,
             true,
         )?;
-        let input_element_count = device_view_element_count(input.ty, validation)?;
-        let output_element_count = device_view_element_count(output.ty, validation)?;
+        let input_element_count = device_view_element_count_or_runtime(input.ty, validation)?;
+        let output_element_count = device_view_element_count_or_runtime(output.ty, validation)?;
 
         let mut signature = Self {
             function: function.id,
@@ -1084,7 +1085,7 @@ impl MirKernelSignature {
             builtin_inputs: context.builtin_inputs,
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
-            dispatch_size: dispatch_size_for_1d_elements(output_element_count),
+            dispatch_size: dispatch_size_for_1d_elements(if output_element_count == super::RUNTIME_SHAPED_ELEMENT_COUNT { 1 } else { output_element_count }),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
         // PRP-004 U3 (D1-A): reduction/matmul kernels carry a corrected
@@ -1109,7 +1110,7 @@ impl MirKernelSignature {
 
         let output_element_ty =
             device_view_element_type(output.ty, validation, context.allow_host_owned_tensor_entry)?;
-        let output_element_count = device_view_element_count(output.ty, validation)?;
+        let output_element_count = device_view_element_count_or_runtime(output.ty, validation)?;
         let mut input_resources = Vec::new();
         for (binding, input) in inputs.iter().enumerate() {
             let (input_element_ty, input_element_count) =
@@ -1141,7 +1142,7 @@ impl MirKernelSignature {
                             binding == 0,
                         )?;
                     }
-                    let input_element_count = device_view_element_count(input.ty, validation)?;
+                    let input_element_count = device_view_element_count_or_runtime(input.ty, validation)?;
                     (input_element_ty, input_element_count)
                 };
             input_resources.push(MirKernelResource {
@@ -1187,7 +1188,7 @@ impl MirKernelSignature {
             builtin_inputs: context.builtin_inputs,
             called_builtins: called_builtins_for_function(function),
             workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
-            dispatch_size: dispatch_size_for_1d_elements(output_element_count),
+            dispatch_size: dispatch_size_for_1d_elements(if output_element_count == super::RUNTIME_SHAPED_ELEMENT_COUNT { 1 } else { output_element_count }),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
         // PRP-004 U3 (D1-A): reduction/matmul kernels carry a corrected
