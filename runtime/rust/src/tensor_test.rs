@@ -2069,3 +2069,24 @@ fn write_values_accepts_a_resolved_edge_view_source() {
     dest.write_values(&wrapped).unwrap();
     assert_eq!(dest.planata().unwrap(), wrapped.planata().unwrap());
 }
+
+#[test]
+fn index_form_reads_and_stores_in_range() {
+    let mut tensor = Tensor::<f32>::crea(&[3], 0.0).unwrap();
+    tensor.index_set(&[1], 7.5);
+    assert_eq!(tensor.index_get(&[1]), 7.5);
+}
+
+#[test]
+#[should_panic(expected = "tensor ponde invalid index")]
+fn index_form_store_out_of_range_is_fatal() {
+    let mut tensor = Tensor::<f32>::crea(&[3], 0.0).unwrap();
+    tensor.index_set(&[3], 1.0);
+}
+
+#[test]
+#[should_panic(expected = "tensor accipe invalid index")]
+fn index_form_read_out_of_range_is_fatal() {
+    let tensor = Tensor::<f32>::crea(&[3], 0.0).unwrap();
+    let _ = tensor.index_get(&[3]);
+}

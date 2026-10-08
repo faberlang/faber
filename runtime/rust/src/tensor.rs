@@ -460,6 +460,35 @@ impl<T: Clone + Default> Tensor<T> {
         Ok(())
     }
 
+    /// Index-form read (`t[i]`): the element, or a FATAL fault.
+    ///
+    /// The index form has no error channel (K11-c); every target traps with
+    /// the same text as the runner's `runner_tensor_accipe_invalid_index`.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `ERR_ACCIPE_INVALID_INDEX` when the index is negative, out
+    /// of bounds, or falls in a view gap.
+    #[must_use]
+    pub fn index_get(&self, indices: &[i64]) -> T {
+        match self.accipe(indices) {
+            Ok(Some(value)) => value,
+            _ => panic!("{ERR_ACCIPE_INVALID_INDEX}"),
+        }
+    }
+
+    /// Index-form store (`t[i] ← v`): stores, or a FATAL fault.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `ERR_PONDE_INVALID_INDEX` (the runner's
+    /// `runner_tensor_ponde_invalid_index` text) when the store fails.
+    pub fn index_set(&mut self, indices: &[i64], value: T) {
+        if self.ponde(indices, value).is_err() {
+            panic!("{ERR_PONDE_INVALID_INDEX}");
+        }
+    }
+
     /// Replace every element in the tensor with one value.
     ///
     /// # Errors
