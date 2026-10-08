@@ -3537,6 +3537,9 @@ impl<'a> FunctionBuilder<'a> {
             // `∉` is the existing boolean negation of the same `Contains` call.
             return Some(self.assign_temp(MirValueKind::Unary { op: MirUnOp::Not, operand: contained }, ty, expr.span));
         }
+        if matches!(op, HirBinOp::InRange | HirBinOp::NotInRange) {
+            return self.lower_range_membership(op == HirBinOp::NotInRange, lhs, rhs, expr);
+        }
         // TENSOR-GLYPHS-3A: glyph products dispatch by operand family before
         // the primitive `mir_bin_op` fallback (which fails them closed).
         if op.is_glyph_product() {
@@ -3612,6 +3615,57 @@ impl<'a> FunctionBuilder<'a> {
         let ty = self.expr_ty(expr)?;
 
         Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
+    }
+
+    /// `x ∈ r` / `x ∉ r` over an interval (`InRange` / `NotInRange`).
+    ///
+    /// A literal `lo‥hi` / `lo…hi` right operand lowers to scalar compares
+    /// (`lo <= x` and `x < hi`, or `x <= hi` when inclusive), so no interval
+    /// object exists and the form is legal in kernels. Evaluation order is
+    /// `x`, `lo`, `hi`, each once. Any other interval-typed right operand (a
+    /// variable) takes the runtime `IntervalContains` op, which the runner
+    /// already uses for `r.continet(x)`. `∉` is the boolean negation.
+    fn lower_range_membership(
+        &mut self,
+        negated: bool,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let ty = self.expr_ty(expr)?;
+        let value = self.lower_expr_value(lhs)?;
+        let contained = if let HirExpressionKind::Intervallum { start, end, step: None, kind } = &rhs.kind {
+            let low = self.lower_expr_value(start)?;
+            let high = self.lower_expr_value(end)?;
+            let upper = if matches!(kind, HirRangeKind::Inclusive) {
+                MirBinOp::LtEq
+            } else {
+                MirBinOp::Lt
+            };
+            let above = self.assign_temp(
+                MirValueKind::Binary { op: MirBinOp::GtEq, lhs: value.clone(), rhs: low },
+                ty,
+                expr.span,
+            );
+            let below = self.assign_temp(MirValueKind::Binary { op: upper, lhs: value, rhs: high }, ty, expr.span);
+            self.assign_temp(
+                MirValueKind::Binary { op: MirBinOp::And, lhs: above, rhs: below },
+                ty,
+                expr.span,
+            )
+        } else {
+            let interval = self.lower_expr_value(rhs)?;
+            self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::IntervalContains),
+                vec![interval, value],
+                ty,
+                expr.span,
+            )
+        };
+        if !negated {
+            return Some(contained);
+        }
+        Some(self.assign_temp(MirValueKind::Unary { op: MirUnOp::Not, operand: contained }, ty, expr.span))
     }
 
     /// `÷` (d11-6 ruling 15): integer operands convert to `f64` and divide;
@@ -4582,9 +4636,9 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         HirBinOp::Shr => Some(MirBinOp::Shr),
         HirBinOp::Is => Some(MirBinOp::Eq),
         HirBinOp::IsNot => Some(MirBinOp::NotEq),
-        // Collection membership (`Between`, `NotBetween`) is intercepted by
-        // `lower_binary` before this point; range containment has no MIR
-        // primitive (membership-glyph OD-4), so both range forms fail closed.
+        // Membership (`Between`, `NotBetween`, `InRange`, `NotInRange`) is
+        // intercepted by `lower_binary` before this point; the explicit arm
+        // fails closed for any future caller.
         HirBinOp::InRange | HirBinOp::Between | HirBinOp::NotInRange | HirBinOp::NotBetween => None,
         // Glyph products are intercepted by `lower_binary` before this point;
         // keep the explicit fail-closed arm for any future caller.

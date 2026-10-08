@@ -277,6 +277,18 @@ impl FunctionBuilder<'_> {
                     expr.span,
                 ))
             }
+            Type::Record(_) => {
+                let Some(entries) = entries else {
+                    self.errors.push(MirError::unsupported(
+                        expr.span,
+                        "record construction without object entries before aggregate MIR lowering",
+                    ));
+                    return None;
+                };
+                let fields = self.lower_record_object_fields(entries, expr.span)?;
+                let ty = self.expr_ty(expr).unwrap_or(MirType::semantic(target));
+                Some(self.construct_temp(MirAggregateKind::Record, MirAggregateFields::Named(fields), ty, expr.span))
+            }
             Type::Map(_, _) => {
                 let Some(entries) = entries else {
                     self.errors.push(MirError::unsupported(
@@ -439,6 +451,28 @@ impl FunctionBuilder<'_> {
             Some(source) => self.lower_struct_update_fields(def_id, &explicit, source),
             None => self.materialize_struct_fields(def_id, &explicit, StructFieldFill::Construction, span),
         }
+    }
+
+    /// Labelled record literal entries, in written order (the runner renders a
+    /// record in that order). A record has no defaults, spread or computed
+    /// keys: every label is written once with its value.
+    fn lower_record_object_fields(&mut self, entries: &[HirObjectField], span: Span) -> Option<Vec<MirNamedOperand>> {
+        let mut fields = Vec::with_capacity(entries.len());
+        for entry in entries {
+            let name = match &entry.key {
+                HirObjectKey::Ident(name) | HirObjectKey::String(name) => *name,
+                HirObjectKey::Computed(expr) | HirObjectKey::Spread(expr) => {
+                    self.errors.push(MirError::unsupported(
+                        expr.span,
+                        "computed or spread record keys before aggregate MIR lowering",
+                    ));
+                    return None;
+                }
+            };
+            let value = self.required_object_value(entry, span, "record")?;
+            fields.push(MirNamedOperand { name, value: self.lower_expr_value(value)? });
+        }
+        Some(fields)
     }
 
     /// Lower copy-with-changes (`Genus { … } ex source`, D15.1–D15.3).

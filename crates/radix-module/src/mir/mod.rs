@@ -340,6 +340,9 @@ mod potentia_tests;
 #[path = "rank2_reduction_readiness_test.rs"]
 mod rank2_reduction_readiness_tests;
 #[cfg(test)]
+#[path = "record_literal_test.rs"]
+mod record_literal_tests;
+#[cfg(test)]
 #[path = "saturating_word_test.rs"]
 mod saturating_word_tests;
 
