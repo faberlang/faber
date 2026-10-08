@@ -25,6 +25,17 @@ pub type ElementRange = Range<usize>;
 /// that owns its device buffer.
 pub type ResidencyHook = Rc<RefCell<dyn KernelDispatcher>>;
 
+/// A recoverable kernel error a delivery point surfaced: the constant text a
+/// `⇥` kernel declared, and the open block the faulting launch was tagged with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceFault {
+    /// The text delivered to the owner block's `cape` binding.
+    pub text: String,
+    /// The block id given to [`KernelDispatcher::set_launch_owner`] for the
+    /// faulting launch (`None`: no block was open).
+    pub owner: Option<u64>,
+}
+
 /// Executes a kernel call on behalf of the runner.
 pub trait KernelDispatcher {
     /// Run `function` with the evaluated `args`.
@@ -44,6 +55,24 @@ pub trait KernelDispatcher {
         args: &mut [Value],
         span: Span,
     ) -> Result<Option<Value>, RunnerError>;
+
+    /// Tag the launches of the next [`Self::dispatch`] with the innermost open
+    /// handled block (`None`: no block is open). Called by the runner right
+    /// before each dispatch; the tag comes back on a [`DeviceFault`].
+    fn set_launch_owner(&mut self, _owner: Option<u64>) {}
+
+    /// Take the first recoverable kernel error that a delivery point
+    /// ([`Self::make_host_current`], [`Self::flush`], [`Self::finish`]) already
+    /// surfaced, if any. This does no device work, so the runner may call it
+    /// after every statement of a `fac omnia` body; the submit count does not
+    /// change. A fatal fault never reaches here: it fails the delivery point.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`RunnerError`] when taking the fault fails.
+    fn deliver_faults(&mut self) -> Result<Option<DeviceFault>, RunnerError> {
+        Ok(None)
+    }
 
     /// Make the host copy of `range` current for `token` (download only that
     /// range). Called before a host read of device-resident elements.

@@ -26,11 +26,11 @@ const DUMP_VALUE_PREFIX: &str = "v";
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
     MirBlockId, MirCallee, MirClosureEnvironmentId, MirCollectionOp, MirConstant, MirConversion,
-    MirConversionFlavor, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic,
-    MirKeyValueOperand, MirLocalId, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp,
-    MirOptionUnwrapMode, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirProvider,
-    MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminator,
-    MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
+    MirConversionFlavor, MirDeviceBlockOp, MirDiagnosticKind, MirFunction, MirFunctionId,
+    MirIntrinsic, MirKeyValueOperand, MirLocalId, MirNamedOperand, MirOperand, MirOptionChainLink,
+    MirOptionOp, MirOptionUnwrapMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
+    MirProvider, MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId,
+    MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
 };
 
 /// Render a MIR program into deterministic, human-readable inspection text.
@@ -436,6 +436,7 @@ fn intrinsic(value: &MirIntrinsic) -> String {
 
         MirIntrinsic::ReadLine => "read_line".to_owned(),
         MirIntrinsic::Cede => "cede".to_owned(),
+        MirIntrinsic::DeviceBlock(op) => device_block_spelling(*op),
         MirIntrinsic::GpuBuiltin(builtin) => format!("gpu_builtin {}", builtin.spelling()),
         MirIntrinsic::CursorStream(cursor) if cursor.stepped => {
             format!("cursor_stream stepped def#{}", cursor.callee.0)
@@ -846,4 +847,25 @@ fn temp_id(id: MirTempId) -> String {
 
 fn value_id(id: MirValueId) -> String {
     format!("{DUMP_VALUE_PREFIX}{}", id.0)
+}
+
+fn device_block_spelling(op: MirDeviceBlockOp) -> String {
+    match op {
+        MirDeviceBlockOp::Enter { omnia, handler } => {
+            format!(
+                "device_block_enter {} handler=b{}",
+                if omnia { "omnia" } else { "plain" },
+                handler.0
+            )
+        }
+        MirDeviceBlockOp::Exit { error_edge } => {
+            format!(
+                "device_block_exit{}",
+                if error_edge { " error" } else { "" }
+            )
+        }
+        MirDeviceBlockOp::Deliver { sync } => {
+            format!("device_deliver{}", if sync { " sync" } else { "" })
+        }
+    }
 }

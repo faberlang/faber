@@ -435,6 +435,7 @@ impl FunctionBuilder<'_> {
             diagnostic_range_step_not_positive: context.diagnostic_range_step_not_positive,
             diagnostic_ponde_invalid_index: context.diagnostic_ponde_invalid_index,
             diagnostic_accipe_invalid_index: context.diagnostic_accipe_invalid_index,
+            fault_delivery: context.fault_delivery,
             function_errors: Arc::clone(&context.function_errors),
             function_params: Arc::clone(&context.function_params),
             tensor_edge_policies: Arc::clone(&context.tensor_edge_policies),

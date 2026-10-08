@@ -396,6 +396,7 @@ pub(crate) fn intrinsic_name(intrinsic: &MirIntrinsic) -> String {
         MirIntrinsic::Sermo(op) => format!("sermo.{}", sermo_name(op)),
         MirIntrinsic::ReadLine => "read_line".to_owned(),
         MirIntrinsic::Cede => "cede".to_owned(),
+        MirIntrinsic::DeviceBlock(_) => "device_block".to_owned(),
         MirIntrinsic::GpuBuiltin(_) => "gpu_builtin".to_owned(),
         MirIntrinsic::CursorStream(_) => "cursor_stream".to_owned(),
         MirIntrinsic::Gradient(op) => format!("gradient.{}", debug_snake(op)),

@@ -1015,9 +1015,34 @@ pub enum MirEdgePolicy {
     },
 }
 
+/// Device fault-delivery marker (U9-5): where a handled block opens, closes
+/// and delivers queued kernel errors.
+///
+/// The markers are runtime calls with no destination and no value. Only the
+/// MIR runner acts on them; every other executor treats them as no-ops. They
+/// are emitted only in a unit that declares a `⇥` kernel (the only source of a
+/// recoverable device fault), so a program without one never sees them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MirDeviceBlockOp {
+    /// A handled block opens. One argument: the handler's error place, which
+    /// receives a delivered error's text. `handler` is the `cape` block a
+    /// delivery jumps to. `omnia` selects `fac omnia` (queued) over plain
+    /// `fac` (a `⇥` kernel call waits at the call).
+    Enter { omnia: bool, handler: MirBlockId },
+    /// The innermost open block closes. `error_edge` marks the handler-entry
+    /// edge (an error already chosen the handler); otherwise the edge is a
+    /// fall-through, `rumpe`, `perge` or `redde` and an omnia block delivers.
+    Exit { error_edge: bool },
+    /// Take an error a delivery point already surfaced (no device work), or
+    /// with `sync` complete the queued launches first (the `dum` back-edge).
+    Deliver { sync: bool },
+}
+
 /// Compiler-runtime operations that are not ordinary user calls.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MirIntrinsic {
+    /// Device fault-delivery marker; see [`MirDeviceBlockOp`].
+    DeviceBlock(MirDeviceBlockOp),
     Diagnostic(MirDiagnosticKind),
     Assert,
     FormatString {

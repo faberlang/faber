@@ -2050,6 +2050,16 @@ struct FilumCapture {
     ty: MirType,
 }
 
+/// An open handled block that carries device fault-delivery markers (U9-5).
+#[derive(Debug, Clone, Copy)]
+struct DeviceBlockContext {
+    /// `breakables.len()` when the block opened: a `rumpe`/`perge` leaves the
+    /// block exactly when the target breakable was pushed at or before this
+    /// depth.
+    breakables_len: usize,
+    omnia: bool,
+}
+
 #[derive(Debug, Clone)]
 struct HandlerContext {
     error_place: MirPlace,
@@ -2122,6 +2132,9 @@ struct FunctionBuilderContext<'a> {
     diagnostic_range_step_not_positive: Symbol,
     diagnostic_ponde_invalid_index: Symbol,
     diagnostic_accipe_invalid_index: Symbol,
+    /// A `⇥` kernel exists in the unit: handled blocks emit the device
+    /// fault-delivery markers (U9-5).
+    fault_delivery: bool,
     function_errors: Arc<FxHashMap<DefId, MirType>>,
     function_async: Arc<FxHashMap<DefId, bool>>,
     function_generator: Arc<FxHashMap<DefId, bool>>,
@@ -2215,6 +2228,7 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_range_step_not_positive: Symbol(0),
             diagnostic_ponde_invalid_index: Symbol(0),
             diagnostic_accipe_invalid_index: Symbol(0),
+            fault_delivery: false,
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
             function_generator: Arc::new(FxHashMap::default()),
@@ -2306,6 +2320,9 @@ struct FunctionBuilder<'a> {
     /// kernel's inline flow.
     filum_capture: Option<FilumCapture>,
     handlers: Vec<HandlerContext>,
+    /// Handled blocks open now that carry device markers; empty unless the
+    /// unit declares a `⇥` kernel.
+    device_blocks: Vec<DeviceBlockContext>,
     /// Active `capta` trap boundaries (UT); see [`TrapContext`].
     traps: Vec<TrapContext>,
     /// Monotonic DFS order shared by handler and trap pushes, so
@@ -2385,6 +2402,7 @@ impl<'a> FunctionBuilder<'a> {
             reduction_fold: None,
             filum_capture: None,
             handlers: Vec::new(),
+            device_blocks: Vec::new(),
             traps: Vec::new(),
             capture_depth: 0,
             materializing_consts: FxHashSet::default(),

@@ -78,6 +78,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeSermo,
     RuntimeReadLine,
     RuntimeCede,
+    RuntimeDeviceBlock,
     RuntimeGpuBuiltin,
     RuntimeCursorStream,
     RuntimeGradient,
@@ -160,6 +161,11 @@ impl MirRuntimeAbi {
             MirIntrinsic::Cede => (
                 MirRuntimeAbiFamily::RuntimeCede,
                 MirRuntimeAbiKind::HostIntegration,
+                false,
+            ),
+            MirIntrinsic::DeviceBlock(_) => (
+                MirRuntimeAbiFamily::RuntimeDeviceBlock,
+                MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),
             MirIntrinsic::GpuBuiltin(_) => (

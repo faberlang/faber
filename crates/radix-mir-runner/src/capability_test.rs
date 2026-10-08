@@ -144,7 +144,7 @@ fn every_runtime_family_has_a_runner_ledger_status() {
     // family) is a deliberate change visible in this test and in
     // docs/factory/stepper-alignment/stepper-runtime-ledger.md.
     use RunnerDispatchStatus::*;
-    let expected: [(MirRuntimeAbiFamily, RunnerDispatchStatus); 15] = [
+    let expected: [(MirRuntimeAbiFamily, RunnerDispatchStatus); 16] = [
         (MirRuntimeAbiFamily::RuntimeDiagnostic, Implement),
         (MirRuntimeAbiFamily::RuntimeAssert, Implement),
         (MirRuntimeAbiFamily::RuntimeFormat, Implement),
@@ -155,6 +155,7 @@ fn every_runtime_family_has_a_runner_ledger_status() {
         (MirRuntimeAbiFamily::RuntimeReadLine, Implement),
         (MirRuntimeAbiFamily::RuntimeProvider, HostDelegate),
         (MirRuntimeAbiFamily::RuntimeCede, Implement),
+        (MirRuntimeAbiFamily::RuntimeDeviceBlock, Implement),
         (MirRuntimeAbiFamily::RuntimeCursorStream, Implement),
         (MirRuntimeAbiFamily::RuntimeSermo, Implement),
         // S5-U1: gradient handles dispatch in-process via runtime.rs
@@ -167,8 +168,8 @@ fn every_runtime_family_has_a_runner_ledger_status() {
     ];
     assert_eq!(
         expected.len(),
-        15,
-        "ledger must cover all fifteen runtime families"
+        16,
+        "ledger must cover all sixteen runtime families"
     );
     for (family, want) in expected {
         assert_eq!(

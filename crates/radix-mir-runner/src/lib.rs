@@ -10,6 +10,7 @@ pub mod capability;
 mod conversio;
 mod cursor;
 mod decimal;
+mod device_block;
 mod exact_int;
 mod host;
 pub mod inf;
@@ -397,6 +398,19 @@ struct Frame {
     /// `true` while this frame runs a `@ cursor` generator whose `cede` parks
     /// the frame and hands the item to [`Runner::yielded`] rather than awaiting.
     is_generator: bool,
+    /// Handled blocks open in this frame, innermost last (`fac … cape`,
+    /// `fac omnia … cape`). Maintained by the device-block markers; empty for
+    /// every program without a `⇥` kernel.
+    blocks: Vec<OpenBlock>,
+}
+
+/// One open handled block (U9-5): the delivery target of a queued kernel error.
+struct OpenBlock {
+    /// Unique per dynamic entry, increasing; the owner tag of its launches.
+    id: u64,
+    omnia: bool,
+    handler: MirBlockId,
+    error_place: MirPlace,
 }
 
 enum CallOutcome {
@@ -576,6 +590,11 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     kernel_policy: RunnerKernelPolicy,
     /// Receives compute-stage calls under [`RunnerKernelPolicy::Dispatch`].
     kernel_dispatcher: Option<kernel_dispatch::ResidencyHook>,
+    /// Next open-block id (see [`OpenBlock::id`]).
+    next_block_id: u64,
+    /// A delivered kernel error whose owner block is open in a caller frame;
+    /// it waits there for the caller's next delivery point.
+    carried_fault: Option<kernel_dispatch::DeviceFault>,
     /// Last conversation id handed out by `SermoOpen` (§2.7 record).
     next_conversation_id: u64,
     /// Router slots held by open conversations (D8.3); each conversation
@@ -640,6 +659,8 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             slot_types: index_slot_types(program),
             kernel_policy: RunnerKernelPolicy::Refuse,
             kernel_dispatcher: None,
+            next_block_id: 1,
+            carried_fault: None,
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
             field_float_widths,
@@ -1521,6 +1542,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             resume_at: 0,
             resumed: false,
             is_generator: false,
+            blocks: Vec::new(),
         }
     }
 
@@ -1602,12 +1624,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let Some(dispatcher) = self.kernel_dispatcher.as_ref() else {
             return Ok(());
         };
-        dispatcher
-            .try_borrow_mut()
-            .map_err(|_| {
-                RunnerError::internal(Span::default(), "kernel dispatcher is busy during finish")
-            })?
-            .finish()
+        let mut dispatcher = dispatcher.try_borrow_mut().map_err(|_| {
+            RunnerError::internal(Span::default(), "kernel dispatcher is busy during finish")
+        })?;
+        let finished = dispatcher.finish();
+        // A recoverable error still queued at program end has no handler.
+        let leftover = dispatcher.deliver_faults();
+        finished?;
+        if let Some(fault) = self.carried_fault.take().or(leftover?) {
+            return Err(device_block::unhandled_fault_error(&fault, Span::default()));
+        }
+        Ok(())
     }
 
     /// Hand a kernel call to the dispatcher; the returned value is the call's
@@ -1619,6 +1646,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         args: &mut [Value],
         span: Span,
     ) -> Result<Value, RunnerError> {
+        let owner = self.launch_owner();
         let Some(dispatcher) = self.kernel_dispatcher.as_ref() else {
             return Err(RunnerError::internal(
                 span,
@@ -1629,6 +1657,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let mut dispatcher = dispatcher.try_borrow_mut().map_err(|_| {
             RunnerError::internal(span, "kernel dispatcher is busy during a dispatch")
         })?;
+        dispatcher.set_launch_owner(owner);
         Ok(dispatcher
             .dispatch(function_id, args, span)?
             .unwrap_or(Value::Unit))
@@ -1936,6 +1965,15 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 self.write_place(place, evaluated, statement.span)?;
                 Ok(StatementOutcome::Continue)
             }
+            MirStatementKind::RuntimeCall {
+                destination: _,
+                call,
+            } if matches!(call.intrinsic, radix_mir::MirIntrinsic::DeviceBlock(_)) => {
+                let radix_mir::MirIntrinsic::DeviceBlock(op) = &call.intrinsic else {
+                    unreachable!("matched above");
+                };
+                self.execute_device_block(*op, call, statement.span)
+            }
             MirStatementKind::RuntimeCall { destination, call } => {
                 // Keep this boundary around both production dispatch paths:
                 // `Convert` is handled directly here, while every other
@@ -2197,6 +2235,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
         if dispatched {
             let mut arg_values = arg_values;
+            let owner = self.launch_owner();
             let value = self.dispatch_kernel_call(func_id, &mut arg_values, span)?;
             // `mut` write-back through the existing param-mode path: the
             // dispatcher's final argument value lands in the caller's place.
@@ -2205,6 +2244,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     && let MirOperand::Place(place) = operand
                 {
                     self.write_place(place, arg, span)?;
+                }
+            }
+            // U9-5: a `⇥` kernel under an omnia block is queued (its error
+            // arrives at a delivery point); anywhere else the call waits.
+            if self.function_by_id(func_id, span)?.error_ty.is_some() && !self.top_block_is_omnia()
+            {
+                self.flush_dispatcher()?;
+                if let Some(fault) = self.take_dispatcher_fault(span)? {
+                    if fault.owner == owner {
+                        return Ok(CallOutcome::Err(Value::Str(fault.text)));
+                    }
+                    // An earlier launch of an outer block failed first: it
+                    // unwinds to that block at the next delivery point.
+                    self.carried_fault = Some(fault);
                 }
             }
             return Ok(CallOutcome::Ok(value));
@@ -3632,6 +3685,10 @@ mod tensor_math_test;
 #[cfg(test)]
 #[path = "conversion_parity_test.rs"]
 mod conversion_parity_test;
+
+#[cfg(test)]
+#[path = "device_block_test.rs"]
+mod device_block_test;
 
 #[cfg(test)]
 #[path = "recovery_block_test.rs"]

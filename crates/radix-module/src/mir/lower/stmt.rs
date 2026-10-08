@@ -95,6 +95,7 @@ impl HirVisitor for FunctionBuilder<'_> {
                 }
                 if let Some(value) = self.lower_return_expr(expr) {
                     self.emit_function_return_shape_check(expr.id.0, value.clone(), stmt.span);
+                    self.emit_device_exits_to(0, stmt.span);
                     self.terminate_current(MirTerminatorKind::Return(Some(value)), stmt.span);
                 }
             }
@@ -104,6 +105,7 @@ impl HirVisitor for FunctionBuilder<'_> {
                         .push(MirError::unsupported(stmt.span, "filum reduction redde without a term value"));
                     return;
                 }
+                self.emit_device_exits_to(0, stmt.span);
                 self.terminate_current(MirTerminatorKind::Return(None), stmt.span);
             }
             HirStatementKind::Rumpe => self.lower_rumpe(stmt.span),
@@ -118,6 +120,9 @@ impl HirVisitor for FunctionBuilder<'_> {
                     self.lower_si_stmt(&clause.cond, &clause.body, None, None, clause.span);
                 }
             }
+        }
+        if !matches!(stmt.kind, HirStatementKind::Tacet) {
+            self.deliver_after_statement(stmt.span);
         }
     }
 

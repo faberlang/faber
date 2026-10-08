@@ -110,6 +110,7 @@ pub(super) fn collect_runtime_call_requirement(
         | MirIntrinsic::SermoSetOpener
         | MirIntrinsic::Sermo(_)
         | MirIntrinsic::Cede
+        | MirIntrinsic::DeviceBlock(_)
         | MirIntrinsic::GpuBuiltin(_)
         | MirIntrinsic::Gradient(_)
         | MirIntrinsic::TypeCheck(_)

@@ -5,9 +5,9 @@ use super::{
 };
 use crate::lista_tensor_conversio::validate_lista_to_tensor_source;
 use crate::{
-    MirAtomicOp, MirBinOp, MirCollectionOp, MirConstant, MirConversion, MirFilumForm,
-    MirGradientOp, MirIntrinsic, MirLayoutKind, MirOperand, MirPlace, MirRuntimeCall, MirSermoOp,
-    MirShapeExpr, MirType,
+    MirAtomicOp, MirBinOp, MirCollectionOp, MirConstant, MirConversion, MirDeviceBlockOp,
+    MirFilumForm, MirGradientOp, MirIntrinsic, MirLayoutKind, MirOperand, MirPlace, MirRuntimeCall,
+    MirSermoOp, MirShapeExpr, MirType,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type};
@@ -227,6 +227,15 @@ impl Validator<'_, '_> {
                 );
             }
             MirIntrinsic::Provider(_) => {}
+            MirIntrinsic::DeviceBlock(op) => {
+                let expected = usize::from(matches!(op, MirDeviceBlockOp::Enter { .. }));
+                self.require_arg_count(call.args.len(), expected, span, "device block marker");
+                if let MirDeviceBlockOp::Enter { handler, .. } = op
+                    && scope.function.block_by_id(*handler).is_none()
+                {
+                    self.error(span, "device block marker handler block is missing");
+                }
+            }
             MirIntrinsic::SermoOpen | MirIntrinsic::SermoSetOpener => {}
             MirIntrinsic::Sermo(op) => self.validate_sermo_call(scope, op, call, span),
             MirIntrinsic::Cede => {

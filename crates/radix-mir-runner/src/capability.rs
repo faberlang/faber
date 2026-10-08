@@ -79,6 +79,7 @@ pub fn runner_dispatch_status(family: MirRuntimeAbiFamily) -> RunnerDispatchStat
         | MirRuntimeAbiFamily::RuntimePanic
         | MirRuntimeAbiFamily::RuntimeReadLine
         | MirRuntimeAbiFamily::RuntimeCede
+        | MirRuntimeAbiFamily::RuntimeDeviceBlock
         | MirRuntimeAbiFamily::RuntimeCursorStream
         | MirRuntimeAbiFamily::RuntimeSermo
         | MirRuntimeAbiFamily::RuntimeGradient

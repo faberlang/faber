@@ -53,6 +53,8 @@ pub(super) struct CallableParamMeta<'a> {
 /// `Arc` so that `builder_context` (called once per function body) clones only
 /// the cheap atomic reference instead of the entire map.
 struct FrozenMaps<'a> {
+    /// A `⇥` kernel exists in the unit: handled blocks emit device markers.
+    fault_delivery: bool,
     function_errors: Arc<FxHashMap<DefId, MirType>>,
     function_async: Arc<FxHashMap<DefId, bool>>,
     function_generator: Arc<FxHashMap<DefId, bool>>,
@@ -86,6 +88,7 @@ struct FrozenMaps<'a> {
 /// only after a complete [`MirProgram`] exists.
 pub(super) struct LoweringContextMaps<'a> {
     interner: &'a Interner,
+    fault_delivery: bool,
     function_errors: FxHashMap<DefId, MirType>,
     function_async: FxHashMap<DefId, bool>,
     function_generator: FxHashMap<DefId, bool>,
@@ -159,6 +162,7 @@ impl<'a> LoweringContextMaps<'a> {
     pub(super) fn collect(unit: &'a AnalyzedModule) -> Self {
         let mut maps = Self {
             interner: &unit.interner,
+            fault_delivery: false,
             function_errors: FxHashMap::default(),
             function_async: FxHashMap::default(),
             function_generator: FxHashMap::default(),
@@ -188,6 +192,7 @@ impl<'a> LoweringContextMaps<'a> {
             interface_implementors: FxHashMap::default(),
             gpu_builtins: unit.gpu_builtins.clone(),
             frozen: FrozenMaps {
+                fault_delivery: false,
                 function_errors: Arc::new(FxHashMap::default()),
                 function_async: Arc::new(FxHashMap::default()),
                 function_generator: Arc::new(FxHashMap::default()),
@@ -269,6 +274,7 @@ impl<'a> LoweringContextMaps<'a> {
         // After freeze, builder_context reads from self.frozen, not the
         // (now-empty) owned fields.
         maps.frozen = FrozenMaps {
+            fault_delivery: maps.fault_delivery,
             function_errors: Arc::new(core::mem::take(&mut maps.function_errors)),
             function_async: Arc::new(core::mem::take(&mut maps.function_async)),
             function_generator: Arc::new(core::mem::take(&mut maps.function_generator)),
@@ -325,6 +331,7 @@ impl<'a> LoweringContextMaps<'a> {
             diagnostic_range_step_not_positive: diagnostics.range_step_not_positive,
             diagnostic_ponde_invalid_index: diagnostics.ponde_invalid_index,
             diagnostic_accipe_invalid_index: diagnostics.accipe_invalid_index,
+            fault_delivery: self.frozen.fault_delivery,
             function_errors: Arc::clone(&self.frozen.function_errors),
             function_async: Arc::clone(&self.frozen.function_async),
             function_generator: Arc::clone(&self.frozen.function_generator),
@@ -373,6 +380,7 @@ impl<'a> LoweringContextMaps<'a> {
         if let Some(err_ty) = function.err_ty {
             self.function_errors
                 .insert(def_id, MirType::semantic(err_ty));
+            self.fault_delivery |= function.is_kernel;
         }
         if let Some(return_ty) = function.ret_ty {
             let return_ty = if function.is_async && function.is_generator {
@@ -690,6 +698,7 @@ impl<'a> LoweringContextMaps<'a> {
         if let Some(err_ty) = method.func.err_ty {
             self.function_errors
                 .insert(method.def_id, MirType::semantic(err_ty));
+            self.fault_delivery |= method.func.is_kernel;
         }
         if let Some(return_ty) = method.func.ret_ty {
             let params = std::iter::once(HirParamSignatureProxy { ty: receiver_ty, optional: false }).chain(

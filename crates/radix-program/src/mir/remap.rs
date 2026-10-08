@@ -287,6 +287,7 @@ pub(super) fn remap_runtime_call_text_symbols(
         | MirIntrinsic::SermoSetOpener
         | MirIntrinsic::ReadLine
         | MirIntrinsic::Cede
+        | MirIntrinsic::DeviceBlock(_)
         | MirIntrinsic::GpuBuiltin(_)
         | MirIntrinsic::CursorStream(_)
         | MirIntrinsic::Gradient(_)

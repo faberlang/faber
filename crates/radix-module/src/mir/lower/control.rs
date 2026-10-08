@@ -302,11 +302,15 @@ impl FunctionBuilder<'_> {
             error_block: handler_id,
             depth: self.capture_depth,
         });
+        let omnia = handled_body_is_omnia(body);
+        self.open_device_block(omnia, handler_id, MirPlace::local(handler_local), span);
         self.visit_block(body);
         self.handlers.pop();
+        self.close_device_block(span);
         let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(after_id), span);
 
         self.switch_to(handler_id);
+        self.emit_device_handler_exit(catch.span);
         self.visit_block(&catch.body);
         let handler_reaches = self.terminate_open_current(MirTerminatorKind::Goto(after_id), catch.span);
 
@@ -2776,24 +2780,40 @@ impl FunctionBuilder<'_> {
             error_block: handler_id,
             depth: self.capture_depth,
         });
+        self.open_device_block(false, handler_id, MirPlace::local(handler_local), span);
         let Some(condition) = self.lower_expr_value(cond) else {
             self.handlers.pop();
+            self.close_device_block(span);
             self.seal_unreachable(handler_id, catch.span);
             self.switch_to(join_id);
             return;
         };
 
+        // The else edge leaves the handled region without running the then
+        // block, so it closes the device block on its own edge.
+        let else_edge = if self.context.fault_delivery {
+            self.fresh_block(span)
+        } else {
+            else_id
+        };
         self.terminate_current(
-            MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
+            MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_edge },
             span,
         );
+        if else_edge != else_id {
+            self.switch_to(else_edge);
+            self.emit_device_marker(radix_mir::MirDeviceBlockOp::Exit { error_edge: false }, Vec::new(), span);
+            self.terminate_current(MirTerminatorKind::Goto(else_id), span);
+        }
 
         self.switch_to(then_id);
         self.visit_block(then_block);
         self.handlers.pop();
+        self.close_device_block(span);
         let then_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
 
         self.switch_to(handler_id);
+        self.emit_device_handler_exit(catch.span);
         self.visit_block(&catch.body);
         let handler_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), catch.span);
 
@@ -2914,6 +2934,10 @@ impl FunctionBuilder<'_> {
         }
         self.terminate_open_current(MirTerminatorKind::Goto(test_id), test.span);
         self.switch_to(test_id);
+        if block.breakable == Some(radix_hir::HirBreakableKind::FacOmniaLoop) && self.context.fault_delivery {
+            // `fac omnia … dum` delivers per iteration at the back edge.
+            self.emit_device_marker(radix_mir::MirDeviceBlockOp::Deliver { sync: true }, Vec::new(), test.span);
+        }
         self.visit_stmt(test);
         self.breakables.pop();
         self.terminate_open_current(MirTerminatorKind::Goto(body_id), expr.span);
@@ -4750,6 +4774,63 @@ impl FunctionBuilder<'_> {
         self.assign_temp(MirValueKind::Binary { op, lhs, rhs }, ty, span)
     }
 
+    /// Emit one device fault-delivery marker (a value-less runtime call).
+    pub(super) fn emit_device_marker(&mut self, op: radix_mir::MirDeviceBlockOp, args: Vec<MirOperand>, span: Span) {
+        let vacuum = MirType::semantic(self.types.primitive(Primitive::Vacuum));
+        self.runtime_call_to_place(None, MirIntrinsic::DeviceBlock(op), args, vacuum, span);
+    }
+
+    /// Open a handled block: its launches are tagged with it at run time.
+    /// No-op unless the unit declares a `⇥` kernel.
+    fn open_device_block(&mut self, omnia: bool, handler: MirBlockId, error_place: MirPlace, span: Span) {
+        if !self.context.fault_delivery {
+            return;
+        }
+        self.emit_device_marker(
+            radix_mir::MirDeviceBlockOp::Enter { omnia, handler },
+            vec![MirOperand::Place(error_place)],
+            span,
+        );
+        self.device_blocks
+            .push(DeviceBlockContext { breakables_len: self.breakables.len(), omnia });
+    }
+
+    /// Close the innermost handled block on its fall-through edge.
+    fn close_device_block(&mut self, span: Span) {
+        if self.device_blocks.pop().is_some() && self.current_is_open() {
+            self.emit_device_marker(radix_mir::MirDeviceBlockOp::Exit { error_edge: false }, Vec::new(), span);
+        }
+    }
+
+    /// Mark the handler-entry edge: an error already chose the handler.
+    fn emit_device_handler_exit(&mut self, span: Span) {
+        if self.context.fault_delivery {
+            self.emit_device_marker(radix_mir::MirDeviceBlockOp::Exit { error_edge: true }, Vec::new(), span);
+        }
+    }
+
+    /// Close every open block that a jump to a breakable pushed at depth
+    /// `breakables_len` leaves, innermost first (`0`: all of them, for
+    /// `redde`).
+    pub(super) fn emit_device_exits_to(&mut self, breakables_len: usize, span: Span) {
+        let leaving = self
+            .device_blocks
+            .iter()
+            .rev()
+            .take_while(|block| block.breakables_len >= breakables_len)
+            .count();
+        for _ in 0..leaving {
+            self.emit_device_marker(radix_mir::MirDeviceBlockOp::Exit { error_edge: false }, Vec::new(), span);
+        }
+    }
+
+    /// Cheap delivery check after a statement of an omnia body.
+    pub(super) fn deliver_after_statement(&mut self, span: Span) {
+        if self.device_blocks.last().is_some_and(|block| block.omnia) && self.current_is_open() {
+            self.emit_device_marker(radix_mir::MirDeviceBlockOp::Deliver { sync: false }, Vec::new(), span);
+        }
+    }
+
     /// Lower `rumpe` to the innermost breakable scope exit edge.
     pub(super) fn lower_rumpe(&mut self, span: Span) {
         let Some(context) = self.breakables.last_mut() else {
@@ -4759,6 +4840,8 @@ impl FunctionBuilder<'_> {
         };
         context.rumpe_used = true;
         let target = context.rumpe_target;
+        let target_len = self.breakables.len();
+        self.emit_device_exits_to(target_len, span);
         self.terminate_current(MirTerminatorKind::Goto(target), span);
     }
 
@@ -4774,6 +4857,13 @@ impl FunctionBuilder<'_> {
                 .push(MirError::unsupported(span, "perge outside a loop"));
             return;
         };
+        // A breakable `fac` block shares its loop's `perge` target; the loop is
+        // the outermost context with that target.
+        let mut loop_index = self.breakables.len() - 1;
+        while loop_index > 0 && self.breakables[loop_index - 1].perge_target == Some(perge_target) {
+            loop_index -= 1;
+        }
+        self.emit_device_exits_to(loop_index + 1, span);
         self.terminate_current(MirTerminatorKind::Goto(perge_target), span);
     }
 
@@ -4830,4 +4920,19 @@ impl FunctionBuilder<'_> {
             self.visit_expr(expr);
         }
     }
+}
+
+/// Whether a handled body is a `fac omnia` block or loop.
+fn handled_body_is_omnia(body: &HirBlock) -> bool {
+    let omnia_block = |block: &HirBlock| {
+        matches!(
+            block.breakable,
+            Some(radix_hir::HirBreakableKind::FacOmnia | radix_hir::HirBreakableKind::FacOmniaLoop)
+        )
+    };
+    omnia_block(body)
+        || matches!(
+            body.expr.as_deref().map(|expr| &expr.kind),
+            Some(HirExpressionKind::Block(inner) | HirExpressionKind::Loop(inner)) if omnia_block(inner)
+        )
 }
