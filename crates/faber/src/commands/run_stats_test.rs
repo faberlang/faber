@@ -539,9 +539,8 @@ device = "metal"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("explicit device selection `metal`")
-            && stderr.contains("cannot run on the CPU/FMIR runner route"),
-        "refusal must name the device selection that the runner route cannot run: {stderr}"
+        stderr.contains("E_DEVICE_NONE_ADMITTED"),
+        "a device selection with --stats must refuse with the stable device code: {stderr}"
     );
     assert!(
         !output

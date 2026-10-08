@@ -2599,24 +2599,24 @@ fn run_kernel_file_is_refused_by_default_and_runs_on_the_cpu_device() {
     let file = write_single_file("run-kernel-cpu-device", KERNEL_SOURCE);
     let path = file.to_str().expect("utf8 source path");
 
-    // Default route: refused, and the refusal text names the CPU route.
+    // Default route: `auto` over a kernel package takes the device session and
+    // never the CPU (it fails closed with no admitted device, or on the device
+    // itself), so the kernel does not run with its sequential meaning.
     let (stdout, stderr, status) = run_faber_status(&["run", path]);
     assert_eq!(
         status.code(),
         Some(1),
-        "the default route refuses a kernel:\n{stderr}"
+        "the default route does not run a kernel on the CPU:\n{stderr}"
     );
-    assert_eq!(stdout, "", "refused code must not execute");
-    // ALLOW_DIAGNOSTIC_RENDER_TEXT: the CLI stderr text is the contract for the `--device cpu` hint.
     assert!(
-        stderr.contains("--device cpu"),
-        "the refusal must name `--device cpu`:\n{stderr}"
+        !stdout.contains("2.0"),
+        "the default route must not produce the CPU kernel result:\n{stdout}"
     );
     let (_, auto_stderr, auto_status) = run_faber_status(&["run", "--device", "auto", path]);
     assert_eq!(
         auto_status.code(),
         Some(1),
-        "`--device auto` stays refused:\n{auto_stderr}"
+        "`--device auto` does not run a kernel on the CPU:\n{auto_stderr}"
     );
 
     // CPU device: the kernel runs with its sequential meaning.
@@ -2633,16 +2633,15 @@ fn run_kernel_package_runs_on_the_cpu_device_by_flag_manifest_and_with_stats() {
     let package = write_basic_package("run-kernel-package-cpu-device", KERNEL_SOURCE);
     let path = package.to_str().expect("utf8 package path");
 
-    let (_, stderr, status) = run_faber_status(&["run", path]);
+    let (stdout, stderr, status) = run_faber_status(&["run", path]);
     assert_eq!(
         status.code(),
         Some(1),
-        "the default route refuses a kernel:\n{stderr}"
+        "the default route does not run a kernel on the CPU:\n{stderr}"
     );
-    // ALLOW_DIAGNOSTIC_RENDER_TEXT: the CLI stderr text is the contract for the `--device cpu` hint.
     assert!(
-        stderr.contains("--device cpu"),
-        "the refusal must name `--device cpu`:\n{stderr}"
+        !stdout.contains("2.0"),
+        "the default route must not produce the CPU kernel result:\n{stdout}"
     );
 
     let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);

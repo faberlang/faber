@@ -2022,16 +2022,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 self.write_place(place, evaluated, statement.span)?;
                 Ok(StatementOutcome::Continue)
             }
-            MirStatementKind::RuntimeCall {
-                destination: _,
-                call,
-            } if matches!(call.intrinsic, radix_mir::MirIntrinsic::DeviceBlock(_)) => {
-                let radix_mir::MirIntrinsic::DeviceBlock(op) = &call.intrinsic else {
-                    unreachable!("matched above");
-                };
-                self.execute_device_block(*op, call, statement.span)
-            }
             MirStatementKind::RuntimeCall { destination, call } => {
+                if let radix_mir::MirIntrinsic::DeviceBlock(op) = &call.intrinsic {
+                    return self.execute_device_block(*op, call, statement.span);
+                }
                 // Keep this boundary around both production dispatch paths:
                 // `Convert` is handled directly here, while every other
                 // intrinsic goes through `eval_runtime_call`.  In particular,

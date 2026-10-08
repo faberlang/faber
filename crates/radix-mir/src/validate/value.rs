@@ -12,7 +12,9 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
-use radix_types::{IndexExpr, IndexId, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
+use radix_types::{
+    IndexExpr, IndexId, Primitive, RuntimeExtentId, SemanticMutability, Type, TypeId, TypeTable,
+};
 
 impl Validator<'_, '_> {
     pub(crate) fn validate_value(&mut self, scope: &FunctionScope<'_, '_>, value: &MirValue) {
@@ -366,7 +368,7 @@ impl Validator<'_, '_> {
                 .functions
                 .get(def_id)
                 .cloned()
-                .map(|signature| self.strip_param_ref_wrappers(signature))
+                .map(|signature| self.strip_param_ref_wrappers(signature, true))
                 .or_else(|| Self::signature_from_program_def(scope, *def_id)),
             MirCallee::Closure(closure) => self.validate_closure_callee(scope, closure, span),
             MirCallee::Value(value) => {
@@ -432,13 +434,19 @@ impl Validator<'_, '_> {
     /// parameter type (a function type, or a function lowered in another
     /// module whose signature the context carries); MIR carries intent in
     /// `MirParamMode` and the argument is the payload place, exactly as a
-    /// direct call to a `mut` parameter passes it.
+    /// direct call to a `mut` parameter passes it. A definition callee strips
+    /// only the `Mutable` wrapper (`mutable_only`): a parameter whose type is
+    /// genuinely a reference with another access (`Immutable`, `Copy`) takes a
+    /// `Ref` argument of the same inner type unchanged.
     fn strip_param_ref_wrappers(
         &self,
         mut signature: MirFunctionSignature,
+        mutable_only: bool,
     ) -> MirFunctionSignature {
         for param in &mut signature.params {
-            if let Type::Ref(_, inner) = self.context.types.get(param.ty.semantic_id()) {
+            if let Type::Ref(mutability, inner) = self.context.types.get(param.ty.semantic_id())
+                && (!mutable_only || *mutability == SemanticMutability::Mutable)
+            {
                 param.ty = MirType::semantic(*inner);
             }
         }
@@ -450,7 +458,9 @@ impl Validator<'_, '_> {
         ty: TypeId,
     ) -> Option<MirFunctionSignature> {
         match self.context.types.get(ty) {
-            Type::Func(sig) => Some(self.strip_param_ref_wrappers(signature_from_func_sig(sig))),
+            Type::Func(sig) => {
+                Some(self.strip_param_ref_wrappers(signature_from_func_sig(sig), false))
+            }
             Type::Alias(_, inner) => self.signature_from_semantic_callable_type(*inner),
             _ => None,
         }

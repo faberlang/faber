@@ -29,3 +29,7 @@ pub(crate) use validator::{
 #[cfg(test)]
 #[path = "../validate_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../validate_ref_param_test.rs"]
+mod ref_param_tests;
