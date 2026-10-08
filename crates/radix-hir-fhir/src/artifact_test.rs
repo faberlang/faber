@@ -196,7 +196,7 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // schema 34 carries runtime shape guards in provider units; schema 36
     // reshapes `HirExpressionKind::Transfer` into `CopyInto`; schema 37 removes
     // the legacy `Summa` and `Extremum` variants in favor of `Reduction`.
-    assert_eq!(SCHEMA_VERSION, 37);
+    assert_eq!(SCHEMA_VERSION, 38);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

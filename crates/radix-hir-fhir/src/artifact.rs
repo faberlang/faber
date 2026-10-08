@@ -577,7 +577,10 @@ pub struct FunctionProvenanceTableWire {
 /// Version 37 removes the legacy `HirExpressionKind::Summa` and `Extremum`
 /// variants in favor of `Reduction`; schema-v36 artifacts fail closed because
 /// the serialized enum ordinals changed.
-pub const SCHEMA_VERSION: u32 = 37;
+/// Version 38 adds `HirTypeSlot::TypedZero` (the authored type of a typed zero
+/// `Type {}`); schema-v37 artifacts fail closed because the sidecar registry
+/// gained a slot variant.
+pub const SCHEMA_VERSION: u32 = 38;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

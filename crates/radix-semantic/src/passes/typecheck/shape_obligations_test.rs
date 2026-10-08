@@ -288,6 +288,11 @@ main {
 
 #[test]
 fn unrelated_runtime_local_annotation_is_rejected() {
+    // Z3 (47bd2c173): a bare value name in an annotation extent is the invisible
+    // int-to-size crossing and is refused before any shape comparison, so the
+    // unrelated-extents source is rejected at the annotation, not at the unifier.
+    // The unifier-level rejection is pinned by
+    // `unrelated_runtime_local_initializer_is_rejected_without_false_shape_fact`.
     let source = r#"
 fn runtime_extent(int value) → int { return value }
 
@@ -312,7 +317,7 @@ main {
     );
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
-            diagnostic.is_error() && diagnostic.issue() == Some("incompatible_tensor_index")
+            diagnostic.is_error() && diagnostic.issue() == Some("annotation_extent_bare_value_name")
         }),
         "diagnostics: {:?}",
         result.diagnostics

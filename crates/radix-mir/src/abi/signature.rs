@@ -241,12 +241,12 @@ fn append_tensor_extent_resources(
         .types
         .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
         .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_U32))?;
-    let mut next_binding = signature
+    let first_binding = signature
         .resources()
         .map(|resource| resource.binding)
         .max()
         .map_or(0, |binding| binding + 1);
-    for (_, local, axis) in ordered {
+    for (binding, (_, local, axis)) in (first_binding..).zip(ordered) {
         let tensor = signature
             .resources()
             .find(|resource| {
@@ -257,7 +257,7 @@ fn append_tensor_extent_resources(
         let tensor_binding = tensor.binding;
         signature.extra_inputs.push(MirKernelResource {
             group: DEFAULT_KERNEL_RESOURCE_GROUP,
-            binding: next_binding,
+            binding,
             kind: MirKernelResourceKind::TensorAxisExtent {
                 tensor_binding,
                 axis,
@@ -270,7 +270,6 @@ fn append_tensor_extent_resources(
             source_name: None,
             reduced_projection: None,
         });
-        next_binding += 1;
     }
     Ok(())
 }

@@ -264,10 +264,9 @@ impl Graph {
         for &block in &self.postorder {
             reach[block][block] = true;
             for &succ in &self.successors[block] {
-                for x in 0..count {
-                    if reach[succ][x] {
-                        reach[block][x] = true;
-                    }
+                let from_succ = reach[succ].clone();
+                for (reachable, &via_succ) in reach[block].iter_mut().zip(&from_succ) {
+                    *reachable |= via_succ;
                 }
             }
         }

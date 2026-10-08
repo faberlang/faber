@@ -28,9 +28,9 @@ fn runtime_size(int value) → int { return value }
 main {
     const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
     const int n ← data.length() / 2
-    const tensor<f32, [n, n]> source ← data ↦ tensor<f32, [size n, size n]>
-    const tensor<f32, [n, n]> materialized ← sourceᵀ.materialize()
-    const tensor<f32, [n, n]> sum ← math.add(materialized, source)
+    const tensor<f32, [size n, size n]> source ← data ↦ tensor<f32, [size n, size n]>
+    const tensor<f32, [size n, size n]> materialized ← sourceᵀ.materialize()
+    const tensor<f32, [size n, size n]> sum ← math.add(materialized, source)
     const f32 error ← loss.mse(sum, source)
     const list<f32> values ← sum ↦ list<f32>
     print values[0]
@@ -39,7 +39,7 @@ main {
     print values[3]
     print error
     const list<f32> source_flat ← source.flatten()
-    const tensor<f32, [n, n]> product ← source · source
+    const tensor<f32, [size n, size n]> product ← source · source
     const list<f32> product_values ← product ↦ list<f32>
     print source_flat[0]
     print product_values[0]
@@ -57,8 +57,8 @@ main {
     print canceled.shape()[0]
     const int extent ← runtime_size(4)
     const list<f32> dynamic_flat ← [1.0, 2.0, 3.0]
-    const tensor<f32, [extent - 1]> dynamic ← dynamic_flat ↦ tensor<f32, [size (extent - 1)]>
-    const tensor<f32, [extent - 1]> dynamic_tail ← drop_one(dynamic)
+    const tensor<f32, [size (extent - 1)]> dynamic ← dynamic_flat ↦ tensor<f32, [size (extent - 1)]>
+    const tensor<f32, [size (extent - 1)]> dynamic_tail ← drop_one(dynamic)
     print dynamic_tail.shape()[0]
 }
 "#;

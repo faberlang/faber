@@ -299,7 +299,7 @@ fn default_signature(unit: &KernelUnit, dispatch_size: MirKernelDispatchSize) ->
         kind: MirKernelResourceKind::StorageBuffer,
         role,
         access,
-        element_ty: unit.resources[0].version.element_ty.clone(),
+        element_ty: unit.resources[0].version.element_ty,
         element_count: dispatch_size.x,
         source_local: None,
         source_name: None,
