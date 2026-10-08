@@ -22,7 +22,7 @@ use radix::module::diagnostics::Diagnostic;
 use radix::module::mir::StdioHost;
 use radix::program::mir::DeviceSelection;
 use std::fs;
-use std::io;
+use std::io::{self, Write as _};
 use std::path::Path;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -95,6 +95,24 @@ fn interpret_path(
                 }
             };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
+        #[cfg(feature = "device-runtime")]
+        if device_session_selected(&config, archive.package_input(), selection) {
+            if let Err(mut diagnostics) = run_on_device_session(
+                &config,
+                archive.package_input(),
+                selection,
+                &mut host,
+                stats,
+                stats_file,
+            ) {
+                archive.remap_diagnostics(&mut diagnostics);
+                eprint_archive_diagnostics(&diagnostics);
+                drop(archive);
+                std::process::exit(1);
+            }
+            drop(archive);
+            return;
+        }
         if stats_requested {
             let metadata = match run_stats::package_metadata(archive.package_input()) {
                 Ok(metadata) => metadata,
@@ -167,19 +185,14 @@ fn interpret_path(
             }
         };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        // gpu-reset C2-U6b: an explicit GPU run goes through the in-process
-        // device session; no child process, no `[device]` table needed.
+        // gpu-reset C2-U6b/U6c: an explicit GPU run, or an `auto` run of a
+        // package that declares kernels, goes through the in-process device
+        // session; no child process, no `[device]` table needed.
         #[cfg(feature = "device-runtime")]
-        if !stats_requested && matches!(selection, DeviceSelection::Metal | DeviceSelection::Cuda)
-        {
-            let mut registry = package::mir::system_device_registry();
-            if let Err(diagnostics) = package::mir::run_package_on_device_session(
-                &config,
-                path,
-                selection,
-                &mut registry,
-                &mut host,
-            ) {
+        if device_session_selected(&config, path, selection) {
+            if let Err(diagnostics) =
+                run_on_device_session(&config, path, selection, &mut host, stats, stats_file)
+            {
                 eprint_route_diagnostics(&diagnostics);
                 std::process::exit(1);
             }
@@ -253,6 +266,7 @@ fn interpret_path(
     // An explicit GPU request can never be served here (N1.1 fail closed:
     // "package has no device program"). `cpu` needs no device program: it runs
     // the file's kernels on the MIR runner.
+    #[cfg(not(feature = "device-runtime"))]
     if !matches!(selection, DeviceSelection::Auto | DeviceSelection::Cpu) {
         eprintln!(
             "error: explicit device selection `{}` cannot be served: a single `.fab` file carries no package device program; device execution requires a package with a `[device]` section",
@@ -273,6 +287,19 @@ fn interpret_path(
             std::process::exit(1);
         }
     };
+    // gpu-reset C2-U6c: a lone `.fab` file runs on the in-process device
+    // session too (explicit GPU, or `auto` with kernels).
+    #[cfg(feature = "device-runtime")]
+    if device_session_selected(&config, path, selection) {
+        let mut host = StdioHost::with_argumenta(program_args.to_vec());
+        if let Err(diagnostics) =
+            run_on_device_session(&config, path, selection, &mut host, stats, stats_file)
+        {
+            eprint_route_diagnostics(&diagnostics);
+            std::process::exit(1);
+        }
+        return;
+    }
     let config = match selection.kernel_lowering() {
         radix::module::mir::KernelLowering::Host => config.with_host_kernels(),
         radix::module::mir::KernelLowering::Device => config,
@@ -373,31 +400,109 @@ pub(super) fn is_single_fab_file(path: &Path) -> bool {
     path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("fab")
 }
 
+/// Whether this run takes the in-process device session: an explicit GPU, or
+/// `auto` over a package that declares kernels (a GPU is admitted, or the run
+/// fails closed with `E_DEVICE_NONE_ADMITTED`; `auto` never picks the CPU for
+/// a kernel package). `auto` over a package without kernels, and `cpu`, run
+/// the CPU route.
+#[cfg(feature = "device-runtime")]
+fn device_session_selected(
+    config: &radix::module::driver::Config,
+    input: &Path,
+    selection: DeviceSelection,
+) -> bool {
+    match selection {
+        DeviceSelection::Metal | DeviceSelection::Cuda => true,
+        DeviceSelection::Cpu => false,
+        DeviceSelection::Auto => {
+            package::mir::package_declares_kernels(config, input).unwrap_or(false)
+        }
+    }
+}
+
+/// The marker a dispatching run prints with its host stats: kernels ran on the
+/// device and carry no timing (gpu-reset C2-U6c, D4).
+#[cfg(feature = "device-runtime")]
+const DEVICE_STATS_MARKER: &str = "device: dispatched (not measured)";
+
+/// Run `input` on the in-process device session over the system registry,
+/// emitting host-only stats plus [`DEVICE_STATS_MARKER`] when requested.
+#[cfg(feature = "device-runtime")]
+fn run_on_device_session(
+    config: &radix::module::driver::Config,
+    input: &Path,
+    selection: DeviceSelection,
+    host: &mut StdioHost,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
+) -> Result<(), Vec<Diagnostic>> {
+    let mut registry = package::mir::system_device_registry();
+    run_on_device_session_with(
+        config,
+        input,
+        selection,
+        &mut registry,
+        host,
+        stats,
+        stats_file,
+        &mut io::stdout(),
+    )
+}
+
+/// [`run_on_device_session`] over an injected registry and marker sink.
+#[cfg(feature = "device-runtime")]
+#[allow(clippy::too_many_arguments)]
+fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
+    config: &radix::module::driver::Config,
+    input: &Path,
+    selection: DeviceSelection,
+    registry: &mut radix_device_core::registry::DeviceRegistry,
+    host: &mut H,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
+    out: &mut dyn io::Write,
+) -> Result<(), Vec<Diagnostic>> {
+    let stats_requested = stats || stats_file.is_some();
+    let metadata = if stats_requested {
+        Some(
+            run_stats::package_metadata(input)
+                .map_err(|diagnostic| vec![*diagnostic])?,
+        )
+    } else {
+        None
+    };
+    let started = Instant::now();
+    let run = package::mir::run_package_on_device_session_with_stats(
+        config,
+        input,
+        selection,
+        registry,
+        host,
+        stats_requested,
+    )?;
+    if let (Some(metadata), Some(run_stats_value)) = (metadata, run.stats) {
+        let _ = writeln!(out, "{DEVICE_STATS_MARKER}");
+        let artifact =
+            RunStatsArtifact::new(metadata, run_stats_value, elapsed_wall_ms(started), 0);
+        if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
+            eprintln!("error: could not write run statistics: {error}");
+            std::process::exit(1);
+        }
+    }
+    Ok(())
+}
+
 /// Resolve the effective device selection for `faber run` (N1.1): CLI
 /// `--device` > manifest `[device] device` > default `auto`. An invalid
 /// manifest value fails closed with a structured diagnostic (never silently
-/// ignored). An explicit GPU device combined with a stats request refuses
-/// here, during route resolution (RSM-4): the device route never runs the
-/// interpreter the meter measures. `cpu` runs the interpreter, so its stats
-/// are the ordinary runner stats.
+/// ignored). A stats request is permitted with any selection: a
+/// dispatching run reports host rows only (gpu-reset C2-U6c, D4).
 fn resolve_route_selection(
     args: &RunArgs,
     input_path: &Path,
 ) -> Result<DeviceSelection, Box<Diagnostic>> {
-    let stats_requested = args.stats || args.stats_file.is_some();
     if let Some(device) = args.device {
         let selection = device.selection();
-        if stats_requested && !matches!(selection, DeviceSelection::Auto | DeviceSelection::Cpu) {
-            return Err(Box::new(
-                faber_cli::package_diagnostic_error(format!(
-                    "run statistics (`--stats`/`--stats-file`) require the interpreted CPU route; `--device {}` executes a device route that never runs the interpreter, so the stats request is refused",
-                    selection.spelling()
-                ))
-                .with_file(input_path.display().to_string())
-                .with_arg("issue", "run_stats_device_route_unsupported")
-                .with_arg("device", selection.spelling().to_owned()),
-            ));
-        }
         return Ok(selection);
     }
     let Ok(layout) = package::discover_build_layout(input_path) else {

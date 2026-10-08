@@ -369,22 +369,43 @@ pub fn run_package_on_device_session<H: radix_mir_runner::Host + ?Sized>(
     registry: &mut radix_device_core::registry::DeviceRegistry,
     host: &mut H,
 ) -> Result<String, Vec<Diagnostic>> {
+    run_package_on_device_session_with_stats(config, input, selection, registry, host, false)
+        .map(|run| run.receipt)
+}
+
+/// The result of an in-process device run: the discovery receipt line that was
+/// printed, and the host-side meter when one was requested.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+#[derive(Debug)]
+pub struct DeviceSessionRun {
+    pub receipt: String,
+    /// Host rows only. Kernel dispatches run on the device and are not
+    /// measured (gpu-reset C2-U6c, D4).
+    pub stats: Option<radix_mir_runner::RunnerStats>,
+}
+
+/// [`run_package_on_device_session`] with the opt-in host meter
+/// (`collect_stats`). Program arguments on `host` bind into the entry record
+/// and the package's declared CLI exit code is applied on success, as on the
+/// other package routes.
+///
+/// # Errors
+/// As [`run_package_on_device_session`], plus argument-binding failures.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    selection: DeviceSelection,
+    registry: &mut radix_device_core::registry::DeviceRegistry,
+    host: &mut H,
+    collect_stats: bool,
+) -> Result<DeviceSessionRun, Vec<Diagnostic>> {
     use super::device::{DeviceImageBackend, SessionKernelDispatcher, device_image_for_lowered};
     use super::host_factory::{discovery_receipt, host_error_diagnostic, open_device_selection};
     use radix_device_core::backend::{DeviceBackend, DeviceClass};
     use radix_device_core::partition::MemoryBudget;
     use radix_device_core::session::DeviceSession;
 
-    // The device route binds no program arguments yet: fail closed rather
-    // than run with operands silently unbound.
-    let has_args = host.argumenta().map(|args| !args.is_empty()).unwrap_or(false);
-    if has_args {
-        return Err(vec![mir_issue_diag(
-            input,
-            "device_run_program_args_unsupported",
-            "program arguments are not supported on the in-process device route yet",
-        )]);
-    }
     // Admission first: an unavailable explicit device fails before lowering
     // work is spent on it.
     let opened = open_device_selection(
@@ -417,61 +438,67 @@ pub fn run_package_on_device_session<H: radix_mir_runner::Host + ?Sized>(
     receipt.print();
 
     let mut session = Some(session);
-    with_interpreted_lowered_package_mir(config, input, |lowered| {
-        let (image, omitted) = device_image_for_lowered(lowered, backend)?;
-        if image.kernels.is_empty() {
-            let reasons = omitted
-                .iter()
-                .map(|(_, reason)| reason.clone())
-                .collect::<Vec<_>>()
-                .join("; ");
-            return Err(vec![
-                mir_issue_diag(
-                    input,
-                    "E_DEVICE_NONE_ADMITTED",
-                    format!("no kernel of this package lowers to the device: {reasons}"),
-                )
-                .with_arg("code", "E_DEVICE_NONE_ADMITTED".to_owned()),
-            ]);
-        }
-        let validated = &lowered.validated;
-        let names = radix_mir::names::MirNames::new(
-            validated.program(),
-            validated.validation().types.as_table(),
-            &lowered.interner,
-        );
-        let omissions: Vec<(radix_mir::MirFunctionId, String)> = omitted
-            .iter()
-            .map(|(id, reason)| {
-                let name = validated
-                    .program()
-                    .functions
+    let stats = radix::program::mir::with_interpreted_bound_package_mir(
+        config,
+        input,
+        host,
+        &faber_mir_seams(),
+        |lowered, validated, exit_code, host| {
+            let (image, omitted) = device_image_for_lowered(lowered, backend)?;
+            if image.kernels.is_empty() {
+                let reasons = omitted
                     .iter()
-                    .find(|function| function.id == *id)
-                    .and_then(|function| function.name)
-                    .map_or_else(|| id.0.to_string(), |s| lowered.interner.resolve(s).to_owned());
-                (
-                    *id,
-                    format!("kernel `{name}` has no device kernel: {reason}"),
-                )
-            })
-            .collect();
-        let entry = names
-            .explicit_entry_function()
-            .map(|function| function.id)
-            .ok_or_else(|| vec![mir_diag(input, "no entry function in MIR program")])?;
-        let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
-        let dispatcher = SessionKernelDispatcher::new(
-            session.take().expect("session is taken once"),
-            image.artifact,
-            units,
-            validated.validation().types.as_table(),
-        )
-        .map_err(|error| vec![host_error_diagnostic(&error)])?;
-        dispatcher.borrow_mut().set_omissions(omissions);
-        let hook: radix_mir_runner::kernel_dispatch::ResidencyHook = dispatcher.clone();
-        radix_mir_runner::run_function_with_kernel_dispatcher(validated, entry, host, &hook)
-            .map_err(|errors| {
+                    .map(|(_, reason)| reason.clone())
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                return Err(vec![
+                    mir_issue_diag(
+                        input,
+                        "E_DEVICE_NONE_ADMITTED",
+                        format!("no kernel of this package lowers to the device: {reasons}"),
+                    )
+                    .with_arg("code", "E_DEVICE_NONE_ADMITTED".to_owned()),
+                ]);
+            }
+            let interner = validated.validation().interner.as_interner().ok_or_else(|| {
+                vec![mir_diag(input, "device run requires interner context")]
+            })?;
+            let names = radix_mir::names::MirNames::new(
+                validated.program(),
+                validated.validation().types.as_table(),
+                interner,
+            );
+            let omissions: Vec<(radix_mir::MirFunctionId, String)> = omitted
+                .iter()
+                .map(|(id, reason)| {
+                    let name = validated
+                        .program()
+                        .functions
+                        .iter()
+                        .find(|function| function.id == *id)
+                        .and_then(|function| function.name)
+                        .map_or_else(|| id.0.to_string(), |s| interner.resolve(s).to_owned());
+                    (
+                        *id,
+                        format!("kernel `{name}` has no device kernel: {reason}"),
+                    )
+                })
+                .collect();
+            let entry = names
+                .explicit_entry_function()
+                .map(|function| function.id)
+                .ok_or_else(|| vec![mir_diag(input, "no entry function in MIR program")])?;
+            let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
+            let dispatcher = SessionKernelDispatcher::new(
+                session.take().expect("session is taken once"),
+                image.artifact,
+                units,
+                validated.validation().types.as_table(),
+            )
+            .map_err(|error| vec![host_error_diagnostic(&error)])?;
+            dispatcher.borrow_mut().set_omissions(omissions);
+            let hook: radix_mir_runner::kernel_dispatch::ResidencyHook = dispatcher.clone();
+            let runner_diagnostics = |errors: Vec<radix_mir_runner::RunnerError>| {
                 errors
                     .into_iter()
                     .map(|error| {
@@ -479,10 +506,47 @@ pub fn run_package_on_device_session<H: radix_mir_runner::Host + ?Sized>(
                             .with_arg("code", error.issue)
                     })
                     .collect::<Vec<_>>()
-            })
+            };
+            let collected = if collect_stats {
+                let outcome = radix_mir_runner::run_function_with_kernel_dispatcher_and_stats(
+                    validated, entry, host, &hook,
+                )
+                .map_err(runner_diagnostics)?;
+                outcome.result.map_err(runner_diagnostics)?;
+                Some(outcome.stats)
+            } else {
+                radix_mir_runner::run_function_with_kernel_dispatcher(
+                    validated, entry, host, &hook,
+                )
+                .map_err(runner_diagnostics)?;
+                None
+            };
+            if let Some(code) = exit_code {
+                host.exit(code);
+            }
+            Ok(collected)
+        },
+    )?;
+    Ok(DeviceSessionRun {
+        receipt: receipt.render(),
+        stats,
     })
-    .and_then(|result| result)?;
-    Ok(receipt.render())
+}
+
+/// Whether the package lowers at least one `@ kernel` function: the `auto`
+/// selection routes a package that declares kernels through the device
+/// session (admitting a GPU or failing closed with `E_DEVICE_NONE_ADMITTED`),
+/// and a package without kernels runs on the CPU route unchanged.
+///
+/// # Errors
+/// Structured diagnostics when the package does not lower.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub fn package_declares_kernels(config: &Config, input: &Path) -> Result<bool, Vec<Diagnostic>> {
+    with_interpreted_lowered_package_mir(config, input, |lowered| {
+        lowered.validated.program().functions.iter().any(|function| {
+            function.shader_stage == Some(radix_mir::MirKernelShaderStage::Compute)
+        })
+    })
 }
 
 /// Device-route memory budget declared at admission (the registry's policy

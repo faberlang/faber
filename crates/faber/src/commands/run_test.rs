@@ -279,28 +279,26 @@ fn run_rejects_the_retired_backend_flag() {
 // ── RSM-4: fail-closed stats + device-route refusal (CLI hook) ───────────
 
 #[test]
-fn route_selection_refuses_stats_with_explicit_device() {
-    let dir = temp_dir("stats-device-refused");
+fn route_selection_allows_stats_with_explicit_device() {
+    // gpu-reset C2-U6c (D4): a dispatching run reports host rows only, so the
+    // stats request no longer refuses at route resolution.
+    let dir = temp_dir("stats-device-allowed");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, Some("metal"));
 
     let mut args = run_args(dir.clone(), Some(DeviceChoice::Metal));
     args.stats = true;
-    let err = resolve_route_selection(&args, &dir)
-        .expect_err("stats + explicit device must refuse during route resolution");
-    assert_eq!(err.issue(), Some("run_stats_device_route_unsupported"));
-    assert!(
-        err.message.contains("run statistics") && err.message.contains("metal"),
-        "diagnostic must name the stats/device incompatibility: {}",
-        err.message
+    assert_eq!(
+        resolve_route_selection(&args, &dir).expect("stats + metal resolves"),
+        DeviceSelection::Metal
     );
 
-    // The file-sink spelling refuses with the same identity.
     let mut file_args = run_args(dir.clone(), Some(DeviceChoice::Cuda));
-    file_args.stats_file = Some(dir.join("refused.json"));
-    let err = resolve_route_selection(&file_args, &dir)
-        .expect_err("stats-file + explicit device must refuse identically");
-    assert_eq!(err.issue(), Some("run_stats_device_route_unsupported"));
+    file_args.stats_file = Some(dir.join("allowed.json"));
+    assert_eq!(
+        resolve_route_selection(&file_args, &dir).expect("stats-file + cuda resolves"),
+        DeviceSelection::Cuda
+    );
 }
 
 #[test]

@@ -36,6 +36,66 @@ fn config_for_selection(config: &Config, selection: DeviceSelection) -> Cow<'_, 
     }
 }
 
+/// Prepare the package under the interpreted consumer, bind the host's
+/// program arguments into the CLI entry record exactly as the image routes do,
+/// and lend the lowered unit, the argument-bound validated program, and the
+/// declared CLI exit code to `run`. This is the in-process device route's
+/// operand-binding seam: the caller runs the entry itself and applies
+/// `host.exit(code)` on success.
+/// # Errors
+/// Returns an error when the input is invalid or the arguments do not bind.
+pub fn with_interpreted_bound_package_mir<R, H: Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    host: &mut H,
+    seams: &MirSeams,
+    run: impl for<'a, 'v> FnOnce(
+        &super::LoweredMirUnit<'a>,
+        &radix_module::mir::ValidatedMir<'v>,
+        Option<i32>,
+        &mut H,
+    ) -> Result<R, Vec<Diagnostic>>,
+) -> Result<R, Vec<Diagnostic>> {
+    let argumenta = host
+        .argumenta()
+        .map_err(|e| vec![mir_diag(input, e.message)])?
+        .to_vec();
+    with_prepared_package_mir(config, input, &argumenta, seams, |prepared, lowered| {
+        let (type_snapshot, interner_strings) = super::image::snapshot_context(lowered);
+        let types = super::TypeTable::from_snapshot(type_snapshot).map_err(|error| {
+            vec![mir_diag(
+                &prepared.entry_path,
+                format!("could not load type metadata: {error}"),
+            )]
+        })?;
+        let mut interner = super::Interner::from_strings(interner_strings);
+        let mut program = lowered.validated.program().clone();
+        super::cli_bind::bind_fmir_text_runtime_cli(
+            &mut program,
+            prepared.fmir_text_cli.as_ref(),
+            "run_entry",
+            &mut interner,
+            &*host,
+            &prepared.entry_path,
+        )?;
+        let mut validation = radix_module::mir::MirValidationContext::new(&types);
+        validation.interner = radix_module::mir::MirInterner::Borrowed(&interner);
+        super::image::apply_validation_metadata(
+            &mut validation,
+            &super::image::snapshot_validation_metadata(lowered.validated.validation()),
+        );
+        let validated = radix_module::mir::ValidatedMir::new(program, validation).map_err(
+            |errors| {
+                errors
+                    .into_iter()
+                    .map(|error| mir_diag(&prepared.entry_path, error.message))
+                    .collect::<Vec<_>>()
+            },
+        )?;
+        run(lowered, &validated, prepared.cli_exit_code, host)
+    })
+}
+
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_mir<H: Host + ?Sized>(

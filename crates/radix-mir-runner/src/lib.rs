@@ -1168,6 +1168,32 @@ pub fn run_function_with_kernel_dispatcher<H: Host + ?Sized>(
     .result
 }
 
+/// [`run_function_with_kernel_dispatcher`] with the opt-in diagnostic meter
+/// armed: the outcome carries the host-side [`RunnerStats`] beside the result.
+/// Kernel dispatches are not measured; the meter observes host functions and
+/// intrinsics only.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be started.
+pub fn run_function_with_kernel_dispatcher_and_stats<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    dispatcher: &kernel_dispatch::ResidencyHook,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_function_dispatching(
+        validated,
+        function_id,
+        host,
+        None,
+        None,
+        true,
+        RunnerKernelPolicy::Dispatch,
+        Some(Rc::clone(dispatcher)),
+    )
+}
+
 fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
     validated: &ValidatedMir<'_>,
     function_id: MirFunctionId,

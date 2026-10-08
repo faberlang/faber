@@ -50,7 +50,7 @@ pub struct FmirValidationMetadata {
 
 /// Snapshot the merged program's struct/variant validation surface from a
 /// validated context (defs are stable across the merged type table).
-fn snapshot_validation_metadata(
+pub(super) fn snapshot_validation_metadata(
     validation: &radix_module::mir::MirValidationContext<'_>,
 ) -> FmirValidationMetadata {
     let mut closure_environments = validation
@@ -140,7 +140,7 @@ fn snapshot_validation_metadata(
 
 /// Apply carried struct/variant metadata to a freshly built validation
 /// context before re-validating the merged program.
-fn apply_validation_metadata(
+pub(super) fn apply_validation_metadata(
     context: &mut radix_module::mir::MirValidationContext<'_>,
     metadata: &FmirValidationMetadata,
 ) {
