@@ -85,6 +85,9 @@ pub enum FaberCliTarget {
     /// Novelty Fortran 2008 program (default-off `hir-fortran` feature).
     #[value(name = "fortran", alias = "f90")]
     HirFortran,
+    /// Novelty Odin program (default-off `hir-odin` feature).
+    #[value(name = "odin")]
+    HirOdin,
 
     /// Experimental MIR-backed WebAssembly text target. Emits `.wat` text
     /// only; `wasm` is an alias kept for compatibility (binary conversion is
@@ -159,6 +162,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirPascal => radix::module::codegen::Target::HirPascal,
             FaberCliTarget::HirCobol => radix::module::codegen::Target::HirCobol,
             FaberCliTarget::HirFortran => radix::module::codegen::Target::HirFortran,
+            FaberCliTarget::HirOdin => radix::module::codegen::Target::HirOdin,
             FaberCliTarget::MirWasm => radix::module::codegen::Target::MirWasm,
             FaberCliTarget::MirLlvm => radix::module::codegen::Target::MirLlvm,
             FaberCliTarget::MirMetal => radix::module::codegen::Target::MirMetal,

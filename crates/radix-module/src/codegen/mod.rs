@@ -37,6 +37,8 @@ pub mod haskell;
 pub(crate) mod hygiene;
 mod names;
 pub mod needs;
+#[cfg(feature = "hir-odin")]
+pub mod odin;
 #[cfg(feature = "hir-pascal")]
 pub mod pascal;
 #[cfg(feature = "hir-python")]
@@ -472,6 +474,7 @@ pub fn generate_from_analyzed_with_options(
         Target::HirPascal => generate_pascal_from_analyzed(analysis),
         Target::HirCobol => generate_cobol_from_analyzed(analysis),
         Target::HirFortran => generate_fortran_from_analyzed(analysis),
+        Target::HirOdin => generate_odin_from_analyzed(analysis),
         #[cfg(feature = "hir-faber")]
         Target::HirFaber => {
             let imported_spellings = analysis.resolver.imported_spellings(&analysis.interner);
@@ -660,6 +663,18 @@ fn generate_fortran_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> R
 #[cfg(not(feature = "hir-fortran"))]
 fn generate_fortran_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
     Err(unavailable_target_error(Target::HirFortran))
+}
+
+#[cfg(feature = "hir-odin")]
+fn generate_odin_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    let r#gen = odin::OdinCodegen::new(&analysis.hir, &analysis.interner);
+    let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    Ok(crate::Output::Odin(crate::OdinOutput { code: output.code }))
+}
+
+#[cfg(not(feature = "hir-odin"))]
+fn generate_odin_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
+    Err(unavailable_target_error(Target::HirOdin))
 }
 
 /// Emit each distinct file-namespace provider binding as a module, mapping

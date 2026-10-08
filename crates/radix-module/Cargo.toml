@@ -37,6 +37,7 @@ radix-semantic = { path = "../radix-semantic" }
 # Consumerless leaves, gated out of default builds (U7, removal-delivery-spec).
 # Novelty Pascal leaf: default-off, NOT in full-targets.
 # Novelty Fortran leaf: default-off, NOT in full-targets.
+# Novelty Odin leaf: default-off, NOT in full-targets.
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }
 radix-host-abi = { path = "../radix-host-abi" }

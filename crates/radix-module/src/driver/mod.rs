@@ -762,6 +762,7 @@ fn generate_output(
         | Target::HirPascal
         | Target::HirCobol
         | Target::HirFortran
+        | Target::HirOdin
         | Target::HirTypeScript
         | Target::HirGo
         // D11.6 py4: Python ints are exact; the clamp runs at the store.
@@ -3836,6 +3837,7 @@ fn collect_target_policy_diagnostics(
         | Target::HirPascal
         | Target::HirCobol
         | Target::HirFortran
+        | Target::HirOdin
         | Target::HirTypeScript
         | Target::MirWasm
         | Target::MirWgsl => {}

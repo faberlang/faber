@@ -49,6 +49,9 @@ pub enum Target {
     /// Novelty Fortran 2008 source emitted from checked HIR (scalar subset and
     /// rank-1 fixed-shape tensors). Default-off; fails closed outside the subset.
     HirFortran,
+    /// Novelty Odin source emitted from checked HIR (scalar-and-print
+    /// registration spike). Default-off; fails closed outside the subset.
+    HirOdin,
 
     /// Faber source re-emitted from analyzed HIR.
     ///
@@ -128,6 +131,7 @@ impl Target {
             Target::HirPascal => "pascal",
             Target::HirCobol => "cobol",
             Target::HirFortran => "fortran",
+            Target::HirOdin => "odin",
             Target::HirFaber => "faber",
             Target::HirFhir => "fhir",
             Target::MirWasm => "wasm-text",
@@ -164,6 +168,7 @@ impl Target {
             "pascal" => Some(Self::HirPascal),
             "cobol" => Some(Self::HirCobol),
             "fortran" => Some(Self::HirFortran),
+            "odin" => Some(Self::HirOdin),
             "faber" => Some(Self::HirFaber),
             "fhir" => Some(Self::HirFhir),
             "wasm-text" => Some(Self::MirWasm),
@@ -203,6 +208,7 @@ impl Target {
         Target::HirPascal,
         Target::HirCobol,
         Target::HirFortran,
+        Target::HirOdin,
         Target::HirFaber,
         Target::HirFhir,
         Target::MirWasm,
@@ -232,6 +238,7 @@ impl Target {
             Target::HirPascal => Some("hir-pascal"),
             Target::HirCobol => Some("hir-cobol"),
             Target::HirFortran => Some("hir-fortran"),
+            Target::HirOdin => Some("hir-odin"),
             Target::HirFaber => Some("hir-faber"),
             Target::HirFhir => Some("hir-fhir"),
             Target::MirMetal => Some("mir-metal"),
@@ -267,6 +274,7 @@ impl Target {
             Target::HirPascal => cfg!(feature = "hir-pascal"),
             Target::HirCobol => cfg!(feature = "hir-cobol"),
             Target::HirFortran => cfg!(feature = "hir-fortran"),
+            Target::HirOdin => cfg!(feature = "hir-odin"),
             Target::HirFaber => cfg!(feature = "hir-faber"),
             Target::HirFhir => cfg!(feature = "hir-fhir"),
             Target::MirMetal => cfg!(feature = "mir-metal"),
@@ -307,6 +315,7 @@ mod tests {
             Target::HirPascal => "pascal",
             Target::HirCobol => "cobol",
             Target::HirFortran => "fortran",
+            Target::HirOdin => "odin",
             Target::HirFaber => "faber",
             Target::HirFhir => "fhir",
             Target::MirWasm => "wasm-text",
@@ -342,6 +351,7 @@ mod tests {
             "pascal",
             "cobol",
             "fortran",
+            "odin",
             "faber",
             "fhir",
             "wasm-text",

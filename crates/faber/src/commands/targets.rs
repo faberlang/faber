@@ -243,6 +243,9 @@ fn compiled_features() -> BTreeSet<&'static str> {
     if cfg!(feature = "hir-fortran") {
         compiled.insert("hir-fortran");
     }
+    if cfg!(feature = "hir-odin") {
+        compiled.insert("hir-odin");
+    }
     if cfg!(feature = "hir-swift") {
         compiled.insert("hir-swift");
     }

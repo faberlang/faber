@@ -22,7 +22,7 @@
 /// this test until it joins this list or is named hidden — the list can no
 /// longer silently drop a backend. The order is the report's presentation
 /// order and is preserved verbatim for the printed row output.
-const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 21] = [
+const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 22] = [
     crate::codegen::Target::HirRust,
     crate::codegen::Target::MirFmir,
     crate::codegen::Target::MirFmirBinary,
@@ -36,6 +36,7 @@ const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 21] = [
     crate::codegen::Target::HirPascal,
     crate::codegen::Target::HirCobol,
     crate::codegen::Target::HirFortran,
+    crate::codegen::Target::HirOdin,
     crate::codegen::Target::MirWasm,
     crate::codegen::Target::MirLlvm,
     crate::codegen::Target::MirLlvmHost,
@@ -90,6 +91,7 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::HirPascal => "pas",
         crate::codegen::Target::HirCobol => "cob",
         crate::codegen::Target::HirFortran => "f90",
+        crate::codegen::Target::HirOdin => "odin",
         crate::codegen::Target::MirWasm => "wat",
         crate::codegen::Target::MirLlvm => "ll",
         crate::codegen::Target::MirLlvmHost => "run",
@@ -216,6 +218,13 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             run: false,
             package: false,
             note: "novelty HIR-backed Fortran 2008 program (scalar subset plus rank-1 fixed-shape tensors; fail-closed); default-off `hir-fortran` feature",
+        },
+        crate::codegen::Target::HirOdin => TargetCapabilities {
+            check: true,
+            build: true,
+            run: false,
+            package: false,
+            note: "novelty HIR-backed Odin program (scalar-and-print registration spike; fail-closed); default-off `hir-odin` feature",
         },
         crate::codegen::Target::HirTypeScript => TargetCapabilities {
             check: true,

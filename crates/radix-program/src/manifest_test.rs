@@ -272,6 +272,7 @@ fn build_target_accepts_the_cli_vocabulary() {
         ("pascal", Target::HirPascal),
         ("cobol", Target::HirCobol),
         ("fortran", Target::HirFortran),
+        ("odin", Target::HirOdin),
     ] {
         assert_eq!(
             manifest_build_target(Some(spelling), Path::new("faber.toml"))
