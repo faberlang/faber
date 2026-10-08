@@ -3,7 +3,7 @@
 use super::{FunctionScope, MirValidationError, Validator};
 use crate::{
     MirAggregateCarrier, MirAggregateFamily, MirBlockId, MirClosureEnvironmentId, MirConstant,
-    MirGenericBindings, MirKernelBuiltin, MirLayoutKind, MirLocalId, MirOperand, MirProjection,
+    MirDeviceViewElement, MirGenericBindings, MirKernelBuiltin, MirLayoutKind, MirLocalId, MirOperand, MirProjection,
     MirScalarLayout, MirType, instantiate_existing_generic_type,
 };
 use radix_hir::DefId;
@@ -514,7 +514,11 @@ impl Validator<'_, '_> {
                     self.error(span, "device view projection result has no layout");
                     return;
                 };
-                if result_layout.kind != MirLayoutKind::Scalar(view.element) {
+                let expected = match view.element {
+                    MirDeviceViewElement::Scalar(scalar) => MirLayoutKind::Scalar(scalar),
+                    MirDeviceViewElement::Vector(vector) => MirLayoutKind::DeviceVector(vector),
+                };
+                if result_layout.kind != expected {
                     self.error(span, "device view projection element layout mismatch");
                 }
             }

@@ -232,13 +232,14 @@ fn validation_with_device_tensor_layouts(types: &TypeTable) -> MirValidationCont
         let MirLayoutKind::DeviceView(view) = layout.kind else {
             continue;
         };
-        validation.layouts.set_type_layout(
-            ty,
-            MirLayoutKind::DeviceView(crate::MirDeviceViewLayout::device_handle_row_major(
-                view.element,
-                view.rank,
-            )),
+        let mut handle = crate::MirDeviceViewLayout::device_handle_row_major(
+            crate::MirScalarLayout::F32,
+            view.rank,
         );
+        handle.element = view.element;
+        validation
+            .layouts
+            .set_type_layout(ty, MirLayoutKind::DeviceView(handle));
     }
     validation
 }

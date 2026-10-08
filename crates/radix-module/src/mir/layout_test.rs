@@ -5,7 +5,7 @@
 
 use super::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout, MirDeviceMatrixLayout,
-    MirDeviceVectorLayout, MirDeviceViewLayout, MirLayoutKind, MirLayoutTable, MirPackedBitOrder,
+    MirDeviceVectorLayout, MirDeviceViewElement, MirDeviceViewLayout, MirLayoutKind, MirLayoutTable, MirPackedBitOrder,
     MirPackedNumericFormat, MirPackedNumericLayout, MirScalarLayout, MirTensorLocusLayout, MirTensorStorageLayout,
     MirTensorStrideLayout, MirTensorViewLayout,
 };
@@ -233,7 +233,7 @@ fn dense_tensor_layout_records_materialized_row_major_facts() {
     assert_eq!(
         layout.kind,
         MirLayoutKind::DeviceView(MirDeviceViewLayout {
-            element: MirScalarLayout::F32,
+            element: MirDeviceViewElement::Scalar(MirScalarLayout::F32),
             rank: 2,
             storage: MirTensorStorageLayout::HostOwned,
             locus: MirTensorLocusLayout::Host,
@@ -252,7 +252,7 @@ fn dense_tensor_layout_can_represent_axis0_views() {
     assert_eq!(
         MirDeviceViewLayout::axis0_view(MirScalarLayout::F32, 2, 3, 3),
         MirDeviceViewLayout {
-            element: MirScalarLayout::F32,
+            element: MirDeviceViewElement::Scalar(MirScalarLayout::F32),
             rank: 2,
             storage: MirTensorStorageLayout::HostOwned,
             locus: MirTensorLocusLayout::Host,
@@ -271,7 +271,7 @@ fn dense_tensor_layout_can_represent_device_handle_locus() {
     assert_eq!(
         MirDeviceViewLayout::device_handle_row_major(MirScalarLayout::F32, 1),
         MirDeviceViewLayout {
-            element: MirScalarLayout::F32,
+            element: MirDeviceViewElement::Scalar(MirScalarLayout::F32),
             rank: 1,
             storage: MirTensorStorageLayout::DeviceHandle,
             locus: MirTensorLocusLayout::Device,

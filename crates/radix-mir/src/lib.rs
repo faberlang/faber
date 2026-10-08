@@ -174,7 +174,8 @@ pub use kernel_plan::{
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,
-    MirDeviceMatrixLayout, MirDeviceVectorLayout, MirDeviceViewLayout, MirLayout, MirLayoutError,
+    MirDeviceMatrixLayout, MirDeviceVectorLayout, MirDeviceViewElement, MirDeviceViewLayout, MirLayout,
+    MirLayoutError,
     MirLayoutKind, MirLayoutTable, MirPackedBitOrder, MirPackedNumericFormat,
     MirPackedNumericLayout, MirScalarLayout, MirTensorLocusLayout, MirTensorStorageLayout,
     MirTensorStrideLayout, MirTensorViewLayout,

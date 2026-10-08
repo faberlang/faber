@@ -4136,6 +4136,13 @@ fn kernel_matmul_shapes(
             "matmul operands require device-view layouts",
         ));
     };
+    let (Some(left_element), Some(right_element)) =
+        (left_view.element.scalar(), right_view.element.scalar())
+    else {
+        return Err(PlanMappingError::mapping(
+            "matmul operands cannot be vector-element device views",
+        ));
+    };
     // Batched trailing dims: the last two axes are the contraction's
     // [M, K] / [K, N]; rank-2 keeps `right_dims.get(1)` (the promoted
     // rank-1 RHS carries N = 1).
@@ -4153,8 +4160,8 @@ fn kernel_matmul_shapes(
         m: left_dims[m_index],
         k: left_dims[k_index],
         n,
-        left_layout: left_view.element,
-        right_layout: right_view.element,
+        left_layout: left_element,
+        right_layout: right_element,
     }))
 }
 

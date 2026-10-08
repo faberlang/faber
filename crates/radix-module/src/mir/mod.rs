@@ -180,7 +180,7 @@ pub use radix_mir::{
 };
 pub use radix_mir::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout, MirDeviceMatrixLayout,
-    MirDeviceVectorLayout, MirDeviceViewLayout, MirLayout, MirLayoutError, MirLayoutKind, MirLayoutTable,
+    MirDeviceVectorLayout, MirDeviceViewElement, MirDeviceViewLayout, MirLayout, MirLayoutError, MirLayoutKind, MirLayoutTable,
     MirPackedBitOrder, MirPackedNumericFormat, MirPackedNumericLayout, MirScalarLayout, MirTensorLocusLayout,
     MirTensorStorageLayout, MirTensorStrideLayout, MirTensorViewLayout,
 };

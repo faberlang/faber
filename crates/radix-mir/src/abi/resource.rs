@@ -539,11 +539,18 @@ pub(crate) fn require_kernel_device_view(
             view.rank
         )));
     }
-    if !crate::tensor_type::is_kernel_element_layout(view.element) {
+    let Some(element) = view.element.scalar() else {
         return Err(MirAbiError::with_detail(
-            format!("kernel device view element {}", view.element.spelling()),
+            "vector-element device view is not admitted as a kernel resource".to_string(),
+            "mir_kernel_device_view_vector_element_unsupported",
+            "vector-element device view",
+        ));
+    };
+    if !crate::tensor_type::is_kernel_element_layout(element) {
+        return Err(MirAbiError::with_detail(
+            format!("kernel device view element {}", element.spelling()),
             "mir_kernel_device_view_element_unsupported",
-            view.element.spelling(),
+            element.spelling(),
         ));
     }
     Ok(())

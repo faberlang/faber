@@ -4714,8 +4714,17 @@ fn copy_into_rejects_a_non_vacuum_result() {
 /// One function reading `tensor[index]` where `index` is a numerus local.
 fn device_view_linear_read_program(types: &mut TypeTable, dims: &[u64]) -> MirProgram {
     let tensor_ty = MirType::semantic(tensor_type(types, Primitive::Fractus, dims));
-    let index_ty = MirType::semantic(types.primitive(Primitive::Numerus));
     let element_ty = MirType::semantic(types.primitive(Primitive::Fractus));
+    device_view_linear_read_program_typed(types, tensor_ty, element_ty)
+}
+
+/// Same program with an explicit tensor type and the read's result type.
+fn device_view_linear_read_program_typed(
+    types: &mut TypeTable,
+    tensor_ty: MirType,
+    element_ty: MirType,
+) -> MirProgram {
+    let index_ty = MirType::semantic(types.primitive(Primitive::Numerus));
     let local = |id: u32, ty: MirType| MirLocal {
         id: MirLocalId(id),
         ty,
@@ -4772,6 +4781,44 @@ fn device_view_linear_index_validates_for_rank2_and_rank3_storage() {
         let errors = validate(&program, &types);
         assert!(errors.is_empty(), "rank {} linear device index must validate: {errors:?}", dims.len());
     }
+}
+
+/// `tensor<element, [4, 6]>` and its element type id.
+fn tensor_of_element(types: &mut TypeTable, element: TypeId) -> MirType {
+    let d0 = types.intern_index(IndexExpr::Literal(4));
+    let d1 = types.intern_index(IndexExpr::Literal(6));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![d0, d1]));
+    MirType::semantic(types.tensor_with_shape(element, shape))
+}
+
+#[test]
+fn device_view_index_on_vector_element_view_yields_the_vector_layout() {
+    let mut types = TypeTable::new();
+    let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let width = types.intern_index(IndexExpr::Literal(4));
+    let vector = types.intern(Type::Vector(f32_ty, width));
+    let tensor_ty = tensor_of_element(&mut types, vector);
+    let program =
+        device_view_linear_read_program_typed(&mut types, tensor_ty, MirType::semantic(vector));
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "vector-element view index must validate: {errors:?}");
+}
+
+#[test]
+fn device_view_index_on_opaque_tensor_runtime_is_still_rejected() {
+    let mut types = TypeTable::new();
+    let f64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let tuple = types.intern(Type::Tuple(vec![f64_ty]));
+    let tensor_ty = tensor_of_element(&mut types, tuple);
+    let program =
+        device_view_linear_read_program_typed(&mut types, tensor_ty, MirType::semantic(tuple));
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("tensor runtime aggregate has no device-view projection contract")),
+        "expected the opaque-tensor rejection, got: {errors:?}"
+    );
 }
 
 // -----------------------------------------------------------------------

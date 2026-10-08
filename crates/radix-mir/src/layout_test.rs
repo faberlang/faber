@@ -11,7 +11,8 @@
 //! corrected census, never weakened.
 
 use crate::{
-    MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirDeviceViewLayout,
+    MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirDeviceVectorLayout, MirDeviceViewElement,
+    MirDeviceViewLayout,
     MirLayoutKind, MirLayoutTable, MirScalarLayout, MirTensorLocusLayout, MirTensorStorageLayout,
     MirTensorStrideLayout, MirTensorViewLayout, MirType,
 };
@@ -35,7 +36,7 @@ fn bounded_octeti_resolves_rank1_u8_device_view_with_static_length() {
     assert_eq!(
         layout.kind,
         MirLayoutKind::DeviceView(MirDeviceViewLayout {
-            element: MirScalarLayout::U8,
+            element: MirDeviceViewElement::Scalar(MirScalarLayout::U8),
             rank: 1,
             storage: MirTensorStorageLayout::HostOwned,
             locus: MirTensorLocusLayout::Host,
@@ -647,7 +648,7 @@ fn sparsa_resolves_sparse_storage_device_view_row() {
     assert_eq!(
         layout.kind,
         MirLayoutKind::DeviceView(MirDeviceViewLayout {
-            element: MirScalarLayout::F64,
+            element: MirDeviceViewElement::Scalar(MirScalarLayout::F64),
             rank: 2,
             storage: MirTensorStorageLayout::Sparse,
             locus: MirTensorLocusLayout::Host,
@@ -764,4 +765,95 @@ fn policy_float_cells_share_the_bare_float_scalar_layout() {
             .expect("policy-float layout fact");
         assert_eq!(layout.kind, MirLayoutKind::Scalar(scalar));
     }
+}
+
+// G15-1: vector-element tensors get a device-view layout whose element is the
+// `DeviceVector` layout. Only widths with size == alignment (2 and 4) are
+// admitted; width 3 fails closed with a named reason (MSL `float3` stride).
+
+fn vector_element_tensor(types: &mut TypeTable, width: u64) -> radix_types::TypeId {
+    let f32_ty = types.sized_numeric(Primitive::Fractus, radix_types::NumericWidth::F32);
+    let width_index = types.intern_index(IndexExpr::Literal(width));
+    let vector_ty = types.intern(Type::Vector(f32_ty, width_index));
+    let dim = types.intern_index(IndexExpr::Literal(8));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![dim, dim]));
+    types.tensor_with_shape(vector_ty, shape)
+}
+
+#[test]
+fn vector_element_tensor_resolves_device_view_with_vector_element() {
+    let mut types = TypeTable::new();
+    let tensor = vector_element_tensor(&mut types, 4);
+    let table = MirLayoutTable::from_types(&types);
+
+    let layout = table
+        .layout_for_type(MirType::semantic(tensor))
+        .expect("tensor<vector<f32, 4>> layout fact");
+    let MirLayoutKind::DeviceView(view) = layout.kind else {
+        panic!("expected DeviceView, got {:?}", layout.kind);
+    };
+    assert_eq!(
+        view.element,
+        MirDeviceViewElement::Vector(MirDeviceVectorLayout {
+            element: MirScalarLayout::F32,
+            width: 4,
+            align: 16,
+        })
+    );
+    assert_eq!(view.rank, 2);
+    assert_eq!(view.element.scalar(), None);
+}
+
+#[test]
+fn vector_element_tensor_width2_is_admitted() {
+    let mut types = TypeTable::new();
+    let tensor = vector_element_tensor(&mut types, 2);
+    let table = MirLayoutTable::from_types(&types);
+    let layout = table
+        .layout_for_type(MirType::semantic(tensor))
+        .expect("tensor<vector<f32, 2>> layout fact");
+    assert!(matches!(
+        layout.kind,
+        MirLayoutKind::DeviceView(MirDeviceViewLayout {
+            element: MirDeviceViewElement::Vector(MirDeviceVectorLayout { width: 2, .. }),
+            ..
+        })
+    ));
+}
+
+#[test]
+fn vector_element_tensor_width3_fails_closed_with_named_reason() {
+    let mut types = TypeTable::new();
+    let tensor = vector_element_tensor(&mut types, 3);
+    let table = MirLayoutTable::from_types(&types);
+    let error = table
+        .layout_for_type(MirType::semantic(tensor))
+        .expect_err("vec3-element tensor must fail closed");
+    assert!(
+        error
+            .message
+            .contains("only widths 2 and 4 (size == alignment) are admitted"),
+        "unexpected reason: {}",
+        error.message
+    );
+}
+
+#[test]
+fn scalar_element_tensor_layout_is_unchanged() {
+    let mut types = TypeTable::new();
+    let f32_ty = types.sized_numeric(Primitive::Fractus, radix_types::NumericWidth::F32);
+    let dim = types.intern_index(IndexExpr::Literal(8));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![dim, dim]));
+    let tensor = types.tensor_with_shape(f32_ty, shape);
+    let table = MirLayoutTable::from_types(&types);
+    let layout = table
+        .layout_for_type(MirType::semantic(tensor))
+        .expect("tensor<f32> layout fact");
+    assert_eq!(
+        layout.kind,
+        MirLayoutKind::DeviceView(MirDeviceViewLayout::materialized_row_major(
+            MirScalarLayout::F32,
+            2
+        ))
+    );
 }

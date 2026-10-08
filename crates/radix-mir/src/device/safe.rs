@@ -343,17 +343,21 @@ impl<'a> DeviceSafeClassifier<'a> {
                         self.record_layout("kernel dense tensor view layout");
                     } else if view.rank != 1 {
                         self.record_layout(format!("kernel device view rank {}", view.rank));
-                    } else if !matches!(
-                        view.element,
-                        MirScalarLayout::Bf16
-                            | MirScalarLayout::F32
-                            | MirScalarLayout::I32
-                            | MirScalarLayout::U32
-                    ) {
-                        self.record_layout(format!(
-                            "kernel device view element {}",
-                            view.element.spelling()
-                        ));
+                    } else if let Some(element) = view.element.scalar() {
+                        if !matches!(
+                            element,
+                            MirScalarLayout::Bf16
+                                | MirScalarLayout::F32
+                                | MirScalarLayout::I32
+                                | MirScalarLayout::U32
+                        ) {
+                            self.record_layout(format!(
+                                "kernel device view element {}",
+                                element.spelling()
+                            ));
+                        }
+                    } else {
+                        self.record_layout("vector-element device view is not admitted as a kernel resource");
                     }
                 }
                 MirLayoutKind::DeviceVector(vector) => {

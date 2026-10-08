@@ -87,9 +87,36 @@ pub struct MirAggregateLayout {
     pub capacity: Option<u64>,
 }
 
+/// Element of a device view: a scalar cell, or one packed vector per cell
+/// (`tensor<vector<f32, 4>, [H, W]>`). The vector arm admits only widths whose
+/// size equals their alignment (2 and 4); width 3 fails closed at layout time
+/// because MSL `float3` has a 16-byte stride.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MirDeviceViewElement {
+    Scalar(MirScalarLayout),
+    Vector(MirDeviceVectorLayout),
+}
+
+impl MirDeviceViewElement {
+    /// The scalar element, or `None` for a vector element.
+    #[must_use]
+    pub fn scalar(self) -> Option<MirScalarLayout> {
+        match self {
+            Self::Scalar(scalar) => Some(scalar),
+            Self::Vector(_) => None,
+        }
+    }
+}
+
+impl From<MirScalarLayout> for MirDeviceViewElement {
+    fn from(scalar: MirScalarLayout) -> Self {
+        Self::Scalar(scalar)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MirDeviceViewLayout {
-    pub element: MirScalarLayout,
+    pub element: MirDeviceViewElement,
     pub rank: u8,
     pub storage: MirTensorStorageLayout,
     pub locus: MirTensorLocusLayout,
@@ -851,15 +878,33 @@ fn tensor_layout_kind(
     visiting: &mut FxHashSet<TypeId>,
 ) -> LayoutResolution {
     layout_kind_for_type(types, element, memo, visiting).then(|element| {
-        let MirLayoutKind::Scalar(element) = element else {
-            return LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::TensorRuntime));
+        let element = match element {
+            MirLayoutKind::Scalar(scalar) => MirDeviceViewElement::Scalar(scalar),
+            MirLayoutKind::DeviceVector(vector) => {
+                // WHY: width 3 has size 12 but stride/alignment 16 (MSL `float3`);
+                // size/stride conflation is a known trap, so only widths whose
+                // size equals their alignment are admitted.
+                if !matches!(vector.width, 2 | 4) {
+                    return LayoutResolution::MissingFact(format!(
+                        "tensor of vector<_, {}> has no device-view layout: only widths 2 and 4 \
+                         (size == alignment) are admitted; vec3 stride/packing is undecided",
+                        vector.width
+                    ));
+                }
+                MirDeviceViewElement::Vector(vector)
+            }
+            _ => {
+                return LayoutResolution::Resolved(opaque_aggregate(
+                    MirAggregateFamily::TensorRuntime,
+                ));
+            }
         };
         let Some(rank) = tensor_rank(types, shape) else {
             return LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::TensorRuntime));
         };
-        LayoutResolution::Resolved(MirLayoutKind::DeviceView(
-            MirDeviceViewLayout::materialized_row_major(element, rank),
-        ))
+        let mut view = MirDeviceViewLayout::materialized_row_major(MirScalarLayout::F32, rank);
+        view.element = element;
+        LayoutResolution::Resolved(MirLayoutKind::DeviceView(view))
     })
 }
 
@@ -882,7 +927,7 @@ impl MirDeviceViewLayout {
     #[must_use]
     pub fn materialized_row_major(element: MirScalarLayout, rank: u8) -> Self {
         Self {
-            element,
+            element: MirDeviceViewElement::Scalar(element),
             rank,
             storage: MirTensorStorageLayout::HostOwned,
             locus: MirTensorLocusLayout::Host,
@@ -918,7 +963,7 @@ impl MirDeviceViewLayout {
     #[must_use]
     pub fn device_handle_row_major(element: MirScalarLayout, rank: u8) -> Self {
         Self {
-            element,
+            element: MirDeviceViewElement::Scalar(element),
             rank,
             storage: MirTensorStorageLayout::DeviceHandle,
             locus: MirTensorLocusLayout::Device,
@@ -939,7 +984,7 @@ impl MirDeviceViewLayout {
         stride_elements: u64,
     ) -> Self {
         Self {
-            element,
+            element: MirDeviceViewElement::Scalar(element),
             rank,
             storage: MirTensorStorageLayout::HostOwned,
             locus: MirTensorLocusLayout::Host,
