@@ -167,6 +167,24 @@ fn interpret_path(
             }
         };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
+        // gpu-reset C2-U6b: an explicit GPU run goes through the in-process
+        // device session; no child process, no `[device]` table needed.
+        #[cfg(feature = "device-runtime")]
+        if !stats_requested && matches!(selection, DeviceSelection::Metal | DeviceSelection::Cuda)
+        {
+            let mut registry = package::mir::system_device_registry();
+            if let Err(diagnostics) = package::mir::run_package_on_device_session(
+                &config,
+                path,
+                selection,
+                &mut registry,
+                &mut host,
+            ) {
+                eprint_route_diagnostics(&diagnostics);
+                std::process::exit(1);
+            }
+            return;
+        }
         if stats_requested {
             let metadata = match run_stats::package_metadata(path) {
                 Ok(metadata) => metadata,
@@ -538,3 +556,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
 #[cfg(test)]
 #[path = "run_test.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "device-runtime", target_os = "macos"))]
+#[path = "run_device_test.rs"]
+mod run_device_tests;

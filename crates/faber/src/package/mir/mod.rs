@@ -345,3 +345,162 @@ pub(crate) fn mir_issue_diag(
 ) -> Diagnostic {
     mir_diag(path, message).with_arg("issue", issue)
 }
+
+/// The in-process device run (gpu-reset C2-U6b): lower the package to MIR,
+/// open a [`DeviceSession`](radix_device_core::session::DeviceSession) through
+/// the faber device seam, build the per-kernel device image, and run `main` on
+/// the MIR runner under `RunnerKernelPolicy::Dispatch` through a
+/// [`SessionKernelDispatcher`](super::device::SessionKernelDispatcher). No child
+/// process is spawned and no `[device]` table is required (D1). A call to a
+/// kernel that did not lower fails closed at the call, naming the function
+/// (D3). An unavailable explicit device fails closed before anything lowers
+/// onto it; there is no fallback.
+///
+/// Returns the discovery receipt line that was printed.
+///
+/// # Errors
+/// Structured diagnostics: device admission (`E_DEVICE_UNAVAILABLE`,
+/// `E_DEVICE_NONE_ADMITTED`, ...), image construction, or the runner's error.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub fn run_package_on_device_session<H: radix_mir_runner::Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    selection: DeviceSelection,
+    registry: &mut radix_device_core::registry::DeviceRegistry,
+    host: &mut H,
+) -> Result<String, Vec<Diagnostic>> {
+    use super::device::{DeviceImageBackend, SessionKernelDispatcher, device_image_for_lowered};
+    use super::host_factory::{discovery_receipt, host_error_diagnostic, open_device_selection};
+    use radix_device_core::backend::{DeviceBackend, DeviceClass};
+    use radix_device_core::partition::MemoryBudget;
+    use radix_device_core::session::DeviceSession;
+
+    // The device route binds no program arguments yet: fail closed rather
+    // than run with operands silently unbound.
+    let has_args = host.argumenta().map(|args| !args.is_empty()).unwrap_or(false);
+    if has_args {
+        return Err(vec![mir_issue_diag(
+            input,
+            "device_run_program_args_unsupported",
+            "program arguments are not supported on the in-process device route yet",
+        )]);
+    }
+    // Admission first: an unavailable explicit device fails before lowering
+    // work is spent on it.
+    let opened = open_device_selection(
+        registry,
+        selection,
+        true,
+        MemoryBudget::new(DEVICE_RUN_MEMORY_BUDGET_BYTES),
+    )
+    .map_err(|diagnostic| vec![diagnostic])?
+    .ok_or_else(|| vec![mir_diag(input, "no device was admitted for the device route")])?;
+    let receipt = discovery_receipt(&opened);
+    let backend = match receipt.class {
+        DeviceClass::Backend(DeviceBackend::Metal) => DeviceImageBackend::Metal,
+        other => {
+            return Err(vec![
+                mir_issue_diag(
+                    input,
+                    "E_DEVICE_UNSUPPORTED",
+                    format!(
+                        "no per-kernel device image backend for `{}` yet",
+                        other.spelling()
+                    ),
+                )
+                .with_arg("code", "E_DEVICE_UNSUPPORTED".to_owned()),
+            ]);
+        }
+    };
+    let session = DeviceSession::from_opened(opened)
+        .map_err(|error| vec![host_error_diagnostic(&error)])?;
+    receipt.print();
+
+    let mut session = Some(session);
+    with_interpreted_lowered_package_mir(config, input, |lowered| {
+        let (image, omitted) = device_image_for_lowered(lowered, backend)?;
+        if image.kernels.is_empty() {
+            let reasons = omitted
+                .iter()
+                .map(|(_, reason)| reason.clone())
+                .collect::<Vec<_>>()
+                .join("; ");
+            return Err(vec![
+                mir_issue_diag(
+                    input,
+                    "E_DEVICE_NONE_ADMITTED",
+                    format!("no kernel of this package lowers to the device: {reasons}"),
+                )
+                .with_arg("code", "E_DEVICE_NONE_ADMITTED".to_owned()),
+            ]);
+        }
+        let validated = &lowered.validated;
+        let names = radix_mir::names::MirNames::new(
+            validated.program(),
+            validated.validation().types.as_table(),
+            &lowered.interner,
+        );
+        let omissions: Vec<(radix_mir::MirFunctionId, String)> = omitted
+            .iter()
+            .map(|(id, reason)| {
+                let name = validated
+                    .program()
+                    .functions
+                    .iter()
+                    .find(|function| function.id == *id)
+                    .and_then(|function| function.name)
+                    .map_or_else(|| id.0.to_string(), |s| lowered.interner.resolve(s).to_owned());
+                (
+                    *id,
+                    format!("kernel `{name}` has no device kernel: {reason}"),
+                )
+            })
+            .collect();
+        let entry = names
+            .explicit_entry_function()
+            .map(|function| function.id)
+            .ok_or_else(|| vec![mir_diag(input, "no entry function in MIR program")])?;
+        let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
+        let dispatcher = SessionKernelDispatcher::new(
+            session.take().expect("session is taken once"),
+            image.artifact,
+            units,
+            validated.validation().types.as_table(),
+        )
+        .map_err(|error| vec![host_error_diagnostic(&error)])?;
+        dispatcher.borrow_mut().set_omissions(omissions);
+        let hook: radix_mir_runner::kernel_dispatch::ResidencyHook = dispatcher.clone();
+        radix_mir_runner::run_function_with_kernel_dispatcher(validated, entry, host, &hook)
+            .map_err(|errors| {
+                errors
+                    .into_iter()
+                    .map(|error| {
+                        mir_issue_diag(input, "device_run_failed", error.message)
+                            .with_arg("code", error.issue)
+                    })
+                    .collect::<Vec<_>>()
+            })
+    })
+    .and_then(|result| result)?;
+    Ok(receipt.render())
+}
+
+/// Device-route memory budget declared at admission (the registry's policy
+/// ceiling is the declared budget itself).
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+const DEVICE_RUN_MEMORY_BUDGET_BYTES: u64 = 8 * 1024 * 1024 * 1024;
+
+/// Register the system device runtimes this build and platform provide
+/// (Metal on macOS). CUDA joins when its per-kernel image backend lands.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub fn system_device_registry() -> radix_device_core::registry::DeviceRegistry {
+    #[allow(unused_mut)]
+    let mut registry = radix_device_core::registry::DeviceRegistry::new();
+    #[cfg(target_os = "macos")]
+    if let Some(info) = radix_device_metal::system_devices().into_iter().next()
+        && let Ok(driver) = radix_device_metal::SystemMetalDriver::open(info.registry_id)
+    {
+        registry.register(Box::new(radix_device_metal::MetalRuntime::new(driver)));
+    }
+    registry
+}
