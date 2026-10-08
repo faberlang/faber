@@ -837,6 +837,7 @@ impl<'a> KernelBuilder<'a> {
                 None,
                 &return_tuple_locals,
                 &mut BTreeMap::new(),
+                true,
             );
         }
 
@@ -868,6 +869,7 @@ impl<'a> KernelBuilder<'a> {
                     None,
                     &return_tuple_locals,
                     &mut BTreeMap::new(),
+                    true,
                 ),
                 Err(error) => Err(error),
             };
@@ -975,6 +977,7 @@ impl<'a> KernelBuilder<'a> {
                 Some(subchain_index),
                 &return_tuple_locals,
                 &mut subchain_output_buffer_ids,
+                decomposition.subchains.len() == 1,
             )?;
         }
 
@@ -1027,6 +1030,7 @@ impl<'a> KernelBuilder<'a> {
         subchain_index: Option<usize>,
         return_tuple_locals: &[MirLocalId],
         subchain_output_buffer_ids: &mut BTreeMap<(usize, u32), BufferId>,
+        whole_result: bool,
     ) -> Result<(), DeviceProgramBuildError> {
         let mut resources: Vec<ResourceBuild> = Vec::new();
         // The trainable param local → its registered buffer id, filled as the
@@ -1066,6 +1070,19 @@ impl<'a> KernelBuilder<'a> {
             } else {
                 None
             };
+            // A whole-function kernel's (or sole subchain's) first output slot
+            // is its declared result: its shape is the return type's literal dims (a fresh
+            // output has no parameter to carry one). Only when the product
+            // agrees with the slot's element count.
+            let shape = shape.or_else(|| {
+                if !whole_result || output_index != Some(0) {
+                    return None;
+                }
+                crate::abi::kernel_result_shape(kernel_source, self.validation).filter(|dims| {
+                    dims.iter().try_fold(1u64, |acc, d| acc.checked_mul(*d))
+                        == Some(resource.element_count)
+                })
+            });
             // An update output slot: the slot's tuple index decides which
             // parameter it updates. The alias applies ONLY when the output
             // slot IS the full result-tuple slot for that parameter's update

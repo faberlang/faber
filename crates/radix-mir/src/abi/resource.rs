@@ -428,6 +428,17 @@ pub fn kernel_param_shape(
     tensor_param_shape_dims(param.ty, validation)
 }
 
+/// The concrete shape vector of a kernel's declared tensor result: the
+/// literal dims of the function's return type. `None` when the result is not
+/// a tensor or any dim is not a literal.
+#[must_use]
+pub fn kernel_result_shape(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<u64>> {
+    tensor_param_shape_dims(function.return_ty, validation)
+}
+
 fn tensor_param_shape_dims(ty: MirType, validation: &MirValidationContext<'_>) -> Option<Vec<u64>> {
     match validation.types.get(ty.semantic_id()) {
         Type::Tensor(_, shape) => tensor_shape_dims(*shape, validation),
