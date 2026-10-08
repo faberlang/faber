@@ -48,6 +48,16 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
             let path = expect_str(via, span, "solum.read_bytes path")?;
             read_bytes(&path, span).map(Value::Octeti)
         }
+        "digest_file" => {
+            let [via] = args else {
+                return Err(RunnerError::internal(
+                    span,
+                    "solum.digest_file provider arity",
+                ));
+            };
+            let path = expect_str(via, span, "solum.digest_file path")?;
+            digest_file(&path, span).map(Value::Str)
+        }
         "read_range" => {
             let [via, initium, longitudo] = args else {
                 return Err(RunnerError::internal(
@@ -399,6 +409,26 @@ fn read_text(path: &str, span: Span) -> Result<String, RunnerError> {
 fn read_bytes(path: &str, span: Span) -> Result<Vec<u8>, RunnerError> {
     fs::read(path)
         .map_err(|err| RunnerError::internal(span, format!("solum.read_bytes failed: {err}")))
+}
+
+/// Streaming SHA-256 of a file as 64 lowercase hex digits (never loads the
+/// file whole). Copy of the retired `hosts` `solum:digestio` semantics.
+fn digest_file(path: &str, span: Span) -> Result<String, RunnerError> {
+    let mut file = File::open(path).map_err(|err| {
+        RunnerError::internal(span, format!("solum.digest_file open failed: {err}"))
+    })?;
+    let mut hasher = handroll::Sha256::new();
+    let mut buf = vec![0_u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buf).map_err(|err| {
+            RunnerError::internal(span, format!("solum.digest_file read failed: {err}"))
+        })?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buf[..read]);
+    }
+    Ok(hasher.finalize_hex())
 }
 
 fn read_byte_range(

@@ -3,7 +3,9 @@
 //! Exit/abort traps so interpreted Faber can return an [`ExitCode`] without
 //! terminating the embedder process.
 
-use radix::module::mir::{Host, KernelModule, MirDiagnosticKind, MirProvider, RunnerError, Value};
+use radix::module::mir::{
+    Host, KernelModule, MirDiagnosticKind, MirProvider, RunnerError, Value, serve_route,
+};
 use std::any::Any;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::process::ExitCode;
@@ -70,6 +72,17 @@ impl Host for TrapHost<'_> {
             self.exit(code);
         }
         self.inner.kernel_call(module, verb, args, span)
+    }
+
+    fn sermo_route(
+        &mut self,
+        route: &str,
+        opener: &Value,
+        span: radix::module::lexer::Span,
+    ) -> Option<Result<Vec<Value>, Value>> {
+        // WHY: serve through `self` so `processus:exi` reaches `TrapHost::exit`
+        // (the exit trap), not the inner host's process exit.
+        serve_route(self, route, opener, span)
     }
 
     fn write_stdout_raw(&mut self, text: &str) -> Result<(), RunnerError> {

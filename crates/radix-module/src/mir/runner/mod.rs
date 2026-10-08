@@ -10,7 +10,7 @@ pub use radix_mir_runner::{
     run_entry_with_kernel_policy, run_entry_with_stats, run_entry_with_stats_and_kernel_policy, run_function,
     run_function_with_kernel_policy, run_function_with_limits, run_function_with_limits_and_kernel_policy,
     run_function_with_stats_and_limits, run_function_with_stats_and_limits_and_kernel_policy,
-    run_function_with_step_budget, runner_dispatch_status,
+    run_function_with_step_budget, runner_dispatch_status, serve_route,
 };
 
 #[cfg(test)]
@@ -24,6 +24,10 @@ mod ad_serve_tests;
 #[cfg(test)]
 #[path = "itera_inf_test.rs"]
 mod itera_inf_tests;
+
+#[cfg(test)]
+#[path = "route_serve_test.rs"]
+mod route_serve_tests;
 
 #[cfg(test)]
 #[path = "range_step_test.rs"]

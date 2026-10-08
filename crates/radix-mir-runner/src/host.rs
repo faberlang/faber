@@ -80,7 +80,8 @@ pub trait Host {
     /// Tier-3 conversation answer for a frame route (A4/U9): `Some(Ok(items))`
     /// answers content items then `done`, `Some(Err(data))` an `error`
     /// terminal. `None` means the host does not serve the route and the
-    /// router fails closed. No runner host serves frame routes yet.
+    /// router fails closed. `StdioHost` and `BufferHost` serve the raw
+    /// process-capability routes in `routes.rs`.
     fn sermo_route(
         &mut self,
         _route: &str,
@@ -288,6 +289,15 @@ impl BufferHost {
 }
 
 impl Host for BufferHost {
+    fn sermo_route(
+        &mut self,
+        route: &str,
+        opener: &Value,
+        span: Span,
+    ) -> Option<Result<Vec<Value>, Value>> {
+        super::routes::serve_route(self, route, opener, span)
+    }
+
     fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), RunnerError> {
         if kind == MirDiagnosticKind::Mone {
             self.stderr_lines.push(text.to_owned());
@@ -398,6 +408,15 @@ impl StdioHost {
 }
 
 impl Host for StdioHost {
+    fn sermo_route(
+        &mut self,
+        route: &str,
+        opener: &Value,
+        span: Span,
+    ) -> Option<Result<Vec<Value>, Value>> {
+        super::routes::serve_route(self, route, opener, span)
+    }
+
     fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), RunnerError> {
         let target: &mut dyn Write = match kind {
             MirDiagnosticKind::Mone => &mut io::stderr(),

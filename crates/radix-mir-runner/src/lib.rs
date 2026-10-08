@@ -19,6 +19,7 @@ pub mod kernel;
 pub mod kernel_dispatch;
 pub mod kernel_lanes;
 mod regex_program;
+mod routes;
 mod runtime;
 pub mod sermo;
 #[cfg(test)]
@@ -38,6 +39,7 @@ pub use inf::{
     RUNNER_INF_BIT_CEILING, RUNNER_INF_MUL_WORK_CEILING, RUNNER_ISSUE_INF_SIZE_EXHAUSTED,
 };
 pub use kernel::reset_execution_state;
+pub use routes::serve_route;
 pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
 pub use value::{FieldOrder, MapKey, Value};
 

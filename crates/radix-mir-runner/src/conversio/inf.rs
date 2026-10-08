@@ -103,12 +103,18 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     /// encoding (`0` is `00`; a positive value with its top bit set gets a
     /// leading `00`). Any other source keeps the ordinary octeti rows.
     pub(crate) fn convert_to_octeti_from(
-        &self,
+        &mut self,
         value: Value,
         source_ty: TypeId,
         params: &[Symbol],
         span: Span,
     ) -> Result<Value, RunnerError> {
+        // A conversation reply (`ad 'solum:hauri' (via) ↦ octeti`) materializes
+        // its first content item, as `↦ textus` and `↦ numerus` do.
+        if let Value::Sermo(sermo) = value {
+            let item = self.sermo_first_item(&sermo, span)?;
+            return self.convert_to_octeti_from(item, source_ty, params, span);
+        }
         let inf_source = effective_width(self.types, source_ty) == Some(NumericWidth::Inf);
         if inf_source && let Some(endian) = self.inf_endian(params) {
             let Some(exact) = to_magnus(&value) else {

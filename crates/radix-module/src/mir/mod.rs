@@ -242,7 +242,7 @@ pub use runner::{
     run_entry_with_stats, run_entry_with_stats_and_kernel_policy, run_function, run_function_with_kernel_policy,
     run_function_with_limits, run_function_with_limits_and_kernel_policy, run_function_with_stats_and_limits,
     run_function_with_stats_and_limits_and_kernel_policy, run_function_with_step_budget, run_source,
-    runner_dispatch_status,
+    runner_dispatch_status, serve_route,
 };
 #[cfg(feature = "mir-sexp")]
 pub use sexp_text::{MirSexpTextProbeError, classify_sexp_lowerability, emit_sexp_text};
