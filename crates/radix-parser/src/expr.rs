@@ -2207,6 +2207,38 @@ impl Parser {
                 }
             }
 
+            // `_ { field = value, … }`: the inferred constructor. The hole
+            // type before braces builds the expected type; it lowers to the
+            // same `Verte` node as `Type { … }` with an `Infer` target.
+            TokenKind::Underscore(_)
+                if matches!(self.peek_at(1).kind, TokenKind::LBrace)
+                    && self.looks_like_typed_constructor_fields_at(1) =>
+            {
+                let hole_span = self.peek().span;
+                self.advance();
+                self.advance();
+                let mut fields = self.parse_object_fields()?;
+                self.expect_token(&TokenKind::RBrace, "expected '}'")?;
+                self.parse_construction_source(&mut fields)?;
+                let object = Expr {
+                    id: self.next_id(),
+                    kind: ExprKind::Object(ObjectExpr { fields }),
+                    span: hole_span.merge(self.previous_span()),
+                };
+                let ty = TypeExpr {
+                    nullable: false,
+                    mode: None,
+                    kind: TypeExprKind::Infer,
+                    span: hole_span,
+                    form: TypeFormLevel::LONG,
+                    iuncta_label: None,
+                };
+                ExprKind::Verte(VerteExpr {
+                    expr: Box::new(object),
+                    ty,
+                })
+            }
+
             TokenKind::LBracket => {
                 self.advance();
                 let elements = self.parse_array_elements()?;
@@ -3184,14 +3216,19 @@ impl Parser {
     }
 
     fn looks_like_typed_constructor_fields(&self) -> bool {
+        self.looks_like_typed_constructor_fields_at(0)
+    }
+
+    /// Field-list lookahead for a `{` at offset `brace` from the cursor.
+    fn looks_like_typed_constructor_fields_at(&self, brace: usize) -> bool {
         // A leading `sparge` routes here so the removed construction spread
         // (D15.4) gets its named diagnostic instead of a generic parse error.
-        matches!(self.peek_at(1).kind, TokenKind::RBrace)
-            || self.keyword_ident_at(1) == Some(TokenKind::Sparge)
+        matches!(self.peek_at(brace + 1).kind, TokenKind::RBrace)
+            || self.keyword_ident_at(brace + 1) == Some(TokenKind::Sparge)
             || matches!(
-                self.peek_at(1).kind,
+                self.peek_at(brace + 1).kind,
                 TokenKind::Ident(_) | TokenKind::String(_)
-            ) && matches!(self.peek_at(2).kind, TokenKind::Eq)
+            ) && matches!(self.peek_at(brace + 2).kind, TokenKind::Eq)
     }
 
     fn expect_field_value_separator(&mut self) -> Result<(), ParseError> {

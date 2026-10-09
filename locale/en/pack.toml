@@ -3532,6 +3532,10 @@ help = "write `target ← source ↦ T` instead of `↤` for this conversion"
 message = "regex conversion does not support a `⊥` default; regex has no literal form, so there is no target-typed value to substitute"
 help = "remove the recovery arm from this regex conversion"
 
+[diagnostics.SEM016.issues.inferred_constructor_no_expected_type]
+message = "`_ { … }` builds the expected type, but there is none here"
+help = "name the type: write `Type { … }`, or give the binding, parameter or return an explicit type"
+
 [diagnostics.SEM016.issues.valor_verte_unsupported]
 message = "{valor} ∷ T is not supported — a dynamic value's shape cannot be asserted at compile time. Use `↦ T` for runtime extraction (with `⊥` for a default)."
 help = "use runtime `↦ T` conversion with a `⊥` default instead"

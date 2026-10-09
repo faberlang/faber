@@ -544,7 +544,23 @@ impl TypeChecker<'_> {
                 source,
                 target,
                 entries,
-            } => self.check_verte(source, *target, entries.as_mut(), expected, expr.span),
+            } => {
+                if entries.is_some() && self.is_infer(self.resolve_inferred_type(*target)) {
+                    // `_ { … }`: the hole before braces builds the expected
+                    // type. No concrete expected type is a named error.
+                    match expected.map(|ty| self.resolve_inferred_type(ty)) {
+                        Some(ty) if !self.is_infer(ty) => *target = ty,
+                        _ => {
+                            self.invalid_conversion(
+                                super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                                expr.span,
+                            );
+                            return self.error_type;
+                        }
+                    }
+                }
+                self.check_verte(source, *target, entries.as_mut(), expected, expr.span)
+            }
             // An implicit store node is the checker's own output; re-checking
             // it re-derives the slot type and never re-runs `↦` admission.
             HirExpressionKind::Conversio {

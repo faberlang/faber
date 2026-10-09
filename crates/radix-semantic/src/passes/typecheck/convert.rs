@@ -102,6 +102,8 @@ const ISSUE_RATIO_FIELD_MISSING: &str = "ratio_field_missing";
 const ISSUE_UNKNOWN_RECORD_FIELD: &str = "unknown_record_field";
 const ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH: &str = "field_initializer_type_mismatch";
 const ISSUE_VALOR_VERTE_UNSUPPORTED: &str = "valor_verte_unsupported";
+pub(super) const ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE: &str =
+    "inferred_constructor_no_expected_type";
 const ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION: &str = "numeric_ascription_requires_conversion";
 const ISSUE_INVALID_CAST: &str = "invalid_cast";
 const ISSUE_ARRAY_ELEMENT_TYPE_MISMATCH: &str = "array_element_type_mismatch";
