@@ -44,6 +44,10 @@ mod itera_destructure_tests;
 mod bounded_itera_test;
 
 #[cfg(test)]
+#[path = "affine_destination_test.rs"]
+mod affine_destination_test;
+
+#[cfg(test)]
 #[path = "runtime_extent_itera_test.rs"]
 mod runtime_extent_itera_test;
 

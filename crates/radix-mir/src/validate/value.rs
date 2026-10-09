@@ -955,7 +955,10 @@ fn direct_operand_type(scope: &FunctionScope<'_, '_>, operand: &MirOperand) -> O
     }
 }
 
-fn tensor_type_dims(types: &TypeTable, mut ty: TypeId) -> Option<(TypeId, Vec<IndexId>)> {
+pub(super) fn tensor_type_dims(
+    types: &TypeTable,
+    mut ty: TypeId,
+) -> Option<(TypeId, Vec<IndexId>)> {
     loop {
         match types.get(ty) {
             Type::Alias(_, inner) | Type::Ref(_, inner) => ty = *inner,

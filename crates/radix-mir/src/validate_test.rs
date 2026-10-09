@@ -4441,6 +4441,119 @@ fn runtime_affine_call_and_return_require_the_matching_derived_witness() {
 }
 
 // -----------------------------------------------------------------------
+// Call destination with an expression-origin runtime axis
+// -----------------------------------------------------------------------
+
+/// Caller `f0` stores the result of `f1(x: tensor<f32, [3]>) -> tensor<f32, [3]>`
+/// (a monomorphized affine instance) into a local of `destination_axis`.
+fn expression_axis_destination_program(
+    types: &mut TypeTable,
+    destination_axis: IndexExpr,
+) -> MirProgram {
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let three = types.intern_index(IndexExpr::Literal(3));
+    let destination_axis = types.intern_index(destination_axis);
+    let concrete = MirType::semantic(types.tensor_with_shape(element, three));
+    let destination = MirType::semantic(types.tensor_with_shape(element, destination_axis));
+    let place = |local: u32| MirPlace {
+        base: MirPlaceBase::Local(MirLocalId(local)),
+        projections: Vec::new(),
+    };
+    let local = |id: u32, ty| MirLocal {
+        id: MirLocalId(id),
+        name: None,
+        ty,
+        mutable: false,
+        span: Span::default(),
+    };
+    let block = |statements| MirBlock {
+        id: MirBlockId(0),
+        statements,
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(None),
+            span: Span::default(),
+        },
+        span: Span::default(),
+    };
+    let function = |id: u32, params, locals, statements, return_ty| MirFunction {
+        id: MirFunctionId(id),
+        source: None,
+        name: None,
+        params,
+        locals,
+        temps: Vec::new(),
+        blocks: vec![block(statements)],
+        return_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let caller = function(
+        0,
+        Vec::new(),
+        vec![local(0, concrete), local(1, destination)],
+        vec![MirStatement {
+            kind: MirStatementKind::Call {
+                destination: Some(place(1)),
+                callee: MirCallee::Function(MirFunctionId(1)),
+                args: vec![MirOperand::Place(place(0))],
+            },
+            span: Span::default(),
+        }],
+        vacuum,
+    );
+    let mut callee = function(
+        1,
+        vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: concrete,
+            mode: MirParamMode::Owned,
+            span: Span::default(),
+        }],
+        vec![local(0, concrete)],
+        Vec::new(),
+        concrete,
+    );
+    callee.blocks[0].terminator.kind = MirTerminatorKind::Return(Some(MirOperand::Place(place(0))));
+    MirProgram {
+        functions: vec![caller, callee],
+        ..MirProgram::default()
+    }
+}
+
+#[test]
+fn call_destination_with_expression_axis_accepts_a_concrete_callee_extent() {
+    let mut types = TypeTable::new();
+    let program = expression_axis_destination_program(
+        &mut types,
+        IndexExpr::Runtime(RuntimeExtentId::ExpressionAxis {
+            expression: 21,
+            axis: 0,
+        }),
+    );
+    assert_eq!(validate(&program, &types), Vec::<String>::new());
+}
+
+#[test]
+fn call_destination_with_other_runtime_or_static_axis_stays_a_mismatch() {
+    for axis in [
+        IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(DefId(700))),
+        IndexExpr::Literal(2),
+    ] {
+        let mut types = TypeTable::new();
+        let program = expression_axis_destination_program(&mut types, axis);
+        assert_eq!(
+            validate(&program, &types),
+            vec!["destination type mismatch"]
+        );
+    }
+}
+
+// -----------------------------------------------------------------------
 // N7E-3 – policy-float cells are numeric float types in MIR
 // -----------------------------------------------------------------------
 

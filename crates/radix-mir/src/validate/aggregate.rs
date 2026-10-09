@@ -9,7 +9,7 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
-use radix_types::{IndexExpr, Primitive, Type};
+use radix_types::{IndexExpr, Primitive, RuntimeExtentId, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 impl Validator<'_, '_> {
@@ -638,6 +638,48 @@ impl Validator<'_, '_> {
             .ok()
     }
 
+    /// A call result whose destination tensor type carries an
+    /// expression-origin runtime axis (`Runtime(ExpressionAxis)`, recorded by
+    /// the checker when the call's extent is not a compile-time constant at
+    /// the store boundary) against a callee result whose extent is concrete,
+    /// for example the monomorphized instance of an affine generic
+    /// (`tensor<f32, [N - 1]>` at `N = 4`). The equality of those two extents
+    /// is the store's runtime shape check, so only the axes the destination
+    /// marks as expression-origin may differ; element type, rank, and every
+    /// other axis must still agree exactly.
+    fn destination_defers_to_store_shape_check(
+        &self,
+        expected_ty: MirType,
+        destination_ty: MirType,
+    ) -> bool {
+        let types = self.context.types.as_table();
+        let (Some((element, expected_dims)), Some((destination_element, destination_dims))) = (
+            super::value::tensor_type_dims(types, expected_ty.semantic_id()),
+            super::value::tensor_type_dims(types, destination_ty.semantic_id()),
+        ) else {
+            return false;
+        };
+        if !types.equals(element, destination_element)
+            || expected_dims.len() != destination_dims.len()
+        {
+            return false;
+        }
+        let mut deferred = false;
+        for (expected_dim, destination_dim) in expected_dims.iter().zip(&destination_dims) {
+            if types.index_equals(*expected_dim, *destination_dim) {
+                continue;
+            }
+            if !matches!(
+                types.get_index(*destination_dim),
+                IndexExpr::Runtime(RuntimeExtentId::ExpressionAxis { .. })
+            ) {
+                return false;
+            }
+            deferred = true;
+        }
+        deferred
+    }
+
     pub(crate) fn validate_optional_destination(
         &mut self,
         scope: &FunctionScope<'_, '_>,
@@ -682,7 +724,9 @@ impl Validator<'_, '_> {
                         generic_bindings,
                         shape_bindings,
                         span,
-                    ) {
+                    ) && !self
+                        .destination_defers_to_store_shape_check(expected_ty, destination_ty)
+                    {
                         self.require_assignable(
                             expected_ty,
                             destination_ty,
