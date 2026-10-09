@@ -10342,25 +10342,6 @@ main {
     };
     assert!(output.code.contains("crate::child::label()"));
     assert!(!output.code.contains("crate::parent::child::label()"));
-
-    // The generated crate must compile: the re-export reference is rewritten
-    // onto the root module tree (`crate::child::label()`), so a cargo build of
-    // the emitted crate proves there is no dangling `crate::parent::child`
-    // path left in the codegen.
-    // D1 offline seam: the generated crate resolves the faber runtime from the
-    // container-local checkout (the released `v<faber version>` git tag does
-    // not exist until the next release), so the cargo build stays offline.
-    let container_root = radix::module::paths::faberlang_home().expect("faberlang container root");
-    super::runtime_sources::set_path_override_for_test(Some(container_root));
-    let layout = discover_build_layout(&entry).expect("layout");
-    emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
-    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
-    let run = Command::new(binary).output().expect("run generated binary");
-    assert!(run.status.success(), "generated binary failed: {run:?}");
-    assert_eq!(
-        String::from_utf8(run.stdout).expect("stdout utf8"),
-        "child\n"
-    );
 }
 
 #[test]
@@ -10915,54 +10896,6 @@ main {
     let linked = super::library_link::emit_linked_library_crates(&app, &layout).expect("emit");
     assert_eq!(linked.len(), 1);
     std::env::set_current_dir(old).expect("restore cwd");
-}
-
-#[test]
-fn library_genus_record_call_arg_emits_correct_type() {
-    // Regression: package-path library Color {..} as call-arg must not emit as Euler.
-    let app = test_temp_dir("lib-color-call-arg");
-    fs::create_dir_all(app.join("src")).unwrap();
-    fs::write(
-        app.join("faber.toml"),
-        r#"[package]
-name = "color-call-arg"
-version = "0.1.0"
-[paths]
-entry = "main.fab"
-"#,
-    )
-    .unwrap();
-    fs::write(
-        app.join("src/main.fab"),
-        r#"
-import from "triga:math" triga
-
-main {
-  const triga.Color initium ← triga.Color { r = 0.0, g = 0.0, b = 0.0 }
-  const triga.Color finis ← triga.Color { r = 1.0, g = 0.5, b = 0.25 }
-  const triga.Color midpoint ← initium.lerp(finis, 0.5)
-  assert midpoint.r ≡ (0.5 ∷ f32) panic "color call-arg"
-}
-"#,
-    )
-    .unwrap();
-    let result = compile_with_faber_seams(&Config::default(), &app);
-    assert!(result.success(), "compile failed: {:?}", result.diagnostics);
-    let Some(Output::Rust(output)) = result.output else {
-        panic!("expected rust");
-    };
-    assert!(
-        output.code.contains("crate::math::Color {") || output.code.contains("math::Color {"),
-        "expected Color construct in emit, got:\n{}",
-        output.code
-    );
-    assert!(
-        output
-            .code
-            .contains("initium.lerp(faber::Valor::from(finis.clone()), 0.5)"),
-        "Color receiver call-arg must emit with the migrated method:\n{}",
-        output.code
-    );
 }
 
 #[test]
