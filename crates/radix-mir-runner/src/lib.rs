@@ -157,6 +157,12 @@ pub struct RunnerError {
     pub args: Vec<(String, String)>,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Test seam: how many `RunnerError::internal` values this thread has built.
+    pub(crate) static INTERNAL_ERRORS_BUILT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Lowercase identifier fragment for a structured fact value.
 fn runner_slug(value: &str) -> String {
     runner_issue(value).trim_start_matches("runner_").to_owned()
@@ -181,6 +187,8 @@ impl RunnerError {
     pub fn internal(span: Span, message: impl Into<String>) -> Self {
         // WHY: identity derives from the structured `detail` arg, not from
         // parsing the rendered prose message field.
+        #[cfg(test)]
+        INTERNAL_ERRORS_BUILT.with(|built| built.set(built.get() + 1));
         let message = message.into();
         let issue = format!("runner_{}", runner_slug(&message));
         Self {
@@ -3796,6 +3804,14 @@ mod ascii_cursor_test;
 #[cfg(test)]
 #[path = "textus_index_test.rs"]
 mod textus_index_test;
+
+#[cfg(test)]
+#[path = "collection_index_plain_test.rs"]
+mod collection_index_plain_test;
+
+#[cfg(test)]
+#[path = "tensor_get_direct_test.rs"]
+mod tensor_get_direct_test;
 
 #[cfg(test)]
 #[path = "capability_test.rs"]

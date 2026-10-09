@@ -1847,10 +1847,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor get arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        let index = self.shape_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
+        // The index lista is validated and read in place: no extent `Vec`, and
+        // no clone of the tensor shape.
+        let index = self.index_cells_arg(index, span, ERR_ACCIPE_INVALID_INDEX)?;
         let checked = !matches!(self.types.get(return_ty.semantic_id()), Type::Option(_));
-        let shape = tensor.borrow().shape.clone();
-        let Some(offset) = tensor_flat_offset(&shape, &index) else {
+        let located = {
+            let borrow = tensor.borrow();
+            tensor_flat_offset_cells(&borrow.shape, &index.borrow()).map(|offset| {
+                let dense = borrow.is_dense_row_major()
+                    && borrow.logical_len().is_some_and(|count| offset < count);
+                (offset, dense)
+            })
+        };
+        let Some((offset, dense)) = located else {
             return if checked {
                 Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX))
             } else {
@@ -1860,10 +1869,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // Dense row-major read: the flat offset already is the physical
         // offset, so read the cell directly instead of handing it to
         // `tensor_read_at`, which re-unravels it into coordinates.
-        let dense = {
-            let borrow = tensor.borrow();
-            borrow.is_dense_row_major() && borrow.logical_len().is_some_and(|count| offset < count)
-        };
         let read = if dense {
             let borrow = tensor.borrow();
             match borrow.read_physical(offset) {
@@ -4344,7 +4349,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // A semantically octeti local can retain the array carrier
                 // after a lista<u8> assignment; normalize its window back to
                 // octeti so endian conversion sees the declared source type.
-                if let Ok((start, end, inclusive)) = interval_parts(&index, span) {
+                if let Some((start, end, inclusive)) = window_interval(&index) {
                     let start = start.as_index(span)?;
                     let end = end.as_index(span)?;
                     let end = if inclusive {
@@ -4392,7 +4397,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // textus substring). Mirrors the octeti window above, but walks
                 // chars and truncates past the end like Rust codegen's
                 // `chars().skip(lo).take(hi - lo)` — no out-of-bounds trap.
-                if let Ok((start, end, inclusive)) = interval_parts(&index, span) {
+                if let Some((start, end, inclusive)) = window_interval(&index) {
                     let start = start.as_index(span)?;
                     let end = end.as_index(span)?;
                     let end = if inclusive {
@@ -4421,7 +4426,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
             }
             Value::Octeti(bytes) => {
-                if let Ok((start, end, inclusive)) = interval_parts(&index, span) {
+                if let Some((start, end, inclusive)) = window_interval(&index) {
                     let start = start.as_index(span)?;
                     let end = end.as_index(span)?;
                     let end = if inclusive {
@@ -4541,15 +4546,31 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // whole `Vec<Value>` through `array_arg`.
         cell.borrow()
             .iter()
-            .map(|value| match value {
-                Value::Int(dim) if tensor_dim_non_negative(*dim) => Ok(*dim),
-                Value::Int(_) => Err(RunnerError::internal(span, negative_message)),
-                other => Err(RunnerError::internal(
-                    span,
-                    format!("tensor shape element is not numerus: {other:?}"),
-                )),
-            })
+            .map(|value| shape_element(value, span, negative_message))
             .collect()
+    }
+
+    /// Evaluate an index `lista` operand and validate every element exactly as
+    /// `shape_arg` does (same errors, same order), but keep the cells instead
+    /// of collecting them into a fresh `Vec<i64>`. Every element of the
+    /// returned lista is a non-negative `Value::Int`.
+    fn index_cells_arg(
+        &mut self,
+        operand: &MirOperand,
+        span: Span,
+        negative_message: &'static str,
+    ) -> Result<Rc<RefCell<Vec<Value>>>, RunnerError> {
+        let value = self.eval_operand(operand, span)?;
+        let Value::Array(cell) = value else {
+            return Err(RunnerError::internal(
+                span,
+                format!("tensor lista argument type mismatch: {value:?}"),
+            ));
+        };
+        for element in cell.borrow().iter() {
+            shape_element(element, span, negative_message)?;
+        }
+        Ok(cell)
     }
 
     fn conversion_shape_arg(
@@ -5616,8 +5637,61 @@ fn tensor_kind(tensor: &Rc<RefCell<TensorValue>>) -> Option<DenseKind> {
     tensor.borrow().data.kind()
 }
 
+/// One validated extent of a shape or index `lista`.
+fn shape_element(
+    value: &Value,
+    span: Span,
+    negative_message: &'static str,
+) -> Result<i64, RunnerError> {
+    match value {
+        Value::Int(dim) if tensor_dim_non_negative(*dim) => Ok(*dim),
+        Value::Int(_) => Err(RunnerError::internal(span, negative_message)),
+        other => Err(RunnerError::internal(
+            span,
+            format!("tensor shape element is not numerus: {other:?}"),
+        )),
+    }
+}
+
+/// `tensor_flat_offset` over an index already validated by `index_cells_arg`
+/// (every cell a non-negative `Value::Int`), without materialising `Vec<i64>`.
+fn tensor_flat_offset_cells(shape: &[i64], index: &[Value]) -> Option<usize> {
+    if shape.len() != index.len() {
+        return None;
+    }
+    let mut offset = 0_usize;
+    let mut stride = 1_usize;
+    for (dim, idx) in shape.iter().zip(index.iter()).rev() {
+        let Value::Int(idx) = idx else {
+            return None;
+        };
+        let dim = usize::try_from(*dim).ok()?;
+        let idx = usize::try_from(*idx).ok()?;
+        if idx >= dim {
+            return None;
+        }
+        offset = offset.checked_add(idx.checked_mul(stride)?)?;
+        stride = stride.checked_mul(dim)?;
+    }
+    Some(offset)
+}
+
 fn interval_value(start: Value, end: Value, inclusive: bool) -> Value {
     Value::Tuple(vec![start, end, Value::Bool(inclusive)])
+}
+
+/// The `(start, end, inclusive)` window of an interval index, or `None` for a
+/// plain element index. Tests the carrier shape directly: the fallible
+/// `interval_parts` builds (and the caller then drops) a `RunnerError` for
+/// every non-interval value, which is every ordinary `xs[i]`.
+fn window_interval(value: &Value) -> Option<(Value, Value, bool)> {
+    let Value::Tuple(parts) = value else {
+        return None;
+    };
+    let [start, end, Value::Bool(inclusive)] = parts.as_slice() else {
+        return None;
+    };
+    Some((start.clone(), end.clone(), *inclusive))
 }
 
 fn interval_parts(value: &Value, span: Span) -> Result<(Value, Value, bool), RunnerError> {
