@@ -2355,11 +2355,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 // other modes retain the existing value transfer behavior.
                 if mode == MirParamMode::MutRef
                     && depth > 0
-                    && matches!(operand, MirOperand::Place(place) if place.projections.is_empty())
+                    && let MirOperand::Place(place) = operand
+                    && place.projections.is_empty()
                 {
-                    let MirOperand::Place(place) = operand else {
-                        unreachable!("place checked above");
-                    };
                     frame.aliases.insert(
                         local,
                         PlaceAlias {
@@ -3315,20 +3313,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 }
             }
             MirUnOp::Log => {
-                let is_valid = match value {
-                    Value::Float(v) => v > 0.0,
-                    Value::Int(v) => v > 0,
-                    Value::UInt(v) => v > 0,
-                    _ => return Err(RunnerError::internal(span, "log requires numeric operand")),
-                };
-                if !is_valid {
-                    return Err(RunnerError::internal(span, "log requires positive input"));
-                }
                 let result = match value {
-                    Value::Float(v) => v.ln(),
-                    Value::Int(v) => (v as f64).ln(),
-                    Value::UInt(v) => (v as f64).ln(),
-                    _ => unreachable!(),
+                    Value::Float(v) if v > 0.0 => v.ln(),
+                    Value::Int(v) if v > 0 => (v as f64).ln(),
+                    Value::UInt(v) if v > 0 => (v as f64).ln(),
+                    Value::Float(_) | Value::Int(_) | Value::UInt(_) => {
+                        return Err(RunnerError::internal(span, "log requires positive input"));
+                    }
+                    _ => return Err(RunnerError::internal(span, "log requires numeric operand")),
                 };
                 if result.is_finite() {
                     Ok(Value::Float(result))

@@ -13,17 +13,15 @@ fn config() -> ScanConfig {
 }
 
 const BUDGETS: Budgets = Budgets {
-    // WHY: minted at D-03 baseline; frozen, not audited here.
     unwrap: 0,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
     expect: 0,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
+    // WHY: `BufferHost::abort`/`exit` return `!` by the `Host` contract; the capture
+    // host unwinds so tests can observe them.
     panic: 2,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
-    unreachable: 2,
+    unreachable: 0,
     todo: 0,
     unimplemented: 0,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
+    // WHY: `StdioHost::abort` drops a failed stderr write on its way to `exit(1)`.
     let_underscore: 1,
     // D03-RUNNER extracted 2 inline modules (kernel/aleator.rs `tests`,
     // kernel/solum.rs `range_tests`).

@@ -13,17 +13,15 @@ fn config() -> ScanConfig {
 }
 
 const BUDGETS: Budgets = Budgets {
-    // WHY: minted at D-03 baseline; frozen, not audited here.
     unwrap: 0,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
+    // WHY: `schema/md3h_fixtures.rs` (2) is test-only support pulled in via #[path]
+    // by a `_test.rs`; `canonical_program_bytes` (1) is public API with a
+    // documented infallible postcard encode.
     expect: 3,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
     panic: 0,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
     unreachable: 0,
     todo: 0,
     unimplemented: 0,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
     let_underscore: 0,
     // WHY: D03-FMIR extracted 5 inline modules (codec, schema/mod,
     // schema/validate, schema/admit kv_cache_admission_tests,
