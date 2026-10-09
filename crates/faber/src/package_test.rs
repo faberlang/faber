@@ -7849,9 +7849,9 @@ locale = "zh-Hans"
 
 #[test]
 fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
-    let root = radix::module::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples/reader-locale");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("corpus-product/reader-locale");
 
     // zh-Hant, ar, hi, vi removed: reader locale changes now
     // produce LOCALE002 lexer warnings before semantic analysis.
@@ -7859,9 +7859,9 @@ fn installed_reader_locale_reference_examples_compile_from_installed_packs() {
     let (locale, path, function, binding, greeting) = (
         "zh-Hans",
         "zh-Hans",
-        "fn 问候(名字: String) -> String",
-        "let 问候语: String",
-        "你好",
+        "fn 迎接(访客: String) -> String",
+        "let 欢迎语: String",
+        "欢迎光临",
     );
     let example = root.join(path);
     let result = compile_with_faber_seams(&Config::default(), &example);
@@ -8131,9 +8131,9 @@ locale = "zh-Hans"
 
 #[test]
 fn thai_reader_locale_example_compiles_from_manifest() {
-    let example = radix::module::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples/reader-locale/th-TH");
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("corpus-product/reader-locale/th-TH");
 
     let result = compile_with_faber_seams(&Config::default(), &example);
 
@@ -8142,35 +8142,35 @@ fn thai_reader_locale_example_compiles_from_manifest() {
         panic!("expected generated Rust output");
     };
     let rust = output.code;
-    assert!(rust.contains("fn ทักทาย(name: String) -> String"));
-    let greeting_line = rust
+    assert!(rust.contains("fn ต้อนรับ(who: String) -> String"));
+    let line_binding = rust
         .lines()
-        .find(|l| l.contains("greeting"))
+        .find(|l| l.contains("let line"))
         .unwrap_or_default()
         .to_owned();
-    assert!(greeting_line.contains("format!(\"สวัสดี, {name}!\")"));
-    assert!(rust.contains("fn ผ่าน(score: i64) -> bool"));
-    assert!(rust.contains("if score >= 80"));
+    assert!(line_binding.contains("format!(\"ขอต้อนรับ, {who}!\")"));
+    assert!(rust.contains("fn สอบผ่าน(mark: i64) -> bool"));
+    assert!(rust.contains("if mark >= 90"));
     assert!(rust.contains("return true;"));
     assert!(rust.contains("return false;"));
-    assert!(rust.contains("fn นับผ่าน(scores: Vec<i64>) -> i64"));
-    assert!(rust.contains("for score in 0..((scores).len() as i64)"));
+    assert!(rust.contains("fn นับคะแนน(marks: Vec<i64>) -> i64"));
+    assert!(rust.contains("for mark in 0..((marks).len() as i64)"));
     assert!(rust.contains("continue;"));
     assert!(rust.contains("break;"));
-    assert!(rust.contains("fn นับถอยหลัง(start: i64) -> i64"));
+    assert!(rust.contains("fn ลดลง(start: i64) -> i64"));
     assert!(rust.contains("while current > 0"));
-    assert!(rust.contains("let score: i64 = 82;"));
-    assert!(rust.contains("let scores: Vec<i64> = vec!["));
+    assert!(rust.contains("let mark: i64 = 77;"));
+    assert!(rust.contains("let marks: Vec<i64> = vec!["));
     // Display tokens are the Thai pack's own words (`verum`/`falsum`/`iuncta`
     // keywords and the `nihil` type row), emitted as Rust string literals.
     assert!(
         rust.contains(
-            r#"faber::display::bivalens_with(ผ่าน(score), &faber::display::DisplayTokens { true_: "จร\u{e34}ง", false_: "เท\u{e47}จ", none: "น\u{e31}ล", tuple: "ท\u{e39}เพ\u{e34}ล" })"#
+            r#"faber::display::bivalens_with(สอบผ่าน(mark), &faber::display::DisplayTokens { true_: "จร\u{e34}ง", false_: "เท\u{e47}จ", none: "น\u{e31}ล", tuple: "ท\u{e39}เพ\u{e34}ล" })"#
         ),
         "{rust}"
     );
-    assert!(rust.contains("นับผ่าน(scores.clone())"));
-    assert!(rust.contains("นับถอยหลัง(3)"));
+    assert!(rust.contains("นับคะแนน(marks.clone())"));
+    assert!(rust.contains("ลดลง(4)"));
 }
 
 // S09-7: `go` is a supported manifest target; the fail-closed case uses a

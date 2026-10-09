@@ -51,9 +51,9 @@ fn convert_resolves_imports_in_corpus_fixture() {
 
 #[test]
 fn convert_thai_localizes_surface() {
-    let root = radix::module::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples/reader-locale/th-TH");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("corpus-product/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
     let latin = root.join("twins/main.la.fab");
 
@@ -82,24 +82,24 @@ fn convert_thai_localizes_surface() {
         "localized Thai emit must differ from the Latin twin"
     );
 
-    assert!(thai_output.contains("ฟังก์ชัน ทักทาย(ข้อความ name) → ข้อความ"));
-    assert!(thai_output.contains("คงที่ ข้อความ greeting ← \"สวัสดี, §!\"(name)"));
-    assert!(thai_output.contains("คืน greeting"));
-    assert!(thai_output.contains("ฟังก์ชัน ผ่าน(จํานวน score) → ตรรกะ"));
-    assert!(thai_output.contains("ถ้าไม่ก็ score ≥ 50 ดังนั้น คืน จริง"));
-    assert!(thai_output.contains("ฟังก์ชัน นับผ่าน(รายการ<จํานวน> scores) → จํานวน"));
+    assert!(thai_output.contains("ฟังก์ชัน ต้อนรับ(ข้อความ who) → ข้อความ"));
+    assert!(thai_output.contains("คงที่ ข้อความ line ← \"ขอต้อนรับ, §!\"(who)"));
+    assert!(thai_output.contains("คืน line"));
+    assert!(thai_output.contains("ฟังก์ชัน สอบผ่าน(จํานวน mark) → ตรรกะ"));
+    assert!(thai_output.contains("ถ้าไม่ก็ mark ≥ 40 ดังนั้น คืน จริง"));
+    assert!(thai_output.contains("ฟังก์ชัน นับคะแนน(รายการ<จํานวน> marks) → จํานวน"));
     assert!(thai_output.contains("แปร จํานวน total ← 0"));
-    assert!(thai_output.contains("วน จาก scores คงที่ score"));
-    assert!(thai_output.contains("ถ้า score ≺ 0 {"));
+    assert!(thai_output.contains("วน จาก marks คงที่ mark"));
+    assert!(thai_output.contains("ถ้า mark ≺ 0 {"));
     assert!(thai_output.contains("ไปต่อ"));
     assert!(thai_output.contains("หยุด"));
-    assert!(thai_output.contains("ฟังก์ชัน นับถอยหลัง(จํานวน start) → จํานวน"));
+    assert!(thai_output.contains("ฟังก์ชัน ลดลง(จํานวน start) → จํานวน"));
     assert!(thai_output.contains("ขณะ current ≻ 0"));
     assert!(thai_output.contains("เริ่ม {"));
-    assert!(thai_output.contains("คงที่ จํานวน score ← 82"));
-    assert!(thai_output.contains("คงที่ รายการ<จํานวน> scores ← [-1, 82, 41, 60]"));
-    assert!(thai_output.contains("บันทึก ผ่าน(score)"));
-    assert!(thai_output.contains("บันทึก นับผ่าน(scores)"));
+    assert!(thai_output.contains("คงที่ จํานวน mark ← 77"));
+    assert!(thai_output.contains("คงที่ รายการ<จํานวน> marks ← [-1, 95, 30, 55, 61]"));
+    assert!(thai_output.contains("บันทึก สอบผ่าน(mark)"));
+    assert!(thai_output.contains("บันทึก นับคะแนน(marks)"));
     // The Latin keyword surface must not survive localized re-emit, and the
     // template-application glyph `"…"(args)` must not expand to a named
     // `scriptum(...)` call. Comments are preserved trivia and may mention
@@ -664,9 +664,9 @@ fn convert_preserves_template_application_sugar() {
 fn convert_localizes() {
     // `convert --to <X>` selects the HIR-backed re-emit path with the
     // localized surface.
-    let root = radix::module::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples/reader-locale/th-TH");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("corpus-product/reader-locale/th-TH");
     let thai = root.join("src/main.fab");
 
     let output = Command::new(faber_binary())
