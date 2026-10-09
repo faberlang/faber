@@ -2517,6 +2517,10 @@ help = "استخدم declaration متاحا أو implement السطح المعل
 message = "method `{method}` معلم nondum لهذا target{?reason|: |}"
 help = "استخدم declaration متاحا أو غير target"
 
+[diagnostics.SEM017.issues.nondum_function_for_target]
+message = "function `{function}` معلم nondum لهذا target{?reason|: |}"
+help = "استخدم declaration متاحا أو غير target"
+
 [diagnostics.SEM018]
 message = "annotation غير صالح"
 help = "أصلح عقد annotation قبل semantic lowering"

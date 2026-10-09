@@ -2529,6 +2529,10 @@ help = "उपलब्ध declaration का उपयोग करें य�
 message = "method `{method}` इस target के लिए nondum के रूप में चिह्नित है{?reason|: |}"
 help = "उपलब्ध declaration का उपयोग करें या target बदलें"
 
+[diagnostics.SEM017.issues.nondum_function_for_target]
+message = "function `{function}` इस target के लिए nondum के रूप में चिह्नित है{?reason|: |}"
+help = "उपलब्ध declaration का उपयोग करें या target बदलें"
+
 [diagnostics.SEM018]
 message = "अमान्य annotation"
 help = "semantic lowering से पहले annotation contract ठीक करें"

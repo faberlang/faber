@@ -686,8 +686,14 @@ fn resolve_selective_imports(
             let exported = member.name.name;
             if let Some(sig) = resolver.namespace_file_function(decl.path, exported) {
                 let ty = types.function(sig.clone());
+                let gates = resolver
+                    .namespace_file_unavailable(decl.path, exported)
+                    .map(<[_]>::to_vec);
                 if let Some(symbol) = resolver.get_symbol_mut(def_id) {
                     symbol.ty = Some(ty);
+                }
+                if let Some(gates) = gates {
+                    resolver.bind_unavailable_import(def_id, gates);
                 }
             } else if let Some(ty) = resolver.namespace_file_const(decl.path, exported) {
                 if let Some(symbol) = resolver.get_symbol_mut(def_id) {

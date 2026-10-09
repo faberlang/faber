@@ -1,0 +1,56 @@
++++
+term = "nondum"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "nondum_functio_decl", "nondum_annotation", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "availability"
+canonical = false
+summary = "A free function marked @ nondum may omit its body; any use of it is refused."
+syntax = "@ nondum [target] [reason] <signature>"
+related = ["nondum", "functio", "implendum", "@"]
+locale = "en"
++++
+# =============================================================================
+# nondum — a declared function that is not implemented yet
+# =============================================================================
+#
+# What this teaches:
+#   • `@ nondum` on a top-level function declares it without a body: the
+#     function is part of the interface (it can be exported and re-exported)
+#     but it is unavailable, and no backend emits it
+#   • without a target the function is unavailable on every target;
+#     `@ nondum rs "reason"` limits the gate to one target
+#   • declaring such a function costs nothing, and a program that never uses
+#     it compiles and runs
+#
+# Common mistakes:
+#   • using the function — a call, a call through an imported namespace or an
+#     imported name, or taking it as a value — fails with SEM017
+#     (`nondum_function_for_target`): `parse_later("a=1")` or
+#     `fixum _ f ← parse_later` are both refused, wherever the declaration lives
+#   • leaving the body off a function that is not marked `@ nondum`
+#     (PARSE012, `function_body_absent`)
+#
+# See also: nondum, functio, implendum, @
+# =============================================================================
+
+# meta/nondum-function — a bodiless function declared unavailable
+#
+# GRAMMAR:
+#   nondum_functio_decl :← annotation* '@' 'nondum' payload? functio-signature
+#
+# EXPECTED OUTPUT:
+#   declared, never called
+#
+# BACKEND:
+#   The declaration has no body and is omitted from every backend's output.
+
+@ unstable "pending host dispatch"
+fn parse_later(string text) → string
+
+fn now(string text) → string {
+    return text
+}
+
+main {
+    print now("declared, never called")
+}

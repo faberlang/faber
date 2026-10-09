@@ -2517,6 +2517,10 @@ help = "sử dụng khai báo khả dụng hoặc triển khai bề mặt đư�
 message = "phương thức `{method}` được đánh dấu nondum cho đích này{?reason|: |}"
 help = "sử dụng khai báo khả dụng hoặc thay đổi đích"
 
+[diagnostics.SEM017.issues.nondum_function_for_target]
+message = "hàm `{function}` được đánh dấu nondum cho đích này{?reason|: |}"
+help = "sử dụng khai báo khả dụng hoặc thay đổi đích"
+
 [diagnostics.SEM018]
 message = "chú thích không hợp lệ"
 help = "sửa hợp đồng chú thích trước khi hạ cấp ngữ nghĩa"

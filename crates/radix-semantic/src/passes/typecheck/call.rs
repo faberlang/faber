@@ -208,6 +208,68 @@ impl TypeChecker<'_> {
         true
     }
 
+    /// Reports SEM017 `nondum_function_for_target` for a use of a free
+    /// function whose `@ nondum` gates cover this target.
+    ///
+    /// A gate without a target covers every target. `name` is the spelling the
+    /// source used (`parse`, or `toml.parse` through a namespace). Returns
+    /// `true` when the diagnostic was emitted.
+    pub(super) fn report_unavailable_function(
+        &mut self,
+        gates: &[crate::file_interface::InterfaceUnavailable],
+        name: impl Into<String>,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let Some(gate) = crate::file_interface::InterfaceUnavailable::applicable(gates, |target| {
+            self.target_name_matches(target)
+        }) else {
+            return false;
+        };
+        let reason = gate.reason.clone();
+        let mut error = SemanticError::structured(SemanticErrorKind::UnavailableDeclaration, span)
+            .with_arg("issue", "nondum_function_for_target")
+            .with_arg("function", name);
+        if let Some(reason) = reason {
+            error = error.with_arg("reason", reason);
+        }
+        self.errors.push(error);
+        true
+    }
+
+    /// `namespace.member` spelling for diagnostics about an imported function.
+    pub(super) fn qualified_function_name(&self, namespace: Symbol, member: Symbol) -> String {
+        format!(
+            "{}.{}",
+            self.method_display_name(namespace),
+            self.method_display_name(member)
+        )
+    }
+
+    /// Reports SEM017 for a use of the local function or selective-import
+    /// binding `def_id` when it is marked `@ nondum` for this target.
+    pub(super) fn report_unavailable_path(
+        &mut self,
+        def_id: DefId,
+        span: radix_lexer::Span,
+    ) -> bool {
+        if self.unavailable_functions.is_empty() && !self.resolver.has_unavailable_bindings() {
+            return false;
+        }
+        let Some(gates) = self
+            .unavailable_functions
+            .get(&def_id)
+            .cloned()
+            .or_else(|| self.resolver.binding_unavailable(def_id).map(<[_]>::to_vec))
+        else {
+            return false;
+        };
+        let name = self.resolver.get_symbol(def_id).map_or_else(
+            || "function".to_owned(),
+            |symbol| self.method_display_name(symbol.name),
+        );
+        self.report_unavailable_function(&gates, name, span)
+    }
+
     /// Assembles a provisional function signature from already-checked argument types.
     // moves params into FuncSig
     fn signature_from_arg_types(&mut self, params: Vec<ParamType>) -> FuncSig {
@@ -544,6 +606,17 @@ impl TypeChecker<'_> {
             .resolver
             .namespace_file_function_canonical(namespace, name)
             .cloned()?;
+        if let Some(gates) = self
+            .resolver
+            .namespace_file_unavailable_canonical(namespace, name)
+            .map(<[_]>::to_vec)
+        {
+            let qualified = self.qualified_function_name(namespace, name);
+            if self.report_unavailable_function(&gates, qualified, receiver.span) {
+                self.typecheck_call_arg_exprs(args);
+                return Some(self.error_type);
+            }
+        }
         let imported_policy = self
             .resolver
             .namespace_file_tensor_edge_policy_requirements_canonical(namespace, name)
@@ -1372,6 +1445,11 @@ impl TypeChecker<'_> {
                 return self
                     .types
                     .sized_numeric(Primitive::Numerus, NumericWidth::U32);
+            }
+
+            if self.report_unavailable_path(*def_id, callee.span) {
+                self.typecheck_call_arg_exprs(args);
+                return self.error_type;
             }
 
             if let Some(sig) = self.functions.get(def_id).cloned() {

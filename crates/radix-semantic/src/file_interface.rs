@@ -26,6 +26,13 @@ pub struct FileInterface {
     /// missing identity keeps the historical canonical-name behavior.
     pub identity: Option<InterfaceLibraryIdentity>,
     pub exports: BTreeMap<String, FileExport>,
+    /// Exported functions marked `@ nondum`, keyed by export name.
+    ///
+    /// The gate travels with the interface so an importer refuses every use of
+    /// the function (call, namespace member call, value reference) exactly as
+    /// the declaring file does. Strings, not interner symbols: the importer
+    /// owns a different interner.
+    pub unavailable: BTreeMap<String, Vec<InterfaceUnavailable>>,
     /// Routes this file serves with `@ ad '<route>'` handlers, keyed by the
     /// exact route. Routes are program-wide facts independent of export
     /// visibility: a private handler still serves its route (D6.10).
@@ -47,6 +54,43 @@ impl FileInterface {
     pub fn with_identity(mut self, identity: InterfaceLibraryIdentity) -> Self {
         self.identity = Some(identity);
         self
+    }
+}
+
+/// The `@ nondum [target] ["reason"]` gate of one exported function.
+///
+/// `target: None` means the function is unavailable on every target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InterfaceUnavailable {
+    pub target: Option<String>,
+    pub reason: Option<String>,
+}
+
+impl InterfaceUnavailable {
+    /// Portable form of every `@ nondum` record in `availability`.
+    #[must_use]
+    pub fn from_availability(
+        availability: &[radix_hir::HirAvailability],
+        interner: &Interner,
+    ) -> Vec<Self> {
+        availability
+            .iter()
+            .map(
+                |radix_hir::HirAvailability::Nondum { target, reason }| Self {
+                    target: target.map(|symbol| interner.resolve(symbol).to_owned()),
+                    reason: reason.map(|symbol| interner.resolve(symbol).to_owned()),
+                },
+            )
+            .collect()
+    }
+
+    /// The first gate in `gates` that applies on the target named by
+    /// `matches_target`; a gate without a target applies everywhere.
+    #[must_use]
+    pub fn applicable(gates: &[Self], matches_target: impl Fn(&str) -> bool) -> Option<&Self> {
+        gates
+            .iter()
+            .find(|gate| gate.target.as_deref().is_none_or(&matches_target))
     }
 }
 

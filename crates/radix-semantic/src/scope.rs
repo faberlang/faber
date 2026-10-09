@@ -33,8 +33,8 @@ use super::types::{FuncSig, Type, TypeId, TypeTable};
 use crate::file_interface::{
     FileExportKind, FileInterface, FileInterfaceError, InterfaceConstValue, InterfaceGenericParam,
     InterfaceLibraryIdentity, InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalExport,
-    InterfaceNominalKind, InterfaceStructExport, import_interface_callable_with_resolver,
-    import_interface_type_with_resolver,
+    InterfaceNominalKind, InterfaceStructExport, InterfaceUnavailable,
+    import_interface_callable_with_resolver, import_interface_type_with_resolver,
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
@@ -278,6 +278,9 @@ pub struct ImportedFileInterface {
     /// keyed like `const_members`. A const without an entry is not constant
     /// in a consumer's `=` initializer.
     const_values: FxHashMap<LexSymbol, InterfaceConstValue>,
+    /// `@ nondum` gates of exported functions, keyed like `exports` (the
+    /// consumer-visible member spelling).
+    unavailable: FxHashMap<LexSymbol, Vec<InterfaceUnavailable>>,
 }
 
 /// Remapped contract for a single imported file export.
@@ -836,6 +839,10 @@ pub struct Resolver {
     /// the same `TypeId` as the qualified path. Runtime-only; excluded from
     /// snapshots (type positions are resolved before the artifact is cut).
     selective_type_imports: FxHashMap<DefId, (LexSymbol, LexSymbol)>,
+    /// Selective-import bindings that name an exported function marked
+    /// `@ nondum`, keyed by the caller-owned binding `DefId`. Every use of the
+    /// binding is refused (SEM017). Runtime-only; excluded from snapshots.
+    unavailable_bindings: FxHashMap<DefId, Vec<InterfaceUnavailable>>,
     /// Declaration parameter names of imported implendum exports (D1.2).
     imported_contract_type_params: FxHashMap<DefId, Vec<LexSymbol>>,
     /// `@ radix contract` roles of imported implendum exports (D1.4).
@@ -892,6 +899,7 @@ impl Resolver {
             scribe_family_surfaces: FxHashSet::default(),
             tuple_element_labels: FxHashMap::default(),
             selective_type_imports: FxHashMap::default(),
+            unavailable_bindings: FxHashMap::default(),
             imported_contract_type_params: FxHashMap::default(),
             imported_contract_roles: FxHashMap::default(),
         }
@@ -1166,6 +1174,7 @@ impl Resolver {
                     identity,
                     const_members: FxHashSet::default(),
                     const_values: FxHashMap::default(),
+                    unavailable: FxHashMap::default(),
                 },
             );
         }
@@ -1388,9 +1397,13 @@ impl Resolver {
                         let exported = ImportedFileExport::Function(sig);
                         let policy_def =
                             (!requirements.is_empty()).then(|| self.fresh_builtin_def_id());
+                        let gates = interface.unavailable.get(member);
                         for projected_member in projected_members {
                             let member = interner.intern(&projected_member);
                             imported.exports.insert(member, exported.clone());
+                            if let Some(gates) = gates {
+                                imported.unavailable.insert(member, gates.clone());
+                            }
                             if let Some(policy_def) = policy_def {
                                 imported
                                     .tensor_edge_policy_requirements
@@ -2101,6 +2114,49 @@ impl Resolver {
             ImportedFileExport::Function(sig) => Some(sig),
             ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
         }
+    }
+
+    /// `@ nondum` gates of the imported function a source-spelled namespace
+    /// member names; `None` when the member is unmarked or not a function.
+    #[must_use]
+    pub fn namespace_file_unavailable(
+        &self,
+        namespace: LexSymbol,
+        member: LexSymbol,
+    ) -> Option<&[InterfaceUnavailable]> {
+        let interface = self.file_interfaces.get(&namespace)?;
+        let key = self.file_interface_export_key(interface, member)?;
+        interface.unavailable.get(&key).map(Vec::as_slice)
+    }
+
+    /// `@ nondum` gates of the imported function a post-HIR canonical member
+    /// name resolves to; `None` when the member is unmarked or not a function.
+    #[must_use]
+    pub fn namespace_file_unavailable_canonical(
+        &self,
+        namespace: LexSymbol,
+        canonical: LexSymbol,
+    ) -> Option<&[InterfaceUnavailable]> {
+        let interface = self.file_interfaces.get(&namespace)?;
+        let key = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        interface.unavailable.get(&key).map(Vec::as_slice)
+    }
+
+    /// Record that a selective import binding names an `@ nondum` function.
+    pub fn bind_unavailable_import(&mut self, binding: DefId, gates: Vec<InterfaceUnavailable>) {
+        self.unavailable_bindings.insert(binding, gates);
+    }
+
+    /// `@ nondum` gates of the function a selective import binding names.
+    #[must_use]
+    pub fn binding_unavailable(&self, binding: DefId) -> Option<&[InterfaceUnavailable]> {
+        self.unavailable_bindings.get(&binding).map(Vec::as_slice)
+    }
+
+    /// Whether any selective import binding names an `@ nondum` function.
+    #[must_use]
+    pub fn has_unavailable_bindings(&self) -> bool {
+        !self.unavailable_bindings.is_empty()
     }
 
     /// Edge-policy obligations exported by a generic namespace function.
@@ -3947,6 +4003,7 @@ impl Resolver {
                         identity: None,
                         const_members: FxHashSet::default(),
                         const_values: FxHashMap::default(),
+                        unavailable: FxHashMap::default(),
                     },
                 )
             })
@@ -4013,6 +4070,7 @@ impl Resolver {
             scribe_family_surfaces: FxHashSet::default(),
             tuple_element_labels: FxHashMap::default(),
             selective_type_imports: FxHashMap::default(),
+            unavailable_bindings: FxHashMap::default(),
             imported_contract_type_params: FxHashMap::default(),
             imported_contract_roles: FxHashMap::default(),
         }

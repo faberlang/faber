@@ -2517,6 +2517,10 @@ help = "使用可用的宣告，或實作標記的表面"
 message = "方法 `{method}` 對此目標標記為 nondum{?reason|: |}"
 help = "使用可用的宣告，或變更目標"
 
+[diagnostics.SEM017.issues.nondum_function_for_target]
+message = "函式 `{function}` 對此目標標記為 nondum{?reason|: |}"
+help = "使用可用的宣告，或變更目標"
+
 [diagnostics.SEM018]
 message = "無效註釋"
 help = "在語意降低前修正註釋契約"

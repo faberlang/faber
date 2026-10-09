@@ -19,6 +19,7 @@ mod nodes_test;
 mod presentation_test;
 pub mod tails;
 pub mod tensor_edge_policy;
+mod unavailable;
 pub mod visit;
 
 pub use nodes::*;

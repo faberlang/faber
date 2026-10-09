@@ -1713,9 +1713,39 @@ fn file_interface_for_program(
         let Some(export) = file_export_from_stmt(stmt, interner, &nominal_kinds, &ctx) else {
             continue;
         };
+        if matches!(stmt.kind, StmtKind::Func(_)) {
+            let gates = unavailable_gates_from_annotations(&stmt.annotations, interner);
+            if !gates.is_empty() {
+                interface.unavailable.insert(export.name.clone(), gates);
+            }
+        }
         interface.insert(export);
     }
     interface
+}
+
+/// The `@ nondum [target] ["reason"]` gates written on one declaration, in
+/// sugar or braced spelling, as portable interface records.
+fn unavailable_gates_from_annotations(
+    annotations: &[Annotation],
+    interner: &crate::lexer::Interner,
+) -> Vec<crate::file_interface::InterfaceUnavailable> {
+    annotations
+        .iter()
+        .filter_map(|annotation| {
+            let view = match &annotation.kind {
+                AnnotationKind::Statement(stmt) => crate::syntax::nondum_from_stmt(stmt, interner),
+                AnnotationKind::Braced(braced) => crate::syntax::braced_nondum_view(braced, interner),
+                _ => None,
+            }?;
+            Some(crate::file_interface::InterfaceUnavailable {
+                target: view
+                    .target
+                    .map(|symbol| interner.resolve(symbol).to_owned()),
+                reason: view.ratio.map(|symbol| interner.resolve(symbol).to_owned()),
+            })
+        })
+        .collect()
 }
 
 fn peeled_source_body(name: &str, source: &str) -> Option<String> {

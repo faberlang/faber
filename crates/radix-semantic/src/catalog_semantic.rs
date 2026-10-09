@@ -962,7 +962,7 @@ fn nucleum_fragment_effect_help(args: &[DiagnosticArg]) -> Option<String> {
 
 fn semantic_unavailable_declaration_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
-        "nondum_method_for_target" => {
+        "nondum_method_for_target" | "nondum_function_for_target" => {
             Some("use an available declaration or change the target".to_owned())
         }
         _ => None,

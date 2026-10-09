@@ -1,0 +1,447 @@
+//! `@ nondum` free functions: declaring is legal, every use is refused.
+//!
+//! The refusal is SEM017 `nondum_function_for_target` and covers a direct
+//! call, a call through an imported namespace or an imported name, and the
+//! function used as a value. A gate without a target covers every target; a
+//! gate with a target covers only that target. A declaration that nothing
+//! references compiles, with or without a body.
+
+use std::collections::BTreeMap;
+
+use crate::SemanticErrorKind;
+use crate::file_interface::{
+    FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceParam,
+    InterfaceTypeSnapshot, InterfaceUnavailable,
+};
+use crate::passes::visibility_annotation::VisibilityTier;
+use crate::test_support::{self, AnalyzedFixture};
+use crate::{Primitive, SemanticParamMode};
+use radix_target::Target;
+
+const ISSUE: &str = "nondum_function_for_target";
+
+fn arg<'a>(err: &'a crate::SemanticError, name: &str) -> Option<&'a str> {
+    err.args
+        .iter()
+        .find(|arg| arg.name == name)
+        .map(|arg| arg.value.as_str())
+}
+
+fn refusals(result: &AnalyzedFixture) -> Vec<&crate::SemanticError> {
+    result
+        .diagnostics
+        .iter()
+        .filter(|err| err.is_error() && test_support::issue(err) == Some(ISSUE))
+        .collect()
+}
+
+fn errors(result: &AnalyzedFixture) -> Vec<&crate::SemanticError> {
+    result
+        .diagnostics
+        .iter()
+        .filter(|err| err.is_error())
+        .collect()
+}
+
+fn assert_refused_once(result: &AnalyzedFixture, function: &str, reason: Option<&str>) {
+    let found = refusals(result);
+    assert_eq!(found.len(), 1, "diagnostics: {:?}", result.diagnostics);
+    assert_eq!(found[0].kind, SemanticErrorKind::UnavailableDeclaration);
+    assert_eq!(arg(found[0], "function"), Some(function));
+    assert_eq!(arg(found[0], "reason"), reason);
+    assert!(
+        test_support::args_have_no_legacy_message(&found[0].args),
+        "structured args only"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Same-file functions
+// ---------------------------------------------------------------------------
+
+const DIRECT_CALL: &str = r#"
+@ nondum "pending host dispatch"
+functio later(textus s) → textus
+
+incipit {
+    nota later("x")
+}
+"#;
+
+#[test]
+fn direct_call_of_a_nondum_function_is_refused() {
+    let result = test_support::analyze_source(DIRECT_CALL);
+    assert!(result.is_err());
+    assert_refused_once(&result, "later", Some("pending host dispatch"));
+}
+
+#[test]
+fn nondum_function_used_as_a_value_is_refused() {
+    let result = test_support::analyze_source(
+        r#"
+@ nondum "pending host dispatch"
+functio later(textus s) → textus
+
+incipit {
+    fixum _ f ← later
+    tacet
+}
+"#,
+    );
+    assert!(result.is_err());
+    assert_refused_once(&result, "later", Some("pending host dispatch"));
+}
+
+#[test]
+fn nondum_function_passed_as_an_argument_is_refused() {
+    let result = test_support::analyze_source(
+        r#"
+@ nondum "pending host dispatch"
+functio later(textus s) → textus
+
+functio apply((textus) → textus f, textus s) → textus {
+    redde f(s)
+}
+
+incipit {
+    nota apply(later, "x")
+}
+"#,
+    );
+    assert!(result.is_err());
+    assert_refused_once(&result, "later", Some("pending host dispatch"));
+}
+
+#[test]
+fn every_use_is_refused_separately() {
+    let result = test_support::analyze_source(
+        r#"
+@ nondum "later"
+functio later(textus s) → textus
+
+incipit {
+    nota later("a")
+    nota later("b")
+}
+"#,
+    );
+    assert_eq!(refusals(&result).len(), 2, "{:?}", result.diagnostics);
+}
+
+#[test]
+fn a_gate_without_a_target_refuses_on_every_target() {
+    for target in [
+        Target::HirRust,
+        Target::HirTypeScript,
+        Target::HirGo,
+        Target::MirFmir,
+    ] {
+        let result = test_support::analyze_source_for_target(DIRECT_CALL, target);
+        assert_eq!(
+            refusals(&result).len(),
+            1,
+            "{target:?}: {:?}",
+            result.diagnostics
+        );
+    }
+}
+
+#[test]
+fn a_gate_with_a_target_refuses_only_on_that_target() {
+    let source = r#"
+@ nondum rs "rust only"
+functio later(textus s) → textus {
+    redde s
+}
+
+incipit {
+    nota later("x")
+}
+"#;
+    let on_rust = test_support::analyze_source_for_target(source, Target::HirRust);
+    assert_refused_once(&on_rust, "later", Some("rust only"));
+
+    let on_ts = test_support::analyze_source_for_target(source, Target::HirTypeScript);
+    assert!(on_ts.is_ok(), "diagnostics: {:?}", on_ts.diagnostics);
+}
+
+#[test]
+fn a_nondum_function_with_a_body_is_refused_when_used() {
+    let result = test_support::analyze_source(
+        r#"
+@ nondum "withdrawn"
+functio later(textus s) → textus {
+    redde s
+}
+
+incipit {
+    nota later("x")
+}
+"#,
+    );
+    assert_refused_once(&result, "later", Some("withdrawn"));
+}
+
+#[test]
+fn a_gate_without_a_reason_carries_no_reason_arg() {
+    let result = test_support::analyze_source(
+        r#"
+@ nondum
+functio later(textus s) → textus
+
+incipit {
+    nota later("x")
+}
+"#,
+    );
+    assert_refused_once(&result, "later", None);
+}
+
+#[test]
+fn braced_gate_form_is_refused() {
+    let result = test_support::analyze_source(
+        r#"
+@ nondum { ratio = "braced" }
+functio later(textus s) → textus
+
+incipit {
+    nota later("x")
+}
+"#,
+    );
+    assert_refused_once(&result, "later", Some("braced"));
+}
+
+#[test]
+fn an_unreferenced_nondum_declaration_compiles() {
+    for source in [
+        "@ nondum \"later\"\nfunctio later(textus s) → textus\n\nincipit { tacet }\n",
+        "@ nondum \"later\"\nfunctio later(textus s) → textus { redde s }\n\nincipit { tacet }\n",
+        "@ nondum\nfunctio later() → numerus\n",
+    ] {
+        let result = test_support::analyze_source(source);
+        assert!(result.is_ok(), "{source}: {:?}", result.diagnostics);
+        assert!(
+            result.diagnostics.is_empty(),
+            "a declaration-only nondum function raises no warning either: {:?}",
+            result.diagnostics
+        );
+    }
+}
+
+#[test]
+fn an_unmarked_function_beside_a_nondum_one_still_compiles() {
+    let result = test_support::analyze_source(
+        r#"
+@ nondum "later"
+functio later(textus s) → textus
+
+functio now(textus s) → textus {
+    redde s
+}
+
+incipit {
+    nota now("x")
+}
+"#,
+    );
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}
+
+// ---------------------------------------------------------------------------
+// Imported functions
+// ---------------------------------------------------------------------------
+
+fn text_callable() -> InterfaceCallable {
+    InterfaceCallable {
+        type_params: Vec::new(),
+        params: vec![InterfaceParam {
+            ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
+        err: None,
+        is_async: false,
+        is_generator: false,
+        tensor_edge_policy_requirements: Vec::new(),
+        device: None,
+    }
+}
+
+/// A provider exporting `later` (gated by `gates`) and the ungated `now`.
+fn provider(gates: Vec<InterfaceUnavailable>) -> FileInterface {
+    let mut interface = FileInterface::new();
+    for name in ["later", "now"] {
+        interface.insert(FileExport {
+            name: name.to_owned(),
+            kind: FileExportKind::Function(text_callable()),
+        });
+    }
+    if !gates.is_empty() {
+        interface.unavailable.insert("later".to_owned(), gates);
+    }
+    interface
+}
+
+fn gate(target: Option<&str>, reason: Option<&str>) -> InterfaceUnavailable {
+    InterfaceUnavailable {
+        target: target.map(str::to_owned),
+        reason: reason.map(str::to_owned),
+    }
+}
+
+fn analyze_with_provider(
+    source: &str,
+    target: Target,
+    gates: Vec<InterfaceUnavailable>,
+) -> AnalyzedFixture {
+    let publica = VisibilityTier::Publica;
+    let mut config = crate::PassConfig::for_target(target);
+    let exports = || BTreeMap::from([("later".to_owned(), publica), ("now".to_owned(), publica)]);
+    config.namespace_exports = BTreeMap::from([
+        ("mod".to_owned(), exports()),
+        ("./mod".to_owned(), exports()),
+    ]);
+    // Namespace imports key the interface by binding name, selective imports
+    // by import path.
+    config.file_interfaces = BTreeMap::from([
+        ("mod".to_owned(), provider(gates.clone())),
+        ("./mod".to_owned(), provider(gates)),
+    ]);
+    test_support::analyze_source_with_config(source, config)
+}
+
+fn analyze_import(source: &str, gates: Vec<InterfaceUnavailable>) -> AnalyzedFixture {
+    analyze_with_provider(source, Target::HirRust, gates)
+}
+
+fn host_gate() -> Vec<InterfaceUnavailable> {
+    vec![gate(None, Some("pending host dispatch"))]
+}
+
+#[test]
+fn call_through_an_imported_namespace_is_refused() {
+    let result = analyze_import(
+        r#"importa ex "./mod" mod
+incipit { nota mod.later("x") }"#,
+        host_gate(),
+    );
+    assert!(result.is_err());
+    assert_refused_once(&result, "mod.later", Some("pending host dispatch"));
+}
+
+#[test]
+fn namespace_function_used_as_a_value_is_refused() {
+    let result = analyze_import(
+        r#"importa ex "./mod" mod
+incipit {
+    fixum _ f ← mod.later
+    tacet
+}"#,
+        host_gate(),
+    );
+    assert!(result.is_err());
+    assert_refused_once(&result, "mod.later", Some("pending host dispatch"));
+}
+
+#[test]
+fn call_through_an_imported_name_is_refused() {
+    let result = analyze_import(
+        r#"importa ex "./mod" fixum later
+incipit { nota later("x") }"#,
+        host_gate(),
+    );
+    assert!(result.is_err());
+    assert_refused_once(&result, "later", Some("pending host dispatch"));
+}
+
+#[test]
+fn call_through_an_aliased_imported_name_names_the_alias() {
+    let result = analyze_import(
+        r#"importa ex "./mod" fixum later ut deferred
+incipit { nota deferred("x") }"#,
+        host_gate(),
+    );
+    assert_refused_once(&result, "deferred", Some("pending host dispatch"));
+}
+
+#[test]
+fn imported_name_used_as_a_value_is_refused_on_every_use() {
+    let result = analyze_import(
+        r#"importa ex "./mod" fixum later
+incipit {
+    fixum _ f ← later
+    fixum _ g ← later
+    tacet
+}"#,
+        host_gate(),
+    );
+    assert_eq!(refusals(&result).len(), 2, "{:?}", result.diagnostics);
+}
+
+#[test]
+fn importing_a_nondum_name_without_using_it_compiles() {
+    for source in [
+        r#"importa ex "./mod" mod
+incipit { nota mod.now("x") }"#,
+        r#"importa ex "./mod" fixum now
+incipit { nota now("x") }"#,
+    ] {
+        let result = analyze_import(source, host_gate());
+        assert!(
+            errors(&result).is_empty(),
+            "{source}: {:?}",
+            result.diagnostics
+        );
+    }
+}
+
+#[test]
+fn an_ungated_sibling_export_is_usable_beside_a_nondum_one() {
+    let result = analyze_import(
+        r#"importa ex "./mod" mod
+incipit {
+    nota mod.now("x")
+    nota mod.later("y")
+}"#,
+        host_gate(),
+    );
+    assert_refused_once(&result, "mod.later", Some("pending host dispatch"));
+}
+
+#[test]
+fn imported_target_gate_refuses_only_on_its_target() {
+    let source = r#"importa ex "./mod" mod
+incipit { nota mod.later("x") }"#;
+    let gates = || vec![gate(Some("rs"), Some("rust only"))];
+
+    let on_rust = analyze_with_provider(source, Target::HirRust, gates());
+    assert_refused_once(&on_rust, "mod.later", Some("rust only"));
+
+    let on_ts = analyze_with_provider(source, Target::HirTypeScript, gates());
+    assert!(errors(&on_ts).is_empty(), "{:?}", on_ts.diagnostics);
+}
+
+#[test]
+fn imported_selective_target_gate_refuses_only_on_its_target() {
+    let source = r#"importa ex "./mod" fixum later
+incipit { nota later("x") }"#;
+    let gates = || vec![gate(Some("ts"), None)];
+
+    let on_ts = analyze_with_provider(source, Target::HirTypeScript, gates());
+    assert_refused_once(&on_ts, "later", None);
+
+    let on_rust = analyze_with_provider(source, Target::HirRust, gates());
+    assert!(errors(&on_rust).is_empty(), "{:?}", on_rust.diagnostics);
+}
+
+#[test]
+fn a_provider_without_gates_changes_nothing() {
+    let result = analyze_import(
+        r#"importa ex "./mod" mod
+incipit { nota mod.later("x") }"#,
+        Vec::new(),
+    );
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}

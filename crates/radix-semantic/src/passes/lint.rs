@@ -217,6 +217,14 @@ impl<'a> LintContext<'a> {
                         .annotations
                         .iter()
                         .any(|annotation| annotation.ad_route(self.interner).is_some()) => {}
+                // An `@ nondum` function is declared to be unavailable; the
+                // semantic pass refuses every use, so "unused" is the point.
+                HirItemKind::Function(_)
+                    if item
+                        .annotations
+                        .iter()
+                        .any(|annotation| self.interner.resolve(annotation.family) == "nondum") => {
+                }
                 HirItemKind::Function(func) if !item.def_id.is_hir_synthetic() => {
                     self.functions.push((
                         item.def_id,
@@ -327,8 +335,12 @@ impl<'a> LintContext<'a> {
         for param in &func.params {
             self.warn_on_shadowed_keyword(param.name, param.span);
             self.def_names.insert(param.def_id, param.name);
-            self.defs
-                .push((param.def_id, param.span, WarningKind::UnusedVariable));
+            // A signature-only declaration has no body that could read its
+            // parameters, so they are never "unused".
+            if func.body.is_some() {
+                self.defs
+                    .push((param.def_id, param.span, WarningKind::UnusedVariable));
+            }
             self.check_shadowing(param.name, param.def_id, param.span);
             self.insert_name(param.name, param.def_id);
             self.warn_on_explicit_ignotum(param.ty, param.span);

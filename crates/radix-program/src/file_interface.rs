@@ -13,7 +13,7 @@ use radix_module::file_interface::{
     InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
     InterfaceFieldDefault, InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMethodExport,
     InterfaceNominalExport, InterfaceQualifiedIdentity, InterfaceStructExport,
-    InterfaceStructField, InterfaceTensorEdgePolicyRequirement,
+    InterfaceStructField, InterfaceTensorEdgePolicyRequirement, InterfaceUnavailable,
     snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity,
 };
 use radix_module::hir::{
@@ -179,6 +179,26 @@ pub fn extract_file_interface_with_identity(
             HirItemKind::Import(_) => continue,
         };
 
+        // An `@ nondum` free function stays in the interface so importers can
+        // resolve it and then refuse every use (SEM017).
+        if matches!(item.kind, HirItemKind::Function(_)) {
+            let availability: Vec<_> = item
+                .annotations
+                .iter()
+                .filter_map(|annotation| {
+                    radix_module::semantic::try_parse_nondum_annotation(
+                        annotation,
+                        &analysis.interner,
+                    )
+                })
+                .collect();
+            if !availability.is_empty() {
+                interface.unavailable.insert(
+                    name.clone(),
+                    InterfaceUnavailable::from_availability(&availability, &analysis.interner),
+                );
+            }
+        }
         interface.insert(FileExport { name, kind });
     }
 

@@ -170,6 +170,12 @@ pub struct Parser {
     /// Range-bound and construction-source entries suppress it until their nested
     /// `parse_expression` calls begin a new expression context.
     conversio_postfix_enabled: bool,
+    /// Set while the annotated top-level `functio` that follows a `@ nondum`
+    /// annotation is about to parse, so its signature may omit the body.
+    ///
+    /// Consumed (cleared) by `parse_func_decl` on entry, so it never reaches a
+    /// nested declaration.
+    nondum_function_pending: bool,
     /// Set once either budget is exhausted; parsing then stops descending.
     ///
     /// A budget diagnostic is raised where the budget was spent, which can be a
@@ -344,6 +350,7 @@ impl Parser {
             folded_operators: 0,
             expression_contexts: 0,
             conversio_postfix_enabled: true,
+            nondum_function_pending: false,
             budget_exhausted: false,
             budget_diagnostic: None,
             conditionals: Vec::new(),
@@ -1713,6 +1720,10 @@ mod region_decl_test;
 #[cfg(test)]
 #[path = "static_decl_test.rs"]
 mod static_decl_test;
+
+#[cfg(test)]
+#[path = "nondum_function_test.rs"]
+mod nondum_function_test;
 
 #[cfg(test)]
 #[path = "discerne_separator_test.rs"]

@@ -479,7 +479,12 @@ impl TypeChecker<'_> {
         let Some(interner) = self.interner else {
             return false;
         };
-        let target = interner.resolve(target);
+        self.target_name_matches(interner.resolve(target))
+    }
+
+    /// Whether an availability gate's target spelling names the backend this
+    /// check runs for.
+    pub(super) fn target_name_matches(&self, target: &str) -> bool {
         match self.target {
             radix_target::Target::MirStepper => matches!(target, "stepper" | "mir-stepper"),
             radix_target::Target::HirRust => matches!(target, "rs" | "rust"),

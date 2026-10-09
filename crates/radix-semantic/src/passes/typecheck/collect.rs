@@ -398,6 +398,7 @@ impl TypeChecker<'_> {
                 HirItemKind::Function(func) => {
                     let sig = self.function_signature(func);
                     self.functions.insert(item.def_id, sig);
+                    self.record_function_availability(item.def_id, &item.annotations);
                     if let Some(role) = func.nucleum_role() {
                         self.nucleum_roles.insert(item.def_id, role);
                         if is_inlinable_kernel(func) {
@@ -454,6 +455,29 @@ impl TypeChecker<'_> {
         // Contract kind checks run after every local genus and implendum is
         // collected so they are declaration-order independent.
         self.resolve_struct_implements();
+    }
+
+    /// Record the `@ nondum` gates of a local free function so its uses can be
+    /// refused. A function without the annotation records nothing.
+    fn record_function_availability(
+        &mut self,
+        def_id: DefId,
+        annotations: &[radix_hir::HirAnnotation],
+    ) {
+        let Some(interner) = self.interner else {
+            return;
+        };
+        let availability: Vec<radix_hir::HirAvailability> = annotations
+            .iter()
+            .filter_map(|annotation| crate::try_parse_nondum_annotation(annotation, interner))
+            .collect();
+        if availability.is_empty() {
+            return;
+        }
+        self.unavailable_functions.insert(
+            def_id,
+            crate::file_interface::InterfaceUnavailable::from_availability(&availability, interner),
+        );
     }
 
     /// Kind-check each genus's `implet` clause and record its contracts.

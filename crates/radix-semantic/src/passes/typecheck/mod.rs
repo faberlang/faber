@@ -117,6 +117,9 @@ mod mutating_intrinsic_test;
 #[path = "non_null_mutating_receiver_test.rs"]
 mod non_null_mutating_receiver_test;
 #[cfg(test)]
+#[path = "nondum_function_test.rs"]
+mod nondum_function_test;
+#[cfg(test)]
 #[path = "ponde_failable_test.rs"]
 mod ponde_failable_test;
 #[cfg(test)]
@@ -468,6 +471,11 @@ pub(crate) struct TypeChecker<'a> {
     /// Import bindings that behave like module/provider receivers.
     pub import_receivers: FxHashSet<DefId>,
 
+    /// Local free functions marked `@ nondum`, keyed by item definition.
+    /// Every use is refused (SEM017 `nondum_function_for_target`) on a target
+    /// the gate covers; the declaration itself is fine.
+    pub unavailable_functions: FxHashMap<DefId, Vec<crate::file_interface::InterfaceUnavailable>>,
+
     /// Backend target selected for target-aware availability gates.
     pub target: Target,
 
@@ -812,6 +820,7 @@ impl<'a> TypeChecker<'a> {
             empty_dense_ids: Vec::new(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
+            unavailable_functions: FxHashMap::default(),
             target,
             variant_fields: FxHashMap::default(),
             variant_field_names: FxHashMap::default(),

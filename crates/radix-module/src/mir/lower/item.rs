@@ -51,6 +51,11 @@ impl<'lowerer, 'unit, 'maps> ItemLoweringPass<'lowerer, 'unit, 'maps> {
 
 impl HirVisitor for ItemLoweringPass<'_, '_, '_> {
     fn visit_item(&mut self, item: &HirItem) {
+        // A declaration-only `@ nondum` function has no body to lower; every
+        // use was refused by semantic analysis.
+        if item.is_unavailable_declaration(&self.lowerer.unit.interner) {
+            return;
+        }
         match &item.kind {
             HirItemKind::Function(function) => {
                 // Generic AIR bodies are source templates. Their concrete

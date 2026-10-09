@@ -371,3 +371,122 @@ fn typed_kernel_twin_export_materializes_as_interface_callable() {
     assert_eq!(device.visibility, InterfaceDeviceVisibility::Public);
     assert_eq!(device.body, InterfaceBodyChannel::Source);
 }
+
+const NONDUM_PRODUCER: &str = r#"@ publica
+@ nondum "pending host dispatch"
+functio later(textus s) → textus
+
+@ publica
+@ nondum ts
+functio later_ts(textus s) → textus {
+    redde s
+}
+
+@ publica
+functio nunc(textus s) → textus {
+    redde s
+}
+"#;
+
+fn nondum_producer_interface() -> radix_module::file_interface::FileInterface {
+    let analysis = analyze(NONDUM_PRODUCER);
+    let export_names = ["later".to_owned(), "later_ts".to_owned(), "nunc".to_owned()];
+    extract_file_interface_with_identity(&analysis, &export_names, "model.fab", None)
+        .expect("extract interface")
+}
+
+#[test]
+fn extract_file_interface_carries_nondum_gates() {
+    let interface = nondum_producer_interface();
+
+    for name in ["later", "later_ts", "nunc"] {
+        assert!(
+            matches!(
+                interface.exports.get(name).map(|export| &export.kind),
+                Some(FileExportKind::Function(_))
+            ),
+            "{name} stays exported so importers can resolve and refuse it"
+        );
+    }
+    assert_eq!(
+        interface.unavailable.get("later"),
+        Some(&vec![radix_module::file_interface::InterfaceUnavailable {
+            target: None,
+            reason: Some("pending host dispatch".to_owned()),
+        }])
+    );
+    assert_eq!(
+        interface.unavailable.get("later_ts"),
+        Some(&vec![radix_module::file_interface::InterfaceUnavailable {
+            target: Some("ts".to_owned()),
+            reason: None,
+        }])
+    );
+    assert!(!interface.unavailable.contains_key("nunc"));
+}
+
+fn analyze_nondum_consumer(source: &str) -> Result<(), Vec<radix_module::diagnostics::Diagnostic>> {
+    analyze_source(
+        &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+        "consumer.fab",
+        source,
+        AnalyzeRequest {
+            cli_program: None,
+            contract: ModuleImportContract {
+                file_interfaces: BTreeMap::from([(
+                    "model".to_owned(),
+                    nondum_producer_interface(),
+                )]),
+                ..ModuleImportContract::default()
+            },
+        },
+    )
+    .map(|_| ())
+}
+
+fn refused_functions(diagnostics: &[radix_module::diagnostics::Diagnostic]) -> Vec<String> {
+    diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.code == Some("SEM017"))
+        .filter_map(|diagnostic| {
+            diagnostic
+                .args
+                .iter()
+                .find(|arg| arg.name == "function")
+                .map(|arg| arg.value.clone())
+        })
+        .collect()
+}
+
+#[test]
+fn imported_nondum_function_is_refused_through_the_extracted_interface() {
+    let diagnostics = analyze_nondum_consumer(
+        "importa ex \"model:types\" model\nincipit { nota model.later(\"x\") }\n",
+    )
+    .expect_err("a call to an imported nondum function must not compile");
+    assert_eq!(
+        refused_functions(&diagnostics),
+        vec!["model.later".to_owned()]
+    );
+}
+
+#[test]
+fn imported_nondum_function_value_use_is_refused_through_the_extracted_interface() {
+    let diagnostics = analyze_nondum_consumer(
+        "importa ex \"model:types\" model\nincipit {\n    fixum _ f ← model.later\n    tacet\n}\n",
+    )
+    .expect_err("a value use of an imported nondum function must not compile");
+    assert_eq!(
+        refused_functions(&diagnostics),
+        vec!["model.later".to_owned()]
+    );
+}
+
+#[test]
+fn imported_nondum_function_is_usable_where_its_gate_does_not_apply() {
+    // The `ts` gate on `later_ts` does not cover the Rust target.
+    analyze_nondum_consumer(
+        "importa ex \"model:types\" model\nincipit {\n    nota model.nunc(\"x\")\n    nota model.later_ts(\"y\")\n}\n",
+    )
+    .expect("ungated and other-target-gated functions compile");
+}

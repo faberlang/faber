@@ -3612,6 +3612,10 @@ help = "use an available declaration or implement the marked surface"
 message = "method `{method}` is marked nondum for this target{?reason|: |}"
 help = "use an available declaration or change the target"
 
+[diagnostics.SEM017.issues.nondum_function_for_target]
+message = "function `{function}` is marked nondum for this target{?reason|: |}"
+help = "use an available declaration or change the target"
+
 [diagnostics.SEM018]
 message = "invalid annotation"
 help = "fix the annotation contract before semantic lowering"

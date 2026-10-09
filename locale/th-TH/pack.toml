@@ -2529,6 +2529,10 @@ help = "ใช้ declaration ที่พร้อมใช้งานหร�
 message = "method `{method}` ถูกทำเครื่องหมาย nondum สำหรับ target นี้{?reason|: |}"
 help = "ใช้ declaration ที่พร้อมใช้งานหรือเปลี่ยน target"
 
+[diagnostics.SEM017.issues.nondum_function_for_target]
+message = "function `{function}` ถูกทำเครื่องหมาย nondum สำหรับ target นี้{?reason|: |}"
+help = "ใช้ declaration ที่พร้อมใช้งานหรือเปลี่ยน target"
+
 [diagnostics.SEM018]
 message = "annotation ไม่ถูกต้อง"
 help = "แก้ contract ของ annotation ก่อน semantic lowering"

@@ -153,7 +153,13 @@ impl Parser {
 
             TokenKind::At => {
                 let annotations = self.parse_annotations()?;
-                let mut stmt = self.parse_stmt()?;
+                self.nondum_function_pending = self.check_keyword_ident(TokenKind::Functio)
+                    && annotations
+                        .iter()
+                        .any(|annotation| self.is_nondum_annotation(annotation));
+                let parsed = self.parse_stmt();
+                self.nondum_function_pending = false;
+                let mut stmt = parsed?;
                 let mut combined = leading_trivia;
                 combined.append(&mut stmt.leading_trivia);
                 stmt.leading_trivia = combined;
@@ -699,7 +705,13 @@ impl Parser {
     ///   func-decl := `functio` ident `(` params `)` modifiers ['→' type] block
     ///   params    := type-param* regular-param*
     ///   type-param := `prae` `typus` ident
+    ///
+    /// A top-level declaration annotated `@ nondum` may omit the block: it is
+    /// present in the interface but unavailable, and any use is refused by
+    /// semantic analysis. Library analysis (`allow_bodyless_functions`) keeps
+    /// accepting signature-only binding declarations.
     fn parse_func_decl(&mut self) -> Result<StmtKind, ParseError> {
+        let nondum_declared = std::mem::take(&mut self.nondum_function_pending);
         self.expect_keyword_ident(TokenKind::Functio, "expected 'functio'")?;
 
         let name = self.parse_function_name()?;
@@ -726,7 +738,7 @@ impl Parser {
 
         let body = if self.check(&TokenKind::LBrace) {
             Some(self.parse_block()?)
-        } else if self.options.allow_bodyless_functions {
+        } else if self.options.allow_bodyless_functions || nondum_declared {
             None
         } else {
             return Err(ParseError::structured(
@@ -748,6 +760,20 @@ impl Parser {
             annotations: Vec::new(),
             leading_trivia: Vec::new(),
         }))
+    }
+
+    /// Whether `annotation` is the `@ nondum` availability marker, in either
+    /// its sugar (`@ nondum [target] ["reason"]`) or braced spelling.
+    fn is_nondum_annotation(&self, annotation: &Annotation) -> bool {
+        match &annotation.kind {
+            AnnotationKind::Statement(stmt) => {
+                radix_syntax::nondum_from_stmt(stmt, &self.interner).is_some()
+            }
+            AnnotationKind::Braced(braced) => {
+                radix_syntax::braced_nondum_view(braced, &self.interner).is_some()
+            }
+            _ => false,
+        }
     }
 
     /// Parse the optional callable-posture word after modifiers.

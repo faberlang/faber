@@ -1120,6 +1120,18 @@ impl TypeChecker<'_> {
             {
                 return ty;
             }
+            // A namespace function referenced as a value: an `@ nondum`
+            // export is refused here, the same as a call through the namespace.
+            if let Some(gates) = self
+                .resolver
+                .namespace_file_unavailable_canonical(namespace, name)
+                .map(<[_]>::to_vec)
+            {
+                let qualified = self.qualified_function_name(namespace, name);
+                if self.report_unavailable_function(&gates, qualified, object.span) {
+                    return self.error_type;
+                }
+            }
             // Namespace enum-variant value references (`module.VARIANT`)
             // resolve through the imported enum's variant table; the
             // variant's value type is `Type::Enum(consumer enum def)`
@@ -1246,6 +1258,11 @@ impl TypeChecker<'_> {
     /// `ignotum` so qualified lookup can keep progressing without pretending the
     /// module itself is a first-class runtime value.
     pub fn check_path(&mut self, def_id: DefId, span: radix_lexer::Span) -> TypeId {
+        // Any use of an `@ nondum` function — call target or value — is refused.
+        if self.report_unavailable_path(def_id, span) {
+            return self.error_type;
+        }
+
         if let Some(binding) = self.lookup_binding(def_id) {
             return binding.ty;
         }

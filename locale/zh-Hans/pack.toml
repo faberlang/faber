@@ -2517,6 +2517,10 @@ help = "使用可用 declaration 或实现标记的 surface"
 message = "method `{method}` 在此 target 被标记为 nondum{?reason|: |}"
 help = "使用可用 declaration 或更改 target"
 
+[diagnostics.SEM017.issues.nondum_function_for_target]
+message = "function `{function}` 在此 target 被标记为 nondum{?reason|: |}"
+help = "使用可用 declaration 或更改 target"
+
 [diagnostics.SEM018]
 message = "annotation 无效"
 help = "在 semantic lowering 前修正 annotation contract"

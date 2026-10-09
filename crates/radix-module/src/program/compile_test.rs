@@ -3774,3 +3774,58 @@ incipit {
         limes.default
     );
 }
+
+#[test]
+fn interface_snapshot_carries_nondum_gates_in_every_spelling() {
+    // The AST snapshot feeds sibling-file and library imports before full
+    // analysis: an `@ nondum` function stays exported and its gate rides the
+    // interface, so the importer refuses every use (SEM017).
+    let (program, interner) = super::parse_program_for_namespace_exports(
+        "producer.fab",
+        r#"
+@ publica
+@ nondum "pending host dispatch"
+functio later(textus s) → textus
+
+@ publica
+@ nondum rs
+functio later_rs(textus s) → textus
+
+@ publica
+@ nondum { target = ts, ratio = "braced" }
+functio later_ts(textus s) → textus
+
+@ publica
+functio nunc(textus s) → textus {
+    redde s
+}
+"#,
+        None,
+    )
+    .expect("parse producer source");
+
+    let interface = super::file_interface_for_program(&program, &interner, None);
+
+    for name in ["later", "later_rs", "later_ts", "nunc"] {
+        assert!(
+            matches!(
+                interface.exports.get(name).map(|export| &export.kind),
+                Some(crate::file_interface::FileExportKind::Function(_))
+            ),
+            "{name} stays exported"
+        );
+    }
+    let gate = |target: Option<&str>, reason: Option<&str>| {
+        vec![crate::file_interface::InterfaceUnavailable {
+            target: target.map(str::to_owned),
+            reason: reason.map(str::to_owned),
+        }]
+    };
+    assert_eq!(
+        interface.unavailable.get("later"),
+        Some(&gate(None, Some("pending host dispatch")))
+    );
+    assert_eq!(interface.unavailable.get("later_rs"), Some(&gate(Some("rs"), None)));
+    assert_eq!(interface.unavailable.get("later_ts"), Some(&gate(Some("ts"), Some("braced"))));
+    assert!(!interface.unavailable.contains_key("nunc"));
+}
