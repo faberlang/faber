@@ -489,3 +489,91 @@ fn grid_reduce_combine_entry_is_the_suffix_convention() {
         "wave_speed_combine"
     );
 }
+
+/// The `MatMulPlan` inside a matmul fixture unit.
+fn matmul_plan_of(unit: &KernelUnit) -> MatMulPlan {
+    match &unit.plan {
+        CollectionKernelPlan::TiledMatMul(plan) => plan.clone(),
+        other => panic!("not a matmul unit: {other:?}"),
+    }
+}
+
+#[test]
+fn runtime_matmul_class_equals_the_literal_selection_per_shape() {
+    use crate::kernel_plan::{MatMulClass, MatMulDims, simdgroup_matmul_admission};
+    // (m, k, n, class): one per class, the section-5 rule-4 shapes, and the
+    // n > 8192 and n % 4 != 0 boundaries of the simdgroup predicate.
+    let table = [
+        (1, 960, 960, MatMulClass::OneRow),
+        (16, 8, 1, MatMulClass::Gemv),
+        (36, 64, 52, MatMulClass::Simdgroup),
+        (2, 8, 4, MatMulClass::Simdgroup),
+        (37, 65, 31, MatMulClass::Tiled),
+        (36, 64, 8192, MatMulClass::Simdgroup),
+        (36, 64, 8196, MatMulClass::Tiled),
+        (36, 64, 50, MatMulClass::Tiled),
+        (16, 64, 52, MatMulClass::Tiled),
+    ];
+    let runtime = {
+        let mut unit = matmul();
+        let mut plan = matmul_plan_of(&unit);
+        plan.dims = MatMulDims::Runtime {
+            class: MatMulClass::Tiled,
+        };
+        unit.plan = CollectionKernelPlan::TiledMatMul(plan);
+        unit
+    };
+    for (m, k, n, want) in table {
+        // The literal path's own selection for the same numbers: a literal
+        // plan through the emitter's predicates (m == 1, n == 1, the
+        // simdgroup admission plus the row-major `n % 4` stage-read rule).
+        let mut literal = matmul_plan_of(&matmul());
+        literal.dims = MatMulDims::Literal { m, k, n };
+        (literal.m, literal.k, literal.n) = (m, k, n);
+        let literal_class = if literal.m == 1 {
+            MatMulClass::OneRow
+        } else if literal.n == 1 {
+            MatMulClass::Gemv
+        } else if simdgroup_matmul_admission(&literal).is_some() && literal.n % 4 == 0 {
+            MatMulClass::Simdgroup
+        } else {
+            MatMulClass::Tiled
+        };
+        assert_eq!(literal_class, want, "{m}x{k}x{n} literal");
+        assert_eq!(
+            crate::kernel_plan::matmul_class_for_extents(m, k, n),
+            Some(literal_class),
+            "{m}x{k}x{n} selection"
+        );
+        let shapes = vec![vec![m, k], vec![k, n], vec![m, n]];
+        let launched = matmul_launch_plan(&matmul_plan_of(&runtime), &shapes).expect("launch plan");
+        assert_eq!(
+            launched.dims,
+            MatMulDims::Runtime {
+                class: literal_class
+            },
+            "{m}x{k}x{n} launch plan"
+        );
+        // The geometry is the literal tile grid for the same numbers.
+        assert_eq!(
+            geometry_for_call(&runtime, &shapes),
+            geometry_for_call(&matmul(), &shapes),
+            "{m}x{k}x{n} geometry"
+        );
+    }
+}
+
+#[test]
+fn runtime_matmul_refuses_the_literal_only_outer_update() {
+    use crate::kernel_plan::{MatMulClass, MatMulDims};
+    let mut unit = matmul();
+    let mut plan = matmul_plan_of(&unit);
+    plan.dims = MatMulDims::Runtime {
+        class: MatMulClass::Tiled,
+    };
+    unit.plan = CollectionKernelPlan::TiledMatMul(plan);
+    let shapes = vec![vec![8, 1], vec![1, 8], vec![8, 8]];
+    let error = geometry_for_call(&unit, &shapes).expect_err("K == 1 is literal-only");
+    assert_eq!(error.code, GEOMETRY_SHAPE_NOT_COVERED);
+    assert!(error.args[0].1.contains("K == 1 outer update"));
+}

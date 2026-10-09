@@ -179,8 +179,8 @@ pub use kernel_plan::{
     SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS, SIMDGROUP_MATMUL_STAGING_SLOTS,
     SharedMemoryLayout, SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TRANSPOSE_WORKGROUP_X,
     TransposePlan, admit_quantized_gather, admit_quantized_matmul,
-    causal_softmax_row_reduction_admission, rmsnorm_row_reduction_admission,
-    simdgroup_matmul_admission,
+    causal_softmax_row_reduction_admission, matmul_class_for_extents,
+    rmsnorm_row_reduction_admission, simdgroup_matmul_admission,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,

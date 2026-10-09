@@ -756,25 +756,54 @@ pub struct SimdgroupMatMulFacts {
 /// windows) are checked at the emitter and fall back to the scalar body.
 #[must_use]
 pub fn simdgroup_matmul_admission(plan: &MatMulPlan) -> Option<SimdgroupMatMulFacts> {
-    let tile = u64::from(plan.tile);
     if plan.tile != MATMUL_TILE
         || plan.workgroup_x != MATMUL_TILE
         || plan.workgroup_y != MATMUL_TILE
         || plan.batch != 1
-        || plan.m <= 1
-        || plan.k == 0
-        || !plan.k.is_multiple_of(tile)
-        || plan.m.is_multiple_of(tile)
         || plan.left_layout != MirScalarLayout::F32
         || plan.right_layout != MirScalarLayout::F32
-        || plan.n > SIMDGROUP_MATMUL_MAX_N
+        || !simdgroup_extents_admitted(plan.m, plan.k, plan.n)
     {
         return None;
     }
     Some(SimdgroupMatMulFacts {
-        k_tiles: plan.k / tile,
+        k_tiles: plan.k / u64::from(plan.tile),
         staging_slots: SIMDGROUP_MATMUL_STAGING_SLOTS,
         partial_slots: SIMDGROUP_MATMUL_PARTIAL_SLOTS,
+    })
+}
+
+/// The extent half of the simdgroup admission: multi-row, `k` a nonzero tile
+/// multiple, `m` a partial band, `n` under the projection-class cap. Shared
+/// by [`simdgroup_matmul_admission`] (literal plans) and
+/// [`matmul_class_for_extents`] (run-time extents) so the two cannot drift.
+fn simdgroup_extents_admitted(m: u64, k: u64, n: u64) -> bool {
+    let tile = u64::from(MATMUL_TILE);
+    m > 1
+        && k != 0
+        && k.is_multiple_of(tile)
+        && !m.is_multiple_of(tile)
+        && n <= SIMDGROUP_MATMUL_MAX_N
+}
+
+/// The matmul class the literal path selects for these extents (design note
+/// item 7, section 5 rule 3): `OneRow` when `m == 1`, else `Gemv` when
+/// `n == 1`, else `Simdgroup` when the simdgroup admission holds and
+/// `n % 4 == 0` (the `float4` stage read of a row-major right operand), else
+/// `Tiled`. `None` for `k == 1`: the rank-1 outer update stays literal-only.
+#[must_use]
+pub fn matmul_class_for_extents(m: u64, k: u64, n: u64) -> Option<MatMulClass> {
+    if k == 1 {
+        return None;
+    }
+    Some(if m == 1 {
+        MatMulClass::OneRow
+    } else if n == 1 {
+        MatMulClass::Gemv
+    } else if simdgroup_extents_admitted(m, k, n) && n.is_multiple_of(4) {
+        MatMulClass::Simdgroup
+    } else {
+        MatMulClass::Tiled
     })
 }
 

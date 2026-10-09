@@ -27,7 +27,7 @@ use crate::abi::{
     MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
     MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize, workgroup_count_for_dispatch,
 };
-use crate::kernel_plan::CollectionKernelPlan;
+use crate::kernel_plan::{CollectionKernelPlan, MatMulDims, matmul_class_for_extents};
 
 use super::types::{GENERIC_1D_MAX_ELEMENTS, KernelUnit, generic_1d_workgroup};
 
@@ -347,23 +347,48 @@ fn generic_1d(unit: &KernelUnit, elements: u64) -> Result<CallGeometry, Geometry
     finish(dispatch, workgroup)
 }
 
-/// Tile grid `(ceil(N/tile), ceil(M/tile))`, launched verbatim.
-fn tiled_matmul(
+/// The matmul plan a call launches. A literal plan is launched as built. A
+/// run-time-extent plan (design note item 7) is the one `Tiled` plan
+/// `from_contract` built, cloned with its class swapped to the one the
+/// call-site shapes select, [`matmul_class_for_extents`]: the same selection
+/// the literal path makes for the same numbers. The K == 1 outer update stays
+/// literal-only and is refused for run-time extents.
+///
+/// # Errors
+///
+/// Returns a [`GeometryError`] when the operand shapes are not a rank-2 (or
+/// rank-1 right) matmul with agreeing inner dimensions, or the shapes select
+/// a literal-only body.
+pub fn matmul_launch_plan(
     matmul: &crate::kernel_plan::MatMulPlan,
     shapes: &[Vec<u64>],
-) -> Result<CallGeometry, GeometryError> {
+) -> Result<crate::kernel_plan::MatMulPlan, GeometryError> {
+    let (m, k, n) = matmul_extents(shapes)?;
+    let mut plan = matmul.clone();
+    if let MatMulDims::Runtime { .. } = plan.dims {
+        let Some(class) = matmul_class_for_extents(m, k, n) else {
+            return Err(GeometryError::new(
+                GEOMETRY_SHAPE_NOT_COVERED,
+                vec![(
+                    "reason",
+                    "matmul with run-time extents does not cover the K == 1 outer update (literal-only)"
+                        .to_owned(),
+                )],
+            ));
+        };
+        plan.dims = MatMulDims::Runtime { class };
+    }
+    Ok(plan)
+}
+
+/// `(m, k, n)` from the two operand call-site shapes.
+fn matmul_extents(shapes: &[Vec<u64>]) -> Result<(u64, u64, u64), GeometryError> {
     let uncovered = |reason: &str| {
         GeometryError::new(
             GEOMETRY_SHAPE_NOT_COVERED,
             vec![("reason", reason.to_owned())],
         )
     };
-    if matmul.batch != 1 || matmul.right_batch != 1 {
-        return Err(GeometryError::new(
-            GEOMETRY_PLAN_NOT_COVERED,
-            vec![("plan", "TiledMatMul(batched)".to_owned())],
-        ));
-    }
     let (Some(left), Some(right)) = (shapes.first(), shapes.get(1)) else {
         return Err(uncovered("matmul needs two operands"));
     };
@@ -379,6 +404,22 @@ fn tiled_matmul(
     if k != k_right {
         return Err(uncovered("matmul inner dimensions differ"));
     }
+    Ok((m, k, n))
+}
+
+/// Tile grid `(ceil(N/tile), ceil(M/tile))`, launched verbatim.
+fn tiled_matmul(
+    matmul: &crate::kernel_plan::MatMulPlan,
+    shapes: &[Vec<u64>],
+) -> Result<CallGeometry, GeometryError> {
+    if matmul.batch != 1 || matmul.right_batch != 1 {
+        return Err(GeometryError::new(
+            GEOMETRY_PLAN_NOT_COVERED,
+            vec![("plan", "TiledMatMul(batched)".to_owned())],
+        ));
+    }
+    let matmul = &matmul_launch_plan(matmul, shapes)?;
+    let (m, _, n) = matmul_extents(shapes)?;
     let tile = u64::from(matmul.tile.max(1));
     let workgroup = MirWorkgroupSize {
         x: matmul.workgroup_x,
