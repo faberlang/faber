@@ -944,6 +944,7 @@ fn map_provider_modules(
                     field_name_policy: radix_hir_rust::RustFieldNamePolicy::default(),
                     native_host_bootstrap: false,
                     static_route_table: None,
+                    display_tokens: None,
                 },
             )?;
             // The provider's emitted signatures (not its Faber declarations)
