@@ -467,6 +467,7 @@ impl FunctionBuilder<'_> {
             provider_imports: Arc::clone(&context.provider_imports),
             imported_type_members: Arc::clone(&context.imported_type_members),
             method_targets: Arc::clone(&context.method_targets),
+            creo_hooks: Arc::clone(&context.creo_hooks),
             interface_implementors: Arc::clone(&context.interface_implementors),
             imported_method_providers: Arc::clone(&context.imported_method_providers),
             gpu_builtins: Arc::clone(&context.gpu_builtins),

@@ -38,6 +38,10 @@ mod http_route_tests;
 mod range_step_tests;
 
 #[cfg(test)]
+#[path = "creo_hook_test.rs"]
+mod creo_hook_tests;
+
+#[cfg(test)]
 #[path = "call_depth_test.rs"]
 mod call_depth_tests;
 

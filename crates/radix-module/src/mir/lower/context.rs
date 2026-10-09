@@ -76,6 +76,7 @@ struct FrozenMaps<'a> {
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
     imported_type_members: Arc<FxHashMap<(DefId, Symbol), MirType>>,
     method_targets: Arc<FxHashMap<(DefId, Symbol), MethodTarget>>,
+    creo_hooks: Arc<FxHashMap<DefId, DefId>>,
     interface_implementors: Arc<FxHashMap<DefId, Vec<(DefId, TypeId)>>>,
     imported_method_providers: Arc<FxHashMap<(DefId, Symbol), ImportedMethodProvider>>,
     gpu_builtins: Arc<FxHashMap<DefId, MirKernelBuiltin>>,
@@ -133,6 +134,9 @@ pub(super) struct LoweringContextMaps<'a> {
     /// This file's canonical module segments (package-aware compiles only).
     package_module_segments: Vec<String>,
     method_targets: FxHashMap<(DefId, Symbol), MethodTarget>,
+    /// Genus → its `creo` post-construction hook method. Typed construction
+    /// calls the hook once the fields are initialized.
+    creo_hooks: FxHashMap<DefId, DefId>,
     /// Contract → the local `genus` types whose `implet` clause names it, in
     /// declaration order. A method call through a contract-typed value lowers
     /// to a type-test chain over exactly these members.
@@ -189,6 +193,7 @@ impl<'a> LoweringContextMaps<'a> {
             package_product: None,
             package_module_segments: Vec::new(),
             method_targets: FxHashMap::default(),
+            creo_hooks: FxHashMap::default(),
             interface_implementors: FxHashMap::default(),
             gpu_builtins: unit.gpu_builtins.clone(),
             frozen: FrozenMaps {
@@ -209,6 +214,7 @@ impl<'a> LoweringContextMaps<'a> {
                 provider_imports: Arc::new(FxHashMap::default()),
                 imported_type_members: Arc::new(FxHashMap::default()),
                 method_targets: Arc::new(FxHashMap::default()),
+                creo_hooks: Arc::new(FxHashMap::default()),
                 interface_implementors: Arc::new(FxHashMap::default()),
                 imported_method_providers: Arc::new(FxHashMap::default()),
                 gpu_builtins: Arc::new(FxHashMap::default()),
@@ -292,6 +298,7 @@ impl<'a> LoweringContextMaps<'a> {
             provider_imports: Arc::new(core::mem::take(&mut maps.provider_imports)),
             imported_type_members: Arc::new(core::mem::take(&mut maps.imported_type_members)),
             method_targets: Arc::new(core::mem::take(&mut maps.method_targets)),
+            creo_hooks: Arc::new(core::mem::take(&mut maps.creo_hooks)),
             interface_implementors: Arc::new(core::mem::take(&mut maps.interface_implementors)),
             imported_method_providers: Arc::new(core::mem::take(&mut maps.imported_method_providers)),
             gpu_builtins: Arc::new(
@@ -364,6 +371,7 @@ impl<'a> LoweringContextMaps<'a> {
             provider_imports: Arc::clone(&self.frozen.provider_imports),
             imported_type_members: Arc::clone(&self.frozen.imported_type_members),
             method_targets: Arc::clone(&self.frozen.method_targets),
+            creo_hooks: Arc::clone(&self.frozen.creo_hooks),
             interface_implementors: Arc::clone(&self.frozen.interface_implementors),
             imported_method_providers: Arc::clone(&self.frozen.imported_method_providers),
             gpu_builtins: Arc::clone(&self.frozen.gpu_builtins),
@@ -696,6 +704,9 @@ impl<'a> LoweringContextMaps<'a> {
             .insert(method.def_id, method.func.is_generator);
         self.method_targets
             .insert((owner_def_id, method.func.name), MethodTarget { def_id: method.def_id });
+        if self.interner.resolve(method.func.name) == "creo" {
+            self.creo_hooks.insert(owner_def_id, method.def_id);
+        }
         if let Some(err_ty) = method.func.err_ty {
             self.function_errors
                 .insert(method.def_id, MirType::semantic(err_ty));

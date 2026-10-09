@@ -224,12 +224,31 @@ impl FunctionBuilder<'_> {
         let explicit: Vec<_> = fields.iter().map(|(name, value)| (*name, value)).collect();
         let named = self.materialize_struct_fields(def_id, &explicit, StructFieldFill::Construction, expr.span)?;
         let ty = self.expr_ty(expr)?;
-        Some(self.construct_temp(
+        let constructed = self.construct_temp(
             MirAggregateKind::Struct(def_id),
             MirAggregateFields::Named(named),
             ty,
             expr.span,
-        ))
+        );
+        self.call_creo_hook(def_id, &constructed, expr.span);
+        Some(constructed)
+    }
+
+    /// Run the genus's `creo` post-construction hook on a freshly constructed
+    /// aggregate, after field defaults and overrides are merged. A genus
+    /// without a `creo` method constructs unchanged.
+    fn call_creo_hook(&mut self, def_id: DefId, constructed: &MirOperand, span: Span) {
+        let Some(hook) = self.context.creo_hooks.get(&def_id).copied() else {
+            return;
+        };
+        self.append_stmt(MirStatement {
+            kind: MirStatementKind::Call {
+                destination: None,
+                callee: MirCallee::definition_with_type_args(hook, Vec::new()),
+                args: vec![constructed.clone()],
+            },
+            span,
+        });
     }
 
     /// Lower a `verte` aggregate conversion.
@@ -270,12 +289,14 @@ impl FunctionBuilder<'_> {
                         _ => false,
                     })
                     .unwrap_or(MirType::semantic(target));
-                Some(self.construct_temp(
+                let constructed = self.construct_temp(
                     MirAggregateKind::Struct(*def_id),
                     MirAggregateFields::Named(fields),
                     ty,
                     expr.span,
-                ))
+                );
+                self.call_creo_hook(*def_id, &constructed, expr.span);
+                Some(constructed)
             }
             Type::Record(_) => {
                 let Some(entries) = entries else {
