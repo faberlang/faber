@@ -175,25 +175,9 @@ fn log_smoke_skip(tool: &str, label: &str, action: &str) {
     trace_smoke_line(&format!("{tool} not found on PATH; skipping smoke {action} for {label}"));
 }
 
-/// Locates the checked-out Go runtime module (`faber/runtime/go`) by walking up
-/// from the crate dir and the faberlang home. Mirrors `inf_audit_test.rs`.
-fn go_runtime_dir() -> Option<PathBuf> {
-    let mut starts = vec![PathBuf::from(env!("CARGO_MANIFEST_DIR"))];
-    if let Some(home) = crate::paths::faberlang_home() {
-        starts.push(home);
-    }
-    for mut dir in starts {
-        loop {
-            let candidate = dir.join("faber/runtime/go");
-            if candidate.join("go.mod").is_file() {
-                return Some(candidate);
-            }
-            if !dir.pop() {
-                break;
-            }
-        }
-    }
-    None
+/// The in-tree Go runtime module (`runtime/go`). Mirrors `inf_audit_test.rs`.
+fn go_runtime_dir() -> PathBuf {
+    crate::test_support::runtime_dir("go")
 }
 
 fn go_mod_content(runtime: &Path) -> String {
@@ -252,7 +236,7 @@ pub fn assert_emitted_rust_typechecks(code: &str, label: &str) {
             "Faber Rust runtime",
             label,
             &format!(
-                "typecheck (set {} to the faber/runtime/rust package)",
+                "typecheck (set {} to the runtime/rust package)",
                 crate::test_support::FABER_RUNTIME_CRATE_ENV
             ),
         );
@@ -296,7 +280,7 @@ pub fn compile_emitted_rust_binary(code: &str, label: &str) -> PathBuf {
     );
     let runtime = crate::test_support::faber_runtime_crate_path().unwrap_or_else(|| {
         panic!(
-            "{} must point at the faber/runtime/rust package for executable Rust smoke {label}",
+            "{} must point at the runtime/rust package for executable Rust smoke {label}",
             crate::test_support::FABER_RUNTIME_CRATE_ENV
         )
     });
@@ -349,10 +333,7 @@ pub fn assert_emitted_go_compiles(code: &str, label: &str) {
     }
 
     let dir = smoke_temp_dir(label);
-    let Some(runtime) = go_runtime_dir() else {
-        log_smoke_skip("Faber Go runtime", label, "compile (faber/runtime/go module not found)");
-        return;
-    };
+    let runtime = go_runtime_dir();
     io_ok(fs::write(dir.path().join("go.mod"), go_mod_content(&runtime)), "write go.mod");
     io_ok(fs::write(dir.path().join("main.go"), code), "write generated go");
 
