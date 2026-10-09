@@ -3306,16 +3306,16 @@ message = "regex conversion does not support a `⊥` default; regex has no liter
 help = "remove the recovery arm from this regex conversion"
 
 [diagnostics.SEM016.issues.inferred_constructor_no_expected_type]
-message = "`_ { … }` builds the expected type, but there is none here"
-help = "name the type: write `Type { … }`, or give the binding, parameter or return an explicit type"
+message = "`_ { … }` genus exspectatum aedificat, sed hic nullum est"
+help = "genus nominatim scribe `Genus { … }`, vel ligationi, parametro, aut reditui genus expressum da"
 
 [diagnostics.SEM016.issues.inferred_constructor_entries_need_map]
-message = "`_ { \"key\": value, … }` gives entries, but the expected type is not a map"
-help = "entries `\"key\": value` build a map; for a genus or class write fields `name = value`"
+message = "`_ { \"clavis\": valor, … }` introitus praebet, sed genus exspectatum tabula non est"
+help = "introitus `\"clavis\": valor` tabulam aedificant; ad genus vel classem campos `nomen = valor` scribe"
 
 [diagnostics.SEM016.issues.inferred_constructor_fields_for_map]
-message = "`_ { name = value, … }` gives fields, but the expected type is a map"
-help = "a map takes entries `\"key\": value`; fields `name = value` build a genus or class"
+message = "`_ { nomen = valor, … }` campos praebet, sed genus exspectatum tabula est"
+help = "tabula introitus `\"clavis\": valor` accipit; campi `nomen = valor` genus vel classem aedificant"
 
 [diagnostics.SEM016.issues.valor_verte_unsupported]
 message = "{valor} ∷ T is not supported — a dynamic value's shape cannot be asserted at compile time. Use `↦ T` for runtime extraction (with `⊥` for a default)."
