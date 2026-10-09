@@ -494,32 +494,6 @@ impl Host for ExitRecordingHost {
     }
 }
 
-fn dev_norma_library_home() -> PathBuf {
-    if let Some(home) = std::env::var_os("FABER_LIBRARY_HOME")
-        .map(PathBuf::from)
-        .filter(|path| path.join("norma/src").exists())
-    {
-        return home;
-    }
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("faberlang container root");
-    for candidate in workspace.ancestors() {
-        // Skip lane worktrees (`worktrees/<lane>/…`): a stale sibling checkout
-        // there would shadow the container stdlib for packet-local runs.
-        if candidate
-            .components()
-            .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
-        {
-            continue;
-        }
-        if candidate.join("norma/src").exists() {
-            return candidate.to_path_buf();
-        }
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
-}
-
 /// The product-default English code pack (en = authority). The transitive
 /// loader tests below call `load_package`/`load_package_with_config`
 /// directly; they must pass the same default pack the `compile_package*` /
@@ -1230,7 +1204,7 @@ main args args {
     .expect("write entry");
 
     let artifact = build_mir_artifact_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
+        &Config::default(),
         &entry,
         &[dir.to_string_lossy().into_owned()],
     )
@@ -1450,7 +1424,7 @@ fn artifact_harness_run_test(
     setup: impl FnOnce(&'static str) -> ArtifactHarnessCaseInner,
 ) {
     let case = setup(_case_name);
-    let config = Config::default().with_library_home(dev_norma_library_home());
+    let config = Config::default();
     let artifact = build_mir_artifact_for_faber(&config, &case.input, &case.argumenta)
         .unwrap_or_else(|diagnostics| {
             panic!(
@@ -2304,22 +2278,18 @@ main {
     )
     .expect("write entry");
 
-    let reached = with_lowered_package_mir(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        |lowered| {
-            assert!(!lowered.validated.program().functions.is_empty());
-            assert!(
-                lowered
-                    .validated
-                    .validation()
-                    .interner
-                    .as_interner()
-                    .is_some()
-            );
-            true
-        },
-    )
+    let reached = with_lowered_package_mir(&Config::default(), &entry, |lowered| {
+        assert!(!lowered.validated.program().functions.is_empty());
+        assert!(
+            lowered
+                .validated
+                .validation()
+                .interner
+                .as_interner()
+                .is_some()
+        );
+        true
+    })
     .expect("package MIR callback should receive linked Norma program");
 
     assert!(reached);
@@ -2401,11 +2371,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_mir_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        &mut host,
-    );
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2452,11 +2418,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_mir_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        &mut host,
-    );
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2507,11 +2469,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_mir_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        &mut host,
-    );
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2556,11 +2514,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_mir_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        &mut host,
-    );
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2608,11 +2562,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_mir_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        &mut host,
-    );
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2662,11 +2612,7 @@ main args args {
     let source = fixture_root.join("nested").join("source.bin");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_mir_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        &mut host,
-    );
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -2714,11 +2660,7 @@ main args args {
     let fixture_root = dir.join("workspace");
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
-    let result = run_mir_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        &mut host,
-    );
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -4519,11 +4461,7 @@ main {
     .expect("write entry");
 
     let mut host = BufferHost::default();
-    let result = run_mir_for_faber(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &entry,
-        &mut host,
-    );
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
 
     assert!(
         result.is_ok(),
@@ -4932,9 +4870,7 @@ fn summa(tf32[2] x) → f32 {
     .expect("write entry");
     let entry = dir.join("src").join("main.fab");
     let result = build_fmir_image_for_faber(
-        &Config::default()
-            .with_library_home(dev_norma_library_home())
-            .with_target(Target::MirFmirBinary),
+        &Config::default().with_target(Target::MirFmirBinary),
         &entry,
         &[],
     );
@@ -9847,7 +9783,8 @@ main {
 // ---------------------------------------------------------------------------
 
 fn repo_norma_source_file(relative_path: &str) -> PathBuf {
-    dev_norma_library_home()
+    radix::program::library_home()
+        .expect("library home resolves in-tree")
         .join("norma/src")
         .join(format!("{relative_path}.fab"))
 }
@@ -11006,10 +10943,7 @@ main {
 "#,
     )
     .unwrap();
-    let result = compile_with_faber_seams(
-        &Config::default().with_library_home(dev_norma_library_home()),
-        &app,
-    );
+    let result = compile_with_faber_seams(&Config::default(), &app);
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust");

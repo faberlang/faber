@@ -44,32 +44,6 @@ use radix::module::mir::BufferHost;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn dev_norma_library_home() -> PathBuf {
-    if let Some(home) = std::env::var_os("FABER_LIBRARY_HOME")
-        .map(PathBuf::from)
-        .filter(|path| path.join("norma/src").exists())
-    {
-        return home;
-    }
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("faberlang container root");
-    for candidate in workspace.ancestors() {
-        // Skip lane worktrees (`worktrees/<lane>/…`): a stale sibling checkout
-        // there would shadow the container stdlib for packet-local runs.
-        if candidate
-            .components()
-            .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
-        {
-            continue;
-        }
-        if candidate.join("norma/src").exists() {
-            return candidate.to_path_buf();
-        }
-    }
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
-}
-
 const LOCAL_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.salutare()\n}\n\nmain {\n    print utilModule.salutare()\n}\n";
 const LOCAL_UTIL: &str = "@ public\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
@@ -113,8 +87,13 @@ fn fixture_library_home(dir: &Path) -> PathBuf {
     )
     .expect("write fixture triga math");
     #[cfg(unix)]
-    std::os::unix::fs::symlink(dev_norma_library_home().join("norma"), home.join("norma"))
-        .expect("link norma into the fixture library home");
+    std::os::unix::fs::symlink(
+        radix::program::library_home()
+            .expect("library home resolves in-tree")
+            .join("norma"),
+        home.join("norma"),
+    )
+    .expect("link norma into the fixture library home");
     home
 }
 
@@ -382,7 +361,7 @@ kind = "bin"
     );
     if declared {
         manifest.push_str("\n[dependencies]\nnorma = \"1.0.0\"\n");
-        let home = dev_norma_library_home();
+        let home = radix::program::library_home().expect("library home resolves in-tree");
         let home = home.display();
         let lock = format!(
             "[[package]]\nname = \"norma\"\nversion = \"1.0.0\"\nsource = \"path:{home}/norma\"\npackage_root = \"{home}/norma\"\nkind = \"source\"\ntarget_language = \"\"\ntarget_triple = \"\"\ntarget_manifest = \"\"\ninterface_root = \"{home}/norma/src\"\nartifact = \"\"\ncrate = \"\"\nrustc = \"\"\n"
@@ -659,9 +638,7 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
     // precedent (Latin sources declare la identity, they are not en-migrated).
     let la_pack_path = radix::module::locale::workspace_locale_pack_path("la");
     let la_pack = LocalePack::from_toml_path(la_pack_path).expect("load la locale pack");
-    let config = Config::default()
-        .with_library_home(dev_norma_library_home())
-        .with_locale_pack(la_pack);
+    let config = Config::default().with_locale_pack(la_pack);
     let package = analyze_with_faber_seams(&config, &entry)
         .expect("analyze Latin Norma compatibility consumer");
 
@@ -1011,7 +988,7 @@ kind = "bin"
 fn loaded_package_library_import_unit_parity() {
     let dir = test_temp_dir("fhir-library-parity");
     let entry = write_library_package(&dir, true);
-    let config = Config::default().with_library_home(dev_norma_library_home());
+    let config = Config::default();
 
     let direct = analyze_with_faber_seams(&config, &entry).expect("direct analysis with norma");
     assert!(
@@ -1060,7 +1037,7 @@ fn loaded_package_library_import_unit_parity() {
 fn loaded_package_undeclared_library_import_fails_before_codegen() {
     let dir = test_temp_dir("fhir-undeclared");
     let entry = write_library_package(&dir, false);
-    let config = Config::default().with_library_home(dev_norma_library_home());
+    let config = Config::default();
 
     // Analysis succeeds (norma resolves via the dev library home) and the
     // envelope builds, but the manifest declares no dependency record for

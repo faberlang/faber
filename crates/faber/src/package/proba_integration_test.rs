@@ -501,12 +501,12 @@ describe "helpers" {
 
 #[test]
 fn norma_src_proba_is_discovered_beside_product_sources() {
-    let norma_src = radix::module::paths::faberlang_home()
-        .expect("faberlang container root")
+    let norma_src = radix::program::library_home()
+        .expect("library home resolves in-tree")
         .join("norma/src");
     assert!(
         norma_src.is_dir(),
-        "expected sibling norma/src at {}",
+        "expected in-tree lib/norma/src at {}",
         norma_src.display()
     );
     let math_proba = norma_src.join("math.proba");
