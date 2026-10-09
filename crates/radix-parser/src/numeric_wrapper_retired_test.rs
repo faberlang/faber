@@ -49,12 +49,25 @@ impl KeywordPack for AllNumericWords {
     }
 
     fn type_latin_key(&self, text: &str) -> Option<&str> {
-        if INT_WORDS.contains(&text) && text != "numerus" {
+        if INT_WORDS.contains(&text) {
             Some("numerus")
-        } else if FLOAT_WORDS.contains(&text) && text != "fractus" {
+        } else if FLOAT_WORDS.contains(&text) {
             Some("fractus")
         } else {
-            None
+            // The pack also spells the Latin words it uses as its own types.
+            [
+                "lista",
+                "tabula",
+                "tensor",
+                "vector",
+                "matrix",
+                "modulus",
+                "saturatus",
+                "exactus",
+                "octetus",
+            ]
+            .into_iter()
+            .find(|word| *word == text)
         }
     }
 

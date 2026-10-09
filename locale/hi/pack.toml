@@ -714,7 +714,7 @@ help = "`{form}` की जगह `{bare}` लिखें; width marker स्�
 
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
-help = "use the type spelling declared by this reader locale"
+help = "इस reader locale में घोषित टाइप वर्तनी का उपयोग करें{?expected|: '|'}"
 
 [diagnostics.PARSE041]
 message = "अमान्य प्रकार annotation"

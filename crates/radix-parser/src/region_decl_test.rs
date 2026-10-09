@@ -35,6 +35,10 @@ impl KeywordPack for EnModulePack {
         }
     }
 
+    fn type_latin_key(&self, text: &str) -> Option<&str> {
+        (text == "int").then_some("numerus")
+    }
+
     fn keyword_suggestion(&self, _text: &str) -> Option<String> {
         None
     }
@@ -142,7 +146,7 @@ fn regio_word_stays_an_identifier_elsewhere() {
 
 #[test]
 fn en_module_word_stays_an_identifier_elsewhere() {
-    let result = parse_en("const numerus module ← 1\nconst numerus other ← module\n");
+    let result = parse_en("const int module ← 1\nconst int other ← module\n");
     assert!(result.success(), "{:?}", result.errors);
     assert_eq!(region_name(&result), None);
     assert_eq!(result.program.expect("program").statements.len(), 2);

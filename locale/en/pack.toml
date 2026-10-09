@@ -1142,7 +1142,7 @@ help = "reduce the iuncta arity to 16 or fewer, or declare a class for more fiel
 
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
-help = "use the type spelling declared by this reader locale"
+help = "use the type spelling declared by this reader locale{?expected|: '|'}"
 
 [diagnostics.PARSE040.issues.null_value_in_type_position]
 message = "'{value}' is the null value, not a type"

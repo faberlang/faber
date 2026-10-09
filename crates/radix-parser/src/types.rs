@@ -203,11 +203,19 @@ impl Parser {
                     .with_arg("type", type_surface));
             } else if self.check_keyword_ident(TokenKind::Modulus) {
                 let span = self.peek().span;
+                let source = self.current_ident_source();
                 self.advance();
+                if source == "modulus" {
+                    self.reject_latin_type_word("modulus", span);
+                }
                 self.keyword_ident("modulus", span)
             } else if self.check_keyword_ident(TokenKind::Iuncta) {
                 let span = self.peek().span;
+                let source = self.current_ident_source();
                 self.advance();
+                if source == "iuncta" {
+                    self.reject_latin_type_word("iuncta", span);
+                }
                 self.keyword_ident("iuncta", span)
             } else {
                 let ident = self.parse_ident()?;

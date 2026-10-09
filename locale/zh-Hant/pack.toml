@@ -714,7 +714,7 @@ help = "寫 `{bare}`，不要寫 `{form}`；寬度標記本身就是型別"
 
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
-help = "use the type spelling declared by this reader locale"
+help = "使用此讀者語言中宣告的類型拼寫{?expected|：'|'}"
 
 [diagnostics.PARSE041]
 message = "無效型別註記"

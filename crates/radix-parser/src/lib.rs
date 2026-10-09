@@ -1214,19 +1214,36 @@ impl Parser {
     fn canonical_type_ident(&mut self, ident: Ident) -> Ident {
         let source = self.interner.resolve(ident.name);
         let Some(latin_key) = self.reader_type_latin_keys.get(source).cloned() else {
-            if self.keyword_surface == KeywordSurfaceMode::PackAuthoritative
-                && !self.has_latin_fallback
-                && Self::is_canonical_type_spelling(source)
-            {
-                self.errors.push(
-                    ParseError::structured(ParseErrorKind::TypeInvalid, ident.span)
-                        .with_arg("issue", "wrong_locale_type")
-                        .with_arg("type", source),
-                );
-            }
+            let source = source.to_owned();
+            self.reject_latin_type_word(&source, ident.span);
             return ident;
         };
         self.keyword_ident(&latin_key, ident.span)
+    }
+
+    /// Seal a canonical Latin type word on a non-Latin reader surface.
+    ///
+    /// Latin is a locale pack like every other, so a pack-authoritative file
+    /// without the explicit `la` fallback (`has_latin_fallback`) may not spell
+    /// a type with its Latin word. A word the file declares or selectively
+    /// imports is an ordinary user name and stays accepted. The help argument
+    /// `expected` carries the file locale's own spelling when the pack has one.
+    fn reject_latin_type_word(&mut self, source: &str, span: Span) {
+        if self.keyword_surface != KeywordSurfaceMode::PackAuthoritative
+            || self.has_latin_fallback
+            || !self.is_latin_type_word(source)
+            || self.declared_type_names.contains(source)
+            || self.imported_type_names.contains(source)
+        {
+            return;
+        }
+        let mut error = ParseError::structured(ParseErrorKind::TypeInvalid, span)
+            .with_arg("issue", "wrong_locale_type")
+            .with_arg("type", source);
+        if let Some(expected) = self.reader_type_surfaces.get(source) {
+            error = error.with_arg("expected", expected.as_str());
+        }
+        self.errors.push(error);
     }
 
     /// Authored source spelling of the current word, when it is an identifier.
@@ -1242,8 +1259,8 @@ impl Parser {
     }
 
     /// Whether the current word is the null *type* in the active surface
-    /// (D23.2): the pack's `nihil` type row, or the Latin `nihil` when the
-    /// surface declares no type rows. The null *value* word is a keyword
+    /// (D23.2): the pack's `nihil` type row, or the Latin `nihil` itself (a
+    /// sealed file then reports it as the wrong locale's type word). The null *value* word is a keyword
     /// literal and never matches here.
     fn check_null_type_word(&self) -> bool {
         let TokenKind::Ident(sym) = self.peek().kind else {
@@ -1252,7 +1269,16 @@ impl Parser {
         let text = self.interner.resolve(sym);
         match self.reader_type_latin_keys.get(text) {
             Some(latin) => latin == "nihil",
-            None => self.reader_type_latin_keys.is_empty() && text == "nihil",
+            // The Latin word in a surface whose pack names the null type
+            // otherwise still reads as the null type here, so a sealed file's
+            // `casu nihil` reaches `reject_latin_type_word` instead of
+            // binding the word as a pattern name; a declared or imported
+            // `nihil` stays an ordinary name.
+            None => {
+                text == "nihil"
+                    && !self.declared_type_names.contains(text)
+                    && !self.imported_type_names.contains(text)
+            }
         }
     }
 
@@ -1278,14 +1304,22 @@ impl Parser {
             .unwrap_or_else(|| "nulla".to_owned())
     }
 
-    fn is_canonical_type_spelling(source: &str) -> bool {
-        radix_types::lookup_collection_type_spec(source).is_some_and(|spec| {
-            spec.canonical
-                && matches!(
-                    spec.kind,
-                    radix_types::CollectionKind::Queue | radix_types::CollectionKind::Stack
-                )
-        })
+    /// Whether `source` is a canonical Latin type word.
+    ///
+    /// Derived from data, never a second hand-typed list: the static Latin
+    /// primitive, collection and tensor-family rows, every Latin type identity
+    /// the active pack declares (`reader_type_surfaces`, which carries the
+    /// width-policy, relational and conversation rows), and the keyword-registry
+    /// words that fill type slots (`nihil`, `modulus`, `iuncta`).
+    fn is_latin_type_word(&self, source: &str) -> bool {
+        radix_types::lookup_primitive_type_spec(source).is_some()
+            || radix_types::lookup_collection_type_spec(source).is_some()
+            || radix_types::lookup_tensor_family_type_spec(source).is_some()
+            || self.reader_type_surfaces.contains_key(source)
+            || matches!(
+                lookup_keyword_spec(source).and_then(|spec| spec.token_kind.clone()),
+                Some(TokenKind::Nihil | TokenKind::Modulus | TokenKind::Iuncta)
+            )
     }
 
     /// Require a token while preserving the grammar contract as a locale issue.
@@ -1914,3 +1948,7 @@ mod big_integer_literal_test;
 #[cfg(test)]
 #[path = "selective_import_type_pattern_test.rs"]
 mod selective_import_type_pattern_test;
+
+#[cfg(test)]
+#[path = "latin_type_seal_test.rs"]
+mod latin_type_seal_test;

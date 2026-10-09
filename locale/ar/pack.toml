@@ -714,7 +714,7 @@ help = "اكتب `{bare}` بدلا من `{form}`؛ علامة العرض هي ن
 
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
-help = "use the type spelling declared by this reader locale"
+help = "استخدم تهجئة النوع المعلنة في لغة القارئ هذه{?expected|: '|'}"
 
 [diagnostics.PARSE041]
 message = "تعليمة نوع غير صالحة"

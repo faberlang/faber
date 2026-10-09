@@ -34,7 +34,11 @@ impl KeywordPack for EnBindingPack {
     }
 
     fn type_latin_key(&self, text: &str) -> Option<&str> {
-        (text == "int").then_some("numerus")
+        match text {
+            "int" => Some("numerus"),
+            "void" => Some("vacuum"),
+            _ => None,
+        }
     }
 
     fn keyword_suggestion(&self, _text: &str) -> Option<String> {
@@ -90,7 +94,7 @@ fn latin_fixum_with_equals_is_a_compile_time_local() {
 
 #[test]
 fn english_const_with_equals_is_a_compile_time_local() {
-    let result = parse_en("fn f() → vacuum { const int n = 4 * 8 }");
+    let result = parse_en("fn f() → void { const int n = 4 * 8 }");
     assert!(result.success(), "parse errors: {:?}", result.errors);
     let decl = first_local(&result);
     assert!(decl.compile_time);
@@ -113,7 +117,7 @@ fn arrow_initializer_stays_a_runtime_store() {
 fn varia_with_equals_is_rejected() {
     let latin = parse_program("functio f() → vacuum { varia numerus n = 7 }");
     single_issue(&latin, "varia_compile_time_initializer");
-    let english = parse_en("fn f() → vacuum { var int n = 7 }");
+    let english = parse_en("fn f() → void { var int n = 7 }");
     single_issue(&english, "varia_compile_time_initializer");
 }
 

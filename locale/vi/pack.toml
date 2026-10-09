@@ -714,7 +714,7 @@ help = "viết `{bare}` thay vì `{form}`; dấu hiệu độ rộng tự nó l�
 
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
-help = "use the type spelling declared by this reader locale"
+help = "dùng chính tả kiểu được khai báo trong ngôn ngữ đọc này{?expected|: '|'}"
 
 [diagnostics.PARSE041]
 message = "chú thích kiểu không hợp lệ"

@@ -940,9 +940,12 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
         "expected_type_name" => {
             Some("start the type with an identifier, _, or function type".to_owned())
         }
-        "wrong_locale_type" => {
-            Some("use the type spelling declared by this reader locale".to_owned())
-        }
+        "wrong_locale_type" => Some(match arg_value(args, "expected") {
+            Some(expected) => {
+                format!("use the type spelling declared by this reader locale: `{expected}`")
+            }
+            None => "use the type spelling declared by this reader locale".to_owned(),
+        }),
         "null_value_in_type_position" => {
             let ty = arg_value(args, "type")?;
             Some(format!(

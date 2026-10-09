@@ -714,7 +714,7 @@ help = "เขียน `{bare}` แทน `{form}`; ตัวระบุคว
 
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
-help = "use the type spelling declared by this reader locale"
+help = "ใช้การสะกดชนิดที่ประกาศในภาษาของตัวอ่านนี้{?expected|: '|'}"
 
 [diagnostics.PARSE041]
 message = "คำอธิบายชนิดไม่ถูกต้อง"

@@ -59,6 +59,8 @@ impl KeywordPack for SlotTestPack {
             "bool" => Some("bivalens"),
             "int" => Some("numerus"),
             "string" => Some("textus"),
+            "void" => Some("vacuum"),
+            "list" => Some("lista"),
             _ => None,
         }
     }
@@ -234,9 +236,9 @@ fn name_slots_accept_keyword_spellings_on_en_pack_surface() {
     // Green guards: declaration and parameter slots keep surface spellings
     // (`print`/`read`/`nota`) under a pack that maps print→nota, read→lege.
     for source in [
-        "fn read(string read) → vacuum {}\n",
-        "fn print(string print) → vacuum {}\n",
-        "fn nota(string nota) → vacuum {}\n",
+        "fn read(string read) → void {}\n",
+        "fn print(string print) → void {}\n",
+        "fn nota(string nota) → void {}\n",
     ] {
         let result = parse_ok_with_slot_pack(source);
         let program = result.program.as_ref().expect("program");
@@ -345,7 +347,7 @@ fn vacua_claim_is_surface_gated() {
     // Pack-authoritative (non-`la` pack): the pack does not declare `vacua`,
     // so the undeclared Latin spelling is an ordinary identifier expression
     // and must not claim the empty-collection marker.
-    let mut parser = parser_over_with_pack("var lista words ← vacua");
+    let mut parser = parser_over_with_pack("var list words ← vacua");
     let result = parser.parse_program();
     assert!(
         result.errors.is_empty(),
