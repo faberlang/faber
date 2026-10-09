@@ -1172,6 +1172,7 @@ fn lowers_copy_into_of_a_view_source_with_one_call() {
     assert_eq!(dump.matches("tensor_transpose").count(), 1, "{dump}");
 }
 
+#[test]
 fn lowers_direct_calls_to_definition_callees() {
     let dump =
         dump_source("functio duplex(numerus n) → numerus { redde n * 2 } functio usa() → numerus { redde duplex(4) }");
@@ -1186,9 +1187,11 @@ function f0 -> ty#1 {
     let _0: ty#1
   temps:
     %0: ty#1
+    %1: ty#1
   bb0:
     %0 = _0 * const int 2: ty#1
-    return %0
+    %1 = runtime convert runtime ty#1 -> ty#1(%0) -> ty#1
+    return %1
 }
 
 function f1 -> ty#1 {
