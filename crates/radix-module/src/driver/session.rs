@@ -31,6 +31,27 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+/// How `@ kernel` (and nucleum fragment) functions lower.
+///
+/// `Device` is the form the device translators consume: device views for
+/// tensors, device-checked arithmetic, `⇇` as the output-buffer store,
+/// kernel-to-kernel calls composed (inlined) into their callers, and the
+/// `filum` reduction recipe. `Host` lowers every kernel exactly as an
+/// ordinary function: tensor brackets are `TensorGet`/`TensorSet`, integer
+/// and vector-lane stores keep the host store checks, `⇇` keeps its
+/// storage-preserving host copy, a call to a helper kernel stays a plain
+/// call, and a `thread` reduction is the sequential fold. The CPU route
+/// (`faber run --device cpu`) selects `Host`; the selection is a property of
+/// the route, never of a source name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum KernelLowering {
+    /// Device-translatable form (the default).
+    #[default]
+    Device,
+    /// Ordinary host-function form, run by the MIR runner on the CPU.
+    Host,
+}
+
 /// Policy for promoting warning diagnostics to errors at the compilation boundary.
 ///
 /// Phases keep emitting `Severity::Warning` unchanged. One driver step applies
@@ -113,7 +134,7 @@ pub struct Config {
     /// (the default) keeps the device-translatable form; `Host` lowers
     /// kernels as ordinary functions for the CPU route (`--device cpu`).
     /// Emit and build routes never read it.
-    pub kernel_lowering: crate::mir::KernelLowering,
+    pub kernel_lowering: KernelLowering,
 
     /// When true, `llvm-text` emit for modules with device roles writes the
     /// NVVM device module (kernel bodies, `; @nucleum device-entry`) instead
@@ -173,7 +194,7 @@ impl Default for Config {
             output_mode: OutputMode::Application,
             module_name: None,
             no_fuse: false,
-            kernel_lowering: crate::mir::KernelLowering::Device,
+            kernel_lowering: KernelLowering::Device,
             emit_nvvm_device_module: false,
             import_path_templates: None,
             complexity_budget: None,
@@ -304,7 +325,7 @@ impl Config {
     /// route that runs them on the MIR runner.
     #[must_use]
     pub fn with_host_kernels(mut self) -> Self {
-        self.kernel_lowering = crate::mir::KernelLowering::Host;
+        self.kernel_lowering = KernelLowering::Host;
         self
     }
 

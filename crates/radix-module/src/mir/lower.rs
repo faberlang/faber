@@ -33,6 +33,7 @@
 
 use crate::cli::{CliDefault, CliOperand, CliOption, CliType};
 use crate::driver::AnalyzedModule;
+pub use crate::driver::KernelLowering;
 use crate::hir::visit::{HirVisitor, walk_expr, walk_program};
 use crate::hir::{
     DefId, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget, HirExpression,
@@ -605,27 +606,6 @@ fn portable_tensor_edge_shape_identity(types: &TypeTable, shape: IndexId) -> Opt
         | IndexExpr::Infer(_)
         | IndexExpr::Unspecified => None,
     }
-}
-
-/// How `@ kernel` (and nucleum fragment) functions lower.
-///
-/// `Device` is the form the device translators consume: device views for
-/// tensors, device-checked arithmetic, `⇇` as the output-buffer store,
-/// kernel-to-kernel calls composed (inlined) into their callers, and the
-/// `filum` reduction recipe. `Host` lowers every kernel exactly as an
-/// ordinary function: tensor brackets are `TensorGet`/`TensorSet`, integer
-/// and vector-lane stores keep the host store checks, `⇇` keeps its
-/// storage-preserving host copy, a call to a helper kernel stays a plain
-/// call, and a `thread` reduction is the sequential fold. The CPU route
-/// (`faber run --device cpu`) selects `Host`; the selection is a property of
-/// the route, never of a source name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum KernelLowering {
-    /// Device-translatable form (the default).
-    #[default]
-    Device,
-    /// Ordinary host-function form, run by the MIR runner on the CPU.
-    Host,
 }
 
 #[derive(Default)]
