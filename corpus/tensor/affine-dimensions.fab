@@ -44,7 +44,7 @@ main {
     print canceled.shape()[0]
 
     const int n ← runtime_size(4)
-    const tensor<f32, [n - 1]> dynamic ← three_values ↦ tensor<f32, [size (n - 1)]>
-    const tensor<f32, [n - 1]> dynamic_tail ← drop_one(dynamic)
+    const tensor<f32, [size (n - 1)]> dynamic ← three_values ↦ tensor<f32, [size (n - 1)]>
+    const tensor<f32, [size (n - 1)]> dynamic_tail ← drop_one(dynamic)
     print dynamic_tail.shape()[0]
 }
