@@ -120,14 +120,14 @@ impl super::FaberCodegen<'_> {
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Vector)),
                 self.type_to_faber(*elem, names, surface),
-                self.format_figura(*width)
+                self.format_figura(*width, surface)
             ),
 
             Type::Matrix(elem, shape) => format!(
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Matrix)),
                 self.type_to_faber(*elem, names, surface),
-                self.format_figura(*shape)
+                self.format_figura(*shape, surface)
             ),
 
             Type::Sparsa(elem, shape) => self.format_sparsa_type(*elem, *shape, names, surface),
@@ -255,7 +255,7 @@ impl super::FaberCodegen<'_> {
                         radix_types::AppliedArg::Type(id) => {
                             self.type_to_faber(*id, names, surface)
                         }
-                        radix_types::AppliedArg::Size(id) => self.format_figura(*id),
+                        radix_types::AppliedArg::Size(id) => self.format_figura(*id, surface),
                     })
                     .collect();
                 format!("{}<{}>", base_str, args_str.join(", "))
@@ -294,34 +294,34 @@ impl super::FaberCodegen<'_> {
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity)
+                self.format_figura(*capacity, surface)
             ),
             Type::BoundedQueue { element, capacity } => format!(
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity)
+                self.format_figura(*capacity, surface)
             ),
             Type::BoundedStack { element, capacity } => format!(
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity)
+                self.format_figura(*capacity, surface)
             ),
             Type::BoundedTextus { capacity } => format!(
                 "{}<{}>",
                 surface.type_surface(TypeBindingKind::Primitive(Primitive::Textus)),
-                self.format_figura(*capacity)
+                self.format_figura(*capacity, surface)
             ),
             Type::BoundedAscii { capacity } => format!(
                 "{}<{}>",
                 surface.type_surface(TypeBindingKind::Primitive(Primitive::Ascii)),
-                self.format_figura(*capacity)
+                self.format_figura(*capacity, surface)
             ),
             Type::BoundedOcteti { capacity } => format!(
                 "{}<{}>",
                 surface.type_surface(TypeBindingKind::Primitive(Primitive::Octeti)),
-                self.format_figura(*capacity)
+                self.format_figura(*capacity, surface)
             ),
         }
     }
@@ -450,7 +450,7 @@ impl super::FaberCodegen<'_> {
     ) -> Result<String, CodegenError> {
         match level.0 {
             0 => self.semantic_long_form_to_faber(form, names, surface),
-            1 => self.semantic_short_form_to_faber(form),
+            1 => self.semantic_short_form_to_faber(form, surface),
             2 => self.semantic_policy_form_to_faber(form, surface),
             3 => self.semantic_inf_word_form_to_faber(form, TypeBindingKind::ModularWord, surface),
             4 => {
@@ -522,7 +522,11 @@ impl super::FaberCodegen<'_> {
 
     /// SHORT spellings per the registry: bare width markers and fused
     /// `l/t/v/m/s` roots. Width markers keep their language-wide spelling.
-    fn semantic_short_form_to_faber(&self, form: &HirTypeForm) -> Result<String, CodegenError> {
+    fn semantic_short_form_to_faber(
+        &self,
+        form: &HirTypeForm,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
         match self.types.get(form.ty) {
             // Lowering's fail-closed bail-out keeps the authored level over an
             // Error witness; render it like the canonical path.
@@ -534,13 +538,13 @@ impl super::FaberCodegen<'_> {
             Type::Array(_) => Ok(format!("l{}", self.fused_width_marker(form)?)),
             Type::Tensor(_, shape) => match form.args.as_slice() {
                 [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)]
-                    if self.same_figura(*index, *shape) =>
+                    if self.same_figura(*index, *shape, surface) =>
                 {
                     let marker = self.fused_child_marker(child)?;
                     Ok(fused_with_figura(
                         "t",
                         &marker,
-                        &self.format_figura(*shape),
+                        &self.format_figura(*shape, surface),
                     ))
                 }
                 _ => Err(malformed_type_form(
@@ -555,7 +559,7 @@ impl super::FaberCodegen<'_> {
                 Ok(fused_with_figura(
                     "v",
                     &marker,
-                    &self.format_figura(*width),
+                    &self.format_figura(*width, surface),
                 ))
             }
             Type::Matrix(_, shape) => {
@@ -563,7 +567,7 @@ impl super::FaberCodegen<'_> {
                 Ok(fused_with_figura(
                     "m",
                     &marker,
-                    &self.format_figura(*shape),
+                    &self.format_figura(*shape, surface),
                 ))
             }
             Type::Sparsa(_, shape) => {
@@ -571,7 +575,7 @@ impl super::FaberCodegen<'_> {
                 Ok(fused_with_figura(
                     "s",
                     &marker,
-                    &self.format_figura(*shape),
+                    &self.format_figura(*shape, surface),
                 ))
             }
             _ => Err(malformed_type_form(
@@ -769,7 +773,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
-                    self.format_figura(*capacity)
+                    self.format_figura(*capacity, surface)
                 ))
             }
             Type::BoundedQueue { capacity, .. } => {
@@ -777,7 +781,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
-                    self.format_figura(*capacity)
+                    self.format_figura(*capacity, surface)
                 ))
             }
             Type::BoundedStack { capacity, .. } => {
@@ -785,7 +789,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
-                    self.format_figura(*capacity)
+                    self.format_figura(*capacity, surface)
                 ))
             }
             Type::Option(_) => match form.args.as_slice() {
@@ -867,7 +871,7 @@ impl super::FaberCodegen<'_> {
         args.iter()
             .map(|arg| match arg {
                 HirTypeFormArg::Type(child) => self.type_form_to_faber(child, names, surface),
-                HirTypeFormArg::Size(index) => Ok(self.format_figura(*index)),
+                HirTypeFormArg::Size(index) => Ok(self.format_figura(*index, surface)),
                 HirTypeFormArg::Name(symbol) => Ok(self.symbol_to_string(*symbol)),
             })
             .collect()
@@ -962,7 +966,7 @@ impl super::FaberCodegen<'_> {
     ) -> Result<String, CodegenError> {
         match form.args.as_slice() {
             [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)]
-                if self.same_figura(*index, shape) =>
+                if self.same_figura(*index, shape, surface) =>
             {
                 self.type_form_to_faber(child, names, surface)
             }
@@ -1000,8 +1004,8 @@ impl super::FaberCodegen<'_> {
         }
     }
 
-    fn same_figura(&self, left: IndexId, right: IndexId) -> bool {
-        self.format_figura(left) == self.format_figura(right)
+    fn same_figura(&self, left: IndexId, right: IndexId, surface: &impl KeywordSurface) -> bool {
+        self.format_figura(left, surface) == self.format_figura(right, surface)
     }
 
     fn figura_tensor_head(
@@ -1014,7 +1018,7 @@ impl super::FaberCodegen<'_> {
         format!(
             "{}<{child}, {}>",
             surface.type_surface(TypeBindingKind::TensorFamily(kind)),
-            self.format_figura(figura)
+            self.format_figura(figura, surface)
         )
     }
 
@@ -1027,7 +1031,7 @@ impl super::FaberCodegen<'_> {
         format!(
             "{}<{}>",
             surface.type_surface(TypeBindingKind::Primitive(prim)),
-            self.format_figura(capacity)
+            self.format_figura(capacity, surface)
         )
     }
 
@@ -1123,7 +1127,7 @@ impl super::FaberCodegen<'_> {
             "{}<{}, {}>",
             surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor)),
             self.type_to_faber(elem, names, surface),
-            self.format_figura(shape)
+            self.format_figura(shape, surface)
         )
     }
 
@@ -1138,7 +1142,7 @@ impl super::FaberCodegen<'_> {
             "{}<{}, {}>",
             surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Sparsa)),
             self.type_to_faber(elem, names, surface),
-            self.format_figura(shape)
+            self.format_figura(shape, surface)
         )
     }
 }

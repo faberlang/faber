@@ -3,8 +3,24 @@ use radix_hir::DefId;
 use radix_lexer::Interner;
 use radix_types::{IndexExpr, IndexVar, RuntimeExtentId, TypeTable};
 
+/// Latin reader surface: only the size-lift keyword is ever consulted here.
+struct LaSurface;
+
+impl crate::KeywordSurface for LaSurface {
+    fn keyword(&self, kind: radix_lexer::TokenKind) -> &str {
+        match kind {
+            radix_lexer::TokenKind::Magnitudo => "magnitudo",
+            other => panic!("unexpected keyword: {other:?}"),
+        }
+    }
+
+    fn type_surface(&self, _kind: crate::TypeBindingKind) -> &str {
+        "tensor"
+    }
+}
+
 fn figura(codegen: &crate::FaberCodegen<'_>, index: IndexId) -> String {
-    codegen.format_figura(index)
+    codegen.format_figura(index, &LaSurface)
 }
 
 #[test]
@@ -106,6 +122,6 @@ fn format_figura_runtime_scalar_uses_emitter_binding_names() {
         .borrow_mut()
         .insert(0, parameter_name);
 
-    assert_eq!(figura(&codegen, local), "n");
-    assert_eq!(figura(&codegen, parameter), "width");
+    assert_eq!(figura(&codegen, local), "magnitudo n");
+    assert_eq!(figura(&codegen, parameter), "magnitudo width");
 }

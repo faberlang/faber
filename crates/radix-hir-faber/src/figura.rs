@@ -7,16 +7,71 @@
 //! and interner ride the [`super::FaberCodegen`] context.
 use radix_codegen_shared::CodegenError;
 use radix_diagnostics::DiagnosticArg;
+use radix_lexer::TokenKind;
 use radix_types::{IndexExpr, IndexId, RuntimeExtentId};
+
+use crate::KeywordSurface;
 
 impl super::FaberCodegen<'_> {
     /// Pretty-print an interned index expression as Faber `Figura` syntax.
-    pub(super) fn format_figura(&self, index_id: IndexId) -> String {
+    ///
+    /// An extent that depends on a runtime value is spelled as a size lift
+    /// (`size n`, `size (n - 1)`; la `magnitudo`), because a bare value name
+    /// in an extent position is refused (SEM008
+    /// `annotation_extent_bare_value_name`). Literal and size-parameter
+    /// extents keep their bare spelling. A tuple lifts each dimension on its
+    /// own.
+    pub(super) fn format_figura(&self, index_id: IndexId, surface: &impl KeywordSurface) -> String {
+        match self.types.get_index(index_id) {
+            IndexExpr::Tuple(dims) if dims.is_empty() => "[]".to_owned(),
+            IndexExpr::Tuple(dims) => {
+                let parts = dims
+                    .iter()
+                    .map(|dim| self.format_figura(*dim, surface))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("[{parts}]")
+            }
+            _ if !self.index_has_runtime(index_id) => self.format_figura_term(index_id, surface),
+            IndexExpr::Runtime(_) => {
+                let name = self.format_figura_term(index_id, surface);
+                if name == "<error>" {
+                    // Unrepresentable origin: the recorded emission error
+                    // fails the output closed; do not dress it as a lift.
+                    return name;
+                }
+                format!("{} {name}", surface.keyword(TokenKind::Magnitudo))
+            }
+            _ => {
+                let term = self.format_figura_term(index_id, surface);
+                format!("{} ({term})", surface.keyword(TokenKind::Magnitudo))
+            }
+        }
+    }
+
+    /// Whether an extent term reads a runtime value anywhere in its
+    /// affine/divide chain.
+    fn index_has_runtime(&self, index_id: IndexId) -> bool {
+        match self.types.get_index(index_id) {
+            IndexExpr::Runtime(_) => true,
+            IndexExpr::Affine { base, .. } => self.index_has_runtime(*base),
+            IndexExpr::Divide { numerator, .. } => self.index_has_runtime(*numerator),
+            IndexExpr::Tuple(dims) => dims.iter().any(|dim| self.index_has_runtime(*dim)),
+            IndexExpr::Literal(_)
+            | IndexExpr::Param(_)
+            | IndexExpr::Infer(_)
+            | IndexExpr::Unspecified => false,
+        }
+    }
+
+    /// The unlifted spelling of one extent term; callers lift it when it
+    /// reads a runtime value.
+    fn format_figura_term(&self, index_id: IndexId, surface: &impl KeywordSurface) -> String {
         match self.types.get_index(index_id) {
             IndexExpr::Literal(value) => value.to_string(),
             IndexExpr::Param(symbol) => self.interner.resolve(*symbol).to_owned(),
             IndexExpr::Affine { base, offset } => {
-                let base = self.format_figura(*base);
+                let base = self.format_figura_term(*base, surface);
                 if *offset < 0 {
                     format!("{base} - {}", offset.unsigned_abs())
                 } else {
@@ -24,17 +79,14 @@ impl super::FaberCodegen<'_> {
                 }
             }
             IndexExpr::Divide { numerator, divisor } => {
-                format!("({}) / {divisor}", self.format_figura(*numerator))
+                format!(
+                    "({}) / {divisor}",
+                    self.format_figura_term(*numerator, surface)
+                )
             }
-            IndexExpr::Tuple(dims) if dims.is_empty() => "[]".to_owned(),
-            IndexExpr::Tuple(dims) => {
-                let parts = dims
-                    .iter()
-                    .map(|dim| self.format_figura(*dim))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!("[{parts}]")
-            }
+            // Callers hand tuples to `format_figura`; recursing keeps the
+            // match total without a panic arm.
+            IndexExpr::Tuple(_) => self.format_figura(index_id, surface),
             IndexExpr::Runtime(source) => self.format_runtime_extent(source),
             IndexExpr::Infer(_) | IndexExpr::Unspecified => "_".to_owned(),
         }
