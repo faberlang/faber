@@ -10,7 +10,7 @@ fn smoke_case() -> PathBuf {
 
 fn rust_runtime() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../faber/runtime/rust")
+        .join("../../runtime/rust")
         .canonicalize()
         .expect("packet Rust runtime")
 }
