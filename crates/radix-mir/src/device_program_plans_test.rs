@@ -4866,6 +4866,7 @@ fn matmul_contract_literal_dims_keep_the_numeric_tile_grid() {
 #[test]
 fn matmul_contract_runtime_dims_resolve_without_a_numeric_grid() {
     let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
     let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
     let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Err(2)]);
     let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(2)]);
@@ -4875,14 +4876,29 @@ fn matmul_contract_runtime_dims_resolve_without_a_numeric_grid() {
         .expect("run-time matmul resolves")
         .expect("run-time matmul has a contract");
     assert_eq!(contract, CollectionOpContract::MatMulRuntime);
-    // The plan pass has no run-time plan yet: named refusal, not a literal
-    // dimensions error.
-    let error = kernel_matmul_shapes(&function, &validation).expect_err("no run-time plan yet");
+    // `MatMulShapes` carries literal dims only, so it still refuses run-time
+    // dims by name; the plan pass skips it for `MatMulRuntime` and builds the
+    // plan from the signature alone.
+    let error = kernel_matmul_shapes(&function, &validation).expect_err("no literal shapes");
     assert!(
         error.message.contains("run-time extents"),
         "{}",
         error.message
     );
+    let plan = kernel_plan_for_function(
+        &function,
+        &contract_shape_signature(&function, &contract, &validation).expect("signature"),
+        &validation,
+    )
+    .expect("run-time matmul plans")
+    .expect("run-time matmul has a plan");
+    assert!(matches!(
+        plan,
+        CollectionKernelPlan::TiledMatMul(crate::kernel_plan::MatMulPlan {
+            dims: crate::kernel_plan::MatMulDims::Runtime { .. },
+            ..
+        })
+    ));
 }
 
 /// Design-note item 4: the run-time matmul signature carries runtime-shaped

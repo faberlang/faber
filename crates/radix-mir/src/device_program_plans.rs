@@ -274,7 +274,13 @@ pub fn kernel_plan_for_function_with_limit(
     // recipe op; elementwise-only bodies resolve no contract. Matmul shapes
     // are resolved once from the body's matmul statement scan.
     let contract = collection_op_contract(function, validation)?;
-    let matmul_shapes = kernel_matmul_shapes(function, validation)?;
+    // Run-time extents (`MatMulRuntime`) carry no literal shapes: the plan is
+    // built from the signature alone and the dims are read at launch.
+    let matmul_shapes = if matches!(contract, Some(CollectionOpContract::MatMulRuntime)) {
+        None
+    } else {
+        kernel_matmul_shapes(function, validation)?
+    };
     let mut recipe: Option<CollectionKernelPlan> = None;
     for op in ops {
         // PGC-R5: a DEAD stability-max reduction is not a recipe — the
@@ -3748,8 +3754,20 @@ fn finish_subchain_emission_signature(
     // Data-flow inputs: params beyond the recipe operands — locals read from
     // earlier subchains. They bind after the recipe inputs, before the
     // output, mirroring the whole-function ABI's inputs-then-output layout.
+    // Run-time matmul extent resources (`TensorAxisExtent`) bind after the
+    // output, so they do not take a data-flow/output slot.
+    let operand_inputs = signature
+        .extra_inputs
+        .iter()
+        .filter(|resource| {
+            !matches!(
+                resource.kind,
+                MirKernelResourceKind::TensorAxisExtent { .. }
+            )
+        })
+        .count();
     let mut next_binding = 1u32
-        + u32::try_from(signature.extra_inputs.len()).map_err(|_| {
+        + u32::try_from(operand_inputs).map_err(|_| {
             PlanMappingError::mapping("subchain signature has too many extra inputs")
         })?;
     for param in &function.params {
@@ -4170,7 +4188,9 @@ pub fn resolve_subchain_plan(
         ))
     })?;
     let signature = contract_shape_signature(function, &contract, validation)?;
-    let shapes = if recipe_op == MirCollectionOp::TensorMatMul {
+    let shapes = if recipe_op == MirCollectionOp::TensorMatMul
+        && contract != CollectionOpContract::MatMulRuntime
+    {
         kernel_matmul_shapes(function, validation)?
     } else {
         None
