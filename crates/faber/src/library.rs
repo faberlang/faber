@@ -4,7 +4,7 @@
 //! `radix-program` with the explicit-input posture — `radix-program` never
 //! reads the ambient environment. This module keeps the faber-owned ambient
 //! discovery seam — `FABER_LIBRARY_HOME` env reading and the
-//! workspace-ancestor probe (CTO memo) — and constructs the explicit
+//! in-tree `lib/` home (CTO memo) — and constructs the explicit
 //! resolver inputs the compiler crate requires.
 
 #[cfg(test)]
@@ -22,18 +22,18 @@ pub const FABER_LIBRARY_HOME_ENV: &str = "FABER_LIBRARY_HOME";
 /// The faber lib artifact does not call doctor/check-library; the binary does.
 pub const KNOWN_LIBRARIES: &[&str] = &["norma", "triga", "gradus", "tela"];
 
-/// How the library home was selected. Env wins; otherwise the workspace probe.
+/// How the library home was selected. Env wins; otherwise the in-tree `lib/`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LibraryHomeSource {
     Env,
-    AncestorProbe,
+    InTree,
 }
 
 impl LibraryHomeSource {
     pub fn as_key(self) -> &'static str {
         match self {
             Self::Env => "env",
-            Self::AncestorProbe => "ancestor-probe",
+            Self::InTree => "in-tree",
         }
     }
 }
@@ -84,7 +84,7 @@ impl LibraryAvailability {
 }
 
 /// Build a resolver from the ambient library home: an explicit
-/// `FABER_LIBRARY_HOME`, or the sibling workspace dev layout when present.
+/// `FABER_LIBRARY_HOME`, or the in-tree `<repo>/lib` when present.
 pub(crate) fn default_library_resolver() -> LibraryResolver {
     LibraryResolver::with_optional_home(default_library_home())
 }
@@ -102,26 +102,14 @@ pub fn resolved_library_home() -> Option<ResolvedLibraryHome> {
         });
     }
 
-    // Walk ancestors from the crate parent for a sibling `norma/src` layout.
-    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap_or_else(|| Path::new("."));
-    for candidate in workspace_root.ancestors() {
-        // Skip lane worktrees (`worktrees/<lane>/…`): a stale sibling checkout
-        // there would shadow the container stdlib for packet-local runs.
-        if candidate
-            .components()
-            .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
-        {
-            continue;
-        }
-        let norma_src = candidate.join("norma/src");
-        if norma_src.is_dir() && norma_src.join("fs.fab").is_file() {
-            return Some(ResolvedLibraryHome {
-                path: candidate.to_path_buf(),
-                source: LibraryHomeSource::AncestorProbe,
-            });
-        }
+    // In-tree home: `<repo>/lib` (holds `norma/`), located from this crate's
+    // manifest directory (`crates/faber` → `../../lib`).
+    let in_tree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lib");
+    if in_tree.join("norma").is_dir() {
+        return Some(ResolvedLibraryHome {
+            path: in_tree,
+            source: LibraryHomeSource::InTree,
+        });
     }
 
     None

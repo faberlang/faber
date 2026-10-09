@@ -2,7 +2,7 @@
 //!
 //! Supports relative paths, `norma:*`, and generic `provider:module` imports via
 //! `$FABER_LIBRARY_HOME/<provider>/` (with optional top-level `faber.toml`
-//! `[`paths`].source`).
+//! `[`paths`].source`), falling back to the in-tree `<repo>/lib/<provider>/`.
 
 use rustc_hash::FxHashMap;
 use std::collections::BTreeMap;
@@ -12,11 +12,12 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::driver::Session;
 
-/// Process-wide memo for [`library_home`]'s production path (BO-D-1).
+/// Process-wide memo for the configured library home's production path
+/// (BO-D-1).
 ///
-/// The env var and the ancestor walk cannot change during a compilation
-/// session, so the first provider import pays the walk once and every later
-/// call returns the cached value in O(1). The test-only thread-local override
+/// The env var cannot change during a compilation session, so the first
+/// provider import reads it once and every later call returns the cached
+/// value in O(1). The test-only thread-local override
 /// is checked before this cache, so test isolation is preserved.
 static LIBRARY_HOME_CACHE: OnceLock<Option<PathBuf>> = OnceLock::new();
 
@@ -377,8 +378,9 @@ fn is_valid_provider_segment(provider: &str) -> bool {
 }
 
 fn resolve_library_provider_import(provider: &str, module_path: &str) -> Option<PathBuf> {
-    let home = library_home()?;
-    let provider_repo = provider_repo_for_segment(&home, provider)?;
+    let provider_repo = library_homes()
+        .iter()
+        .find_map(|home| provider_repo_for_segment(home, provider))?;
     let source_root = installed_provider_source_root(&provider_repo)?;
     let candidate = source_root.join(module_path);
     resolve_fab_file(&candidate)
@@ -443,7 +445,17 @@ fn provider_name_from_manifest(toml_source: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-pub fn library_home() -> Option<PathBuf> {
+/// In-tree library home: `<repo>/lib`, located from this crate's manifest
+/// directory (`crates/radix-module` → `../../lib`). It holds `norma/`.
+#[must_use]
+pub fn in_tree_library_home() -> Option<PathBuf> {
+    let home = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lib");
+    home.is_dir().then_some(home)
+}
+
+/// The configured library home: the `FABER_LIBRARY_HOME` env var (or, in
+/// tests, the thread-local override). `None` when nothing is configured.
+fn configured_library_home() -> Option<PathBuf> {
     // Thread-local override (test-only): isolate compile_test env-var mutations
     // so parallel vertex-source tests don't pick up a transient temp path.
     #[cfg(test)]
@@ -454,39 +466,36 @@ pub fn library_home() -> Option<PathBuf> {
             return Some(home.clone());
         }
     }
-    // Production path: env-var check + ancestor walk, memoized per process.
-    // Neither the env var nor the filesystem layout changes during a
-    // compilation session, so the walk runs at most once.
+    // Production path: env-var check, memoized per process. The env var does
+    // not change during a compilation session.
     LIBRARY_HOME_CACHE
         .get_or_init(|| {
-            if let Some(home) = std::env::var_os(FABER_LIBRARY_HOME_ENV).map(PathBuf::from)
-                && home.is_dir()
-            {
-                return Some(home);
-            }
-            // Walk out of both normal checkouts and packet worktrees. A packet's
-            // compile-time manifest lives below `faberlang/worktrees/<packet>/radix`,
-            // so the old two-level probe stopped before the sibling `norma` checkout.
-            // Stop only on `norma/`. A nearer `triga/` (packet member or leftover
-            // sibling checkout) is not a library home unless Norma is there too.
-            // Never accept the container `worktrees/` root itself: it "has"
-            // norma only via a stale lane checkout that would shadow the real
-            // stdlib for every packet below it.
-            let mut candidate = Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
-            loop {
-                let under_worktrees = candidate
-                    .components()
-                    .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"));
-                if !under_worktrees && candidate.join("norma").is_dir() {
-                    return Some(candidate);
-                }
-                if !candidate.pop() {
-                    break;
-                }
-            }
-            None
+            std::env::var_os(FABER_LIBRARY_HOME_ENV)
+                .map(PathBuf::from)
+                .filter(|home| home.is_dir())
         })
         .clone()
+}
+
+/// Library homes to search, in order: the configured home first, then the
+/// in-tree `<repo>/lib`. A provider resolves from the first home that holds it.
+fn library_homes() -> Vec<PathBuf> {
+    let mut homes = Vec::new();
+    if let Some(configured) = configured_library_home() {
+        homes.push(configured);
+    }
+    if let Some(in_tree) = in_tree_library_home()
+        && !homes.contains(&in_tree)
+    {
+        homes.push(in_tree);
+    }
+    homes
+}
+
+/// The primary library home: the configured home when set, else the in-tree
+/// `<repo>/lib`.
+pub fn library_home() -> Option<PathBuf> {
+    library_homes().into_iter().next()
 }
 
 fn installed_provider_source_root(provider_repo: &Path) -> Option<PathBuf> {

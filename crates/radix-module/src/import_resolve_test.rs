@@ -441,6 +441,48 @@ fn library_home_memo_preserves_thread_override_precedence() {
     assert_eq!(library_home(), production);
 }
 
+// ── U6b: `norma:*` resolves from the in-tree `lib/` ──────────────────────────
+
+#[test]
+fn norma_resolves_from_in_tree_lib_when_no_home_configured() {
+    // No thread-local override on a fresh test thread; the process env var is
+    // not set by the suite. `norma:math` must come from `<repo>/lib/norma/src`.
+    let in_tree = in_tree_library_home().expect("<repo>/lib exists in the tree");
+    let resolved = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), "norma:math", None)
+        .expect("norma:math resolves with no home configured");
+    let expected_root = in_tree.join("norma/src");
+    assert!(
+        resolved.starts_with(&expected_root),
+        "{} not under {}",
+        resolved.display(),
+        expected_root.display()
+    );
+    assert!(resolved.is_file());
+}
+
+#[test]
+fn norma_resolves_from_tree_when_configured_home_lacks_it() {
+    // A configured home holding only a fake provider: `norma` is not there, so
+    // it falls back to the in-tree home; the fake provider still comes from the
+    // configured home.
+    let dir = crate::test_support::test_temp_dir("libhome-norma-fallback");
+    let fake_src = dir.path().join("fakeprov/src");
+    std::fs::create_dir_all(&fake_src).unwrap();
+    std::fs::write(fake_src.join("thing.fab"), "").unwrap();
+    let previous = library_home_test_support::set_thread_library_home(Some(dir.path().to_path_buf()));
+
+    let norma = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), "norma:math", None);
+    let fake = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), "fakeprov:thing", None);
+
+    library_home_test_support::set_thread_library_home(previous);
+
+    let in_tree = in_tree_library_home().expect("<repo>/lib exists in the tree");
+    let norma = norma.expect("norma:math resolves from the in-tree lib");
+    assert!(norma.starts_with(in_tree.join("norma/src")), "{}", norma.display());
+    let fake = fake.expect("fakeprov:thing resolves from the configured home");
+    assert!(fake.starts_with(dir.path()), "{}", fake.display());
+}
+
 // ── F-046: path traversal via template rest ─────────────────────────────────
 
 #[test]
