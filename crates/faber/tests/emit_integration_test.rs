@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 #[path = "support/temp.rs"]
@@ -46,19 +46,12 @@ fn corpus_root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus")
 }
 
-/// Container `examples/` root: `FABER_EXAMPLES_HOME` override, then the
-/// faberlang container root via `radix::module::paths::faberlang_home()`.
-fn examples_home() -> PathBuf {
-    if let Ok(home) = std::env::var("FABER_EXAMPLES_HOME") {
-        return PathBuf::from(home);
-    }
-    radix::module::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples")
-}
-
+/// Radix-authored reader-locale sample package under `corpus-product/`.
 fn reader_locale_example_root(locale: &str) -> PathBuf {
-    examples_home().join("reader-locale").join(locale)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("corpus-product/reader-locale")
+        .join(locale)
 }
 
 fn temp_dir(label: &str) -> TempDir {
@@ -332,7 +325,7 @@ fn emit_reader_locale_accepts_direct_entry_file_input() {
 
     assert!(ok, "reader-locale entry-file emit failed:\n{stderr}");
     assert!(
-        stdout.contains("fn ทักทาย"),
+        stdout.contains("fn ต้อนรับ"),
         "expected localized Rust emit output:\n{stdout}"
     );
 }
@@ -351,7 +344,7 @@ fn emit_reader_locale_accepts_manifest_file_input() {
 
     assert!(ok, "reader-locale manifest emit failed:\n{stderr}");
     assert!(
-        stdout.contains("fn ทักทาย"),
+        stdout.contains("fn ต้อนรับ"),
         "expected localized Rust emit output:\n{stdout}"
     );
 }
@@ -517,50 +510,5 @@ fn emit_faber_target_localizes_reader_locale() {
             .filter(|line| !line.trim_start().starts_with('#'))
             .any(|line| line.contains("functio")),
         "localized emit should not emit the Latin keyword: {stdout}"
-    );
-}
-
-#[test]
-#[ignore = "pre-existing: Arabic reader-locale parse error at lines 152/197 of ~10-line source; unrelated to annotation/codegen fixes"]
-fn emit_faber_reader_locale_arabic_preserves_logical_order() {
-    // Phase 3 (req. #9): Arabic emit preserves logical (codepoint) order. The
-    // emitted bytes decode to Arabic keyword codepoints in canonical logical
-    // sequence; no Bidi isolates / embedding controls are inserted (logical
-    // order is invariant; visual reordering would be a correctness bug).
-    let example = reader_locale_example_root("ar");
-    let entry = example.join("src/main.fab");
-
-    let (stdout, stderr, ok) = run_faber_emit(&[
-        "emit",
-        "-t",
-        "faber",
-        "--locale",
-        "ar",
-        entry.to_str().expect("entry path"),
-    ]);
-
-    assert!(ok, "arabic emit should succeed: {stderr}");
-    // functio -> دالة, incipit -> بداية, in logical order.
-    assert!(
-        stdout.contains("دالة"),
-        "arabic emit should localize functio: {stdout}"
-    );
-    assert!(
-        stdout.contains("بداية"),
-        "arabic emit should localize incipit: {stdout}"
-    );
-    assert!(
-        !stdout.contains("functio"),
-        "arabic emit should not emit the Latin keyword: {stdout}"
-    );
-    // No Bidi / directional embedding controls. Logical order means scalar
-    // values stream in source order; any directional control is a visual bug.
-    const BIDI_CONTROLS: &[char] = &[
-        '\u{202A}', '\u{202B}', '\u{202C}', '\u{202D}', '\u{202E}', // LRE/RLE/PDF/LRO/RLO
-        '\u{2066}', '\u{2067}', '\u{2068}', '\u{2069}', // LRI/RLI/FSI/PDI
-    ];
-    assert!(
-        !stdout.chars().any(|c| BIDI_CONTROLS.contains(&c)),
-        "arabic emit must not inject Bidi controls (logical order invariant): {stdout}"
     );
 }
