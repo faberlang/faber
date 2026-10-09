@@ -1,6 +1,6 @@
 +++
 locale = "en"
 +++
-fn load(string path) → string ⇥ numerus ∪ string {
+fn load(string path) → string ⇥ int ∪ string {
     return "data"
 }

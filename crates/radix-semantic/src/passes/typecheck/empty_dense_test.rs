@@ -140,7 +140,7 @@ fn empty_keeps_rank_zero_sparse_and_collection_slots() {
     accepts("fn main() {\n    const tensor<f32, []> a ← empty\n}\n");
     accepts("fn main() {\n    const sparsa<f32, [2, 3]> a ← empty\n}\n");
     accepts(
-        "fn main() {\n    const list<int> a ← empty\n    const tabula<textus, int> b ← empty\n    const copia<int> c ← empty\n}\n",
+        "fn main() {\n    const list<int> a ← empty\n    const map<string, int> b ← empty\n    const set<int> c ← empty\n}\n",
     );
 }
 

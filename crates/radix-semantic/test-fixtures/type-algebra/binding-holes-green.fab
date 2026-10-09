@@ -1,7 +1,7 @@
 +++
 locale = "en"
 +++
-fn pair() → numerus ∪ string {
+fn pair() → int ∪ string {
     return 5
 }
 main {

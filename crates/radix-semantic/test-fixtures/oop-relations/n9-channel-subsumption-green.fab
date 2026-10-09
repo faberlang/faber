@@ -10,7 +10,7 @@ class Hello implements Greets {
     fn greet() → string { return "hello" }
 }
 
-fn failable() → vacuum ⇥ Greets ∪ string {
+fn failable() → void ⇥ Greets ∪ string {
     const Hello h ← Hello {}
     throw h
 }

@@ -1,4 +1,4 @@
 +++
 locale = "en"
 +++
-type Bad = numerus ∩ fractus
+type Bad = int ∩ float

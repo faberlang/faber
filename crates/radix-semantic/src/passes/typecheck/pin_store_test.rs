@@ -1,6 +1,6 @@
 //! Z2-P: opaque-return binding-site pin store checks.
 //!
-//! `fn load(textus path) → tf32[_, _]` returns per-call opaque axes. A
+//! `fn load(string path) → tf32[_, _]` returns per-call opaque axes. A
 //! declaration store `const tf32[H, W] elev ← load(path)` pins those opaque
 //! axes to the annotation's named size terms at the store: the check is
 //! green and the extent equality is recorded as a runtime-recoverable store
@@ -41,7 +41,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
     );
 }
 
-const LOAD_FN: &str = "fn load(textus path) → tf32[_, _] {
+const LOAD_FN: &str = "fn load(string path) → tf32[_, _] {
     const tf32[2, 3] t ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     return t
 }

@@ -163,16 +163,13 @@ class Doc implements _ {
 
 #[test]
 fn r2_primitive_intersection_is_rejected_in_alias() {
-    assert_en_rejects_with_issue(
-        "type Bad = numerus ∩ fractus",
-        "intersection_primitive_operand",
-    );
+    assert_en_rejects_with_issue("type Bad = int ∩ float", "intersection_primitive_operand");
 }
 
 #[test]
 fn r2_primitive_intersection_is_rejected_in_annotation() {
     assert_en_rejects_with_issue(
-        "fn probe(numerus ∩ fractus both) → numerus {
+        "fn probe(int ∩ float both) → int {
     return 0
 }
 ",
@@ -212,7 +209,7 @@ fn g_binding_holes_stay_legal() {
 ",
     );
     analyze_en(
-        "fn pair() → numerus ∪ string {
+        "fn pair() → int ∪ string {
     return 5
 }
 main {
@@ -226,7 +223,7 @@ main {
 #[test]
 fn channel_union_stays_green() {
     analyze_en(
-        "fn load(string path) → string ⇥ numerus ∪ string {
+        "fn load(string path) → string ⇥ int ∪ string {
     return \"data\"
 }
 ",

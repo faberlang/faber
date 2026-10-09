@@ -81,7 +81,7 @@ fn custom_limes_policy_requires_plain_instance_callbacks() {
 
     rejects_with_issue(
         &format!(
-            "class InvalidPolicy {{ fn remap(vector<int, 1> coord) → numerus {{ return 0 }} }}\nmain {{\n{}\nconst tf32[3] invalid ← base.shift([1]).limes<InvalidPolicy>()\n}}",
+            "class InvalidPolicy {{ fn remap(vector<int, 1> coord) → int {{ return 0 }} }}\nmain {{\n{}\nconst tf32[3] invalid ← base.shift([1]).limes<InvalidPolicy>()\n}}",
             tensor_seed()
         ),
         "tensor_limes_policy_invalid",

@@ -184,13 +184,13 @@ class Hello implements Greets {
     fn greet() → string { return \"hello\" }
 }
 
-fn probe(lista<Greets> xs) → void {
+fn probe(list<Greets> xs) → void {
     print \"probe\"
 }
 
 main {
     const Hello h ← Hello {}
-    const lista<Hello> hs ← [h]
+    const list<Hello> hs ← [h]
     probe(hs)
 }
 ",
@@ -235,7 +235,7 @@ class Hello implements Greets {
     fn greet() → string { return \"hello\" }
 }
 
-fn failable() → vacuum ⇥ Greets ∪ string {
+fn failable() → void ⇥ Greets ∪ string {
     const Hello h ← Hello {}
     throw h
 }
