@@ -4350,6 +4350,18 @@ fn prune_unreachable_library_functions(
                     scan_mir_function_references(&library.program, function_id).environments,
                 );
             }
+            // Rows keyed by a pruned program function go with it. A key that
+            // names no program function at all is a generic template's row
+            // (templates have no `program.functions` entry) and stays.
+            let program_ids: HashSet<MirFunctionId> = library
+                .program
+                .functions
+                .iter()
+                .map(|function| function.id)
+                .collect();
+            library
+                .device_function_metadata
+                .retain(|key, _| keep.contains(key) || !program_ids.contains(key));
             library
                 .program
                 .functions
@@ -4360,7 +4372,11 @@ fn prune_unreachable_library_functions(
             // The reachability pruning leaves function-id gaps; the merge
             // shift assumes each appended program's ids are zero-based and
             // contiguous, so re-index the kept functions before merging.
-            reindex_function_ids(&mut library.program, &mut library.environments);
+            reindex_function_ids(
+                &mut library.program,
+                &mut library.environments,
+                &mut library.device_function_metadata,
+            );
             library.templates.retain(|template| {
                 template
                     .source
@@ -4387,11 +4403,22 @@ fn prune_unreachable_library_functions(
 /// the same shifted id (duplicate MIR function ids in the merged program).
 /// Block/local/temp ids stay per-function-scoped and untouched here; the
 /// merge's uniform shift handles them.
-fn reindex_function_ids(program: &mut MirProgram, environments: &mut [MirClosureEnvironment]) {
+///
+/// The library's synthetic-kernel `device_function_metadata` rows are keyed
+/// (and parented) by function id, so surviving rows move to their functions'
+/// new ids through the same map. The caller has already dropped the rows of
+/// pruned functions; a row whose key is not a program function (a generic
+/// template's row) keeps its key.
+fn reindex_function_ids(
+    program: &mut MirProgram,
+    environments: &mut [MirClosureEnvironment],
+    device_function_metadata: &mut MirDeviceFunctionMetadataMap,
+) {
     let mut remap = HashMap::new();
     for (index, function) in program.functions.iter().enumerate() {
         remap.insert(function.id, MirFunctionId(index as u32));
     }
+    remap_device_function_metadata(device_function_metadata, &remap);
     let contiguous = program
         .functions
         .iter()
@@ -4411,6 +4438,22 @@ fn reindex_function_ids(program: &mut MirProgram, environments: &mut [MirClosure
     }
     for environment in environments {
         environment.function = remap[&environment.function];
+    }
+}
+
+/// Re-key device metadata rows through an old-to-new function-id map. A row
+/// keyed outside the map (a generic template) keeps its key; a kept row's
+/// parent follows the map too (a parent outside the map keeps its id).
+fn remap_device_function_metadata(
+    metadata: &mut MirDeviceFunctionMetadataMap,
+    remap: &HashMap<MirFunctionId, MirFunctionId>,
+) {
+    let rows = std::mem::take(metadata);
+    for (key, mut row) in rows {
+        remap_function_id(&mut row.identity.parent, remap);
+        let mut key = key;
+        remap_function_id(&mut key, remap);
+        metadata.insert(key, row);
     }
 }
 
@@ -4855,6 +4898,10 @@ fn scan_option_chain_references(link: &MirOptionChainLink, scan: &mut MirReferen
         }
     }
 }
+
+#[cfg(test)]
+#[path = "prune_device_metadata_test.rs"]
+mod prune_device_metadata_tests;
 
 #[cfg(test)]
 mod metadata_merge_tests {
