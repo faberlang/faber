@@ -25,9 +25,7 @@ const BIDI_ISOLATE_START: &str = "\u{2068}";
 const BIDI_ISOLATE_END: &str = "\u{2069}";
 
 fn locale_examples_root() -> PathBuf {
-    radix::module::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples/reader-locale")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-product/reader-locale")
 }
 
 fn locale_fault_path(locale: &str, rel: &str) -> PathBuf {
