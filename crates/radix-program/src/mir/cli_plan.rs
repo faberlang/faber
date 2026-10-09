@@ -907,7 +907,11 @@ pub(super) fn add_runtime_field_type_rewrites(
     fields_by_local: &CliRecordFieldsByLocal,
     imported: &mut HashMap<TypeId, TypeId>,
 ) {
-    for fields in fields_by_local.values() {
+    // Importing interns into the target type table: walk the std `HashMap`
+    // in symbol order, never in its per-process seeded order.
+    let mut locals: Vec<_> = fields_by_local.iter().collect();
+    locals.sort_by_key(|(local, _)| local.0);
+    for (_, fields) in locals {
         for field in fields {
             if let MirRuntimeRecordValue::Array { ty, .. } = &field.value {
                 let source = ty.semantic_id();

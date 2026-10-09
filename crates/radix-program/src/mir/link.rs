@@ -2258,10 +2258,11 @@ fn expand_locale_namespace_targets<V: Clone>(
     table: &HashMap<(PathBuf, DefId, String), V>,
 ) -> HashMap<(PathBuf, DefId, String), V> {
     let mut expanded = table.clone();
-    for ((path, def, name), value) in table {
-        if path != unit_path {
-            continue;
-        }
+    // Interning into the unit interner below is order-sensitive: walk the
+    // std `HashMap` in key order, never in its per-process seeded order.
+    let mut entries: Vec<_> = table.iter().filter(|(key, _)| key.0 == unit_path).collect();
+    entries.sort_by(|a, b| (a.0.1.0, &a.0.2).cmp(&(b.0.1.0, &b.0.2)));
+    for ((path, def, name), value) in entries {
         let Some(symbol) = analysis.resolver.get_symbol(*def) else {
             continue;
         };
@@ -2283,10 +2284,14 @@ fn expand_locale_namespace_exports(
     namespaces: &NamespaceExports,
 ) -> NamespaceExports {
     let mut expanded = namespaces.clone();
-    for ((path, def), names) in namespaces {
-        if path != unit_path {
-            continue;
-        }
+    // Interning into the unit interner below is order-sensitive: walk the
+    // std `HashMap` in key order, never in its per-process seeded order.
+    let mut entries: Vec<_> = namespaces
+        .iter()
+        .filter(|(key, _)| key.0 == unit_path)
+        .collect();
+    entries.sort_by_key(|(key, _)| key.1.0);
+    for ((path, def), names) in entries {
         let Some(symbol) = analysis.resolver.get_symbol(*def) else {
             continue;
         };

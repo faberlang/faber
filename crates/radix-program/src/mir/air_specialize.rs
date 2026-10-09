@@ -378,8 +378,12 @@ fn plan_linked_library_instances(
     // Register every materialized instance (including nested-call instances
     // the specialization pass discovered inside the library) and each
     // instance's backward companion under package synthetic source identities.
+    // Synthetic ids are handed out in walk order, so walk the std `HashMap`s
+    // in `DefId` order, never in their per-process seeded order.
+    let mut instances: Vec<DefId> = plan.instance_by_key.values().copied().collect();
+    instances.sort_by_key(|instance| instance.0);
     let mut synthetic_of = HashMap::new();
-    for (_, instance) in &plan.instance_by_key {
+    for instance in &instances {
         let synthetic = DefId(links.next_synthetic);
         links.next_synthetic = links.next_synthetic.saturating_add(1);
         links
@@ -388,7 +392,10 @@ fn plan_linked_library_instances(
         synthetic_of.insert(*instance, synthetic);
     }
     let mut companion_synthetic_of = HashMap::new();
-    for (instance, companion) in &plan.companions {
+    let mut companions: Vec<(DefId, DefId)> =
+        plan.companions.iter().map(|(i, c)| (*i, *c)).collect();
+    companions.sort_by_key(|(instance, _)| instance.0);
+    for (instance, companion) in &companions {
         let synthetic = DefId(links.next_synthetic);
         links.next_synthetic = links.next_synthetic.saturating_add(1);
         links
