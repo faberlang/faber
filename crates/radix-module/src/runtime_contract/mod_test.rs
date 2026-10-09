@@ -6,6 +6,7 @@
 
 use crate::runtime_contract::{
     display::{display_bivalens, display_fractus},
+    display_tokens::DisplayTokens,
     frame::FrameStatus,
     instans::{Instans, InstansPraecisio},
     sparsa, tensor,
@@ -46,8 +47,8 @@ fn tensor_shape_math_matches_runtime_semantics() {
 fn display_helpers_match_runtime_text() {
     assert_eq!(display_fractus(5.0_f64), "5.0");
     assert_eq!(display_fractus(5.5_f64), "5.5");
-    assert_eq!(display_bivalens(true), "verum");
-    assert_eq!(display_bivalens(false), "falsum");
+    assert_eq!(display_bivalens(true, &DisplayTokens::latin()), "verum");
+    assert_eq!(display_bivalens(false, &DisplayTokens::latin()), "falsum");
 }
 
 #[test]

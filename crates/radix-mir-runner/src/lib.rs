@@ -52,6 +52,7 @@ use radix_mir::{
     MirTerminatorKind, MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
     ValidatedMir,
 };
+use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
 use regex_program::RegexProgram;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -680,6 +681,16 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
         }
     }
 
+    /// The output tokens of the function now running: its entry in the image's
+    /// display-token table, or Latin when it has none (library-linked
+    /// functions carry no entry).
+    fn display_tokens(&self) -> &DisplayTokens {
+        self.frames
+            .last()
+            .and_then(|frame| self.context.display_tokens.for_function(frame.function))
+            .unwrap_or_else(|| value::FieldOrder::latin_tokens())
+    }
+
     /// Display metadata (field orders and declared float widths) for value
     /// rendering.
     pub(crate) fn field_order(&self) -> value::FieldOrder<'_> {
@@ -692,6 +703,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             tuple: None,
             char_text: false,
             names: &self.context.display_names,
+            tokens: self.display_tokens(),
             dynamic: false,
         }
     }
@@ -3907,3 +3919,7 @@ mod softmax_rank_test;
 #[cfg(test)]
 #[path = "sermo_frame_test.rs"]
 mod sermo_frame_test;
+
+#[cfg(test)]
+#[path = "display_tokens_test.rs"]
+mod display_tokens_test;

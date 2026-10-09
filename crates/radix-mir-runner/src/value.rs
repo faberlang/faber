@@ -34,6 +34,7 @@ use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::MirClosureEnvironmentId;
 use radix_mir::{MirBinOp, MirFunctionId};
 use radix_runtime_contract::display::{display_bivalens, display_fractus, display_text_payload};
+use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_runtime_contract::instans::Instans;
 use radix_types::{FloatPolicy, NumericWidth, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -88,6 +89,9 @@ static NO_FLOAT_WIDTHS: std::sync::LazyLock<FieldFloatWidths> =
 static NO_CHAR_FIELDS: std::sync::LazyLock<FieldCharSet> =
     std::sync::LazyLock::new(FxHashSet::default);
 
+static LATIN_DISPLAY_TOKENS: std::sync::LazyLock<DisplayTokens> =
+    std::sync::LazyLock::new(DisplayTokens::latin);
+
 static NO_DISPLAY_NAMES: std::sync::LazyLock<DisplayNames> =
     std::sync::LazyLock::new(FxHashMap::default);
 
@@ -106,6 +110,9 @@ pub struct FieldOrder<'a> {
     /// construction literal, where the field's declared type decides.
     pub char_text: bool,
     pub names: &'a DisplayNames,
+    /// The words printed for `bivalens`, the null value and a tuple head: the
+    /// tokens of the file the printing function was written in.
+    pub tokens: &'a DisplayTokens,
     /// The value is shown through a `valor`/`json` static type: a dynamic
     /// carrier displays as a JSON-shaped object, not a construction literal.
     pub dynamic: bool,
@@ -128,6 +135,7 @@ impl<'a> FieldOrder<'a> {
             char_fields: &NO_CHAR_FIELDS,
             char_text: false,
             names: &NO_DISPLAY_NAMES,
+            tokens: &LATIN_DISPLAY_TOKENS,
             dynamic: false,
             tuple_fields: &NO_TUPLE_FIELDS,
             tuple: None,
@@ -144,6 +152,18 @@ impl<'a> FieldOrder<'a> {
     #[must_use]
     pub fn with_names(self, names: &'a DisplayNames) -> Self {
         Self { names, ..self }
+    }
+
+    /// The same metadata with the output tokens of the printing function.
+    #[must_use]
+    pub fn with_tokens(self, tokens: &'a DisplayTokens) -> Self {
+        Self { tokens, ..self }
+    }
+
+    /// The Latin output tokens, the fallback for a function with no entry.
+    #[must_use]
+    pub fn latin_tokens() -> &'static DisplayTokens {
+        &LATIN_DISPLAY_TOKENS
     }
 
     /// The same metadata for a value whose static type is a dynamic carrier.
@@ -1322,7 +1342,7 @@ impl Value {
             Value::Magnus(v) => v.to_string(),
             Value::Dec(carrier, scale) => crate::decimal::format(*carrier, *scale),
             Value::Float(v) => display_float_at_width(*v, float_width),
-            Value::Bool(v) => display_bivalens(*v).to_owned(),
+            Value::Bool(v) => display_bivalens(*v, order.tokens).to_owned(),
             Value::Str(v) => display_text_payload(v).to_owned(),
             Value::Ascii(b) => {
                 let ch = char::from(*b);
@@ -1333,7 +1353,7 @@ impl Value {
                 let mut buf = [0u8; 4];
                 display_text_payload(ch.encode_utf8(&mut buf)).to_owned()
             }
-            Value::Nil => "nihil".to_owned(),
+            Value::Nil => order.tokens.none.clone(),
             Value::Unit => String::new(),
             Value::Octeti(bytes) => String::from_utf8_lossy(bytes).into_owned(),
             Value::Instans(value) => value.to_rfc3339(),
@@ -1476,7 +1496,7 @@ fn display_tuple<'a>(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(format!("iuncta [{}]", rendered.join(", ")))
+    Ok(format!("{} [{}]", order.tokens.tuple, rendered.join(", ")))
 }
 
 fn display_list(
@@ -1570,7 +1590,7 @@ fn display_tabula_map(
             MapKey::UInt(v) => v.to_string(),
             MapKey::Magnus(v) => v.to_string(),
             MapKey::Bool(v) => format!("{v}"),
-            MapKey::Unit => "nihil".to_owned(),
+            MapKey::Unit => order.tokens.none.clone(),
             MapKey::Tuple(_) => key.document_key(),
         };
         let val_str = display_in_collection(value, interner, order, span, float_width)?;

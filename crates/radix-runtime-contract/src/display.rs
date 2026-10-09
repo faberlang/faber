@@ -5,6 +5,7 @@
 //! Radix is the authority; the runtime copy is expected to become a
 //! generated/committed artifact in a later phase.
 
+use crate::display_tokens::DisplayTokens;
 use std::fmt::Display;
 
 /// Float display contact: values with a zero fractional part render with one
@@ -49,10 +50,11 @@ pub fn display_fractus<T: FractusDisplay>(value: T) -> String {
     }
 }
 
-/// Render a `bivalens` as Faber boolean text (`verum` / `falsum`).
+/// Render a `bivalens` as the boolean text of `tokens` (`verum` / `falsum` in
+/// Latin, `true` / `false` in English).
 #[must_use]
-pub fn display_bivalens(value: bool) -> &'static str {
-    if value { "verum" } else { "falsum" }
+pub fn display_bivalens(value: bool, tokens: &DisplayTokens) -> &str {
+    if value { &tokens.true_ } else { &tokens.false_ }
 }
 
 /// Pass through a `textus` payload (hook point kept for parity with the runtime
