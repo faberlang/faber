@@ -271,17 +271,12 @@ incipit {
 "#,
     )
     .expect("app");
-    let mut home = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let home = loop {
-        if home.join("norma/src/value.fab").is_file() {
-            break home;
-        }
-        assert!(
-            home.pop(),
-            "expected norma/src/value.fab as ancestor of {}",
-            env!("CARGO_MANIFEST_DIR")
-        );
-    };
+    let home = crate::import_resolve::in_tree_library_home().expect("<repo>/lib exists in the tree");
+    assert!(
+        home.join("norma/src/value.fab").is_file(),
+        "expected lib/norma/src/value.fab under {}",
+        home.display()
+    );
     let _guard = LibraryHomeGuard::set(&home);
     let result = crate::Compiler::new(crate::driver::Config::default()).compile(&app);
     assert!(

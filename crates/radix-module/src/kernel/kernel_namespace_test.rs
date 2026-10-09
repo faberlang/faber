@@ -17,37 +17,8 @@ use crate::mir::MirLoweringOptions;
 use crate::mir::lower_analyzed_unit;
 use crate::mir::{MirIntrinsic, MirProvider, MirProviderKind, MirStatementKind};
 
-fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("workspace root")
-        .to_path_buf()
-}
-
 fn library_home() -> PathBuf {
-    if let Some(home) = std::env::var_os("FABER_LIBRARY_HOME")
-        .map(PathBuf::from)
-        .filter(|path| path.join("norma/src").exists())
-    {
-        return home;
-    }
-
-    for candidate in workspace_root().ancestors() {
-        // Skip lane worktrees (`worktrees/<lane>/…`): a stale sibling checkout
-        // there would shadow the container stdlib for packet-local runs.
-        if candidate
-            .components()
-            .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
-        {
-            continue;
-        }
-        if candidate.join("norma/src").exists() {
-            return candidate.to_path_buf();
-        }
-    }
-
-    workspace_root().join("..")
+    crate::import_resolve::in_tree_library_home().expect("<repo>/lib exists in the tree")
 }
 
 fn norma_module_public_functions(module: &str) -> HashSet<String> {

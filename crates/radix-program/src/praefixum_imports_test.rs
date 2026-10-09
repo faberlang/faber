@@ -12,10 +12,15 @@ use std::path::{Path, PathBuf};
 
 const EFFECT: &str = "scribe";
 
+/// In-tree library home `<repo>/lib` (holds `norma/`).
 fn library_home() -> PathBuf {
-    std::env::var_os("FABER_LIBRARY_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.."))
+    let home = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../lib");
+    assert!(
+        home.join("norma/src").is_dir(),
+        "expected lib/norma/src under {}",
+        home.display()
+    );
+    home
 }
 
 fn analyze(dir: &Path) -> AnalyzedProgram {
