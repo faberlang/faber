@@ -6,10 +6,6 @@
 //!
 //! It embeds the `faber explain` reference: every corpus exemplum whose
 //! frontmatter declares `explains = [...]`, plus `legacy-redirects.toml`.
-//!
-//! It also stamps the faber runtime source pin from the release manifest
-//! (`release-manifest.yaml`), so generated manifests emit the exact commit
-//! selected by release inputs.
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -35,8 +31,6 @@ fn main() {
     }
 
     embed_reference(&manifest_dir.join("../../corpus"), &out_dir);
-
-    stamp_source_revisions(&manifest_dir.join("../../release-manifest.yaml"));
 }
 
 /// Write `reference_embedded.rs`: one `include_str!` per exemplum that
@@ -110,40 +104,6 @@ fn declares_explains(path: &Path) -> bool {
     lines
         .take_while(|line| *line != "+++")
         .any(|line| line.starts_with("explains ="))
-}
-
-/// Export the faber runtime source pin from `pinnedInputs.source`.
-/// Source commit rows are scoped by their `- name:` row, so unrelated
-/// `commit:` fields elsewhere in the release manifest cannot become pins.
-fn stamp_source_revisions(manifest: &Path) {
-    println!("cargo:rerun-if-changed={}", manifest.display());
-    let text = fs::read_to_string(manifest).unwrap_or_else(|err| {
-        panic!("read release manifest {}: {err}", manifest.display());
-    });
-    for source in ["faber"] {
-        let mut source_name: Option<&str> = None;
-        let mut source_commit: Option<&str> = None;
-        for line in text.lines() {
-            let trimmed = line.trim_start();
-            if let Some(name) = trimmed.strip_prefix("- name:") {
-                source_name = Some(name.trim().trim_matches('"'));
-            } else if let Some(commit) = trimmed.strip_prefix("commit:")
-                && source_name == Some(source)
-            {
-                source_commit = Some(commit.trim().trim_matches('"'));
-                break;
-            }
-        }
-        let commit = source_commit.unwrap_or_else(|| {
-            panic!("{} has no source row named {source}", manifest.display());
-        });
-        assert!(
-            commit.len() == 40 && commit.bytes().all(|b| b.is_ascii_hexdigit()),
-            "{}: {source} source pin {commit:?} is not a 40-hex commit",
-            manifest.display()
-        );
-        println!("cargo:rustc-env=FABER_RUNTIME_PINNED_REV={commit}");
-    }
 }
 
 fn compress_pack(locale_root: &Path, artifact_dir: &Path, locale: &str) {

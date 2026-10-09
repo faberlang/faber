@@ -9299,9 +9299,10 @@ fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
 
 #[test]
 fn emit_generated_crate_writes_cargo_toml_and_main_rs_under_target_faber() {
-    // D1 git-default: no override and no workspace probe (released-binary path).
-    super::runtime_sources::disable_path_override_probe_for_test();
+    // The runtime is a path dependency on the named repository root.
     let pkg = test_temp_dir("emit-writer");
+    let support_root = pkg.join("support-root");
+    super::runtime_sources::set_path_override_for_test(Some(support_root.clone()));
     fs::create_dir_all(pkg.join("src")).expect("src");
     fs::write(pkg.join("src/main.fab"), r#"main { print "writer test" }"#).expect("entry");
     fs::write(
@@ -9342,7 +9343,9 @@ entry = "main.fab"
     assert!(cargo_toml.contains("edition = \"2021\""));
     assert!(cargo_toml.contains("0.3.0"));
     assert!(cargo_toml.contains("[dependencies]"));
-    assert!(cargo_toml.contains("package = \"faber\"") && cargo_toml.contains("git = "));
+    assert!(cargo_toml.contains("package = \"faber\""));
+    assert!(cargo_toml.contains(&support_root.join("runtime/rust").display().to_string()));
+    assert!(!cargo_toml.contains("git = "));
     assert!(!cargo_toml.contains("norma = { path = "));
     assert!(!cargo_toml.contains("tokio = { version = "));
 
