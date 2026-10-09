@@ -202,9 +202,51 @@ impl CollectionKernelPlan {
                     right_batch,
                 }))
             }
-            // Run-time extents have no plan until the plan builder learns the
-            // runtime marker (design note item 5); fail closed.
-            CollectionOpContract::MatMulRuntime => None,
+            // Run-time extents (design note item 5). The plan is built at emit
+            // time but the shape class is chosen at launch (item 7), so the
+            // plan records the one class that is correct for every shape,
+            // `Tiled` (its guards express the M, N and K tails); item 7
+            // substitutes the launch-selected class on a copy of this plan.
+            // The literal `m`/`k`/`n` fields are unused (zero) in this arm.
+            CollectionOpContract::MatMulRuntime => {
+                if op != MirCollectionOp::TensorMatMul {
+                    return None;
+                }
+                if !signature_matches_matmul_runtime(signature) {
+                    return None;
+                }
+                let tile = MATMUL_TILE;
+                let tile_slots = tile * tile;
+                Some(CollectionKernelPlan::TiledMatMul(MatMulPlan {
+                    dims: crate::kernel_plan::MatMulDims::Runtime {
+                        class: crate::kernel_plan::MatMulClass::Tiled,
+                    },
+                    m: 0,
+                    k: 0,
+                    n: 0,
+                    left_layout: MirScalarLayout::F32,
+                    right_layout: MirScalarLayout::F32,
+                    tile,
+                    workgroup_x: signature.workgroup.x,
+                    workgroup_y: signature.workgroup.y,
+                    shared_memory: MatMulSharedMemory {
+                        shared_a: SharedMemoryLayout {
+                            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                            slot_count: tile_slots,
+                            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+                        },
+                        shared_b: SharedMemoryLayout {
+                            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+                            slot_count: tile_slots,
+                            buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+                        },
+                    },
+                    barriers: matmul_barrier_schedule(),
+                    oob_padding: OobPaddingPolicy::ZeroFill,
+                    batch: 1,
+                    right_batch: 1,
+                }))
+            }
             CollectionOpContract::Transpose { m, n } => {
                 if op != MirCollectionOp::TensorTranspose {
                     return None;
@@ -847,6 +889,32 @@ fn signature_matches_matmul(
         && signature.dispatch_size.y == dispatch_y
         && signature.dispatch_size.z == 1
         && signature.extra_inputs.len() == 1
+}
+
+/// The run-time-extent matmul signature must carry the runtime marker: an
+/// 8x8x1 workgroup, the right operand as the first extra input, at least one
+/// operand or output buffer that is runtime-shaped, and at least one
+/// `TensorAxisExtent` resource (the extents the emitter reads). The dispatch
+/// is a launch fact, so it is not checked.
+fn signature_matches_matmul_runtime(signature: &MirKernelSignature) -> bool {
+    use crate::abi::MirKernelResourceKind;
+    let has_extent = signature.extra_inputs.iter().any(|resource| {
+        matches!(
+            resource.kind,
+            MirKernelResourceKind::TensorAxisExtent { .. }
+        )
+    });
+    let runtime_shaped = signature.input.is_runtime_shaped()
+        || signature.output.is_runtime_shaped()
+        || signature
+            .extra_inputs
+            .first()
+            .is_some_and(|resource| resource.is_runtime_shaped());
+    signature.workgroup.x == MATMUL_TILE
+        && signature.workgroup.y == MATMUL_TILE
+        && signature.workgroup.z == 1
+        && has_extent
+        && runtime_shaped
 }
 
 /// The grouped-matmul signature must already carry the contract it was built

@@ -590,6 +590,11 @@ fn validate_matmul_barrier_coverage(plan: &MatMulPlan) -> Result<(), PlanValidat
 /// larger than ~90 slots, so the four tail loops are each bounded by the
 /// tile edge.
 fn validate_matmul_oob_padding_coverage(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
+    // Run-time extents carry no literal numbers to cover; the body's own
+    // guards express the M, N and K tails (design note section 5).
+    if matches!(plan.dims, super::MatMulDims::Runtime { .. }) {
+        return Ok(());
+    }
     if plan.tile == 0 || plan.m == 0 || plan.k == 0 || plan.n == 0 {
         return Err(PlanValidationError::MatMulZeroDimension {
             m: plan.m,

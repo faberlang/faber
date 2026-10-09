@@ -453,6 +453,71 @@ fn matmul_plan_is_fully_populated() {
     plan.validate().expect("built matmul plan validates");
 }
 
+/// Design-note item 5: the run-time contract builds a `Runtime` plan (class
+/// `Tiled`, the all-shapes body) from the signature's runtime marker alone,
+/// the plan validates, and a signature without the marker builds nothing.
+#[test]
+fn matmul_runtime_contract_builds_a_runtime_plan_from_the_marker() {
+    let shapes = matmul_fixture_shapes();
+    let mut signature = matmul_signature(shapes, 0, 0);
+    signature.input.element_count = crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+    let mut extent = signature.output.clone();
+    extent.binding = 3;
+    extent.kind = MirKernelResourceKind::TensorAxisExtent {
+        tensor_binding: 0,
+        axis: 0,
+    };
+    extent.role = MirKernelResourceRole::Input;
+    extent.access = MirKernelResourceAccess::Read;
+    extent.element_count = 1;
+    signature.extra_inputs.push(extent);
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &CollectionOpContract::MatMulRuntime,
+        MirCollectionOp::TensorMatMul,
+        None,
+    )
+    .expect("run-time matmul builds a plan");
+    let CollectionKernelPlan::TiledMatMul(plan) = plan else {
+        panic!("expected a tiled matmul plan");
+    };
+    assert_eq!(
+        plan.dims,
+        MatMulDims::Runtime {
+            class: MatMulClass::Tiled
+        }
+    );
+    assert_eq!(
+        (plan.tile, plan.batch, plan.right_batch),
+        (MATMUL_TILE, 1, 1)
+    );
+    assert_eq!(plan.workgroup_x, MATMUL_TILE);
+    super::validate::validate_matmul_plan(&plan).expect("run-time plan validates");
+
+    // No extent resource: not a run-time signature.
+    signature.extra_inputs.pop();
+    assert!(
+        CollectionKernelPlan::from_contract(
+            &signature,
+            &CollectionOpContract::MatMulRuntime,
+            MirCollectionOp::TensorMatMul,
+            None,
+        )
+        .is_none()
+    );
+    // Wrong op: no plan.
+    signature.extra_inputs.push(signature.output.clone());
+    assert!(
+        CollectionKernelPlan::from_contract(
+            &signature,
+            &CollectionOpContract::MatMulRuntime,
+            MirCollectionOp::Sum,
+            None,
+        )
+        .is_none()
+    );
+}
+
 #[test]
 fn matmul_contract_without_shapes_returns_none() {
     let shapes = MatMulShapes {
