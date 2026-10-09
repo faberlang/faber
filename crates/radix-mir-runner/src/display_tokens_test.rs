@@ -203,3 +203,53 @@ fn runner_falls_back_to_latin_without_a_function_entry() {
     assert_eq!(run_print(None), ["verum"]);
     assert_eq!(run_print(Some(MirFunctionId(7))), ["verum"]);
 }
+
+fn bool_key_map() -> Value {
+    let mut entries = rustc_hash::FxHashMap::default();
+    entries.insert(MapKey::Bool(true), Value::Int(1));
+    Value::Map(Rc::new(RefCell::new(entries)))
+}
+
+#[test]
+fn english_tokens_print_bool_map_key_as_true_false() {
+    let (structs, variants) = Default::default();
+    let tokens = english();
+    let order = empty_order(&structs, &variants).with_tokens(&tokens);
+    assert_eq!(show(&bool_key_map(), order), "{true: 1}");
+    let mut entries = rustc_hash::FxHashMap::default();
+    entries.insert(MapKey::Bool(false), Value::Int(2));
+    let map = Value::Map(Rc::new(RefCell::new(entries)));
+    assert_eq!(show(&map, order), "{false: 2}");
+}
+
+#[test]
+fn latin_tokens_print_bool_map_key_as_verum_falsum() {
+    let (structs, variants) = Default::default();
+    let latin = DisplayTokens::latin();
+    let order = empty_order(&structs, &variants).with_tokens(&latin);
+    assert_eq!(show(&bool_key_map(), order), "{verum: 1}");
+    let mut entries = rustc_hash::FxHashMap::default();
+    entries.insert(MapKey::Bool(false), Value::Int(2));
+    let map = Value::Map(Rc::new(RefCell::new(entries)));
+    assert_eq!(show(&map, order), "{falsum: 2}");
+    // A composite key's bool part prints through the tokens too.
+    let mut entries = rustc_hash::FxHashMap::default();
+    entries.insert(
+        MapKey::Tuple(vec![MapKey::Bool(true), MapKey::UInt(3)]),
+        Value::Int(1),
+    );
+    let map = Value::Map(Rc::new(RefCell::new(entries)));
+    assert_eq!(show(&map, order), "{verum,3: 1}");
+}
+
+#[test]
+fn bool_key_inside_a_list_of_maps_uses_the_function_tokens() {
+    let (structs, variants) = Default::default();
+    let list = Value::Array(Rc::new(RefCell::new(vec![bool_key_map()])));
+    let tokens = english();
+    let order = empty_order(&structs, &variants).with_tokens(&tokens);
+    assert_eq!(show(&list, order), "[{true: 1}]");
+    let latin = DisplayTokens::latin();
+    let order = empty_order(&structs, &variants).with_tokens(&latin);
+    assert_eq!(show(&list, order), "[{verum: 1}]");
+}

@@ -1562,6 +1562,20 @@ fn display_in_collection(
     })
 }
 
+/// A composite key shown in a printed map: its parts comma-separated, a bool
+/// part through the printing function's tokens (not the document spelling).
+fn display_tuple_key(parts: &[MapKey], tokens: &DisplayTokens) -> String {
+    parts
+        .iter()
+        .map(|part| match part {
+            MapKey::Bool(v) => display_bivalens(*v, tokens).to_owned(),
+            MapKey::Tuple(inner) => display_tuple_key(inner, tokens),
+            other => other.document_key(),
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 fn display_tabula_map(
     entries: &FxHashMap<MapKey, Value>,
     interner: &Interner,
@@ -1589,9 +1603,9 @@ fn display_tabula_map(
             MapKey::Int(v) => v.to_string(),
             MapKey::UInt(v) => v.to_string(),
             MapKey::Magnus(v) => v.to_string(),
-            MapKey::Bool(v) => format!("{v}"),
+            MapKey::Bool(v) => display_bivalens(*v, order.tokens).to_owned(),
             MapKey::Unit => order.tokens.none.clone(),
-            MapKey::Tuple(_) => key.document_key(),
+            MapKey::Tuple(parts) => display_tuple_key(parts, order.tokens),
         };
         let val_str = display_in_collection(value, interner, order, span, float_width)?;
         parts.push(format!("{key_str}: {val_str}"));
