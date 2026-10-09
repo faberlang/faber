@@ -318,7 +318,13 @@ pub struct MirLayoutError {
     pub issue: &'static str,
     pub id: Option<MirLayoutId>,
     pub ty: Option<TypeId>,
+    /// Named facts behind the message (`reason`, `width`, ...); consumers
+    /// identify the failure by `issue` and these, never by the prose.
+    pub args: LayoutFacts,
 }
+
+/// Named facts behind a layout refusal (`reason`, `width`, ...).
+pub type LayoutFacts = Vec<(&'static str, String)>;
 
 /// Resolution of one `Type` variant under the layout resolver.
 ///
@@ -332,7 +338,7 @@ enum LayoutResolution {
     NoLayout,
     /// A type that fails the layout resolver loudly; the message names the
     /// offending family/width.
-    MissingFact(String),
+    MissingFact(String, LayoutFacts),
 }
 
 impl LayoutResolution {
@@ -352,7 +358,7 @@ pub struct MirLayoutTable {
     /// Named missing-fact rows (fallthrough law): an unmapped sized numeric
     /// records its width-named message here instead of a silent no-row, so
     /// resolving it fails loudly with `mir_layout_missing_type_fact`.
-    missing_facts: FxHashMap<TypeId, String>,
+    missing_facts: FxHashMap<TypeId, (String, LayoutFacts)>,
 }
 
 impl MirLayoutTable {
@@ -372,8 +378,8 @@ impl MirLayoutTable {
                 LayoutResolution::Resolved(kind) => {
                     table.insert_type_layout(ty, kind);
                 }
-                LayoutResolution::MissingFact(message) => {
-                    table.missing_facts.insert(ty, message);
+                LayoutResolution::MissingFact(message, args) => {
+                    table.missing_facts.insert(ty, (message, args));
                 }
                 LayoutResolution::NoLayout => {}
             }
@@ -391,17 +397,19 @@ impl MirLayoutTable {
             .ok_or_else(|| match self.missing_facts.get(&semantic) {
                 // Fallthrough law: a named missing fact (an unmapped sized
                 // numeric) is loud, with the family/width named in the message.
-                Some(message) => MirLayoutError {
+                Some((message, args)) => MirLayoutError {
                     message: message.clone(),
                     issue: "mir_layout_missing_type_fact",
                     id: None,
                     ty: Some(semantic),
+                    args: args.clone(),
                 },
                 None => MirLayoutError {
                     message: format!("missing layout fact for ty#{}", semantic.0),
                     issue: "mir_layout_missing_type_fact",
                     id: None,
                     ty: Some(semantic),
+                    args: vec![("reason", "no_layout_fact".to_owned())],
                 },
             })?;
         self.layout(id).ok_or_else(|| MirLayoutError {
@@ -409,6 +417,7 @@ impl MirLayoutTable {
             issue: "mir_layout_missing_row",
             id: Some(id),
             ty: None,
+            args: vec![("reason", "no_layout_row".to_owned())],
         })
     }
 
@@ -615,6 +624,7 @@ fn layout_kind_for_type(
         Type::PolicyFloat(_, width) => sized_numeric_layout(Primitive::Fractus, *width),
         Type::TensorEdgePolicy(_) => LayoutResolution::MissingFact(
             "tensor edge-policy marker has no runtime layout".to_owned(),
+            vec![("reason", "edge_policy_marker_no_layout".to_owned())],
         ),
         Type::Primitive(Primitive::Vacuum) => LayoutResolution::Resolved(MirLayoutKind::Void),
         Type::Primitive(Primitive::Numquam) => LayoutResolution::Resolved(MirLayoutKind::Never),
@@ -885,11 +895,17 @@ fn tensor_layout_kind(
                 // size/stride conflation is a known trap, so only widths whose
                 // size equals their alignment are admitted.
                 if !matches!(vector.width, 2 | 4) {
-                    return LayoutResolution::MissingFact(format!(
-                        "tensor of vector<_, {}> has no device-view layout: only widths 2 and 4 \
-                         (size == alignment) are admitted; vec3 stride/packing is undecided",
-                        vector.width
-                    ));
+                    return LayoutResolution::MissingFact(
+                        format!(
+                            "tensor of vector<_, {}> has no device-view layout: only widths 2 and 4 \
+                             (size == alignment) are admitted; vec3 stride/packing is undecided",
+                            vector.width
+                        ),
+                        vec![
+                            ("reason", "vector_width_unsupported".to_owned()),
+                            ("width", vector.width.to_string()),
+                        ],
+                    );
                 }
                 MirDeviceViewElement::Vector(vector)
             }
@@ -1041,10 +1057,14 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
                 Primitive::Fractus => "fractus",
                 _ => "sized-numeric",
             };
-            return LayoutResolution::MissingFact(format!(
-                "{family}<{}> has no named layout arm",
-                width.faber_marker()
-            ));
+            return LayoutResolution::MissingFact(
+                format!("{family}<{}> has no named layout arm", width.faber_marker()),
+                vec![
+                    ("reason", "no_named_layout_arm".to_owned()),
+                    ("family", family.to_owned()),
+                    ("width", width.faber_marker().to_owned()),
+                ],
+            );
         }
     };
     LayoutResolution::Resolved(MirLayoutKind::Scalar(scalar))
@@ -1066,10 +1086,17 @@ fn int_layout(width: NumericWidth) -> LayoutResolution {
         | NumericWidth::F64
         // decimal-widths D1: decimals have no integer layout arm until D4/D5.
         | NumericWidth::D64 => {
-            return LayoutResolution::MissingFact(format!(
-                "modulus<{}> has no named layout arm",
-                width.faber_marker()
-            ));
+            return LayoutResolution::MissingFact(
+                format!(
+                    "modulus<{}> has no named layout arm",
+                    width.faber_marker()
+                ),
+                vec![
+                    ("reason", "no_named_layout_arm".to_owned()),
+                    ("family", "modulus".to_owned()),
+                    ("width", width.faber_marker().to_owned()),
+                ],
+            );
         }
         // A word over `inf` is the bare `inf` type (ruling 32): the same
         // `Magnus` layout, never a fixed-width word.

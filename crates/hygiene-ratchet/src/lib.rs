@@ -453,6 +453,42 @@ where
     }
 }
 
+/// Detects the opening of a raw string (`r"`, `r#"`, `br##"`, ...) whose
+/// first character `first` (`r` or `b`) was just consumed. Returns the number
+/// of further characters through the opening quote and the `#` count.
+fn raw_string_open<I>(first: char, chars: &std::iter::Peekable<I>) -> Option<(usize, usize)>
+where
+    I: Iterator<Item = char> + Clone,
+{
+    let mut lookahead = chars.clone();
+    let mut consumed = 0;
+    if first == 'b' {
+        if lookahead.next() != Some('r') {
+            return None;
+        }
+        consumed += 1;
+    }
+    let mut hashes = 0;
+    loop {
+        match lookahead.next()? {
+            '#' => {
+                hashes += 1;
+                consumed += 1;
+            }
+            '"' => return Some((consumed + 1, hashes)),
+            _ => return None,
+        }
+    }
+}
+
+fn closes_raw_string<I>(chars: &std::iter::Peekable<I>, hashes: usize) -> bool
+where
+    I: Iterator<Item = char> + Clone,
+{
+    let mut lookahead = chars.clone();
+    (0..hashes).all(|_| lookahead.next() == Some('#'))
+}
+
 /// Strip comments and string/char literal bodies so budget scans see code only.
 #[must_use]
 // State machine for full-file scrubbing is naturally long; split deferred.
@@ -464,16 +500,35 @@ pub fn scrub_rust_source(source: &str) -> String {
         LineComment,
         BlockComment,
         String,
+        RawString(usize),
         Char,
     }
 
     let mut out = String::with_capacity(source.len());
     let mut chars = source.chars().peekable();
     let mut state = State::Code;
+    let mut block_depth = 0usize;
+    let mut prev_ident = false;
 
     while let Some(ch) = chars.next() {
+        let was_ident = prev_ident;
+        prev_ident = ch.is_ascii_alphanumeric() || ch == '_';
         match state {
             State::Code => match ch {
+                'r' | 'b' if !was_ident => {
+                    if let Some((consumed, hashes)) = raw_string_open(ch, &chars) {
+                        for _ in 0..=consumed {
+                            out.push(' ');
+                        }
+                        for _ in 0..consumed {
+                            chars.next();
+                        }
+                        prev_ident = false;
+                        state = State::RawString(hashes);
+                    } else {
+                        out.push(ch);
+                    }
+                }
                 '/' if chars.peek() == Some(&'/') => {
                     out.push(' ');
                     out.push(' ');
@@ -484,6 +539,7 @@ pub fn scrub_rust_source(source: &str) -> String {
                     out.push(' ');
                     out.push(' ');
                     chars.next();
+                    block_depth = 1;
                     state = State::BlockComment;
                 }
                 '"' => {
@@ -524,11 +580,19 @@ pub fn scrub_rust_source(source: &str) -> String {
                 }
             }
             State::BlockComment => {
-                if ch == '*' && chars.peek() == Some(&'/') {
+                if ch == '/' && chars.peek() == Some(&'*') {
                     out.push(' ');
                     out.push(' ');
                     chars.next();
-                    state = State::Code;
+                    block_depth += 1;
+                } else if ch == '*' && chars.peek() == Some(&'/') {
+                    out.push(' ');
+                    out.push(' ');
+                    chars.next();
+                    block_depth -= 1;
+                    if block_depth == 0 {
+                        state = State::Code;
+                    }
                 } else if ch == '\n' {
                     out.push('\n');
                 } else {
@@ -543,6 +607,20 @@ pub fn scrub_rust_source(source: &str) -> String {
                     }
                 } else if ch == '"' {
                     out.push(' ');
+                    state = State::Code;
+                } else if ch == '\n' {
+                    out.push('\n');
+                } else {
+                    out.push(' ');
+                }
+            }
+            State::RawString(hashes) => {
+                if ch == '"' && closes_raw_string(&chars, hashes) {
+                    out.push(' ');
+                    for _ in 0..hashes {
+                        chars.next();
+                        out.push(' ');
+                    }
                     state = State::Code;
                 } else if ch == '\n' {
                     out.push('\n');

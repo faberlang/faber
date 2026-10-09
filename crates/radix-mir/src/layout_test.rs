@@ -829,12 +829,16 @@ fn vector_element_tensor_width3_fails_closed_with_named_reason() {
     let error = table
         .layout_for_type(MirType::semantic(tensor))
         .expect_err("vec3-element tensor must fail closed");
+    assert_eq!(error.issue, "mir_layout_missing_type_fact");
     assert!(
         error
-            .message
-            .contains("only widths 2 and 4 (size == alignment) are admitted"),
-        "unexpected reason: {}",
-        error.message
+            .args
+            .contains(&("reason", "vector_width_unsupported".to_owned())),
+        "unexpected reason: {error:?}"
+    );
+    assert!(
+        error.args.contains(&("width", "3".to_owned())),
+        "the refused width is named: {error:?}"
     );
 }
 

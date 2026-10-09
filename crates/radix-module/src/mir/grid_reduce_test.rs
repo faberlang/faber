@@ -166,10 +166,9 @@ main {}
     assert!(
         errors
             .iter()
-            .any(|error| error.issue == LANE_FORM_NESTED_REDUCE_ISSUE
-                && error
-                    .message
-                    .contains("nested reduce is not lowered yet (C4-8 nested)")),
+            // The issue is the refusal's identity (one producer, one prose);
+            // the definition span points at the enclosing lane region.
+            .any(|error| error.issue == LANE_FORM_NESTED_REDUCE_ISSUE && error.definition_span.is_some()),
         "{errors:?}"
     );
 }

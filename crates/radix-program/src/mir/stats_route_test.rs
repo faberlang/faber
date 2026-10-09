@@ -154,9 +154,10 @@ fn runner_route_refuses_explicit_gpu_selection_without_a_device_image() {
     .expect_err("an explicit GPU selection cannot run on the runner route");
 
     assert!(
-        diagnostics
+        diagnostics.iter().any(|d| d
+            .args
             .iter()
-            .any(|d| d.message.contains("explicit device selection `metal`")),
+            .any(|arg| arg.name == "selection" && arg.value == "metal")),
         "the refusal must name the selection: {diagnostics:?}"
     );
     assert!(host.stdout_lines.is_empty(), "the CPU leg must not run");

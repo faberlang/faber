@@ -46,6 +46,46 @@ fn alphabetic_char_literals_do_not_swallow_following_code() {
 }
 
 #[test]
+fn raw_strings_with_inner_quotes_do_not_desynchronise_scrubbing() {
+    // A raw string holding an odd number of inner quotes used to flip the
+    // string state, hiding every later assertion in the file.
+    let source = "fn a() { let _s = r#\"say \"hi\" and \" more\"#; }\nfn b() { assert!(d.message.contains(\"x\")); }\n";
+    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+
+    assert!(scrubbed.contains(".message.contains("));
+    assert!(!scrubbed.contains("say"));
+    assert_eq!(scrubbed.len(), source.len());
+}
+
+#[test]
+fn raw_strings_with_backslashes_and_byte_prefix_are_blanked() {
+    let source = "fn a() { let _s = r\"a\\\"; let _t = br##\"x\"# y\"##; }\nfn b() { d.message.is_empty(); }\n";
+    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+
+    assert!(scrubbed.contains(".message.is_empty("));
+    assert!(!scrubbed.contains(" y"));
+    assert!(scrubbed.contains("let _t"));
+}
+
+#[test]
+fn identifiers_ending_in_r_or_b_are_not_raw_string_prefixes() {
+    let source = "fn a(bar: &str, car: u8) { let _x = bar; let _y = \"s\"; }\nfn b() { d.message.is_empty(); }\n";
+    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+
+    assert!(scrubbed.contains("bar: &str"));
+    assert!(scrubbed.contains(".message.is_empty("));
+}
+
+#[test]
+fn nested_block_comments_are_fully_blanked() {
+    let source = "/* outer /* inner */ still comment */ fn a() { d.message.is_empty(); }\n";
+    let scrubbed = hygiene_ratchet::scrub_rust_source(source);
+
+    assert!(!scrubbed.contains("still"));
+    assert!(scrubbed.contains(".message.is_empty("));
+}
+
+#[test]
 fn inline_test_modules_count_any_cfg_test_gated_name() {
     assert_eq!(count_inline("#[cfg(test)]\nmod tests {\n}\n"), 1);
     assert_eq!(count_inline("#[cfg(test)]\nmod smoke_tests {\n}\n"), 1);
@@ -486,22 +526,6 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         || rel == "crates/faber/src/diagnostic_explain_test.rs"
         || rel == "crates/faber/src/reference_test.rs"
         || rel == "crates/faber/src/reference_parse_test.rs"
-        // Faber product diagnostics still asserted by `message` text. Every
-        // other crates/faber file asserts code/issue/args; each remaining
-        // entry names the missing field. Remove an entry when its file asserts
-        // code/issue/args.
-        //  - fhir_test.rs: the "non-function namespace member `VALUE`"
-        //    diagnostic is built in radix-program/src/mir/link.rs with no
-        //    issue or member arg.
-        //  - host_factory_test.rs: the device class named in the admission
-        //    refusal (`cpu`, `cuda`) lives only in `HostError.message`
-        //    (radix-device-core); `HostError` carries no class field.
-        //  - proba_integration_test.rs: `proba_import_forbidden`
-        //    (radix-program/src/import_graph.rs) carries no arg for the
-        //    required remediation text it is asserted against.
-        || rel == "crates/faber/src/package/fhir_test.rs"
-        || rel == "crates/faber/src/package/host_factory_test.rs"
-        || rel == "crates/faber/src/package/proba_integration_test.rs"
         // exempla LLVM e2e classifier: `classify_builder_failure` buckets an
         // `llvm_emission_failed` diagnostic as unsupported by searching its
         // message for the category slug. Missing field: the capability
@@ -519,18 +543,18 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // scalar layout, window exceeded, control flow).
         || rel == "crates/radix-mir/src/device_program_plans_test.rs"
         || rel == "crates/radix-mir/src/kernel_decomposition_test.rs"
-        // HostError constructor/Display contract: error.rs owns backend
-        // naming, requested/limit budget facts, recoverable-OOM wording, and
-        // `{code}: {message}` rendering. HostError has code/retryable/launch_ids
-        // but no issue/args for these facts. Remove when those facts become
-        // structured.
-        || rel == "crates/radix-device-core/src/error_test.rs"
-        // Admission refusal contract: registry.rs::open composes the CPU class,
-        // backend probe notes, degraded device identity/reason, and budget
-        // facts into HostError.message. There is no structured refusal payload
-        // yet. Metal launch attribution is NOT exempt: HostError.launch_ids
-        // already carries that fact, so runtime_test.rs asserts it directly.
-        || rel == "crates/radix-device-core/src/registry_test.rs"
+        // NVVM descriptor refusals: `MirLlvmTextProbeError`
+        // (radix-mir-llvm/src/lib.rs) carries `message`, `category`, `shape`
+        // and `detail` only, and ~37 struct literals build it. Missing field:
+        // a structured reason/args on the error for the seven refusals the
+        // file asserts (reduction grid vs plan partials, kernel-less module,
+        // non-scalar and f64 element layout, plan/count contradiction, extra
+        // matmul input, conflicting recipes). Newly visible after the
+        // scrubber stopped losing track at raw strings.
+        || rel == "crates/radix-mir-llvm/src/nvvm_descriptor_test.rs"
+        // HostError `Display` contract: `{code}: {message}` rendering, pinned
+        // in its own file; every other HostError test asserts code and args.
+        || rel == "crates/radix-device-core/src/error_display_test.rs"
 }
 
 fn display_relative(root: &Path, path: &Path) -> String {

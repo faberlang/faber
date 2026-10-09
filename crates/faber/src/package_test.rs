@@ -10328,8 +10328,11 @@ main {
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "invalid_installed_library_manifest")
             && diagnostic_has_arg(diag, "provider", "altlib")
-            && diag.message.contains("paths.source")
-            && diag.message.contains("is not supported")
+            && diagnostic_has_arg(
+                diag,
+                "cause_issue",
+                "package_member_unsupported_source_root",
+            )
     }));
 }
 

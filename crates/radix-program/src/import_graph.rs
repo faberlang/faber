@@ -504,6 +504,7 @@ fn proba_import_forbidden_diagnostic(from_file: &Path, import_path: &str) -> Dia
     .with_file(from_file.display().to_string())
     .with_arg("issue", "proba_import_forbidden")
     .with_arg("import", import_path.to_owned())
+    .with_arg("remediation", "move_shared_helpers_to_fab_module")
 }
 
 fn detect_import_cycles_from(
@@ -763,15 +764,22 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
             provider,
             manifest_path,
             reason,
-        } => crate::package_diagnostic_error(format!(
-            "installed library provider `{provider}` for import `{specifier}` has an invalid manifest at {}: {reason}",
-            manifest_path.display()
-        ))
-        .with_file(file.display().to_string())
-        .with_arg("issue", "invalid_installed_library_manifest")
-        .with_arg("specifier", specifier)
-        .with_arg("provider", provider)
-        .with_arg("manifest_path", manifest_path.display().to_string()),
+            cause_issue,
+        } => {
+            let diagnostic = crate::package_diagnostic_error(format!(
+                "installed library provider `{provider}` for import `{specifier}` has an invalid manifest at {}: {reason}",
+                manifest_path.display()
+            ))
+            .with_file(file.display().to_string())
+            .with_arg("issue", "invalid_installed_library_manifest")
+            .with_arg("specifier", specifier)
+            .with_arg("provider", provider)
+            .with_arg("manifest_path", manifest_path.display().to_string());
+            match cause_issue {
+                Some(cause) => diagnostic.with_arg("cause_issue", cause.into_string()),
+                None => diagnostic,
+            }
+        }
         LibraryResolveError::InstalledSourceRootMissing {
             specifier,
             provider,

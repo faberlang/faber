@@ -493,7 +493,8 @@ fn admit_runner_route(
                 "explicit device selection `{}` cannot run on the CPU/FMIR runner route; device execution runs through the in-process device session (`faber run` of a package built with `device-runtime`), and CPU-only images never silently fall back",
                 selection.spelling()
             ),
-        )]);
+        )
+        .with_arg("selection", selection.spelling())]);
     }
     Ok(())
 }

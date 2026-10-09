@@ -4,7 +4,7 @@
 //! (not a reimplemented mini-harness).
 
 use super::library_resolver_from_config;
-use super::test_support::{diagnostic_has_issue, test_temp_dir};
+use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use radix::module::Output;
 use radix::module::driver::Config;
 use radix::module::locale::LocalePack;
@@ -70,8 +70,8 @@ fn load_with_faber_seams(
     )
 }
 
-const PROBA_IMPORT_MESSAGE: &str =
-    ".proba files are test sources and cannot be imported; move shared helpers to a .fab module";
+/// The structured remediation the `proba_import_forbidden` diagnostic carries.
+const PROBA_IMPORT_REMEDIATION: &str = "move_shared_helpers_to_fab_module";
 
 /// The product-default English code pack (en = authority). The loader-level
 /// tests below drive `load_package_with_config` directly, so they must
@@ -324,8 +324,9 @@ fn product_fab_cannot_import_proba() {
         err
     );
     assert!(
-        err.iter().any(|d| d.message.contains(PROBA_IMPORT_MESSAGE)),
-        "expected required diagnostic text, got {:?}",
+        err.iter()
+            .any(|d| diagnostic_has_arg(d, "remediation", PROBA_IMPORT_REMEDIATION)),
+        "expected required remediation, got {:?}",
         err
     );
 }
@@ -358,8 +359,8 @@ describe "b" { test "use a" { assert a.shared() ≡ 1 } }
     assert!(
         err.iter()
             .any(|d| diagnostic_has_issue(d, "proba_import_forbidden")
-                && d.message.contains(PROBA_IMPORT_MESSAGE)),
-        "expected proba_import_forbidden with required text: {:?}",
+                && diagnostic_has_arg(d, "remediation", PROBA_IMPORT_REMEDIATION)),
+        "expected proba_import_forbidden with required remediation: {:?}",
         err
     );
 }

@@ -122,6 +122,10 @@ pub enum LibraryResolveError {
 
         /// Targeted reason for the invalid package install.
         reason: String,
+
+        /// Stable issue of the manifest-validation diagnostic that caused the
+        /// failure, when one exists (boxed to keep the error small).
+        cause_issue: Option<Box<str>>,
     },
 
     /// A provider manifest points at a source root that does not exist.
@@ -401,6 +405,7 @@ fn installed_provider_source_root(
             provider: provider.to_owned(),
             manifest_path,
             reason: "missing top-level faber.toml".to_owned(),
+            cause_issue: None,
         });
     }
 
@@ -409,6 +414,7 @@ fn installed_provider_source_root(
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             manifest_path: manifest_path.clone(),
+            cause_issue: diag.issue().map(Box::from),
             reason: diag.message,
         }
     })?;
@@ -417,6 +423,7 @@ fn installed_provider_source_root(
             specifier: specifier.to_owned(),
             provider: provider.to_owned(),
             manifest_path: manifest_path.clone(),
+            cause_issue: diag.issue().map(Box::from),
             reason: diag.message,
         }
     })?;
@@ -427,6 +434,7 @@ fn installed_provider_source_root(
             provider: provider.to_owned(),
             manifest_path,
             reason: "faber.toml build.kind must be \"lib\"".to_owned(),
+            cause_issue: None,
         });
     }
 
@@ -436,6 +444,7 @@ fn installed_provider_source_root(
             provider: provider.to_owned(),
             manifest_path,
             reason: "faber.toml [library] is required".to_owned(),
+            cause_issue: None,
         });
     };
 
@@ -448,6 +457,7 @@ fn installed_provider_source_root(
                 "faber.toml library.provider is `{}`, expected `{provider}`",
                 library.provider
             ),
+            cause_issue: None,
         });
     }
 

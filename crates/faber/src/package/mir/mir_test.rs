@@ -250,8 +250,10 @@ fn runner_route_explicit_gpu_selection_fails_closed_with_or_without_stats() {
         }
         .expect("the runner route cannot serve an explicit GPU selection");
         assert!(
-            err.iter()
-                .any(|diag| diag.message.contains("explicit device selection `metal`")),
+            err.iter().any(|diag| diag
+                .args
+                .iter()
+                .any(|arg| arg.name == "selection" && arg.value == "metal")),
             "stats={stats}: {err:?}"
         );
         assert!(host.stdout_lines.is_empty(), "the CPU leg must not run");

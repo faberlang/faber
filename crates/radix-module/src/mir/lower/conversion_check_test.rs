@@ -167,7 +167,10 @@ fn conversio_assign_failure_matches_explicit() {
     assert_eq!(derived_error.arg("expected"), Some("6"));
     assert_eq!(derived_error.arg("actual"), Some("3"));
     // Spans legitimately differ (the declaration lines have different
-    // columns); the rendered text and structured facts must not.
-    assert_eq!(derived_error.message, explicit_error.message);
+    // columns); everything else (rendered text, issue, code, structured
+    // facts) must not.
+    let mut derived_without_span = derived_error.clone();
+    derived_without_span.span = explicit_error.span;
+    assert_eq!(&derived_without_span, explicit_error);
     assert_eq!(derived_error.args, explicit_error.args);
 }

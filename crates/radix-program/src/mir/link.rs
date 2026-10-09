@@ -1304,12 +1304,7 @@ pub(super) fn rewrite_analysis_namespace_calls(
     // without a type cannot be distinguished from a non-failable call and the
     // cape handler's blocks orphan).
     if !diagnostics.is_empty() {
-        return Err(diagnostics
-            .into_iter()
-            .map(|message| {
-                crate::package_diagnostic_error(message).with_file(unit_path.display().to_string())
-            })
-            .collect());
+        return Err(diagnostics);
     }
     let method_types = synthetic_namespace_function_types(unit_path, analysis, targets);
     if !method_types.is_empty() {
@@ -1342,7 +1337,7 @@ pub(super) fn rewrite_block(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     for stmt in &mut block.statements {
         rewrite_stmt(
@@ -1375,7 +1370,7 @@ pub(super) fn rewrite_stmt(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     match &mut stmt.kind {
         HirStatementKind::Local(local) => {
@@ -1456,7 +1451,7 @@ pub(super) fn rewrite_expr(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     match &mut expr.kind {
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
@@ -2356,22 +2351,38 @@ pub(super) fn namespace_call_diagnostic(
     method: radix_module::lexer::Symbol,
     interner: &Interner,
     namespaces: &NamespaceExports,
-) -> Option<String> {
+) -> Option<Diagnostic> {
     let (namespace_def, mut fields) = namespace_receiver_path(receiver, interner)?;
     let exports = namespaces.get(&(unit_path.to_path_buf(), namespace_def))?;
     let method_name = interner.resolve(method).to_owned();
+    let diagnostic = |message: String, reason: &'static str, member: &str| {
+        crate::package_diagnostic_error(message)
+            .with_file(unit_path.display().to_string())
+            .with_arg("reason", reason)
+            .with_arg("member", member)
+    };
     if fields.is_empty() {
         if exports.contains(&method_name) {
-            return Some(format!(
-                "package MIR does not yet support non-function namespace member `{method_name}`"
+            return Some(diagnostic(
+                format!(
+                    "package MIR does not yet support non-function namespace member `{method_name}`"
+                ),
+                "non_function_namespace_member",
+                &method_name,
             ));
         }
-        return Some(format!("namespace does not export `{method_name}`"));
+        return Some(diagnostic(
+            format!("namespace does not export `{method_name}`"),
+            "namespace_member_not_exported",
+            &method_name,
+        ));
     }
     fields.push(method_name);
     let qualified = fields.join(".");
-    Some(format!(
-        "package MIR does not yet support nested namespace call `{qualified}`"
+    Some(diagnostic(
+        format!("package MIR does not yet support nested namespace call `{qualified}`"),
+        "nested_namespace_call",
+        &qualified,
     ))
 }
 
@@ -2452,7 +2463,7 @@ pub(super) struct ShadowedAliasRewriter<'a> {
     /// a genuine method call and must never be rewritten into a namespace
     /// call, even when the receiver's name shadows an import binding.
     pub(super) genus_methods: &'a HashSet<(DefId, Symbol)>,
-    pub(super) diagnostics: &'a mut Vec<String>,
+    pub(super) diagnostics: &'a mut Vec<Diagnostic>,
 }
 impl ShadowedAliasRewriter<'_> {
     pub(super) fn import_target(
@@ -2621,7 +2632,7 @@ fn rewrite_shadowed_alias_namespace_calls(
     unit_path: &Path,
     analysis: &mut radix_module::driver::AnalyzedModule,
     targets: &NamespaceCallTargets,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Import binding name → import item def id.
     let mut imports: HashMap<String, DefId> = HashMap::new();
@@ -2842,7 +2853,7 @@ pub(super) fn rewrite_call_args(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     for arg in args {
         rewrite_expr(
@@ -2864,7 +2875,7 @@ pub(super) fn rewrite_cape(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     rewrite_block(
         unit_path,
@@ -2884,7 +2895,7 @@ pub(super) fn rewrite_casu_arm(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     rewrite_expr(
         unit_path,
@@ -2904,7 +2915,7 @@ pub(super) fn rewrite_object_field(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     match &mut field.key {
         radix_module::hir::HirObjectKey::Computed(key)
@@ -2941,7 +2952,7 @@ pub(super) fn rewrite_optional_chain(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     match chain {
         HirOptionalChainKind::Member(_) => {}
@@ -2973,7 +2984,7 @@ pub(super) fn rewrite_non_null_chain(
     targets: &NamespaceCallTargets,
     data_member_targets: &NamespaceDataMemberTargets,
     namespaces: &NamespaceExports,
-    diagnostics: &mut Vec<String>,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
     match chain {
         radix_module::hir::HirNonNullKind::Value | radix_module::hir::HirNonNullKind::Member(_) => {

@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::package::library_resolver_from_config;
-use crate::package::test_support::test_temp_dir;
+use crate::package::test_support::{diagnostic_has_arg, test_temp_dir};
 use radix::program::analyze::AnalyzedProgram;
 use radix::program::codegen::assemble_crate;
 use radix::program::rust_target::generate_package_rust;
@@ -997,9 +997,8 @@ kind = "bin"
         Err(diagnostics) => {
             assert!(
                 diagnostics.iter().any(|diag| {
-                    diag.message.contains(
-                        "package MIR does not yet support non-function namespace member `VALUE`",
-                    )
+                    diagnostic_has_arg(diag, "reason", "non_function_namespace_member")
+                        && diagnostic_has_arg(diag, "member", "VALUE")
                 }),
                 "expected non-function namespace member diagnostic, got {diagnostics:?}"
             );
