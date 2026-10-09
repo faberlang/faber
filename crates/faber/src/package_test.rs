@@ -14814,3 +14814,111 @@ fn web4_lib_kind_package_cargo_builds_to_an_rlib() {
         Some("libweb4_lib.rlib")
     );
 }
+
+#[test]
+fn library_import_refuses_nondum_method_and_function_with_sem017() {
+    // F1b: an importer of a locked library provider whose
+    // interface declares a bodiless `@ unstable` genus method and a bodiless
+    // `@ unstable` free function is refused for each call. The importer reads
+    // the provider's gates from its extracted file interface.
+    let dir = test_temp_dir("library-nondum-method-and-function");
+    let lib_root = dir.join("libs");
+    let provider = lib_root.join("prov");
+    fs::create_dir_all(provider.join("src")).expect("create provider src");
+    fs::write(
+        provider.join("src/module.fab"),
+        r#"+++
+locale = "en"
++++
+@ public
+class Socket {
+    var string host
+
+    @ unstable "pending host dispatch"
+    fn send(string data) → void
+
+    fn name() → string {
+        return self.host
+    }
+}
+
+@ public
+@ unstable "pending host dispatch"
+fn parse_later(string text) → string
+"#,
+    )
+    .expect("write provider module");
+
+    let consumer = dir.join("consumer");
+    fs::create_dir_all(consumer.join("src")).expect("create consumer src");
+    fs::write(
+        consumer.join("faber.toml"),
+        r#"[package]
+name = "nondum-consumer"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+entry = "src/main.fab"
+
+[build]
+target = "ts"
+kind = "bin"
+
+[dependencies]
+prov = "0.1.0"
+"#,
+    )
+    .expect("write consumer manifest");
+    fs::write(
+        consumer.join("faber.lock"),
+        format!(
+            r#"
+[[package]]
+name = "prov"
+version = "0.1.0"
+source = "path"
+package_root = "{}"
+kind = "lib"
+target_language = "ts"
+target_triple = "browser"
+target_manifest = ""
+interface_root = "{}"
+artifact = ""
+crate = "prov"
+rustc = ""
+"#,
+            provider.display(),
+            provider.join("src").display(),
+        ),
+    )
+    .expect("write lock");
+    fs::write(
+        consumer.join("src/main.fab"),
+        r#"import from "prov:module" module
+
+main {
+    const module.Socket s ← module.Socket { host = "h" }
+    s.send("x")
+    print module.parse_later("a")
+}
+"#,
+    )
+    .expect("write consumer entry");
+
+    let config = Config::default().with_library_home(lib_root);
+    let diagnostics = check_with_faber_seams(&config, &consumer.join("src/main.fab"));
+    let refused = diagnostics
+        .iter()
+        .filter(|diag| diag.issue() == Some("nondum_function_for_target"))
+        .count();
+    assert_eq!(
+        refused,
+        2,
+        "expected SEM017 for the method call and the function call, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+}
