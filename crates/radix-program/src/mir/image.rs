@@ -33,6 +33,7 @@ pub struct FmirValidationMetadata {
     pub struct_field_order: HashMap<DefId, Vec<Symbol>>,
     pub variant_field_order: HashMap<DefId, Vec<Symbol>>,
     pub display_names: HashMap<DefId, String>,
+    pub display_tokens: radix_module::mir::MirDisplayTokens,
     pub struct_type_params: HashMap<DefId, Vec<Symbol>>,
     pub enum_type_params: HashMap<DefId, Vec<Symbol>>,
     pub optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
@@ -76,6 +77,7 @@ pub(super) fn snapshot_validation_metadata(
             .map(|(def, order)| (*def, order.clone()))
             .collect(),
         display_names: validation.display_names.clone().into_iter().collect(),
+        display_tokens: validation.display_tokens.clone(),
         struct_type_params: validation
             .struct_type_params
             .iter()
@@ -160,6 +162,7 @@ pub(super) fn apply_validation_metadata(
         .map(|(def, order)| (*def, order.clone()))
         .collect();
     context.display_names = metadata.display_names.clone().into_iter().collect();
+    context.display_tokens = metadata.display_tokens.clone();
     context.struct_type_params = metadata
         .struct_type_params
         .iter()

@@ -81,6 +81,9 @@ mod conversio_route;
 #[path = "lower/conversion_check_test.rs"]
 mod conversion_check_tests;
 #[cfg(test)]
+#[path = "lower/display_tokens_test.rs"]
+mod display_tokens_tests;
+#[cfg(test)]
 #[path = "lower/empty_dense_test.rs"]
 mod empty_dense_tests;
 #[cfg(test)]
@@ -836,6 +839,7 @@ pub fn lower_analyzed_unit(
         let imported_device_routes = maps.take_imported_device_routes();
         let mut validation = maps.validation;
         align_function_signatures_with_mir_params(&mut validation, &program.functions);
+        record_function_display_tokens(&mut validation, &program.functions, &display_tokens_for_file(unit));
         validation.layouts = MirLayoutTable::from_types(&types);
         validation.closure_environments = closure_environments
             .iter()
@@ -876,6 +880,42 @@ pub fn lower_analyzed_unit(
         })
     } else {
         Err(lowering_errors)
+    }
+}
+
+/// The display tokens the file holding `unit` prints through.
+///
+/// Plumbing only: every file fills Latin until the final unit
+/// switches this one function to the file's locale pack.
+fn display_tokens_for_file(_unit: &AnalyzedModule) -> radix_runtime_contract::display_tokens::DisplayTokens {
+    radix_runtime_contract::display_tokens::DisplayTokens::latin()
+}
+
+/// Whether the intrinsic renders program output (`print`, interpolation,
+/// `nota`, `vide`, `mone`, `scribe`).
+fn is_print_family(intrinsic: &MirIntrinsic) -> bool {
+    matches!(
+        intrinsic,
+        MirIntrinsic::Diagnostic(_) | MirIntrinsic::FormatString { .. } | MirIntrinsic::FormatValue { .. }
+    )
+}
+
+/// Give every function holding a print-family site an id into the program's
+/// display-token table. The id rides per function, not per call: every site
+/// of a function comes from one file, and `MirRuntimeCall` has hundreds of
+/// struct-literal users across the backends.
+fn record_function_display_tokens(
+    validation: &mut MirValidationContext<'_>,
+    functions: &[MirFunction],
+    tokens: &radix_runtime_contract::display_tokens::DisplayTokens,
+) {
+    for function in functions {
+        let prints = function.blocks.iter().flat_map(|block| &block.statements).any(|statement| {
+            matches!(&statement.kind, MirStatementKind::RuntimeCall { call, .. } if is_print_family(&call.intrinsic))
+        });
+        if prints {
+            validation.display_tokens.assign(function.id, tokens);
+        }
     }
 }
 

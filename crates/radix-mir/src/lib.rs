@@ -19,6 +19,7 @@ pub mod device_plan_ingress;
 pub mod device_program;
 pub mod device_program_plans;
 pub mod device_semantics;
+pub mod display_tokens;
 pub mod distributed;
 pub mod dump;
 pub mod elementwise_plan;
@@ -124,6 +125,7 @@ pub use cost_analysis::{
     CostTag, amplify_class, basis_tag, classify_conversion, conversion_family, cost_rollups,
     cost_sites, foldable_tag, uncosted_tag,
 };
+pub use display_tokens::{DisplayTokensId, MirDisplayTokens};
 // Vocabulary moved down to radix-types (feature-granularity §2); re-exported
 pub use device::{
     FragmentSurvivor, FragmentSurvivorKind, MirDeviceContext, MirDeviceRole,

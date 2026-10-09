@@ -3408,7 +3408,8 @@ fn append_shifted_program<'merged, 'incoming>(
     consumer_launch_entries: &HashSet<DefId>,
 ) -> Result<(LoweredMirUnit<'merged>, LibraryMirParts), Vec<Diagnostic>> {
     let (mut merged_program, mut context) = merged.validated.into_parts();
-    let (incoming_program, _) = incoming.validated.into_parts();
+    let (incoming_program, incoming_context) = incoming.validated.into_parts();
+    let incoming_display_tokens = incoming_context.display_tokens.clone();
     let mut incoming_parts = LibraryMirParts {
         program: incoming_program,
         environments: incoming.closure_environments,
@@ -3430,6 +3431,11 @@ fn append_shifted_program<'merged, 'incoming>(
         offset,
         diagnostic_path,
     )?;
+    // The incoming unit's display tokens join the merged table; its function
+    // ids shift with the unit's functions.
+    context
+        .display_tokens
+        .absorb(&incoming_display_tokens, |id| MirFunctionId(id.0 + offset));
     merge_tensor_edge_policy_metadata(
         &mut merged.tensor_edge_policy_metadata,
         &incoming_parts.tensor_edge_policy_metadata,

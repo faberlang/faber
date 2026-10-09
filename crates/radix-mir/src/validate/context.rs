@@ -178,6 +178,9 @@ pub struct MirValidationContext<'a> {
     /// as `<name> { field = value, ... }`. Resolved text, so the map needs no
     /// interner remap when package units link.
     pub display_names: FxHashMap<DefId, String>,
+    /// Program-level display-token table and the id each print-bearing
+    /// function uses; nothing reads it yet.
+    pub display_tokens: crate::display_tokens::MirDisplayTokens,
     pub struct_type_params: FxHashMap<DefId, Vec<Symbol>>,
     /// Struct → the contracts its `implet` clause names. A struct value is
     /// assignable to a contract-typed slot exactly when the contract is listed.
@@ -218,6 +221,7 @@ impl<'a> MirValidationContext<'a> {
             struct_field_order: FxHashMap::default(),
             variant_field_order: FxHashMap::default(),
             display_names: FxHashMap::default(),
+            display_tokens: crate::display_tokens::MirDisplayTokens::default(),
             struct_type_params: FxHashMap::default(),
             struct_contracts: FxHashMap::default(),
             enum_type_params: FxHashMap::default(),
@@ -277,6 +281,7 @@ impl<'a> MirValidationContext<'a> {
             .variant_field_order
             .clone_from(&self.variant_field_order);
         context.display_names.clone_from(&self.display_names);
+        context.display_tokens.clone_from(&self.display_tokens);
         context
             .struct_type_params
             .clone_from(&self.struct_type_params);
@@ -330,6 +335,7 @@ impl<'a> MirValidationContext<'a> {
             struct_field_order,
             variant_field_order,
             display_names,
+            display_tokens,
             struct_type_params,
             struct_contracts,
             enum_type_params,
@@ -359,6 +365,7 @@ impl<'a> MirValidationContext<'a> {
             struct_field_order,
             variant_field_order,
             display_names,
+            display_tokens,
             struct_type_params,
             struct_contracts,
             enum_type_params,

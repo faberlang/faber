@@ -237,6 +237,7 @@ impl<'a> LoweringContextMaps<'a> {
                 struct_field_order: FxHashMap::default(),
                 variant_field_order: FxHashMap::default(),
                 display_names: FxHashMap::default(),
+                display_tokens: radix_mir::MirDisplayTokens::default(),
                 struct_type_params: FxHashMap::default(),
                 struct_contracts: FxHashMap::default(),
                 enum_type_params: FxHashMap::default(),

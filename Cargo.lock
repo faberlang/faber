@@ -850,6 +850,7 @@ dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-lexer",
+ "radix-runtime-contract",
  "radix-syntax",
  "radix-types",
  "rustc-hash",

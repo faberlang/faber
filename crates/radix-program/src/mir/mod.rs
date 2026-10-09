@@ -782,6 +782,9 @@ mod const_member_lane_tests;
 mod closure_env_link_tests;
 
 #[cfg(test)]
+#[path = "display_tokens_link_test.rs"]
+mod display_tokens_link_tests;
+#[cfg(test)]
 #[path = "private_helper_link_test.rs"]
 mod private_helper_link_tests;
 

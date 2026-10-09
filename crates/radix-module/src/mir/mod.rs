@@ -108,12 +108,12 @@ mod union_overlap_dispatch_test;
 
 // --- Core from radix-mir (module paths for residual code) ---
 pub use radix_mir::{
-    KernelModule, MirAtomicOp, MirCollectionOp, MirColorTargetFormat, MirDepthCompareFunction, MirDepthStencilState,
-    MirGraphicsPipelineReflection, MirInputStepMode, MirPrimitiveTopology, MirStencilFaceState, MirStencilOp, abi,
-    ai_workbench_stage5, artifact_completeness, boundary_abi, capability, control, device, device_semantics, dump,
-    generic, host_partition, inference_blocker_matrix, layout, names, nodes, rank2_reduction_readiness,
-    tensor_operation_floor, tensor_operation_parity, tensor_placement, tensor_runtime_abi, tensor_systems_target, ty,
-    validate, visit,
+    DisplayTokensId, KernelModule, MirAtomicOp, MirCollectionOp, MirColorTargetFormat, MirDepthCompareFunction,
+    MirDepthStencilState, MirDisplayTokens, MirGraphicsPipelineReflection, MirInputStepMode, MirPrimitiveTopology,
+    MirStencilFaceState, MirStencilOp, abi, ai_workbench_stage5, artifact_completeness, boundary_abi, capability,
+    control, device, device_semantics, dump, generic, host_partition, inference_blocker_matrix, layout, names, nodes,
+    rank2_reduction_readiness, tensor_operation_floor, tensor_operation_parity, tensor_placement, tensor_runtime_abi,
+    tensor_systems_target, ty, validate, visit,
 };
 
 #[cfg(feature = "mir-coverage")]
