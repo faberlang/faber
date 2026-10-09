@@ -1447,7 +1447,7 @@ iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
 # are retired (literal-family Stage 6). Genus construction uses `typedConstructor`.
 json_literal := '{' (json_member (',' json_member)*)? '}'
 json_member  := STRING ':' json_value
-typed_constructor := type_annotation '{' field_list? '}' construction_source?
+typed_constructor := type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal
 field_list := field_init (',' field_init)*
 field_init := (field_key '=' expression) | IDENTIFIER
 field_key := IDENTIFIER | STRING | '[' expression ']'
