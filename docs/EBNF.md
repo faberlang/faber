@@ -101,446 +101,448 @@ clausura_param ::= type_annotation IDENTIFIER
 # [045] genus_decl
 genus_decl ::= 'genus' IDENTIFIER generic_params? ('implet' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
 # [046] genus_member
-genus_member ::= annotation* (genus_field_decl | functio_method_decl)
-# [047] genus_field_decl
+genus_member ::= annotation* (genus_field_decl | functio_method_decl) | nondum_method_decl
+# [047] nondum_method_decl
+nondum_method_decl ::= annotation* nondum_annotation annotation* 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
+# [048] genus_field_decl
 genus_field_decl ::= ('fixum' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
-# [048] field_decl
+# [049] field_decl
 field_decl ::= ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
-# [049] functio_method_decl
+# [050] functio_method_decl
 functio_method_decl ::= 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
-# [050] annotation
+# [051] annotation
 annotation ::= nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
-# [051] annotation_name
+# [052] annotation_name
 annotation_name ::= ANNOTATION_NAME
-# [052] braced_annotation
+# [053] braced_annotation
 braced_annotation ::= '@' annotation_name '{' annotation_field_list? '}'
-# [053] annotation_field_list
+# [054] annotation_field_list
 annotation_field_list ::= annotation_field (',' annotation_field)*
-# [054] annotation_field
+# [055] annotation_field
 annotation_field ::= ANNOTATION_FIELD_NAME '=' (expression | concrete_type)
-# [055] annotation_sugar
+# [056] annotation_sugar
 annotation_sugar ::= '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
-# [056] nucleum_annotation
+# [057] nucleum_annotation
 nucleum_annotation ::= nucleum_sugar | nucleum_braced
-# [057] nucleum_sugar
+# [058] nucleum_sugar
 nucleum_sugar ::= '@' 'nucleum' nucleum_modifier? NEWLINE
-# [058] nucleum_braced
+# [059] nucleum_braced
 nucleum_braced ::= '@' 'nucleum' '{' nucleum_field_list? '}'
-# [059] nucleum_modifier
+# [060] nucleum_modifier
 nucleum_modifier ::= 'fragment'
-# [060] nucleum_field_list
+# [061] nucleum_field_list
 nucleum_field_list ::= nucleum_field (',' nucleum_field)*
-# [061] nucleum_field
+# [062] nucleum_field
 nucleum_field ::= 'fragment' '=' ('verum' | 'falsum')
-# [062] radix_annotation
+# [063] radix_annotation
 radix_annotation ::= '@' 'radix' radix_directive NEWLINE
-# [063] radix_directive
+# [064] radix_directive
 radix_directive ::= 'lane' STRING | 'backward' STRING | 'contract' STRING | 'typus' IDENTIFIER 'in' concrete_type+
-# [064] ad_annotation
+# [065] ad_annotation
 ad_annotation ::= '@' 'ad' ASCII_STRING NEWLINE
-# [065] nondum_annotation
+# [066] nondum_annotation
 nondum_annotation ::= '@' 'nondum' NON_NEWLINE_TOKEN* NEWLINE | '@' 'nondum' '{' annotation_field_list? '}'
-# [066] implendum_decl
+# [067] implendum_decl
 implendum_decl ::= 'implendum' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
-# [067] implendum_method_decl
+# [068] implendum_method_decl
 implendum_method_decl ::= annotation* 'functio' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# [068] typus_decl
+# [069] typus_decl
 typus_decl ::= 'typus' IDENTIFIER generic_params? '=' type_annotation
-# [069] ordo_decl
+# [070] ordo_decl
 ordo_decl ::= 'ordo' IDENTIFIER '{' enum_member (',' enum_member)* '}'
-# [070] enum_member
+# [071] enum_member
 enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-# [071] discretio_decl
+# [072] discretio_decl
 discretio_decl ::= 'discretio' IDENTIFIER generic_params? '{' union_fields? variant (',' variant)* '}'
-# [072] union_fields
+# [073] union_fields
 union_fields ::= annotation+ field_decl union_member*
-# [073] union_member
+# [074] union_member
 union_member ::= annotation* field_decl
-# [074] variant
+# [075] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
-# [075] variant_fields
+# [076] variant_fields
 variant_fields ::= (type_annotation IDENTIFIER)*
-# [076] schema_decl
+# [077] schema_decl
 schema_decl ::= 'schema' IDENTIFIER '{' (schema_column (NEWLINE schema_column)*)? '}'
-# [077] schema_column
+# [078] schema_column
 schema_column ::= 'columna' type_annotation IDENTIFIER (':' IDENTIFIER)?
-# [078] importa_decl
+# [079] importa_decl
 importa_decl ::= importa_record | importa_sugar
-# [079] importa_record
+# [080] importa_record
 importa_record ::= 'importa' '{' import_field_list '}'
-# [080] import_field_list
+# [081] import_field_list
 import_field_list ::= import_field (',' import_field)*
-# [081] import_field
+# [082] import_field
 import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
-# [082] ex_field
+# [083] ex_field
 ex_field ::= 'ex' '=' STRING
-# [083] visibilitas_field
+# [084] visibilitas_field
 visibilitas_field ::= 'visibilitas' '=' publica
-# [084] nomen_field
+# [085] nomen_field
 nomen_field ::= 'nomen' '=' IDENTIFIER
-# [085] ut_field
+# [086] ut_field
 ut_field ::= 'ut' '=' IDENTIFIER
-# [086] omnia_field
+# [087] omnia_field
 omnia_field ::= 'omnia' '=' IDENTIFIER
-# [087] importa_sugar
+# [088] importa_sugar
 importa_sugar ::= 'importa' 'ex' STRING publica? (named_import | wildcard_import | selective_import)?
-# [088] publica
+# [089] publica
 publica ::= 'publica'
-# [089] named_import
+# [090] named_import
 named_import ::= IDENTIFIER ('ut' IDENTIFIER)?
-# [090] wildcard_import
+# [091] wildcard_import
 wildcard_import ::= '*' 'ut' IDENTIFIER
-# [091] selective_import
+# [092] selective_import
 selective_import ::= 'fixum' import_value_binding (',' import_value_binding)*
-# [092] import_value_binding
+# [093] import_value_binding
 import_value_binding ::= IDENTIFIER ('ut' IDENTIFIER)?
-# [093] type_annotation
+# [094] type_annotation
 type_annotation ::= union_hole_type | concrete_type
-# [094] concrete_type
+# [095] concrete_type
 concrete_type ::= intersection_type ('∪' intersection_type)*
-# [095] union_hole_type
+# [096] union_hole_type
 union_hole_type ::= ('de' | 'in' | 'own' | 'copy')? '∪'
-# [096] intersection_type
+# [097] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
-# [097] owned_type
+# [098] owned_type
 owned_type ::= ('de' | 'in' | 'own' | 'copy')? base_type
-# [098] base_type
+# [099] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
-# [099] failable_promissum_type
+# [100] failable_promissum_type
 failable_promissum_type ::= IDENTIFIER '<' type_annotation alternate_exit_clause '>'
-# [100] ratio_type
+# [101] ratio_type
 ratio_type ::= 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
-# [101] hole_type
+# [102] hole_type
 hole_type ::= '_'
-# [102] qualified_type
+# [103] qualified_type
 qualified_type ::= type_head ('.' IDENTIFIER)*
-# [103] type_head
+# [104] type_head
 type_head ::= IDENTIFIER | 'modulus'
-# [104] type_arguments
+# [105] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# [105] type_argument
+# [106] type_argument
 type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# [106] labeled_type_argument
+# [107] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [107] width_type_sugar
+# [108] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [108] shape_suffix
+# [109] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [109] figura
+# [110] figura
 figura ::= figura_product (('+' | '-') NATURAL)*
-# [110] figura_product
+# [111] figura_product
 figura_product ::= figura_primary ('/' NATURAL)*
-# [111] figura_primary
+# [112] figura_primary
 figura_primary ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
-# [112] figura_list
+# [113] figura_list
 figura_list ::= figura (',' figura)*
-# [113] function_type
+# [114] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [114] type_list
+# [115] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [115] si_stmt
+# [116] si_stmt
 si_stmt ::= 'si' si_tail
-# [116] si_tail
+# [117] si_tail
 si_tail ::= expression arm ('sin' si_tail | secus_clause)?
-# [117] secus_clause
+# [118] secus_clause
 secus_clause ::= 'secus' else_arm
-# [118] arm
+# [119] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [119] else_arm
+# [120] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [120] dum_stmt
+# [121] dum_stmt
 dum_stmt ::= 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
-# [121] itera_stmt
+# [122] itera_stmt
 itera_stmt ::= 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [122] itera_binding
+# [123] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [123] apud_clause
+# [124] apud_clause
 apud_clause ::= 'apud' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [124] elige_stmt
+# [125] elige_stmt
 elige_stmt ::= 'elige' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [125] casu_elige_clause
+# [126] casu_elige_clause
 casu_elige_clause ::= 'casu' expression (block_stmt | ergo_joint statement)
-# [126] ceterum_clause
+# [127] ceterum_clause
 ceterum_clause ::= 'ceterum' (block_stmt | ergo_joint statement)
-# [127] discerne_stmt
+# [128] discerne_stmt
 discerne_stmt ::= 'discerne' 'omnia'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [128] discriminants
+# [129] discriminants
 discriminants ::= subject_path ('et' subject_path)*
-# [129] subject_path
+# [130] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [130] casu_variant_clause
+# [131] casu_variant_clause
 casu_variant_clause ::= 'casu' patterns (block_stmt | ergo_joint statement)
-# [131] patterns
+# [132] patterns
 patterns ::= pattern ('et' pattern)*
-# [132] pattern
+# [133] pattern
 pattern ::= pattern_atom ('aut' pattern_atom)*
-# [133] pattern_atom
+# [134] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [134] negated_number
+# [135] negated_number
 negated_number ::= '-' NUMBER
-# [135] type_pattern
+# [136] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [136] ut_pattern
+# [137] ut_pattern
 ut_pattern ::= ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
-# [137] pattern_binding
+# [138] pattern_binding
 pattern_binding ::= IDENTIFIER ('ut' IDENTIFIER)?
-# [138] custodi_stmt
+# [139] custodi_stmt
 custodi_stmt ::= 'custodi' '{' si_guard_clause+ '}'
-# [139] si_guard_clause
+# [140] si_guard_clause
 si_guard_clause ::= 'si' expression (block_stmt | ergo_joint statement)
-# [140] ex_stmt
+# [141] ex_stmt
 ex_stmt ::= 'ex' expression ('fixum' | 'varia') extract_fields
-# [141] extract_fields
+# [142] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [142] extract_field
+# [143] extract_field
 extract_field ::= IDENTIFIER ('ut' IDENTIFIER)?
-# [143] ceteri_field
+# [144] ceteri_field
 ceteri_field ::= 'ceteri' IDENTIFIER
-# [144] redde_stmt
+# [145] redde_stmt
 redde_stmt ::= 'redde' expression?
-# [145] reddet_stmt
+# [146] reddet_stmt
 reddet_stmt ::= 'reddet' expression
-# [146] tacebit_stmt
+# [147] tacebit_stmt
 tacebit_stmt ::= 'tacebit' expression
-# [147] cede_stmt
+# [148] cede_stmt
 cede_stmt ::= 'cede' expression
-# [148] rumpe_stmt
+# [149] rumpe_stmt
 rumpe_stmt ::= 'rumpe'
-# [149] perge_stmt
+# [150] perge_stmt
 perge_stmt ::= 'perge'
-# [150] tacet_stmt
+# [151] tacet_stmt
 tacet_stmt ::= 'tacet'
-# [151] iace_stmt
+# [152] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [152] iace_expr
+# [153] iace_expr
 iace_expr ::= ('iace' | 'mori') expression
-# [153] iace_guarded_expr
+# [154] iace_guarded_expr
 iace_guarded_expr ::= ('iace' | 'mori') expression NO_NEWLINE 'si' expression
-# [154] cape_clause
+# [155] cape_clause
 cape_clause ::= 'cape' IDENTIFIER block_stmt
-# [155] adfirma_stmt
+# [156] adfirma_stmt
 adfirma_stmt ::= 'adfirma' expression ('mori' expression)?
-# [156] requirit_stmt
+# [157] requirit_stmt
 requirit_stmt ::= 'requirit' expression 'iace' expression
-# [157] reice_stmt
+# [158] reice_stmt
 reice_stmt ::= 'reice' expression 'iace' expression
-# [158] expression
+# [159] expression
 expression ::= assignment
-# [159] transfer
+# [160] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [160] assignment
+# [161] assignment
 assignment ::= transfer ('←' assignment | '↤' assignment inline_default?)?
-# [161] inc_dec_stmt
+# [162] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [162] place
+# [163] place
 place ::= call_expr
-# [163] ternary
+# [164] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [164] aut_expr
+# [165] aut_expr
 aut_expr ::= et_expr (('aut') et_expr)*
-# [165] et_expr
+# [166] et_expr
 et_expr ::= equality (('et') equality)*
-# [166] equality
+# [167] equality
 equality ::= comparison equality_tail*
-# [167] equality_tail
+# [168] equality_tail
 equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison | ('est' | 'non' 'est') type_annotation
-# [168] comparison
+# [169] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [169] format_expr
+# [170] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [170] bitwise_or_expr
+# [171] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [171] bitwise_xor_expr
+# [172] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [172] bitwise_and_expr
+# [173] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [173] shift_expr
+# [174] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [174] range_expr
+# [175] range_expr
 range_expr ::= additive_expr range_tail?
-# [175] range_tail
+# [176] range_tail
 range_tail ::= ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_expr)?
-# [176] additive_expr
+# [177] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [177] multiplicative_expr
+# [178] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [178] vel_expr
+# [179] vel_expr
 vel_expr ::= unary_expr ('vel' vel_rhs)*
-# [179] vel_rhs
+# [180] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [180] vel_range_tail
+# [181] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'ante' | 'usque') unary_expr ('per' unary_expr)?
-# [181] unary_expr
+# [182] unary_expr
 unary_expr ::= ('-' | '¬' | 'non') unary_expr | finge_expr | cast_expr
-# [182] gradient_expr
+# [183] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [183] gradient_selection
+# [184] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [184] gradient_place
+# [185] gradient_place
 gradient_place ::= expression
-# [185] cast_expr
+# [186] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [186] conversio_expr
+# [187] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [187] interval_target
+# [188] interval_target
 interval_target ::= range_expr
-# [188] via_clause
+# [189] via_clause
 via_clause ::= 'via' IDENTIFIER
-# [189] inline_default
+# [190] inline_default
 inline_default ::= '⊥' unary_expr
-# [190] call_expr
+# [191] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [191] call_suffix
+# [192] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [192] member_suffix
+# [193] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [193] transpose_suffix
+# [194] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [194] optional_suffix
+# [195] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [195] non_null_suffix
+# [196] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [196] argument_list
+# [197] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [197] argument
+# [198] argument
 argument ::= template_argument | call_marker? 'sparge'? expression
-# [198] call_marker
+# [199] call_marker
 call_marker ::= 'de' | 'in' | 'own' | 'copy'
-# [199] template_argument
+# [200] template_argument
 template_argument ::= 'sparge'? IDENTIFIER ':' expression
-# [200] literal
+# [201] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nulla' | '∞' | 'nonnumerus'
-# [201] primary
+# [202] primary
 primary ::= IDENTIFIER | literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
-# [202] ad_expr
+# [203] ad_expr
 ad_expr ::= 'ad' ASCII_STRING ad_opener?
-# [203] ad_opener
+# [204] ad_opener
 ad_opener ::= '(' expression ')'
-# [204] array_literal
+# [205] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [205] array_element_list
+# [206] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [206] array_element
+# [207] array_element
 array_element ::= argument | '_'
-# [207] iuncta_expr
+# [208] iuncta_expr
 iuncta_expr ::= 'iuncta' type_arguments '[' argument_list? ']'
-# [208] json_literal
+# [209] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [209] json_member
+# [210] json_member
 json_member ::= STRING ':' json_value
-# [210] typed_constructor
+# [211] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source?
-# [211] field_list
+# [212] field_list
 field_list ::= field_init (',' field_init)*
-# [212] field_init
+# [213] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [213] field_key
+# [214] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [214] construction_source
+# [215] construction_source
 construction_source ::= 'ex' call_expr
-# [215] json_value
+# [216] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [216] json_object
+# [217] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [217] json_array
+# [218] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [218] json_string
+# [219] json_string
 json_string ::= STRING
-# [219] json_number
+# [220] json_number
 json_number ::= NUMBER
-# [220] finge_expr
+# [221] finge_expr
 finge_expr ::= 'finge' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [221] qualified_ident
+# [222] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [222] praefixum_expr
+# [223] praefixum_expr
 praefixum_expr ::= 'praefixum' block_stmt
-# [223] scriptum_expr
+# [224] scriptum_expr
 scriptum_expr ::= 'scriptum' '(' STRING (',' expression)* ')'
-# [224] lege_expr
+# [225] lege_expr
 lege_expr ::= 'lege' 'lineam'?
-# [225] first_match_expr
+# [226] first_match_expr
 first_match_expr ::= 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
-# [226] reducta_expr
+# [227] reducta_expr
 reducta_expr ::= 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [227] reducta_op
+# [228] reducta_op
 reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
-# [228] reducta_group
+# [229] reducta_group
 reducta_group ::= 'pro' expression
-# [229] reducta_body
+# [230] reducta_body
 reducta_body ::= ('fixum' | 'varia') IDENTIFIER block_stmt
-# [230] reducta_identity
+# [231] reducta_identity
 reducta_identity ::= 'vel' expression
-# [231] filum_clause
+# [232] filum_clause
 filum_clause ::= 'filum' IDENTIFIER
-# [232] capta_expr
+# [233] capta_expr
 capta_expr ::= 'capta' block_stmt
-# [233] object_pattern
+# [234] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [234] pattern_property
+# [235] pattern_property
 pattern_property ::= 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
-# [235] array_pattern
+# [236] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [236] array_pattern_element
+# [237] array_pattern_element
 array_pattern_element ::= '_' | 'ceteri'? IDENTIFIER
-# [237] nota_stmt
+# [238] nota_stmt
 nota_stmt ::= ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
-# [238] entry_header
+# [239] entry_header
 entry_header ::= ('argumenta' IDENTIFIER)? ('exitus' expression)?
-# [239] incipit_stmt
+# [240] incipit_stmt
 incipit_stmt ::= 'incipit' entry_header block_stmt
-# [240] incipiet_stmt
+# [241] incipiet_stmt
 incipiet_stmt ::= 'incipiet' entry_header block_stmt
-# [241] probandum_decl
+# [242] probandum_decl
 probandum_decl ::= 'probandum' STRING proba_modifier* '{' probandum_body '}'
-# [242] probandum_body
+# [243] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [243] proba_stmt
+# [244] proba_stmt
 proba_stmt ::= 'proba' STRING proba_modifier* block_stmt
-# [244] proba_modifier
+# [245] proba_modifier
 proba_modifier ::= 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING | 'temporis' NATURAL | 'metior' | 'repete' NATURAL | 'fragilis' NATURAL | 'solum_in' STRING
-# [245] praepara_block
+# [246] praepara_block
 praepara_block ::= ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
-# [246] fac_stmt
+# [247] fac_stmt
 fac_stmt ::= 'fac' block_stmt cape_clause? ('dum' expression)?
-# [247] IDENTIFIER
+# [248] IDENTIFIER
 IDENTIFIER ::=
-# [248] NUMBER
+# [249] NUMBER
 NUMBER ::=
-# [249] NATURAL
+# [250] NATURAL
 NATURAL ::=
-# [250] STRING
+# [251] STRING
 STRING ::=
-# [251] ASCII_STRING
+# [252] ASCII_STRING
 ASCII_STRING ::=
-# [252] BACKTICK_STRING
+# [253] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [253] OCTETI_STRING
+# [254] OCTETI_STRING
 OCTETI_STRING ::=
-# [254] NEWLINE
+# [255] NEWLINE
 NEWLINE ::=
-# [255] WIDTH_MARKER
+# [256] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [256] LISTA_WIDTH_SUGAR
+# [257] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [257] TENSOR_WIDTH_SUGAR
+# [258] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [258] SPARSA_WIDTH_SUGAR
+# [259] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [259] VECTOR_WIDTH_SUGAR
+# [260] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [260] MATRIX_WIDTH_SUGAR
+# [261] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [261] FRONTMATTER_DELIMITER
+# [262] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [262] TOML_LINES
+# [263] TOML_LINES
 TOML_LINES ::=
-# [263] ANNOTATION_NAME
+# [264] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [264] ANNOTATION_FIELD_NAME
+# [265] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [265] NON_NEWLINE_TOKEN
+# [266] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [266] NO_NEWLINE
+# [267] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -614,6 +616,7 @@ NO_NEWLINE ::=
 | [`clausura_param`](#clausura-param) | `#clausura-param` | live |
 | [`genus_decl`](#genus-decl) | `#genus-decl` | live |
 | [`genus_member`](#genus-member) | `#genus-member` | live |
+| [`nondum_method_decl`](#nondum-method-decl) | `#nondum-method-decl` | live |
 | [`genus_field_decl`](#genus-field-decl) | `#genus-field-decl` | live |
 | [`field_decl`](#field-decl) | `#field-decl` | live |
 | [`functio_method_decl`](#functio-method-decl) | `#functio-method-decl` | live |
@@ -1194,7 +1197,7 @@ The body joint keeps the existing closure law: `∴` followed by one expression,
 - Call-site access markers: an argument passed to a parameter declared `mut` / `own` / `copy` carries the same marker at the call (en `mut` `own` `copy`; la `in` `own` `copy`), as in `bump(mut a)`, `eat(own a)`, `dup(copy a)`; the read marker `ref` (la `de`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `own` and `copy` with the matching marker. Call-site `copy` is a plain echo of the parameter marker. Parameters take no `var`/`const`; the marker says what the callee may do. An unmarked or `ref` parameter is read-only, a `mut` parameter writes the caller's value, and an `own` or `copy` parameter is always writable by the callee (method call, field store, reassignment, element store; an `own` tensor parameter may be rebound whole). Only a whole local binding may be passed as `own`: a field or element, an unmarked parameter, a module constant, or an `itera` binder is `SEM057 own_argument_not_local_binding` / `own_argument_unmarked_parameter` / `own_argument_module_constant` / `own_argument_loop_binder` (`copy b.xs` is fine and does not kill `b`). After `eat(own a)` the name `a` is dead: a later use is `SEM050 use_after_own`, blamed on the call argument (an unmarked source gets a copy suggestion); `moved_in_loop` and `moved_name_captured_by_closure` cover loops and closures; an exclusive (`own`/`copy`) source keeps `use_after_move` at the later read; a fresh value (`eat(own make())`) is always fine.
 - Post-name marker: `sponte` (voluntary/optional provision)
 - `ceteri` marks rest parameter
-- Ordinary `functio` declarations and genus methods require bodies. Signature-only methods belong in `implendum`. The one exception is a top-level `functio` marked `@ nondum`, which may omit its block (see `nondum_functio_decl`).
+- Ordinary `functio` declarations and genus methods require bodies. Signature-only methods belong in `implendum`. The one exception is a top-level `functio` or a genus method marked `@ nondum`, which may omit its block (see `nondum_functio_decl`, `nondum_method_decl`).
 - `errata NAME` is a legacy runtime-injected `ignotum` local, and `iacit` is a legacy marker with no current semantic effect. Neither declares the typed alternate-exit contract. New failable APIs should use `⇥ E`; whether either legacy modifier should survive is unresolved.
 - `ergo` is the compact **statement-body** joint only (one-statement `si`/`dum`/`casu`/… arms).
 - `∴` is the compact **clausura** joint only. The two are not aliases.
@@ -1305,7 +1308,7 @@ wire operation such as `json.pange(value ↦ json)`.
     domain.
   Any other directive after `@ radix` is rejected (`unknown_directive`).
 - `@ verte` defines codegen transformation (method name or template)
-- `@ nondum [TARGET] ["REASON"]` marks a declaration as present in an interface but unavailable for the target; without a `TARGET` it is unavailable on every target. On a top-level `functio` the block may be omitted (`@ nondum "pending host dispatch"` then the signature alone): the function is declared, exported and re-exported, any use of it (a call, a call through an imported namespace or name, or the function taken as a value) is refused with `SEM017 nondum_function_for_target`, and no backend emits it. A signature-only `functio` without `@ nondum` is `PARSE012`
+- `@ nondum [TARGET] ["REASON"]` marks a declaration as present in an interface but unavailable for the target; without a `TARGET` it is unavailable on every target. On a top-level `functio` or a genus method the block may be omitted (`@ nondum "pending host dispatch"` then the signature alone): the function is declared, exported and re-exported, any use of it (a call, a call through an imported namespace or name, or the function taken as a value; for a method, a call through an instance, `self`, or an imported genus) is refused with `SEM017 nondum_function_for_target`, and no backend emits it; the genus's other methods are unaffected. A signature-only `functio` without `@ nondum` is `PARSE012`
 - `@ cli "NAME"` marks an `incipit` entry as a CLI program
 - `@ imperium "NAME"` marks a function as a CLI command entry point
 - `@ optio NAME ...` defines a CLI option; use `typus bivalens` for boolean flags

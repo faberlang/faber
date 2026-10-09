@@ -938,8 +938,9 @@ ad_handler_decl := annotation* ad_annotation annotation* functio_decl
 # and no backend emits it. The annotation need not be the only one; stacked
 # annotations may precede or follow it. A signature-only `functio` without
 # `@ nondum` stays `PARSE012 function_body_absent`, and the exemption reaches
-# only the `functio` directly after the annotations: never a `genus` method,
-# a nested declaration, or a later top-level declaration. Library analysis of a
+# only the `functio` directly after the annotations: never a nested
+# declaration or a later top-level declaration. A `genus` method gets the same
+# exemption through `nondum_method_decl`. Library analysis of a
 # `kind = "lib"` package or an imported library interface additionally accepts
 # any signature-only `functio` as a binding declaration (a parser option, not
 # part of this grammar).
@@ -1045,7 +1046,16 @@ clausura_params := clausura_param (',' clausura_param)*
 clausura_param  := type_annotation IDENTIFIER
 
 genus_decl    := 'genus' IDENTIFIER generic_params? ('implet' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
-genus_member  := annotation* (genus_field_decl | functio_method_decl)
+genus_member  := annotation* (genus_field_decl | functio_method_decl) | nondum_method_decl
+# A `genus` method marked `@ nondum` (en `@ unstable`) may omit its block, like
+# a top-level `functio` (`nondum_functio_decl`): the method is declared and
+# unavailable, a call of it — through an instance, through `self`, or through an
+# imported genus — is refused (`SEM017 nondum_function_for_target`), no backend
+# emits it, and the genus's other methods are unaffected. The annotation need
+# not be the only one; the exemption reaches only the method directly after
+# the annotations. A signature-only method without `@ nondum` stays `PARSE012
+# function_body_absent`.
+nondum_method_decl := annotation* nondum_annotation annotation* 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 # `genus_field_decl` (D16.1-D16.3, D5c): every `genus` field declares exactly one
 # of `fixum` / `varia` / `generis` — there is no default, and an unmarked genus
 # field is PARSE010 `field_modifier_missing`. The unmarked form survives only
