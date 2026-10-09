@@ -1,15 +1,15 @@
-verum
-falsum
-verum
-falsum
-[verum, verum, verum, falsum]
-[falsum, falsum, falsum, verum]
-falsum
-verum
+true
+false
+true
+false
+[true, true, true, false]
+[false, false, false, true]
+false
+true
 3
 [NaN, 1.0, 1.0, 1.0]
-falsum
-verum
-falsum
-verum
-verum
+false
+true
+false
+true
+true

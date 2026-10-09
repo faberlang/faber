@@ -1,14 +1,14 @@
-[[verum, falsum], [falsum, falsum]]
-[[falsum, verum], [verum, verum]]
-[[verum, falsum], [falsum, falsum]]
-[[falsum, verum], [falsum, verum]]
-[[verum, falsum], [verum, falsum]]
-[[falsum, falsum], [falsum, falsum]]
-[[verum, verum], [verum, verum]]
-[[falsum, verum], [verum, verum]]
+[[true, false], [false, false]]
+[[false, true], [true, true]]
+[[true, false], [false, false]]
+[[false, true], [false, true]]
+[[true, false], [true, false]]
+[[false, false], [false, false]]
+[[true, true], [true, true]]
+[[false, true], [true, true]]
 [[1.0, 5.0], [2.0, 4.0]]
 [[9.0, 5.0], [3.0, 4.0]]
 [[1.0, 3.5], [3.0, 3.5]]
-falsum
-verum
-verum
+false
+true
+true

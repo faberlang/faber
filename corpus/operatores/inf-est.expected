@@ -1,13 +1,13 @@
-int=verum inf=verum u64=verum not-inf=falsum
-int=verum inf=verum u64=verum not-inf=falsum
-int=falsum inf=verum u64=falsum not-inf=falsum
-int=falsum inf=verum u64=falsum not-inf=falsum
-int=falsum inf=verum u64=falsum not-inf=falsum
-int=verum inf=verum u64=verum not-inf=falsum
-int=falsum inf=verum u64=falsum not-inf=falsum
-int=falsum inf=falsum u64=falsum not-inf=verum
-int=falsum inf=falsum u64=falsum not-inf=verum
-int=falsum inf=falsum u64=falsum not-inf=verum
+int=true inf=true u64=true not-inf=false
+int=true inf=true u64=true not-inf=false
+int=false inf=true u64=false not-inf=false
+int=false inf=true u64=false not-inf=false
+int=false inf=true u64=false not-inf=false
+int=true inf=true u64=true not-inf=false
+int=false inf=true u64=false not-inf=false
+int=false inf=false u64=false not-inf=true
+int=false inf=false u64=false not-inf=true
+int=false inf=false u64=false not-inf=true
 7
 -9223372036854775808
 -1

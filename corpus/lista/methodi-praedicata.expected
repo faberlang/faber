@@ -1,5 +1,5 @@
-verum
-falsum
-falsum
-verum
+true
+false
+false
+true
 caught: negative dimension

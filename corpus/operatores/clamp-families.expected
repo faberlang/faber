@@ -7,11 +7,11 @@
 255.0
 1.5
 127.5
-verum
+true
 255.0
 0.0
-verum
-verum
-verum
-verum
-falsum
+true
+true
+true
+true
+false
