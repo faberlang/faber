@@ -253,3 +253,51 @@ fn bool_key_inside_a_list_of_maps_uses_the_function_tokens() {
     let order = empty_order(&structs, &variants).with_tokens(&latin);
     assert_eq!(show(&list, order), "[{verum: 1}]");
 }
+
+fn set_of(items: Vec<MapKey>) -> Value {
+    Value::Set(Rc::new(RefCell::new(items.into_iter().collect())))
+}
+
+#[test]
+fn english_tokens_print_bool_set_elements_as_true_false() {
+    let (structs, variants) = Default::default();
+    let tokens = english();
+    let order = empty_order(&structs, &variants).with_tokens(&tokens);
+    assert_eq!(
+        show(&set_of(vec![MapKey::Bool(true)]), order),
+        "Set(RefCell { value: {true} })"
+    );
+    assert_eq!(
+        show(&set_of(vec![MapKey::Bool(false)]), order),
+        "Set(RefCell { value: {false} })"
+    );
+}
+
+#[test]
+fn latin_tokens_print_bool_set_elements_as_verum_falsum() {
+    let (structs, variants) = Default::default();
+    let latin = DisplayTokens::latin();
+    let order = empty_order(&structs, &variants).with_tokens(&latin);
+    assert_eq!(
+        show(&set_of(vec![MapKey::Bool(true)]), order),
+        "Set(RefCell { value: {verum} })"
+    );
+    assert_eq!(
+        show(&set_of(vec![MapKey::Bool(false)]), order),
+        "Set(RefCell { value: {falsum} })"
+    );
+}
+
+#[test]
+fn int_set_display_text_is_unchanged() {
+    let (structs, variants) = Default::default();
+    let tokens = english();
+    let order = empty_order(&structs, &variants).with_tokens(&tokens);
+    let ints = set_of(vec![MapKey::UInt(3)]);
+    assert_eq!(show(&ints, order), format!("{ints:?}"));
+    assert_eq!(show(&ints, order), "Set(RefCell { value: {UInt(3)} })");
+    let texts = set_of(vec![MapKey::Str("x".to_owned())]);
+    assert_eq!(show(&texts, order), format!("{texts:?}"));
+    let empty = set_of(vec![]);
+    assert_eq!(show(&empty, order), format!("{empty:?}"));
+}

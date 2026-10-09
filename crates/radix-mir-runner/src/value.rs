@@ -1424,7 +1424,7 @@ impl Value {
                 // whose type the caller could not resolve.
                 None => format!("{self:?}"),
             },
-            Value::Set(_) => format!("{self:?}"),
+            Value::Set(cell) => display_set(&cell.borrow(), order.tokens),
             Value::GradientHandle(id) => format!("gradient-handle#{id}"),
             Value::Cursor(_) => "cursor".to_owned(),
         })
@@ -1560,6 +1560,22 @@ fn display_in_collection(
         }
         other => other.display_typed(interner, order, span, float_width)?,
     })
+}
+
+/// A printed set keeps its Rust-Debug text (`Set(RefCell { value: {..} })`,
+/// hash order); only bool, none and tuple elements are spelled through the
+/// printing function's tokens instead of `Bool(true)` / `Unit` / `Tuple([..])`.
+fn display_set(items: &FxHashSet<MapKey>, tokens: &DisplayTokens) -> String {
+    let parts = items
+        .iter()
+        .map(|item| match item {
+            MapKey::Bool(v) => display_bivalens(*v, tokens).to_owned(),
+            MapKey::Unit => tokens.none.clone(),
+            MapKey::Tuple(parts) => display_tuple_key(parts, tokens),
+            other => format!("{other:?}"),
+        })
+        .collect::<Vec<_>>();
+    format!("Set(RefCell {{ value: {{{}}} }})", parts.join(", "))
 }
 
 /// A composite key shown in a printed map: its parts comma-separated, a bool
