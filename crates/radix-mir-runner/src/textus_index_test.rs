@@ -12,7 +12,7 @@ use radix_types::{IndexExpr, Primitive, TypeId, TypeTable};
 
 /// Run one collection intrinsic over `args` (bound to `%0..`) in a fresh
 /// runner. `return_ty` builds the declared result type from the table.
-fn eval_collection(
+pub(super) fn eval_collection(
     op: MirCollectionOp,
     args: Vec<Value>,
     return_ty: impl FnOnce(&mut TypeTable) -> TypeId,

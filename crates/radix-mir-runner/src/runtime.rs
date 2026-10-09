@@ -37,9 +37,10 @@ use super::tensor_edge::{
     resolve_custom_value,
 };
 use super::value::{
-    GradientStorage, MapKey, TensorEdgeOp, TensorInverseMap, TensorValue, Value, coordinate_fits,
-    format_template_shaped, inverse_view_coordinate, modular_operand, modular_word_reduce,
-    modular_word_result, round_float, uint_width_checked_add, values_equal, width_checked_add,
+    GradientStorage, MapKey, TensorEdgeOp, TensorInverseMap, TensorValue, Value, as_text_str,
+    coordinate_fits, format_template_shaped, inverse_view_coordinate, modular_operand,
+    modular_word_reduce, modular_word_result, round_float, uint_width_checked_add, values_equal,
+    width_checked_add,
 };
 use super::{
     CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
@@ -1497,7 +1498,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         "consentit receiver is not regex",
                     ));
                 };
-                let Value::Str(text) = self.eval_operand(text, span)? else {
+                let Some(text) = as_text_str(self.eval_operand(text, span)?) else {
                     return Err(RunnerError::internal(
                         span,
                         "consentit argument is not textus",
@@ -1523,10 +1524,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let [receiver, delim] = args else {
                     return Err(RunnerError::internal(span, "collection split arity"));
                 };
-                let Value::Str(text) = self.eval_operand(receiver, span)? else {
+                let Some(text) = as_text_str(self.eval_operand(receiver, span)?) else {
                     return Err(RunnerError::internal(span, "split receiver is not textus"));
                 };
-                let Value::Str(delim) = self.eval_operand(delim, span)? else {
+                let Some(delim) = as_text_str(self.eval_operand(delim, span)?) else {
                     return Err(RunnerError::internal(span, "split delimiter is not textus"));
                 };
                 let parts = text
@@ -1539,16 +1540,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let [receiver, from, to] = args else {
                     return Err(RunnerError::internal(span, "collection replace arity"));
                 };
-                let Value::Str(text) = self.eval_operand(receiver, span)? else {
+                let Some(text) = as_text_str(self.eval_operand(receiver, span)?) else {
                     return Err(RunnerError::internal(
                         span,
                         "replace receiver is not textus",
                     ));
                 };
-                let Value::Str(from) = self.eval_operand(from, span)? else {
+                let Some(from) = as_text_str(self.eval_operand(from, span)?) else {
                     return Err(RunnerError::internal(span, "replace from is not textus"));
                 };
-                let Value::Str(to) = self.eval_operand(to, span)? else {
+                let Some(to) = as_text_str(self.eval_operand(to, span)?) else {
                     return Err(RunnerError::internal(span, "replace to is not textus"));
                 };
                 Ok(Value::Str(text.replace(&from, &to)))
@@ -4658,8 +4659,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Value::Array(cell) => Ok(cell.borrow().iter().any(|item| values_equal(item, &needle))),
             Value::Set(cell) => Ok(cell.borrow().contains(&needle.to_key(span)?)),
             Value::Map(cell) => Ok(cell.borrow().contains_key(&needle.to_key(span)?)),
-            Value::Str(text) => {
-                let Value::Str(needle) = needle else {
+            text @ (Value::Str(_) | Value::Ascii(_)) => {
+                let (Some(text), Some(needle)) = (as_text_str(text), as_text_str(needle)) else {
                     return Err(RunnerError::internal(span, "contains needle is not textus"));
                 };
                 Ok(text.contains(&needle))
@@ -4679,7 +4680,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Value::Regex(program) = self.eval_operand(receiver, span)? else {
             return Err(RunnerError::internal(span, "inventa receiver is not regex"));
         };
-        let Value::Str(text) = self.eval_operand(text, span)? else {
+        let Some(text) = as_text_str(self.eval_operand(text, span)?) else {
             return Err(RunnerError::internal(
                 span,
                 "inventa argument is not textus",
@@ -4703,7 +4704,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Value::Regex(program) = self.eval_operand(receiver, span)? else {
             return Err(RunnerError::internal(span, "bulk receiver is not regex"));
         };
-        let Value::Str(text) = self.eval_operand(text, span)? else {
+        let Some(text) = as_text_str(self.eval_operand(text, span)?) else {
             return Err(RunnerError::internal(span, "bulk argument is not textus"));
         };
         let items = if matches!(op, MirCollectionOp::RegexFindAll) {
@@ -4731,10 +4732,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Value::Regex(program) = self.eval_operand(receiver, span)? else {
             return Err(RunnerError::internal(span, "replace receiver is not regex"));
         };
-        let Value::Str(text) = self.eval_operand(text, span)? else {
+        let Some(text) = as_text_str(self.eval_operand(text, span)?) else {
             return Err(RunnerError::internal(span, "replace text is not textus"));
         };
-        let Value::Str(replacement) = self.eval_operand(replacement, span)? else {
+        let Some(replacement) = as_text_str(self.eval_operand(replacement, span)?) else {
             return Err(RunnerError::internal(
                 span,
                 "replace replacement is not textus",
@@ -4760,7 +4761,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 "replace-each receiver is not regex",
             ));
         };
-        let Value::Str(text) = self.eval_operand(text, span)? else {
+        let Some(text) = as_text_str(self.eval_operand(text, span)?) else {
             return Err(RunnerError::internal(
                 span,
                 "replace-each text is not textus",
@@ -4826,7 +4827,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(optional_text(index.and_then(|index| found.group(index))))
             }
             (MirCollectionOp::MatchNamed, [_, name]) => {
-                let Value::Str(name) = self.eval_operand(name, span)? else {
+                let Some(name) = as_text_str(self.eval_operand(name, span)?) else {
                     return Err(RunnerError::internal(span, "group name is not textus"));
                 };
                 Ok(optional_text(found.named(&name)))
@@ -4863,7 +4864,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "text collection arity"));
         };
-        let Value::Str(text) = self.eval_operand(receiver, span)? else {
+        let Some(text) = as_text_str(self.eval_operand(receiver, span)?) else {
             return Err(RunnerError::internal(span, "text receiver is not textus"));
         };
         Ok(Value::Str(f(text)))
@@ -4878,10 +4879,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [left, right] = args else {
             return Err(RunnerError::internal(span, "text pair arity"));
         };
-        let Value::Str(left) = self.eval_operand(left, span)? else {
+        let Some(left) = as_text_str(self.eval_operand(left, span)?) else {
             return Err(RunnerError::internal(span, "text pair left is not textus"));
         };
-        let Value::Str(right) = self.eval_operand(right, span)? else {
+        let Some(right) = as_text_str(self.eval_operand(right, span)?) else {
             return Err(RunnerError::internal(span, "text pair right is not textus"));
         };
         Ok(Value::Bool(f(left, right)))

@@ -2560,6 +2560,18 @@ pub fn scalar_text_index(text: &str, index: usize, span: Span) -> Result<Value, 
     ascii1_from_scalar(ch, span)
 }
 
+/// Text of a value a `textus` consumer accepts. A scalar bracket projection
+/// (`s[i]`) carries the compact one-byte `Value::Ascii` because MIR places have
+/// no static type for the runner to widen by (F-44); every `Str`-only consumer
+/// reads its text through here so both carriers mean the same text.
+pub fn as_text_str(value: Value) -> Option<String> {
+    match value {
+        Value::Str(text) => Some(text),
+        Value::Ascii(byte) => Some(char::from(byte).to_string()),
+        _ => None,
+    }
+}
+
 pub fn format_template(
     template: &str,
     args: &[Value],

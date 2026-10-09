@@ -3806,6 +3806,10 @@ mod ascii_cursor_test;
 mod textus_index_test;
 
 #[cfg(test)]
+#[path = "textus_bracket_test.rs"]
+mod textus_bracket_test;
+
+#[cfg(test)]
 #[path = "collection_index_plain_test.rs"]
 mod collection_index_plain_test;
 
