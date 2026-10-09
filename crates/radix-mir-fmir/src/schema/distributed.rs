@@ -549,6 +549,11 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         }
         WireCollectionKernelPlan::TiledMatMul(plan) => {
             CollectionKernelPlan::TiledMatMul(MatMulPlan {
+                dims: radix_mir::MatMulDims::Literal {
+                    m: plan.m,
+                    k: plan.k,
+                    n: plan.n,
+                },
                 m: plan.m,
                 k: plan.k,
                 n: plan.n,
@@ -576,6 +581,11 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         // batched fact can never decode as rank-2 by omission.
         WireCollectionKernelPlan::BatchedTiledMatMul(plan) => {
             CollectionKernelPlan::TiledMatMul(MatMulPlan {
+                dims: radix_mir::MatMulDims::Literal {
+                    m: plan.m,
+                    k: plan.k,
+                    n: plan.n,
+                },
                 m: plan.m,
                 k: plan.k,
                 n: plan.n,

@@ -633,11 +633,15 @@ pub struct MatMulShapes {
 ///   per workgroup (F-035: each workgroup writes a distinct output tile).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatMulPlan {
-    /// Left matrix rows `M`.
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: MatMulDims,
+    /// Left matrix rows `M` (the literal arm of [`MatMulPlan::dims`]).
     pub m: u64,
-    /// Contracted inner dimension `K` (left columns / right rows).
+    /// Contracted inner dimension `K` (left columns / right rows; the
+    /// literal arm of [`MatMulPlan::dims`]).
     pub k: u64,
-    /// Right matrix columns `N` (one for a promoted rank-1 RHS).
+    /// Right matrix columns `N` (one for a promoted rank-1 RHS; the literal
+    /// arm of [`MatMulPlan::dims`]).
     pub n: u64,
     /// Element layout of the left operand; dense tiles stay f32 after load.
     pub left_layout: MirScalarLayout,
@@ -668,6 +672,31 @@ pub struct MatMulPlan {
     /// dims are a PREFIX of the receiver's (the GQA share: K/V per kv-head
     /// broadcast over q-per-kv heads); `right_batch` divides `batch`.
     pub right_batch: u64,
+}
+
+/// How a [`MatMulPlan`] knows its extents: literal numbers, or run-time
+/// extents selected by shape class. Nothing produces `Runtime` yet; it is
+/// only representable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatMulDims {
+    /// Compile-time extents `M`, `K`, `N`.
+    Literal { m: u64, k: u64, n: u64 },
+    /// Extents bound at run time; the recipe body is the one for `class`.
+    Runtime { class: MatMulClass },
+}
+
+/// The matmul body a run-time-extent plan selects (one per body the literal
+/// form chooses by value).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatMulClass {
+    /// `M == 1` one-row GEMV.
+    OneRow,
+    /// `N == 1` direct GEMV.
+    Gemv,
+    /// Simdgroup fast path.
+    Simdgroup,
+    /// Scalar tiled body.
+    Tiled,
 }
 
 /// The two shared-memory operand tiles of the tiled-matmul recipe.

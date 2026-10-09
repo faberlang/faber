@@ -171,6 +171,11 @@ impl CollectionKernelPlan {
                 }
                 let tile_slots = tile * tile;
                 Some(CollectionKernelPlan::TiledMatMul(MatMulPlan {
+                    dims: crate::kernel_plan::MatMulDims::Literal {
+                        m: shapes.m,
+                        k: shapes.k,
+                        n: shapes.n,
+                    },
                     m: shapes.m,
                     k: shapes.k,
                     n: shapes.n,

@@ -83,6 +83,7 @@ fn dummy_shared() -> SharedMemoryLayout {
 
 fn dummy_matmul() -> MatMulPlan {
     MatMulPlan {
+        dims: crate::kernel_plan::MatMulDims::Literal { m: 1, k: 1, n: 1 },
         m: 1,
         k: 1,
         n: 1,

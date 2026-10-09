@@ -85,6 +85,7 @@ fn matmul() -> KernelUnit {
         buffer_name: name.to_owned(),
     };
     let plan = CollectionKernelPlan::TiledMatMul(MatMulPlan {
+        dims: crate::kernel_plan::MatMulDims::Literal { m: 0, k: 0, n: 0 },
         m: 0,
         k: 0,
         n: 0,

@@ -172,14 +172,15 @@ pub use kernel_decomposition::{
     decompose_kernel_function_with_limit,
 };
 pub use kernel_plan::{
-    BarrierPhase, BarrierPoint, CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, MatMulShapes,
-    OobPaddingPolicy, PackedAdmissionError, PackedDequantError, PackedDequantKind,
-    PackedDequantResolution, PlanValidationError, QuantizedGatherPlan, QuantizedMatMulPlan,
-    ROW_REDUCTION_WORKGROUP_X, ReduceOp, ReductionPlan, RowReductionFacts, SIMDGROUP_MATMUL_MAX_N,
-    SIMDGROUP_MATMUL_PARTIAL_SLOTS, SIMDGROUP_MATMUL_STAGING_SLOTS, SharedMemoryLayout,
-    SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
-    admit_quantized_gather, admit_quantized_matmul, causal_softmax_row_reduction_admission,
-    rmsnorm_row_reduction_admission, simdgroup_matmul_admission,
+    BarrierPhase, BarrierPoint, CollectionKernelPlan, GroupedMatMulPlan, MatMulClass, MatMulDims,
+    MatMulPlan, MatMulShapes, OobPaddingPolicy, PackedAdmissionError, PackedDequantError,
+    PackedDequantKind, PackedDequantResolution, PlanValidationError, QuantizedGatherPlan,
+    QuantizedMatMulPlan, ROW_REDUCTION_WORKGROUP_X, ReduceOp, ReductionPlan, RowReductionFacts,
+    SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS, SIMDGROUP_MATMUL_STAGING_SLOTS,
+    SharedMemoryLayout, SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TRANSPOSE_WORKGROUP_X,
+    TransposePlan, admit_quantized_gather, admit_quantized_matmul,
+    causal_softmax_row_reduction_admission, rmsnorm_row_reduction_admission,
+    simdgroup_matmul_admission,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,

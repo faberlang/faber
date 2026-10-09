@@ -668,7 +668,7 @@ pub fn collection_op_contract(
                         .map_err(MirAbiError::new)?;
                     let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
                         .map_err(MirAbiError::new)?;
-                    let tile: u64 = 8;
+                    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
                     // U1 head-axis: a rank-3/4 receiver with a rank-2+ right
                     // operand carrying leading batch axes is the batched
                     // contraction (decode `[5,3,1,64]·[5,64,76]` and prefill
@@ -765,7 +765,7 @@ pub fn collection_op_contract(
                 MirCollectionOp::TensorQuantizedMatMul => {
                     let (left_dims, right_dims, layout) =
                         packed_rank2_matmul_operands(function, args, validation)?;
-                    let tile: u64 = 8;
+                    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
                     let m = left_dims[0];
                     let n = right_dims[1];
                     // M=1 quantized dispatch exists as a shared, lane-neutral
@@ -1449,7 +1449,7 @@ fn grouped_matmul_contract(
             "grouped matmul dispatch contract requires non-zero dimensions",
         ));
     }
-    let tile: u64 = 8;
+    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
     Ok(CollectionOpContract::GroupedMatMul {
         dispatch_x: n.div_ceil(tile),
         dispatch_y: left_dims[0].div_ceil(tile),

@@ -2740,6 +2740,11 @@ fn matmul_kernel_descriptor_reports_tiled_matmul_recipe() {
     let tile = 8;
     let tile_slots = tile * tile;
     let matmul_plan = crate::kernel_plan::MatMulPlan {
+        dims: crate::kernel_plan::MatMulDims::Literal {
+            m: 17,
+            k: 12,
+            n: 33,
+        },
         m: 17,
         k: 12,
         n: 33,

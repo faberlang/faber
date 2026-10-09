@@ -225,6 +225,11 @@ fn matmul_plan() -> MatMulPlan {
     let tile = MATMUL_TILE;
     let tile_slots = tile * tile;
     MatMulPlan {
+        dims: crate::kernel_plan::MatMulDims::Literal {
+            m: shapes.m,
+            k: shapes.k,
+            n: shapes.n,
+        },
         m: shapes.m,
         k: shapes.k,
         n: shapes.n,

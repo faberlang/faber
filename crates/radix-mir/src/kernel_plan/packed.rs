@@ -308,6 +308,11 @@ pub(super) fn tiled_matmul_from_shapes(shapes: MatMulShapes) -> CollectionKernel
     let tile = MATMUL_TILE;
     let tile_slots = tile * tile;
     CollectionKernelPlan::TiledMatMul(MatMulPlan {
+        dims: crate::kernel_plan::MatMulDims::Literal {
+            m: shapes.m,
+            k: shapes.k,
+            n: shapes.n,
+        },
         m: shapes.m,
         k: shapes.k,
         n: shapes.n,
