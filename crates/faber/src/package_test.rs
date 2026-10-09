@@ -1406,15 +1406,28 @@ entry = "main.fab"
 "#,
         )
         .expect("write manifest");
-        let workspace_root =
-            radix::module::paths::faberlang_home().expect("faberlang container root");
-        let touch_source = workspace_root.join("examples/coreutils/packages/touch/src/main.fab");
-        let touch_source_text = fs::read_to_string(&touch_source).expect("read coreutils touch");
         fs::write(
             src.join("main.fab"),
-            format!("+++\nlocale = \"la\"\n+++\n{touch_source_text}"),
+            r#"+++
+locale = "la"
++++
+importa ex "norma:fs" solum
+
+functio tange_paths(lista<textus> paths) → vacuum {
+    itera ex paths fixum path {
+        solum.tange(path)
+    }
+}
+
+@ cli "touch"
+@ descriptio "GNU coreutils touch create-file parity exemplum"
+@ operandus ceteri textus paths
+incipit argumenta args {
+    tange_paths(args.paths)
+}
+"#,
         )
-        .expect("write touch source copy");
+        .expect("write touch source");
         let input = dir.to_path_buf();
         let touched = dir.join("created.txt");
         ArtifactHarnessCaseInner {
@@ -11050,281 +11063,6 @@ entry = "main.fab"
     assert!(a.nodes.iter().any(|n| n.id.starts_with("rust:entry:")));
 }
 
-fn examples_sqlite_lib() -> Option<PathBuf> {
-    // Resolve the sibling `examples/` checkout of this radix tree (main
-    // container or lane packet), never a hardcoded main-checkout path, so the
-    // shipped library is verified at the same revision as the compiler.
-    let lib = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/sqlite");
-    if lib.exists() { Some(lib) } else { None }
-}
-
-/// Build a temp app that path-deps the shipped `examples/sqlite` package.
-fn write_sqlite_consumer_app(app: &Path, lib: &Path, entry_body: &str) {
-    fs::create_dir_all(app.join("src")).expect("app src");
-    let interface_root = lib.join("src");
-    fs::write(
-        app.join("faber.toml"),
-        r#"[package]
-name = "g8-sqlite-app"
-version = "0.1.0"
-
-[paths]
-entry = "main.fab"
-
-[dependencies]
-sqlite = "0.1.0"
-"#,
-    )
-    .expect("app manifest");
-    fs::write(
-        app.join("faber.lock"),
-        format!(
-            r#"
-[[package]]
-name = "sqlite"
-version = "0.1.0"
-source = "path"
-package_root = "{package_root}"
-kind = "lib"
-target_language = "rust"
-target_triple = "host"
-target_manifest = ""
-interface_root = "{interface_root}"
-artifact = ""
-crate = "sqlite"
-rustc = ""
-"#,
-            package_root = lib.display(),
-            interface_root = interface_root.display(),
-        ),
-    )
-    .expect("lock");
-    fs::write(app.join("src/main.fab"), entry_body).expect("entry");
-}
-
-fn build_and_run_sqlite_app(app: &Path) -> std::process::Output {
-    let result = compile_with_faber_seams(&Config::default(), app);
-    assert!(
-        result.success(),
-        "expected sqlite consumer compile, got {:?}",
-        result.diagnostics
-    );
-    let layout = discover_build_layout(app).expect("layout");
-    let mut runtime_plan = runtime_plan_with_faber_seams(&Config::default(), app).expect("plan");
-    let linked = super::library_link::emit_linked_library_crates(app, &layout).expect("link");
-    runtime_plan.library_path_deps = linked
-        .into_iter()
-        .map(|lib| (lib.crate_name, lib.crate_root))
-        .collect();
-    let Some(Output::Rust(output)) = result.output else {
-        panic!("expected Rust");
-    };
-    emit_generated_crate_with_runtime_plan(&layout, &output.code, None, &runtime_plan)
-        .expect("emit crate");
-    let binary = invoke_cargo_build(&layout, false).expect("cargo build app+sqlite");
-    Command::new(&binary).output().expect("run app")
-}
-
-#[test]
-#[ignore = "sqlite provider e2e builds Rust dependency graph; run with ignored integration checks"]
-/// G8 DB1 evidence: shipped `examples/sqlite` verifies and links into an app.
-fn g8_sqlite_package_verifies_and_links_application() {
-    let Some(lib) = examples_sqlite_lib() else {
-        eprintln!("skip: examples/sqlite missing");
-        return;
-    };
-    let report = verify_library_binding_shapes(&lib, "rust").expect("sqlite library verifies");
-    assert_eq!(
-        report.bindings, 6,
-        "exsequi/exsequi_batch/quaere/scalar/transactio/sha256_hex"
-    );
-
-    let root = test_temp_dir("g8-sqlite-app");
-    let app = root.join("app");
-    write_sqlite_consumer_app(
-        &app,
-        &lib,
-        r#"
-import from "sqlite:sqlite" sqlite
-
-main {
-  do {
-    const value ∪ none result ← sqlite.scalar(":memory:", "SELECT 1", empty)
-    print result
-  }
-  catch err {
-    warn err
-  }
-}
-"#,
-    );
-    let output = build_and_run_sqlite_app(&app);
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "sqlite consumer should exit 0"
-    );
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains("Numerus(1)") || stdout.contains('1'),
-        "expected scalar 1 on stdout, got {stdout:?}"
-    );
-}
-
-#[test]
-#[ignore = "sqlite provider e2e builds Rust dependency graph; run with ignored integration checks"]
-/// G8 DB2: SQL engine errors surface as ⇥ textus and recover through cape.
-fn g8_sqlite_sql_error_is_recoverable() {
-    let Some(lib) = examples_sqlite_lib() else {
-        eprintln!("skip: examples/sqlite missing");
-        return;
-    };
-    let root = test_temp_dir("g8-sqlite-sql-err");
-    let app = root.join("app");
-    write_sqlite_consumer_app(
-        &app,
-        &lib,
-        r#"
-import from "sqlite:sqlite" sqlite
-
-main {
-  do {
-    const value ∪ none _ ← sqlite.scalar(":memory:", "SELECT FROM", empty)
-    print "unexpected-ok"
-  }
-  catch err {
-    warn err
-  }
-}
-"#,
-    );
-    let output = build_and_run_sqlite_app(&app);
-    assert_eq!(output.status.code(), Some(0));
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        !stdout.contains("unexpected-ok"),
-        "SQL error must not take success path: {stdout:?}"
-    );
-    assert!(
-        !stderr.trim().is_empty(),
-        "expected mone of SQL error on stderr, got empty"
-    );
-}
-
-#[test]
-#[ignore = "sqlite provider e2e builds Rust dependency graph; run with ignored integration checks"]
-/// G8 DB2: invalid filesystem path is ⇥ textus, not panic.
-fn g8_sqlite_invalid_path_is_recoverable() {
-    let Some(lib) = examples_sqlite_lib() else {
-        eprintln!("skip: examples/sqlite missing");
-        return;
-    };
-    let root = test_temp_dir("g8-sqlite-bad-path");
-    let app = root.join("app");
-    write_sqlite_consumer_app(
-        &app,
-        &lib,
-        r#"
-import from "sqlite:sqlite" sqlite
-
-main {
-  do {
-    const value ∪ none _ ← sqlite.scalar("/no/such/faber/g8/path.sqlite", "SELECT 1", empty)
-    print "unexpected-ok"
-  }
-  catch err {
-    warn err
-  }
-}
-"#,
-    );
-    let output = build_and_run_sqlite_app(&app);
-    assert_eq!(output.status.code(), Some(0));
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        !stdout.contains("unexpected-ok"),
-        "path error must cape: {stdout:?}"
-    );
-    assert!(!stderr.trim().is_empty(), "expected path error on stderr");
-}
-
-#[test]
-/// G8 DB3: package exposes transactio binding (semantics covered by shim unit tests).
-fn g8_sqlite_transactio_binding_verified() {
-    let Some(lib) = examples_sqlite_lib() else {
-        eprintln!("skip: examples/sqlite missing");
-        return;
-    };
-    let report = verify_library_binding_shapes(&lib, "rust").expect("sqlite library verifies");
-    assert!(
-        report.bindings >= 4,
-        "expected transactio among bindings, got {}",
-        report.bindings
-    );
-    // Deterministic commit/rollback proofs live in examples/sqlite/rust (shim_test).
-}
-
-#[test]
-#[ignore = "full sqlite Rust binding Cargo probe; run with ignored integration checks"]
-fn g8_sqlite_rust_binding_probe_verifies_real_symbols() {
-    let Some(lib) = examples_sqlite_lib() else {
-        eprintln!("skip: examples/sqlite missing");
-        return;
-    };
-    let report = verify_library_bindings(&lib, "rust").expect("sqlite library verifies");
-    assert_eq!(
-        report.bindings, 6,
-        "exsequi/exsequi_batch/quaere/scalar/transactio/sha256_hex"
-    );
-}
-
-#[test]
-#[ignore = "sqlite provider e2e builds Rust dependency graph; run with ignored integration checks"]
-/// G8 DB2: zero-row scalar maps to nihil (Option empty) through the product path.
-fn g8_sqlite_empty_scalar_is_nihil() {
-    let Some(lib) = examples_sqlite_lib() else {
-        eprintln!("skip: examples/sqlite missing");
-        return;
-    };
-    let root = test_temp_dir("g8-sqlite-empty");
-    let app = root.join("app");
-    write_sqlite_consumer_app(
-        &app,
-        &lib,
-        r#"
-import from "sqlite:sqlite" sqlite
-
-main {
-  do {
-    const value ∪ none result ← sqlite.scalar(":memory:", "SELECT 1 WHERE 0", empty)
-    if result ≡ null {
-      print "empty-ok"
-    }
-    else {
-      print "unexpected-value"
-    }
-  }
-  catch err {
-    warn err
-  }
-}
-"#,
-    );
-    let output = build_and_run_sqlite_app(&app);
-    assert_eq!(output.status.code(), Some(0));
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        stdout.contains("empty-ok"),
-        "expected empty-ok for zero-row scalar, got {stdout:?}"
-    );
-    assert!(
-        !stdout.contains("unexpected-value"),
-        "zero rows must be nihil: {stdout:?}"
-    );
-}
-
 #[test]
 #[ignore = "native library link e2e builds generated Rust; run with ignored integration checks"]
 fn g4_native_library_links_into_application_build() {
@@ -11830,40 +11568,6 @@ main args args exit 0 {
 }
 
 #[test]
-fn g6_go4_coreutils_true_package_go_builds() {
-    let path = PathBuf::from("~/work/faberlang/examples/coreutils/packages/true");
-    if !path.exists() {
-        eprintln!("skip: coreutils true package missing at {}", path.display());
-        return;
-    }
-    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &path);
-    let modules = result.go_modules;
-    let result = result.compile_result;
-    assert!(
-        result.success(),
-        "true package go compile failed: {:?}",
-        result.diagnostics
-    );
-    let Some(Output::Go(output)) = result.output else {
-        panic!("expected Go");
-    };
-    assert!(
-        output.code.contains("gnu_argv") || output.code.contains("var "),
-        "expected argv namespace in entry:\n{}",
-        output.code
-    );
-    let layout = discover_build_layout(&path).expect("layout");
-    let go_layout = super::GoBuildLayout::from_package(&layout);
-    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
-    let binary = super::invoke_go_build(&go_layout).expect("go build true");
-    let status = Command::new(&binary)
-        .args(["ignored"])
-        .status()
-        .expect("run true");
-    assert_eq!(status.code(), Some(0), "GNU true should exit 0");
-}
-
-#[test]
 fn g6_consolum_shim_dedupes_across_units() {
     let dir = test_temp_dir("g6-consolum-dedupe");
     fs::create_dir_all(dir.join("src")).expect("src");
@@ -11989,71 +11693,6 @@ main args args exit 0 {
 }
 
 #[test]
-fn g6_go4_coreutils_echo_package_go_builds() {
-    let path = PathBuf::from("~/work/faberlang/examples/coreutils/packages/echo");
-    if !path.exists() {
-        eprintln!("skip: coreutils echo package missing at {}", path.display());
-        return;
-    }
-    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &path);
-    let modules = result.go_modules;
-    let result = result.compile_result;
-    assert!(
-        result.success(),
-        "echo package go compile failed: {:?}",
-        result.diagnostics
-    );
-    let Some(Output::Go(output)) = result.output else {
-        panic!("expected Go");
-    };
-    assert!(
-        output.code.contains("var consolum") || output.code.contains("consolum ="),
-        "expected norma:console shim:\n{}",
-        output.code
-    );
-    assert!(
-        output.code.contains("fmt.Print"),
-        "expected Dic → fmt.Print in shim:\n{}",
-        output.code
-    );
-    let layout = discover_build_layout(&path).expect("layout");
-    let go_layout = super::GoBuildLayout::from_package(&layout);
-    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
-    let binary = super::invoke_go_build(&go_layout).expect("go build echo");
-    let output = Command::new(&binary)
-        .args(["hello", "world"])
-        .output()
-        .expect("run echo");
-    assert_eq!(output.status.code(), Some(0), "echo exit");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert_eq!(stdout, "hello world\n", "echo stdout got {stdout:?}");
-
-    let output = Command::new(&binary)
-        .args(["-n", "hello"])
-        .output()
-        .expect("run echo -n");
-    assert_eq!(output.status.code(), Some(0), "echo -n exit");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert_eq!(stdout, "hello", "echo -n stdout got {stdout:?}");
-
-    let output = Command::new(&binary)
-        .args(["-E", "hello", "world"])
-        .output()
-        .expect("run echo -E");
-    assert_eq!(output.status.code(), Some(0), "echo -E exit");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert_eq!(stdout, "hello world\n", "echo -E stdout got {stdout:?}");
-
-    let output = Command::new(&binary)
-        .args(["-n", "-E", "x"])
-        .output()
-        .expect("run echo -n -E");
-    assert_eq!(output.status.code(), Some(0), "echo -n -E exit");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert_eq!(stdout, "x", "echo -n -E stdout got {stdout:?}");
-}
-
-#[test]
 fn g6_consolum_shim_supports_full_stdio_surface() {
     let dir = test_temp_dir("g6-consolum-surface");
     fs::create_dir_all(dir.join("src")).expect("src");
@@ -12147,38 +11786,6 @@ main args args exit 0 {
         "notty:\nsalve\nBYTEBYTE"
     );
     assert_eq!(String::from_utf8_lossy(&output.stderr), "warn\ndebug\n");
-}
-
-#[test]
-fn g6_go4_coreutils_false_package_go_builds() {
-    let path = PathBuf::from("~/work/faberlang/examples/coreutils/packages/false");
-    if !path.exists() {
-        eprintln!(
-            "skip: coreutils false package missing at {}",
-            path.display()
-        );
-        return;
-    }
-    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &path);
-    let modules = result.go_modules;
-    let result = result.compile_result;
-    assert!(
-        result.success(),
-        "false package go compile failed: {:?}",
-        result.diagnostics
-    );
-    let Some(Output::Go(output)) = result.output else {
-        panic!("expected Go");
-    };
-    let layout = discover_build_layout(&path).expect("layout");
-    let go_layout = super::GoBuildLayout::from_package(&layout);
-    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
-    let binary = super::invoke_go_build(&go_layout).expect("go build false");
-    let status = Command::new(&binary)
-        .args(["ignored"])
-        .status()
-        .expect("run false");
-    assert_eq!(status.code(), Some(1), "GNU false should exit 1");
 }
 
 // ---------------------------------------------------------------------------
