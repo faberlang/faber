@@ -142,3 +142,28 @@ func TestDisplayValorBigInt(t *testing.T) {
 		t.Fatalf("DisplayValor(record) = %q", got)
 	}
 }
+
+// TestDisplayTokensEnglish pins the English token variants: bivalens, nil and
+// nested collections print true/false/none, and the Latin entry points are
+// unchanged.
+func TestDisplayTokensEnglish(t *testing.T) {
+	en := DisplayTokens{True: "true", False: "false", None: "none"}
+	if got := DisplayVerumTokens(true, en); got != "true" {
+		t.Fatalf("DisplayVerumTokens(true) = %q, want true", got)
+	}
+	if got := DisplayVerumTokens(false, en); got != "false" {
+		t.Fatalf("DisplayVerumTokens(false) = %q, want false", got)
+	}
+	if got := DisplayValorTokens(nil, en); got != "none" {
+		t.Fatalf("DisplayValorTokens(nil) = %q, want none", got)
+	}
+	if got := DisplayValorTokens([]any{true, nil}, en); got != "[true, none]" {
+		t.Fatalf("DisplayValorTokens(list) = %q, want [true, none]", got)
+	}
+	if got := DisplayValorTokens(map[string]any{"k": false}, en); got != `{"k": false}` {
+		t.Fatalf("DisplayValorTokens(map) = %q", got)
+	}
+	if got := DisplayValor([]any{true, nil}); got != "[verum, nihil]" {
+		t.Fatalf("DisplayValor(list) = %q, want [verum, nihil]", got)
+	}
+}

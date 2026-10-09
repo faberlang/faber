@@ -34,40 +34,59 @@ export type DisplayHint =
   | { kind: "map"; key: DisplayHint; value: DisplayHint }
   | { kind: "set"; element: DisplayHint };
 
+/**
+ * The words a program prints for a `bivalens` and for the null value. The
+ * print locale is the code locale: Latin code prints `verum`/`falsum`/`nihil`,
+ * English code prints `true`/`false`/`none`. Every renderer takes the tokens
+ * as an optional last argument that defaults to the Latin set.
+ */
+export interface DisplayTokens {
+  true_: string;
+  false_: string;
+  none: string;
+}
+
+/** The Latin tokens, the default of every renderer. */
+export const LATIN_TOKENS: DisplayTokens = { true_: "verum", false_: "falsum", none: "nihil" };
+
 /** Render any value under a display hint. */
-export function value(subject: any, hint: DisplayHint = "unknown"): string {
+export function value(
+  subject: any,
+  hint: DisplayHint = "unknown",
+  tokens: DisplayTokens = LATIN_TOKENS,
+): string {
   if (typeof hint === "object") {
     if (hint.kind === "nullable") {
-      return subject === null || subject === undefined ? "nihil" : value(subject, hint.inner);
+      return subject === null || subject === undefined ? tokens.none : value(subject, hint.inner, tokens);
     }
     if (hint.kind === "lista") {
-      return list(subject, hint.element);
+      return list(subject, hint.element, tokens);
     }
     if (hint.kind === "tensor") {
-      return tensor(subject, hint.element);
+      return tensor(subject, hint.element, tokens);
     }
     if (hint.kind === "sparsa") {
-      return sparsa(subject, hint.element);
+      return sparsa(subject, hint.element, tokens);
     }
     if (hint.kind === "map") {
-      return map(subject, hint.key, hint.value);
+      return map(subject, hint.key, hint.value, tokens);
     }
-    return list(subject, hint.element);
+    return list(subject, hint.element, tokens);
   }
   if (subject === null || subject === undefined) {
-    return hint === "vacuum" ? "vacuum" : "nihil";
+    return hint === "vacuum" ? "vacuum" : tokens.none;
   }
   switch (hint) {
     case "bivalens":
-      return subject ? "verum" : "falsum";
+      return subject ? tokens.true_ : tokens.false_;
     case "fractus":
       return fractus(subject);
     case "nihil":
-      return "nihil";
+      return tokens.none;
     case "vacuum":
       return "vacuum";
     case "valor":
-      return valor(subject);
+      return valor(subject, tokens);
     case "regex":
       return String(subject);
     case "textus":
@@ -77,7 +96,7 @@ export function value(subject: any, hint: DisplayHint = "unknown"): string {
     case "numerus":
       return numerus(subject);
     default:
-      return valor(subject);
+      return valor(subject, tokens);
   }
 }
 
@@ -125,36 +144,36 @@ export function fractus(subject: any): string {
 }
 
 /** Render a list/array under an element hint. */
-export function list(subject: any, element: DisplayHint): string {
+export function list(subject: any, element: DisplayHint, tokens: DisplayTokens = LATIN_TOKENS): string {
   if (subject === null || subject === undefined) {
-    return "nihil";
+    return tokens.none;
   }
-  return `[${Array.from(subject as Array<any>).map((item) => value(item, element)).join(", ")}]`;
+  return `[${Array.from(subject as Array<any>).map((item) => value(item, element, tokens)).join(", ")}]`;
 }
 
 /** Render a dense tensor under an element hint. */
-export function tensor(subject: any, element: DisplayHint): string {
+export function tensor(subject: any, element: DisplayHint, tokens: DisplayTokens = LATIN_TOKENS): string {
   if (subject === null || subject === undefined) {
-    return "nihil";
+    return tokens.none;
   }
   if (typeof subject.planata === "function") {
-    return list(subject.planata(), element);
+    return list(subject.planata(), element, tokens);
   }
   if (Array.isArray(subject.data)) {
-    return list(subject.data, element);
+    return list(subject.data, element, tokens);
   }
-  return valor(subject);
+  return valor(subject, tokens);
 }
 
 /** Render a sparse tensor under an element hint. */
-export function sparsa(subject: any, element: DisplayHint): string {
+export function sparsa(subject: any, element: DisplayHint, tokens: DisplayTokens = LATIN_TOKENS): string {
   if (subject === null || subject === undefined) {
-    return "nihil";
+    return tokens.none;
   }
   if (typeof subject.densata === "function") {
-    return tensor(subject.densata(), element);
+    return tensor(subject.densata(), element, tokens);
   }
-  return valor(subject);
+  return valor(subject, tokens);
 }
 
 /** Render a map/record under key and value hints. */
@@ -162,28 +181,29 @@ export function map(
   subject: any,
   keyHint: DisplayHint,
   valueHint: DisplayHint,
+  tokens: DisplayTokens = LATIN_TOKENS,
 ): string {
   if (subject === null || subject === undefined) {
-    return "nihil";
+    return tokens.none;
   }
   const entries = subject instanceof Map ? Array.from(subject.entries()) : Object.entries(subject);
-  return `{${entries.map(([key, item]) => `${JSON.stringify(value(key, keyHint))}: ${value(item, valueHint)}`).join(", ")}}`;
+  return `{${entries.map(([key, item]) => `${JSON.stringify(value(key, keyHint, tokens))}: ${value(item, valueHint, tokens)}`).join(", ")}}`;
 }
 
 /** Render a Faber valor (dynamic value carrier) as text. */
-export function valor(subject: any): string {
+export function valor(subject: any, tokens: DisplayTokens = LATIN_TOKENS): string {
   if (
     subject !== null &&
     typeof subject === "object" &&
     typeof subject.__faberValorTag === "string"
   ) {
-    return taggedValor(subject);
+    return taggedValor(subject, tokens);
   }
   if (subject === null || subject === undefined) {
-    return "nihil";
+    return tokens.none;
   }
   if (typeof subject === "boolean") {
-    return subject ? "verum" : "falsum";
+    return subject ? tokens.true_ : tokens.false_;
   }
   if (typeof subject === "number") {
     // A bare JS number is a numerus unless it can only be a float (fractional,
@@ -196,7 +216,7 @@ export function valor(subject: any): string {
     return subject;
   }
   if (Array.isArray(subject)) {
-    return list(subject, "valor");
+    return list(subject, "valor", tokens);
   }
   if (typeof subject.text === "function") {
     return String(subject.text());
@@ -204,20 +224,20 @@ export function valor(subject: any): string {
   if (typeof subject.toString === "function" && subject.toString !== Object.prototype.toString) {
     return String(subject);
   }
-  return map(subject, "textus", "valor");
+  return map(subject, "textus", "valor", tokens);
 }
 
 /**
  * Unbox valor tags so a nota of valor prints `42` / `[1, 2]` / `{…}` rather
  * than `Numerus(42)` / `Lista([...])` (mirrors Faber/rust `display_valor`).
  */
-export function taggedValor(subject: any): string {
+export function taggedValor(subject: any, tokens: DisplayTokens = LATIN_TOKENS): string {
   const payload = subject.__faberValorPayload;
   switch (subject.__faberValorTag) {
     case "Nihil":
-      return "nihil";
+      return tokens.none;
     case "Bivalens":
-      return payload ? "verum" : "falsum";
+      return payload ? tokens.true_ : tokens.false_;
     case "Numerus":
       return String(payload);
     case "Fractus":
@@ -229,10 +249,10 @@ export function taggedValor(subject: any): string {
     case "Octeti":
       return `<${Array.isArray(payload) ? payload.length : 0} bytes>`;
     case "Lista":
-      return list(payload, "valor");
+      return list(payload, "valor", tokens);
     case "Tabula":
-      return map(payload, "textus", "valor");
+      return map(payload, "textus", "valor", tokens);
     default:
-      return valor(payload);
+      return valor(payload, tokens);
   }
 }

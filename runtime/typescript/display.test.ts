@@ -72,3 +72,26 @@ test("a numerus beyond 2^53 displays its exact integer", () => {
   assert.equal(display.value(42, "numerus"), "42");
   assert.equal(display.value(-0, "numerus"), "0");
 });
+
+test("english tokens print true/false/none through every display renderer", () => {
+  const english = { true_: "true", false_: "false", none: "none" };
+  assert.equal(display.value(true, "bivalens", english), "true");
+  assert.equal(display.value(false, "bivalens", english), "false");
+  assert.equal(display.value(null, "unknown", english), "none");
+  assert.equal(display.value(null, { kind: "nullable", inner: "numerus" }, english), "none");
+  assert.equal(display.value(7, { kind: "nullable", inner: "numerus" }, english), "7");
+  assert.equal(display.value([true, false], { kind: "lista", element: "bivalens" }, english), "[true, false]");
+  assert.equal(
+    display.value(new Map([["k", null]]), { kind: "map", key: "textus", value: { kind: "nullable", inner: "numerus" } }, english),
+    '{"k": none}',
+  );
+  assert.equal(display.valor([true, null], english), "[true, none]");
+  assert.equal(display.taggedValor({ __faberValorTag: "Bivalens", __faberValorPayload: false }, english), "false");
+});
+
+test("the Latin default is unchanged when no tokens are passed", () => {
+  assert.equal(display.value(true, "bivalens"), "verum");
+  assert.equal(display.value(false, "bivalens"), "falsum");
+  assert.equal(display.value(null), "nihil");
+  assert.equal(display.value([true, null], { kind: "lista", element: "valor" }), "[verum, nihil]");
+});

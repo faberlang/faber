@@ -29,13 +29,31 @@ import (
 	"time"
 )
 
+// DisplayTokens are the words a program prints for a bivalens and for the null
+// value. The print locale is the code locale: Latin code prints
+// verum/falsum/nihil and English code prints true/false/none.
+type DisplayTokens struct {
+	True  string
+	False string
+	None  string
+}
+
+// LatinTokens are the Latin display tokens; DisplayVerum and DisplayValor use
+// them.
+var LatinTokens = DisplayTokens{True: "verum", False: "falsum", None: "nihil"}
+
 // DisplayVerum renders a Go bool as the Faber bivalens surface
 // (`verum`/`falsum`).
 func DisplayVerum(b bool) string {
+	return DisplayVerumTokens(b, LatinTokens)
+}
+
+// DisplayVerumTokens renders a Go bool with the module's display tokens.
+func DisplayVerumTokens(b bool, tokens DisplayTokens) string {
 	if b {
-		return "verum"
+		return tokens.True
 	}
-	return "falsum"
+	return tokens.False
 }
 
 // DisplayList renders a Faber list as `[a, b, c]` via the element renderer.
@@ -62,15 +80,17 @@ func MapDisplay[K comparable, V any](entries map[K]V, renderKey func(K) string, 
 // DisplayValor renders a boxed Faber valor/json value with Faber display
 // semantics. See the package doc for the per-type rules.
 func DisplayValor(value any) string {
+	return DisplayValorTokens(value, LatinTokens)
+}
+
+// DisplayValorTokens renders a boxed value with the module's display tokens.
+func DisplayValorTokens(value any, tokens DisplayTokens) string {
 	if value == nil {
-		return "nihil"
+		return tokens.None
 	}
 	switch v := value.(type) {
 	case bool:
-		if v {
-			return "verum"
-		}
-		return "falsum"
+		return DisplayVerumTokens(v, tokens)
 	case string:
 		return v
 	case []byte:
@@ -112,15 +132,15 @@ func DisplayValor(value any) string {
 	rv := reflect.ValueOf(value)
 	for rv.Kind() == reflect.Pointer {
 		if rv.IsNil() {
-			return "nihil"
+			return tokens.None
 		}
 		rv = rv.Elem()
 	}
 	switch rv.Kind() {
 	case reflect.Slice, reflect.Array:
-		return valorSliceDisplay(rv)
+		return valorSliceDisplay(rv, tokens)
 	case reflect.Map:
-		return valorMapDisplay(rv)
+		return valorMapDisplay(rv, tokens)
 	case reflect.Struct:
 		name := rv.Type().Name()
 		if rv.Type().PkgPath() == "faber/rt" && (strings.HasPrefix(name, "TensorTensor") || strings.HasPrefix(name, "VectorVector")) {
@@ -131,11 +151,11 @@ func DisplayValor(value any) string {
 				}
 				results := method.Call(nil)
 				if len(results) == 1 && results[0].Kind() == reflect.Slice {
-					return valorSliceDisplay(results[0])
+					return valorSliceDisplay(results[0], tokens)
 				}
 			}
 		}
-		return valorStructDisplay(rv)
+		return valorStructDisplay(rv, tokens)
 	}
 	return fmt.Sprint(value)
 }
@@ -160,35 +180,35 @@ func valorByteListDisplay(values []byte) string {
 }
 
 // valorSliceDisplay renders a reflected slice/array as `[a, b, c]`.
-func valorSliceDisplay(rv reflect.Value) string {
+func valorSliceDisplay(rv reflect.Value, tokens DisplayTokens) string {
 	parts := make([]string, rv.Len())
 	for i := 0; i < rv.Len(); i++ {
-		parts[i] = DisplayValor(rv.Index(i).Interface())
+		parts[i] = DisplayValorTokens(rv.Index(i).Interface(), tokens)
 	}
 	return "[" + strings.Join(parts, ", ") + "]"
 }
 
 // valorMapDisplay renders a reflected map as `{"k": v, ...}` with the keys
 // sorted by their display form and string keys quoted.
-func valorMapDisplay(rv reflect.Value) string {
+func valorMapDisplay(rv reflect.Value, tokens DisplayTokens) string {
 	keys := rv.MapKeys()
 	sort.Slice(keys, func(i, j int) bool {
-		return DisplayValor(keys[i].Interface()) < DisplayValor(keys[j].Interface())
+		return DisplayValorTokens(keys[i].Interface(), tokens) < DisplayValorTokens(keys[j].Interface(), tokens)
 	})
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
-		keyStr := DisplayValor(key.Interface())
+		keyStr := DisplayValorTokens(key.Interface(), tokens)
 		if key.Kind() == reflect.String {
 			keyStr = strconv.Quote(key.String())
 		}
-		parts = append(parts, keyStr+": "+DisplayValor(rv.MapIndex(key).Interface()))
+		parts = append(parts, keyStr+": "+DisplayValorTokens(rv.MapIndex(key).Interface(), tokens))
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 // valorStructDisplay renders a genus record as `{"field": value, ...}` with
 // Go-exported field names lowercased and quoted.
-func valorStructDisplay(rv reflect.Value) string {
+func valorStructDisplay(rv reflect.Value, tokens DisplayTokens) string {
 	t := rv.Type()
 	parts := make([]string, 0, rv.NumField())
 	for i := 0; i < rv.NumField(); i++ {
@@ -197,7 +217,7 @@ func valorStructDisplay(rv reflect.Value) string {
 		if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
 			name = string(rune(name[0])+32) + name[1:]
 		}
-		parts = append(parts, strconv.Quote(name)+": "+DisplayValor(rv.Field(i).Interface()))
+		parts = append(parts, strconv.Quote(name)+": "+DisplayValorTokens(rv.Field(i).Interface(), tokens))
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
 }
