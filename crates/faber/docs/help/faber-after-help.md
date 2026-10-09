@@ -95,13 +95,10 @@ Common flows:
     faber -c 'incipit { nota 1 }'
     faber repl
 
-  Scripting host routes (import processus provider):
-    processus.argumenta()  — argv after `--` (or repl/-c trailing args)
-    processus.lege(name)   — environment variable (fails if unset; use future legeret for effective-value read)
-    processus.scribe(name, value) — set environment variable
-    processus.sedes()        — current working directory
-    processus.identitas()    — process id
-    processus.exi(code)      — exit interpreter
+  Scripting host routes (`ad` routes):
+    runtime:echo and processus:exi work (processus:exi exits the interpreter).
+    Every other host route fails closed at plan time and is unavailable in
+    this release; the rest return with the native host (core-norma N2).
 
   Single-file check (non-package):
     faber check crates/exempla/corpus/salve-munde.fab
@@ -122,7 +119,7 @@ Common flows:
     fragment. Converted output replaces or inserts its target `locale` key and
     retains unrelated frontmatter metadata.
 
-  Inspect resolved library home (FABER_LIBRARY_HOME or ancestor probing):
+  Inspect resolved library home (FABER_LIBRARY_HOME or the in-tree lib/):
     faber doctor
     faber check-library norma
 
