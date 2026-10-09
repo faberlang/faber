@@ -40,6 +40,7 @@ pub(crate) mod composite_plan;
 mod device;
 mod dispatch;
 mod embedded_locale;
+pub(crate) mod embedded_runtime;
 #[cfg(feature = "hir-fhir")]
 mod fhir;
 #[cfg(feature = "hir-go")]

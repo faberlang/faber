@@ -6,6 +6,9 @@
 //!
 //! It embeds the `faber explain` reference: every corpus exemplum whose
 //! frontmatter declares `explains = [...]`, plus `legacy-redirects.toml`.
+//!
+//! It embeds the runtime support sources (`runtime/*`, `crates/radix-host-abi`)
+//! so an installed binary can materialize a path-dependency root.
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -31,6 +34,99 @@ fn main() {
     }
 
     embed_reference(&manifest_dir.join("../../corpus"), &out_dir);
+    embed_runtime(&manifest_dir.join("../.."), &out_dir);
+}
+
+/// Repository-relative roots whose files the binary carries.
+const RUNTIME_ROOTS: &[&str] = &[
+    "runtime/rust",
+    "runtime/go",
+    "runtime/typescript",
+    "runtime/swift",
+    "runtime/llvm",
+    "crates/radix-host-abi",
+];
+
+/// Write `runtime_embedded.rs`: `EMBEDDED_RUNTIME` (sorted repo-relative path
+/// and `include_bytes!` of the file) and `EMBEDDED_RUNTIME_DIGEST` (FNV-1a 64
+/// over paths and bytes, so the extraction directory tracks the content).
+fn embed_runtime(repo_root: &Path, out_dir: &Path) {
+    let repo_root = repo_root.canonicalize().unwrap_or_else(|err| {
+        panic!("repository root {}: {err}", repo_root.display());
+    });
+    let mut files = Vec::new();
+    for root in RUNTIME_ROOTS {
+        let dir = repo_root.join(root);
+        println!("cargo:rerun-if-changed={}", dir.display());
+        collect_runtime_files(&dir, &mut files);
+    }
+    files.sort();
+
+    let mut digest: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut feed = |bytes: &[u8]| {
+        for byte in bytes {
+            digest ^= u64::from(*byte);
+            digest = digest.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    };
+    let mut generated = String::from("static EMBEDDED_RUNTIME: &[(&str, &[u8])] = &[\n");
+    for file in &files {
+        let relative = file
+            .strip_prefix(&repo_root)
+            .expect("runtime file under repository root")
+            .to_str()
+            .expect("utf-8 runtime path")
+            .replace('\\', "/");
+        let bytes = fs::read(file).unwrap_or_else(|err| {
+            panic!("read {}: {err}", file.display());
+        });
+        feed(relative.as_bytes());
+        feed(&[0]);
+        feed(&(bytes.len() as u64).to_le_bytes());
+        feed(&bytes);
+        writeln!(
+            generated,
+            "    ({relative:?}, include_bytes!({:?})),",
+            file.to_str().expect("utf-8 runtime path")
+        )
+        .expect("write to String");
+    }
+    generated.push_str("];\n");
+    writeln!(
+        generated,
+        "const EMBEDDED_RUNTIME_DIGEST: &str = \"{digest:016x}\";"
+    )
+    .expect("write to String");
+
+    let target = out_dir.join("runtime_embedded.rs");
+    fs::write(&target, generated).unwrap_or_else(|err| {
+        panic!("write {}: {err}", target.display());
+    });
+}
+
+fn collect_runtime_files(dir: &Path, files: &mut Vec<PathBuf>) {
+    let entries = fs::read_dir(dir).unwrap_or_else(|err| {
+        panic!("read {}: {err}", dir.display());
+    });
+    for entry in entries {
+        let path = entry
+            .unwrap_or_else(|err| panic!("read {}: {err}", dir.display()))
+            .path();
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if path.is_dir() {
+            if !matches!(name, "target" | "node_modules" | ".git") {
+                collect_runtime_files(&path, files);
+            }
+        } else if path.is_file() {
+            let ts_lock = name.ends_with(".lock")
+                && path
+                    .components()
+                    .any(|c| c.as_os_str() == std::ffi::OsStr::new("typescript"));
+            if !ts_lock {
+                files.push(path);
+            }
+        }
+    }
 }
 
 /// Write `reference_embedded.rs`: one `include_str!` per exemplum that
