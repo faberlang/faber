@@ -3879,6 +3879,10 @@ mod format_value_test;
 mod shuffle_test;
 
 #[cfg(test)]
+#[path = "value_json_order_test.rs"]
+mod value_json_order_test;
+
+#[cfg(test)]
 mod exact_int_test;
 
 #[cfg(test)]

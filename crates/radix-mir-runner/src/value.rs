@@ -1553,7 +1553,15 @@ fn display_tabula_map(
     // the test-only seed so a `print tabula` golden cannot quietly pin the
     // runner's FxHashMap order.
     let mut rows: Vec<(&MapKey, &Value)> = entries.iter().collect();
-    crate::shuffle::shuffle_unordered(&mut rows);
+    if order.dynamic {
+        // A `valor`/`json` object is not an ordinary `tabula`: its display
+        // order is fixed as sorted keys (byte order, the order a
+        // `BTreeMap<String, _>` gives; stepper-valor-representation.md), so
+        // no shuffle applies.
+        rows.sort_by_key(|row| display_sort_key(row.0));
+    } else {
+        crate::shuffle::shuffle_unordered(&mut rows);
+    }
     let mut parts = Vec::new();
     for (key, value) in rows {
         let key_str = match key {
@@ -1569,6 +1577,16 @@ fn display_tabula_map(
         parts.push(format!("{key_str}: {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
+}
+
+/// The key text a `valor`/`json` object display sorts by: a string key is its
+/// own bytes; any other key (not reachable from a json literal) its document
+/// form, so the order stays total and deterministic.
+fn display_sort_key(key: &MapKey) -> String {
+    match key {
+        MapKey::Str(text) => text.clone(),
+        other => other.document_key(),
+    }
 }
 
 fn display_tabula_struct(
