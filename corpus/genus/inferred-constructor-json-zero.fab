@@ -1,0 +1,53 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "json_literal", "json_member", "json_value", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "The inferred constructor `_ { … }` builds the expected json value and the typed zero."
+syntax = "<type> <name> ← _ { … }"
+related = ["genus", "tensor"]
+locale = "en"
++++
+# =============================================================================
+# genus — the inferred constructor `_ { … }` for json and the typed zero
+# =============================================================================
+#
+# What this teaches:
+#   • `_ { "key": value }` against `json` builds what the bare `{ … }` literal builds.
+#   • `_ {}` against a tensor, vector or matrix is the typed zero `Type {}`.
+#   • The expected type comes from a binding, a parameter, or a declared return.
+#
+# See also: genus
+# =============================================================================
+
+fn doc() → json {
+    return _ { "x": 7 }
+}
+
+fn cells(tensor<f32, [2, 2]> t) → int {
+    return t.shape()[0]
+}
+
+fn blank() → tf32[3] {
+    return _ {}
+}
+
+main {
+    const json j ← _ { "a": 1 }
+    const json same ← { "a": 1 }
+    print j
+    print same
+    print doc()
+
+    const tensor<f32, [8]> b ← _ {}
+    print b.shape()
+    print b[[3]]
+
+    const tf32[2, 3] g ← _ {}
+    print g.shape()
+    print g[[1, 2]]
+
+    print cells(_ {})
+    print blank().shape()
+}

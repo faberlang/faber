@@ -143,3 +143,38 @@ fn empty_keeps_rank_zero_sparse_and_collection_slots() {
         "fn main() {\n    const list<int> a ← empty\n    const tabula<textus, int> b ← empty\n    const copia<int> c ← empty\n}\n",
     );
 }
+
+// `_ {}` at a dense slot is the same typed zero (need, inferred
+// constructor): it takes exactly the rewrite `empty` takes.
+
+#[test]
+fn inferred_constructor_empty_braces_build_typed_zero_for_tensor_vector_and_matrix() {
+    accepts(
+        "fn z() → tf32[3] { return _ {} }\n\
+         fn take(tensor<f32, [2, 2]> t) → int { return 0 }\n\
+         main {\n\
+         \x20   var tensor<f32, [8]> b ← _ {}\n\
+         \x20   const vf32[4] v ← _ {}\n\
+         \x20   const mf32[2, 2] m ← _ {}\n\
+         \x20   print take(_ {})\n\
+         \x20   print z().shape()\n\
+         }\n",
+    );
+}
+
+#[test]
+fn inferred_constructor_typed_zero_refuses_what_empty_refuses() {
+    refuses_with(
+        "fn f<size N>() → tf32[N + 1] {\n    return _ {}\n}\n",
+        REFUSED,
+    );
+    refuses_with("fn f<size N>() → vf32[N] {\n    return _ {}\n}\n", REFUSED);
+}
+
+#[test]
+fn inferred_constructor_typed_zero_without_expected_type_is_named_error() {
+    refuses_with(
+        "main {\n    print _ {}\n}\n",
+        "inferred_constructor_no_expected_type",
+    );
+}

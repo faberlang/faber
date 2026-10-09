@@ -326,6 +326,21 @@ impl TypeChecker<'_> {
             }
             return None;
         }
+        // `_ {}` at a dense tensor, vector, or matrix slot is the typed zero
+        // `Type {}`: the very rewrite `empty` (`vacua`) takes at that slot.
+        if no_fields
+            && matches!(
+                self.types.get(concrete),
+                Type::Tensor(..) | Type::Vector(..) | Type::Matrix(..)
+            )
+        {
+            expr.kind = HirExpressionKind::Vacua;
+            expr.ty = None;
+            return match self.desugar_empty_dense(expr, Some(concrete)) {
+                super::empty_dense::EmptyDense::Refused => Some(concrete),
+                _ => None,
+            };
+        }
         if is_map {
             if !no_fields {
                 self.invalid_conversion(

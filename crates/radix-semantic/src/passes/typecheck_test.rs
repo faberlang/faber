@@ -2518,3 +2518,34 @@ fn inferred_constructor_entries_without_expected_type_is_named_error() {
         "inferred_constructor_no_expected_type",
     );
 }
+
+#[test]
+fn inferred_constructor_entries_build_expected_json_value() {
+    test_support::assert_accepts(
+        "
+functio f() → json { redde _ { \"a\": 1, \"b\": [1, 2] } }
+functio g(json v) → numerus { redde 0 }
+incipit {
+    fixum json j ← _ { \"a\": 1 }
+    nota g(_ { \"k\": \"v\" })
+    nota g(f())
+}
+",
+    );
+}
+
+#[test]
+fn inferred_constructor_with_hole_on_both_sides_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "genus P { varia numerus x = 0 } incipit { fixum _ p ← _ { x = 1 } }",
+        "inferred_constructor_no_expected_type",
+    );
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum _ m ← _ { \"a\": 1 } }",
+        "inferred_constructor_no_expected_type",
+    );
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum _ z ← _ {} }",
+        "inferred_constructor_no_expected_type",
+    );
+}
