@@ -37,6 +37,7 @@ use radix_hir::{
 };
 use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type};
 use radix_lexer::{Interner, Span};
+use radix_types::{IndexExpr, RuntimeExtentId};
 use rustc_hash::FxHashSet;
 
 const ISSUE_EMPTY_MARKER_SHADOWING: &str = "empty_marker_shadowing";
@@ -72,6 +73,7 @@ pub fn lint(
     let mut ctx = LintContext::new(resolver, types, interner, locale_pack);
     ctx.mutating_methods = method_receiver_mutation::collect(hir, types, interner);
     ctx.collect_items(hir);
+    ctx.mark_type_extent_uses();
     ctx.check_program(hir);
 
     let mut errors = ctx.errors;
@@ -233,6 +235,21 @@ impl<'a> LintContext<'a> {
                 self.used.insert(item.def_id);
             }
             self.imports.push((item.def_id, Span::default()));
+        }
+    }
+
+    /// A scalar binding named in a type's extent (`tf32[size (n - 1)]`) is read
+    /// when the shape is evaluated, but the name lives in the type, not in a
+    /// `Path` expression. Every such extent is interned as a runtime index
+    /// term, so reading those terms is the use.
+    fn mark_type_extent_uses(&mut self) {
+        for raw in 0..self.types.index_count() {
+            let id = radix_types::IndexId(u32::try_from(raw).expect("index arena fits u32"));
+            if let IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)) =
+                self.types.get_index(id)
+            {
+                self.used.insert(*def_id);
+            }
         }
     }
 

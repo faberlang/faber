@@ -144,6 +144,10 @@ mod borrow_receiver_write_test;
 mod lint_mut_arg_test;
 
 #[cfg(test)]
+#[path = "lint_tensor_use_test.rs"]
+mod lint_tensor_use_test;
+
+#[cfg(test)]
 #[path = "borrow_non_null_receiver_test.rs"]
 mod borrow_non_null_receiver_test;
 

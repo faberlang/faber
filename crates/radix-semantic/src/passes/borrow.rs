@@ -983,13 +983,11 @@ impl<'a> BorrowChecker<'a> {
 
     /// Statement-form `fill` (result dropped) is the in-place tensor store; the
     /// registry row is `TensorFill`, whose bound form returns a fresh tensor and
-    /// so is not marked receiver-mutating. The statement posture is the write.
+    /// so is not marked receiver-mutating. The statement posture is the write:
+    /// it is rejected on a read-only parameter and counts as a write to a
+    /// writable root (so a `mut` parameter it fills is not reported unused).
     fn check_statement_fill(&mut self, expr: &HirExpression) {
         let HirExpressionKind::MethodCall(receiver, method, _, args, _) = &expr.kind else {
-            return;
-        };
-        let Some(origin) = Self::root_def_id(receiver).and_then(|d| self.nonmut_tensor_origin(d))
-        else {
             return;
         };
         let is_fill = receiver
@@ -1004,8 +1002,18 @@ impl<'a> BorrowChecker<'a> {
                     )
                 )
             });
-        if is_fill {
+        if !is_fill {
+            return;
+        }
+        let Some(root) = Self::root_def_id(receiver) else {
+            return;
+        };
+        if let Some(origin) = self.nonmut_tensor_origin(root) {
             self.nonmut_tensor_write_error(origin, expr.span);
+            return;
+        }
+        if let Some(usage) = self.param_usage.get_mut(&root) {
+            usage.mutated = true;
         }
     }
 
