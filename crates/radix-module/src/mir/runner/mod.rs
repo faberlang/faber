@@ -46,6 +46,10 @@ mod creo_hook_tests;
 mod call_depth_tests;
 
 #[cfg(test)]
+#[path = "display_tokens_run_test.rs"]
+mod display_tokens_run_tests;
+
+#[cfg(test)]
 #[path = "kernel_ban_test.rs"]
 mod kernel_ban_tests;
 

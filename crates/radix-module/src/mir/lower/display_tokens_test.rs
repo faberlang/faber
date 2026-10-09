@@ -1,5 +1,5 @@
 //! The lowered program carries a display-token table and an id for every
-//! function holding a print-family site (need, plumbing only).
+//! function holding a print-family site.
 
 use super::*;
 use crate::codegen::Target;
@@ -7,7 +7,7 @@ use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use radix_runtime_contract::display_tokens::DisplayTokens;
 
 #[test]
-fn english_print_and_interpolation_sites_carry_latin_id_zero() {
+fn english_print_and_interpolation_sites_carry_english_id_zero() {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let source = "+++
 locale = \"en\"
@@ -20,7 +20,15 @@ main {
     let unit = analyze_source(&session, "tokens.fab", source, AnalyzeRequest::default()).expect("analyzes");
     let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("lowers");
     let validation = lowered.validated.validation();
-    assert_eq!(validation.display_tokens.tokens, vec![DisplayTokens::latin()]);
+    assert_eq!(
+        validation.display_tokens.tokens,
+        vec![DisplayTokens {
+            true_: "true".to_owned(),
+            false_: "false".to_owned(),
+            none: "none".to_owned(),
+            tuple: "tuple".to_owned(),
+        }]
+    );
     let entry = lowered
         .validated
         .program()

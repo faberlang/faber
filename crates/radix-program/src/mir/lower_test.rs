@@ -185,6 +185,7 @@ fn rewrite_lowered_type_ids_applies_remapped_validation_off_rewritten_keys() {
         companions: Default::default(),
         imported_device_routes: Default::default(),
         imported_device_registrations: Vec::new(),
+        display_tokens: radix_module::runtime_contract::display_tokens::DisplayTokens::latin(),
     };
 
     let mut variant_remap = HashMap::new();

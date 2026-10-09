@@ -40,3 +40,15 @@ fn display_tokens_every_other_shipped_pack_gives_four_distinct_nonempty_strings(
         }
     }
 }
+
+#[test]
+fn display_tokens_pack_missing_a_row_falls_back_per_token_to_latin() {
+    let mut en = pack("en");
+    en.keywords.remove("falsum");
+    en.types.remove("nihil");
+    let tokens = display_tokens_from_pack(&en);
+    assert_eq!(tokens.true_, "true");
+    assert_eq!(tokens.false_, "falsum");
+    assert_eq!(tokens.none, "nihil");
+    assert_eq!(tokens.tuple, "tuple");
+}

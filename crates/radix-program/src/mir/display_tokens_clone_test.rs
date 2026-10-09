@@ -6,7 +6,8 @@
 use super::*;
 use radix_module::lexer::Span;
 use radix_module::mir::{
-    MirDeviceFunctionMetadataMap, MirDisplayTokens, MirMonomorphization, MirMonomorphizationKey,
+    MirDeviceFunctionMetadataMap, MirDiagnosticKind, MirDisplayTokens, MirIntrinsic,
+    MirMonomorphization, MirMonomorphizationKey, MirRuntimeCall, MirStatement, MirStatementKind,
     MirTensorEdgePolicyMetadata,
 };
 use radix_module::runtime_contract::display_tokens::DisplayTokens;
@@ -45,6 +46,23 @@ fn function(id: u32, source: u32, unit: MirType) -> MirFunction {
         shader_stage: None,
         span: Span::default(),
     }
+}
+
+/// A template whose body holds one print site.
+fn printing_function(id: u32, source: u32, unit: MirType) -> MirFunction {
+    let mut template = function(id, source, unit);
+    template.blocks[0].statements.push(MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: None,
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Diagnostic(MirDiagnosticKind::Nota),
+                args: Vec::new(),
+                return_ty: unit,
+            },
+        },
+        span: Span::default(),
+    });
+    template
 }
 
 fn unit_ty() -> MirType {
@@ -113,16 +131,14 @@ fn library_unit_display_tokens_survive_the_link() {
 #[test]
 fn cross_file_generic_clone_takes_the_defining_files_tokens() {
     let ty = unit_ty();
-    let mut library_table = MirDisplayTokens::default();
-    library_table.assign(MirFunctionId(0), &english());
     let mut template_tokens = HashMap::new();
-    record_template_display_tokens(&mut template_tokens, &[function(7, 50, ty)], &library_table);
-    // A template from a unit that prints nothing records nothing.
     record_template_display_tokens(
         &mut template_tokens,
-        &[function(8, 60, ty)],
-        &MirDisplayTokens::default(),
+        &[printing_function(7, 50, ty)],
+        &english(),
     );
+    // A template that prints nothing records nothing.
+    record_template_display_tokens(&mut template_tokens, &[function(8, 60, ty)], &english());
 
     let mut merged = MirDisplayTokens::default();
     merged.assign(MirFunctionId(0), &DisplayTokens::latin());

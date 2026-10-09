@@ -134,7 +134,7 @@ pub use lower::{
     ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, KernelLowering, LoweredMirUnit, MirError,
     MirGenericParam, MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue, MirTensorEdgeAppliedArg,
     MirTensorEdgePolicyMetadata, MirTensorEdgePolicyProvider, MirTensorEdgePolicySelector, MirTensorEdgeShapeIdentity,
-    MirTensorEdgeTypeIdentity, MirTensorLimesTemplate, PackageStructMetadata, dump_analyzed_unit,
+    MirTensorEdgeTypeIdentity, MirTensorLimesTemplate, PackageStructMetadata, dump_analyzed_unit, holds_print_site,
     instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
     instantiate_merged_generic_calls_with_devices_and_metadata,
     instantiate_merged_generic_calls_with_tensor_edge_policy, lower_analyzed_unit,

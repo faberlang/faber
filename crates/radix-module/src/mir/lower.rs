@@ -269,6 +269,11 @@ pub struct LoweredMirUnit<'a> {
     /// under its route's role + body channel rather than a role bit alone.
     /// Empty until package linking runs the device-aware instantiation.
     pub imported_device_registrations: Vec<ImportedDeviceRegistration>,
+    /// The display words of the file this unit was lowered from. Every
+    /// printing function of the unit carries them in the validation table;
+    /// package linking also reads them for [`Self::generic_templates`], which
+    /// leave the program before the table is filled.
+    pub display_tokens: radix_runtime_contract::display_tokens::DisplayTokens,
 }
 
 impl<'a> LoweredMirUnit<'a> {
@@ -294,6 +299,7 @@ impl<'a> LoweredMirUnit<'a> {
             companions,
             imported_device_routes,
             imported_device_registrations,
+            display_tokens,
         } = self;
         let validated = validated.patch_program(patch)?;
         Ok(Self {
@@ -308,6 +314,7 @@ impl<'a> LoweredMirUnit<'a> {
             companions,
             imported_device_routes,
             imported_device_registrations,
+            display_tokens,
         })
     }
 }
@@ -839,7 +846,8 @@ pub fn lower_analyzed_unit(
         let imported_device_routes = maps.take_imported_device_routes();
         let mut validation = maps.validation;
         align_function_signatures_with_mir_params(&mut validation, &program.functions);
-        record_function_display_tokens(&mut validation, &program.functions, &display_tokens_for_file(unit));
+        let display_tokens = display_tokens_for_file(unit);
+        record_function_display_tokens(&mut validation, &program.functions, &display_tokens);
         validation.layouts = MirLayoutTable::from_types(&types);
         validation.closure_environments = closure_environments
             .iter()
@@ -877,18 +885,17 @@ pub fn lower_analyzed_unit(
             companions: radix_mir::device::MirCompanionMap::default(),
             imported_device_routes,
             imported_device_registrations: Vec::new(),
+            display_tokens,
         })
     } else {
         Err(lowering_errors)
     }
 }
 
-/// The display tokens the file holding `unit` prints through.
-///
-/// Plumbing only: every file fills Latin until the final unit
-/// switches this one function to the file's locale pack.
-fn display_tokens_for_file(_unit: &AnalyzedModule) -> radix_runtime_contract::display_tokens::DisplayTokens {
-    radix_runtime_contract::display_tokens::DisplayTokens::latin()
+/// The display tokens the file holding `unit` prints through: its own locale
+/// pack's words.
+fn display_tokens_for_file(unit: &AnalyzedModule) -> radix_runtime_contract::display_tokens::DisplayTokens {
+    unit.display_tokens.clone()
 }
 
 /// Whether the intrinsic renders program output (`print`, interpolation,
@@ -910,13 +917,19 @@ fn record_function_display_tokens(
     tokens: &radix_runtime_contract::display_tokens::DisplayTokens,
 ) {
     for function in functions {
-        let prints = function.blocks.iter().flat_map(|block| &block.statements).any(|statement| {
-            matches!(&statement.kind, MirStatementKind::RuntimeCall { call, .. } if is_print_family(&call.intrinsic))
-        });
-        if prints {
+        if holds_print_site(function) {
             validation.display_tokens.assign(function.id, tokens);
         }
     }
+}
+
+/// Whether `function` holds a print-family site. Package linking asks this of
+/// generic templates, which leave the program before the table is filled.
+#[must_use]
+pub fn holds_print_site(function: &MirFunction) -> bool {
+    function.blocks.iter().flat_map(|block| &block.statements).any(|statement| {
+        matches!(&statement.kind, MirStatementKind::RuntimeCall { call, .. } if is_print_family(&call.intrinsic))
+    })
 }
 
 /// Replace HIR reference wrappers in local callable signatures with the MIR

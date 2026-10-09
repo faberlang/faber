@@ -1308,7 +1308,7 @@ pub(super) fn lower_package_units<'a>(
                 record_template_display_tokens(
                     &mut template_tokens,
                     &lowered.generic_templates,
-                    &library_context.display_tokens,
+                    &lowered.display_tokens,
                 );
                 library_parts.push(LibraryMirParts {
                     program: library_program,
@@ -1404,7 +1404,7 @@ pub(super) fn lower_package_units<'a>(
     record_template_display_tokens(
         &mut template_tokens,
         &generic_templates,
-        &merged.validated.validation().display_tokens,
+        &merged.display_tokens,
     );
     // Host kernel lowering has no device routes: imported kernels are plain
     // functions, so the composition inputs stay empty.
@@ -1460,7 +1460,7 @@ pub(super) fn lower_package_units<'a>(
         record_template_display_tokens(
             &mut template_tokens,
             &lowered.generic_templates,
-            &lowered.validated.validation().display_tokens,
+            &lowered.display_tokens,
         );
         let mut available_templates = generic_templates.clone();
         available_templates.extend(future_library_templates.iter().cloned());
@@ -3681,33 +3681,25 @@ fn function_id_overflow_diag(path: &Path, message: &str) -> Diagnostic {
     mir_issue_diag(path, "package_mir_function_id_overflow", message)
 }
 
-/// Display tokens of the file a unit was written in, as far as the unit's own
-/// table shows it: every entry of a unit's table comes from that one file, so
-/// the first entry is the file's tokens. A unit whose table is empty (no
-/// function prints) yields none. The flip unit replaces this derivation with
-/// the file's locale pack directly.
-fn unit_display_tokens(
-    table: &radix_module::mir::MirDisplayTokens,
-) -> Option<&radix_module::runtime_contract::display_tokens::DisplayTokens> {
-    table.tokens.first()
-}
-
-/// Remember the defining file's tokens for each generic template of a unit.
+/// Remember the defining file's tokens for each printing generic template of
+/// a unit. The tokens are the unit's own file words, never a sibling's.
 fn record_template_display_tokens(
     template_tokens: &mut HashMap<
         DefId,
         radix_module::runtime_contract::display_tokens::DisplayTokens,
     >,
     templates: &[MirFunction],
-    table: &radix_module::mir::MirDisplayTokens,
+    tokens: &radix_module::runtime_contract::display_tokens::DisplayTokens,
 ) {
-    let Some(tokens) = unit_display_tokens(table) else {
-        return;
-    };
-    for source in templates.iter().filter_map(|template| template.source) {
-        template_tokens
-            .entry(source)
-            .or_insert_with(|| tokens.clone());
+    for template in templates
+        .iter()
+        .filter(|template| radix_module::mir::holds_print_site(template))
+    {
+        if let Some(source) = template.source {
+            template_tokens
+                .entry(source)
+                .or_insert_with(|| tokens.clone());
+        }
     }
 }
 

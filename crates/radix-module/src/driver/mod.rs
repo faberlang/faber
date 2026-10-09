@@ -3107,6 +3107,12 @@ pub struct AnalyzedModule {
     /// rebuild when one changes. Empty for loaded artifacts.
     pub embedded_inputs: Vec<std::path::PathBuf>,
 
+    /// Words this file's print statements render `true`, `false`, `none` and
+    /// `tuple` as: the file's own locale pack (frontmatter locale, else the
+    /// session pack), Latin when the file reads with no pack and for loaded
+    /// artifacts.
+    pub display_tokens: crate::runtime_contract::display_tokens::DisplayTokens,
+
     /// Warnings and informational diagnostics accumulated before codegen.
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -3211,6 +3217,7 @@ impl AnalyzedModule {
             #[cfg(feature = "mir-core")]
             graphics_source,
             embedded_inputs: Vec::new(),
+            display_tokens: crate::runtime_contract::display_tokens::DisplayTokens::latin(),
             diagnostics,
         }
     }
@@ -3504,6 +3511,11 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
         default_import_names: _,
     } = contract;
     let insere = insere::resolve_insere_files(&program, &interner, name);
+    // Read the file's display words before the pack moves into the analysis.
+    let display_tokens = lex_pack.as_ref().map_or_else(
+        crate::runtime_contract::display_tokens::DisplayTokens::latin,
+        crate::runtime_contract::display_tokens_from_pack,
+    );
 
     let Ok(semantic_result) = analyze_semantic_program(SemanticAnalysisInput {
         session,
@@ -3535,8 +3547,9 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
         return Err(diagnostics);
     }
 
-    let mut unit = analyzed_unit_from_semantic(interner, cli_program, semantic_result, name, &mut diagnostics)
-        .map_err(|()| diagnostics)?;
+    let mut unit =
+        analyzed_unit_from_semantic(interner, cli_program, semantic_result, display_tokens, name, &mut diagnostics)
+            .map_err(|()| diagnostics)?;
     unit.embedded_inputs = insere.inputs;
     // D8.5: evaluate `praefixum` statics on the MIR runner so every backend
     // receives literals. Faber re-emission keeps the authored body.
@@ -4201,6 +4214,7 @@ fn analyzed_unit_from_semantic(
     interner: Interner,
     cli_program: Option<crate::cli::CliProgram>,
     semantic_result: semantic::SemanticResult,
+    display_tokens: crate::runtime_contract::display_tokens::DisplayTokens,
     name: &str,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<AnalyzedModule, ()> {
@@ -4284,6 +4298,7 @@ fn analyzed_unit_from_semantic(
         hir: fields.hir,
         presentation: semantic_result.presentation,
         embedded_inputs: Vec::new(),
+        display_tokens,
         diagnostics: std::mem::take(diagnostics),
     })
 }

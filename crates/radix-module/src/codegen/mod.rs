@@ -544,9 +544,9 @@ pub fn generate_from_analyzed_with_options(
     feature = "hir-haskell"
 ))]
 pub(crate) fn display_tokens_for_module(
-    _analysis: &crate::driver::AnalyzedModule,
+    analysis: &crate::driver::AnalyzedModule,
 ) -> radix_codegen_shared::names::DisplayTokens {
-    radix_codegen_shared::names::DisplayTokens::latin()
+    analysis.display_tokens.clone()
 }
 
 #[cfg(all(
