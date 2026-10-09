@@ -49,3 +49,29 @@ incipit {
 "#;
     assert_eq!(run_lines("latin-tokens.fab", source), vec!["verum", "falsum", "nihil"]);
 }
+
+#[test]
+fn english_multi_argument_print_prints_none_through_the_tokens() {
+    let source = r#"+++
+locale = "en"
++++
+main {
+    const int ∪ none absent ← null
+    print 1, absent, true
+}
+"#;
+    assert_eq!(run_lines("english-multi.fab", source), vec!["1 none true"]);
+}
+
+#[test]
+fn latin_multi_argument_print_prints_nihil() {
+    let source = r#"+++
+locale = "la"
++++
+incipit {
+    fixum numerus ∪ nihil absens ← nulla
+    nota 1, absens, verum
+}
+"#;
+    assert_eq!(run_lines("latin-multi.fab", source), vec!["1 nihil verum"]);
+}

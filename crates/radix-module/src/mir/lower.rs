@@ -713,7 +713,7 @@ pub fn lower_analyzed_unit(
     let diagnostics = DiagnosticSymbols {
         format_templates: [interner.intern("§"), interner.intern("§ §"), interner.intern("§ § §")],
         separator: interner.intern(" "),
-        nihil: interner.intern("nihil"),
+        nihil: interner.intern(&unit.display_tokens.none),
         lockstep_length_mismatch: interner.intern("itera lockstep sources must have equal length"),
         ordo_no_member: interner.intern("no ordo member has this value"),
         potentia_negative_exponent: interner.intern("numerus potentia failed: negative exponent"),
