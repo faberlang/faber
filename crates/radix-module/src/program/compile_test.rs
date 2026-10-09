@@ -2055,9 +2055,7 @@ incipit {
     )
     .expect("app");
     let source = fs::read_to_string(&app).expect("read app");
-    // Packet worktrees sit below faberlang/worktrees/<lane>/; a fixed
-    // crates/radix-module/../../.. walk stops at the packet (no norma/).
-    let home = crate::paths::faberlang_home().expect("faberlang container root");
+    let home = crate::import_resolve::in_tree_library_home().expect("<repo>/lib exists in the tree");
     assert!(
         home.join("norma/src/json.fab").is_file(),
         "expected norma json under {}",
