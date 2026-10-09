@@ -216,11 +216,11 @@ fn function_without_modifier_bindings_is_unchanged() {
 #[test]
 fn record_annotation_keeps_its_hole_and_authored_order() {
     let source = format!(
-        "{EN}main {{\n    const record<g: _, w: int> hole ← ratio<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
+        "{EN}main {{\n    const record<g: _, w: int> hole ← record<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
     );
     let emitted = reemit(&source, "en");
     assert!(
-        emitted.contains("ratio<g: _, w: int> hole"),
+        emitted.contains("record<g: _, w: int> hole"),
         "the `_` element hole must not be re-spelled as its solved type:\n{emitted}"
     );
     assert_fixed_point(&emitted, "en");
@@ -229,8 +229,8 @@ fn record_annotation_keeps_its_hole_and_authored_order() {
 #[test]
 fn record_annotation_keeps_authored_field_order() {
     let source = format!(
-        "{EN}main {{\n    const record<w: int, g: _> hole ← ratio<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
+        "{EN}main {{\n    const record<w: int, g: _> hole ← record<g: f32, w: int> {{ g = 1.0, w = 2 }}\n    print hole.w\n}}\n"
     );
     let emitted = reemit(&source, "en");
-    assert!(emitted.contains("ratio<w: int, g: _> hole"), "{emitted}");
+    assert!(emitted.contains("record<w: int, g: _> hole"), "{emitted}");
 }

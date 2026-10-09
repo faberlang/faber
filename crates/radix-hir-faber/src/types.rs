@@ -738,7 +738,7 @@ impl super::FaberCodegen<'_> {
                 let rendered = self.labeled_iuncta_children(form, fields.len(), names, surface)?;
                 Ok(format!(
                     "{}<{}>",
-                    surface.contextual_keyword("ratio"),
+                    surface.type_surface(TypeBindingKind::Ratio),
                     rendered.join(", ")
                 ))
             }
@@ -1107,7 +1107,7 @@ impl super::FaberCodegen<'_> {
             .collect();
         format!(
             "{}<{}>",
-            surface.contextual_keyword("ratio"),
+            surface.type_surface(TypeBindingKind::Ratio),
             entries.join(", ")
         )
     }

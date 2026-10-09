@@ -117,6 +117,7 @@ impl KeywordSurface for LatinSurface {
             TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic) => "atomic",
             TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum) => "intervallum",
             TypeBindingKind::ModularWord => "modulus",
+            TypeBindingKind::Ratio => "ratio",
             _ => "ignotum",
         }
     }
@@ -1073,6 +1074,49 @@ fn record_type_renders_as_sorted_ratio() {
     assert_eq!(
         codegen.type_to_faber(record, &names, &surface),
         "ratio<g: f32, w: numerus>"
+    );
+}
+
+/// English surface for the record head: the pack row is `[types] ratio =
+/// "record"`; the Latin contextual-keyword path would still print `ratio`.
+struct EnglishRecordSurface;
+
+impl KeywordSurface for EnglishRecordSurface {
+    fn keyword(&self, _kind: TokenKind) -> &'static str {
+        "kw"
+    }
+
+    fn type_surface(&self, kind: TypeBindingKind) -> &str {
+        match kind {
+            TypeBindingKind::Ratio => "record",
+            TypeBindingKind::Primitive(Primitive::Numerus) => "int",
+            TypeBindingKind::Primitive(Primitive::Fractus) => "float",
+            _ => "ignotum",
+        }
+    }
+}
+
+#[test]
+fn record_type_renders_the_surface_record_spelling_in_en() {
+    let mut types = TypeTable::new();
+    let names = FxHashMap::default();
+    let mut interner = Interner::new();
+    let g = interner.intern("g");
+    let w = interner.intern("w");
+    let fractus = types.primitive(Primitive::Fractus);
+    let numerus = types.primitive(Primitive::Numerus);
+    let record = types.record([(w, numerus), (g, fractus)]);
+    let codegen = FaberCodegen::new(&types, &interner);
+
+    assert_eq!(
+        codegen.type_to_faber(record, &names, &EnglishRecordSurface),
+        "record<g: float, w: int>"
+    );
+    // The la surface (LatinSurface) still emits the Latin spelling.
+    assert!(
+        codegen
+            .type_to_faber(record, &names, &LatinSurface)
+            .starts_with("ratio<")
     );
 }
 

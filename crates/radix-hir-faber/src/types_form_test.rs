@@ -28,6 +28,7 @@ impl KeywordSurface for LaSurface {
             TypeBindingKind::Primitive(Primitive::Fractus) => "fractus",
             TypeBindingKind::Primitive(Primitive::Textus) => "textus",
             TypeBindingKind::Primitive(Primitive::Octeti) => "octeti",
+            TypeBindingKind::Ratio => "ratio",
             TypeBindingKind::TrappingWord => "exactus",
             TypeBindingKind::SaturatingWord => "saturatus",
             TypeBindingKind::Collection(CollectionKind::Lista) => "lista",
@@ -53,6 +54,7 @@ impl KeywordSurface for EnSurface {
     fn type_surface(&self, kind: TypeBindingKind) -> &str {
         match kind {
             TypeBindingKind::Primitive(Primitive::Numerus) => "int",
+            TypeBindingKind::Ratio => "record",
             TypeBindingKind::TrappingWord => "trapping",
             TypeBindingKind::SaturatingWord => "saturating",
             TypeBindingKind::Collection(CollectionKind::Lista) => "list",
@@ -143,6 +145,33 @@ fn labeled_iuncta_elements_render_with_their_authored_labels() {
         render_at(&codegen, &site, tuple_ty, &LaSurface),
         "iuncta<gx: u32, f32>"
     );
+}
+
+/// The authored labeled record form writes the surface's own `[types]`
+/// spelling of the record head (en `record`, la `ratio`), never the Latin
+/// word under a non-Latin surface.
+#[test]
+fn labeled_record_form_renders_the_surface_record_spelling() {
+    let mut fx = fixture();
+    let g = fx.interner.intern("g");
+    let w = fx.interner.intern("w");
+    let record_ty = fx.types.record([(g, fx.f32_ty), (w, fx.u32_ty)]);
+    let mut labeled_g = semantic_form(TypeFormLevel::LONG, fx.f32_ty, Vec::new());
+    labeled_g.label = Some(g);
+    let mut labeled_w = semantic_form(TypeFormLevel::LONG, fx.u32_ty, Vec::new());
+    labeled_w.label = Some(w);
+    let form = semantic_form(
+        TypeFormLevel::LONG,
+        record_ty,
+        vec![type_arg(labeled_g), type_arg(labeled_w)],
+    );
+    let site = declared_site(1);
+    let codegen = codegen_with_forms(&fx, vec![(site.clone(), form)]);
+    let la = render_at(&codegen, &site, record_ty, &LaSurface);
+    let en = render_at(&codegen, &site, record_ty, &EnSurface);
+    assert!(la.starts_with("ratio<g: "), "la must keep ratio: {la}");
+    assert!(en.starts_with("record<g: "), "en must write record: {en}");
+    assert!(!en.contains("ratio"), "en must carry no Latin ratio: {en}");
 }
 
 #[test]
