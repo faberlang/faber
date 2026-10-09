@@ -32,7 +32,7 @@ fn outer_write_after_capture_is_visible_inside_closure() {
 #[test]
 fn closure_write_to_captured_var_is_visible_outside() {
     let out = run_en(
-        "main {\n    var int n ← 0\n    const () → vacuum bump ← () → vacuum ∴ do { n ← n + 1 }\n    bump()\n    bump()\n    print n\n}\n",
+        "main {\n    var int n ← 0\n    const () → void bump ← () → void ∴ do { n ← n + 1 }\n    bump()\n    bump()\n    print n\n}\n",
     );
     assert_eq!(out, ["2"]);
 }
@@ -64,7 +64,7 @@ fn loop_body_var_captured_and_mutated_is_fresh_per_iteration() {
 #[test]
 fn nested_closures_share_one_binding() {
     let out = run_en(
-        "main {\n    var int n ← 0\n    const () → vacuum outer ← () → vacuum ∴ do {\n        const () → vacuum inner ← () → vacuum ∴ do { n ← n + 10 }\n        inner()\n        n ← n + 1\n    }\n    outer()\n    outer()\n    print n\n}\n",
+        "main {\n    var int n ← 0\n    const () → void outer ← () → void ∴ do {\n        const () → void inner ← () → void ∴ do { n ← n + 10 }\n        inner()\n        n ← n + 1\n    }\n    outer()\n    outer()\n    print n\n}\n",
     );
     assert_eq!(out, ["22"]);
 }
@@ -72,7 +72,7 @@ fn nested_closures_share_one_binding() {
 #[test]
 fn two_closures_share_one_captured_var() {
     let out = run_en(
-        "main {\n    var int n ← 0\n    const () → vacuum inc ← () → vacuum ∴ do { n ← n + 1 }\n    const () → int get ← () → int ∴ n\n    inc()\n    inc()\n    print get()\n    n ← 40\n    inc()\n    print get()\n}\n",
+        "main {\n    var int n ← 0\n    const () → void inc ← () → void ∴ do { n ← n + 1 }\n    const () → int get ← () → int ∴ n\n    inc()\n    inc()\n    print get()\n    n ← 40\n    inc()\n    print get()\n}\n",
     );
     assert_eq!(out, ["2", "41"]);
 }
@@ -121,10 +121,10 @@ fn rebound_capture_is_stored_in_a_shared_cell() {
 
 #[test]
 fn param_less_vacuum_closure_is_not_the_entry() {
-    // Entry-shaped synthetic closures (no params, `vacuum` return) must not
+    // Entry-shaped synthetic closures (no params, `void` return) must not
     // be selected as `incipit`; only the unreferenced entry is.
     let out = run_en(
-        "main {\n    const () → vacuum hello ← () → vacuum ∴ do { print \"inner\" }\n    print \"outer\"\n    hello()\n}\n",
+        "main {\n    const () → void hello ← () → void ∴ do { print \"inner\" }\n    print \"outer\"\n    hello()\n}\n",
     );
     assert_eq!(out, ["outer", "inner"]);
 }
@@ -132,7 +132,7 @@ fn param_less_vacuum_closure_is_not_the_entry() {
 #[test]
 fn shared_text_rebinding_reads_before_it_stores() {
     let out = run_en(
-        "main {\n    var string s ← \"a\"\n    const () → vacuum grow ← () → vacuum ∴ do { s ← s + \"b\" }\n    grow()\n    grow()\n    print s\n}\n",
+        "main {\n    var string s ← \"a\"\n    const () → void grow ← () → void ∴ do { s ← s + \"b\" }\n    grow()\n    grow()\n    print s\n}\n",
     );
     assert_eq!(out, ["abb"]);
 }
@@ -140,7 +140,7 @@ fn shared_text_rebinding_reads_before_it_stores() {
 #[test]
 fn increment_through_a_captured_var() {
     let out = run_en(
-        "main {\n    var int n ← 0\n    const () → vacuum tick ← () → vacuum ∴ do { n↑ }\n    tick()\n    tick()\n    tick()\n    print n\n}\n",
+        "main {\n    var int n ← 0\n    const () → void tick ← () → void ∴ do { n↑ }\n    tick()\n    tick()\n    tick()\n    print n\n}\n",
     );
     assert_eq!(out, ["3"]);
 }

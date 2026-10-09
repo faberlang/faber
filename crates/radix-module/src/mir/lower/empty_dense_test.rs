@@ -144,7 +144,7 @@ fn empty_sparse_tensor_keeps_its_all_zero_shape() {
 #[test]
 fn empty_collections_stay_empty_collections() {
     let out = stdout(&program(
-        "const list<int> a ← empty\n    const tabula<textus, int> b ← empty",
+        "const list<int> a ← empty\n    const map<string, int> b ← empty",
         "    print a.length()\n    print b.length()",
     ));
     assert_eq!(out, ["0", "0"]);
