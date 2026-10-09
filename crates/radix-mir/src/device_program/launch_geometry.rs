@@ -381,6 +381,34 @@ pub fn matmul_launch_plan(
     Ok(plan)
 }
 
+/// The classes a run-time-extent matmul unit emits an entry for, Tiled first.
+pub const MATMUL_CLASSES: [crate::kernel_plan::MatMulClass; 4] = {
+    use crate::kernel_plan::MatMulClass;
+    [
+        MatMulClass::Tiled,
+        MatMulClass::OneRow,
+        MatMulClass::Gemv,
+        MatMulClass::Simdgroup,
+    ]
+};
+
+/// The device-artifact entry symbol of `class` for a run-time-extent matmul
+/// unit named `entry` (design note section 5 rule 1: one entry per class).
+/// The Tiled class keeps the unit's own entry; the other three are
+/// class-suffixed siblings. The emitter names its class entries with this
+/// function and the dispatcher launches the one [`matmul_launch_plan`]
+/// selects, so the two cannot disagree.
+#[must_use]
+pub fn matmul_class_entry(entry: &str, class: crate::kernel_plan::MatMulClass) -> String {
+    use crate::kernel_plan::MatMulClass;
+    match class {
+        MatMulClass::Tiled => entry.to_owned(),
+        MatMulClass::OneRow => format!("{entry}__one_row"),
+        MatMulClass::Gemv => format!("{entry}__gemv"),
+        MatMulClass::Simdgroup => format!("{entry}__simdgroup"),
+    }
+}
+
 /// `(m, k, n)` from the two operand call-site shapes.
 fn matmul_extents(shapes: &[Vec<u64>]) -> Result<(u64, u64, u64), GeometryError> {
     let uncovered = |reason: &str| {
