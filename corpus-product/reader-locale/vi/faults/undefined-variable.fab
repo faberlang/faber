@@ -1,0 +1,4 @@
+# Fault: use of an undeclared name (SEM001 unknown_identifier).
+bắtđầu {
+  in tên_thiếu
+}

@@ -1,0 +1,5 @@
+# Fault: text literal bound to an integer-typed constant (SEM010).
+入口 {
+  常數 整數 錯配 ← "文字"
+  顯示 錯配
+}

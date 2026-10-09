@@ -1,0 +1,4 @@
+# Fault: use of an undeclared name (SEM001 unknown_identifier).
+入口 {
+  顯示 缺失名稱
+}

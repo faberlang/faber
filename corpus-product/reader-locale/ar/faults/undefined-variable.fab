@@ -1,0 +1,4 @@
+# Fault: use of an undeclared name (SEM001 unknown_identifier).
+بداية {
+  اعرض متغير_مفقود
+}
