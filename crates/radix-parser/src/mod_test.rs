@@ -5256,3 +5256,48 @@ fn const_size_declaration_parses_and_bare_or_var_forms_are_rejected() {
     let lexed = lex_with_locale_pack("size", &EnSizePack);
     assert!(matches!(lexed.tokens[0].kind, TokenKind::Ident(_)));
 }
+
+/// Parses a `tabula` binding with `init` as its initializer and hands the
+/// initializer expression kind to `check`.
+fn with_inferred_constructor_init(init: &str, check: impl FnOnce(&ExprKind)) {
+    let result = parse_ok(&format!(
+        "incipit {{ fixum tabula<textus, numerus> m ← {init} }}"
+    ));
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Incipit(entry) = &program.statements[0].kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(block) = &entry.body else {
+        panic!("expected incipit block");
+    };
+    let StmtKind::Var(var) = &block.statements[0].kind else {
+        panic!("expected binding");
+    };
+    check(&var.init.as_deref().expect("initializer").kind);
+}
+
+#[test]
+fn inferred_constructor_entries_parse_as_hole_verte_over_json_object() {
+    with_inferred_constructor_init("_ { \"a\": 1, \"b\": 2 }", |kind| {
+        let ExprKind::Verte(verte) = kind else {
+            panic!("expected Verte");
+        };
+        assert!(matches!(verte.ty.kind, TypeExprKind::Infer));
+        let ExprKind::Literal(Literal::JsonValor(JsonValue::Object(members))) = &verte.expr.kind
+        else {
+            panic!("entries must be the bare-literal JSON members");
+        };
+        assert_eq!(members.len(), 2);
+    });
+}
+
+#[test]
+fn inferred_constructor_empty_braces_parse_as_hole_verte_over_empty_object() {
+    with_inferred_constructor_init("_ { }", |kind| {
+        let ExprKind::Verte(verte) = kind else {
+            panic!("expected Verte");
+        };
+        assert!(matches!(verte.ty.kind, TypeExprKind::Infer));
+        assert!(matches!(verte.expr.kind, ExprKind::Object(_)));
+    });
+}

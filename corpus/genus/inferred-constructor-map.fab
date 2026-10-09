@@ -1,0 +1,47 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "json_literal", "json_member", "json_value", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "The inferred constructor `_ { \"key\": value }` builds the expected map; the same entries as the bare `{ … }` literal."
+syntax = "<map type> <name> ← _ { \"<key>\": <value>, … }"
+related = ["genus", "tabula"]
+locale = "en"
++++
+# =============================================================================
+# genus — the inferred constructor `_ { … }` with entries
+# =============================================================================
+#
+# What this teaches:
+#   • `_ { "key": value }` builds the expected map, entry for entry what the
+#     bare `{ "key": value }` literal builds.
+#   • The expected type comes from a binding, a parameter, or a declared return.
+#   • `_ {}` against a map is the empty map.
+#
+# See also: genus
+# =============================================================================
+
+fn pondus() → map<string, int> {
+    return _ { "x": 7, "y": 9 }
+}
+
+fn summa(map<string, int> m) → int {
+    return m["a"] + m["b"]
+}
+
+main {
+    const map<string, int> puncta ← _ { "aelia": 95, "balbus": 87 }
+    print puncta["aelia"]
+    print puncta["balbus"]
+
+    const map<string, int> p ← pondus()
+    print p["x"]
+    print p["y"]
+
+    print summa(_ { "a": 3, "b": 4 })
+
+    var map<string, int> vacuum ← _ {}
+    vacuum["k"] ← 5
+    print vacuum["k"]
+}

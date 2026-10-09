@@ -104,6 +104,10 @@ const ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH: &str = "field_initializer_type_mism
 const ISSUE_VALOR_VERTE_UNSUPPORTED: &str = "valor_verte_unsupported";
 pub(super) const ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE: &str =
     "inferred_constructor_no_expected_type";
+pub(super) const ISSUE_INFERRED_CONSTRUCTOR_ENTRIES_NEED_MAP: &str =
+    "inferred_constructor_entries_need_map";
+pub(super) const ISSUE_INFERRED_CONSTRUCTOR_FIELDS_FOR_MAP: &str =
+    "inferred_constructor_fields_for_map";
 const ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION: &str = "numeric_ascription_requires_conversion";
 const ISSUE_INVALID_CAST: &str = "invalid_cast";
 const ISSUE_ARRAY_ELEMENT_TYPE_MISMATCH: &str = "array_element_type_mismatch";

@@ -2239,6 +2239,39 @@ impl Parser {
                 })
             }
 
+            // `_ { "key": value, … }`: the inferred constructor with ENTRIES.
+            // The entries are the same constant JSON members the bare `{ … }`
+            // literal takes; the hole target lets the checker pick the shape
+            // from the expected type (a map builds what the bare literal
+            // builds; any other type is a named error).
+            TokenKind::Underscore(_)
+                if matches!(self.peek_at(1).kind, TokenKind::LBrace)
+                    && matches!(self.peek_at(2).kind, TokenKind::String(_))
+                    && matches!(self.peek_at(3).kind, TokenKind::Colon) =>
+            {
+                let hole_span = self.peek().span;
+                self.advance();
+                self.advance();
+                let literal = self.parse_json_literal()?;
+                let object = Expr {
+                    id: self.next_id(),
+                    kind: literal,
+                    span: hole_span.merge(self.previous_span()),
+                };
+                let ty = TypeExpr {
+                    nullable: false,
+                    mode: None,
+                    kind: TypeExprKind::Infer,
+                    span: hole_span,
+                    form: TypeFormLevel::LONG,
+                    iuncta_label: None,
+                };
+                ExprKind::Verte(VerteExpr {
+                    expr: Box::new(object),
+                    ty,
+                })
+            }
+
             TokenKind::LBracket => {
                 self.advance();
                 let elements = self.parse_array_elements()?;

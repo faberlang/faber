@@ -259,6 +259,89 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// `_ { … }` content shape. The hole before braces builds the expected
+    /// type, and the contents must match what that type takes: ENTRIES
+    /// (`"key": value`) build a map or a `json` value exactly as the bare
+    /// `{ … }` literal does, FIELDS (`name = value`) build a genus. A map
+    /// target with no contents is the empty bare literal. The wrong shape is
+    /// a named error. Returns `Some(type)` when the node is settled here.
+    fn desugar_inferred_constructor_shape(
+        &mut self,
+        expr: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> Option<TypeId> {
+        let HirExpressionKind::Verte {
+            source,
+            target,
+            entries,
+        } = &expr.kind
+        else {
+            return None;
+        };
+        if !self.is_infer(self.resolve_inferred_type(*target)) {
+            return None;
+        }
+        let entry_form = entries.is_none()
+            && matches!(
+                &source.kind,
+                HirExpressionKind::Literal(HirLiteral::JsonValor(radix_syntax::JsonValue::Object(
+                    _
+                )))
+            );
+        let field_form = entries.is_some();
+        if !entry_form && !field_form {
+            return None;
+        }
+        let no_fields = entries.as_ref().is_some_and(|fields| fields.is_empty());
+        let span = expr.span;
+        let concrete = expected
+            .map(|ty| self.resolve_inferred_type(ty))
+            .filter(|ty| !self.is_infer(*ty));
+        let Some(concrete) = concrete else {
+            if entry_form {
+                self.invalid_conversion(
+                    super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                    span,
+                );
+                return Some(self.error_type);
+            }
+            return None;
+        };
+        let is_map = matches!(self.types.get(concrete), Type::Map(..));
+        let json = self.json_type();
+        if entry_form {
+            if !(is_map || concrete == json) {
+                self.invalid_conversion(
+                    super::convert::ISSUE_INFERRED_CONSTRUCTOR_ENTRIES_NEED_MAP,
+                    span,
+                );
+                // The named error stands alone: the node takes the slot's type.
+                return Some(concrete);
+            }
+            let placeholder = HirExpressionKind::Tuple(Vec::new(), None);
+            if let HirExpressionKind::Verte { source, .. } =
+                std::mem::replace(&mut expr.kind, placeholder)
+            {
+                expr.kind = source.kind;
+            }
+            return None;
+        }
+        if is_map {
+            if !no_fields {
+                self.invalid_conversion(
+                    super::convert::ISSUE_INFERRED_CONSTRUCTOR_FIELDS_FOR_MAP,
+                    span,
+                );
+                // The named error stands alone: the node takes the slot's type.
+                return Some(concrete);
+            }
+            expr.kind = HirExpressionKind::Literal(HirLiteral::JsonValor(
+                radix_syntax::JsonValue::Object(Vec::new()),
+            ));
+        }
+        None
+    }
+
     /// Synthesizes an expression type, optionally using an expected type as
     /// context for shape-sensitive expressions.
     ///
@@ -287,6 +370,9 @@ impl TypeChecker<'_> {
             );
         if let (Some(_), Some(slot)) = (&store, expected) {
             self.mark_word_ring(expr, slot);
+        }
+        if let Some(settled) = self.desugar_inferred_constructor_shape(expr, expected) {
+            return settled;
         }
         let ty = match &mut expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path(*def_id, expr.span),

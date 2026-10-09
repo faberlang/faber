@@ -505,6 +505,12 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "matrix_materialize_unsupported" => {
             Some("keep matrix values as typed parameters until matrix construction lowering is implemented".to_owned())
         }
+        "inferred_constructor_entries_need_map" => Some(
+            "entries `\"key\": value` build a map; for a genus or class write fields `name = value`".to_owned(),
+        ),
+        "inferred_constructor_fields_for_map" => Some(
+            "a map takes entries `\"key\": value`; fields `name = value` build a genus or class".to_owned(),
+        ),
         "inferred_constructor_no_expected_type" => {
             Some("name the type: write `Type { … }`, or give the binding, parameter or return an explicit type".to_owned())
         }

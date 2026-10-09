@@ -3309,6 +3309,14 @@ help = "remove the recovery arm from this regex conversion"
 message = "`_ { … }` builds the expected type, but there is none here"
 help = "name the type: write `Type { … }`, or give the binding, parameter or return an explicit type"
 
+[diagnostics.SEM016.issues.inferred_constructor_entries_need_map]
+message = "`_ { \"key\": value, … }` gives entries, but the expected type is not a map"
+help = "entries `\"key\": value` build a map; for a genus or class write fields `name = value`"
+
+[diagnostics.SEM016.issues.inferred_constructor_fields_for_map]
+message = "`_ { name = value, … }` gives fields, but the expected type is a map"
+help = "a map takes entries `\"key\": value`; fields `name = value` build a genus or class"
+
 [diagnostics.SEM016.issues.valor_verte_unsupported]
 message = "{valor} ∷ T is not supported — a dynamic value's shape cannot be asserted at compile time. Use `↦ T` for runtime extraction (with `⊥` for a default)."
 help = "use runtime `↦ T` conversion with a `⊥` default instead"

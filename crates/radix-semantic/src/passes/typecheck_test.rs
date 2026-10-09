@@ -2466,3 +2466,55 @@ incipit {
         .count();
     assert_eq!(spelled, 6, "each typed zero records its authored type");
 }
+
+#[test]
+fn inferred_constructor_entries_build_expected_map_in_binding_return_and_argument() {
+    test_support::assert_accepts(
+        "
+functio f() → tabula<textus, numerus> { redde _ { \"a\": 1, \"b\": 2 } }
+functio g(tabula<textus, numerus> m) → numerus { redde 0 }
+incipit {
+    fixum tabula<textus, numerus> m ← _ { \"a\": 1 }
+    fixum tabula<textus, numerus> n ← f()
+    nota g(_ { \"a\": 3 })
+}
+",
+    );
+}
+
+#[test]
+fn inferred_constructor_empty_braces_build_empty_map() {
+    test_support::assert_accepts("incipit { fixum tabula<textus, numerus> m ← _ { } }");
+}
+
+#[test]
+fn inferred_constructor_entries_value_type_mismatch_is_the_bare_literal_error() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<textus, numerus> m ← _ { \"a\": \"x\" } }",
+        "json_value_type_mismatch",
+    );
+}
+
+#[test]
+fn inferred_constructor_entries_for_genus_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "genus P { varia numerus x = 0 } incipit { fixum P p ← _ { \"x\": 1 } }",
+        "inferred_constructor_entries_need_map",
+    );
+}
+
+#[test]
+fn inferred_constructor_fields_for_map_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<textus, numerus> m ← _ { x = 1 } }",
+        "inferred_constructor_fields_for_map",
+    );
+}
+
+#[test]
+fn inferred_constructor_entries_without_expected_type_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "incipit { nota _ { \"a\": 1 } }",
+        "inferred_constructor_no_expected_type",
+    );
+}
