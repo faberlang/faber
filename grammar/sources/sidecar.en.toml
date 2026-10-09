@@ -1,0 +1,29 @@
+# English normative sidecar for the generated grammar render.
+#
+# The render reads three files: `source.fg` (the grammar), this file
+# (definition — the section intro and the derived-section flags), and
+# `prose.en.md` (the normative prose, Markdown so it diffs and lints as a
+# document). The prose filename is a convention, not a key here: the pipeline
+# reads `prose.en.md` beside the source.
+#
+# Per-production notes live as `@`-metadata comments in `source.fg`, which is
+# where `status` and `formerly` are read from. The `[productions.*]` intro
+# tables this file used to carry were read by nothing — 218 of 221 were the same
+# sentence — and are gone.
+#
+# Recorded decisions: TOML sidecars per locale (OQ3); the normative prose split
+# out of the sidecar, with the generated EBNF keeping only light intros (OQ4).
+
+[meta]
+schema = "grammar-sidecar/v1"
+locale = "en"
+source = "source.fg"
+
+[document]
+intro = "The grammar below is the identity rendering of the validated source. Normative detail is kept in `prose.en.md` beside this file and rendered as documentation; the source remains the syntax authority."
+
+[render]
+identity = true
+derived_keyword_reference = true
+derived_lexicon_appendix = true
+derived_comma_table = true

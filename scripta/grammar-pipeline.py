@@ -4,8 +4,8 @@
 `--audit-md` retains the GSD-1 Markdown sin report for historical and locale
 analysis. `--validate` checks dialect closure and reachability. GSD-6's
 `--render` and `--emit` produce the identity EBNF and one-way grammar.jsonl.
-Locale packs are the identity render plus `§{…}` keyed substitution
-(`faber/docs/design/ebnf-substitution.md`): region-scoped, unknown-key-fatal,
+Locale packs are the identity render plus `§{…}` keyed substitution:
+region-scoped, unknown-key-fatal,
 zero-residual in designated regions. `--check` is the fail-closed
 normative-triple + locale-render gate used by stage 1.
 """
@@ -95,48 +95,21 @@ class Grammar:
     by_name: dict[str, Production] = field(default_factory=dict)
 
 
-def discover_container_root(start: Path | None = None) -> Path | None:
-    here = start if start is not None else RADIX
-    for directory in [here, *here.parents]:
-        if (directory / "worktrees").is_dir() and (directory / "radix").is_dir():
-            if directory.parent.name == "worktrees":
-                continue
-            return directory
-    return None
+GRAMMAR_DIR = RADIX / "grammar"
 
 
 def default_ebnf_path() -> Path:
-    packet = RADIX.parent / "faber" / "docs" / "EBNF.md"
-    if packet.is_file():
-        return packet
-    container = discover_container_root(RADIX)
-    if container is not None:
-        candidate = container / "faber" / "docs" / "EBNF.md"
-        if candidate.is_file():
-            return candidate
-    raise FileNotFoundError(
-        "cannot locate faber/docs/EBNF.md beside radix or in the container"
-    )
+    return GRAMMAR_DIR / "EBNF.md"
 
 
-def default_locale_dir() -> Path | None:
-    container = discover_container_root(RADIX)
-    if container is None:
-        return None
-    directory = container / "faberlang.dev" / "generator" / "grammar"
-    return directory if directory.is_dir() else None
+def default_locale_dir() -> Path:
+    return GRAMMAR_DIR
 
 
 def display_path(path: Path) -> str:
-    container = discover_container_root(RADIX)
     resolved = path.resolve()
-    if container is not None:
-        try:
-            return resolved.relative_to(container.resolve()).as_posix()
-        except ValueError:
-            pass
     try:
-        return resolved.relative_to(RADIX.parent.resolve()).as_posix()
+        return resolved.relative_to(RADIX.resolve()).as_posix()
     except ValueError:
         return path.as_posix()
 
@@ -710,7 +683,7 @@ def default_findings_path() -> Path:
 
 
 def default_source_path() -> Path:
-    return default_ebnf_path().parent / "grammar" / "source.fg"
+    return GRAMMAR_DIR / "sources" / "source.fg"
 
 
 def default_sidecar_path() -> Path:
@@ -1109,15 +1082,15 @@ def keyword_spine(source_text: str, source_path: Path) -> set[str]:
 
 
 IDENTITY_BANNER = (
-    "This file is generated from `docs/grammar/source.fg`, its `sidecar.en.toml`\n"
+    "This file is generated from `grammar/sources/source.fg`, its `sidecar.en.toml`\n"
     "and its `prose.en.md`; hand edits fail the stage-1 normative-triple gate."
 )
 
 
 def stamp_locale_banner(text: str, locale: str) -> str:
     replacement = (
-        "This file is generated from `docs/grammar/source.fg`, its "
-        f"`sidecar.en.toml` and its `prose.en.md`, and\n`docs/grammar/"
+        "This file is generated from `grammar/sources/source.fg`, its "
+        f"`sidecar.en.toml` and its `prose.en.md`, and\n`grammar/sources/"
         f"glossary.{locale}.toml`; hand edits fail the locale-render gate."
     )
     if IDENTITY_BANNER not in text:
@@ -1279,7 +1252,7 @@ def render_identity(
     if prose:
         lines.extend(prose.splitlines())
     else:
-        lines.append("Normative details are maintained in `docs/grammar/prose.en.md`.")
+        lines.append("Normative details are maintained in `grammar/sources/prose.en.md`.")
     lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -1477,25 +1450,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         default=None,
-        help="render output path for --render (default: sibling faber/docs/EBNF.md)",
+        help="render output path for --render (default: grammar/EBNF.md)",
     )
     parser.add_argument(
         "--jsonl-output",
         type=Path,
         default=None,
-        help="emit output path (default: docs/grammar/grammar.jsonl)",
+        help="emit output path (default: grammar/sources/grammar.jsonl)",
     )
     parser.add_argument(
         "--ebnf",
         type=Path,
         default=None,
-        help="Markdown grammar path (default: sibling faber/docs/EBNF.md)",
+        help="Markdown grammar path (default: grammar/EBNF.md)",
     )
     parser.add_argument(
         "--locale-dir",
         type=Path,
         default=None,
-        help="directory of EBNF.{locale}.md packs (default: faberlang.dev/generator/grammar)",
+        help="directory of EBNF.{locale}.md packs (default: grammar/)",
     )
     parser.add_argument(
         "--json",
