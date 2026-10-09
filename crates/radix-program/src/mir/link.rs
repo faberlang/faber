@@ -205,7 +205,10 @@ fn synthetic_method_function_types(
     {
         methods_by_receiver.insert(def_id, struct_methods);
     }
-    for (receiver_def, method_name) in methods.keys() {
+    // Each iteration interns a function type into the caller's table, so the
+    // visit order fixes the emitted type ids: never walk the std `HashMap`
+    // (per-process random order) directly.
+    for (receiver_def, method_name) in ordered_method_keys(methods) {
         let Some(struct_methods) = methods_by_receiver.get(receiver_def) else {
             continue;
         };
@@ -219,6 +222,16 @@ fn synthetic_method_function_types(
         function_types.insert((*receiver_def, method_name.clone()), function_ty);
     }
     function_types
+}
+
+/// The synthetic method-call keys in a stable `(receiver def, method name)`
+/// order, independent of the map's hash seed.
+pub(super) fn ordered_method_keys(
+    methods: &HashMap<(DefId, String), DefId>,
+) -> Vec<&(DefId, String)> {
+    let mut keys: Vec<&(DefId, String)> = methods.keys().collect();
+    keys.sort_by(|a, b| (a.0.0, &a.1).cmp(&(b.0.0, &b.1)));
+    keys
 }
 
 struct PackageMirLinkAccumulator {

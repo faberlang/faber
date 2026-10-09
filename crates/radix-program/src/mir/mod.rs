@@ -44,6 +44,8 @@ pub(crate) mod manifest;
 pub(crate) mod remap;
 
 #[cfg(test)]
+mod link_order_test;
+#[cfg(test)]
 mod remap_test;
 
 #[cfg(test)]
