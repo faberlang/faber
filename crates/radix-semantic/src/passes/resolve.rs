@@ -3538,12 +3538,12 @@ fn lower_bounded_primitive(
         }
         [capacity] => {
             let capacity = lower_generic_index_arg(capacity, resolver, interner, types)?;
-            Ok(match prim {
-                Primitive::Ascii => types.bounded_ascii(capacity),
-                Primitive::Textus => types.bounded_textus(capacity),
-                Primitive::Octeti => types.bounded_octeti(capacity),
-                _ => unreachable!("lower_bounded_primitive only handles ascii/textus/octeti"),
-            })
+            match prim {
+                Primitive::Ascii => Ok(types.bounded_ascii(capacity)),
+                Primitive::Textus => Ok(types.bounded_textus(capacity)),
+                Primitive::Octeti => Ok(types.bounded_octeti(capacity)),
+                _ => Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS)),
+            }
         }
         _ => Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS)),
     }
@@ -3579,20 +3579,20 @@ fn lower_queue_stack_type(
     match params {
         [elem] => {
             let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
-            Ok(match collection {
-                CollectionKind::Queue => types.queue(elem),
-                CollectionKind::Stack => types.stack(elem),
-                _ => unreachable!("queue/stack helper called for another collection"),
-            })
+            match collection {
+                CollectionKind::Queue => Ok(types.queue(elem)),
+                CollectionKind::Stack => Ok(types.stack(elem)),
+                _ => Err(TypeLowerError::CollectionArity(collection)),
+            }
         }
         [elem, capacity] => {
             let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
             let capacity = lower_generic_index_arg(capacity, resolver, interner, types)?;
-            Ok(match collection {
-                CollectionKind::Queue => types.bounded_queue(elem, capacity),
-                CollectionKind::Stack => types.bounded_stack(elem, capacity),
-                _ => unreachable!("queue/stack helper called for another collection"),
-            })
+            match collection {
+                CollectionKind::Queue => Ok(types.bounded_queue(elem, capacity)),
+                CollectionKind::Stack => Ok(types.bounded_stack(elem, capacity)),
+                _ => Err(TypeLowerError::CollectionArity(collection)),
+            }
         }
         _ => Err(TypeLowerError::CollectionArity(collection)),
     }

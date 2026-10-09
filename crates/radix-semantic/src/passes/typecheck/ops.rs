@@ -35,11 +35,6 @@ const ISSUE_CONVERSIO_ASSIGN_ROUTE_UNSUPPORTED: &str = "conversio_assign_route_u
 const ISSUE_CONVERSIO_ASSIGN_INFERENCE_HOLE_DESTINATION: &str =
     "conversio_assign_inference_hole_destination";
 
-#[cold]
-fn fresh_tensor_result_missing_shape() -> ! {
-    unreachable!("fresh tensor result carries a shape");
-}
-
 impl TypeChecker<'_> {
     fn is_error(&self, ty: TypeId) -> bool {
         self.resolve_inferred_type(ty) == self.error_type
@@ -279,7 +274,7 @@ impl TypeChecker<'_> {
                 }
                 (rhs.kind, rhs.element, rhs.capacity)
             }
-            (None, None) => unreachable!("queue/stack arithmetic arm requires a collection"),
+            (None, None) => return None,
         };
 
         Some(match (kind, capacity) {
@@ -1566,11 +1561,8 @@ impl TypeChecker<'_> {
                 // for dispatch and demotes the result back to rank 1. Whole
                 // shapes, rank-1 receivers, and higher ranks still fail closed
                 // with the contract diagnostics.
-                let result = super::tensor_index::tensor_with_fresh_shape(self, elem);
-                let result_shape = match self.types.get(result) {
-                    Type::Tensor(_, shape) => *shape,
-                    _ => fresh_tensor_result_missing_shape(),
-                };
+                let (result, result_shape) =
+                    super::tensor_index::tensor_with_fresh_shape_hole(self, elem);
                 super::tensor_index::constrain_glyph_matmul_result_shape(
                     self,
                     lhs_resolved,
@@ -1895,11 +1887,8 @@ impl TypeChecker<'_> {
                 };
                 // Symbolic tuple shapes and whole-shape params unify exactly;
                 // only an explicit expanded view may repair a shape mismatch.
-                let result = super::tensor_index::tensor_with_fresh_shape(self, elem);
-                let result_shape = match self.types.get(result) {
-                    Type::Tensor(_, shape) => *shape,
-                    _ => fresh_tensor_result_missing_shape(),
-                };
+                let (result, result_shape) =
+                    super::tensor_index::tensor_with_fresh_shape_hole(self, elem);
                 let lhs_shape = self.resolve_index(lhs_shape);
                 let rhs_shape = self.resolve_index(rhs_shape);
                 let mut unifier = self.index_infer.unifier(self.types);

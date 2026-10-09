@@ -571,9 +571,10 @@ impl Builder {
             self.sequence(&mut body_fragment, next);
         }
         let test_fragment = self.build_statement(test, Some(LoopContext))?;
-        let test_entry = test_fragment
-            .entry
-            .expect("fac … dum test statement has a condition entry");
+        let test_entry = test_fragment.entry.ok_or(CfgError::UnsupportedShape {
+            construct: "fac dum test without a condition entry",
+            span: test.span,
+        })?;
         let body_entry = body_fragment.entry.unwrap_or(test_entry);
         self.cfg.add_edge(header, body_entry, CfgEdgeKind::Next);
         self.connect_normals(&body_fragment, test_entry, CfgEdgeKind::Next);

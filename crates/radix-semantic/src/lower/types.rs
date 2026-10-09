@@ -110,11 +110,8 @@ impl Lowerer<'_> {
         // here as the sole argument.
         self.form_frames.push(super::TypeFormFrame::default());
         let ty_id = self.lower_type_with_context(ty, allow_scalar_ref_mut, signature_position);
-        let marker = self
-            .form_frames
-            .pop()
-            .expect("authored type marker frame must be on the stack");
-        let form = match marker.args.first() {
+        let marker = self.form_frames.pop();
+        let form = match marker.as_ref().and_then(|frame| frame.args.first()) {
             Some(radix_hir::HirTypeFormArg::Type(form)) => (**form).clone(),
             // Lowering bailed out before the root node completed (e.g. a
             // rejected hole in signature position): fail closed with an
@@ -253,10 +250,11 @@ impl Lowerer<'_> {
         }
 
         if capturing_form {
-            let frame = self
-                .form_frames
-                .pop()
-                .expect("authored form frame pushed above");
+            // The frame was pushed above; an empty stack means lowering
+            // already bailed out, so leave the type without a form.
+            let Some(frame) = self.form_frames.pop() else {
+                return ty_id;
+            };
             let mut form = Self::complete_type_form(ty, base_ty, frame);
             // Access and nullable modifiers wrap the authored carrier. Keep
             // its name and generic children beneath each semantic wrapper.
@@ -1087,7 +1085,10 @@ impl Lowerer<'_> {
                     Primitive::Ascii => self.types.bounded_ascii(capacity),
                     Primitive::Textus => self.types.bounded_textus(capacity),
                     Primitive::Octeti => self.types.bounded_octeti(capacity),
-                    _ => unreachable!("lower_bounded_primitive only handles ascii/textus/octeti"),
+                    _ => {
+                        self.error("primitive_params");
+                        self.types.intern(Type::Error)
+                    }
                 }
             }
             _ => {
@@ -1230,7 +1231,10 @@ impl Lowerer<'_> {
                 match collection {
                     CollectionKind::Queue => self.types.queue(elem),
                     CollectionKind::Stack => self.types.stack(elem),
-                    _ => unreachable!("queue/stack helper called for another collection"),
+                    _ => {
+                        self.error_from_message(collection.arity_error());
+                        self.types.intern(Type::Error)
+                    }
                 }
             }
             [elem, capacity] => {
@@ -1241,7 +1245,10 @@ impl Lowerer<'_> {
                 match collection {
                     CollectionKind::Queue => self.types.bounded_queue(elem, capacity),
                     CollectionKind::Stack => self.types.bounded_stack(elem, capacity),
-                    _ => unreachable!("queue/stack helper called for another collection"),
+                    _ => {
+                        self.error_from_message(collection.arity_error());
+                        self.types.intern(Type::Error)
+                    }
                 }
             }
             _ => {

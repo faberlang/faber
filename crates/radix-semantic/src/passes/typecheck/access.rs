@@ -973,7 +973,7 @@ impl TypeChecker<'_> {
         let Type::Tuple(parts) = self.types.get(peeled) else {
             return None;
         };
-        let HirExpressionKind::Array(elements) = &index.kind else {
+        let HirExpressionKind::Array(elements) = &mut index.kind else {
             return None;
         };
         if elements.len() != parts.len()
@@ -986,17 +986,12 @@ impl TypeChecker<'_> {
         {
             return None;
         }
-        let HirExpressionKind::Array(elements) =
-            std::mem::replace(&mut index.kind, HirExpressionKind::Error)
-        else {
-            unreachable!("index kind was matched as an array literal above");
-        };
-        let items = elements
+        // Spreads and holes were excluded above, so every element is an expression.
+        let items = std::mem::take(elements)
             .into_iter()
-            .map(|element| match element {
-                HirArrayElement::Expr(expr) => expr,
-                HirArrayElement::Spread(_) => unreachable!("spreads were excluded above"),
-                HirArrayElement::Infer(_) => unreachable!("holes were excluded above"),
+            .filter_map(|element| match element {
+                HirArrayElement::Expr(expr) => Some(expr),
+                HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => None,
             })
             .collect();
         index.kind = HirExpressionKind::Tuple(items, None);

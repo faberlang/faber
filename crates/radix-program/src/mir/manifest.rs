@@ -1,7 +1,5 @@
 //! Package-MIR artifact root, manifest writing, and manifest helpers.
 
-use std::fmt::Write as _;
-
 use super::{
     Diagnostic, PACKAGE_MIR_ARTIFACT_DIR, PACKAGE_MIR_ARTIFACT_VERSION, PACKAGE_MIR_TARGET_NAME,
     Path, PathBuf, PreparedPackageMir, fs, mir_diag, mir_issue_diag,
@@ -52,11 +50,9 @@ pub(super) fn package_mir_manifest(
         "version = {PACKAGE_MIR_ARTIFACT_VERSION}\ntarget = \"{PACKAGE_MIR_TARGET_NAME}\"\nentry = \"{entry}\"\nentry_function = \"run_entry\"\n\n[runtime]\n"
     );
     for requirement in &prepared.runtime_requirements {
-        let _ = writeln!(
-            manifest,
-            "requirement = \"{}\"",
-            escape_manifest_value(requirement)
-        );
+        manifest.push_str("requirement = \"");
+        manifest.push_str(&escape_manifest_value(requirement));
+        manifest.push_str("\"\n");
     }
     manifest.push_str("\n[sources]\n");
     let mut sources = prepared
@@ -66,7 +62,9 @@ pub(super) fn package_mir_manifest(
         .collect::<Vec<_>>();
     sources.sort();
     for source in sources {
-        let _ = writeln!(manifest, "file = \"{}\"", escape_manifest_value(&source));
+        manifest.push_str("file = \"");
+        manifest.push_str(&escape_manifest_value(&source));
+        manifest.push_str("\"\n");
     }
     manifest
 }

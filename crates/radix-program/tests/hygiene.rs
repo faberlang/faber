@@ -16,15 +16,15 @@ const BUDGETS: Budgets = Budgets {
     // WHY: minted at the housekeeping Step 3 baseline; ratchet down only.
     unwrap: 0,
     // WHY: minted at the housekeeping Step 3 baseline; ratchet down only.
-    expect: 14,
+    expect: 0,
     // WHY: minted at the housekeeping Step 3 baseline; ratchet down only.
     panic: 0,
     // WHY: minted at the housekeeping Step 3 baseline; ratchet down only.
-    unreachable: 4,
+    unreachable: 0,
     todo: 0,
     unimplemented: 0,
     // WHY: minted at the housekeeping Step 3 baseline; ratchet down only.
-    let_underscore: 5,
+    let_underscore: 0,
     inline_test_modules: 0,
     test_attr_in_production: 0,
 };

@@ -1223,10 +1223,10 @@ impl<'a> DerivedCapabilityQueries<'a> {
                 }
                 None => CapabilityAnswer::Rejected(CapabilityReason::MissingFact),
             },
-            // Handled by the SCR-04 guard above.
+            // Handled by the SCR-04 guard above; fail closed if ever reached.
             FunctionCapabilityKind::ReturnedBorrowProvenance
             | FunctionCapabilityKind::RequiredRegionRelationships => {
-                unreachable!("region rows are rejected before the fact lookup")
+                CapabilityAnswer::Rejected(CapabilityReason::MissingFact)
             }
         }
     }

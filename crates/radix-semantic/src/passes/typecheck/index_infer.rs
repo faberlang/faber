@@ -26,7 +26,10 @@ impl TypeChecker<'_> {
     /// binding's list type distinguishes the two readings.
     pub(crate) fn extent_binding_is_value_shape(&self, index: IndexId) -> bool {
         let index = match self.types.get_index(index) {
-            IndexExpr::Tuple(dims) if dims.len() == 1 => *dims.first().unwrap(),
+            IndexExpr::Tuple(dims) => match dims.as_slice() {
+                [only] => *only,
+                _ => index,
+            },
             _ => index,
         };
         let IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)) =

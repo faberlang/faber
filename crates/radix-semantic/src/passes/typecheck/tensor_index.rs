@@ -85,8 +85,16 @@ pub(super) fn matrix_shape_dims(
 
 /// Tensor return type with a fresh shape hole for ops that may change rank/size.
 pub(super) fn tensor_with_fresh_shape(checker: &mut TypeChecker<'_>, elem: TypeId) -> TypeId {
+    tensor_with_fresh_shape_hole(checker, elem).0
+}
+
+/// Like [`tensor_with_fresh_shape`], also returning the fresh shape hole.
+pub(super) fn tensor_with_fresh_shape_hole(
+    checker: &mut TypeChecker<'_>,
+    elem: TypeId,
+) -> (TypeId, IndexId) {
     let shape = checker.fresh_index_hole();
-    checker.types.tensor_with_shape(elem, shape)
+    (checker.types.tensor_with_shape(elem, shape), shape)
 }
 
 /// Return the named rank-law decline for the source-only `ᵀ` glyph, when the

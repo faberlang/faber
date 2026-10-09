@@ -429,14 +429,14 @@ fn explicit_binding_vector(
     {
         return None;
     }
-    let mut explicit = explicit_args.iter().copied();
     Some(
         params
             .iter()
-            .map(|param| ResolvedGenericBinding {
+            .zip(explicit_args.iter().copied())
+            .map(|(param, ty)| ResolvedGenericBinding {
                 name: param.name,
                 source: radix_types::GenericBindingSource::Explicit,
-                witness: GenericWitness::Typus(explicit.next().expect("count checked")),
+                witness: GenericWitness::Typus(ty),
             })
             .collect(),
     )

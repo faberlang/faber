@@ -458,12 +458,12 @@ fn float_width_holds(width: NumericWidth, value: f64) -> bool {
     }
 }
 
-fn ascii_pack_digit_count(value: u128, radix: u32) -> u128 {
+fn ascii_pack_digit_count(value: u128, radix: u32) -> u64 {
     if value == 0 {
         return 1;
     }
     let mut remaining = value;
-    let mut digits = 0;
+    let mut digits = 0u64;
     while remaining > 0 {
         remaining /= u128::from(radix);
         digits += 1;
@@ -1745,13 +1745,8 @@ impl TypeChecker<'_> {
                             let radix = self
                                 .ascii_format_radix(params)
                                 .expect("ascii format hint checked above");
-                            let digits = ascii_pack_digit_count(
-                                u128::try_from(value).expect("non-negative i128 fits u128"),
-                                radix,
-                            );
-                            let witness = self.types.intern_index(IndexExpr::Literal(
-                                u64::try_from(digits).expect("digit count fits u64"),
-                            ));
+                            let digits = ascii_pack_digit_count(value.unsigned_abs(), radix);
+                            let witness = self.types.intern_index(IndexExpr::Literal(digits));
                             self.constrain_index_equal(capacity, witness, span);
                         } else if !has_recovery {
                             self.invalid_conversion(ISSUE_ASCII_PACK_NEGATIVE_SOURCE, span);
@@ -1813,8 +1808,8 @@ impl TypeChecker<'_> {
             return None;
         };
         let radix = self.ascii_format_radix(params)?;
-        let digits = ascii_pack_digit_count(u128::try_from(value).ok()?, radix);
-        if digits > u128::from(*width) {
+        let digits = ascii_pack_digit_count(value.unsigned_abs(), radix);
+        if digits > *width {
             Some(ISSUE_ASCII_PACK_WIDTH_OVERFLOW)
         } else {
             None

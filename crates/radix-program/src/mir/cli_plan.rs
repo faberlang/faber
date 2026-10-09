@@ -70,42 +70,27 @@ pub(super) fn plan_cli_package(
 
     match cli_program.mode {
         CliMode::SingleCommand => {
+            // The entry node was found above through `cli_program`.
+            let Some(entry_node) = package.nodes.get_mut(&entry_id) else {
+                return Ok(plan);
+            };
             if mode == CliPlanningMode::FmirTextRuntime {
                 if let Some((records, cli_section, exit_code)) =
                     plan_fmir_text_runtime_cli_root_entry(
-                        package.nodes.get_mut(&entry_id).expect("entry node"),
+                        entry_node,
                         &cli_program,
                         &mut diagnostics,
                     )
                 {
                     plan.exit_code = exit_code;
-                    plan.entry_records.insert(
-                        package
-                            .nodes
-                            .get(&entry_id)
-                            .expect("entry node")
-                            .path
-                            .clone(),
-                        records,
-                    );
+                    plan.entry_records.insert(entry_node.path.clone(), records);
                     plan.fmir_text_cli = Some(cli_section);
                 }
-            } else if let Some((records, exit_code)) = plan_cli_root_entry(
-                package.nodes.get_mut(&entry_id).expect("entry node"),
-                &cli_program,
-                argumenta,
-                &mut diagnostics,
-            ) {
+            } else if let Some((records, exit_code)) =
+                plan_cli_root_entry(entry_node, &cli_program, argumenta, &mut diagnostics)
+            {
                 plan.exit_code = exit_code;
-                plan.entry_records.insert(
-                    package
-                        .nodes
-                        .get(&entry_id)
-                        .expect("entry node")
-                        .path
-                        .clone(),
-                    records,
-                );
+                plan.entry_records.insert(entry_node.path.clone(), records);
             }
         }
         CliMode::Subcommand => {
@@ -796,7 +781,8 @@ pub(super) fn selected_command_record_type_rewrite(
     if &entry_id == unit_id {
         return None;
     }
-    let from = command_cli_args_type(package.nodes.get(unit_id)?, command)?;
+    let unit = package.nodes.get(unit_id)?;
+    let from = command_cli_args_type(unit, command)?;
     let field_names = global_options
         .iter()
         .map(|option| {
@@ -808,10 +794,7 @@ pub(super) fn selected_command_record_type_rewrite(
             )
         })
         .chain(command.options.iter().map(|option| {
-            let name = package
-                .nodes
-                .get(unit_id)
-                .expect("command unit")
+            let name = unit
                 .analysis
                 .interner
                 .resolve(option.binding_symbol)
@@ -832,10 +815,7 @@ pub(super) fn selected_command_record_type_rewrite(
             )
         }))
         .chain(command.operands.iter().map(|operand| {
-            let name = package
-                .nodes
-                .get(unit_id)
-                .expect("command unit")
+            let name = unit
                 .analysis
                 .interner
                 .resolve(operand.binding_symbol)
@@ -1493,18 +1473,17 @@ pub(super) fn import_semantic_type_with_nominal(
         }
         other @ (Type::Struct(_) | Type::Enum(_) | Type::Interface(_)) => {
             import_nominal_by_canonical_key(&other, nominal).unwrap_or_else(|| {
-                let def = match &other {
-                    Type::Struct(def) | Type::Enum(def) | Type::Interface(def) => *def,
-                    _ => unreachable!("matched Struct/Enum/Interface"),
+                let remap = |def: DefId| {
+                    nominal
+                        .and_then(|ctx| ctx.def_remap.get(&def).copied())
+                        .unwrap_or(def)
                 };
-                let dest = nominal
-                    .and_then(|ctx| ctx.def_remap.get(&def).copied())
-                    .unwrap_or(def);
                 match other {
-                    Type::Struct(_) => target.intern(Type::Struct(dest)),
-                    Type::Enum(_) => target.intern(Type::Enum(dest)),
-                    Type::Interface(_) => target.intern(Type::Interface(dest)),
-                    _ => unreachable!("matched Struct/Enum/Interface"),
+                    Type::Struct(def) => target.intern(Type::Struct(remap(def))),
+                    Type::Enum(def) => target.intern(Type::Enum(remap(def))),
+                    Type::Interface(def) => target.intern(Type::Interface(remap(def))),
+                    // The outer pattern admits only Struct/Enum/Interface.
+                    other => target.intern(other),
                 }
             })
         }

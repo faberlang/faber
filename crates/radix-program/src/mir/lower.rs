@@ -695,7 +695,9 @@ pub(super) fn lower_package_units<'a>(
         }
     }
     let Some(entry) = package.nodes.get_mut(entry_id) else {
-        unreachable!("entry id selected from program nodes");
+        return Err(vec![crate::package_diagnostic_error(
+            "internal invariant: entry id selected from program nodes",
+        )]);
     };
     // Linked const data members (sibling units + libraries) are transplanted
     // into the entry analysis before the entry lowers: the entry's rewritten
@@ -730,7 +732,11 @@ pub(super) fn lower_package_units<'a>(
         .map(|(id, _)| id.clone())
         .collect();
     for id in sibling_reader_ids {
-        let (_, mut reader) = others.remove_entry(&id).expect("reader id from map");
+        let Some((_, mut reader)) = others.remove_entry(&id) else {
+            return Err(vec![crate::package_diagnostic_error(
+                "internal invariant: reader id from map",
+            )]);
+        };
         let injection = inject_package_data_members(
             &reader.path,
             &mut reader.analysis,
@@ -1329,7 +1335,9 @@ pub(super) fn lower_package_units<'a>(
     }
     prune_unreachable_library_functions(&mut library_parts, &mut reachable_seed);
     let Some(entry) = package.nodes.get_mut(entry_id) else {
-        unreachable!("entry id selected from program nodes");
+        return Err(vec![crate::package_diagnostic_error(
+            "internal invariant: entry id selected from program nodes",
+        )]);
     };
 
     // CDC-1: the entry unit's own device facts join the consumer-local
@@ -2353,19 +2361,22 @@ fn rewrite_lowered_shape_size_indices<'a>(
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     let (mut program, context) = lowered.validated.into_parts();
     let mut rewrite_function = |function: &mut MirFunction| {
-        let _ = radix_module::mir::generic::rewrite_function_constants(function, &mut |constant| {
-            let MirConstant::ShapeSize { shape, .. } = constant else {
-                return true;
-            };
-            *shape = import_shape_size_index(
-                source_types,
-                target_types,
-                *shape,
-                param_symbols,
-                record_field_symbols,
-            );
-            true
-        });
+        let completed =
+            radix_module::mir::generic::rewrite_function_constants(function, &mut |constant| {
+                let MirConstant::ShapeSize { shape, .. } = constant else {
+                    return true;
+                };
+                *shape = import_shape_size_index(
+                    source_types,
+                    target_types,
+                    *shape,
+                    param_symbols,
+                    record_field_symbols,
+                );
+                true
+            });
+        // The callback never aborts the walk.
+        debug_assert!(completed);
     };
     for function in &mut program.functions {
         rewrite_function(function);
@@ -2533,9 +2544,7 @@ fn remap_lowered_program_text_symbols<'a>(
         .any(|index| matches!(context.types.get(TypeId(index as u32)), Type::Record(_)));
     if has_records {
         let mut snapshot = context.types.snapshot();
-        snapshot.remap_record_field_symbols(|symbol| {
-            remap_optional_symbol(Some(symbol), source, target).expect("symbol is present")
-        });
+        snapshot.remap_record_field_symbols(|symbol| remap_symbol(symbol, source, target));
         let remapped_types = TypeTable::from_snapshot(snapshot)
             .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
         context = context.with_owned_types(remapped_types);
@@ -3590,8 +3599,7 @@ fn remap_closure_environment_symbols(
 ) {
     for environment in environments {
         for capture in &mut environment.captures {
-            capture.name = remap_optional_symbol(Some(capture.name), source, target)
-                .expect("capture name is always present");
+            capture.name = remap_symbol(capture.name, source, target);
         }
     }
 }

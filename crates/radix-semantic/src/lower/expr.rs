@@ -390,35 +390,6 @@ impl Lowerer<'_> {
         let lhs = lower_expr(self, &bin.lhs);
         let rhs = lower_expr(self, &bin.rhs);
 
-        // Infix extrema are syntax sugar for the canonical method twins. Keep
-        // the HIR shape identical to an explicit `.maximus(n)` / `.minimus(n)`
-        // call so the existing typecheck, registry lookup, and MIR lowering
-        // paths remain the sole semantic owners.
-        let twin = match bin.op {
-            radix_syntax::BinOp::Maximum => Some("maximus"),
-            radix_syntax::BinOp::Minimum => Some("minimus"),
-            _ => None,
-        };
-        if let Some(canonical) = twin {
-            let surface = self
-                .locale_pack
-                .map_or(canonical, |pack| pack.intrinsic_surface(canonical));
-            let name = self.interner.intern(surface);
-            return HirExpressionKind::MethodCall(
-                Box::new(lhs),
-                name,
-                Vec::new(),
-                vec![HirCallArg {
-                    name: None,
-                    spread: false,
-                    marker: None,
-                    span: rhs.span,
-                    expr: rhs,
-                }],
-                None,
-            );
-        }
-
         let op = match bin.op {
             radix_syntax::BinOp::Add => HirBinOp::Add,
             radix_syntax::BinOp::Sub => HirBinOp::Sub,
@@ -458,12 +429,44 @@ impl Lowerer<'_> {
             // WHY: placeholders; the checker retargets `Between` / `NotBetween` to the range forms by right-operand type.
             radix_syntax::BinOp::Member => HirBinOp::Between,
             radix_syntax::BinOp::NotMember => HirBinOp::NotBetween,
-            radix_syntax::BinOp::Maximum | radix_syntax::BinOp::Minimum => {
-                unreachable!("minmax infix nodes normalize to method calls above")
+            radix_syntax::BinOp::Maximum => {
+                return self.lower_extremum_method_call("maximus", lhs, rhs);
+            }
+            radix_syntax::BinOp::Minimum => {
+                return self.lower_extremum_method_call("minimus", lhs, rhs);
             }
         };
 
         HirExpressionKind::Binary(op, Box::new(lhs), Box::new(rhs))
+    }
+
+    /// Infix extrema are syntax sugar for the canonical method twins. Keep
+    /// the HIR shape identical to an explicit `.maximus(n)` / `.minimus(n)`
+    /// call so the existing typecheck, registry lookup, and MIR lowering
+    /// paths remain the sole semantic owners.
+    fn lower_extremum_method_call(
+        &mut self,
+        canonical: &str,
+        lhs: HirExpression,
+        rhs: HirExpression,
+    ) -> HirExpressionKind {
+        let surface = self
+            .locale_pack
+            .map_or(canonical, |pack| pack.intrinsic_surface(canonical));
+        let name = self.interner.intern(surface);
+        HirExpressionKind::MethodCall(
+            Box::new(lhs),
+            name,
+            Vec::new(),
+            vec![HirCallArg {
+                name: None,
+                spread: false,
+                marker: None,
+                span: rhs.span,
+                expr: rhs,
+            }],
+            None,
+        )
     }
 
     /// Lower unary expression (unarius)
@@ -970,7 +973,7 @@ impl Lowerer<'_> {
 
         let erased = self.interner.intern(&analysis.erased);
         let positional = if has_labeled {
-            self.reorder_labeled_actuals(&analysis, lowered)
+            self.reorder_labeled_actuals(&analysis, lowered)?
         } else {
             lowered.into_iter().map(|(_, expr)| expr).collect()
         };
@@ -982,7 +985,7 @@ impl Lowerer<'_> {
         &self,
         analysis: &TemplateHoleAnalysis,
         lowered: Vec<(Option<radix_lexer::Symbol>, HirExpression)>,
-    ) -> Vec<HirExpression> {
+    ) -> Option<Vec<HirExpression>> {
         let slot_count = analysis
             .holes
             .iter()
@@ -991,17 +994,11 @@ impl Lowerer<'_> {
             .map_or(0, |position| position.saturating_add(1));
         let mut slots: Vec<Option<HirExpression>> = (0..slot_count).map(|_| None).collect();
         for (label, expr) in lowered {
-            let label = label.expect("labeled template actuals are present");
-            let name = self.interner.resolve(label);
-            let position = analysis
-                .label_position(name)
-                .expect("unknown labels already rejected");
+            let name = self.interner.resolve(label?);
+            let position = analysis.label_position(name)?;
             slots[position] = Some(expr);
         }
-        slots
-            .into_iter()
-            .map(|slot| slot.expect("labeled actuals fill every position"))
-            .collect()
+        slots.into_iter().collect()
     }
 
     /// Collapse namespace calls like `faber.json.solve(args)` into receiver
@@ -2043,29 +2040,33 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
     };
     match lowerer.lower_applied_arg(arg) {
         radix_types::AppliedArg::Type(id) => id,
-        radix_types::AppliedArg::Size(id) => match lowerer.types.get_index(id).clone() {
-            crate::IndexExpr::Literal(value) => {
-                let symbol = lowerer.interner.intern(&value.to_string());
-                lowerer.types.intern(crate::Type::Param(symbol))
+        radix_types::AppliedArg::Size(id) => {
+            match (lowerer.types.get_index(id).clone(), spelled_runtime_lift) {
+                (crate::IndexExpr::Literal(value), _) => {
+                    let symbol = lowerer.interner.intern(&value.to_string());
+                    lowerer.types.intern(crate::Type::Param(symbol))
+                }
+                (crate::IndexExpr::Param(symbol), _) => {
+                    lowerer.types.intern(crate::Type::Param(symbol))
+                }
+                (
+                    crate::IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(_)),
+                    Some(lift),
+                ) => lowerer.types.intern(crate::Type::Param(lift)),
+                (
+                    crate::IndexExpr::Runtime(_)
+                    | crate::IndexExpr::Affine { .. }
+                    | crate::IndexExpr::Divide { .. }
+                    | crate::IndexExpr::Infer(_)
+                    | crate::IndexExpr::Unspecified
+                    | crate::IndexExpr::Tuple(_),
+                    _,
+                ) => {
+                    lowerer.error("generic_call_size_shape_unsupported");
+                    lowerer.types.intern(crate::Type::Error)
+                }
             }
-            crate::IndexExpr::Param(symbol) => lowerer.types.intern(crate::Type::Param(symbol)),
-            crate::IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(_))
-                if spelled_runtime_lift.is_some() =>
-            {
-                lowerer
-                    .types
-                    .intern(crate::Type::Param(spelled_runtime_lift.unwrap()))
-            }
-            crate::IndexExpr::Runtime(_)
-            | crate::IndexExpr::Affine { .. }
-            | crate::IndexExpr::Divide { .. }
-            | crate::IndexExpr::Infer(_)
-            | crate::IndexExpr::Unspecified
-            | crate::IndexExpr::Tuple(_) => {
-                lowerer.error("generic_call_size_shape_unsupported");
-                lowerer.types.intern(crate::Type::Error)
-            }
-        },
+        }
     }
 }
 

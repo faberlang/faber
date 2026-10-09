@@ -604,7 +604,11 @@ impl TypeChecker<'_> {
             let (expr, spread) = match element {
                 HirArrayElement::Expr(expr) => (expr, false),
                 HirArrayElement::Spread(expr) => (expr, true),
-                HirArrayElement::Infer(_) => unreachable!("shape holes rejected above"),
+                HirArrayElement::Infer(span) => {
+                    // Rejected before the loop; keep the same diagnostic if reached.
+                    self.invalid_operand_types(ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT, *span);
+                    return self.error_type;
+                }
             };
             let ty = if spread {
                 if has_expected_element {

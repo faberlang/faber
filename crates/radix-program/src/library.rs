@@ -22,7 +22,6 @@
 //!   faber-side; this crate only ever receives explicit homes.
 
 use std::collections::BTreeMap;
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 /// Locked package interface root used for build-time resolution.
@@ -973,7 +972,8 @@ fn read_and_parse_library_interface(
         );
         if let Some(err) = parse.errors.first() {
             let diagnostic = Diagnostic::from_parse_error(&display_name, peeled.body, err);
-            let _ = write!(message, ": {}", diagnostic.message);
+            message.push_str(": ");
+            message.push_str(&diagnostic.message);
         }
         return Err(crate::package_diagnostic_error(message)
             .with_file(module.interface_path.display().to_string()));

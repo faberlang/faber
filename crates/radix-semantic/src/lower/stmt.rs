@@ -891,10 +891,17 @@ impl Lowerer<'_> {
 
         let binding = self.next_def_id();
         let iter = self.lower_expr(&iter_stmt.sources[0]);
-        let first_binding = iter_stmt
-            .bindings
-            .first()
-            .expect("parser produces at least one itera binder");
+        // The parser always supplies one binder; fail closed if it did not.
+        let Some(first_binding) = iter_stmt.bindings.first() else {
+            self.error_with_args_at(
+                vec![radix_diagnostics::DiagnosticArg::new(
+                    "issue",
+                    "itera_binder_pattern_unsupported",
+                )],
+                iter.span,
+            );
+            return HirStatementKind::Expr(error_expr(self, iter.span));
+        };
         let binding_span = binding_pattern_span(first_binding);
         let binding_name = match first_binding {
             radix_syntax::BindingPattern::Ident(ident) => ident.name,
@@ -959,9 +966,9 @@ impl Lowerer<'_> {
                 iter_stmt.mutability,
                 false,
             ),
-            radix_syntax::BindingPattern::Ident(_) => Vec::new(),
-            radix_syntax::BindingPattern::Wildcard(_) => {
-                unreachable!("wildcard loop binder rejected above")
+            // Wildcard binders returned above, so only identifiers reach here.
+            radix_syntax::BindingPattern::Ident(_) | radix_syntax::BindingPattern::Wildcard(_) => {
+                Vec::new()
             }
         };
         let mut body = self.lower_ergo_body(&iter_stmt.body);

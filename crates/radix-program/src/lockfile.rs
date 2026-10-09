@@ -87,8 +87,6 @@ impl LockedPackage {
 /// Read `faber.lock` from a package root when present.
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
-/// # Panics
-/// Panics when required internal state is absent.
 pub fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Diagnostic>> {
     let path = package_root.join(LOCK_FILE);
     if !path.is_file() {
@@ -108,9 +106,9 @@ pub fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Diagnosti
         // only with a non-empty diagnostics vector — it collects duplicate
         // package-name findings and errors only when at least one exists — so
         // popping the last finding is always sound.
-        let diagnostic = diagnostics
-            .pop()
-            .expect("duplicate lock diagnostics must be non-empty");
+        let diagnostic = diagnostics.pop().unwrap_or_else(|| {
+            package_diagnostic_error("internal invariant: duplicate lock diagnostics are non-empty")
+        });
         return Err(Box::new(diagnostic));
     }
     Ok(Some(lock))

@@ -136,7 +136,7 @@ impl TypeChecker<'_> {
                 }
                 (element, list.capacity)
             }
-            (None, None) => unreachable!("list arithmetic arm requires a lista operand"),
+            (None, None) => return None,
         };
         Some(self.lista_result(result_element, result_capacity))
     }

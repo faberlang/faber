@@ -103,10 +103,11 @@ pub fn textus_literal_payload(text: &str) -> String {
 /// Render embedded bytes as an `octeti` literal payload (contiguous hex).
 #[must_use]
 pub fn octeti_literal_payload(bytes: &[u8]) -> String {
-    use std::fmt::Write as _;
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut payload = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        let _ = write!(payload, "{byte:02x}");
+    for &byte in bytes {
+        payload.push(char::from(HEX[usize::from(byte >> 4)]));
+        payload.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     payload
 }

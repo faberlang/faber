@@ -647,6 +647,14 @@ impl HirVisitor for PolicyCallCollector<'_> {
     }
 }
 
+/// Index of a kernel report's target within [`DEVICE_TARGETS`].
+fn device_target_index(target: Target) -> usize {
+    DEVICE_TARGETS
+        .iter()
+        .position(|device| *device == target)
+        .expect("all kernel reports use a device target")
+}
+
 fn supports_width(target: Target, requirement: &KernelWidthRequirement) -> bool {
     match requirement.primitive {
         Primitive::Numerus => match requirement.policy {
@@ -695,11 +703,10 @@ fn propagate_callee_requirements(
         .iter()
         .flat_map(|kernel| {
             kernel.target_reports.iter().map(move |report| {
-                let target_index = DEVICE_TARGETS
-                    .iter()
-                    .position(|target| *target == report.target)
-                    .expect("all kernel reports use a device target");
-                ((kernel.def_id, target_index), report.clone())
+                (
+                    (kernel.def_id, device_target_index(report.target)),
+                    report.clone(),
+                )
             })
         })
         .collect();
@@ -738,10 +745,7 @@ fn propagate_callee_requirements(
                     .failures
                     .push(KernelRequirementFailure::RecursiveCall);
             }
-            let target_index = DEVICE_TARGETS
-                .iter()
-                .position(|target| *target == report.target)
-                .expect("all kernel reports use a device target");
+            let target_index = device_target_index(report.target);
             for callee in &reached {
                 if let Some(callee_report) = target_summaries.get(&(*callee, target_index)) {
                     report.widths.extend(callee_report.widths.iter().cloned());
@@ -981,17 +985,15 @@ impl BodyFacts<'_> {
             }
             HirExpressionKind::Unary(op, operand) => {
                 let input = self.evaluate(operand);
-                let output = if is_modular_unary(expr.ty, *op, self.types) {
-                    AbstractRange::from_type(
-                        expr.ty.expect("modular result has a type"),
-                        self.types,
-                    )
+                let modular_ty = expr
+                    .ty
+                    .filter(|ty| is_modular_unary(Some(*ty), *op, self.types));
+                let output = if let Some(ty) = modular_ty {
+                    AbstractRange::from_type(ty, self.types)
                 } else {
                     unary_range(*op, input)
                 };
-                if is_integer_value_type(expr.ty, self.types)
-                    && !is_modular_unary(expr.ty, *op, self.types)
-                {
+                if is_integer_value_type(expr.ty, self.types) && modular_ty.is_none() {
                     self.check_intermediate(expr.span, output.clone());
                 }
                 output
@@ -1033,21 +1035,20 @@ impl BodyFacts<'_> {
                         _ => {}
                     }
                 }
-                let modular = is_modular_binary(expr.ty, *op, self.types);
+                let modular_ty = expr
+                    .ty
+                    .filter(|ty| is_modular_binary(Some(*ty), *op, self.types));
                 let output = if *op == HirBinOp::Coalesce {
                     // The payload of the left side, or the right side.
                     merge_abstract_ranges(&[left, right])
-                } else if modular {
-                    AbstractRange::from_type(
-                        expr.ty.expect("modular result has a type"),
-                        self.types,
-                    )
+                } else if let Some(ty) = modular_ty {
+                    AbstractRange::from_type(ty, self.types)
                 } else {
                     binary_range(*op, left, right)
                 };
                 if is_integer_value_operator(*op)
                     && is_integer_value_type(expr.ty, self.types)
-                    && !modular
+                    && modular_ty.is_none()
                 {
                     self.check_intermediate(expr.span, output.clone());
                 }
@@ -1345,15 +1346,12 @@ impl BodyFacts<'_> {
                         _ => None,
                     }
                     .unwrap_or_else(AbstractRange::unknown);
-                    let modular_result = is_modular_type(expr.ty, self.types);
-                    if !modular_result || method_name == "divisio" {
+                    let modular_ty = expr.ty.filter(|ty| is_modular_type(Some(*ty), self.types));
+                    if modular_ty.is_none() || method_name == "divisio" {
                         self.check_intermediate(expr.span, result.clone());
                     }
-                    return if modular_result {
-                        AbstractRange::from_type(
-                            expr.ty.expect("typed tensor method result"),
-                            self.types,
-                        )
+                    return if let Some(ty) = modular_ty {
+                        AbstractRange::from_type(ty, self.types)
                     } else {
                         result
                     };
@@ -2255,9 +2253,10 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
                 multiply(lhs.maximum.clone(), rhs.minimum),
                 multiply(lhs.maximum, rhs.maximum),
             ];
+            let [first, rest @ ..] = &values;
             KernelValueRange {
-                minimum: values.iter().cloned().reduce(minimum).unwrap(),
-                maximum: values.into_iter().reduce(maximum).unwrap(),
+                minimum: rest.iter().cloned().fold(first.clone(), minimum),
+                maximum: rest.iter().cloned().fold(first.clone(), maximum),
             }
         }
         HirBinOp::Div | HirBinOp::Shr => {
@@ -2349,9 +2348,10 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
                 multiply(lhs.minimum.clone(), factor.clone()),
                 multiply(lhs.maximum.clone(), factor),
             ];
+            let [first, rest @ ..] = &values;
             KernelValueRange {
-                minimum: values.iter().cloned().reduce(minimum).unwrap(),
-                maximum: values.into_iter().reduce(maximum).unwrap(),
+                minimum: rest.iter().cloned().fold(first.clone(), minimum),
+                maximum: rest.iter().cloned().fold(first.clone(), maximum),
             }
         }
         HirBinOp::BitAnd => {

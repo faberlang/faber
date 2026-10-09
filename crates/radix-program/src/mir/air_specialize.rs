@@ -173,13 +173,12 @@ pub(super) fn plan_package_instances(
             }));
         }
 
-        for (key, instance) in report.instance_defs {
+        for (_, instance) in report.instance_defs {
             let synthetic = DefId(links.next_synthetic);
             links.next_synthetic = links.next_synthetic.saturating_add(1);
             links
                 .sources
                 .insert((target_path.clone(), instance), synthetic);
-            let _ = key;
         }
         for (call, key) in calls.iter().zip(keys) {
             let Some(instance) = instance_by_key.get(&key).copied() else {

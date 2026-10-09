@@ -110,8 +110,6 @@ pub fn with_interpreted_lowered_package_mir<R>(
 /// are linked through the normal interpreted consumer.
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
-/// # Panics
-/// Panics when required internal state is absent.
 pub fn with_linked_test_package_mir<R>(
     package: AnalyzedProgram,
     scope: &TestPackageScope,
@@ -138,8 +136,6 @@ pub fn with_linked_test_package_mir<R>(
 ///
 /// # Errors
 /// Returns an error when scoping, linking, lowering, or validation fails.
-/// # Panics
-/// Panics when required internal state is absent.
 pub(crate) fn link_package_functions<R>(
     mut package: AnalyzedProgram,
     scope: &TestPackageScope,
@@ -153,7 +149,11 @@ pub(crate) fn link_package_functions<R>(
         .nodes
         .get(&anchor_id)
         .map(|node| node.path.clone())
-        .expect("remap anchor is a program node");
+        .ok_or_else(|| {
+            vec![crate::package_diagnostic_error(
+                "internal invariant: remap anchor is a program node",
+            )]
+        })?;
     let mut links = local_namespace_call_targets(
         &package,
         PackageMirConsumer::Interpreted,
@@ -335,7 +335,11 @@ fn prepare_package_mir<R>(
         .nodes
         .get(&entry_id)
         .map(|node| node.path.clone())
-        .expect("entry id is a program node");
+        .ok_or_else(|| {
+            vec![crate::package_diagnostic_error(
+                "internal invariant: entry id is a program node",
+            )]
+        })?;
     let source_paths = package
         .nodes
         .values()

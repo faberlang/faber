@@ -655,8 +655,7 @@ impl TypeChecker<'_> {
                 self.error_type
             };
         }
-        if let Some(decimal_ty) = self.expected_decimal_slot_type(expected) {
-            let _ = decimal_ty;
+        if self.expected_decimal_slot_type(expected).is_some() {
             return self.decimal_literal_out_of_range(span);
         }
         self.numerus_literal_out_of_range(span);
@@ -778,7 +777,7 @@ impl TypeChecker<'_> {
         let factor = i128::from(10u32).checked_pow(shift.cast_unsigned());
         let carrier_max: i128 = match width {
             NumericWidth::D64 => i128::from(i64::MAX),
-            _ => unreachable!("decimal width checked above"),
+            _ => return None,
         };
         if factor
             .and_then(|f| mantissa.checked_mul(f))

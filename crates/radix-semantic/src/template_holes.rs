@@ -71,10 +71,9 @@ pub fn analyze_template(template: &str) -> TemplateHoleAnalysis {
     let mut cursor = 0usize;
 
     while cursor < template.len() {
-        let character = template[cursor..]
-            .chars()
-            .next()
-            .expect("cursor always points inside the template");
+        let Some(character) = template[cursor..].chars().next() else {
+            break;
+        };
         if character != '§' {
             let next = cursor + character.len_utf8();
             erased.push_str(&template[cursor..next]);

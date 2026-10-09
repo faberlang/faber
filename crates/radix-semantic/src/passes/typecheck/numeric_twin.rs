@@ -243,7 +243,9 @@ impl TypeChecker<'_> {
         let span = expr.span;
         let kind = std::mem::replace(&mut expr.kind, HirExpressionKind::Vacua);
         let HirExpressionKind::MethodCall(mut receiver, _, _, mut args, _) = kind else {
-            unreachable!("numeric_twin_of only accepts method calls");
+            // `numeric_twin_of` only accepts method calls; restore and decline.
+            expr.kind = kind;
+            return false;
         };
         let mut argument = || Box::new(args.remove(0).expr);
         expr.kind = match twin {

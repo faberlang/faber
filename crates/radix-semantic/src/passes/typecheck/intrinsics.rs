@@ -1677,7 +1677,10 @@ fn hir_array_has_shape_hole(expr: &HirExpression) -> bool {
 
 fn check_tensor_shape_hole_argument(checker: &mut TypeChecker<'_>, arg: &mut HirCallArg) {
     let HirExpressionKind::Array(elements) = &mut arg.expr.kind else {
-        unreachable!("shape-hole probe only admits array expressions")
+        // The shape-hole probe only admits array expressions; check anything
+        // else as an ordinary argument.
+        checker.check_expr(&mut arg.expr);
+        return;
     };
     for element in elements {
         match element {
