@@ -35,6 +35,7 @@ use radix_lexer::{
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 /// Reader pack schema version accepted by this implementation.
@@ -91,6 +92,10 @@ pub struct LocalePack {
     /// Inclusive upper bound on folded input char-length that can match any
     /// spelling under the edit-distance threshold.
     suggestion_input_len_max: usize,
+    /// Memo of [`LocalePack::keyword_suggestion`] results, shared by every pack
+    /// whose folded spelling table is identical. Derived data, set by
+    /// `rebuild_surfaces`.
+    suggestion_memo: SuggestionMemoHandle,
 
     // Exact spelling → token/type kind maps, paid once at rebuild_surfaces.
     // Keys are pack canonical spellings and aliases (owned).
@@ -216,6 +221,13 @@ impl LocalePack {
     /// Suggestion results are unchanged for inputs that remain eligible.
     #[must_use]
     pub fn keyword_suggestion(&self, text: &str) -> Option<String> {
+        self.suggestion_memo
+            .0
+            .get_or_compute(text, || self.compute_keyword_suggestion(text))
+    }
+
+    /// Uncached [`Self::keyword_suggestion`]; the memo's reference semantics.
+    fn compute_keyword_suggestion(&self, text: &str) -> Option<String> {
         // `inf` is a reserved, locale-invariant width marker (the unbounded
         // integer), one edit from the English `if`; it is never a typo.
         if text == radix_types::NumericWidth::Inf.faber_marker() {
@@ -529,6 +541,7 @@ impl LocalePack {
         self.keyword_folded_spellings = folded;
         self.suggestion_input_len_min = len_min;
         self.suggestion_input_len_max = len_max;
+        self.suggestion_memo = suggestion_memo_for(&self.keyword_folded_spellings);
         self.keyword_latin_key_by_spelling = build_keyword_latin_key_by_spelling(&self.keywords);
         self.type_binding_by_spelling = build_type_binding_by_spelling(&self.types);
         self.intrinsic_surfaces = build_intrinsic_surfaces(&self.intrinsics);
@@ -1443,6 +1456,7 @@ pub fn latin_locale_pack() -> LocalePack {
         keyword_folded_spellings: Vec::new(),
         suggestion_input_len_min: 0,
         suggestion_input_len_max: 0,
+        suggestion_memo: SuggestionMemoHandle::default(),
         keyword_latin_key_by_spelling: HashMap::new(),
         type_binding_by_spelling: HashMap::new(),
         intrinsic_surfaces: HashMap::new(),
@@ -1577,6 +1591,85 @@ pub fn suggestion_key(text: &str) -> String {
         .flat_map(|ch| ch.to_string().nfd().collect::<Vec<_>>())
         .filter(|ch| !is_combining_mark(*ch))
         .collect()
+}
+
+/// Largest number of distinct identifier texts one memo retains. Past it,
+/// results are computed but not stored, so a long-lived process (a language
+/// server fed unbounded distinct identifiers) cannot grow the memo forever.
+const SUGGESTION_MEMO_CAPACITY: usize = 1 << 16;
+
+/// Process-wide memo of `keyword_suggestion` results for one folded spelling
+/// table. The result is a pure function of (table, text), so packs that carry
+/// the same table share one memo and packs that differ never do.
+#[derive(Default)]
+struct SuggestionMemo {
+    entries: Mutex<HashMap<String, Option<String>>>,
+    /// Number of uncached computations, for the call-count test.
+    #[cfg(test)]
+    computed: std::sync::atomic::AtomicUsize,
+}
+
+impl SuggestionMemo {
+    fn get_or_compute(
+        &self,
+        text: &str,
+        compute: impl FnOnce() -> Option<String>,
+    ) -> Option<String> {
+        if let Some(hit) = self
+            .entries
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(text)
+        {
+            return hit.clone();
+        }
+        // The lock is released while computing; two threads racing on one
+        // text compute the same pure value and the later insert is identical.
+        let value = compute();
+        #[cfg(test)]
+        self.computed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let mut entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
+        if entries.len() < SUGGESTION_MEMO_CAPACITY {
+            entries.insert(text.to_owned(), value.clone());
+        }
+        value
+    }
+}
+
+/// Pack field wrapper: equality ignores the memo (derived data) and cloning
+/// shares it (same table by construction).
+#[derive(Clone, Default)]
+struct SuggestionMemoHandle(Arc<SuggestionMemo>);
+
+impl std::fmt::Debug for SuggestionMemoHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SuggestionMemoHandle")
+    }
+}
+
+impl PartialEq for SuggestionMemoHandle {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for SuggestionMemoHandle {}
+
+/// The shared memo for a folded spelling table: one per distinct
+/// `(canonical, folded)` sequence in the process.
+fn suggestion_memo_for(spellings: &[KeywordFoldedSpelling]) -> SuggestionMemoHandle {
+    type TableKey = Vec<(String, String)>;
+    static MEMOS: OnceLock<Mutex<HashMap<TableKey, Arc<SuggestionMemo>>>> = OnceLock::new();
+    let key: TableKey = spellings
+        .iter()
+        .map(|spelling| (spelling.canonical.clone(), spelling.folded.clone()))
+        .collect();
+    let mut memos = MEMOS
+        .get_or_init(Mutex::default)
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    SuggestionMemoHandle(Arc::clone(memos.entry(key).or_default()))
 }
 
 /// One pack spelling folded for suggestion matching.
@@ -2376,6 +2469,7 @@ impl ReaderPackToml {
             keyword_folded_spellings: Vec::new(),
             suggestion_input_len_min: 0,
             suggestion_input_len_max: 0,
+            suggestion_memo: SuggestionMemoHandle::default(),
             keyword_latin_key_by_spelling: HashMap::new(),
             type_binding_by_spelling: HashMap::new(),
             intrinsic_surfaces: HashMap::new(),
@@ -2588,3 +2682,7 @@ impl radix_lexer::KeywordPack for LocalePack {
         LocalePack::keyword_suggestion(self, text)
     }
 }
+
+#[cfg(test)]
+#[path = "locale_suggestion_test.rs"]
+mod suggestion_tests;
