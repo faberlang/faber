@@ -138,7 +138,7 @@ glyph = "@"
 codepoint = "U+0040"
 unicode_name = "COMMERCIAL AT"
 role = "annotation"
-claiming_slots = ["ad_annotation", "annotation_sugar", "braced_annotation", "nucleum_braced", "nucleum_sugar", "radix_annotation"]
+claiming_slots = ["ad_annotation", "annotation_sugar", "braced_annotation", "nondum_annotation", "nucleum_braced", "nucleum_sugar", "radix_annotation"]
 
 [[glyphs]]
 glyph = "¶"
@@ -924,13 +924,26 @@ program       := regio_decl? statement*
 # follows). Two imports that would default to the same name are a compile
 # error; alias one with `ut`.
 regio_decl    := 'regio' IDENTIFIER
-statement     := annotation* statement_core | ad_handler_decl
+statement     := annotation* statement_core | ad_handler_decl | nondum_functio_decl
 # An `@ ad '<route>'` annotation must be followed — directly, or after further
 # stacked annotations — by a `functio` (`ad_annotation_requires_functio`); it
 # attaches to no other declaration and to no `genus` member, `discretio` field
 # or `implendum` method, so `annotation` below leaves it out. Top-level
 # placement, handler shape and reserved routes are semantic.
 ad_handler_decl := annotation* ad_annotation annotation* functio_decl
+# A top-level `functio` marked `@ nondum` (en `@ unstable`) may omit its
+# block: the declaration is part of the interface and is unavailable, so any
+# use of it — a call, a call through an imported namespace or name, or the
+# function taken as a value — is refused (`SEM017 nondum_function_for_target`),
+# and no backend emits it. The annotation need not be the only one; stacked
+# annotations may precede or follow it. A signature-only `functio` without
+# `@ nondum` stays `PARSE012 function_body_absent`, and the exemption reaches
+# only the `functio` directly after the annotations: never a `genus` method,
+# a nested declaration, or a later top-level declaration. Library analysis of a
+# `kind = "lib"` package or an imported library interface additionally accepts
+# any signature-only `functio` as a binding declaration (a parser option, not
+# part of this grammar).
+nondum_functio_decl := annotation* nondum_annotation annotation* 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
 statement_core := importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl
                | typus_decl | ordo_decl | discretio_decl | schema_decl
                | si_stmt | dum_stmt | itera_stmt
@@ -1080,6 +1093,12 @@ radix_directive        := 'lane' STRING | 'backward' STRING | 'contract' STRING 
 # `@ ad '<route>'` (en `@ call`) registers a top-level `functio` as the handler
 # for one exact route. Pattern routes (`@ ad sed "…"`) are deferred.
 ad_annotation          := '@' 'ad' ASCII_STRING NEWLINE
+# `@ nondum [TARGET] ["REASON"]` (en `@ unstable`): the availability marker.
+# Without a target the declaration is unavailable on every target. It is an
+# `annotation_sugar` or `braced_annotation` with the claimed name `nondum`
+# (`{ target = …, ratio = "…" }` in the braced spelling); this production names
+# it only so `nondum_functio_decl` can require it.
+nondum_annotation      := '@' 'nondum' NON_NEWLINE_TOKEN* NEWLINE | '@' 'nondum' '{' annotation_field_list? '}'
 
 implendum_decl   := 'implendum' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
 implendum_method_decl := annotation* 'functio' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?

@@ -192,7 +192,7 @@ The body joint keeps the existing closure law: `∴` followed by one expression,
 - Call-site access markers: an argument passed to a parameter declared `mut` / `own` / `copy` carries the same marker at the call (en `mut` `own` `copy`; la `in` `own` `copy`), as in `bump(mut a)`, `eat(own a)`, `dup(copy a)`; the read marker `ref` (la `de`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `own` and `copy` with the matching marker. Call-site `copy` is a plain echo of the parameter marker. Parameters take no `var`/`const`; the marker says what the callee may do. An unmarked or `ref` parameter is read-only, a `mut` parameter writes the caller's value, and an `own` or `copy` parameter is always writable by the callee (method call, field store, reassignment, element store; an `own` tensor parameter may be rebound whole). Only a whole local binding may be passed as `own`: a field or element, an unmarked parameter, a module constant, or an `itera` binder is `SEM057 own_argument_not_local_binding` / `own_argument_unmarked_parameter` / `own_argument_module_constant` / `own_argument_loop_binder` (`copy b.xs` is fine and does not kill `b`). After `eat(own a)` the name `a` is dead: a later use is `SEM050 use_after_own`, blamed on the call argument (an unmarked source gets a copy suggestion); `moved_in_loop` and `moved_name_captured_by_closure` cover loops and closures; an exclusive (`own`/`copy`) source keeps `use_after_move` at the later read; a fresh value (`eat(own make())`) is always fine.
 - Post-name marker: `sponte` (voluntary/optional provision)
 - `ceteri` marks rest parameter
-- Ordinary `functio` declarations and genus methods require bodies. Signature-only methods belong in `implendum`.
+- Ordinary `functio` declarations and genus methods require bodies. Signature-only methods belong in `implendum`. The one exception is a top-level `functio` marked `@ nondum`, which may omit its block (see `nondum_functio_decl`).
 - `errata NAME` is a legacy runtime-injected `ignotum` local, and `iacit` is a legacy marker with no current semantic effect. Neither declares the typed alternate-exit contract. New failable APIs should use `⇥ E`; whether either legacy modifier should survive is unresolved.
 - `ergo` is the compact **statement-body** joint only (one-statement `si`/`dum`/`casu`/… arms).
 - `∴` is the compact **clausura** joint only. The two are not aliases.
@@ -303,7 +303,7 @@ wire operation such as `json.pange(value ↦ json)`.
     domain.
   Any other directive after `@ radix` is rejected (`unknown_directive`).
 - `@ verte` defines codegen transformation (method name or template)
-- `@ nondum [TARGET] ["REASON"]` marks a declaration as present in an interface but unavailable for the target
+- `@ nondum [TARGET] ["REASON"]` marks a declaration as present in an interface but unavailable for the target; without a `TARGET` it is unavailable on every target. On a top-level `functio` the block may be omitted (`@ nondum "pending host dispatch"` then the signature alone): the function is declared, exported and re-exported, any use of it (a call, a call through an imported namespace or name, or the function taken as a value) is refused with `SEM017 nondum_function_for_target`, and no backend emits it. A signature-only `functio` without `@ nondum` is `PARSE012`
 - `@ cli "NAME"` marks an `incipit` entry as a CLI program
 - `@ imperium "NAME"` marks a function as a CLI command entry point
 - `@ optio NAME ...` defines a CLI option; use `typus bivalens` for boolean flags
@@ -1910,7 +1910,8 @@ consumer chooses one.
 
 Feature flags (`@ feature`, `[features]`) belong to the visibility model and
 are unchanged. `@ nondum` stays the marker for "not implemented on this target
-yet".
+yet"; on a top-level `functio` with no `TARGET` it marks a function that is not
+implemented on any target, and the block may be left off.
 
 There is no `unsafe`. Faber code is always checked. Code that must step
 outside the checker is foreign code, written outside Faber.
