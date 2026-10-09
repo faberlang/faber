@@ -1,4 +1,6 @@
-use super::{Sha256, sha256, sha256_hex};
+use super::{
+    BlocksFn, H0, Sha256, compress_blocks_portable, hardware_blocks, hex, sha256, sha256_hex,
+};
 
 /// FIPS 180-4 §B.1: the empty message.
 #[test]
@@ -83,4 +85,133 @@ fn one_shot_and_incremental_agree() {
     }
     assert_eq!(bytewise.finalize(), sha256(data));
     assert_eq!(odd.finalize_hex(), sha256_hex(data));
+}
+
+/// Every backend this machine can run: the portable path always, plus the
+/// hardware path when the CPU has it (aarch64 `sha2`).
+fn backends() -> Vec<(&'static str, BlocksFn)> {
+    let mut all: Vec<(&'static str, BlocksFn)> = vec![("portable", compress_blocks_portable)];
+    if let Some(hardware) = hardware_blocks() {
+        all.push(("hardware", hardware));
+    }
+    all
+}
+
+/// Digest `chunks` of `data` through one explicit backend.
+fn digest_via(backend: BlocksFn, data: &[u8], chunk: usize) -> String {
+    let mut hasher = Sha256::new();
+    for piece in data.chunks(chunk.max(1)) {
+        hasher.update_with(piece, backend);
+    }
+    hex(&hasher.finalize_with(backend))
+}
+
+/// Deterministic pseudo-random bytes (xorshift64*), no dependencies.
+fn pseudo_random(len: usize) -> Vec<u8> {
+    let mut x: u64 = 0x9e37_79b9_7f4a_7c15;
+    (0..len)
+        .map(|_| {
+            x ^= x >> 12;
+            x ^= x << 25;
+            x ^= x >> 27;
+            (x.wrapping_mul(0x2545_f491_4f6c_dd1d) >> 56) as u8
+        })
+        .collect()
+}
+
+/// On aarch64 hardware with the SHA-2 extension the hardware path must be
+/// selected; elsewhere it must be absent (so the portable path is the one
+/// the public API uses).
+#[test]
+fn hardware_backend_selected_where_available() {
+    #[cfg(target_arch = "aarch64")]
+    assert_eq!(
+        hardware_blocks().is_some(),
+        std::arch::is_aarch64_feature_detected!("sha2")
+    );
+    #[cfg(not(target_arch = "aarch64"))]
+    assert!(hardware_blocks().is_none());
+}
+
+/// The NIST vectors through every available backend, byte-identical digests.
+#[test]
+fn nist_vectors_through_every_backend() {
+    let million_a = vec![b'a'; 1_000_000];
+    let vectors: [(&[u8], &str); 4] = [
+        (
+            b"",
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        ),
+        (
+            b"abc",
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        ),
+        (
+            b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+        ),
+        (
+            &million_a,
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+        ),
+    ];
+    for (name, backend) in backends() {
+        for (data, expected) in vectors {
+            assert_eq!(
+                digest_via(backend, data, 4096),
+                expected,
+                "{name} backend, {} bytes",
+                data.len()
+            );
+        }
+    }
+}
+
+/// A 4 MB pseudo-random buffer, split at awkward chunk sizes, must produce
+/// the portable single-shot digest on every backend and through the public
+/// (dispatching) API.
+#[test]
+fn random_buffer_awkward_chunks_match_portable() {
+    let data = pseudo_random(4 * 1024 * 1024 + 37);
+    let reference = digest_via(compress_blocks_portable, &data, data.len());
+    for (name, backend) in backends() {
+        for chunk in [1_usize, 63, 64, 65, 4096] {
+            // Chunk size 1 over 4 MB is slow in debug builds; bound it to a prefix
+            // and compare against the portable digest of the same prefix.
+            let slice = if chunk == 1 {
+                &data[..65_537]
+            } else {
+                &data[..]
+            };
+            let expected = if chunk == 1 {
+                digest_via(compress_blocks_portable, slice, slice.len())
+            } else {
+                reference.clone()
+            };
+            assert_eq!(
+                digest_via(backend, slice, chunk),
+                expected,
+                "{name} backend, chunk {chunk}"
+            );
+        }
+    }
+    let mut public = Sha256::new();
+    for piece in data.chunks(4099) {
+        public.update(piece);
+    }
+    assert_eq!(public.finalize_hex(), reference);
+}
+
+/// Block-level agreement: the hardware compression of many blocks equals the
+/// portable compression from the same starting state.
+#[test]
+fn block_runs_match_across_backends() {
+    let data = pseudo_random(64 * 33);
+    let mut expected = H0;
+    compress_blocks_portable(&mut expected, &data);
+    for (name, backend) in backends() {
+        let mut state = H0;
+        backend(&mut state, &data);
+        assert_eq!(state, expected, "{name} backend");
+    }
 }

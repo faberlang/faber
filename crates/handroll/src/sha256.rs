@@ -124,7 +124,12 @@ impl Sha256 {
     /// `&[u8]` (byte arrays and slices, like the replaced sha2 `Digest`
     /// trait).
     pub fn update(&mut self, data: impl AsRef<[u8]>) {
-        let mut data = data.as_ref();
+        self.update_with(data.as_ref(), compress_blocks);
+    }
+
+    /// [`Self::update`] over an explicit block-compress backend, so tests can
+    /// drive the portable and hardware paths over identical input.
+    fn update_with(&mut self, mut data: &[u8], compress_blocks: BlocksFn) {
         self.total_bytes = self.total_bytes.wrapping_add(data.len() as u64);
         // Top off the partial block, if any.
         if self.buffered != 0 {
@@ -133,14 +138,15 @@ impl Sha256 {
             self.buffered += take;
             data = &data[take..];
             if self.buffered == 64 {
-                compress(&mut self.state, &self.buffer);
+                compress_blocks(&mut self.state, &self.buffer);
                 self.buffered = 0;
             }
         }
-        // Full blocks.
-        while data.len() >= 64 {
-            compress(&mut self.state, &data[..64]);
-            data = &data[64..];
+        // Full blocks, handed to the backend in one run.
+        let full = data.len() - data.len() % 64;
+        if full != 0 {
+            compress_blocks(&mut self.state, &data[..full]);
+            data = &data[full..];
         }
         // Partial-block tail.
         if !data.is_empty() {
@@ -151,7 +157,12 @@ impl Sha256 {
 
     /// Finalize the digest, consuming the hasher.
     #[must_use]
-    pub fn finalize(mut self) -> [u8; 32] {
+    pub fn finalize(self) -> [u8; 32] {
+        self.finalize_with(compress_blocks)
+    }
+
+    /// [`Self::finalize`] over an explicit block-compress backend.
+    fn finalize_with(mut self, compress_blocks: BlocksFn) -> [u8; 32] {
         let bit_len = self.total_bytes.wrapping_mul(8);
         // FIPS 180-4 §5.1.1 padding: `0x80`, zeroes, then the 64-bit
         // big-endian message length (in bits) in the final block.
@@ -159,12 +170,12 @@ impl Sha256 {
         self.buffered += 1;
         if self.buffered > 56 {
             self.buffer[self.buffered..].fill(0);
-            compress(&mut self.state, &self.buffer);
+            compress_blocks(&mut self.state, &self.buffer);
             self.buffered = 0;
         }
         self.buffer[self.buffered..56].fill(0);
         self.buffer[56..64].copy_from_slice(&bit_len.to_be_bytes());
-        compress(&mut self.state, &self.buffer);
+        compress_blocks(&mut self.state, &self.buffer);
         let mut digest = [0_u8; 32];
         let (outs, _) = digest.as_chunks_mut::<4>();
         for (out, &word) in outs.iter_mut().zip(&self.state) {
@@ -215,6 +226,107 @@ pub fn hex(bytes: &[u8]) -> String {
         out.push(HEX_DIGITS[(byte & 0x0f) as usize] as char);
     }
     out
+}
+
+/// A block-compress backend: folds every 64-byte block of the slice (whose
+/// length is a multiple of 64) into the state, in order.
+type BlocksFn = fn(&mut [u32; 8], &[u8]);
+
+/// Compress `blocks` with the SHA-2 hardware path when this CPU has it, else
+/// the portable path. Both produce identical state for identical input.
+fn compress_blocks(state: &mut [u32; 8], blocks: &[u8]) {
+    match hardware_blocks() {
+        Some(hardware) => hardware(state, blocks),
+        None => compress_blocks_portable(state, blocks),
+    }
+}
+
+/// The hardware block-compress backend, if this CPU supports it (decided at
+/// run time; the feature probe is a cached atomic load after the first call).
+#[cfg(target_arch = "aarch64")]
+fn hardware_blocks() -> Option<BlocksFn> {
+    std::arch::is_aarch64_feature_detected!("sha2").then_some(compress_blocks_sha2 as BlocksFn)
+}
+
+/// No hardware backend off aarch64: the portable path is used.
+#[cfg(not(target_arch = "aarch64"))]
+fn hardware_blocks() -> Option<BlocksFn> {
+    None
+}
+
+/// Portable backend: [`compress`] over each 64-byte block.
+fn compress_blocks_portable(state: &mut [u32; 8], blocks: &[u8]) {
+    debug_assert_eq!(blocks.len() % 64, 0);
+    for block in blocks.chunks_exact(64) {
+        compress(state, block);
+    }
+}
+
+/// Safe wrapper for the aarch64 SHA-2 backend; only ever selected through
+/// [`hardware_blocks`], which checks the CPU feature first.
+#[cfg(target_arch = "aarch64")]
+fn compress_blocks_sha2(state: &mut [u32; 8], blocks: &[u8]) {
+    debug_assert_eq!(blocks.len() % 64, 0);
+    assert!(
+        std::arch::is_aarch64_feature_detected!("sha2"),
+        "SHA-2 backend selected on a CPU without the sha2 feature"
+    );
+    // SAFETY: the `sha2` target feature required by `compress_sha2` was just
+    // confirmed present on the running CPU by `is_aarch64_feature_detected!`.
+    // All memory access inside is through in-bounds pointers derived from
+    // `state` (8 words) and 64-byte chunks of `blocks`.
+    unsafe { compress_sha2(state, blocks) };
+}
+
+/// aarch64 SHA-2 instruction compression over every 64-byte block of
+/// `blocks` (ARM crypto extension: 4 rounds per `sha256h`/`sha256h2` pair).
+/// This is the only `unsafe` in the crate.
+///
+/// # Safety
+///
+/// The caller must have confirmed the `sha2` CPU feature at run time.
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "sha2")]
+unsafe fn compress_sha2(state: &mut [u32; 8], blocks: &[u8]) {
+    use std::arch::aarch64::{
+        vaddq_u32, vld1q_u8, vld1q_u32, vreinterpretq_u32_u8, vrev32q_u8, vsha256h2q_u32,
+        vsha256hq_u32, vsha256su0q_u32, vsha256su1q_u32, vst1q_u32,
+    };
+    // SAFETY: `state` holds 8 u32 (two 4-lane loads/stores); each block chunk
+    // is exactly 64 bytes (four 16-byte loads); `K` holds 64 u32 (sixteen
+    // 4-lane loads).
+    unsafe {
+        let mut abcd = vld1q_u32(state.as_ptr());
+        let mut efgh = vld1q_u32(state.as_ptr().add(4));
+        for block in blocks.chunks_exact(64) {
+            let (abcd_in, efgh_in) = (abcd, efgh);
+            let mut msg = [
+                vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(block.as_ptr()))),
+                vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(block.as_ptr().add(16)))),
+                vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(block.as_ptr().add(32)))),
+                vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(block.as_ptr().add(48)))),
+            ];
+            for group in 0..16 {
+                let slot = group % 4;
+                if group >= 4 {
+                    // W[4g..4g+4] from the previous four groups (same slot holds g-4).
+                    msg[slot] = vsha256su1q_u32(
+                        vsha256su0q_u32(msg[slot], msg[(group + 1) % 4]),
+                        msg[(group + 2) % 4],
+                        msg[(group + 3) % 4],
+                    );
+                }
+                let wk = vaddq_u32(msg[slot], vld1q_u32(K.as_ptr().add(4 * group)));
+                let prev_abcd = abcd;
+                abcd = vsha256hq_u32(abcd, efgh, wk);
+                efgh = vsha256h2q_u32(efgh, prev_abcd, wk);
+            }
+            abcd = vaddq_u32(abcd, abcd_in);
+            efgh = vaddq_u32(efgh, efgh_in);
+        }
+        vst1q_u32(state.as_mut_ptr(), abcd);
+        vst1q_u32(state.as_mut_ptr().add(4), efgh);
+    }
 }
 
 /// One FIPS 180-4 compression round over a single 64-byte block.
