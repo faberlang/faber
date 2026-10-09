@@ -1,0 +1,29 @@
+# Colocated tests for main.fab.
+import from "./main" main
+
+describe "double" {
+    test "doubles a positive number" {
+        assert main.double(4) ≡ 8
+    }
+
+    test "doubles zero" {
+        assert main.double(0) ≡ 0
+    }
+}
+
+describe "clamp_low" {
+    test "raises a value below the floor" {
+        assert main.clamp_low(1, 5) ≡ 5
+    }
+
+    test "keeps a value above the floor" {
+        assert main.clamp_low(9, 5) ≡ 9
+    }
+}
+
+describe "is_even" {
+    test "detects even and odd" {
+        assert main.is_even(6)
+        assert not main.is_even(7)
+    }
+}

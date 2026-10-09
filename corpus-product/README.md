@@ -12,6 +12,7 @@ Package-shaped product fixtures for Faber build/run/test proofs.
 | `tensor-fragment/tiny-linear-device/` | FMIR + device linear + reference JSON |
 | `tensor-fragment/tiny-linear-device-relu/` | Rung-2 fragment: device linear + ReLU + reference JSON (negative pre-activation weights) |
 | `tensor-package/fmir-matmul/` | FMIR package matmul proof |
+| `proba-canary/` | Stage-3 proba canary: pure functions with colocated `main.proba` tests; `faber test` must report 0 failed / 0 blocked (`scripta/proba-canary.list`) |
 | `regio/` | D7.7 `module` default import name: `import from "./planum"` binds the sibling's declared `geometry` (runner + Rust, `exempla_e2e/regio_package_test.rs`) |
 
 ## Run
