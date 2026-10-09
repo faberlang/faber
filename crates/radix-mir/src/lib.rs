@@ -68,7 +68,7 @@ mod lane_op_test;
 #[cfg(test)]
 mod layout_test;
 #[cfg(test)]
-mod packed_negative_matrix;
+mod packed_negative_matrix_test;
 #[cfg(test)]
 mod param_mode_test;
 /// Shared statement/value read analysis for device-program lowering.

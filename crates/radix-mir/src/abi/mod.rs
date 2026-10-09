@@ -14,6 +14,7 @@ mod reflection;
 mod resource;
 mod signature;
 #[cfg(test)]
+#[path = "mod_test.rs"]
 mod tests;
 mod throw_sites;
 mod types;

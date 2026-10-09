@@ -14,10 +14,9 @@ fn config() -> ScanConfig {
 
 const BUDGETS: Budgets = Budgets {
     unwrap: 0,
-    // WHY: `schema/md3h_fixtures.rs` (2) is test-only support pulled in via #[path]
-    // by a `_test.rs`; `canonical_program_bytes` (1) is public API with a
-    // documented infallible postcard encode.
-    expect: 3,
+    // WHY: `canonical_program_bytes` is public API with a documented
+    // infallible postcard encode.
+    expect: 1,
     panic: 0,
     unreachable: 0,
     todo: 0,

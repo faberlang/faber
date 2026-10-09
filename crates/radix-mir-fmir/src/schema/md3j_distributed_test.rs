@@ -4,7 +4,7 @@
 //! graph unchanged while declaring 8 GiB for every partition. The over-budget
 //! image is intentionally wire-legal: hosts admission owns its rejection.
 
-#[path = "md3j_fixtures.rs"]
+#[path = "md3j_fixtures_test.rs"]
 mod md3j_fixtures;
 
 use super::{

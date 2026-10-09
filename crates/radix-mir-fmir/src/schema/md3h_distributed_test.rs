@@ -9,7 +9,7 @@
 //! lines 193–197, read-only). C1 retires that branch; this crate does not
 //! call the faber run route.
 
-#[path = "md3h_fixtures.rs"]
+#[path = "md3h_fixtures_test.rs"]
 mod md3h_fixtures;
 
 use super::{
