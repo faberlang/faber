@@ -120,7 +120,7 @@ fn tokenless_keyword_after_nihil_value_does_not_trigger_retired_prefix() {
     let result = parse_ok(
         r"
 incipit {
-  fixum numerus ∪ nihil maybe ← nihil
+  fixum numerus ∪ nihil maybe ← nulla
   nota 42
 }
 ",
@@ -1225,7 +1225,7 @@ fn nihil_non_est_is_a_type_test_not_a_prefix_predicate() {
     // `nihil <value>` prefix predicate. Batch D made `non` tokenless; the
     // retired-prefix lookahead must not treat the operator as a value
     // operand start (`Operator` is not expression-primary).
-    let result = parse_ok("fixum _ v ← nihil non est Sacculus");
+    let result = parse_ok("fixum _ v ← nulla non est Sacculus");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");

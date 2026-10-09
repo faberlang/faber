@@ -1363,9 +1363,9 @@ fn keyword_token_kind_and_type_binding_use_spelling_index() {
 #[test]
 fn same_spelling_across_keywords_and_types_is_allowed() {
     // D23.2: one word may name both a keyword row and a type row. Latin
-    // `nihil` is the live case (the null type plus the transitional
-    // value-literal alias); before D23.2 the shared-namespace rule (F-113)
-    // forced the invented `nihil_t` / `null_ty` type spellings.
+    // `modulus` is the live case (the modular-word keyword plus the
+    // modulus type); before D23.2 the shared-namespace rule (F-113) forced
+    // the invented `nihil_t` / `null_ty` type spellings.
     let pack = LocalePack::from_toml_str(
         r#"
 [pack]
@@ -1373,10 +1373,10 @@ id = "la-test"
 fallback = ["la"]
 
 [keywords]
-nihil = "nihil"
+modulus = "modulus"
 
 [types]
-nihil = "nihil"
+modulus = "modulus"
 
 [llm]
 system_prompt_snippet = "emit Latin reader-locale Faber"
@@ -1385,8 +1385,8 @@ exemplars = ["./exemplars/salve-munde.fab"]
     )
     .expect("shared spelling across keyword and type sections must load");
 
-    assert_eq!(pack.keywords["nihil"].canonical, "nihil");
-    assert_eq!(pack.types["nihil"].canonical, "nihil");
+    assert_eq!(pack.keywords["modulus"].canonical, "modulus");
+    assert_eq!(pack.types["modulus"].canonical, "modulus");
 }
 
 #[test]

@@ -423,6 +423,49 @@ fn en_vacua_marker_rejects_after_alias_removal() {
     );
 }
 
+fn assert_bare_nihil_value_named_error(locale: &str, body: &str, replacement: &str) {
+    let session = session_for(locale);
+    let source = with_frontmatter(locale, body);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "bare-nihil-value.fab",
+        &source,
+    );
+    assert!(!result.success(), "{locale} bare `nihil` value must be rejected");
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|d| d.is_error() && d.code == Some("PARSE030") && d.issue() == Some("retired_null_value_spelling"))
+        .unwrap_or_else(|| {
+            panic!(
+                "{locale} bare `nihil` value must give retired_null_value_spelling, got: {:?}",
+                result.diagnostics
+            )
+        });
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "replacement" && arg.value == replacement),
+        "{locale} replacement must be `{replacement}`: {diagnostic:?}"
+    );
+}
+
+#[test]
+fn en_bare_nihil_value_is_named_retired_error() {
+    assert_bare_nihil_value_named_error("en", "main {\n  const int union none n ← nihil\n  print n\n}\n", "null");
+}
+
+#[test]
+fn la_bare_nihil_value_is_named_retired_error() {
+    assert_bare_nihil_value_named_error("la", "incipit {\n  fixum numerus ∪ nihil n ← nihil\n  scribe n\n}\n", "nulla");
+}
+
 #[test]
 fn en_empty_marker_compiles() {
     let session = session_for("en");

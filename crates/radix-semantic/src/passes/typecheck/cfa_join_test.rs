@@ -67,7 +67,7 @@ fn assignment_drops_a_null_fact_before_the_next_use() {
     test_support::assert_rejects_with_issue(
         "functio f(textus ∪ nihil x) → numerus {\n\
              si x non est nihil {\n\
-                 x ← nihil\n\
+                 x ← nulla\n\
                  redde x.longitudo()\n\
              }\n\
              redde 0\n\
@@ -81,7 +81,7 @@ fn assignment_on_one_join_edge_drops_the_incoming_fact() {
     test_support::assert_rejects_with_issue(
         "functio f(textus ∪ nihil x, bivalens c) → numerus {\n\
              adfirma x non est nihil\n\
-             si c { x ← nihil } secus { nota x.longitudo() }\n\
+             si c { x ← nulla } secus { nota x.longitudo() }\n\
              redde x.longitudo()\n\
          }",
         "optional_receiver_requires_chain",
@@ -95,7 +95,7 @@ fn loop_entry_drops_facts_for_bindings_touched_by_the_body() {
              adfirma x non est nihil\n\
              dum falsum {\n\
                  nota x.longitudo()\n\
-                 x ← nihil\n\
+                 x ← nulla\n\
              }\n\
              redde 0\n\
          }",

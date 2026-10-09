@@ -787,7 +787,7 @@ fn lowers_coalesce_with_effectful_fallback_to_a_nil_branch() {
     // fallback must lower into its own block behind a nil check.
     let dump = dump_source(
         r"
-functio forte() → numerus ∪ nihil { redde nihil }
+functio forte() → numerus ∪ nihil { redde nulla }
 functio latus() → numerus {
     nota 1
     redde 9
@@ -868,7 +868,7 @@ function f0 -> ty#1 {
 
 #[test]
 fn materializes_constant_nil_redde_with_type() {
-    let dump = dump_source("functio nullum() → nihil { redde nihil }");
+    let dump = dump_source("functio nullum() → nihil { redde nulla }");
     assert_eq!(
         dump,
         "\
@@ -3622,7 +3622,7 @@ fn lowers_scalar_verte_as_target_typed_passthrough() {
     let dump = dump_source(
         r"
 functio absent() → textus ∪ nihil {
-    redde nihil ∷ textus ∪ nihil
+    redde nulla ∷ textus ∪ nihil
 }
 ",
     );
@@ -5364,7 +5364,7 @@ fn mir_generic_explicit_type_arg_for_nil_lowers_and_validates() {
 functio consume<T>(T ∪ nihil x) → vacuum {}
 
 incipit {
-    consume<textus>(nihil)
+    consume<textus>(nulla)
 }
 ";
     let unit = analyze(source);

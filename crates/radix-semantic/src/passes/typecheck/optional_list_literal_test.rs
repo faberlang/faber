@@ -14,7 +14,7 @@ fn list_literal_checks_against_optional_list_slot() {
     assert_accepts(
         r"incipit {
     fixum lista<numerus> ∪ nihil a ← [1, 2]
-    varia lista<numerus> ∪ nihil b ← nihil
+    varia lista<numerus> ∪ nihil b ← nulla
     b ← [3]
     nota a
     nota b
@@ -44,7 +44,7 @@ fn vacua_stores_into_optional_collection_slots() {
     assert_accepts(
         r"incipit {
     fixum lista<numerus> ∪ nihil a ← vacua
-    varia lista<numerus> ∪ nihil b ← nihil
+    varia lista<numerus> ∪ nihil b ← nulla
     b ← vacua
     fixum tabula<textus, numerus> ∪ nihil c ← vacua
     nota a

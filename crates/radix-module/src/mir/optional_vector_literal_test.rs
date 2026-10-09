@@ -15,7 +15,7 @@ fn vector_literal_returned_into_optional_slot_lowers_as_the_vector() {
     let result = run_source(
         &session,
         "optional-vector.fab",
-        "functio normalis(numerus codex) → vector<f32, 3> ∪ nihil {\n    si codex ≡ 1 { redde [-1.0, 0.0, 0.0] ↦ vector<f32, 3> }\n    redde nihil\n}\nincipit {\n    nota normalis(1)\n    nota normalis(2)\n}",
+        "functio normalis(numerus codex) → vector<f32, 3> ∪ nihil {\n    si codex ≡ 1 { redde [-1.0, 0.0, 0.0] ↦ vector<f32, 3> }\n    redde nulla\n}\nincipit {\n    nota normalis(1)\n    nota normalis(2)\n}",
         &mut host,
     );
     assert!(result.is_ok(), "fixture failed: {:?}", result.err());

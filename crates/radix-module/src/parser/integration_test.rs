@@ -115,9 +115,8 @@ fn assert_call_form_constructor_rejected(source: &str) {
 fn retired_prefix_predicates_emit_rewrite_diagnostics() {
     assert_retired_prefix_predicate("fixum _ x ← falsum disabled", "falsum", "value ≡ falsum");
     assert_retired_prefix_predicate("fixum _ x ← verum enabled", "verum", "value ≡ verum");
-    // D23.2/D23.4: `nulla` is the null value literal, so both its canonical
-    // spelling and the transitional `nihil` alias are literal-prefix forms.
-    assert_retired_prefix_predicate("fixum _ x ← nihil maybe", "nulla", "value est nihil");
+    // D23.2/D23.4: `nulla` is the null value literal, so it is a
+    // literal-prefix form. `nihil` is no longer a value spelling.
     assert_retired_prefix_predicate("fixum _ x ← nulla maybe", "nulla", "value est nihil");
 }
 

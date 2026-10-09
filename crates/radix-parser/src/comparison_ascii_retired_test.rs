@@ -45,7 +45,7 @@ fn pair(op: &str, glyph: &str) -> (String, String) {
 #[test]
 fn ascii_less_than_is_rejected_in_if() {
     assert_eq!(
-        retired("incipit { si a < b { nihil } }"),
+        retired("incipit { si a < b { nulla } }"),
         vec![pair("<", "≺")],
         "ascii `<` in an if condition"
     );
@@ -54,7 +54,7 @@ fn ascii_less_than_is_rejected_in_if() {
 #[test]
 fn ascii_greater_than_is_rejected_in_while() {
     assert_eq!(
-        retired("incipit { dum a > b { nihil } }"),
+        retired("incipit { dum a > b { nulla } }"),
         vec![pair(">", "≻")],
         "ascii `>` in a while condition"
     );
@@ -71,10 +71,10 @@ fn chained_ascii_comparisons_all_report() {
 #[test]
 fn glyph_comparisons_are_accepted() {
     for source in [
-        "incipit { si a ≺ b { nihil } }",
-        "incipit { dum a ≻ b { nihil } }",
-        "incipit { si a ≤ b { nihil } }",
-        "incipit { si a ≥ b { nihil } }",
+        "incipit { si a ≺ b { nulla } }",
+        "incipit { dum a ≻ b { nulla } }",
+        "incipit { si a ≤ b { nulla } }",
+        "incipit { si a ≥ b { nulla } }",
         "fixum _ x ← a ≺ b aut c ≻ d",
     ] {
         let result = parse_source(source);

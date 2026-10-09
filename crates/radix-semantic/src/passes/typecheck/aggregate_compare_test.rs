@@ -130,7 +130,7 @@ fn a_scalar_is_never_equal_to_an_aggregate() {
 
 #[test]
 fn a_nihil_test_on_an_aggregate_keeps_its_own_rule() {
-    accepts(&function(&format!("{T} a"), "bivalens", "a ≡ nihil"));
+    accepts(&function(&format!("{T} a"), "bivalens", "a ≡ nulla"));
 }
 
 #[test]

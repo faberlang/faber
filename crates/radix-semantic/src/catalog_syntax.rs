@@ -1011,6 +1011,12 @@ fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
         "expression_ad_block" => Some("expression-form ad must not have a block".to_owned()),
         "closure_block_body" => Some("closure block body must use 'fac'".to_owned()),
         "closure_fac_body_dum" => Some("closure fac body cannot use 'dum'".to_owned()),
+        "retired_null_value_spelling" => {
+            let replacement = arg_value(args, "replacement")?;
+            Some(format!(
+                "`nihil` is not the null value; the null value is `{replacement}`"
+            ))
+        }
         _ => None,
     }
 }
@@ -1058,6 +1064,12 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
             ))
         }
         "closure_fac_body_dum" => Some("remove dum from closure fac bodies".to_owned()),
+        "retired_null_value_spelling" => {
+            let replacement = arg_value(args, "replacement")?;
+            Some(format!(
+                "write `{replacement}` for the null value; `nihil` names only the null type"
+            ))
+        }
         _ => None,
     }
 }

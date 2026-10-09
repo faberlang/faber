@@ -337,7 +337,7 @@ functio vector3(f32 x, f32 y, f32 z) → Vector3 {
 }
 @ publica
 functio matrix4_inversa_affinis(de Matrix4 matrix) → Matrix4 ∪ nihil {
-    redde nihil
+    redde nulla
 }
 ",
     )
@@ -2323,7 +2323,7 @@ functio scope(textus selector) → Scope {
 functio query(Scope scope, textus selector) → Element ∪ nihil {
     nota scope
     nota selector
-    redde nihil
+    redde nulla
 }
 
 @ publica

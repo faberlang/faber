@@ -323,7 +323,7 @@ fn air_first_match_keep_outs_unchanged_alongside_admitted_head() {
 @ radix lane "air"
 functio pick(tf32[2] x) → fractus ∪ nihil {
     dum verum {
-        redde nihil
+        redde nulla
     }
 }
 "#,

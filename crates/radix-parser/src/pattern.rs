@@ -117,7 +117,9 @@ impl Parser {
         // arm it denotes the null member of the scrutinee union. Parse the
         // complete type expression so bounded families (`lista<T, N>`) and
         // tensor figures remain available to lowering.
-        if (self.check_keyword_ident(TokenKind::Nihil) || self.peek_starts_type_name())
+        if (self.check_keyword_ident(TokenKind::Nihil)
+            || self.check_null_type_word()
+            || self.peek_starts_type_name())
             && !matches!(self.peek_at(1).kind, TokenKind::Dot)
         {
             let ty = self.parse_type()?;

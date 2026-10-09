@@ -223,7 +223,7 @@ fn rivus_lookup_key_direct_form_compiles_without_captures() {
                  }\n\
                  redde code\n\
              }\n\
-             redde nihil\n\
+             redde nulla\n\
          }",
     );
 }

@@ -458,7 +458,7 @@ non = "非"
 vel = "兜底"
 # S2-U2: Latin support vocabulary used by the fixture must be declared.
 fixum = "fixum"
-nihil = "nihil"
+nulla = "nulla"
 redde = "redde"
 
 [llm]
@@ -472,11 +472,11 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
         .with_locale_pack(pack);
     let session = Session::new(config);
     let source = r"函数 checksum() → numerus {
-  fixum _ a ← nihil 是 nihil
-  fixum _ b ← 非 (nihil 是 nihil)
-  fixum _ c ← nihil 是 nihil 且 nihil 是 nihil
-  fixum _ d ← nihil 是 nihil 或 nihil 是 nihil
-  fixum _ n ← nihil 兜底 0
+  fixum _ a ← nulla 是 nihil
+  fixum _ b ← 非 (nulla 是 nihil)
+  fixum _ c ← nulla 是 nihil 且 nulla 是 nihil
+  fixum _ d ← nulla 是 nihil 或 nulla 是 nihil
+  fixum _ n ← nulla 兜底 0
   redde 0
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -633,7 +633,7 @@ fallback = ["la"]
 [keywords]
 incipit = "入口"
 nota = "显示"
-nihil = "空"
+nulla = "空"
 
 [llm]
 system_prompt_snippet = "emit Chinese reader-locale Faber"

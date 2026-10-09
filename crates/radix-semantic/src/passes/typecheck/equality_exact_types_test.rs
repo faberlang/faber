@@ -145,7 +145,7 @@ incipit {
         },
         EqualityCase {
             name: "nihil_bypass",
-            source: "incipit { si nihil ≡ nihil { nota \"ok\" } }",
+            source: "incipit { si nulla ≡ nulla { nota \"ok\" } }",
             expect: EqualityExpect::Accepts,
         },
         EqualityCase {

@@ -1241,6 +1241,21 @@ impl Parser {
         }
     }
 
+    /// Whether the current word is the null *type* in the active surface
+    /// (D23.2): the pack's `nihil` type row, or the Latin `nihil` when the
+    /// surface declares no type rows. The null *value* word is a keyword
+    /// literal and never matches here.
+    fn check_null_type_word(&self) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        let text = self.interner.resolve(sym);
+        match self.reader_type_latin_keys.get(text) {
+            Some(latin) => latin == "nihil",
+            None => self.reader_type_latin_keys.is_empty() && text == "nihil",
+        }
+    }
+
     /// Active surface spelling of the null *type* (D23.2).
     ///
     /// Falls back to the canonical Latin `nihil` when the active surface
@@ -1250,6 +1265,17 @@ impl Parser {
             .get("nihil")
             .cloned()
             .unwrap_or_else(|| "nihil".to_owned())
+    }
+
+    /// Active surface spelling of the null *value* literal (D23.2).
+    ///
+    /// The pack word whose identity is `nulla`; the canonical Latin `nulla`
+    /// when the active surface declares no keyword rows (registry-direct Latin).
+    fn null_value_surface(&self) -> String {
+        self.reader_keyword_surfaces
+            .get("nulla")
+            .cloned()
+            .unwrap_or_else(|| "nulla".to_owned())
     }
 
     fn is_canonical_type_spelling(source: &str) -> bool {

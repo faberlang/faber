@@ -316,7 +316,7 @@ fn extrema_lift_tensor_against_tensor_and_scalar() {
 
 #[test]
 fn vel_fills_the_nihil_elements() {
-    let setup = "fixum lista<numerus ∪ nihil> t_data ← [1, nihil, 3, nihil]
+    let setup = "fixum lista<numerus ∪ nihil> t_data ← [1, nulla, 3, nulla]
 fixum tensor<numerus ∪ nihil, [2, 2]> t ← t_data ↦ tensor<numerus ∪ nihil, [2, 2]>
 fixum lista<numerus> d_data ← [10, 20, 30, 40]
 fixum tensor<numerus, [2, 2]> d ← d_data ↦ tensor<numerus, [2, 2]>\n";

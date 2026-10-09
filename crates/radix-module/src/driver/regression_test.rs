@@ -515,7 +515,7 @@ fn compile_supports_extended_binary_operators() {
     let source = r"incipit {
   fixum _ a ← 1
   fixum _ b ← 2
-  fixum numerus ∪ nihil maybe ← nihil
+  fixum numerus ∪ nihil maybe ← nulla
 
   nota a ≡ b
   nota a ≠ b
@@ -534,7 +534,7 @@ fn compile_supports_extended_unary_operators() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   fixum _ flag ← verum
-  fixum textus ∪ nihil maybe ← nihil
+  fixum textus ∪ nihil maybe ← nulla
   fixum _ n ← -3
 
   nota non flag
@@ -977,7 +977,7 @@ functio id(textus x) → textus {
 }
 
 incipit {
-  fixum User ∪ nihil maybeUser ← nihil
+  fixum User ∪ nihil maybeUser ← nulla
   fixum _ a ← maybeUser?.name
   fixum _ b ← maybeUser?.nums?[0]
   fixum (textus) → textus ∪ nihil maybeFn ← id
@@ -1001,7 +1001,7 @@ functio id(textus x) → textus {
 }
 
 incipit {
-  fixum User ∪ nihil maybeUser ← nihil
+  fixum User ∪ nihil maybeUser ← nulla
   fixum _ a ← maybeUser?.name
   fixum (textus) → textus ∪ nihil maybeFn ← id
   fixum _ c ← maybeFn?("x")
@@ -1079,7 +1079,7 @@ incipit {
 fn rust_output_emits_coalesce_unwrap() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum textus ∪ nihil name ← nihil
+  fixum textus ∪ nihil name ← nulla
   fixum _ display ← name vel "Anonymous"
   nota display
 }"#;
@@ -1132,7 +1132,7 @@ fn rust_output_applies_nullable_field_defaults_in_verte_struct_literals() {
 
 incipit {
   fixum _ a ← User { name = "Ada" }
-  fixum _ b ← User { name = "Lin", email = nihil }
+  fixum _ b ← User { name = "Lin", email = nulla }
   fixum _ c ← User { name = "Ken", email = "ken@example.com" }
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1274,7 +1274,7 @@ functio duplicate_nullable() → textus ∪ textus ∪ nihil {
 }
 
 functio nullable_direct() → textus ∪ nihil {
-  redde nihil
+  redde nulla
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -1293,7 +1293,7 @@ functio nullable_direct() → textus ∪ nihil {
 fn plain_union_does_not_accept_nihil_without_nullable_member() {
     let session = test_session(Target::HirRust);
     let source = r"functio badplain() → textus ∪ numerus {
-  redde nihil
+  redde nulla
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -1310,7 +1310,7 @@ fn plain_union_does_not_accept_nihil_without_nullable_member() {
 fn degenerate_nihil_only_union_is_rejected() {
     let session = test_session(Target::HirRust);
     let source = r"functio bad() → nihil ∪ nihil {
-  redde nihil
+  redde nulla
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -1537,7 +1537,7 @@ fn rust_output_converts_textus_literals_to_owned_strings() {
 incipit {
   varia textus name ← "Marcus"
   fixum lista<textus> words ← ["a", "b"]
-  fixum textus ∪ nihil maybe ← nihil
+  fixum textus ∪ nihil maybe ← nulla
   fixum _ fallback ← maybe vel "x"
   nota pick(verum), name, words, fallback
 }"#;
@@ -1564,7 +1564,7 @@ fn rust_output_wraps_optional_local_initializers_in_some() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
   fixum textus ∪ nihil actualName ← "Marcus"
-  fixum textus ∪ nihil maybe ← nihil
+  fixum textus ∪ nihil maybe ← nulla
   nota actualName, maybe
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1583,8 +1583,8 @@ fn rust_output_wraps_optional_local_initializers_in_some() {
 fn rust_output_uses_or_for_option_coalesce() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
-  fixum textus ∪ nihil a ← nihil
-  fixum textus ∪ nihil b ← nihil
+  fixum textus ∪ nihil a ← nulla
+  fixum textus ∪ nihil b ← nulla
   fixum _ first ← a vel b
   nota first
 }";

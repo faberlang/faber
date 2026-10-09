@@ -1241,7 +1241,7 @@ fn genus_field_defaults_with_literals_do_not_consume_following_fields() {
 genus Thing {
     varia bivalens visible = falsum
     varia bivalens enabled = verum
-    varia textus maybe = nihil
+    varia textus maybe = nulla
     varia textus name
 }
 ",
@@ -3799,9 +3799,9 @@ fn si_is_usable_as_a_type_name_after_tokenless_migration() {
     // position. Pre-migration the reserved Si token made these parse errors
     // (`legacy_si_*_rejected` family).
     for source in [
-        "fixum si x ← nihil\n",
+        "fixum si x ← nulla\n",
         "functio f(si handle) → vacuum {}\n",
-        "functio find() → si { redde nihil }\n",
+        "functio find() → si { redde nulla }\n",
         "typus MaybeSi = si\n",
         "genus User { varia si email }\n",
     ] {
@@ -3872,7 +3872,7 @@ fn name_slots_accept_keyword_spellings_on_latin_surface() {
 #[test]
 fn legacy_question_mark_in_fixum_rejected() {
     assert_parse_error_matches(
-        r"fixum textus? maybe ← nihil",
+        r"fixum textus? maybe ← nulla",
         ParseExpectation::Arg {
             name: "expected",
             value: "identifier",
@@ -3883,7 +3883,7 @@ fn legacy_question_mark_in_fixum_rejected() {
 #[test]
 fn legacy_question_mark_in_function_return_rejected() {
     assert_parse_error_matches(
-        r"functio find() → textus? { redde nihil }",
+        r"functio find() → textus? { redde nulla }",
         ParseExpectation::Kind(ParseErrorKind::FunctionBodyAbsent),
     );
 }

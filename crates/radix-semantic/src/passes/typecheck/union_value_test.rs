@@ -110,7 +110,7 @@ incipit {
     fixum lista<KeywordSpec> KEYWORDS ← [
         KeywordSpec { text = "palabra", token_kind = token.TokenKind.Palabra },
         KeywordSpec { text = "numerus", token_kind = finge token.TokenKind.Numerus { code = 3 } ∷ token.TokenKind },
-        KeywordSpec { text = "vacua", token_kind = nihil }
+        KeywordSpec { text = "vacua", token_kind = nulla }
     ]
     nota KEYWORDS
 }"#;

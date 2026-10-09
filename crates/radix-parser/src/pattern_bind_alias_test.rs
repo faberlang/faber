@@ -94,7 +94,7 @@ fn wildcard_pattern_has_no_bindings() {
     let result = parse_ok(
         r"
 discerne m {
-    casu _ ergo nihil
+    casu _ ergo nulla
 }
 ",
     );

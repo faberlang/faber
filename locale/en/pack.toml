@@ -65,9 +65,6 @@ reice = "reject"
 clausura = "lambda"
 falsum = "false"
 # Null value literal (D23.2). The null *type* row lives under [types] below.
-# TRANSITIONAL (D23.2 window): `nihil` stays an accepted value-literal alias
-# until the sweep lands; delete this row with the registry alias then.
-nihil = "nihil"
 nulla = "null"
 verum = "true"
 nonnumerus = "nan"
@@ -994,6 +991,10 @@ help = "bind the constructor first: const tf32[2, 3] a ← the type tf32[2, 3] f
 [diagnostics.PARSE030.issues.constructor_requires_empty_braces]
 message = "the typed zero of a type is written `Type` followed by empty braces; the bare type form is retired"
 help = "write the zero as the type followed by empty braces"
+
+[diagnostics.PARSE030.issues.retired_null_value_spelling]
+message = "'nihil' is not the null value; the null value is '{replacement}'"
+help = "write '{replacement}' for the null value; 'nihil' names only the null type"
 
 [diagnostics.PARSE030.issues.comparison_ascii_retired]
 message = "the ASCII `{operator}` is not a comparison operator; comparison is spelled `{glyph}`"

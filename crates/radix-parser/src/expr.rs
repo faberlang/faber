@@ -2148,6 +2148,14 @@ impl Parser {
                         span: start.merge(self.previous_span()),
                     });
                 }
+                // `nihil` was the null value spelling until D23.2 split the
+                // value (`nulla`) from the type (`nihil`). In value position
+                // it is a named error, not an unknown identifier. A call,
+                // member access or constructor keeps the word usable as an
+                // ordinary name.
+                if self.is_retired_null_value_spelling() {
+                    return Err(self.retired_null_value_error());
+                }
                 let ident = self.parse_primary_ident()?;
                 // Locale-aware `nonnumerus` claim: NaN is a literal only in
                 // the primary literal slot. A following `(` keeps the
@@ -2452,6 +2460,25 @@ impl Parser {
             expr: Box::new(object),
             ty,
         })))
+    }
+
+    #[inline(never)]
+    fn retired_null_value_error(&self) -> ParseError {
+        ParseError::structured(ParseErrorKind::ExpressionInvalid, self.peek().span)
+            .with_arg("issue", "retired_null_value_spelling")
+            .with_arg("replacement", self.null_value_surface())
+    }
+
+    /// The current word is the bare Latin `nihil` in value position.
+    fn is_retired_null_value_spelling(&self) -> bool {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return false;
+        };
+        self.interner.resolve(sym) == "nihil"
+            && !matches!(
+                self.peek_at(1).kind,
+                TokenKind::LParen | TokenKind::Dot | TokenKind::LBrace | TokenKind::LtAscii
+            )
     }
 
     fn parse_primary_ident(&mut self) -> Result<Ident, ParseError> {

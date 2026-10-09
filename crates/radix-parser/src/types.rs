@@ -188,23 +188,19 @@ impl Parser {
             TypeExprKind::UnionHole
         } else {
             let name = if self.check_keyword_ident(TokenKind::Nihil) {
-                // The null *type* is `nihil` (D23.2). The null *value* literal
-                // (`null` / `nulla`) shares the literal token, so a type
-                // position may see it: rewrite only the canonical null-type
-                // spelling, and reject every other spelling as the value
-                // literal where a type is required (D23.1/D23.2).
+                // The null *type* is `nihil` (D23.2) and reaches the type
+                // grammar as an ordinary type word. The null *value* literal
+                // (`null` / `nulla`) is the only word claiming the `Nihil`
+                // identity, so seeing it where a type is required is an error
+                // (D23.1/D23.2).
                 let span = self.peek().span;
                 let source = self.current_ident_source();
-                if source != "nihil" {
-                    self.advance();
-                    let type_surface = self.null_type_surface();
-                    return Err(ParseError::structured(ParseErrorKind::TypeInvalid, span)
-                        .with_arg("issue", "null_value_in_type_position")
-                        .with_arg("value", source)
-                        .with_arg("type", type_surface));
-                }
                 self.advance();
-                self.keyword_ident("nihil", span)
+                let type_surface = self.null_type_surface();
+                return Err(ParseError::structured(ParseErrorKind::TypeInvalid, span)
+                    .with_arg("issue", "null_value_in_type_position")
+                    .with_arg("value", source)
+                    .with_arg("type", type_surface));
             } else if self.check_keyword_ident(TokenKind::Modulus) {
                 let span = self.peek().span;
                 self.advance();

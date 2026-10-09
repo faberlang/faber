@@ -74,5 +74,5 @@ fn nullable_union_return_type_parses_today() {
     // The `T ∪ nihil` result shape is already grammar (EBNF: `T ∪ nihil` is
     // the canonical nullable form). Pinned so the admit drivers above are
     // attributable to the head spelling, not the result type.
-    let _ = parse_ok("functio t(numerus a) → numerus ∪ nihil { redde nihil }");
+    let _ = parse_ok("functio t(numerus a) → numerus ∪ nihil { redde nulla }");
 }
