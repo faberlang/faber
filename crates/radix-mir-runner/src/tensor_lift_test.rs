@@ -386,5 +386,8 @@ fn whole_equality_needs_two_tensors() {
         vec![floats(&[1.0], &[1]), Value::Float(1.0)],
     )
     .expect_err("a scalar is not a whole tensor");
-    assert!(err.message.contains("two tensor operands"), "{err:?}");
+    assert_eq!(
+        err.issue, "runner_tensor_equality_needs_two_tensor_operands",
+        "{err:?}"
+    );
 }

@@ -223,5 +223,7 @@ fn refused_lane_form_kernel_call_is_the_named_refusal_not_an_arity_error() {
         panic!("a refused kernel call must fail");
     };
     assert_eq!(error.issue, RUNNER_KERNEL_REFUSED_ISSUE);
-    assert!(error.message.contains("--device cpu"), "{}", error.message);
+    // The whole diagnostic (message hint included) is the refusal constructor's
+    // own value; no prose is re-spelled here.
+    assert_eq!(error, kernel_refused(error.span));
 }

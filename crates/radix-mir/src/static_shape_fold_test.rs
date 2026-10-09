@@ -664,11 +664,6 @@ fn unfoldable_magnitudines_fails_closed_with_typed_diagnostic() {
     let error = fold_static_shapes(&function, &validation)
         .expect_err("dynamic magnitudines must fail closed");
     assert_eq!(error.kind, ShapeFoldKind::UnfoldableMagnitudines);
-    assert!(
-        error.message.contains("no literal tensor shape"),
-        "diagnostic names the missing literal shape: {}",
-        error.message
-    );
 }
 
 #[test]
@@ -680,11 +675,6 @@ fn crea_on_dynamic_destination_fails_closed_with_typed_diagnostic() {
     let error = fold_static_shapes(&function, &validation)
         .expect_err("crea on a dynamic destination must fail closed");
     assert_eq!(error.kind, ShapeFoldKind::NonStaticShapeDestination);
-    assert!(
-        error.message.contains("no literal tensor shape"),
-        "diagnostic names the missing literal shape: {}",
-        error.message
-    );
 }
 
 #[test]

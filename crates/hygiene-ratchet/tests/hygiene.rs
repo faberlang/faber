@@ -135,6 +135,50 @@ fn non_renderer_tests_do_not_assert_diagnostic_text() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn diagnostic_text_scan_skips_symlinks_and_agent_dirs() {
+    use std::os::unix::fs::symlink;
+
+    let base = std::env::temp_dir().join(format!(
+        "hygiene-ratchet-symlink-scan-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&base);
+    let root = base.join("workspace");
+    let outside = base.join("outside");
+    let offending = "#[test]\nfn t() { assert!(d.message.contains(\"x\")); }\n";
+
+    fs::create_dir_all(root.join("crates/in/tests")).expect("create in-tree tests dir");
+    fs::create_dir_all(root.join(".claude/worktrees/agent/tests")).expect("create .claude dir");
+    fs::create_dir_all(outside.join("tests")).expect("create outside tests dir");
+    fs::write(root.join("crates/in/tests/in_tree.rs"), offending).expect("write in-tree file");
+    fs::write(
+        root.join(".claude/worktrees/agent/tests/agent.rs"),
+        offending,
+    )
+    .expect("write .claude file");
+    fs::write(outside.join("tests/outside.rs"), offending).expect("write outside file");
+    symlink(&outside, root.join("crates/linked")).expect("symlink outside directory");
+
+    let mut violations = Vec::new();
+    collect_diagnostic_text_assertions(&root, &root, &mut violations);
+    let _ = fs::remove_dir_all(&base);
+
+    assert!(
+        violations
+            .iter()
+            .any(|line| line.starts_with("crates/in/tests/in_tree.rs")),
+        "in-tree offender must still be found: {violations:?}"
+    );
+    assert!(
+        violations
+            .iter()
+            .all(|line| line.starts_with("crates/in/tests/in_tree.rs")),
+        "symlinked and .claude directories must not be scanned: {violations:?}"
+    );
+}
+
 fn collect_diagnostic_text_assertions(root: &Path, dir: &Path, violations: &mut Vec<String>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -142,11 +186,21 @@ fn collect_diagnostic_text_assertions(root: &Path, dir: &Path, violations: &mut 
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        // `DirEntry::file_type` does not follow symlinks: a symlinked
+        // directory (for example a local `.claude/worktrees/hosts` link into a
+        // sibling repository) is not part of this workspace and must not be
+        // scanned.
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
             if path
                 .file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| matches!(name, ".codex" | ".git" | "target"))
+                .is_some_and(|name| matches!(name, ".claude" | ".codex" | ".git" | "target"))
             {
                 continue;
             }
@@ -404,89 +458,79 @@ fn is_rust_test_file(path: &Path) -> bool {
     name.ends_with("_test.rs") || name.ends_with(".test.rs") || name == "test_gate.rs"
 }
 
+/// Files exempt from `non_renderer_tests_do_not_assert_diagnostic_text`.
+///
+/// The list only shrinks. Every entry states the structured field that is
+/// missing (or the renderer contract it pins); an entry whose file no longer
+/// triggers the scan is deleted, not kept as a precaution.
 fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
     let rel = display_relative(root, path);
     rel == "crates/hygiene-ratchet/tests/hygiene.rs"
-        || rel == "crates/radix/src/diagnostics/render_test.rs"
-        // The renderer tests followed the crate split into radix-module.
+        // Renderer contract: diagnostic render tests and pack-template
+        // interpolation (issue-vs-code fallback, localized row resolution).
         || rel == "crates/radix-module/src/diagnostics/render_test.rs"
-        // Renderer-contract: pack template interpolation, issue-vs-code
-        // fallback, and localized row resolution. Followed the crate split
-        // from crates/radix/src/locale_test.rs.
         || rel == "crates/radix-module/src/locale_test.rs"
-        // Renderer-contract (locale-pack surface): the queue/stack and lista
+        // Renderer contract (locale-pack surface): the queue/stack and lista
         // operator tests render the SEM011 template through the installed en
-        // and la packs and pin the localized prose — the same pack-template
-        // contract as `crates/radix-module/src/locale_test.rs`, not a
-        // code/issue assertion surface.
+        // and la packs and pin the localized prose, the same pack-template
+        // contract as `crates/radix-module/src/locale_test.rs`.
         || rel == "crates/radix-semantic/src/passes/typecheck/queue_stack_test.rs"
         || rel == "crates/radix-semantic/src/passes/typecheck/lista_operator_test.rs"
-        // Renderer-contract (PKG001 empty-message regression): the bounded-param
-        // test pins that the interface_export_unrepresentable locale template
-        // resolves to non-empty prose that renders into default `faber check`
-        // output — a message-rendering contract, not a code/issue surface
-        // (the machine identity is asserted via issue() in the same test).
+        // Renderer contract (PKG001 empty-message regression): pins that the
+        // interface_export_unrepresentable template resolves to non-empty prose
+        // in default `faber check` output; the machine identity is asserted via
+        // issue() in the same test.
         || rel == "crates/radix-program/src/bounded_param_pkg001_test.rs"
+        // Renderer contract: `faber explain` / reference-pack resolution pins
+        // the template and help text it returns.
         || rel == "crates/faber/src/diagnostic_explain_test.rs"
-        || rel == "crates/faber/src/explain_test.rs"
-        || rel == "crates/faber-cli/src/reference_test.rs"
-        || rel == "crates/faber/src/reference_parse_test.rs"
-        || rel == "crates/faber/src/package_text_contract_test.rs"
-        // Recomposition layout (S1-U2): the faber-cli crate moved to
-        // crates/faber; the reference-test allowlist entry follows.
         || rel == "crates/faber/src/reference_test.rs"
-        // S1-U2 recomposition import: faber product test files assert rendered
-        // diagnostic text (message/help field assertions inherited from the
-        // faber-cli surface); scheduled for issue/code migration.
+        || rel == "crates/faber/src/reference_parse_test.rs"
+        // Faber product diagnostics: `issue()` exists, but the interpolated
+        // facts these tests assert (device value, file and path names, config
+        // keys) are not carried as diagnostic args, so the tests fall back to
+        // `message` text. Missing field: per-fact `args` on the package and
+        // command diagnostics. Migrated by the crates/faber unit; remove each
+        // entry as its file asserts code/issue/args.
         || rel == "crates/faber/src/commands/format_test.rs"
         || rel == "crates/faber/src/commands/run_test.rs"
         || rel == "crates/faber/src/package_test.rs"
         || rel == "crates/faber/src/package/cargo_test.rs"
-        || rel == "crates/faber/src/package/device/device_test.rs"
-        || rel == "crates/faber/src/package/device/legality_test.rs"
         || rel == "crates/faber/src/package/fhir_test.rs"
         || rel == "crates/faber/src/package/frontmatter_integration_test.rs"
-        || rel == "crates/faber/src/package/frontmatter_test.rs"
         || rel == "crates/faber/src/package/host_factory_test.rs"
         || rel == "crates/faber/src/package/locale_test.rs"
-        || rel == "crates/faber/src/package/lockfile_test.rs"
         || rel == "crates/faber/src/package/manifest_test.rs"
-        || rel == "crates/faber/src/package/mir/nominal_test.rs"
-        || rel == "crates/faber/src/package/ngab1_host_partition_test.rs"
         || rel == "crates/faber/src/package/proba_integration_test.rs"
         || rel == "crates/faber/src/package/product/product_test.rs"
-        // Pre-existing e2e harness / device-emit render-text assertions.
+        // exempla LLVM e2e classifier: `classify_builder_failure` buckets an
+        // `llvm_emission_failed` diagnostic as unsupported by searching its
+        // message for the category slug. Missing field: the capability
+        // category as a diagnostic arg on the llvm_emission_failed diagnostic
+        // (radix-program/src/llvm.rs).
         || rel == "crates/exempla/src/exempla_e2e/llvm.rs"
-        || rel == "crates/radix-mir-metal/src/emit/tests/device.rs"
-        // Residual text assertions scheduled for issue/code migration.
-        || rel == "crates/radix-mir/tests/validated_mir_reject.rs"
-        || rel == "crates/radix/src/driver/mod_test.rs"
+        // radix-air reverse-AD call graph: `CallGraphCycleError` carries
+        // `functions` and `message` only. Missing field: a kind/issue
+        // distinguishing cross-package call, mutual-recursion cycle and
+        // unreachable-function errors.
         || rel == "crates/radix-air/src/reverse_ad_test.rs"
-        // Pre-3R S3-era residual text assertions (device-program plan +
-        // device-artifact surfaces), allowlisted for issue/code migration.
+        // Device-program planning and kernel decomposition: `PlanMappingError`
+        // carries `message` only. Missing field: a stable issue per plan
+        // rejection (no kernel plan, binding maximum, conflicting recipes,
+        // scalar layout, window exceeded, control flow).
         || rel == "crates/radix-mir/src/device_program_plans_test.rs"
-        || rel == "crates/radix-mir-llvm/tests/device_artifact.rs"
-        // MIR-surface text assertions awaiting the standardized-error-messages
-        // factory goal (docs/factory/standardized-error-messages/): the
-        // underlying error types carry no stable code/issue yet. Remove each
-        // entry as its tests migrate to code/issue assertions — the allowlist
-        // only shrinks.
         || rel == "crates/radix-mir/src/kernel_decomposition_test.rs"
-        || rel == "crates/radix-mir/src/static_shape_fold_test.rs"
-        || rel == "crates/radix-mir-llvm/tests/device_mode.rs"
         // HostError constructor/Display contract: error.rs owns backend
         // naming, requested/limit budget facts, recoverable-OOM wording, and
         // `{code}: {message}` rendering. HostError has code/retryable/launch_ids
-        // but no issue/args for these facts; error_test.rs pins their rendering
-        // alongside code/retryable. Remove when those facts become structured.
+        // but no issue/args for these facts. Remove when those facts become
+        // structured.
         || rel == "crates/radix-device-core/src/error_test.rs"
         // Admission refusal contract: registry.rs::open composes the CPU class,
         // backend probe notes, degraded device identity/reason, and budget
-        // facts into HostError.message. registry_test.rs pins each alongside
-        // its stable code and proves no fallback/retry loss. There is no
-        // structured refusal payload yet; remove when one replaces this text.
-        // Metal launch attribution is NOT exempt: HostError.launch_ids already
-        // carries that fact, so runtime_test.rs must assert it directly.
+        // facts into HostError.message. There is no structured refusal payload
+        // yet. Metal launch attribution is NOT exempt: HostError.launch_ids
+        // already carries that fact, so runtime_test.rs asserts it directly.
         || rel == "crates/radix-device-core/src/registry_test.rs"
 }
 

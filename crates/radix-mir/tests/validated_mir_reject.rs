@@ -46,11 +46,12 @@ fn func(id: u32, blocks: Vec<MirBlock>, return_ty: MirType) -> MirFunction {
     }
 }
 
+/// Rejection identities (`MirValidationError::issue`), never the prose message.
 fn assert_rejected(program: MirProgram, types: &TypeTable) -> Vec<String> {
     let context = MirValidationContext::new(types);
     match ValidatedMir::new(program, context) {
         Ok(_) => panic!("expected ValidatedMir::new to reject invalid program"),
-        Err(errors) => errors.into_iter().map(|e| e.message).collect(),
+        Err(errors) => errors.into_iter().map(|e| e.issue).collect(),
     }
 }
 
@@ -67,10 +68,12 @@ fn rejects_no_value_return() {
             MirType::semantic(TypeId(0)),
         )],
     };
-    let messages = assert_rejected(prog, &types);
+    let issues = assert_rejected(prog, &types);
     assert!(
-        messages.iter().any(|m| m.contains("no-value return")),
-        "expected no-value-return rejection, got: {messages:?}"
+        issues
+            .iter()
+            .any(|i| i == "mir_validation_no_value_return_in_value_returning_function"),
+        "expected no-value-return rejection, got: {issues:?}"
     );
 }
 
@@ -85,10 +88,12 @@ fn rejects_missing_block_target() {
             MirType::semantic(TypeId(0)),
         )],
     };
-    let messages = assert_rejected(prog, &types);
+    let issues = assert_rejected(prog, &types);
     assert!(
-        messages.iter().any(|m| m.contains("block")),
-        "expected block-target rejection, got: {messages:?}"
+        issues
+            .iter()
+            .any(|i| i == "mir_validation_block_bb999_does_not_exist"),
+        "expected block-target rejection, got: {issues:?}"
     );
 }
 
@@ -114,7 +119,9 @@ fn rejects_empty_context_with_duplicate_function_id() {
     );
     let errors = result.unwrap_err();
     assert!(
-        errors.iter().any(|e| e.message.contains("duplicate")),
+        errors
+            .iter()
+            .any(|e| e.issue == "mir_validation_duplicate_mir_function_id_f0"),
         "expected duplicate function ID error, got: {errors:?}"
     );
 }
@@ -155,7 +162,7 @@ fn patch_program_returns_a_token_only_after_revalidation() {
         Err(PatchProgramError::Validation(errors)) => assert!(
             errors
                 .iter()
-                .any(|error| error.message.contains("duplicate")),
+                .any(|error| error.issue == "mir_validation_duplicate_mir_function_id_f0"),
             "expected duplicate function ID rejection, got: {errors:?}"
         ),
         Err(PatchProgramError::Patch(never)) => match never {},
@@ -185,12 +192,12 @@ fn rejects_function_with_no_blocks() {
             MirType::semantic(types.primitive(Primitive::Nihil)),
         )],
     };
-    let messages = assert_rejected(prog, &types);
+    let issues = assert_rejected(prog, &types);
     assert!(
-        messages
+        issues
             .iter()
-            .any(|m| m.contains("block") || m.contains("empty")),
-        "expected block/empty rejection for function with no blocks, got: {messages:?}"
+            .any(|i| i == "mir_validation_function_has_no_entry_block_bb0"),
+        "expected no-entry-block rejection for function with no blocks, got: {issues:?}"
     );
 }
 
@@ -208,11 +215,11 @@ fn rejects_duplicate_block_ids_within_function() {
             MirType::semantic(types.primitive(Primitive::Nihil)),
         )],
     };
-    let messages = assert_rejected(prog, &types);
+    let issues = assert_rejected(prog, &types);
     assert!(
-        messages
+        issues
             .iter()
-            .any(|m| m.contains("duplicate") || m.contains("block")),
-        "expected duplicate block ID rejection, got: {messages:?}"
+            .any(|i| i == "mir_validation_duplicate_mir_block_id_bb0"),
+        "expected duplicate block ID rejection, got: {issues:?}"
     );
 }

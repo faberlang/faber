@@ -11,7 +11,7 @@ use radix_mir::{
 };
 use radix_types::{Primitive, TypeTable};
 
-const INVALID_INDEX: &str = "tensor accipe invalid index";
+const INVALID_INDEX_ISSUE: &str = "runner_tensor_accipe_invalid_index";
 
 fn tensor_get(receiver: Value, index: Value, checked: bool) -> Result<Value, RunnerError> {
     let mut type_table = TypeTable::new();
@@ -143,9 +143,8 @@ fn out_of_range_and_wrong_rank_keep_the_error_text_and_code() {
     let value = tensor(dense(6, &[2, 3]));
     for coordinates in [&[2, 0][..], &[0, 3], &[5, 5], &[0], &[0, 0, 0], &[]] {
         let error = get(&value, coordinates).unwrap_err();
-        assert_eq!(error.message, INVALID_INDEX, "{coordinates:?}");
         assert_eq!(error.code, "runner_internal");
-        assert_eq!(error.issue, "runner_tensor_accipe_invalid_index");
+        assert_eq!(error.issue, INVALID_INDEX_ISSUE, "{coordinates:?}");
         // The optional form answers a miss with none.
         assert_eq!(
             tensor_get(value.clone(), index(coordinates), false).unwrap(),
@@ -159,11 +158,11 @@ fn out_of_range_and_wrong_rank_keep_the_error_text_and_code() {
 fn negative_and_non_numerus_index_elements_keep_their_errors() {
     let value = tensor(dense(6, &[2, 3]));
     let error = get(&value, &[-1, 0]).unwrap_err();
-    assert_eq!(error.message, INVALID_INDEX);
+    assert_eq!(error.issue, INVALID_INDEX_ISSUE);
     assert_eq!(error.code, "runner_internal");
     // A bad element is reported even when the rank is wrong too.
     let error = get(&value, &[-1]).unwrap_err();
-    assert_eq!(error.message, INVALID_INDEX);
+    assert_eq!(error.issue, INVALID_INDEX_ISSUE);
 
     let bad = Value::Array(Rc::new(RefCell::new(vec![
         Value::Int(0),
@@ -171,8 +170,8 @@ fn negative_and_non_numerus_index_elements_keep_their_errors() {
     ])));
     let error = tensor_get(value.clone(), bad, true).unwrap_err();
     assert_eq!(
-        error.message,
-        "tensor shape element is not numerus: Str(\"x\")"
+        error.issue,
+        "runner_tensor_shape_element_is_not_numerus_str_x"
     );
     assert_eq!(error.code, "runner_internal");
 }
@@ -181,7 +180,10 @@ fn negative_and_non_numerus_index_elements_keep_their_errors() {
 fn wrong_typed_arguments_keep_their_errors() {
     let value = tensor(dense(6, &[2, 3]));
     let error = tensor_get(value.clone(), Value::Int(1), true).unwrap_err();
-    assert_eq!(error.message, "tensor lista argument type mismatch: Int(1)");
+    assert_eq!(
+        error.issue,
+        "runner_tensor_lista_argument_type_mismatch_int_1"
+    );
     let error = tensor_get(Value::Int(1), index(&[0]), true).unwrap_err();
-    assert_eq!(error.message, "tensor receiver type mismatch: Int(1)");
+    assert_eq!(error.issue, "runner_tensor_receiver_type_mismatch_int_1");
 }
