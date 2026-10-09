@@ -126,10 +126,10 @@ fn prove_same_unit_method() {
             continue;
         }
         for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(function) = &item.kind {
-                if unit.analysis.interner.resolve(function.name) == "prove_same_unit_method" {
-                    functions.push((unit.path.clone(), item.def_id));
-                }
+            if let HirItemKind::Function(function) = &item.kind
+                && unit.analysis.interner.resolve(function.name) == "prove_same_unit_method"
+            {
+                functions.push((unit.path.clone(), item.def_id));
             }
         }
     }

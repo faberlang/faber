@@ -66,10 +66,10 @@ fn literal_dims(
     }
 }
 
-fn named_function_shapes<'a>(
-    lowered: &'a LoweredMirUnit<'_>,
-    function_name: &str,
-) -> Vec<(Option<Vec<i64>>, Option<Vec<i64>>)> {
+/// Parameter and return shapes of one function, when statically known.
+type FunctionShapes = (Option<Vec<i64>>, Option<Vec<i64>>);
+
+fn named_function_shapes(lowered: &LoweredMirUnit<'_>, function_name: &str) -> Vec<FunctionShapes> {
     let types = lowered.validated.validation().types.as_table();
     lowered
         .validated

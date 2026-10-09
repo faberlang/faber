@@ -200,10 +200,10 @@ fn package_mir_mixed_shape_generic_links_through_test_package() {
             continue;
         }
         for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(function) = &item.kind {
-                if unit.analysis.interner.resolve(function.name) == "prove_mixed_shape_family" {
-                    functions.push((unit.path.clone(), item.def_id));
-                }
+            if let HirItemKind::Function(function) = &item.kind
+                && unit.analysis.interner.resolve(function.name) == "prove_mixed_shape_family"
+            {
+                functions.push((unit.path.clone(), item.def_id));
             }
         }
     }

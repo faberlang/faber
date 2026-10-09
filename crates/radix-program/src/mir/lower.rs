@@ -263,7 +263,7 @@ fn program_aggregate_defs(program: &MirProgram) -> (Vec<DefId>, Vec<DefId>) {
 }
 
 fn lowered_aggregate_defs(lowered: &LoweredMirUnit<'_>) -> (Vec<DefId>, Vec<DefId>) {
-    let (mut structs, mut variants) = program_aggregate_defs(&lowered.validated.program());
+    let (mut structs, mut variants) = program_aggregate_defs(lowered.validated.program());
     for function in &lowered.generic_templates {
         collect_function_aggregate_defs(function, &mut structs, &mut variants);
     }
@@ -1005,7 +1005,7 @@ pub(super) fn lower_package_units<'a>(
         let dispatch_function = selected_cli_dispatch_function(
             cli_plan,
             &unit_path,
-            &lowered.validated.program(),
+            lowered.validated.program(),
             &source_interner,
             &entry.analysis.interner,
         );
@@ -1345,7 +1345,7 @@ pub(super) fn lower_package_units<'a>(
         );
     }
     let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse, kernel_lowering)?;
-    ensure_unique_definition_sources(&merged.validated.program(), &entry_path)?;
+    ensure_unique_definition_sources(merged.validated.program(), &entry_path)?;
     // Generic limes templates from future library units are already offered
     // to the incremental linker below. Make their portable policy sites
     // visible at the same time, so a template cannot be specialized with its
@@ -1373,7 +1373,7 @@ pub(super) fn lower_package_units<'a>(
     let mut dispatch_function = selected_cli_dispatch_function(
         cli_plan,
         &entry_path,
-        &merged.validated.program(),
+        merged.validated.program(),
         &merged.interner,
         &merged.interner,
     );
@@ -2924,13 +2924,13 @@ fn rewrite_function_type_ids(function: &mut MirFunction, rewrites: &[(TypeId, Ty
         for statement in &mut block.statements {
             rewrite_statement_type_id(statement, rewrites);
         }
-        if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind {
-            // Failable generic callees carry the same imported-unit type
-            // args as direct calls; rewrite them on the try edge too.
-            if let MirCallee::Definition { type_args, .. } = callee {
-                for type_arg in type_args {
-                    rewrite_type_id(type_arg, rewrites);
-                }
+        // Failable generic callees carry the same imported-unit type
+        // args as direct calls; rewrite them on the try edge too.
+        if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
+            && let MirCallee::Definition { type_args, .. } = callee
+        {
+            for type_arg in type_args {
+                rewrite_type_id(type_arg, rewrites);
             }
         }
     }
@@ -4071,7 +4071,7 @@ struct LibraryMirParts {
 }
 
 fn prune_unreachable_library_functions(
-    library_parts: &mut Vec<LibraryMirParts>,
+    library_parts: &mut [LibraryMirParts],
     reachable_seed: &mut HashSet<DefId>,
 ) {
     if library_parts.is_empty() {

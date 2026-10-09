@@ -10,6 +10,7 @@
 //!     "path that does not resolve to a local value".
 //!   * face 2 — a linked const initializer carries the conversion shape
 //!     (`[…] ↦ set<string>`); `transplant_expr` failed closed on it.
+//!
 //! The standalone `∈` operator is not under test here (radix-module owns
 //! that proof); this lane pins the package transplant/link seam only.
 
@@ -85,10 +86,10 @@ fn run_const_member_package_tests(src: &Path) -> Vec<String> {
             continue;
         }
         for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(function) = &item.kind {
-                if function.test.is_some() {
-                    functions.push((unit.path.clone(), item.def_id));
-                }
+            if let HirItemKind::Function(function) = &item.kind
+                && function.test.is_some()
+            {
+                functions.push((unit.path.clone(), item.def_id));
             }
         }
     }

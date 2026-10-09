@@ -65,10 +65,10 @@ struct SyntheticCapeBindingPass<'a> {
 impl HirVisitorMut for SyntheticCapeBindingPass<'_> {
     fn visit_expr_mut(&mut self, expr: &mut radix_module::hir::HirExpression) {
         if let HirExpressionKind::Handled { body, catch } = &mut expr.kind {
-            let unresolved = match catch.binding_ty.map(|ty| self.types.get(ty)) {
-                Some(Type::Primitive(Primitive::Ignotum)) | None => true,
-                _ => false,
-            };
+            let unresolved = matches!(
+                catch.binding_ty.map(|ty| self.types.get(ty)),
+                Some(Type::Primitive(Primitive::Ignotum)) | None
+            );
             if unresolved {
                 let mut collector = CapeFailableCollector {
                     method_types: self.method_types,
@@ -2487,13 +2487,9 @@ impl ShadowedAliasRewriter<'_> {
         // ordinary method call on a local whose method happens to match an
         // imported module's export, e.g. `h1b.gelu()` → `nn.gelu(h1b)`).
         if def.is_hir_synthetic() {
-            let Some(binding_name) = self.local_names.get(def).copied() else {
-                return None;
-            };
+            let binding_name = self.local_names.get(def).copied()?;
             let local_name = self.interner.resolve(binding_name).to_owned();
-            let Some(import_def) = self.imports.get(&local_name).copied() else {
-                return None;
-            };
+            let import_def = self.imports.get(&local_name).copied()?;
             // Guard: a genuine method call on the receiver's own type is not
             // a namespace reference and must not be rewritten, even when the
             // receiver's name shadows an import binding and the module exports
@@ -2510,9 +2506,7 @@ impl ShadowedAliasRewriter<'_> {
         // Only Module symbols (import namespaces) — or locals that shadow
         // one (the name-based resolution below then matches the import
         // binding, mirroring the analysis's namespace-member intent).
-        let Some(symbol) = self.resolver.get_symbol(*def) else {
-            return None;
-        };
+        let symbol = self.resolver.get_symbol(*def)?;
         if !matches!(
             symbol.kind,
             radix_module::semantic::SymbolKind::Module | radix_module::semantic::SymbolKind::Local

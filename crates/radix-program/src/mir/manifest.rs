@@ -52,9 +52,9 @@ pub(super) fn package_mir_manifest(
         "version = {PACKAGE_MIR_ARTIFACT_VERSION}\ntarget = \"{PACKAGE_MIR_TARGET_NAME}\"\nentry = \"{entry}\"\nentry_function = \"run_entry\"\n\n[runtime]\n"
     );
     for requirement in &prepared.runtime_requirements {
-        let _ = write!(
+        let _ = writeln!(
             manifest,
-            "requirement = \"{}\"\n",
+            "requirement = \"{}\"",
             escape_manifest_value(requirement)
         );
     }
@@ -66,7 +66,7 @@ pub(super) fn package_mir_manifest(
         .collect::<Vec<_>>();
     sources.sort();
     for source in sources {
-        let _ = write!(manifest, "file = \"{}\"\n", escape_manifest_value(&source));
+        let _ = writeln!(manifest, "file = \"{}\"", escape_manifest_value(&source));
     }
     manifest
 }

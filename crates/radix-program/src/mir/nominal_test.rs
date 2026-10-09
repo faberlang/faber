@@ -132,7 +132,7 @@ fn package_mir_nominal_identity_unifies_across_analyses() {
     let entry = write_nominal_package(&dir, NOMINAL_UTIL, NOMINAL_MAIN);
     let config = Config::default();
 
-    let merged = with_interpreted_lowered_package_mir(
+    with_interpreted_lowered_package_mir(
         &config,
         &entry,
         &crate::test_support::test_mir_seams(),
@@ -145,7 +145,6 @@ fn package_mir_nominal_identity_unifies_across_analyses() {
         },
     )
     .expect("merged package MIR program");
-    let _ = merged;
 
     let mut host = BufferHost::default();
     run_package_mir(

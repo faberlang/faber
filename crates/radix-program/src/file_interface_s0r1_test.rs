@@ -436,9 +436,9 @@ fn twin_export_preserves_producer_identity_and_export_name() {
 
 /// The consumer round trip through the full import contract (export surface
 /// + interface, as the production per-unit `AnalyzeRequest` carries them): a
-/// concrete-shaped call through the imported twin analyzes without
-/// diagnostics — the portable signature carries the symbolic witnesses, and
-/// the call binds `[4, 8]` against `[M, K]`.
+///   concrete-shaped call through the imported twin analyzes without
+///   diagnostics — the portable signature carries the symbolic witnesses, and
+///   the call binds `[4, 8]` against `[M, K]`.
 #[test]
 fn twin_signature_consumer_round_trip_binds_concrete_shapes() {
     let interface = twin_provider_interface();

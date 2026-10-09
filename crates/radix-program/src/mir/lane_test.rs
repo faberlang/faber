@@ -197,9 +197,11 @@ fn write_library_package(
     let library = dir.join("libhome").join(lib_name);
     fs::create_dir_all(&src).expect("create package src");
     fs::create_dir_all(library.join("src")).expect("create library src");
-    let reader = (lib_name == "callbacklib")
-        .then_some("\n[reader]\nlocale = \"la\"\n")
-        .unwrap_or_default();
+    let reader = if lib_name == "callbacklib" {
+        "\n[reader]\nlocale = \"la\"\n"
+    } else {
+        Default::default()
+    };
     fs::write(
         dir.join("faber.toml"),
         format!(
@@ -409,10 +411,10 @@ fn prove_linked_bodies() {
             continue;
         }
         for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(function) = &item.kind {
-                if unit.analysis.interner.resolve(function.name) == "prove_linked_bodies" {
-                    functions.push((unit.path.clone(), item.def_id));
-                }
+            if let HirItemKind::Function(function) = &item.kind
+                && unit.analysis.interner.resolve(function.name) == "prove_linked_bodies"
+            {
+                functions.push((unit.path.clone(), item.def_id));
             }
         }
     }
@@ -1156,7 +1158,7 @@ fn package_mir_return_channel_mismatch_without_conversion_fails_closed() {
             .iter()
             .map(|diagnostic| {
                 (
-                    diagnostic.code.clone(),
+                    diagnostic.code,
                     diagnostic.issue().map(|issue| issue.to_owned()),
                 )
             })
@@ -1244,8 +1246,7 @@ fn linear_carrier(int x) → int ⇥ NnError {
     fs::create_dir_all(library.join("src")).expect("create library src");
     fs::write(
         dir.join("faber.toml"),
-        format!(
-            r#"
+        r#"
 [package]
 name = "fhir-lane-return-conv"
 version = "1.0.0"
@@ -1264,8 +1265,7 @@ locale = "en"
 
 [dependencies]
 convlib = "1.0.0"
-"#
-        ),
+"#,
     )
     .expect("write faber.toml");
     let library_display = library.display();

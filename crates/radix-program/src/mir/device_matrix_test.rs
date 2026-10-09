@@ -309,7 +309,7 @@ fn unmarked_twin_helper_is_module_private_and_not_importable() {
         "the unmarked helper twin must not be importable cross-package, got {:?}",
         diagnostics
             .iter()
-            .map(|diagnostic| (diagnostic.code.clone(), diagnostic.issue()))
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
             .collect::<Vec<_>>()
     );
 }
@@ -377,7 +377,7 @@ fn signature_only_twin_body_fails_closed_at_the_package_link() {
         "named fail-closed issue `imported_device_body_missing` required, got {:?}",
         errors
             .iter()
-            .map(|error| (error.code.clone(), error.issue()))
+            .map(|error| (error.code, error.issue()))
             .collect::<Vec<_>>()
     );
 }
@@ -412,7 +412,7 @@ fn unknown_imported_callee_stays_unresolved() {
         "the unresolved callee must fail with the named `namespace_missing_export` issue, got {:?}",
         unresolved
             .iter()
-            .map(|diagnostic| (diagnostic.code.clone(), diagnostic.issue()))
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
             .collect::<Vec<_>>()
     );
 }

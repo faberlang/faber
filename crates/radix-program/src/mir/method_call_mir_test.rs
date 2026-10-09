@@ -315,10 +315,10 @@ fn package_test_self_provider_nested_tensor_methods_execute() {
             continue;
         }
         for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(function) = &item.kind {
-                if unit.analysis.interner.resolve(function.name) == "prove_nested_tensor_methods" {
-                    functions.push((unit.path.clone(), item.def_id));
-                }
+            if let HirItemKind::Function(function) = &item.kind
+                && unit.analysis.interner.resolve(function.name) == "prove_nested_tensor_methods"
+            {
+                functions.push((unit.path.clone(), item.def_id));
             }
         }
     }
@@ -490,10 +490,10 @@ fn package_test_sibling_union_payloads_project() {
             continue;
         }
         for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(function) = &item.kind {
-                if unit.analysis.interner.resolve(function.name) == "prove_sibling_union_payloads" {
-                    functions.push((unit.path.clone(), item.def_id));
-                }
+            if let HirItemKind::Function(function) = &item.kind
+                && unit.analysis.interner.resolve(function.name) == "prove_sibling_union_payloads"
+            {
+                functions.push((unit.path.clone(), item.def_id));
             }
         }
     }
@@ -618,10 +618,10 @@ fn package_mir_nested_library_method_calls_link_through_test_package() {
             continue;
         }
         for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(function) = &item.kind {
-                if unit.analysis.interner.resolve(function.name) == "prove_nested_tensor_methods" {
-                    functions.push((unit.path.clone(), item.def_id));
-                }
+            if let HirItemKind::Function(function) = &item.kind
+                && unit.analysis.interner.resolve(function.name) == "prove_nested_tensor_methods"
+            {
+                functions.push((unit.path.clone(), item.def_id));
             }
         }
     }

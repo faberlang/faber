@@ -13,6 +13,7 @@
 //!     `closure_environments[].captures[].source` metadata → body and
 //!     environment row disagreed on the capture DefId → "closure capture
 //!     projection is missing metadata".
+//!
 //! The entry unit merges first with offset 0, which is why entry-owned
 //! closures always linked; the controls below pin that seam.
 
@@ -172,10 +173,10 @@ fn run_closure_env_package_tests(package_root: &Path, stdlib_home: &Path) -> Vec
             continue;
         }
         for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(function) = &item.kind {
-                if function.test.is_some() {
-                    functions.push((unit.path.clone(), item.def_id));
-                }
+            if let HirItemKind::Function(function) = &item.kind
+                && function.test.is_some()
+            {
+                functions.push((unit.path.clone(), item.def_id));
             }
         }
     }
@@ -257,7 +258,7 @@ test "sibling closure captures param" {
 "#,
     );
     let package_root = src.parent().unwrap().to_path_buf();
-    let output = run_closure_env_package_tests(&package_root, &package_root.parent().unwrap());
+    let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
     assert_verum(&output, "sibling param capture");
 }
 
@@ -304,7 +305,7 @@ test "sibling closure captures local" {
 "#,
     );
     let package_root = src.parent().unwrap().to_path_buf();
-    let output = run_closure_env_package_tests(&package_root, &package_root.parent().unwrap());
+    let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
     assert_verum(&output, "sibling local capture");
 }
 
@@ -355,7 +356,7 @@ test "sibling closure captures module const" {
 "#,
     );
     let package_root = src.parent().unwrap().to_path_buf();
-    let output = run_closure_env_package_tests(&package_root, &package_root.parent().unwrap());
+    let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
     assert_verum(&output, "sibling module-const capture");
 }
 
@@ -417,7 +418,7 @@ test "sibling closure captures cross-unit const" {
 "#,
     );
     let package_root = src.parent().unwrap().to_path_buf();
-    let output = run_closure_env_package_tests(&package_root, &package_root.parent().unwrap());
+    let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
     assert_verum(&output, "sibling cross-unit const capture");
 }
 
@@ -451,7 +452,7 @@ test "entry closure captures param" {
 "#,
     );
     let package_root = src.parent().unwrap().to_path_buf();
-    let output = run_closure_env_package_tests(&package_root, &package_root.parent().unwrap());
+    let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
     assert_verum(&output, "entry-unit capture control");
 }
 
@@ -494,7 +495,7 @@ test "sibling closure captures nothing" {
 "#,
     );
     let package_root = src.parent().unwrap().to_path_buf();
-    let output = run_closure_env_package_tests(&package_root, &package_root.parent().unwrap());
+    let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
     assert_verum(&output, "sibling no-capture control");
 }
 

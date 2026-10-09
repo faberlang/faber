@@ -667,7 +667,7 @@ fn generate_output(
             // nothing.
             #[cfg(not(feature = "mir-amd"))]
             {
-                return Err(unavailable_target_spanned(Target::MirAmd));
+                Err(unavailable_target_spanned(Target::MirAmd))
             }
             #[cfg(feature = "mir-amd")]
             {

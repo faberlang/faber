@@ -1,7 +1,6 @@
 //! Symbol-bearing intrinsic payloads must survive merging independently
 //! interned modules.
 
-use super::DefId;
 use super::remap::remap_runtime_call_text_symbols;
 use radix_module::lexer::{Interner, Span};
 use radix_module::mir::{
