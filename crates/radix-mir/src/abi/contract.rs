@@ -93,6 +93,12 @@ pub enum CollectionOpContract {
         dispatch_x: u64,
         dispatch_y: u64,
     },
+    /// Rank-2 matmul whose M, K or N is bound at run time. The tile grid is
+    /// not a number here: `tiled_matmul` (launch geometry) computes
+    /// `(ceil(N/8), ceil(M/8))` from the call-site shapes, and the
+    /// inner-dimension equality becomes a launch-time check. Batched and
+    /// quantized matmul stay literal-only.
+    MatMulRuntime,
     Transpose {
         /// Source rows `M` of the rank-2 operand (output columns).
         m: u64,
@@ -425,6 +431,11 @@ pub(crate) fn apply_collection_op_contract(
                 z: 1,
             };
         }
+        CollectionOpContract::MatMulRuntime => {
+            // Same 8x8 workgroup; the grid comes from the call-site shapes
+            // at launch, so `dispatch_size` is left untouched.
+            signature.workgroup = MirWorkgroupSize { x: 8, y: 8, z: 1 };
+        }
         CollectionOpContract::RowReduction { rows, .. } => {
             // PGC-R5: one workgroup per row. Only the launch geometry
             // changes — buffer bindings and element counts stay the
@@ -664,6 +675,32 @@ pub fn collection_op_contract(
                     else {
                         continue;
                     };
+                    let left_all = crate::tensor_type::tensor_dims(left_ty, validation)
+                        .map_err(MirAbiError::new)?;
+                    let right_all = crate::tensor_type::tensor_dims(right_ty, validation)
+                        .map_err(MirAbiError::new)?;
+                    let runtime = left_all
+                        .iter()
+                        .chain(&right_all)
+                        .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime));
+                    if runtime {
+                        // Only the rank-2 contraction takes run-time extents;
+                        // batched stays literal-only (named refusal).
+                        if left_all.len() != 2 || !(1..=2).contains(&right_all.len()) {
+                            return Err(MirAbiError::new(
+                                "matmul with run-time extents requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
+                            ));
+                        }
+                        if let (
+                            crate::tensor_type::Dim::Literal(left_k),
+                            crate::tensor_type::Dim::Literal(right_k),
+                        ) = (left_all[1], right_all[0])
+                            && left_k != right_k
+                        {
+                            return Err(MirAbiError::new("matmul inner dimensions must match"));
+                        }
+                        return Ok(Some(CollectionOpContract::MatMulRuntime));
+                    }
                     let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
                         .map_err(MirAbiError::new)?;
                     let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)

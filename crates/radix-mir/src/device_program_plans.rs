@@ -2888,6 +2888,13 @@ pub fn contract_shape_signature(
                 z: 1,
             };
         }
+        CollectionOpContract::MatMulRuntime => {
+            // Operand and output resources for run-time extents are built
+            // from `TensorAxisExtent` resources (design note item 4).
+            return Err(PlanMappingError::mapping(
+                "matmul with run-time extents has no signature resources yet",
+            ));
+        }
         CollectionOpContract::Transpose { m, n } => {
             let operand_ty = recipe_operand_ty(function, MirCollectionOp::TensorTranspose)?;
             let element_ty = tensor_element_ty(operand_ty, validation)?;
@@ -4145,6 +4152,22 @@ fn kernel_matmul_shapes(
         .ok_or_else(|| PlanMappingError::mapping("matmul left operand has no local type"))?;
     let right_ty = crate::local_ty::operand_ty(function, &call.args[1])
         .ok_or_else(|| PlanMappingError::mapping("matmul right operand has no local type"))?;
+    let left_all =
+        crate::tensor_type::tensor_dims(left_ty, validation).map_err(PlanMappingError::mapping)?;
+    let right_all =
+        crate::tensor_type::tensor_dims(right_ty, validation).map_err(PlanMappingError::mapping)?;
+    if left_all
+        .iter()
+        .chain(&right_all)
+        .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime))
+    {
+        // The contract resolver accepts rank-2 run-time extents
+        // (`MatMulRuntime`); `MatMulShapes` carries literal dims only, so no
+        // plan is built from them until the plan arm lands.
+        return Err(PlanMappingError::mapping(
+            "matmul with run-time extents has no kernel plan yet",
+        ));
+    }
     let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
         .map_err(PlanMappingError::mapping)?;
     let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)

@@ -202,6 +202,9 @@ impl CollectionKernelPlan {
                     right_batch,
                 }))
             }
+            // Run-time extents have no plan until the plan builder learns the
+            // runtime marker (design note item 5); fail closed.
+            CollectionOpContract::MatMulRuntime => None,
             CollectionOpContract::Transpose { m, n } => {
                 if op != MirCollectionOp::TensorTranspose {
                     return None;

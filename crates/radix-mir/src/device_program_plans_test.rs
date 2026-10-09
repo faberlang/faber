@@ -346,6 +346,27 @@ fn matmul_function(types: &mut TypeTable) -> MirFunction {
     let left = rank2_tensor_ty(types, [17, 12]);
     let right = rank2_tensor_ty(types, [12, 33]);
     let out = rank2_tensor_ty(types, [17, 33]);
+    matmul_function_over(left, right, out)
+}
+
+/// A rank-2 `f32` tensor type whose listed axes are run-time extents
+/// (`Some(parameter)`) and whose other axes are literal.
+fn rank2_tensor_ty_mixed(types: &mut TypeTable, dims: [Result<u64, u32>; 2]) -> MirType {
+    let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| match dim {
+            Ok(count) => types.intern_index(IndexExpr::Literal(count)),
+            Err(parameter) => types.intern_index(IndexExpr::Runtime(
+                radix_types::RuntimeExtentId::ScalarParameter { parameter },
+            )),
+        })
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32_ty, shape)))
+}
+
+fn matmul_function_over(left: MirType, right: MirType, out: MirType) -> MirFunction {
     MirFunction {
         id: MirFunctionId(0),
         source: None,
@@ -4823,4 +4844,74 @@ fn from_filum_summa_rejects_degenerate_declarations() {
     assert!(CollectionKernelPlan::from_filum_summa(&filum, 1024).is_none());
     let filum = filum_declaration(32);
     assert!(CollectionKernelPlan::from_filum_summa(&filum, 0).is_none());
+}
+
+#[test]
+fn matmul_contract_literal_dims_keep_the_numeric_tile_grid() {
+    let mut types = TypeTable::new();
+    let function = matmul_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("literal matmul resolves")
+        .expect("literal matmul has a contract");
+    assert_eq!(
+        contract,
+        CollectionOpContract::MatMul {
+            dispatch_x: 5,
+            dispatch_y: 3
+        }
+    );
+}
+
+#[test]
+fn matmul_contract_runtime_dims_resolve_without_a_numeric_grid() {
+    let mut types = TypeTable::new();
+    let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Err(2)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(2)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("run-time matmul resolves")
+        .expect("run-time matmul has a contract");
+    assert_eq!(contract, CollectionOpContract::MatMulRuntime);
+    // The plan pass has no run-time plan yet: named refusal, not a literal
+    // dimensions error.
+    let error = kernel_matmul_shapes(&function, &validation).expect_err("no run-time plan yet");
+    assert!(
+        error.message.contains("run-time extents"),
+        "{}",
+        error.message
+    );
+}
+
+#[test]
+fn matmul_contract_mixed_dims_with_equal_literal_inner_is_runtime() {
+    let mut types = TypeTable::new();
+    let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(12)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Ok(12), Ok(33)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(33)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    assert_eq!(
+        collection_op_contract(&function, &validation).unwrap(),
+        Some(CollectionOpContract::MatMulRuntime)
+    );
+}
+
+#[test]
+fn matmul_contract_runtime_dims_still_reject_literal_inner_mismatch() {
+    let mut types = TypeTable::new();
+    let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(12)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Ok(11), Ok(33)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(33)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let error = collection_op_contract(&function, &validation)
+        .expect_err("literal inner mismatch is still an error");
+    assert!(
+        error.message.contains("inner dimensions"),
+        "{}",
+        error.message
+    );
 }
