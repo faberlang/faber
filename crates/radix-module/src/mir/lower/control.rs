@@ -1097,11 +1097,19 @@ impl FunctionBuilder<'_> {
                 expr,
             );
         }
-        let source_ty = source.ty?;
+        // A `mut`/`own`/`ref` parameter carries its access marker on the
+        // source type; the reduction reads the tensor carrier under it.
+        let source_ty = self.types.peel_access_marker(source.ty?).1;
         let (element, shape, matrix) = match self.normalized_type(source_ty) {
             Type::Tensor(element, shape) => (*element, *shape, false),
             Type::Matrix(element, shape) => (*element, *shape, true),
-            _ => return None,
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    source.span,
+                    "reduction source before tensor or matrix MIR lowering",
+                ));
+                return None;
+            }
         };
         let dimensions = i64s_from_literal_index(shape, self.types);
         let rank = match self.types.get_index(shape) {
@@ -1764,7 +1772,7 @@ impl FunctionBuilder<'_> {
                 return None;
             }
         }
-        let Some(source_ty) = source.ty else {
+        let Some(source_ty) = source.ty.map(|ty| self.types.peel_access_marker(ty).1) else {
             self.errors
                 .push(MirError::missing_type(source.span, "filum reduce source type"));
             return None;

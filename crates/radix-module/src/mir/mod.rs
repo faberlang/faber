@@ -76,6 +76,10 @@ mod device_block_erase_test;
 mod grid_reduce_test;
 
 #[cfg(test)]
+#[path = "reduction_access_marker_test.rs"]
+mod reduction_access_marker_test;
+
+#[cfg(test)]
 #[path = "device_value_join_test.rs"]
 mod device_value_join_test;
 #[cfg(test)]
