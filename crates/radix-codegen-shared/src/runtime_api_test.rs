@@ -496,7 +496,7 @@ fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
         .iter()
         .filter(|row| row.ns == Namespace::Regex && row.targets.contains(&Target::HirRust))
         .collect();
-    assert_eq!(rows.len(), 12);
+    assert_eq!(rows.len(), 14);
     for row in rows {
         assert_eq!(row.kind, RuntimeKind::Fn);
         assert_eq!(
@@ -507,6 +507,14 @@ fn the_regex_rows_spell_as_faber_regex_functions_in_rust() {
     assert_eq!(
         spell(Target::HirRust, &REGEX_FIND_ALL),
         Ok("faber::regex::find_all".to_owned())
+    );
+    assert_eq!(
+        spell(Target::HirRust, &REGEX_COMPILE_OR_TRAP),
+        Ok("faber::regex::compile_or_trap".to_owned())
+    );
+    assert_eq!(
+        spell(Target::HirRust, &REGEX_LITERAL_OR_TRAP),
+        Ok("faber::regex::literal_or_trap".to_owned())
     );
 }
 
@@ -976,6 +984,7 @@ fn the_rust_gen_and_float_rows_spell_as_the_crate_root_types_and_a_float_functio
             ("faber::AsyncCursorShared".to_owned(), RuntimeKind::Type),
             ("faber::r#gen::block_on".to_owned(), RuntimeKind::Fn),
             ("faber::r#gen::block_on_tokio".to_owned(), RuntimeKind::Fn),
+            ("faber::r#gen::send_or_drop".to_owned(), RuntimeKind::Fn),
             ("faber::float::f16_bits_to_f32".to_owned(), RuntimeKind::Fn),
         ]
     );

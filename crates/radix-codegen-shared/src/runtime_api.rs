@@ -435,6 +435,16 @@ pub const GEN_BLOCK_ON_TOKIO: RuntimeItem = RuntimeItem {
     targets: &[Target::HirRust],
 };
 
+/// `gen` row: answering a consumer request whose receiving end may have hung
+/// up (`faber::r#gen::send_or_drop`). The answer is dropped when nobody waits
+/// for it, so the generated producer never discards a `Result` itself.
+pub const GEN_SEND_OR_DROP: RuntimeItem = RuntimeItem {
+    ns: Namespace::Gen,
+    name: "send_or_drop",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+
 /// `float` row (T1-R7, fork F-D): the half-float bit decode of the Rust runtime
 /// (`faber::float::f16_bits_to_f32`). The Rust target has no std half-float
 /// carrier, so `fractus<f16>` is a decoded-`f32` conversion intermediate.
@@ -871,6 +881,15 @@ pub const REGEX_ERROR: RuntimeItem = regex_row("RegexError", RuntimeKind::Type, 
 /// `replace_each` and `escape`; `compile` is its constructor.
 pub const REGEX_COMPILE: RuntimeItem = regex_row("compile", RuntimeKind::Fn, REGEX_SWIFT_PY);
 
+/// `regex` rows: the Rust constructors that compile a pattern and trap when it
+/// is rejected (`faber::regex::compile_or_trap` for an unrecovered
+/// `textus ↦ regex` conversion, `faber::regex::literal_or_trap` for a regex
+/// literal the compiler wrote), so generated code never unwraps `Regex::new`.
+pub const REGEX_COMPILE_OR_TRAP: RuntimeItem =
+    regex_row("compile_or_trap", RuntimeKind::Fn, &[Target::HirRust]);
+pub const REGEX_LITERAL_OR_TRAP: RuntimeItem =
+    regex_row("literal_or_trap", RuntimeKind::Fn, &[Target::HirRust]);
+
 /// Shared TypeScript route registry accessor and typed entries.
 pub const ROUTES_TABLE: RuntimeItem = RuntimeItem {
     ns: Namespace::Routes,
@@ -1150,6 +1169,7 @@ pub const TABLE: &[RuntimeItem] = &[
     GEN_ASYNC_CURSOR_SHARED,
     GEN_BLOCK_ON,
     GEN_BLOCK_ON_TOKIO,
+    GEN_SEND_OR_DROP,
     FLOAT_F16_BITS_TO_F32,
     TRAP_TRAP,
     TRAP_FAIL,
@@ -1243,6 +1263,8 @@ pub const TABLE: &[RuntimeItem] = &[
     REGEX_REPLACE_EACH,
     REGEX_ERROR,
     REGEX_COMPILE,
+    REGEX_COMPILE_OR_TRAP,
+    REGEX_LITERAL_OR_TRAP,
 ];
 
 /// The TypeScript runtime's word-ring operations (T1-T6). These are ring

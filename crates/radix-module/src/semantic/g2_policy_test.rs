@@ -162,7 +162,8 @@ incipit {
         panic!("expected rust");
     };
     assert!(
-        rust.code.contains("faber::Regex::new(s.as_str()).unwrap()"),
+        rust.code
+            .contains("faber::regex::compile_or_trap(s.as_str())"),
         "regex conversion must consume the runtime constructor's result: {}",
         rust.code
     );
