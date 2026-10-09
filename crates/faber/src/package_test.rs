@@ -10959,7 +10959,7 @@ main {
     // D1 offline seam: the linked library's faber runtime row falls back to
     // the container-local checkout behind the path override.
     let override_root = root.join("container");
-    fs::create_dir_all(override_root.join("faber/runtime/rust")).expect("override runtime");
+    fs::create_dir_all(override_root.join("runtime/rust")).expect("override runtime");
     super::runtime_sources::set_path_override_for_test(Some(override_root));
     let deps = radix::program::artifact_plan::native_library_deps(&app).expect("native deps");
     assert_eq!(
