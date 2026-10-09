@@ -166,7 +166,7 @@ incipit {
     nota processus.argv()
 }
 "#;
-    let mut unit = analyze_source(&session, "kernel-import.fab", source, AnalyzeRequest::default()).expect("analysis");
+    let unit = analyze_source(&session, "kernel-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");
@@ -200,8 +200,7 @@ incipit {
     nota toml.parse("x = 1")
 }
 "#;
-    let mut unit =
-        analyze_source(&session, "kernel-toml-import.fab", source, AnalyzeRequest::default()).expect("analysis");
+    let unit = analyze_source(&session, "kernel-toml-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");
@@ -236,8 +235,7 @@ incipit {
     nota faber.aleator.uuid()
 }
 "#;
-    let mut unit =
-        analyze_source(&session, "kernel-glob-import.fab", source, AnalyzeRequest::default()).expect("analysis");
+    let unit = analyze_source(&session, "kernel-glob-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");

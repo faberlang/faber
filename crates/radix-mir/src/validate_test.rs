@@ -4521,7 +4521,6 @@ fn expression_axis_destination_program(
     callee.blocks[0].terminator.kind = MirTerminatorKind::Return(Some(MirOperand::Place(place(0))));
     MirProgram {
         functions: vec![caller, callee],
-        ..MirProgram::default()
     }
 }
 

@@ -14,7 +14,7 @@ incipit {
     nota consume(own "salve")
 }
 "#;
-    let mut unit = crate::driver::analyze_source(&session, "own-textus.fab", source, AnalyzeRequest::default())
+    let unit = crate::driver::analyze_source(&session, "own-textus.fab", source, AnalyzeRequest::default())
         .expect("analysis succeeds");
     let textus = unit.types.primitive(crate::semantic::Primitive::Textus);
     let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("MIR lowering succeeds");

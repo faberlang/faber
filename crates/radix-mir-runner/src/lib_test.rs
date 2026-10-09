@@ -5967,10 +5967,6 @@ fn self_loop_blocks() -> Vec<MirBlock> {
     ]
 }
 
-fn bool_type(types: &mut radix_types::TypeTable) -> MirType {
-    MirType::semantic(types.primitive(radix_types::Primitive::Bivalens))
-}
-
 fn block_chain(len: u32) -> Vec<MirBlock> {
     (0..len)
         .map(|index| MirBlock {

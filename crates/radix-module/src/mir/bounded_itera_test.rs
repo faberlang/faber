@@ -21,7 +21,7 @@ fn bounded_lista_ex_lowers_to_len_static_split() {
   }
   redde total
 }";
-    let mut unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+    let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
         .expect("bounded lista itera source analyzes");
     let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .expect("runtime-len bounded lista itera ex lowers in the base MIR lane");
@@ -62,7 +62,7 @@ fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
   }
   redde
 }";
-    let mut unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+    let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
         .expect("bounded lista itera source analyzes");
     let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("the split lowers");
     validate_program(lowered.validated.program(), lowered.validated.validation())
@@ -85,7 +85,7 @@ fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
 
 #[test]
 fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
-    let mut unit = analyze_source(
+    let unit = analyze_source(
         &session(),
         "bounded-itera.fab",
         r"functio big(lista<numerus, 11> xs) → vacuum {
@@ -148,7 +148,7 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
         ),
     ];
     for (name, source) in cases {
-        let mut unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+        let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
             .unwrap_or_else(|error| panic!("{name} source analyzes: {error:?}"));
         let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
             .unwrap_or_else(|error| panic!("{name} itera ex lowers in the base MIR lane: {error:?}"));
@@ -184,7 +184,7 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
 /// governs `lista<T, N>`.
 #[test]
 fn scalar_bounded_buffers_capacity_above_ten_stay_unsupported() {
-    let mut unit = analyze_source(
+    let unit = analyze_source(
         &session(),
         "bounded-itera.fab",
         r"functio big(textus<11> xs) → vacuum {

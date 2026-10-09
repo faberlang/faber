@@ -202,7 +202,7 @@ incipit {
     nota 1
 }
 ";
-    let mut analysis =
+    let analysis =
         analyze_source(&runner_session(), "gather_mir.fab", source, AnalyzeRequest::default()).expect("frontend");
     let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("lowering");
     let call = collection_runtime_call(lowered.validated.program(), MirCollectionOp::TensorGather);
@@ -222,7 +222,7 @@ incipit {
     nota bad
 }
 ";
-    let mut analysis = analyze_source(
+    let analysis = analyze_source(
         &runner_session(),
         "exact_tensor_dynamic_oob.fab",
         source,
@@ -430,7 +430,7 @@ incipit {
 /// the typed facts (table rows V = 4, table cols D = 3, id count T = 4).
 #[test]
 fn gather_fixture_resolves_gather_recipe() {
-    let mut analysis = analyze_source(
+    let analysis = analyze_source(
         &runner_session(),
         "gather_pinned.fab",
         GATHER_PINNED_SOURCE,

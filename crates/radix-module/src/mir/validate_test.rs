@@ -1536,7 +1536,7 @@ fn rejects_lista_to_tensor_runtime_convert() {
 fn octeti_unify_exemplum_mir_validates() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/octeti/unify.fab");
     let source = std::fs::read_to_string(path).expect("read octeti unify exemplum");
-    let mut unit = analyze(&source);
+    let unit = analyze(&source);
     lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("octeti unify exemplum validates in MIR");
 }
 
@@ -1544,7 +1544,7 @@ fn octeti_unify_exemplum_mir_validates() {
 fn validates_valor_array_carrier_aggregate() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../corpus/conversio/valor-tensor.fab");
     let source = std::fs::read_to_string(path).expect("read valor tensor exemplum");
-    let mut unit = analyze(&source);
+    let unit = analyze(&source);
     lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("valor array carrier validates in MIR");
 }
 
@@ -1562,7 +1562,7 @@ fn representative_lowered_phase_3_to_7_mir_validates() {
         r"functio parse(textus raw) → numerus { redde raw ↦ i32 via Hex ⊥ 0 }",
         r#"functio log(textus name) → vacuum { nota "salve" vide name mone "cave" }"#,
     ] {
-        let mut unit = analyze(source);
+        let unit = analyze(source);
         lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("lowered MIR validates");
     }
 }

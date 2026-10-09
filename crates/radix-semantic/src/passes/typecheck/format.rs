@@ -33,12 +33,9 @@ pub(super) fn check_format_expr(
         return textus;
     }
     let subject = format_subject(checker.types, resolved);
-    match subject {
-        FormatSubject::Unsupported => {
-            checker.invalid_operand_types(ISSUE_FORMAT_TYPE_UNSUPPORTED, span);
-            return textus;
-        }
-        _ => {}
+    if matches!(subject, FormatSubject::Unsupported) {
+        checker.invalid_operand_types(ISSUE_FORMAT_TYPE_UNSUPPORTED, span);
+        return textus;
     }
     let Some(text) = checker
         .interner

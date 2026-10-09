@@ -1092,7 +1092,6 @@ fn collection_kernel_plan_carries_no_communication_variant() {
             CollectionKernelPlan::DistributedSum(_) => true,
             // gpu-reset C4-1: a lane grid is an in-kernel recipe plan.
             CollectionKernelPlan::LaneGrid { .. } | CollectionKernelPlan::SingleLane => true,
-            CollectionKernelPlan::LaneGrid { .. } => true,
             // C4-8: a grid reduction is an in-kernel recipe plan.
             CollectionKernelPlan::GridReduce { .. } => true,
         }

@@ -87,7 +87,6 @@ impl RegionFacts {
             .find(|region| region.borrower == borrower)
     }
 
-    #[must_use]
     pub fn regions_for(&self, borrower: DefId) -> impl Iterator<Item = &BorrowRegion> {
         self.regions
             .iter()
@@ -464,12 +463,7 @@ fn is_tensor_view_expr(
         HirExpressionKind::Path(def_id) => aliases.contains_key(def_id),
         HirExpressionKind::MethodCall(receiver, method, _, args, _) => receiver
             .ty
-            .and_then(|ty| {
-                interner
-                    .strings()
-                    .get(method.0 as usize)
-                    .map(|name| (ty, name))
-            })
+            .zip(interner.strings().get(method.0 as usize))
             .and_then(|(ty, name)| lookup_method_for_type_id(ty, types, name, args.len()))
             .is_some_and(|entry| is_tensor_view_method(entry.faber_name)),
         HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Value)

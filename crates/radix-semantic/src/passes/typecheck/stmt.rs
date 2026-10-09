@@ -115,14 +115,14 @@ impl TypeChecker<'_> {
     pub fn check_local(&mut self, local: &mut HirLocal) {
         // Z1: a static `const size N = 3` records its literal value so affine
         // extents over `N` fold at the stores that name it.
-        if local.size_decl && local.size_static {
-            if let Some(radix_hir::HirExpression {
+        if local.size_decl
+            && local.size_static
+            && let Some(radix_hir::HirExpression {
                 kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)),
                 ..
             }) = local.init.as_ref()
-            {
-                self.static_size_values.insert(local.def_id, *value);
-            }
+        {
+            self.static_size_values.insert(local.def_id, *value);
         }
         if let Some(ty) = local.ty {
             let span = local

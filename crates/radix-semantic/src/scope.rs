@@ -353,6 +353,14 @@ pub struct ImportedFileStructField {
     pub init: Option<HirExpression>,
 }
 
+/// One imported file struct: its def id, fields, interface methods, and type parameters.
+pub type ImportedFileStructEntry = (
+    DefId,
+    Vec<ImportedFileStructField>,
+    Vec<ImportedFileInterfaceMethod>,
+    Vec<LexSymbol>,
+);
+
 #[derive(Debug, Clone, Copy)]
 pub struct ImportedFileTypeExport {
     pub member: LexSymbol,
@@ -2585,14 +2593,7 @@ impl Resolver {
     }
 
     #[must_use]
-    pub fn imported_file_structs(
-        &self,
-    ) -> Vec<(
-        DefId,
-        Vec<ImportedFileStructField>,
-        Vec<ImportedFileInterfaceMethod>,
-        Vec<LexSymbol>,
-    )> {
+    pub fn imported_file_structs(&self) -> Vec<ImportedFileStructEntry> {
         self.file_interfaces
             .values()
             .flat_map(|interface| interface.exports.values())
@@ -2680,12 +2681,7 @@ impl Resolver {
     pub fn imported_file_structs_for_namespace(
         &self,
         namespace: LexSymbol,
-    ) -> Vec<(
-        DefId,
-        Vec<ImportedFileStructField>,
-        Vec<ImportedFileInterfaceMethod>,
-        Vec<LexSymbol>,
-    )> {
+    ) -> Vec<ImportedFileStructEntry> {
         self.file_interfaces
             .get(&namespace)
             .into_iter()
@@ -2851,7 +2847,6 @@ impl Resolver {
     /// recovery) flatten scope visibility deliberately: production analysis
     /// enrolls all rows in the global scope, so the flat walk and
     /// [`Self::conversion_row_for`] agree on the live unit.
-    #[must_use]
     pub fn conversion_rows(&self) -> impl Iterator<Item = ConversionRow> + '_ {
         self.conversion_rows.values().flatten().copied()
     }

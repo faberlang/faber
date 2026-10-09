@@ -17,7 +17,7 @@ fn octeti_itera_ex_validates_byte_binding_and_runtime_bound() {
     }
     redde out
 }";
-    let mut unit = crate::driver::analyze_source(&session(), "byte-list.fab", source, AnalyzeRequest::default())
+    let unit = crate::driver::analyze_source(&session(), "byte-list.fab", source, AnalyzeRequest::default())
         .expect("D10.4/D19.4 admit bytes iteration with a u8 binding");
     let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .expect("byte iteration must lower through the existing byte index row");
@@ -78,7 +78,7 @@ fn octeti_itera_de_keeps_existing_fail_closed_admission() {
         nota index
     }
 }";
-    let mut unit = crate::driver::analyze_source(&session(), "byte-indices.fab", source, AnalyzeRequest::default())
+    let unit = crate::driver::analyze_source(&session(), "byte-indices.fab", source, AnalyzeRequest::default())
         .expect("the checker admits the index surface while MIR owns its decline");
     let errors = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .expect_err("this repair only implements byte value iteration");

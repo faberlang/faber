@@ -458,7 +458,7 @@ enum ProbeOutcome {
 
 fn probe(source: &str, session: &Session) -> ProbeOutcome {
     let analysis = analyze_source(session, "bijection-probe.fab", source, AnalyzeRequest::default());
-    let mut analysis = match analysis {
+    let analysis = match analysis {
         Ok(analysis) => analysis,
         Err(diagnostics) => {
             let text: Vec<String> = diagnostics

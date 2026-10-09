@@ -227,7 +227,7 @@ impl TypeChecker<'_> {
             return;
         }
         for (slot, dim) in coordinate_types.iter_mut().zip(dims) {
-            let Some(last) = dim.checked_sub(1).and_then(|d| i128::try_from(d).ok()) else {
+            let Some(last) = dim.checked_sub(1).map(i128::from) else {
                 continue;
             };
             *slot = self.width_type(radix_types::numeric_range::smallest_width((0, last)));

@@ -1434,7 +1434,7 @@ fn tensor_edge_policy_facts_survive_fhir_round_trip() {
         .hir
         .items
         .iter()
-        .find_map(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)).then_some(item))
+        .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
         .expect("function item");
     let function_def = function.def_id;
     let function_hir = function.id;

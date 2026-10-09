@@ -8,7 +8,7 @@ use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 fn dump(body: &str) -> String {
     let source = format!("+++\nlocale = \"en\"\n+++\n{body}\n");
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    let mut unit = analyze_source(&session, "true-div.fab", &source, AnalyzeRequest::default())
+    let unit = analyze_source(&session, "true-div.fab", &source, AnalyzeRequest::default())
         .unwrap_or_else(|diagnostics| panic!("analysis succeeds: {diagnostics:?}"));
     crate::mir::dump_analyzed_unit(&unit).unwrap_or_else(|errors| panic!("MIR lowering succeeds: {errors:?}"))
 }

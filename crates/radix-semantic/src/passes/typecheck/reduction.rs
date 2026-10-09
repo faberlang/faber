@@ -224,10 +224,7 @@ pub(super) fn check_reduction_expr(
             identity.span,
             "reducta_identity_type_mismatch",
         );
-    } else if extremum
-        && !grouped
-        && dimensions.is_none_or(|d| d.is_empty() || d.iter().any(|x| *x == 0))
-    {
+    } else if extremum && !grouped && dimensions.is_none_or(|d| d.is_empty() || d.contains(&0)) {
         let nullable = checker.types.option(result);
         if let Some(expected) = expected {
             let expected = checker.resolve_inferred_type(expected);

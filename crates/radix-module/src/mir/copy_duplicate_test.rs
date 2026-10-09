@@ -19,9 +19,8 @@ fn run(name: &str, source: &str) -> Vec<String> {
 
 fn dump(source: &str) -> String {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    let mut unit =
-        crate::driver::analyze_source(&session, "copy.fab", source, crate::driver::AnalyzeRequest::default())
-            .unwrap_or_else(|diagnostics| panic!("analysis succeeds: {diagnostics:?}"));
+    let unit = crate::driver::analyze_source(&session, "copy.fab", source, crate::driver::AnalyzeRequest::default())
+        .unwrap_or_else(|diagnostics| panic!("analysis succeeds: {diagnostics:?}"));
     crate::mir::dump_analyzed_unit(&unit).unwrap_or_else(|errors| panic!("MIR lowering succeeds: {errors:?}"))
 }
 

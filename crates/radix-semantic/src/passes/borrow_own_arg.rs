@@ -206,10 +206,12 @@ impl BorrowChecker<'_> {
         }
         let mut repeated: Vec<(DefId, radix_lexer::Span)> = Vec::new();
         for (def_id, state) in &self.states {
-            if state.moved && !entry.moved.contains(def_id) && entry.known.contains(def_id) {
-                if let Some(span) = self.own.move_spans.get(def_id) {
-                    repeated.push((*def_id, *span));
-                }
+            if state.moved
+                && !entry.moved.contains(def_id)
+                && entry.known.contains(def_id)
+                && let Some(span) = self.own.move_spans.get(def_id)
+            {
+                repeated.push((*def_id, *span));
             }
         }
         for (def_id, span) in &self.own.pending {

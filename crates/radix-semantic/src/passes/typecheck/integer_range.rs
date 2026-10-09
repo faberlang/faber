@@ -165,7 +165,7 @@ impl TypeChecker<'_> {
     fn plain_int_width(&self, ty: TypeId) -> Option<NumericWidth> {
         let resolved = self.resolve_inferred_type(ty);
         let (_, resolved) = self.types.peel_access_marker(resolved);
-        radix_types::numeric_width::numerus_integer_width(&self.types, resolved)
+        radix_types::numeric_width::numerus_integer_width(self.types, resolved)
     }
 
     /// Declared width of an integer that takes part in the range rule: a

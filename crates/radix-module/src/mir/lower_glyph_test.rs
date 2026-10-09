@@ -14,7 +14,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 }
 
 fn dump_source(source: &str) -> String {
-    let mut unit = analyze(source);
+    let unit = analyze(source);
     dump_analyzed_unit(&unit).expect("MIR lowering succeeds")
 }
 
@@ -384,7 +384,7 @@ functio combine(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2
 
 #[test]
 fn rejects_glyph_vector_matrix_dot_with_explicit_diagnostic() {
-    let mut unit = analyze(
+    let unit = analyze(
         r"
 functio vecmat(vector<f32, 2> v, matrix<f32, [2, 2]> m) → vector<f32, 2> {
     redde v · m

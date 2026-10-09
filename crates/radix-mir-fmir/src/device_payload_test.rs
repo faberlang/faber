@@ -3034,7 +3034,6 @@ fn finalized_artifact_parent_provenance_is_hash_bound() {
     ));
 
     // Finalized without the parent provenance → fail closed.
-    let mut finalized = finalized;
     finalized.compiler_input_packet_sha256 = None;
     finalized.packet_sha256 = finalized.compute_packet_sha256();
     let mut section = sample_device_section();

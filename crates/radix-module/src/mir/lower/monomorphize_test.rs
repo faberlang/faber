@@ -128,7 +128,6 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
         }
         true
     });
-    let mut floats = floats;
     floats.sort_by(f64::total_cmp);
     // product 2*8=16 (index projection), axis 1 → D=8 (assign),
     // product 16 (runtime-call arg), product 16 (return).

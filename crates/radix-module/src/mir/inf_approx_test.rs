@@ -12,8 +12,11 @@ use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
-/// The integer types of the family: Faber spelling, name, and whether a value fits.
-const FAMILY: [(&str, &str, fn(i128) -> bool); 4] = [
+/// One integer type of the family: Faber spelling, name, and whether a value fits.
+type FamilyRow = (&'static str, &'static str, fn(i128) -> bool);
+
+/// The integer types of the family.
+const FAMILY: [FamilyRow; 4] = [
     ("i32", "i32", |v| i32::try_from(v).is_ok()),
     ("numerus", "i64", |v| i64::try_from(v).is_ok()),
     ("u64", "u64", |v| u64::try_from(v).is_ok()),

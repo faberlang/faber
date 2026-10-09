@@ -686,7 +686,7 @@ fn infer_single_shape_hole_from_count(
     if known_product == 0 {
         return;
     }
-    if element_count % known_product != 0 {
+    if !element_count.is_multiple_of(known_product) {
         checker.error_issue(
             SemanticErrorKind::TypeMismatch,
             ISSUE_INCOMPATIBLE_TENSOR_INDEX,
@@ -1150,6 +1150,12 @@ fn dimensions_provably_equal(checker: &mut TypeChecker<'_>, left: IndexId, right
         )
 }
 
+/// One chosen source axis: (source axis, source index, target index, target axis, stretched).
+type PickedAxis = (usize, IndexId, IndexId, usize, bool);
+
+/// Best candidate so far: (stretch count, target axes, picks).
+type BestAxisMapping = (usize, Vec<usize>, Vec<PickedAxis>);
+
 /// Source-axis to target-axis choices, ranked by stretch count and then by
 /// rightmost target positions. Unknown dimensions are potential runtime matches;
 /// the carrier performs their exact-or-singleton check after selecting the same
@@ -1165,12 +1171,8 @@ fn best_expanded_axis_mapping(
         target: &[IndexId],
         source_axis: usize,
         target_start: usize,
-        picked: &mut Vec<(usize, IndexId, IndexId, usize, bool)>,
-        best: &mut Option<(
-            usize,
-            Vec<usize>,
-            Vec<(usize, IndexId, IndexId, usize, bool)>,
-        )>,
+        picked: &mut Vec<PickedAxis>,
+        best: &mut Option<BestAxisMapping>,
     ) {
         if source_axis == source.len() {
             let target_axes = picked
@@ -1270,14 +1272,13 @@ fn index_term_for_shape_expression(
     {
         let divisor = u64::try_from(divisor).ok().filter(|divisor| *divisor > 0)?;
         let numerator = index_term_for_shape_expression(checker, numerator)?;
-        return radix_types::divide_index_exact(&mut checker.types, numerator, divisor).ok();
+        return radix_types::divide_index_exact(checker.types, numerator, divisor).ok();
     }
     let mut offset = 0_i128;
     let base = flatten_shape_affine_expression(expr, &mut offset);
     if !std::ptr::eq(base, expr) {
         let base = index_term_for_shape_expression(checker, base)?;
-        let term =
-            radix_types::compose_index_affine_constant(&mut checker.types, base, offset).ok()?;
+        let term = radix_types::compose_index_affine_constant(checker.types, base, offset).ok()?;
         return match radix_types::evaluate_index_dimension(term, checker.types) {
             Ok(Some(value)) => Some(checker.types.intern_index(IndexExpr::Literal(value))),
             Ok(None) => Some(term),
@@ -1326,11 +1327,11 @@ fn flatten_shape_affine_expression<'a>(
 ) -> &'a HirExpression {
     match &expr.kind {
         HirExpressionKind::Binary(HirBinOp::Add, value, amount) => {
-            if let Some(amount) = static_signed_numerus_literal(amount) {
-                if let Some(total) = offset.checked_add(amount) {
-                    *offset = total;
-                    return flatten_shape_affine_expression(value, offset);
-                }
+            if let Some(amount) = static_signed_numerus_literal(amount)
+                && let Some(total) = offset.checked_add(amount)
+            {
+                *offset = total;
+                return flatten_shape_affine_expression(value, offset);
             }
             if let Some(literal) = static_signed_numerus_literal(value)
                 && let Some(total) = offset.checked_add(literal)

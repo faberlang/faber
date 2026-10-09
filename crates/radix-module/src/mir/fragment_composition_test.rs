@@ -586,7 +586,7 @@ functio k(f32 x) → f32 {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis =
+    let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let lowered =
@@ -623,7 +623,7 @@ functio k(f32 x) → f32 {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis =
+    let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let errors =
         crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect_err("cycle must fail closed");
@@ -649,7 +649,7 @@ functio k(f32 x) → f32 {
     let budget = ExpansionBudget { max_concrete_instances: 0, ..ExpansionBudget::DOCUMENTED_DEFAULTS };
     with_budget_override(budget, || {
         let session = Session::new(Config::default());
-        let mut analysis =
+        let analysis =
             driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
         let errors = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
             .expect_err("budget must fail closed");
@@ -926,7 +926,7 @@ functio k(f32 x) → f32 {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis =
+    let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let lowered =
@@ -1157,7 +1157,7 @@ functio k(f32 x) → f32 {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis =
+    let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let lowered =

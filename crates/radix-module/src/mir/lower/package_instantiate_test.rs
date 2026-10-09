@@ -88,13 +88,16 @@ fn imported_device_route(body: InterfaceBodyChannel) -> ImportedDeviceRoute {
     }
 }
 
-fn imported_device_fixture() -> (
+/// Shared fixture tuple: types, interner, consumer program, templates, generic params.
+type DeviceFixture = (
     TypeTable,
     Interner,
     MirProgram,
     Vec<MirFunction>,
     Vec<(DefId, Vec<MirGenericParam>)>,
-) {
+);
+
+fn imported_device_fixture() -> DeviceFixture {
     let mut types = TypeTable::new();
     let mut interner = Interner::new();
     let symbol = interner.intern("T");
@@ -153,7 +156,7 @@ fn imported_device_fixture() -> (
         shader_stage: None,
         span: Span::default(),
     };
-    let program = MirProgram { functions: vec![caller], ..MirProgram::default() };
+    let program = MirProgram { functions: vec![caller] };
     let generic_params = vec![(
         IMPORTED_SOURCE,
         vec![MirGenericParam { name: symbol, is_shape: false, runtime_witness: None }],
@@ -303,7 +306,7 @@ fn unresolved_imported_device_bindings_fail_closed_with_named_reason() {
         shader_stage: None,
         span: Span::default(),
     };
-    let mut program = MirProgram { functions: vec![caller], ..MirProgram::default() };
+    let mut program = MirProgram { functions: vec![caller] };
     let generic_params = vec![(
         IMPORTED_SOURCE,
         vec![MirGenericParam { name: size_symbol, is_shape: true, runtime_witness: None }],
@@ -453,13 +456,7 @@ fn artifact_restored_signature_only_device_route_fails_closed() {
 
 const IMPORTED_INNER_SOURCE: DefId = DefId(8);
 
-fn imported_device_pair_fixture() -> (
-    TypeTable,
-    Interner,
-    MirProgram,
-    Vec<MirFunction>,
-    Vec<(DefId, Vec<MirGenericParam>)>,
-) {
+fn imported_device_pair_fixture() -> DeviceFixture {
     let mut types = TypeTable::new();
     let mut interner = Interner::new();
     let symbol = interner.intern("T");
@@ -564,7 +561,7 @@ fn imported_device_pair_fixture() -> (
         shader_stage: None,
         span: Span::default(),
     };
-    let program = MirProgram { functions: vec![caller], ..MirProgram::default() };
+    let program = MirProgram { functions: vec![caller] };
     let generic_params = vec![
         (
             IMPORTED_SOURCE,
@@ -726,13 +723,7 @@ const LOCAL_TEMPLATE_SOURCE: DefId = DefId(12);
 
 /// A consumer-local public Kernel caller calling a local generic Kernel
 /// helper template — the consumer-local-only shape (no imported routes).
-fn consumer_local_fixture() -> (
-    TypeTable,
-    Interner,
-    MirProgram,
-    Vec<MirFunction>,
-    Vec<(DefId, Vec<MirGenericParam>)>,
-) {
+fn consumer_local_fixture() -> DeviceFixture {
     let (types, interner, program, templates, mut generic_params) = imported_device_fixture();
     // Re-key the fixture onto consumer-local sources and give the caller the
     // public-Kernel declaration identity composition keys on.
@@ -1009,7 +1000,7 @@ fn consumer_local_caller_hits_expansion_budget_identity() {
         shader_stage: None,
         span: Span::default(),
     };
-    let mut program = MirProgram { functions: vec![caller], ..MirProgram::default() };
+    let mut program = MirProgram { functions: vec![caller] };
 
     let consumer_roles = std::iter::once((caller_source, crate::mir::MirDeviceRole::Kernel))
         .chain(
@@ -1201,7 +1192,6 @@ fn two_shape_instances_keep_canonical_keys_and_do_not_merge() {
             make_caller(2, tensor_2x2_b),
             make_caller(3, tensor_8x8),
         ],
-        ..MirProgram::default()
     };
     let generic_params = vec![(
         SOURCE,
@@ -1347,7 +1337,6 @@ fn minted_instance_substitutes_shape_size_param_to_concrete_integer() {
             shader_stage: None,
             span: Span::default(),
         }],
-        ..MirProgram::default()
     };
     let generic_params = vec![(
         SOURCE,

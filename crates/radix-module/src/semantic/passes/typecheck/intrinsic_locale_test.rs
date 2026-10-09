@@ -154,7 +154,7 @@ const FAMILY_MISS: &str = "fn probe(string t) → string {\n    return t.append(
 /// and MIR lowers the same `Contains` op.
 #[test]
 fn en_surface_resolves_to_same_intrinsic_as_canonical() {
-    let mut unit = analyze(EN_SOURCE, Some(en_pack())).expect("en `contains` should typecheck with the en pack");
+    let unit = analyze(EN_SOURCE, Some(en_pack())).expect("en `contains` should typecheck with the en pack");
     assert_eq!(
         method_call_spellings(&unit.hir, &unit.interner),
         vec!["continet".to_owned()],
@@ -214,7 +214,7 @@ fn en_append_surface_resolves_and_latin_spelling_errors() {
 fn la_and_no_pack_keep_latin_identity() {
     let cases: [(&str, Option<crate::locale::LocalePack>); 2] = [("la", Some(la_pack())), ("no-pack", None)];
     for (label, locale) in cases {
-        let mut unit = analyze(LA_SOURCE, locale)
+        let unit = analyze(LA_SOURCE, locale)
             .unwrap_or_else(|diags| panic!("{label}: canonical `continet` should typecheck: {diags:?}"));
         assert_eq!(
             method_call_spellings(&unit.hir, &unit.interner),
@@ -245,7 +245,7 @@ fn without_pack_surface_spelling_is_unchanged() {
 /// works, and the en surface keeps its miss path (same as no-pack).
 #[test]
 fn la_pack_keeps_canonical_spelling_and_identity() {
-    let mut unit = analyze(LA_SOURCE, Some(la_pack())).expect("la canonical `continet` should typecheck");
+    let unit = analyze(LA_SOURCE, Some(la_pack())).expect("la canonical `continet` should typecheck");
     assert_eq!(method_call_spellings(&unit.hir, &unit.interner), vec!["continet".to_owned()]);
     let mir = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
@@ -283,7 +283,7 @@ fn unknown_method_diagnostics_are_pack_agnostic() {
 /// proves the canonical name reached lowering unchanged.
 #[test]
 fn lint_and_mir_accept_en_spelling_call() {
-    let mut unit = analyze(EN_SOURCE, Some(en_pack())).expect("en `contains` passes typecheck + lint with the en pack");
+    let unit = analyze(EN_SOURCE, Some(en_pack())).expect("en `contains` passes typecheck + lint with the en pack");
     let mir = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("en `contains` call lowers to MIR");
@@ -329,7 +329,7 @@ const EN_ALNUM_CANONICAL: &str = "const string ASCII_ALNUM_CHARS = \"0123456789a
 /// fallback) — only the declared en surface `contains` resolves.
 #[test]
 fn en_proof_ascii_alnum_chars_contains() {
-    let mut en = analyze(EN_ALNUM_SOURCE, Some(en_pack()))
+    let en = analyze(EN_ALNUM_SOURCE, Some(en_pack()))
         .expect("en proof `.contains(c)` must pass faber check with the en pack");
 
     // The en surface rewrites to the canonical registry identity.
@@ -361,7 +361,7 @@ fn en_proof_ascii_alnum_chars_contains() {
 #[test]
 fn la_proof_ascii_alnum_chars_continet() {
     let la_source = "fixum textus ASCII_ALNUM_CHARS = \"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"\nfunctio is_ascii_alphanumeric(textus c) → bivalens {\n    redde ASCII_ALNUM_CHARS.continet(c)\n}\n";
-    let mut unit = analyze(la_source, Some(la_pack())).expect("la proof `.continet(c)` must pass with the la pack");
+    let unit = analyze(la_source, Some(la_pack())).expect("la proof `.continet(c)` must pass with the la pack");
     assert_eq!(
         method_call_spellings(&unit.hir, &unit.interner),
         vec!["continet".to_owned()],

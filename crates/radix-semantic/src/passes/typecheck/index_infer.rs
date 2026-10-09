@@ -299,9 +299,7 @@ impl TypeChecker<'_> {
                         continue;
                     }
 
-                    let Some((runtime_actual, _)) = self.runtime_boundary_axis(axis as u32) else {
-                        return None;
-                    };
+                    let (runtime_actual, _) = self.runtime_boundary_axis(axis as u32)?;
                     // A value-shape extent (a whole-figura `list<int>` value
                     // name) has no scalar read: the producing conversion's
                     // runtime count check owns the fact, so no axis equation
@@ -371,7 +369,7 @@ impl TypeChecker<'_> {
         let mut ordinals = FxHashSet::default();
         collect_value_parameter_extents(
             ty,
-            &self.types,
+            self.types,
             &mut FxHashSet::default(),
             &mut FxHashSet::default(),
             &mut ordinals,
@@ -797,12 +795,10 @@ fn collect_value_parameter_extents(
                       out: &mut FxHashSet<u32>| {
         collect_value_parameter_extents(ty, types, seen_types, seen_indices, out)
     };
-    let check_index = |id: IndexId,
-                       seen_types: &mut FxHashSet<TypeId>,
-                       seen_indices: &mut FxHashSet<IndexId>,
-                       out: &mut FxHashSet<u32>| {
-        collect_value_parameter_extents_in_index(id, types, seen_types, seen_indices, out)
-    };
+    let check_index =
+        |id: IndexId, seen_indices: &mut FxHashSet<IndexId>, out: &mut FxHashSet<u32>| {
+            collect_value_parameter_extents_in_index(id, types, seen_indices, out)
+        };
 
     match types.get(ty) {
         Type::Array(inner)
@@ -819,13 +815,13 @@ fn collect_value_parameter_extents(
         Type::BoundedArray { element, capacity }
         | Type::BoundedQueue { element, capacity }
         | Type::BoundedStack { element, capacity } => {
-            check_index(*capacity, seen_types, seen_indices, out);
+            check_index(*capacity, seen_indices, out);
             check_type(*element, seen_types, seen_indices, out);
         }
         Type::BoundedTextus { capacity }
         | Type::BoundedAscii { capacity }
         | Type::BoundedOcteti { capacity } => {
-            check_index(*capacity, seen_types, seen_indices, out);
+            check_index(*capacity, seen_indices, out);
         }
         Type::Map(key, value) => {
             check_type(*key, seen_types, seen_indices, out);
@@ -844,7 +840,7 @@ fn collect_value_parameter_extents(
         | Type::Vector(element, shape)
         | Type::Matrix(element, shape)
         | Type::Sparsa(element, shape) => {
-            check_index(*shape, seen_types, seen_indices, out);
+            check_index(*shape, seen_indices, out);
             check_type(*element, seen_types, seen_indices, out);
         }
         Type::Func(signature) => {
@@ -863,9 +859,7 @@ fn collect_value_parameter_extents(
                     radix_types::AppliedArg::Type(ty) => {
                         check_type(*ty, seen_types, seen_indices, out)
                     }
-                    radix_types::AppliedArg::Size(index) => {
-                        check_index(*index, seen_types, seen_indices, out)
-                    }
+                    radix_types::AppliedArg::Size(index) => check_index(*index, seen_indices, out),
                 }
             }
         }
@@ -881,7 +875,6 @@ fn collect_value_parameter_extents(
 fn collect_value_parameter_extents_in_index(
     id: IndexId,
     types: &TypeTable,
-    seen_types: &mut FxHashSet<TypeId>,
     seen_indices: &mut FxHashSet<IndexId>,
     out: &mut FxHashSet<u32>,
 ) {
@@ -894,26 +887,14 @@ fn collect_value_parameter_extents_in_index(
         }
         IndexExpr::Tuple(dims) => {
             for dim in dims {
-                collect_value_parameter_extents_in_index(
-                    *dim,
-                    types,
-                    seen_types,
-                    seen_indices,
-                    out,
-                );
+                collect_value_parameter_extents_in_index(*dim, types, seen_indices, out);
             }
         }
         IndexExpr::Affine { base, .. } => {
-            collect_value_parameter_extents_in_index(*base, types, seen_types, seen_indices, out)
+            collect_value_parameter_extents_in_index(*base, types, seen_indices, out)
         }
         IndexExpr::Divide { numerator, .. } => {
-            collect_value_parameter_extents_in_index(
-                *numerator,
-                types,
-                seen_types,
-                seen_indices,
-                out,
-            );
+            collect_value_parameter_extents_in_index(*numerator, types, seen_indices, out);
         }
         _ => {}
     }

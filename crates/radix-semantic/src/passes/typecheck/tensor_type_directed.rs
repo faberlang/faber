@@ -157,10 +157,7 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
 
-        let Some(entry) = radix_intrinsics::lookup_namespace_method_by_name("tensor", method_name)
-        else {
-            return None;
-        };
+        let entry = radix_intrinsics::lookup_namespace_method_by_name("tensor", method_name)?;
         Some(self.check_tensor_namespace_catalog_call(entry, explicit_type_args, args, span))
     }
 

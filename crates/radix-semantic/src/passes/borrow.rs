@@ -2386,18 +2386,16 @@ impl HirVisitor for BorrowChecker<'_> {
                 {
                     self.nonmut_agg_method_error(origin, *method, expr.span);
                 }
-                if is_mutating {
-                    if let Some(receiver_root) = Self::root_def_id(receiver) {
-                        for arg in args {
-                            if self.is_tensor_view(&arg.expr)
-                                && self.tensor_view_origins(&arg.expr).contains(&receiver_root)
-                            {
-                                self.error(
-                                    SemanticErrorKind::ModeMismatch,
-                                    ISSUE_TENSOR_VIEW_READ_ONLY,
-                                    arg.expr.span,
-                                );
-                            }
+                if is_mutating && let Some(receiver_root) = Self::root_def_id(receiver) {
+                    for arg in args {
+                        if self.is_tensor_view(&arg.expr)
+                            && self.tensor_view_origins(&arg.expr).contains(&receiver_root)
+                        {
+                            self.error(
+                                SemanticErrorKind::ModeMismatch,
+                                ISSUE_TENSOR_VIEW_READ_ONLY,
+                                arg.expr.span,
+                            );
                         }
                     }
                 }

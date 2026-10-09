@@ -982,12 +982,12 @@ impl TypeChecker<'_> {
             }
             IndexExpr::Affine { base, offset } => {
                 let base = self.freshen_anonymous_index_holes(base, holes);
-                add_index_constant(&mut self.types, base, offset)
+                add_index_constant(self.types, base, offset)
                     .unwrap_or_else(|_| self.types.intern_index(IndexExpr::Affine { base, offset }))
             }
             IndexExpr::Divide { numerator, divisor } => {
                 let numerator = self.freshen_anonymous_index_holes(numerator, holes);
-                divide_index_exact(&mut self.types, numerator, divisor).unwrap_or_else(|_| {
+                divide_index_exact(self.types, numerator, divisor).unwrap_or_else(|_| {
                     self.types
                         .intern_index(IndexExpr::Divide { numerator, divisor })
                 })
@@ -1199,12 +1199,12 @@ impl TypeChecker<'_> {
             }
             IndexExpr::Affine { base, offset } => {
                 let base = self.substitute_index_params(base, Some(shape_vars));
-                add_index_constant(&mut self.types, base, offset)
+                add_index_constant(self.types, base, offset)
                     .unwrap_or_else(|_| self.types.intern_index(IndexExpr::Affine { base, offset }))
             }
             IndexExpr::Divide { numerator, divisor } => {
                 let numerator = self.substitute_index_params(numerator, Some(shape_vars));
-                divide_index_exact(&mut self.types, numerator, divisor).unwrap_or_else(|_| {
+                divide_index_exact(self.types, numerator, divisor).unwrap_or_else(|_| {
                     self.types
                         .intern_index(IndexExpr::Divide { numerator, divisor })
                 })
@@ -1225,7 +1225,7 @@ impl TypeChecker<'_> {
     ) -> Option<radix_types::IndexArithmeticError> {
         first_index_arithmetic_error_in_type(
             ty,
-            &self.types,
+            self.types,
             &mut FxHashSet::default(),
             &mut FxHashSet::default(),
         )
@@ -1526,10 +1526,9 @@ fn first_index_arithmetic_error_in_type(
         |ty, seen_types: &mut FxHashSet<TypeId>, seen_indices: &mut FxHashSet<IndexId>| {
             first_index_arithmetic_error_in_type(ty, types, seen_types, seen_indices)
         };
-    let check_index =
-        |id, seen_types: &mut FxHashSet<TypeId>, seen_indices: &mut FxHashSet<IndexId>| {
-            first_index_arithmetic_error_in_index(id, types, seen_types, seen_indices)
-        };
+    let check_index = |id, seen_indices: &mut FxHashSet<IndexId>| {
+        first_index_arithmetic_error_in_index(id, types, seen_indices)
+    };
 
     match types.get(ty) {
         radix_types::Type::Array(inner)
@@ -1546,14 +1545,12 @@ fn first_index_arithmetic_error_in_type(
         radix_types::Type::BoundedArray { element, capacity }
         | radix_types::Type::BoundedQueue { element, capacity }
         | radix_types::Type::BoundedStack { element, capacity } => {
-            check_index(*capacity, seen_types, seen_indices)
+            check_index(*capacity, seen_indices)
                 .or_else(|| check_type(*element, seen_types, seen_indices))
         }
         radix_types::Type::BoundedTextus { capacity }
         | radix_types::Type::BoundedAscii { capacity }
-        | radix_types::Type::BoundedOcteti { capacity } => {
-            check_index(*capacity, seen_types, seen_indices)
-        }
+        | radix_types::Type::BoundedOcteti { capacity } => check_index(*capacity, seen_indices),
         radix_types::Type::Map(key, value) => check_type(*key, seen_types, seen_indices)
             .or_else(|| check_type(*value, seen_types, seen_indices)),
         radix_types::Type::Record(fields) => fields
@@ -1567,10 +1564,8 @@ fn first_index_arithmetic_error_in_type(
         radix_types::Type::Tensor(element, shape)
         | radix_types::Type::Vector(element, shape)
         | radix_types::Type::Matrix(element, shape)
-        | radix_types::Type::Sparsa(element, shape) => {
-            check_index(*shape, seen_types, seen_indices)
-                .or_else(|| check_type(*element, seen_types, seen_indices))
-        }
+        | radix_types::Type::Sparsa(element, shape) => check_index(*shape, seen_indices)
+            .or_else(|| check_type(*element, seen_types, seen_indices)),
         radix_types::Type::Func(signature) => signature
             .params
             .iter()
@@ -1585,9 +1580,7 @@ fn first_index_arithmetic_error_in_type(
             .or_else(|| {
                 args.iter().find_map(|arg| match arg {
                     radix_types::AppliedArg::Type(ty) => check_type(*ty, seen_types, seen_indices),
-                    radix_types::AppliedArg::Size(index) => {
-                        check_index(*index, seen_types, seen_indices)
-                    }
+                    radix_types::AppliedArg::Size(index) => check_index(*index, seen_indices),
                 })
             }),
         radix_types::Type::Union(members)
@@ -1602,7 +1595,6 @@ fn first_index_arithmetic_error_in_type(
 fn first_index_arithmetic_error_in_index(
     id: IndexId,
     types: &TypeTable,
-    seen_types: &mut FxHashSet<TypeId>,
     seen_indices: &mut FxHashSet<IndexId>,
 ) -> Option<radix_types::IndexArithmeticError> {
     if !seen_indices.insert(id) {
@@ -1610,230 +1602,23 @@ fn first_index_arithmetic_error_in_index(
     }
     let expression = types.get_index(id);
     match expression {
-        IndexExpr::Tuple(dims) => dims.iter().find_map(|dim| {
-            first_index_arithmetic_error_in_index(*dim, types, seen_types, seen_indices)
-        }),
+        IndexExpr::Tuple(dims) => dims
+            .iter()
+            .find_map(|dim| first_index_arithmetic_error_in_index(*dim, types, seen_indices)),
         IndexExpr::Affine { base, .. } => radix_types::evaluate_index_dimension(id, types)
             .err()
-            .or_else(|| {
-                first_index_arithmetic_error_in_index(*base, types, seen_types, seen_indices)
-            }),
+            .or_else(|| first_index_arithmetic_error_in_index(*base, types, seen_indices)),
         IndexExpr::Divide { numerator, .. } => radix_types::evaluate_index_dimension(id, types)
             .err()
-            .or_else(|| {
-                first_index_arithmetic_error_in_index(*numerator, types, seen_types, seen_indices)
-            }),
+            .or_else(|| first_index_arithmetic_error_in_index(*numerator, types, seen_indices)),
         _ => None,
     }
 }
 
 #[cfg(test)]
-mod size_default_unify_test {
-    use super::*;
-    use radix_lexer::{Interner, Span};
-    use radix_target::Target;
-
-    /// S00-4: a magnitudo default that cannot unify with the already-inferred
-    /// hole value must report a diagnostic, never return the default as if it
-    /// bound. `constrain_index_equal` stands in for any inference source that
-    /// substituted the hole before the default bind runs.
-    #[test]
-    fn size_default_conflicting_with_inferred_value_reports() {
-        let mut types = TypeTable::new();
-        let resolver = Resolver::new();
-        let interner = Interner::new();
-        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
-        let hole = checker.fresh_index_hole();
-        let inferred = checker.types.intern_index(IndexExpr::Literal(3));
-        checker.constrain_index_equal(hole, inferred, Span::default());
-        assert!(
-            checker.errors.is_empty(),
-            "setup must not emit diagnostics: {:?}",
-            checker.errors
-        );
-
-        let bound = checker.bind_size_param_default(hole, 4, Span::default());
-
-        assert!(
-            bound.is_none(),
-            "failed default bind must not yield a witness id"
-        );
-        assert!(
-            checker.errors.iter().any(|error| {
-                error.kind == SemanticErrorKind::TypeMismatch
-                    && error
-                        .args
-                        .iter()
-                        .any(|arg| arg.name == "issue" && arg.value == "incompatible_tensor_index")
-            }),
-            "expected incompatible_tensor_index diagnostic, got: {:?}",
-            checker.errors
-        );
-    }
-
-    #[test]
-    fn affine_substitution_cancels_before_natural_validation() {
-        let mut types = TypeTable::new();
-        let resolver = Resolver::new();
-        let mut interner = Interner::new();
-        let n = interner.intern("N");
-        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
-        let parameter = checker.types.intern_index(IndexExpr::Param(n));
-        let minus_one =
-            radix_types::compose_index_affine_constant(&mut checker.types, parameter, -1)
-                .expect("symbolic offset");
-        let canceled = radix_types::compose_index_affine_constant(&mut checker.types, minus_one, 1)
-            .expect("canceled affine offset");
-        let zero = checker.types.intern_index(IndexExpr::Literal(0));
-        let mut substitutions = FxHashMap::default();
-        substitutions.insert(n, zero);
-
-        let instantiated = checker.substitute_index_params(canceled, Some(&mut substitutions));
-        assert_eq!(
-            radix_types::evaluate_index_dimension(instantiated, &checker.types),
-            Ok(Some(0))
-        );
-    }
-
-    #[test]
-    fn exact_division_substitution_preserves_non_integral_failure() {
-        let mut types = TypeTable::new();
-        let resolver = Resolver::new();
-        let mut interner = Interner::new();
-        let d = interner.intern("D");
-        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
-        let parameter = checker.types.intern_index(IndexExpr::Param(d));
-        let divided = radix_types::divide_index_exact(&mut checker.types, parameter, 2)
-            .expect("symbolic exact division");
-        let five = checker.types.intern_index(IndexExpr::Literal(5));
-        let mut substitutions = FxHashMap::default();
-        substitutions.insert(d, five);
-
-        let instantiated = checker.substitute_index_params(divided, Some(&mut substitutions));
-        assert_eq!(
-            radix_types::evaluate_index_dimension(instantiated, &checker.types),
-            Err(radix_types::IndexArithmeticError::NonIntegral)
-        );
-        let f32_ty = checker
-            .types
-            .sized_numeric(Primitive::Fractus, NumericWidth::F32);
-        let tensor = checker.types.tensor_with_shape(f32_ty, instantiated);
-        assert_eq!(
-            checker.first_index_arithmetic_error_in_type(tensor),
-            Some(radix_types::IndexArithmeticError::NonIntegral)
-        );
-    }
-}
+#[path = "size_default_unify_test.rs"]
+mod size_default_unify_test;
 
 #[cfg(test)]
-mod size_lift_negative_test {
-    use super::*;
-    use radix_lexer::{Interner, Span};
-    use radix_target::Target;
-
-    fn magnitudo_params(names: &[radix_lexer::Symbol]) -> Vec<radix_types::GenericParamDescriptor> {
-        names
-            .iter()
-            .map(|name| radix_types::GenericParamDescriptor {
-                name: *name,
-                sort: radix_types::GenericParamSort::Magnitudo,
-                constraint: radix_types::TypeParamConstraint::Any,
-                default: None,
-            })
-            .collect()
-    }
-
-    #[test]
-    fn negative_constant_size_arg_is_a_compile_error_at_the_call() {
-        let mut types = TypeTable::new();
-        let resolver = Resolver::new();
-        let mut interner = Interner::new();
-        let h = interner.intern("h");
-        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
-        let zero = checker.types.intern_index(IndexExpr::Literal(0));
-        let witness = checker.types.intern_index(IndexExpr::Affine {
-            base: zero,
-            offset: -1,
-        });
-        checker.current_shape_call = Some(HirId(7));
-        let mut shape_vars = FxHashMap::default();
-        shape_vars.insert(h, witness);
-        let params = magnitudo_params(&[h]);
-
-        let runtime_symbols =
-            checker.capture_runtime_call_size_bindings(&params, &shape_vars, Span::default());
-        checker.reject_negative_constant_size_args(
-            &params,
-            &shape_vars,
-            &runtime_symbols,
-            Span::default(),
-        );
-
-        assert!(runtime_symbols.is_empty());
-        assert!(
-            checker
-                .shape_obligations
-                .call_size_bindings
-                .get(&HirId(7))
-                .is_none()
-        );
-        assert!(
-            checker
-                .errors
-                .iter()
-                .any(|error| { error.issue() == Some(ISSUE_SIZE_LIFT_NEGATIVE) })
-        );
-    }
-
-    #[test]
-    fn positive_constant_and_runtime_size_args_stay_clean() {
-        let mut types = TypeTable::new();
-        let resolver = Resolver::new();
-        let mut interner = Interner::new();
-        let h = interner.intern("h");
-        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
-        let positive = checker.types.intern_index(IndexExpr::Literal(3));
-        let scalar =
-            checker
-                .types
-                .intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarParameter {
-                    parameter: 2,
-                }));
-        let runtime_witness = radix_types::add_index_constant(&mut checker.types, scalar, -1)
-            .expect("runtime affine extent");
-        checker.current_shape_call = Some(HirId(7));
-        let params = magnitudo_params(&[h]);
-
-        let mut shape_vars = FxHashMap::default();
-        shape_vars.insert(h, positive);
-        let positive_symbols =
-            checker.capture_runtime_call_size_bindings(&params, &shape_vars, Span::default());
-        checker.reject_negative_constant_size_args(
-            &params,
-            &shape_vars,
-            &positive_symbols,
-            Span::default(),
-        );
-        assert!(positive_symbols.is_empty());
-        assert!(checker.errors.is_empty());
-
-        shape_vars.insert(h, runtime_witness);
-        let runtime_symbols =
-            checker.capture_runtime_call_size_bindings(&params, &shape_vars, Span::default());
-        checker.reject_negative_constant_size_args(
-            &params,
-            &shape_vars,
-            &runtime_symbols,
-            Span::default(),
-        );
-        assert!(runtime_symbols.contains(&h));
-        assert!(checker.errors.is_empty());
-        let binding = checker
-            .shape_obligations
-            .call_size_bindings
-            .get(&HirId(7))
-            .and_then(|rows| rows.first())
-            .expect("runtime witness keeps the sidecar binding");
-        assert_eq!(binding.witness, runtime_witness);
-    }
-}
+#[path = "size_lift_negative_test.rs"]
+mod size_lift_negative_test;

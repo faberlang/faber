@@ -158,7 +158,7 @@ fn assert_rejected_goto_policy(result: radix_types::Lowerability, message: &str)
 
 fn classify_source(source: &str) -> radix_types::Lowerability {
     let session = Session::new(Config::default());
-    let mut analysis =
+    let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
     let lowered =
@@ -2349,7 +2349,7 @@ functio k(f32 x) → f32 {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis =
+    let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
     let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())

@@ -326,16 +326,16 @@ fn analyze_kernel(
                 .insert(param.def_id, AbstractRange::from_type(param.ty, types));
         }
     }
-    if let Some(ret_ty) = function.ret_ty {
-        if !is_integer_value_type(Some(ret_ty), types) {
-            base.record_type(
-                ret_ty,
-                function
-                    .body
-                    .as_ref()
-                    .map_or(Span::default(), |body| body.span),
-            );
-        }
+    if let Some(ret_ty) = function.ret_ty
+        && !is_integer_value_type(Some(ret_ty), types)
+    {
+        base.record_type(
+            ret_ty,
+            function
+                .body
+                .as_ref()
+                .map_or(Span::default(), |body| body.span),
+        );
     }
     if let Some(body) = &function.body {
         base.visit_block_stateful(body);
@@ -930,8 +930,7 @@ impl BodyFacts<'_> {
         }
         match &expr.kind {
             HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => {
-                let range = i128::try_from(*value)
-                    .map_or_else(|_| AbstractRange::unknown(), AbstractRange::exact);
+                let range = AbstractRange::exact(i128::from(*value));
                 self.check_intermediate(expr.span, range.clone());
                 range
             }
@@ -2364,23 +2363,17 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
                 maximum: KernelRangeExpr::Constant(mask),
             }
         }
-        HirBinOp::BitOr | HirBinOp::BitXor => {
-            if lhs == rhs {
-                lhs
-            } else {
-                return AbstractRange::unknown();
-            }
-        }
+        HirBinOp::BitOr | HirBinOp::BitXor if lhs == rhs => lhs,
         _ => return AbstractRange::unknown(),
     };
     AbstractRange(Some(result))
 }
 
 fn add(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
-    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
-        if let Some(value) = lhs.checked_add(rhs) {
-            return KernelRangeExpr::Constant(value);
-        }
+    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs))
+        && let Some(value) = lhs.checked_add(rhs)
+    {
+        return KernelRangeExpr::Constant(value);
     }
     match (lhs, rhs) {
         (value, KernelRangeExpr::Constant(0)) | (KernelRangeExpr::Constant(0), value) => value,
@@ -2389,10 +2382,10 @@ fn add(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
 }
 
 fn subtract(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
-    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
-        if let Some(value) = lhs.checked_sub(rhs) {
-            return KernelRangeExpr::Constant(value);
-        }
+    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs))
+        && let Some(value) = lhs.checked_sub(rhs)
+    {
+        return KernelRangeExpr::Constant(value);
     }
     match (lhs, rhs) {
         (value, KernelRangeExpr::Constant(0)) => value,
@@ -2408,10 +2401,10 @@ fn negate(value: KernelRangeExpr) -> KernelRangeExpr {
 }
 
 fn multiply(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
-    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
-        if let Some(value) = lhs.checked_mul(rhs) {
-            return KernelRangeExpr::Constant(value);
-        }
+    if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs))
+        && let Some(value) = lhs.checked_mul(rhs)
+    {
+        return KernelRangeExpr::Constant(value);
     }
     match (&lhs, &rhs) {
         (_, KernelRangeExpr::Constant(0)) | (KernelRangeExpr::Constant(0), _) => {

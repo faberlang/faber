@@ -103,10 +103,6 @@ const E2: u32 = 5;
 const OUT: u32 = 6; // a launch's device-resident output
 const READ: u32 = 7; // the host read of OUT
 
-struct Prog {
-    types: TypeTable,
-}
-
 fn span() -> Span {
     Span::default()
 }

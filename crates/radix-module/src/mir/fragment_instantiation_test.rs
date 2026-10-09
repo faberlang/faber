@@ -775,7 +775,7 @@ functio outer(f32 x) → f32 {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis =
+    let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let lowered =
@@ -807,7 +807,7 @@ functio k(f32 x) → f32 {
 }
 ";
     let session = Session::new(Config::default());
-    let mut analysis =
+    let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
@@ -997,13 +997,14 @@ fn lower_source(source: &str) -> Result<(), Vec<crate::mir::MirError>> {
     let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .expect("load English locale pack");
     let session = Session::new(Config::default().with_resolved_locale_pack(pack));
-    let mut analysis = driver::analyze_source(&session, "projected.fab", source, AnalyzeRequest::default())
-        .unwrap_or_else(|diagnostics| {
+    let analysis = driver::analyze_source(&session, "projected.fab", source, AnalyzeRequest::default()).unwrap_or_else(
+        |diagnostics| {
             panic!(
                 "analyze source: {:?}",
                 diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
             )
-        });
+        },
+    );
     crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).map(|_| ())
 }
 
