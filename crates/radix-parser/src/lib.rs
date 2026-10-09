@@ -724,14 +724,19 @@ impl Parser {
     }
 
     /// Save parser position for bounded lookahead rollback.
-    fn checkpoint(&self) -> (usize, NodeId) {
-        (self.pos, self.next_node_id)
+    fn checkpoint(&self) -> (usize, NodeId, usize) {
+        (self.pos, self.next_node_id, self.errors.len())
     }
 
     /// Restore parser position after failed lookahead.
-    fn restore(&mut self, checkpoint: (usize, NodeId)) {
+    ///
+    /// WHY: diagnostics pushed while speculating (a type word read by a type
+    /// lookahead that did not commit, such as `ratio` in expression position)
+    /// belong to a parse that was abandoned, so they roll back with it.
+    fn restore(&mut self, checkpoint: (usize, NodeId, usize)) {
         self.pos = checkpoint.0;
         self.next_node_id = checkpoint.1;
+        self.errors.truncate(checkpoint.2);
         self.conditionals.retain(|&(id, _)| id < checkpoint.1);
         // pos may have moved backward; re-sync the non-trivia cursor.
         self.sync_non_trivia_cursor();
@@ -1163,27 +1168,7 @@ impl Parser {
         if radix_types::numeric_width::is_numeric_width_type_sugar(source) {
             return true;
         }
-        matches!(
-            source,
-            "numerus"
-                | "textus"
-                | "bivalens"
-                | "fractus"
-                | "instans"
-                | "json"
-                | "valor"
-                | "lista"
-                | "tabula"
-                | "regex"
-                | "octeti"
-                | "ascii"
-                | "littera"
-                | "vacuum"
-                | "tensor"
-                | "sparsa"
-                | "vector"
-                | "matrix"
-        )
+        self.is_latin_type_word(source)
     }
 
     /// Consume an identifier with exact source text.

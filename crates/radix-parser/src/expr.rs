@@ -2637,7 +2637,7 @@ impl Parser {
         }
 
         let saved_pos = self.pos;
-        let saved_next_id = self.next_node_id;
+        let saved = self.checkpoint();
         match self.parse_compact_clausura_expr() {
             Ok(expr) => Ok(Some(expr)),
             Err(err)
@@ -2653,7 +2653,7 @@ impl Parser {
                 Err(err)
             }
             Err(_) => {
-                self.restore((saved_pos, saved_next_id));
+                self.restore(saved);
                 Ok(None)
             }
         }

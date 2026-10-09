@@ -28,6 +28,8 @@ impl KeywordPack for EnLikePack {
             "match" => Some("discerne"),
             "case" => Some("casu"),
             "return" => Some("redde"),
+            "var" => Some("varia"),
+            "print" => Some("nota"),
             _ => None,
         }
     }
@@ -190,4 +192,39 @@ fn la_file_accepts_latin_null_type_in_union_est_and_casu_forms() {
     assert_latin_accepts("functio f(numerus ∪ nihil v) { }");
     assert_latin_accepts("functio f(numerus ∪ nihil v) { redde v est nihil }");
     assert_latin_accepts("functio f(numerus ∪ nihil v) { discerne v { casu nihil { } } }");
+}
+
+#[test]
+fn en_file_keeps_latin_type_words_as_expression_names() {
+    for word in ["ratio", "valor", "lista", "numerus"] {
+        let source = format!(
+            "var int {word} ← 1\nprint {word}\n{word} ← 2\nconst int y = {word} + 1\nf({word})\nprint {word}\n\n{word} ← 3\nprint {word}"
+        );
+        let result = parse_en(&source);
+        assert!(
+            wrong_locale_types(&result).is_empty(),
+            "en file `{source}` must read `{word}` as a name: {:?}",
+            result.errors
+        );
+    }
+}
+
+#[test]
+fn en_file_still_rejects_the_same_words_in_a_type_slot() {
+    for word in ["valor", "lista", "numerus"] {
+        let source = format!("var int {word} ← 1\nprint {word}\n{word} ← 2\nconst {word} y = 1");
+        let result = parse_en(&source);
+        assert_eq!(
+            wrong_locale_types(&result),
+            vec![word.to_owned()],
+            "en file `{source}` must reject `{word}` in a type slot: {:?}",
+            result.errors
+        );
+    }
+}
+
+#[test]
+fn en_file_rejects_latin_type_pattern_and_la_file_accepts_it() {
+    assert_sealed("fn f(int v) { match v { case numerus { } } }", "numerus");
+    assert_latin_accepts("functio f(numerus v) { discerne v { casu numerus { } } }");
 }
