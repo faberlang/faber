@@ -159,7 +159,7 @@ test "module const list membership" {
     let output = run_const_member_package_tests(&src);
     assert_eq!(
         output,
-        vec!["verum".to_owned(), "falsum".to_owned()],
+        vec!["true".to_owned(), "false".to_owned()],
         "same-unit module list const must answer ∈ from the proba lane"
     );
 }
@@ -209,7 +209,7 @@ test "sibling fn reads module const" {
     let output = run_const_member_package_tests(&src);
     assert_eq!(
         output,
-        vec!["verum".to_owned(), "falsum".to_owned()],
+        vec!["true".to_owned(), "false".to_owned()],
         "sibling function bodies must read linked module consts through the transplant seam"
     );
 }
@@ -348,7 +348,7 @@ test "library fn reads module consts" {
     .expect("write main.proba");
     assert_eq!(
         run_const_member_package_tests(&src),
-        vec!["2.0.0", "42", "verum", "falsum"],
+        vec!["2.0.0", "42", "true", "false"],
         "library function bodies must receive linked const value bindings"
     );
 }

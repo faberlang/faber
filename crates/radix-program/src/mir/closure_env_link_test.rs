@@ -207,10 +207,10 @@ fn run_closure_env_package_tests(package_root: &Path, stdlib_home: &Path) -> Vec
     })
 }
 
-fn assert_verum(output: &[String], context: &str) {
+fn assert_true(output: &[String], context: &str) {
     assert_eq!(
         output,
-        &["verum".to_owned()],
+        &["true".to_owned()],
         "{context} must run the linked sibling closure"
     );
 }
@@ -259,7 +259,7 @@ test "sibling closure captures param" {
     );
     let package_root = src.parent().unwrap().to_path_buf();
     let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
-    assert_verum(&output, "sibling param capture");
+    assert_true(&output, "sibling param capture");
 }
 
 /// Face 1 through a sibling LOCAL capture (same shift seam, distinct capture
@@ -306,7 +306,7 @@ test "sibling closure captures local" {
     );
     let package_root = src.parent().unwrap().to_path_buf();
     let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
-    assert_verum(&output, "sibling local capture");
+    assert_true(&output, "sibling local capture");
 }
 
 const G_CONST_CAPTURE: &str = r#"+++
@@ -357,7 +357,7 @@ test "sibling closure captures module const" {
     );
     let package_root = src.parent().unwrap().to_path_buf();
     let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
-    assert_verum(&output, "sibling module-const capture");
+    assert_true(&output, "sibling module-const capture");
 }
 
 /// Face 1 only: the sibling closure reads a THIRD unit's exported const
@@ -419,7 +419,7 @@ test "sibling closure captures cross-unit const" {
     );
     let package_root = src.parent().unwrap().to_path_buf();
     let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
-    assert_verum(&output, "sibling cross-unit const capture");
+    assert_true(&output, "sibling cross-unit const capture");
 }
 
 /// Control (green before the fix): the same capture-closure lowered inside the
@@ -453,7 +453,7 @@ test "entry closure captures param" {
     );
     let package_root = src.parent().unwrap().to_path_buf();
     let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
-    assert_verum(&output, "entry-unit capture control");
+    assert_true(&output, "entry-unit capture control");
 }
 
 /// Control (green before the fix): a sibling closure with NO captures builds
@@ -496,7 +496,7 @@ test "sibling closure captures nothing" {
     );
     let package_root = src.parent().unwrap().to_path_buf();
     let output = run_closure_env_package_tests(&package_root, package_root.parent().unwrap());
-    assert_verum(&output, "sibling no-capture control");
+    assert_true(&output, "sibling no-capture control");
 }
 
 /// Library route (both faces): the capture-closure lives in a lock-pinned path
@@ -524,5 +524,5 @@ test "library closure captures const" {
 "#,
     );
     let output = run_closure_env_package_tests(&dir.join("pkg"), &dir.join("libhome"));
-    assert_verum(&output, "library module-const capture");
+    assert_true(&output, "library module-const capture");
 }

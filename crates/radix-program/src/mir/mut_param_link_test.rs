@@ -96,5 +96,5 @@ fn imported_generic_mut_parameter_links_and_writes_through() {
 #[test]
 fn trap_around_in_range_literal_tensor_read_has_no_error_member() {
     let lines = run_stdout("mut-param-trap-read", None, TRAP_MAIN);
-    assert_eq!(lines, vec!["2.0".to_owned(), "verum".to_owned()]);
+    assert_eq!(lines, vec!["2.0".to_owned(), "true".to_owned()]);
 }
