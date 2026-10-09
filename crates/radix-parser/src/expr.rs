@@ -292,7 +292,7 @@ impl Parser {
         first_inner_id: NodeId,
     ) -> Result<Expr, ParseError> {
         let then = Box::new(self.parse_expression()?);
-        self.expect(&TokenKind::Ballot, "expected '✗' in conditional")?;
+        self.expect_token(&TokenKind::Ballot, "expected '✗' in conditional")?;
         let else_span = self.current_span();
         let else_ = Box::new(self.nested(
             ParseErrorKind::ExpressionInvalid,
@@ -1195,7 +1195,7 @@ impl Parser {
             ExprKind::Literal(Literal::String(_) | Literal::Forma(_))
         );
         let args = self.parse_argument_list(allows_template_labels)?;
-        self.expect(&TokenKind::RParen, "expected ')'")?;
+        self.expect_token(&TokenKind::RParen, "expected ')'")?;
         Ok(self.postfix_expr(
             start,
             ExprKind::Call(CallExpr {
@@ -1221,7 +1221,7 @@ impl Parser {
     fn parse_index_postfix(&mut self, start: Span, object: Expr) -> Result<Expr, ParseError> {
         self.advance();
         let index = Box::new(self.parse_expression()?);
-        self.expect(&TokenKind::RBracket, "expected ']'")?;
+        self.expect_token(&TokenKind::RBracket, "expected ']'")?;
         Ok(self.postfix_expr(
             start,
             ExprKind::Index(IndexExpr {
@@ -1287,7 +1287,7 @@ impl Parser {
                     break;
                 }
             }
-            self.expect(
+            self.expect_token(
                 &TokenKind::RBracket,
                 "expected ']' after gradient selectors",
             )?;
@@ -1318,12 +1318,12 @@ impl Parser {
                     PostfixPayload::Member => OptionalChainKind::Member(self.parse_member_ident()?),
                     PostfixPayload::Index => {
                         let index = Box::new(self.parse_expression()?);
-                        self.expect(&TokenKind::RBracket, "expected ']'")?;
+                        self.expect_token(&TokenKind::RBracket, "expected ']'")?;
                         OptionalChainKind::Index(index)
                     }
                     PostfixPayload::Call => {
                         let args = self.parse_argument_list(false)?;
-                        self.expect(&TokenKind::RParen, "expected ')'")?;
+                        self.expect_token(&TokenKind::RParen, "expected ')'")?;
                         OptionalChainKind::Call(args)
                     }
                 };
@@ -1340,12 +1340,12 @@ impl Parser {
                     PostfixPayload::Member => NonNullKind::Member(self.parse_member_ident()?),
                     PostfixPayload::Index => {
                         let index = Box::new(self.parse_expression()?);
-                        self.expect(&TokenKind::RBracket, "expected ']'")?;
+                        self.expect_token(&TokenKind::RBracket, "expected ']'")?;
                         NonNullKind::Index(index)
                     }
                     PostfixPayload::Call => {
                         let args = self.parse_argument_list(false)?;
-                        self.expect(&TokenKind::RParen, "expected ')'")?;
+                        self.expect_token(&TokenKind::RParen, "expected ')'")?;
                         NonNullKind::Call(args)
                     }
                 };
@@ -1840,25 +1840,25 @@ impl Parser {
             .with_arg("operators", operators)
     }
 
-    /// Return whether a former reduction head occurs in its old expression shape.
+    /// Return the head word when a former reduction occurs in its old expression shape.
     ///
     /// The words remain ordinary identifiers everywhere else. Only the old
     /// head-plus-source-keyword pair is claimed, so the diagnostic can point
     /// directly to the migration site without reserving the operator word.
-    fn is_retired_reduction_expr_head(&self) -> bool {
-        matches!(
-            self.peek().kind,
-            TokenKind::Ident(sym)
-                if matches!(self.keyword_claim_key(sym), Some("summa" | "maxima" | "minima"))
-        ) && self.keyword_ident_at(1) == Some(TokenKind::Ex)
+    fn retired_reduction_expr_head(&self) -> Option<Symbol> {
+        let TokenKind::Ident(sym) = self.peek().kind else {
+            return None;
+        };
+        (matches!(
+            self.keyword_claim_key(sym),
+            Some("summa" | "maxima" | "minima")
+        ) && self.keyword_ident_at(1) == Some(TokenKind::Ex))
+        .then_some(sym)
     }
 
     /// Consume a former reduction expression and report its named migration issue.
-    fn parse_retired_reduction_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_retired_reduction_expr(&mut self, sym: Symbol) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        let TokenKind::Ident(sym) = self.peek().kind else {
-            unreachable!("retired reduction head was checked before dispatch");
-        };
         let head = self.interner.resolve(sym).to_owned();
         self.advance();
         self.expect_keyword_ident(TokenKind::Ex, "expected reduction source")?;
@@ -1915,7 +1915,7 @@ impl Parser {
     fn parse_first_match_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         self.eat_identifier_text("primus_quem");
-        self.expect(&TokenKind::LParen, "expected '(' after 'primus_quem'")?;
+        self.expect_token(&TokenKind::LParen, "expected '(' after 'primus_quem'")?;
 
         let source = Box::new(self.parse_expression()?);
         let apud = if self.eat_keyword_ident(TokenKind::Apud) {
@@ -1923,7 +1923,7 @@ impl Parser {
         } else {
             Vec::new()
         };
-        self.expect(
+        self.expect_token(
             &TokenKind::Comma,
             "expected ',' after the first-match source",
         )?;
@@ -1932,7 +1932,7 @@ impl Parser {
         }
         let binding = self.parse_ident()?;
         let body = self.parse_block()?;
-        self.expect(
+        self.expect_token(
             &TokenKind::RParen,
             "expected ')' after the first-match predicate",
         )?;
@@ -1972,8 +1972,8 @@ impl Parser {
         {
             return self.parse_reducta_expr();
         }
-        if self.is_retired_reduction_expr_head() {
-            return self.parse_retired_reduction_expr();
+        if let Some(head) = self.retired_reduction_expr_head() {
+            return self.parse_retired_reduction_expr(head);
         }
         if self.is_first_match_expr_head() {
             return self.parse_first_match_expr();
@@ -2183,7 +2183,7 @@ impl Parser {
                     let type_span = ident.span;
                     self.advance();
                     let mut fields = self.parse_object_fields()?;
-                    self.expect(&TokenKind::RBrace, "expected '}'")?;
+                    self.expect_token(&TokenKind::RBrace, "expected '}'")?;
                     self.parse_construction_source(&mut fields)?;
                     let object = Expr {
                         id: self.next_id(),
@@ -2210,7 +2210,7 @@ impl Parser {
             TokenKind::LBracket => {
                 self.advance();
                 let elements = self.parse_array_elements()?;
-                self.expect(&TokenKind::RBracket, "expected ']'")?;
+                self.expect_token(&TokenKind::RBracket, "expected ']'")?;
                 ExprKind::Array(ArrayExpr { elements })
             }
 
@@ -2225,7 +2225,7 @@ impl Parser {
             TokenKind::LParen => {
                 self.advance();
                 let inner = self.parse_expression()?;
-                self.expect(&TokenKind::RParen, "expected ')'")?;
+                self.expect_token(&TokenKind::RParen, "expected ')'")?;
                 ExprKind::Paren(Box::new(inner))
             }
 
@@ -2270,7 +2270,7 @@ impl Parser {
     /// the constructed type matches the annotation path under any reader pack.
     fn parse_ratio_constructor(&mut self, name: Ident) -> Result<ExprKind, ParseError> {
         let name = self.canonical_type_ident(name);
-        self.expect(&TokenKind::LtAscii, "expected '<' after 'ratio'")?;
+        self.expect_token(&TokenKind::LtAscii, "expected '<' after 'ratio'")?;
 
         let mut type_args = Vec::new();
         let mut labels = HashSet::new();
@@ -2282,15 +2282,15 @@ impl Parser {
                 break;
             }
         }
-        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        self.expect_token(&TokenKind::GtAscii, "expected '>'")?;
         let type_span = name.span.merge(self.previous_span());
 
-        self.expect(
+        self.expect_token(
             &TokenKind::LBrace,
             "expected '{' after ratio type arguments",
         )?;
         let mut fields = self.parse_object_fields()?;
-        self.expect(&TokenKind::RBrace, "expected '}' after ratio fields")?;
+        self.expect_token(&TokenKind::RBrace, "expected '}' after ratio fields")?;
         self.parse_construction_source(&mut fields)?;
 
         let object = Expr {
@@ -2363,7 +2363,7 @@ impl Parser {
         }
         self.advance();
         let mut fields = self.parse_object_fields()?;
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_token(&TokenKind::RBrace, "expected '}'")?;
         self.parse_construction_source(&mut fields)?;
         let object = Expr {
             id: self.next_id(),
@@ -2424,7 +2424,7 @@ impl Parser {
                     break;
                 }
             }
-            self.expect(&TokenKind::RBrace, "expected '}'")?;
+            self.expect_token(&TokenKind::RBrace, "expected '}'")?;
             fields
         } else {
             Vec::new()
@@ -2457,10 +2457,10 @@ impl Parser {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Iuncta, "expected 'iuncta'")?;
 
-        self.expect(&TokenKind::LtAscii, "expected '<' after 'iuncta'")?;
+        self.expect_token(&TokenKind::LtAscii, "expected '<' after 'iuncta'")?;
         let type_args = self.finish_iuncta_type_args_list()?;
 
-        self.expect(
+        self.expect_token(
             &TokenKind::LBracket,
             "expected '[' after iuncta type arguments",
         )?;
@@ -2471,7 +2471,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect(&TokenKind::RBracket, "expected ']' after iuncta elements")?;
+        self.expect_token(&TokenKind::RBracket, "expected ']' after iuncta elements")?;
 
         let span = start.merge(self.previous_span());
         let id = self.next_id();
@@ -2628,7 +2628,7 @@ impl Parser {
         let start = self.current_span();
         let params = if self.eat(&TokenKind::LParen) {
             let params = self.parse_clausura_param_list_until(&TokenKind::RParen)?;
-            self.expect(&TokenKind::RParen, "expected ')' after closure parameters")?;
+            self.expect_token(&TokenKind::RParen, "expected ')' after closure parameters")?;
             params
         } else {
             vec![self.parse_clausura_param()?]
@@ -2641,7 +2641,7 @@ impl Parser {
                 self.current_span(),
             ));
         }
-        self.expect(
+        self.expect_token(
             &TokenKind::Therefore,
             "expected '∴' after closure signature",
         )?;
@@ -2710,7 +2710,7 @@ impl Parser {
 
         let opener = if self.eat(&TokenKind::LParen) {
             let expr = self.parse_expression()?;
-            self.expect(&TokenKind::RParen, "expected ')' after ad opener")?;
+            self.expect_token(&TokenKind::RParen, "expected ')' after ad opener")?;
             Some(Box::new(expr))
         } else {
             None
@@ -2777,7 +2777,7 @@ impl Parser {
 
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
             let start = self.current_span();
-            let (label, label_span) = if self.argument_label_start() {
+            let labeled = if self.argument_label_start() {
                 let label = self.parse_contextual_ident(KeywordOwner::DeclarationName)?;
                 let label_span = label.span;
                 if !allows_template_labels {
@@ -2785,20 +2785,19 @@ impl Parser {
                         .with_arg("issue", "labeled_actual_non_template_call")
                         .with_arg("label", self.interner.resolve(label.name).to_owned()));
                 }
-                self.expect(&TokenKind::Colon, "expected ':' after argument label")?;
-                (Some(label.name), Some(label_span))
+                self.expect_token(&TokenKind::Colon, "expected ':' after argument label")?;
+                Some((label.name, label_span))
             } else {
-                (None, None)
+                None
             };
 
             let marker = self.parse_argument_marker();
             let spread = self.eat_keyword_ident(TokenKind::Sparge);
-            if label.is_some() && spread {
-                return Err(ParseError::structured(
-                    ParseErrorKind::Expected,
-                    label_span.expect("labeled argument span"),
-                )
-                .with_arg("issue", "labeled_actual_spread_unsupported"));
+            if let Some((_, label_span)) = labeled
+                && spread
+            {
+                return Err(ParseError::structured(ParseErrorKind::Expected, label_span)
+                    .with_arg("issue", "labeled_actual_spread_unsupported"));
             }
 
             if self.argument_bind_start() {
@@ -2815,21 +2814,18 @@ impl Parser {
                     .with_arg("binding_operator", "="));
             }
 
-            if let Some(label) = label
+            if let Some((label, label_span)) = labeled
                 && !labels.insert(label)
             {
-                return Err(ParseError::structured(
-                    ParseErrorKind::Expected,
-                    label_span.expect("labeled argument span"),
-                )
-                .with_arg("issue", "duplicate_tuple_element_label")
-                .with_arg("label", self.interner.resolve(label).to_owned()));
+                return Err(ParseError::structured(ParseErrorKind::Expected, label_span)
+                    .with_arg("issue", "duplicate_tuple_element_label")
+                    .with_arg("label", self.interner.resolve(label).to_owned()));
             }
 
             let value = Box::new(self.parse_expression()?);
             let span = start.merge(self.previous_span());
             args.push(Argument {
-                label,
+                label: labeled.map(|(name, _)| name),
                 is_spread: spread,
                 marker,
                 value,
@@ -2979,7 +2975,7 @@ impl Parser {
             } else if self.check(&TokenKind::LBracket) {
                 self.advance();
                 let key_expr = Box::new(self.parse_expression()?);
-                self.expect(&TokenKind::RBracket, "expected ']'")?;
+                self.expect_token(&TokenKind::RBracket, "expected ']'")?;
                 self.expect_field_value_separator()?;
                 let value = Some(Box::new(self.parse_expression()?));
                 let span = start.merge(self.previous_span());
@@ -3033,7 +3029,7 @@ impl Parser {
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let key_span = self.current_span();
             let key = self.parse_json_key()?;
-            self.expect(&TokenKind::Colon, "expected ':' after JSON key")?;
+            self.expect_token(&TokenKind::Colon, "expected ':' after JSON key")?;
             let value = self.parse_json_value()?;
             members.push(JsonMember {
                 key_span,
@@ -3044,7 +3040,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect(&TokenKind::RBrace, "expected '}' after JSON object")?;
+        self.expect_token(&TokenKind::RBrace, "expected '}' after JSON object")?;
         Ok(members)
     }
 
@@ -3148,7 +3144,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect(&TokenKind::RBracket, "expected ']' after JSON array")?;
+        self.expect_token(&TokenKind::RBracket, "expected ']' after JSON array")?;
         Ok(JsonValue::Array(elements))
     }
 
@@ -3221,7 +3217,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        self.expect_token(&TokenKind::GtAscii, "expected '>'")?;
         Ok(args)
     }
 
@@ -3231,7 +3227,7 @@ impl Parser {
     /// Mirrors the generic-head production in type position: natural literals
     /// and shape tuples are size expressions, other arguments are types.
     fn parse_constructor_type_args(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
-        self.expect(&TokenKind::LtAscii, "expected '<'")?;
+        self.expect_token(&TokenKind::LtAscii, "expected '<'")?;
         let mut args = Vec::new();
         loop {
             args.push(self.parse_type_argument()?);
@@ -3239,7 +3235,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        self.expect_token(&TokenKind::GtAscii, "expected '>'")?;
         Ok(args)
     }
 
@@ -3266,7 +3262,7 @@ impl Parser {
             return Err(self.expected_expression_error("scriptum"));
         };
         self.expect_keyword_ident(TokenKind::Scriptum, "expected 'scriptum'")?;
-        self.expect(&TokenKind::LParen, "expected '(' after 'scriptum'")?;
+        self.expect_token(&TokenKind::LParen, "expected '(' after 'scriptum'")?;
 
         let template = self.parse_string()?;
 
@@ -3295,7 +3291,7 @@ impl Parser {
             args.push(self.parse_expression()?);
         }
 
-        self.expect(&TokenKind::RParen, "expected ')'")?;
+        self.expect_token(&TokenKind::RParen, "expected ')'")?;
 
         let span = start.merge(self.previous_span());
         let id = self.next_id();

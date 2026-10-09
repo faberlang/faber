@@ -257,13 +257,13 @@ impl Parser {
 
     /// Parse the bracketed coordinate names claimed by an `apud` clause.
     pub(super) fn parse_apud_clause(&mut self) -> Result<Vec<Ident>, ParseError> {
-        self.expect(&TokenKind::LBracket, "expected '[' after 'apud'")?;
+        self.expect_token(&TokenKind::LBracket, "expected '[' after 'apud'")?;
 
         let mut coordinates = vec![self.parse_ident()?];
         while self.eat(&TokenKind::Comma) {
             coordinates.push(self.parse_ident()?);
         }
-        self.expect(
+        self.expect_token(
             &TokenKind::RBracket,
             "expected ']' after `apud` coordinates",
         )?;
@@ -287,7 +287,7 @@ impl Parser {
 
         let expr = Box::new(self.parse_expression()?);
 
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_token(&TokenKind::LBrace, "expected '{'")?;
 
         let mut cases = Vec::new();
         let mut default = None;
@@ -310,7 +310,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_token(&TokenKind::RBrace, "expected '}'")?;
 
         let catch = self.try_parse_cape_stmt()?;
 
@@ -342,7 +342,7 @@ impl Parser {
         let exhaustive = self.eat_discerne_exhaustive_marker();
         let subjects = self.parse_discerne_subjects()?;
 
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_token(&TokenKind::LBrace, "expected '{'")?;
 
         let mut arms = Vec::new();
         let mut default = None;
@@ -369,7 +369,7 @@ impl Parser {
             }
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_token(&TokenKind::RBrace, "expected '}'")?;
 
         Ok(StmtKind::Discerne(DiscerneStmt {
             exhaustive,
@@ -505,7 +505,7 @@ impl Parser {
     ///   custodi-stmt := `custodi` '{' (`si` expr if-body)+ '}'
     pub(super) fn parse_custodi_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Custodi, "expected 'custodi'")?;
-        self.expect(&TokenKind::LBrace, "expected '{'")?;
+        self.expect_token(&TokenKind::LBrace, "expected '{'")?;
 
         let mut clauses = Vec::new();
 
@@ -518,7 +518,7 @@ impl Parser {
             clauses.push(CustodiClause { cond, body, span });
         }
 
-        self.expect(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_token(&TokenKind::RBrace, "expected '}'")?;
 
         Ok(StmtKind::Custodi(CustodiStmt { clauses }))
     }

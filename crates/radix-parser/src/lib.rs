@@ -1271,7 +1271,7 @@ impl Parser {
     }
 
     // Unmigrated declaration, statement, and expression contracts still use prose.
-    fn expect(&mut self, kind: &TokenKind, msg: &str) -> Result<&Token, ParseError> {
+    fn expect_token(&mut self, kind: &TokenKind, msg: &str) -> Result<&Token, ParseError> {
         if self.check(kind) {
             Ok(self.advance())
         } else {
