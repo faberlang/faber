@@ -1519,7 +1519,7 @@ main args args {
         ok,
         "CLI flag option package interpretation failed:\n{stderr}"
     );
-    assert_eq!(stdout, "verum\n");
+    assert_eq!(stdout, "true\n");
     assert!(
         !stderr.contains("Compiling") && !stderr.contains("cargo"),
         "CLI package interpretation must not invoke Cargo:\n{stderr}"
@@ -1621,7 +1621,7 @@ main args args {
         ok,
         "CLI global flag option package interpretation failed:\n{stderr}"
     );
-    assert_eq!(stdout, "verum\n");
+    assert_eq!(stdout, "true\n");
     assert!(
         !stderr.contains("Compiling") && !stderr.contains("cargo"),
         "CLI global option package interpretation must not invoke Cargo:\n{stderr}"
@@ -1739,7 +1739,7 @@ fn run() args args {
         ok,
         "mounted CLI global option package interpretation failed:\n{stderr}"
     );
-    assert_eq!(stdout, "verum\n");
+    assert_eq!(stdout, "true\n");
     assert!(
         !stderr.contains("Compiling") && !stderr.contains("cargo"),
         "mounted CLI global option interpretation must not invoke Cargo:\n{stderr}"

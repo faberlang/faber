@@ -2409,7 +2409,7 @@ main args args {
     );
     assert_eq!(
         host.stdout_lines,
-        vec!["verum".to_owned(), "falsum".to_owned()]
+        vec!["true".to_owned(), "false".to_owned()]
     );
 }
 
@@ -2564,7 +2564,7 @@ main args args {
     );
     assert_eq!(
         host.stdout_lines,
-        vec!["0".to_owned(), "verum".to_owned(), "verum".to_owned()]
+        vec!["0".to_owned(), "true".to_owned(), "true".to_owned()]
     );
     assert!(!fixture_root.join("nested").exists());
 }
@@ -2670,7 +2670,7 @@ main args args {
     );
     assert_eq!(
         host.stdout_lines,
-        vec!["verum".to_owned(), source.to_string_lossy().into_owned(),]
+        vec!["true".to_owned(), source.to_string_lossy().into_owned(),]
     );
     assert!(!fixture_root.join("nested").exists());
 }
@@ -2945,10 +2945,10 @@ main args args {
     .expect("write entry");
 
     for (argumenta, expected) in [
-        (vec!["--verbose".to_owned()], "verum"),
-        (vec!["--verbose=false".to_owned()], "verum"),
-        (vec!["-v".to_owned()], "verum"),
-        (Vec::new(), "falsum"),
+        (vec!["--verbose".to_owned()], "true"),
+        (vec!["--verbose=false".to_owned()], "true"),
+        (vec!["-v".to_owned()], "true"),
+        (Vec::new(), "false"),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
         let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
@@ -3098,8 +3098,8 @@ main args args {
     .expect("write entry");
 
     for (argumenta, expected) in [
-        (Vec::new(), "falsum"),
-        (vec!["--verbose".to_owned()], "verum"),
+        (Vec::new(), "false"),
+        (vec!["--verbose".to_owned()], "true"),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
         let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
@@ -3566,14 +3566,14 @@ fn run() args args {
     .expect("write jobs");
 
     for (argumenta, expected) in [
-        (vec!["jobs".to_owned(), "run".to_owned()], "falsum"),
+        (vec!["jobs".to_owned(), "run".to_owned()], "false"),
         (
             vec!["jobs".to_owned(), "run".to_owned(), "--verbose".to_owned()],
-            "verum",
+            "true",
         ),
         (
             vec!["jobs".to_owned(), "run".to_owned(), "-v".to_owned()],
-            "verum",
+            "true",
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
@@ -3729,10 +3729,10 @@ fn run() args args {
     .expect("write jobs");
 
     for (argumenta, expected) in [
-        (vec!["jobs".to_owned(), "run".to_owned()], "falsum"),
+        (vec!["jobs".to_owned(), "run".to_owned()], "false"),
         (
             vec!["--verbose".to_owned(), "jobs".to_owned(), "run".to_owned()],
-            "verum",
+            "true",
         ),
     ] {
         let mut host = BufferHost::with_argumenta(argumenta.clone());
