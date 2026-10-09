@@ -543,15 +543,6 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // scalar layout, window exceeded, control flow).
         || rel == "crates/radix-mir/src/device_program_plans_test.rs"
         || rel == "crates/radix-mir/src/kernel_decomposition_test.rs"
-        // NVVM descriptor refusals: `MirLlvmTextProbeError`
-        // (radix-mir-llvm/src/lib.rs) carries `message`, `category`, `shape`
-        // and `detail` only, and ~37 struct literals build it. Missing field:
-        // a structured reason/args on the error for the seven refusals the
-        // file asserts (reduction grid vs plan partials, kernel-less module,
-        // non-scalar and f64 element layout, plan/count contradiction, extra
-        // matmul input, conflicting recipes). Newly visible after the
-        // scrubber stopped losing track at raw strings.
-        || rel == "crates/radix-mir-llvm/src/nvvm_descriptor_test.rs"
         // HostError `Display` contract: `{code}: {message}` rendering, pinned
         // in its own file; every other HostError test asserts code and args.
         || rel == "crates/radix-device-core/src/error_display_test.rs"
