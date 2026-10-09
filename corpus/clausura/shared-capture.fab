@@ -56,7 +56,7 @@ main {
     print peek()
 
     # A closure write is visible outside.
-    const () → vacuum bump ← () → vacuum ∴ do { n ← n + 1 }
+    const () → void bump ← () → void ∴ do { n ← n + 1 }
     bump()
     print n
 

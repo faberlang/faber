@@ -37,19 +37,19 @@ locale = "en"
 # the emitted lanes, the guard-free shape, and the element types.
 
 @ radix lane "air"
-fn full_bytes() → vacuum {
+fn full_bytes() → void {
     const bytes<8> xs ← |de ad be ef ba dc fe ca| ↦ bytes<8>
     for from xs const b { }
 }
 
 @ radix lane "air"
-fn full_ascii() → vacuum {
+fn full_ascii() → void {
     const ascii<8> xs ← 'alphabet' ↦ ascii<8>
     for from xs const c { }
 }
 
 @ radix lane "air"
-fn full_string() → vacuum {
+fn full_string() → void {
     const string<8> xs ← "abcdefgh" ↦ string<8>
     for from xs const c { }
 }

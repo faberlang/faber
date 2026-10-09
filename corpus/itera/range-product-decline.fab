@@ -39,19 +39,19 @@ locale = "en"
 # WHY: documents the source/binder arity law, the extent/binder shadowing
 # law, and the every-member-is-a-range law for the Cartesian series.
 
-fn counts(numerus m, numerus n) → void {
+fn counts(int m, int n) → void {
     for range 0‥m, 0‥n const i {
         print i
     }
 }
 
-fn shadows(numerus k) → void {
+fn shadows(int k) → void {
     for range 0‥k, 1‥2 const k, j {
         print k
     }
 }
 
-fn mixes(numerus m, numerus n) → void {
+fn mixes(int m, int n) → void {
     for range 0‥m, n const i, j {
         print i
     }

@@ -51,19 +51,19 @@ fn dump(bytes buf) → string {
 }
 
 fn encode_be(inf value) → string {
-    return dump(value ↦ octeti via Be)
+    return dump(value ↦ bytes via Be)
 }
 
 fn encode_le(inf value) → string {
-    return dump(value ↦ octeti via Le)
+    return dump(value ↦ bytes via Le)
 }
 
 fn round_be(inf value) → inf {
-    return value ↦ octeti via Be ↦ inf via Be
+    return value ↦ bytes via Be ↦ inf via Be
 }
 
 fn round_le(inf value) → inf {
-    return value ↦ octeti via Le ↦ inf via Le
+    return value ↦ bytes via Le ↦ inf via Le
 }
 
 main {
@@ -116,16 +116,16 @@ main {
     print pattern ↦ inf via Le
 
     # 5. A valor carries an inf of any size and gives it back exactly.
-    const valor boxed ← big ↦ valor
+    const value boxed ← big ↦ value
     print boxed ↦ inf
-    const valor small_boxed ← minus_129 ↦ valor
+    const value small_boxed ← minus_129 ↦ value
     print small_boxed ↦ inf
-    const valor from_numerus ← 7 ↦ valor
+    const value from_numerus ← 7 ↦ value
     print from_numerus ↦ inf
 
     # 6. A valor that is not an integer fails; `⊥` recovers.
-    const valor fractional ← 1.5 ↦ valor
-    const valor word ← "7" ↦ valor
+    const value fractional ← 1.5 ↦ value
+    const value word ← "7" ↦ value
     print fractional ↦ inf ⊥ 9
     print word ↦ inf ⊥ 8
 }

@@ -45,12 +45,12 @@ locale = "en"
 #   inf-est.expected — one line per print.
 
 # One line: the three tests, then the extraction both ways.
-fn probe(valor v) → string {
+fn probe(value v) → string {
     return "int=§ inf=§ u64=§ not-inf=§"(v is int, v is inf, v is u64, v not is inf)
 }
 
 # `is int` guards the narrowing, so the fallback never triggers for an integer.
-fn narrow(valor v) → int {
+fn narrow(value v) → int {
     if v is int {
         return v ↦ int ⊥ -2
     }
@@ -58,7 +58,7 @@ fn narrow(valor v) → int {
 }
 
 # Past `i64` the integer is still there: `is inf`, then `↦ inf`.
-fn widen(valor v) → inf {
+fn widen(value v) → inf {
     if v is inf {
         return v ↦ inf ⊥ -3
     }
@@ -93,27 +93,27 @@ main {
     const inf u64_max ← 18446744073709551615
 
     # 1. The tag table: an integer, at the edges of `i64` and `u64`.
-    print probe(small ↦ valor)
-    print probe(int_max ↦ valor)
-    print probe(past_int ↦ valor)
-    print probe(u64_max ↦ valor)
-    print probe(past_u64 ↦ valor)
-    print probe(int_min ↦ valor)
-    print probe(below_int ↦ valor)
+    print probe(small ↦ value)
+    print probe(int_max ↦ value)
+    print probe(past_int ↦ value)
+    print probe(u64_max ↦ value)
+    print probe(past_u64 ↦ value)
+    print probe(int_min ↦ value)
+    print probe(below_int ↦ value)
 
     # 2. Not integers: a float, text and a boolean fail every integer test.
-    print probe(1.5 ↦ valor)
-    print probe("7" ↦ valor)
-    print probe(true ↦ valor)
+    print probe(1.5 ↦ value)
+    print probe("7" ↦ value)
+    print probe(true ↦ value)
 
     # 3. `is int` guards `↦ int`; `is inf` guards `↦ inf`.
-    print narrow(small ↦ valor)
-    print narrow(int_min ↦ valor)
-    print narrow(past_int ↦ valor)
-    print narrow(1.5 ↦ valor)
-    print widen(past_u64 ↦ valor)
-    print widen(below_int ↦ valor)
-    print widen("7" ↦ valor)
+    print narrow(small ↦ value)
+    print narrow(int_min ↦ value)
+    print narrow(past_int ↦ value)
+    print narrow(1.5 ↦ value)
+    print widen(past_u64 ↦ value)
+    print widen(below_int ↦ value)
+    print widen("7" ↦ value)
 
     # 4. A guarded return in a failable function: the handler only runs on a throw.
     do {

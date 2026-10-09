@@ -38,15 +38,15 @@ locale = "en"
 import from "norma:json" json
 
 # A field of a parsed object, as a plain valor.
-fn pick(map<string, valor> members, string key) → valor {
-    return members.get(key) ∷ valor
+fn pick(map<string, value> members, string key) → value {
+    return members.get(key) ∷ value
 }
 
 main {
     # 1. JSON integer tokens keep every digit; a fraction is a float.
     const json document ← json.parse(«{"a": 18446744073709551616, "b": -18446744073709551617, "c": 18446744073709551615, "d": -5, "e": 1.5}»)
-    const valor root ← document ↦ valor
-    const map<string, valor> members ← root ↦ map<string, valor>
+    const value root ← document ↦ value
+    const map<string, value> members ← root ↦ map<string, value>
     print pick(members, "a") ↦ inf
     print pick(members, "b") ↦ inf
     print pick(members, "c") ↦ inf
@@ -60,8 +60,8 @@ main {
     }
     const string payload ← «{"n":§}»(digits)
     const json parsed ← json.parse(payload)
-    const valor parsed_root ← parsed ↦ valor
-    const map<string, valor> parsed_members ← parsed_root ↦ map<string, valor>
+    const value parsed_root ← parsed ↦ value
+    const map<string, value> parsed_members ← parsed_root ↦ map<string, value>
     const inf thousand ← pick(parsed_members, "n") ↦ inf
     const string back ← thousand ↦ string
     print back.length()

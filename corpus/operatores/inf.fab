@@ -153,7 +153,7 @@ main {
 
     # 10. Text: parse and render at a radix.
     print "ff" ↦ inf via Hex
-    print big ↦ textus
+    print big ↦ string
     print big ↦ ascii<17> via Hex
 
     # 11. `¶` formats like any integer.
@@ -163,11 +163,11 @@ main {
     # 12. A field prints its digits; a list sums exactly.
     const Sample sample ← Sample { v = 18446744073709551616 }
     print sample
-    const lista<inf> items ← [1, 18446744073709551616, 3]
+    const list<inf> items ← [1, 18446744073709551616, 3]
     print items.sum()
 
     # 13. `valor` carries an `inf` of any length and gives it back exactly.
-    const valor boxed ← big ↦ valor
+    const value boxed ← big ↦ value
     print boxed
     const inf unboxed ← boxed ↦ inf
     print unboxed + 1

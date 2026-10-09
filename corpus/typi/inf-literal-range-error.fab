@@ -36,6 +36,6 @@ locale = "en"
 #   inf-literal-range-error.expected — the stable diagnostic identity.
 
 main {
-    const numerus too_big ← 18446744073709551616
+    const int too_big ← 18446744073709551616
     print too_big
 }

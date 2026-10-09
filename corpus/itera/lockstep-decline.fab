@@ -39,13 +39,13 @@ locale = "en"
 # WHY: documents the source/binder arity law, the one-shared-coordinate law,
 # and the fail-closed equal-length admission for the lockstep series.
 
-fn arity(lista<numerus> ks, lista<numerus> vs) → void {
+fn arity(list<int> ks, list<int> vs) → void {
     for from ks, vs const k {
         print k
     }
 }
 
-fn cardinality(lista<numerus> ks, lista<numerus> vs) → void {
+fn cardinality(list<int> ks, list<int> vs) → void {
     for from ks, vs at [i, j] const k, v {
         print k
     }
