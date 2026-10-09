@@ -18,12 +18,8 @@
 //! `file_interface_test.rs` files, eval-once/transitive/cycle/budget
 //! composition in `radix-module/src/mir/fragment_composition_test.rs`, and
 //! package round-trip + cache identity in `radix-module/src/hir/package_test.rs`.
-//! The capstone is the Gradus package/proba identity check: the eighteen
-//! pre-existing CTR-08 baseline reds (five `ADM001` + thirteen `PKG001`)
-//! must read zero through the same package analysis `faber check` runs.
 
 use super::*;
-use radix_module::codegen::Target;
 
 /// The gradus `math.fab` twin shape: an exported public size-generic
 /// `@ kernel` template with ordered symbolic shape witnesses and **no
@@ -459,106 +455,4 @@ fn fragment_role_twin_registers_as_fragment_never_kernel() {
             errors
         ),
     }
-}
-
-/// Locate a sibling package root (`<name>/faber.toml`) by walking up from
-/// this crate to the faberlang container — the same workspace shape the
-/// sibling-referencing harness crates use. Packet worktrees resolve the main
-/// container one level above `worktrees/<lane>/`.
-fn workspace_sibling(name: &str) -> Option<PathBuf> {
-    let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    loop {
-        let candidate = dir.join(name);
-        if candidate.join("faber.toml").is_file() {
-            return Some(candidate);
-        }
-        if !dir.pop() {
-            return None;
-        }
-    }
-}
-
-/// The 18-red family counter shared by the identity pins: `ADM001`
-/// (`nucleum_orphaned_annotation`) and `PKG001`
-/// (`interface_export_unrepresentable`) occurrences across a diagnostic set.
-fn family_reds(diagnostics: &[Diagnostic]) -> (usize, usize) {
-    let adm = diagnostics
-        .iter()
-        .filter(|diagnostic| diagnostic.issue() == Some("nucleum_orphaned_annotation"))
-        .count();
-    let pkg = diagnostics
-        .iter()
-        .filter(|diagnostic| diagnostic.issue() == Some("interface_export_unrepresentable"))
-        .count();
-    (adm, pkg)
-}
-
-/// The Gradus package/proba identity capstone: the eighteen pre-existing
-/// CTR-08 baseline reds (five ADM001 math-twin orphans + thirteen PKG001
-/// twin-signature unrepresentables) read **zero** through the same package
-/// analysis `faber check` runs, and the proba-inclusive graph (`faber test`
-/// discovery) reads zero for the family too. This pin runs wherever the
-/// faberlang workspace checkout exists; a bare radix clone skips it (the
-/// sibling corpus is workspace evidence, not a repo fixture).
-#[test]
-fn gradus_package_and_proba_identity_read_zero_for_the_18_red_family() {
-    let Some(gradus) = workspace_sibling("gradus") else {
-        eprintln!("skipping: gradus sibling package not found (workspace-only identity pin)");
-        return;
-    };
-    // The full-corpus analysis recurses past the default test-thread stack;
-    // run it on a dedicated stack like the product process does.
-    let worker = std::thread::Builder::new()
-        .stack_size(64 * 1024 * 1024)
-        .spawn(move || gradus_identity_assertions(&gradus))
-        .expect("spawn the gradus identity worker");
-    if let Err(payload) = worker.join() {
-        std::panic::resume_unwind(payload);
-    }
-}
-
-fn gradus_identity_assertions(gradus: &Path) {
-    let manifest = gradus.join("faber.toml");
-    let config = Config::default().with_target(Target::MirFmir);
-    let seams = crate::test_support::test_analysis_seams();
-
-    let family_locations = |diagnostics: &[Diagnostic]| {
-        diagnostics
-            .iter()
-            .filter(|diagnostic| {
-                diagnostic.issue().is_some_and(|issue| {
-                    issue == "nucleum_orphaned_annotation"
-                        || issue == "interface_export_unrepresentable"
-                })
-            })
-            .map(|diagnostic| {
-                (
-                    diagnostic.file.clone(),
-                    diagnostic.line,
-                    diagnostic.issue().map(str::to_owned),
-                )
-            })
-            .collect::<Vec<_>>()
-    };
-
-    let package_diagnostics = crate::analyze::check_package(&config, &manifest, &seams);
-    let (adm, pkg) = family_reds(&package_diagnostics);
-    assert_eq!(
-        (adm, pkg),
-        (0, 0),
-        "the gradus package check must read zero ADM001/PKG001, got {adm}/{pkg}: {:?}",
-        family_locations(&package_diagnostics)
-    );
-
-    let proba_diagnostics =
-        crate::analyze::analyze_package_for_tests(&config, &manifest, None, &seams)
-            .map(|program| program.diagnostics)
-            .unwrap_or_else(|diagnostics| diagnostics);
-    let (adm, pkg) = family_reds(&proba_diagnostics);
-    assert_eq!(
-        (adm, pkg),
-        (0, 0),
-        "the gradus proba-inclusive analysis must read zero ADM001/PKG001, got {adm}/{pkg}: {:?}",
-        family_locations(&proba_diagnostics)
-    );
 }

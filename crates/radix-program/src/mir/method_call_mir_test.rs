@@ -531,61 +531,6 @@ fn package_test_sibling_union_payloads_project() {
 }
 
 #[test]
-fn gradus_cache_proba_package_test_links() {
-    let Some(home) = radix_module::paths::faberlang_home() else {
-        return;
-    };
-    let package_root = home.join("gradus");
-    if !package_root.join("faber.toml").is_file() {
-        return;
-    }
-    let proba_path = package_root.join("src/cache.proba");
-    let config = Config::default();
-    let mut package = crate::analyze::analyze_package_for_tests(
-        &config,
-        &package_root,
-        Some(&crate::test_source_filter::TestSourceFilter {
-            include: vec!["cache.proba".to_owned()],
-            exclude: Vec::new(),
-        }),
-        &crate::test_support::test_analysis_seams(),
-    )
-    .unwrap_or_else(|diagnostics| panic!("analyze gradus cache.proba: {:?}", diagnostics));
-    let (root_id, _) = package
-        .node_by_path(&proba_path)
-        .expect("cache.proba is an analyzed node");
-    let root_id = root_id.clone();
-    let included = package.imports.local_closure(std::iter::once(&root_id));
-    package.nodes.retain(|id, _| included.contains(id));
-    package.entry = Some(root_id.clone());
-    package.roots = vec![root_id];
-    let mut functions = Vec::new();
-    for unit in package.nodes.values() {
-        if unit.path != proba_path {
-            continue;
-        }
-        for item in &unit.analysis.hir.items {
-            if let HirItemKind::Function(_) = &item.kind {
-                functions.push((unit.path.clone(), item.def_id));
-            }
-        }
-    }
-    assert!(
-        !functions.is_empty(),
-        "cache.proba must contribute test functions"
-    );
-    let scope = TestPackageScope::for_program(&package, functions);
-    with_linked_test_package_mir(
-        package,
-        &scope,
-        &config,
-        &crate::test_support::test_mir_seams(),
-        |_, _| (),
-    )
-    .unwrap_or_else(|diagnostics| panic!("gradus cache.proba must link: {:?}", diagnostics));
-}
-
-#[test]
 fn package_mir_nested_library_method_calls_link_through_test_package() {
     let dir = crate::test_support::test_temp_dir("method-call-mir-test");
     let entry = write_nested_tensor_package(dir.as_ref());

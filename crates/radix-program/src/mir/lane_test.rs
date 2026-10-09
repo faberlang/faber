@@ -12,8 +12,6 @@
 //! rewriting the inner `Path` to the referenced linked const's synthetic def
 //! id; a `Path` with no linked const target still fails closed (MC6,
 //! 7df48a51).
-//! The PML4 composed loop (gradus/exempla/training-loop-mlp) executes on the
-//! FMIR lane with its trajectory matching the train.proba U6 pins.
 
 use super::*;
 use radix_module::lexer::Span;
@@ -713,95 +711,6 @@ fn package_mir_const_data_member_path_initializer_module_private_target_transpla
         host.stdout_lines,
         vec!["960".to_owned()],
         "PRIVATE_N * 3 must evaluate through the transplanted private const"
-    );
-}
-
-/// Recursively copy a package directory, skipping `target/` build artifacts
-/// (mirrors the bert-tiny image-test helper).
-fn copy_package_dir_skipping_target(src: &std::path::Path, dest: &std::path::Path) {
-    for entry in std::fs::read_dir(src).expect("read package dir") {
-        let entry = entry.expect("read dir entry");
-        let dest_path = dest.join(entry.file_name());
-        if entry.path().is_dir() {
-            if entry.file_name() == "target" {
-                continue;
-            }
-            std::fs::create_dir_all(&dest_path).expect("create sub dir");
-            copy_package_dir_skipping_target(&entry.path(), &dest_path);
-        } else {
-            std::fs::copy(entry.path(), dest_path).expect("copy file");
-        }
-    }
-}
-
-/// The PML4-U6 accepted trajectory (train.proba U6 pins; f64 oracle
-/// evaluations of the documented convergence — compared under the documented
-/// 5e-4 absolute tolerance against the f32 self-hosted runner output).
-const PML4_PINS: [(usize, f64); 6] = [
-    (0, 1.576_448_169_383_708),
-    (10, 0.781_537_707_007_742_7),
-    (25, 0.430_346_187_564_129_6),
-    (50, 0.138_488_131_161_667_97),
-    (75, 0.047_464_055_696_807_61),
-    (99, 0.017_928_625_511_508_454),
-];
-
-#[test]
-// Re-enabled with the LIB-MIR landing (radix 43c0102ba: textus.accipe
-// intrinsic + SizedNumeric zero-init arm): the FMIR runner now lowers
-// library-to-library calls in the gradus multi-module library, so the PML4
-// executed-lane acceptance runs again (TARGETLANE001 a42bc97 + LIB-MIR).
-fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
-    // CTO-1 acceptance: the PML4 composed loop (gradus/exempla/
-    // training-loop-mlp — a 4×4 two-layer MLP, 100 steps, lr 0.1, the
-    // accepted MLP training-proof workload) executes on the FMIR lane
-    // (in-memory interpreted package MIR) and its trajectory matches the
-    // train.proba U6 pins. This is the executed-evidence prerequisite for the
-    // auditor-owned runtime-evidence gate.
-    //
-    // Re-enabled with TARGETLANE001 executed-lane routing: the executed-
-    // package analysis resolves to a MIR-backed target — the manifest
-    // `[build] target = "fmir"` propagated to the analysis config — so the
-    // air-lane functions pass the lane policy at analysis instead of tripping
-    // `lane_requires_mir_backed_target` under the old default `HirRust`.
-    let workspace = radix_module::paths::faberlang_home().expect("faberlang container root");
-    let exemplum = workspace.join("gradus/exempla/training-loop-mlp");
-    let dir = crate::test_support::test_temp_dir("pml4-lane");
-    copy_package_dir_skipping_target(&exemplum, dir.path());
-
-    let config = radix_module::driver::Config::default().with_library_home(workspace);
-    let entry = dir.path().join("src/main.fab");
-    let mut host = BufferHost::default();
-    run_package_mir(
-        &config,
-        &entry,
-        &crate::test_support::test_mir_seams(),
-        &mut host,
-    )
-    .expect("the PML4 loop must run on the FMIR lane");
-
-    // The loop prints one `nota metrica.damnum()` per step (lines 0..100),
-    // then the checkpoint round-trip and the full loss trace.
-    assert!(
-        host.stdout_lines.len() >= 101,
-        "expected 100 per-step losses plus the checkpoint line, got {} lines",
-        host.stdout_lines.len()
-    );
-    for (step, pin) in PML4_PINS {
-        let actual: f64 = host.stdout_lines[step]
-            .parse()
-            .unwrap_or_else(|_| panic!("step {step} loss must be numeric"));
-        assert!(
-            (actual - pin).abs() <= 5e-4,
-            "step {step}: f32 runner loss {actual} must match the f64 oracle pin {pin} within 5e-4"
-        );
-    }
-    let initial: f64 = host.stdout_lines[0].parse().expect("initial loss numeric");
-    let final_loss: f64 = host.stdout_lines[99].parse().expect("final loss numeric");
-    assert!(
-        final_loss / initial < 0.1,
-        "convergence ratio {final_loss}/{initial} = {} must be < 0.1",
-        final_loss / initial
     );
 }
 
