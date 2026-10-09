@@ -50,6 +50,7 @@ pub mod tensor_placement;
 pub mod tensor_runtime_abi;
 pub mod tensor_systems_target;
 mod tensor_type;
+mod text;
 pub mod ty;
 pub mod validate;
 pub mod vector_expand;

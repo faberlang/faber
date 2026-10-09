@@ -5,8 +5,8 @@
 //! at run time and append this static suffix, so every backend words the
 //! message like the runner.
 
+use crate::text::push_fmt;
 use radix_hir::{HirStoreKind, HirStoreSite};
-use std::fmt::Write;
 
 /// The store position phrase used when the site names no slot.
 #[must_use]
@@ -48,7 +48,7 @@ pub fn store_trap_suffix(
     let mut message = format!(" does not fit in `{ty}` ({position})");
     if let Some(origin) = site.inferred_origin() {
         let name = slot.unwrap_or("the slot");
-        let _ = write!(
+        push_fmt!(
             message,
             "; `{name}` was inferred as `{ty}` from {origin}, declare its type"
         );

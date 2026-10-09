@@ -11,8 +11,7 @@
 //!   block  :← 'b' decimal
 //!   dispatch :← "p0" (wasm/sexp block cursor)
 
-use std::fmt::Write;
-
+use crate::text::push_fmt;
 use crate::visit::{MirVisitor, walk_callee, walk_operand, walk_value};
 use crate::{
     MirBlockId, MirCallee, MirConstant, MirExternalFunctionIdentity, MirFunction, MirFunctionId,
@@ -261,7 +260,7 @@ fn literal_bytes_identity(family: &str, bytes: &[u8]) -> String {
     let mut identity = format!("{family}_{}", bytes.len());
     for byte in bytes {
         identity.push('_');
-        write!(identity, "{byte:02x}").unwrap();
+        push_fmt!(identity, "{byte:02x}");
     }
     identity
 }

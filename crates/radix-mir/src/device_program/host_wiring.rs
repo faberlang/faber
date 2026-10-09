@@ -199,28 +199,30 @@ struct Collector<'a> {
 }
 
 impl Collector<'_> {
-    fn host_value(&self, base: &MirPlaceBase) -> HostValue {
-        let function = self.function.expect("a host function is being visited");
-        HostValue {
-            function,
+    /// The value identity of `base` inside the host function being visited
+    /// (`None` outside any function).
+    fn host_value(&self, base: &MirPlaceBase) -> Option<HostValue> {
+        Some(HostValue {
+            function: self.function?,
             base: match base {
                 MirPlaceBase::Local(local) => HostBase::Local(*local),
                 MirPlaceBase::Temp(temp) => HostBase::Temp(*temp),
             },
-        }
+        })
     }
 
     fn place_identity(&self, place: &MirPlace) -> Option<HostValue> {
-        place
-            .projections
-            .is_empty()
-            .then(|| self.host_value(&place.base))
+        if place.projections.is_empty() {
+            self.host_value(&place.base)
+        } else {
+            None
+        }
     }
 
     fn operand_identity(&self, operand: &MirOperand) -> Option<HostValue> {
         match operand {
             MirOperand::Place(place) => self.place_identity(place),
-            MirOperand::Temp(temp) => Some(self.host_value(&MirPlaceBase::Temp(*temp))),
+            MirOperand::Temp(temp) => self.host_value(&MirPlaceBase::Temp(*temp)),
             MirOperand::Value(_) | MirOperand::Constant(_) => None,
         }
     }

@@ -15,8 +15,8 @@
 //!   it is valid target code.
 
 use crate::MirGradientOp;
+use crate::text::{push_fmt, push_line};
 use crate::visit::MirVisitor;
-use std::fmt::Write;
 
 const DUMP_FUNCTION_PREFIX: &str = "f";
 const DUMP_BLOCK_PREFIX: &str = "bb";
@@ -64,7 +64,7 @@ impl MirVisitor for MirDumper {
             .error_ty
             .map(|error_ty| format!(" ⇥ {}", ty(error_ty)))
             .unwrap_or_default();
-        let _ = writeln!(
+        push_line!(
             self.out,
             "function {} -> {}{} {{",
             function_id(function.id),
@@ -74,14 +74,14 @@ impl MirVisitor for MirDumper {
         if !function.params.is_empty() {
             self.out.push_str("  params:\n");
             for param in &function.params {
-                let _ = writeln!(self.out, "    {}: {}", local_id(param.local), ty(param.ty));
+                push_line!(self.out, "    {}: {}", local_id(param.local), ty(param.ty));
             }
         }
         if !function.locals.is_empty() {
             self.out.push_str("  locals:\n");
             for local in &function.locals {
                 let mutability = if local.mutable { "var" } else { "let" };
-                let _ = writeln!(
+                push_line!(
                     self.out,
                     "    {} {}: {}",
                     mutability,
@@ -93,7 +93,7 @@ impl MirVisitor for MirDumper {
         if !function.temps.is_empty() {
             self.out.push_str("  temps:\n");
             for temp in &function.temps {
-                let _ = writeln!(self.out, "    {}: {}", temp_id(temp.id), ty(temp.ty));
+                push_line!(self.out, "    {}: {}", temp_id(temp.id), ty(temp.ty));
             }
         }
         for block in &function.blocks {
@@ -103,7 +103,7 @@ impl MirVisitor for MirDumper {
     }
 
     fn visit_block(&mut self, block: &MirBlock) {
-        let _ = writeln!(self.out, "  {}:", block_id(block.id));
+        push_line!(self.out, "  {}:", block_id(block.id));
         for stmt in &block.statements {
             self.visit_stmt(stmt);
         }
@@ -371,26 +371,26 @@ fn place_fmt(place: &MirPlace) -> String {
     for projection in &place.projections {
         match projection {
             MirProjection::Field(field) => {
-                let _ = write!(out, ".sym#{}", field.0);
+                push_fmt!(out, ".sym#{}", field.0);
             }
             MirProjection::VariantField { variant, field } => {
-                let _ = write!(out, ".def#{}.sym#{}", variant.0, field.0);
+                push_fmt!(out, ".def#{}.sym#{}", variant.0, field.0);
             }
             MirProjection::ClosureCapture {
                 environment,
                 source,
             } => {
-                let _ = write!(out, ".{}.def#{}", closure_env_id(*environment), source.0);
+                push_fmt!(out, ".{}.def#{}", closure_env_id(*environment), source.0);
             }
             MirProjection::SharedCell => out.push_str(".cell"),
             MirProjection::Index(index) => {
-                let _ = write!(out, "[{}]", operand(index));
+                push_fmt!(out, "[{}]", operand(index));
             }
             MirProjection::VectorLane(index) => {
-                let _ = write!(out, ".lane{index}");
+                push_fmt!(out, ".lane{index}");
             }
             MirProjection::MatrixCell { row, column } => {
-                let _ = write!(out, ".cell{row}_{column}");
+                push_fmt!(out, ".cell{row}_{column}");
             }
         }
     }

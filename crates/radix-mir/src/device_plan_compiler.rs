@@ -15,9 +15,9 @@ use crate::device_program_plans::{
     ExecutorPlanExtension, LibraryBind, LibrarySelection, LogicalSignature, OffsetBinding,
     PlanProvenance, UniformBinding, WorkspaceBinding,
 };
+use crate::text::push_line;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::fmt::Write as _;
 
 /// Revision of the canonical graph recognition rules.
 pub const PLAN_COMPILER_REVISION: u32 = 1;
@@ -520,8 +520,7 @@ impl CompiledDevicePlan {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            // `let _` drops the infallible fmt::Write result for String.
-            let _ = writeln!(
+            push_line!(
                 text,
                 "| {} | {} | {} | {} | {} |",
                 layer.layer,
@@ -702,7 +701,7 @@ impl PlanCompiler {
                 moe_facts,
                 ssm_facts,
                 seq_extent,
-            ));
+            )?);
             schedule.push(ScheduledCall {
                 index,
                 layer: candidate.layer,
@@ -823,10 +822,10 @@ impl PlanCompiler {
             if context.inputs.len() != 2 {
                 continue;
             }
-            let Some(softmax_id) = context.inputs.iter().copied().find(|id| {
+            let Some(softmax) = context.inputs.iter().find_map(|id| {
                 graph
                     .node(*id)
-                    .is_some_and(|node| node.op == TypedOp::CausalSoftmax)
+                    .filter(|node| node.op == TypedOp::CausalSoftmax)
             }) else {
                 continue;
             };
@@ -840,7 +839,6 @@ impl PlanCompiler {
                     detail: "attention context is missing its typed V projection".to_owned(),
                 });
             };
-            let softmax = graph.node(softmax_id).expect("checked above");
             if softmax.inputs.len() != 1 {
                 return Err(GraphError::PatternMismatch {
                     layer: context.layer,
@@ -1352,14 +1350,18 @@ impl PlanCompiler {
         moe_facts: Option<MoEFacts>,
         ssm_facts: Option<SsmFacts>,
         seq_extent: u64,
-    ) -> LibrarySelection {
+    ) -> Result<LibrarySelection, GraphError> {
         let operation = candidate.operation;
         let logical_signature = operation.signature();
         let library_entry = operation.entry().map(str::to_owned);
         let mut binds = Vec::new();
         let mut offsets = Vec::new();
-        if operation == LibraryOperation::CausalAttention {
-            let facts = attention_facts.expect("attention candidates carry typed facts");
+        let causal_facts = if operation == LibraryOperation::CausalAttention {
+            Some(attention_facts.ok_or_else(|| missing_facts(candidate, "attention"))?)
+        } else {
+            None
+        };
+        if let Some(facts) = causal_facts {
             let views = [
                 ("q", facts.q_dims(), facts.q_strides()),
                 ("k", facts.kv_dims(), facts.kv_strides()),
@@ -1395,10 +1397,8 @@ impl PlanCompiler {
                 };
                 let (dims, strides) =
                     if operation == LibraryOperation::SsmConv1d && name == "kernel" {
-                        let SsmFacts::Conv1d { kernel_width, .. } =
-                            ssm_facts.expect("SSM conv selections carry typed facts")
-                        else {
-                            unreachable!("SSM conv selection has scan facts")
+                        let Some(SsmFacts::Conv1d { kernel_width, .. }) = ssm_facts else {
+                            return Err(missing_facts(candidate, "SSM conv"));
                         };
                         (vec![kernel_width], vec![1])
                     } else {
@@ -1437,32 +1437,31 @@ impl PlanCompiler {
                 });
             }
         }
-        let (mut uniforms, workspace, requirements) =
-            if operation == LibraryOperation::CausalAttention {
-                (
-                    vec![UniformBinding {
-                        name: "scale_bits".to_owned(),
-                        ty: crate::device_program_plans::UniformType::U32,
-                        bits: attention_facts.expect("attention facts").scale_bits,
-                    }],
-                    Some(WorkspaceBinding {
-                        bytes: 0,
-                        alignment: 16,
-                    }),
-                    vec![BackendRequirement {
-                        backend: "metal".to_owned(),
-                        feature: "CausalAttention".to_owned(),
-                    }],
-                )
-            } else {
-                (Vec::new(), None, Vec::new())
-            };
+        let (mut uniforms, workspace, requirements) = if let Some(facts) = causal_facts {
+            (
+                vec![UniformBinding {
+                    name: "scale_bits".to_owned(),
+                    ty: crate::device_program_plans::UniformType::U32,
+                    bits: facts.scale_bits,
+                }],
+                Some(WorkspaceBinding {
+                    bytes: 0,
+                    alignment: 16,
+                }),
+                vec![BackendRequirement {
+                    backend: "metal".to_owned(),
+                    feature: "CausalAttention".to_owned(),
+                }],
+            )
+        } else {
+            (Vec::new(), None, Vec::new())
+        };
         // MoE selections carry their declared expert policy and a
         // metal-scoped body admission requirement; dispatch lands in M8-U1b.
         let mut requirements = requirements;
         match operation {
             LibraryOperation::RouterSelection => {
-                let facts = moe_facts.expect("router candidates carry typed facts");
+                let facts = moe_facts.ok_or_else(|| missing_facts(candidate, "router"))?;
                 uniforms.push(UniformBinding {
                     name: "expert_count".to_owned(),
                     ty: crate::device_program_plans::UniformType::U32,
@@ -1479,7 +1478,7 @@ impl PlanCompiler {
                 });
             }
             LibraryOperation::GroupedExpertGemm => {
-                let facts = moe_facts.expect("expert candidates carry typed facts");
+                let facts = moe_facts.ok_or_else(|| missing_facts(candidate, "expert"))?;
                 uniforms.push(UniformBinding {
                     name: "expert_count".to_owned(),
                     ty: crate::device_program_plans::UniformType::U32,
@@ -1491,10 +1490,8 @@ impl PlanCompiler {
                 });
             }
             LibraryOperation::SsmConv1d => {
-                let SsmFacts::Conv1d { kernel_width, .. } =
-                    ssm_facts.expect("SSM conv selections carry typed facts")
-                else {
-                    unreachable!("SSM conv selection has scan facts")
+                let Some(SsmFacts::Conv1d { kernel_width, .. }) = ssm_facts else {
+                    return Err(missing_facts(candidate, "SSM conv"));
                 };
                 uniforms.push(UniformBinding {
                     name: "kernel_width".to_owned(),
@@ -1507,10 +1504,8 @@ impl PlanCompiler {
                 });
             }
             LibraryOperation::SsmScan => {
-                let SsmFacts::Scan { state_dim, .. } =
-                    ssm_facts.expect("SSM scan selections carry typed facts")
-                else {
-                    unreachable!("SSM scan selection has conv facts")
+                let Some(SsmFacts::Scan { state_dim, .. }) = ssm_facts else {
+                    return Err(missing_facts(candidate, "SSM scan"));
                 };
                 uniforms.push(UniformBinding {
                     name: "state_dim".to_owned(),
@@ -1534,7 +1529,7 @@ impl PlanCompiler {
                 bits: u32::from(seq_extent == 1),
             });
         }
-        LibrarySelection {
+        Ok(LibrarySelection {
             kernel_index: index,
             library_entry,
             logical_signature,
@@ -1549,7 +1544,15 @@ impl PlanCompiler {
                 revision: PLAN_COMPILER_REVISION,
                 source_nodes: candidate.source_nodes.iter().map(|id| id.0).collect(),
             },
-        }
+        })
+    }
+}
+
+/// A candidate reached selection without the typed facts its operation needs.
+fn missing_facts(candidate: &Candidate, kind: &str) -> GraphError {
+    GraphError::PatternMismatch {
+        layer: candidate.layer,
+        detail: format!("{kind} candidate carries no matching typed facts"),
     }
 }
 

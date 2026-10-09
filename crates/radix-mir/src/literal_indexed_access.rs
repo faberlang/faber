@@ -101,7 +101,8 @@ impl LiteralIndexedAccessPlan {
                         let destination = MirSlot::from_place(destination.as_ref()?)?;
                         get_results.insert(resolve_slot(destination, &aliases)?);
                     }
-                    MirCollectionOp::TensorSet => {
+                    // `TensorSet`: the let-else above admits only Get and Set.
+                    _ => {
                         let receiver =
                             resolve_slot(MirSlot::from_operand(call.args.first()?)?, &aliases)?;
                         if receiver != returned_output || offset >= output_elements {
@@ -109,7 +110,6 @@ impl LiteralIndexedAccessPlan {
                         }
                         set_offsets.insert(offset);
                     }
-                    _ => unreachable!(),
                 }
             }
         }

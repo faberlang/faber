@@ -20,12 +20,6 @@ enum ElementwiseCollectionKind {
 }
 
 #[derive(Clone, Copy)]
-enum TensorConstKind {
-    Int,
-    Float,
-}
-
-#[derive(Clone, Copy)]
 struct TensorNormFlags {
     rank_1_or_2: bool,
     layernorm_arity_gate: bool,
@@ -33,10 +27,23 @@ struct TensorNormFlags {
 }
 
 struct TensorConstValidation {
-    kind: TensorConstKind,
     label: &'static str,
     name: &'static str,
     message: &'static str,
+}
+
+fn int_constant(constant: &MirConstant) -> Option<i64> {
+    match constant {
+        MirConstant::Int(value) => Some(*value),
+        _ => None,
+    }
+}
+
+fn float_constant(constant: &MirConstant) -> Option<f64> {
+    match constant {
+        MirConstant::Float(value) => Some(*value),
+        _ => None,
+    }
 }
 
 struct TensorNormSpec {
@@ -1948,8 +1955,8 @@ impl Validator<'_, '_> {
                             "elementwise scalar type mismatch",
                         );
                     }
-                    (Some(_), None) | (None, Some(_)) => {}
-                    (None, None) => unreachable!("elementwise collection kind selected above"),
+                    // `(None, None)` already returned above.
+                    (Some(_), None) | (None, Some(_)) | (None, None) => {}
                 }
                 if flows {
                     self.require_assignable(
@@ -2380,30 +2387,31 @@ impl Validator<'_, '_> {
 
     /// Axis/epsilon literals often arrive as temps after sized-fractus lowering.
     /// Those operands stay valid; only a wrong constant kind is rejected.
-    fn validate_tensor_const_arg<P>(
+    fn validate_tensor_const_arg<V, P>(
         &mut self,
         scope: &FunctionScope<'_, '_>,
         arg: &MirOperand,
         span: Span,
         validation: &TensorConstValidation,
+        extract: fn(&MirConstant) -> Option<V>,
         predicate: P,
     ) where
-        P: FnOnce(&mut Self, &MirConstant),
+        P: FnOnce(&mut Self, V),
     {
-        let _ = self.validate_operand(scope, arg, span);
+        self.validate_operand(scope, arg, span);
         let MirOperand::Constant(constant) = arg else {
             return;
         };
-        match (validation.kind, constant) {
-            (TensorConstKind::Int, MirConstant::Int(_))
-            | (TensorConstKind::Float, MirConstant::Float(_)) => predicate(self, constant),
-            _ => self.error(
+        if let Some(value) = extract(constant) {
+            predicate(self, value);
+        } else {
+            self.error(
                 span,
                 format!(
                     "tensor {} {} must be {}",
                     validation.label, validation.name, validation.message
                 ),
-            ),
+            );
         }
     }
 
@@ -2420,16 +2428,13 @@ impl Validator<'_, '_> {
             arg,
             span,
             &TensorConstValidation {
-                kind: TensorConstKind::Int,
                 label,
                 name: "axis",
                 message: "an int constant or temp",
             },
-            |this: &mut Self, constant: &MirConstant| {
-                let MirConstant::Int(axis_val) = constant else {
-                    unreachable!("integer tensor constant expected")
-                };
-                if usize::try_from(*axis_val).map_or(true, |axis| axis >= rank) {
+            int_constant,
+            |this: &mut Self, axis_val: i64| {
+                if usize::try_from(axis_val).map_or(true, |axis| axis >= rank) {
                     this.error(
                         span,
                         format!("tensor {label} axis {axis_val} is out of range for rank {rank}"),
@@ -2451,16 +2456,13 @@ impl Validator<'_, '_> {
             arg,
             span,
             &TensorConstValidation {
-                kind: TensorConstKind::Float,
                 label,
                 name: "epsilon",
                 message: "a float constant or temp",
             },
-            |this: &mut Self, constant: &MirConstant| {
-                let MirConstant::Float(f) = constant else {
-                    unreachable!("float tensor constant expected")
-                };
-                if *f <= 0.0 || !f.is_finite() {
+            float_constant,
+            |this: &mut Self, f: f64| {
+                if f <= 0.0 || !f.is_finite() {
                     this.error(
                         span,
                         format!("tensor {label} epsilon must be positive and finite"),
@@ -2481,16 +2483,13 @@ impl Validator<'_, '_> {
             arg,
             span,
             &TensorConstValidation {
-                kind: TensorConstKind::Int,
                 label: "rope",
                 name: "pos",
                 message: "an int constant or temp",
             },
-            |this: &mut Self, constant: &MirConstant| {
-                let MirConstant::Int(pos_val) = constant else {
-                    unreachable!("integer tensor constant expected")
-                };
-                if *pos_val < 0 {
+            int_constant,
+            |this: &mut Self, pos_val: i64| {
+                if pos_val < 0 {
                     this.error(
                         span,
                         format!("tensor rope pos {pos_val} must be non-negative"),
@@ -2513,7 +2512,7 @@ impl Validator<'_, '_> {
         receiver_ty: MirType,
         span: Span,
     ) {
-        let _ = self.validate_operand(scope, arg, span);
+        self.validate_operand(scope, arg, span);
         let dim_val = match arg {
             MirOperand::Constant(MirConstant::Int(dim_val)) => *dim_val,
             MirOperand::Constant(MirConstant::UInt(dim_val)) => {

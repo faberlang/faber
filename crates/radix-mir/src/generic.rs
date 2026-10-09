@@ -1974,21 +1974,21 @@ pub fn substitute_tensor_from_flat_shape_size_constants(
             .collect::<Vec<_>>();
 
         for (shape_temp, target_shape) in shape_targets {
-            let Some(construct_index) = block.statements.iter().position(|statement| {
-                let MirStatementKind::Construct { destination, .. } = &statement.kind else {
-                    return false;
+            let Some(aggregate) = block.statements.iter().find_map(|statement| {
+                let MirStatementKind::Construct {
+                    destination,
+                    aggregate,
+                } = &statement.kind
+                else {
+                    return None;
                 };
                 matches!(&destination.base, crate::MirPlaceBase::Temp(temp) if *temp == shape_temp)
+                    .then_some(aggregate)
             }) else {
                 all_folded = false;
                 continue;
             };
             let dimension_temps = {
-                let MirStatementKind::Construct { aggregate, .. } =
-                    &block.statements[construct_index].kind
-                else {
-                    unreachable!("construct index selected from a Construct statement");
-                };
                 let MirAggregateFields::Ordered(items) = &aggregate.fields else {
                     all_folded = false;
                     continue;
@@ -2006,22 +2006,19 @@ pub fn substitute_tensor_from_flat_shape_size_constants(
                     all_folded = false;
                     continue;
                 };
-                let Some(runtime_index) = block.statements.iter().position(|statement| {
-                    let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
-                        return false;
+                let Some(call) = block.statements.iter_mut().find_map(|statement| {
+                    let MirStatementKind::RuntimeCall { destination, call } = &mut statement.kind
+                    else {
+                        return None;
                     };
                     matches!(
                         destination.as_ref().map(|place| &place.base),
                         Some(crate::MirPlaceBase::Temp(temp)) if *temp == dimension_temp
                     )
+                    .then_some(call)
                 }) else {
                     all_folded = false;
                     continue;
-                };
-                let MirStatementKind::RuntimeCall { call, .. } =
-                    &mut block.statements[runtime_index].kind
-                else {
-                    unreachable!("runtime index selected from a RuntimeCall statement");
                 };
                 let Some(MirOperand::Constant(MirConstant::ShapeSize { axis, .. })) =
                     call.args.first_mut()
@@ -2061,16 +2058,11 @@ fn tensor_shape(types: &TypeTable, ty: MirType) -> Option<IndexId> {
 /// any operand/constant position — the post-monomorphization survivor signal.
 #[must_use]
 pub fn function_contains_shape_size(function: &mut MirFunction) -> bool {
-    let mut found = false;
-    let _ = rewrite_function_constants(function, &mut |constant| {
-        if matches!(constant, MirConstant::ShapeSize { .. }) {
-            found = true;
-            false
-        } else {
-            true
-        }
-    });
-    found
+    // The rewriter returns `false` as soon as the visitor does, so a `false`
+    // result means a `ShapeSize` term was seen.
+    !rewrite_function_constants(function, &mut |constant| {
+        !matches!(constant, MirConstant::ShapeSize { .. })
+    })
 }
 
 fn rewrite_statement_constants(
