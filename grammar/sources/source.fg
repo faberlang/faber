@@ -1,0 +1,1546 @@
+# Faber grammar source — EBNF.md transcription with GSD-4 repairs.
+# @grammar 2. ID-spine rename pass: snake_case, Latin introducers, and aliases.
+
+@grammar 2
+@start fab_file
+
+@glyphs
+# GSD-2 glyph/glossary registry.
+#
+# Each `glyph` is one source codepoint.  Multi-codepoint terminals such as
+# `?.`, `![`, and `+++` claim their component codepoints here; the complete
+# terminal remains named by the claiming production slot.  Findings are
+# report-only reconciliation rows and do not grant a consumer glyph grammar
+# authority.
+
+[registry]
+schema = 1
+source = "docs/EBNF.md"
+role_table = [
+  "access",
+  "alternate_exit",
+  "annotation",
+  "arithmetic",
+  "assignment",
+  "bitwise",
+  "closure_joint",
+  "comparison",
+  "conditional",
+  "conversion",
+  "default",
+  "equality",
+  "format",
+  "generic",
+  "gradient",
+  "increment",
+  "literal",
+  "range",
+  "return_type",
+  "separator",
+  "shift",
+  "string_delimiter",
+  "template_hole",
+  "tensor_product",
+  "transfer",
+  "transpose",
+  "type_ascription",
+  "type_intersection",
+  "type_union",
+  "unary",
+]
+
+[[glyphs]]
+glyph = "!"
+codepoint = "U+0021"
+unicode_name = "EXCLAMATION MARK"
+role = "access"
+claiming_slots = ["non_null_suffix"]
+
+[[glyphs]]
+glyph = "%"
+codepoint = "U+0025"
+unicode_name = "PERCENT SIGN"
+role = "arithmetic"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "*"
+codepoint = "U+002A"
+unicode_name = "ASTERISK"
+role = "arithmetic"
+claiming_slots = ["multiplicative_expr", "wildcard_import"]
+
+[[glyphs]]
+glyph = "+"
+codepoint = "U+002B"
+unicode_name = "PLUS SIGN"
+role = "arithmetic"
+claiming_slots = ["additive_expr"]
+
+[[glyphs]]
+glyph = "-"
+codepoint = "U+002D"
+unicode_name = "HYPHEN-MINUS"
+role = "arithmetic"
+claiming_slots = ["additive_expr", "enum_member", "unary_expr"]
+
+[[glyphs]]
+glyph = "."
+codepoint = "U+002E"
+unicode_name = "FULL STOP"
+role = "access"
+claiming_slots = ["member_suffix", "non_null_suffix", "optional_suffix", "qualified_ident", "qualified_type"]
+
+[[glyphs]]
+glyph = "/"
+codepoint = "U+002F"
+unicode_name = "SOLIDUS"
+role = "arithmetic"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = ":"
+codepoint = "U+003A"
+unicode_name = "COLON"
+role = "separator"
+claiming_slots = ["json_member", "clausura_legacy_expr"]
+
+[[glyphs]]
+glyph = "<"
+codepoint = "U+003C"
+unicode_name = "LESS-THAN SIGN"
+role = "generic"
+claiming_slots = ["call_type_args", "generic_params", "type_arguments"]
+
+[[glyphs]]
+glyph = "="
+codepoint = "U+003D"
+unicode_name = "EQUALS SIGN"
+role = "assignment"
+claiming_slots = ["annotation_field", "enum_member", "field_decl", "field_init", "fixum_decl", "ut_field", "nomen_field", "ex_field", "visibilitas_field", "omnia_field", "nucleum_field", "typus_decl"]
+
+[[glyphs]]
+glyph = ">"
+codepoint = "U+003E"
+unicode_name = "GREATER-THAN SIGN"
+role = "generic"
+claiming_slots = ["call_type_args", "generic_params", "type_arguments"]
+
+[[glyphs]]
+glyph = "?"
+codepoint = "U+003F"
+unicode_name = "QUESTION MARK"
+role = "access"
+claiming_slots = ["optional_suffix"]
+
+[[glyphs]]
+glyph = "@"
+codepoint = "U+0040"
+unicode_name = "COMMERCIAL AT"
+role = "annotation"
+claiming_slots = ["ad_annotation", "annotation_sugar", "braced_annotation", "nondum_annotation", "nucleum_braced", "nucleum_sugar", "radix_annotation"]
+
+[[glyphs]]
+glyph = "¶"
+codepoint = "U+00B6"
+unicode_name = "PILCROW SIGN"
+role = "format"
+claiming_slots = ["format_expr"]
+
+[[glyphs]]
+glyph = "¬"
+codepoint = "U+00AC"
+unicode_name = "NOT SIGN"
+role = "unary"
+claiming_slots = ["unary_expr"]
+
+[[glyphs]]
+glyph = "·"
+codepoint = "U+00B7"
+unicode_name = "MIDDLE DOT"
+role = "tensor_product"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "×"
+codepoint = "U+00D7"
+unicode_name = "MULTIPLICATION SIGN"
+role = "tensor_product"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "÷"
+codepoint = "U+00F7"
+unicode_name = "DIVISION SIGN"
+role = "arithmetic"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "ᵀ"
+codepoint = "U+1D40"
+unicode_name = "MODIFIER LETTER CAPITAL T"
+role = "transpose"
+claiming_slots = ["transpose_suffix"]
+
+[[glyphs]]
+glyph = "‥"
+codepoint = "U+2025"
+unicode_name = "TWO DOT LEADER"
+role = "range"
+claiming_slots = ["range_tail", "vel_range_tail"]
+
+[[glyphs]]
+glyph = "…"
+codepoint = "U+2026"
+unicode_name = "HORIZONTAL ELLIPSIS"
+role = "range"
+claiming_slots = ["range_tail", "vel_range_tail"]
+
+[[glyphs]]
+glyph = "←"
+codepoint = "U+2190"
+unicode_name = "LEFTWARDS ARROW"
+role = "assignment"
+claiming_slots = ["array_destruct", "assignment", "figendum_decl", "object_destruct", "sit_decl", "fixum_decl"]
+
+[[glyphs]]
+glyph = "↑"
+codepoint = "U+2191"
+unicode_name = "UPWARDS ARROW"
+role = "increment"
+claiming_slots = ["inc_dec_stmt"]
+
+[[glyphs]]
+glyph = "→"
+codepoint = "U+2192"
+unicode_name = "RIGHTWARDS ARROW"
+role = "return_type"
+claiming_slots = ["function_type", "clausura_legacy_expr", "return_clause"]
+
+[[glyphs]]
+glyph = "↓"
+codepoint = "U+2193"
+unicode_name = "DOWNWARDS ARROW"
+role = "increment"
+claiming_slots = ["inc_dec_stmt"]
+
+[[glyphs]]
+glyph = "↤"
+codepoint = "U+21A4"
+unicode_name = "LEFTWARDS ARROW FROM BAR"
+role = "assignment"
+claiming_slots = ["assignment", "fixum_decl"]
+
+[[glyphs]]
+glyph = "↦"
+codepoint = "U+21A6"
+unicode_name = "RIGHTWARDS ARROW FROM BAR"
+role = "conversion"
+claiming_slots = ["conversio_expr"]
+
+[[glyphs]]
+glyph = "⇇"
+codepoint = "U+21C7"
+unicode_name = "LEFTWARDS PAIRED ARROWS"
+role = "transfer"
+claiming_slots = ["transfer"]
+
+[[glyphs]]
+glyph = "⇐"
+codepoint = "U+21D0"
+unicode_name = "LEFTWARDS DOUBLE ARROW"
+role = "shift"
+claiming_slots = ["shift_expr"]
+
+[[glyphs]]
+glyph = "⇒"
+codepoint = "U+21D2"
+unicode_name = "RIGHTWARDS DOUBLE ARROW"
+role = "shift"
+claiming_slots = ["shift_expr"]
+
+[[glyphs]]
+glyph = "⇥"
+codepoint = "U+21E5"
+unicode_name = "RIGHTWARDS ARROW TO BAR"
+role = "alternate_exit"
+claiming_slots = ["alternate_exit_clause"]
+
+[[glyphs]]
+glyph = "⊥"
+codepoint = "U+22A5"
+unicode_name = "UP TACK"
+role = "default"
+claiming_slots = ["inline_default"]
+
+[[glyphs]]
+glyph = "✓"
+codepoint = "U+2713"
+unicode_name = "CHECK MARK"
+role = "conditional"
+claiming_slots = ["ternary"]
+
+[[glyphs]]
+glyph = "✗"
+codepoint = "U+2717"
+unicode_name = "BALLOT X"
+role = "conditional"
+claiming_slots = ["ternary"]
+
+[[glyphs]]
+glyph = "↢"
+codepoint = "U+21A2"
+unicode_name = "LEFTWARDS ARROW WITH TAIL"
+role = "await_assignment"
+claiming_slots = ["fixum_decl", "sit_decl"]
+
+[[glyphs]]
+glyph = "∇"
+codepoint = "U+2207"
+unicode_name = "NABLA"
+role = "gradient"
+claiming_slots = ["gradient_expr"]
+
+[[glyphs]]
+glyph = "∞"
+codepoint = "U+221E"
+unicode_name = "INFINITY"
+role = "literal"
+claiming_slots = ["literal"]
+
+[[glyphs]]
+glyph = "∧"
+codepoint = "U+2227"
+unicode_name = "LOGICAL AND"
+role = "bitwise"
+claiming_slots = ["bitwise_and_expr"]
+
+[[glyphs]]
+glyph = "∨"
+codepoint = "U+2228"
+unicode_name = "LOGICAL OR"
+role = "bitwise"
+claiming_slots = ["bitwise_or_expr"]
+
+[[glyphs]]
+glyph = "∩"
+codepoint = "U+2229"
+unicode_name = "INTERSECTION"
+role = "type_intersection"
+claiming_slots = ["generic_bound", "genus_decl"]
+
+[[glyphs]]
+glyph = "∪"
+codepoint = "U+222A"
+unicode_name = "UNION"
+role = "type_union"
+claiming_slots = ["type_annotation", "union_hole_type"]
+
+[[glyphs]]
+glyph = "∴"
+codepoint = "U+2234"
+unicode_name = "THEREFORE"
+role = "closure_joint"
+claiming_slots = ["clausura_joint"]
+
+[[glyphs]]
+glyph = "∷"
+codepoint = "U+2237"
+unicode_name = "PROPORTION"
+role = "type_ascription"
+claiming_slots = ["cast_expr", "finge_expr"]
+
+[[glyphs]]
+glyph = "≅"
+codepoint = "U+2245"
+unicode_name = "APPROXIMATELY EQUAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≇"
+codepoint = "U+2247"
+unicode_name = "NEITHER APPROXIMATELY NOR ACTUALLY EQUAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≈"
+codepoint = "U+2248"
+unicode_name = "ALMOST EQUAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≉"
+codepoint = "U+2249"
+unicode_name = "NOT ALMOST EQUAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≠"
+codepoint = "U+2260"
+unicode_name = "NOT EQUAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≡"
+codepoint = "U+2261"
+unicode_name = "IDENTICAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≢"
+codepoint = "U+2262"
+unicode_name = "NOT IDENTICAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≤"
+codepoint = "U+2264"
+unicode_name = "LESS-THAN OR EQUAL TO"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "≥"
+codepoint = "U+2265"
+unicode_name = "GREATER-THAN OR EQUAL TO"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "∈"
+codepoint = "U+2208"
+unicode_name = "ELEMENT OF"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "∉"
+codepoint = "U+2209"
+unicode_name = "NOT AN ELEMENT OF"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "≺"
+codepoint = "U+227A"
+unicode_name = "PRECEDES"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "≻"
+codepoint = "U+227B"
+unicode_name = "SUCCEEDS"
+role = "comparison"
+claiming_slots = ["comparison"]
+
+[[glyphs]]
+glyph = "⊗"
+codepoint = "U+2297"
+unicode_name = "CIRCLED TIMES"
+role = "tensor_product"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "⊘"
+codepoint = "U+2298"
+unicode_name = "CIRCLED DIVISION SLASH"
+role = "tensor_product"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "⊙"
+codepoint = "U+2299"
+unicode_name = "CIRCLED DOT OPERATOR"
+role = "tensor_product"
+claiming_slots = ["multiplicative_expr"]
+
+[[glyphs]]
+glyph = "⊻"
+codepoint = "U+22BB"
+unicode_name = "XOR"
+role = "bitwise"
+claiming_slots = ["bitwise_xor_expr"]
+
+[[glyphs]]
+glyph = "⤒"
+codepoint = "U+2912"
+unicode_name = "UPWARDS ARROW TO BAR"
+role = "arithmetic"
+claiming_slots = ["additive_expr"]
+
+[[glyphs]]
+glyph = "⤓"
+codepoint = "U+2913"
+unicode_name = "DOWNWARDS ARROW TO BAR"
+role = "arithmetic"
+claiming_slots = ["additive_expr"]
+
+[[glyphs]]
+glyph = "§"
+codepoint = "U+00A7"
+unicode_name = "SECTION SIGN"
+role = "template_hole"
+claiming_slots = ["string_template"]
+source_refs = ["EBNF.md:768"]
+
+[[glyphs]]
+glyph = "«"
+codepoint = "U+00AB"
+unicode_name = "LEFT-POINTING DOUBLE ANGLE QUOTATION MARK"
+role = "string_delimiter"
+claiming_slots = ["block_string_literal"]
+source_refs = ["EBNF.md:760", "EBNF.md:779"]
+
+[[glyphs]]
+glyph = "»"
+codepoint = "U+00BB"
+unicode_name = "RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK"
+role = "string_delimiter"
+claiming_slots = ["block_string_literal"]
+source_refs = ["EBNF.md:760", "EBNF.md:779"]
+
+# Read-only reconciliation findings.  These rows record consumer/corpus drift;
+# they do not add a glyph to the grammar registry.
+[[findings]]
+kind = "corpus-stray"
+glyph = "↔"
+codepoint = "U+2194"
+unicode_name = "LEFT RIGHT ARROW"
+source = "radix/corpus/**/*.fab"
+occurrences = 22
+status = "not-claimed"
+note = "Corpus prose uses ↔ for bidirectional conversion; no EBNF production claims it."
+
+[[findings]]
+kind = "corpus-stray"
+glyph = "−"
+codepoint = "U+2212"
+unicode_name = "MINUS SIGN"
+source = "radix/corpus/binarius/binarius.fab"
+occurrences = 2
+status = "not-claimed"
+note = "Comment-only typographic minus; the active arithmetic terminal is ASCII '-'."
+
+[[findings]]
+kind = "corpus-stray"
+glyph = "≯"
+codepoint = "U+226F"
+unicode_name = "NOT GREATER-THAN"
+source = "radix/corpus/si/si.fab"
+occurrences = 1
+status = "not-claimed"
+note = "Comment-only skipped example; no EBNF production claims it."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "–"
+codepoint = "U+2013"
+unicode_name = "EN DASH"
+source = "radix/corpus/**/*.fab"
+occurrences = 3
+status = "documentation-only"
+note = "Prose punctuation, not a Faber terminal."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "—"
+codepoint = "U+2014"
+unicode_name = "EM DASH"
+source = "radix/corpus/**/*.fab"
+occurrences = 1500
+status = "documentation-only"
+note = "Prose punctuation, not a Faber terminal."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "•"
+codepoint = "U+2022"
+unicode_name = "BULLET"
+source = "radix/corpus/**/*.fab"
+occurrences = 1048
+status = "documentation-only"
+note = "Prose list marker, not a Faber terminal."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "❝"
+codepoint = "U+275D"
+unicode_name = "HEAVY DOUBLE TURNED COMMA QUOTATION MARK ORNAMENT"
+source = "radix/corpus/literalia/block-string.fab"
+occurrences = 1
+status = "documentation-only"
+note = "Comment-only retired block-string delimiter example; active block strings use «...»."
+
+[[findings]]
+kind = "corpus-prose"
+glyph = "❞"
+codepoint = "U+275E"
+unicode_name = "HEAVY DOUBLE COMMA QUOTATION MARK ORNAMENT"
+source = "radix/corpus/literalia/block-string.fab"
+occurrences = 1
+status = "documentation-only"
+note = "Comment-only retired block-string delimiter example; active block strings use «...»."
+
+[[findings]]
+kind = "consumer-extra"
+glyph = "!"
+codepoint = "U+0021"
+unicode_name = "EXCLAMATION MARK"
+source = "tree-sitter-faber/grammar.js:526"
+status = "consumer-only"
+note = "tree-sitter-faber lists bare !; EBNF claims ! only as part of !., ![, and !( in nonNullSuffix."
+
+[[findings]]
+kind = "consumer-extra"
+glyph = "⊜"
+codepoint = "U+229C"
+unicode_name = "SQUARED DOT OPERATOR"
+source = "tree-sitter-faber/grammar.js:562"
+status = "consumer-only"
+note = "tree-sitter-faber lists ⊜, but no EBNF production or corpus language example claims it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "·"
+codepoint = "U+00B7"
+unicode_name = "MIDDLE DOT"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF and corpus claim the tensor inner-product glyph; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "×"
+codepoint = "U+00D7"
+unicode_name = "MULTIPLICATION SIGN"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF and corpus claim the tensor cross-product glyph; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "∇"
+codepoint = "U+2207"
+unicode_name = "NABLA"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF claims postfix gradient selection; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "≺"
+codepoint = "U+227A"
+unicode_name = "PRECEDES"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF claims canonical less-than ordering; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "≻"
+codepoint = "U+227B"
+unicode_name = "SUCCEEDS"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF claims canonical greater-than ordering; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "⊗"
+codepoint = "U+2297"
+unicode_name = "CIRCLED TIMES"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF and corpus claim the tensor outer-product glyph; tree-sitter's operator choice does not list it."
+
+[[findings]]
+kind = "consumer-missing"
+glyph = "⊙"
+codepoint = "U+2299"
+unicode_name = "CIRCLED DOT OPERATOR"
+source = "tree-sitter-faber/grammar.js:521-566"
+status = "registry-only"
+note = "EBNF and corpus claim the tensor Hadamard glyph; tree-sitter's operator choice does not list it."
+
+[reconciliation]
+explain_consumer = "radix/corpus/**/*.fab via faber explain"
+explain_symbolic_gaps = []
+tree_sitter_extra = ["!", "⊜"]
+tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
+@keywords
+## Keyword Reference
+#
+# Derived table (GSD-4): every quoted latin keyword literal from the productions.
+# | Category | Faber | Meaning |
+# | --- | --- | --- |
+# | Declarations | `discretio` | tagged union |
+# | Declarations | `fixum` | immutable binding |
+# | Declarations | `functio` | function |
+# | Declarations | `genus` | class |
+# | Declarations | `implendum` | interface contract |
+# | Declarations | `importa` | import |
+# | Declarations | `incipiet` | async entrypoint |
+# | Declarations | `incipit` | entrypoint |
+# | Declarations | `magnitudo` | size/index generic parameter |
+# | Declarations | `nomen` | import binding name |
+# | Declarations | `ordo` | enum |
+# | Declarations | `publica` | public visibility |
+# | Declarations | `regio` | file module name (contextual) |
+# | Declarations | `schema` | relational heading (experimental; census-types) |
+# | Declarations | `columna` | relational column (experimental; census-types) |
+# | Declarations | `sit` | inferred immutable local |
+# | Declarations | `sponte` | optional declaration slot |
+# | Declarations | `typus` | type alias |
+# | Declarations | `varia` | mutable binding |
+# | Declarations | `visibilitas` | visibility field |
+# | Genus | `generis` | static member |
+# | Genus | `implet` | implements |
+# | Comptime | `insere` | build-time file embed |
+# | Control | `casu` | case |
+# | Control | `ceterum` | default case |
+# | Control | `custodi` | guard |
+# | Control | `discerne` | pattern match |
+# | Control | `dum` | while / postfix until |
+# | Control | `elige` | switch |
+# | Control | `ergo` | compact statement-body joint |
+# | Control | `fac` | do block / post-test loop |
+# | Control | `itera` | for |
+# | Control | `perge` | continue |
+# | Control | `redde` | return |
+# | Control | `rumpe` | break |
+# | Control | `secus` | else |
+# | Control | `si` | if |
+# | Control | `sin` | else-if |
+# | Control | `tacet` | no-op |
+# | Error | `adfirma` | assert |
+# | Error | `cape` | local handler |
+# | Error | `capta` | capture boundary (error channel reified as a value) |
+# | Error | `iace` | throw |
+# | Error | `iacit` | throws marker |
+# | Error | `mori` | panic |
+# | Error | `requirit` | require |
+# | Error | `reice` | reject |
+# | Async | `cede` | yield |
+# | Async | `fient` | async stream posture |
+# | Async | `fiet` | async finite posture |
+# | Async | `figendum` | await-bind immutable |
+# | Async | `fiunt` | sync stream posture |
+# | Async | `reddet` | await-return |
+# | Async | `tacebit` | await-discard |
+# | Async | `variandum` | await-bind mutable |
+# | Endpoints | `ad` | capability call |
+# | Boolean | `aut` | or |
+# | Boolean | `est` | is / type test |
+# | Boolean | `et` | and |
+# | Boolean | `falsum` | false |
+# | Boolean | `non` | not |
+# | Boolean | `vel` | nullable default / explicit reduction identity |
+# | Boolean | `verum` | true |
+# | Expression | `argmaxima` | argmax reduction operator (en `argmax`) |
+# | Expression | `argminima` | argmin reduction operator (en `argmin`) |
+# | Expression | `factum` | product reduction operator (en `product`) |
+# | Expression | `maxima` | maximum reduction operator (en `max`) |
+# | Expression | `minima` | minimum reduction operator (en `min`) |
+# | Expression | `numeratio` | count reduction operator (en `count`) |
+# | Expression | `pro` | grouped reduction clause (en `per`; contextual) |
+# | Expression | `quilibet` | any reduction operator (en `any`; contextual) |
+# | Expression | `reducta` | reduction expression head (en `reduce`; contextual) |
+# | Expression | `summa` | sum reduction operator (en `sum`) |
+# | Objects | `clausura` | legacy closure |
+# | Objects | `ego` | self |
+# | Objects | `finge` | construct variant |
+# | Objects | `iuncta` | tuple type/constructor |
+# | Objects | `ratio` | named-field aggregate type/constructor |
+# | Objects | `praefixum` | prefix expression |
+# | Grammar | `primus_quem` | first-match selection head |
+# | Grammar | `ubi` | first-match predicate tail |
+# | Conversion | `via` | convert-hint clause or reduction operator clause (contextual) |
+# | Type | `copy` | copy ownership |
+# | Type | `de` | borrow / for-in keys |
+# | Type | `in` | ownership in |
+# | Type | `modulus` | modular-word policy type head (en `wrapping`) |
+# | Type | `nihil` | none (the null type; D23.2) |
+# | Type | `own` | owned |
+# | Iteration | `ab` | range iteration |
+# | Iteration | `ante` | range until exclusive |
+# | Iteration | `ex` | for-of / import from / reduction source |
+# | Iteration | `per` | range step |
+# | Iteration | `usque` | range until inclusive |
+# | Params | `argumenta` | CLI arguments modifier |
+# | Params | `ceteri` | rest |
+# | Params | `errata` | error channel |
+# | Params | `exitus` | exit code |
+# | Params | `immutata` | immutable modifier |
+# | Params | `omnia` | all reduction operator / glob |
+# | Params | `optiones` | options modifier |
+# | Params | `sparge` | spread |
+# | Params | `ut` | as / alias |
+# | Diagnostics | `mone` | warn |
+# | Diagnostics | `nota` | note |
+# | Diagnostics | `scribe` | diagnostic channel |
+# | Diagnostics | `vide` | debug |
+# | Literals | `nulla` | null |
+# | Literals | `nonnumerus` | named NaN literal (`nan` outside the Latin pack) |
+# | JSON | `false` | JSON false |
+# | JSON | `null` | JSON null |
+# | JSON | `true` | JSON true |
+# | Builtin | `lege` | read |
+# | Builtin | `lineam` | line |
+# | Builtin | `scriptum` | write |
+# | Annotation | `fragment` | nucleum fragment |
+# | Annotation | `nucleum` | kernel annotation |
+# | Annotation | `radix` | compiler-reserved annotation family |
+# | Annotation | `lane` | `@ radix` compiler-lane directive |
+# | Annotation | `contract` | `@ radix` contract-role mark |
+# | Annotation | `backward` | `@ radix` gradient-companion directive |
+# | Testing | `erratur` | expect failure |
+# | Testing | `fragilis` | flaky |
+# | Testing | `futurum` | future |
+# | Testing | `metior` | benchmark |
+# | Testing | `omitte` | skip |
+# | Testing | `postpara` | teardown |
+# | Testing | `postparabit` | async teardown |
+# | Testing | `praepara` | setup |
+# | Testing | `praeparabit` | async setup |
+# | Testing | `proba` | test |
+# | Testing | `probandum` | test suite |
+# | Testing | `repete` | repeat |
+# | Testing | `solum` | only |
+# | Testing | `solum_in` | only-in |
+# | Testing | `tag` | tag |
+# | Testing | `temporis` | timeout |
+#
+## End derived keyword table
+
+@lexicon
+# Lexical tier. Empty RHS; status is capture-pending. radix-lexer / driver /
+# parser is the authority (crates/radix-lexer/src/). Not a second lexer spec.
+
+# scan.rs scan_identifier; Unicode XID_Start or '_' then XID_Continue or '_'; NFKC intern; TokenKind::Ident (keywords also lex as identifiers)
+@status capture-pending
+IDENTIFIER ::=
+
+# scan.rs scan_number; decimal/hex/bin/oct integers and floats with '_' separators; TokenKind::Integer(u64) when the value fits u64, TokenKind::BigInteger(text) when an integer literal is longer (no upper bound on length; inf track, F9 ruling 34) or Float(f64); a BigInteger is legal only where an expression literal or a `casu` constant pattern stands (its value must then fit the receiving slot: always an `inf` slot, otherwise the slot's range) and is a parse error in a NATURAL, enum-member or JSON-literal position (a JSON integer keeps the signed 64-bit wire range: `json_integer_overflow` / `json_integer_underflow`); scan.rs also lexes the glyph '∞' as Float(+inf), never an `inf` value
+@status capture-pending
+NUMBER ::=
+
+# not a distinct lexer token; TokenKind::Integer (so at most u64::MAX; a BigInteger here is a parse error) used as magnitudo capacity in type position, as the count of a `proba` modifier (`temporis`, `repete`, `fragilis`; a float is `test_modifier_integer`), and as a function's `exitus` code (no fraction/exponent)
+@status capture-pending
+NATURAL ::=
+
+# scan.rs scan_string / scan_guillemet_block_string; double-quoted or guillemet block; TokenKind::String
+@status capture-pending
+STRING ::=
+
+# scan.rs scan_ascii_string; single-quoted; TokenKind::AsciiString
+@status capture-pending
+ASCII_STRING ::=
+
+# scan.rs scan_backtick_string; backtick forma template; TokenKind::BacktickString
+@status capture-pending
+BACKTICK_STRING ::=
+
+# scan.rs scan_octeti_string; pipe-delimited hex; TokenKind::OctetiString
+@status capture-pending
+OCTETI_STRING ::=
+
+# scan.rs scan_line_break; LF or CRLF; TokenKind::Newline
+@status capture-pending
+NEWLINE ::=
+
+# parser type-position identifier i8/i16/i32/i64/u8/u16/u32/u64 and decimal d64 (numerus and exactus), f16/bf16/f32/f64 (fractus only); every integer width i8…u64 (modulus and saturatus; no d64, no float); integer widths and d64 (exactus; a float width is `trapping_float_not_implemented`); the unbounded integer marker `inf` (numerus, exactus, modulus and saturatus all name the same type; locale-invariant, not a keyword; never prefixed sugar; not a float width; not a tensor, sparsa, vector or matrix element; host-only, so no kernel or AIR-lane position takes it); not a lexer token
+@status capture-pending
+WIDTH_MARKER ::=
+
+# parser type-position l + WIDTH_MARKER; not a lexer token
+@status capture-pending
+LISTA_WIDTH_SUGAR ::=
+
+# parser type-position t + WIDTH_MARKER; not a lexer token
+@status capture-pending
+TENSOR_WIDTH_SUGAR ::=
+
+# parser type-position s + WIDTH_MARKER; not a lexer token
+@status capture-pending
+SPARSA_WIDTH_SUGAR ::=
+
+# parser type-position v + WIDTH_MARKER; not a lexer token
+@status capture-pending
+VECTOR_WIDTH_SUGAR ::=
+
+# parser type-position m + WIDTH_MARKER; not a lexer token
+@status capture-pending
+MATRIX_WIDTH_SUGAR ::=
+
+# driver peels a line whose trimmed content is exactly +++ before lexing
+@status capture-pending
+FRONTMATTER_DELIMITER ::=
+
+# driver; TOML body between FRONTMATTER_DELIMITER lines
+@status capture-pending
+TOML_LINES ::=
+
+# parser; identifier spelling after @, including keyword spellings
+@status capture-pending
+ANNOTATION_NAME ::=
+
+# parser; identifier spelling in annotation field position
+@status capture-pending
+ANNOTATION_FIELD_NAME ::=
+
+# parser; one ordinary token other than TokenKind::Newline
+@status capture-pending
+NON_NEWLINE_TOKEN ::=
+
+# parser zero-width constraint: adjacent parts stay on the same logical line
+@status capture-pending
+NO_NEWLINE ::=
+@rewrite
+
+fab_file       := frontmatter? program
+frontmatter   := FRONTMATTER_DELIMITER NEWLINE TOML_LINES FRONTMATTER_DELIMITER NEWLINE?
+program       := regio_decl? statement*
+# `regio_decl` (D7.7, en `module`): an optional file name, at most one, and
+# only as the file's first declaration — before any import or other
+# statement (`module_declaration_duplicate` on a second one,
+# `module_declaration_misplaced` elsewhere). `regio` is contextual: it is
+# claimed only in this leading, statement-initial position followed by an
+# identifier; every other appearance of the spelling is an ordinary
+# identifier (e.g. a field or local named `regio`). It does two jobs: the
+# name is the file's default import binding (`importa ex "library:geo"`
+# binds the declared name instead of the last path segment), and it is the
+# anchor for the module's documentation comment (the leading comment block
+# directly above it, D7.3/D7.6), replacing the old "first block in the file"
+# rule. A file without it keeps today's behaviour (default import name = last
+# path segment; leading comment block still attaches forward to whatever
+# follows). Two imports that would default to the same name are a compile
+# error; alias one with `ut`.
+regio_decl    := 'regio' IDENTIFIER
+statement     := annotation* statement_core | ad_handler_decl | nondum_functio_decl
+# An `@ ad '<route>'` annotation must be followed — directly, or after further
+# stacked annotations — by a `functio` (`ad_annotation_requires_functio`); it
+# attaches to no other declaration and to no `genus` member, `discretio` field
+# or `implendum` method, so `annotation` below leaves it out. Top-level
+# placement, handler shape and reserved routes are semantic.
+ad_handler_decl := annotation* ad_annotation annotation* functio_decl
+# A top-level `functio` marked `@ nondum` (en `@ unstable`) may omit its
+# block: the declaration is part of the interface and is unavailable, so any
+# use of it — a call, a call through an imported namespace or name, or the
+# function taken as a value — is refused (`SEM017 nondum_function_for_target`),
+# and no backend emits it. The annotation need not be the only one; stacked
+# annotations may precede or follow it. A signature-only `functio` without
+# `@ nondum` stays `PARSE012 function_body_absent`, and the exemption reaches
+# only the `functio` directly after the annotations: never a nested
+# declaration or a later top-level declaration. A `genus` method gets the same
+# exemption through `nondum_method_decl`. Library analysis of a
+# `kind = "lib"` package or an imported library interface additionally accepts
+# any signature-only `functio` as a binding declaration (a parser option, not
+# part of this grammar).
+nondum_functio_decl := annotation* nondum_annotation annotation* 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
+statement_core := importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl
+               | typus_decl | ordo_decl | discretio_decl | schema_decl
+               | si_stmt | dum_stmt | itera_stmt
+               | elige_stmt | discerne_stmt | custodi_stmt | fac_stmt
+               | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt
+               | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt
+               | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt
+               | ex_stmt | probandum_decl | proba_stmt | block_stmt
+               | inc_dec_stmt | expr_stmt
+binding_decl   := fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
+expr_stmt      := expression
+block_stmt     := '{' statement* '}'
+# `const_init` (D8.10, st1 R4): the initializer of an `=` binding is either the
+# build-time file embed or an ordinary expression (`praefixum { … }` is an
+# expression, D8.4-D8.6). It is the `=` tail of a `fixum` constant, at module
+# level or inside a block (`fixum_decl`), and of a `genus` field default under
+# any of the three modifiers (`genus_field_decl`, `field_decl`).
+const_init     := insere_expr | expression
+# `insere` (en `embed`, D8.10) is contextual: the parser claims it in
+# expression-primary position when the word is directly followed by a string
+# literal; any other appearance of the spelling (a call `insere(21)`, a binding
+# named `insere`) stays an ordinary identifier. Lowering admits an
+# `insere_expr` only as the whole initializer of a `const_init` — a
+# module-level `=` constant, a block-level `=` constant, or a `genus` field
+# default under any modifier (`generis`, `fixum`, `varia`). Anywhere else
+# (`x ← insere "p"`, a call argument, a `redde` value) it is `SEM061`
+# `insere_outside_constant`; as a bare operand of a larger initializer
+# expression it has no slot of its own (`insere_type_required`). The string is
+# a package-relative path, resolved against the nearest ancestor `faber.toml`
+# (or, absent one, the source file's own directory); an absolute path or a `..`
+# escape is rejected, and a missing file is a compile error. The file is a
+# build input, read once at compile time. The result's type follows the slot,
+# the declared type of the constant or field: `textus` requires the file to be
+# valid UTF-8; `octeti` reads the raw bytes. A `_` slot, or no slot, is `SEM061`
+# `insere_type_required`; any other concrete slot type is `SEM061`
+# `insere_type_invalid`.
+insere_expr    := 'insere' STRING
+
+# `fixum T x = e` (D5.10) is a typed constant: `=` states a compile-time fact,
+# so `e` is evaluated while compiling (literals, arithmetic, module constants
+# and earlier constants) and must fit `T` whatever `T`'s policy. At the top of a
+# file the same declaration is the module-level constant (st1 R1; en
+# `const T X = e`); that is the only value a module can declare, so a
+# module-level `varia`, `sit`, destructuring, or a runtime `←` / `↤` / `↢`
+# initializer is `SEM062 top_level_binding`. `varia` never takes `=`
+# (`varia_compile_time_initializer`); a runtime store is `←`. The retired
+# `generis T X = e` declaration (en `static`) parses whole for recovery and is
+# reported as `PARSE010 static_decl_retired`, at the top level and in blocks
+# alike; `generis` survives only as the `genus` field modifier below.
+fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
+figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
+sit_decl      := 'sit' IDENTIFIER (('←' | '↢') expression)?
+array_destruct := ('fixum' | 'varia') array_pattern '←' expression
+object_destruct := ('fixum' | 'varia') object_pattern '←' expression
+
+functio_decl     := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
+param_list    := (parameter (',' parameter)*)?
+generic_params := '<' (type_param_list (',' size_param_list)? | size_param_list) '>'
+# Type parameters come first and `magnitudo` size parameters after them: a type
+# parameter following a size parameter is `type_param_after_magnitudo`.
+type_param_list := generic_param (',' generic_param)*
+size_param_list := size_param (',' size_param)*
+generic_param  := IDENTIFIER generic_bound? generic_type_default?
+size_param     := 'magnitudo' IDENTIFIER generic_size_default?
+# defaults are declaration-time facts; once one parameter defaults, every following parameter must default (`generic_default_not_trailing`)
+# `generic_bound` (D1.1-D1.3, C1): a type parameter may name the contracts its
+# witnesses must declare. Inside `<…>` the comma separates parameters, so
+# several bounds on one parameter join with `∩` only — a comma there would
+# read as the next parameter. Bounds are checked (and usable inside the
+# bounded body) only on a `functio_decl` / `functio_method_decl` type
+# parameter; the same clause parses on `genus_decl` / `typus_decl` /
+# `discretio_decl` / `implendum_decl` type parameters but is rejected there
+# (`implet_bound_on_type_declaration`) — those declarations state contracts
+# through `genus_decl`'s own `implet` clause, not a parameter bound.
+generic_bound := 'implet' contract_ref ('∩' contract_ref)*
+# `contract_ref` (C1): a generic contract is always written with its type
+# arguments in full (`Orderable<Persona>`, `Orderable<T>`); there is no
+# bare-name shorthand for a generic `implendum` (`implet_contract_arity` when
+# the argument count does not match the contract's declared parameters). The
+# angle-bracket part is grammatically optional only for a zero-parameter
+# contract.
+contract_ref := IDENTIFIER ('<' type_annotation (',' type_annotation)* '>')?
+generic_type_default := '=' type_annotation
+generic_size_default := '=' NATURAL
+call_type_args  := '<' type_annotation (',' type_annotation)* '>'
+parameter    := 'ceteri'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
+func_modifier := 'argumenta' IDENTIFIER | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NATURAL) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
+callable_posture := 'fiet' | 'fiunt' | 'fient'
+return_clause := '→' type_annotation
+alternate_exit_clause := '⇥' type_annotation
+ergo_joint  := 'ergo'
+clausura_joint  := '∴'
+clausura_expr   := compact_clausura_expr | clausura_legacy_expr
+compact_clausura_expr := clausura_signature clausura_joint (expression | fac_block)
+clausura_signature := (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
+fac_block := 'fac' block_stmt cape_clause?
+clausura_legacy_expr := 'clausura' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
+clausura_params := clausura_param (',' clausura_param)*
+clausura_param  := type_annotation IDENTIFIER
+
+genus_decl    := 'genus' IDENTIFIER generic_params? ('implet' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
+genus_member  := annotation* (genus_field_decl | functio_method_decl) | nondum_method_decl
+# A `genus` method marked `@ nondum` (en `@ unstable`) may omit its block, like
+# a top-level `functio` (`nondum_functio_decl`): the method is declared and
+# unavailable, a call of it — through an instance, through `self`, or through an
+# imported genus — is refused (`SEM017 nondum_function_for_target`), no backend
+# emits it, and the genus's other methods are unaffected. The annotation need
+# not be the only one; the exemption reaches only the method directly after
+# the annotations. A signature-only method without `@ nondum` stays `PARSE012
+# function_body_absent`.
+nondum_method_decl := annotation* nondum_annotation annotation* 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
+# `genus_field_decl` (D16.1-D16.3, D5c): every `genus` field declares exactly one
+# of `fixum` / `varia` / `generis` — there is no default, and an unmarked genus
+# field is PARSE010 `field_modifier_missing`. The unmarked form survives only
+# in the `discretio` shared-field position (`union_member` → `field_decl`, fork
+# F7 held).
+# `fixum T x`: set only in a construction literal (`Genus { … }`), never
+# reassigned (`SEM020 assignment_to_fixum_field`); `Genus { … } ex p` copies
+# it unchanged. `varia T x`: reassignable per instance. `generis T X = …`: one
+# per type, compile-time. Independent of visibility (`@ privata` + `fixum` is
+# legal). The initializer is `const_init` (D8.10): under all three modifiers a
+# field default may be an ordinary expression, the build-time `insere_expr`, or
+# a `praefixum { … }` block.
+genus_field_decl := ('fixum' | 'varia' | 'generis') type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
+# `field_decl` is the `discretio` shared-field form, where the modifier stays
+# optional (F7 held); `genus_field_decl` above is the `genus` form.
+field_decl    := ('fixum' | 'varia' | 'generis')? type_annotation IDENTIFIER 'sponte'? ('=' const_init)?
+functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
+
+annotation            := nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
+annotation_name        := ANNOTATION_NAME
+braced_annotation      := '@' annotation_name '{' annotation_field_list? '}'
+annotation_field_list   := annotation_field (',' annotation_field)*
+annotation_field       := ANNOTATION_FIELD_NAME '=' (expression | concrete_type)
+annotation_sugar       := '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
+nucleum_annotation     := nucleum_sugar | nucleum_braced
+nucleum_sugar          := '@' 'nucleum' nucleum_modifier? NEWLINE
+nucleum_braced         := '@' 'nucleum' '{' nucleum_field_list? '}'
+nucleum_modifier       := 'fragment'
+nucleum_field_list      := nucleum_field (',' nucleum_field)*
+nucleum_field          := 'fragment' '=' ('verum' | 'falsum')
+# `@ radix` is reserved for compiler-owned metadata; applications must not
+# define or rely on it. Directive words `lane` and `backward` are claimed by
+# exact spelling after `@ radix`. The braced records `@ radix { lane = STRING }`
+# and `@ radix { param = IDENT, allowed = TYPE, ... }` use braced_annotation.
+# `contract STRING` (D1.4) marks an `implendum` as a norma contract the
+# compiler itself must recognize, because built-in types conform to it and
+# operators derive from it: `@ radix contract "ordering"` on norma's
+# `Orderable<T>` (`norma:order`). The mark reuses this same
+# `@ radix <directive> STRING` shape; `contract`, like `backward`, is a plain
+# claimed spelling, not a locale-translated keyword. Valid only on an
+# `implendum_decl`; the compiler finds the contract by the mark, never by its
+# name. `"ordering"` is the only recognized role today.
+radix_annotation       := '@' 'radix' radix_directive NEWLINE
+radix_directive        := 'lane' STRING | 'backward' STRING | 'contract' STRING | 'typus' IDENTIFIER 'in' concrete_type+
+# `@ ad '<route>'` (en `@ call`) registers a top-level `functio` as the handler
+# for one exact route. Pattern routes (`@ ad sed "…"`) are deferred.
+ad_annotation          := '@' 'ad' ASCII_STRING NEWLINE
+# `@ nondum [TARGET] ["REASON"]` (en `@ unstable`): the availability marker.
+# Without a target the declaration is unavailable on every target. It is an
+# `annotation_sugar` or `braced_annotation` with the claimed name `nondum`
+# (`{ target = …, ratio = "…" }` in the braced spelling); this production names
+# it only so `nondum_functio_decl` can require it.
+nondum_annotation      := '@' 'nondum' NON_NEWLINE_TOKEN* NEWLINE | '@' 'nondum' '{' annotation_field_list? '}'
+
+implendum_decl   := 'implendum' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
+implendum_method_decl := annotation* 'functio' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
+
+typus_decl := 'typus' IDENTIFIER generic_params? '=' type_annotation
+
+ordo_decl   := 'ordo' IDENTIFIER '{' enum_member (',' enum_member)* '}'
+enum_member := IDENTIFIER ('=' ('-'? NUMBER | STRING))?
+
+discretio_decl := 'discretio' IDENTIFIER generic_params? '{' union_fields? variant (',' variant)* '}'
+# Shared fields come first, before every variant. The first shared field must
+# open with an annotation — `@ commune` (en `@ shared`) in practice — and the
+# fields after it join the same region with or without one; a bare `T name`
+# before any annotation reads as a variant. A variant may not redeclare a
+# shared field (`union_variant_redeclares_shared_field`).
+union_fields  := annotation+ field_decl union_member*
+union_member  := annotation* field_decl
+variant       := IDENTIFIER ('{' variant_fields '}')?
+variant_fields := (type_annotation IDENTIFIER)*
+
+# Experimental (owned by the census-types goal): a relational heading naming
+# only the columns the application reads. Columns take no separator but each row
+# starts on its own line (a same-line `columna` after a row is
+# `schema_nested_column`); the
+# optional `: source` row maps the public column name to a source column.
+schema_decl   := 'schema' IDENTIFIER '{' (schema_column (NEWLINE schema_column)*)? '}'
+schema_column := 'columna' type_annotation IDENTIFIER (':' IDENTIFIER)?
+
+importa_decl     := importa_record | importa_sugar
+importa_record   := 'importa' '{' import_field_list '}'
+# A record needs its `ex = STRING` source (`missing_import_source`); `omnia`
+# cannot be combined with `nomen` or `ut` (`mixed_wildcard_and_named_import`),
+# `visibilitas` takes only `publica`, and an unknown field is
+# `unknown_import_field`.
+import_field_list := import_field (',' import_field)*
+import_field    := ex_field | visibilitas_field | nomen_field
+                | ut_field | omnia_field
+ex_field := 'ex' '=' STRING
+visibilitas_field := 'visibilitas' '=' publica
+nomen_field := 'nomen' '=' IDENTIFIER
+ut_field := 'ut' '=' IDENTIFIER
+omnia_field := 'omnia' '=' IDENTIFIER
+
+importa_sugar    := 'importa' 'ex' STRING publica? (named_import | wildcard_import | selective_import)?
+publica    := 'publica'
+named_import   := IDENTIFIER ('ut' IDENTIFIER)?
+wildcard_import := '*' 'ut' IDENTIFIER
+# Selective imports (EOT-2): one immutable local binding per exported member,
+# value or type; the imported interface supplies the complete type. The parser
+# tolerates one trailing comma after the final member; the canonical spine
+# keeps every comma required (comma law).
+selective_import := 'fixum' import_value_binding (',' import_value_binding)*
+import_value_binding := IDENTIFIER ('ut' IDENTIFIER)?
+
+type_annotation := union_hole_type | concrete_type
+# `concrete_type` is every type expression except the standalone `∪` hole. The
+# slots that cannot take a hole take this form: a static's declared type, an
+# annotation field's type value and the `@ radix typus` domain list. (The
+# monomorphic hole `_` is also rejected in a static's type slot; it stays a
+# legal member of a union elsewhere.)
+concrete_type   := intersection_type ('∪' intersection_type)*
+# The standalone union hole `∪` is a complete type expression: it consumes the
+# whole type, so a following `∪` or `∩` (`∪ ∪ A`, `∪ ∩ A`) is a parse error
+# (`unexpected_cup_after_union_hole`), and it is never a member of a union or
+# intersection. The monomorphic hole `_` (`hole_type`) has no such rule.
+union_hole_type := ('de' | 'in' | 'own' | 'copy')? '∪'
+# `∩` binds tighter than `∪`: the cup tail parses at intersection level.
+intersection_type := owned_type ('∩' owned_type)*
+owned_type      := ('de' | 'in' | 'own' | 'copy')? base_type
+# There is no grouping parenthesis in type position: `(` opens a function type
+# only, so `(A ∪ B)` is a parse error. A union member that needs its own access
+# marker is written on the member (`de A ∪ B`).
+base_type       := hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
+# `promissum<T ⇥ E>` is the failable promise: the only applied type whose
+# argument list carries an alternate-exit clause. The head must be the
+# `promissum` type name (a keyword-free type spelling, so it is an IDENTIFIER
+# here); any other head, and the comma form `promissum<T, E>`, is a parse error
+# (`promissum_alternate_uses_exit_arrow`). `promissum<T>` with no `⇥` is an
+# ordinary `qualified_type type_arguments`.
+failable_promissum_type := IDENTIFIER '<' type_annotation alternate_exit_clause '>'
+ratio_type      := 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
+hole_type       := '_'
+# `modulus` (en `wrapping`, the modular-word policy) is claimed as a type-name
+# head by the type parser, so `modulus<u32>` is an ordinary applied type
+# (`exactus` and `saturatus` are plain identifiers). Outside a type slot the
+# spelling is an ordinary identifier.
+qualified_type  := type_head ('.' IDENTIFIER)*
+type_head       := IDENTIFIER | 'modulus'
+# The bare numeric type words `numerus` and `fractus` (and their locale words)
+# take no type arguments: the wrapped spelling `numerus<W>` / `fractus<W>`,
+# including the holes `numerus<_>` / `fractus<_>`, is a parse error
+# (`numeric_wrapper_retired`), not a production of this grammar. A width marker
+# is its own type (`width_type_sugar`); only the policy words `modulus`,
+# `saturatus` and `exactus` wrap a marker (`modulus<u32>`).
+type_arguments  := '<' type_argument (',' type_argument)* '>'
+type_argument   := labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
+labeled_type_argument := IDENTIFIER ':' type_annotation
+width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
+                | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix?
+                | MATRIX_WIDTH_SUGAR shape_suffix
+shape_suffix    := '[' figura_list? ']'
+figura          := figura_product (('+' | '-') NATURAL)*
+figura_product  := figura_primary ('/' NATURAL)*
+figura_primary  := '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
+figura_list     := figura (',' figura)*
+function_type   := '(' type_list? ')' '→' type_annotation alternate_exit_clause?
+type_list       := type_annotation (',' type_annotation)*
+
+si_stmt     := 'si' si_tail
+# `sin` is the else-if word and is followed directly by the next condition,
+# not by another `si`: `si a { … } sin b { … } secus { … }`. Both `sin si b`
+# and `secus si b` are parse errors. Each branch arm may carry its own `cape`.
+si_tail     := expression arm ('sin' si_tail | secus_clause)?
+secus_clause := 'secus' else_arm
+arm        := (block_stmt | ergo_joint statement) cape_clause?
+else_arm    := (block_stmt | ergo_joint statement) cape_clause?
+
+dum_stmt  := 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
+# A top-level `_` in the itera binder parses as the legacy unused loop-variable
+# identifier, not a destructuring wildcard. `ex` and `ab` admit the
+# comma-separated source series (`ex` lockstep zip, `ab` Cartesian product);
+# `de` stays single-source. Patterns bind only the single-source form.
+itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_binding := array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
+# `apud` (C7, D3.1-D3.4): one name binds a `lista` position, a `tabula` key,
+# or (for a composite `tabula<iuncta<K1, …, Kn>, V>`) N names for the parts of
+# the `iuncta` key, in addition to the tensor/matrix axis coordinates above.
+# `copia`, cursors, generators, `textus`, and `sparsa` have no index surface
+# and reject `apud` fail-closed (`SEM010 itera_apud_requires_indexed_iterable`).
+# The same-shaped bracket list indexes a composite key directly outside a
+# loop: `m[[k1, …, kn]]` on that `tabula` reads/writes the entry keyed by that
+# `iuncta` (ordinary `index_expr`, not a distinct production). A `tabula` key
+# or `copia` element must be hashable — no `fractus`, no mutable collection,
+# no `valor`/`json`/regex; `iuncta`/`genus`/`discretio` keys are hashable when
+# every part is (`tabula_key_not_hashable`, `copia_element_not_hashable`).
+# Map/set iteration order is unspecified.
+apud_clause := 'apud' '[' IDENTIFIER (',' IDENTIFIER)* ']'
+
+elige_stmt    := 'elige' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
+casu_elige_clause    := 'casu' expression (block_stmt | ergo_joint statement)
+ceterum_clause  := 'ceterum' (block_stmt | ergo_joint statement)
+
+discerne_stmt := 'discerne' 'omnia'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
+discriminants := subject_path ('et' subject_path)*
+# A `discerne` subject is a name or member path, not an expression; bind a
+# call or computed value to a name first.
+subject_path := IDENTIFIER ('.' IDENTIFIER)*
+casu_variant_clause  := 'casu' patterns (block_stmt | ergo_joint statement)
+patterns     := pattern ('et' pattern)*
+# `aut` joins alternatives for one subject into one pattern; `et` separates
+# patterns for multi-subject arms. A comma only separates the field bindings
+# inside one variant pattern, never two patterns.
+pattern      := pattern_atom ('aut' pattern_atom)*
+# A one-segment type name in a `discerne` arm is classified as a type pattern
+# by the parser's type-name lookahead; qualified paths remain variant patterns.
+pattern_atom  := '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
+# The lexer never signs a number, so a pattern claims a leading `-` directly
+# before a number literal as its sign (`casu -1`). `∞` is a NUMBER, so `-∞` is
+# a negated number. `-` before anything else is not pattern syntax. A NaN
+# literal (`nonnumerus`) in a pattern slot is rejected: NaN never equals itself.
+negated_number := '-' NUMBER
+# Type arguments name a generic member type (`casu lista<numerus>`). `discerne`
+# matches a closed set only (a union's members, an enum's variants), so a type
+# pattern that is not a member of the scrutinee's closed set — a length-shaped
+# collection (`lista<T, 4>`) or a numeric width (`u32` over `numerus`) — parses
+# but is rejected (`SEM010 discerne_pattern_not_in_closed_set`).
+type_pattern := IDENTIFIER type_arguments? ut_pattern?
+ut_pattern  := ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
+pattern_binding := IDENTIFIER ('ut' IDENTIFIER)?
+
+custodi_stmt   := 'custodi' '{' si_guard_clause+ '}'
+si_guard_clause := 'si' expression (block_stmt | ergo_joint statement)
+
+
+ex_stmt   := 'ex' expression ('fixum' | 'varia') extract_fields
+extract_fields := extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
+extract_field  := IDENTIFIER ('ut' IDENTIFIER)?
+ceteri_field     := 'ceteri' IDENTIFIER
+
+redde_stmt   := 'redde' expression?
+reddet_stmt := 'reddet' expression
+tacebit_stmt := 'tacebit' expression
+cede_stmt    := 'cede' expression
+rumpe_stmt    := 'rumpe'
+perge_stmt := 'perge'
+tacet_stmt     := 'tacet'
+
+iace_stmt         := iace_expr | iace_guarded_expr
+iace_expr         := ('iace' | 'mori') expression
+iace_guarded_expr := ('iace' | 'mori') expression NO_NEWLINE 'si' expression
+cape_clause       := 'cape' IDENTIFIER block_stmt
+adfirma_stmt        := 'adfirma' expression ('mori' expression)?
+requirit_stmt      := 'requirit' expression 'iace' expression
+reice_stmt         := 'reice' expression 'iace' expression
+
+expression := assignment
+# Copy-into: `target ⇇ value` copies the values of `value` into the existing
+# storage of `target`. Binds above assignment and below ternary; operands are
+# complete before the copy. One ⇇ per statement: a chain is `copy_into_chain`.
+transfer   := ternary ('⇇' ternary)?
+assignment := transfer ('←' assignment | '↤' assignment inline_default?)?
+inc_dec_stmt := place ('↑' | '↓')
+place      := call_expr  (* semantic analysis requires an assignable target *)
+# `c ✓ a ✗ b` is the one value conditional (D4.5), one level only (D4.6): a
+# `✓ ✗` inside the condition or either branch is rejected (`conditional_nested`).
+ternary    := aut_expr ('✓' expression '✗' aut_expr)?
+aut_expr         := et_expr (('aut') et_expr)*
+et_expr        := equality (('et') equality)*
+equality   := comparison equality_tail*
+# The equality tier carries two jobs that share a precedence level, not a
+# meaning (D23.1): a value comparison with a `comparison` on the right, and a
+# type test (`est` / `non est`) with a *type* on the right.
+equality_tail := ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison
+               | ('est' | 'non' 'est') type_annotation
+comparison := format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
+# Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;
+# membership uses the glyphs `∈`/`∉` (element of / not an element of). One
+# operator covers collection membership and range containment; the semantic
+# pass dispatches on the right operand's type, not on the spelling. `∉` is the
+# first-class negation (not sugar over `non`), and there is no ASCII spelling.
+# `¶` (D2.1) is looser than arithmetic and tighter than comparison, so both
+# operands of a comparison see the format tier first: `a + b ¶ ".2" ≤ 100 ¶ ".2"`
+# is `(a + b ¶ ".2") ≤ (100 ¶ ".2")`. The spec must be a string literal
+# (D2.2); `¶` does not chain (`format_chained`).
+format_expr := bitwise_or_expr ('¶' STRING)?
+bitwise_or_expr  := bitwise_xor_expr ('∨' bitwise_xor_expr)*
+bitwise_xor_expr := bitwise_and_expr ('⊻' bitwise_and_expr)*
+bitwise_and_expr := shift_expr ('∧' shift_expr)*
+shift_expr      := range_expr (('⇐' | '⇒') range_expr)*
+range_expr      := additive_expr range_tail?
+range_tail  := ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_expr)?
+# `⤒` (maximum) and `⤓` (minimum) are arithmetic extrema at the additive tier,
+# left-associative: `a ⤒ b ⤓ c` is `(a ⤒ b) ⤓ c`.
+additive_expr   := multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
+# Glyph products (`·` `×` `⊗` `⊙`) and Hadamard divide `⊘` bind at the
+# multiplicative level with `*`, left-associative. `·` inner product
+# dispatches dot/matvec/matmul by rank.
+# `/` and `÷` are two divisions (D11.6). On integers `/` is floor division
+# (`-7 / 2` is -4) and `%` is the matching remainder, which takes the divisor's
+# sign (`-7 % 2` is 1); the only failure is a zero divisor. `÷` is true
+# division and never yields an integer: `7 ÷ 2` is 3.5. On integers it yields
+# `f32` when the widest operand is 8 or 16 bits and `f64` for 32 or 64 bits
+# (an untyped constant joins by value: `u8 ÷ 2` is `f32`, `7 ÷ 2` is `f64`);
+# on floats and `d64` it equals `/`. `÷` has `/`'s precedence and
+# associativity and the same glyph in every locale.
+multiplicative_expr := vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
+# `vel` is local nullable elimination (`T ∪ nihil vel T → T`), not logical `aut`.
+# It binds tighter than arithmetic so `prefix + item vel ""` is `prefix + (item vel "")`.
+# `velRhs` greedily consumes a following range tail, so `a vel b‥c` is `a vel (b‥c)`.
+vel_expr   := unary_expr ('vel' vel_rhs)*
+vel_rhs     := unary_expr vel_range_tail?
+vel_range_tail := ('‥' | '…' | 'ante' | 'usque') unary_expr ('per' unary_expr)?
+unary_expr      := ('-' | '¬' | 'non') unary_expr | finge_expr | cast_expr
+# `∇` is a structural POSTFIX gradient-selection operator, never a prefix unary
+# form. It binds in the expression postfix fold after calls have been formed,
+# and its optional selector bracket is consumed as part of the gradient suffix
+# before ordinary postfix continuation resumes. The concrete parser accepts an
+# ordinary expression as the left side; semantic analysis must require it to
+# resolve to an eligible differentiable forward call.
+gradient_expr := call_expr ('∇' gradient_selection?)?
+gradient_selection := '[' gradient_place (',' gradient_place)* ']'
+gradient_place := expression  (* semantic analysis requires a direct call_expr argument place *)
+# `inline_default` after the cast/conversio repeats (X3, D17.7) is the call
+# default: a trailing `⊥` following an operand whose last postfix step was a
+# call is that call's default, evaluated only when the call fails through its
+# `⇥` channel (`f() ⊥ 0`); the call must be failable, and the default must
+# type-check as the success type, same rules as the conversion default below.
+# `⊥` after any other non-conversion operand — one that ends in neither a
+# call nor `↦ T` — is rejected (`default_requires_failable`); it is not a
+# general postfix operator. `f() ⊥ 0 ⊥ 1` (a second default) is the same
+# rejection: one default per expression.
+cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
+# `via` (D11.9) is the convert-hint clause: a modifier of the conversion, not
+# part of the target type (`"ff" ↦ i32 via Hex`, `octeti[0‥2] ↦ u16 via Le`).
+# It binds tighter than the `⊥` default: `x ↦ u32 via Hex ⊥ 0` is
+# `(x ↦ u32 via Hex) ⊥ 0`. The retired spellings — the hint as a further type
+# argument (`ascii<N, Hex>`, `littera<Code>`) and as a bracketed tail
+# (`octeti<16><Le>`) — are parse errors (`conversio_hint_type_argument`,
+# `conversio_hint_tail_argument`), not productions of this grammar.
+conversio_expr        := '↦' (type_annotation | interval_target) via_clause? inline_default?
+# `interval_target` is the interval clamp: `15 ↦ 0‥10` clamps the value into the
+# half-open range (9), `15 ↦ 0…10` into the closed one (10), and `x ↦ fines`
+# clamps into a stored `intervallum` value; a range-typed source clamps into the
+# target range (`wide ↦ 10…50`). The parser reads the target as an interval
+# operand — instead of a type — when it opens with a number literal or a
+# non-type identifier (a capitalized name, a known type word or a qualified
+# `ns.Type` stays a type). A clamp takes no `via` hint
+# (`conversio_via_target_takes_no_hint`), no `⊥` default
+# (`intervallum_clamp_recovery_unsupported`) and no `per` step
+# (`intervallum_value_step_unsupported`); those are semantic rejections of a
+# shape this grammar still admits.
+interval_target       := range_expr
+# `via` is contextual: it is claimed only on the conversion's own line,
+# immediately after the target type; everywhere else it is an ordinary
+# identifier. The hint is a compile-time identifier (`Hex`, `Bin`, `Oct`,
+# `Be`, `Le`, `Bits`, `Code`) that selects the conversion row; whether the
+# hint is known, and whether the target takes one, is semantic.
+via_clause            := 'via' IDENTIFIER
+# `⊥` (U+22A5) is the default channel (D17.7): it binds looser than `↦ T`.
+# `⇥` only ever names an error type; it never carries a value.
+inline_default    := '⊥' unary_expr
+
+call_expr          := primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
+call_suffix    := call_type_args? '(' argument_list ')'
+member_suffix  := '.' IDENTIFIER | '[' expression ']'
+# Postfix rank-2 tensor transpose (U+1D40); sugar for the `transpone` intrinsic.
+transpose_suffix := 'ᵀ'
+optional_suffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
+non_null_suffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
+argument_list  := (argument (',' argument)*)?
+# The optional call-site marker repeats the access marker its parameter declares
+# (see the prose rule "Call-site access markers").
+argument      := template_argument | call_marker? 'sparge'? expression
+call_marker   := 'de' | 'in' | 'own' | 'copy'
+template_argument := 'sparge'? IDENTIFIER ':' expression
+
+# `∞` and `nonnumerus` are non-finite floating-point literals; `nonnumerus`
+# is claimed only in the literal slot (a following `(` keeps it a call).
+literal := NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING
+         | 'verum' | 'falsum' | 'nulla' | '∞' | 'nonnumerus'
+primary := IDENTIFIER | literal | 'ego'
+         | array_literal | json_literal | typed_constructor | iuncta_expr
+         | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
+         | first_match_expr
+         | reducta_expr
+         | capta_expr
+         | '(' expression ')'
+ad_expr    := 'ad' ASCII_STRING ad_opener?
+ad_opener  := '(' expression ')'
+array_literal := '[' array_element_list? ']'
+array_element_list := array_element (',' array_element)*
+array_element := argument | '_'
+iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
+# Bare `{ ... }` is a JSON document literal. Keys are quoted JSON strings separated
+# by `:`; values are JSON constants. Anonymous Faber objects (`{ key = expr }`)
+# are retired (literal-family Stage 6). Genus construction uses `typedConstructor`.
+json_literal := '{' (json_member (',' json_member)*)? '}'
+json_member  := STRING ':' json_value
+typed_constructor := type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal
+field_list := field_init (',' field_init)*
+field_init := (field_key '=' expression) | IDENTIFIER
+field_key := IDENTIFIER | STRING | '[' expression ']'
+# `construction_source` (D15.1-D15.3): "copy with changes" — a new genus
+# value from braced overrides and one source, `Genus { field = value, … } ex
+# source`. Braced fields override; every other field copies shallowly
+# (collections shared, not deep-cloned) from the source, private fields
+# included. `ex` keeps its one meaning ("from") and must start on the same
+# line as the closing `}` — a line-leading `ex` is the extraction statement
+# (`ex p fixum x`) instead. Exactly one source is legal; a second same-line
+# `ex` is rejected (`construction_source_repeated`). The source must be the
+# same genus type as the constructor.
+construction_source := 'ex' call_expr
+# JSON values: constants only (no Faber expressions, no variable references).
+json_value := json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
+json_object := '{' (json_member (',' json_member)*)? '}'
+json_array  := '[' (json_value (',' json_value)*)? ']'
+json_string := STRING
+# Numerus when no decimal point or exponent is present; otherwise Fractus. A
+# numerus literal keeps the signed 64-bit wire range (`json_integer_overflow`).
+json_number := NUMBER
+
+finge_expr     := 'finge' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
+qualified_ident := IDENTIFIER ('.' IDENTIFIER)*
+# `praefixum` (D8.4-D8.6, D9): the compile-time initializer for a constant. The
+# retired parenthesized form (`'praefixum' '(' expression ')'`) is gone; a
+# bare block is the only shape, rejected with `praefixum_expression_form_retired`
+# when written. It is legal as the whole initializer of an `=` constant
+# (`fixum_decl`) at module level or at block level (inside any function,
+# method, closure or entry body), and as a `genus` field default under any
+# modifier (`const_init`); anywhere else it is `SEM064`
+# (`praefixum_outside_constant`). The body stands alone: it may read module
+# constants but not a parameter or local of the enclosing body
+# (`praefixum_captures_local`), and inside a generic function, method or genus
+# it may not mention a type parameter (`praefixum_type_parameter`). A
+# block-level body is evaluated like a module constant; an inner `praefixum`
+# constant runs before the one that contains it, and a cycle through a site is
+# `constant_cycle`. The body is a
+# `block_stmt` ending in a `redde`; it lowers to MIR and runs on `radix-mir-runner` during the build
+# under a step budget (10M steps), so an endless loop fails the build instead
+# of hanging it (`SEM064 praefixum_step_limit`), and `mori` or a propagated
+# `⇥` is a build error carrying its message (`praefixum_failed`). Allowed:
+# pure computation (arithmetic, `textus`, collections, loops, `si`,
+# `discerne`, building `genus` values), calls to ordinary functions that obey
+# the same rules (checked transitively), reading other module constants in
+# dependency order (a cycle is an error), and sync generators (`fiunt`). Forbidden: any
+# `ad`, await, async cursors, and `externa` — each rejected as `SEM064`
+# (`praefixum_forbidden`). A body with no `redde` value is
+# `praefixum_no_result`; a result with no literal form on every backend
+# (closure, handle, generic genus) is `praefixum_result_not_literal`; a
+# construct the runner cannot lower is `praefixum_unsupported`.
+praefixum_expr := 'praefixum' block_stmt
+scriptum_expr  := 'scriptum' '(' STRING (',' expression)* ')'
+lege_expr      := 'lege' 'lineam'?
+# Dedicated first-match selection: total over a bounded source, first-live
+# selection, `T ∪ nihil` for no-match/empty. The `ubi` predicate tail is owned
+# by this head — never the reduce/scan `fixum`/`varia` binder tail.
+first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
+# General shaped-source reduction. `via` is mandatory; the operator is one of
+# the nine locale-pack words below. Grouping is contextual, and the optional
+# tail is either a body (with an optional `filum`) or a bodiless identity.
+# The body is claimed only by `(fixum | varia) IDENTIFIER '{'`, so a following
+# declaration remains a separate statement. `reducta` and its operator words
+# stay ordinary identifiers outside their grammar slots.
+reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
+reducta_group := 'pro' expression
+reducta_body := ('fixum' | 'varia') IDENTIFIER block_stmt
+reducta_identity := 'vel' expression
+# `filum` is claimed by exact spelling only inside a reduction production.
+filum_clause := 'filum' IDENTIFIER
+# Capture boundary: `capta` claims its spelling only in expression-primary
+# position directly followed by `{`; the block's trailing expression is the
+# success value and the error channel is reified into a value union.
+capta_expr := 'capta' block_stmt
+
+object_pattern  := '{' pattern_property (',' pattern_property)* '}'
+pattern_property := 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
+array_pattern   := '[' array_pattern_element (',' array_pattern_element)* ']'
+array_pattern_element := '_' | 'ceteri'? IDENTIFIER
+
+nota_stmt := ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
+
+entry_header  := ('argumenta' IDENTIFIER)? ('exitus' expression)?
+incipit_stmt  := 'incipit' entry_header block_stmt
+incipiet_stmt := 'incipiet' entry_header block_stmt
+
+probandum_decl := 'probandum' STRING proba_modifier* '{' probandum_body '}'
+probandum_body := (praepara_block | probandum_decl | proba_stmt)*
+proba_stmt     := 'proba' STRING proba_modifier* block_stmt
+proba_modifier := 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING
+              | 'temporis' NATURAL | 'metior' | 'repete' NATURAL | 'fragilis' NATURAL
+              | 'solum_in' STRING
+praepara_block := ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
+
+fac_stmt := 'fac' block_stmt cape_clause? ('dum' expression)?

@@ -2,11 +2,9 @@
 # Normative grammar gate: validate source.fg and compare the generated
 # identity EBNF.md, grammar.jsonl, and locale EBNF.{locale}.md renders.
 #
-# Reads the sibling public faber checkout (faber/docs/) — run by
-# scripta/check-ecosystem-gates, which skips the grammar family with a
-# one-line notice when the sibling is absent (hard-fails under strict /
-# --full / --release). A missing sibling is reported here as a one-line
-# gate failure (grammar-pipeline.py run_check), never a traceback.
+# Reads grammar/ in this repository — run by scripta/check-ecosystem-gates.
+# A missing input is reported as a one-line gate failure
+# (grammar-pipeline.py run_check), never a traceback.
 
 set -euo pipefail
 
@@ -15,7 +13,7 @@ cd "$(dirname "$0")/.."
 status=0
 python3 scripta/grammar-pipeline.py --check "$@" || status=$?
 if [ "$status" -ne 0 ]; then
-  echo "check-grammar: the generated grammar renders drifted from docs/grammar/source.fg." >&2
+  echo "check-grammar: the generated grammar renders drifted from grammar/sources/source.fg." >&2
   echo "check-grammar: move hand edits into source.fg; don't regenerate over them." >&2
 fi
 exit "$status"
