@@ -410,6 +410,117 @@ func (t TensorTensor[T]) Forma(shape []int) TensorTensor[T] {
 	return TensorTensor[T]{data: append([]T{}, t.data...), shape: append([]int{}, shape...)}
 }
 
+// Expande is `t.expanded(shape)`: broadcast the receiver to `shape`, with the
+// same axis mapping as the Rust carrier (`Tensor::expanded`). Source axes map
+// to target axes in order; an exact extent is preferred, a source extent of 1
+// may stretch, and unmatched target axes are inserted. Among equally cheap
+// mappings the rightmost one wins. Rust returns a zero-stride view over shared
+// storage; this carrier has no strides, so Expande returns a materialized
+// COPY with the same logical contents. It panics, as Rust errors, on a
+// negative extent, an element count overflow, or no valid axis mapping.
+func (t TensorTensor[T]) Expande(shape []int) TensorTensor[T] {
+	const maxInt = int(^uint(0) >> 1)
+	count := 1
+	for _, dim := range shape {
+		if dim < 0 {
+			panic("tensor shape dimension must be non-negative")
+		}
+	}
+	for _, dim := range shape {
+		if dim > 0 && count > maxInt/dim {
+			panic("tensor element count overflow")
+		}
+		count *= dim
+	}
+	sourceRank := len(t.shape)
+	targetRank := len(shape)
+	const impossible = int(^uint(0) >> 2)
+	stretchCost := func(sourceAxis int, targetAxis int) int {
+		if t.shape[sourceAxis] == shape[targetAxis] {
+			return 0
+		}
+		if t.shape[sourceAxis] == 1 {
+			return 1
+		}
+		return impossible
+	}
+	// costs[s][u]: cheapest mapping of source axes s.. into target axes u..
+	costs := make([][]int, sourceRank+1)
+	for s := range costs {
+		costs[s] = make([]int, targetRank+1)
+		if s != sourceRank {
+			for u := range costs[s] {
+				costs[s][u] = impossible
+			}
+		}
+	}
+	for s := sourceRank - 1; s >= 0; s-- {
+		for u := targetRank - 1; u >= 0; u-- {
+			best := costs[s][u+1]
+			if rest := costs[s+1][u+1]; rest < impossible {
+				if mapped := stretchCost(s, u) + rest; mapped < best {
+					best = mapped
+				}
+			}
+			if best > impossible {
+				best = impossible
+			}
+			costs[s][u] = best
+		}
+	}
+	if costs[0][0] >= impossible {
+		panic("tensor broadcast shape mismatch")
+	}
+	targetToSource := make([]int, targetRank)
+	for i := range targetToSource {
+		targetToSource[i] = -1
+	}
+	sourceAxis, targetAxis := 0, 0
+	for sourceAxis < sourceRank {
+		skipTarget := costs[sourceAxis][targetAxis+1]
+		mapTarget := impossible
+		if rest := costs[sourceAxis+1][targetAxis+1]; rest < impossible {
+			mapTarget = stretchCost(sourceAxis, targetAxis) + rest
+		}
+		if skipTarget <= mapTarget {
+			targetAxis++
+		} else {
+			targetToSource[targetAxis] = sourceAxis
+			sourceAxis++
+			targetAxis++
+		}
+	}
+	// Per-target-axis source stride; 0 marks a stretched or inserted axis.
+	sourceStrides := make([]int, sourceRank)
+	stride := 1
+	for axis := sourceRank - 1; axis >= 0; axis-- {
+		sourceStrides[axis] = stride
+		stride *= t.shape[axis]
+	}
+	strides := make([]int, targetRank)
+	for target, source := range targetToSource {
+		if source >= 0 && t.shape[source] == shape[target] {
+			strides[target] = sourceStrides[source]
+		}
+	}
+	data := make([]T, count)
+	counters := make([]int, targetRank)
+	position := 0
+	for i := 0; i < count; i++ {
+		data[i] = t.data[position]
+		for axis := targetRank - 1; axis >= 0; axis-- {
+			counters[axis]++
+			if counters[axis] < shape[axis] {
+				position += strides[axis]
+				break
+			}
+			counters[axis] = 0
+			position -= strides[axis] * (shape[axis] - 1)
+		}
+	}
+	return TensorTensor[T]{data: data, shape: append([]int{}, shape...)}
+}
+
 func (t TensorTensor[T]) Accipe(indices any) *T {
 	offset, ok := tensorOffset(t.shape, indexSlice(indices))
 	if !ok || offset >= len(t.data) {

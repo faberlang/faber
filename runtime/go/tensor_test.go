@@ -144,3 +144,41 @@ func TestTensorCheckedMethodForms(t *testing.T) {
 		t.Fatalf("PondeChecked out of range error = %v", err)
 	}
 }
+
+// TestTensorExpande pins Expande against the Rust `expanded_view_layout`
+// mapping: exact extent first, a source extent of 1 may stretch, unmatched
+// target axes are inserted, the rightmost mapping wins; and the three error
+// texts.
+func TestTensorExpande(t *testing.T) {
+	row := tensorOf([]int64{1, 2, 3}, []int{3})
+	got := row.Expande([]int{2, 3})
+	if !reflect.DeepEqual(got.Magnitudines(), []int{2, 3}) ||
+		!reflect.DeepEqual(got.Planata(), []int64{1, 2, 3, 1, 2, 3}) {
+		t.Fatalf("row Expande [2 3] = %v %v", got.Magnitudines(), got.Planata())
+	}
+	col := tensorOf([]int64{1, 2}, []int{2, 1})
+	got = col.Expande([]int{2, 3})
+	if !reflect.DeepEqual(got.Planata(), []int64{1, 1, 1, 2, 2, 2}) {
+		t.Fatalf("col Expande [2 3] = %v", got.Planata())
+	}
+	// A source extent of 1 stretches; unmatched leading target axes are inserted.
+	one := tensorOf([]int64{7}, []int{1})
+	got = one.Expande([]int{2, 2})
+	if !reflect.DeepEqual(got.Planata(), []int64{7, 7, 7, 7}) {
+		t.Fatalf("one Expande [2 2] = %v", got.Planata())
+	}
+	// Equal extents: the rightmost mapping wins, so [2] maps to the last axis.
+	pair := tensorOf([]int64{1, 2}, []int{2})
+	got = pair.Expande([]int{2, 2})
+	if !reflect.DeepEqual(got.Planata(), []int64{1, 2, 1, 2}) {
+		t.Fatalf("pair Expande [2 2] = %v", got.Planata())
+	}
+	// Identity, and the copy does not alias the receiver.
+	same := row.Expande([]int{3})
+	if !reflect.DeepEqual(same.Planata(), []int64{1, 2, 3}) {
+		t.Fatalf("identity Expande = %v", same.Planata())
+	}
+	wantPanic(t, "tensor broadcast shape mismatch", func() { row.Expande([]int{2, 4}) })
+	wantPanic(t, "tensor shape dimension must be non-negative", func() { row.Expande([]int{-1, 3}) })
+	wantPanic(t, "tensor element count overflow", func() { row.Expande([]int{1 << 40, 1 << 40}) })
+}
