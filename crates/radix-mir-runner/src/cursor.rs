@@ -20,7 +20,7 @@
 use super::{Frame, Host, Runner, RunnerError, Value};
 use crate::sermo::SermoValue;
 use radix_hir::DefId;
-use radix_lexer::{Span, Symbol};
+use radix_lexer::Span;
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
@@ -46,7 +46,6 @@ struct CursorState {
 struct SermoSource {
     sermo: Rc<RefCell<SermoValue>>,
     frame: DefId,
-    data_field: Symbol,
 }
 
 /// One resumption of a generator frame.
@@ -71,14 +70,10 @@ impl GeneratorCursor {
     }
 
     /// Lazy content-frame cursor over a conversation's inbound direction.
-    pub(crate) fn sermo(sermo: Rc<RefCell<SermoValue>>, frame: DefId, data_field: Symbol) -> Self {
+    pub(crate) fn sermo(sermo: Rc<RefCell<SermoValue>>, frame: DefId) -> Self {
         Self(Rc::new(RefCell::new(CursorState {
             frame: None,
-            sermo: Some(SermoSource {
-                sermo,
-                frame,
-                data_field,
-            }),
+            sermo: Some(SermoSource { sermo, frame }),
             current: None,
             pulled: 0,
             read: 0,
@@ -173,11 +168,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .borrow()
             .sermo
             .as_ref()
-            .map(|source| (Rc::clone(&source.sermo), source.frame, source.data_field));
-        if let Some((sermo, frame, data_field)) = source {
-            return Ok(self
-                .sermo_next(&sermo, span)?
-                .map(|data| crate::sermo::frame_value(frame, data_field, data)));
+            .map(|source| (Rc::clone(&source.sermo), source.frame));
+        if let Some((sermo, frame)) = source {
+            return self.sermo_frame_next(frame, &sermo, span);
         }
         match self.generator_resume(cursor, span)? {
             GeneratorStep::Yield(item) => Ok(Some(item)),

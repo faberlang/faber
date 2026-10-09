@@ -39,7 +39,8 @@ use super::{CallOutcome, Host, MirBlockId, MirFunctionId, Runner, RunnerError, V
 use crate::conversio::MissingFieldPolicy;
 use crate::cursor::{GeneratorCursor, GeneratorStep};
 use radix_hir::DefId;
-use radix_lexer::{Span, Symbol};
+use radix_lexer::Span;
+use radix_types::Type;
 use rustc_hash::FxHashMap;
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
@@ -214,14 +215,80 @@ fn error_text(data: &Value) -> String {
     }
 }
 
-/// A `scrinium` frame value carrying `data`.
-pub(crate) fn frame_value(frame: DefId, data_field: Symbol, data: Value) -> Value {
-    let mut fields = FxHashMap::default();
-    fields.insert(data_field, data);
-    Value::Struct(frame, Rc::new(RefCell::new(fields)))
-}
-
 impl<H: Host + ?Sized> Runner<'_, H> {
+    /// `tuus.accipe()`: the next inbound content frame, or `none` at the
+    /// terminal.
+    pub(crate) fn sermo_receive(
+        &mut self,
+        frame: DefId,
+        sermo: &Rc<RefCell<SermoValue>>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        Ok(self
+            .sermo_frame_next(frame, sermo, span)?
+            .unwrap_or(Value::Nil))
+    }
+
+    /// The next inbound content item, wrapped as a `scrinium` frame.
+    pub(crate) fn sermo_frame_next(
+        &mut self,
+        frame: DefId,
+        sermo: &Rc<RefCell<SermoValue>>,
+        span: Span,
+    ) -> Result<Option<Value>, RunnerError> {
+        let Some(data) = self.sermo_next(sermo, span)? else {
+            return Ok(None);
+        };
+        self.sermo_frame(frame, sermo, data, span).map(Some)
+    }
+
+    /// A received content frame: every declared `scrinium` field is present.
+    ///
+    /// WHY: the runner models a conversation's id and route and nothing per
+    /// frame. `call` is the route, `parent_id` the conversation id, `status`
+    /// is `item`. The runner has no frame id, clock, source label or trace, so
+    /// `id`, `created_ms`, `from` and `trace` are `none` (their `sponte`
+    /// absence), not invented values.
+    pub(crate) fn sermo_frame(
+        &self,
+        frame: DefId,
+        sermo: &Rc<RefCell<SermoValue>>,
+        data: Value,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        const STATUS_ITEM: usize = 1;
+        let declared = self
+            .context
+            .struct_fields
+            .get(&frame)
+            .ok_or_else(|| RunnerError::internal(span, "scrinium fields missing"))?;
+        let conversation = Rc::clone(&sermo.borrow().conversation);
+        let conversation = conversation.borrow();
+        let mut data = Some(data);
+        let mut fields = FxHashMap::default();
+        for (&symbol, ty) in declared {
+            let value = match self.interner.resolve(symbol) {
+                "id" | "created_ms" | "from" | "trace" => Value::Nil,
+                "parent_id" => Value::Str(conversation.id.to_string()),
+                "call" => Value::Str(conversation.route.clone()),
+                "data" => data.take().unwrap_or(Value::Nil),
+                "status" => {
+                    let Type::Enum(status) = self.types.get(ty.semantic_id()) else {
+                        return Err(RunnerError::internal(
+                            span,
+                            "scrinium status is not an enum",
+                        ));
+                    };
+                    let variant = self.status_variant_at(*status, STATUS_ITEM, span)?;
+                    Value::EnumVariant(variant, Rc::new(RefCell::new(FxHashMap::default())))
+                }
+                _ => return Err(RunnerError::internal(span, "unknown scrinium field")),
+            };
+            fields.insert(symbol, value);
+        }
+        Ok(Value::Struct(frame, Rc::new(RefCell::new(fields))))
+    }
+
     /// `SermoOpen`: resolve the static handler and start a zero-opener handler.
     pub(crate) fn sermo_open(&mut self, route: String, span: Span) -> Result<Value, RunnerError> {
         let handler = match self.context.ad_routes.get(&route) {

@@ -332,16 +332,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirSermoOp::Close => Ok(Value::Bool(self.sermo_close(&sermo))),
             MirSermoOp::CloseFailed => Ok(Value::Bool(Self::sermo_close_failed(&sermo))),
             MirSermoOp::CloseError => Ok(Value::Str(Self::sermo_take_close_error(&sermo))),
-            MirSermoOp::Receive { frame, data_field } => {
-                Ok(self.sermo_next(&sermo, span)?.map_or(Value::Nil, |data| {
-                    crate::sermo::frame_value(*frame, *data_field, data)
-                }))
+            MirSermoOp::Receive { frame, .. } => self.sermo_receive(*frame, &sermo, span),
+            MirSermoOp::Cursor { frame, .. } => {
+                Ok(Value::Cursor(GeneratorCursor::sermo(sermo, *frame)))
             }
-            MirSermoOp::Cursor { frame, data_field } => Ok(Value::Cursor(GeneratorCursor::sermo(
-                sermo,
-                *frame,
-                *data_field,
-            ))),
             MirSermoOp::DrainCursor => {
                 Err(RunnerError::internal(span, "nested cursor drain dispatch"))
             }
@@ -362,6 +356,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             crate::sermo::SermoTerminal::Error(_) => 5,
             crate::sermo::SermoTerminal::Cancel => 6,
         };
+        self.status_variant_at(status, position, span)
+    }
+
+    /// The `status` variant declared at `position` (`request` is 0, `item` 1).
+    pub(crate) fn status_variant_at(
+        &self,
+        status: radix_hir::DefId,
+        position: usize,
+        span: Span,
+    ) -> Result<radix_hir::DefId, RunnerError> {
         self.context
             .enum_variants
             .get(&status)
