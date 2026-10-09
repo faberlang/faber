@@ -86,9 +86,6 @@ pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
-pub(crate) use dispatch::{
-    ProviderManifest, load_provider_manifests, selected_providers_for_routes,
-};
 #[cfg(feature = "hir-go")]
 #[cfg(test)]
 pub(crate) use go_build::{GoBuildLayout, emit_go_module, invoke_go_build};

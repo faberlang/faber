@@ -7,9 +7,9 @@
 //! It embeds the `faber explain` reference: every corpus exemplum whose
 //! frontmatter declares `explains = [...]`, plus `legacy-redirects.toml`.
 //!
-//! It also stamps the faber runtime and hosts source pins from the release
-//! manifest (`release-manifest.yaml`), so generated manifests emit the exact
-//! commits selected by release inputs.
+//! It also stamps the faber runtime source pin from the release manifest
+//! (`release-manifest.yaml`), so generated manifests emit the exact commit
+//! selected by release inputs.
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -112,7 +112,7 @@ fn declares_explains(path: &Path) -> bool {
         .any(|line| line.starts_with("explains ="))
 }
 
-/// Export the faber runtime and hosts source pins from `pinnedInputs.source`.
+/// Export the faber runtime source pin from `pinnedInputs.source`.
 /// Source commit rows are scoped by their `- name:` row, so unrelated
 /// `commit:` fields elsewhere in the release manifest cannot become pins.
 fn stamp_source_revisions(manifest: &Path) {
@@ -120,7 +120,7 @@ fn stamp_source_revisions(manifest: &Path) {
     let text = fs::read_to_string(manifest).unwrap_or_else(|err| {
         panic!("read release manifest {}: {err}", manifest.display());
     });
-    for source in ["faber", "hosts"] {
+    for source in ["faber"] {
         let mut source_name: Option<&str> = None;
         let mut source_commit: Option<&str> = None;
         for line in text.lines() {
@@ -142,12 +142,7 @@ fn stamp_source_revisions(manifest: &Path) {
             "{}: {source} source pin {commit:?} is not a 40-hex commit",
             manifest.display()
         );
-        let variable = match source {
-            "faber" => "FABER_RUNTIME_PINNED_REV",
-            "hosts" => "FABER_HOSTS_PINNED_REV",
-            _ => unreachable!(),
-        };
-        println!("cargo:rustc-env={variable}={commit}");
+        println!("cargo:rustc-env=FABER_RUNTIME_PINNED_REV={commit}");
     }
 }
 
