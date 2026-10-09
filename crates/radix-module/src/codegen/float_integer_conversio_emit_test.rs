@@ -38,7 +38,10 @@ fn rust_checks_float_truncation_and_honors_recovery() {
     assert!(code.contains("x0.is_finite()"), "{code}");
     assert!(code.contains("<u8 as TryFrom<i128>>::try_from(x0.trunc() as i128)"), "{code}");
     assert!(code.contains(".unwrap_or(7"), "{code}");
-    assert!(code.contains(&format!(".expect(\"{MESSAGE}\")")), "{code}");
+    assert!(
+        code.contains("faber::trap::some(") && code.contains("faber::Trap::OutOfRange(\"fractus\", \"numerus\")"),
+        "{code}"
+    );
     assert!(!code.contains("d as u8"), "no saturating `as` cast: {code}");
 }
 

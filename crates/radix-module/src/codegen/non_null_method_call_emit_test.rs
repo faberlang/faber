@@ -53,15 +53,15 @@ fn rust_emits_method_calls_on_the_asserted_payload() {
     assert!(main.contains("let mut xs: Option<Vec<i64>>"), "{main}");
     // A mutating receiver borrows the stored value; a read borrows shared.
     assert!(
-        main.contains(r#"(xs).as_mut().expect("nonnull assertion failed").push(3);"#),
+        main.contains(r#"faber::trap::some((xs).as_mut(), faber::Trap::Nonnull).push(3);"#),
         "{main}"
     );
     assert!(
-        main.contains(r#"(xs).as_ref().expect("nonnull assertion failed").len() as i64"#),
+        main.contains(r#"faber::trap::some((xs).as_ref(), faber::Trap::Nonnull).len() as i64"#),
         "{main}"
     );
     assert!(
-        main.contains(r#"(t).as_ref().expect("nonnull assertion failed").chars().count() as i64"#),
+        main.contains(r#"faber::trap::some((t).as_ref(), faber::Trap::Nonnull).chars().count() as i64"#),
         "{main}"
     );
     assert!(!main.contains("length.clone()()"), "{main}");

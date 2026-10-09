@@ -53,7 +53,7 @@ incipit {
         "bounded octeti index must keep N, got: {code}"
     );
     assert!(
-        code.contains(".get(0usize)") && code.contains("octeti index trap"),
+        code.contains(".get(0usize)") && code.contains("faber::Trap::OctetiIndex"),
         "bounded octeti scalar index must use the carrier O(1) prefix get/trap, got: {code}"
     );
     assert!(

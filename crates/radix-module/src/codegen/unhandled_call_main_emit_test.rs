@@ -73,9 +73,9 @@ fn main_body(code: &str, marker: &str) -> String {
 fn rust_aborts_on_an_unhandled_failable_call_in_main() {
     let code = emit(Target::HirRust, &format!("{DECLS}{MAIN}"));
     let main = main_body(&code, "fn main()");
-    assert!(main.contains("check(1).expect(\"failable call failed\")"), "{main}");
-    assert!(main.contains("risky(2).expect(\"failable call failed\")"), "{main}");
-    assert!(main.contains("k.nimm(1).expect(\"failable call failed\")"), "{main}");
+    assert!(main.contains("faber::trap::ok(check(1), faber::Trap::FailableCall)"), "{main}");
+    assert!(main.contains("faber::trap::ok(risky(2), faber::Trap::FailableCall)"), "{main}");
+    assert!(main.contains("faber::trap::ok(k.nimm(1), faber::Trap::FailableCall)"), "{main}");
 }
 
 #[test]

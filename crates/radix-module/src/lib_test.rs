@@ -127,8 +127,8 @@ fn tensor_reple_statement_stays_in_place() {
     };
     assert!(
         // `reple` is fallible (an edge view is read-only), so the in-place call
-        // carries its handled outcome: `t.reple(4.0).expect(..);`.
-        output.code.contains("t.reple(4.0).expect("),
+        // carries its handled outcome: `faber::trap::ok_static(t.reple(4.0));`.
+        output.code.contains("faber::trap::ok_static(t.reple(4.0))"),
         "statement reple must stay the in-place mutator, got:\n{}",
         output.code
     );

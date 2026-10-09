@@ -95,7 +95,7 @@ incipit {
         panic!("expected rust");
     };
     assert!(
-        rust.code.contains("lista index trap") || rust.code.contains(".get("),
+        rust.code.contains("faber::Trap::ListaIndex") || rust.code.contains(".get("),
         "expected checked lista get, got:\n{}",
         rust.code
     );
@@ -130,7 +130,7 @@ incipit {
         panic!("expected rust");
     };
     assert!(
-        rust.code.contains("tabula missing key"),
+        rust.code.contains("faber::Trap::TabulaKey"),
         "expected tabula trap, got:\n{}",
         rust.code
     );

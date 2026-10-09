@@ -123,9 +123,8 @@ fn call_occurrences(code: &str, def_prefix: &str, name: &str) -> usize {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_emits_conversio_assign_as_parse_then_store() {
-    let code = emit_rust(
-        "incipit {\n  fixum textus raw ← \"42\"\n  varia numerus count ← 0\n  count ↤ raw\n  nota count\n}",
-    );
+    let code =
+        emit_rust("incipit {\n  fixum textus raw ← \"42\"\n  varia numerus count ← 0\n  count ↤ raw\n  nota count\n}");
     assert!(
         code.contains(".parse::<"),
         "rust must emit the text→numeric conversion, not a cast:\n{code}"

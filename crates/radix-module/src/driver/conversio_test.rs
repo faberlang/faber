@@ -112,7 +112,8 @@ fn octeti_to_textus_conversio_emits_from_utf8_with_expect() {
     let code = super::rust_output(result).code;
     assert!(code.contains("std::str::from_utf8("), "expected from_utf8, got:\n{code}");
     assert!(
-        code.contains(".expect(\"octeti to textus conversion failed: invalid UTF-8\")"),
+        code.contains("faber::trap::ok(std::str::from_utf8(")
+            && code.contains("faber::Trap::Other(\"octeti to textus conversion failed: invalid UTF-8\")"),
         "expected expect, got:\n{code}"
     );
 }
@@ -174,7 +175,7 @@ fn fractus_to_numerus_conversio_emits_checked_truncation() {
         "expected checked range conversion, got:\n{code}"
     );
     assert!(
-        code.contains("fractus to numerus conversion out of range"),
+        code.contains("faber::Trap::OutOfRange(\"fractus\", \"numerus\")"),
         "expected the runner's failure text, got:\n{code}"
     );
 }
@@ -329,7 +330,8 @@ fn valor_to_numerus_conversio_emits_from_valor() {
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
-        code.contains("<i64 as faber::FromValor>::from_valor") && code.contains("valor to numerus conversion failed"),
+        code.contains("<i64 as faber::FromValor>::from_valor")
+            && code.contains("faber::Trap::Conversion(\"valor\", \"numerus\")"),
         "expected valor numerus extraction, got:\n{code}"
     );
 }
@@ -364,7 +366,8 @@ incipit {
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
-        code.contains("faber::Valor::Octeti(__bytes)") && code.contains("valor to octeti conversion failed"),
+        code.contains("faber::Valor::Octeti(__bytes)")
+            && code.contains("faber::Trap::Conversion(\"valor\", \"octeti\")"),
         "expected valor octeti extraction, got:\n{code}"
     );
 }

@@ -214,7 +214,9 @@ main {
     };
     assert!(
         output.code.contains("faber::Valor::Octeti(__bytes)")
-            && output.code.contains("valor to octeti conversion failed"),
+            && output
+                .code
+                .contains("faber::Trap::Conversion(\"valor\", \"octeti\")"),
         "expected valor octeti extraction, got:\n{}",
         output.code
     );

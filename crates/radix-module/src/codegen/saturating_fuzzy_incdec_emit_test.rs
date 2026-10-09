@@ -98,7 +98,7 @@ fn rust_list_element_inc_dec_is_one_checked_store() {
         code.contains("faber::exact::store::<u8>((*") && code.contains(" as i128) + 1, \"assignment\")"),
         "{code}"
     );
-    assert!(!code.contains(").cloned().expect(\"lista index trap\") += 1"), "{code}");
+    assert!(!code.contains(").cloned(), faber::Trap::ListaIndex) += 1"), "{code}");
 }
 
 #[test]
