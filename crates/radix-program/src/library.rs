@@ -622,6 +622,27 @@ impl LibraryInterfaceCache {
     fn locale_loader(&self) -> Option<LocaleLoader> {
         self.locale_loader
     }
+
+    /// True when `other` would cache byte-identical analysis results: the same
+    /// analysis target (the only [`Config`] field `with_config` forwards) and
+    /// the same reader-locale loader. A cache carried from one pipeline stage
+    /// into the next is reusable only under this equality.
+    pub(crate) fn analyzes_like(&self, other: &Self) -> bool {
+        self.analysis_config.target == other.analysis_config.target
+            && match (self.locale_loader, other.locale_loader) {
+                (Some(left), Some(right)) => std::ptr::fn_addr_eq(left, right),
+                (None, None) => true,
+                _ => false,
+            }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Test counter: one `(target, library identity)` record per library
+    /// interface analysis performed on this thread.
+    pub(crate) static LIBRARY_ANALYSIS_LOG: std::cell::RefCell<Vec<(String, String)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// # Errors
@@ -1194,6 +1215,13 @@ fn analyze_cached_library_interface_body(
     library_cache: &mut LibraryInterfaceCache,
     key: &LibraryIdentityKey,
 ) -> Result<(), Diagnostic> {
+    #[cfg(test)]
+    LIBRARY_ANALYSIS_LOG.with(|log| {
+        log.borrow_mut().push((
+            format!("{:?}", library_cache.analysis_config.target),
+            format!("{key:?}"),
+        ));
+    });
     let mut diagnostics = Vec::new();
     let expanded = expand_library_imports(
         std::slice::from_ref(import),

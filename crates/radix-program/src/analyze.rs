@@ -264,11 +264,30 @@ pub fn analyze_package(
     input: &Path,
     seams: &AnalysisSeams,
 ) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
+    analyze_package_retaining_library_cache(config, input, seams).map(|(package, _)| package)
+}
+
+/// [`analyze_package`], also returning the [`LibraryInterfaceCache`] the
+/// analysis filled. The MIR preparation that follows analyzes the same
+/// libraries under the same target, so it reuses this cache instead of
+/// rebuilding every library interface.
+pub(crate) fn analyze_package_retaining_library_cache(
+    config: &Config,
+    input: &Path,
+    seams: &AnalysisSeams,
+) -> Result<(AnalyzedProgram, LibraryInterfaceCache), Vec<Diagnostic>> {
     let config = effective_package_config(config, input, seams.locale_loader)?;
     let spec = discover_package(input).map_err(|diag| vec![*diag])?;
     let package_root = package_root_for_input(input);
     let library_resolver = (seams.resolver_for_package)(&config, &package_root)?;
-    analyze_package_spec(&config, spec, &library_resolver, false, None, seams)
+    analyze_package_spec_retaining_library_cache(
+        &config,
+        spec,
+        &library_resolver,
+        false,
+        None,
+        seams,
+    )
 }
 
 /// Check every loaded package module and return diagnostics without codegen.
@@ -394,6 +413,25 @@ pub fn analyze_package_spec(
     proba_filter: Option<&TestSourceFilter>,
     seams: &AnalysisSeams,
 ) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
+    analyze_package_spec_retaining_library_cache(
+        config,
+        spec,
+        library_resolver,
+        include_proba,
+        proba_filter,
+        seams,
+    )
+    .map(|(package, _)| package)
+}
+
+fn analyze_package_spec_retaining_library_cache(
+    config: &Config,
+    spec: PackageSpec,
+    library_resolver: &LibraryResolver,
+    include_proba: bool,
+    proba_filter: Option<&TestSourceFilter>,
+    seams: &AnalysisSeams,
+) -> Result<(AnalyzedProgram, LibraryInterfaceCache), Vec<Diagnostic>> {
     let deadline = include_proba.then(|| Instant::now() + PACKAGE_TEST_ANALYSIS_BUDGET);
     analyze_package_spec_with_deadline(
         config,
@@ -414,7 +452,7 @@ fn analyze_package_spec_with_deadline(
     proba_filter: Option<&TestSourceFilter>,
     deadline: Option<Instant>,
     seams: &AnalysisSeams,
-) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
+) -> Result<(AnalyzedProgram, LibraryInterfaceCache), Vec<Diagnostic>> {
     // One package analysis = one driver run (ARCH-U3): the session minted
     // here owns the parse-once memo identity shared by loading, mount
     // planning, and every per-file analysis below (through re-wraps).
@@ -756,7 +794,7 @@ fn analyze_package_spec_with_deadline(
         }
     }
 
-    Ok(program)
+    Ok((program, library_cache))
 }
 
 /// Merge the `@ ad` routes of every analyzed package module and every

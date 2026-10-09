@@ -16,6 +16,36 @@ struct PackageMirPreparation<'a> {
     cli_mode: CliPlanningMode,
     consumer: PackageMirConsumer,
     loaded_links: Option<&'a BTreeMap<PathBuf, BTreeMap<String, PathBuf>>>,
+    /// The cache the package analysis filled. Link and lowering reuse it when
+    /// it analyzes libraries exactly as `library_cache_for_config(config)`
+    /// would (same target, same locale loader); otherwise they start fresh.
+    analysis_library_cache: Option<LibraryInterfaceCache>,
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Test seam: when set, link and lowering ignore the analysis-stage
+    /// library cache and build a fresh one, as before the cache was shared.
+    pub(super) static FRESH_LIBRARY_CACHE_PER_STAGE: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
+/// The library cache for link and lowering: the analysis-stage cache when it
+/// is interchangeable with a fresh one, else a fresh one.
+fn library_cache_for_preparation(
+    config: &Config,
+    seams: &MirSeams,
+    analysis_cache: Option<LibraryInterfaceCache>,
+) -> LibraryInterfaceCache {
+    let fresh = (seams.library_cache_for_config)(config);
+    #[cfg(test)]
+    if FRESH_LIBRARY_CACHE_PER_STAGE.with(std::cell::Cell::get) {
+        return fresh;
+    }
+    match analysis_cache {
+        Some(cache) if cache.analyzes_like(&fresh) => cache,
+        _ => fresh,
+    }
 }
 
 /// Analyze, link, and validate a package as MIR, then lend the result to a target probe.
@@ -238,7 +268,8 @@ pub(super) fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
         }
         PackageMirConsumer::ExternalTarget => config,
     };
-    let package = crate::analyze::analyze_package(config, input, &seams.analysis)?;
+    let (package, analysis_library_cache) =
+        crate::analyze::analyze_package_retaining_library_cache(config, input, &seams.analysis)?;
     prepare_package_mir(
         package,
         PackageMirPreparation {
@@ -247,6 +278,7 @@ pub(super) fn with_prepared_package_mir_with_cli_mode_and_consumer<R>(
             cli_mode,
             consumer,
             loaded_links: None,
+            analysis_library_cache: Some(analysis_library_cache),
         },
         seams,
         || (seams.device_config_for_input)(input),
@@ -273,6 +305,7 @@ fn prepare_package_mir<R>(
         cli_mode,
         consumer,
         loaded_links,
+        analysis_library_cache,
     } = preparation;
     if package
         .diagnostics
@@ -283,7 +316,7 @@ fn prepare_package_mir<R>(
     }
     let cli_plan = plan_cli_package(&mut package, argumenta, cli_mode)?;
     let library_resolver = package.library_resolver.clone();
-    let mut library_cache = (seams.library_cache_for_config)(config);
+    let mut library_cache = library_cache_for_preparation(config, seams, analysis_library_cache);
     let mut links = local_namespace_call_targets(
         &package,
         consumer,
@@ -387,6 +420,7 @@ pub(super) fn with_prepared_package_mir_from_loaded<R>(
             cli_mode: CliPlanningMode::Parsed,
             consumer: PackageMirConsumer::Interpreted,
             loaded_links: Some(loaded_links),
+            analysis_library_cache: None,
         },
         seams,
         || Ok(DeviceManifestConfig::default()),

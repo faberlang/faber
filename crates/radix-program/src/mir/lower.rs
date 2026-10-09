@@ -1260,11 +1260,16 @@ pub(super) fn lower_package_units<'a>(
     let mut library_parts: Vec<LibraryMirParts> = Vec::new();
     for library in &links.libraries {
         let mut diagnostics = Vec::new();
+        // Read the library's own file interface before its cache entry is
+        // lent out below: while the entry is lent, a lookup of this very key
+        // misses and would re-analyze the whole library.
+        let cached_interface =
+            library_cached_file_interface(&library.import, library_resolver, library_cache).ok();
         with_library_cached_analysis_mut(
             &library.import,
             library_resolver,
             library_cache,
-            |analysis, cache| {
+            |analysis, _| {
                 if let Err(errors) = rewrite_analysis_namespace_calls(
                     &library.path,
                     analysis,
@@ -1280,8 +1285,6 @@ pub(super) fn lower_package_units<'a>(
                 // while the library analysis is freely borrowable (the entry
                 // registered the library's file interface under the same
                 // module identity during analysis).
-                let cached_interface =
-                    library_cached_file_interface(&library.import, library_resolver, cache).ok();
                 let source_identity = cached_interface
                     .as_ref()
                     .and_then(|interface| interface.identity.clone());

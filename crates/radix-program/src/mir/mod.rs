@@ -711,6 +711,10 @@ mod transitive_generic_reach_tests;
 mod lane_tests;
 
 #[cfg(test)]
+#[path = "library_cache_share_test.rs"]
+mod library_cache_share_tests;
+
+#[cfg(test)]
 #[path = "receiver_method_lane_test.rs"]
 mod receiver_method_lane_tests;
 
