@@ -1198,8 +1198,8 @@ family = "membership"
 cell = "x ∈ lo‥hi / lo…hi / lo before hi (range containment)"
 status = "direct"
 exemplum = "operatores/membership-range.fab"
-expected = false
-note = "stdout is not pinned: range containment has no MIR lowering, so the runner rejects it (OD-4, want)"
+expected = true
+note = "membership-range.expected pins the three printed lines (range containment runs on the runner; F-45)"
 
 [[cells]]
 id = "membership.reject.scalar"

@@ -33,7 +33,7 @@ locale = "en"
 #   rangeMembership :← expr '∈' rangeExpr
 #
 # EXPECTED OUTPUT:
-#   none — stdout not pinned for this exemplum.
+#   membership-range.expected — one result per print.
 
 const int aetas = 25
 
