@@ -2549,3 +2549,67 @@ fn inferred_constructor_with_hole_on_both_sides_is_named_error() {
         "inferred_constructor_no_expected_type",
     );
 }
+
+#[test]
+fn inferred_constructor_against_optional_genus_builds_the_genus_in_binding_argument_and_return() {
+    test_support::assert_accepts(
+        "
+genus P { varia numerus x = 0 }
+functio f() → P ∪ nihil { redde _ { x = 1 } }
+functio g(P ∪ nihil p) → numerus { redde 0 }
+incipit {
+    fixum P ∪ nihil p ← _ { x = 2 }
+    nota g(_ { x = 3 })
+    nota g(f())
+}
+",
+    );
+}
+
+#[test]
+fn inferred_constructor_against_optional_map_builds_the_map() {
+    test_support::assert_accepts(
+        "
+functio f() → tabula<textus, numerus> ∪ nihil { redde _ { \"a\": 1 } }
+functio g(tabula<textus, numerus> ∪ nihil m) → numerus { redde 0 }
+incipit {
+    fixum tabula<textus, numerus> ∪ nihil m ← _ { \"a\": 1 }
+    fixum tabula<textus, numerus> ∪ nihil e ← _ { }
+    nota g(_ { \"a\": 2 })
+    nota g(f())
+}
+",
+    );
+}
+
+#[test]
+fn inferred_constructor_against_union_of_several_types_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "genus P { varia numerus x = 0 } incipit { fixum P ∪ textus ∪ nihil p ← _ { x = 1 } }",
+        "inferred_constructor_ambiguous_union",
+    );
+    test_support::assert_rejects_with_issue(
+        "genus P { varia numerus x = 0 } incipit { fixum P ∪ textus p ← _ { x = 1 } }",
+        "inferred_constructor_ambiguous_union",
+    );
+}
+
+#[test]
+fn inferred_constructor_against_only_none_is_the_no_expected_type_error() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum nihil p ← _ { x = 1 } }",
+        "inferred_constructor_no_expected_type",
+    );
+}
+
+#[test]
+fn inferred_constructor_wrong_shape_against_optional_member_is_the_existing_shape_error() {
+    test_support::assert_rejects_with_issue(
+        "genus P { varia numerus x = 0 } incipit { fixum P ∪ nihil p ← _ { \"x\": 1 } }",
+        "inferred_constructor_entries_need_map",
+    );
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<textus, numerus> ∪ nihil m ← _ { x = 1 } }",
+        "inferred_constructor_fields_for_map",
+    );
+}

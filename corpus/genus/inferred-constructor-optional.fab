@@ -1,0 +1,56 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "concrete_type", "base_type", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "json_literal", "json_member", "json_value", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Against an optional slot `T ∪ none`, the inferred constructor `_ { … }` builds T."
+syntax = "<type> ∪ none <name> ← _ { <field> = <value>, … }"
+related = ["genus"]
+locale = "en"
++++
+# =============================================================================
+# genus — the inferred constructor against an optional slot
+# =============================================================================
+#
+# What this teaches:
+#   • Against `T ∪ none`, `_ { … }` builds T: the hole matches the expected
+#     format of T, and T is the type that gets captured.
+#   • The same holds for a map: `_ { "key": value }` against a map ∪ none.
+#   • Binding, argument and return positions all work.
+#
+# See also: genus
+# =============================================================================
+
+class Punctum {
+    var int x = 0
+    var int y = 0
+}
+
+fn origo() → Punctum ∪ none {
+    return _ { x = 7, y = 9 }
+}
+
+fn abscissa(Punctum ∪ none p) → int {
+    return p?.x coalesce -1
+}
+
+fn pondus(map<string, int> ∪ none m) → int {
+    return m?["a"] coalesce -1
+}
+
+main {
+    const Punctum ∪ none a ← _ { x = 1, y = 2 }
+    print a?.x coalesce -1
+    print a?.y coalesce -1
+
+    const Punctum ∪ none b ← origo()
+    print b?.x coalesce -1
+    print b?.y coalesce -1
+
+    print abscissa(_ { x = 5 })
+
+    const map<string, int> ∪ none m ← _ { "a": 3 }
+    print m?["a"] coalesce -1
+    print pondus(_ { "a": 4 })
+}

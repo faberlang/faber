@@ -3309,6 +3309,10 @@ help = "remove the recovery arm from this regex conversion"
 message = "`_ { … }` genus exspectatum aedificat, sed hic nullum est"
 help = "genus nominatim scribe `Genus { … }`, vel ligationi, parametro, aut reditui genus expressum da"
 
+[diagnostics.SEM016.issues.inferred_constructor_ambiguous_union]
+message = "`_ { … }` genus exspectatum aedificat, sed genus exspectatum plurium generum unio est"
+help = "genus quod significas expressum scribe `Genus { … }`"
+
 [diagnostics.SEM016.issues.inferred_constructor_entries_need_map]
 message = "`_ { \"clavis\": valor, … }` introitus praebet, sed genus exspectatum tabula non est"
 help = "introitus `\"clavis\": valor` tabulam aedificant; ad genus vel classem campos `nomen = valor` scribe"

@@ -259,6 +259,97 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// Whether `expr` is an inferred-constructor hole `_ { … }`: a `Verte`
+    /// whose target is the unresolved hole, with fields or constant entries.
+    fn is_inferred_constructor_hole(&self, expr: &HirExpression) -> bool {
+        let HirExpressionKind::Verte {
+            source,
+            target,
+            entries,
+        } = &expr.kind
+        else {
+            return false;
+        };
+        self.is_infer(self.resolve_inferred_type(*target))
+            && (entries.is_some()
+                || matches!(
+                    &source.kind,
+                    HirExpressionKind::Literal(HirLiteral::JsonValor(
+                        radix_syntax::JsonValue::Object(_)
+                    ))
+                ))
+    }
+
+    /// The type an inferred constructor builds when the slot is a union.
+    /// `T ∪ none` builds `T` (operator ruling 2026-10-09): the hole behaves as
+    /// if the slot were `T` alone. Several non-none members are ambiguous and
+    /// raise a named error; a union of only `none` has no type to build, so it
+    /// is the no-expected-type error. A slot that is not a union is unchanged.
+    fn inferred_constructor_expected(
+        &mut self,
+        expr: &HirExpression,
+        expected: Option<TypeId>,
+    ) -> Result<Option<TypeId>, TypeId> {
+        let Some(slot) = expected else {
+            return Ok(None);
+        };
+        if !self.is_inferred_constructor_hole(expr) {
+            return Ok(expected);
+        }
+        let ty = self.resolve_inferred_type(slot);
+        let mut members = Vec::new();
+        if !self.collect_non_none_members(ty, &mut members) {
+            return Ok(expected);
+        }
+        match members.as_slice() {
+            [] => Ok(None),
+            [only] => Ok(Some(*only)),
+            _ => {
+                self.invalid_conversion(
+                    super::convert::ISSUE_INFERRED_CONSTRUCTOR_AMBIGUOUS_UNION,
+                    expr.span,
+                );
+                // The named error stands alone: the node takes the slot's type.
+                Err(slot)
+            }
+        }
+    }
+
+    /// Flattens `ty` through aliases, `Option` and nested unions into its
+    /// distinct non-none members. Returns false when `ty` is not a union.
+    fn collect_non_none_members(&self, ty: TypeId, out: &mut Vec<TypeId>) -> bool {
+        let nihil = self.types.primitive(Primitive::Nihil);
+        match self.types.get(ty) {
+            Type::Alias(_, inner) => self.collect_non_none_members(*inner, out),
+            Type::Option(inner) => {
+                self.collect_leaf(*inner, nihil, out);
+                true
+            }
+            Type::Union(members) => {
+                for member in members {
+                    self.collect_leaf(*member, nihil, out);
+                }
+                true
+            }
+            _ => self.types.equals(ty, nihil),
+        }
+    }
+
+    fn collect_leaf(&self, ty: TypeId, nihil: TypeId, out: &mut Vec<TypeId>) {
+        let mut nested = Vec::new();
+        if self.collect_non_none_members(ty, &mut nested) {
+            for member in nested {
+                if !out.iter().any(|seen| self.types.equals(*seen, member)) {
+                    out.push(member);
+                }
+            }
+        } else if !self.types.equals(ty, nihil)
+            && !out.iter().any(|seen| self.types.equals(*seen, ty))
+        {
+            out.push(ty);
+        }
+    }
+
     /// `_ { … }` content shape. The hole before braces builds the expected
     /// type, and the contents must match what that type takes: ENTRIES
     /// (`"key": value`) build a map or a `json` value exactly as the bare
@@ -386,6 +477,10 @@ impl TypeChecker<'_> {
         if let (Some(_), Some(slot)) = (&store, expected) {
             self.mark_word_ring(expr, slot);
         }
+        let expected = match self.inferred_constructor_expected(expr, expected) {
+            Ok(expected) => expected,
+            Err(slot) => return slot,
+        };
         if let Some(settled) = self.desugar_inferred_constructor_shape(expr, expected) {
             return settled;
         }

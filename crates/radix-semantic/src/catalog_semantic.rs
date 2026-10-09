@@ -511,6 +511,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "inferred_constructor_fields_for_map" => Some(
             "a map takes entries `\"key\": value`; fields `name = value` build a genus or class".to_owned(),
         ),
+        "inferred_constructor_ambiguous_union" => {
+            Some("write the explicit `Type { … }` for the member you mean".to_owned())
+        }
         "inferred_constructor_no_expected_type" => {
             Some("name the type: write `Type { … }`, or give the binding, parameter or return an explicit type".to_owned())
         }

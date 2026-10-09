@@ -3536,6 +3536,10 @@ help = "remove the recovery arm from this regex conversion"
 message = "`_ { … }` builds the expected type, but there is none here"
 help = "name the type: write `Type { … }`, or give the binding, parameter or return an explicit type"
 
+[diagnostics.SEM016.issues.inferred_constructor_ambiguous_union]
+message = "`_ { … }` builds the expected type, but the expected type is a union of several types"
+help = "write the explicit `Type { … }` for the member you mean"
+
 [diagnostics.SEM016.issues.inferred_constructor_entries_need_map]
 message = "`_ { \"key\": value, … }` gives entries, but the expected type is not a map"
 help = "entries `\"key\": value` build a map; for a genus or class write fields `name = value`"
