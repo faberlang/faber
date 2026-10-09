@@ -1027,6 +1027,12 @@ pub(super) fn lower_package_units<'a>(
     // closure environments); the validation token is rebuilt on the merged
     // program below.
     let mut library_parts: Vec<LibraryMirParts> = Vec::new();
+    // Display tokens of the file that defines each generic template, keyed by
+    // the template's source DefId (stable across id shifts and pruning).
+    let mut template_tokens: HashMap<
+        DefId,
+        radix_module::runtime_contract::display_tokens::DisplayTokens,
+    > = HashMap::new();
     for library in &links.libraries {
         let mut diagnostics = Vec::new();
         // Read the library's own file interface before its cache entry is
@@ -1298,8 +1304,15 @@ pub(super) fn lower_package_units<'a>(
                     return Ok(());
                 }
                 extra_validation.merge(&validation);
+                let (library_program, library_context) = lowered.validated.into_parts();
+                record_template_display_tokens(
+                    &mut template_tokens,
+                    &lowered.generic_templates,
+                    &library_context.display_tokens,
+                );
                 library_parts.push(LibraryMirParts {
-                    program: lowered.validated.into_parts().0,
+                    program: library_program,
+                    display_tokens: library_context.display_tokens.clone(),
                     environments: lowered.closure_environments,
                     templates: lowered.generic_templates,
                     generic_params: lowered.generic_params,
@@ -1388,6 +1401,11 @@ pub(super) fn lower_package_units<'a>(
 
     let mut generic_templates = std::mem::take(&mut merged.generic_templates);
     let mut generic_params = std::mem::take(&mut merged.generic_params);
+    record_template_display_tokens(
+        &mut template_tokens,
+        &generic_templates,
+        &merged.validated.validation().display_tokens,
+    );
     // Host kernel lowering has no device routes: imported kernels are plain
     // functions, so the composition inputs stay empty.
     let imported_device_index = match kernel_lowering {
@@ -1439,6 +1457,11 @@ pub(super) fn lower_package_units<'a>(
                 )]
             })?
             .0;
+        record_template_display_tokens(
+            &mut template_tokens,
+            &lowered.generic_templates,
+            &lowered.validated.validation().display_tokens,
+        );
         let mut available_templates = generic_templates.clone();
         available_templates.extend(future_library_templates.iter().cloned());
         let mut available_generic_params = generic_params.clone();
@@ -1491,7 +1514,12 @@ pub(super) fn lower_package_units<'a>(
         consumer_device_roles,
         consumer_launch_entries,
     )?;
-    merged = rebuild_merged_validated(merged, &entry_path, Some(&extra_validation))?;
+    merged = rebuild_merged_validated(
+        merged,
+        &entry_path,
+        Some(&extra_validation),
+        &template_tokens,
+    )?;
 
     if cli_plan.dispatch.is_some() {
         let Some(function) = dispatch_function else {
@@ -3417,6 +3445,7 @@ fn append_shifted_program<'merged, 'incoming>(
         generic_params: incoming.generic_params,
         tensor_edge_policy_metadata: incoming.tensor_edge_policy_metadata,
         device_function_metadata: incoming.device_function_metadata,
+        display_tokens: incoming_display_tokens.clone(),
     };
     let offset = append_shifted_parts(
         &mut merged_program,
@@ -3514,6 +3543,9 @@ fn append_shifted_library_parts<'a>(
         offset,
         diagnostic_path,
     )?;
+    context
+        .display_tokens
+        .absorb(&library.display_tokens, |id| MirFunctionId(id.0 + offset));
     merge_tensor_edge_policy_metadata(
         &mut merged.tensor_edge_policy_metadata,
         &library.tensor_edge_policy_metadata,
@@ -3649,6 +3681,55 @@ fn function_id_overflow_diag(path: &Path, message: &str) -> Diagnostic {
     mir_issue_diag(path, "package_mir_function_id_overflow", message)
 }
 
+/// Display tokens of the file a unit was written in, as far as the unit's own
+/// table shows it: every entry of a unit's table comes from that one file, so
+/// the first entry is the file's tokens. A unit whose table is empty (no
+/// function prints) yields none. The flip unit replaces this derivation with
+/// the file's locale pack directly.
+fn unit_display_tokens(
+    table: &radix_module::mir::MirDisplayTokens,
+) -> Option<&radix_module::runtime_contract::display_tokens::DisplayTokens> {
+    table.tokens.first()
+}
+
+/// Remember the defining file's tokens for each generic template of a unit.
+fn record_template_display_tokens(
+    template_tokens: &mut HashMap<
+        DefId,
+        radix_module::runtime_contract::display_tokens::DisplayTokens,
+    >,
+    templates: &[MirFunction],
+    table: &radix_module::mir::MirDisplayTokens,
+) {
+    let Some(tokens) = unit_display_tokens(table) else {
+        return;
+    };
+    for source in templates.iter().filter_map(|template| template.source) {
+        template_tokens
+            .entry(source)
+            .or_insert_with(|| tokens.clone());
+    }
+}
+
+/// Give every monomorphization clone that has no tokens yet the tokens of the
+/// file defining its template. A clone already in the table (a same-file
+/// clone recorded at lowering) keeps its own entry; a clone whose template
+/// has no recorded tokens stays without an id.
+fn assign_clone_display_tokens(
+    table: &mut radix_module::mir::MirDisplayTokens,
+    monomorphizations: &[radix_module::mir::MirMonomorphization],
+    template_tokens: &HashMap<DefId, radix_module::runtime_contract::display_tokens::DisplayTokens>,
+) {
+    for clone in monomorphizations {
+        if table.by_function.contains_key(&clone.function) {
+            continue;
+        }
+        if let Some(tokens) = template_tokens.get(&clone.key.source) {
+            table.assign(clone.function, tokens);
+        }
+    }
+}
+
 /// Rebuild the validated-MIR token after package merging shifts IDs and
 /// appends `functions/closure_environments`. The prior token proved the
 /// pre-merge program; the merged program needs its own proof.
@@ -3656,8 +3737,14 @@ pub(super) fn rebuild_merged_validated<'a>(
     mut merged: LoweredMirUnit<'a>,
     diagnostic_path: &Path,
     extra: Option<&RemappedValidation>,
+    template_tokens: &HashMap<DefId, radix_module::runtime_contract::display_tokens::DisplayTokens>,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     let (program, mut context) = merged.validated.into_parts();
+    assign_clone_display_tokens(
+        &mut context.display_tokens,
+        &merged.monomorphizations,
+        template_tokens,
+    );
     context.closure_environments.clear();
     for environment in &merged.closure_environments {
         context
@@ -4082,6 +4169,9 @@ struct LibraryMirParts {
     /// Synthetic-kernel metadata carried from the lowered unit; merged with
     /// the same id shift as the program (KCM-05).
     device_function_metadata: MirDeviceFunctionMetadataMap,
+    /// The unit's display-token table, keyed by the unit's own function ids
+    /// (absorbed with the merge shift like the program itself).
+    display_tokens: radix_module::mir::MirDisplayTokens,
 }
 
 fn prune_unreachable_library_functions(
@@ -4133,6 +4223,10 @@ fn prune_unreachable_library_functions(
                 .device_function_metadata
                 .retain(|key, _| keep.contains(key) || !program_ids.contains(key));
             library
+                .display_tokens
+                .by_function
+                .retain(|function, _| keep.contains(function));
+            library
                 .program
                 .functions
                 .retain(|function| keep.contains(&function.id));
@@ -4146,6 +4240,7 @@ fn prune_unreachable_library_functions(
                 &mut library.program,
                 &mut library.environments,
                 &mut library.device_function_metadata,
+                &mut library.display_tokens,
             );
             library.templates.retain(|template| {
                 template
@@ -4183,12 +4278,17 @@ fn reindex_function_ids(
     program: &mut MirProgram,
     environments: &mut [MirClosureEnvironment],
     device_function_metadata: &mut MirDeviceFunctionMetadataMap,
+    display_tokens: &mut radix_module::mir::MirDisplayTokens,
 ) {
     let mut remap = HashMap::new();
     for (index, function) in program.functions.iter().enumerate() {
         remap.insert(function.id, MirFunctionId(index as u32));
     }
     remap_device_function_metadata(device_function_metadata, &remap);
+    display_tokens.by_function = std::mem::take(&mut display_tokens.by_function)
+        .into_iter()
+        .map(|(function, id)| (remap.get(&function).copied().unwrap_or(function), id))
+        .collect();
     let contiguous = program
         .functions
         .iter()
@@ -4676,3 +4776,7 @@ mod prune_device_metadata_tests;
 #[cfg(test)]
 #[path = "metadata_merge_test.rs"]
 mod metadata_merge_tests;
+
+#[cfg(test)]
+#[path = "display_tokens_clone_test.rs"]
+mod display_tokens_clone_tests;

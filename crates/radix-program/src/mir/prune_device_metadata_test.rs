@@ -76,6 +76,7 @@ fn library(
         generic_params: Vec::new(),
         tensor_edge_policy_metadata: MirTensorEdgePolicyMetadata::default(),
         device_function_metadata,
+        display_tokens: radix_module::mir::MirDisplayTokens::default(),
     }
 }
 
