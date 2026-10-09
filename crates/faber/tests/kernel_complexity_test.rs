@@ -102,13 +102,6 @@ fn kernel_complexity_package(label: &str, check_section: Option<&str>) -> TempDi
 fn run_faber_check(args: &[&str], package: &Path) -> (String, String, Option<i32>) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_faber"));
     command.args(args).arg(package);
-    // Workspace-dev validation law: the spawned binary must resolve the
-    // workspace library home, not an installed (stale) machine default.
-    if let Ok(home) = std::env::var("FABER_LIBRARY_HOME") {
-        command.env("FABER_LIBRARY_HOME", home);
-    } else if let Some(root) = radix::module::paths::faberlang_home() {
-        command.env("FABER_LIBRARY_HOME", root);
-    }
     let output = command
         .stdin(Stdio::null())
         .output()
