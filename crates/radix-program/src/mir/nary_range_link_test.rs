@@ -10,7 +10,7 @@ use radix_module::mir::LoweredMirUnit;
 use radix_module::mir::{BufferHost, MirFunctionId, dump_program};
 use std::fs;
 
-const RANGE_UTIL: &str = "@ public\nfn row_max() → numerus {\n    return 2\n}\n\n@ public\nfn col_max() → numerus {\n    return 3\n}\n\n@ public\nfn emit_cell(numerus v) → numerus {\n    return v\n}\n";
+const RANGE_UTIL: &str = "@ public\nfn row_max() → int {\n    return 2\n}\n\n@ public\nfn col_max() → int {\n    return 3\n}\n\n@ public\nfn emit_cell(int v) → int {\n    return v\n}\n";
 
 const RANGE_MAIN: &str = "import from \"./util\" * as utilModule\n\nmain {\n    for range 0‥utilModule.row_max(), 0‥utilModule.col_max() const i, j {\n        print utilModule.emit_cell(i * 10 + j)\n    }\n}\n";
 

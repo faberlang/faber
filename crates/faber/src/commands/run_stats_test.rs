@@ -63,7 +63,7 @@ main {
         total ← bump(total)
         i ← i + 1
     }
-    var textus raw ← "41"
+    var string raw ← "41"
     var int parsed ↤ raw
     total ← bump(parsed)
     print "total=", total
