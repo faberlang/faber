@@ -19,8 +19,7 @@ const BUDGETS: Budgets = Budgets {
     unwrap: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     expect: 0,
-    // WHY: visit.rs keeps one production panic for the default depth hook.
-    panic: 1,
+    panic: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     unreachable: 0,
     todo: 0,

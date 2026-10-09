@@ -26,7 +26,7 @@ const BUDGETS: Budgets = Budgets {
     todo: 0,
     unimplemented: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
-    let_underscore: 1,
+    let_underscore: 0,
     // WHY: D03-RUNTIME extracted all three inline test modules (frame, sparsa,
     // and tensor).
     inline_test_modules: 0,

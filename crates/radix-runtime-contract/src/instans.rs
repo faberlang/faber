@@ -249,7 +249,7 @@ fn format_rfc3339_utc(nanos: i64, praecisio: InstansPraecisio) -> String {
     if digits > 0 {
         let fraction = nanos_remainder / 10u32.pow(9 - digits as u32);
         out.push('.');
-        let _ = std::fmt::Write::write_fmt(&mut out, format_args!("{fraction:0digits$}"));
+        out.push_str(&format!("{fraction:0digits$}"));
     }
     out.push('Z');
     out

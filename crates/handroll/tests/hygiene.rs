@@ -16,7 +16,7 @@ const BUDGETS: Budgets = Budgets {
     // WHY: minted at D-03 baseline; frozen, not audited here.
     unwrap: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
-    expect: 4,
+    expect: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     panic: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
@@ -24,7 +24,7 @@ const BUDGETS: Budgets = Budgets {
     todo: 0,
     unimplemented: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
-    let_underscore: 1,
+    let_underscore: 0,
     // WHY: D03-HANDROLL extracts both inline test modules (entropy, sha256);
     // minted at observed, lowered to 0 by this unit.
     inline_test_modules: 0,
