@@ -2,12 +2,15 @@
 """Emit measurement JSON for the public compatibility matrices.
 
 Runs the in-process exempla harness (emit_hir_target_matrix,
-emit_mir_target_matrix, emit_conversio_target_matrix) and writes per-target
-JSON under radix/corpus/measurement/:
+emit_mir_target_matrix) and writes per-target JSON under
+radix/corpus/measurement/:
 
   compat/<target>.json          EBNF matrix rows for one target (hir/mir lanes)
-  conversio/<target>.json       conversio cells for one target (hir/mir lanes)
-  conversio/disagreements.json  measured-vs-predicted disagreements
+
+The conversio/ and conversio-decimal/ measurement JSON is no longer emitted
+here: its generator measured a fixture tree in the sibling examples repo, which
+are not part of radix (single-repo-development U1, ruling Q6). The committed
+files under corpus/measurement/conversio*/ are frozen records.
 
 The public faber repository renders its matrices from this JSON
 (faber/scripta/render-matrices.py); it never runs the exempla build itself.
@@ -21,8 +24,6 @@ Env:
   COMPAT_OUT              output root (default radix/corpus/measurement)
   EBNF_MATRIX_HIR_LOG     captured emit_hir_target_matrix output (skip cargo)
   EBNF_MATRIX_MIR_LOG     captured emit_mir_target_matrix output (skip cargo)
-  CONVERSIO_MATRIX_LOG    captured emit_conversio_target_matrix output (skip cargo)
-  CONVERSIO_MATRIX_FIXTURES  fixture tree root (default ../examples/conversio-matrix)
 
 The freshness gate (scripta/check-compat-json-freshness, wired into
 check-measurement-gates / stage 4a) regenerates to a temp root and runs the
@@ -69,23 +70,6 @@ CARGO_MIR = [
     "--features", "mir-core",
     "--", "--ignored", "--nocapture",
 ]
-CARGO_CONVERSIO = [
-    "cargo", "test", "-p", "exempla", "--lib", "emit_conversio_target_matrix",
-    "--features", "mir-core",
-    "--", "--ignored", "--nocapture",
-]
-
-# Conversio family universe in stable matrix order (ConversioTypeFamily::ALL).
-FAMILIES = [
-    "numerus", "fractus", "bivalens", "textus", "ascii", "octeti",
-    "regex", "json", "valor", "instans", "modulus",
-    "lista", "tabula", "copia", "intervallum",
-    "tensor", "vector", "matrix", "sparsa",
-    "cursor", "promissum",
-]
-
-CONV_HIR_TARGETS = ["rust", "ts", "go", "faber"]
-CONV_MIR_TARGETS = ["llvm-text", "wasm-text", "wasm", "wgsl-text", "sexp-struct", "sexp"]
 
 
 def run_or_read(log_env: str, cargo_cmd: list[str]) -> str:
@@ -115,8 +99,6 @@ def normalize_corpus_path(raw: str) -> str | None:
     for marker in (
         "/radix/corpus/",
         "radix/corpus/",
-        "/examples/corpus/",
-        "examples/corpus/",
     ):
         idx = raw.find(marker)
         if idx >= 0:
@@ -292,179 +274,9 @@ def emit_compat(out_root: Path) -> None:
         )
 
 
-# --- conversio measurement parsing ------------------------------------------
-
-_FIXTURES_OVERRIDE = os.environ.get("CONVERSIO_MATRIX_FIXTURES")
-FIXTURES_ROOT = (
-    Path(_FIXTURES_OVERRIDE)
-    if _FIXTURES_OVERRIDE
-    else ROOT.parent / "examples" / "conversio-matrix"
-)
-
-
-def fixture_backed(src: str, tgt: str) -> bool:
-    return (FIXTURES_ROOT / src / f"{tgt}.fab").is_file()
-
-
-def parse_section(text: str, marker: str) -> list[str]:
-    lines = text.splitlines()
-    start = None
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped == marker or stripped.endswith(f"... {marker}"):
-            start = i
-            break
-    if start is None:
-        return []
-    rows = []
-    for line in lines[start + 1:]:
-        stripped = line.strip()
-        if not stripped or stripped in ("ROWS", "MEASURED", "DISAGREEMENTS", "DECIMAL ROWS"):
-            break
-        rows.append(line)
-    return rows
-
-
-def parse_tsv(text: str) -> dict[tuple[str, str, str], str]:
-    verdicts: dict[tuple[str, str, str], str] = {}
-    for line in parse_section(text, "ROWS"):
-        parts = line.split("\t")
-        if len(parts) != 4:
-            continue
-        src, tgt, target, verdict = parts
-        verdicts[(src, tgt, target)] = verdict
-    return verdicts
-
-
-def parse_disagreements(text: str) -> list[dict]:
-    rows = []
-    for line in parse_section(text, "DISAGREEMENTS"):
-        parts = line.split("\t")
-        if len(parts) != 6:
-            continue
-        src, tgt, target, predicted, measured, detail = parts
-        rows.append(
-            {
-                "src": src,
-                "tgt": tgt,
-                "target": target,
-                "predicted": predicted,
-                "measured": measured,
-                "detail": detail,
-            }
-        )
-    return rows
-
-
-# Decimal conversio rows (decimal-widths goal D6). Width-refined cells in the
-# same stable order as the harness `DECIMAL_CELLS` table.
-DECIMAL_CELL_IDS = [
-    "d64-i64",
-    "i64-d64",
-    "d64-u32",
-    "u32-d64",
-    "fractus-d64",
-    "d64-fractus",
-    "textus-d64",
-    "d64-textus",
-]
-
-
-def parse_decimal_rows(text: str) -> dict[tuple[str, str], str]:
-    rows: dict[tuple[str, str], str] = {}
-    for line in parse_section(text, "DECIMAL ROWS"):
-        parts = line.split("\t")
-        if len(parts) != 4:
-            continue
-        cell_id, target, verdict, _detail = parts
-        rows[(cell_id, target)] = verdict
-    return rows
-
-
-def emit_conversio_decimal(out_root: Path) -> None:
-    text = run_or_read("CONVERSIO_MATRIX_LOG", CARGO_CONVERSIO)
-    rows = parse_decimal_rows(text)
-
-    for target in CONV_HIR_TARGETS + CONV_MIR_TARGETS:
-        lane = "hir" if target in CONV_HIR_TARGETS else "mir"
-        summary = {"dedicated": 0, "fallback": 0, "rejected": 0, "not-emitted": 0}
-        cells = []
-        for cell_id in DECIMAL_CELL_IDS:
-            src, tgt = cell_id.split("-", 1)
-            verdict = rows.get((cell_id, target), "not-emitted")
-            summary[verdict] = summary.get(verdict, 0) + 1
-            cells.append(
-                {
-                    "src": src,
-                    "tgt": tgt,
-                    "tier": verdict,
-                    "measured": True,
-                }
-            )
-        write_json(
-            out_root / "conversio-decimal" / f"{target}.json",
-            {
-                "schemaVersion": 1,
-                "artifact": "faber-conversio-decimal-measurement",
-                "target": target,
-                "lane": lane,
-                "generatedBy": "radix/scripta/emit-compat-json.py",
-                "summary": summary,
-                "cells": cells,
-            },
-        )
-
-
-def emit_conversio(out_root: Path) -> None:
-    text = run_or_read("CONVERSIO_MATRIX_LOG", CARGO_CONVERSIO)
-    verdicts = parse_tsv(text)
-    disagreements = parse_disagreements(text)
-
-    for target in CONV_HIR_TARGETS + CONV_MIR_TARGETS:
-        lane = "hir" if target in CONV_HIR_TARGETS else "mir"
-        summary = {"dedicated": 0, "fallback": 0, "rejected": 0, "not-emitted": 0}
-        cells = []
-        for src in FAMILIES:
-            for tgt in FAMILIES:
-                verdict = verdicts.get((src, tgt, target), "not-emitted")
-                summary[verdict] = summary.get(verdict, 0) + 1
-                cells.append(
-                    {
-                        "src": src,
-                        "tgt": tgt,
-                        "tier": verdict,
-                        "measured": fixture_backed(src, tgt),
-                    }
-                )
-        write_json(
-            out_root / "conversio" / f"{target}.json",
-            {
-                "schemaVersion": 1,
-                "artifact": "faber-conversio-measurement",
-                "target": target,
-                "lane": lane,
-                "generatedBy": "radix/scripta/emit-compat-json.py",
-                "summary": summary,
-                "cells": cells,
-            },
-        )
-
-    write_json(
-        out_root / "conversio" / "disagreements.json",
-        {
-            "schemaVersion": 1,
-            "artifact": "faber-conversio-disagreements",
-            "generatedBy": "radix/scripta/emit-compat-json.py",
-            "rows": disagreements,
-        },
-    )
-
-
 def main() -> int:
     out_root = Path(os.environ.get("COMPAT_OUT", DEFAULT_OUT))
     emit_compat(out_root)
-    emit_conversio(out_root)
-    emit_conversio_decimal(out_root)
     print(f"measurement JSON written under {out_root}", file=sys.stderr)
     return 0
 
