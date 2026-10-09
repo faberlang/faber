@@ -343,7 +343,13 @@ impl FunctionBuilder<'_> {
             depth: self.capture_depth,
         });
         self.lower_block_to_destination(body, destination.clone(), ty, span);
-        let trap = self.traps.pop().expect("trap context pushed");
+        let Some(trap) = self.traps.pop() else {
+            self.errors.push(MirError::validation(
+                span,
+                "capture trap context was popped before its body finished",
+            ));
+            return None;
+        };
 
         let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join), span);
         if body_reaches || trap.error_paths {
@@ -2382,10 +2388,7 @@ impl FunctionBuilder<'_> {
                         &mut reaches_join,
                     )?;
                 }
-                HirPattern::Alias(_, _, inner) if matches!(inner.as_ref(), HirPattern::Variant(_, _)) => {
-                    let HirPattern::Variant(variant, fields) = inner.as_ref() else {
-                        unreachable!("inner variant pattern shape was matched");
-                    };
+                HirPattern::Alias(_, _, inner) if let HirPattern::Variant(variant, fields) = inner.as_ref() => {
                     self.lower_unit_variant_arm(
                         *variant,
                         fields,
@@ -2522,7 +2525,11 @@ impl FunctionBuilder<'_> {
                 other => other,
             };
             let HirPattern::Variant(variant, fields) = variant_pattern else {
-                unreachable!("variant alternatives are checked before lowering");
+                self.errors.push(MirError::unsupported(
+                    arm.span,
+                    "variant alternative that is not a variant pattern",
+                ));
+                return None;
             };
             let hit_id = self.fresh_block(arm.span);
             let miss_id = if index + 1 == alternatives.len() {
@@ -2759,7 +2766,9 @@ impl FunctionBuilder<'_> {
         span: Span,
     ) -> Option<MirConstant> {
         let (HirPattern::Literal(literal) | HirPattern::NegatedLiteral(literal)) = pattern else {
-            unreachable!("literal alternatives are checked before constant lowering");
+            self.errors
+                .push(MirError::unsupported(span, "literal alternative that is not a literal pattern"));
+            return None;
         };
         let constant = self.literal_switch_constant(literal, scrutinee_ty, span)?;
         if matches!(pattern, HirPattern::NegatedLiteral(_)) {
@@ -3967,11 +3976,14 @@ impl FunctionBuilder<'_> {
             CollectionIteraKind::BoundedArray(elem, _) => (collection, MirType::semantic(*elem), false),
             CollectionIteraKind::Bytes(element) => (collection, MirType::semantic(*element), false),
             CollectionIteraKind::Text(element) => (collection, MirType::semantic(*element), false),
-            CollectionIteraKind::Shaped { .. } => {
-                unreachable!("shaped collection itera returns through nested lowering above")
-            }
-            CollectionIteraKind::Unsupported => {
-                unreachable!("unsupported collection itera kinds fail closed above")
+            // Shaped itera returned through nested lowering above and
+            // unsupported kinds failed closed before the collection lowered.
+            CollectionIteraKind::Shaped { .. } | CollectionIteraKind::Unsupported => {
+                self.errors.push(MirError::unsupported(
+                    iter.iter.span,
+                    "itera collection before iterator MIR lowering",
+                ));
+                return None;
             }
         };
 
@@ -4472,18 +4484,15 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(iter.iter.span, "shaped itera coordinate list"));
             return None;
         };
-        let coordinate_operands = iter
-            .coordinates
-            .iter()
-            .map(|(def_id, _)| {
-                let local = self
-                    .bindings
-                    .get(def_id)
-                    .expect("shaped coordinate binding exists")
-                    .local;
-                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(local)))
-            })
-            .collect();
+        let mut coordinate_operands = Vec::with_capacity(iter.coordinates.len());
+        for (def_id, _) in iter.coordinates.iter() {
+            let Some(binding) = self.bindings.get(def_id) else {
+                self.errors
+                    .push(MirError::validation(iter.iter.span, "shaped itera coordinate has no binding"));
+                return None;
+            };
+            coordinate_operands.push(MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(binding.local))));
+        }
         let index_list = self.construct_temp(
             MirAggregateKind::Array,
             MirAggregateFields::Ordered(coordinate_operands),
@@ -4534,11 +4543,11 @@ impl FunctionBuilder<'_> {
         loop_after_id: MirBlockId,
     ) -> Option<()> {
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
-        let row = self
-            .bindings
-            .get(&row_def)
-            .expect("matrix row coordinate binding exists")
-            .local;
+        let Some(row) = self.bindings.get(&row_def).map(|binding| binding.local) else {
+            self.errors
+                .push(MirError::validation(iter.iter.span, "matrix row coordinate has no binding"));
+            return None;
+        };
         let rows = u8::try_from(dimensions[0]).ok()?;
         let columns = u8::try_from(dimensions[1]).ok()?;
         let row_stride = self.binary_temp(
@@ -4706,7 +4715,13 @@ impl FunctionBuilder<'_> {
                     rumpe_used: false,
                 });
                 self.visit_block(iter.body);
-                let ctx = self.breakables.pop().expect("breakable context balances");
+                let Some(ctx) = self.breakables.pop() else {
+                    self.errors.push(MirError::validation(
+                        iter.span,
+                        "breakable context popped before its body finished",
+                    ));
+                    return None;
+                };
                 reaches_after |= ctx.rumpe_used;
                 self.terminate_open_current(MirTerminatorKind::Goto(lane_end), iter.span);
                 self.switch_to(lane_end);

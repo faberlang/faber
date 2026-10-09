@@ -2646,7 +2646,11 @@ impl FunctionBuilder<'_> {
         // Direct definition call: spread/default-aware arg lowering, then dispatch
         // to provider import, variant constructor, or definition body.
         let HirExpressionKind::Path(def_id) = &callee.kind else {
-            unreachable!("non-path callees are handled by the value_callee branch");
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "call through a callee that is not a path or value callee",
+            ));
+            return None;
         };
 
         if let Some(builtin) = self.context.gpu_builtins.get(def_id).copied() {

@@ -13,74 +13,22 @@ fn config() -> ScanConfig {
 }
 
 const BUDGETS: Budgets = Budgets {
-    // WHY: one breakables.last() unwrap in MIR lower control after shape verification.
-    unwrap: 1,
-    // WHY: BO-S-10 (fe911e7b3) resolve.rs name-suggestion fold cache invariant —
-    // "visible-name fold cached in the first pass" is a hard postcondition of
-    // the two-pass suggestion walk; a panic here is the correct fail-closed
-    // behavior. Documented pre-existing deviation (BO-S-1 delivery closeout).
-    // Re-baselined 1→12 after the clippy repair commits (5f87d9983 drop
-    // package-wide cast allows; treat each cast site individually, 84c0d0e51,
-    // c7e8e5216): cast sites now use `u32::try_from(x).expect("…fits u32")`
-    // checked conversions instead of silent `as u32` + allow. All 11 added
-    // sites are structurally bounded indices (function counts, line offsets,
-    // scope/index tables, fixture ids); the expect is the fail-closed check,
-    // not a default.
-    // Re-baselined 12→20: U2's identity-resolved shader-contract ingestion
-    // (wgsl-shader-contract-boundary Wave 1, commit 045905653) added
-    // `crates/radix/src/driver/shader_contract.rs` with a `#[cfg(test)]`
-    // inline test module whose assertions unwrap compilation results with
-    // `.expect("…")` — idiomatic fail-closed test asserts (8 sites). The
-    // ratchet counts `.expect(` inside inline test modules; all 8 sites are
-    // test-only, none in production lowering. Re-baselined at the U4
-    // gate-repair checkpoint so `--stage 1-4` turns green.
-    // Re-baselined 20→21: fe4fdf9da (package_identity_facts_for_path
-    // effective-reader-pack) added one fail-closed `.expect(` to the
-    // registry-direct re-parse contract; production-fix tracking per the
-    // llvm/wasm registry re-parse residual.
-    expect: 21,
-    // WHY: one guard in emit.rs output_code contract — an internal invariant
-    // that callers should not violate for binary wasm output.
-    // Additional: hir/lower/annotation.rs exhaustive match guard on Nondum
-    // variant (closure-cleanup extraction residue, pre-existing debt).
-    // Re-baselined 2→3: the U2 shader_contract.rs inline test module's
-    // `wgsl_output` helper panics on a non-WGSL output (`panic!("expected
-    // WGSL output")`) — test-only guard, same contract-guard rationale.
-    panic: 3,
-    // WHY: exhaustive-match guard arms in MIR lower (runtime, control, place)
-    // and semantic typecheck — shape verified before dispatch.
-    // Burned 14→9 after removing artifact/monomorphize inline-test noise.
-    // Re-baselined 9→11: tensor-glyphs rank-rule typecheck added two
-    // `fresh tensor result carries a shape` guards (ops.rs), and U8
-    // feature-granularity narrowed the driver target dispatch to Rust | Go
-    // (`match target above narrowed to Rust | Go`) — all shape-verified
-    // fail-closed arms, same guard rationale.
-    // Re-baselined 11→12: elementwise lista arithmetic lowering (1a6329505)
-    // added the runtime.rs collection-op dispatch guards — operator mapping
-    // is exhaustive over the arithmetic set checked above, same guard rationale.
-    // Re-baselined 12→13: 5e21c4ac2b (lista all-any predicate twins) added
-    // the two TransformKind::All | Any arms in collection_higher_order.rs —
-    // predicate folds route through lower_collection_predicate before these
-    // matches, so the arms are fail-closed caller-contract guards; and
-    // 6f73336977 (carry analyzed provider units on the driver output,
-    // ARCH-U4/B6-U4) added the codegen/mod.rs lock_unit exhaustiveness
-    // guard — lock_unit returning None implies the Failed marker the inner
-    // let-else re-matches. Same guard rationale.
-    unreachable: 13,
+    unwrap: 0,
+    // WHY: one `u32::try_from(line)` in `SourceFile::offset_to_line_col`. The
+    // line index is a position in the `Vec<u32>` of strictly increasing line
+    // starts, so it fits u32 by construction (`SourceFile::from_raw` rejects
+    // 4 GB+ bodies); the method is public API returning `(u32, u32)`.
+    expect: 1,
+    panic: 0,
+    unreachable: 0,
     todo: 0,
     unimplemented: 0,
-    // WHY: deliberate Result discards in dump formatters (air/dump.rs),
-    // ABI render codegen (abi/render.rs), diagnostics output
-    // (diagnostics/render.rs), JSON CLI output (tool/commands/json.rs),
-    // GPU symbol resolution (builtins/gpu.rs), and child process cleanup
-    // (llvm_host.rs) — all are write-to-output/side-effect operations where
-    // errors are surfaced through the caller's error path or are intentionally
-    // best-effort. Lean checker best-effort cleanup uses `ignore_result`.
-    // Re-baselined 41→48→6 (2026-08-19 hygiene burndown): inspection JSON
-    // emitters now use `writeln!(…).ok()` / `write!(…).ok()` instead of
-    // `let _ =` discards; remaining sites are deliberate side-effect binds
-    // in lowering/resolver paths.
-    let_underscore: 6,
+    // WHY: the four `substitute_tensor_from_flat_shape_size_constants` /
+    // `substitute_shape_size_constants` calls in mir/lower/monomorphize.rs and
+    // mir/lower/package_instantiate.rs return `#[must_use]` bools whose `false`
+    // (a term that cannot fold yet) is deliberately left to the post-finalize
+    // survivor net, which reports one stable diagnostic.
+    let_underscore: 4,
     // D03-MODULE-PI extracted package_instantiate.rs `mod tests` (path-wired);
     // D03-MODULE-LH moved the `library_home_test_support` helper into the
     // import_resolve.rs companion (pub(crate) re-export preserves its path).

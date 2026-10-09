@@ -36,6 +36,8 @@ pub enum FrontmatterError {
     ByteOrderMark,
     OpeningDelimiterNotFirstLine,
     Unterminated,
+    /// The body begins beyond `u32::MAX` bytes (sources are limited to 4 GB).
+    SourceTooLarge,
 }
 
 impl std::fmt::Display for FrontmatterError {
@@ -46,6 +48,7 @@ impl std::fmt::Display for FrontmatterError {
                 "opening +++ must be on the first line of the file (comments and whitespace before it are not allowed)"
             }
             Self::Unterminated => "unterminated frontmatter",
+            Self::SourceTooLarge => "source is too large (frontmatter body offset exceeds 4 GB)",
         })
     }
 }
@@ -57,11 +60,8 @@ impl std::error::Error for FrontmatterError {}
 /// # Errors
 ///
 /// Returns [`FrontmatterError`] when a byte order mark precedes frontmatter,
-/// the opening `+++` is not on the first line, or frontmatter is unterminated.
-///
-/// # Panics
-///
-/// Panics if the body byte offset exceeds `u32::MAX` (source files larger than 4 GB).
+/// the opening `+++` is not on the first line, frontmatter is unterminated, or
+/// the body byte offset exceeds `u32::MAX` (source files larger than 4 GB).
 pub fn split_frontmatter(source: &str) -> Result<SplitFrontmatter<'_>, FrontmatterError> {
     if source.starts_with(BOM) {
         return Err(FrontmatterError::ByteOrderMark);
@@ -98,13 +98,10 @@ pub fn split_frontmatter(source: &str) -> Result<SplitFrontmatter<'_>, Frontmatt
     }
 
     let body_start = body_start.ok_or(FrontmatterError::Unterminated)?;
+    let body_byte_offset = u32::try_from(body_start).map_err(|_| FrontmatterError::SourceTooLarge)?;
     let frontmatter_text = &source[after_open..frontmatter_end];
 
-    Ok(SplitFrontmatter {
-        frontmatter_text: Some(frontmatter_text),
-        body: &source[body_start..],
-        body_byte_offset: u32::try_from(body_start).expect("frontmatter body offset fits u32 (4 GB source limit)"),
-    })
+    Ok(SplitFrontmatter { frontmatter_text: Some(frontmatter_text), body: &source[body_start..], body_byte_offset })
 }
 
 fn delimiter_line_index(source: &str) -> Option<usize> {

@@ -379,12 +379,11 @@ impl HirAspectVerifier for LeanAspectChecker {
 
         let gate_holes: Vec<HirAspectCheckResult> = recognized
             .iter()
-            .filter(|r| is_gate_hole_record(r))
-            .map(|r| {
-                let label = match &r.detail {
-                    HirAspectDetail::GatePurityHole { issue } => issue.label(),
-                    _ => unreachable!("is_gate_hole_record guards the detail"),
-                };
+            .filter_map(|r| match &r.detail {
+                HirAspectDetail::GatePurityHole { issue } => Some(issue.label()),
+                _ => None,
+            })
+            .map(|label| {
                 HirAspectCheckResult {
                     status: HirAspectCheckStatus::Failed,
                     evidence: HirAspectEvidence(format!(
@@ -514,18 +513,32 @@ fn merge_results(
             if is_gate_hole_record(record) {
                 next_gate_holes
                     .next()
-                    .expect("one gate-hole result per hole record")
+                    .unwrap_or_else(|| missing_result("gate-hole"))
             } else if has_proof_content(record) {
                 next_checked
                     .next()
-                    .expect("one checked result per checkable record")
+                    .unwrap_or_else(|| missing_result("checked"))
             } else {
                 next_refused
                     .next()
-                    .expect("one refused result per refused record")
+                    .unwrap_or_else(|| missing_result("refused"))
             }
         })
         .collect()
+}
+
+/// Fail-closed result for a record whose per-class result list ran short.
+/// Every record owes exactly one result of its class, so this marks an
+/// internal bookkeeping fault and is never reported as proven.
+fn missing_result(class: &str) -> HirAspectCheckResult {
+    HirAspectCheckResult {
+        status: HirAspectCheckStatus::Failed,
+        evidence: HirAspectEvidence(format!(
+            "internal error: no {class} result was produced for this aspect record; refusing to report it as proven"
+        )),
+        counterexample: Vec::new(),
+        backend: HirAspectBackendKind::Lean,
+    }
 }
 
 /// Lake project name used for generated temp projects.

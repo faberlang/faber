@@ -31,12 +31,14 @@ use std::path::PathBuf;
 pub enum SourceLoadError {
     Frontmatter(String),
     Toml(String),
+    /// The peeled body is larger than `u32::MAX` bytes (4 GB source limit).
+    TooLarge(String),
 }
 
 impl std::fmt::Display for SourceLoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Frontmatter(message) | Self::Toml(message) => f.write_str(message),
+            Self::Frontmatter(message) | Self::Toml(message) | Self::TooLarge(message) => f.write_str(message),
         }
     }
 }
@@ -73,10 +75,6 @@ pub fn source_load_diagnostic(file: &str, error: &SourceLoadError) -> Diagnostic
 ///
 /// Returns [`SourceLoadError::Frontmatter`] when frontmatter delimiters are malformed,
 /// or [`SourceLoadError::Toml`] when frontmatter TOML content is invalid.
-///
-/// # Panics
-///
-/// Panics if the body byte offset exceeds `u32::MAX` (source files larger than 4 GB).
 pub fn peel_raw_source<'a>(name: &str, raw: &'a str) -> Result<PeeledSource<'a>, SourceLoadError> {
     let split = split_frontmatter(raw).map_err(|error| SourceLoadError::Frontmatter(format!("{name}: {error}")))?;
 
@@ -121,11 +119,8 @@ impl SourceFile {
     ///
     /// # Errors
     ///
-    /// Returns [`SourceLoadError`] when frontmatter peeling or TOML parsing fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the source file peak after frontmatter exceeds `u32::MAX` bytes (4 GB+).
+    /// Returns [`SourceLoadError`] when frontmatter peeling or TOML parsing fails,
+    /// or the peeled body exceeds `u32::MAX` bytes (4 GB+).
     // public constructor: callers choose move vs clone
     pub fn new(path: PathBuf, raw_content: String) -> Result<Self, SourceLoadError> {
         let name = path
@@ -142,11 +137,8 @@ impl SourceFile {
     ///
     /// # Errors
     ///
-    /// Returns [`SourceLoadError`] when frontmatter peeling or TOML parsing fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the peeled body exceeds `u32::MAX` bytes (4 GB+).
+    /// Returns [`SourceLoadError`] when frontmatter peeling or TOML parsing fails,
+    /// or the peeled body exceeds `u32::MAX` bytes (4 GB+).
     // public constructor: callers choose move vs clone
     pub fn inline(name: impl Into<String>, raw_content: String) -> Result<Self, SourceLoadError> {
         Self::from_raw(PathBuf::new(), name.into(), raw_content)
@@ -156,18 +148,16 @@ impl SourceFile {
     ///
     /// # Errors
     ///
-    /// Returns [`SourceLoadError`] when frontmatter peeling or TOML parsing fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the peeled body exceeds `u32::MAX` bytes (4 GB+).
+    /// Returns [`SourceLoadError`] when frontmatter peeling or TOML parsing fails,
+    /// or the peeled body exceeds `u32::MAX` bytes (4 GB+).
     // public constructor: callers choose move vs clone
     pub fn from_raw(path: PathBuf, name: String, raw_content: String) -> Result<Self, SourceLoadError> {
         let peeled = peel_raw_source(&name, &raw_content)?;
         let body_byte_offset = peeled.body_byte_offset;
         let frontmatter = peeled.frontmatter;
         let content = peeled.body.to_owned();
-        let line_starts = compute_line_starts(&content);
+        let line_starts = compute_line_starts(&content)
+            .ok_or_else(|| SourceLoadError::TooLarge(format!("{name}: source exceeds the 4 GB size limit")))?;
 
         Ok(Self { path, name, content, raw_content, frontmatter, body_byte_offset, line_starts })
     }
@@ -223,19 +213,18 @@ impl SourceFile {
 /// EDGE: `\r\n` input records the byte after `\n`; any preceding `\r` remains
 /// part of the line slice because display trimming only removes the line feed.
 ///
-/// # Panics
-///
-/// Panics if a line start offset exceeds `u32::MAX` (source files larger than 4 GB).
-fn compute_line_starts(content: &str) -> Vec<u32> {
+/// Returns `None` when a line start offset exceeds `u32::MAX` (source files
+/// larger than 4 GB).
+fn compute_line_starts(content: &str) -> Option<Vec<u32>> {
     let mut starts = vec![0];
 
     for (i, c) in content.char_indices() {
         if c == '\n' {
-            starts.push(u32::try_from(i + 1).expect("line start offset fits u32 (4 GB source limit)"));
+            starts.push(u32::try_from(i + 1).ok()?);
         }
     }
 
-    starts
+    Some(starts)
 }
 
 #[cfg(test)]

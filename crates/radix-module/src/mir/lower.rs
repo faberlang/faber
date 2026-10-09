@@ -2433,16 +2433,13 @@ impl<'a> FunctionBuilder<'a> {
     /// handler / propagation routing.
     fn take_innermost_trap(&mut self) -> Option<TrapContext> {
         let handler_depth = self.handlers.last().map_or(0, |handler| handler.depth);
-        let trap = self.traps.last().cloned()?;
-        if trap.depth > handler_depth {
-            self.traps
-                .last_mut()
-                .expect("trap context present")
-                .error_paths = true;
-            Some(trap)
-        } else {
-            None
+        let trap = self.traps.last_mut()?;
+        if trap.depth <= handler_depth {
+            return None;
         }
+        let snapshot = trap.clone();
+        trap.error_paths = true;
+        Some(snapshot)
     }
 
     fn add_param(&mut self, def_id: DefId, name: crate::lexer::Symbol, ty: TypeId, mode: HirParamMode, span: Span) {
@@ -2548,7 +2545,8 @@ impl<'a> FunctionBuilder<'a> {
         self.shared_bindings = radix_hir::capture::CaptureFacts::for_block(body).shared;
         let entry = self.fresh_block(body.span);
         self.switch_to(entry);
-        let _ = self.emit_function_entry_shape_check(body.span);
+        // `None` means the check already recorded its diagnostic in `self.errors`.
+        self.emit_function_entry_shape_check(body.span);
         self.emit_copy_param_entries();
         if let Some(cli_args) = cli_args {
             self.add_runtime_record_local(cli_args);
@@ -4150,10 +4148,14 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn assign_temp(&mut self, kind: MirValueKind, ty: MirType, span: Span) -> MirOperand {
+        MirOperand::Temp(self.assign_new_temp(kind, ty, span))
+    }
+
+    fn assign_new_temp(&mut self, kind: MirValueKind, ty: MirType, span: Span) -> MirTempId {
         let temp = self.push_temp(ty, span);
         let value = self.new_value(kind, ty, span);
         self.append_stmt(MirStatement { kind: MirStatementKind::Assign { place: MirPlace::temp(temp), value }, span });
-        MirOperand::Temp(temp)
+        temp
     }
 
     fn record_closure_destination(&mut self, destination: &MirPlace, value: &MirOperand) {

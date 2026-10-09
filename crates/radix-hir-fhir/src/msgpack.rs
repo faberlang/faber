@@ -211,9 +211,8 @@ fn write_uint(out: &mut Vec<u8>, n: u64) {
 /// Signed opcodes only: the Rust signedness of a field is a wire fact (§1.6).
 fn write_int(out: &mut Vec<u8>, n: i64) {
     if (-32..0).contains(&n) {
-        // Negative fixint 0xe0..=0xff encodes -32..=-1 directly.
-        let offset = u8::try_from(n + 32).expect("checked -32..=-1");
-        out.push(0xe0 + offset);
+        // Negative fixint 0xe0..=0xff is the low byte of -32..=-1 itself.
+        out.push(n.to_be_bytes()[7]);
     } else if i8::try_from(n).is_ok() {
         out.push(0xd0);
         out.extend_from_slice(&n.to_be_bytes()[7..8]);
@@ -239,39 +238,48 @@ fn write_f64(out: &mut Vec<u8>, n: f64) {
     out.extend_from_slice(&n.to_be_bytes());
 }
 
+/// Low byte of a length already known to fit one byte.
+fn len_byte(len: u32) -> u8 {
+    len.to_be_bytes()[3]
+}
+
+/// Low two bytes (big-endian) of a length already known to fit a `u16`.
+fn len_u16_be(len: u32) -> [u8; 2] {
+    let bytes = len.to_be_bytes();
+    [bytes[2], bytes[3]]
+}
+
 fn write_str(out: &mut Vec<u8>, s: &str) -> Result<(), MsgpackError> {
-    let len = s.len();
+    let len = u32::try_from(s.len())
+        .map_err(|_| MsgpackError::Encode("string length exceeds msgpack u32".to_string()))?;
     if len <= 31 {
-        out.push(0xa0 | u8::try_from(len).expect("checked <= 31"));
+        out.push(0xa0 | len_byte(len));
     } else if len <= 0xff {
         out.push(0xd9);
-        out.push(u8::try_from(len).expect("checked <= 0xff"));
+        out.push(len_byte(len));
     } else if len <= 0xffff {
         out.push(0xda);
-        out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
+        out.extend_from_slice(&len_u16_be(len));
     } else {
-        let len32 = u32::try_from(len)
-            .map_err(|_| MsgpackError::Encode("string length exceeds msgpack u32".to_string()))?;
         out.push(0xdb);
-        out.extend_from_slice(&len32.to_be_bytes());
+        out.extend_from_slice(&len.to_be_bytes());
     }
     out.extend_from_slice(s.as_bytes());
     Ok(())
 }
 
 fn write_bin(out: &mut Vec<u8>, b: &[u8]) -> Result<(), MsgpackError> {
-    let len = b.len();
+    let len = u32::try_from(b.len())
+        .map_err(|_| MsgpackError::Encode("byte length exceeds msgpack u32".to_string()))?;
     if len <= 0xff {
         out.push(0xc4);
-        out.push(u8::try_from(len).expect("checked <= 0xff"));
+        out.push(len_byte(len));
     } else if len <= 0xffff {
         out.push(0xc5);
-        out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
+        out.extend_from_slice(&len_u16_be(len));
     } else {
-        let len32 = u32::try_from(len)
-            .map_err(|_| MsgpackError::Encode("byte length exceeds msgpack u32".to_string()))?;
         out.push(0xc6);
-        out.extend_from_slice(&len32.to_be_bytes());
+        out.extend_from_slice(&len.to_be_bytes());
     }
     out.extend_from_slice(b);
     Ok(())
@@ -281,10 +289,10 @@ fn write_array_len(out: &mut Vec<u8>, len: usize) -> Result<(), MsgpackError> {
     let len = u32::try_from(len)
         .map_err(|_| MsgpackError::Encode("array length exceeds msgpack u32".to_string()))?;
     if len <= 15 {
-        out.push(0x90 | u8::try_from(len).expect("checked <= 15"));
+        out.push(0x90 | len_byte(len));
     } else if len <= 0xffff {
         out.push(0xdc);
-        out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
+        out.extend_from_slice(&len_u16_be(len));
     } else {
         out.push(0xdd);
         out.extend_from_slice(&len.to_be_bytes());
@@ -296,10 +304,10 @@ fn write_map_len(out: &mut Vec<u8>, len: usize) -> Result<(), MsgpackError> {
     let len = u32::try_from(len)
         .map_err(|_| MsgpackError::Encode("map length exceeds msgpack u32".to_string()))?;
     if len <= 15 {
-        out.push(0x80 | u8::try_from(len).expect("checked <= 15"));
+        out.push(0x80 | len_byte(len));
     } else if len <= 0xffff {
         out.push(0xde);
-        out.extend_from_slice(&u16::try_from(len).expect("checked <= 0xffff").to_be_bytes());
+        out.extend_from_slice(&len_u16_be(len));
     } else {
         out.push(0xdf);
         out.extend_from_slice(&len.to_be_bytes());

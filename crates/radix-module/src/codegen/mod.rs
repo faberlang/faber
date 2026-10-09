@@ -758,8 +758,10 @@ fn map_provider_modules(
                 });
             };
             let Some(provider) = carried.lock_unit() else {
-                let crate::driver::CarriedProviderUnit::Failed { message } = carried else {
-                    unreachable!("lock_unit returned None for a non-Failed marker");
+                // `lock_unit` yields `None` only for a failed-carriage marker.
+                let message = match carried {
+                    crate::driver::CarriedProviderUnit::Failed { message } => message.as_str(),
+                    crate::driver::CarriedProviderUnit::Unit(_) => "is carried without an analyzed unit",
                 };
                 return Err(CodegenError {
                     message: format!("provider module `{module_name}` {message}"),
@@ -881,6 +883,10 @@ pub fn generate_from_loose_parts(
     types: &TypeTable,
     interner: &Interner,
 ) -> Result<crate::Output, CodegenError> {
+    let type_table = TypeTable::from_snapshot(types.snapshot()).map_err(|message| CodegenError {
+        message: format!("type table snapshot round-trip failed: {message}"),
+        args: vec![DiagnosticArg::new("issue", "type_table_snapshot_failed")],
+    })?;
     let analysis = crate::driver::AnalyzedModule::from_loaded(
         // Synthetic modules never join a real analysis snapshot; stamp 0 is
         // unreachable for analyzed units (`AnalysisStamp::next` starts at 1).
@@ -889,7 +895,7 @@ pub fn generate_from_loose_parts(
         // `TypeTable` is not `Clone`; the snapshot round-trip is the copy
         // path (it can only fail on tables missing primitives that
         // `TypeTable::new()` preloads, so a live table always round-trips).
-        TypeTable::from_snapshot(types.snapshot()).expect("type table snapshot round-trip"),
+        type_table,
         crate::semantic::Resolver::default(),
         hir.clone(),
         None,

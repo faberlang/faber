@@ -69,8 +69,8 @@ fn fresh_mir_function_ids_follow_sparse_max_without_collisions() {
 
     let mut ids = FreshMirFunctionIds::after([MirFunctionId(7), MirFunctionId(1), MirFunctionId(3)]);
 
-    assert_eq!(ids.next(), MirFunctionId(8));
-    assert_eq!(ids.next(), MirFunctionId(9));
+    assert_eq!(ids.next().expect("id space not exhausted"), MirFunctionId(8));
+    assert_eq!(ids.next().expect("id space not exhausted"), MirFunctionId(9));
 }
 
 #[test]

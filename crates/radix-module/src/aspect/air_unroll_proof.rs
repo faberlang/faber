@@ -56,10 +56,8 @@ pub fn unroll_route_facts(
             within_budget(lanes.len()).then_some(UnrollRouteFacts { route: UnrollRoute::Ab, lanes })
         }
         HirIteraMode::Ex => {
-            let count = static_lane_count(coordinates, source, types)?;
-            let lanes: Vec<i64> = (0..count)
-                .map(|lane| i64::try_from(lane).expect("lane index fits i64"))
-                .collect();
+            let count = i64::try_from(static_lane_count(coordinates, source, types)?).ok()?;
+            let lanes: Vec<i64> = (0..count).collect();
             within_budget(lanes.len()).then_some(UnrollRouteFacts { route: UnrollRoute::Ex, lanes })
         }
         HirIteraMode::De => None,

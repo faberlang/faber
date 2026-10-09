@@ -277,10 +277,15 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 }
             }
         }
-        let struct_fields = lowerer
-            .struct_field_types
-            .take()
-            .expect("struct field types retained during lowering");
+        let struct_fields = lowerer.struct_field_types.take().unwrap_or_else(|| {
+            // Retained from the earlier lowering pass; `run` aborts on the
+            // recorded error before any instance reads the empty table.
+            lowerer.errors.push(MirError::validation(
+                Span::new(0, 0),
+                "struct field types were not retained for monomorphization",
+            ));
+            Arc::new(FxHashMap::default())
+        });
         let templates = lowerer
             .functions
             .iter()

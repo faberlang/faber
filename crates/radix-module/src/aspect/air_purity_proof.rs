@@ -154,7 +154,11 @@ struct Walk {
 
 impl Walk {
     fn record_local(&mut self, local: &HirLocal) {
-        if local.mutable || local.runtime_provided || local.init.is_none() {
+        let Some(init) = local.init.as_ref() else {
+            self.gate_rejects = true;
+            return;
+        };
+        if local.mutable || local.runtime_provided {
             self.gate_rejects = true;
             return;
         }
@@ -168,7 +172,7 @@ impl Walk {
             // inside an otherwise-admissible body is a real gate hole.
             self.hole = Some(GateHoleIssue::AwaitingLocalInit);
         }
-        match walk_expr(local.init.as_ref().expect("init presence checked above")) {
+        match walk_expr(init) {
             // The initializer extends the immutable `let` chain; the chain
             // wraps around the value term in `finish`.
             ValueJudgment::Pure(term) => self.lets.push(term),

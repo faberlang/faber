@@ -534,11 +534,7 @@ impl FunctionBuilder<'_> {
     }
 
     fn assign_temp_place(&mut self, kind: MirValueKind, ty: MirType, span: Span) -> MirPlace {
-        let temp = self.assign_temp(kind, ty, span);
-        match temp {
-            MirOperand::Temp(temp) => MirPlace::temp(temp),
-            _ => unreachable!("assign_temp always returns a temp operand"),
-        }
+        MirPlace::temp(self.assign_new_temp(kind, ty, span))
     }
 
     fn nullable_inner_ty(&self, expr: &HirExpression) -> Option<MirType> {

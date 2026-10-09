@@ -177,7 +177,11 @@ impl FunctionBuilder<'_> {
             return;
         };
         // The lane id is the 32-bit global invocation id the device launches.
-        let lane_ty = lane_word(self.types).expect("device lowering interns the lane word");
+        let Some(lane_ty) = lane_word(self.types) else {
+            self.errors
+                .push(MirError::missing_type(first.span, "device lane word (u32 numerus)"));
+            return;
+        };
         let lane = self.next_local_id();
         self.add_lane_param(*def_id, *name, lane_ty, first.span);
         self.lane_region = Some(LaneRegion { span: first.span, lane });

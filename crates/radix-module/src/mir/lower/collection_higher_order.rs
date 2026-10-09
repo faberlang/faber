@@ -379,7 +379,9 @@ impl FunctionBuilder<'_> {
             TransformKind::Filter => bivalens,
             TransformKind::Map => result_element_ty,
             TransformKind::All | TransformKind::Any => {
-                unreachable!("predicate folds use lower_collection_predicate")
+                self.errors
+                    .push(MirError::unsupported(span, "predicate fold lowered as a collection transform"));
+                return None;
             }
         };
         let mapped = self.call_callback_callee(callback, vec![item.clone()], callback_return, span);
@@ -412,7 +414,9 @@ impl FunctionBuilder<'_> {
                 );
             }
             TransformKind::All | TransformKind::Any => {
-                unreachable!("predicate folds use lower_collection_predicate")
+                self.errors
+                    .push(MirError::unsupported(span, "predicate fold lowered as a collection transform"));
+                return None;
             }
         }
         if !self.current_is_open() {

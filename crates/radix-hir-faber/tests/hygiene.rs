@@ -19,8 +19,7 @@ const BUDGETS: Budgets = Budgets {
     // `FaberCodegen::slot_ordinal` / `ergo_return_expr` real handling.
     expect: 0,
     panic: 0,
-    // WHY: minted at D-03 baseline; frozen, not audited here.
-    unreachable: 1,
+    unreachable: 0,
     todo: 0,
     unimplemented: 0,
     let_underscore: 0,

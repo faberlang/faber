@@ -30,7 +30,8 @@
 //! hardcoded `secus` (`e0fbae339`) is not a valid particle.
 
 use crate::surface::{FrameFamily, KeywordSurface, TypeBindingKind};
-use radix_codegen_shared::CodeWriter;
+use radix_codegen_shared::{CodeWriter, CodegenError};
+use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirCallArg, HirCape, HirConversioTarget, HirExpression,
     HirExpressionKind, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey,
@@ -1007,7 +1008,17 @@ impl super::FaberCodegen<'_> {
                 self.write_expr(body, names, surface, writer);
             }
             HirExpressionKind::Cede(_) => {
-                unreachable!("legacy context-dependent cede HIR is rejected before Faber emission");
+                // Rejected up front by `reject_unsupported_legacy_hir`; if a
+                // caller bypasses that gate, fail closed through the recorded
+                // emission error instead of emitting bad source.
+                let placeholder = self.record_type_emission_error(CodegenError {
+                    message: "cannot emit legacy context-dependent cede HIR".to_owned(),
+                    args: vec![DiagnosticArg::new(
+                        "issue",
+                        "legacy_cede_reached_faber_codegen",
+                    )],
+                });
+                writer.write(&placeholder);
             }
             HirExpressionKind::Yield(inner) => {
                 writer.write(surface.keyword(TokenKind::Cede));

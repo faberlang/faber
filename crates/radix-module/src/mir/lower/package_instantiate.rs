@@ -589,7 +589,10 @@ impl PackageInstantiate<'_> {
                 return None;
             }
         }
-        let _ = bind_generic_type_witness_with_shapes(
+        // The return type only adds bindings when it witnesses them; a param
+        // left unbound is rejected by the `?` lookups below, so a failed
+        // return-type bind needs no separate exit.
+        bind_generic_type_witness_with_shapes(
             self.types,
             template.return_ty,
             function.return_ty,

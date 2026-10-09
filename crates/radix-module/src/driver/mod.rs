@@ -334,6 +334,13 @@ pub fn compile(session: &Session, name: &str, source: &str, request: ModuleCompi
     }
 }
 
+fn missing_cli_program(analysis: AnalyzedModule, name: &str) -> CompileResult {
+    compile_error(
+        analysis,
+        codegen_diagnostic(name, "CODEGEN003", "CLI code generation requires an analyzed CLI program"),
+    )
+}
+
 fn compile_cli_program(
     target: Target,
     name: &str,
@@ -360,32 +367,26 @@ fn compile_cli_program(
                 Err(err) => compile_codegen_error(analysis, name, source, err),
             }
         }
-        Target::HirRust | Target::HirGo => {
+        Target::HirRust => {
             let Some(cli_program) = analysis.cli_program.as_ref() else {
-                return compile_error(
-                    analysis,
-                    codegen_diagnostic(name, "CODEGEN003", "CLI code generation requires an analyzed CLI program"),
-                );
+                return missing_cli_program(analysis, name);
             };
-            match target {
-                Target::HirRust => {
-                    match codegen::generate_rust_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
-                        Ok(output) => CompileResult {
-                            output: Some(crate::Output::Rust(output)),
-                            diagnostics: analysis.diagnostics,
-                        },
-                        Err(err) => compile_codegen_error(analysis, name, source, err.into()),
-                    }
+            match codegen::generate_rust_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+                Ok(output) => {
+                    CompileResult { output: Some(crate::Output::Rust(output)), diagnostics: analysis.diagnostics }
                 }
-                Target::HirGo => {
-                    match codegen::generate_go_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
-                        Ok(output) => {
-                            CompileResult { output: Some(crate::Output::Go(output)), diagnostics: analysis.diagnostics }
-                        }
-                        Err(err) => compile_codegen_error(analysis, name, source, err.into()),
-                    }
+                Err(err) => compile_codegen_error(analysis, name, source, err.into()),
+            }
+        }
+        Target::HirGo => {
+            let Some(cli_program) = analysis.cli_program.as_ref() else {
+                return missing_cli_program(analysis, name);
+            };
+            match codegen::generate_go_cli(&analysis.hir, &analysis.types, &analysis.interner, cli_program) {
+                Ok(output) => {
+                    CompileResult { output: Some(crate::Output::Go(output)), diagnostics: analysis.diagnostics }
                 }
-                _ => unreachable!("match target above narrowed to Rust | Go"),
+                Err(err) => compile_codegen_error(analysis, name, source, err.into()),
             }
         }
         _ => compile_error(
@@ -2028,7 +2029,7 @@ pub fn apply_air_backward_bundle<'a>(
             }
         })?;
         for mut function in companion_mir.functions {
-            function.id = fresh_ids.next();
+            function.id = fresh_ids.next()?;
             unannotated_functions.push(function);
         }
     }
@@ -2155,8 +2156,14 @@ fn finalize_air_backward_shapes<'a>(
             let Some(mut instance) = finalize_air_backward_instance(&mut types, template, &bindings) else {
                 continue;
             };
-            instance.id = next_ids.next();
-            let source = instance.source.expect("AIR companion has source identity");
+            instance.id = next_ids.next()?;
+            let Some(source) = instance.source else {
+                return Err(SpannedCodegenError {
+                    message: "AIR companion instance has no source identity".to_owned(),
+                    args: vec![DiagnosticArg::new("issue", "air_companion_missing_source")],
+                    span: None,
+                });
+            };
             let key = MirMonomorphizationKey { source, type_args: Vec::new(), shape_args: shape_args.clone() };
             instance_ids.insert(key.clone(), instance.id);
             instance_return_types.insert(key.clone(), instance.return_ty);
@@ -2639,10 +2646,13 @@ impl FreshMirFunctionIds {
         Self { next }
     }
 
-    fn next(&mut self) -> crate::mir::MirFunctionId {
-        let id = crate::mir::MirFunctionId(u32::try_from(self.next).expect("MIR function id space exhausted"));
+    fn next(&mut self) -> Result<crate::mir::MirFunctionId, codegen::CodegenError> {
+        let id = u32::try_from(self.next).map_err(|_| codegen::CodegenError {
+            message: "MIR function id space exhausted".to_owned(),
+            args: vec![DiagnosticArg::new("issue", "mir_function_id_space_exhausted")],
+        })?;
         self.next += 1;
-        id
+        Ok(crate::mir::MirFunctionId(id))
     }
 }
 
@@ -2672,14 +2682,14 @@ fn replace_air_lane_mir<'a>(
                     }
                     program.functions[index] = function;
                 } else {
-                    function.id = fresh_ids.next();
+                    function.id = fresh_ids.next()?;
                     program.functions.push(function);
                 }
             }
-            Ok::<(), std::convert::Infallible>(())
+            Ok::<(), codegen::CodegenError>(())
         })
         .map_err(|error| match error {
-            radix_mir::validate::PatchProgramError::Patch(never) => match never {},
+            radix_mir::validate::PatchProgramError::Patch(error) => SpannedCodegenError::from(error),
             radix_mir::validate::PatchProgramError::Validation(errors) => mir_validation_errors_to_spanned(errors),
         })
 }
@@ -2732,13 +2742,18 @@ fn generate_air_lane_backward_with_companion<'a>(
         .iter()
         .zip(primal.selected_input_types.iter())
         .enumerate()
-        .map(|(position, (&source, &ty))| AirCompanionSelectedInput {
-            source,
-            position: u32::try_from(position).expect("selected parameter count fits u32"),
-            ty,
-            gradient_ty: ty,
+        .map(|(position, (&source, &ty))| {
+            Ok(AirCompanionSelectedInput {
+                source,
+                position: u32::try_from(position).map_err(|_| codegen::CodegenError {
+                    message: "selected parameter count exceeds u32".to_owned(),
+                    args: vec![DiagnosticArg::new("issue", "air_companion_selected_parameter_count")],
+                })?,
+                ty,
+                gradient_ty: ty,
+            })
         })
-        .collect();
+        .collect::<Result<_, codegen::CodegenError>>()?;
     let selected_inputs: &'static [AirCompanionSelectedInput] = selected_inputs.leak();
 
     let selected_outputs: &'static [AirCompanionSelectedOutput] =
@@ -2800,7 +2815,7 @@ fn generate_air_lane_backward_with_companion<'a>(
     let backward_mir = mir_validation.mir;
     let mut backward_functions = Vec::with_capacity(backward_mir.functions.len());
     for mut function in backward_mir.functions {
-        function.id = fresh_ids.next();
+        function.id = fresh_ids.next()?;
         backward_functions.push(function);
     }
 

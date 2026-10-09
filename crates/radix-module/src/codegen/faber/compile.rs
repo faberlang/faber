@@ -586,11 +586,9 @@ impl HirVisitor for StructuralOwnerIndex<'_> {
         let Some(frame) = self.functions.last_mut() else {
             return;
         };
-        let ordinal = *frame.occurrences.entry(name.clone()).or_default();
-        *frame
-            .occurrences
-            .get_mut(&name)
-            .expect("occurrence inserted") += 1;
+        let occurrences = frame.occurrences.entry(name.clone()).or_default();
+        let ordinal = *occurrences;
+        *occurrences += 1;
         self.owners
             .insert(def_id, StructuralOwner::Local { function: frame.path.clone(), name, ordinal });
     }
