@@ -1,0 +1,47 @@
++++
+locale = "la"
++++
+functio ต้อนรับ(textus who) → textus {
+    fixum textus line ← "ขอต้อนรับ, §!"(who)
+    redde line
+}
+
+functio สอบผ่าน(numerus mark) → bivalens {
+    si mark ≥ 90 ergo redde verum
+    sin mark ≥ 40 ergo redde verum
+    secus ergo redde falsum
+}
+
+functio นับคะแนน(lista<numerus> marks) → numerus {
+    varia numerus total ← 0
+    itera de marks fixum mark {
+        si mark ≺ 0 {
+            perge
+        }
+        si mark ≥ 40 {
+            total ← total + 1
+        }
+        si total ≥ 3 {
+            rumpe
+        }
+    }
+    redde total
+}
+
+functio ลดลง(numerus start) → numerus {
+    varia numerus current ← start
+    dum current ≻ 0 {
+        current ← current - 1
+    }
+    redde current
+}
+
+incipit {
+    fixum textus message ← ต้อนรับ("ทุกคน")
+    fixum numerus mark ← 77
+    fixum lista<numerus> marks ← [-1, 95, 30, 55, 61]
+    nota message
+    nota สอบผ่าน(mark)
+    nota นับคะแนน(marks)
+    nota ลดลง(4)
+}
