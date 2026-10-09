@@ -15,7 +15,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 
 fn dump_source(source: &str) -> String {
     let mut unit = analyze(source);
-    dump_analyzed_unit(&mut unit).expect("MIR lowering succeeds")
+    dump_analyzed_unit(&unit).expect("MIR lowering succeeds")
 }
 
 // ===========================================================================
@@ -391,7 +391,7 @@ functio vecmat(vector<f32, 2> v, matrix<f32, [2, 2]> m) → vector<f32, 2> {
 }
 ",
     );
-    let errors = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
+    let errors = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .expect_err("vector·matrix must fail closed on the MIR lane");
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert_eq!(

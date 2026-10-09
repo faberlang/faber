@@ -120,7 +120,7 @@ fn call(
     destination: MirTempId,
     callee: u32,
     args: Vec<MirOperand>,
-    ty: radix_mir::MirType,
+    _ty: radix_mir::MirType,
 ) -> MirStatement {
     MirStatement {
         kind: MirStatementKind::Call {

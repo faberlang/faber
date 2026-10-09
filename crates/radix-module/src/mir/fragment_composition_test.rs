@@ -4,7 +4,6 @@ use super::{
     ExpansionBudget, FragmentCompositionError, ISSUE_CYCLE, ISSUE_EXPANSION, compose_with_metadata,
     reject_surviving_fragment_calls_with_metadata, surviving_fragment_calls_with_metadata, with_budget_override,
 };
-use crate::diagnostics::DiagnosticArg;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
@@ -590,8 +589,8 @@ functio k(f32 x) → f32 {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect("composition must succeed");
+    let lowered =
+        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("composition must succeed");
     assert!(
         surviving_fragment_calls_with_metadata(
             &lowered.validated.program().functions,
@@ -626,8 +625,8 @@ functio k(f32 x) → f32 {
     let session = Session::new(Config::default());
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect_err("cycle must fail closed");
+    let errors =
+        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect_err("cycle must fail closed");
     assert!(
         errors.iter().any(|err| err.issue == ISSUE_CYCLE),
         "expected nucleum_fragment_cycle, got {errors:?}"
@@ -652,7 +651,7 @@ functio k(f32 x) → f32 {
         let session = Session::new(Config::default());
         let mut analysis =
             driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
-        let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        let errors = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
             .expect_err("budget must fail closed");
         assert!(
             errors.iter().any(|err| err.issue == ISSUE_EXPANSION),
@@ -930,8 +929,8 @@ functio k(f32 x) → f32 {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect("kernel helper must compose");
+    let lowered =
+        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("kernel helper must compose");
     assert!(
         surviving_fragment_calls_with_metadata(
             &lowered.validated.program().functions,
@@ -1161,8 +1160,8 @@ functio k(f32 x) → f32 {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect("composition must succeed");
+    let lowered =
+        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("composition must succeed");
     let kernel = lowered
         .validated
         .program()

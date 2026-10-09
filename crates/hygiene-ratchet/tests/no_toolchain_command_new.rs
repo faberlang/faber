@@ -12,6 +12,7 @@
 //!   - `radix-hir` / `radix-hir-*` — all HIR backends
 //!   - `radix-lower-*`
 //!   - `radix-codegen-shared`
+//!
 //! plus `crates/radix-module/src/codegen`.
 //!
 //! Allowlisted by policy (spawns are deliberate; entries only shrink):

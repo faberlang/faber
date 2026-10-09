@@ -1,7 +1,6 @@
 //! Coverage for nucleum-fragment instantiation checking and the call-legality matrix.
 
 use super::{FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_THROW_CALLER, ISSUE_TYPE, check_with_metadata};
-use crate::diagnostics::DiagnosticArg;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
@@ -779,8 +778,8 @@ functio outer(f32 x) → f32 {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect("Entry→Entry must compose");
+    let lowered =
+        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("Entry→Entry must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
             &lowered.validated.program().functions,
@@ -811,7 +810,7 @@ functio k(f32 x) → f32 {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+    let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
         .expect("legal Entry→Fragment must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
@@ -1005,7 +1004,7 @@ fn lower_source(source: &str) -> Result<(), Vec<crate::mir::MirError>> {
                 diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
             )
         });
-    crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).map(|_| ())
+    crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).map(|_| ())
 }
 
 #[test]

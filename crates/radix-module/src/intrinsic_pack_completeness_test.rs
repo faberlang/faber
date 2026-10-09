@@ -121,7 +121,7 @@ fn locale_pack_completeness_intrinsic_surfaces_resolve_back_per_family() {
         for entry in INTRINSICS {
             let surface = pack.intrinsic_surface(entry.faber_name);
             assert_eq!(
-                pack.intrinsic_canonical(entry.receiver, &surface),
+                pack.intrinsic_canonical(entry.receiver, surface),
                 Some(entry.faber_name),
                 "{locale}: `{surface}` must resolve to `{}` on {:?}",
                 entry.faber_name,

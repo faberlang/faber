@@ -162,11 +162,11 @@ fn classify_source(source: &str) -> radix_types::Lowerability {
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
     let lowered =
-        crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("lower source to MIR");
+        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("lower source to MIR");
     let mut validation = lowered.validated.validation().clone();
     attach_device_tensor_layouts(&mut validation);
     let mut context = MirDeviceContext::from_hir_roles(roles);
-    context.attach_program(&lowered.validated.program());
+    context.attach_program(lowered.validated.program());
     let validated = ValidatedMir::new(lowered.validated.program().clone(), validation).expect("valid test MIR");
     classify_device_safe(&validated, &context)
 }
@@ -2352,7 +2352,7 @@ functio k(f32 x) → f32 {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+    let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
         .expect("legal fragment call must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(

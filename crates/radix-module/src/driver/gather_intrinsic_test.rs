@@ -204,7 +204,7 @@ incipit {
 ";
     let mut analysis =
         analyze_source(&runner_session(), "gather_mir.fab", source, AnalyzeRequest::default()).expect("frontend");
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("lowering");
+    let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("lowering");
     let call = collection_runtime_call(lowered.validated.program(), MirCollectionOp::TensorGather);
     assert_eq!(call.args.len(), 2, "MIR layout [table, ids]");
 }
@@ -229,7 +229,7 @@ incipit {
         AnalyzeRequest::default(),
     )
     .expect("exact tensor OOB source should analyze");
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+    let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
         .expect("exact tensor OOB source should lower");
     let tensor_get = lowered
         .validated
@@ -437,7 +437,7 @@ fn gather_fixture_resolves_gather_recipe() {
         AnalyzeRequest::default(),
     )
     .expect("frontend");
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("lowering");
+    let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("lowering");
     let validation = lowered.validated.validation();
     let function = lowered
         .validated

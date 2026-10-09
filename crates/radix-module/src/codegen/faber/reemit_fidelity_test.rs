@@ -1051,7 +1051,7 @@ fn canonical_revalidation_accepts_layout_only_changes() {
 
 /// Both passes include the unmodified D8.9 HIR meaning proof.
 fn emit_closure_body_twice(source: &str, locale: &str) -> String {
-    let pack = crate::locale::LocalePack::from_toml_path(&crate::locale::workspace_locale_pack_path(locale))
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
         .expect("reader pack loads");
     let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
     let emit = |source: &str| {

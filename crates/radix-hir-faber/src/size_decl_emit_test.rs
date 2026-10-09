@@ -6,7 +6,7 @@
 //! inferred immutable binding.
 
 use super::*;
-use crate::{FaberCodegen, empty_presentation};
+use crate::FaberCodegen;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirId, HirLiteral, HirLocal, HirModule,

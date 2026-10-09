@@ -12,10 +12,9 @@ use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::lexer::Span;
 use crate::mir::MirLoweringOptions;
 use crate::mir::{
-    MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirParamMode, MirPlaceBase, MirProgram, MirStatementKind,
-    MirValue, MirValueKind, device_roles_from_hir,
+    MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirPlaceBase, MirProgram, MirStatementKind, MirValue,
+    MirValueKind, device_roles_from_hir,
 };
-use crate::test_support::test_span;
 
 // 5c7541f86 (DIE D-02-04): issue values are lowercase.
 const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
@@ -48,7 +47,7 @@ fn analyze(source: &str) -> Result<crate::driver::AnalyzedModule, Vec<Diagnostic
 
 fn lower(source: &str) -> Result<(crate::driver::AnalyzedModule, MirProgram), Vec<crate::mir::MirError>> {
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("analyze must succeed: {errors:?}"));
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())?;
+    let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())?;
     let program = lowered.validated.program().clone();
     drop(lowered);
     Ok((analysis, program))
@@ -191,7 +190,7 @@ functio host(f32 x) → f32 {
 }
 ";
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("host→fragment analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+    let errors = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
         .expect_err("host→fragment must fail at instantiation");
     let err = expect_lower_issue(&errors, ISSUE_CONTEXT);
     assert_eq!(
@@ -529,8 +528,8 @@ functio k(f32 x) → f32 {
 }
 ";
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("cycle analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
-        .expect_err("cycle must fail closed");
+    let errors =
+        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect_err("cycle must fail closed");
     let err = expect_lower_issue(&errors, ISSUE_CYCLE);
     assert!(span_in(err.span, source, "pong(x)") || span_in(err.span, source, "ping(x)"));
 }
@@ -551,7 +550,7 @@ functio k(f32 x) → f32 {
     let budget = ExpansionBudget { max_concrete_instances: 0, ..ExpansionBudget::DOCUMENTED_DEFAULTS };
     with_budget_override(budget, || {
         let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("budget fixture analyzes: {errors:?}"));
-        let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        let errors = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
             .expect_err("budget override must fail closed");
         let err = expect_lower_issue(&errors, ISSUE_EXPANSION);
         assert!(

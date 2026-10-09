@@ -28,9 +28,9 @@ fn dump(source: &str) -> String {
     let source = english(source);
     let mut unit = analyze_source(&session(), "runtime-extent-itera.fab", &source, AnalyzeRequest::default())
         .expect("runtime-extent itera source analyzes");
-    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
+    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
         .unwrap_or_else(|error| panic!("runtime-extent itera must lower: {error:?}"));
-    dump_program(&lowered.validated.program())
+    dump_program(lowered.validated.program())
 }
 
 #[test]

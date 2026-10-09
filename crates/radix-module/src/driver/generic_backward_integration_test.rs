@@ -107,7 +107,7 @@ incipit {
         "the final whole executable MIR program must contain no ShapeSize survivor"
     );
 
-    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "loss_backward"),
         "concrete call site must install the generated companion; got functions: {names:?}"
@@ -295,7 +295,7 @@ incipit {
          reverse_ad_broadcast_reduction_missing_type",
     );
 
-    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "broad_loss_backward"),
         "companion 'broad_loss_backward' must be installed in the lowered MIR; got functions: {names:?}"
@@ -351,7 +351,7 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
         "unrolled full-prefix body must generate a reverse_ad companion",
     );
 
-    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "lane_sum_backward"),
         "companion 'lane_sum_backward' must be installed in the lowered MIR; got functions: {names:?}"
@@ -389,7 +389,7 @@ incipit {
         lower_mir_with_context_for_target(&mut analysis, false),
         "generic full-prefix range must reach the concrete backward companion",
     );
-    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "generic_lane_sum_backward"),
         "generic concrete companion must be installed in MIR; got functions: {names:?}"
@@ -510,7 +510,7 @@ incipit {
         apply_air_backward_bundle(lowered, bundle, &analysis, false),
         "generic caller-mask body must generate a reverse-AD companion",
     );
-    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
     assert!(
         names
             .iter()
@@ -566,7 +566,7 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
         "masked unrolled body must generate a reverse_ad companion",
     );
 
-    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "masked_mean_backward"),
         "companion 'masked_mean_backward' must be installed in the lowered MIR; got functions: {names:?}"

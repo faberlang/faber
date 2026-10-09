@@ -121,7 +121,8 @@ fn shifts_are_unmasked() {
         ok("varia u8 a ← 1\nvaria u8 n ← 63\nfixum u64 y ← a ⇐ n\nnota y"),
         ["9223372036854775808"]
     );
-    for n in ["64"] {
+    {
+        let n = "64";
         let body = format!("varia u8 a ← 1\nvaria u8 n ← {n}\nnota \"a\"\nnota a ⇐ n");
         assert_eq!(trap(&body).0, ["a"]);
     }

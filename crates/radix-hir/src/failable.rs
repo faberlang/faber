@@ -288,10 +288,10 @@ mod tests {
 
     fn func(
         name: &str,
-        def_id: DefId,
+        _def_id: DefId,
         body: Option<HirBlock>,
         interner: &mut Interner,
-        span: radix_lexer::Span,
+        _span: radix_lexer::Span,
     ) -> HirFunction {
         HirFunction {
             name: interner.intern(name),

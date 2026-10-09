@@ -27,7 +27,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 
 fn lower_errors(source: &str) -> Vec<String> {
     let mut unit = analyze(source);
-    match lower_analyzed_unit(&mut unit, MirLoweringOptions::default()) {
+    match lower_analyzed_unit(&unit, MirLoweringOptions::default()) {
         Ok(_) => Vec::new(),
         Err(errors) => errors.into_iter().map(|error| error.message).collect(),
     }
@@ -35,7 +35,7 @@ fn lower_errors(source: &str) -> Vec<String> {
 
 fn dump_source(source: &str) -> String {
     let mut unit = analyze(source);
-    dump_analyzed_unit(&mut unit).unwrap_or_else(|errors| {
+    dump_analyzed_unit(&unit).unwrap_or_else(|errors| {
         panic!(
             "MIR lowering succeeds: {:?}",
             errors

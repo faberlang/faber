@@ -140,10 +140,10 @@ fn catalog_issue_keys(source: &str) -> BTreeSet<String> {
             continue;
         }
 
-        if depth == 1 {
-            if let Some(pattern) = arm_pattern_before_arrow(line) {
-                issues.extend(identifier_literals(pattern));
-            }
+        if depth == 1
+            && let Some(pattern) = arm_pattern_before_arrow(line)
+        {
+            issues.extend(identifier_literals(pattern));
         }
 
         depth += brace_delta_outside_strings_and_comments(line);

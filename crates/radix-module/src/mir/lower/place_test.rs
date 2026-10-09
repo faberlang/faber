@@ -8,10 +8,10 @@ fn dump_validated(source: &str) -> String {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let mut unit = crate::driver::analyze_source(&session, "place.fab", source, AnalyzeRequest::default())
         .expect("analysis succeeds");
-    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("MIR lowering succeeds");
-    validate_program(&lowered.validated.program(), lowered.validated.validation())
+    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("MIR lowering succeeds");
+    validate_program(lowered.validated.program(), lowered.validated.validation())
         .expect("the linearized device index must validate");
-    dump_analyzed_unit(&mut unit).expect("MIR dump succeeds")
+    dump_analyzed_unit(&unit).expect("MIR dump succeeds")
 }
 
 #[test]
