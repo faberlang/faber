@@ -133,6 +133,22 @@ fn interface_member_kind_name(kind: InterfaceMemberKind) -> &'static str {
 }
 
 #[cfg(feature = "hir-fhir")]
+fn interface_unavailable_to_wire(gate: &InterfaceUnavailable) -> radix_hir_fhir::UnavailableWire {
+    radix_hir_fhir::UnavailableWire {
+        target: gate.target.clone(),
+        reason: gate.reason.clone(),
+    }
+}
+
+#[cfg(feature = "hir-fhir")]
+fn interface_unavailable_from_wire(gate: radix_hir_fhir::UnavailableWire) -> InterfaceUnavailable {
+    InterfaceUnavailable {
+        target: gate.target,
+        reason: gate.reason,
+    }
+}
+
+#[cfg(feature = "hir-fhir")]
 fn interface_nominal_kind_from_wire(kind: radix_hir_fhir::NominalKind) -> InterfaceNominalKind {
     match kind {
         radix_hir_fhir::NominalKind::Struct => InterfaceNominalKind::Struct,
@@ -3934,6 +3950,7 @@ impl Resolver {
             .file_interfaces
             .into_iter()
             .map(|(ns, iface)| {
+                let unavailable = iface.unavailable;
                 let exports: FxHashMap<LexSymbol, ImportedFileExport> = iface
                     .exports
                     .into_iter()
@@ -3978,9 +3995,11 @@ impl Resolver {
                                         surface_name: method.surface_name,
                                         sig: method.sig,
                                         visibility: method.visibility,
-                                        // Artifact snapshots do not carry
-                                        // `@ nondum` gates.
-                                        unavailable: Vec::new(),
+                                        unavailable: method
+                                            .unavailable
+                                            .into_iter()
+                                            .map(interface_unavailable_from_wire)
+                                            .collect(),
                                     })
                                     .collect();
                                 ImportedFileExport::Struct(ImportedFileStruct {
@@ -4009,7 +4028,18 @@ impl Resolver {
                         identity: None,
                         const_members: FxHashSet::default(),
                         const_values: FxHashMap::default(),
-                        unavailable: FxHashMap::default(),
+                        unavailable: unavailable
+                            .into_iter()
+                            .map(|(member, gates)| {
+                                (
+                                    member,
+                                    gates
+                                        .into_iter()
+                                        .map(interface_unavailable_from_wire)
+                                        .collect(),
+                                )
+                            })
+                            .collect(),
                     },
                 )
             })
@@ -4145,6 +4175,11 @@ impl Resolver {
                                         surface_name: method.surface_name,
                                         sig: method.sig.clone(),
                                         visibility: method.visibility,
+                                        unavailable: method
+                                            .unavailable
+                                            .iter()
+                                            .map(interface_unavailable_to_wire)
+                                            .collect(),
                                     })
                                     .collect(),
                             },
@@ -4152,7 +4187,27 @@ impl Resolver {
                         (member, snapshot)
                     })
                     .collect();
-                (ns, FileInterfaceSnapshot { exports })
+                let mut unavailable: Vec<_> = imported
+                    .unavailable
+                    .iter()
+                    .map(|(&member, gates)| {
+                        (
+                            member,
+                            gates
+                                .iter()
+                                .map(interface_unavailable_to_wire)
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                    .collect();
+                unavailable.sort_by_key(|(member, _)| member.0);
+                (
+                    ns,
+                    FileInterfaceSnapshot {
+                        exports,
+                        unavailable,
+                    },
+                )
             })
             .collect();
 

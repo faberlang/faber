@@ -82,6 +82,20 @@ pub struct RadixBackwardWire {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FileInterfaceSnapshot {
     pub exports: Vec<(Symbol, FileExportSnapshot)>,
+    /// `@ nondum` gates of exported free functions, keyed by the
+    /// consumer-visible member spelling. Members absent here are available.
+    pub unavailable: Vec<(Symbol, Vec<UnavailableWire>)>,
+}
+
+/// Serializable `@ nondum [target] ["reason"]` gate (schema v40).
+///
+/// `target: None` means unavailable on every target. Mirrors the semantic
+/// `InterfaceUnavailable` record so a bodiless `@ nondum` declaration stays
+/// refused (SEM017) after crossing the artifact boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnavailableWire {
+    pub target: Option<String>,
+    pub reason: Option<String>,
 }
 
 /// Serializable export entry within a file interface snapshot.
@@ -122,6 +136,8 @@ pub struct StructMethodSnapshot {
     pub surface_name: Symbol,
     pub sig: FuncSig,
     pub visibility: radix_syntax::MemberVisibility,
+    /// `@ nondum` gates of the method; every call is refused (SEM017).
+    pub unavailable: Vec<UnavailableWire>,
 }
 
 // ---------------------------------------------------------------------------
@@ -583,8 +599,12 @@ pub struct FunctionProvenanceTableWire {
 /// Version 39 adds `HirPresentation::empty_dense_ids` (which nodes typecheck
 /// rewrote from `empty` to the typed zero of a dense tensor, vector or matrix
 /// slot, so the Faber re-emitter prints `empty` again); schema-v38 artifacts
+/// fail closed. Version 40 carries `@ nondum` availability gates on imported
+/// free functions and genus methods in the resolver file-interface snapshot
+/// (`FileInterfaceSnapshot::unavailable`, `StructMethodSnapshot::unavailable`)
+/// so a loaded artifact still refuses calls with SEM017; schema-v39 artifacts
 /// fail closed.
-pub const SCHEMA_VERSION: u32 = 39;
+pub const SCHEMA_VERSION: u32 = 40;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

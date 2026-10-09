@@ -641,6 +641,7 @@ fn resolver_snapshot_round_trips_imported_json_opt_in() {
                         is_json: true,
                     },
                 )],
+                unavailable: Vec::new(),
             },
         )],
         ..Resolver::new().to_snapshot()
@@ -654,5 +655,88 @@ fn resolver_snapshot_round_trips_imported_json_opt_in() {
     assert_eq!(
         restored.imported_json_structs().collect::<Vec<_>>(),
         vec![DefId(7)]
+    );
+}
+
+#[cfg(feature = "hir-fhir")]
+#[test]
+fn resolver_snapshot_round_trips_nondum_gates_for_functions_and_methods() {
+    use radix_hir_fhir::artifact::{
+        FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot, StructMethodSnapshot,
+        UnavailableWire,
+    };
+    use radix_types::{FuncSig, TypeId};
+
+    let namespace = LexSymbol(0);
+    let function = LexSymbol(1);
+    let genus = LexSymbol(2);
+    let method = LexSymbol(3);
+    let sig = FuncSig {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        ret: TypeId(8),
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let gate = || {
+        vec![UnavailableWire {
+            target: None,
+            reason: Some("pending host dispatch".to_owned()),
+        }]
+    };
+    let snapshot = ResolverSnapshot {
+        file_interfaces: vec![(
+            namespace,
+            FileInterfaceSnapshot {
+                exports: vec![
+                    (function, FileExportSnapshot::Function(sig.clone())),
+                    (
+                        genus,
+                        FileExportSnapshot::Struct {
+                            def_id: DefId(7),
+                            ty: TypeId(8),
+                            fields: Vec::new(),
+                            methods: vec![StructMethodSnapshot {
+                                def_id: DefId(9),
+                                name: method,
+                                surface_name: method,
+                                sig,
+                                visibility: radix_syntax::MemberVisibility::Publica,
+                                unavailable: gate(),
+                            }],
+                            is_json: false,
+                        },
+                    ),
+                ],
+                unavailable: vec![(function, gate())],
+            },
+        )],
+        ..Resolver::new().to_snapshot()
+    };
+    let resolver = Resolver::from_snapshot(snapshot);
+
+    let function_gates = resolver
+        .namespace_file_unavailable(namespace, function)
+        .expect("nondum free-function gate survives from_snapshot");
+    assert_eq!(function_gates.len(), 1);
+    assert_eq!(
+        function_gates[0].reason.as_deref(),
+        Some("pending host dispatch")
+    );
+    let again = resolver.to_snapshot();
+    let genus_export = again.file_interfaces[0]
+        .1
+        .exports
+        .iter()
+        .find_map(|(member, export)| match export {
+            FileExportSnapshot::Struct { methods, .. } if *member == genus => Some(methods),
+            _ => None,
+        })
+        .expect("struct export restored");
+    assert_eq!(genus_export[0].unavailable, gate());
+    assert_eq!(
+        again.file_interfaces[0].1.unavailable,
+        vec![(function, gate())]
     );
 }
