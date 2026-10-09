@@ -53,9 +53,7 @@ fn library_home_missing_renders_message_hint_and_real_line() {
         .statements
         .iter()
         .find_map(|stmt| match &stmt.kind {
-            StmtKind::Import(decl) if parse.interner.resolve(decl.path) == "prov:mod" => {
-                Some(decl.clone())
-            }
+            StmtKind::Import(decl) if parse.interner.resolve(decl.path) == "prov:mod" => Some(decl),
             _ => None,
         })
         .expect("import decl for prov:mod");

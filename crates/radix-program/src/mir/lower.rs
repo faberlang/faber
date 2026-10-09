@@ -4702,7 +4702,7 @@ fn scan_mir_function_references(
     program: &MirProgram,
     function_id: MirFunctionId,
 ) -> MirReferenceScan {
-    let mut scan = MirReferenceScan::default();
+    let scan = MirReferenceScan::default();
     let Some(function) = program
         .functions
         .iter()
