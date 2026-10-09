@@ -426,6 +426,7 @@ pub fn generate_from_analyzed_with_options(
                     }
                 }
                 let mut r#gen = rust::RustCodegen::new_with_types(hir, &analysis.interner, &analysis.types);
+                r#gen.set_display_tokens(display_tokens_for_module(analysis));
                 r#gen.set_shape_obligations(rust::rust_shape_obligations(&analysis.shape_obligations));
                 r#gen.set_tensor_edge_policy_table(Some(&analysis.tensor_edge_policies));
                 r#gen.set_tensor_edge_policy_callback_identities(callback_identities.iter().cloned());
@@ -473,6 +474,7 @@ pub fn generate_from_analyzed_with_options(
                     ts::TsCodegen::new(hir, &analysis.types, &module_interner)
                 };
                 let mut r#gen = r#gen;
+                r#gen.set_display_tokens(display_tokens_for_module(analysis));
                 r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
                 r#gen.set_library_registry(&analysis.libraries);
                 r#gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
@@ -528,6 +530,36 @@ pub fn generate_from_analyzed_with_options(
         | Target::MirFmirBundle => Err(mir_backed_requires_driver()),
     }
 }
+
+/// The output tokens the module behind `analysis` prints through.
+///
+/// Plumbing only: every module fills Latin until the final
+/// unit (U9) makes this one function read the module's locale pack.
+#[cfg(any(
+    feature = "hir-rust",
+    feature = "hir-ts",
+    feature = "hir-go",
+    feature = "hir-swift",
+    feature = "hir-python",
+    feature = "hir-haskell"
+))]
+pub(crate) fn display_tokens_for_module(
+    _analysis: &crate::driver::AnalyzedModule,
+) -> radix_codegen_shared::names::DisplayTokens {
+    radix_codegen_shared::names::DisplayTokens::latin()
+}
+
+#[cfg(all(
+    test,
+    feature = "hir-rust",
+    feature = "hir-ts",
+    feature = "hir-go",
+    feature = "hir-swift",
+    feature = "hir-python",
+    feature = "hir-haskell"
+))]
+#[path = "display_tokens_test.rs"]
+mod display_tokens_test;
 
 /// Register cross-file DefIds from sibling module imports into the TS codegen.
 ///
@@ -586,6 +618,7 @@ fn generate_go_from_analyzed(
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     let mut r#gen = go::GoCodegen::new(hir, &analysis.types, &analysis.interner);
+    r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_library_registry(&analysis.libraries);
     let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
@@ -608,6 +641,7 @@ fn generate_swift_from_analyzed(
     module_name: Option<&str>,
 ) -> Result<crate::Output, CodegenError> {
     let mut r#gen = swift::SwiftCodegen::new(hir, &analysis.types, &analysis.interner);
+    r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_output_mode(
         match output_mode {
@@ -636,6 +670,7 @@ fn generate_python_from_analyzed(
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     let mut r#gen = python::PythonCodegen::new(hir, &analysis.types, &analysis.interner);
+    r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Python(crate::PythonOutput { code: output.code }))
@@ -673,6 +708,7 @@ fn generate_haskell_from_analyzed(
     hir: &HirModule,
 ) -> Result<crate::Output, CodegenError> {
     let mut r#gen = haskell::HaskellCodegen::new(hir, &analysis.interner);
+    r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Haskell(crate::HaskellOutput { code: output.code }))

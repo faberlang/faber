@@ -10,6 +10,7 @@ publish = false
 radix-diagnostics = { path = "../radix-diagnostics" }
 radix-hir = { path = "../radix-hir" }
 radix-lexer = { path = "../radix-lexer" }
+radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-target = { path = "../radix-target" }
 radix-types = { path = "../radix-types" }
 rustc-hash = "2"

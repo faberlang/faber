@@ -17,6 +17,7 @@
 use radix_hir::visit::HirVisitor;
 use radix_hir::{DefId, HirModule};
 use radix_lexer::{Interner, Symbol};
+pub use radix_runtime_contract::display_tokens::DisplayTokens;
 use rustc_hash::FxHashMap;
 
 /// Error returned when a `DefId` is not in the name catalog.
@@ -44,6 +45,7 @@ impl MissingDefError {
 pub struct NameCatalog<'a> {
     names: FxHashMap<DefId, Symbol>,
     interner: &'a Interner,
+    display_tokens: DisplayTokens,
 }
 
 impl<'a> NameCatalog<'a> {
@@ -53,7 +55,21 @@ impl<'a> NameCatalog<'a> {
         Self {
             names: collect_names(hir),
             interner,
+            display_tokens: DisplayTokens::latin(),
         }
+    }
+
+    /// Output tokens (`true`/`false`/`none`/`tuple` words) of the module this
+    /// catalog serves. One module is one locale, so one value per catalog.
+    #[must_use]
+    pub fn display_tokens(&self) -> &DisplayTokens {
+        &self.display_tokens
+    }
+
+    /// Install the module's output tokens; the driver calls this once per
+    /// codegen invocation with `display_tokens_for_module`.
+    pub fn set_display_tokens(&mut self, tokens: DisplayTokens) {
+        self.display_tokens = tokens;
     }
 
     /// Shared compile-session interner for source spellings.
