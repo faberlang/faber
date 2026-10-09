@@ -96,15 +96,15 @@ fn interpret_path(
             };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
         #[cfg(feature = "device-runtime")]
-        if device_session_selected(&config, archive.package_input(), selection) {
-            if let Err(mut diagnostics) = run_on_device_session(
-                &config,
-                archive.package_input(),
-                selection,
-                &mut host,
-                stats,
-                stats_file,
-            ) {
+        if let Some(result) = try_device_session(
+            &config,
+            archive.package_input(),
+            selection,
+            &mut host,
+            stats,
+            stats_file,
+        ) {
+            if let Err(mut diagnostics) = result {
                 archive.remap_diagnostics(&mut diagnostics);
                 eprint_archive_diagnostics(&diagnostics);
                 drop(archive);
@@ -188,10 +188,10 @@ fn interpret_path(
         // package that declares kernels, goes through the in-process device
         // session; no child process, no `[device]` table needed.
         #[cfg(feature = "device-runtime")]
-        if device_session_selected(&config, path, selection) {
-            if let Err(diagnostics) =
-                run_on_device_session(&config, path, selection, &mut host, stats, stats_file)
-            {
+        if let Some(result) =
+            try_device_session(&config, path, selection, &mut host, stats, stats_file)
+        {
+            if let Err(diagnostics) = result {
                 eprint_route_diagnostics(&diagnostics);
                 std::process::exit(1);
             }
@@ -288,11 +288,16 @@ fn interpret_path(
     // gpu-reset C2-U6c: a lone `.fab` file runs on the in-process device
     // session too (explicit GPU, or `auto` with kernels).
     #[cfg(feature = "device-runtime")]
-    if device_session_selected(&config, path, selection) {
-        let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(diagnostics) =
-            run_on_device_session(&config, path, selection, &mut host, stats, stats_file)
-        {
+    let mut device_host = StdioHost::with_argumenta(program_args.to_vec());
+    if let Some(result) = try_device_session(
+        &config,
+        path,
+        selection,
+        &mut device_host,
+        stats,
+        stats_file,
+    ) {
+        if let Err(diagnostics) = result {
             eprint_route_diagnostics(&diagnostics);
             std::process::exit(1);
         }
@@ -403,6 +408,10 @@ pub(super) fn is_single_fab_file(path: &Path) -> bool {
 /// fails closed with `E_DEVICE_NONE_ADMITTED`; `auto` never picks the CPU for
 /// a kernel package). `auto` over a package without kernels, and `cpu`, run
 /// the CPU route.
+///
+/// The `auto` answer prepares the whole package, so it is a stand-alone
+/// question only on the fallback paths of [`run_auto_on_device_session_with`];
+/// the run itself decides from the one preparation it executes.
 #[cfg(feature = "device-runtime")]
 fn device_session_selected(
     config: &radix::module::driver::Config,
@@ -415,6 +424,82 @@ fn device_session_selected(
         DeviceSelection::Auto => {
             package::mir::package_declares_kernels(config, input).unwrap_or(false)
         }
+    }
+}
+
+/// Run `input` on the in-process device session when `selection` takes it
+/// ([`device_session_selected`]); `None` means the CPU route runs instead.
+/// `auto` prepares the package once: the lowered unit that proves it declares
+/// kernels is the one the device run executes.
+#[cfg(feature = "device-runtime")]
+fn try_device_session(
+    config: &radix::module::driver::Config,
+    input: &Path,
+    selection: DeviceSelection,
+    host: &mut StdioHost,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
+) -> Option<Result<(), Vec<Diagnostic>>> {
+    match selection {
+        DeviceSelection::Cpu => None,
+        DeviceSelection::Metal | DeviceSelection::Cuda => Some(run_on_device_session(
+            config, input, selection, host, stats, stats_file,
+        )),
+        DeviceSelection::Auto => {
+            let mut registry = package::mir::system_device_registry();
+            run_auto_on_device_session_with(
+                config,
+                input,
+                &mut registry,
+                host,
+                stats,
+                stats_file,
+                &mut io::stdout(),
+            )
+        }
+    }
+}
+
+/// [`try_device_session`] for `auto` over an injected registry and marker
+/// sink.
+#[cfg(feature = "device-runtime")]
+#[allow(clippy::too_many_arguments)]
+fn run_auto_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
+    config: &radix::module::driver::Config,
+    input: &Path,
+    registry: &mut radix_device_core::registry::DeviceRegistry,
+    host: &mut H,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
+    out: &mut dyn io::Write,
+) -> Option<Result<(), Vec<Diagnostic>>> {
+    let stats_requested = stats || stats_file.is_some();
+    let metadata = if stats_requested {
+        match run_stats::package_metadata(input) {
+            Ok(metadata) => Some(metadata),
+            // Metadata failure precedes any run: keep the route the package
+            // would have taken (device reports it, CPU reports its own).
+            Err(diagnostic) => {
+                return device_session_selected(config, input, DeviceSelection::Auto)
+                    .then(|| Err(vec![*diagnostic]));
+            }
+        }
+    } else {
+        None
+    };
+    let started = Instant::now();
+    match package::mir::run_package_on_device_session_if_kernels(
+        config,
+        input,
+        registry,
+        host,
+        stats_requested,
+    ) {
+        Ok(None) => None,
+        Ok(Some(run)) => Some(finish_device_run(
+            run, metadata, started, stats, stats_file, out,
+        )),
+        Err(diagnostics) => Some(Err(diagnostics)),
     }
 }
 
@@ -475,6 +560,20 @@ fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
         host,
         stats_requested,
     )?;
+    finish_device_run(run, metadata, started, stats, stats_file, out)
+}
+
+/// Emit the host-only stats artifact and [`DEVICE_STATS_MARKER`] for a
+/// finished device run that was asked to collect stats.
+#[cfg(feature = "device-runtime")]
+fn finish_device_run(
+    run: package::mir::DeviceSessionRun,
+    metadata: Option<run_stats::PackageMetadata>,
+    started: Instant,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
+    out: &mut dyn io::Write,
+) -> Result<(), Vec<Diagnostic>> {
     if let (Some(metadata), Some(run_stats_value)) = (metadata, run.stats) {
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
         let artifact =
