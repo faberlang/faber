@@ -25,8 +25,8 @@ fn module_segments_sanitize_outside_source_root_absolute_hyphen_path() {
         .join("faberlang")
         .join("worktrees")
         .join("faber-hir-v1");
-    let source_root = workspace_root.join("examples/coreutils/packages/echo");
-    let file = workspace_root.join("examples/coreutils/common/gnu/format.fab");
+    let source_root = workspace_root.join("pkgs/coreutils/packages/echo");
+    let file = workspace_root.join("pkgs/coreutils/common/gnu/format.fab");
     let segments = module_segments_for_file(&source_root, &file, None);
     assert!(
         segments
