@@ -34,6 +34,7 @@ mod tensor_edge;
 mod tensor_edge_policy;
 pub mod textus;
 pub mod textus_bounded;
+pub mod trap;
 pub mod valor;
 
 pub use arena::{Arena, ArenaHandle};
@@ -69,6 +70,7 @@ pub use tensor_edge_policy::{
 };
 pub use textus::unicode_scalar_value;
 pub use textus_bounded::{TextusN, TextusNOverflow};
+pub use trap::Trap;
 pub use valor::{FromValor, Valor};
 
 #[cfg(test)]
@@ -90,6 +92,10 @@ mod regex_test;
 #[cfg(test)]
 #[path = "intervallum_test.rs"]
 mod intervallum_test;
+
+#[cfg(test)]
+#[path = "trap_test.rs"]
+mod trap_test;
 
 #[cfg(test)]
 #[path = "tensor_edge_policy_test.rs"]
