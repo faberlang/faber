@@ -1,0 +1,413 @@
++++
+locale = "en"
++++
+# Canonical module: norma:text; Latin locale spelling: chorda.
+
+# text.fab — public Faber text library (cord operations + mechanical verbs)
+#
+# Public import: importa ex "norma:text" private text
+# Method ledger: docs/stdlib/chorda-methods.md
+# Mechanical v1: encode/decode/try_decode = UTF-8 textus ↔ octeti only (one functio per verb)
+#
+# Naming rule: text owns string-level transformations that sit above compiler
+# intrinsics such as textus.longitudo() and textus.sectio().
+# English canonical members are defined here; the Latin locale pack preserves
+# the historical surfaces.
+
+
+# =========================================================================
+# CORD OPERATIONS
+# =========================================================================
+
+# Name: reverse (Latin locale: retorta) from retorquere, "to twist back."
+# Morphologia: Perfectum result adjective; the returned cord is the completed
+# reversed form, and the input is not mutated.
+# Why: Provide a cord-level reverse operation without making textus itself
+# carry every derived helper.
+# Edge: v1 walks the compiler-owned sectio index space.
+@ public
+fn reverse(string s) → string {
+    var int i ← s.length()
+    var string out ← ""
+
+    while i ≻ 0 {
+        i ← i - 1
+        out ← out + s.slice(i, i + 1)
+    }
+
+    return out
+}
+
+# Name: join (Latin locale: nexa) from nectere, "to bind" or "to tie."
+# Morphologia: Perfectum result adjective; the segments have been bound by
+# the supplied vinculum.
+# Why: Join cord segments with an arbitrary bond string, avoiding separate
+# join helpers for every naming convention.
+# Edge: An empty partes list returns the empty cord.
+@ public
+fn join(list<string> segments, string separator) → string {
+    var string out ← ""
+    var int index ← 0
+
+    for from segments const pars {
+        if index ≻ 0 {
+            out ← out + separator
+        }
+
+        index ← index + 1
+        out ← out + pars
+    }
+
+    return out
+}
+
+# Name: count (Latin locale: reputat) from reputare, "to reckon" or "to count."
+# Morphologia: Praesens active verb; this observes the cord and reports a
+# count rather than returning a transformed cord.
+# Why: Count non-overlapping occurrences of quaesitum in s.
+# Edge: Empty quaesitum is defined as zero matches, not every boundary.
+@ public
+fn count(string s, string pattern) → int {
+    var int pos ← 0
+    var int count ← 0
+    const int pattern_length ← pattern.length()
+
+    if pattern_length ≡ 0 then return 0
+
+    # Advance by the query length on a match so overlapping occurrences are
+    # intentionally not counted.
+    while pos + pattern_length ≤ s.length() {
+        if s.slice(pos, pos + pattern_length) ≡ pattern {
+            count ← count + 1
+            pos ← pos + pattern_length
+        }
+        else {
+            pos ← pos + 1
+        }
+    }
+
+    return count
+}
+
+# Name: is_palindrome (Latin locale: reciprocus) from reciprocus, "running back the same way."
+# Morphologia: Adjectival predicate shape; the result tells whether the cord
+# has reciprocal forward/backward reading.
+# Why: Public palindrome test built on reverse rather than duplicating the
+# reverse walk.
+@ public
+fn is_palindrome(string s) → bool {
+    return s ≡ reverse(s)
+}
+
+# =========================================================================
+# CORD FILTERING (scalar retention — filter ≠ numeric clamp)
+# =========================================================================
+
+# Name: chars (Latin locale: scala) from scala, "ladder."
+# Morphologia: Nominal decomposition; a cord becomes a ladder of scalar
+# segments rather than a newly inflected cord.
+# Why: Expose the scalar walk as data for callers that need explicit pieces.
+# Edge: v1 follows the same sectio index model used by textus intrinsics.
+@ public
+fn chars(string s) → list<string> {
+    var list<string> out ← []
+    var int i ← 0
+
+    while i ≺ s.length() {
+        out.append(s.slice(i, i + 1))
+        i ← i + 1
+    }
+
+    return out
+}
+
+# Name: keep_if (Latin locale: retenta_iudicio) from retinere + iudicium, "judgment."
+# Morphologia: Perfectum result adjective; the returned cord contains the
+# scalars that have been retained.
+# Why: Predicate form for caller-defined retention logic.
+# Edge: The predicate receives one scalar textus segment at a time.
+@ public
+fn keep_if(string s, (string) → bool pred) → string {
+    var list<string> kept ← []
+    var int i ← 0
+
+    while i ≺ s.length() {
+        const string c ← s.slice(i, i + 1)
+        if pred(c) {
+            kept.append(c)
+        }
+
+        i ← i + 1
+    }
+
+    return join(kept, "")
+}
+
+# Name: keep_between (Latin locale: retenta) from retinere, "to keep back."
+# Morphologia: Perfectum result adjective; interval bounds select what is
+# retained in the returned cord.
+# Why: Inclusive scalar-order filtering.
+# Edge: sponte bounds are open ends; nihil infimum means no lower bound,
+# nihil supremum means no upper bound.
+@ public
+fn keep_between(string s, string lower optional, string upper optional) → string {
+    var list<string> kept ← []
+    var int i ← 0
+
+    # Start optimistic for each scalar and rule it out only when a present
+    # bound excludes it.
+    while i ≺ s.length() {
+        const string c ← s.slice(i, i + 1)
+        var bool keep ← true
+
+        if lower not is none and c ≺ lower {
+            keep ← false
+        }
+        if upper not is none and c ≻ upper {
+            keep ← false
+        }
+        if keep {
+            kept.append(c)
+        }
+
+        i ← i + 1
+    }
+
+    return join(kept, "")
+}
+
+# Name: drop_if (Latin locale: expurgata_iudicio) from expurgare + iudicium, "judgment."
+# Morphologia: Perfectum result adjective; the returned cord has had the
+# rejected scalars purged from it.
+# Why: Predicate form for caller-defined removal logic.
+# Edge: pred(c) = verum means c is removed, not retained.
+@ public
+fn drop_if(string s, (string) → bool pred) → string {
+    var list<string> kept ← []
+    var int i ← 0
+
+    while i ≺ s.length() {
+        const string c ← s.slice(i, i + 1)
+        if pred(c) ≡ false {
+            kept.append(c)
+        }
+
+        i ← i + 1
+    }
+
+    return join(kept, "")
+}
+
+# Name: drop_between (Latin locale: expurgata) from expurgare, "to purge."
+# Morphologia: Perfectum result adjective; interval bounds describe the
+# scalar region purged from the returned cord.
+# Why: Remove scalars inside inclusive bounds and keep scalars outside them.
+# Edge: sponte bounds are open ends; with both bounds absent, every scalar is
+# inside the open interval and is therefore purged.
+@ public
+fn drop_between(string s, string lower optional, string upper optional) → string {
+    var list<string> kept ← []
+    var int i ← 0
+
+    # Start with each scalar inside the purged interval; present bounds can
+    # prove it lies outside and should be kept.
+    while i ≺ s.length() {
+        const string c ← s.slice(i, i + 1)
+        var bool drop ← true
+
+        if lower not is none and c ≺ lower {
+            drop ← false
+        }
+        if upper not is none and c ≻ upper {
+            drop ← false
+        }
+        if drop ≡ false {
+            kept.append(c)
+        }
+
+        i ← i + 1
+    }
+
+    return join(kept, "")
+}
+
+# Name: suffix (Latin locale: residuum) from residuum, "what remains."
+# Morphologia: Nominal result; this names the remainder rather than an
+# action performed on the cord.
+# Why: Return the suffix of s from initium through the end.
+# Edge: sectio owns out-of-range clamping behavior for initium.
+@ public
+fn suffix(string s, int start) → string {
+    return s.slice(start, s.length())
+}
+
+# =========================================================================
+# DOCUMENT SPLIT (delimiter-leading front block)
+# =========================================================================
+
+# Name: nl is private helper vocabulary, not a public Latin verb.
+# Morphologia: Private support noun; this isolates the line delimiter used
+# by split_frontmatter helpers.
+# Why: Keep nl spelling in one place for fence-line detection.
+@ private
+fn newline() → string {
+    return "\n"
+}
+
+# Name: delimiter_end (Latin locale: _finis_delimitris) means the delimiter boundary found while scanning.
+# Morphologia: Private nominal helper; it returns a position, not a cord.
+# Why: Find the nl before a line whose full content is the delimiter.
+# Edge: A delimiter at document end is accepted as the closing fence.
+@ private
+fn delimiter_end(string document, string delimiter, int search_from) → int {
+    const int delim_len ← delimiter.length()
+    const string nl ← newline()
+    var int pos ← search_from
+
+    while pos ≺ document.length() {
+        if document.slice(pos, pos + 1) ≡ nl {
+            const int line_start ← pos + 1
+
+            if line_start + delim_len ≤ document.length() {
+                if document.slice(line_start, line_start + delim_len) ≡ delimiter {
+                    const int line_end ← line_start + delim_len
+
+                    if line_end ≡ document.length() then return pos
+                    if document.slice(line_end, line_end + 1) ≡ nl then return pos
+                }
+            }
+        }
+
+        pos ← pos + 1
+    }
+
+    return -1
+}
+
+# Name: trim_trailing_newlines (Latin locale: _amputa_postremam_newline) from amputare, "to cut off."
+# Morphologia: Private perfective helper; it trims the completed extracted
+# wire segment before split_frontmatter returns it.
+# Why: Drop trailing newline(s) from an extracted metadata wire blob.
+# Edge: Multiple trailing newlines are removed because frontmatter payloads
+# are line records, not significant terminal blank lines.
+@ private
+fn trim_trailing_newlines(string s) → string {
+    var int len ← s.length()
+    const string nl ← newline()
+
+    while len ≻ 0 and s.slice(len - 1, len) ≡ nl {
+        len ← len - 1
+    }
+
+    return s.slice(0, len)
+}
+
+# Name: split_frontmatter (Latin locale: diducta) from deducere, "to lead apart."
+# Morphologia: Perfectum result adjective; the document has been led apart
+# into metadata and corpus wires.
+# Why: Split delimiter-leading documents into opaque [metadataWire, corpusWire].
+# Maps to: `+++` frontmatter convention (EBNF file frontmatter); metadata is
+# not parsed here — callers run `toml.tempta` / other parsers on the wire.
+# Edge: Missing or empty fences throw textus errors through the alternate
+# exit channel instead of returning partial data.
+@ public
+fn split_frontmatter(string document, string delimiter) → list<string> ⇥ string {
+    const int delim_len ← delimiter.length()
+
+    # Opening-fence validation is one cohesive guard paragraph. After this
+    # block, delimiter slicing is safe and semantically meaningful.
+    if delim_len ≡ 0 then throw "empty delimiter"
+    if document.length() ≺ delim_len then throw "missing opening delimiter"
+    if document.slice(0, delim_len) ≠ delimiter then throw "missing opening delimiter"
+
+    var int meta_start ← delim_len
+    const string nl ← newline()
+
+    if meta_start ≺ document.length() and document.slice(meta_start, meta_start + 1) ≡ nl {
+        meta_start ← meta_start + 1
+    }
+
+    const int close_line ← delimiter_end(document, delimiter, delim_len)
+
+    if close_line ≺ 0 then throw "missing closing delimiter"
+
+    const string metadata ← trim_trailing_newlines(document.slice(meta_start, close_line))
+    var int corpus_start ← (close_line + 1) + delim_len
+
+    if corpus_start ≺ document.length() and document.slice(corpus_start, corpus_start + 1) ≡ nl {
+        corpus_start ← corpus_start + 1
+    }
+
+    const string body ← suffix(document, corpus_start)
+    return [metadata, body]
+}
+
+# =========================================================================
+# TRUST BOUNDARY (narrowing — not wire encode/decode)
+# =========================================================================
+
+# Name: collapse_spaces (Latin locale: comprimata) from comprimere, "to press together."
+# Morphologia: Perfectum result adjective; spacing has been compressed in
+# the returned cord.
+# Why: Collapse runs of ASCII spaces to a single space. This is
+# normalization, not byte encoding.
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn collapse_spaces(string s) → string
+
+# Name: to_ascii (Latin locale: angustata) from angustare, "to narrow."
+# Morphologia: Perfectum result adjective; the returned value is narrowed to
+# ascii when every scalar can be represented.
+# Why: Trust-boundary narrowing from textus to ascii.
+# Edge: Throws textus when any codepoint cannot be represented as ascii.
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn to_ascii(string s) → ascii ⇥ string
+
+# Name: try_to_ascii (Latin locale: temptat) from temptare, "to try."
+# Morphologia: Praesens active verb; it attempts narrowing and reports
+# absence with nihil instead of throwing.
+# Why: Trust-boundary twin of to_ascii, distinct from mechanical try_decode.
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn try_to_ascii(string s) → ascii ∪ none
+
+# =========================================================================
+# SPLIT (limited — unbounded split stays on textus.divide)
+# =========================================================================
+
+# Name: split_n (Latin locale: discissa) from discidere, "to cut apart."
+# Morphologia: Perfectum result adjective; the returned list is the cord
+# after it has been cut into pieces.
+# Why: Split s by separator into at most limitem segments.
+# Edge: Unbounded split remains on textus.divide; this is the limited form.
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn split_n(string s, string separator, int limit) → list<string>
+
+# =========================================================================
+# MECHANICAL TRIO (UTF-8 textus ↔ octeti)
+# =========================================================================
+
+# Name: encode (Latin locale: pange) from pangere, "to fasten" or "to compose."
+# Morphologia: Imperativus mechanical verb shared with structured codecs.
+# Why: Materialize textus as UTF-8 octeti for outward or storable byte form.
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn encode(string s) → bytes
+
+# Name: decode (Latin locale: solve) from solvere, "to loosen" or "to untangle."
+# Morphologia: Imperativus mechanical verb paired with encode.
+# Why: Interpret UTF-8 octeti as textus.
+# Edge: Invalid UTF-8 throws through the backing runtime.
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn decode(bytes data) → string
+
+# Name: try_decode (Latin locale: tempta) from temptare, "to try" or "to attempt."
+# Morphologia: Imperativus mechanical verb; try decode without alternate
+# exit propagation.
+# Why: Decode UTF-8 when possible and return nihil on invalid bytes.
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn try_decode(bytes data) → string ∪ none

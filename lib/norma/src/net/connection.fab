@@ -1,0 +1,44 @@
++++
+locale = "en"
++++
+# Canonical module: norma:net/connection; Latin locale spelling: connexus.
+
+# net/connection.fab — TCP socket (connected byte stream)
+#
+# Public import: importa ex "norma:net/connection" private connection
+# Depends on: norma:net/endpoint (for Endpoint type in remote()/local())
+
+import from "norma:net/endpoint" endpoint
+
+@ public
+class Socket {
+    var int id = 0
+
+    # Draw bytes (up to n if provided, otherwise whatever is available)
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn read_bytes(int n optional) → bytes
+
+    @ future
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn read_bytes_async(int n optional) → bytes
+
+    # Pour bytes
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn write_bytes(bytes data) → void
+
+    @ future
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn write_bytes_async(bytes data) → void
+
+    # Close connection
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn close() → void
+
+    # Remote endpoint
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn remote() → endpoint.Endpoint
+
+    # Local endpoint
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn local() → endpoint.Endpoint
+}

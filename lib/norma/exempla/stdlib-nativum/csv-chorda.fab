@@ -1,0 +1,26 @@
++++
+term = "csv-chorda"
+kind = "concept"
+category = "stdlib"
+canonical = true
+summary = "norma:csv v1 round-trip via transitive norma:chorda."
+syntax = "csv.parse(<wire>)"
+related = ["csv", "chorda", "stdlib-nativum"]
+locale = "en"
++++
+
+
+# stdlib-nativum/csv-chorda — user imports only norma:csv; chorda is transitive
+#
+# EXPECTED OUTPUT (Faber-literal row sep — displayed \n is two chars, not U+000A):
+#   3
+#   name,count\nalpha,1\nbeta,2
+
+import from "norma:csv" csv
+
+main {
+    const list<list<string>> grid ← csv.parse("name,count\nalpha,1\nbeta,2")
+    print grid.length()
+    const string wire ← csv.stringify(grid)
+    print wire
+}

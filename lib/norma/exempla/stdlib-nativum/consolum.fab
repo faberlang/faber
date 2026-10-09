@@ -1,0 +1,174 @@
++++
+term = "consolum"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "norma:consolum console I/O API contract tests."
+syntax = "norma:consolum — read_line | write_line | warn_line | debug_line | stdin_is_tty (all ad-routed)"
+related = ["consolum", "stdlib-nativum"]
+locale = "en"
++++
+
+# stdlib-nativum/consolum — norma:consolum console I/O API contract tests
+#
+# All 17 public functions are ad-routed. This exemplum verifies:
+#   1. Import works
+#   2. Each function can be called (host routes unavailable at test time)
+
+import from "norma:consolum" consolum
+
+main {
+    # -----------------------------------------------------------------------
+    # STDIN - Bytes
+    # -----------------------------------------------------------------------
+    do {
+        consolum.read_bytes(16)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.read_bytes_async(16)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # STDIN - Text
+    # -----------------------------------------------------------------------
+    do {
+        consolum.read_line()
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.read_line_async()
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # STDOUT - Bytes
+    # -----------------------------------------------------------------------
+    do {
+        consolum.write_bytes(|01 02 03|)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.write_bytes_async(|01 02 03|)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # STDOUT - Text
+    # -----------------------------------------------------------------------
+    do {
+        consolum.write_line("test-output")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.write_line_async("test-async")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.write_partial("partial")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.write_partial_async("partial-async")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # STDERR - Warning and Debug
+    # -----------------------------------------------------------------------
+    do {
+        consolum.warn_line("warn-output")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.warn_line_async("warn-async")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.debug_line("debug-output")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.debug_line_async("debug-async")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # TTY Detection
+    # -----------------------------------------------------------------------
+    do {
+        consolum.stdin_is_tty()
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.stdout_is_tty()
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        consolum.stderr_is_tty()
+        assert false
+    }
+    catch err {
+        print err
+    }
+}

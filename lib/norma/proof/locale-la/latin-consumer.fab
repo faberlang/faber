@@ -1,0 +1,16 @@
++++
+locale = "la"
++++
+
+# Latin consumer of this library. Keywords are Latin.
+# Public members come from locale/la/pack.toml.
+
+importa ex "norma:text" chorda
+
+functio probe() → textus {
+    redde chorda.retorta("abc")
+}
+
+incipit {
+    nota probe()
+}

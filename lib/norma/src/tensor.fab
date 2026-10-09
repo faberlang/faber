@@ -1,0 +1,87 @@
++++
+locale = "en"
++++
+
+# tensor.fab — native Faber tensor bridge and recipe module
+#
+# Public import: importa ex "norma:tensor" privata tensor
+# Method ledger: docs/stdlib/tensor-methods.md
+# Layering: bodies delegate to ↦ conversio and compiler-owned receiver intrinsics only.
+
+# =========================================================================
+# BRIDGES (lista ↔ tensor via conversio)
+# =========================================================================
+
+# Verb: flatten from "planare" (to flatten) — Perfectum
+# Why: Flatten grid to lista<T> via default conversio (row-major layout).
+@ public
+fn flatten<T, size Shape>(tensor<T, Shape> grid) → list<T> {
+    return grid ↦ list<T>
+}
+
+# Verb: construct from "struere" (to build) — 1-d bridge
+# Why: Promote lista<T> to 1-d tensor via default conversio; a length that does not fill Shape fails through ⇥.
+@ public
+fn construct<T, size Shape>(list<T> data) → tensor<T, Shape> ⇥ string {
+    return data ↦ tensor<T, Shape>
+}
+
+# =========================================================================
+# CONSTRUCTION
+# =========================================================================
+
+# Shaped construction uses compiler-owned static spellings:
+#   tensor.creata<tensor<T, Figura>>(fill)
+#   tensor.structa<tensor<T, Figura>>(data)
+# Data-driven construction is the conversion (the target type is the operand):
+#   data ↦ tensor<T, Figura>
+
+# Why: Product of dimension sizes; empty shape → 1 (scalar degenerate).
+@ public
+fn product(list<int> shape) → int {
+    var int product ← 1
+    for from shape const dim {
+        product ← product * dim
+    }
+    return product
+}
+
+# =========================================================================
+# ELEMENT-WISE MAP (staging recipe)
+# =========================================================================
+
+# Verb: apply from "applicare" (to apply) — Perfectum
+# Why: Map f over every element preserving shape (flatten → walk → rebuild).
+# The rebuild conversion carries the count check the receiver method hid;
+# mapped holds exactly the flattened grid's elements, so the handler only
+# pins the strict context — the fallback returns the untouched grid.
+@ public
+fn apply<T, size Shape>(tensor<T, Shape> grid, (T) → T f) → tensor<T, Shape> {
+    const list<T> flat ↤ grid
+    var list<T> mapped ← []
+    for from flat const elem {
+        mapped.append(f(elem))
+    }
+    do {
+        return mapped ↦ tensor<T, Shape>
+    }
+    catch err {
+        return grid
+    }
+}
+
+# =========================================================================
+# REDUCTIONS (thin delegates to receiver intrinsics)
+# =========================================================================
+
+# Why: Total sum of integer tensor elements — delegates to grid.summa().
+@ public
+fn sum<size Shape>(tensor<int, Shape> grid) → int {
+    return grid.sum()
+}
+
+# Why: Total sum of f32 fractus tensor elements — delegates to grid.summa().
+@ public
+fn sum_f32<size Shape>(tensor<f32, Shape> grid) → f32 {
+    return grid.sum()
+}

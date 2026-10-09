@@ -1,0 +1,48 @@
++++
+locale = "en"
++++
+
+# csv.fab — naive comma / Faber-literal-\n CSV wire helpers (native Faber leaf)
+#
+# Public import: importa ex "norma:csv" privata csv
+# Method ledger: docs/stdlib/csv-methods.md
+# Internal dependency: norma:text (split_n + join)
+
+import from "norma:text" text
+
+# Why: Strip a single trailing CR when rows arrive CRLF-split (v1 LF contract).
+@ private
+fn normalize_row(string row) → string {
+    if row.length() ≡ 0 then return row
+
+    const string last ← row.slice(row.length() - 1, row.length())
+    if last ≡ "\r" then return row.slice(0, row.length() - 1)
+
+    return row
+}
+
+# Verb: parse (text → rows of fields)
+# Why: Parse naive comma/LF wire into rows of fields (see csv-methods.md for limits).
+@ public
+fn parse(string wire) → list<list<string>> {
+    if wire.length() ≡ 0 then return empty
+
+    const list<string> rows ← wire.split("\n")
+    var list<list<string>> map ← []
+    for from rows const row {
+        const string normalized ← normalize_row(row)
+        map.append(normalized.split(","))
+    }
+    return map
+}
+
+# Verb: stringify (rows of fields → text)
+# Why: Compose rows of fields into comma-separated, LF-joined wire text.
+@ public
+fn stringify(list<list<string>> map) → string {
+    var list<string> rows ← []
+    for from map const fields {
+        rows.append(text.join(fields, ","))
+    }
+    return text.join(rows, "\n")
+}

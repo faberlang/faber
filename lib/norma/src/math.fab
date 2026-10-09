@@ -1,0 +1,542 @@
++++
+locale = "en"
++++
+# Canonical module: norma:math; Latin locale spelling: mathesis.
+
+# math.fab — native Faber scalar math catalog
+#
+# Public import: importa ex "norma:math" private math
+# Method ledger: docs/stdlib/mathesis-methods.md
+
+# -------------------------------------------------------------------------
+# Constants
+# -------------------------------------------------------------------------
+
+# Why: Ratio of a circle's circumference to its diameter (f64 catalog constant).
+@ public
+fn PI() → float {
+    return 3.141592653589793
+}
+
+# Why: Base of natural logarithms (f64 catalog constant).
+@ public
+fn E() → float {
+    return 2.718281828459045
+}
+
+# Why: Full circle radians — 2π (composed from PI).
+@ public
+fn TAU() → float {
+    return PI() * 2.0
+}
+
+# -------------------------------------------------------------------------
+# Clamp (present participle)
+# -------------------------------------------------------------------------
+
+# Verb: clamp from "constringere" (to bind tight) — present participle
+# Why: Clamp x to the closed interval [lo, hi] via maximus/minimus.
+@ public
+fn clamp(float x, float lo, float hi) → float {
+    return (x.maximum(lo)).minimum(hi)
+}
+
+# -------------------------------------------------------------------------
+# Arithmetic catalog (Perfectum — glyph twins)
+# -------------------------------------------------------------------------
+
+# Why: Perfectum twin of `+` — returns a + b without mutating operands.
+@ public
+fn add(float a, float b) → float {
+    return a + b
+}
+
+# Why: Perfectum twin of `−` — returns a − b.
+@ public
+fn subtract(float a, float b) → float {
+    return a - b
+}
+
+# Why: Perfectum twin of `×` — returns a × b.
+@ public
+fn multiply(float a, float b) → float {
+    return a * b
+}
+
+# Why: Perfectum twin of `÷` — returns a ÷ b.
+@ public
+fn divide(float a, float b) → float {
+    return a / b
+}
+
+# Why: Perfectum twin of `%` — returns a mod b.
+@ public
+fn modulo(float a, float b) → float {
+    return a % b
+}
+
+# Why: Perfectum twin of unary `−` — returns negated a.
+@ public
+fn negate(float a) → float {
+    return -a
+}
+
+# -------------------------------------------------------------------------
+# Ordering catalog (Perfectum queries)
+# -------------------------------------------------------------------------
+
+# Why: Perfectum twin of `<` — returns whether a is less than b.
+@ public
+fn less(float a, float b) → bool {
+    return a ≺ b
+}
+
+# Why: Perfectum twin of `>` — returns whether a is greater than b.
+@ public
+fn greater(float a, float b) → bool {
+    return a ≻ b
+}
+
+# Why: Perfectum twin of `≤` — returns whether a is at most b.
+@ public
+fn at_most(float a, float b) → bool {
+    return a ≤ b
+}
+
+# Why: Perfectum twin of `≥` — returns whether a is at least b.
+@ public
+fn at_least(float a, float b) → bool {
+    return a ≥ b
+}
+
+# -------------------------------------------------------------------------
+# Bitwise catalog (integer numerus only — v1)
+# -------------------------------------------------------------------------
+
+# Why: Perfectum twin of `∧` — bitwise AND on integer numerus operands.
+@ public
+fn bit_and(int a, int b) → int {
+    return a ∧ b
+}
+
+# Why: Perfectum twin of `∨` — bitwise OR on integer numerus operands.
+@ public
+fn bit_or(int a, int b) → int {
+    return a ∨ b
+}
+
+# Why: Perfectum twin of `⊻` — bitwise XOR on integer numerus operands.
+@ public
+fn bit_xor(int a, int b) → int {
+    return a ⊻ b
+}
+
+# Why: Perfectum twin of `¬` — bitwise complement of integer numerus a.
+@ public
+fn bit_not(int a) → int {
+    return ¬a
+}
+
+# -------------------------------------------------------------------------
+# Shift catalog (integer numerus only — v1)
+# -------------------------------------------------------------------------
+
+# Why: Perfectum twin of `⇐` — left-shift a by b bit positions.
+@ public
+fn shift_left(int a, int b) → int {
+    return a ⇐ b
+}
+
+# Why: Perfectum twin of `⇒` — right-shift a by b bit positions.
+@ public
+fn shift_right(int a, int b) → int {
+    return a ⇒ b
+}
+
+
+# -------------------------------------------------------------------------
+# Transcendentals (nominal catalog — range reduction + short series in Faber)
+# -------------------------------------------------------------------------
+#
+# Every function reduces its argument to a small interval before a short
+# series, so accuracy (about 1e-15 relative) holds over the whole f64 range.
+# Non-finite and out-of-domain input follows IEEE 754: NaN in → NaN out,
+# ln(0) → -∞, ln(x < 0) / sqrt(x < 0) → NaN, sin/cos/tan(±∞) → NaN.
+
+# Why: Sine of x radians — exact π/2 reduction, then a series on [-π/4, π/4].
+@ public
+fn sin(float x) → float {
+    if not is_finite(x) then return nan
+
+    const float a ← x.abs()
+    if a ≤ 0.7853981633974483 then return sin_series(x)
+
+    const AngleReduction reduced ← reduce_half_pi(a)
+    var float v ← cos_series(reduced.angle)
+    if reduced.quadrant % 2 ≡ 0 then v ← sin_series(reduced.angle)
+
+    if reduced.quadrant ≥ 2 then v ← -v
+
+    if x ≺ 0.0 then return -v
+
+    return v
+}
+
+# Why: Cosine of x radians — exact π/2 reduction, then a series on [-π/4, π/4].
+@ public
+fn cos(float x) → float {
+    if not is_finite(x) then return nan
+
+    const float a ← x.abs()
+    if a ≤ 0.7853981633974483 then return cos_series(x)
+
+    const AngleReduction reduced ← reduce_half_pi(a)
+    var float v ← sin_series(reduced.angle)
+    if reduced.quadrant % 2 ≡ 0 then v ← cos_series(reduced.angle)
+
+    if reduced.quadrant ≡ 1 or reduced.quadrant ≡ 2 then return -v
+
+    return v
+}
+
+# Why: Tangent of x radians — sin/cos of the reduced angle; large (not zero) near poles.
+@ public
+fn tan(float x) → float {
+    if not is_finite(x) then return nan
+
+    const float a ← x.abs()
+    if a ≤ 0.7853981633974483 then return sin_series(x) / cos_series(x)
+
+    const AngleReduction reduced ← reduce_half_pi(a)
+    const float s ← sin_series(reduced.angle)
+    const float c ← cos_series(reduced.angle)
+    var float v ← s / c
+    if reduced.quadrant % 2 ≡ 1 then v ← -c / s
+
+    if x ≺ 0.0 then return -v
+
+    return v
+}
+
+# Why: Natural exponential e^x — x = k·ln2 + r, series on |r| ≤ ln2/2, scale by 2^k.
+@ public
+fn exp(float x) → float {
+    if is_nan(x) then return x
+
+    if x ≻ 709.782712893384 then return ∞
+
+    if x ≺ -745.1332191019412 then return 0.0
+
+    const int k ← (x * 1.4426950408889634).round()
+    const float kf ← k ↦ float
+    const float r ← (x - kf * LN2_HI()) - kf * LN2_LO()
+    return scale2(exp_series(r), k)
+}
+
+# Why: Natural logarithm — x = m·2^e with m in [√½, √2], series on m, plus e·ln2.
+# ln(0) → -∞; ln(x < 0) → NaN; ln(∞) → ∞.
+@ public
+fn ln(float x) → float {
+    if is_nan(x) then return x
+
+    if x ≺ 0.0 then return nan
+
+    if x ≡ 0.0 then return -∞
+
+    if x ≡ ∞ then return ∞
+
+    var float m ← x
+    var int e ← 0
+    if biased_exponent(m) ≡ 0 {
+        m ← m * 18014398509481984.0
+        e ← -54
+    }
+    e ← e + biased_exponent(m) - 1023
+    m ← unit_mantissa(m)
+    if m ≻ 1.4142135623730951 {
+        m ← m / 2.0
+        e ← e + 1
+    }
+    const float ef ← e ↦ float
+    return ef * LN2_HI() + (ln_series(m) + ef * LN2_LO())
+}
+
+# Why: Base-10 logarithm via ln(x) / ln(10); same domain as ln.
+@ public
+fn log10(float x) → float {
+    return ln(x) / 2.302585092994046
+}
+
+# Why: Square root — x = m·4^k with m in [1, 4), Newton on m, scale by 2^k.
+# sqrt(x < 0) → NaN; sqrt(±0) → ±0; sqrt(∞) → ∞.
+@ public
+fn sqrt(float x) → float {
+    if is_nan(x) then return x
+
+    if x ≺ 0.0 then return nan
+
+    if x ≡ 0.0 then return x
+
+    if x ≡ ∞ then return x
+
+    var float m ← x
+    var int e ← 0
+    if biased_exponent(m) ≡ 0 {
+        m ← m * 18014398509481984.0
+        e ← -54
+    }
+    e ← e + biased_exponent(m) - 1023
+    m ← unit_mantissa(m)
+    if e % 2 ≠ 0 {
+        m ← m * 2.0
+        e ← e - 1
+    }
+    return scale2(sqrt_newton(m), e / 2)
+}
+
+# pow: ⋆ glyph not shipped — delegates to the compiler's float `power` (pow-glyph goal)
+# Why: IEEE 754 pow — x^0 → 1 and 1^y → 1 (even NaN); otherwise NaN → NaN;
+# 0^y → ±0 (y > 0) or ±∞ (y < 0); negative base → signed result for integral
+# exponent, NaN otherwise; exact for small integral exponents (2^3 = 8).
+@ public
+fn pow(float base, float exponent) → float {
+    return base.power(exponent)
+}
+
+# -------------------------------------------------------------------------
+# Private IEEE bit helpers
+# -------------------------------------------------------------------------
+
+# Why: High part of ln2 (32 significant bits) so k·hi is exact for |k| < 2^21.
+@ private
+fn LN2_HI() → float {
+    return 0.6931471803691238
+}
+
+# Why: Low part of ln2 — ln2 − LN2_HI().
+@ private
+fn LN2_LO() → float {
+    return 1.9082149292705877e-10
+}
+
+# Why: Raw IEEE binary64 payload of x.
+@ private
+fn bits(float x) → u64 {
+    const f64 wide ← x ↦ f64
+    return wide ↦ u64 via Bits
+}
+
+# Why: Biased exponent field (0 = zero/subnormal, 2047 = ∞/NaN).
+@ private
+fn biased_exponent(float x) → int {
+    const u64 field ← (bits(x) ⇒ 52) ∧ (2047 ∷ u64)
+    # The 11-bit mask keeps field below 2048, so the default never applies.
+    return field ↦ int ⊥ 0
+}
+
+# Why: NaN test on the bit fields — independent of each lane's NaN comparison.
+@ private
+fn is_nan(float x) → bool {
+    const u64 fraction ← bits(x) ∧ (4503599627370495 ∷ u64)
+    return biased_exponent(x) ≡ 2047 and fraction ≠ (0 ∷ u64)
+}
+
+# Why: Finite test on the exponent field (excludes ±∞ and NaN).
+@ private
+fn is_finite(float x) → bool {
+    return biased_exponent(x) ≠ 2047
+}
+
+# Why: Replace the exponent of normal x with 0 — mantissa in [1, 2).
+@ private
+fn unit_mantissa(float x) → float {
+    const u64 fraction ← bits(x) ∧ (4503599627370495 ∷ u64)
+    const u64 unit ← fraction ∨ (4607182418800017408 ∷ u64)
+    const f64 wide ← unit ↦ f64 via Bits
+    return wide
+}
+
+# Why: Exact 2^k for normal exponents k in [-1022, 1023].
+@ private
+fn pow2(int k) → float {
+    # k ≥ -1022 keeps k + 1023 non-negative, so the default never applies.
+    const u64 field ← (k + 1023) ↦ u64 ⊥ 0
+    const f64 wide ← (field ⇐ 52) ↦ f64 via Bits
+    return wide
+}
+
+# Why: v · 2^k for k in [-2044, 2046] in at most three exact power-of-two steps.
+@ private
+fn scale2(float v, int k) → float {
+    var float out ← v
+    var int rest ← k
+    if rest ≻ 1023 {
+        out ← out * pow2(1023)
+        rest ← rest - 1023
+    }
+    if rest ≺ -1022 {
+        out ← out * pow2(-1022)
+        rest ← rest + 1022
+    }
+    return out * pow2(rest)
+}
+
+# -------------------------------------------------------------------------
+# Private π/2 reduction (Payne–Hanek)
+# -------------------------------------------------------------------------
+
+# Why: Quadrant (mod 4) and remainder in [-π/4, π/4] of a reduced angle.
+@ private
+class AngleReduction {
+    var int quadrant
+    var float angle
+}
+
+# Why: 2/π as 24-bit big-endian chunks: 2/π = Σ c[i]·2^(−24(i+1)); 1296 bits
+# cover the largest f64 exponent.
+@ private
+fn two_over_pi() → list<int> {
+    return [10680707, 7228996, 1387004, 2578385, 16069853, 12639074, 9804092, 4427841, 16666979, 11263675, 12935607, 2387514, 4345298, 14681673, 3074569, 13734428, 16653803, 1880361, 10960616, 8533493, 3062596, 8710556, 7349940, 6258241, 3772886, 3769171, 3798172, 8675211, 12450088, 3874808, 9961438, 366607, 15675153, 9132554, 7151469, 3571407, 2607881, 12013382, 4155038, 6285869, 7677882, 13102053, 15825725, 473591, 9065106, 15363067, 6271263, 9264392, 5636912, 4652155, 7056368, 13614112, 10155062, 1944035]
+}
+
+# Why: Reduce finite a > π/4 modulo π/2 exactly: a·(2/π) is formed in 24-bit
+# integer limbs (only the limbs that reach the integer part mod 8 or the first
+# 168 fraction bits), so no precision is lost for any f64 magnitude.
+@ private
+fn reduce_half_pi(float a) → AngleReduction {
+    const int mask ← 16777215
+    const u64 fraction ← bits(a) ∧ (4503599627370495 ∷ u64)
+    # fraction is masked to 52 bits, so the default never applies.
+    const int mantissa ← (fraction ↦ int ⊥ 0) + 4503599627370496
+    const int e ← biased_exponent(a) - 1075
+    const int q ← (e + 2400) / 24 - 100
+    const int s ← e - 24 * q
+
+    # a = (mantissa · 2^s) · 2^(24q); split mantissa · 2^s into 24-bit limbs.
+    # The top limb is nonzero only when s > 19 (shift counts stay below 64).
+    var int top ← 0
+    if s ≻ 19 then top ← mantissa ⇒ (72 - s)
+
+    const list<int> limbs ← [
+        (mantissa ∧ ((1 ⇐ (24 - s)) - 1)) ⇐ s,
+        (mantissa ⇒ (24 - s)) ∧ mask,
+        (mantissa ⇒ (48 - s)) ∧ mask,
+        top
+    ]
+    const list<int> table ← two_over_pi()
+
+    # acc[l] holds the coefficient of 2^(−24l); l = 0 is the integer part.
+    var list<int> acc ← [0, 0, 0, 0, 0, 0, 0, 0]
+    for range 0‥4 const j {
+        for range 0‥8 const l {
+            const int i ← l - 1 + q + j
+            if i ≥ 0 and i ≺ table.length() {
+                acc[l] ← acc[l] + limbs[j] * table[i]
+            }
+        }
+    }
+    var int l ← 7
+    while l ≻ 0 {
+        acc[l - 1] ← acc[l - 1] + (acc[l] ⇒ 24)
+        acc[l] ← acc[l] ∧ mask
+        l ← l - 1
+    }
+
+    # Round to the nearest quadrant; take the fraction as ±(distance) in [0, ½].
+    var int quadrant ← acc[0] ∧ 7
+    const bool upper ← acc[1] ≥ 8388608
+    if upper then quadrant ← quadrant + 1
+
+    var float f ← 0.0
+    l ← 7
+    while l ≻ 0 {
+        var int limb ← acc[l]
+        if upper then limb ← mask - limb
+
+        f ← (f + (limb ↦ float)) * 0.000000059604644775390625
+        l ← l - 1
+    }
+    if upper then f ← -f
+
+    return AngleReduction {
+        quadrant = quadrant ∧ 3,
+        angle = f * 1.5707963267948966
+    }
+}
+
+# -------------------------------------------------------------------------
+# Private series / iteration helpers (reduced arguments only)
+# -------------------------------------------------------------------------
+
+# Why: Taylor series for sin(x) on |x| ≤ π/4 (12 terms, far below f64 ulp).
+@ private
+fn sin_series(float x) → float {
+    var float term ← x
+    var float sum ← x
+    const float x2 ← x * x
+    var float n ← 1.0
+    while n ≺ 12.0 {
+        term ← (term * (-x2)) / ((2.0 * n) * (2.0 * n + 1.0))
+        sum ← sum + term
+        n ← n + 1.0
+    }
+    return sum
+}
+
+# Why: Taylor series for cos(x) on |x| ≤ π/4.
+@ private
+fn cos_series(float x) → float {
+    var float term ← 1.0
+    var float sum ← 1.0
+    const float x2 ← x * x
+    var float n ← 1.0
+    while n ≺ 12.0 {
+        term ← (term * (-x2)) / ((2.0 * n - 1.0) * (2.0 * n))
+        sum ← sum + term
+        n ← n + 1.0
+    }
+    return sum
+}
+
+# Why: Taylor series for e^r on |r| ≤ ln2/2 (20 terms).
+@ private
+fn exp_series(float x) → float {
+    var float term ← 1.0
+    var float sum ← 1.0
+    var float n ← 1.0
+    while n ≺ 20.0 {
+        term ← (term * x) / n
+        sum ← sum + term
+        n ← n + 1.0
+    }
+    return sum
+}
+
+# Why: ln(m) = 2·atanh((m−1)/(m+1)) for m in [√½, √2], where |s| ≤ 0.172.
+@ private
+fn ln_series(float m) → float {
+    const float f ← m - 1.0
+    const float s ← f / (2.0 + f)
+    const float s2 ← s * s
+    var float term ← s
+    var float sum ← s
+    var float n ← 1.0
+    while n ≺ 16.0 {
+        term ← term * s2
+        sum ← sum + term / (2.0 * n + 1.0)
+        n ← n + 1.0
+    }
+    return 2.0 * sum
+}
+
+# Why: Newton–Raphson square root for m in [1, 4); 6 steps from (m+1)/2 reach f64 precision.
+@ private
+fn sqrt_newton(float m) → float {
+    var float guess ← (m + 1.0) / 2.0
+    var int i ← 0
+    while i ≺ 6 {
+        guess ← (guess + m / guess) / 2.0
+        i ← i + 1
+    }
+    return guess
+}

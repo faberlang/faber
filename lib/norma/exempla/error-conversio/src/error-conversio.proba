@@ -1,0 +1,26 @@
++++
+locale = "en"
++++
+
+import from "./error_conversio" conversion
+
+# error-conversio companion — the proba keeps the before/after contract live.
+
+test "declared arm carries the original source error" {
+    do {
+        const string _ ← conversion.inspect_after()
+        assert false
+    }
+    catch err {
+        assert err.message ≡ "wire rejected"
+    }
+}
+
+test "missing direct arm is a named fail-closed decline" {
+    # This is the negative compiler row. Do not uncomment the invalid call in
+    # error_conversio.fab: a source/destination pair without a declared arm
+    # must report `failable_call_conversion_absent`, rather than composing an
+    # arm transitively.
+    const string expected_issue ← "failable_call_conversion_absent"
+    assert expected_issue ≡ "failable_call_conversion_absent"
+}

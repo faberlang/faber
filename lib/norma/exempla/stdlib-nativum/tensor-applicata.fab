@@ -1,0 +1,24 @@
++++
+term = "tensor-apply"
+kind = "concept"
+category = "stdlib"
+canonical = true
+summary = "norma:tensor apply map and sum reduction."
+syntax = "norma:tensor — apply | sum"
+related = ["tensor", "stdlib-nativum", "lista"]
+locale = "en"
++++
+# stdlib-nativum/tensor-applicata — loop-based map and intrinsic-backed sum
+#
+# EXPECTED OUTPUT:
+#   14
+
+import from "norma:tensor" tensor
+
+main {
+    const list<int> flat ← [1, 2, 3, 4]
+    const tensor<int, [2, 2]> grid ← tensor.construct<tensor<int, [2, 2]>>(flat)
+    const tensor<int, [2, 2]> scaled ← tensor.apply(grid, int x ∴ x + 1)
+    const int total ← tensor.sum(scaled)
+    print total
+}

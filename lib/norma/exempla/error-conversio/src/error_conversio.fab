@@ -1,0 +1,82 @@
++++
+locale = "en"
++++
+
+# error-conversio — one declared conversion replaces administrative wrappers.
+#
+# The source error is deliberately small so the propagation seam stays visible.
+# The conversion preserves the whole source value in `inner` and projects its
+# shared message. The `err` binding is receiver-safe: English `self` is the
+# method-receiver keyword, so `self.message` is not a whole-source binding here.
+
+@ public
+union WireError {
+    @ shared
+    string message
+
+    Invalid
+}
+
+@ public
+union BoundaryError {
+    @ shared
+    string message
+
+    WireFailure {
+        WireError inner
+    }
+}
+
+# The declared conversion is an ordinary top-level function. Its parameter type
+# is the source error and its return type is the destination; the compiler
+# enrolls that ordered pair, so a propagating `⇥` failure converts at the
+# boundary without a wrapper at each caller. Nothing is nested in the union
+# body, and chains are never composed — only this direct pair is admitted.
+@ conversion
+fn from_wire_error(WireError err) → BoundaryError {
+    return variant WireFailure {message = err.message, inner = err}
+}
+
+@ public
+fn read_wire() → string ⇥ WireError {
+    throw variant Invalid {message = "wire rejected"}
+}
+
+# -------------------------------------------------------------------------
+# BEFORE — administrative wrapper family (kept as a teaching specimen only)
+# -------------------------------------------------------------------------
+#
+# The old wrapper catches the source error and reconstructs the same boundary
+# mapping at every caller. It is intentionally commented out: the declaration
+# above owns this mapping once, so this wrapper is the code E5 deletes.
+#
+# fn inspect_before() → string ⇥ BoundaryError {
+#     do {
+#         return read_wire()
+#     }
+#     catch err {
+#         throw variant WireFailure {message = err.message, inner = err}
+#     }
+# }
+
+# -------------------------------------------------------------------------
+# AFTER — direct propagation through the declared conversion
+# -------------------------------------------------------------------------
+
+@ public
+fn inspect_after() → string ⇥ BoundaryError {
+    return read_wire()
+}
+
+# DECLINE ROW — fail closed, never auto-compose a conversion chain.
+#
+# Source: UnmappedError; destination: BoundaryError.
+# An active equivalent would be rejected with the named diagnostic
+# `failable_call_conversion_absent`; only the direct (WireError, BoundaryError)
+# conversion above is admitted. The invalid call stays commented so this
+# happy-path package remains green while the decline contract remains visible.
+#
+# fn declined() → string ⇥ UnmappedError { ... }
+# fn missing_direct_arm() → string ⇥ BoundaryError {
+#     return declined()
+# }

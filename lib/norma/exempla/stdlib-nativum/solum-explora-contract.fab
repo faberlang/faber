@@ -1,0 +1,21 @@
++++
+term = "solum"
+kind = "existing-home"
+category = "stdlib"
+canonical = false
+summary = "Shallow glob contract on norma:solum."
+syntax = "solum.glob"
+related = ["solum", "stdlib-nativum", "DEFER-067"]
+locale = "en"
++++
+
+# stdlib-nativum/solum-explora-contract — explora import smoke
+#
+# Package test asserts fn explora splices into crate::solum; this exemplum only
+# verifies norma:solum import without invoking pre-gateway filesystem routes.
+
+import from "norma:solum" only
+
+main {
+    print "explora-contract"
+}

@@ -1,0 +1,24 @@
+# Colocated construct fixture for norma:http/server.
+#
+# The MIR runner treats imported module functions as provider routes
+# (same residual as src/http/client.proba). This file proves the genera
+# construct. Keep-alive decision cases live in server.fab. Live listen /
+# stream I/O runs in exempla/http/server-io.
+
+import from "./server" server
+
+describe "server_construct" {
+    test "Listener Incoming and Stream construct" {
+        const server.Listener listener ← server.Listener { handle = 2 }
+        const server.Incoming incoming ← server.Incoming {
+            id = "http-1",
+            connection = 4
+        }
+        const server.Stream stream ← server.Stream { writer = 8 }
+        assert listener.handle ≡ 2
+        assert incoming.id ≡ "http-1"
+        assert incoming.connection ≡ 4
+        assert stream.writer ≡ 8
+        print "server constructed"
+    }
+}

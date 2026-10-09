@@ -1,0 +1,104 @@
++++
+locale = "en"
++++
+
+# fs/path.fab — pure pathname operations
+#
+# Etymology: fs/path — pathname operations; Latin module spelling `solum/path`.
+# manipulation, matching stdlib naming in every language (Rust std::path,
+# Go path/filepath, Python pathlib, Node path). Grade D loanword under
+# morphologia — the standard name is the point.
+#
+# Layering: this is the canonical home for path operations in the solum
+# namespace. Path manipulation is logically distinct from file I/O — you
+# should not need to reach for the file device just to join two path
+# segments or read an extension. The Rust handlers live in
+# Pathname helpers are Faber-native; host path behavior is via ad routes (std::path on the host). The ad routes
+# stay under the solum:* namespace because that is where the handlers are
+# registered.
+#
+# The top-level solum module (solum.fab) keeps thin proxies to these same
+# routes so its public surface is preserved for the kernel manifest, MIR
+# stepper dispatch, and existing callers. New code should import this
+# module directly; the proxies are compatibility surface.
+#
+# Import: file-namespace-imports shipped; import this module directly as
+# norma:fs/path.
+#
+# Morphologia: nominal projections throughout (parens, nomen, suffixum are
+# stable facts about a path string; domus and temporarium are stable facts
+# about the environment). iunge is Imperativus (a command that produces a
+# joined path). absolve is Imperativus (resolve to absolute). No
+# copy-out Perfectum because these do not operate on a receiver — they are
+# pure functions over textus.
+
+# =============================================================================
+# CONSTRUCTION (join segments into a path)
+# =============================================================================
+
+# Join path segments into a single path string.
+# Maps to: Rust PathBuf::push, Go path.Join, Node path.join.
+# Imperativus — produces a joined path from parts.
+@ public
+fn join(list<string> parts) → string {
+    return call 'solum:iunge' (parts) ↦ string
+}
+
+# =============================================================================
+# PROJECTIONS (nominal — stable facts about a path string)
+# =============================================================================
+
+# Parent directory of a path. Returns "" for paths with no parent.
+# Maps to: Rust Path::parent, Go path.Dir, Node path.dirname.
+@ public
+fn parent(string path) → string {
+    return call 'solum:parens' (path) ↦ string
+}
+
+# Final path segment (the filename). Returns "" for paths ending in "..".
+# Maps to: Rust Path::file_name, Go path.Base, Node path.basename.
+@ public
+fn file_name(string path) → string {
+    return call 'solum:nomen' (path) ↦ string
+}
+
+# File extension, including the leading dot (e.g. ".txt"). Returns "" if
+# there is no extension.
+# Maps to: Rust Path::extension, Go path.Ext, Node path.extname.
+@ public
+fn extension(string path) → string {
+    return call 'solum:suffixum' (path) ↦ string
+}
+
+# =============================================================================
+# RESOLUTION (Imperativus — produce a canonical or absolute path)
+# =============================================================================
+
+# Resolve a path to absolute form. Canonicalizes if the file exists;
+# otherwise prepends the current working directory as a best effort.
+# Maps to: Rust fs::canonicalize, Go filepath.Abs, Node path.resolve.
+# WHY: this one does touch the filesystem (canonicalize) — it lives here
+# because it is path resolution, but it can fail on non-existent paths and
+# falls back to cwd-join rather than throwing.
+@ public
+fn resolve(string path) → string {
+    return call 'solum:absolve' (path) ↦ string
+}
+
+# =============================================================================
+# ENVIRONMENT PATHS (nominal — stable facts about the environment)
+# =============================================================================
+
+# User's home directory. Reads $HOME on Unix; falls back to "/" if unset.
+# Maps to: Rust env::var("HOME"), Go os.UserHomeDir, Node os.homedir.
+@ public
+fn home() → string {
+    return call 'solum:domus' ↦ string
+}
+
+# System temporary directory.
+# Maps to: Rust env::temp_dir, Go os.TempDir, Node os.tmpdir.
+@ public
+fn temp_dir() → string {
+    return call 'solum:temporarium' ↦ string
+}

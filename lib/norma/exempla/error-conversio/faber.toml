@@ -1,0 +1,15 @@
+[package]
+name = "error-conversio"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "fmir"
+kind = "bin"
+
+[locale]
+locale = "en"

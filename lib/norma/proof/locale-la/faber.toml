@@ -1,0 +1,15 @@
+[package]
+name = "norma-locale-la"
+version = "0.0.0"
+edition = "2026"
+
+[paths]
+source = "."
+entry = "latin-consumer.fab"
+
+[build]
+kind = "bin"
+target = "rust"
+
+[locale]
+locale = "la"

@@ -1,0 +1,104 @@
++++
+locale = "en"
++++
+
+# Live client I/O against a local fixture server (H5 run proof).
+# The fixture is started by the invoking shell; argv[0] is the origin.
+# `faber check` compiles the verb calls. A rust package build currently
+# hits the faber-runtime tag-pin window (generated manifests still
+# require package `faber-runtime`; live `faber/runtime/rust` is `faber`).
+
+import from "norma:http/client" client
+import from "norma:http/headers" headers
+import from "norma:http/response" response
+import from "norma:processus" processus
+
+fn origin() → string {
+    const list<string> args ← processus.argv()
+    if args.length() ≻ 0 {
+        const string ∪ none first ← args.get(0)
+        if first not is none {
+            return first ↦ string
+        }
+    }
+    return "http://127.0.0.1:18765"
+}
+
+main {
+    const string base ← origin()
+    const client.Url parsed ← client.split(base + "/get")
+    if not client.is_absolute(parsed) {
+        panic "client-io: fixture origin is not an absolute URL"
+    }
+
+    const response.Response got ← client.get(base + "/get")
+    print "get-status"
+    print got.status
+    print "get-body"
+    print got.body
+
+    const response.Response posted ← client.post(base + "/post", "hello")
+    print "post-status"
+    print posted.status
+    print "post-body"
+    print posted.body
+
+    var headers.Headers marked ← headers.empty()
+    if marked.append("x-test", "yes") {
+    }
+    const response.Response patched ← client.patch_with(base + "/patch", marked, "delta")
+    print "patch-status"
+    print patched.status
+    print "patch-body"
+    print patched.body
+    const string ∪ none echo ← patched.header("x-echo-test")
+    if echo is none {
+        print "patch-echo-missing"
+    }
+    else {
+        print "patch-echo"
+        print echo ↦ string
+    }
+
+    const client.Client pooled ← client.session()
+    const response.Response first ← client.get_on(pooled, base + "/one")
+    const response.Response second ← client.get_on(pooled, base + "/two")
+    print "agent-status"
+    print first.status
+    print second.status
+
+    const client.Receive stream ← client.open("GET", base + "/sse", headers.empty(), "")
+    print "open-status"
+    print stream.status
+    var string acc ← ""
+    var int pulls ← 0
+    var bool finished ← false
+    while pulls ≺ 16 and not finished {
+        const client.Chunk chunk ← client.receive_n(stream, 16)
+        acc ← acc + chunk.text
+        finished ← chunk.done
+        pulls ← pulls + 1
+        print "chunk-done"
+        if chunk.done {
+            print "true"
+        }
+        else {
+            print "false"
+        }
+        print "chunk-text"
+        print chunk.text
+    }
+    print "stream-pulls"
+    print pulls
+    print "stream-acc"
+    print acc
+    if pulls ≺ 2 {
+        panic "client-io: streaming receive did not yield incrementally"
+    }
+    if not acc.contains("data: one") {
+        panic "client-io: missing first SSE event"
+    }
+    if not acc.contains("data: two") {
+        panic "client-io: missing second SSE event"
+    }
+}

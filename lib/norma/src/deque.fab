@@ -1,0 +1,151 @@
++++
+locale = "en"
++++
+
+# deque.fab — double-ended queue (deque)
+#
+# Etymology: deque — thread / strand, drawn from either end; Latin locale spelling `fila`.
+# Counterpart to lista (ordered random access) and acervus (heap-priority).
+#
+# NOTE: Generic record construction (`Deque<T> { ... }`) is not yet supported by
+# the parser (generic-genus-construction goal is still draft); the constructors
+# below use `Deque { ... }` with the type arguments inferred from the return
+# type, and the free functions declare their own `<T>`.
+#
+# Layering: pure native Faber over the builtin lista<T>. No Rust backing, no
+# ad routes, no I/O. Backed by two listas: `head` (its tail is the queue
+# head) and `tail` (its tail is the queue tail). Pushes append to the
+# relevant lista; pops read from the relevant tail. When a pop-side is empty,
+# the other side is reversed into it — amortized O(1) per operation.
+# (`ante` would be the natural Latin name for the head-side buffer but is a
+# reserved Faber keyword — TokenKind::Ante — so `head` is used instead.)
+#
+# Import: the file-namespace-imports goal (docs/factory/file-namespace-imports)
+# shipped; this file is imported directly as norma:deque. The genus lives at
+# file top level.
+#
+# Morphologia: receiver methods on the Deque<T> genus (implicit ego), matching
+# how the builtin lista<T> exposes its surface (myDeque.length(),
+# myDeque.append(v), ...). Stems reuse builtin lista stems where the operation
+# is identical (append, pop_front, pop_back) so users cross-walking between
+# lista and deque see the same verbs; deque adds prepend (head push) because
+# lista has no head-push intrinsic. Imperativus throughout for mutation
+# (var receiver required); nominal for projections (length, first,
+# last); present-predicate for state (is_empty); Perfectum for copy-out
+# (to_list).
+
+# =============================================================================
+# TYPE
+# =============================================================================
+
+# Double-ended queue over T. See module header for the two-lista scheme.
+@ public
+class Deque<T> {
+    var list<T> head = []
+    var list<T> tail = []
+
+    # =========================================================================
+    # STATE (nominal / present predicate)
+    # =========================================================================
+
+    fn length() → int {
+        return self.head.length() + self.tail.length()
+    }
+
+    fn is_empty() → bool {
+        return self.head.is_empty() and self.tail.is_empty()
+    }
+
+    # =========================================================================
+    # MUTATION (Imperativus — in-place on a var receiver)
+    # =========================================================================
+
+    fn append(T v) → void {
+        self.tail.append(v)
+    }
+
+    fn prepend(T v) → void {
+        self.head.append(v)
+    }
+
+    fn pop_back() → T ∪ none {
+        if not self.tail.is_empty() then return self.tail.remove_last()
+        if not self.head.is_empty() {
+            # Rebalance: reverse head into tail so the head-side elements
+            # become accessible from the tail end.
+            while not self.head.is_empty() {
+                self.tail.append(self.head.remove_last())
+            }
+            return self.tail.remove_last()
+        }
+        return null
+    }
+
+    fn pop_front() → T ∪ none {
+        if not self.head.is_empty() then return self.head.remove_last()
+        if not self.tail.is_empty() {
+            # Rebalance: reverse tail into head so the tail-side elements
+            # become accessible from the head end.
+            while not self.tail.is_empty() {
+                self.head.append(self.tail.remove_last())
+            }
+            return self.head.remove_last()
+        }
+        return null
+    }
+
+    # =========================================================================
+    # ACCESS (nominal — read without mutation)
+    # =========================================================================
+
+    # `head` stores the head-side reversed, so its tail is the queue head.
+    fn first() → T ∪ none {
+        if not self.head.is_empty() then return self.head.last()
+        if not self.tail.is_empty() then return self.tail.first()
+        return null
+    }
+
+    fn last() → T ∪ none {
+        if not self.tail.is_empty() then return self.tail.last()
+        if not self.head.is_empty() then return self.head.first()
+        return null
+    }
+
+    # =========================================================================
+    # COPY-OUT (Perfectum — return a new value, do not mutate)
+    # =========================================================================
+
+    # Head-to-tail copy; does not consume the queue.
+    fn to_list() → list<T> {
+        var list<T> out ← []
+        # head is stored reversed (its tail is the queue head), so walk it
+        # tail-first to emit in head order.
+        var int i ← self.head.length()
+        while i ≻ 0 {
+            i ← i - 1
+            out.append(self.head.get(i))
+        }
+        for from self.tail const v {
+            out.append(v)
+        }
+        return out
+    }
+}
+
+# =============================================================================
+# CONSTRUCTION (catalog constructors — not receiver methods)
+# =============================================================================
+# WHY: free functions rather than genus methods because they construct a fresh
+# Deque<T> rather than operating on an existing one. `is_empty` is reserved
+# for the emptiness predicate above.
+
+@ public
+fn empty<T>() → Deque<T> {
+    return Deque { }
+}
+
+# First element of the source becomes the queue head (`tail = res` with empty `head`).
+@ public
+fn from_list<T>(list<T> items) → Deque<T> {
+    return Deque { tail = items }
+}

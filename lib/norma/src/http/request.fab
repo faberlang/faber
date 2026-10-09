@@ -1,0 +1,201 @@
++++
+locale = "en"
++++
+
+# http/request.fab — received HTTP request
+#
+# Public import: import from "norma:http/request" request
+# Depends on: norma:http/headers
+#
+# method / path / query / headers / body. `from_target` splits `path?query`
+# and `query_field` percent-decodes a single query key.
+
+import from "norma:http/headers" headers
+
+@ public
+class Request {
+    var string method = ""
+    var string path = ""
+    var string query = ""
+    var headers.Headers headers = headers.Headers { }
+    var string body = ""
+
+    fn header(string name) → string ∪ none {
+        return self.headers.get(name)
+    }
+
+    fn query_field(string name) → string ∪ none {
+        return decode_query_field(self.query, name)
+    }
+}
+
+# Build a Request from a raw request-target (`path` or `path?query`).
+@ public
+fn from_target(string method, string target, headers.Headers headers, string body) → Request {
+    const string path ← target_path(target)
+    const string query ← target_query(target)
+    return Request { method = method, path = path, query = query, headers = headers, body = body }
+}
+
+fn target_path(string target) → string {
+    var int i ← 0
+    while i ≺ target.length() {
+        const string c ← target.slice(i, i + 1)
+        if c ≡ "?" or c ≡ "#" {
+            return target.slice(0, i)
+        }
+        i ← i + 1
+    }
+    return target
+}
+
+fn target_query(string target) → string {
+    var int i ← 0
+    while i ≺ target.length() {
+        const string c ← target.slice(i, i + 1)
+        if c ≡ "#" {
+            return ""
+        }
+        if c ≡ "?" {
+            const int start ← i + 1
+            var int j ← start
+            while j ≺ target.length() {
+                if target.slice(j, j + 1) ≡ "#" {
+                    return target.slice(start, j)
+                }
+                j ← j + 1
+            }
+            return target.slice(start, target.length())
+        }
+        i ← i + 1
+    }
+    return ""
+}
+
+fn decode_query_field(string query, string name) → string ∪ none {
+    const string want ← percent_decode(name)
+    var int i ← 0
+    while i ≤ query.length() {
+        var int amp ← i
+        while amp ≺ query.length() and query.slice(amp, amp + 1) ≠ "&" {
+            amp ← amp + 1
+        }
+        const string pair ← query.slice(i, amp)
+        var int eq ← 0
+        var bool has_eq ← false
+        while eq ≺ pair.length() {
+            if pair.slice(eq, eq + 1) ≡ "=" {
+                has_eq ← true
+                break
+            }
+            eq ← eq + 1
+        }
+        var string key ← pair
+        var string val ← ""
+        if has_eq {
+            key ← pair.slice(0, eq)
+            val ← pair.slice(eq + 1, pair.length())
+        }
+        if percent_decode(key) ≡ want {
+            return percent_decode(val)
+        }
+        if amp ≥ query.length() {
+            return null
+        }
+        i ← amp + 1
+    }
+    return null
+}
+
+fn percent_decode(string s) → string {
+    var string out ← ""
+    var int i ← 0
+    while i ≺ s.length() {
+        const string c ← s.slice(i, i + 1)
+        if c ≡ "+" {
+            out ← out + " "
+            i ← i + 1
+        }
+        elif c ≡ "%" and i + 2 ≺ s.length() {
+            const int hi ← hex_value(s.slice(i + 1, i + 2))
+            const int lo ← hex_value(s.slice(i + 2, i + 3))
+            if hi ≺ 0 or lo ≺ 0 {
+                out ← out + c
+                i ← i + 1
+            }
+            else {
+                out ← out + byte_char(hi * 16 + lo)
+                i ← i + 3
+            }
+        }
+        else {
+            out ← out + c
+            i ← i + 1
+        }
+    }
+    return out
+}
+
+fn hex_value(string c) → int {
+    if c ≡ "0" then return 0
+    if c ≡ "1" then return 1
+    if c ≡ "2" then return 2
+    if c ≡ "3" then return 3
+    if c ≡ "4" then return 4
+    if c ≡ "5" then return 5
+    if c ≡ "6" then return 6
+    if c ≡ "7" then return 7
+    if c ≡ "8" then return 8
+    if c ≡ "9" then return 9
+    if c ≡ "a" or c ≡ "A" then return 10
+    if c ≡ "b" or c ≡ "B" then return 11
+    if c ≡ "c" or c ≡ "C" then return 12
+    if c ≡ "d" or c ≡ "D" then return 13
+    if c ≡ "e" or c ≡ "E" then return 14
+    if c ≡ "f" or c ≡ "F" then return 15
+    return -1
+}
+
+# ASCII byte → length-1 textus. Query decoding is an ASCII-percent floor;
+# bytes outside the printable ASCII range are left as `?`.
+fn byte_char(int n) → string {
+    if n ≺ 32 or n ≻ 126 then return "?"
+    const string printable ← " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+    return printable.slice(n - 32, n - 31)
+}
+
+describe "request" {
+    test "target splits path query headers and body" {
+        const headers.Headers head ← headers.Headers {
+            entries = [headers.Header { name = "X-Trace", value = "yes" }]
+        }
+        const Request req ← from_target(
+            "GET",
+            "/search?q=hello+world&tag=%2B#ignored",
+            head,
+            "body"
+        )
+        assert req.method ≡ "GET"
+        assert req.path ≡ "/search"
+        assert req.query ≡ "q=hello+world&tag=%2B"
+        assert req.body ≡ "body"
+        assert req.headers.entries[0].name ≡ "X-Trace"
+        assert req.headers.entries[0].value ≡ "yes"
+        const string ∪ none query_value ← req.query_field("q")
+        assert query_value not is none
+        assert (query_value ↦ string) ≡ "hello world"
+        const string ∪ none tag_value ← req.query_field("tag")
+        assert tag_value not is none
+        assert (tag_value ↦ string) ≡ "+"
+        assert req.query_field("missing") is none
+    }
+
+    test "percent decoding keeps malformed and nonprintable bytes safe" {
+        assert percent_decode("%20%21%7E") ≡ " !~"
+        assert percent_decode("%22") ≡ "\""
+        assert percent_decode("%5C") ≡ "\\"
+        assert percent_decode("%00") ≡ "?"
+        assert percent_decode("%G0%") ≡ "%G0%"
+        assert percent_decode("+") ≡ " "
+    }
+}

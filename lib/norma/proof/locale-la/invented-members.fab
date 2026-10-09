@@ -1,0 +1,16 @@
++++
+locale = "la"
++++
+
+# Negative: invented Latin names are not in locale/la/pack.toml.
+# Expected: SEM004.namespace_missing_export.
+
+importa ex "norma:text" chorda
+
+functio probe() → textus {
+    redde chorda.retorta_ficta("abc")
+}
+
+incipit {
+    nota probe()
+}

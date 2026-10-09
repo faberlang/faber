@@ -1,0 +1,19 @@
+# http/server.proba — import-resolution fixture for norma:http/server
+#
+# Behavior cases live in src/http/server.fab. Live stream I/O is
+# exempla/http/server-io.
+
+import from "norma:http/server" server
+
+describe "server_import" {
+    test "Listener Incoming and Stream construct" {
+        const server.Listener listener ← server.Listener { handle = 1 }
+        const server.Incoming incoming ← server.Incoming { id = "http-1", connection = 2 }
+        const server.Stream stream ← server.Stream { writer = 3 }
+        assert listener.handle ≡ 1
+        assert incoming.id ≡ "http-1"
+        assert incoming.connection ≡ 2
+        assert stream.writer ≡ 3
+        print "server constructed"
+    }
+}

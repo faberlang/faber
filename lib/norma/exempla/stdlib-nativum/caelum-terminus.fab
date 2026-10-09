@@ -1,0 +1,26 @@
++++
+term = "caelum-terminus"
+kind = "example"
+category = "stdlib"
+canonical = false
+summary = "Type-only stdlib file import through file namespace binding."
+syntax = "importa ex \"norma:caelum/terminus\" privata terminus"
+related = ["caelum", "stdlib-nativum", "imports"]
+locale = "en"
++++
+
+
+# stdlib-nativum/caelum-terminus — type-only file namespace import
+#
+# EXPECTED OUTPUT:
+#   localhost
+
+import from "norma:caelum/terminus" terminus
+
+main {
+    const terminus.Endpoint endpoint ← terminus.Endpoint {
+        host = "localhost",
+        port = 8080
+    }
+    print endpoint.host
+}

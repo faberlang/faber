@@ -1,0 +1,28 @@
++++
+locale = "en"
++++
+
+# order.fab - Ordering contract
+#
+# `Orderable<T>` is the one ordering contract (DECISIONS D1.4; English name
+# per D1.5). A class opts in by naming itself: `class Person implements
+# Orderable<Person>`. Its `compare` returns a negative number, zero, or a
+# positive number when `self` sorts before, with, or after `other`.
+#
+# The compiler recognizes this contract by the `@ radix contract "ordering"`
+# mark (never by its name) and adds what a plain contract cannot:
+# - `≺ ≻ ≤ ≥` on a conforming class call its one `compare`, so the glyphs
+#   and `compare` never disagree;
+# - `int`, `float`, `string` and `instant` conform without code: integers by
+#   value, floats by IEEE 754 totalOrder (-NaN < -∞ < … < -0 < +0 < … < +∞ <
+#   NaN), text by Unicode code point, instants by time;
+# - tuples order lexicographically when every element conforms.
+#
+# Bound a generic in full: `fn larger<T implements Orderable<T>>(T a, T b) → T`.
+# There are no default methods and no contract tower (D1.10).
+
+@ public
+@ radix contract "ordering"
+interface Orderable<T> {
+    fn compare(T other) → int
+}

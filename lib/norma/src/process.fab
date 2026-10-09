@@ -1,0 +1,175 @@
++++
+locale = "en"
++++
+
+# process.fab - Process Device
+#
+# Etymology: process — forward movement / execution; Latin locale spelling `processus`.
+# A going forward, a process in motion.
+#
+# Every verb blocks on its `ad` frame response. Async is host-side plumbing:
+# the gateway decides how long to hold a request; Faber's posture is uniform.
+# There is no `@ future` — sync/async is a route-naming distinction, not a
+# Faber-side marker. Sync and async verbs name distinct `processus:*` routes.
+# `spawn` remains deferred: it returns the `Subprocess` genus, which the
+# ad materializer does not yet support (same blocker as fs.stat).
+# Drifted annotation state is not preserved: the live surface is @ public.
+#
+# Design principles:
+# - Different verbs for different spawn semantics:
+# - spawn: spawn attached, caller manages lifecycle
+# - detach: spawn detached, dismiss to run independently
+# - Shell execution uses traditional sync/async:
+# - Imperative (exec): sync, blocks until complete
+# - Future (exec_async): async, returns promise
+# - Environment uses read_env (read) - simple and consistent
+
+
+# =============================================================================
+# TYPES
+# =============================================================================
+
+# Spawned subprocess handle for attached processes
+# Maps to: Bun.spawn() result
+@ public
+class Subprocess {
+    var int pid
+}
+
+# =========================================================================
+# SPAWN - Attached
+# =========================================================================
+# Verb: spawn from "generare" (to generate, beget, bring forth)
+# Why: Caller maintains control — can wait for exit, capture output via handle.
+# Maps to: Bun.spawn() with handle returned
+
+# Spawn attached process. Deferred because the ad materializer does not yet
+# support arbitrary spawn handles like Subprocess — only vacuum, valor,
+# scalars, octeti, instans, and lista<T>. The param name `argumenta` is also
+# a reserved keyword (TokenKind::Argumenta, used for CLI argument binding),
+# so a native body would need to rename it.
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn spawn(list<string> args, string directory optional, map<string, string> environment optional) → Subprocess
+
+# =========================================================================
+# SPAWN - Detached
+# =========================================================================
+# Verb: detach from "dimittere" (to send away, dismiss, release)
+# Why: Distinct from spawn: fire-and-forget; process survives parent exit.
+# Maps to: Bun.spawn() with proc.unref(), stdio ignored
+
+# Dismiss process to run independently - returns PID.
+# Param named `args` because `argumenta` is TokenKind::Argumenta (CLI
+# argument binding). Optional directorium/ambitus are accepted at the
+# Faber surface; the host route currently receives args only.
+@ public
+fn detach(list<string> args, string directory optional, map<string, string> environment optional) → int {
+    return call 'processus:dimitte' (args) ↦ int
+}
+
+# Execute an argv vector directly and capture status, stdout, and stderr.
+# No shell is involved; args[0] is the executable and the remaining elements
+# are passed as literal argv entries.
+@ public
+fn capture(list<string> args) → value {
+    return call 'processus:captura' (args) ↦ value
+}
+
+# =========================================================================
+# SHELL EXECUTION
+# =========================================================================
+# Verb: exec/exec_async from "exsequi" (to follow out, execute, accomplish)
+# Why: Shell features available (pipes, redirects, &&, ||, etc). Returns stdout.
+# Maps to: sh -c "cmd" via Bun.spawnSync / Bun.spawn
+
+# Execute shell command, block until complete, return stdout (sync)
+@ public
+fn exec(string command) → string {
+    return call 'processus:exsequi' (command) ↦ string
+}
+
+# Execute shell command, return stdout when complete (async route; Faber blocks)
+@ public
+fn exec_async(string command) → string {
+    return call 'processus:exsequetur' (command) ↦ string
+}
+
+# =========================================================================
+# ENVIRONMENT - Read
+# =========================================================================
+# Verb: read_env from "legere" (to read, gather)
+# Why: Same verb as file reading - context (processus vs solum) disambiguates.
+# Maps to: Bun.env[name] / process.env[name]
+
+# Read environment variable (Imperativus: fails when unset; set-to-empty → "")
+@ public
+fn read_env(string name) → string {
+    return call 'processus:lege' (name) ↦ string
+}
+
+# =========================================================================
+# PROCESS INFO - Working Directory
+# =========================================================================
+# Noun: sedes (seat, dwelling place, residence)
+# Why: Avoids collision with solum.directorium which extracts directory from
+# path strings.
+# Maps to: process.cwd()
+
+# Get current working directory (where the process dwells)
+@ public
+fn cwd() → string {
+    return call 'processus:sedes' ↦ string
+}
+
+# =========================================================================
+# PROCESS INFO - Change Directory
+# =========================================================================
+# Verb: chdir from "mutare" (to change, alter)
+# Maps to: process.chdir(path)
+
+# Change current working directory
+@ public
+fn chdir(string path) → void {
+    return call 'processus:muta' (path) ↦ void
+}
+
+# =========================================================================
+# PROCESS INFO - Identity
+# =========================================================================
+# Noun: identitas (identity)
+# Why: Accessor for process identity (PID). Not a verb - it's a property.
+# Maps to: process.pid
+
+# Get process ID
+@ public
+fn pid() → int {
+    return call 'processus:identitas' ↦ int
+}
+
+# =========================================================================
+# PROCESS INFO - Arguments
+# =========================================================================
+# Noun: argumenta (arguments)
+# Why: Accessor for command line arguments. Not a verb - it's a property.
+# Maps to: Bun.argv.slice(2) / process.argv.slice(2)
+
+# Get command line arguments (excludes runtime and script path)
+@ public
+fn argv() → list<string> {
+    return call 'processus:argumenta' ↦ list<string>
+}
+
+# =========================================================================
+# EXIT
+# =========================================================================
+# Verb: exit_process from "exire" (to go out, exit, depart)
+# Why: Returns never — this call does not return.
+# Maps to: process.exit(code)
+
+# Exit process with code (never returns)
+@ public
+fn exit_process(int code) → never {
+    const void _ ← call 'processus:exi' (code) ↦ void
+    panic "process exit returned unexpectedly"
+}

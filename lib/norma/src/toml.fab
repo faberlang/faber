@@ -1,0 +1,35 @@
++++
+locale = "en"
++++
+
+# toml.fab — TOML wire floor facade
+#
+# Etymology: "TOML" — Tom's Obvious Minimal Language (universal, kept as-is).
+#
+# Wire floor only: parse (text → valor), stringify (valor → text), try_parse
+# (lenient parse). Faber-native Norma source (no residual Rust norma crate). Shared valor-tree
+# navigation (cape/carpe/inveni/exige/*ne) lives in norma:value.
+#
+# TOML's predicate semantics are emergent, not implemented here: TOML never
+# produces Valor::Nihil (so valor.nihilne returns falsum on any TOML tree),
+# and TOML datetimes lower to Valor::Instans (so valor.instansne distinguishes
+# them from textus). These behaviors come from what the parser produces, not
+# from predicate overrides — norma:value's generic predicates are correct.
+
+
+# =========================================================================
+# SERIALIZATION (wire floor)
+# =========================================================================
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn stringify(value value) → string
+
+# =========================================================================
+# PARSING (wire floor)
+# =========================================================================
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn parse(string toml) → value
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn try_parse(string toml) → value ∪ none

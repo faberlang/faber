@@ -1,0 +1,167 @@
++++
+locale = "en"
++++
+
+# console.fab - Console Device (stdin/stdout/stderr)
+#
+# Etymology: console — shared base / meeting place; Latin locale spelling `consolum`.
+# The foundation for all I/O interaction.
+#
+# All operations call an `ad` route and wait for its frame response. Sync and
+# async functions use distinct `consolum:*` routes; route selection is
+# host-side plumbing. Stream methods keep paired sync/async forms; TTY
+# predicates are sync-only.
+#
+# Contract notes:
+# - Line and warning/debug output includes a newline.
+# - Partial output does not include a newline.
+
+
+# =========================================================================
+# STDIN - Bytes
+# =========================================================================
+# Maps to: fs.readSync(0, buffer) / async stdin read
+
+# Draw bytes from stdin (sync)
+@ public
+fn read_bytes(int byte_length) → bytes {
+    return call 'consolum:hauri' (byte_length) ↦ bytes
+}
+
+# Draw bytes from stdin (async route; Faber blocks on the frame)
+@ public
+fn read_bytes_async(int byte_length) → bytes {
+    return call 'consolum:hauriet' (byte_length) ↦ bytes
+}
+
+# =========================================================================
+# STDIN - Text
+# =========================================================================
+# Maps to: readline or character-by-character until newline
+
+# Read line from stdin (sync, blocks until newline)
+@ public
+fn read_line() → string {
+    return call 'consolum:lege' ↦ string
+}
+
+# Read line from stdin (async route; Faber blocks on the frame)
+@ public
+fn read_line_async() → string {
+    return call 'consolum:leget' ↦ string
+}
+
+# =========================================================================
+# STDOUT - Bytes
+# =========================================================================
+# Maps to: fs.writeSync(1, data) / process.stdout.write
+
+# Pour bytes to stdout (sync)
+# Opener must be valor (SEM010); cast octeti → valor like solum.funde.
+@ public
+fn write_bytes(bytes data) → void {
+    return call 'consolum:funde' (data ↦ value) ↦ void
+}
+
+# Pour bytes to stdout (async route; Faber blocks)
+@ public
+@ future
+fn write_bytes_async(bytes data) → void {
+    return call 'consolum:funde' (data ↦ value) ↦ void
+}
+
+# =========================================================================
+# STDOUT - Text with Newline
+# =========================================================================
+# Default behavior includes newline (most common use case).
+# Maps to: console.log / process.stdout.write + "\n"
+
+# Write line to stdout with newline (sync)
+@ public
+fn write_line(string msg) → void {
+    return call 'consolum:scribe' (msg) ↦ void
+}
+
+# Write line to stdout with newline (async route; Faber blocks)
+@ public
+fn write_line_async(string msg) → void {
+    return call 'consolum:scribet' (msg) ↦ void
+}
+
+# =========================================================================
+# STDOUT - Text without Newline
+# =========================================================================
+# No newline - for building up output incrementally.
+# Maps to: process.stdout.write (no newline)
+
+# Say text to stdout without newline (sync)
+@ public
+fn write_partial(string msg) → void {
+    return call 'consolum:dic' (msg) ↦ void
+}
+
+# Say text to stdout without newline (async route; Faber blocks)
+@ public
+fn write_partial_async(string msg) → void {
+    return call 'consolum:dicet' (msg) ↦ void
+}
+
+# =========================================================================
+# STDERR - Warning/Error Output
+# =========================================================================
+# Includes newline (errors are typically complete messages).
+# Maps to: console.warn / process.stderr.write + "\n"
+
+# Warn line to stderr with newline (sync)
+@ public
+fn warn_line(string msg) → void {
+    return call 'consolum:mone' (msg) ↦ void
+}
+
+# Warn line to stderr with newline (async route; Faber blocks)
+@ public
+fn warn_line_async(string msg) → void {
+    return call 'consolum:monet' (msg) ↦ void
+}
+
+# =========================================================================
+# DEBUG Output
+# =========================================================================
+# Includes newline. May be filtered by log level in production.
+# Maps to: console.debug / conditional stderr write
+
+# Debug line with newline (sync)
+@ public
+fn debug_line(string msg) → void {
+    return call 'consolum:vide' (msg) ↦ void
+}
+
+# Debug line with newline (async route; Faber blocks)
+@ public
+fn debug_line_async(string msg) → void {
+    return call 'consolum:videbit' (msg) ↦ void
+}
+
+# =========================================================================
+# TTY Detection (R2a present predicates)
+# =========================================================================
+# Predicates for terminal detection. Sync only.
+# Maps to: tty.isatty(fd)
+
+# Can stdin hear an interactive user?
+@ public
+fn stdin_is_tty() → bool {
+    return call 'consolum:audit' ↦ bool
+}
+
+# Does stdout speak to an interactive user?
+@ public
+fn stdout_is_tty() → bool {
+    return call 'consolum:loquitur' ↦ bool
+}
+
+# Does stderr admonish an interactive user?
+@ public
+fn stderr_is_tty() → bool {
+    return call 'consolum:admonet' ↦ bool
+}

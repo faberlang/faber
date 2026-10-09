@@ -1,0 +1,16 @@
++++
+locale = "la"
++++
+
+# Negative: a missing export fails after the namespace resolves.
+# Expected: SEM004.namespace_missing_export.
+
+importa ex "norma:text" chorda
+
+functio probe() → textus {
+    redde chorda.not_a_member("abc")
+}
+
+incipit {
+    nota probe()
+}

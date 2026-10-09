@@ -1,0 +1,179 @@
+# Colocated stdlib test source for math (public catalog).
+# Not importable; discovered only by the faber test path (`include_proba`).
+import from "./math" math
+
+fn sum_pi(float x) → float {
+    return math.add(math.PI(), x)
+}
+
+# Relative error against a reference value (absolute when the reference is 0).
+fn close(float actual, float expected) → bool {
+    const float scale ← expected.abs().maximum(1.0e-300)
+    return (actual - expected).abs() / scale ≤ 1.0e-12
+}
+
+# NaN check through the IEEE bit fields — independent of how any lane
+# evaluates `x ≠ x`.
+fn is_nan(float x) → bool {
+    const f64 wide ← x ↦ f64
+    const u64 bits ← wide ↦ u64 via Bits
+    const u64 exponent ← (bits ⇒ 52) ∧ (2047 ∷ u64)
+    const u64 fraction ← bits ∧ (4503599627370495 ∷ u64)
+    return exponent ≡ (2047 ∷ u64) and fraction ≠ (0 ∷ u64)
+}
+
+describe "math catalog" {
+    test "PI is positive" {
+        assert math.PI() ≻ 0.0
+    }
+
+    test "add composes with PI helper" {
+        assert sum_pi(0.0) ≡ math.PI()
+    }
+
+    test "add is commutative on unit" {
+        assert math.add(1.0, 2.0) ≡ math.add(2.0, 1.0)
+    }
+}
+
+describe "math exp" {
+    test "large positive argument" {
+        assert close(math.exp(30.0), 10686474581524.463)
+        assert close(math.exp(700.0), 1.0142320547350045e304)
+    }
+
+    test "large negative argument" {
+        assert close(math.exp(-30.0), 9.357622968840175e-14)
+        assert close(math.exp(-700.0), 9.85967654375977e-305)
+    }
+
+    test "small argument and unit" {
+        assert close(math.exp(1.0e-10), 1.0000000001)
+        assert math.exp(0.0) ≡ 1.0
+        assert close(math.exp(1.0), math.E())
+    }
+
+    test "overflow and underflow saturate" {
+        assert math.exp(710.0) ≡ ∞
+        assert math.exp(-746.0) ≡ 0.0
+        assert math.exp(∞) ≡ ∞
+        assert math.exp(-∞) ≡ 0.0
+        assert is_nan(math.exp(nan))
+    }
+}
+
+describe "math ln and log10" {
+    test "large and small arguments" {
+        assert close(math.ln(1000.0), 6.907755278982137)
+        assert close(math.ln(1.0e-10), -23.025850929940457)
+        assert close(math.ln(1.0e300), 690.7755278982137)
+        assert close(math.ln(5.0e-324), -744.4400719213812)
+    }
+
+    test "near one keeps relative precision" {
+        assert close(math.ln(1.0000001), 9.999999505838704e-8)
+        assert math.ln(1.0) ≡ 0.0
+        assert close(math.ln(math.E()), 1.0)
+    }
+
+    test "log10" {
+        assert close(math.log10(1000.0), 3.0)
+        assert close(math.log10(1.0e-300), -300.0)
+    }
+
+    test "invalid input is NaN or infinite" {
+        assert is_nan(math.ln(-1.0))
+        assert is_nan(math.ln(nan))
+        assert math.ln(0.0) ≡ -∞
+        assert math.ln(∞) ≡ ∞
+        assert is_nan(math.log10(-1.0))
+    }
+}
+
+describe "math sin cos tan" {
+    test "moderate arguments" {
+        assert close(math.sin(100.0), -0.5063656411097588)
+        assert close(math.sin(-3.0), -0.1411200080598672)
+        assert close(math.cos(-3.0), -0.9899924966004454)
+        assert close(math.tan(0.7), 0.8422883804630793)
+    }
+
+    test "large arguments" {
+        assert close(math.cos(1.0e6), 0.9367521275331447)
+        assert close(math.sin(1.0e22), -0.8522008497671888)
+        assert close(math.sin(1.0e300), -0.8178819121159085)
+        assert close(math.cos(1.0e300), -0.5753861119575491)
+        assert close(math.tan(1.0e10), -0.5583496378112419)
+    }
+
+    test "hardest double for pi/2 reduction" {
+        assert close(math.cos(5.319372648326541e255), -4.687165924254628e-19)
+    }
+
+    test "tiny arguments" {
+        assert math.sin(1.0e-300) ≡ 1.0e-300
+        assert math.cos(0.0) ≡ 1.0
+        assert math.tan(0.0) ≡ 0.0
+    }
+
+    test "tan near the pole is large, not zero" {
+        assert close(math.tan(math.PI() / 2.0), 1.633123935319537e16)
+    }
+
+    test "non-finite input is NaN" {
+        assert is_nan(math.sin(∞))
+        assert is_nan(math.cos(-∞))
+        assert is_nan(math.tan(nan))
+    }
+}
+
+describe "math sqrt and pow" {
+    test "sqrt over the range" {
+        assert close(math.sqrt(1.0e300), 1.0e150)
+        assert close(math.sqrt(2.0), 1.4142135623730951)
+        assert close(math.sqrt(1.0e-310), 9.999999999999986e-156)
+        assert math.sqrt(4.0) ≡ 2.0
+        assert math.sqrt(0.0) ≡ 0.0
+        assert math.sqrt(∞) ≡ ∞
+    }
+
+    test "sqrt of negative is NaN" {
+        assert is_nan(math.sqrt(-1.0))
+        assert is_nan(math.sqrt(nan))
+    }
+
+    test "pow over the range" {
+        assert close(math.pow(10.0, 300.0), 1.0e300)
+        assert close(math.pow(2.0, 0.5), 1.4142135623730951)
+        assert close(math.pow(2.0, -1074.0), 5.0e-324)
+        assert math.pow(3.0, 0.0) ≡ 1.0
+    }
+
+    test "pow with zero and negative base" {
+        assert close(math.pow(-2.0, 3.0), -8.0)
+        assert close(math.pow(-2.0, 2.0), 4.0)
+        assert is_nan(math.pow(-2.0, 0.5))
+        assert math.pow(0.0, 2.0) ≡ 0.0
+        assert math.pow(0.0, -1.0) ≡ ∞
+        assert math.pow(0.0, 0.0) ≡ 1.0
+        assert math.pow(-0.0, -3.0) ≡ -∞
+        assert math.pow(-∞, 3.0) ≡ -∞
+    }
+
+    test "pow is exact for small integral exponents" {
+        assert math.pow(2.0, 3.0) ≡ 8.0
+        assert math.pow(-2.0, 3.0) ≡ -8.0
+        assert math.pow(10.0, 2.0) ≡ 100.0
+        assert math.pow(2.0, -2.0) ≡ 0.25
+    }
+
+    test "pow NaN and infinite exponents follow IEEE" {
+        assert math.pow(nan, 0.0) ≡ 1.0
+        assert math.pow(1.0, nan) ≡ 1.0
+        assert is_nan(math.pow(2.0, nan))
+        assert math.pow(-1.0, ∞) ≡ 1.0
+        assert math.pow(2.0, -∞) ≡ 0.0
+        assert math.pow(0.5, -∞) ≡ ∞
+        assert math.pow(10.0, 400.0) ≡ ∞
+    }
+}

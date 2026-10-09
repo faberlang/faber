@@ -1,0 +1,31 @@
++++
+term = "chorda"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "Trust-boundary narrowing and whitespace cleanup on cords."
+syntax = "try_to_ascii(<cord>) | collapse_spaces(<cord>) | to_ascii(<cord>)"
+related = ["stdlib-nativum", "textus", "ascii"]
+locale = "en"
++++
+
+
+# chorda/angustata — trust-boundary narrowing and whitespace cleanup
+#
+# `angustata` (failable `ascii ⇥ textus`) is covered in `crates/norma/chorda_test.rs`.
+# This exemplum exercises `temptat` and `comprimata` on the package path.
+
+import from "norma:chorda" chorda
+
+main {
+    const ascii ∪ none present ← chorda.try_to_ascii("Authorization")
+    assert present ≠ null
+
+    const ascii ∪ none absent ← chorda.try_to_ascii("π")
+    assert absent ≡ null
+
+    const string neat ← chorda.collapse_spaces("  foo   bar  ")
+    assert neat ≡ "foo bar"
+
+    print neat
+}

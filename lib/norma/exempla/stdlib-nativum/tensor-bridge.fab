@@ -1,0 +1,39 @@
++++
+term = "tensor"
+kind = "concept"
+category = "stdlib"
+canonical = true
+summary = "norma:tensor bridge catalog — flatten, construct, creata, product."
+syntax = "norma:tensor — flatten | construct | creata | product"
+related = ["tensor", "lista"]
+locale = "en"
++++
+
+
+# stdlib-nativum/tensor-bridge — norma:tensor bridge and construction helpers
+#
+# EXPECTED OUTPUT:
+#   4
+#   6
+
+import from "norma:tensor" tensor
+
+main {
+    const list<int> xs ← [1, 2, 3, 4]
+    const tensor<int, [4]> grid ← tensor.construct<tensor<int, [4]>>(xs)
+    const list<int> flat ← tensor.flatten(grid)
+    print flat.length()
+
+    const list<f32> data ← [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+    ]
+    const tensor<f32, [2, 3]> shaped ← tensor.construct<tensor<f32, [2, 3]>>(data)
+    const tensor<f32, [2, 3]> filled ← tensor.creata<tensor<f32, [2, 3]>>(0.0 ∷ f32)
+    print tensor.product(shaped.shape() ↦ list<int>)
+    print filled.length()
+}

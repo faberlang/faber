@@ -1,0 +1,109 @@
++++
+term = "codex"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "norma:codex encoding/decoding API contract tests."
+syntax = "norma:codex — base64 | hex | url (all mori deferred)"
+related = ["codex", "stdlib-nativum"]
+locale = "en"
++++
+
+# stdlib-nativum/codex — norma:codex encoding/decoding API contract tests
+#
+# All 9 public functions are deferred via mori. This exemplum verifies:
+#   1. Each function can be imported and called
+#   2. Each mori body throws
+
+import from "norma:codex" codex
+
+main {
+    # -----------------------------------------------------------------------
+    # Base64 — mori deferred
+    # -----------------------------------------------------------------------
+    do {
+        codex.base64(|61 62 63|)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        codex.decode_base64("AQID")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        codex.try_decode_base64("AQID")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # Hex — mori deferred
+    # -----------------------------------------------------------------------
+    do {
+        codex.hex(|61 62 63|)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        codex.decode_hex("616263")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        codex.try_decode_hex("616263")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # URL encoding — mori deferred
+    # -----------------------------------------------------------------------
+    do {
+        codex.url("hello world")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        codex.decode_url("hello+world")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        codex.encode_url_component("a&b=c")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        codex.decode_url_component("a%26b%3Dc")
+        assert false
+    }
+    catch err {
+        print err
+    }
+}

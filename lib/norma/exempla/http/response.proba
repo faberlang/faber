@@ -1,0 +1,18 @@
+# http/response.proba — import-resolution fixture for norma:http/response
+#
+# Behavior cases live in src/http/response.proba.
+
+import from "norma:http/headers" headers
+import from "norma:http/response" response
+
+describe "response_import" {
+    test "Response constructs" {
+        const response.Response r ← response.Response {
+            status = 200,
+            headers = headers.Headers { },
+            body = "ok"
+        }
+        assert r.status ≡ 200
+        assert r.body ≡ "ok"
+    }
+}

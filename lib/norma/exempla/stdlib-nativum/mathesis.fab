@@ -1,0 +1,96 @@
++++
+term = "mathesis"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "Native norma:mathesis catalog — constants, clamp, transcendentals."
+syntax = "norma:mathesis"
+related = ["mathesis", "stdlib-nativum"]
+locale = "en"
++++
+
+
+# stdlib-nativum/mathesis — native scalar math catalog
+#
+# EXPECTED OUTPUT:
+#   3.141592653589793
+#   0.0
+#   1.0
+#   2.0
+#   3.0
+#   0.0
+#   2.7182818284590446
+#   1.0
+#   2.0
+#   NaN
+#   NaN
+#   16331239353195370.0
+#   -inf
+#   8.0
+#   8.0
+#   4.0
+#   -8.0
+#   NaN
+
+import from "norma:math" mathesis
+
+main {
+    const float pi ← mathesis.PI()
+    const float s ← mathesis.sin(0.0)
+    const float c ← mathesis.cos(0.0)
+    const float r ← mathesis.sqrt(4.0)
+    const float clamped ← mathesis.clamp(5.0, 0.0, 3.0)
+    const float t ← mathesis.tan(0.0)
+    const float exp1 ← mathesis.exp(1.0)
+    const float ln_e ← mathesis.ln(mathesis.E())
+    const float ln10 ← mathesis.log10(100.0)
+    const float neg_sqrt ← mathesis.sqrt(-1.0)
+    const float neg_log ← mathesis.ln(-1.0)
+    const float pole_tan ← mathesis.tan(mathesis.PI() / 2.0)
+    const float zero_log ← mathesis.ln(0.0)
+    const float pow_cat ← mathesis.pow(2.0, 3.0)
+    const float b ← 2.0
+    const float pow_recv ← b.power(3.0)
+    const float neg_b ← -2.0
+    const float neg_pow_recv ← neg_b.power(2.0)
+    const float neg_cube ← neg_b.power(3.0)
+    const float neg_root ← neg_b.power(0.5)
+    print pi
+    print s
+    print c
+    print r
+    print clamped
+    print t
+    print exp1
+    print ln_e
+    print ln10
+    print neg_sqrt
+    print neg_log
+    print pole_tan
+    print zero_log
+    print pow_cat
+    print pow_recv
+    print neg_pow_recv
+    print neg_cube
+    print neg_root
+    assert s ≅ 0.0
+    assert c ≅ 1.0
+    assert r ≅ 2.0
+    assert clamped ≡ 3.0
+    assert t ≅ 0.0
+    assert exp1.approx(mathesis.E(), 0.000001)
+    assert ln_e.approx(1.0, 0.000001)
+    assert ln10.approx(2.0, 0.000001)
+    # IEEE 754 results (operator ruling 2026-09-24): NaN ≠ NaN, so `x ≠ x`
+    # is the NaN probe; out-of-domain input yields NaN or ±∞, never 0.0.
+    assert neg_sqrt ≠ neg_sqrt
+    assert neg_log ≠ neg_log
+    assert pole_tan ≻ 1.0e15
+    assert zero_log ≡ -∞
+    assert pow_cat ≡ 8.0
+    assert pow_recv ≡ pow_cat
+    assert neg_pow_recv ≡ 4.0
+    assert neg_cube ≡ -8.0
+    assert neg_root ≠ neg_root
+    assert mathesis.pow(-2.0, 2.0) ≡ 4.0
+}
