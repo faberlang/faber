@@ -209,6 +209,7 @@ pub fn validate_program(
         program,
         context,
         errors: Vec::new(),
+        existing_type_index: std::cell::OnceCell::new(),
     };
     validator.validate_program();
     if validator.errors.is_empty() {
@@ -273,6 +274,9 @@ pub(crate) struct Validator<'a, 'ctx> {
     pub(crate) program: &'a MirProgram,
     pub(crate) context: &'ctx MirValidationContext<'ctx>,
     pub(crate) errors: Vec<MirValidationError>,
+    /// Lazily built once per validation run: the context's type table is
+    /// borrowed immutably for the whole walk, so the index never goes stale.
+    pub(crate) existing_type_index: std::cell::OnceCell<crate::generic::ExistingTypeIndex>,
 }
 
 pub(crate) struct FunctionScope<'prog, 'map> {

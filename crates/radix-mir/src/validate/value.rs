@@ -792,6 +792,29 @@ impl Validator<'_, '_> {
         self.error(span, message);
     }
 
+    /// Read-only instantiation against the context's type table, sharing one
+    /// [`crate::generic::ExistingTypeIndex`] across the whole validation run.
+    pub(crate) fn instantiate_existing(
+        &self,
+        ty: MirType,
+        generic_bindings: &GenericTypeBindings,
+        shape_bindings: &MirShapeBindings,
+        span: Span,
+    ) -> Result<MirType, crate::generic::MirGenericError> {
+        let types = self.context.types.as_table();
+        let index = self
+            .existing_type_index
+            .get_or_init(|| crate::generic::ExistingTypeIndex::build(types));
+        crate::generic::instantiate_existing_generic_type_with_index(
+            types,
+            ty,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+        )
+    }
+
     pub(crate) fn instantiate_generic_type(
         &mut self,
         ty: MirType,
@@ -799,13 +822,7 @@ impl Validator<'_, '_> {
         shape_bindings: &MirShapeBindings,
         span: Span,
     ) -> Option<MirType> {
-        match crate::generic::instantiate_existing_generic_type_with_shapes(
-            self.context.types.as_table(),
-            ty,
-            generic_bindings,
-            shape_bindings,
-            span,
-        ) {
+        match self.instantiate_existing(ty, generic_bindings, shape_bindings, span) {
             Ok(ty) => Some(ty),
             Err(error) => {
                 self.error(error.span, error.message);

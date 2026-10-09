@@ -1,10 +1,11 @@
 //! Projection, assignability, and type checks.
 
 use super::{FunctionScope, MirValidationError, Validator};
+use crate::generic::MirShapeBindings;
 use crate::{
     MirAggregateCarrier, MirAggregateFamily, MirBlockId, MirClosureEnvironmentId, MirConstant,
     MirDeviceViewElement, MirGenericBindings, MirKernelBuiltin, MirLayoutKind, MirLocalId,
-    MirOperand, MirProjection, MirScalarLayout, MirType, instantiate_existing_generic_type,
+    MirOperand, MirProjection, MirScalarLayout, MirType,
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
@@ -111,10 +112,10 @@ impl Validator<'_, '_> {
                     .copied()
                     .zip(type_args.into_iter().map(MirType::semantic))
                     .collect::<MirGenericBindings>();
-                instantiate_existing_generic_type(
-                    self.context.types.as_table(),
+                self.instantiate_existing(
                     raw_field_ty,
                     &bindings,
+                    &MirShapeBindings::default(),
                     span,
                 )
                 .map_err(|error| self.error(error.span, error.message))

@@ -672,6 +672,35 @@ pub fn instantiate_existing_generic_type_with_shapes(
     span: Span,
 ) -> Result<MirType, MirGenericError> {
     let index = ExistingTypeIndex::build(types);
+    instantiate_existing_generic_type_with_index(
+        types,
+        ty,
+        generic_bindings,
+        shape_bindings,
+        span,
+        &index,
+    )
+}
+
+/// Read-only instantiation using a caller-held [`ExistingTypeIndex`].
+///
+/// `index` must have been built from the current contents of `types` (the
+/// table is read-only here, so a validation-scoped index stays valid for the
+/// whole walk). Result is identical to
+/// [`instantiate_existing_generic_type_with_shapes`], without the per-call
+/// full-table index build.
+///
+/// # Errors
+/// Returns [`MirGenericError`] when the substituted type is not already
+/// represented in `types`.
+pub fn instantiate_existing_generic_type_with_index(
+    types: &TypeTable,
+    ty: MirType,
+    generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+    index: &ExistingTypeIndex,
+) -> Result<MirType, MirGenericError> {
     let mut walk = types;
     let instantiated = instantiate_type_id(
         &mut walk,
@@ -679,7 +708,7 @@ pub fn instantiate_existing_generic_type_with_shapes(
         generic_bindings,
         shape_bindings,
         span,
-        &index,
+        index,
     )?;
     Ok(MirType::semantic(instantiated))
 }

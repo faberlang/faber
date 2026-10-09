@@ -5,7 +5,7 @@ use crate::generic::MirShapeBindings;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirClosureEnvironmentId,
     MirClosureValue, MirConstant, MirGenericBindings, MirNamedOperand, MirOperand, MirPlace,
-    MirType, instantiate_existing_generic_type,
+    MirType,
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
@@ -633,14 +633,9 @@ impl Validator<'_, '_> {
             .copied()
             .zip(type_args.into_iter().map(MirType::semantic))
             .collect::<MirGenericBindings>();
-        instantiate_existing_generic_type(
-            self.context.types.as_table(),
-            raw_field_ty,
-            &bindings,
-            span,
-        )
-        .map_err(|error| self.error(error.span, error.message))
-        .ok()
+        self.instantiate_existing(raw_field_ty, &bindings, &MirShapeBindings::default(), span)
+            .map_err(|error| self.error(error.span, error.message))
+            .ok()
     }
 
     pub(crate) fn validate_optional_destination(
