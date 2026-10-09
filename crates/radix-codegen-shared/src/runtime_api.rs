@@ -95,6 +95,24 @@ pub const DISPLAY_OPTION_BIVALENS: RuntimeItem = display_rust_row("option_bivale
 pub const DISPLAY_OPTION_FRACTUS: RuntimeItem = display_rust_row("option_fractus");
 pub const DISPLAY_OPTION_VACUUM: RuntimeItem = display_rust_row("option_vacuum");
 pub const DISPLAY_TEXT_PAYLOAD: RuntimeItem = display_rust_row("text_payload");
+/// The `*_with` siblings of the Rust display renderers: each takes the
+/// module's `DisplayTokens` as a last argument (the print locale follows the
+/// code locale). Generated code calls them only for a non-Latin token set.
+pub const DISPLAY_BIVALENS_WITH: RuntimeItem = display_rust_row("bivalens_with");
+pub const DISPLAY_OPTION_WITH: RuntimeItem = display_rust_row("option_with");
+pub const DISPLAY_OPTION_BIVALENS_WITH: RuntimeItem = display_rust_row("option_bivalens_with");
+pub const DISPLAY_OPTION_FRACTUS_WITH: RuntimeItem = display_rust_row("option_fractus_with");
+pub const DISPLAY_OPTION_VACUUM_WITH: RuntimeItem = display_rust_row("option_vacuum_with");
+/// `display.valor_with`: `valor` printing the module's display tokens.
+pub const DISPLAY_VALOR_WITH: RuntimeItem = display_rust_row("valor_with");
+/// `display.DisplayTokens`: the output words of one locale (Rust runtime; the
+/// type stays in `faber::display`, see [`spelling`]).
+pub const DISPLAY_DISPLAY_TOKENS: RuntimeItem = RuntimeItem {
+    ns: Namespace::Display,
+    name: "DisplayTokens",
+    kind: RuntimeKind::Type,
+    targets: DISPLAY_RUST_TARGETS,
+};
 
 const DISPLAY_TS_TARGETS: &[Target] = &[Target::HirTypeScript];
 
@@ -271,6 +289,8 @@ pub const DEC_FLOAT_CMP: RuntimeItem = dec_row("float_cmp", RuntimeKind::Fn, DEC
 pub const DEC_FMT: RuntimeItem = dec_row("fmt", RuntimeKind::Fn, DEC_RUST_GO_TS);
 pub const DEC_FMT_LIST: RuntimeItem = dec_row("fmt_list", RuntimeKind::Fn, DEC_RUST_TS);
 pub const DEC_FMT_OPTION: RuntimeItem = dec_row("fmt_option", RuntimeKind::Fn, DEC_RUST);
+/// `dec.fmt_option_with`: `fmt_option` printing the module's display tokens.
+pub const DEC_FMT_OPTION_WITH: RuntimeItem = dec_row("fmt_option_with", RuntimeKind::Fn, DEC_RUST);
 pub const DEC_INT: RuntimeItem = dec_row("int", RuntimeKind::Fn, DEC_RUST_GO_TS);
 pub const DEC_MUL: RuntimeItem = dec_row("mul", RuntimeKind::Fn, DEC_RUST_GO_TS);
 pub const DEC_NEG: RuntimeItem = dec_row("neg", RuntimeKind::Fn, DEC_RUST_GO_TS);
@@ -1021,6 +1041,7 @@ pub const TABLE: &[RuntimeItem] = &[
     DEC_FMT,
     DEC_FMT_LIST,
     DEC_FMT_OPTION,
+    DEC_FMT_OPTION_WITH,
     DEC_INT,
     DEC_MUL,
     DEC_NEG,
@@ -1035,19 +1056,26 @@ pub const TABLE: &[RuntimeItem] = &[
     DEC_TRY_PARSE,
     DEC_TRY_STORE,
     DISPLAY_BIVALENS,
+    DISPLAY_BIVALENS_WITH,
+    DISPLAY_DISPLAY_TOKENS,
     DISPLAY_FRACTUS,
     DISPLAY_LIST,
     DISPLAY_MAP,
     DISPLAY_NUMERUS,
     DISPLAY_OPTION,
     DISPLAY_OPTION_BIVALENS,
+    DISPLAY_OPTION_BIVALENS_WITH,
     DISPLAY_OPTION_FRACTUS,
+    DISPLAY_OPTION_FRACTUS_WITH,
     DISPLAY_OPTION_VACUUM,
+    DISPLAY_OPTION_VACUUM_WITH,
+    DISPLAY_OPTION_WITH,
     DISPLAY_SPARSA,
     DISPLAY_TAGGED_VALOR,
     DISPLAY_TENSOR,
     DISPLAY_TEXT_PAYLOAD,
     DISPLAY_VALOR,
+    DISPLAY_VALOR_WITH,
     DISPLAY_VALUE,
     DISPLAY_VERUM,
     EXACT_ADD,
@@ -1460,6 +1488,11 @@ fn spelling(target: Target, item: &RuntimeItem) -> Result<String, SpellError> {
     let ns = item.ns.as_str();
     let is_type = item.kind == RuntimeKind::Type;
     match target {
+        // The display types stay in their module (`faber::display::DisplayTokens`);
+        // every other Rust type is re-exported at the crate root.
+        Target::HirRust if is_type && item.ns == Namespace::Display => {
+            Ok(format!("faber::display::{}", upper_camel(item.name)))
+        }
         Target::HirRust if is_type => Ok(format!("faber::{}", upper_camel(item.name))),
         Target::HirRust => Ok(format!("faber::{}::{}", rust_module(ns), item.name)),
         Target::HirTypeScript | Target::HirPython if is_type => {

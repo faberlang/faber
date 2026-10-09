@@ -883,7 +883,7 @@ fn the_dec_rows_spell_as_faber_dec_functions_in_rust() {
         .iter()
         .filter(|row| row.ns == Namespace::Dec && row.targets.contains(&Target::HirRust))
         .collect();
-    assert_eq!(rows.len(), 19);
+    assert_eq!(rows.len(), 20);
     for row in rows {
         assert_eq!(row.kind, RuntimeKind::Fn);
         assert!(row.targets.contains(&Target::HirRust));
@@ -950,16 +950,27 @@ fn the_rust_display_rows_spell_as_faber_display_functions() {
         spelled,
         [
             "faber::display::bivalens",
+            "faber::display::bivalens_with",
+            "faber::display::DisplayTokens",
             "faber::display::fractus",
             "faber::display::option",
             "faber::display::option_bivalens",
+            "faber::display::option_bivalens_with",
             "faber::display::option_fractus",
+            "faber::display::option_fractus_with",
             "faber::display::option_vacuum",
+            "faber::display::option_vacuum_with",
+            "faber::display::option_with",
             "faber::display::text_payload",
             "faber::display::valor",
+            "faber::display::valor_with",
         ]
     );
-    assert!(rows.iter().all(|row| row.kind == RuntimeKind::Fn));
+    // `DisplayTokens` is the one type; it stays in `faber::display`.
+    assert!(
+        rows.iter()
+            .all(|row| (row.kind == RuntimeKind::Type) == (row.name == "DisplayTokens"))
+    );
 }
 
 #[test]
