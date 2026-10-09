@@ -806,9 +806,11 @@ impl FunctionBuilder<'_> {
             _ => expr_ty,
         };
         if op == MirCollectionOp::TensorSet && self.is_checked_tensor_method(receiver, &method_name, args) {
-            let (Some(index_ty), Some(value_ty), Some(receiver_ty)) =
-                (self.expr_ty(&args[0].expr), self.expr_ty(&args[1].expr), self.expr_ty(receiver))
-            else {
+            let (Some(index_ty), Some(value_ty), Some(receiver_ty)) = (
+                self.expr_ty(&args[0].expr),
+                self.expr_ty(&args[1].expr),
+                self.checked_tensor_receiver_ty(receiver),
+            ) else {
                 return None;
             };
             return self.lower_checked_tensor_access(
@@ -820,7 +822,9 @@ impl FunctionBuilder<'_> {
             );
         }
         if op == MirCollectionOp::TensorGet && self.is_checked_tensor_method(receiver, &method_name, args) {
-            let (Some(index_ty), Some(receiver_ty)) = (self.expr_ty(&args[0].expr), self.expr_ty(receiver)) else {
+            let (Some(index_ty), Some(receiver_ty)) =
+                (self.expr_ty(&args[0].expr), self.checked_tensor_receiver_ty(receiver))
+            else {
                 return None;
             };
             return self.lower_checked_tensor_access(op, lowered_args, &[receiver_ty, index_ty], expr_ty, expr.span);
@@ -4202,6 +4206,15 @@ impl FunctionBuilder<'_> {
             span,
         });
         id
+    }
+
+    /// The tensor type of a checked `ponde` / `accipe` receiver, under any
+    /// `ref` / `mut` / `own` / `copy` access marker. The helper's parameter
+    /// mode already carries the access; the call passes the bare tensor, so a
+    /// marker left on the parameter type fails MIR verification.
+    fn checked_tensor_receiver_ty(&mut self, receiver: &HirExpression) -> Option<MirType> {
+        let ty = self.expr_ty(receiver)?;
+        Some(MirType::semantic(self.method_receiver_payload_id(ty.semantic_id())))
     }
 
     /// K11: whether this tensor `ponde` / `accipe` method call is the checked
