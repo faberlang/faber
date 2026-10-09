@@ -90,7 +90,7 @@ main {
     const Rec r ← Rec { ok = true, opt = 3, c = 'q', a = 'abc', u = 'q', names = ["a", "b"], price = 0.1, ratio = 0.1 }
     print r
 
-    const Rec e ← Rec { ok = false, opt = nihil, c = 'z', a = 'xyz', u = 'z', names = [], price = 2.0, ratio = 0.25 }
+    const Rec e ← Rec { ok = false, opt = null, c = 'z', a = 'xyz', u = 'z', names = [], price = 2.0, ratio = 0.25 }
     print e
 
     print Vacuus {}

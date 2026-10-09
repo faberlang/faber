@@ -82,7 +82,7 @@ main {
     const list<f32> clipped_out ← clipped.flatten()
     print clipped_out
 
-    const list<int ∪ none> flat_h ← [1, nihil, 3, nihil]
+    const list<int ∪ none> flat_h ← [1, null, 3, null]
     var tensor<int ∪ none, [2, 2]> holes ← flat_h ↦ tensor<int ∪ none, [2, 2]>
     const tensor<int, [2, 2]> zeroed ← holes coalesce 0
     const list<int> zeroed_out ← zeroed.flatten()
