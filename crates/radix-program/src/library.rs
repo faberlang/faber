@@ -18,8 +18,8 @@
 //!   APIs on the normal parse/typecheck path.
 //! - Old built-in slash forms such as `norma/json` are rejected instead of
 //!   silently reinterpreted.
-//! - `FABER_LIBRARY_HOME` env reading and workspace-ancestor probing stay
-//!   faber-side; this crate only ever receives explicit homes.
+//! - `FABER_LIBRARY_HOME` env reading stays faber-side; this crate receives an
+//!   explicit configured home and falls back to the in-tree `<repo>/lib`.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -199,7 +199,7 @@ pub enum LibraryResolveError {
 ///
 /// The resolver carries explicit inputs only — a concrete home (or `None`),
 /// locked package roots, and declared dependencies. Ambient `FABER_LIBRARY_HOME`
-/// env reading and workspace-ancestor probing are faber-side and construct
+/// env reading is faber-side and constructs
 /// this resolver with the resolved home (CTO memo).
 #[derive(Debug, Clone)]
 pub struct LibraryResolver {
@@ -221,8 +221,8 @@ impl LibraryResolver {
     /// Build a resolver from an explicit optional home.
     ///
     /// `None` means no library home is available (deterministic for the same
-    /// input); the faber side resolves `FABER_LIBRARY_HOME` / workspace probing
-    /// and passes the result here.
+    /// input); the faber side resolves `FABER_LIBRARY_HOME` and passes the result
+    /// here; the in-tree `<repo>/lib` is searched after it.
     #[must_use]
     pub fn with_optional_home(library_home: Option<PathBuf>) -> Self {
         Self {
@@ -338,10 +338,17 @@ impl LibraryResolver {
             });
         }
 
-        let library_home = self.library_home_for(specifier)?;
-        let provider_repo = library_home.join(provider);
-
-        if !provider_repo.is_dir() {
+        // Search the configured home first, then the in-tree `<repo>/lib`. A
+        // provider resolves from the first home that holds `<home>/<provider>`.
+        let in_tree_home = in_tree_library_home();
+        let found_repo = self
+            .library_home
+            .iter()
+            .chain(in_tree_home.iter())
+            .map(|home| home.join(provider))
+            .find(|repo| repo.is_dir());
+        let Some(provider_repo) = found_repo else {
+            let library_home = self.library_home_missing(specifier)?;
             // Prefer an explicit dependency-declaration diagnostic when the
             // package has a [dependencies] table and this provider is not Norma
             // library-home layout.
@@ -356,7 +363,7 @@ impl LibraryResolver {
                 provider: provider.to_owned(),
                 library_home,
             });
-        }
+        };
 
         let provider_root = installed_provider_source_root(specifier, provider, &provider_repo)?;
         let interface_path = provider_root.join(format!("{module_path}.fab"));
@@ -379,14 +386,23 @@ impl LibraryResolver {
         )))
     }
 
-    fn library_home_for(&self, specifier: &str) -> Result<PathBuf, LibraryResolveError> {
+    /// The configured home, for a provider no home holds. With no configured
+    /// home there is nothing to report against: the caller must configure one.
+    fn library_home_missing(&self, specifier: &str) -> Result<PathBuf, LibraryResolveError> {
         self.library_home.clone().ok_or_else(|| {
             LibraryResolveError::LibraryHomeMissing {
                 specifier: specifier.to_owned(),
-                hint: "set FABER_LIBRARY_HOME to a directory containing provider repos, such as <home>/norma/src".to_string(),
+                hint: "set FABER_LIBRARY_HOME to a directory containing provider repos, such as <home>/gradus/src (norma resolves from the in-tree lib/ without it)".to_string(),
             }
         })
     }
+}
+
+/// In-tree library home: `<repo>/lib`, located from this crate's manifest
+/// directory (`crates/radix-program` → `../../lib`). It holds `norma/`.
+fn in_tree_library_home() -> Option<PathBuf> {
+    let home = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lib");
+    home.is_dir().then_some(home)
 }
 
 fn installed_provider_source_root(
