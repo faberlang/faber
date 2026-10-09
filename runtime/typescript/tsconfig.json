@@ -28,6 +28,7 @@
     "atomic.ts",
     "result.ts",
     "sermo.ts",
-    "routes.ts"
+    "routes.ts",
+    "stdin.ts"
   ]
 }
