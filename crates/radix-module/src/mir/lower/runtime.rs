@@ -3461,7 +3461,14 @@ impl FunctionBuilder<'_> {
         {
             return Some(folded);
         }
-        let source_ty = self.expr_ty(source)?;
+        // A `copy`/`mut`/`own`/`ref` binding reads typed under its access
+        // marker, but its MIR local carries the payload; the conversion
+        // source is the payload, as the validator compares it to the operand.
+        let source_ty = MirType::semantic(
+            self.types
+                .peel_access_marker(self.expr_ty(source)?.semantic_id())
+                .1,
+        );
         let source_type_id = source_ty.semantic_id();
         let ty = self.expr_ty(expr)?;
         let target = self.materialized_conversio_target(target, ty);

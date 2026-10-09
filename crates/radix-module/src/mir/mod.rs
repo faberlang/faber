@@ -296,6 +296,9 @@ mod constant_fold_agreement_tests;
 #[path = "conversio_function_test.rs"]
 mod conversio_function_tests;
 #[cfg(test)]
+#[path = "copy_conversio_test.rs"]
+mod copy_conversio_tests;
+#[cfg(test)]
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
 #[cfg(all(test, target_os = "macos"))]
