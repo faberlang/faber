@@ -75,7 +75,7 @@ export class Tensor<T> {
                 data[i] = convert(data[i]);
             }
             if (Tensor.elementCount(shape) !== data.length) {
-                throw new Error("tensor conversio element count does not match shape");
+                throw new Error("tensor structa element count does not match shape");
             }
             return new Tensor<T>(data, shape);
         } catch (error) {
@@ -105,6 +105,87 @@ export class Tensor<T> {
             throw new Error("tensor forma (reshape) element count mismatch");
         }
         return new Tensor<T>(this.data, shape);
+    }
+    /**
+     * `t.expanded(shape)`: broadcast the receiver to `shape`, with the same
+     * axis mapping as the Rust carrier (`Tensor::expanded`). Source axes map to
+     * target axes in order; an exact extent is preferred, a source extent of 1
+     * may stretch, and unmatched target axes are inserted. Among equally cheap
+     * mappings the rightmost one wins. Rust returns a zero-stride view over the
+     * shared storage; TypeScript has no zero-stride views here, so this returns
+     * a materialized COPY with the same logical contents (later writes to the
+     * receiver are not visible through it). Errors, as in Rust: a negative
+     * extent, an element count overflow, or no valid axis mapping.
+     */
+    expande(shape: number[]): Tensor<T> {
+        for (let axis = 0; axis < shape.length; axis++) {
+            if (shape[axis] < 0) {
+                throw new Error("tensor shape dimension must be non-negative");
+            }
+        }
+        let count = 1;
+        for (let axis = 0; axis < shape.length; axis++) {
+            count *= shape[axis];
+            if (!Number.isSafeInteger(count)) {
+                throw new Error("tensor element count overflow");
+            }
+        }
+        const sourceRank = this.shape.length;
+        const targetRank = shape.length;
+        const IMPOSSIBLE = Number.POSITIVE_INFINITY;
+        const stretchCost = (sourceAxis: number, targetAxis: number): number =>
+            this.shape[sourceAxis] === shape[targetAxis] ? 0 : this.shape[sourceAxis] === 1 ? 1 : IMPOSSIBLE;
+        // costs[s][t]: cheapest mapping of source axes s.. into target axes t..
+        const costs: number[][] = [];
+        for (let s = 0; s <= sourceRank; s++) {
+            costs.push(new Array(targetRank + 1).fill(s === sourceRank ? 0 : IMPOSSIBLE));
+        }
+        for (let s = sourceRank - 1; s >= 0; s--) {
+            for (let t = targetRank - 1; t >= 0; t--) {
+                costs[s][t] = Math.min(costs[s][t + 1], stretchCost(s, t) + costs[s + 1][t + 1]);
+            }
+        }
+        if (costs[0][0] === IMPOSSIBLE) {
+            throw new Error("tensor broadcast shape mismatch");
+        }
+        const targetToSource: number[] = new Array(targetRank).fill(-1);
+        let sourceAxis = 0;
+        let targetAxis = 0;
+        while (sourceAxis < sourceRank) {
+            const skipTarget = costs[sourceAxis][targetAxis + 1];
+            const mapTarget = stretchCost(sourceAxis, targetAxis) + costs[sourceAxis + 1][targetAxis + 1];
+            if (skipTarget <= mapTarget) {
+                targetAxis++;
+            } else {
+                targetToSource[targetAxis] = sourceAxis;
+                sourceAxis++;
+                targetAxis++;
+            }
+        }
+        // Per-target-axis source stride; 0 marks a stretched or inserted axis.
+        const sourceStrides: number[] = new Array(sourceRank);
+        let stride = 1;
+        for (let axis = sourceRank - 1; axis >= 0; axis--) {
+            sourceStrides[axis] = stride;
+            stride *= this.shape[axis];
+        }
+        const strides: number[] = targetToSource.map((source, target) =>
+            source >= 0 && this.shape[source] === shape[target] ? sourceStrides[source] : 0);
+        const data = new Array(count);
+        const counters: number[] = new Array(targetRank).fill(0);
+        let position = 0;
+        for (let i = 0; i < count; i++) {
+            data[i] = this.data[position];
+            for (let axis = targetRank - 1; axis >= 0; axis--) {
+                if (++counters[axis] < shape[axis]) {
+                    position += strides[axis];
+                    break;
+                }
+                counters[axis] = 0;
+                position -= strides[axis] * (shape[axis] - 1);
+            }
+        }
+        return new Tensor<T>(data as T[], shape);
     }
     accipe(indices: number[]): T | null {
         const offset = Tensor.offset(this.shape, indices);

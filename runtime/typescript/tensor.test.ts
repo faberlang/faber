@@ -56,3 +56,24 @@ test("tensor checked method forms return the element or the runner's text error"
   assert.deepEqual(grid.pondeChecked([0, 5], 1), { ok: false, error: "tensor ponde invalid index" });
   assert.deepEqual(grid.planata(), [1, 9, 3, 4]);
 });
+
+test("tensor expande inserts, stretches and rejects like the Rust carrier", () => {
+  const row = new tensor.Tensor([7, 9], [2]);
+  const inserted = row.expande([2, 2]);
+  assert.deepEqual(inserted.magnitudines(), [2, 2]);
+  assert.deepEqual(inserted.planata(), [7, 9, 7, 9]);
+  // A copy: later writes to the receiver are not visible through it.
+  row.ponde([0], 70);
+  assert.deepEqual(inserted.planata(), [7, 9, 7, 9]);
+
+  const column = new tensor.Tensor([10, 20, 30], [3, 1]);
+  assert.deepEqual(column.expande([3, 4]).planata(), [10, 10, 10, 10, 20, 20, 20, 20, 30, 30, 30, 30]);
+
+  const three = new tensor.Tensor([2, 4, 6], [3]);
+  assert.deepEqual(three.expande([2, 3]).planata(), [2, 4, 6, 2, 4, 6]);
+  assert.deepEqual(three.expande([3]).planata(), [2, 4, 6]);
+
+  assert.throws(() => three.expande([2, 2]), { message: "tensor broadcast shape mismatch" });
+  assert.throws(() => three.expande([-1, 3]), { message: "tensor shape dimension must be non-negative" });
+  assert.throws(() => three.expande([3, 1e300]), { message: "tensor element count overflow" });
+});
