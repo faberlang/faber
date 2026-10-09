@@ -490,3 +490,95 @@ fn imported_nondum_function_is_usable_where_its_gate_does_not_apply() {
     )
     .expect("ungated and other-target-gated functions compile");
 }
+
+const NONDUM_GENUS_PRODUCER: &str = r#"@ publica
+genus Nexus {
+    varia numerus id
+
+    @ nondum "pending host dispatch"
+    functio claude() → vacuum
+
+    @ nondum ts
+    functio mitte() → vacuum {
+        tacet
+    }
+
+    functio lege() → numerus {
+        redde ego.id
+    }
+}
+"#;
+
+fn nondum_genus_interface() -> radix_module::file_interface::FileInterface {
+    let analysis = analyze(NONDUM_GENUS_PRODUCER);
+    extract_file_interface_with_identity(&analysis, &["Nexus".to_owned()], "model.fab", None)
+        .expect("extract interface")
+}
+
+#[test]
+fn extract_file_interface_carries_nondum_method_gates() {
+    let interface = nondum_genus_interface();
+    let Some(FileExportKind::Struct(strukt)) =
+        interface.exports.get("Nexus").map(|export| &export.kind)
+    else {
+        panic!("Nexus exports as a struct");
+    };
+    let gates = |name: &str| {
+        strukt
+            .methods
+            .iter()
+            .find(|method| method.name == name)
+            .unwrap_or_else(|| panic!("method {name} stays exported"))
+            .unavailable
+            .clone()
+    };
+    assert_eq!(
+        gates("claude"),
+        vec![radix_module::file_interface::InterfaceUnavailable {
+            target: None,
+            reason: Some("pending host dispatch".to_owned()),
+        }]
+    );
+    assert_eq!(
+        gates("mitte"),
+        vec![radix_module::file_interface::InterfaceUnavailable {
+            target: Some("ts".to_owned()),
+            reason: None,
+        }]
+    );
+    assert!(gates("lege").is_empty());
+}
+
+#[test]
+fn imported_nondum_method_is_refused_through_the_extracted_interface() {
+    let analyze_consumer = |body: &str| {
+        analyze_source(
+            &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+            "consumer.fab",
+            &format!(
+                "importa ex \"model:types\" model\nincipit {{\n    varia model.Nexus n ← model.Nexus {{ id = 1 }}\n{body}\n}}\n"
+            ),
+            AnalyzeRequest {
+                cli_program: None,
+                contract: ModuleImportContract {
+                    file_interfaces: BTreeMap::from([(
+                        "model".to_owned(),
+                        nondum_genus_interface(),
+                    )]),
+                    ..ModuleImportContract::default()
+                },
+            },
+        )
+        .map(|_| ())
+    };
+    let diagnostics = analyze_consumer("    n.claude()")
+        .expect_err("a call to an imported nondum method must not compile");
+    assert_eq!(
+        refused_functions(&diagnostics),
+        vec!["Nexus.claude".to_owned()]
+    );
+
+    // The ts gate on `mitte` does not cover Rust, and `lege` is ungated.
+    analyze_consumer("    n.mitte()\n    nota n.lege()")
+        .expect("ungated and other-target-gated methods compile");
+}

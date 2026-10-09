@@ -308,6 +308,7 @@ fn snapshot_interface(
                     export_identity,
                 )?,
                 visibility: MemberVisibility::Publica,
+                unavailable: Vec::new(),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -512,6 +513,19 @@ fn snapshot_struct(
                     export_identity,
                 )?,
                 visibility: hir_member_visibility(&method.annotations, &analysis.interner),
+                unavailable: InterfaceUnavailable::from_availability(
+                    &method
+                        .annotations
+                        .iter()
+                        .filter_map(|annotation| {
+                            radix_module::semantic::try_parse_nondum_annotation(
+                                annotation,
+                                &analysis.interner,
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                    &analysis.interner,
+                ),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;

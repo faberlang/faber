@@ -3829,3 +3829,58 @@ functio nunc(textus s) → textus {
     assert_eq!(interface.unavailable.get("later_ts"), Some(&gate(Some("ts"), Some("braced"))));
     assert!(!interface.unavailable.contains_key("nunc"));
 }
+
+#[test]
+fn interface_snapshot_carries_nondum_method_gates() {
+    // A `genus` method marked `@ nondum` stays exported and its gate rides the
+    // method record, so the importer refuses every call (SEM017).
+    let (program, interner) = super::parse_program_for_namespace_exports(
+        "producer.fab",
+        r#"
+@ publica
+genus Nexus {
+    varia numerus id
+
+    @ nondum "pending host dispatch"
+    functio claude() → vacuum
+
+    @ nondum ts
+    functio mitte() → vacuum {
+        tacet
+    }
+
+    functio lege() → numerus {
+        redde ego.id
+    }
+}
+"#,
+        None,
+    )
+    .expect("parse producer source");
+
+    let interface = super::file_interface_for_program(&program, &interner, None);
+
+    let Some(crate::file_interface::FileExportKind::Struct(strukt)) =
+        interface.exports.get("Nexus").map(|export| &export.kind)
+    else {
+        panic!("Nexus exports as a struct");
+    };
+    let gates = |name: &str| {
+        strukt
+            .methods
+            .iter()
+            .find(|method| method.name == name)
+            .unwrap_or_else(|| panic!("method {name} stays exported"))
+            .unavailable
+            .clone()
+    };
+    let gate = |target: Option<&str>, reason: Option<&str>| {
+        vec![crate::file_interface::InterfaceUnavailable {
+            target: target.map(str::to_owned),
+            reason: reason.map(str::to_owned),
+        }]
+    };
+    assert_eq!(gates("claude"), gate(None, Some("pending host dispatch")));
+    assert_eq!(gates("mitte"), gate(Some("ts"), None));
+    assert!(gates("lege").is_empty());
+}

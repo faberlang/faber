@@ -706,10 +706,11 @@ impl Parser {
     ///   params    := type-param* regular-param*
     ///   type-param := `prae` `typus` ident
     ///
-    /// A top-level declaration annotated `@ nondum` may omit the block: it is
-    /// present in the interface but unavailable, and any use is refused by
-    /// semantic analysis. Library analysis (`allow_bodyless_functions`) keeps
-    /// accepting signature-only binding declarations.
+    /// A top-level function or a genus method annotated `@ nondum` may omit the
+    /// block: it is present in the interface but unavailable, and any use is
+    /// refused by semantic analysis. Library analysis
+    /// (`allow_bodyless_functions`) keeps accepting signature-only binding
+    /// declarations.
     fn parse_func_decl(&mut self) -> Result<StmtKind, ParseError> {
         let nondum_declared = std::mem::take(&mut self.nondum_function_pending);
         self.expect_keyword_ident(TokenKind::Functio, "expected 'functio'")?;
@@ -1101,7 +1102,13 @@ impl Parser {
         let annotations = self.parse_annotations()?;
 
         let kind = if self.check_keyword_ident(TokenKind::Functio) {
-            let StmtKind::Func(func) = self.parse_func_decl()? else {
+            // An `@ nondum` method may omit its block, like a free function.
+            self.nondum_function_pending = annotations
+                .iter()
+                .any(|annotation| self.is_nondum_annotation(annotation));
+            let parsed = self.parse_func_decl();
+            self.nondum_function_pending = false;
+            let StmtKind::Func(func) = parsed? else {
                 return Err(Self::expected_error("functio", self.current_span()));
             };
             ClassMemberKind::Method(func)

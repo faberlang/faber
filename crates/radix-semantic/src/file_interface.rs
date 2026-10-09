@@ -327,6 +327,9 @@ pub struct InterfaceMethodExport {
     /// Member visibility of a `genus` method (D5.3); `Publica` for contract
     /// and nominal methods.
     pub visibility: radix_syntax::MemberVisibility,
+    /// `@ nondum` gates of a `genus` method; empty for an available method.
+    /// Carried in memory only, like [`FileInterface::unavailable`].
+    pub unavailable: Vec<InterfaceUnavailable>,
 }
 
 /// Structural type snapshot independent from a producer `TypeTable`.

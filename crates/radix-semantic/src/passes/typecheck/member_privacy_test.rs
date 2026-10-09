@@ -186,6 +186,7 @@ fn imported_interface() -> crate::file_interface::FileInterface {
             device: None,
         },
         visibility,
+        unavailable: Vec::new(),
     };
     let mut interface = FileInterface::new();
     interface.insert(FileExport {

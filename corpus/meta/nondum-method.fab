@@ -1,0 +1,61 @@
++++
+term = "nondum"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "nondum_method_decl", "nondum_annotation", "genus_field_decl", "functio_method_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "block_stmt", "redde_stmt", "member_suffix", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "availability"
+canonical = false
+summary = "A genus method marked @ nondum may omit its body; any call of it is refused."
+syntax = "@ nondum [target] [reason] <method signature>"
+related = ["nondum", "functio", "genus", "@"]
+locale = "en"
++++
+# =============================================================================
+# nondum — a declared genus method that is not implemented yet
+# =============================================================================
+#
+# What this teaches:
+#   • `@ nondum` on a genus method declares it without a body: the method is
+#     part of the genus (and of its imported interface) but it is unavailable,
+#     and no backend emits it
+#   • without a target the method is unavailable on every target;
+#     `@ nondum rs "reason"` limits the gate to one target
+#   • the genus and its other methods work normally; declaring such a method
+#     costs nothing, and a program that never calls it compiles and runs
+#
+# Common mistakes:
+#   • calling the method — through an instance (`s.send("x")`) or through `self`
+#     inside another method — fails with SEM017
+#     (`nondum_function_for_target`), wherever the genus is declared
+#   • leaving the body off a method that is not marked `@ nondum`
+#     (PARSE012, `function_body_absent`)
+#
+# See also: nondum, functio, genus, @
+# =============================================================================
+
+# meta/nondum-method — a bodiless genus method declared unavailable
+#
+# GRAMMAR:
+#   nondum_method_decl :← annotation* '@' 'nondum' payload? functio-signature
+#
+# EXPECTED OUTPUT:
+#   declared, never called
+#
+# BACKEND:
+#   The declaration has no body and is omitted from every backend's output;
+#   the other methods of the genus are emitted as usual.
+
+class Socket {
+    var string host
+
+    @ unstable "pending host dispatch"
+    fn send(string data) → void
+
+    fn name() → string {
+        return self.host
+    }
+}
+
+main {
+    const Socket s ← Socket { host = "declared, never called" }
+    print s.name()
+}

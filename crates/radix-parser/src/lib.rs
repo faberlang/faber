@@ -170,8 +170,9 @@ pub struct Parser {
     /// Range-bound and construction-source entries suppress it until their nested
     /// `parse_expression` calls begin a new expression context.
     conversio_postfix_enabled: bool,
-    /// Set while the annotated top-level `functio` that follows a `@ nondum`
-    /// annotation is about to parse, so its signature may omit the body.
+    /// Set while the annotated top-level `functio` or genus method that follows
+    /// a `@ nondum` annotation is about to parse, so its signature may omit the
+    /// body.
     ///
     /// Consumed (cleared) by `parse_func_decl` on entry, so it never reaches a
     /// nested declaration.

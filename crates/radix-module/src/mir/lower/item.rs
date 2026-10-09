@@ -72,6 +72,10 @@ impl HirVisitor for ItemLoweringPass<'_, '_, '_> {
             }
             HirItemKind::Struct(strukt) => {
                 for method in &strukt.methods {
+                    // A declaration-only `@ nondum` method has no body to lower.
+                    if method.is_unavailable_declaration(&self.lowerer.unit.interner) {
+                        continue;
+                    }
                     self.lowerer
                         .lower_method(item, strukt, method, self.body_ctx);
                 }

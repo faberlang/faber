@@ -3855,6 +3855,7 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
                     device: None,
                 },
                 visibility: crate::syntax::MemberVisibility::Publica,
+                unavailable: Vec::new(),
             }],
             annotation_contract: None,
         }),

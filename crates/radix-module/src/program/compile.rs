@@ -1930,6 +1930,7 @@ fn file_export_from_stmt(
                             }
                             visibility => visibility,
                         },
+                        unavailable: unavailable_gates_from_annotations(&member.annotations, interner),
                     })
                 })
                 .collect::<Vec<_>>();
@@ -2627,6 +2628,7 @@ fn interface_method_from_ast(
             device: None,
         },
         visibility: crate::syntax::MemberVisibility::Publica,
+        unavailable: Vec::new(),
     })
 }
 

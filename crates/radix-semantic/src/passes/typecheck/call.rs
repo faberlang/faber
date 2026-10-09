@@ -236,6 +236,33 @@ impl TypeChecker<'_> {
         true
     }
 
+    /// Reports SEM017 `nondum_function_for_target` for a call of a `genus`
+    /// method marked `@ nondum` on this target. `receiver_ty` is the type the
+    /// method is called on; the diagnostic names the method as `Owner.method`.
+    /// Returns `true` when the diagnostic was emitted.
+    pub(super) fn report_unavailable_method(
+        &mut self,
+        receiver_ty: TypeId,
+        name: Symbol,
+        span: radix_lexer::Span,
+    ) -> bool {
+        if self.unavailable_methods.is_empty() {
+            return false;
+        }
+        let Some(owner) = self.struct_def_from_type(receiver_ty) else {
+            return false;
+        };
+        let Some(gates) = self.unavailable_methods.get(&(owner, name)).cloned() else {
+            return false;
+        };
+        let owner_name = self.resolver.get_symbol(owner).map_or_else(
+            || "genus".to_owned(),
+            |symbol| self.method_display_name(symbol.name),
+        );
+        let qualified = format!("{owner_name}.{}", self.method_display_name(name));
+        self.report_unavailable_function(&gates, qualified, span)
+    }
+
     /// `namespace.member` spelling for diagnostics about an imported function.
     pub(super) fn qualified_function_name(&self, namespace: Symbol, member: Symbol) -> String {
         format!(
@@ -804,6 +831,10 @@ impl TypeChecker<'_> {
         }
         if let Some(sig) = self.lookup_method_signature(receiver_ty, *name) {
             self.check_method_visibility(receiver_ty, *name, receiver.span);
+            if self.report_unavailable_method(receiver_ty, *name, receiver.span) {
+                self.typecheck_call_arg_exprs(args);
+                return self.error_type;
+            }
             if let Some(method) = self.lookup_interface_method_info(receiver_ty, *name) {
                 let availability = method.availability.clone();
                 let span = method.span;
@@ -860,6 +891,12 @@ impl TypeChecker<'_> {
         if let Some(members) = self.union_members_of(receiver_ty) {
             if let Some(sig) = self.union_common_method_signature(&members, *name) {
                 self.check_method_visibility(receiver_ty, *name, receiver.span);
+                for member in &members {
+                    if self.report_unavailable_method(*member, *name, receiver.span) {
+                        self.typecheck_call_arg_exprs(args);
+                        return self.error_type;
+                    }
+                }
                 self.set_chorda_scalar_closure_context(*name);
                 let ret = self.check_instantiated_call_marked(
                     &sig,

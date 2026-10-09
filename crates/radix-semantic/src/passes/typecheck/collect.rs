@@ -125,6 +125,7 @@ impl TypeChecker<'_> {
             methods.insert(method.func.name, sig);
             self.method_defs
                 .insert((def_id, method.func.name), method.def_id);
+            self.record_method_availability(def_id, method.func.name, &method.annotations);
             if method.receiver != radix_hir::HirReceiver::None {
                 self.instance_method_defs.insert((def_id, method.func.name));
             }
@@ -464,20 +465,37 @@ impl TypeChecker<'_> {
         def_id: DefId,
         annotations: &[radix_hir::HirAnnotation],
     ) {
-        let Some(interner) = self.interner else {
-            return;
-        };
+        if let Some(gates) = self.nondum_gates(annotations) {
+            self.unavailable_functions.insert(def_id, gates);
+        }
+    }
+
+    /// Record the `@ nondum` gates of a local `genus` method so its calls can
+    /// be refused. A method without the annotation records nothing.
+    fn record_method_availability(
+        &mut self,
+        owner: DefId,
+        name: Symbol,
+        annotations: &[radix_hir::HirAnnotation],
+    ) {
+        if let Some(gates) = self.nondum_gates(annotations) {
+            self.unavailable_methods.insert((owner, name), gates);
+        }
+    }
+
+    /// The portable `@ nondum` gates written in `annotations`, if any.
+    fn nondum_gates(
+        &self,
+        annotations: &[radix_hir::HirAnnotation],
+    ) -> Option<Vec<crate::file_interface::InterfaceUnavailable>> {
+        let interner = self.interner?;
         let availability: Vec<radix_hir::HirAvailability> = annotations
             .iter()
             .filter_map(|annotation| crate::try_parse_nondum_annotation(annotation, interner))
             .collect();
-        if availability.is_empty() {
-            return;
-        }
-        self.unavailable_functions.insert(
-            def_id,
-            crate::file_interface::InterfaceUnavailable::from_availability(&availability, interner),
-        );
+        (!availability.is_empty()).then(|| {
+            crate::file_interface::InterfaceUnavailable::from_availability(&availability, interner)
+        })
     }
 
     /// Kind-check each genus's `implet` clause and record its contracts.

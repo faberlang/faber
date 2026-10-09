@@ -328,6 +328,8 @@ pub struct ImportedFileInterfaceMethod {
     pub sig: FuncSig,
     /// Member visibility for `genus` methods (D5.3); public elsewhere.
     pub visibility: radix_syntax::MemberVisibility,
+    /// `@ nondum` gates of a `genus` method; every call is refused (SEM017).
+    pub unavailable: Vec<InterfaceUnavailable>,
 }
 
 #[derive(Debug, Clone)]
@@ -1789,6 +1791,7 @@ impl Resolver {
                 surface_name,
                 sig,
                 visibility: method.visibility,
+                unavailable: method.unavailable.clone(),
             });
         }
         (imported, skipped)
@@ -3975,6 +3978,9 @@ impl Resolver {
                                         surface_name: method.surface_name,
                                         sig: method.sig,
                                         visibility: method.visibility,
+                                        // Artifact snapshots do not carry
+                                        // `@ nondum` gates.
+                                        unavailable: Vec::new(),
                                     })
                                     .collect();
                                 ImportedFileExport::Struct(ImportedFileStruct {

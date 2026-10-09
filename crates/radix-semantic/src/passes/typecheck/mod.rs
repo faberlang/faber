@@ -476,6 +476,11 @@ pub(crate) struct TypeChecker<'a> {
     /// the gate covers; the declaration itself is fine.
     pub unavailable_functions: FxHashMap<DefId, Vec<crate::file_interface::InterfaceUnavailable>>,
 
+    /// `genus` methods marked `@ nondum`, keyed by (owning class, method
+    /// name) like `method_defs`. Every call is refused the same way.
+    pub unavailable_methods:
+        FxHashMap<(DefId, Symbol), Vec<crate::file_interface::InterfaceUnavailable>>,
+
     /// Backend target selected for target-aware availability gates.
     pub target: Target,
 
@@ -821,6 +826,7 @@ impl<'a> TypeChecker<'a> {
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             unavailable_functions: FxHashMap::default(),
+            unavailable_methods: FxHashMap::default(),
             target,
             variant_fields: FxHashMap::default(),
             variant_field_names: FxHashMap::default(),
@@ -923,6 +929,10 @@ impl<'a> TypeChecker<'a> {
             for method in &methods {
                 self.method_defs
                     .insert((def_id, method.name), method.def_id);
+                if !method.unavailable.is_empty() {
+                    self.unavailable_methods
+                        .insert((def_id, method.name), method.unavailable.clone());
+                }
             }
             let methods = methods
                 .into_iter()
