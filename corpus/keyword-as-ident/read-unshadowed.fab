@@ -8,6 +8,7 @@ summary = "Unshadowed read stays the lege builtin."
 syntax = "const _ input ← read"
 related = ["lege"]
 locale = "en"
+no_expected = "reads-stdin"
 +++
 # =============================================================================
 # keyword-as-ident — unshadowed `read` builtin

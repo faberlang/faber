@@ -8,6 +8,7 @@ summary = "Failable function-value callback: (string, int) → Tensor ⇥ Lookup
 syntax = "functio <name>((string, int) → tensor<f32, [1]> ⇥ LookupError, string, int) → tensor<f32, [1]> ⇥ LookupError"
 related = ["functio", "⇥", "iace", "redde"]
 locale = "en"
+no_expected = "prints-nothing"
 +++
 # =============================================================================
 # functio — Failable function-value callback: (string, int) → Tensor ⇥ LookupError

@@ -9,6 +9,7 @@ summary = "CLI root with options, operands, subcommands, and module mounts."
 syntax = "@ cli <name>"
 related = ["imperium", "imperia", "optio", "operandus", "argumenta", "descriptio", "ubique", "versio", "alias"]
 locale = "en"
+no_expected = "prints-nothing"
 +++
 
 # =============================================================================

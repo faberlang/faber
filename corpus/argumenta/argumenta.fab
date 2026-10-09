@@ -9,6 +9,7 @@ summary = "Binds command-line arguments for an entry point."
 syntax = "incipit argumenta <name> <block> | functio <name>() argumenta <name> <block>"
 related = ["incipit", "cli", "imperium", "optio", "operandus"]
 locale = "en"
+no_expected = "prints-nothing"
 +++
 
 # =============================================================================

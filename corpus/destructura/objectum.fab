@@ -8,6 +8,8 @@ summary = "Extracts fields from a value into local bindings."
 syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
+no_expected = "awaiting-ruling"
+ruling = "6e66822e"
 +++
 
 # =============================================================================

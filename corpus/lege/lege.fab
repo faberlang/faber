@@ -9,6 +9,7 @@ summary = "Reads input from the active input stream."
 syntax = "lege [lineam]"
 related = ["lineam", "scribe"]
 locale = "en"
+no_expected = "reads-stdin"
 +++
 # =============================================================================
 # lege — Reads input from the active input stream.

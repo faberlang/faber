@@ -9,6 +9,7 @@ summary = "Attaches a description string to CLI metadata."
 syntax = "@ descriptio <string>"
 related = ["versio"]
 locale = "en"
+no_expected = "prints-nothing"
 +++
 
 # =============================================================================

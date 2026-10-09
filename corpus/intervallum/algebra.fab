@@ -7,6 +7,7 @@ canonical = true
 summary = "Interval algebra: intersection, union, and span count."
 related = ["intersect", "union", "longitudo", "nihil"]
 locale = "en"
+no_expected = "prints-nothing"
 +++
 # =============================================================================
 # intervallum — Interval algebra: intersection, union, and span count

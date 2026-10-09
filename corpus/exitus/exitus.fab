@@ -9,6 +9,7 @@ summary = "Sets the exit code or exit expression for an entry point."
 syntax = "incipit argumenta <name> exitus <expr> <block>"
 related = ["incipit", "incipiet", "argumenta"]
 locale = "en"
+no_expected = "prints-nothing"
 +++
 # =============================================================================
 # exitus — Sets the exit code or exit expression for an entry point

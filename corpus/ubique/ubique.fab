@@ -9,6 +9,7 @@ summary = "Marks an option or operand as global."
 syntax = "ubique"
 related = ["optio", "operandus"]
 locale = "en"
+no_expected = "prints-nothing"
 +++
 
 # =============================================================================
