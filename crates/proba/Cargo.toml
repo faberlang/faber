@@ -19,3 +19,6 @@ runner = ["radix/runner", "dep:radix-mir-runner"]
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+hygiene-ratchet = { path = "../hygiene-ratchet" }

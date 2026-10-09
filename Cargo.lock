@@ -668,6 +668,7 @@ dependencies = [
 name = "proba"
 version = "0.1.0"
 dependencies = [
+ "hygiene-ratchet",
  "radix",
  "radix-mir-runner",
 ]
@@ -741,6 +742,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 name = "radix"
 version = "0.84.0"
 dependencies = [
+ "hygiene-ratchet",
  "radix-module",
  "radix-program",
 ]
@@ -770,6 +772,7 @@ dependencies = [
 name = "radix-hir"
 version = "0.84.0"
 dependencies = [
+ "hygiene-ratchet",
  "postcard",
  "radix-lexer",
  "radix-syntax",
@@ -811,11 +814,15 @@ dependencies = [
 [[package]]
 name = "radix-host-abi"
 version = "0.84.0"
+dependencies = [
+ "hygiene-ratchet",
+]
 
 [[package]]
 name = "radix-intrinsics"
 version = "0.84.0"
 dependencies = [
+ "hygiene-ratchet",
  "radix-types",
 ]
 
@@ -823,6 +830,7 @@ dependencies = [
 name = "radix-lexer"
 version = "0.84.0"
 dependencies = [
+ "hygiene-ratchet",
  "proptest",
  "radix-diagnostics",
  "rustc-hash",
@@ -938,6 +946,7 @@ name = "radix-program"
 version = "0.1.0"
 dependencies = [
  "handroll",
+ "hygiene-ratchet",
  "postcard",
  "radix-codegen-shared",
  "radix-mir-fmir",
@@ -960,6 +969,7 @@ dependencies = [
 name = "radix-semantic"
 version = "0.84.0"
 dependencies = [
+ "hygiene-ratchet",
  "radix",
  "radix-diagnostics",
  "radix-hir",
@@ -990,12 +1000,16 @@ dependencies = [
 [[package]]
 name = "radix-target"
 version = "0.84.0"
+dependencies = [
+ "hygiene-ratchet",
+]
 
 [[package]]
 name = "radix-types"
 version = "0.84.0"
 dependencies = [
  "handroll",
+ "hygiene-ratchet",
  "radix-lexer",
  "radix-syntax",
  "rand 0.8.8",

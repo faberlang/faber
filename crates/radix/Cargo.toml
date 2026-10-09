@@ -23,3 +23,5 @@ runner = ["mir-core", "radix-module/runner", "radix-program/runner"]
 ts-import = ["radix-module/ts-import"]
 hir-lean = ["radix-module/hir-lean"]
 
+[dev-dependencies]
+hygiene-ratchet = { path = "../hygiene-ratchet" }
