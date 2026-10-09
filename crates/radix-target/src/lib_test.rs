@@ -1,0 +1,119 @@
+use super::Target;
+
+/// One arm per variant, no wildcard: adding a `Target` variant fails
+/// this function's compilation, forcing the variant into the walk;
+/// removing one fails the same compilation. This match is the domain
+/// anchor that keeps [`Target::ALL`] honest.
+fn universe_spelling(target: Target) -> &'static str {
+    match target {
+        Target::MirStepper => "stepper",
+        Target::HirRust => "rust",
+        Target::HirTypeScript => "ts",
+        Target::HirGo => "go",
+        Target::HirSwift => "swift",
+        Target::HirPython => "python",
+        Target::HirHaskell => "haskell",
+        Target::HirPascal => "pascal",
+        Target::HirCobol => "cobol",
+        Target::HirFortran => "fortran",
+        Target::HirOdin => "odin",
+        Target::HirFaber => "faber",
+        Target::HirFhir => "fhir",
+        Target::MirWasm => "wasm-text",
+        Target::MirLlvm => "llvm-text",
+        Target::MirLlvmHost => "llvm-host",
+        Target::MirAmd => "amd",
+        Target::MirMetal => "metal-text",
+        Target::MirWgsl => "wgsl-text",
+        Target::MirSexp => "sexp",
+        Target::MirBasic => "basic",
+        Target::MirScena => "scena",
+        Target::MirFmir => "fmir-text",
+        Target::MirFmirBinary => "fmir",
+        Target::MirFmirBundle => "fmir-bin",
+    }
+}
+
+/// `ALL` set-equals the variant domain named by the exhaustive match
+/// (defect-audit P6-3/P6-4 guard shape). A variant missing from `ALL`
+/// drops its spelling; a duplicate or stale entry changes the vector —
+/// both fail here. Spellings are pinned to `Display` so the walk and
+/// the CLI spelling cannot drift apart either.
+#[test]
+fn all_is_exactly_the_variant_set() {
+    let expected: Vec<&'static str> = [
+        "stepper",
+        "rust",
+        "ts",
+        "go",
+        "swift",
+        "python",
+        "haskell",
+        "pascal",
+        "cobol",
+        "fortran",
+        "odin",
+        "faber",
+        "fhir",
+        "wasm-text",
+        "llvm-text",
+        "llvm-host",
+        "amd",
+        "metal-text",
+        "wgsl-text",
+        "sexp",
+        "basic",
+        "scena",
+        "fmir-text",
+        "fmir",
+        "fmir-bin",
+    ]
+    .into();
+    let all: Vec<&'static str> = Target::ALL
+        .iter()
+        .map(|target| {
+            let spelling = universe_spelling(*target);
+            assert_eq!(spelling, target.to_string(), "spelling must match Display");
+            spelling
+        })
+        .collect();
+    assert_eq!(
+        all, expected,
+        "Target::ALL must be exactly the variant domain the exhaustive match names"
+    );
+}
+
+/// `from_spelling` is the exact inverse of `Display`: every canonical
+/// spelling round-trips through the full universe, and no non-canonical
+/// input is accepted.
+#[test]
+fn from_spelling_round_trips_every_display_spelling() {
+    for target in Target::ALL {
+        let spelling = universe_spelling(*target);
+        assert_eq!(
+            Target::from_spelling(spelling),
+            Some(*target),
+            "spelling '{spelling}' must round-trip"
+        );
+    }
+}
+
+#[test]
+fn from_spelling_rejects_non_canonical_input() {
+    for spelling in [
+        "",
+        "rust ",
+        "Rust",
+        "TS",
+        "typescript",
+        "wasm",
+        "llvm",
+        "not-a-target",
+    ] {
+        assert_eq!(
+            Target::from_spelling(spelling),
+            None,
+            "spelling '{spelling}' must not parse"
+        );
+    }
+}
