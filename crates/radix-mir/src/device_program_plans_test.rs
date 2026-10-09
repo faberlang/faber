@@ -4885,6 +4885,66 @@ fn matmul_contract_runtime_dims_resolve_without_a_numeric_grid() {
     );
 }
 
+/// Design-note item 4: the run-time matmul signature carries runtime-shaped
+/// operand/output buffers plus one `TensorAxisExtent` resource per run-time
+/// operand axis, after the output.
+#[test]
+fn matmul_runtime_tensor_extent_resources_follow_the_output() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    // a [?0, ?1] x b [?1, 33] -> o [?0, 33]: M, K runtime; N literal.
+    let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Ok(33)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(33)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let signature =
+        contract_shape_signature(&function, &CollectionOpContract::MatMulRuntime, &validation)
+            .expect("run-time matmul signature resolves");
+    assert_eq!(signature.input.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    assert_eq!(signature.output.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    assert_eq!(signature.output.binding, 2);
+    assert_eq!(signature.output.source_local, Some(MirLocalId(2)));
+    assert_eq!(
+        signature.extra_inputs[0].element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+    let extents: Vec<_> = signature
+        .extra_inputs
+        .iter()
+        .filter_map(|resource| match resource.kind {
+            MirKernelResourceKind::TensorAxisExtent {
+                tensor_binding,
+                axis,
+            } => {
+                assert_eq!(resource.element_count, 1);
+                Some((resource.binding, tensor_binding, axis))
+            }
+            _ => None,
+        })
+        .collect();
+    // a axis 0 (M), a axis 1 (K), b axis 0 (K); b axis 1 is literal.
+    assert_eq!(extents, vec![(3, 0, 0), (4, 0, 1), (5, 1, 0)]);
+    assert_eq!(signature.workgroup, MirWorkgroupSize { x: 8, y: 8, z: 1 });
+}
+
+/// Only K runtime: the output stays a literal `M*N` buffer.
+#[test]
+fn matmul_runtime_tensor_extent_resources_literal_output_when_only_k_is_runtime() {
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = rank2_tensor_ty_mixed(&mut types, [Ok(4), Err(0)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(5)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Ok(4), Ok(5)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let signature =
+        contract_shape_signature(&function, &CollectionOpContract::MatMulRuntime, &validation)
+            .expect("run-time matmul signature resolves");
+    assert_eq!(signature.output.element_count, 20);
+}
+
 #[test]
 fn matmul_contract_mixed_dims_with_equal_literal_inner_is_runtime() {
     let mut types = TypeTable::new();

@@ -397,6 +397,7 @@ fn append_tensor_extent_resources(
         non_parameter_operand: false,
     };
     collected.visit_function(function);
+    collect_matmul_runtime_reads(function, validation, &mut collected.reads);
     if collected.non_parameter_operand {
         return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
     }
@@ -418,39 +419,135 @@ fn append_tensor_extent_resources(
         };
         ordered.insert((parameter, local, axis));
     }
-    let extent_ty = validation
-        .types
-        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
-        .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_U32))?;
-    let first_binding = signature
-        .resources()
-        .map(|resource| resource.binding)
-        .max()
-        .map_or(0, |binding| binding + 1);
-    for (binding, (_, local, axis)) in (first_binding..).zip(ordered) {
-        let tensor = signature
+    for (_, local, axis) in ordered {
+        let tensor_binding = signature
             .resources()
             .find(|resource| {
                 resource.kind == MirKernelResourceKind::StorageBuffer
                     && resource.source_local == Some(local)
             })
-            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
-        let tensor_binding = tensor.binding;
-        signature.extra_inputs.push(MirKernelResource {
-            group: DEFAULT_KERNEL_RESOURCE_GROUP,
-            binding,
-            kind: MirKernelResourceKind::TensorAxisExtent {
-                tensor_binding,
-                axis,
-            },
-            role: MirKernelResourceRole::Input,
-            access: MirKernelResourceAccess::Read,
-            element_ty: MirType::semantic(extent_ty),
-            element_count: 1,
-            source_local: None,
-            source_name: None,
-            reduced_projection: None,
-        });
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?
+            .binding;
+        push_axis_extent_resource(signature, tensor_binding, axis, validation)?;
+    }
+    Ok(())
+}
+
+/// Appends one count-one `u32` [`MirKernelResourceKind::TensorAxisExtent`]
+/// input after the highest binding the signature already holds.
+fn push_axis_extent_resource(
+    signature: &mut MirKernelSignature,
+    tensor_binding: u32,
+    axis: u32,
+    validation: &MirValidationContext<'_>,
+) -> Result<(), MirAbiError> {
+    let extent_ty = validation
+        .types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+        .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_U32))?;
+    let binding = signature
+        .resources()
+        .map(|resource| resource.binding)
+        .max()
+        .map_or(0, |binding| binding + 1);
+    signature.extra_inputs.push(MirKernelResource {
+        group: DEFAULT_KERNEL_RESOURCE_GROUP,
+        binding,
+        kind: MirKernelResourceKind::TensorAxisExtent {
+            tensor_binding,
+            axis,
+        },
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty: MirType::semantic(extent_ty),
+        element_count: 1,
+        source_local: None,
+        source_name: None,
+        reduced_projection: None,
+    });
+    Ok(())
+}
+
+/// The operand axes a run-time-extent matmul consumes: every axis whose dim is
+/// `Runtime`, left operand first (M = left axis 0, K = left axis 1), then the
+/// right operand (K = right axis 0, N = right axis 1; a rank-1 right operand
+/// has only axis 0). Literal axes need no resource.
+fn matmul_runtime_axes(
+    left: &[crate::tensor_type::Dim],
+    right: &[crate::tensor_type::Dim],
+) -> (Vec<u32>, Vec<u32>) {
+    let runtime = |dims: &[crate::tensor_type::Dim]| {
+        dims.iter()
+            .enumerate()
+            .filter(|(_, dim)| matches!(dim, crate::tensor_type::Dim::Runtime))
+            .map(|(axis, _)| axis as u32)
+            .collect::<Vec<u32>>()
+    };
+    (runtime(left), runtime(right))
+}
+
+/// Design-note item 4: a collection-op matmul with run-time extents consumes
+/// its operands' extents but contains no `TensorExtent` read, so the extents
+/// are collected from the matmul statement itself.
+fn collect_matmul_runtime_reads(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    reads: &mut Vec<(MirLocalId, u32)>,
+) {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement)
+                != Some(crate::MirCollectionOp::TensorMatMul)
+            {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                continue;
+            };
+            let [left, right] = call.args.as_slice() else {
+                continue;
+            };
+            let operand = |arg: &MirOperand| match arg {
+                MirOperand::Place(place)
+                    if place.projections.is_empty()
+                        && matches!(place.base, MirPlaceBase::Local(_)) =>
+                {
+                    let MirPlaceBase::Local(local) = place.base else {
+                        return None;
+                    };
+                    let ty = crate::local_ty::operand_ty(function, arg)?;
+                    let dims = crate::tensor_type::tensor_dims(ty, validation).ok()?;
+                    Some((local, dims))
+                }
+                _ => None,
+            };
+            let (Some((left_local, left_dims)), Some((right_local, right_dims))) =
+                (operand(left), operand(right))
+            else {
+                continue;
+            };
+            let (left_axes, right_axes) = matmul_runtime_axes(&left_dims, &right_dims);
+            reads.extend(left_axes.into_iter().map(|axis| (left_local, axis)));
+            reads.extend(right_axes.into_iter().map(|axis| (right_local, axis)));
+        }
+    }
+}
+
+/// Design-note item 4: appends the extent resources of a run-time-extent
+/// matmul contract signature (left operand at binding 0, right at binding 1),
+/// after the output. Same shape as [`append_tensor_extent_resources`].
+pub(crate) fn append_matmul_runtime_extent_resources(
+    signature: &mut MirKernelSignature,
+    left_dims: &[crate::tensor_type::Dim],
+    right_dims: &[crate::tensor_type::Dim],
+    validation: &MirValidationContext<'_>,
+) -> Result<(), MirAbiError> {
+    let (left_axes, right_axes) = matmul_runtime_axes(left_dims, right_dims);
+    for axis in left_axes {
+        push_axis_extent_resource(signature, 0, axis, validation)?;
+    }
+    for axis in right_axes {
+        push_axis_extent_resource(signature, 1, axis, validation)?;
     }
     Ok(())
 }

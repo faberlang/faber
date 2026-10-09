@@ -25,7 +25,9 @@ pub use error::*;
 pub use lane_index::{IndexGuard, LaneIndexProof, UnprovenIndex, unproven_indexes};
 pub use launch::*;
 pub use resource::*;
-pub(crate) use signature::{grid_reduce_node, grid_reduce_partial_layout};
+pub(crate) use signature::{
+    append_matmul_runtime_extent_resources, grid_reduce_node, grid_reduce_partial_layout,
+};
 pub use throw_sites::{ThrowSite, throw_sites};
 // Vocabulary types moved to radix-types (re-exported at the crate root).
 pub use crate::{MirKernelAxis, MirKernelBuiltin};

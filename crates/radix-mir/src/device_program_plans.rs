@@ -15,7 +15,7 @@ use crate::abi::{
     CollectionOpContract, DEFAULT_STORAGE_BUFFER_LIMIT, MirAbiError, MirKernelResource,
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
     PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
-    device_view_element_count, storage_buffer_limit_error,
+    device_view_element_count, device_view_element_count_or_runtime, storage_buffer_limit_error,
 };
 use crate::device_plan_compiler::LibraryOperation;
 use crate::device_program::{
@@ -2889,11 +2889,59 @@ pub fn contract_shape_signature(
             };
         }
         CollectionOpContract::MatMulRuntime => {
-            // Operand and output resources for run-time extents are built
-            // from `TensorAxisExtent` resources (design note item 4).
-            return Err(PlanMappingError::mapping(
-                "matmul with run-time extents has no signature resources yet",
+            // Run-time extents (design note item 4): operand and output
+            // buffers are runtime-shaped; M, K and N travel as
+            // `TensorAxisExtent` resources appended after the output. The
+            // grid comes from the call-site shapes at launch, so
+            // `dispatch_size` is left untouched.
+            let (left_ty, right_ty) = matmul_operand_tys(function)?;
+            let element_ty = tensor_element_ty(left_ty, validation)?;
+            let left_dims = crate::tensor_type::tensor_dims(left_ty, validation)
+                .map_err(PlanMappingError::mapping)?;
+            let right_dims = crate::tensor_type::tensor_dims(right_ty, validation)
+                .map_err(PlanMappingError::mapping)?;
+            let runtime = |dim: Option<&crate::tensor_type::Dim>| {
+                matches!(dim, Some(crate::tensor_type::Dim::Runtime))
+            };
+            // Output is [M, N] (N = 1 for a rank-1 right operand): runtime
+            // when M or N is, literal M*N otherwise (only K is runtime).
+            let output_count = match (left_dims.first(), right_dims.get(1)) {
+                (
+                    Some(crate::tensor_type::Dim::Literal(m)),
+                    Some(crate::tensor_type::Dim::Literal(n)),
+                ) => m.saturating_mul(*n),
+                (Some(crate::tensor_type::Dim::Literal(m)), None) => *m,
+                (m, n) if runtime(m) || runtime(n) => crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT,
+                _ => {
+                    return Err(PlanMappingError::mapping(
+                        "matmul with run-time extents requires rank-2 left and rank-1 or rank-2 right tensors",
+                    ));
+                }
+            };
+            signature.input = storage_input(
+                0,
+                element_ty,
+                device_view_element_count_or_runtime(left_ty, validation)?,
+            );
+            signature.extra_inputs.push(storage_input(
+                1,
+                element_ty,
+                device_view_element_count_or_runtime(right_ty, validation)?,
             ));
+            signature.output = storage_output(2, element_ty, output_count);
+            signature.output.source_local =
+                recipe_destination_local_for(function, MirCollectionOp::TensorMatMul);
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::MATMUL_TILE,
+                y: crate::kernel_plan::MATMUL_TILE,
+                z: 1,
+            };
+            crate::abi::append_matmul_runtime_extent_resources(
+                &mut signature,
+                &left_dims,
+                &right_dims,
+                validation,
+            )?;
         }
         CollectionOpContract::Transpose { m, n } => {
             let operand_ty = recipe_operand_ty(function, MirCollectionOp::TensorTranspose)?;

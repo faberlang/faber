@@ -792,9 +792,10 @@ impl MirKernelResource {
 }
 
 /// [`device_view_element_count`], except a tensor with a non-literal shape
-/// yields [`RUNTIME_SHAPED_ELEMENT_COUNT`] instead of an error. Used only by
-/// the lane-form (indexed-view) signature arms; every other kernel family keeps
-/// the fail-closed literal law.
+/// yields [`RUNTIME_SHAPED_ELEMENT_COUNT`] instead of an error. Used by the
+/// lane-form (indexed-view) signature arms and the run-time-extent matmul
+/// contract signature; every other kernel family keeps the fail-closed literal
+/// law.
 pub(crate) fn device_view_element_count_or_runtime(
     ty: MirType,
     validation: &MirValidationContext<'_>,
