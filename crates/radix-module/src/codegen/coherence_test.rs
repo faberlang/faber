@@ -266,13 +266,10 @@ fn frame_statuses() -> [(&'static str, FrameStatus); 7] {
     ]
 }
 
-/// A file of the Go runtime package (`faber/runtime/go`), the sibling checkout
-/// of this repository.
+/// A file of the in-tree Go runtime package (`runtime/go`).
 #[cfg(all(feature = "hir-go", feature = "hir-ts"))]
 fn go_runtime_source(file: &str) -> String {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../faber/runtime/go")
-        .join(file);
+    let path = crate::test_support::runtime_dir("go").join(file);
     std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
 }
 

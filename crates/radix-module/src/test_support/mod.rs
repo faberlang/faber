@@ -28,8 +28,30 @@ pub fn corpus_file(rel: impl AsRef<Path>) -> PathBuf {
     corpus_dir().join(rel)
 }
 
-/// Env override for the public generated-Rust package used by optional
-/// emitted-Rust cargo smoke checks. Radix does not hardcode a monorepo sibling.
+/// Locates the in-tree runtime directory `<name>` (`rust`, `go`, `typescript`,
+/// `swift`). `FABER_SUPPORT_PATH_OVERRIDE` names a root holding
+/// `runtime/<name>` and wins when that directory exists; otherwise the repo's
+/// own `runtime/<name>` (`CARGO_MANIFEST_DIR` is `<repo>/crates/radix-module`).
+///
+/// # Panics
+///
+/// Panics naming the path when the in-tree directory is absent.
+#[must_use]
+pub fn runtime_dir(name: &str) -> PathBuf {
+    let overridden = std::env::var_os("FABER_SUPPORT_PATH_OVERRIDE")
+        .map(|root| PathBuf::from(root).join("runtime").join(name))
+        .filter(|runtime| runtime.is_dir());
+    let runtime = overridden.unwrap_or_else(|| {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../runtime")
+            .join(name)
+    });
+    assert!(runtime.is_dir(), "runtime/{name} not found at {}", runtime.display());
+    runtime.canonicalize().unwrap_or(runtime)
+}
+
+/// Opt-in gate and explicit crate-path override for the emitted-Rust cargo
+/// smoke checks: they run only when this names the `runtime/rust` package.
 pub const FABER_RUNTIME_CRATE_ENV: &str = "FABER_RUST_RUNTIME_CRATE";
 
 /// Resolve the generated-Rust package for cargo path-deps in smoke tests.

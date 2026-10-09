@@ -77,7 +77,7 @@ fn go_saturating_division_by_zero_uses_the_integer_text() {
         code.contains("rt.ExactDiv(rt.ExactI(int64(a)), rt.ExactI(int64(two)))"),
         "{code}"
     );
-    // The integer trap text lives in `rt.ExactDiv` (`faber/runtime/go/exact_test.go`).
+    // The integer trap text lives in `rt.ExactDiv` (`runtime/go/exact_test.go`).
     assert!(!code.contains("saturatus division failed"), "{code}");
 }
 
