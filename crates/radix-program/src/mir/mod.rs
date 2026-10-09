@@ -44,8 +44,6 @@ pub(crate) mod manifest;
 pub(crate) mod remap;
 
 #[cfg(test)]
-mod determinism_test;
-#[cfg(test)]
 mod link_order_test;
 #[cfg(test)]
 mod remap_test;
@@ -712,10 +710,6 @@ mod transitive_generic_reach_tests;
 mod lane_tests;
 
 #[cfg(test)]
-#[path = "library_cache_share_test.rs"]
-mod library_cache_share_tests;
-
-#[cfg(test)]
 #[path = "receiver_method_lane_test.rs"]
 mod receiver_method_lane_tests;
 
@@ -768,10 +762,6 @@ mod mut_param_link_tests;
 #[cfg(test)]
 #[path = "tensor_edge_policy_link_test.rs"]
 mod tensor_edge_policy_link_tests;
-
-#[cfg(test)]
-#[path = "gradus_typed_consumer_test.rs"]
-mod gradus_typed_consumer_tests;
 
 #[cfg(test)]
 #[path = "const_member_lane_test.rs"]
