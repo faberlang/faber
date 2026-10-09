@@ -1,0 +1,111 @@
++++
+locale = "en"
++++
+# json/serialize.fab — recursive JSON serializer
+#
+# The serializer is ordinary Faber. The language's `json ↦ value` conversion
+# exposes the already-validated JSON tree; this module only renders that tree
+# as deterministic compact wire text.
+
+import from "norma:json/lexer" lexer
+
+import from "norma:text" text
+
+@ public
+fn stringify(json document) → string {
+    return encode(document ↦ value)
+}
+
+# Each scalar extraction below follows an `is` test on the same node in encode,
+# so its `⊥` default never applies; it only satisfies D17.8. The extractions are
+# separate functions to keep encode inside its complexity budget.
+fn as_bool(value node) → bool {
+    return node ↦ bool ⊥ false
+}
+
+fn as_text(value node) → string {
+    return node ↦ string ⊥ ""
+}
+
+# Integers render through `inf`: it holds every `int` exactly, so the digits
+# match `int ↦ string`, and a node beyond `int` loses nothing. (`is int` is true
+# only for an integer that fits `int`; a larger node takes the fallback below.)
+fn as_integer(value node) → inf {
+    return node ↦ inf ⊥ 0
+}
+
+fn as_float(value node) → float {
+    return node ↦ float ⊥ 0.0
+}
+
+fn encode(value node) → string {
+    if node is none then return "null"
+    if node is bool {
+        if as_bool(node) then return "true"
+        return "false"
+    }
+    if node is string then return quote(as_text(node))
+    if node is int then return as_integer(node) ↦ string
+    if node is float then return as_float(node) ↦ string
+    # An integer beyond `int` is not `is int` (the carrier law: `is int` holds
+    # only when the integer fits i64); the scalar tests above have removed every
+    # other scalar, so only such an `inf` converts here.
+    do {
+        const inf big ↤ node
+        return big ↦ string
+    }
+    catch err {
+    }
+    do {
+        const map<string, value> fields ↤ node
+        return encode_object(fields)
+    }
+    catch err {
+    }
+    do {
+        const list<value> items ↤ node
+        return encode_array(items)
+    }
+    catch err {
+    }
+    panic "invalid value in JSON document"
+}
+
+fn encode_array(list<value> items) → string {
+    var list<string> encoded ← empty
+    for from items const item {
+        encoded.append(encode(item))
+    }
+    return text.join(["[", text.join(encoded, ","), "]"], "")
+}
+
+fn encode_object(map<string, value> fields) → string {
+    var list<string> keys ← fields.keys()
+    keys.sort()
+    var list<string> members ← empty
+    for from keys const key {
+        members.append(text.join([quote(key), ":", encode(fields[key])], ""))
+    }
+    return text.join(["{", text.join(members, ","), "}"], "")
+}
+
+fn quote(string raw) → string {
+    var list<string> parts ← [«"»]
+    var int index ← 0
+    while index ≺ raw.length() {
+        const string c ← raw.slice(index, index + 1)
+        const string ∪ none escaped ← lexer.escape_char(c)
+        if escaped not is none {
+            parts.append(escaped coalesce "")
+        }
+        elif lexer.is_control(c) {
+            parts.append(lexer.control_escape(c))
+        }
+        else {
+            parts.append(c)
+        }
+        index ← index + 1
+    }
+    parts.append(«"»)
+    return text.join(parts, "")
+}

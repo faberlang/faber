@@ -1,0 +1,27 @@
++++
+term = "vector"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "norma:vector pending placeholder calls are rejected before runtime."
+syntax = "norma:vector — create | shuffle rejected until implemented"
+related = ["vector", "stdlib-nativum"]
+locale = "en"
++++
+
+
+# stdlib-nativum/vector-pending-placeholder — expected compile failure
+#
+# WHY: Pending public vector helpers must not compile to runtime `mori`
+# placeholders. Until real semantics ship, callers fail during package
+# compilation.
+#
+# This exemplum intentionally fails to compile; it is registered in the
+# per-backend EXPECTED_FAILURES lists.
+
+import from "norma:vector" vector
+
+main {
+    vector.create([0])
+    vector.shuffle(null, [0])
+}

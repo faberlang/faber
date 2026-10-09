@@ -1,0 +1,17 @@
+[package]
+name = "norma"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "norma"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust", "fhir", "fmir"]
+
+[locale]
+locale = "en"

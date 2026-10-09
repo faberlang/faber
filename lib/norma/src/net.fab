@@ -1,0 +1,56 @@
++++
+locale = "en"
++++
+
+# net.fab - Network Socket Device (TCP/UDP)
+#
+# Public import: importa ex "norma:net" private net
+# Method ledger: docs/design/caelum-methods.md
+# Sub-modules:
+#   norma:net/endpoint    — TCP endpoint type
+#   norma:net/connection — connected socket (depends on endpoint)
+#   norma:net/listener — listener (depends on connection)
+#
+# Etymology: net — sky / ether; Latin locale spelling `caelum` for the transport layer.
+# Counterpart to fs (ground/local I/O).
+#
+# Design notes:
+# - Verb conjugation encodes sync/async:
+# - Imperative (-a, -e, -i): synchronous (blocking)
+# - Future indicative (-et, -ebit): asynchronous
+# - TLS enabled via optional cert/key params (listen) or tute flag (connect)
+# - TCP: listen/listen_async, connect/connect_async
+# - Sockets are bidirectional byte streams
+
+import from "norma:net/endpoint" endpoint
+import from "norma:net/connection" connection
+import from "norma:net/listener" listener
+
+
+# =========================================================================
+# TCP SERVER
+# =========================================================================
+
+# Create TCP listener (TLS when cert/key provided)
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn listen(int port, string cert optional, string key optional) → listener.Listener
+
+@ public
+@ future
+@ unstable "deferred pending Stage 2 dispatch"
+fn listen_async(int port, string cert optional, string key optional) → listener.Listener
+
+# =========================================================================
+# TCP CLIENT
+# =========================================================================
+
+# Connect to TCP server (TLS when tute=verum)
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn connect(string host, int port, bool secure optional coalesce false) → connection.Socket
+
+@ public
+@ future
+@ unstable "deferred pending Stage 2 dispatch"
+fn connect_async(string host, int port, bool secure optional coalesce false) → connection.Socket

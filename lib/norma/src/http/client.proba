@@ -1,0 +1,44 @@
+# Colocated construct fixture for norma:http/client.
+#
+# The MIR runner treats imported module functions as provider routes
+# (same residual as src/mathesis.proba / exempla/http/headers.proba).
+# This file proves the genera construct. Verb I/O and URL-split behavior
+# are compiled in src/http/client.fab (`faber check`); live route calls
+# run in exempla/http/client-io against a local fixture.
+
+import from "./client" client
+
+describe "client_construct" {
+    test "Url and Client construct" {
+        const client.Url url ← client.Url {
+            scheme = "http",
+            host = "127.0.0.1",
+            port = 9,
+            path = "/test",
+            query = "q=1"
+        }
+        const client.Client session ← client.Client { }
+        assert url.scheme ≡ "http"
+        assert url.host ≡ "127.0.0.1"
+        assert url.port ≡ 9
+        assert url.path ≡ "/test"
+        assert url.query ≡ "q=1"
+        print "client constructed"
+    }
+
+    test "Receive and Chunk construct" {
+        const client.Receive stream ← client.Receive {
+            reader = 1,
+            status = 200
+        }
+        const client.Chunk chunk ← client.Chunk {
+            text = "data: one\n\n",
+            done = false
+        }
+        assert stream.reader ≡ 1
+        assert stream.status ≡ 200
+        assert chunk.text ≡ "data: one\n\n"
+        assert chunk.done ≡ false
+        print "receive constructed"
+    }
+}

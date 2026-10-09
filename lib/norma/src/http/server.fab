@@ -1,0 +1,426 @@
++++
+locale = "en"
++++
+
+# http/server.fab — HTTP/1.1 listener over provider http:* routes
+#
+# Public import: import from "norma:http/server" server
+# Depends on: norma:http/headers, request, response, chunked, sse
+#
+# Listener genus over:
+#   http:listen          [port] | [port, host] | [port, max_body_bytes]
+#                        | [port, max_body_bytes, host] → handle
+#   http:accept          (handle) → {id, method, path, headers, body, connection}
+#   http:respond         [request_id, status, headers, body]
+#   http:respond_open    [request_id, status, headers] → writer
+#   http:respond_chunk   [writer, bytes]   (provider frames; blocks on stall)
+#   http:respond_finish  [writer, keep_alive]
+#   http:stop            (handle)
+#
+# Keep-alive is decided here (HTTP/1.1 default-on, honor Connection: close,
+# HTTP/1.0 default-off) and passed as the finish flag. The provider owns the
+# socket. One-shot `reply` closes; streaming `open` / `write` / `finish`
+# is the keep-alive and SSE path.
+#
+# SSE serving composes sse.stringify (event payload) with chunked.encode
+# (pure complete body) or respond_chunk (provider applies the same framing
+# incrementally so in-language memory stays one frame).
+
+import from "norma:http/headers" headers
+# Alias cannot be `request`: a field type `request.Request` makes that
+# prefix a non-namespace (SEM005/SEM002). Same alias must be used in the
+# facade so PKG001 does not fire.
+import from "norma:http/request" httpreq
+import from "norma:http/response" response
+import from "norma:http/chunked" chunked
+import from "norma:http/sse" sse
+
+# Opaque listener handle from http:listen.
+@ public
+class Listener {
+    var int handle = 0
+
+    fn accept() → Incoming {
+        return accept_incoming(self.handle)
+    }
+
+    fn stop() → void {
+        return call 'http:stop' (self.handle) ↦ void
+    }
+}
+
+# One accepted request plus the provider ids needed to respond.
+@ public
+class Incoming {
+    var string id = ""
+    var int connection = 0
+    var httpreq.Request req = httpreq.Request { }
+}
+
+# Open chunked writer from http:respond_open.
+@ public
+class Stream {
+    var int writer = 0
+
+    fn write(bytes data) → void {
+        return write_chunk(self, data)
+    }
+
+    fn write_event(sse.Event event) → void {
+        return send_event(self, event)
+    }
+
+    fn finish(bool keep_alive) → void {
+        return finish_stream(self, keep_alive)
+    }
+}
+
+# Bind a listener. The returned number is an opaque handle.
+@ public
+fn listen(list<value> args) → int {
+    return call 'http:listen' (args) ↦ int
+}
+
+# Accept one request record from a listener. The returned valor contains the
+# provider request id plus method, path, headers, body, and connection fields.
+@ public
+fn accept(int handle) → value {
+    return call 'http:accept' (handle) ↦ value
+}
+
+# Send one response using the request id and target-neutral status, headers,
+# and body values carried in `args`.
+@ public
+fn respond(list<value> args) → void {
+    return call 'http:respond' (args) ↦ void
+}
+
+# Begin a chunked response. `args` is [request_id, status, headers].
+@ public
+fn respond_open(list<value> args) → int {
+    return call 'http:respond_open' (args) ↦ int
+}
+
+# Write one payload. The provider wraps it as a chunk and blocks if the
+# peer is not reading (backpressure).
+@ public
+fn respond_chunk(list<value> args) → void {
+    return call 'http:respond_chunk' (args) ↦ void
+}
+
+# Finish a chunked response. `args` is [writer, keep_alive].
+@ public
+fn respond_finish(list<value> args) → void {
+    return call 'http:respond_finish' (args) ↦ void
+}
+
+# Stop a listener and release its pending request state.
+@ public
+fn stop(int handle) → void {
+    return call 'http:stop' (handle) ↦ void
+}
+
+@ public
+fn bind(int port) → Listener {
+    const int handle ← listen([port ↦ value])
+    return Listener { handle = handle }
+}
+
+# Two-argument listen: text second item is bind_host (provider default body cap).
+@ public
+fn bind_at(int port, string host) → Listener {
+    const int handle ← listen([port ↦ value, host ↦ value])
+    return Listener { handle = handle }
+}
+
+@ public
+fn bind_limited(int port, int max_body_bytes) → Listener {
+    const int handle ← listen([port ↦ value, max_body_bytes ↦ value])
+    return Listener { handle = handle }
+}
+
+@ public
+fn bind_full(int port, int max_body_bytes, string host) → Listener {
+    const int handle ← listen([port ↦ value, max_body_bytes ↦ value, host ↦ value])
+    return Listener { handle = handle }
+}
+
+@ public
+fn incoming_of(value raw) → Incoming {
+    # Why: a carrier that is not {id, connection, method, path, headers, body}
+    # is a broken host contract, not caller input, so it panics instead of
+    # defaulting an id or connection.
+    do {
+        const map<string, value> fields ↤ raw
+        return Incoming {
+            id = fields["id"] ↦ string,
+            connection = fields["connection"] ↦ int,
+            req = httpreq.from_target(
+                fields["method"] ↦ string,
+                fields["path"] ↦ string,
+                headers_from_carrier(fields["headers"]),
+                body_text(fields["body"])
+            )
+        }
+    }
+    catch err {
+        panic "norma:http/server.incoming_of: malformed accept response: §"(err)
+    }
+}
+
+@ public
+fn accept_incoming(int handle) → Incoming {
+    return incoming_of(accept(handle))
+}
+
+# HTTP/1.1 default-on. Honor Connection: close. HTTP/1.0 is default-off
+# (keep-alive only when the request names it).
+@ public
+fn keep_alive(headers.Headers headers) → bool {
+    return keep_alive_version("HTTP/1.1", headers)
+}
+
+@ public
+fn keep_alive_version(string version, headers.Headers headers) → bool {
+    if has_connection_token(headers, "close") {
+        return false
+    }
+    if is_http10(version) {
+        return has_connection_token(headers, "keep-alive")
+    }
+    return true
+}
+
+# One-shot reply. The provider writes content-length and closes.
+@ public
+fn reply(Incoming incoming, int status, headers.Headers headers, string body) → void {
+    const list<value> args ← [
+        incoming.id ↦ value,
+        status ↦ value,
+        headers_carrier(headers) ↦ value,
+        body ↦ value
+    ]
+    return respond(args)
+}
+
+@ public
+fn reply_with(Incoming incoming, response.Response response) → void {
+    return reply(incoming, response.status, response.headers, response.body)
+}
+
+# Begin a chunked response. Caller writes frames then finish.
+@ public
+fn open(Incoming incoming, int status, headers.Headers headers) → Stream {
+    const list<value> args ← [
+        incoming.id ↦ value,
+        status ↦ value,
+        headers_carrier(headers) ↦ value
+    ]
+    return Stream { writer = respond_open(args) }
+}
+
+# SSE helper: content-type text/event-stream, then chunked frames.
+@ public
+fn open_sse(Incoming incoming) → Stream {
+    var headers.Headers head ← headers.empty()
+    if head.append("Content-Type", "text/event-stream") {
+    }
+    if head.append("Cache-Control", "no-cache") {
+    }
+    return open(incoming, 200, head)
+}
+
+# One SSE event as payload bytes. O(1) in the current event; nothing retained.
+@ public
+fn event_bytes(sse.Event event) → bytes {
+    return sse.stringify(event) ↦ bytes
+}
+
+# Pure composition: one event as a complete chunked body (last-chunk included).
+# Streaming I/O uses event_bytes + respond_chunk instead so the provider can
+# frame incrementally and apply backpressure per write.
+@ public
+fn event_chunk(sse.Event event) → bytes {
+    return chunked.encode(event_bytes(event))
+}
+
+@ public
+fn write_chunk(Stream stream, bytes data) → void {
+    const list<value> args ← [stream.writer ↦ value, data ↦ value]
+    return respond_chunk(args)
+}
+
+@ public
+fn send_event(Stream stream, sse.Event event) → void {
+    return write_chunk(stream, event_bytes(event))
+}
+
+@ public
+fn finish_stream(Stream stream, bool keep_alive) → void {
+    const list<value> args ← [stream.writer ↦ value, keep_alive ↦ value]
+    return respond_finish(args)
+}
+
+fn is_http10(string version) → bool {
+    return version ≡ "HTTP/1.0" or version ≡ "1.0"
+}
+
+fn has_connection_token(headers.Headers headers, string want) → bool {
+    const string folded ← ascii_lower(want)
+    for from headers.entries const entry {
+        if ascii_lower(entry.name) ≡ "connection" {
+            if line_has_token(entry.value, folded) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+fn line_has_token(string line, string folded_want) → bool {
+    var int i ← 0
+    const int n ← line.length()
+    while i ≺ n {
+        while i ≺ n {
+            const string c ← line.slice(i, i + 1)
+            if c ≠ " " and c ≠ "\t" and c ≠ "," {
+                break
+            }
+            i ← i + 1
+        }
+        if i ≥ n then return false
+        var int j ← i
+        while j ≺ n {
+            const string c ← line.slice(j, j + 1)
+            if c ≡ " " or c ≡ "\t" or c ≡ "," {
+                break
+            }
+            j ← j + 1
+        }
+        if ascii_lower(line.slice(i, j)) ≡ folded_want {
+            return true
+        }
+        i ← j
+    }
+    return false
+}
+
+fn headers_carrier(headers.Headers headers) → list<value> {
+    var list<value> out ← []
+    for from headers.entries const entry {
+        var map<string, value> row ← empty
+        row.put("name", entry.name ↦ value)
+        row.put("value", entry.value ↦ value)
+        out.append(row ↦ value)
+    }
+    return out
+}
+
+fn headers_from_carrier(value raw) → headers.Headers {
+    var headers.Headers out ← headers.empty()
+    if raw not is list<value> then return out
+    do {
+        const list<value> items ↤ raw
+        for from items const item {
+            if item is map<string, value> {
+                const map<string, value> row ↤ item
+                const string name ↤ row["name"]
+                const string header_value ↤ row["value"]
+                if out.append(name, header_value) {
+                }
+            }
+        }
+        return out
+    }
+    catch err {
+        panic "norma:http/server: malformed headers carrier: §"(err)
+    }
+}
+
+# Accept bodies arrive as octeti. `value ↦ bytes` is a recorded radix
+# codegen gap (H6 gate); text bodies still decode. Octeti stays empty.
+fn body_text(value raw) → string {
+    if raw is none then return ""
+    # Guarded by the `is` test, so the default never applies.
+    if raw is string then return raw ↦ string ⊥ ""
+    return ""
+}
+
+fn ascii_lower(string s) → string {
+    var string out ← ""
+    var int i ← 0
+    while i ≺ s.length() {
+        out ← out + lower_char(s.slice(i, i + 1))
+        i ← i + 1
+    }
+    return out
+}
+
+fn lower_char(string c) → string {
+    const string upper ← "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    const string lower ← "abcdefghijklmnopqrstuvwxyz"
+    var int i ← 0
+    while i ≺ 26 {
+        if upper.slice(i, i + 1) ≡ c {
+            return lower.slice(i, i + 1)
+        }
+        i ← i + 1
+    }
+    return c
+}
+
+describe "server" {
+    test "http11 default keep-alive" {
+        const headers.Headers blank ← headers.Headers { entries = [] }
+        assert keep_alive(blank)
+        assert keep_alive_version("HTTP/1.1", blank)
+        assert keep_alive_version("1.1", blank)
+    }
+
+    test "http11 honors connection close" {
+        const headers.Headers closed ← headers.Headers {
+            entries = [headers.Header { name = "Connection", value = "close" }]
+        }
+        assert not keep_alive(closed)
+    }
+
+    test "http11 close is case-insensitive and list-aware" {
+        const headers.Headers mixed ← headers.Headers {
+            entries = [headers.Header { name = "Connection", value = "Keep-Alive, Close" }]
+        }
+        assert not keep_alive(mixed)
+        const headers.Headers titled ← headers.Headers {
+            entries = [headers.Header { name = "CONNECTION", value = "Close" }]
+        }
+        assert not keep_alive(titled)
+    }
+
+    test "http10 default off unless keep-alive named" {
+        const headers.Headers blank ← headers.Headers { entries = [] }
+        assert not keep_alive_version("HTTP/1.0", blank)
+        assert not keep_alive_version("1.0", blank)
+        const headers.Headers named ← headers.Headers {
+            entries = [headers.Header { name = "Connection", value = "Keep-Alive" }]
+        }
+        assert keep_alive_version("HTTP/1.0", named)
+        assert not keep_alive_version("HTTP/1.0", headers.Headers {
+            entries = [headers.Header { name = "Connection", value = "close" }]
+        })
+    }
+
+    test "incoming and stream genera construct" {
+        const Listener listener ← Listener { handle = 7 }
+        const Incoming incoming ← Incoming {
+            id = "http-1",
+            connection = 3,
+            req = httpreq.Request { method = "GET", path = "/x", query = "", body = "" }
+        }
+        const Stream stream ← Stream { writer = 9 }
+        assert listener.handle ≡ 7
+        assert incoming.id ≡ "http-1"
+        assert incoming.connection ≡ 3
+        assert incoming.req.method ≡ "GET"
+        assert incoming.req.path ≡ "/x"
+        assert stream.writer ≡ 9
+    }
+}

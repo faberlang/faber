@@ -1,0 +1,79 @@
++++
+locale = "en"
++++
+
+# encoding.fab - Encoding/Decoding
+#
+# Etymology: encoding — book / code; Latin locale spelling `codex`.
+#
+# Part of the Standard Library.
+#
+# Design notes:
+# - All operations are synchronous (pure in-memory transforms)
+# - Encoding: raw bytes → text representation
+# - Decoding: text representation → raw bytes
+# - URL encoding operates on text (percent-encoding)
+# - Public surface migrates to norma:text (pange/solve/tempta). See
+# docs/stdlib/chorda-methods.md and docs/stdlib/stdlib-mechanical-verbs.md.
+
+# =========================================================================
+# BASE64
+# =========================================================================
+
+# Encode bytes to base64 string
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn base64(bytes data) → string
+
+# Decode base64 string to bytes (throws on invalid input)
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn decode_base64(string data) → bytes
+
+# Attempt to decode base64 (returns nihil on invalid input)
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn try_decode_base64(string data) → bytes ∪ none
+
+# =========================================================================
+# HEX
+# =========================================================================
+
+# Encode bytes to lowercase hex string
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn hex(bytes data) → string
+
+# Decode hex string to bytes (throws on invalid input)
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn decode_hex(string data) → bytes
+
+# Attempt to decode hex (returns nihil on invalid input)
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn try_decode_hex(string data) → bytes ∪ none
+
+# =========================================================================
+# URL ENCODING (percent-encoding)
+# =========================================================================
+
+# Encode text for URL (percent-encoding)
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn url(string data) → string
+
+# Decode URL-encoded text
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn decode_url(string data) → string
+
+# Encode for URL query component (also encodes &, =, etc.)
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn encode_url_component(string data) → string
+
+# Decode URL query component
+@ public
+@ unstable "deferred pending Stage 2 dispatch"
+fn decode_url_component(string data) → string

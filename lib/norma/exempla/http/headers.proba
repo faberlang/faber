@@ -1,0 +1,17 @@
+# http/headers.proba — import-resolution fixture for norma:http/headers
+#
+# The MIR runner treats imported norma members as provider routes (same
+# residual as src/mathesis.proba on this binary). This file proves the
+# directory module resolves and the genera construct.
+
+import from "norma:http/headers" headers
+
+describe "headers_import" {
+    test "Headers and Header construct" {
+        const headers.Header line ← headers.Header { name = "Content-Type", value = "text/plain" }
+        const headers.Headers h ← headers.Headers { }
+        assert line.name ≡ "Content-Type"
+        assert line.value ≡ "text/plain"
+        print "headers constructed"
+    }
+}

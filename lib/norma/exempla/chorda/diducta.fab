@@ -1,0 +1,98 @@
++++
+term = "chorda"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "Delimiter-leading document split into opaque metadata and corpus wires."
+syntax = "split_frontmatter(<documentum>, <delimiter>)"
+related = ["chorda", "toml", "textus"]
+locale = "en"
++++
+# chorda/diducta — front-block document split
+#
+# Structural split only: returns [metadataWire, corpusWire] for downstream parsers.
+# Matches EBNF `+++` file frontmatter convention (line-trimmed closing fence).
+
+import from "norma:chorda" chorda
+
+fn newline() → string {
+    return "\n"
+}
+
+fn sampleSkill() → string {
+    return ((((((((("+++" + newline()) + "version = 1") + newline()) + "id = sample") + newline()) + "+++") + newline()) + newline()) + "Body line one.") + newline()
+}
+
+main {
+    # Happy path: well-formed document with delimiter fence
+    do {
+        const string doc ← sampleSkill()
+        const [metadatum, corpus] ← chorda.split_frontmatter(doc, "+++")
+
+        assert metadatum.contains("version = 1")
+        assert metadatum.contains("id = sample")
+        assert corpus.contains("Body line one.")
+
+        print metadatum, corpus
+    }
+    catch err {
+        warn err
+    }
+
+    # Missing opening delimiter: document does not start with delimiter
+    do {
+        chorda.split_frontmatter("no front block", "+++")
+        assert false
+    }
+    catch err {
+        assert err.contains("missing opening delimiter")
+    }
+
+    # Empty delimiter: delimiter string is zero-length
+    do {
+        chorda.split_frontmatter("content", "")
+        assert false
+    }
+    catch err {
+        assert err.contains("empty delimiter")
+    }
+
+    # Document shorter than delimiter: cannot contain the delimiter
+    do {
+        chorda.split_frontmatter("ab", "+++")
+        assert false
+    }
+    catch err {
+        assert err.contains("missing opening delimiter")
+    }
+
+    # Missing closing delimiter: opening fence exists but no closing fence
+    do {
+        chorda.split_frontmatter("+++\nkey = val\n", "+++")
+        assert false
+    }
+    catch err {
+        assert err.contains("missing closing delimiter")
+    }
+
+    # Delimiter-only: document is exactly the delimiter string
+    do {
+        chorda.split_frontmatter("+++", "+++")
+        assert false
+    }
+    catch err {
+        assert err.contains("missing closing delimiter")
+    }
+
+    # Metadata with no trailing newline after opening fence:
+    # opening fence then immediate content then closing fence
+    do {
+        const string doc ← "+++\nkey = val\n+++"
+        const [metadatum, corpus] ← chorda.split_frontmatter(doc, "+++")
+        assert metadatum.contains("key = val")
+        assert corpus.length() ≡ 0
+    }
+    catch err {
+        warn err
+    }
+}

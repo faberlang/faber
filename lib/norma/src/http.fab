@@ -1,0 +1,193 @@
++++
+locale = "en"
++++
+
+# http.fab — HTTP facade (directory form)
+#
+# Public import: import from "norma:http" http
+# For raw TCP/UDP sockets, see caelum.fab. This module imports nothing
+# from norma:net — they are siblings in the host-effect family.
+#
+# Leaves: headers, request, response, chunked, sse, server, client.
+# SSE is `norma:http/sse` only — the facade does not re-export it.
+#
+# Killed leaves (no second caller — do not add):
+#   router      — inferentia dispatches by path equality
+#   middleware  — application-framework surface, not transport
+#   body        — folded into server/client; chunked + sse are the shared codecs
+#   url         — minimal split lives in client + request; no standalone genus
+#
+# Facade holds constructors + re-exports (caelum.fab role).
+# Client I/O verbs are @ future wrappers over the sync client leaf
+# (same `response.Response`). Callers await `http.get`; the leaf
+# performs the `http:*` dispatch. URL split is re-exported from the
+# client leaf. Server verbs proxy the server leaf.
+# The whole surface is @ public.
+# v1 server is plaintext loopback; TLS is explicit-never for the server.
+# Faber packages own request routing and response policy around the handle loop.
+
+import from "norma:http/headers" headers
+# Alias cannot be `request`: a field type `request.Request` makes that
+# prefix a non-namespace (SEM005/SEM002). Same alias as http/server.fab
+# so PKG001 does not fire.
+import from "norma:http/request" httpreq
+import from "norma:http/response" response
+import from "norma:http/chunked" chunked
+import from "norma:http/server" server
+import from "norma:http/client" client
+
+
+# =========================================================================
+# HTTP CLIENT
+# =========================================================================
+
+@ public
+@ future
+fn get(string url) → response.Response {
+    return client.get(url)
+}
+
+@ public
+@ future
+fn post(string url, string body) → response.Response {
+    return client.post(url, body)
+}
+
+@ public
+@ future
+fn put(string url, string body) → response.Response {
+    return client.put(url, body)
+}
+
+@ public
+@ future
+fn delete(string url) → response.Response {
+    return client.delete(url)
+}
+
+@ public
+@ future
+fn patch(string url, string body) → response.Response {
+    return client.patch(url, body)
+}
+
+@ public
+@ future
+fn send_request(string method, string url, map<string, string> headers, string body) → response.Response {
+    return client.send_request(method, url, headers, body)
+}
+
+@ public
+fn session() → client.Client {
+    return client.session()
+}
+
+@ public
+fn open_request(string method, string url, headers.Headers headers, string body) → client.Receive {
+    return client.open(method, url, headers, body)
+}
+
+@ public
+fn receive(client.Receive stream) → client.Chunk {
+    return client.receive(stream)
+}
+
+
+# =========================================================================
+# HTTP SERVER
+# =========================================================================
+
+@ public
+fn listen(list<value> args) → int {
+    return server.listen(args)
+}
+
+@ public
+fn accept(int handle) → value {
+    return server.accept(handle)
+}
+
+@ public
+fn respond(list<value> args) → void {
+    return server.respond(args)
+}
+
+@ public
+fn respond_open(list<value> args) → int {
+    return server.respond_open(args)
+}
+
+@ public
+fn respond_chunk(list<value> args) → void {
+    return server.respond_chunk(args)
+}
+
+@ public
+fn respond_finish(list<value> args) → void {
+    return server.respond_finish(args)
+}
+
+@ public
+fn stop(int handle) → void {
+    return server.stop(handle)
+}
+
+@ public
+fn bind(int port) → server.Listener {
+    return server.bind(port)
+}
+
+@ public
+fn keep_alive(headers.Headers headers) → bool {
+    return server.keep_alive(headers)
+}
+
+
+# =========================================================================
+# CONSTRUCTORS (types live in the leaves)
+# =========================================================================
+
+@ public
+fn empty_headers() → headers.Headers {
+    return headers.empty()
+}
+
+@ public
+fn request_from_target(string method, string target, headers.Headers headers, string body) → httpreq.Request {
+    return httpreq.from_target(method, target, headers, body)
+}
+
+@ public
+fn response_of(int status, headers.Headers headers, string body) → response.Response {
+    return response.of(status, headers, body)
+}
+
+@ public
+fn encode_chunked(bytes data) → bytes {
+    return chunked.encode(data)
+}
+
+@ public
+fn split_url(string url) → client.Url {
+    return client.split(url)
+}
+
+@ public
+fn url_is_absolute(client.Url url) → bool {
+    return client.is_absolute(url)
+}
+
+@ public
+fn empty_client() → client.Client {
+    return client.empty()
+}
+
+@ public
+fn host_header(client.Url url) → string {
+    return client.host_header(url)
+}
+
+@ public
+fn request_target(client.Url url) → string {
+    return client.request_target(url)
+}

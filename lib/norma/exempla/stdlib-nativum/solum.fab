@@ -1,0 +1,59 @@
++++
+term = "solum"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "norma:solum filesystem API contract tests."
+syntax = "norma:solum — glob (native) | stat (mori) | path api"
+related = ["solum", "stdlib-nativum"]
+locale = "en"
++++
+
+# stdlib-nativum/solum — norma:solum filesystem API contract tests
+#
+# Most solum functions are ad-routed (require host routes at runtime).
+# This exemplum tests the native Faber bodies and exposed API shapes:
+#   1. explora iace path — empty path segments (native body)
+#   2. describe/describet mori error text
+
+import from "norma:solum" only
+
+main {
+    # -----------------------------------------------------------------------
+    # explora — native Faber glob reject empty path segment
+    # -----------------------------------------------------------------------
+    do {
+        only.glob("/tmp", "a//b")
+        assert false
+    }
+    catch err {
+        assert err.contains("empty path segment")
+    }
+
+    do {
+        only.glob("/tmp", "*/")
+        assert false
+    }
+    catch err {
+        assert err.contains("empty path segment")
+    }
+
+    # -----------------------------------------------------------------------
+    # describe — mori deferred body
+    # -----------------------------------------------------------------------
+    do {
+        only.stat("/tmp")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        only.statt("/tmp")
+        assert false
+    }
+    catch err {
+        print err
+    }
+}

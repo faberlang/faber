@@ -1,0 +1,221 @@
++++
+locale = "en"
++++
+
+# copula/ordinata.fab — key-ordered associative collection
+#
+# Etymology: ordered_map — arranged collection; Latin locale spelling `ordinata`.
+# Counterpart to tabula (hash-unordered map). Keys iterate in sorted order.
+#
+# NOTE: Generic record construction (`SortedMap<K, V> { ... }`) and generic
+# `<` ordering are not yet supported by the compiler (the
+# generic-genus-construction and Ord-bound goals are still draft). The
+# constructors use `SortedMap { ... }` with type arguments inferred from the
+# return type, `insert` keeps the index sorted via `sort()` instead of
+# comparison, and `fines` is removed until an ordering surface exists.
+#
+# Layering: pure native Faber over the builtin tabula<K, V> (for O(1) lookup)
+# plus a lista<K> kept in sorted order (for ordered iteration). No Rust
+# backing, no ad routes, no I/O.
+#
+# Import: the file-namespace-imports goal (docs/factory/file-namespace-imports)
+# shipped; this file is imported directly as norma:ordered_map. The genus lives at
+# file top level.
+#
+# Morphologia: receiver methods on the SortedMap<K, V> genus (implicit ego),
+# matching how the builtin tabula<K, V> exposes its surface (mySortedMap.put(),
+# mySortedMap.get(), ...). Stems reuse builtin tabula stems where the
+# operation is identical (put, get, delete, has) so users cross-walking
+# between tabula and ordinata see the same verbs. Imperativus for in-place
+# mutation (varia receiver required); nominal for projections (length,
+# keys, values); the sorted-iteration surface (keys, values) is
+# what ordinata adds on top of tabula.
+#
+# Internal helpers (insert, remove, remove_at, equals) live at file
+# scope as free functions with their own <K> type parameter, called from
+# genus methods via turbofish (insert<K>(...)). File-scope free functions
+# do not inherit the enclosing genus's type parameters — they declare their
+# own. This matches how generic functions already work elsewhere in the stdlib.
+
+# =============================================================================
+# TYPE
+# =============================================================================
+
+# Key-ordered map. `index` holds keys in ascending order; `entries` holds
+# the actual key→value bindings. Maintaining both lets lookup stay O(1)
+# (tabula get) while ordered iteration is O(n) over an already-sorted
+# lista, instead of O(n log n) sort-on-each-iteration.
+@ public
+class SortedMap<K, V> {
+    var list<K> index = []
+    var map<K, V> entries = {} ∷ map<K, V>
+
+    # =========================================================================
+    # STATE (nominal / present predicate)
+    # =========================================================================
+
+    # Number of entries. Nominal projection, matches tabula.length().
+    fn length() → int {
+        return self.index.length()
+    }
+
+    # Whether the map holds no entries. Present predicate, matches
+    # tabula.is_empty().
+    fn is_empty() → bool {
+        return self.index.is_empty()
+    }
+
+    # =========================================================================
+    # LOOKUP
+    # =========================================================================
+
+    # Get value by key; nihil if absent. Reuses the tabula lookup stem.
+    fn get(K key) → V ∪ none {
+        return self.entries.get(key)
+    }
+
+    # Whether the key is present. Reuses the tabula presence-probe stem.
+    fn has(K key) → bool {
+        return self.entries.has(key)
+    }
+
+    # =========================================================================
+    # MUTATION (Imperativus — in-place on a varia receiver)
+    # =========================================================================
+
+    # Insert or update a binding. Maintains the sorted key index.
+    # Reuses the tabula insert stem.
+    fn put(K key, V value) → void {
+        if not self.entries.has(key) {
+            insert<K>(mut self.index, key)
+        }
+        self.entries.put(key, value)
+    }
+
+    # Remove a binding. No-op if the key was absent.
+    # Reuses the tabula delete stem.
+    fn delete(K key) → void {
+        if self.entries.has(key) {
+            self.entries.delete(key)
+            remove<K>(mut self.index, key)
+        }
+    }
+
+    # =========================================================================
+    # ORDERED ITERATION (what ordinata adds over tabula)
+    # =========================================================================
+
+    # Keys in ascending order. O(1) — returns the maintained sorted index.
+    # Nominal projection (the keys, as a stable fact about the map).
+    fn keys() → list<K> {
+        return self.index
+    }
+
+    # Values in key-ascending order. Nominal projection.
+    fn values() → list<V> {
+        var list<V> out ← []
+        for from self.index const k {
+            # has verified by construction; get cannot miss.
+            const V ∪ none v ← self.entries.get(k)
+            if v ≡ null then continue
+            out.append(v)
+        }
+        return out
+    }
+}
+
+# =============================================================================
+# CONSTRUCTION (catalog constructors — not receiver methods)
+# =============================================================================
+# WHY: free functions rather than genus methods because they construct a fresh
+# SortedMap<K, V> rather than operating on an existing one. `empty` matches
+# fila.empty; `is_empty` is the emptiness predicate above.
+
+# Empty sorted map constructor.
+@ public
+fn empty<K, V>() → SortedMap<K, V> {
+    return SortedMap { }
+}
+
+# Build a sorted map from a tabula, sorting keys once at construction.
+# WHY: One sort at build time is cheaper than re-sorting on every ordered
+# iteration, which is the common ordinata use case.
+@ public
+fn from_map<K, V>(map<K, V> source_map) → SortedMap<K, V> {
+    var SortedMap<K, V> out ← SortedMap { entries = source_map }
+    var list<K> keys ← source_map.keys()
+    keys.sort()
+    out.index ← keys
+    return out
+}
+
+# =============================================================================
+# INTERNALS (private file-scope helpers)
+# =============================================================================
+# WHY: file-scope free functions, not genus methods, because they are pure
+# algorithms over a lista<K> that do not need the SortedMap<K, V> receiver.
+# They declare their own <K> type parameter and are called via turbofish
+# (insert<K>(...)) from the genus methods. This is the standard generic-
+# function pattern; file-scope functions do not inherit enclosing genus type
+# parameters.
+
+# Insert a key into the sorted index.
+# WHY: the sorted position is found via `sort()` instead of a generic `<`
+# comparison — no ordering surface exists for type params yet (Ord-bound
+# goal). The append-then-sort keeps the index sorted; duplicates can't occur
+# here because callers check has first.
+@ private
+fn insert<K>(mut list<K> index, K key) → void {
+    index.append(key)
+    index.sort()
+}
+
+# Remove a key from the sorted index.
+@ private
+fn remove<K>(mut list<K> index, K key) → void {
+    var int i ← 0
+    while i ≺ index.length() {
+        const K ∪ none extans ← index.get(i)
+        if extans ≡ null {
+            i ← i + 1
+            continue
+        }
+        if equals<K>(extans, key) {
+            remove_at<K>(mut index, i)
+            return
+        }
+        i ← i + 1
+    }
+}
+
+# Generic equality through the call-argument path: the `≡` operator on a
+# null-narrowed binding does not see the refined type, so the comparison is
+# delegated to a two-rigid-param helper.
+@ private
+fn equals<K>(K a, K b) → bool {
+    return a ≡ b
+}
+
+# Positional removal helper — rebuilds the lista without index `positio`.
+# The rebuild mutates the receiver in place: a parameter binding cannot be
+# reassigned (SEM020), so the original is drained and refilled.
+@ private
+fn remove_at<K>(mut list<K> index, int positio) → void {
+    var list<K> out ← []
+    var int i ← 0
+    while i ≺ index.length() {
+        const K ∪ none extans ← index.get(i)
+        if extans ≡ null {
+            i ← i + 1
+            continue
+        }
+        if i ≠ positio {
+            out.append(extans)
+        }
+        i ← i + 1
+    }
+    while not index.is_empty() { index.remove_last() }
+    for from out const item {
+        index.append(item)
+    }
+}

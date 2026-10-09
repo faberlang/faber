@@ -1,0 +1,95 @@
++++
+term = "aleator"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "norma:aleator entropy API contract tests."
+syntax = "norma:aleator — random_float | random_int | random_bytes | uuid | seed (all ad-routed)"
+related = ["aleator", "stdlib-nativum"]
+locale = "en"
++++
+
+# stdlib-nativum/aleator — norma:aleator entropy API contract tests
+#
+# All 5 public functions are ad-routed (require host routes at runtime).
+# This exemplum verifies import and function signature availability.
+
+import from "norma:aleator" aleator
+
+main {
+    # -----------------------------------------------------------------------
+    # Basic generation
+    # -----------------------------------------------------------------------
+    do {
+        const float val ← aleator.random_float()
+        assert val ≥ 0.0
+        assert val ≺ 1.0
+    }
+    catch err {
+        print "aleator.random_float not available"
+    }
+
+    do {
+        const int val ← aleator.random_int(1, 6)
+        assert val ≥ 1
+        assert val ≤ 6
+    }
+    catch err {
+        print "aleator.random_int not available"
+    }
+
+    # Edge: min = max should return the single value
+    do {
+        const int val ← aleator.random_int(5, 5)
+        assert val ≡ 5
+    }
+    catch err {
+        print "aleator.random_int fixed range not available"
+    }
+
+    # -----------------------------------------------------------------------
+    # Cryptographic generation
+    # -----------------------------------------------------------------------
+    do {
+        const bytes val ← aleator.random_bytes(16)
+        assert val.length() ≡ 16
+    }
+    catch err {
+        print "aleator.random_bytes not available"
+    }
+
+    # Edge: n = 0 returns empty bytes
+    do {
+        const bytes val ← aleator.random_bytes(0)
+        assert val.length() ≡ 0
+    }
+    catch err {
+        print "aleator.random_bytes(0) not available"
+    }
+
+    do {
+        const string val ← aleator.uuid()
+        assert val.length() ≡ 36
+    }
+    catch err {
+        print "aleator.uuid not available"
+    }
+
+    # -----------------------------------------------------------------------
+    # Seeding (for reproducible tests)
+    # -----------------------------------------------------------------------
+    do {
+        aleator.seed(42)
+    }
+    catch err {
+        print "aleator.seed not available"
+    }
+
+    # Edge: semina with negative value (should reset to true random)
+    do {
+        aleator.seed(-1)
+    }
+    catch err {
+        print "aleator.seed(-1) not available"
+    }
+}

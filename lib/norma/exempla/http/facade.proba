@@ -1,0 +1,9 @@
+# http/facade.proba — `import from "norma:http"` resolves (H1 fixture).
+
+import from "norma:http" http
+
+describe "facade_import" {
+    test "norma:http resolves" {
+        print "norma:http resolved"
+    }
+}

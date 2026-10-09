@@ -1,0 +1,254 @@
++++
+locale = "en"
++++
+
+# Colocated behavior tests for the pure-Faber JSON wire codec.
+import from "./json" json_codec
+
+@ json
+class Payload {
+    var string name
+    var list<int> counts
+    var bool active
+}
+
+@ json
+class EscapedText {
+    var string control
+    var string text
+    var string unicode
+}
+
+fn rejects(string wire) → bool {
+    do {
+        json_codec.parse(wire)
+        return false
+    }
+    catch err {
+        return true
+    }
+}
+
+fn parse_valid(string wire) → json {
+    do {
+        return json_codec.parse(wire)
+    }
+    catch err {
+        panic err
+    }
+}
+
+# Why: a failing conversion inside a test must fail the test, not be defaulted
+# away, so these helpers panic like parse_valid does.
+fn map_of(value tree) → map<string, value> {
+    do {
+        const map<string, value> root ↤ tree
+        return root
+    }
+    catch err {
+        panic err
+    }
+}
+
+fn byte_text(int code) → string {
+    do {
+        return ([code] ↦ bytes) ↦ string
+    }
+    catch err {
+        panic err
+    }
+}
+
+fn payload_of(json document) → Payload {
+    do {
+        return document ↦ Payload
+    }
+    catch err {
+        panic err
+    }
+}
+
+fn escaped_of(json document) → EscapedText {
+    do {
+        return document ↦ EscapedText
+    }
+    catch err {
+        panic err
+    }
+}
+
+fn json_of(EscapedText payload) → json {
+    do {
+        return payload ↦ json
+    }
+    catch err {
+        panic err
+    }
+}
+
+describe "JSON parsing" {
+    test "parses a typed object with nested values" {
+        const json document ← parse_valid(
+            "{\"name\":\"Ada\",\"counts\":[1,2,3],\"active\":true}"
+        )
+        const Payload payload ← payload_of(document)
+        assert payload.name ≡ "Ada"
+        assert payload.counts.length() ≡ 3
+        assert (payload.counts.get(1) coalesce 0) ≡ 2
+        assert payload.active
+    }
+
+    test "accepts whitespace and JSON number forms" {
+        const json document ← parse_valid(
+            " \n { \"zero\" : 0, \"negative\" : -12, \"fraction\" : 1.25, \"exponent\" : 2e3 } \t "
+        )
+        const value tree ← document ↦ value
+        const map<string, value> root ← map_of(tree)
+        assert (root.get("zero") ↦ int) ≡ 0
+        assert (root.get("negative") ↦ int) ≡ -12
+        assert (root.get("fraction") ↦ float) ≈ 1.25
+        assert (root.get("exponent") ↦ float) ≈ 2000.0
+    }
+
+    test "reads integers at and beyond the int boundary exactly" {
+        const json document ← parse_valid(
+            «{"max":9223372036854775807,"min":-9223372036854775808,"over":9223372036854775808,"under":-9223372036854775809,"wide":18446744073709551616}»
+        )
+        const value tree ← document ↦ value
+        const map<string, value> root ← map_of(tree)
+        assert (root.get("max") ↦ int) ≡ 9223372036854775807
+        assert (root.get("min") ↦ int) ≡ -9223372036854775807 - 1
+        const inf over ← 9223372036854775807
+        assert (root.get("over") ↦ inf) ≡ over + 1
+        assert (root.get("under") ↦ inf) ≡ -over - 2
+        assert (root.get("wide") ↦ inf) ≡ over * 2 + 2
+    }
+
+    test "decodes ordinary string escapes" {
+        const json document ← parse_valid(
+            "{\"text\":\"line\\nquote: \\\" slash: \\\\ solidus: \\/\"}"
+        )
+        const value tree ← document ↦ value
+        const map<string, value> root ← map_of(tree)
+        assert (root.get("text") ↦ string) ≡ "line\nquote: \" slash: \\ solidus: /"
+    }
+
+    test "decodes Unicode escapes and surrogate pairs" {
+        const json document ← parse_valid(
+            "{\"bmp\":\"\\u03BB\",\"pair\":\"\\uD834\\uDD1E\",\"raw\":\"λ\"}"
+        )
+        const value tree ← document ↦ value
+        const map<string, value> root ← map_of(tree)
+        assert (root.get("bmp") ↦ string) ≡ "λ"
+        assert (root.get("pair") ↦ string) ≡ "𝄞"
+        assert (root.get("raw") ↦ string) ≡ "λ"
+    }
+
+    test "preserves null and empty collections" {
+        const json document ← parse_valid(
+            "{\"nothing\":null,\"object\":{},\"array\":[]}"
+        )
+        const value tree ← document ↦ value
+        const map<string, value> root ← map_of(tree)
+        assert root.get("nothing") is none
+        const map<string, value> object ↤ root.get("object")
+        const list<value> array ↤ root.get("array")
+        assert object.length() ≡ 0
+        assert array.length() ≡ 0
+    }
+
+    test "rejects malformed documents" {
+        assert rejects("")
+        assert rejects("[]")
+        assert rejects("{\"a\":1} trailing")
+        assert rejects("{\"a\":1,}")
+        assert rejects("{\"a\":01}")
+        assert rejects("{\"a\":-}")
+        assert rejects("{\"a\":1.}")
+        assert rejects("{\"a\":1e}")
+        assert rejects("{\"a\":1e+}")
+        assert rejects("{\"a\":1,\"a\":2}")
+        assert rejects("{\"a\":true")
+        assert rejects("{\"a\":\"\\uD800\"}")
+        assert rejects("{\"a\":\"\\uDC00\"}")
+        assert rejects("{\"a\":\"\\u12xz\"}")
+        assert rejects("{\"a\":\"line\nbreak\"}")
+    }
+
+    test "try_parse returns null on malformed input" {
+        assert json_codec.try_parse("{]") is none
+        assert json_codec.try_parse("{\"ok\":true}") not is none
+    }
+}
+
+describe "JSON serialization" {
+    test "serializes every JSON value kind" {
+        const json document ← {
+            "text": "Ada",
+            "integer": 3,
+            "fraction": 1.25,
+            "active": true,
+            "nothing": null,
+            "items": [1, false, {"nested": "yes"}]
+        }
+        const string wire ← json_codec.stringify(document)
+        assert wire ≡ «{"active":true,"fraction":1.25,"integer":3,"items":[1,false,{"nested":"yes"}],"nothing":null,"text":"Ada"}»
+    }
+
+    test "escapes strings and preserves Unicode" {
+        const string control ← byte_text(1)
+        const string backspace ← byte_text(8)
+        const string formfeed ← byte_text(12)
+        const EscapedText payload ← EscapedText {
+            control = control,
+            text = «line§quote: § slash: § tab:§ back:§ form:§»(
+                "\n", «"», "\\", "\t", backspace, formfeed
+            ),
+            unicode = "λ𝄞"
+        }
+        const json document ← json_of(payload)
+        const string wire ← json_codec.stringify(document)
+        const string expected ← «{"control":"\\u0001","text":"line\\nquote: \\" slash: \\\\ tab:\\t back:\\b form:\\f","unicode":"λ𝄞"}»
+        assert wire ≡ expected
+        const EscapedText roundtrip ← escaped_of(parse_valid(wire))
+        assert roundtrip.control ≡ payload.control
+        assert roundtrip.text ≡ payload.text
+        assert roundtrip.unicode ≡ payload.unicode
+    }
+
+    test "serializes integers at and beyond the int boundary as bare numbers" {
+        const string wire ← «{"max":9223372036854775807,"min":-9223372036854775808,"over":9223372036854775808,"under":-9223372036854775809}»
+        assert json_codec.stringify(parse_valid(wire)) ≡ wire
+    }
+
+    test "round trips a thousand-digit integer" {
+        var string digits ← "9"
+        for range 1‥1000 const i {
+            digits ← digits + "7"
+        }
+        const string wire ← «{"n":§}»(digits)
+        const json document ← parse_valid(wire)
+        assert json_codec.stringify(document) ≡ wire
+        const value tree ← document ↦ value
+        const map<string, value> root ← map_of(tree)
+        assert ((root.get("n") ↦ inf) ↦ string) ≡ digits
+        assert json_codec.stringify(parse_valid(json_codec.stringify(document))) ≡ wire
+    }
+
+    test "round trips through the public facade" {
+        const json original ← {
+            "model": "gpt-test",
+            "messages": [{"role": "user", "content": "hello"}],
+            "stream": false
+        }
+        const json reparsed ← parse_valid(json_codec.stringify(original))
+        const value tree ← reparsed ↦ value
+        const map<string, value> root ← map_of(tree)
+        assert (root.get("model") ↦ string) ≡ "gpt-test"
+        assert (root.get("stream") ↦ bool) ≡ false
+        const list<value> messages ↤ root.get("messages")
+        const map<string, value> first ↤ messages.get(0)
+        assert (first.get("role") ↦ string) ≡ "user"
+        assert (first.get("content") ↦ string) ≡ "hello"
+    }
+}

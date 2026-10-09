@@ -1,0 +1,141 @@
++++
+locale = "en"
++++
+# json/lexer.fab — shared lexical floor for the JSON wire library
+#
+# Implementation submodule for norma:json. Imported by solve.fab and
+# serialize.fab, but not re-exported by the public facade.
+# No Rust backing: pure Faber character classification and escape tables.
+#
+# Faber has no char type — a single character is a length-1 textus. Classifiers
+# therefore compare length-1 slices using lexicographic ordering (the chorda
+# retenta interval pattern) rather than calling an is_digit intrinsic.
+
+# =========================================================================
+# WHITESPACE
+# =========================================================================
+
+@ public
+fn is_whitespace(string c) → bool {
+    return c ≡ " " or c ≡ "\t" or c ≡ "\n" or c ≡ "\r"
+}
+
+# Advance over whitespace; returns the next non-whitespace index.
+@ public
+fn skip_whitespace(string s, int i) → int {
+    var int pos ← i
+    while pos ≺ s.length() {
+        if is_whitespace(s.slice(pos, pos + 1)) {
+            pos ← pos + 1
+        }
+        else then return pos
+    }
+    return pos
+}
+
+# =========================================================================
+# DIGITS / NUMBER TERMINATORS
+# =========================================================================
+# Faber has no char ordering (textus < is rejected as non-numeric), so digit
+# classification uses membership against a literal digit string.
+
+@ public
+fn is_digit(string c) → bool {
+    return "0123456789".contains(c)
+}
+
+# A value terminator: the chars that legally end a scanned token.
+@ public
+fn is_terminator(string c) → bool {
+    return c ≡ "," or c ≡ "}" or c ≡ "]" or is_whitespace(c)
+}
+
+# JSON strings may not contain an unescaped U+0000..U+001F codepoint.
+@ public
+fn is_control(string c) → bool {
+    const bytes encoded ← c ↦ bytes
+    if encoded.length() ≠ 1 then return false
+    return encoded.get(0) coalesce 32 ∷ u8 ≺ 32 ∷ u8
+}
+
+# =========================================================================
+# SERIALIZER ESCAPE TABLES
+# =========================================================================
+# escape_char maps a single literal char to its backslash escape.
+# Returns nihil when the char needs no escaping (caller emits it raw).
+
+@ public
+fn escape_char(string c) → string ∪ none {
+    if c ≡ «\"» then return «\\\"»
+    if c ≡ "\\" then return "\\\\"
+    if c ≡ "\n" then return "\\n"
+    if c ≡ "\r" then return "\\r"
+    if c ≡ "\t" then return "\\t"
+    if is_control(c) {
+        const bytes encoded ← c ↦ bytes
+        const int code ← encoded.get(0) coalesce 0 ∷ u8 ↦ int
+        if code ≡ 8 then return "\\b"
+        if code ≡ 12 then return "\\f"
+    }
+    return null
+}
+
+# Does this character require backslash escaping? Structural characters and
+# named controls use escape_char; unnamed controls use control_escape.
+@ public
+fn needs_escape(string c) → bool {
+    if c ≡ «\"» or c ≡ "\\" then return true
+    if escape_char(c) not is none then return true
+    return is_control(c)
+}
+
+# Render an unnamed U+0000..U+001F control code as a JSON Unicode escape.
+@ public
+fn control_escape(string c) → string {
+    const bytes encoded ← c ↦ bytes
+    const int code ← encoded.get(0) coalesce 0 ∷ u8 ↦ int
+    return "\u00§§"(hex_digit(code / 16), hex_digit(code % 16))
+}
+
+fn hex_digit(int digit) → string {
+    return "0123456789abcdef".slice(digit, digit + 1)
+}
+
+# =========================================================================
+# PARSER ESCAPE TABLE
+# =========================================================================
+# unescape_char maps a single escape letter (the char following \) back
+# to the literal it represents. Returns nihil for unknown letters (caller
+# signals a syntax error) and treats "u" as a sentinel for \uXXXX handling.
+# The `⊥ ""` defaults on the control bytes 8 and 12 are unreachable (both are
+# ASCII); they only satisfy D17.8.
+
+@ public
+fn unescape_char(string s) → string ∪ none {
+    if s ≡ «\"» then return «\"»
+    if s ≡ "\\" then return "\\"
+    if s ≡ "/" then return "/"
+    if s ≡ "n" then return "\n"
+    if s ≡ "r" then return "\r"
+    if s ≡ "t" then return "\t"
+    if s ≡ "b" then return ([8] ↦ bytes) ↦ string ⊥ ""
+    if s ≡ "f" then return ([12] ↦ bytes) ↦ string ⊥ ""
+    return null
+}
+
+# =========================================================================
+# HEX DIGIT VALUE (for \uXXXX escapes)
+# =========================================================================
+# Single-hex-digit → numeric value. Returns null for non-hex chars.
+
+@ public
+fn hex_value(string c) → int ∪ none {
+    const string lower ← "0123456789abcdef"
+    const string upper ← "0123456789ABCDEF"
+    var int digit ← 0
+    while digit ≺ 16 {
+        if lower.slice(digit, digit + 1) ≡ c or upper.slice(digit, digit + 1) ≡ c then return digit
+        digit ← digit + 1
+    }
+    return null
+}

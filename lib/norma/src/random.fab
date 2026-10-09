@@ -1,0 +1,58 @@
++++
+locale = "en"
++++
+
+# random.fab - Entropy Device (random number generation)
+#
+# Etymology: random — entropy and random-number generation; Latin locale spelling `aleator`.
+#
+# Effect verbs: native Faber bodies over stream `ad` (`aleator:*` routes).
+#
+# Design notes:
+# - fractum/sortire use Math.random (fast, not crypto-secure)
+# - octetos/uuid use crypto.getRandomValues (secure)
+# - semina seeds the RNG for reproducible tests
+
+
+# =========================================================================
+# BASIC GENERATION
+# =========================================================================
+
+# Random float in [0, 1)
+@ public
+fn random_float() → float {
+    return call 'aleator:fractum' ↦ float
+}
+
+# Random integer in [min, max] inclusive (draw by lot)
+@ public
+fn random_int(int min, int max) → int {
+    return call 'aleator:sortire' ([min, max]) ↦ int
+}
+
+# =========================================================================
+# CRYPTOGRAPHIC
+# =========================================================================
+
+# Random bytes (crypto-secure)
+@ public
+fn random_bytes(int n) → bytes {
+    return call 'aleator:octetos' (n) ↦ bytes
+}
+
+# UUID v4 string (crypto-secure)
+@ public
+fn uuid() → string {
+    return call 'aleator:uuid' ↦ string
+}
+
+# =========================================================================
+# SEEDING (for reproducible tests)
+# =========================================================================
+
+# Seed the RNG. Only affects non-crypto functions.
+# Pass 0 or negative to reset to true random.
+@ public
+fn seed(int n) → void {
+    return call 'aleator:semina' (n) ↦ void
+}

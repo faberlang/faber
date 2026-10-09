@@ -1,0 +1,88 @@
++++
+term = "chorda"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "Assertion-based tests for chorda UTF-8 mechanical trio: encode, decode, try_decode."
+syntax = "encode | decode | try_decode"
+related = ["chorda", "textus", "octeti", "stdlib-nativum"]
+locale = "en"
++++
+
+# chorda/mechanica — UTF-8 mechanical trio contract tests
+#
+# encode: textus → octeti (UTF-8 encode)
+# decode: octeti → textus (UTF-8 decode, throws on invalid)
+# try_decode: octeti → textus ∪ nihil (tries decode, returns nihil on invalid)
+#
+# All three are mori-deferred (Stage 2). Tests verify they throw
+# and the mori error can be inspected.
+
+import from "norma:chorda" chorda
+
+main {
+    # -----------------------------------------------------------------------
+    # pange — UTF-8 encode (mori deferred)
+    # -----------------------------------------------------------------------
+    do {
+        const bytes raw ← chorda.encode("Salve")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        const bytes raw ← chorda.encode("")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        const bytes raw ← chorda.encode("π ≈ 3.14")
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # solve — UTF-8 decode (mori deferred)
+    # -----------------------------------------------------------------------
+    do {
+        const string decoded ← chorda.decode(|68 65 6c 6c 6f|)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        const string decoded ← chorda.decode(|ce bb|)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    # -----------------------------------------------------------------------
+    # tempta — try UTF-8 decode (mori deferred)
+    # -----------------------------------------------------------------------
+    do {
+        const string ∪ none decoded ← chorda.try_decode(|68 65 6c 6c 6f|)
+        assert false
+    }
+    catch err {
+        print err
+    }
+
+    do {
+        const string ∪ none decoded ← chorda.try_decode(|ff fe|)
+        assert false
+    }
+    catch err {
+        print err
+    }
+}

@@ -1,0 +1,32 @@
++++
+locale = "en"
++++
+# Canonical module: norma:net/listener; Latin locale spelling: auscultator.
+
+# net/listener.fab — TCP listener
+#
+# Public import: importa ex "norma:net/listener" private listener
+# Depends on: norma:net/connection (for Socket type in accept())
+
+import from "norma:net/connection" connection
+
+@ public
+class Listener {
+    var int id = 0
+
+    # Accept next incoming connection
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn accept() → connection.Socket
+
+    @ future
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn accept_async() → connection.Socket
+
+    # Stop listening
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn close() → void
+
+    # Local port
+    @ unstable "deferred pending Stage 2 dispatch"
+    fn port() → int
+}

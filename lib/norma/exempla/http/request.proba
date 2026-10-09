@@ -1,0 +1,20 @@
+# http/request.proba — import-resolution fixture for norma:http/request
+#
+# Behavior cases live in src/http/request.proba.
+
+import from "norma:http/headers" headers
+import from "norma:http/request" request
+
+describe "request_import" {
+    test "Request constructs" {
+        const request.Request r ← request.Request {
+            method = "GET",
+            path = "/health",
+            query = "",
+            headers = headers.Headers { },
+            body = ""
+        }
+        assert r.method ≡ "GET"
+        assert r.path ≡ "/health"
+    }
+}

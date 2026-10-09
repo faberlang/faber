@@ -1,0 +1,14 @@
++++
+locale = "en"
++++
+# Canonical module: norma:net/endpoint; Latin locale spelling: terminus.
+
+# net/endpoint.fab — TCP endpoint type
+#
+# Public import: importa ex "norma:net/endpoint" private endpoint
+
+@ public
+class Endpoint {
+    var string host
+    var int port
+}

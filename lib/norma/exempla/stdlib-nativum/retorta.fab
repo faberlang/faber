@@ -1,0 +1,23 @@
++++
+term = "reverse"
+kind = "concept"
+category = "stdlib"
+canonical = true
+summary = "First native stdlib body wired through norma:chorda."
+syntax = "reverse(<cord>)"
+related = ["chorda", "stdlib-nativum"]
+locale = "en"
++++
+
+
+# stdlib-nativum/retorta — first native stdlib body via norma:chorda
+#
+# EXPECTED OUTPUT:
+#   amor
+
+import from "norma:chorda" chorda
+
+main {
+    const string reversed ← chorda.reverse("roma")
+    print reversed
+}

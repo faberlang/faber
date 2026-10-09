@@ -1,0 +1,38 @@
++++
+term = "chorda"
+kind = "concept"
+category = "stdlib"
+canonical = false
+summary = "Predicate and interval cord filtering."
+syntax = "keep_if(<cord>, <predicate>) | keep_between(<cord>, <lo>, <hi>) | drop_between(<cord>, <lo>, <hi>)"
+related = ["chorda", "textus"]
+locale = "en"
++++
+# chorda/retenta — predicate and interval cord filtering
+#
+# Filter ≠ clamp: retention walks scalars; it does not snap a whole cord to an interval endpoint.
+# Scalar ordering (Seam B): `c ≥ 'a'` inside `retenta` and native interval bodies.
+
+import from "norma:chorda" chorda
+
+main {
+    const string slug ← chorda.keep_between("hello7!", "a", "z")
+    assert slug ≡ "hello"
+
+    const string letters ← chorda.keep_if("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
+    assert letters ≡ slug
+
+    const string digits ← chorda.keep_if("id42x", string c ∴ (((c ≡ "0" or c ≡ "1") or c ≡ "2") or c ≡ "3") or c ≡ "4")
+    assert digits ≡ "42"
+
+    const string stripped ← chorda.drop_if("hi, world!", string c ∴ (c ≡ "," or c ≡ "!") or c ≡ " ")
+    assert stripped ≡ "hiworld"
+
+    const string without_digits ← chorda.drop_between("hello7!", "0", "9")
+    assert without_digits ≡ "hello!"
+
+    const list<string> scalae ← chorda.chars("ab")
+    assert scalae.length() ≡ 2
+
+    print slug, digits, stripped
+}

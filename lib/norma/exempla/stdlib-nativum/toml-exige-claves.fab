@@ -1,0 +1,44 @@
++++
+term = "toml"
+kind = "existing-home"
+category = "stdlib"
+canonical = false
+summary = "Required-key validation via valor.require_strings(valor, list<string>)."
+syntax = "valor.require_strings(doc, [\"id\", \"name\"])"
+related = ["valor", "toml", "stdlib-nativum"]
+locale = "en"
++++
+# stdlib-nativum/toml-exige-claves — multi-key exige_claves
+#
+# EXPECTED OUTPUT:
+#   faber sample
+
+import from "norma:toml" toml
+import from "norma:valor" value
+
+fn sampleToml() → string {
+    return «name = "faber"
+id = "sample"»
+}
+
+main {
+    const value doc ← toml.parse(sampleToml())
+
+    do {
+        value.require_strings(doc, ["id", "name"])
+        const string name ↤ value.get(doc, "name") ⊥ "missing"
+        const string id ↤ value.get(doc, "id") ⊥ "missing"
+        print name, id
+    }
+    catch err {
+        assert false
+    }
+
+    do {
+        value.require_strings(doc, ["absent"])
+        assert false
+    }
+    catch err {
+        assert err.contains("missing key")
+    }
+}

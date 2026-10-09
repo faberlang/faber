@@ -1,0 +1,47 @@
++++
+locale = "en"
++++
+# json.fab — JSON wire floor facade
+#
+# Etymology: "JSON" — JavaScript Object Notation (universal, kept as-is).
+#
+# Wire floor only: parse (text → json), stringify (json → text), try_parse
+# (lenient parse). The compiler rejects direct `textus ↦ json` / `json ↦ textus`
+# conversions; Norma owns those wire operations as ordinary Faber code.
+#
+# No valor navigation surface here — that is codec-agnostic and lives in
+# norma:value.
+
+import from "norma:json/solve" parser
+
+import from "norma:json/serialize" encoder
+
+# =========================================================================
+# SERIALIZATION
+# =========================================================================
+# Verb: stringify from "pangere" (to fasten, compose)
+# Why: Composing/fastening data into JSON text representation.
+
+@ public
+fn stringify(json document) → string {
+    return encoder.stringify(document)
+}
+
+# =========================================================================
+# PARSING
+# =========================================================================
+# Verb: parse from "solvere" (to loosen, untangle)
+# Why: Untangling/extracting data from JSON text.
+
+@ public
+fn parse(string wire) → json ⇥ string {
+    return parser.parse(wire)
+}
+
+# Verb: try_parse from "temptare" (to try, attempt)
+# Why: Attempting to parse, returning null on failure instead of throwing.
+
+@ public
+fn try_parse(string wire) → json ∪ none {
+    return parser.try_parse(wire)
+}

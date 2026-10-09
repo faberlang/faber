@@ -1,0 +1,157 @@
++++
+locale = "en"
++++
+# Canonical module: norma:value; Latin locale spelling: valor.
+
+# value.fab — codec-agnostic value tree navigation
+#
+# Shared surface for the tree-shaped codecs under the flat codec modules (json, toml, yaml).
+# Each codec owns its wire floor; this module owns the operations on the
+# value tree shape they all produce. CSV is excluded — it produces a flat
+# list<list<string>>, not a valor tree.
+#
+# No Rust backing. Variant discrimination uses `is` (tag check without
+# extraction) and typed read uses `↦` (extraction). The conversio-cascade
+# pattern that previously lived in json.fab and toml.fab is retired here
+# in favor of the flat `is` dispatch.
+
+# =========================================================================
+# SHAPE PREDICATES
+# =========================================================================
+# One-line `is` tag checks. The runtime enum is sibling
+# faber/runtime/rust/src/valor.rs.
+
+@ public
+fn is_null(value v) → bool {
+    return v is none
+}
+
+@ public
+fn is_bool(value v) → bool {
+    return v is bool
+}
+
+@ public
+fn is_string(value v) → bool {
+    return v is string
+}
+
+@ public
+fn is_int(value v) → bool {
+    return v is int
+}
+
+@ public
+fn is_float(value v) → bool {
+    return v is float
+}
+
+@ public
+fn is_list(value v) → bool {
+    return v is list<value>
+}
+
+@ public
+fn is_map(value v) → bool {
+    return v is map<string, value>
+}
+
+# Instans is the RFC3339 datetime wire form (Valor::Instans). Available to
+# all tree codecs — previously toml-only, now shared.
+@ public
+fn is_instant(value v) → bool {
+    return v is instant
+}
+
+# =========================================================================
+# VALUE ACCESS
+# =========================================================================
+# All accessors return null for missing keys, out-of-bounds indices, and
+# non-collection variants. Callers distinguish "absent" from "wrong shape"
+# via the predicates above if they care.
+# Each `↤` extraction below follows an `is` test on the same value, so its
+# `⊥ empty` default never applies; it only satisfies D17.8.
+
+# Get value by key from a map (returns null if missing or non-map).
+@ private
+fn map_lookup(value v, string key) → value {
+    if v is none then return null
+    if v not is map<string, value> then return null
+    const map<string, value> tab ↤ v ⊥ empty
+    const value got ← tab.get(key)
+    return got
+}
+
+@ public
+fn get(value v, string key) → value {
+    return map_lookup(v, key)
+}
+
+# Pluck value by index from a list (returns null if out of bounds or
+# non-list).
+@ public
+fn get_index(value v, int index) → value {
+    if v is none then return null
+    if v not is list<value> then return null
+    const list<value> items ↤ v ⊥ empty
+    const value got ← items.get(index)
+    return got
+}
+
+# Find value by dotted path (e.g. "user.address.city"). Walks maps by
+# key; numeric segments index lists. Returns null if any segment misses.
+@ public
+fn find(value v, string path) → value {
+    const list<string> parts ← path.split(".")
+    var value current ← v
+    for from parts const pars {
+        current ← find_part(current, pars)
+        if current is none then return null
+    }
+    return current
+}
+
+# Walk one path segment. Map-keyed first; numeric segments fall through
+# to list indexing. Non-collection variants return null.
+@ public
+fn find_part(value current, string part) → value {
+    if current is none then return null
+    if current is map<string, value> {
+        const map<string, value> tab ↤ current ⊥ empty
+        const value got ← tab.get(part)
+        return got
+    }
+    if current is list<value> {
+        do {
+            const int idx ↤ part
+            return get_index(current, idx)
+        }
+        catch err {
+            return null
+        }
+    }
+    return null
+}
+
+# =========================================================================
+# STRICT EXTRACTION
+# =========================================================================
+
+# Require a string child at clavis; throw on missing or non-string.
+@ public
+fn require_string(value v, string key) → string ⇥ string {
+    const value child ← map_lookup(v, key)
+    if child is none then throw "missing key: §"(key)
+    if child not is string then throw "key not textus: §"(key)
+    return child ↦ string
+}
+
+# Require multiple string children; throws on the first missing or
+# non-string key. Used by codec callers that validate a schema shape.
+@ public
+fn require_strings(value v, list<string> keys) → void ⇥ string {
+    for from keys const key {
+        const string _ ← require_string(v, key)
+    }
+    return
+}

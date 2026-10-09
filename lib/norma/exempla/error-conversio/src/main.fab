@@ -1,0 +1,16 @@
++++
+locale = "en"
++++
+
+import from "./error_conversio" conversion
+
+# Executed package entry: the converted error reaches the destination union.
+main {
+    do {
+        const string _ ← conversion.inspect_after()
+        assert false
+    }
+    catch err {
+        assert err.message ≡ "wire rejected"
+    }
+}

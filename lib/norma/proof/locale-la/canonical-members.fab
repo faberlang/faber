@@ -1,0 +1,15 @@
++++
+locale = "la"
++++
+
+# Canonical English names remain accepted (missing-row fallback).
+
+importa ex "norma:text" chorda
+
+functio probe() → textus {
+    redde chorda.reverse("abc")
+}
+
+incipit {
+    nota probe()
+}

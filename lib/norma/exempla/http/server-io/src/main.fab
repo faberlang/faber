@@ -1,0 +1,101 @@
++++
+locale = "en"
++++
+
+# Exemplum server: stream N SSE frames over one connection with O(1)
+# in-language memory (each write is the current event only). Mode `stall`
+# writes large frames so a stalled reader blocks the write loop.
+#
+# `faber check` compiles the listen/open_sse/send_event loop. A rust
+# package run currently hits the faber-runtime tag-pin plus rust-emit
+# residuals in the imported module graph (same window as client-io).
+# The MIR runner has no http:* provider, so `faber run` cannot bind.
+#
+# argv: [mode] [port] [n]
+#   mode = sse (default) | stall
+#   port = listen port (default 18766)
+#   n    = frame count (default 8)
+
+import from "norma:http/server" server
+import from "norma:http/sse" sse
+import from "norma:http/headers" headers
+import from "norma:http/request" httpreq
+import from "norma:processus" processus
+
+fn arg_at(int index, string fallback) → string {
+    const list<string> args ← processus.argv()
+    if args.length() ≻ index {
+        const string ∪ none item ← args.get(index)
+        if item not is none {
+            return item ↦ string
+        }
+    }
+    return fallback
+}
+
+# 64 KiB payload via doubling — O(n) copies, not per-byte concat.
+fn stall_frame() → bytes {
+    var string block ← "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    var int i ← 0
+    while i ≺ 10 {
+        block ← block + block
+        i ← i + 1
+    }
+    return block ↦ bytes
+}
+
+main {
+    const string mode ← arg_at(0, "sse")
+    const int port ↤ arg_at(1, "18766")
+    const int n ↤ arg_at(2, "8")
+
+    const server.Listener listener ← server.bind(port)
+    print "listening"
+    print port
+
+    const server.Incoming incoming ← server.accept_incoming(listener.handle)
+    print "accepted"
+    print incoming.id
+    const httpreq.Request req ← incoming.req
+    print req.path
+
+    const headers.Headers head ← req.headers
+    const bool persist ← server.keep_alive(head)
+    const server.Stream stream ← server.open_sse(incoming)
+
+    if mode ≡ "stall" {
+        const bytes frame ← stall_frame()
+        print "frame-bytes"
+        print frame.length()
+        var int i ← 0
+        while i ≺ n {
+            print "write-start"
+            print i
+            server.write_chunk(stream, frame)
+            print "write-done"
+            print i
+            i ← i + 1
+        }
+    }
+    else {
+        var int i ← 0
+        while i ≺ n {
+            print "write-start"
+            print i
+            const sse.Event ev ← sse.Event {
+                name = "",
+                data = i ↦ string,
+                id = "",
+                retry = ""
+            }
+            server.send_event(stream, ev)
+            print "write-done"
+            print i
+            i ← i + 1
+        }
+    }
+
+    server.finish_stream(stream, persist)
+    server.stop(listener.handle)
+    print "done"
+}
