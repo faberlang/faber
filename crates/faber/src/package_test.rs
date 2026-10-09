@@ -23,7 +23,6 @@ use radix::program::emit::{
     compile_package as compile_package_compiler, compile_package_result,
     package_rust_runtime_plan as package_rust_runtime_plan_compiler,
 };
-use radix::program::manifest::ManifestRustHost;
 use radix::program::test_source_filter::TestSourceFilter;
 use std::collections::BTreeMap;
 fn analyze_with_faber_seams(
@@ -187,12 +186,10 @@ use radix::module::hir::{
 };
 use radix::module::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, RunnerError, Value};
 use std::fs;
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
-use std::time::Duration;
 
 use super::product::inject_product_failure_at;
 use super::test_support::{TestDir, test_temp_dir};
@@ -9482,11 +9479,6 @@ entry = "main.fab"
         plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
         vec!["solum:lege".to_owned()]
     );
-    assert_eq!(
-        plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
-        vec!["solum".to_owned()],
-        "host-required routes must auto-select their provider"
-    );
     assert!(plan.host.is_none());
     let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
         .expect("missing host selection diagnostic");
@@ -9527,7 +9519,6 @@ entry = "main.fab"
         "served route must not be host-required: {:?}",
         plan.non_runtime_routes
     );
-    assert!(plan.selected_providers.is_empty());
     assert!(package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none());
 }
 
@@ -9559,10 +9550,6 @@ entry = "main.fab"
     assert_eq!(
         plan.non_runtime_routes.iter().cloned().collect::<Vec<_>>(),
         vec!["ignotum:route".to_owned()]
-    );
-    assert_eq!(
-        plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
-        vec!["ignotum".to_owned()]
     );
     assert!(plan.host.is_none());
     let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
@@ -9611,128 +9598,12 @@ main {
         "library-expanded ad must be collected (got {:?})",
         plan.non_runtime_routes
     );
-    assert!(
-        plan.selected_providers.contains("tempus"),
-        "host-required tempus route must select the tempus provider: {:?}",
-        plan.selected_providers
-    );
     assert!(plan.host.is_none());
     let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
         .expect("missing host selection diagnostic");
     assert!(diagnostic_has_issue(
         &diagnostic,
         "package_host_selection_required"
-    ));
-}
-
-#[test]
-fn package_runtime_plan_argv_only_processus_import_stays_green_with_native_host() {
-    // Norma `processus` walks every library `ad`, including uncalled
-    // `exit_process` → `processus:exi`. That route is a terminal builtin,
-    // not a host export. An argv-only consumer with host=native must not
-    // fail closed as `host_provider_selection_invalid`.
-    let container_root = radix::module::paths::faberlang_home().expect("faberlang container root");
-    super::runtime_sources::set_path_override_for_test(Some(container_root));
-    let pkg = test_temp_dir("runtime-plan-argv-only-processus");
-    fs::create_dir_all(pkg.join("src")).expect("src");
-    fs::write(
-        pkg.join("faber.toml"),
-        r#"
-[package]
-name = "runtime-plan-argv-only-processus"
-
-[paths]
-source = "src"
-entry = "main.fab"
-
-[target.rust]
-host = "native"
-"#,
-    )
-    .expect("manifest");
-    fs::write(
-        pkg.join("src/main.fab"),
-        r#"
-import from "norma:process" process
-
-main {
-  const list<string> args ← process.argv() ↦ list<string>
-}
-"#,
-    )
-    .expect("entry");
-
-    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
-
-    assert_eq!(plan.host, Some(ManifestRustHost::Native));
-    assert!(
-        plan.non_runtime_routes.contains("processus:argumenta"),
-        "argv must collect processus:argumenta (got {:?})",
-        plan.non_runtime_routes
-    );
-    assert!(
-        plan.non_runtime_routes.contains("processus:exi"),
-        "library walk still collects uncalled processus:exi (got {:?})",
-        plan.non_runtime_routes
-    );
-    assert!(
-        super::dispatch::is_builtin_ad_route("processus:exi"),
-        "processus:exi must be classified terminal-builtin"
-    );
-    assert!(
-        plan.provider_error.is_none(),
-        "argv-only native host must not demand a processus:exi export: {:?}",
-        plan.provider_error
-    );
-    assert!(
-        package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none(),
-        "argv-only native host plan must stay green"
-    );
-}
-
-#[test]
-fn package_runtime_plan_rejects_unknown_native_provider() {
-    let pkg = test_temp_dir("runtime-plan-unknown-provider");
-    fs::create_dir_all(pkg.join("src")).expect("src");
-    fs::write(
-        pkg.join("faber.toml"),
-        r#"
-[package]
-name = "runtime-plan-unknown-provider"
-
-[paths]
-source = "src"
-entry = "main.fab"
-
-[build]
-target = "rust"
-
-[target.rust]
-host = "native"
-
-[dispatch]
-providers = ["notaprovider"]
-"#,
-    )
-    .expect("manifest");
-    fs::write(
-        pkg.join("src/main.fab"),
-        r#"main { const string body ← call 'runtime:echo' ("ok") ↦ string print body }"#,
-    )
-    .expect("entry");
-
-    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
-    assert_eq!(plan.host, Some(ManifestRustHost::Native));
-    assert!(plan.selected_providers.contains("notaprovider"));
-    assert!(
-        plan.provider_error.is_some(),
-        "expected missing provider error"
-    );
-    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
-        .expect("provider selection diagnostic");
-    assert!(diagnostic_has_issue(
-        &diagnostic,
-        "host_provider_selection_invalid"
     ));
 }
 
@@ -9857,294 +9728,51 @@ fn emit_generated_crate_works_without_manifest_using_fallback_name() {
 }
 
 #[test]
-#[ignore = "host route e2e builds generated Rust; run with ignored integration checks"]
-fn generated_package_ad_avoids_private_host_bridge_dependency() {
-    let pkg = test_temp_dir("package-ad-runtime-route");
-    let data = pkg.join("data.txt");
-    fs::write(&data, "salve host").expect("write data fixture");
-    let path_lit = format!("{:?}", data.to_string_lossy());
-    let entry = pkg.join("main.fab");
-    fs::write(
-        &entry,
-        format!(
-            r"
-main {{
-    const string body ← call 'solum:lege' ({path_lit}) ↦ string
-    print body
-}}
-"
+fn package_host_routes_fail_closed_with_and_without_native_host() {
+    // The native host route and its providers were dropped (single-repo-
+    // development Q3): a package that uses a host-required route (solum:lege)
+    // must fail at plan time whether or not `[target.rust] host = "native"`
+    // is set, while the manifest line itself still parses.
+    for (label, target_rust, issue) in [
+        (
+            "package-host-route-hostless",
+            "",
+            "package_host_selection_required",
         ),
-    )
-    .expect("write entry");
-
-    let result = compile_with_faber_seams(&Config::default(), &entry);
-    assert!(
-        result.success(),
-        "expected package compile success, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue()))
-            .collect::<Vec<_>>()
-    );
-    let Some(Output::Rust(output)) = result.output else {
-        panic!("expected rust output");
-    };
-    assert!(!output.code.contains("__faber_attach_sermo"));
-
-    let layout = discover_build_layout(&entry).expect("layout");
-    emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
-    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
-    assert!(!cargo.contains("faber-host-macos-arm64"));
-    assert!(!cargo.contains("__faber_host_macos_arm64"));
-    assert!(!cargo.contains("../radix/hosts/macos-arm64"));
-
-    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
-    let run = Command::new(binary).output().expect("run generated binary");
-    assert!(run.status.success(), "generated binary failed: {run:?}");
-    assert_eq!(
-        String::from_utf8(run.stdout).expect("stdout utf8"),
-        "salve host\n"
-    );
-}
-
-#[test]
-#[ignore = "native host e2e builds generated Rust; run with ignored integration checks"]
-fn generated_package_native_host_selects_public_dependency_and_runs() {
-    let pkg = test_temp_dir("package-native-host-route");
-    fs::create_dir_all(pkg.join("src")).expect("create src");
-    fs::write(
-        pkg.join("faber.toml"),
-        r#"
-[package]
-name = "native-host-route"
-
-[paths]
-source = "src"
-entry = "main.fab"
-
-[target.rust]
-host = "native"
-"#,
-    )
-    .expect("write manifest");
-    let data = pkg.join("data.txt");
-    fs::write(&data, "salve native").expect("write data fixture");
-    let path_lit = format!("{:?}", data.to_string_lossy());
-    fs::write(
-        pkg.join("src/main.fab"),
-        format!(
-            r"
-main {{
-    const string body ← call 'solum:lege' ({path_lit}) ↦ string
-    print body
-}}
-"
+        (
+            "package-host-route-native",
+            "\n[target.rust]\nhost = \"native\"\n",
+            "host_provider_unsupported",
         ),
-    )
-    .expect("write entry");
+    ] {
+        let pkg = test_temp_dir(label);
+        fs::create_dir_all(pkg.join("src")).expect("create src");
+        fs::write(
+            pkg.join("faber.toml"),
+            format!(
+                "[package]\nname = \"{label}\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n{target_rust}"
+            ),
+        )
+        .expect("write manifest");
+        fs::write(
+            pkg.join("src/main.fab"),
+            r#"main { const string body ← call 'solum:lege' ("x") ↦ string print body }"#,
+        )
+        .expect("write entry");
 
-    let layout = discover_build_layout(&pkg).expect("layout");
-    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
-    assert!(compile_result.success(), "compile should succeed");
-    let code = match &compile_result.output {
-        Some(radix::module::Output::Rust(r)) => r.code.clone(),
-        _ => panic!("expected rust output"),
-    };
-    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
-    assert_eq!(plan.host, Some(ManifestRustHost::Native));
-    assert_eq!(
-        plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
-        vec!["solum".to_owned()]
-    );
-    assert!(plan.provider_error.is_none(), "{:?}", plan.provider_error);
-    assert!(
-        plan.provider_manifests
-            .iter()
-            .any(|manifest| manifest.provider == "solum"),
-        "expected fs provider manifest"
-    );
-
-    emit_generated_crate_with_runtime_plan(
-        &layout,
-        &code,
-        Some(&read_manifest(&layout.manifest_path).unwrap()),
-        &plan,
-    )
-    .expect("emit generated crate");
-    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
-    assert!(cargo.contains("host-kernel"));
-    assert!(cargo.contains("host_kernel"));
-    assert!(cargo.contains("host-native"));
-    assert!(cargo.contains("host_native"));
-    assert!(cargo.contains("solum"));
-    // Live adapter is host-native-rs (`host_native`), not the deleted runtime
-    // workspace clone `faber-host-native` (purity Tier-1 / 4adf6ef).
-    assert!(!cargo.contains("faber-host-macos-arm64"));
-    assert!(!cargo.contains("../radix/hosts/macos-arm64"));
-    let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
-    assert!(generated_main.contains("mod host_register;"));
-    assert!(generated_main.contains("host_register::install_or_exit();"));
-    let host_register = fs::read_to_string(
-        layout
-            .generated_crate_root
-            .join("src")
-            .join("host_register.rs"),
-    )
-    .expect("host_register");
-    assert!(host_register.contains("solum::register(&mut kernel)"));
-    assert!(host_register.contains("host_native::NativeHost::try_new(kernel)"));
-    assert!(host_register.contains("host native initialization failed"));
-    assert!(host_register.contains("faber::install_host_dispatch"));
-    assert!(
-        host_register.find("try_new(kernel)") < host_register.find("install_host_dispatch"),
-        "host native construction must happen before host dispatch installation"
-    );
-    let host_manifest = fs::read_to_string(layout.generated_crate_root.join("host-manifest.json"))
-        .expect("host-manifest.json");
-    assert!(host_manifest.contains("solum:lege"));
-    assert!(host_manifest.contains("\"provider\": \"solum\""));
-
-    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
-    let run = Command::new(binary).output().expect("run generated binary");
-    assert!(
-        run.status.success(),
-        "generated binary failed: status={:?} stdout={:?} stderr={:?}",
-        run.status,
-        String::from_utf8_lossy(&run.stdout),
-        String::from_utf8_lossy(&run.stderr)
-    );
-    assert_eq!(
-        String::from_utf8(run.stdout).expect("stdout utf8"),
-        "salve native\n"
-    );
-}
-
-#[test]
-#[ignore = "native host async e2e builds generated Rust; run with ignored integration checks"]
-fn generated_package_native_host_async_solum_runs() {
-    // P6 package E2E: async entry + public native host + solum provider.
-    // Cancel/saturation/shutdown remain proven in host-native unit tests;
-    // package path proves install + async dispatch through HostDispatch.
-    let pkg = test_temp_dir("package-native-host-async-solum");
-    fs::create_dir_all(pkg.join("src")).expect("create src");
-    fs::write(
-        pkg.join("faber.toml"),
-        r#"
-[package]
-name = "native-host-async-solum"
-
-[paths]
-source = "src"
-entry = "main.fab"
-
-[target.rust]
-host = "native"
-"#,
-    )
-    .expect("write manifest");
-    let data = pkg.join("data.txt");
-    fs::write(&data, "salve async").expect("write data fixture");
-    let path_lit = format!("{:?}", data.to_string_lossy());
-    fs::write(
-        pkg.join("src/main.fab"),
-        format!(
-            r"
-async_main {{
-    const string body ← call 'solum:lege' ({path_lit}) ↦ string
-    print body
-}}
-"
-        ),
-    )
-    .expect("write entry");
-
-    let layout = discover_build_layout(&pkg).expect("layout");
-    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
-    assert!(
-        compile_result.success(),
-        "compile should succeed: {:?}",
-        compile_result.diagnostics
-    );
-    let code = match &compile_result.output {
-        Some(radix::module::Output::Rust(r)) => r.code.clone(),
-        _ => panic!("expected rust output"),
-    };
-    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
-    assert_eq!(plan.host, Some(ManifestRustHost::Native));
-    assert!(plan.needs_tokio);
-    assert!(plan.selected_providers.contains("solum"));
-    assert!(plan.provider_error.is_none(), "{:?}", plan.provider_error);
-
-    emit_generated_crate_with_runtime_plan(
-        &layout,
-        &code,
-        Some(&read_manifest(&layout.manifest_path).unwrap()),
-        &plan,
-    )
-    .expect("emit generated crate");
-    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("cargo");
-    assert!(cargo.contains("host_native"));
-    assert!(cargo.contains("solum"));
-    assert!(cargo.contains("tokio = { version = "));
-    assert!(!cargo.contains("../radix/hosts/macos-arm64"));
-    let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("main");
-    assert!(generated_main.contains("host_register::install_or_exit();"));
-    assert!(
-        generated_main.contains("faber::r#gen::block_on") || generated_main.contains("tokio::"),
-        "expected async runtime wiring in generated main"
-    );
-
-    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
-    let run = Command::new(binary).output().expect("run generated binary");
-    assert!(
-        run.status.success(),
-        "generated async binary failed: status={:?} stdout={:?} stderr={:?}",
-        run.status,
-        String::from_utf8_lossy(&run.stdout),
-        String::from_utf8_lossy(&run.stderr)
-    );
-    assert_eq!(
-        String::from_utf8(run.stdout).expect("stdout utf8"),
-        "salve async\n"
-    );
-}
-
-#[test]
-fn generated_package_native_host_rejects_unknown_route_provider() {
-    let pkg = test_temp_dir("package-native-host-unknown-route");
-    fs::create_dir_all(pkg.join("src")).expect("create src");
-    fs::write(
-        pkg.join("faber.toml"),
-        r#"
-[package]
-name = "native-host-unknown-route"
-
-[paths]
-source = "src"
-entry = "main.fab"
-
-[target.rust]
-host = "native"
-"#,
-    )
-    .expect("write manifest");
-    fs::write(
-        pkg.join("src/main.fab"),
-        r#"main { const string body ← call 'ignotum:route' ("x") ↦ string print body }"#,
-    )
-    .expect("write entry");
-
-    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
-    assert_eq!(plan.host, Some(ManifestRustHost::Native));
-    assert!(plan.selected_providers.contains("ignotum"));
-    assert!(plan.provider_error.is_some(), "expected missing provider");
-    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
-        .expect("provider selection diagnostic");
-    assert!(diagnostic_has_issue(
-        &diagnostic,
-        "host_provider_selection_invalid"
-    ));
+        let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
+        assert_eq!(
+            plan.host.is_some(),
+            !target_rust.is_empty(),
+            "{label}: host policy must still parse"
+        );
+        let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
+            .unwrap_or_else(|| panic!("{label}: host route must fail closed at plan time"));
+        assert!(
+            diagnostic_has_issue(&diagnostic, issue),
+            "{label}: expected {issue}, got {diagnostic:?}"
+        );
+    }
 }
 
 #[test]
@@ -13324,146 +12952,6 @@ main {
     assert_eq!(
         entry.analysis.interner.resolve(contract.fields[0].name),
         "selector"
-    );
-}
-
-#[test]
-#[ignore = "http provider e2e builds generated Rust and opens localhost; run with ignored integration checks"]
-fn generated_package_http_provider_serves_one_localhost_request() {
-    let pkg = test_temp_dir("package-http-provider-hello");
-    fs::create_dir_all(pkg.join("src")).expect("create src");
-    fs::write(
-        pkg.join("faber.toml"),
-        r#"
-[package]
-name = "http-provider-hello"
-version = "0.1.0"
-
-[paths]
-source = "src"
-entry = "main.fab"
-
-[target.rust]
-host = "native"
-"#,
-    )
-    .expect("write manifest");
-    let probe = TcpListener::bind(("127.0.0.1", 0)).expect("reserve localhost port");
-    let port = probe.local_addr().expect("port").port();
-    drop(probe);
-    fs::write(
-        pkg.join("src/main.fab"),
-        format!(
-            r#"
-main {{
-    const list<value> options ← [{port} ↦ value]
-    const int listener ← call 'http:listen' (options) ↦ int
-    const value request ← call 'http:accept' (listener) ↦ value
-    const map<string, value> fields ← request ↦ map<string, value>
-    const value request_id_value ← fields.accipe("id")
-    const string request_id ← request_id_value ↦ string
-    const list<value> headers ← []
-    const void _ ← call 'http:respond' ([request_id ↦ value, 200 ↦ value, headers ↦ value, "salve mundus" ↦ value]) ↦ void
-    const void _ ← call 'http:stop' (listener) ↦ void
-}}
-"#
-        ),
-    )
-    .expect("write entry");
-
-    let layout = discover_build_layout(&pkg).expect("layout");
-    let compile_result = compile_with_faber_seams(&Config::default(), &pkg);
-    assert!(
-        compile_result.success(),
-        "expected HTTP hello compile success, got {:?}",
-        compile_result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue()))
-            .collect::<Vec<_>>()
-    );
-    let Some(Output::Rust(output)) = compile_result.output else {
-        panic!("expected Rust output");
-    };
-    let plan = runtime_plan_with_faber_seams(&Config::default(), &pkg).expect("runtime plan");
-    assert_eq!(
-        plan.selected_providers.iter().cloned().collect::<Vec<_>>(),
-        vec!["http".to_owned()]
-    );
-    assert!(plan.provider_error.is_none(), "{:?}", plan.provider_error);
-    let http_manifest = plan
-        .provider_manifests
-        .iter()
-        .find(|manifest| manifest.provider == "http")
-        .expect("generated plan must register http provider");
-    assert_eq!(http_manifest.prefixes, ["http"]);
-    assert_eq!(
-        http_manifest
-            .calls
-            .iter()
-            .map(|call| call.route.as_str())
-            .collect::<Vec<_>>(),
-        vec!["http:listen", "http:accept", "http:respond", "http:stop"]
-    );
-
-    emit_generated_crate_with_runtime_plan(
-        &layout,
-        &output.code,
-        Some(&read_manifest(&layout.manifest_path).expect("manifest")),
-        &plan,
-    )
-    .expect("emit generated crate");
-    let cargo = fs::read_to_string(&layout.generated_cargo_manifest).expect("generated cargo");
-    assert!(cargo.contains("http = { package = \"http\""), "{cargo}");
-    let generated_main = fs::read_to_string(&layout.generated_rust_entry).expect("generated main");
-    assert!(generated_main.contains("host_register::install_or_exit();"));
-    let host_register = fs::read_to_string(
-        layout
-            .generated_crate_root
-            .join("src")
-            .join("host_register.rs"),
-    )
-    .expect("host registration");
-    assert!(host_register.contains("http::register(&mut kernel)"));
-    let host_manifest = fs::read_to_string(layout.generated_crate_root.join("host-manifest.json"))
-        .expect("host manifest");
-    assert!(host_manifest.contains("\"provider\": \"http\""));
-    assert!(host_manifest.contains("http:listen"));
-
-    let binary = invoke_cargo_build(&layout, false).expect("cargo build");
-    let mut child = Command::new(binary)
-        .spawn()
-        .expect("spawn generated server");
-    let mut client = None;
-    for _ in 0..100 {
-        match TcpStream::connect(("127.0.0.1", port)) {
-            Ok(stream) => {
-                client = Some(stream);
-                break;
-            }
-            Err(_) => thread::sleep(Duration::from_millis(20)),
-        }
-    }
-    let Some(mut client) = client else {
-        let _ = child.kill();
-        let _ = child.wait();
-        panic!("generated server did not accept localhost connection");
-    };
-    client
-        .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
-        .expect("write GET");
-    client
-        .set_read_timeout(Some(Duration::from_secs(2)))
-        .expect("read timeout");
-    let mut response = String::new();
-    client.read_to_string(&mut response).expect("read response");
-    let status = child.wait().expect("wait generated server");
-    assert!(status.success(), "generated server failed: {status:?}");
-    assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response:?}");
-    assert!(response.contains("\r\n\r\nsalve mundus"), "{response:?}");
-    assert!(
-        response.contains("x-faber-request-id: http-"),
-        "{response:?}"
     );
 }
 

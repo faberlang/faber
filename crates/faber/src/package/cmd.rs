@@ -637,9 +637,6 @@ fn single_file_rust_runtime_plan(
         needs_regex: needs.needs_regex,
         host: None,
         non_runtime_routes: std::collections::BTreeSet::new(),
-        selected_providers: std::collections::BTreeSet::new(),
-        provider_manifests: Vec::new(),
-        provider_error: None,
         library_path_deps: Vec::new(),
         // A file with no entry point cannot be a binary crate: build a library.
         library_crate: analysis.hir.entry.is_none(),
