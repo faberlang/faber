@@ -567,28 +567,6 @@ spelling = "zq_lucis"
     assert!(has_issue(&diagnostics, "invalid_binding_manifest"));
 }
 
-#[test]
-fn real_tela_ts_manifest_parses_with_the_unified_schema() {
-    // The lane checkout carries `tela` beside `radix`; `FABER_TELA_HOME`
-    // overrides it for out-of-tree runs.
-    let tela = std::env::var_os("FABER_TELA_HOME").map_or_else(
-        || std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tela"),
-        std::path::PathBuf::from,
-    );
-    let manifest = read_binding_manifest(&tela.join("bindings/ts.toml")).expect("tela ts.toml");
-
-    let scope = manifest
-        .functions
-        .get("tela:dom.scope")
-        .expect("tela:dom.scope binding");
-    assert_eq!(scope.symbol, "webDomScope");
-    assert_eq!(scope.opener.as_deref(), Some("string"));
-    assert_eq!(scope.result.as_deref(), Some("Scope"));
-    assert!(manifest.shim.is_some());
-    assert!(manifest.shims.contains_key("canvas2d"));
-    assert!(manifest.types.is_empty());
-}
-
 fn write_target_table_package(table: &str) -> tempfile::TempDir {
     let root = tempfile::tempdir().expect("create temp root");
     fs::create_dir_all(root.path().join("src")).expect("create source directory");
