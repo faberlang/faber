@@ -52,9 +52,37 @@ pub fn fractus<T: FractusDisplay>(value: T) -> String {
     }
 }
 
+/// The output words of one locale: what a program prints for a `bivalens`, the
+/// null value and a tuple head. The print locale is the code locale, so
+/// English code prints `true`/`false`/`none`/`tuple` and Latin code prints
+/// `verum`/`falsum`/`nihil`/`iuncta`. Every plain function below prints
+/// [`DisplayTokens::LATIN`]; the `*_with` variants take the module's tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DisplayTokens {
+    pub true_: &'static str,
+    pub false_: &'static str,
+    pub none: &'static str,
+    pub tuple: &'static str,
+}
+
+impl DisplayTokens {
+    /// The Latin tokens (`verum`, `falsum`, `nihil`, `iuncta`).
+    pub const LATIN: Self = Self {
+        true_: "verum",
+        false_: "falsum",
+        none: "nihil",
+        tuple: "iuncta",
+    };
+}
+
 #[must_use]
 pub fn bivalens(value: bool) -> &'static str {
-    if value { "verum" } else { "falsum" }
+    bivalens_with(value, &DisplayTokens::LATIN)
+}
+
+#[must_use]
+pub fn bivalens_with(value: bool, tokens: &DisplayTokens) -> &'static str {
+    if value { tokens.true_ } else { tokens.false_ }
 }
 
 #[must_use]
@@ -63,22 +91,30 @@ pub fn text_payload(value: &str) -> &str {
 }
 
 pub fn valor(value: &Valor) -> String {
+    valor_with(value, &DisplayTokens::LATIN)
+}
+
+pub fn valor_with(value: &Valor, tokens: &DisplayTokens) -> String {
     match value {
-        Valor::Nihil => "nihil".to_owned(),
-        Valor::Bivalens(value) => bivalens(*value).to_owned(),
+        Valor::Nihil => tokens.none.to_owned(),
+        Valor::Bivalens(value) => bivalens_with(*value, tokens).to_owned(),
         Valor::Numerus(value) => value.to_string(),
         Valor::Magnus(value) => value.to_string(),
         Valor::Fractus(value) => fractus(*value),
         Valor::Textus(value) | Valor::Instans(value) => value.clone(),
         Valor::Octeti(bytes) => format!("<{} bytes>", bytes.len()),
         Valor::Lista(items) => {
-            let inner = items.iter().map(valor).collect::<Vec<_>>().join(", ");
+            let inner = items
+                .iter()
+                .map(|item| valor_with(item, tokens))
+                .collect::<Vec<_>>()
+                .join(", ");
             format!("[{inner}]")
         }
         Valor::Tabula(items) => {
             let inner = items
                 .iter()
-                .map(|(key, value)| format!("{key:?}: {}", valor(value)))
+                .map(|(key, value)| format!("{key:?}: {}", valor_with(value, tokens)))
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("{{{inner}}}")
@@ -87,17 +123,33 @@ pub fn valor(value: &Valor) -> String {
 }
 
 pub fn option<T: Display>(value: Option<&T>) -> String {
-    value.map_or_else(|| "nihil".to_owned(), ToString::to_string)
+    option_with(value, &DisplayTokens::LATIN)
+}
+
+pub fn option_with<T: Display>(value: Option<&T>, tokens: &DisplayTokens) -> String {
+    value.map_or_else(|| tokens.none.to_owned(), ToString::to_string)
 }
 
 pub fn option_bivalens(value: Option<bool>) -> &'static str {
-    value.map_or("nihil", bivalens)
+    option_bivalens_with(value, &DisplayTokens::LATIN)
+}
+
+pub fn option_bivalens_with(value: Option<bool>, tokens: &DisplayTokens) -> &'static str {
+    value.map_or(tokens.none, |value| bivalens_with(value, tokens))
 }
 
 pub fn option_fractus<T: FractusDisplay>(value: Option<T>) -> String {
-    value.map_or_else(|| "nihil".to_owned(), fractus)
+    option_fractus_with(value, &DisplayTokens::LATIN)
+}
+
+pub fn option_fractus_with<T: FractusDisplay>(value: Option<T>, tokens: &DisplayTokens) -> String {
+    value.map_or_else(|| tokens.none.to_owned(), fractus)
 }
 
 pub fn option_vacuum<T>(value: Option<T>) -> &'static str {
-    value.map_or("nihil", |_| "vacuum")
+    option_vacuum_with(value, &DisplayTokens::LATIN)
+}
+
+pub fn option_vacuum_with<T>(value: Option<T>, tokens: &DisplayTokens) -> &'static str {
+    value.map_or(tokens.none, |_| "vacuum")
 }

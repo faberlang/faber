@@ -224,9 +224,16 @@ pub fn fmt_list(values: &[i64]) -> String {
 /// The display text of an optional stored `d64`: the value or `nihil`.
 #[must_use]
 pub fn fmt_option(value: Option<i64>) -> String {
+    fmt_option_with(value, &crate::display::DisplayTokens::LATIN)
+}
+
+/// [`fmt_option`] with the module's output tokens: an absent value prints
+/// `tokens.none`.
+#[must_use]
+pub fn fmt_option_with(value: Option<i64>, tokens: &crate::display::DisplayTokens) -> String {
     match value {
         Some(value) => fmt(of(value)),
-        None => "nihil".to_owned(),
+        None => tokens.none.to_owned(),
     }
 }
 

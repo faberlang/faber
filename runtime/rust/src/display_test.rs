@@ -139,3 +139,41 @@ fn display_option_vacuum_some_vacuum() {
 fn display_option_vacuum_none_nihil() {
     assert_eq!(option_vacuum::<()>(None), "nihil");
 }
+
+const ENGLISH: crate::display::DisplayTokens = crate::display::DisplayTokens {
+    true_: "true",
+    false_: "false",
+    none: "none",
+    tuple: "tuple",
+};
+
+#[test]
+fn display_with_tokens_prints_english_words() {
+    use crate::display::{
+        bivalens_with, option_bivalens_with, option_fractus_with, option_vacuum_with, option_with,
+        valor_with,
+    };
+    assert_eq!(bivalens_with(true, &ENGLISH), "true");
+    assert_eq!(bivalens_with(false, &ENGLISH), "false");
+    assert_eq!(option_with::<String>(None, &ENGLISH), "none");
+    assert_eq!(option_bivalens_with(Some(true), &ENGLISH), "true");
+    assert_eq!(option_bivalens_with(None, &ENGLISH), "none");
+    assert_eq!(option_fractus_with::<f64>(None, &ENGLISH), "none");
+    assert_eq!(option_vacuum_with::<()>(None, &ENGLISH), "none");
+    assert_eq!(valor_with(&Valor::Nihil, &ENGLISH), "none");
+    let nested = Valor::Lista(vec![Valor::Bivalens(false), Valor::Nihil]);
+    assert_eq!(valor_with(&nested, &ENGLISH), "[false, none]");
+    assert_eq!(crate::dec::fmt_option_with(None, &ENGLISH), "none");
+}
+
+#[test]
+fn display_plain_functions_stay_latin() {
+    use crate::display::DisplayTokens;
+    assert_eq!(DisplayTokens::LATIN.tuple, "iuncta");
+    assert_eq!(bivalens(true), "verum");
+    assert_eq!(
+        valor(&Valor::Lista(vec![Valor::Bivalens(false), Valor::Nihil])),
+        "[falsum, nihil]"
+    );
+    assert_eq!(crate::dec::fmt_option(None), "nihil");
+}
