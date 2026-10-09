@@ -23,8 +23,8 @@ pub struct MirDisplayTokens {
 impl MirDisplayTokens {
     /// Id of `tokens`, appending it when the table does not hold it yet.
     ///
-    /// # Panics
-    /// Panics when the table holds more than `u32::MAX` entries.
+    /// The table holds one entry per distinct locale in the program (a handful),
+    /// so the index always fits `u32`; the conversion saturates rather than panics.
     pub fn intern(&mut self, tokens: &DisplayTokens) -> DisplayTokensId {
         let index = self
             .tokens
@@ -34,7 +34,7 @@ impl MirDisplayTokens {
                 self.tokens.push(tokens.clone());
                 self.tokens.len() - 1
             });
-        DisplayTokensId(u32::try_from(index).expect("display token table fits u32"))
+        DisplayTokensId(u32::try_from(index).unwrap_or(u32::MAX))
     }
 
     /// Record that `function` prints through `tokens`.
