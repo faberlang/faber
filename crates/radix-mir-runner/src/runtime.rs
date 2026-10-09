@@ -1228,11 +1228,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 };
                 let receiver = self.eval_operand(receiver, span)?;
                 let index = self.eval_operand(index, span)?;
-                if matches!(self.types.get(return_ty.semantic_id()), Type::Option(_)) {
-                    self.optional_collection_index(receiver, index, span)
+                let item = if matches!(self.types.get(return_ty.semantic_id()), Type::Option(_)) {
+                    self.optional_collection_index(receiver, index, span)?
                 } else {
-                    self.collection_index(receiver, index, span)
-                }
+                    self.collection_index(receiver, index, span)?
+                };
+                Ok(self.widen_declared_textus(return_ty.semantic_id(), item))
             }
             MirCollectionOp::Contains => {
                 let [receiver, needle] = args else {
@@ -4603,6 +4604,26 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             Some(_) => Err(RunnerError::internal(span, message)),
             None => Err(RunnerError::internal(span, ERR_ELEMENT_COUNT_OVERFLOW)),
+        }
+    }
+
+    /// A scalar text index carries the one-byte `Value::Ascii` payload. When the
+    /// intrinsic's declared result is plain `textus` (or `textus ∪ nihil`), the
+    /// value must be a `Value::Str` so every `textus` consumer (`contains`,
+    /// `append`, `+`, ...) sees the representation its static type promises.
+    /// A declared `ascii<1>` / `littera` result keeps the compact carrier.
+    fn widen_declared_textus(&self, declared: TypeId, value: Value) -> Value {
+        let declared = match self.types.get(declared) {
+            Type::Option(inner) => *inner,
+            _ => declared,
+        };
+        match value {
+            Value::Ascii(byte)
+                if matches!(self.types.get(declared), Type::Primitive(Primitive::Textus)) =>
+            {
+                Value::Str(char::from(byte).to_string())
+            }
+            other => other,
         }
     }
 
