@@ -234,7 +234,7 @@ main {
     print p_count(a)
 }
 ";
-    assert_thread_equals_plain(source, &["7.5", "nihil", "0", "7.5", "nihil", "0"]);
+    assert_thread_equals_plain(source, &["7.5", "none", "0", "7.5", "none", "0"]);
 }
 
 #[test]
@@ -274,5 +274,5 @@ main {
     print p_all(a)
 }
 ";
-    assert_thread_equals_plain(source, &["2", "falsum", "verum", "2", "falsum", "verum"]);
+    assert_thread_equals_plain(source, &["2", "false", "true", "2", "false", "true"]);
 }
