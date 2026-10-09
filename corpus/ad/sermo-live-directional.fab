@@ -47,6 +47,6 @@ main {
     const status accipe_done ← t2.fini()
     print outbound
     print inbound
-    print got
+    print got?.data
     print accipe_done
 }
