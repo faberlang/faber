@@ -25,56 +25,42 @@ fn write_plain_file(label: &str, contents: &str) -> TempPath {
     TempPath::new(dir, path)
 }
 
-/// Container `examples/` root: `FABER_EXAMPLES_HOME` override, then the
-/// faberlang container root via `radix::module::paths::faberlang_home()`.
-fn examples_home() -> PathBuf {
-    if let Ok(home) = std::env::var("FABER_EXAMPLES_HOME") {
-        return PathBuf::from(home);
-    }
-    radix::module::paths::faberlang_home()
-        .expect("faberlang container root")
-        .join("examples")
-}
-
-fn reader_locale_example_root(locale: &str) -> PathBuf {
-    examples_home().join("reader-locale").join(locale)
-}
-
-fn workspace_root() -> PathBuf {
-    // faberlang container root (siblings: norma, radix, examples).
+/// Repository root (`crates/faber` → `../..`), normalized so paths the CLI
+/// echoes back compare equal to ours.
+fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("faberlang container")
-        .to_path_buf()
+        .join("../..")
+        .canonicalize()
+        .expect("repository root")
 }
 
-fn faberlang_home() -> PathBuf {
-    let workspace = workspace_root();
-    for candidate in workspace.ancestors() {
-        // Lane packets carry a subset of the container siblings; a stale
-        // `worktrees/faber` lane must never satisfy this probe (same skip
-        // law as radix-module paths and runtime_sources).
-        if candidate
-            .components()
-            .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
-        {
-            continue;
-        }
-        if candidate.join("faber/runtime/rust/Cargo.toml").exists() {
-            return candidate.to_path_buf();
-        }
-    }
-    panic!("could not find faber/runtime/rust beside workspace");
+/// Radix-authored reader-locale sample package under `corpus-product/`.
+fn reader_locale_example_root(locale: &str) -> PathBuf {
+    repo_root()
+        .join("corpus-product/reader-locale")
+        .join(locale)
 }
 
+/// Offline support root: the repository root holding `runtime/rust`.
+fn support_root() -> PathBuf {
+    let root = repo_root();
+    assert!(
+        root.join("runtime/rust/Cargo.toml").exists(),
+        "could not find runtime/rust under {}",
+        root.display()
+    );
+    root
+}
+
+/// Library home holding Norma: the in-tree `lib/` (`lib/norma/src`).
 fn norma_library_home() -> PathBuf {
-    let workspace = workspace_root();
-    for candidate in workspace.ancestors() {
-        if candidate.join("norma/src").exists() {
-            return candidate.to_path_buf();
-        }
-    }
-    panic!("could not find norma/src beside workspace");
+    let home = repo_root().join("lib");
+    assert!(
+        home.join("norma/src").exists(),
+        "could not find lib/norma/src under {}",
+        repo_root().display()
+    );
+    home
 }
 
 fn run_faber(args: &[&str]) -> (String, String, bool) {
@@ -425,7 +411,7 @@ fn build_reader_locale_accepts_direct_entry_file_input() {
 "#,
     );
 
-    let workspace = faberlang_home();
+    let workspace = support_root();
     let (stdout, stderr, ok) = run_faber_with_env(
         &[
             "build",

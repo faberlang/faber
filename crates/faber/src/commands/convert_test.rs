@@ -14,12 +14,9 @@ use std::process::{Command, Stdio};
 #[test]
 fn convert_resolves_imports_in_corpus_fixture() {
     let fixture = exempla("importa/default-minimal.fab");
-    let home = radix::module::paths::faberlang_home()
-        .expect("faber crate must sit in the faberlang container");
     let mut child = Command::new(faber_binary())
         .args(["convert", "--to", "la", "--stdout"])
         .arg(&fixture)
-        .env("FABER_LIBRARY_HOME", &home)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
