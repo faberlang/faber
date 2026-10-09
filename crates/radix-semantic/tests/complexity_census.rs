@@ -1,6 +1,6 @@
-//! CC-U4 complexity census: per-function cyclomatic scores over the three
-//! declared Faber trees — `radix/corpus/`, sibling `norma/src/`, sibling
-//! `gradus/src/` — using CC-U1's pure scoring function.
+//! CC-U4 complexity census: per-function cyclomatic scores over the two
+//! declared Faber trees — `radix/corpus/` and in-tree `lib/norma/src/` —
+//! using CC-U1's pure scoring function.
 //!
 //! `#[ignore]`d by default: this is a measurement harness, not a regression
 //! test. Run with
@@ -16,19 +16,17 @@
 //!
 //! Postures (delivery.md CC-U4 read_scope):
 //! - `radix/corpus/`: driver single-unit analysis per file.
-//! - `norma/src/`, `gradus/src/`: package-analysis posture — each module is
-//!   resolved through the production `LibraryResolver` rooted at the
-//!   faberlang container root and analyzed in-process through the
-//!   radix-program library cache (the S8.5 Norma-graph analysis path), so
-//!   intra-tree `norma:*` / `gradus:*` imports resolve exactly as a consuming
-//!   package resolves them. Both trees are read-only siblings; this harness
-//!   only reads them.
+//! - `lib/norma/src/`: package-analysis posture — each module is resolved
+//!   through the production `LibraryResolver` (in-tree `lib/` fallback) and
+//!   analyzed in-process through the radix-program library cache (the S8.5
+//!   Norma-graph analysis path), so intra-tree `norma:*` imports resolve
+//!   exactly as a consuming package resolves them. This harness only reads
+//!   the tree.
 
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use radix::module::paths::faberlang_home;
 use radix::module::{AnalyzeRequest, Session, analyze_source};
 use radix::program::LibraryImportBinding;
 use radix::program::library::{
@@ -252,7 +250,7 @@ fn census_corpus() -> TreeCensus {
 }
 
 /// Dev-tree reader locale pack for the library cache seam (mirrors
-/// `radix-program` `test_locale_pack`: every norma/gradus module declares its
+/// `radix-program` `test_locale_pack`: every norma module declares its
 /// locale in frontmatter, and the loader loads it from `locale/`).
 fn dev_locale_pack(
     _input: &Path,
@@ -268,30 +266,28 @@ fn dev_locale_pack(
     Ok(Some(pack))
 }
 
-/// One library package tree (`norma/src`, `gradus/src`) through the production
+/// The in-tree Norma package (`lib/norma/src`) through the production
 /// resolver + radix-program library cache: per-module full analysis with
-/// intra-tree `provider:*` imports resolved as a consuming package would.
-fn census_library_tree(provider: &str, label: &'static str) -> TreeCensus {
-    let mut census = TreeCensus::new(label);
-    let home = faberlang_home().unwrap_or_else(|| {
-        panic!(
-            "census: faberlang container root not found (needed for the {provider} sibling tree)"
-        )
-    });
-    let source_root = home.join(provider).join("src");
+/// intra-tree `norma:*` imports resolved as a consuming package would.
+fn census_norma_tree() -> TreeCensus {
+    const PROVIDER: &str = "norma";
+    let mut census = TreeCensus::new("lib/norma/src");
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source_root = repo_root.join("lib").join(PROVIDER).join("src");
     assert!(
         source_root.is_dir(),
-        "census: {provider} source tree missing at {}",
+        "census: {PROVIDER} source tree missing at {}",
         source_root.display()
     );
-    let resolver = LibraryResolver::new(home);
+    // No explicit home: the resolver falls back to the in-tree `<repo>/lib`.
+    let resolver = LibraryResolver::with_optional_home(None);
     let mut cache =
         LibraryInterfaceCache::with_config(&Config::default().with_target(Target::HirRust))
             .with_locale_loader(dev_locale_pack);
 
     for (rel, _file) in fab_files(&source_root) {
         census.files_attempted += 1;
-        let specifier = format!("{}:{}", provider, rel.trim_end_matches(".fab"));
+        let specifier = format!("{}:{}", PROVIDER, rel.trim_end_matches(".fab"));
         let module = match resolver.resolve(&specifier) {
             Ok(Some(module)) => module,
             Ok(None) => {
@@ -510,12 +506,8 @@ fn render_census(trees: &[TreeCensus]) -> String {
 
 #[test]
 #[ignore = "CC-U4 census harness: run with `-- --ignored --nocapture` to print the tables"]
-fn complexity_census_over_corpus_norma_gradus() {
-    let trees = vec![
-        census_corpus(),
-        census_library_tree("norma", "norma/src"),
-        census_library_tree("gradus", "gradus/src"),
-    ];
+fn complexity_census_over_corpus_norma() {
+    let trees = vec![census_corpus(), census_norma_tree()];
 
     // Structural self-checks: the census must have measured real populations
     // and its bookkeeping must close (scored + failed == attempted per tree).
