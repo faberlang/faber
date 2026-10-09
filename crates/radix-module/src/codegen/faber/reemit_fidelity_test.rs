@@ -1284,3 +1284,77 @@ fn typed_sermo_annotation_keeps_its_arguments() {
     assert!(emitted.contains("sermo<numerus, numerus> t"), "{emitted}");
     assert!(emitted.contains("sermo loose"), "{emitted}");
 }
+
+/// Re-emits `source` at the English reader locale and asserts the output is a
+/// fixed point; returns the first emission.
+fn emit_en_idempotent(source: &str) -> String {
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .unwrap_or_else(|error| panic!("en pack loads: {error:?}"));
+    let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+    let emit = |input: &str| {
+        let result = reemit_faber(&session, &pack, "inferred_constructor.fab", input);
+        assert!(
+            result.success(),
+            "{:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diag| (diag.code, diag.issue()))
+                .collect::<Vec<_>>()
+        );
+        result.output.expect("emit should produce output").code
+    };
+    let first = emit(source);
+    assert_eq!(first, emit(&first), "re-emission must be idempotent");
+    first
+}
+
+#[test]
+fn inferred_constructor_map_entries_reemit_as_the_hole() {
+    let code = emit_en_idempotent("fn pondus() → map<string, int> {\n    return _ { \"x\": 7 }\n}\n");
+    assert!(
+        code.contains("return _ { \"x\": 7 }"),
+        "map entries must re-emit as the hole:\n{code}"
+    );
+}
+
+#[test]
+fn inferred_constructor_empty_map_reemits_as_the_hole() {
+    let code = emit_en_idempotent("fn f() → void {\n    var map<string, int> m ← _ {}\n}\n");
+    assert!(code.contains("m ← _ {}"), "empty map hole must re-emit as the hole:\n{code}");
+}
+
+#[test]
+fn inferred_constructor_tensor_zero_reemits_as_the_hole() {
+    let code = emit_en_idempotent("fn f() → void {\n    var tf32[2, 3] blank ← _ {}\n}\n");
+    assert!(
+        code.contains("blank ← _ {}"),
+        "tensor zero hole must re-emit as the hole:\n{code}"
+    );
+}
+
+#[test]
+fn inferred_constructor_genus_fields_reemit_as_the_hole() {
+    let code = emit_en_idempotent(
+        "class Punctum {\n    var int x = 0\n    var int y = 0\n}\n\nfn origo() → Punctum {\n    return _ { x = 7, y = 9 }\n}\n",
+    );
+    assert!(
+        code.contains("return _ { x = 7, y = 9 }"),
+        "genus hole must re-emit as the hole:\n{code}"
+    );
+}
+
+#[test]
+fn inferred_constructor_at_an_optional_slot_reemits_as_the_hole() {
+    let code = emit_en_idempotent(
+        "class Punctum {\n    var int x = 0\n    var int y = 0\n}\n\nfn origo() → Punctum ∪ none {\n    return _ { x = 7, y = 9 }\n}\n\nfn pondus() → map<string, int> ∪ none {\n    return _ { \"a\": 3 }\n}\n",
+    );
+    assert!(
+        code.contains("return _ { x = 7, y = 9 }"),
+        "optional genus hole must re-emit as the hole:\n{code}"
+    );
+    assert!(
+        code.contains("return _ { \"a\": 3 }"),
+        "optional map hole must re-emit as the hole:\n{code}"
+    );
+}

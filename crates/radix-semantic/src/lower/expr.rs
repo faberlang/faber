@@ -1376,6 +1376,13 @@ impl Lowerer<'_> {
     /// retain named fields without requiring a dedicated object-expression HIR
     /// shape.
     fn lower_verte(&mut self, verte: &radix_syntax::VerteExpr, owner: HirId) -> HirExpressionKind {
+        if matches!(verte.ty.kind, radix_syntax::TypeExprKind::Infer) {
+            // An inferred-constructor hole `_ {}` may become the typed-zero
+            // `crea` call at a dense slot (`empty_dense`); typecheck cannot
+            // intern, so the names it needs are interned here (as for `empty`).
+            self.intrinsic_surface_symbol("crea");
+            self.interner.intern("crea");
+        }
         let previous_bare_generic_construction = self.allow_bare_generic_construction;
         self.allow_bare_generic_construction = matches!(
             &verte.expr.kind,

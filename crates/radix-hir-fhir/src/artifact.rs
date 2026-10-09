@@ -603,8 +603,11 @@ pub struct FunctionProvenanceTableWire {
 /// free functions and genus methods in the resolver file-interface snapshot
 /// (`FileInterfaceSnapshot::unavailable`, `StructMethodSnapshot::unavailable`)
 /// so a loaded artifact still refuses calls with SEM017; schema-v39 artifacts
-/// fail closed.
-pub const SCHEMA_VERSION: u32 = 40;
+/// fail closed. Version 41 adds `HirPresentation::inferred_constructor_ids`
+/// (which nodes typecheck rewrote from an inferred-constructor hole `_ { … }`,
+/// so the Faber re-emitter prints the hole again); schema-v40 artifacts fail
+/// closed.
+pub const SCHEMA_VERSION: u32 = 41;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

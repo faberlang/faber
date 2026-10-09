@@ -2229,6 +2229,15 @@ pub struct HirPresentation {
     #[serde(default)]
     pub empty_dense_ids: Vec<HirId>,
 
+    /// Ids of the expressions typecheck produced by desugaring an authored
+    /// inferred constructor `_ { … }` (entries at a map or `json` slot, `_ {}`
+    /// at a map or dense tensor slot, fields at a genus or record slot). The
+    /// rewrite keeps the hole node's id; Faber re-emission prints the hole
+    /// for exactly these ids, so `faber format` stays surface-faithful instead
+    /// of printing the typed constructor or bare literal it became.
+    #[serde(default)]
+    pub inferred_constructor_ids: Vec<HirId>,
+
     /// Initializer-expression ids of wildcard-bound declarations
     /// (`fixum T _ ← expr`), which lower to bare expression statements.
     /// Emission restores the authored discard binding for exactly these.

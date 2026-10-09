@@ -461,6 +461,9 @@ pub(crate) struct TypeChecker<'a> {
     /// Node ids of `empty` literals rewritten into the typed zero, handed to
     /// the presentation sidecar when the check finishes.
     pub(super) empty_dense_ids: Vec<HirId>,
+    /// Node ids of inferred-constructor holes `_ { … }` the checker rewrote,
+    /// handed to the presentation sidecar when the check finishes.
+    pub(super) inferred_constructor_ids: Vec<HirId>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -753,6 +756,9 @@ pub(crate) fn typecheck_with_config(
         presentation
             .empty_dense_ids
             .append(&mut checker.empty_dense_ids);
+        presentation
+            .inferred_constructor_ids
+            .append(&mut checker.inferred_constructor_ids);
     }
     shape_obligations.clone_from(&checker.shape_obligations);
     tensor_edge_policies.clone_from(&checker.tensor_edge_policies);
@@ -823,6 +829,7 @@ impl<'a> TypeChecker<'a> {
             static_size_values: FxHashMap::default(),
             numeric_twin_ids: Vec::new(),
             empty_dense_ids: Vec::new(),
+            inferred_constructor_ids: Vec::new(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             unavailable_functions: FxHashMap::default(),

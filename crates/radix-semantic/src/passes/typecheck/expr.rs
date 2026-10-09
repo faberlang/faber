@@ -383,6 +383,8 @@ impl TypeChecker<'_> {
         if !entry_form && !field_form {
             return None;
         }
+        // The authored hole: re-emission prints `_ { … }` for this node id.
+        self.inferred_constructor_ids.push(expr.id);
         let no_fields = entries.as_ref().is_some_and(|fields| fields.is_empty());
         let span = expr.span;
         let concrete = expected

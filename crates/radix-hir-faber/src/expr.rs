@@ -166,6 +166,20 @@ impl super::FaberCodegen<'_> {
             self.write_expr_prec(operand, parent_prec, names, surface, writer);
             return;
         }
+        // An inferred-constructor hole `_ { … }` the checker rewrote prints as
+        // the hole: the tensor zero is `_ {}`, a map or `json` literal is the
+        // literal behind a leading `_`, and a genus or record constructor
+        // writes `_` for its type name (see `write_verte_expr`).
+        if self.inferred_constructor_ids.contains(&expr.id) {
+            match &expr.kind {
+                HirExpressionKind::MethodCall(..) | HirExpressionKind::Vacua => {
+                    writer.write("_ {}");
+                    return;
+                }
+                HirExpressionKind::Literal(HirLiteral::JsonValor(_)) => writer.write("_ "),
+                _ => {}
+            }
+        }
         // An `empty` the checker rewrote into the typed zero prints as the
         // authored literal, not as the `Type {}` it became.
         if self.empty_dense_ids.contains(&expr.id) {
@@ -1325,7 +1339,11 @@ impl super::FaberCodegen<'_> {
                     let (sources, fields): (Vec<_>, Vec<_>) = entries
                         .iter()
                         .partition(|field| matches!(field.key, HirObjectKey::Spread(_)));
-                    writer.write(&name);
+                    if self.inferred_constructor_ids.contains(&owner) {
+                        writer.write("_");
+                    } else {
+                        writer.write(&name);
+                    }
                     writer.write(" {");
                     if !fields.is_empty() {
                         writer.write(" ");
@@ -1351,7 +1369,11 @@ impl super::FaberCodegen<'_> {
                     return;
                 }
                 Type::Record(_) => {
-                    writer.write(&rendered_target);
+                    if self.inferred_constructor_ids.contains(&owner) {
+                        writer.write("_");
+                    } else {
+                        writer.write(&rendered_target);
+                    }
                     let ordered = sorted_record_entries(entries, self.interner);
                     if ordered.is_empty() {
                         writer.write(" {}");
