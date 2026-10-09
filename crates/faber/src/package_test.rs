@@ -6876,9 +6876,11 @@ fn run() args args {
 
     assert!(output.code.contains("pub verbose: bool"));
     assert!(
-        output
-            .code
-            .contains("println!(\"{}\", faber::display::bivalens(args.verbose));")
+        output.code.contains(
+            "println!(\"{}\", faber::display::bivalens_with(args.verbose, &faber::display::DisplayTokens { true_: \"true\", false_: \"false\", none: \"none\", tuple: \"tuple\" }));"
+        ),
+        "{}",
+        output.code
     );
 }
 
@@ -8213,7 +8215,14 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     assert!(rust.contains("while current > 0"));
     assert!(rust.contains("let score: i64 = 82;"));
     assert!(rust.contains("let scores: Vec<i64> = vec!["));
-    assert!(rust.contains("faber::display::bivalens(ผ่าน(score))"));
+    // Display tokens are the Thai pack's own words (`verum`/`falsum`/`iuncta`
+    // keywords and the `nihil` type row), emitted as Rust string literals.
+    assert!(
+        rust.contains(
+            r#"faber::display::bivalens_with(ผ่าน(score), &faber::display::DisplayTokens { true_: "จร\u{e34}ง", false_: "เท\u{e47}จ", none: "น\u{e31}ล", tuple: "ท\u{e39}เพ\u{e34}ล" })"#
+        ),
+        "{rust}"
+    );
     assert!(rust.contains("นับผ่าน(scores.clone())"));
     assert!(rust.contains("นับถอยหลัง(3)"));
 }
