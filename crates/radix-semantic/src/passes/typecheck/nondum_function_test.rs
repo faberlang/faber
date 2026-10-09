@@ -557,6 +557,42 @@ incipit {
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
+/// A `∪` receiver whose members agree on a method signature but disagree on
+/// `@ nondum` availability is reachable: `union_common_method_signature`
+/// compares signatures only, so the call resolves and the availability gate
+/// (call.rs, union branch) runs per member. Intent pinned here: one gated
+/// member refuses the WHOLE call with a single SEM017 naming that member,
+/// whichever position it holds in the union.
+#[test]
+fn a_union_call_is_refused_when_any_member_is_nondum() {
+    for union in ["Nexus ∪ Aliud", "Aliud ∪ Nexus"] {
+        let source = format!(
+            r#"
+genus Nexus {{
+    varia textus nomen
+
+    @ nondum "pending"
+    functio mitte() → vacuum
+}}
+
+genus Aliud {{
+    varia textus nomen
+
+    functio mitte() → vacuum {{
+        nota ego.nomen
+    }}
+}}
+
+functio f({union} x) {{
+    x.mitte()
+}}
+"#
+        );
+        let result = test_support::analyze_source(&source);
+        assert_refused_once(&result, "Nexus.mitte", Some("pending"));
+    }
+}
+
 // Imported genus methods
 
 fn socket_interface(gates: Vec<InterfaceUnavailable>) -> FileInterface {

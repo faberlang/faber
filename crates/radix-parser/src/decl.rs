@@ -1107,7 +1107,6 @@ impl Parser {
                 .iter()
                 .any(|annotation| self.is_nondum_annotation(annotation));
             let parsed = self.parse_func_decl();
-            self.nondum_function_pending = false;
             let StmtKind::Func(func) = parsed? else {
                 return Err(Self::expected_error("functio", self.current_span()));
             };
