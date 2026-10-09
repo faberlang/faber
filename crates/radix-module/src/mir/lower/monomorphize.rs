@@ -724,17 +724,54 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
 
         if let Some(destination) = destination {
             let actual = self.place_ty(destination, scope, span)?;
-            if !bind_generic_type_witness_with_shapes(
+            // The destination type of a call is the callee's return type with the
+            // call's own extents substituted. Extents already bound from the
+            // arguments are authoritative: a run-time axis of the destination
+            // (the call expression's own result axis) is the same value read back,
+            // not a second witness, so it never conflicts with them.
+            let mut trial_bindings = bindings.clone();
+            let mut trial_shapes = shape_bindings.clone();
+            if bind_generic_type_witness_with_shapes(
                 self.types(),
                 template.return_ty,
                 actual,
-                &mut bindings,
-                &mut shape_bindings,
+                &mut trial_bindings,
+                &mut trial_shapes,
             ) {
-                self.lowerer
-                    .errors
-                    .push(MirError::validation(span, "destination type mismatch"));
-                return None;
+                bindings = trial_bindings;
+                shape_bindings = trial_shapes;
+            } else {
+                let mut conflicts = Vec::new();
+                collect_runtime_shape_conflicts(
+                    self.types(),
+                    template.return_ty.semantic_id(),
+                    actual.semantic_id(),
+                    &shape_bindings,
+                    &mut conflicts,
+                );
+                let mut retry_bindings = bindings.clone();
+                let mut retry_shapes = shape_bindings.clone();
+                for (parameter, _) in &conflicts {
+                    retry_shapes.remove(parameter);
+                }
+                if conflicts.is_empty()
+                    || !bind_generic_type_witness_with_shapes(
+                        self.types(),
+                        template.return_ty,
+                        actual,
+                        &mut retry_bindings,
+                        &mut retry_shapes,
+                    )
+                {
+                    self.lowerer
+                        .errors
+                        .push(MirError::validation(span, "destination type mismatch"));
+                    return None;
+                }
+                bindings = retry_bindings;
+                for (parameter, witness) in retry_shapes {
+                    shape_bindings.entry(parameter).or_insert(witness);
+                }
             }
         }
 
