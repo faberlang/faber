@@ -302,6 +302,33 @@ fn response_sender_enforces_one_terminal_frame() {
 }
 
 #[test]
+fn or_drop_senders_deliver_while_open_and_ignore_a_finished_conversation() {
+    let (mut sermo, sender, _cancellation) = frame::test_response_sender("test:or-drop");
+
+    sender.item_or_drop(Valor::Numerus(1));
+    sender.send_or_drop(FrameStatus::Item, Valor::Numerus(2));
+    sender.done_or_drop();
+    // Every later frame is rejected by the sender; the helpers drop it quietly.
+    sender.item_or_drop(Valor::Numerus(3));
+    sender.error_or_drop("late error");
+    sender.done_or_drop();
+    sender.send_or_drop(FrameStatus::Error, Valor::Textus("late".into()));
+
+    let first = frame::sermo_recv(&mut sermo).expect("first item");
+    assert_eq!(
+        (first.status, first.data),
+        (FrameStatus::Item, Valor::Numerus(1))
+    );
+    let second = frame::sermo_recv(&mut sermo).expect("second item");
+    assert_eq!(
+        (second.status, second.data),
+        (FrameStatus::Item, Valor::Numerus(2))
+    );
+    let terminal = frame::sermo_recv(&mut sermo).expect("done terminal");
+    assert_eq!(terminal.status, FrameStatus::Done);
+}
+
+#[test]
 fn response_sender_keeps_terminal_last_across_concurrent_clones() {
     for _ in 0..200 {
         let (mut sermo, sender, _cancellation) =

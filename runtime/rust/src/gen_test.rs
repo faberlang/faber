@@ -133,3 +133,17 @@ fn block_on_polls_a_pending_future_until_it_is_ready() {
 fn block_on_tokio_runs_the_future_on_a_runtime() {
     assert_eq!(super::block_on_tokio(async { 11_i64 }), 11);
 }
+
+#[test]
+fn send_or_drop_delivers_to_a_live_receiver() {
+    let (sender, receiver) = std::sync::mpsc::channel::<Result<Option<i64>, String>>();
+    super::send_or_drop(&sender, Ok(Some(5)));
+    assert_eq!(receiver.recv(), Ok(Ok(Some(5))));
+}
+
+#[test]
+fn send_or_drop_ignores_a_receiver_that_hung_up() {
+    let (sender, receiver) = std::sync::mpsc::channel::<Result<Option<i64>, String>>();
+    drop(receiver);
+    super::send_or_drop(&sender, Ok(Some(5)));
+}

@@ -298,6 +298,15 @@ impl<T: Unpin, E: Unpin> Future for AsyncCursorNext<T, E> {
     }
 }
 
+/// Answer a consumer request with `message`. When the consumer has dropped its
+/// end the answer has nowhere to go and is dropped: an abandoned stream is the
+/// consumer's choice, not a failure of the producer.
+pub fn send_or_drop<M>(request: &Sender<M>, message: M) {
+    if request.send(message).is_err() {
+        // The receiving end hung up: nothing is waiting for the answer.
+    }
+}
+
 /// Drive `future` to completion on the calling thread: poll with a no-op
 /// waker, yielding the thread between polls. No runtime is involved.
 pub fn block_on<F: Future>(future: F) -> F::Output {

@@ -158,6 +158,40 @@ impl std::fmt::Display for Regex {
     }
 }
 
+/// The failure text of an unrecovered `textus ↦ regex` conversion: the text
+/// `Result::unwrap` printed before generated code routed it through the trap
+/// module.
+const COMPILE_TRAP: &str = "called `Result::unwrap()` on an `Err` value";
+
+/// The failure text of a regex literal the compiler should have validated.
+const LITERAL_TRAP: &str = "regex literal validated";
+
+/// Compile `pattern`, trapping when it is rejected: the unrecovered form of the
+/// failable `textus ↦ regex` conversion.
+///
+/// # Panics
+///
+/// With the `Result::unwrap` text and the rejection when [`Regex::new`]
+/// rejects `pattern`.
+#[must_use]
+#[track_caller]
+pub fn compile_or_trap(pattern: &str) -> Regex {
+    crate::trap::ok(Regex::new(pattern), crate::Trap::Other(COMPILE_TRAP))
+}
+
+/// Compile a pattern the compiler wrote as a regex literal, trapping when it
+/// is rejected. A rejected literal is a compiler defect, not a program error.
+///
+/// # Panics
+///
+/// With `regex literal validated` and the rejection when [`Regex::new`]
+/// rejects `pattern`.
+#[must_use]
+#[track_caller]
+pub fn literal_or_trap(pattern: &str) -> Regex {
+    crate::trap::ok(Regex::new(pattern), crate::Trap::Other(LITERAL_TRAP))
+}
+
 /// Whether the pattern matches somewhere in `text`.
 ///
 /// G12 `consentit`: the pattern was validated and compiled at construction,

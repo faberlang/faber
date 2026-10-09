@@ -2,8 +2,8 @@
 
 use crate::Regex;
 use crate::regex::{
-    escape, find, find_all, match_end, match_group, match_named, match_start, match_text, matches,
-    replace, replace_with, split,
+    compile_or_trap, escape, find, find_all, literal_or_trap, match_end, match_group, match_named,
+    match_start, match_text, matches, replace, replace_with, split,
 };
 
 fn rejected(pattern: &str) -> crate::regex::RegexError {
@@ -187,4 +187,42 @@ fn escape_backslashes_the_metacharacters_only() {
     assert_eq!(escape("é😀 x"), "é😀 x");
     let anchored = compiled(&format!("^{}$", escape("(1+1)=[2]{3}|?^$")));
     assert!(matches(&anchored, "(1+1)=[2]{3}|?^$"));
+}
+
+/// The panic text of a constructor that must trap.
+fn trap_text(f: impl FnOnce() -> Regex) -> String {
+    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
+        .expect_err("a rejected pattern must trap");
+    payload
+        .downcast_ref::<String>()
+        .cloned()
+        .expect("trap payload is a String")
+}
+
+#[test]
+fn compile_or_trap_returns_the_compiled_pattern() {
+    let compiled = compile_or_trap("\\d+");
+    assert!(matches(&compiled, "abc123"));
+    assert_eq!(compiled.pattern(), "\\d+");
+}
+
+#[test]
+fn compile_or_trap_fails_with_the_result_unwrap_text() {
+    let expected = format!(
+        "called `Result::unwrap()` on an `Err` value: {:?}",
+        rejected("(unclosed")
+    );
+    assert_eq!(trap_text(|| compile_or_trap("(unclosed")), expected);
+}
+
+#[test]
+fn literal_or_trap_returns_the_compiled_pattern() {
+    let compiled = literal_or_trap("(?i)\\w+");
+    assert!(matches(&compiled, "ABC"));
+}
+
+#[test]
+fn literal_or_trap_fails_with_the_literal_validated_text() {
+    let expected = format!("regex literal validated: {:?}", rejected("a(?=b)"));
+    assert_eq!(trap_text(|| literal_or_trap("a(?=b)")), expected);
 }

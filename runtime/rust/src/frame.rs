@@ -422,6 +422,38 @@ impl ResponseSender {
         Ok(())
     }
 
+    /// [`item`](Self::item), dropping the frame when the sender is cancelled or
+    /// a terminal frame was already sent: nothing is listening for it.
+    pub fn item_or_drop(&self, data: Valor) {
+        if self.item(data).is_err() {
+            // Rejected: the conversation is over; the frame has no reader.
+        }
+    }
+
+    /// [`done`](Self::done), dropping the frame when the sender is cancelled or
+    /// a terminal frame was already sent: the conversation is already over.
+    pub fn done_or_drop(&self) {
+        if self.done().is_err() {
+            // Rejected: the conversation is over; the frame has no reader.
+        }
+    }
+
+    /// [`error`](Self::error), dropping the frame when the sender is cancelled
+    /// or a terminal frame was already sent: the conversation is already over.
+    pub fn error_or_drop(&self, message: impl Into<String>) {
+        if self.error(message).is_err() {
+            // Rejected: the conversation is over; the frame has no reader.
+        }
+    }
+
+    /// [`send`](Self::send), dropping the frame when the sender is cancelled or
+    /// a terminal frame was already sent: nothing is listening for it.
+    pub fn send_or_drop(&self, status: FrameStatus, data: Valor) {
+        if self.send(status, data).is_err() {
+            // Rejected: the conversation is over; the frame has no reader.
+        }
+    }
+
     /// Deliver the terminal rejection for a start error. Cancellation-aware:
     /// once the receiving side's drop has recorded cancellation on the shared
     /// `Cancellation`, the detached rejection must NOT surface an `Error`
