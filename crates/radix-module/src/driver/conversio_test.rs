@@ -12,7 +12,8 @@ use crate::test_support::test_session;
 fn conversio_glyph_form_compiles_to_parse() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ n ← "22" ↦ numerus
+  fixum textus raw ← "22"
+  fixum _ n ← raw ↦ numerus
   nota n
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -23,10 +24,26 @@ fn conversio_glyph_form_compiles_to_parse() {
 }
 
 #[test]
+fn conversio_of_a_literal_emits_its_value() {
+    let session = test_session(Target::HirRust);
+    let source = r#"incipit {
+  fixum _ n ← "22" ↦ numerus
+  nota n
+}"#;
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+
+    assert!(result.success());
+    let output = super::rust_output(result);
+    assert!(output.code.contains("let n: i64 = 22_i64;"));
+    assert!(!output.code.contains(".parse::<i64>()"));
+}
+
+#[test]
 fn conversio_emits_parse_not_as_cast() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit {
-  fixum _ n ← "42" ↦ numerus
+  fixum textus raw ← "22"
+  fixum _ n ← raw ↦ numerus
   nota n
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());

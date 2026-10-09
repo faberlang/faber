@@ -70,6 +70,14 @@ pub trait IntrinsicSurface {
     fn intrinsic_surface(&self, canonical: &str) -> Option<String>;
 }
 
+/// A [`CodeWriter`] position captured by [`CodeWriter::mark`].
+#[derive(Clone, Copy, Debug)]
+pub struct WriterMark {
+    len: usize,
+    indent: usize,
+    at_line_start: bool,
+}
+
 /// Indentation-aware code writer.
 ///
 /// The struct is intentionally small and backend-agnostic. It provides enough
@@ -104,6 +112,23 @@ impl CodeWriter {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.buffer
+    }
+
+    /// Capture the writer position so a speculative emission can be undone.
+    #[must_use]
+    pub fn mark(&self) -> WriterMark {
+        WriterMark {
+            len: self.buffer.len(),
+            indent: self.indent,
+            at_line_start: self.at_line_start,
+        }
+    }
+
+    /// Discard everything written since `mark` and restore its indentation.
+    pub fn rewind(&mut self, mark: WriterMark) {
+        self.buffer.truncate(mark.len);
+        self.indent = mark.indent;
+        self.at_line_start = mark.at_line_start;
     }
 
     /// Write text verbatim without applying block indentation on embedded newlines.

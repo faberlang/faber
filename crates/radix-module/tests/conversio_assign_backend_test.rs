@@ -123,11 +123,25 @@ fn call_occurrences(code: &str, def_prefix: &str, name: &str) -> usize {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_emits_conversio_assign_as_parse_then_store() {
-    let code = emit_rust("incipit {\n  varia numerus count ← 0\n  count ↤ \"42\"\n  nota count\n}");
+    let code = emit_rust(
+        "incipit {\n  fixum textus raw ← \"42\"\n  varia numerus count ← 0\n  count ↤ raw\n  nota count\n}",
+    );
     assert!(
         code.contains(".parse::<"),
         "rust must emit the text→numeric conversion, not a cast:\n{code}"
     );
+    assert!(!code.contains("count ↤"), "raw ↤ must not leak into emitted rust:\n{code}");
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_emits_conversio_assign_of_a_literal_as_its_value() {
+    let code = emit_rust("incipit {\n  varia numerus count ← 0\n  count ↤ \"42\"\n  nota count\n}");
+    assert!(
+        code.contains("count = 42_i64;"),
+        "a literal text→numeric conversion stores its value:\n{code}"
+    );
+    assert!(!code.contains(".parse::<"), "no runtime parse of a literal:\n{code}");
     assert!(!code.contains("count ↤"), "raw ↤ must not leak into emitted rust:\n{code}");
 }
 
@@ -286,8 +300,9 @@ fn chain_emits_inner_conversion_feeding_outer_store_on_rust() {
     // (recorded in evidence), shared identically by `←` chains. The chain
     // still converts through the `↦` route: the inner text→numeric parse
     // appears once, and both stores are emitted.
-    let code =
-        emit_rust("incipit {\n  varia numerus a ← 0\n  varia numerus b ← 0\n  a ↤ b ↤ \"42\"\n  nota a\n  nota b\n}");
+    let code = emit_rust(
+        "incipit {\n  fixum textus raw ← \"42\"\n  varia numerus a ← 0\n  varia numerus b ← 0\n  a ↤ b ↤ raw\n  nota a\n  nota b\n}",
+    );
     assert_eq!(
         count_occurrences(&code, ".parse::<"),
         1,
