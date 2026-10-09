@@ -5260,8 +5260,46 @@ main {
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_text_mixed_native_and_runtime_backed() {
+fn compile_package_omits_nondum_norma_text_functions_from_output() {
     let dir = test_temp_dir("norma-chorda-mixed");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "norma:text" text
+
+main {
+  print text.reverse("Salve")
+}
+"#,
+    )
+    .expect("write entry");
+
+    let result = compile_with_faber_seams(&Config::default(), &entry);
+    assert!(
+        result.success(),
+        "expected norma:text package compile success, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+
+    assert!(output.code.contains("fn reverse"));
+    assert!(output.code.contains("pub mod text"));
+    assert!(output.code.contains("crate::text::reverse"));
+    // `text.encode`/`text.decode` are bodiless `@ unstable` declarations: no
+    // backend emits them.
+    assert!(!output.code.contains("pub(crate) fn encode"));
+}
+
+#[test]
+fn compile_package_refuses_nondum_norma_text_encode() {
+    let dir = test_temp_dir("norma-text-encode-nondum");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -5278,27 +5316,25 @@ main {
 
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
-        result.success(),
-        "expected norma:text mixed package compile success, got {:?}",
+        !result.success(),
+        "an @ unstable norma function must refuse every use"
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("nondum_function_for_target")),
+        "expected nondum_function_for_target, got {:?}",
         result
             .diagnostics
             .iter()
             .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
     );
-    let Some(Output::Rust(output)) = result.output else {
-        panic!("expected rust output");
-    };
-
-    assert!(output.code.contains("fn reverse"));
-    assert!(output.code.contains("pub mod text"));
-    assert!(output.code.contains("crate::text::encode"));
-    assert!(output.code.contains("crate::text::decode"));
-    assert!(output.code.contains("pub(crate) fn encode"));
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_toml_library_imports() {
+fn compile_package_refuses_nondum_norma_toml_parse() {
     let dir = test_temp_dir("norma-toml-import");
     let entry = dir.join("main.fab");
     fs::write(
@@ -5313,37 +5349,38 @@ main {
     )
     .expect("write entry");
 
+    // `toml.parse` is a bodiless `@ unstable` declaration: the import resolves,
+    // every use is refused at compile time.
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
-        result.success(),
-        "expected norma:toml package compile success, got {:?}",
+        !result.success(),
+        "an @ unstable norma function must refuse every use"
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("nondum_function_for_target")),
+        "expected nondum_function_for_target, got {:?}",
         result
             .diagnostics
             .iter()
             .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
     );
-    let Some(Output::Rust(output)) = result.output else {
-        panic!("expected rust output");
-    };
-
-    assert!(output.code.contains("crate::toml::parse"));
-    assert!(output.code.contains("pub(crate) fn parse"));
-    assert!(!output.code.contains("norma::toml::parse"));
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_toml_native_navigation_body() {
-    let dir = test_temp_dir("norma-toml-native-nav");
+fn compile_package_resolves_builtin_norma_value_native_navigation_body() {
+    let dir = test_temp_dir("norma-value-native-nav");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:toml" toml
 import from "norma:value" value
 
 main {
-  const value doc ← toml.parse("id = \"sample\"")
+  const value doc ← { "id": "sample" } ↦ value
   do {
     const string id ← value.require_string(doc, "id")
     print id
@@ -5358,7 +5395,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:toml native navigation compile success, got {:?}",
+        "expected norma:value native navigation compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5376,17 +5413,16 @@ main {
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_toml_exige_claves_native_body() {
-    let dir = test_temp_dir("norma-toml-exige-claves");
+fn compile_package_resolves_builtin_norma_value_exige_claves_native_body() {
+    let dir = test_temp_dir("norma-value-exige-claves");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:toml" toml
 import from "norma:value" value
 
 main {
-  const value doc ← toml.parse("id = \"sample\"")
+  const value doc ← { "id": "sample" } ↦ value
   do {
     value.require_strings(doc, ["id", "name"])
     print "ok"
@@ -5401,7 +5437,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:toml exige_claves compile success, got {:?}",
+        "expected norma:value require_strings compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5854,7 +5890,6 @@ import from "norma:process" process as proc
 main {
   const _ out ← proc.exec("echo hi")
   const _ env ← proc.read_env("PATH")
-  const _ _ ← proc.spawn(["true"])
 }
 "#,
     )
@@ -5878,9 +5913,8 @@ main {
     assert!(output.code.contains("processus:lege"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn exec"));
-    assert!(output.code.contains("crate::process::spawn"));
-    assert!(output.code.contains("pub(crate) fn spawn"));
-    assert!(!output.code.contains("norma::process::spawn"));
+    // `process.spawn` is a bodiless `@ unstable` declaration: never emitted.
+    assert!(!output.code.contains("pub(crate) fn spawn"));
     assert!(!output.code.contains("norma::process::exec"));
     assert!(!output.code.contains("norma::process::read_env"));
     assert!(!output.code.contains("crate::norma::hal::process"));
@@ -5981,7 +6015,7 @@ main {
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_yaml_imports() {
+fn compile_package_refuses_nondum_norma_yaml_calls() {
     let dir = test_temp_dir("norma-yaml-import");
     let entry = dir.join("main.fab");
     fs::write(
@@ -5997,34 +6031,27 @@ main {
     )
     .expect("write entry");
 
+    // `yaml.parse` and `yaml.stringify` are bodiless `@ unstable` declarations:
+    // the import resolves, every use is refused at compile time.
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
-        result.success(),
-        "expected norma:yaml package compile success, got {:?}",
+        !result.success(),
+        "an @ unstable norma function must refuse every use"
+    );
+    let nondum_refusals = result
+        .diagnostics
+        .iter()
+        .filter(|diag| diag.issue() == Some("nondum_function_for_target"))
+        .count();
+    assert_eq!(
+        nondum_refusals,
+        2,
+        "expected one nondum_function_for_target per yaml call, got {:?}",
         result
             .diagnostics
             .iter()
             .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
-    );
-    let Some(Output::Rust(output)) = result.output else {
-        panic!("expected rust output");
-    };
-
-    assert!(output.code.contains("crate::yaml::parse"));
-    assert!(output.code.contains("crate::yaml::stringify"));
-    assert!(
-        output.code.contains("crate::yaml::parse")
-            && (output.code.contains("faber::Valor")
-                || output.code.contains("use faber::Valor as valor;")
-                || output.code.contains(": valor")),
-        "expected valor/yaml binding via faber::Valor, got:\n{}",
-        output.code
-    );
-    assert!(
-        !output.code.contains(&["Faber", "Value"].concat()),
-        "generated code must not reference legacy valor type:\n{}",
-        output.code
     );
 }
 
@@ -6437,16 +6464,16 @@ main {}
 
 #[test]
 fn dual_norma_format_imports_scope_provenance_by_binding() {
-    let dir = test_temp_dir("norma-json-yaml-provenance");
+    let dir = test_temp_dir("norma-json-csv-provenance");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r#"import from "norma:yaml" yaml_mod
+        r#"import from "norma:csv" csv_mod
 import from "norma:json" json_mod
 
 main {
-  const value yaml_doc ← yaml_mod.parse("count: 1")
-  const _ yaml_text ← yaml_mod.stringify(yaml_doc)
+  const list<list<string>> csv_rows ← csv_mod.parse("count,1")
+  const _ csv_text ← csv_mod.stringify(csv_rows)
   do {
     const json json_doc ← json_mod.parse("{\"count\": 1}")
     const _ json_text ← json_mod.stringify(json_doc)
@@ -6463,23 +6490,23 @@ main {
     let package = analyze_with_faber_seams(&Config::default(), &entry).expect("analyze package");
     let analysis = &package.entry_node().expect("entry unit").analysis;
 
-    let yaml_item =
-        library_item_by_export(analysis, &["yaml"], "stringify", LibraryItemKind::Function);
+    let csv_item =
+        library_item_by_export(analysis, &["csv"], "stringify", LibraryItemKind::Function);
     let json_item =
         library_item_by_export(analysis, &["json"], "stringify", LibraryItemKind::Function);
     assert_ne!(
-        yaml_item.def_id, json_item.def_id,
+        csv_item.def_id, json_item.def_id,
         "overlapping function names must keep distinct DefIds"
     );
-    assert_eq!(yaml_item.identity.module_path, vec!["yaml"]);
+    assert_eq!(csv_item.identity.module_path, vec!["csv"]);
     assert_eq!(json_item.identity.module_path, vec!["json"]);
-    assert_eq!(yaml_item.exported_name, "stringify");
+    assert_eq!(csv_item.exported_name, "stringify");
     assert_eq!(json_item.exported_name, "stringify");
 
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected json+yaml package compile success, got {:?}",
+        "expected json+csv package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -6489,12 +6516,12 @@ main {
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
-    assert!(output.code.contains("crate::yaml::stringify"));
-    assert!(output.code.contains("crate::yaml::parse"));
+    assert!(output.code.contains("crate::csv::stringify"));
+    assert!(output.code.contains("crate::csv::parse"));
     assert!(output.code.contains("pub(crate) fn stringify"));
     assert!(output.code.contains("pub(crate) fn parse"));
-    assert!(!output.code.contains("norma::yaml::stringify"));
-    assert!(!output.code.contains("norma::yaml::parse"));
+    assert!(!output.code.contains("norma::csv::stringify"));
+    assert!(!output.code.contains("norma::csv::parse"));
     assert!(!output.code.contains("norma::json::stringify"));
     assert!(!output.code.contains("norma::json::parse"));
 }
@@ -6545,11 +6572,8 @@ main {
         output.code.contains("crate::json::parse") || output.code.contains("json::parse"),
         "expected json::parse in generated code"
     );
-    assert!(
-        output
-            .code
-            .contains("crate::text::split_n(path.clone(), \".\".to_string()")
-    );
+    // `value.find` splits its dotted path with the string `split` intrinsic.
+    assert!(output.code.contains("path.split("));
 }
 
 #[test]
@@ -10394,8 +10418,8 @@ fn transitive_import_text_via_fixture_library_compiles() {
 importa ex "norma:text" chorda
 
 @ publica
-functio split_fields(textus row) → lista<textus> {
-    redde chorda.split_n(row, ",", row.length() + 1)
+functio join_fields(lista<textus> parts) → textus {
+    redde chorda.join(parts, ",")
 }
 "#,
     );
@@ -10408,8 +10432,8 @@ functio split_fields(textus row) → lista<textus> {
 import from "norma:transitive_fixture" transitive_fixture
 
 main {
-    const list<string> fields ← transitive_fixture.split_fields("alpha,beta")
-    print fields.length()
+    const string wire ← transitive_fixture.join_fields(["alpha", "beta"])
+    print wire
 }
 "#,
     )
@@ -10426,7 +10450,7 @@ main {
         panic!("expected rust output");
     };
     assert!(output.code.contains("pub mod text"));
-    assert!(output.code.contains("crate::text::split_n"));
+    assert!(output.code.contains("crate::text::join"));
     assert!(output.code.contains("pub mod transitive_fixture"));
     assert!(!output.code.contains("unresolved_def"));
 }
@@ -10842,7 +10866,8 @@ main {
     };
     assert!(output.code.contains("pub mod csv"));
     assert!(output.code.contains("pub mod text"));
-    assert!(output.code.contains("pub(crate) fn split_n"));
+    // `text.split_n` is a bodiless `@ unstable` declaration: never emitted.
+    assert!(!output.code.contains("fn split_n"));
     assert!(output.code.contains("pub(crate) fn join"));
 
     let layout = discover_build_layout(&entry).expect("layout");

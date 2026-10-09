@@ -91,7 +91,7 @@ const LOCAL_LOCALE_UTIL: &str = "@ public\nfn salutare() → string {\n    retur
 // The `triga:` provider is an inline fixture library (see
 // `fixture_library_home`), not the live triga sibling, so a sibling's API
 // churn cannot break this test. The fixture names are source-canonical.
-const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:text\" text\n\nfn run() → string {\n    const math.Point3 origin ← math.point3(1.0, 0.0, 0.0)\n    const string reversed ← text.reverse(\"abc\")\n    const string decoded ← text.decode(text.encode(\"abc\"))\n    const list<string> parts ← text.split_n(\"a,b\", \",\", 2)\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:text\" text\n\nfn run() → string {\n    const math.Point3 origin ← math.point3(1.0, 0.0, 0.0)\n    const string reversed ← text.reverse(\"abc\")\n    const string joined ← text.join([reversed, \"abc\"], \",\")\n    print joined\n    return joined\n}\n\nmain {\n    print run()\n}\n";
 const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:text\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
 
 /// A library home with the real Norma stdlib (symlinked) and an inline
