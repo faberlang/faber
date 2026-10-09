@@ -1,0 +1,3 @@
+ok: valid: hello
+caught: empty input
+caught: force throw
