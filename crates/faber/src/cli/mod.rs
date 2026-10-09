@@ -21,9 +21,8 @@ without a faber.toml manifest is treated as a legacy package whose entry is
 instead.
 
 Library resolution: FABER_LIBRARY_HOME overrides the library home. Otherwise
-ancestor probing from the input path (and the compiled workspace) locates a
-sibling `norma/src` provider layout. `faber doctor` prints the resolved home
-and per-library availability.
+the in-tree `lib/` of this checkout is used. `faber doctor` prints the
+resolved home and per-library availability.
 
 Availability taxonomy: `norma` is the builtin identity row (LibraryProvider::Builtin);
 other provider names are package identity. On disk a checkout is a faber
@@ -63,7 +62,7 @@ const CHECK_LIBRARY_LONG_ABOUT: &str = "\
 Check a named library's complete interface graph from the library home.
 
 v1 resolves <name> from the library home only (FABER_LIBRARY_HOME, else
-ancestor probing). The source root mirrors the import resolver: top-level
+the in-tree `lib/`). The source root mirrors the import resolver: top-level
 faber.toml if present, otherwise <home>/<name>/src. v1 does not parse
 cista.toml, does not discover CISTAE_HOME or faber.lock store roots, and
 does not replace `scripta/check-source` or run .proba tests.

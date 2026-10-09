@@ -91,7 +91,7 @@ fn toml_to_value(value: toml::Value, span: Span) -> Result<Value, RunnerError> {
 
 /// Map a TOML datetime into an absolute [`Instans`].
 ///
-/// WHY: the `faber:toml` wire contract (`norma/src/toml.fab`) lowers TOML
+/// WHY: the `faber:toml` wire contract (`lib/norma/src/toml.fab`) lowers TOML
 /// datetimes to `Valor::Instans` and never produces `Valor::Nihil`. TOML
 /// permits offset-free local forms; an [`Instans`] is an absolute point in
 /// time, so local date-times and local dates are read as UTC (`Z`), matching

@@ -1191,8 +1191,8 @@ fn check_long_help_discloses_library_resolution() {
         "check --help must name FABER_LIBRARY_HOME:\n{help}"
     );
     assert!(
-        help.contains("ancestor probing from the input path"),
-        "check --help must name ancestor probing from the input path:\n{help}"
+        help.contains("the in-tree `lib/`"),
+        "check --help must name the in-tree library home:\n{help}"
     );
     assert!(
         help.contains("faber.toml"),
