@@ -942,7 +942,6 @@ fn map_provider_modules(
                     imported_namespace_info: Some(namespace_info),
                     gpu_builtins: &[],
                     field_name_policy: radix_hir_rust::RustFieldNamePolicy::default(),
-                    native_host_bootstrap: false,
                     static_route_table: None,
                     display_tokens: None,
                 },
