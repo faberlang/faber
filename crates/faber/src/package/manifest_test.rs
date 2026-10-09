@@ -2,6 +2,7 @@
 //! S1-5, N1.1): parsing, fail-closed validation, and the precedence fold.
 
 use super::*;
+use radix::module::diagnostics::DiagnosticArg;
 use std::path::Path;
 
 #[test]
@@ -36,7 +37,7 @@ fn unsupported_device_fails_closed_with_issue() {
     let err = manifest_device_choice(Some("rocm"), Path::new("faber.toml"))
         .expect_err("unsupported value must fail closed");
     assert_eq!(err.issue(), Some("package_device_unsupported"));
-    assert!(err.message.contains("rocm"));
+    assert!(err.args.contains(&DiagnosticArg::new("device", "rocm")));
 }
 
 fn manifest_with_target_tables(tables: &str) -> FaberManifest {

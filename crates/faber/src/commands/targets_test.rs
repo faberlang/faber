@@ -64,7 +64,7 @@ fn row_set_equals_cli_selectable_variant_set() {
     // set minus the hidden `scena` spelling — a target added to
     // `FaberCliTarget` joins `faber targets` by construction, and a row no
     // CLI spelling selects cannot appear.
-    let specs = faber_target_row_specs();
+    let specs = faber_target_row_specs().expect("every CLI target maps to a faber feature");
     let mut names: BTreeSet<String> = specs.iter().map(|s| s.name.clone()).collect();
 
     // Documented override (goal Open question 4 ruling): MirWasm keeps two
@@ -97,7 +97,7 @@ fn row_set_equals_cli_selectable_variant_set() {
 fn mirwasm_double_row_shares_target_and_feature() {
     // OQ-4: the `wasm`/`wasm-text` double row stays explicit; both rows must
     // carry identical target and feature truth.
-    let specs = faber_target_row_specs();
+    let specs = faber_target_row_specs().expect("every CLI target maps to a faber feature");
     let wasm = row_spec(&specs, "wasm");
     let wasm_text = row_spec(&specs, "wasm-text");
     assert_eq!(wasm.target, Target::MirWasm);
@@ -111,7 +111,7 @@ fn fmir_family_rows_share_the_fmir_feature_override() {
     // leaves the fmir family ungated; faber gates all three package-image
     // targets on its `mir-fmir` feature.
     for name in ["fmir-text", "fmir", "fmir-bin"] {
-        let specs = faber_target_row_specs();
+        let specs = faber_target_row_specs().expect("every CLI target maps to a faber feature");
         let spec = row_spec(&specs, name);
         assert_eq!(
             spec.feature, "mir-fmir",
@@ -122,7 +122,7 @@ fn fmir_family_rows_share_the_fmir_feature_override() {
 
 #[test]
 fn small_build_reports_only_compiled_capabilities() {
-    let rows = target_rows(&small_compiled());
+    let rows = target_rows(&small_compiled()).expect("every CLI target maps to a faber feature");
 
     // The rust host lane is present under hir-rust.
     let rust = row(&rows, "rust");
@@ -171,8 +171,8 @@ fn default_build_reports_full_surface() {
     // The test binary builds under default features (full-targets), so the
     // real cfg!-derived compiled set is the full emit surface — no
     // table-derived expectation (that circularity hid `swift`).
-    let rows = target_rows(&compiled_features());
-    let specs = faber_target_row_specs();
+    let rows = target_rows(&compiled_features()).expect("every CLI target maps to a faber feature");
+    let specs = faber_target_row_specs().expect("every CLI target maps to a faber feature");
     // All derived emit rows plus the device-runtime capability row, which is
     // part of the default build (A2 closeout).
     assert_eq!(rows.len(), specs.len() + 1);
@@ -224,7 +224,7 @@ fn default_build_reports_full_surface() {
 
 #[test]
 fn rendered_table_contains_capability_rows_under_full_build() {
-    let table = rendered_targets_table();
+    let table = rendered_targets_table().expect("every CLI target maps to a faber feature");
     assert!(table.contains("rust available=yes"), "{table}");
     // Capability truth under the default build: device-runtime is compiled,
     // so it reports its row.
@@ -247,7 +247,7 @@ fn every_row_feature_is_compiled_in_the_default_test_build() {
     // and a `cfg!` arm missing from compiled_features() — the omissions that
     // hid `swift` (P6-2).
     let compiled = compiled_features();
-    for spec in faber_target_row_specs() {
+    for spec in faber_target_row_specs().expect("every CLI target maps to a faber feature") {
         if EXPERIMENTAL_DEFAULT_OFF.contains(&spec.feature) {
             continue;
         }

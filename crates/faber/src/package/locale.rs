@@ -28,6 +28,8 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
          next action: choose one of the embedded reader locales ({})",
         embedded_locales_list()
     ))
+    .with_arg("locale", locale.to_owned())
+    .with_arg("embedded_locales", embedded_locales_list())
 }
 
 /// Build the product-default code config for inputs without package context.
@@ -78,9 +80,10 @@ pub(crate) fn resolve_diagnostics_locale_pack(
     if let Some(locale) = cli_diagnostics_locale {
         let trimmed = locale.trim();
         if trimmed.is_empty() {
-            return Err(Box::new(crate::package_diagnostic_error(
-                "--diagnostics-locale must not be empty",
-            )));
+            return Err(Box::new(
+                crate::package_diagnostic_error("--diagnostics-locale must not be empty")
+                    .with_arg("flag", "--diagnostics-locale"),
+            ));
         }
         return load_locale_pack_for_input(input, Some(trimmed));
     }
@@ -114,9 +117,10 @@ fn selected_locale<'a>(
     if let Some(locale) = cli_locale {
         let trimmed = locale.trim();
         if trimmed.is_empty() {
-            return Err(Box::new(crate::package_diagnostic_error(
-                "--locale must not be empty",
-            )));
+            return Err(Box::new(
+                crate::package_diagnostic_error("--locale must not be empty")
+                    .with_arg("flag", "--locale"),
+            ));
         }
         return Ok(trimmed.to_owned());
     }
@@ -191,7 +195,9 @@ fn load_locale_pack_from_file(
                  next action: fix the package pack path",
                 pack_path.display()
             ))
-            .with_file(input.display().to_string()),
+            .with_file(input.display().to_string())
+            .with_arg("locale", locale.to_owned())
+            .with_arg("pack", pack_path.display().to_string()),
         )
     })?;
 

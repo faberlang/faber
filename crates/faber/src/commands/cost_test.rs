@@ -336,15 +336,7 @@ fn report_over_fixture_package_pins_dominant_classes_and_buckets() {
     let root = tempfile::tempdir().expect("cost fixture root");
     let package = write_cost_fixture(root.path());
     let report = super::cost::cost_report_for_input(&package, None, None, CostClass::C0)
-        .unwrap_or_else(|diagnostics| {
-            panic!(
-                "cost fixture must lower: {:?}",
-                diagnostics
-                    .iter()
-                    .map(|diag| &diag.message)
-                    .collect::<Vec<_>>()
-            )
-        });
+        .unwrap_or_else(|diagnostics| panic!("cost fixture must lower: {:?}", diagnostics));
     assert_eq!(report.version, COST_REPORT_VERSION);
     assert_eq!(report.legend, COST_LEGEND);
     assert_eq!(report.package.dominant.as_deref(), Some("C3"));

@@ -341,6 +341,7 @@ pub fn manifest_device_choice(
                 ))
                 .with_file(path.display().to_string())
                 .with_arg("issue", "package_device_unsupported")
+                .with_arg("key", "device.device")
                 .with_arg("device", spelling.to_owned()),
             )),
         }
@@ -411,7 +412,8 @@ pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
                 "faber.toml [device] backend was renamed: use `device = \"auto\" | \"cpu\" | \"metal\" | \"cuda\"` under [device]",
             )
             .with_file(path.display().to_string())
-            .with_arg("issue", "package_device_backend_renamed"),
+            .with_arg("issue", "package_device_backend_renamed")
+            .with_arg("replacement_key", "device"),
         ));
     }
     Ok(manifest)
@@ -502,7 +504,9 @@ pub(crate) fn validate_manifest(
                 ))
                 .with_file(path.display().to_string())
                 .with_arg("issue", "package_member_unsupported_source_root")
-                .with_arg("source", unsupported.to_owned()),
+                .with_arg("source", unsupported.to_owned())
+                .with_arg("supported_source_roots", "src,.")
+                .with_arg("reason", "custom_source_root_usage_contract_pending"),
             ));
         }
     }

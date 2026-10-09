@@ -69,7 +69,8 @@ fn targets_table_reports_capability_truth_for_the_default_build() {
     // rust host lane must be present, and so must the device-runtime
     // capability row — `device-runtime` is part of full-targets again (A2
     // closeout), so a stock `cargo build -p faber` can dispatch to Metal.
-    let table = crate::commands::targets::rendered_targets_table();
+    let table = crate::commands::targets::rendered_targets_table()
+        .expect("every CLI target maps to a faber feature");
     assert!(
         table.contains("rust available=yes"),
         "rust host lane must be reported as available:\n{table}"

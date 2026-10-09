@@ -486,23 +486,22 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         || rel == "crates/faber/src/diagnostic_explain_test.rs"
         || rel == "crates/faber/src/reference_test.rs"
         || rel == "crates/faber/src/reference_parse_test.rs"
-        // Faber product diagnostics: `issue()` exists, but the interpolated
-        // facts these tests assert (device value, file and path names, config
-        // keys) are not carried as diagnostic args, so the tests fall back to
-        // `message` text. Missing field: per-fact `args` on the package and
-        // command diagnostics. Migrated by the crates/faber unit; remove each
-        // entry as its file asserts code/issue/args.
-        || rel == "crates/faber/src/commands/format_test.rs"
-        || rel == "crates/faber/src/commands/run_test.rs"
-        || rel == "crates/faber/src/package_test.rs"
-        || rel == "crates/faber/src/package/cargo_test.rs"
+        // Faber product diagnostics still asserted by `message` text. Every
+        // other crates/faber file asserts code/issue/args; each remaining
+        // entry names the missing field. Remove an entry when its file asserts
+        // code/issue/args.
+        //  - fhir_test.rs: the "non-function namespace member `VALUE`"
+        //    diagnostic is built in radix-program/src/mir/link.rs with no
+        //    issue or member arg.
+        //  - host_factory_test.rs: the device class named in the admission
+        //    refusal (`cpu`, `cuda`) lives only in `HostError.message`
+        //    (radix-device-core); `HostError` carries no class field.
+        //  - proba_integration_test.rs: `proba_import_forbidden`
+        //    (radix-program/src/import_graph.rs) carries no arg for the
+        //    required remediation text it is asserted against.
         || rel == "crates/faber/src/package/fhir_test.rs"
-        || rel == "crates/faber/src/package/frontmatter_integration_test.rs"
         || rel == "crates/faber/src/package/host_factory_test.rs"
-        || rel == "crates/faber/src/package/locale_test.rs"
-        || rel == "crates/faber/src/package/manifest_test.rs"
         || rel == "crates/faber/src/package/proba_integration_test.rs"
-        || rel == "crates/faber/src/package/product/product_test.rs"
         // exempla LLVM e2e classifier: `classify_builder_failure` buckets an
         // `llvm_emission_failed` diagnostic as unsupported by searching its
         // message for the category slug. Missing field: the capability

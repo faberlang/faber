@@ -218,16 +218,14 @@ pub(super) fn eprint_io_error(path: &std::path::Path, err: &std::io::Error) -> !
 /// Parse argv and dispatch to the selected command handler.
 pub fn run() {
     let cli = crate::cli::Cli::parse();
+    #[cfg(feature = "runner")]
     if let Some(source) = cli.eval_source {
-        #[cfg(feature = "runner")]
         cmd_eval(&source, cli.eval_args);
-        #[cfg(not(feature = "runner"))]
-        {
-            let _ = source;
-            let _ = cli.eval_args;
-            exit_runner_feature_unavailable("-c/--command");
-        }
         return;
+    }
+    #[cfg(not(feature = "runner"))]
+    if cli.eval_source.is_some() {
+        exit_runner_feature_unavailable("-c/--command");
     }
     let Some(command) = cli.command else {
         eprintln!("error: no subcommand provided; use `faber --help` for usage");

@@ -40,7 +40,7 @@ struct FaberTargetRowSpec {
 ///   spellings — primary `wasm-text` and the `wasm` alias — so the report
 ///   carries both rows with identical capability truth (goal Open question 4
 ///   ruling: the double row may stay explicit).
-fn faber_target_row_specs() -> Vec<FaberTargetRowSpec> {
+fn faber_target_row_specs() -> Result<Vec<FaberTargetRowSpec>, String> {
     let mut rows = Vec::new();
     for variant in FaberCliTarget::value_variants() {
         if matches!(variant, FaberCliTarget::MirScena) {
@@ -52,17 +52,17 @@ fn faber_target_row_specs() -> Vec<FaberTargetRowSpec> {
         rows.push(FaberTargetRowSpec {
             target,
             name: target.to_string(),
-            feature: faber_row_feature(target),
+            feature: faber_row_feature(target)?,
         });
         if matches!(variant, FaberCliTarget::MirWasm) {
             rows.push(FaberTargetRowSpec {
                 target,
                 name: "wasm".to_string(),
-                feature: faber_row_feature(target),
+                feature: faber_row_feature(target)?,
             });
         }
     }
-    rows
+    Ok(rows)
 }
 
 /// The faber feature gating one emit-target row.
@@ -73,11 +73,11 @@ fn faber_target_row_specs() -> Vec<FaberTargetRowSpec> {
 /// `fmir-bin`) is faber-build-gated on the shared `mir-fmir` feature, which
 /// radix's neutral mapping leaves ungated (`None`) because the runner
 /// consumes images whenever any emit surface is present.
-fn faber_row_feature(target: Target) -> &'static str {
+fn faber_row_feature(target: Target) -> Result<&'static str, String> {
     match target {
-        Target::MirFmir | Target::MirFmirBinary | Target::MirFmirBundle => "mir-fmir",
-        other => other.required_feature().unwrap_or_else(|| {
-            panic!(
+        Target::MirFmir | Target::MirFmirBinary | Target::MirFmirBundle => Ok("mir-fmir"),
+        other => other.required_feature().ok_or_else(|| {
+            format!(
                 "CLI target {other} has no faber feature mapping: every \
                  `faber targets` row must name a faber feature (extend \
                  faber_row_feature's overrides)"
@@ -129,8 +129,8 @@ impl TargetRow {
 /// considers always-compiled (e.g. `MirLlvm`), and only faber knows its own
 /// feature gates. When a row's feature is not compiled, build/run/package are
 /// forced off so no row claims a capability the build did not compile.
-fn target_rows(compiled: &BTreeSet<&'static str>) -> Vec<TargetRow> {
-    let specs = faber_target_row_specs();
+fn target_rows(compiled: &BTreeSet<&'static str>) -> Result<Vec<TargetRow>, String> {
+    let specs = faber_target_row_specs()?;
     let mut rows = Vec::with_capacity(specs.len() + FABER_CAPABILITY_ROWS.len());
     for spec in specs {
         let available = compiled.contains(spec.feature);
@@ -168,7 +168,7 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Vec<TargetRow> {
             },
         });
     }
-    rows
+    Ok(rows)
 }
 
 /// Faber-surface capability overrides on top of radix's
@@ -277,17 +277,23 @@ fn compiled_features() -> BTreeSet<&'static str> {
 }
 
 /// Render the full `faber targets` table for the compiled build.
-pub(crate) fn rendered_targets_table() -> String {
+pub(crate) fn rendered_targets_table() -> Result<String, String> {
     let compiled = compiled_features();
-    target_rows(&compiled)
+    Ok(target_rows(&compiled)?
         .iter()
         .map(TargetRow::render)
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n"))
 }
 
 pub(crate) fn cmd_targets() {
-    println!("{}", rendered_targets_table());
+    match rendered_targets_table() {
+        Ok(table) => println!("{table}"),
+        Err(message) => {
+            eprintln!("error: {message}");
+            std::process::exit(1);
+        }
+    }
 }
 
 fn yes_no(value: bool) -> &'static str {

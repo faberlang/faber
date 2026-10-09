@@ -69,7 +69,7 @@ pub fn faber_mir_seams() -> radix::program::mir::MirSeams {
 /// (ownership-freeze §5.1): faber's `device/` subtree builds the device
 /// payload. `Ok(None)` when the package declares no `[device]` surface or
 /// when this build compiles no `device-runtime`.
-#[cfg(feature = "runner")]
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
 fn device_section_builder(
     prepared: &radix::program::mir::PreparedPackageMir<'_>,
     lowered: &radix::module::mir::LoweredMirUnit<'_>,
@@ -78,140 +78,145 @@ fn device_section_builder(
     // DDPP1-U2 (C2 feature isolation): the device-section builder compiles
     // only under `device-runtime` (it consumes the faber `device/` subtree);
     // without it no package carries a device payload.
-    #[cfg(feature = "device-runtime")]
+    if !prepared.device_declared {
+        return Ok(None);
+    }
+    // S5-U5b: the manifest `[device] steps` channel (or the portable
+    // default) is the declared repeating step count the constructor
+    // admits against the source loop bound and the wire carries.
+    let declared_steps = prepared
+        .device_steps
+        .unwrap_or(super::device::DEFAULT_TRAINING_STEPS);
+    let Some((program, semantics, step_count)) =
+        super::device::device_program_for_lowered_with_metadata(
+            &lowered.validated,
+            &lowered.interner,
+            &lowered.companions,
+            declared_steps,
+            &lowered.device_function_metadata,
+        )?
+    else {
+        // The selected entry lowers to no compute kernel: no device
+        // payload. An explicit GPU request fails closed at run time
+        // (N1.1); `auto` keeps the CPU route.
+        return Ok(None);
+    };
+    // S5-U5b: `[device] steps` applies only to a RepeatingStep training
+    // program. A declared count on a SingleRun program is a contradiction
+    // — fail closed, never a silently dropped count.
+    if prepared.device_steps.is_some()
+        && program.lifetime != radix_mir::device_program::DeviceProgramLifetime::RepeatingStep
     {
-        if !prepared.device_declared {
-            return Ok(None);
-        }
-        // S5-U5b: the manifest `[device] steps` channel (or the portable
-        // default) is the declared repeating step count the constructor
-        // admits against the source loop bound and the wire carries.
-        let declared_steps = prepared
-            .device_steps
-            .unwrap_or(super::device::DEFAULT_TRAINING_STEPS);
-        let Some((program, semantics, step_count)) =
-            super::device::device_program_for_lowered_with_metadata(
-                &lowered.validated,
-                &lowered.interner,
-                &lowered.companions,
-                declared_steps,
-                &lowered.device_function_metadata,
-            )?
-        else {
-            // The selected entry lowers to no compute kernel: no device
-            // payload. An explicit GPU request fails closed at run time
-            // (N1.1); `auto` keeps the CPU route.
-            return Ok(None);
-        };
-        // S5-U5b: `[device] steps` applies only to a RepeatingStep training
-        // program. A declared count on a SingleRun program is a contradiction
-        // — fail closed, never a silently dropped count.
-        if prepared.device_steps.is_some()
-            && program.lifetime != radix_mir::device_program::DeviceProgramLifetime::RepeatingStep
-        {
-            return Err(vec![crate::package_diagnostic_error(
-                "faber.toml device.steps applies only to a training-loop package; this package's device program is not a RepeatingStep training program",
+        return Err(vec![crate::package_diagnostic_error(
+            "faber.toml device.steps applies only to a training-loop package; this package's device program is not a RepeatingStep training program",
+        )
+        .with_file(diagnostic_path.display().to_string())
+        .with_arg("issue", "package_device_steps_not_repeating")]);
+    }
+    // Fail closed when a declared input is missing for an input buffer.
+    // The TWO exemptions (S3-A5 + S5-U1): the companion's reverse-AD
+    // upstream seed — a synthetic 1-element input whose source param
+    // carries no source name — is provisioned with 1.0; and a DECOMPOSED
+    // kernel's data-flow input that another kernel produces (a forward
+    // intermediate) needs no external value.
+    let mut device_inputs = prepared.device_inputs.clone();
+    let mut upstream_seeds: Vec<(String, Vec<f32>)> = Vec::new();
+    let produced: std::collections::BTreeSet<String> = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| {
+            matches!(
+                resource.buffer.role,
+                radix_mir::device_program::BufferRole::Output
             )
-            .with_file(diagnostic_path.display().to_string())
-            .with_arg("issue", "package_device_steps_not_repeating")]);
-        }
-        // Fail closed when a declared input is missing for an input buffer.
-        // The TWO exemptions (S3-A5 + S5-U1): the companion's reverse-AD
-        // upstream seed — a synthetic 1-element input whose source param
-        // carries no source name — is provisioned with 1.0; and a DECOMPOSED
-        // kernel's data-flow input that another kernel produces (a forward
-        // intermediate) needs no external value.
-        let mut device_inputs = prepared.device_inputs.clone();
-        let mut upstream_seeds: Vec<(String, Vec<f32>)> = Vec::new();
-        let produced: std::collections::BTreeSet<String> = program
-            .kernels
+        })
+        .map(|resource| resource.buffer.name.clone())
+        .collect();
+    for kernel in &program.kernels {
+        let Some(function) = lowered
+            .validated
+            .program()
+            .functions
             .iter()
-            .flat_map(|kernel| kernel.resources.iter())
-            .filter(|resource| {
-                matches!(
-                    resource.buffer.role,
-                    radix_mir::device_program::BufferRole::Output
-                )
-            })
-            .map(|resource| resource.buffer.name.clone())
-            .collect();
-        for kernel in &program.kernels {
-            let Some(function) = lowered
-                .validated
-                .program()
-                .functions
-                .iter()
-                .find(|function| function.id == kernel.function)
-            else {
-                continue;
-            };
-            let has_anonymous_param = function.params.iter().any(|param| param.name.is_none());
-            if has_anonymous_param {
-                for program_name in kernel.resources.iter().filter(|resource| {
-                    resource.buffer.role == radix_mir::device_program::BufferRole::Input
-                }) {
-                    if program_name.version.element_count == 1
-                        && !device_inputs.contains_key(&program_name.buffer.name)
-                        && !produced.contains(&program_name.buffer.name)
-                    {
-                        upstream_seeds.push((program_name.buffer.name.clone(), vec![1.0]));
-                    }
-                }
-            }
-            let Ok(_signature) =
-                radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-                    function, lowered.validated.validation(), &lowered.interner,
-                )
-            else {
-                continue;
-            };
+            .find(|function| function.id == kernel.function)
+        else {
+            continue;
+        };
+        let has_anonymous_param = function.params.iter().any(|param| param.name.is_none());
+        if has_anonymous_param {
             for program_name in kernel.resources.iter().filter(|resource| {
                 resource.buffer.role == radix_mir::device_program::BufferRole::Input
             }) {
-                if has_anonymous_param && program_name.version.element_count == 1 {
-                    continue;
-                }
-                if !device_inputs.contains_key(&program_name.buffer.name) {
-                    if produced.contains(&program_name.buffer.name) {
-                        continue;
-                    }
-                    return Err(vec![
-                        mir_issue_diag(
-                            diagnostic_path,
-                            "package_device_input_missing",
-                            format!(
-                                "[device] inputs has no value for kernel `{}` input buffer `{}`",
-                                kernel.entry, program_name.buffer.name
-                            ),
-                        )
-                        .with_arg("buffer", program_name.buffer.name.clone()),
-                    ]);
+                if program_name.version.element_count == 1
+                    && !device_inputs.contains_key(&program_name.buffer.name)
+                    && !produced.contains(&program_name.buffer.name)
+                {
+                    upstream_seeds.push((program_name.buffer.name.clone(), vec![1.0]));
                 }
             }
         }
-        for (name, values) in upstream_seeds {
-            device_inputs.insert(name, values);
+        let Ok(_signature) =
+            radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                function, lowered.validated.validation(), &lowered.interner,
+            )
+        else {
+            continue;
+        };
+        for program_name in kernel
+            .resources
+            .iter()
+            .filter(|resource| resource.buffer.role == radix_mir::device_program::BufferRole::Input)
+        {
+            if has_anonymous_param && program_name.version.element_count == 1 {
+                continue;
+            }
+            if !device_inputs.contains_key(&program_name.buffer.name) {
+                if produced.contains(&program_name.buffer.name) {
+                    continue;
+                }
+                return Err(vec![
+                    mir_issue_diag(
+                        diagnostic_path,
+                        "package_device_input_missing",
+                        format!(
+                            "[device] inputs has no value for kernel `{}` input buffer `{}`",
+                            kernel.entry, program_name.buffer.name
+                        ),
+                    )
+                    .with_arg("buffer", program_name.buffer.name.clone()),
+                ]);
+            }
         }
-        let selection = prepared.device_selection.unwrap_or(DeviceSelection::Auto);
-        let section = super::device::device_section_for_program(
-            &program,
-            &semantics,
-            &lowered.validated,
-            &lowered.interner,
-            super::device::DeviceSectionBuild {
-                selection,
-                inputs: &device_inputs,
-                ptx_target: super::device::ptx_target_for(None),
-                repeating_steps: step_count,
-            },
-        )?;
-        Ok(Some(section))
     }
-    #[cfg(not(feature = "device-runtime"))]
-    {
-        let _ = (prepared, lowered, diagnostic_path);
-        Ok(None)
+    for (name, values) in upstream_seeds {
+        device_inputs.insert(name, values);
     }
+    let selection = prepared.device_selection.unwrap_or(DeviceSelection::Auto);
+    let section = super::device::device_section_for_program(
+        &program,
+        &semantics,
+        &lowered.validated,
+        &lowered.interner,
+        super::device::DeviceSectionBuild {
+            selection,
+            inputs: &device_inputs,
+            ptx_target: super::device::ptx_target_for(None),
+            repeating_steps: step_count,
+        },
+    )?;
+    Ok(Some(section))
+}
+
+/// Without `device-runtime` (DDPP1-U2, C2 feature isolation) no package
+/// carries a device payload: the builder is the constant `Ok(None)`.
+#[cfg(all(feature = "runner", not(feature = "device-runtime")))]
+fn device_section_builder(
+    _prepared: &radix::program::mir::PreparedPackageMir<'_>,
+    _lowered: &radix::module::mir::LoweredMirUnit<'_>,
+    _diagnostic_path: &Path,
+) -> Result<Option<radix_mir_fmir::FmirDeviceSection>, Vec<Diagnostic>> {
+    Ok(None)
 }
 
 /// Public package-MIR callback for external backend harnesses: forward to the

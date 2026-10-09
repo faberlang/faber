@@ -1,4 +1,5 @@
 use super::*;
+use radix::module::diagnostics::DiagnosticArg;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -118,10 +119,9 @@ fn empty_diagnostics_locale_is_rejected() {
     let err = config_with_locale(Target::HirRust, &entry, Some("zh-Hans"), Some("   "))
         .expect_err("empty diagnostics locale");
     assert!(
-        err.message
-            .contains("--diagnostics-locale must not be empty"),
-        "unexpected message: {}",
-        err.message
+        err.args
+            .contains(&DiagnosticArg::new("flag", "--diagnostics-locale")),
+        "unexpected diagnostic: {err:?}"
     );
     let _ = fs::remove_dir_all(_root);
 }
@@ -197,14 +197,12 @@ fn package_local_override_is_selected_before_embedded() {
     let err = load_locale_pack_for_input(&entry, Some("en")).expect_err("override must load");
     let display = pack_path.display().to_string();
     assert!(
-        err.message.contains(&display),
-        "package-local path must be named, got: {}",
-        err.message
+        err.args.contains(&DiagnosticArg::new("pack", display)),
+        "package-local path must be named, got: {err:?}"
     );
     assert!(
-        !err.message.contains("no embedded reader pack"),
-        "must not fall through to embedded: {}",
-        err.message
+        !err.args.iter().any(|arg| arg.name == "embedded_locales"),
+        "must not fall through to embedded: {err:?}"
     );
 
     let _ = fs::remove_dir_all(root);
@@ -236,14 +234,15 @@ pack = "./locale/custom.toml"
 
     let err = load_locale_pack_for_input(&entry, None).expect_err("manifest pack must load");
     assert!(
-        err.message.contains("custom.toml"),
-        "manifest pack path must be named, got: {}",
-        err.message
+        err.args.iter().any(|arg| arg.name == "pack"
+            && Path::new(&arg.value)
+                .file_name()
+                .is_some_and(|name| name == "custom.toml")),
+        "manifest pack path must be named, got: {err:?}"
     );
     assert!(
-        !err.message.contains("no embedded reader pack"),
-        "must not fall through to embedded: {}",
-        err.message
+        !err.args.iter().any(|arg| arg.name == "embedded_locales"),
+        "must not fall through to embedded: {err:?}"
     );
 
     let _ = fs::remove_dir_all(root);

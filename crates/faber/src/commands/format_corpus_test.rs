@@ -43,8 +43,8 @@ fn canonical_pipeline(
     path: &Path,
     source: &str,
 ) -> Result<(radix::module::driver::Session, String, String), String> {
-    let session = format_session(path, None, source)
-        .map_err(|err| format!("format session: {}", err.message))?;
+    let session =
+        format_session(path, None, source).map_err(|err| format!("format session: {err:?}"))?;
     let name = path.display().to_string();
     let result = reemit_faber(
         &session,

@@ -564,11 +564,7 @@ test "vector3 builds" {
     assert!(
         result.success(),
         "lib package without paths.entry should compile for faber test, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (&diag.message, diag.issue()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");

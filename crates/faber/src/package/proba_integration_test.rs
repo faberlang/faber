@@ -290,9 +290,7 @@ fn single_file_proba_entry_fails_closed_outside_test_path() {
         err.iter()
             .any(|d| diagnostic_has_issue(d, "proba_source_build_forbidden")),
         "expected proba_source_build_forbidden, got {:?}",
-        err.iter()
-            .map(|d| (&d.message, d.issue()))
-            .collect::<Vec<_>>()
+        err
     );
 }
 
@@ -323,14 +321,12 @@ fn product_fab_cannot_import_proba() {
         err.iter()
             .any(|d| diagnostic_has_issue(d, "proba_import_forbidden")),
         "expected proba_import_forbidden: {:?}",
-        err.iter()
-            .map(|d| (&d.message, d.issue()))
-            .collect::<Vec<_>>()
+        err
     );
     assert!(
         err.iter().any(|d| d.message.contains(PROBA_IMPORT_MESSAGE)),
         "expected required diagnostic text, got {:?}",
-        err.iter().map(|d| &d.message).collect::<Vec<_>>()
+        err
     );
 }
 
@@ -364,9 +360,7 @@ describe "b" { test "use a" { assert a.shared() ≡ 1 } }
             .any(|d| diagnostic_has_issue(d, "proba_import_forbidden")
                 && d.message.contains(PROBA_IMPORT_MESSAGE)),
         "expected proba_import_forbidden with required text: {:?}",
-        err.iter()
-            .map(|d| (&d.message, d.issue()))
-            .collect::<Vec<_>>()
+        err
     );
 }
 
@@ -455,11 +449,7 @@ this is not valid faber
     assert!(
         result.success(),
         "build must ignore invalid adjacent .proba: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| &d.message)
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
 }
 
@@ -496,11 +486,7 @@ describe "helpers" {
     assert!(
         result.success(),
         "test compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| (&d.message, d.issue()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
@@ -616,10 +602,6 @@ describe "mathesis catalog" {
     assert!(
         result.success(),
         "norma-style proba compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| (&d.message, d.issue()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
 }

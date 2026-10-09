@@ -862,6 +862,7 @@ fn assert_format_refuses(label: &str, source: &str, construct: &str) {
             !output.status.success(),
             "{label}: format {mode} must exit non-zero:\n{stderr}"
         );
+        // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
         assert!(
             stderr.contains("CODEGEN006")
                 && stderr.contains("ast_construct_dropped")
@@ -913,6 +914,7 @@ fn format_refuses_top_level_statement_loss() {
             !output.status.success(),
             "beside: {mode} must exit non-zero:\n{stderr}"
         );
+        // ALLOW_DIAGNOSTIC_RENDER_TEXT: subprocess CLI stderr renderer contract.
         assert!(
             stderr.contains("SEM008") && stderr.contains("top_level_statement_beside_entry"),
             "beside: {mode} must name the SEM008 issue:\n{stderr}"

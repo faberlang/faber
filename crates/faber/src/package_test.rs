@@ -657,11 +657,7 @@ fn compile_package_rust_code(entry: &Path) -> String {
     assert!(
         result.success(),
         "expected package compile success, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
@@ -810,11 +806,7 @@ main {
     assert!(
         result.success(),
         "expected norma:json package compile success, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
@@ -855,11 +847,7 @@ main {
     assert!(
         result.success(),
         "expected norma:json package compile success, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
@@ -909,11 +897,7 @@ main {
             .iter()
             .any(|diag| diagnostic_has_issue(diag, "unsupported_conversio")),
         "expected direct text/json conversion rejection, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
 }
 
@@ -1155,7 +1139,7 @@ fn label() → int {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["7".to_owned()]);
@@ -1186,7 +1170,7 @@ main args args {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["cli root".to_owned()]);
@@ -1222,7 +1206,7 @@ main {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["Salve, Munde!".to_owned()]);
@@ -2242,7 +2226,7 @@ main args args {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["Ian".to_owned()]);
@@ -2287,7 +2271,7 @@ main args args {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["Ian".to_owned()]);
@@ -2420,7 +2404,7 @@ main args args {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(
@@ -2834,7 +2818,7 @@ main args args {
         "expected CLI argument parsing diagnostic for non-numeric input, got {:?}",
         diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
 }
@@ -3196,7 +3180,7 @@ main args args {
         "expected CLI argument parsing diagnostic, got {:?}",
         diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
 }
@@ -4538,7 +4522,7 @@ main {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["amor".to_owned()]);
@@ -5804,7 +5788,7 @@ main {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(
@@ -6299,7 +6283,7 @@ main {
         "expected wildcard library import to resolve in check, got {:?}",
         diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
 }
@@ -7523,19 +7507,16 @@ source = "components/faber"
         "package_member_unsupported_source_root"
     ));
     assert!(
-        err.message.contains("src"),
-        "diagnostic must name the supported default, got: {}",
-        err.message
+        diagnostic_has_arg(&err, "source", "components/faber"),
+        "diagnostic must name the rejected source root, got: {err:?}"
     );
     assert!(
-        err.message.contains("package root"),
-        "diagnostic must name the supported package-root value, got: {}",
-        err.message
+        diagnostic_has_arg(&err, "supported_source_roots", "src,."),
+        "diagnostic must name the supported default and package-root values, got: {err:?}"
     );
     assert!(
-        err.message.contains("usage contract"),
-        "diagnostic must name the pending usage contract, got: {}",
-        err.message
+        diagnostic_has_arg(&err, "reason", "custom_source_root_usage_contract_pending"),
+        "diagnostic must name the pending usage contract, got: {err:?}"
     );
 }
 
@@ -7630,11 +7611,7 @@ entry = "main.fab"
     assert!(
         result.output.is_some(),
         "dot-source package must compile, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
 }
 
@@ -7854,11 +7831,7 @@ locale = "zh-Hans"
     assert!(
         result.success(),
         "expected manifest reader locale package compile success, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.message.clone()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
 }
 
@@ -8067,7 +8040,7 @@ fn probe() → bool {
         diagnostics
             .iter()
             .filter(|diag| diag.is_error())
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
 }
@@ -8728,7 +8701,7 @@ main {
         "expected typed top-level json/solve namespace call, got {:?}",
         diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
 }
@@ -11097,20 +11070,7 @@ fn build_and_run_sqlite_app(app: &Path) -> std::process::Output {
     assert!(
         result.success(),
         "expected sqlite consumer compile, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| {
-                (
-                    d.code,
-                    d.issue(),
-                    d.message.clone(),
-                    d.span,
-                    d.source_line.clone(),
-                    d.args.clone(),
-                )
-            })
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let layout = discover_build_layout(app).expect("layout");
     let mut runtime_plan = runtime_plan_with_faber_seams(&Config::default(), app).expect("plan");
@@ -11441,11 +11401,7 @@ main {
     assert!(
         result.success(),
         "expected app compile success, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| (d.code, d.issue(), d.message.clone()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
@@ -11651,15 +11607,7 @@ main {
         &Config::default().with_library_home(dev_norma_library_home()),
         &app,
     );
-    assert!(
-        result.success(),
-        "compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| d.message.clone())
-            .collect::<Vec<_>>()
-    );
+    assert!(result.success(), "compile failed: {:?}", result.diagnostics);
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust");
     };
@@ -11740,11 +11688,7 @@ main args args exit 0 {
     assert!(
         result.success(),
         "go package compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| d.message.clone())
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go output");
@@ -11816,11 +11760,7 @@ main args args exit 0 {
     assert!(
         result.success(),
         "go multi-module compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| d.message.clone())
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go output");
@@ -11865,11 +11805,7 @@ fn g6_go4_coreutils_true_package_go_builds() {
     assert!(
         result.success(),
         "true package go compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| d.message.clone())
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
@@ -11941,11 +11877,7 @@ main args args exit 0 {
     assert!(
         result.success(),
         "dual console import should compile: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| d.message.clone())
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
@@ -12015,11 +11947,7 @@ main args args exit 0 {
             .iter()
             .any(|d| diagnostic_has_issue(d, "package_go_func_name_collision")),
         "expected package_go_func_name_collision: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| (d.message.clone(), d.args.clone()))
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
 }
 
@@ -12036,11 +11964,7 @@ fn g6_go4_coreutils_echo_package_go_builds() {
     assert!(
         result.success(),
         "echo package go compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| d.message.clone())
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
@@ -12149,11 +12073,7 @@ main args args exit 0 {
     assert!(
         result.success(),
         "console surface compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| d.message.clone())
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
@@ -12208,11 +12128,7 @@ fn g6_go4_coreutils_false_package_go_builds() {
     assert!(
         result.success(),
         "false package go compile failed: {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|d| d.message.clone())
-            .collect::<Vec<_>>()
+        result.diagnostics
     );
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
@@ -13649,8 +13565,7 @@ fn g10_web3_failed_rebuild_keeps_previous_product_usable() {
         .expect_err("injected failure must abort the product build");
         assert!(
             diagnostic_has_issue(&err, "product_injected_failure"),
-            "stage {stage}: unexpected error: {}",
-            err.message
+            "stage {stage}: unexpected error: {err:?}"
         );
         let controllers_after = fs::read_to_string(&build.controllers_json).expect("controllers");
         assert_eq!(
@@ -14383,7 +14298,7 @@ main {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(
@@ -14548,7 +14463,7 @@ main {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(host.stdout_lines, vec!["9".to_owned()]);
@@ -14644,7 +14559,7 @@ main {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(
@@ -14751,7 +14666,7 @@ main {
             .err()
             .unwrap_or_default()
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
             .collect::<Vec<_>>()
     );
     assert_eq!(

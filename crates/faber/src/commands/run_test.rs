@@ -1,6 +1,7 @@
 use super::*;
 use crate::cli::RunArgs;
 use faber_cli::package::DeviceChoice;
+use radix::module::diagnostics::DiagnosticArg;
 use radix::module::mir::RunSourceError;
 use radix::program::mir::DeviceSelection;
 use std::path::{Path, PathBuf};
@@ -201,8 +202,11 @@ fn route_selection_rejects_invalid_manifest_device() {
     write_manifest(&dir, Some("rocm"));
     let args = run_args(dir.clone(), None);
     let err = resolve_route_selection(&args, &dir).expect_err("invalid value must fail closed");
-    assert!(err.message.contains("rocm"));
-    assert!(err.message.contains("device.device"));
+    assert!(err.args.contains(&DiagnosticArg::new("device", "rocm")));
+    assert!(
+        err.args
+            .contains(&DiagnosticArg::new("key", "device.device"))
+    );
 }
 
 #[test]
@@ -257,9 +261,10 @@ fn route_selection_retired_backend_key_is_refused_naming_device() {
     let err = resolve_route_selection(&args, &dir).expect_err("retired key must fail closed");
     assert_eq!(err.issue(), Some("package_device_backend_renamed"));
     assert!(
-        err.message.contains("device = "),
-        "names the new key: {}",
-        err.message
+        err.args
+            .contains(&DiagnosticArg::new("replacement_key", "device")),
+        "names the new key: {:?}",
+        err.args
     );
 }
 
