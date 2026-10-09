@@ -1,0 +1,25 @@
+# Proba canary package: tiny pure functions with colocated proba tests.
+# Stage 3 of ./scripta/test runs `faber test` on this package; it must stay
+# at 0 failed and 0 blocked.
+
+@ public
+fn double(int n) → int {
+    return n * 2
+}
+
+@ public
+fn clamp_low(int n, int floor) → int {
+    if n ≺ floor {
+        return floor
+    }
+    return n
+}
+
+@ public
+fn is_even(int n) → bool {
+    return n % 2 ≡ 0
+}
+
+main {
+    print "proba canary"
+}
