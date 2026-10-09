@@ -150,6 +150,12 @@ pub struct MirValidationContext<'a> {
     pub layouts: MirLayoutTable,
     pub interner: MirInterner<'a>,
     pub functions: FxHashMap<DefId, MirFunctionSignature>,
+    /// Functions lowered from genus methods: the first MIR parameter of each is
+    /// the method's receiver, lowered as an `Owned` parameter that MIR itself
+    /// cannot tell from an `own Genus` parameter. Backends that must treat a
+    /// receiver differently (the sexp write-back) read it here; it is not part
+    /// of any serialized MIR form.
+    pub method_defs: FxHashSet<DefId>,
     pub external_function_identities: FxHashMap<DefId, MirExternalFunctionIdentity>,
     /// Current package product identity (package-aware compiles only).
     ///
@@ -205,6 +211,7 @@ impl<'a> MirValidationContext<'a> {
             layouts: MirLayoutTable::from_types(types),
             interner: MirInterner::Absent,
             functions: FxHashMap::default(),
+            method_defs: FxHashSet::default(),
             external_function_identities: FxHashMap::default(),
             package_product: None,
             struct_fields: FxHashMap::default(),
@@ -257,6 +264,7 @@ impl<'a> MirValidationContext<'a> {
         let mut context = MirValidationContext::<'b>::new(types);
         context.interner = self.interner.clone();
         context.functions.clone_from(&self.functions);
+        context.method_defs.clone_from(&self.method_defs);
         context
             .external_function_identities
             .clone_from(&self.external_function_identities);
@@ -315,6 +323,7 @@ impl<'a> MirValidationContext<'a> {
         let Self {
             interner,
             functions,
+            method_defs,
             external_function_identities,
             package_product,
             struct_fields,
@@ -343,6 +352,7 @@ impl<'a> MirValidationContext<'a> {
             layouts,
             interner,
             functions,
+            method_defs,
             external_function_identities,
             package_product,
             struct_fields,

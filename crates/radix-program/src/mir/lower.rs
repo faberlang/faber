@@ -47,6 +47,8 @@ pub(super) struct RemappedValidation {
     enum_variants: HashMap<DefId, Vec<DefId>>,
     variant_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
     functions: HashMap<DefId, MirFunctionSignature>,
+    /// Functions lowered from genus methods (first parameter is the receiver).
+    method_defs: HashSet<DefId>,
     /// Tier-1 `@ ad` routes of the linked units (route → handler `DefId`).
     ad_routes: HashMap<String, DefId>,
 }
@@ -131,6 +133,7 @@ impl RemappedValidation {
         for (def, sig) in &other.functions {
             self.functions.entry(*def).or_insert_with(|| sig.clone());
         }
+        self.method_defs.extend(other.method_defs.iter().copied());
         for (route, def) in &other.ad_routes {
             self.ad_routes.entry(route.clone()).or_insert(*def);
         }
@@ -189,6 +192,7 @@ impl RemappedValidation {
         for (def, sig) in &self.functions {
             context.functions.entry(*def).or_insert_with(|| sig.clone());
         }
+        context.method_defs.extend(self.method_defs.iter().copied());
         for (route, def) in &self.ad_routes {
             context.ad_routes.entry(route.clone()).or_insert(*def);
         }
@@ -634,6 +638,9 @@ fn collect_remapped_validation(
             rewrite_type_id(&mut param.ty, type_rewrites);
         }
         out.functions.entry(remap_function_def(*def)).or_insert(sig);
+    }
+    for def in &source.method_defs {
+        out.method_defs.insert(remap_function_def(*def));
     }
     for (route, def) in &source.ad_routes {
         out.ad_routes
@@ -2810,6 +2817,10 @@ fn rewrite_lowered_program_sources<'a>(
     context.functions = std::mem::take(&mut context.functions)
         .into_iter()
         .map(|(def, signature)| (rewrite(def), signature))
+        .collect();
+    context.method_defs = std::mem::take(&mut context.method_defs)
+        .into_iter()
+        .map(rewrite)
         .collect();
     context.external_function_identities =
         std::mem::take(&mut context.external_function_identities)

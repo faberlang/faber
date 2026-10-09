@@ -226,6 +226,7 @@ impl<'a> LoweringContextMaps<'a> {
                 layouts: MirLayoutTable::default(),
                 interner: radix_mir::MirInterner::Borrowed(&unit.interner),
                 functions: FxHashMap::default(),
+                method_defs: FxHashSet::default(),
                 external_function_identities: FxHashMap::default(),
                 package_product: None,
                 struct_fields: FxHashMap::default(),
@@ -700,6 +701,7 @@ impl<'a> LoweringContextMaps<'a> {
                 .insert(method.def_id, MirType::semantic(err_ty));
             self.fault_delivery |= method.func.is_kernel;
         }
+        self.validation.method_defs.insert(method.def_id);
         if let Some(return_ty) = method.func.ret_ty {
             let params = std::iter::once(HirParamSignatureProxy { ty: receiver_ty, optional: false }).chain(
                 method
