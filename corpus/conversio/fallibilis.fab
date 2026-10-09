@@ -76,5 +76,7 @@ main {
     assert tutum(bad) ≡ epochZero()
     assert tutumDirect(good) ≡ (good ↦ instant)
     assert tutumDirect(bad) ≡ epochZero()
-    print inlineRecovery(good), tutum(good), tutumDirect(good)
+    print inlineRecovery(good) ↦ string
+    print tutum(good) ↦ string
+    print tutumDirect(good) ↦ string
 }
