@@ -445,6 +445,31 @@ pub const FLOAT_F16_BITS_TO_F32: RuntimeItem = RuntimeItem {
     targets: &[Target::HirRust],
 };
 
+/// `trap` rows (R0, `faber::trap`): the one place generated Rust fails. A
+/// failing index, key, conversion or assertion calls a `trap` function with a
+/// [`Trap`](`faber::Trap`) kind instead of writing `.expect(..)` / `panic!(..)`
+/// inline. The functions are unwinding panics with the failure text the inline
+/// form printed. `trap.Trap` is the closed kind enum, spelled at the crate root
+/// as `faber::Trap`. No row applies a width limit.
+const TRAP_RUST_TARGETS: &[Target] = &[Target::HirRust];
+
+const fn trap_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
+    RuntimeItem {
+        ns: Namespace::Trap,
+        name,
+        kind,
+        targets: TRAP_RUST_TARGETS,
+    }
+}
+
+pub const TRAP_TRAP: RuntimeItem = trap_row("Trap", RuntimeKind::Type);
+pub const TRAP_FAIL: RuntimeItem = trap_row("fail", RuntimeKind::Fn);
+pub const TRAP_SOME: RuntimeItem = trap_row("some", RuntimeKind::Fn);
+pub const TRAP_OK: RuntimeItem = trap_row("ok", RuntimeKind::Fn);
+pub const TRAP_OK_STATIC: RuntimeItem = trap_row("ok_static", RuntimeKind::Fn);
+pub const TRAP_REQUIRE: RuntimeItem = trap_row("require", RuntimeKind::Fn);
+pub const TRAP_UNREACHABLE: RuntimeItem = trap_row("unreachable", RuntimeKind::Fn);
+
 /// TypeScript JSON, dynamic-value, variant, tuple-map and atomic carriers (T1-T11).
 pub const JSON_VALUE: RuntimeItem = RuntimeItem {
     ns: Namespace::Json,
@@ -1126,6 +1151,13 @@ pub const TABLE: &[RuntimeItem] = &[
     GEN_BLOCK_ON,
     GEN_BLOCK_ON_TOKIO,
     FLOAT_F16_BITS_TO_F32,
+    TRAP_TRAP,
+    TRAP_FAIL,
+    TRAP_SOME,
+    TRAP_OK,
+    TRAP_OK_STATIC,
+    TRAP_REQUIRE,
+    TRAP_UNREACHABLE,
     INF_TO_NUMBER,
     INF_CLAMP,
     FORMAT_FMT,
@@ -1257,11 +1289,12 @@ pub enum Namespace {
     Routes,
     Gen,
     Float,
+    Trap,
 }
 
 impl Namespace {
     /// Every namespace, in declaration order.
-    pub const ALL: [Namespace; 25] = [
+    pub const ALL: [Namespace; 26] = [
         Namespace::Exact,
         Namespace::Dec,
         Namespace::Inf,
@@ -1287,6 +1320,7 @@ impl Namespace {
         Namespace::Routes,
         Namespace::Gen,
         Namespace::Float,
+        Namespace::Trap,
     ];
 
     /// The `lower_snake_case` spelling of the namespace.
@@ -1318,6 +1352,7 @@ impl Namespace {
             Namespace::Routes => "routes",
             Namespace::Gen => "gen",
             Namespace::Float => "float",
+            Namespace::Trap => "trap",
         }
     }
 }

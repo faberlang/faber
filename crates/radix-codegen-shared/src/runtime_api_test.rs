@@ -982,6 +982,57 @@ fn the_rust_gen_and_float_rows_spell_as_the_crate_root_types_and_a_float_functio
 }
 
 #[test]
+fn the_rust_trap_rows_spell_as_faber_trap_functions_and_the_crate_root_trap_type() {
+    let rows: Vec<&RuntimeItem> = TABLE
+        .iter()
+        .filter(|row| row.ns == Namespace::Trap)
+        .collect();
+    let spelled: Vec<(String, RuntimeKind)> = rows
+        .iter()
+        .map(|row| (spell_any(Target::HirRust, row), row.kind))
+        .collect();
+    assert_eq!(
+        spelled,
+        [
+            ("faber::Trap".to_owned(), RuntimeKind::Type),
+            ("faber::trap::fail".to_owned(), RuntimeKind::Fn),
+            ("faber::trap::some".to_owned(), RuntimeKind::Fn),
+            ("faber::trap::ok".to_owned(), RuntimeKind::Fn),
+            ("faber::trap::ok_static".to_owned(), RuntimeKind::Fn),
+            ("faber::trap::require".to_owned(), RuntimeKind::Fn),
+            ("faber::trap::unreachable".to_owned(), RuntimeKind::Fn),
+        ]
+    );
+    assert!(rows.iter().all(|row| row.targets == [Target::HirRust]));
+    assert_eq!(Namespace::Trap.as_str(), "trap");
+}
+
+#[test]
+fn the_trap_namespace_is_carried_by_rust_alone() {
+    let refs = RuntimeRefs::new();
+    assert_eq!(
+        refs.spell(Target::HirRust, &TRAP_SOME),
+        Ok("faber::trap::some".to_owned())
+    );
+    assert_eq!(refs.used(), [Namespace::Trap]);
+    assert!(
+        reserved_names(Target::HirTypeScript, TABLE)
+            .iter()
+            .all(|name| name != "trap")
+    );
+    assert!(
+        reserved_names(Target::HirPython, TABLE)
+            .iter()
+            .all(|name| name != "trap")
+    );
+    assert!(
+        reserved_names(Target::HirSwift, TABLE)
+            .iter()
+            .all(|name| name != "Trap")
+    );
+}
+
+#[test]
 fn modulus_rows_cover_every_ring_operation_and_width_for_typescript() {
     let rows: Vec<_> = TABLE
         .iter()
