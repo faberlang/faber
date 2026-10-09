@@ -109,7 +109,6 @@ pub(super) struct LoweringContextMaps<'a> {
     meus_def: Option<DefId>,
     tuus_def: Option<DefId>,
     scrinium_def: Option<DefId>,
-    scrinium_data_field: Option<Symbol>,
     top_level_consts: FxHashMap<DefId, &'a HirConst>,
     static_fields: FxHashMap<(DefId, Symbol), &'a HirField>,
     imported_static_fields: FxHashMap<(DefId, Symbol), HirExpression>,
@@ -180,7 +179,6 @@ impl<'a> LoweringContextMaps<'a> {
             meus_def: None,
             tuus_def: None,
             scrinium_def: None,
-            scrinium_data_field: None,
             top_level_consts: FxHashMap::default(),
             static_fields: FxHashMap::default(),
             imported_static_fields: FxHashMap::default(),
@@ -364,7 +362,6 @@ impl<'a> LoweringContextMaps<'a> {
             meus_def: self.meus_def,
             tuus_def: self.tuus_def,
             scrinium_def: self.scrinium_def,
-            scrinium_data_field: self.scrinium_data_field,
             top_level_consts: Arc::clone(&self.frozen.top_level_consts),
             static_fields: Arc::clone(&self.frozen.static_fields),
             imported_static_fields: Arc::clone(&self.frozen.imported_static_fields),
@@ -471,11 +468,6 @@ impl<'a> LoweringContextMaps<'a> {
             }
             "scrinium" => {
                 self.scrinium_def = Some(def_id);
-                self.scrinium_data_field = strukt
-                    .fields
-                    .iter()
-                    .find(|field| self.interner.resolve(field.name) == "data")
-                    .map(|field| field.name);
             }
             _ => {}
         }

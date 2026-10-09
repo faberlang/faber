@@ -774,33 +774,17 @@ impl Validator<'_, '_> {
                     "sermo close error is not textus",
                 );
             }
-            MirSermoOp::Receive { frame, data_field } => {
+            MirSermoOp::Receive { .. } => {
                 if !matches!(
                     self.type_kind(call.return_ty),
                     Type::Option(_) | Type::Union(_)
                 ) {
                     self.error(span, "sermo receive result is not optional frame");
                 }
-                if !self
-                    .context
-                    .struct_fields
-                    .get(frame)
-                    .is_some_and(|fields| fields.contains_key(data_field))
-                {
-                    self.error(span, "sermo receive frame metadata is missing data field");
-                }
             }
-            MirSermoOp::Cursor { frame, data_field } => {
+            MirSermoOp::Cursor { .. } => {
                 if !matches!(self.type_kind(call.return_ty), Type::Cursor(_)) {
                     self.error(span, "sermo cursor result is not cursor");
-                }
-                if !self
-                    .context
-                    .struct_fields
-                    .get(frame)
-                    .is_some_and(|fields| fields.contains_key(data_field))
-                {
-                    self.error(span, "sermo cursor frame metadata is missing data field");
                 }
             }
             MirSermoOp::DrainCursor => {

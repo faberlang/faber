@@ -17,14 +17,13 @@ use radix_module::mir::{
     MirFunctionId, MirIntrinsic, MirKeyValueOperand, MirLocal, MirLocalId, MirNamedOperand,
     MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode,
     MirPlace, MirPlaceBase, MirProgram, MirProjection, MirProvider, MirProviderKind,
-    MirRuntimeCall, MirSermoOp, MirStatement, MirStatementKind, MirStructFieldDefaults,
-    MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId,
-    MirValueKind,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase,
+    MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
 };
 use radix_types::{Primitive, TypeTable};
 
 /// The distinct sentinel texts, indexed by fixture slot.
-const SENTINELS: [&str; 54] = [
+const SENTINELS: [&str; 52] = [
     "sentinel.function.name",
     "sentinel.param.name",
     "sentinel.local.name",
@@ -60,8 +59,6 @@ const SENTINELS: [&str; 54] = [
     "sentinel.runtime.convert.recovery",
     "sentinel.runtime.convert.default-field.name",
     "sentinel.runtime.convert.default-field.value",
-    "sentinel.runtime.sermo.receive.data-field",
-    "sentinel.runtime.sermo.cursor.data-field",
     "sentinel.filum.binder",
     "sentinel.filum.term-binder-name",
     "sentinel.filum.coordinate.name",
@@ -297,51 +294,23 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
         },
         MirStatement {
             kind: MirStatementKind::RuntimeCall {
-                destination: None,
-                call: MirRuntimeCall {
-                    intrinsic: MirIntrinsic::Sermo(MirSermoOp::Receive {
-                        frame: DefId(40),
-                        data_field: sym(35),
-                    }),
-                    args: vec![],
-                    return_ty: ty,
-                },
-            },
-            span,
-        },
-        MirStatement {
-            kind: MirStatementKind::RuntimeCall {
-                destination: None,
-                call: MirRuntimeCall {
-                    intrinsic: MirIntrinsic::Sermo(MirSermoOp::Cursor {
-                        frame: DefId(41),
-                        data_field: sym(36),
-                    }),
-                    args: vec![],
-                    return_ty: ty,
-                },
-            },
-            span,
-        },
-        MirStatement {
-            kind: MirStatementKind::RuntimeCall {
                 destination: Some(simple_place()),
                 call: MirRuntimeCall {
                     intrinsic: MirIntrinsic::FilumReduce(MirFilumReduceOp {
                         op: radix_module::mir::MirReduceOp::Sum,
                         form: radix_module::mir::MirFilumForm::Declared,
                         term_ty: radix_module::mir::MirType::semantic(radix_types::TypeId(0)),
-                        filum_binder: Some(sym(37)),
+                        filum_binder: Some(sym(35)),
                         term_binder: MirLocalId(5),
-                        term_binder_name: Some(sym(38)),
+                        term_binder_name: Some(sym(36)),
                         coordinates: vec![MirFilumCoordinate {
                             local: MirLocalId(6),
-                            name: Some(sym(39)),
+                            name: Some(sym(37)),
                         }],
                         lane_width: 32,
                         term_body: vec![{
                             let mut statement =
-                                assign(MirValueKind::Operand(operand(string(40))), 20);
+                                assign(MirValueKind::Operand(operand(string(38))), 20);
                             let MirStatementKind::Assign { place, .. } = &mut statement.kind else {
                                 unreachable!("built an assign")
                             };
@@ -364,8 +333,8 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                     kind: MirAggregateKind::Record,
                     ty,
                     fields: MirAggregateFields::Named(vec![MirNamedOperand {
-                        name: sym(41),
-                        value: operand(string(42)),
+                        name: sym(39),
+                        value: operand(string(40)),
                     }]),
                 },
             },
@@ -378,8 +347,8 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                     kind: MirAggregateKind::Map,
                     ty,
                     fields: MirAggregateFields::Keyed(vec![MirKeyValueOperand {
-                        key: operand(string(43)),
-                        value: operand(string(44)),
+                        key: operand(string(41)),
+                        value: operand(string(42)),
                     }]),
                 },
             },
@@ -438,28 +407,28 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                     0,
                     statements,
                     MirTerminatorKind::Return(Some(operand(MirConstant::Regex {
-                        pattern: sym(45),
-                        flags: Some(sym(46)),
+                        pattern: sym(43),
+                        flags: Some(sym(44)),
                     }))),
                 ),
                 block(
                     1,
                     vec![],
-                    MirTerminatorKind::ReturnError(operand(string(47))),
+                    MirTerminatorKind::ReturnError(operand(string(45))),
                 ),
                 block(
                     2,
                     vec![],
                     MirTerminatorKind::TryCall {
                         destination: Some(simple_place()),
-                        callee: MirCallee::Value(operand(string(48))),
-                        args: vec![operand(string(49))],
+                        callee: MirCallee::Value(operand(string(46))),
+                        args: vec![operand(string(47))],
                         ok_block: MirBlockId(3),
                         error_place: MirPlace {
                             base: MirPlaceBase::Local(MirLocalId(2)),
                             projections: vec![MirProjection::VariantField {
                                 variant: DefId(50),
-                                field: sym(50),
+                                field: sym(48),
                             }],
                         },
                         error_block: MirBlockId(4),
@@ -469,7 +438,7 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                     3,
                     vec![],
                     MirTerminatorKind::Branch {
-                        condition: operand(string(51)),
+                        condition: operand(string(49)),
                         then_block: MirBlockId(0),
                         else_block: MirBlockId(1),
                     },
@@ -478,9 +447,9 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                     4,
                     vec![],
                     MirTerminatorKind::Switch {
-                        value: operand(string(52)),
+                        value: operand(string(50)),
                         cases: vec![MirSwitchCase {
-                            value: MirConstant::String(sym(53)),
+                            value: MirConstant::String(sym(51)),
                             target: MirBlockId(0),
                         }],
                         default: MirBlockId(1),

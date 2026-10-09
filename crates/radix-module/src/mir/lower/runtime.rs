@@ -1268,14 +1268,8 @@ impl FunctionBuilder<'_> {
             }
         } else if Some(receiver_def) == self.context.tuus_def {
             match method_name {
-                "accipe" => crate::mir::MirSermoOp::Receive {
-                    frame: self.context.scrinium_def?,
-                    data_field: self.context.scrinium_data_field?,
-                },
-                "cursor" => crate::mir::MirSermoOp::Cursor {
-                    frame: self.context.scrinium_def?,
-                    data_field: self.context.scrinium_data_field?,
-                },
+                "accipe" => crate::mir::MirSermoOp::Receive { frame: self.context.scrinium_def? },
+                "cursor" => crate::mir::MirSermoOp::Cursor { frame: self.context.scrinium_def? },
                 "fini" => crate::mir::MirSermoOp::Finish,
                 _ => return None,
             }

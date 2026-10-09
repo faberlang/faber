@@ -460,7 +460,6 @@ impl FunctionBuilder<'_> {
             meus_def: context.meus_def,
             tuus_def: context.tuus_def,
             scrinium_def: context.scrinium_def,
-            scrinium_data_field: context.scrinium_data_field,
             top_level_consts: Arc::clone(&context.top_level_consts),
             static_fields: Arc::clone(&context.static_fields),
             imported_static_fields: Arc::clone(&context.imported_static_fields),

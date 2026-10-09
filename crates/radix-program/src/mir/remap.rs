@@ -265,7 +265,6 @@ pub(super) fn remap_runtime_call_text_symbols(
                 }
             }
         }
-        MirIntrinsic::Sermo(op) => remap_sermo_text_symbols(op, source, target),
         MirIntrinsic::FilumReduce(filum) => remap_filum_sum_text_symbols(filum, source, target),
         MirIntrinsic::TensorShapeCheck(check) => {
             for relation in &mut check.relations {
@@ -283,6 +282,7 @@ pub(super) fn remap_runtime_call_text_symbols(
         | MirIntrinsic::Collection(_)
         | MirIntrinsic::Atomic(_)
         | MirIntrinsic::Panic
+        | MirIntrinsic::Sermo(_)
         | MirIntrinsic::SermoOpen
         | MirIntrinsic::SermoSetOpener
         | MirIntrinsic::ReadLine
@@ -324,32 +324,6 @@ fn remap_shape_expr_text_symbols(
         MirShapeExpr::Literal(_)
         | MirShapeExpr::ScalarArgument { .. }
         | MirShapeExpr::TensorAxis { .. } => {}
-    }
-}
-
-/// Sermo frame metadata carries the `data` field's symbol. The merged program
-/// resolves it against the merged frame's field map, so an un-remapped symbol
-/// either misses that map or indexes an unrelated string.
-fn remap_sermo_text_symbols(op: &mut MirSermoOp, source: &Interner, target: &mut Interner) {
-    match op {
-        MirSermoOp::Receive {
-            frame: _,
-            data_field,
-        }
-        | MirSermoOp::Cursor {
-            frame: _,
-            data_field,
-        } => {
-            *data_field = remap_symbol(*data_field, source, target);
-        }
-        MirSermoOp::ViewMeus
-        | MirSermoOp::ViewTuus
-        | MirSermoOp::Send
-        | MirSermoOp::Finish
-        | MirSermoOp::Close
-        | MirSermoOp::CloseFailed
-        | MirSermoOp::CloseError
-        | MirSermoOp::DrainCursor => {}
     }
 }
 

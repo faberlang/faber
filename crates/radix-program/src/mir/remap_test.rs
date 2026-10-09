@@ -6,7 +6,7 @@ use super::remap::remap_runtime_call_text_symbols;
 use radix_module::lexer::{Interner, Span};
 use radix_module::mir::{
     MirFilumCoordinate, MirFilumReduceOp, MirIntrinsic, MirLocalId, MirProvider, MirProviderKind,
-    MirRuntimeCall, MirSermoOp, MirStatement, MirStatementKind, MirType,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirType,
 };
 use radix_types::{Primitive, TypeTable};
 
@@ -37,30 +37,6 @@ fn provider_route_symbols_keep_their_text_after_module_merge() {
     assert_eq!(target.resolve(provider.module[1]), "process");
     assert_eq!(target.resolve(provider.name), "pid");
     assert_eq!(provider.kind, MirProviderKind::Package);
-}
-
-#[test]
-fn sermo_frame_data_field_keeps_its_text_after_module_merge() {
-    let mut source = Interner::new();
-    let data_field = source.intern("data");
-    let mut target = Interner::new();
-    target.intern("unrelated-entry-symbol");
-    target.intern("another-entry-symbol");
-    let types = TypeTable::new();
-    let mut call = MirRuntimeCall {
-        intrinsic: MirIntrinsic::Sermo(MirSermoOp::Receive {
-            frame: DefId(7),
-            data_field,
-        }),
-        args: vec![],
-        return_ty: MirType::semantic(types.primitive(Primitive::Numerus)),
-    };
-    remap_runtime_call_text_symbols(&mut call, &source, &mut target);
-    let MirIntrinsic::Sermo(MirSermoOp::Receive { frame, data_field }) = call.intrinsic else {
-        panic!("sermo identity changed")
-    };
-    assert_eq!(frame, DefId(7));
-    assert_eq!(target.resolve(data_field), "data");
 }
 
 #[test]

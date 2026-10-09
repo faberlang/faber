@@ -1516,11 +1516,9 @@ pub enum MirSermoOp {
     CloseError,
     Receive {
         frame: DefId,
-        data_field: Symbol,
     },
     Cursor {
         frame: DefId,
-        data_field: Symbol,
     },
     DrainCursor,
 }
