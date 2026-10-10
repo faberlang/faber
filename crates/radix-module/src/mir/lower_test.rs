@@ -1129,6 +1129,47 @@ functio check(valor v) → bivalens {
     );
 }
 
+/// `match a and b { case X and Y ... default ... }` lowers to a chain of tag
+/// probes over the subject tuple: one equality branch per variant column, a
+/// miss falling to the next arm, and the default arm reached after the last.
+#[test]
+fn lowers_multi_subject_match_to_a_tag_probe_chain() {
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+
+union Forma {
+    Circulus,
+    Quadratum
+}
+
+fn pair(Forma a, Forma b) → string {
+    match a and b {
+        case Circulus and Quadratum {
+            return "circle-square"
+        }
+        default {
+            return "other"
+        }
+    }
+}
+"#,
+    );
+    assert_eq!(
+        dump.matches("construct variant").count(),
+        2,
+        "one tag probe per column:\n{dump}"
+    );
+    assert_eq!(dump.matches("branch %").count(), 2, "one branch per column:\n{dump}");
+    assert!(
+        dump.contains("_0 == %0") && dump.contains("_1 == %2"),
+        "columns probe a then b:\n{dump}"
+    );
+    assert_eq!(dump.matches("return %").count(), 2, "arm body and default both return:\n{dump}");
+    assert!(!dump.contains("switch"), "no single-subject switch:\n{dump}");
+}
+
 // ===========================================================================
 // Section G: Direct calls, intrinsics, methods
 // ===========================================================================

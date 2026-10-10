@@ -2130,11 +2130,7 @@ impl FunctionBuilder<'_> {
             return None;
         }
         let [scrutinee] = scrutinees else {
-            self.errors.push(MirError::unsupported(
-                expr.span,
-                "multi-subject discerne before switch MIR lowering",
-            ));
-            return None;
+            return self.lower_multi_subject_discerne(scrutinees, arms, expr);
         };
 
         let value = self.lower_expr_value(scrutinee)?;
@@ -2463,6 +2459,113 @@ impl FunctionBuilder<'_> {
             reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
         } else if let Some(current) = self.current {
             self.seal_unreachable(current, expr.span);
+        }
+
+        if reaches_join {
+            self.switch_to(join_id);
+            Some(MirOperand::Constant(MirConstant::Unit))
+        } else {
+            self.seal_unreachable(join_id, expr.span);
+            None
+        }
+    }
+
+    /// Lower a multi-subject variant `discerne` (`match a and b { case X and Y }`)
+    /// to a decision chain over the tuple of tags.
+    ///
+    /// Every subject is a closed set (semantic step M2), evaluated once and left
+    /// in a place. Each arm probes its columns left to right: a miss falls to the
+    /// next arm, a full hit binds the payloads and runs the body. Arm order and
+    /// the all-wildcard default arm keep their source meaning.
+    fn lower_multi_subject_discerne(
+        &mut self,
+        scrutinees: &[HirExpression],
+        arms: &[HirCasuArm],
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let mut subjects = Vec::with_capacity(scrutinees.len());
+        for scrutinee in scrutinees {
+            let ty = self.expr_ty(scrutinee)?;
+            let value = self.lower_expr_value(scrutinee)?;
+            let place = self.materialize_operand_place(value.clone(), ty, scrutinee.span);
+            subjects.push((value, place, ty));
+        }
+        let join_id = self.fresh_block(expr.span);
+        let mut default_body = None;
+        let mut reaches_join = false;
+
+        for arm in arms {
+            if arm.patterns.len() != subjects.len() {
+                self.errors.push(MirError::unsupported(
+                    arm.span,
+                    "multi-subject discerne arm pattern count differs from subject count",
+                ));
+                return None;
+            }
+            if arm
+                .patterns
+                .iter()
+                .all(|pattern| matches!(pattern, HirPattern::Wildcard))
+            {
+                default_body = Some((&arm.body, arm.span));
+                break;
+            }
+            let else_id = self.fresh_block(arm.span);
+            let mut hits = Vec::new();
+            for (pattern, (value, place, ty)) in arm.patterns.iter().zip(&subjects) {
+                let variant_pattern = match pattern {
+                    HirPattern::Alias(_, _, inner) => inner.as_ref(),
+                    other => other,
+                };
+                match variant_pattern {
+                    HirPattern::Wildcard => {
+                        if matches!(pattern, HirPattern::Alias(..)) {
+                            hits.push((pattern, place, *ty));
+                        }
+                    }
+                    HirPattern::Variant(variant, fields) => {
+                        let then_id = self.fresh_block(arm.span);
+                        let condition = self.variant_probe_condition(*variant, fields, value, place, *ty, arm.span)?;
+                        self.terminate_current(
+                            MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
+                            arm.span,
+                        );
+                        self.switch_to(then_id);
+                        hits.push((pattern, place, *ty));
+                    }
+                    _ => {
+                        self.errors.push(MirError::unsupported(
+                            arm.span,
+                            "non-variant pattern in multi-subject discerne before MIR lowering",
+                        ));
+                        return None;
+                    }
+                }
+            }
+            for (pattern, place, ty) in hits {
+                if let HirPattern::Alias(alias_def, alias_name, inner) = pattern
+                    && matches!(inner.as_ref(), HirPattern::Wildcard)
+                {
+                    let alias = self.pattern_binding_local(*alias_def, *alias_name, ty, arm.span);
+                    self.assign(MirPlace::local(alias), MirOperand::Place(place.clone()), ty, arm.span);
+                } else {
+                    self.bind_variant_payload(pattern, place, ty, arm.span)?;
+                }
+            }
+            self.lower_expr_value(&arm.body);
+            reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
+            self.switch_to(else_id);
+        }
+
+        if let Some((body, span)) = default_body {
+            self.lower_expr_value(body);
+            reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
+        } else if let Some(current) = self.current {
+            if self.discerne_is_total(scrutinees, arms) {
+                self.seal_unreachable(current, expr.span);
+            } else {
+                reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), expr.span);
+            }
         }
 
         if reaches_join {
