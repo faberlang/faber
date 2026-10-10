@@ -875,11 +875,13 @@ fn math_namespace_interface() -> crate::file_interface::FileInterface {
                     ty: tensor_mn.clone(),
                     mode: crate::SemanticParamMode::Owned,
                     optional: false,
+                    sponte: false,
                 },
                 InterfaceParam {
                     ty: tensor_mn.clone(),
                     mode: crate::SemanticParamMode::Owned,
                     optional: false,
+                    sponte: false,
                 },
             ],
             ret: Box::new(tensor_mn),

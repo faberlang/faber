@@ -2235,6 +2235,7 @@ fn eot_selective_test_interface() -> crate::file_interface::FileInterface {
             ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
             mode: SemanticParamMode::Ref,
             optional: false,
+            sponte: false,
         }],
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
         err: None,
@@ -2310,6 +2311,68 @@ incipit { tacet }"#,
         "selective type import must bind the type: {:?}",
         result.diagnostics
     );
+}
+
+/// Need: the imported snapshot carries `sponte` apart from `optional`.
+fn imported_omittable_param_interface(sponte: bool) -> crate::file_interface::FileInterface {
+    use crate::file_interface::{
+        FileExport, FileExportKind, InterfaceCallable, InterfaceParam, InterfaceTypeSnapshot,
+    };
+    use crate::{Primitive, SemanticParamMode};
+
+    let mut interface = crate::file_interface::FileInterface::new();
+    interface.insert(FileExport {
+        name: "prende".to_owned(),
+        kind: FileExportKind::Function(InterfaceCallable {
+            type_params: Vec::new(),
+            params: vec![InterfaceParam {
+                ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                mode: SemanticParamMode::Owned,
+                optional: true,
+                sponte,
+            }],
+            ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
+            err: None,
+            is_async: false,
+            is_generator: false,
+            tensor_edge_policy_requirements: Vec::new(),
+            device: None,
+        }),
+    });
+    interface
+}
+
+fn analyze_optional_argument_into_imported_param(sponte: bool) -> test_support::AnalyzedFixture {
+    test_support::analyze_source_with_import_contract(
+        r#"importa ex "norma:consolum" fixum prende
+functio g(numerus ∪ nihil x) { prende(x) }
+incipit { tacet }"#,
+        std::collections::BTreeMap::new(),
+        std::collections::BTreeMap::from([(
+            "norma:consolum".to_owned(),
+            imported_omittable_param_interface(sponte),
+        )]),
+    )
+}
+
+#[test]
+fn optional_argument_into_imported_defaulted_non_sponte_param_is_sem010() {
+    let result = analyze_optional_argument_into_imported_param(false);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| err.is_error()
+                && test_support::issue(err) == Some("optional_into_plain_cell")),
+        "expected optional_into_plain_cell, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn optional_argument_into_imported_sponte_param_is_accepted() {
+    let result = analyze_optional_argument_into_imported_param(true);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
 #[test]

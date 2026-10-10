@@ -261,6 +261,7 @@ fn text_callable() -> InterfaceCallable {
             ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
         err: None,

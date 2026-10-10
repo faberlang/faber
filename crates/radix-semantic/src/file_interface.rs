@@ -580,6 +580,9 @@ pub struct InterfaceParam {
     pub ty: InterfaceTypeSnapshot,
     pub mode: SemanticParamMode,
     pub optional: bool,
+    /// Whether the parameter is a source `sponte` slot (accepts an optional
+    /// argument), as opposed to a merely defaulted, omittable parameter.
+    pub sponte: bool,
 }
 
 /// Nominal type identity that must not be guessed during Stage 1 import.
@@ -1397,7 +1400,7 @@ fn import_interface_callable_inner(
                     ty: import_interface_type_inner(&param.ty, types, interner, resolver)?,
                     mode: param.mode,
                     optional: param.optional,
-                    sponte: param.optional,
+                    sponte: param.sponte,
                 })
             })
             .collect::<FileInterfaceResult<Vec<_>>>()?,
@@ -1499,6 +1502,7 @@ fn snapshot_interface_callable_inner(
                     )?,
                     mode: param.mode,
                     optional: param.optional,
+                    sponte: param.sponte,
                 })
             })
             .collect::<FileInterfaceResult<Vec<_>>>()?,

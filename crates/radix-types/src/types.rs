@@ -1279,6 +1279,7 @@ impl TypeTable {
                         .all(|(a_param, b_param)| {
                             a_param.mode == b_param.mode
                                 && a_param.optional == b_param.optional
+                                && a_param.sponte == b_param.sponte
                                 && self.equals(a_param.ty, b_param.ty)
                         })
                     && self.equals(a_sig.ret, b_sig.ret)

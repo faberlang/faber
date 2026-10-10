@@ -742,6 +742,7 @@ fn imports_function_export_before_struct_alphabetically() {
                 }),
                 mode: SemanticParamMode::Ref,
                 optional: false,
+                sponte: false,
             }],
             ret: Box::new(InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
                 kind: InterfaceNominalKind::Struct,
