@@ -436,7 +436,9 @@ fn provider_units_wire(
                     radix_hir_fhir::ProviderCarriageEntryWire::Failed { message: message.clone() }
                 }
                 crate::driver::CarriedProviderUnit::Unit(unit) => {
-                    let provider = unit.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    let provider = unit
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
                     radix_hir_fhir::ProviderCarriageEntryWire::Unit(Box::new(radix_hir_fhir::ProviderUnitWire {
                         hir: provider.hir.clone(),
                         types: provider.types.snapshot(),

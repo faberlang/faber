@@ -14,7 +14,7 @@ impl crate::KeywordSurface for LaSurface {
         }
     }
 
-    fn type_surface(&self, _kind: crate::TypeBindingKind) -> &str {
+    fn type_surface(&self, _kind: crate::TypeBindingKind) -> &'static str {
         "tensor"
     }
 }

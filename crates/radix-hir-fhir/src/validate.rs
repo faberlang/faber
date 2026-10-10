@@ -3851,7 +3851,7 @@ pub(crate) fn validate_referential_integrity(
             for failure in &report.failures {
                 match failure {
                     crate::artifact::KernelRequirementFailureWire::CalleeNotAdmitted { callee } => {
-                        checks.check_def(*callee)?
+                        checks.check_def(*callee)?;
                     }
                     crate::artifact::KernelRequirementFailureWire::IntermediateOutOfRange {
                         range,

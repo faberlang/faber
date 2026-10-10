@@ -416,14 +416,14 @@ incipit {
 /// ids `[4]`) — the CCI-4 pinned shape the plan facts resolve from. It lowers
 /// on the MIR lane: the ids are runtime data, which the AIR lane's static
 /// literal-ids contract does not admit.
-const GATHER_PINNED_SOURCE: &str = r#"
+const GATHER_PINNED_SOURCE: &str = r"
 functio select(tf32[4, 3] table, tensor<u32, [4]> ids) → tf32[4, 3] {
     redde table.gather(ids)
 }
 incipit {
     nota 1
 }
-"#;
+";
 
 /// CCI-5: the pinned `gather` source fixture lowers to MIR and the MIR
 /// resolves through the GI3-1 seam to `CollectionKernelPlan::Gather` with

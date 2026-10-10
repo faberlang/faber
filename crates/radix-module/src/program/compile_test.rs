@@ -1773,7 +1773,7 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/capsule.fab"),
-        r#"
+        r"
 @ public
 class Capsule {
     var string schema
@@ -1792,12 +1792,12 @@ union AdmissionError {
     UnknownVersion,
     BadManifest
 }
-"#,
+",
     )
     .expect("capsule");
     fs::write(
         provider.join("src/gguf_manifest.fab"),
-        r#"
+        r"
 @ public
 union GgufManifestError {
     @ shared
@@ -1807,7 +1807,7 @@ union GgufManifestError {
     Truncated,
     BadWire
 }
-"#,
+",
     )
     .expect("gguf_manifest");
     // The gguf module imports its siblings in PACKAGE form (bare
@@ -3730,13 +3730,13 @@ fn import_contract_carries_static_field_default_from_sibling() {
     let lectio = dir.join("lectio.fab");
     fs::write(
         &lectio,
-        r#"
+        r"
 @ publica
 genus Tab {
     generis numerus LIMES = 7
     varia numerus w = 1
 }
-"#,
+",
     )
     .expect("lectio");
     let app = dir.join("app.fab");

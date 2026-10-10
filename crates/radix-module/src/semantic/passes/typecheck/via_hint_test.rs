@@ -282,7 +282,7 @@ fn a_plain_conversion_carries_no_hint() {
 
 #[test]
 fn the_default_binds_after_the_via_clause() {
-    let code = rust_code(latin_config(), r#"functio f(textus s) → i32 { redde s ↦ i32 via Hex ⊥ 7 }"#);
+    let code = rust_code(latin_config(), r"functio f(textus s) → i32 { redde s ↦ i32 via Hex ⊥ 7 }");
     assert!(code.contains('7'), "{code}");
 }
 
@@ -370,10 +370,10 @@ fn via_without_a_hint_is_a_parse_error_issue() {
 fn via_stays_an_ordinary_name_in_a_program_that_also_uses_the_clause() {
     let code = rust_code(
         latin_config(),
-        r#"functio f(textus via) → i32 {
+        r"functio f(textus via) → i32 {
     fixum _ n ← via ↦ i32 via Hex ⊥ 0
     redde n
-}"#,
+}",
     );
     assert!(code.contains("via"), "{code}");
 }

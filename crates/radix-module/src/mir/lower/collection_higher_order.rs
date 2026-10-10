@@ -500,13 +500,12 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         }
-        let key_ty = match closure.ty.map(|ty| self.normalized_type(ty)) {
-            Some(Type::Func(sig)) => sig.ret,
-            _ => {
-                self.errors
-                    .push(MirError::missing_type(closure.span, "ordina key selector"));
-                return None;
-            }
+        let key_ty = if let Some(Type::Func(sig)) = closure.ty.map(|ty| self.normalized_type(ty)) {
+            sig.ret
+        } else {
+            self.errors
+                .push(MirError::missing_type(closure.span, "ordina key selector"));
+            return None;
         };
         // WHY: typecheck interns `lista<key>` when it admits the selector, so
         // the key carrier exists in the read-only type table here.

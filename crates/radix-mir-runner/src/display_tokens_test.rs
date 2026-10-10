@@ -153,7 +153,7 @@ fn print_bool_function(id: u32, types: &TypeTable) -> MirFunction {
                     call: MirRuntimeCall {
                         intrinsic: MirIntrinsic::Diagnostic(MirDiagnosticKind::Nota),
                         args: vec![MirOperand::Constant(MirConstant::Bool(true))],
-                        return_ty: void.clone(),
+                        return_ty: void,
                     },
                 },
                 span: Span::default(),

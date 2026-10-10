@@ -25,7 +25,7 @@ impl KeywordSurface for LatinSurface {
         }
     }
 
-    fn type_surface(&self, _kind: TypeBindingKind) -> &str {
+    fn type_surface(&self, _kind: TypeBindingKind) -> &'static str {
         "numerus"
     }
 }

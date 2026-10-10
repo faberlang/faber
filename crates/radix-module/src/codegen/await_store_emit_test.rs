@@ -5,7 +5,7 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session, compile};
 
-const NARROWING: &str = r#"
+const NARROWING: &str = r"
 functio fetch() fiet → numerus {
     redde 300
 }
@@ -13,7 +13,7 @@ functio fetch() fiet → numerus {
 functio caller() fiet → vacuum {
     fixum u8 v ↢ fetch()
     nota v
-}"#;
+}";
 
 fn emit(target: Target, source: &str) -> String {
     let session = Session::new(Config::default().with_target(target));
@@ -60,7 +60,7 @@ fn typescript_checks_the_value_after_await() {
 
 #[test]
 fn an_assignable_await_bind_emits_no_check() {
-    let source = r#"
+    let source = r"
 functio fetch() fiet → u8 {
     redde 5
 }
@@ -68,7 +68,7 @@ functio fetch() fiet → u8 {
 functio caller() fiet → vacuum {
     fixum u8 v ↢ fetch()
     nota v
-}"#;
+}";
     let code = emit(Target::HirRust, source);
     assert!(code.contains("let v: u8 = fetch().await;"), "{code}");
 }

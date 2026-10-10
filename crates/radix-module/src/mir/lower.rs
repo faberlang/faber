@@ -276,7 +276,7 @@ pub struct LoweredMirUnit<'a> {
     pub display_tokens: radix_runtime_contract::display_tokens::DisplayTokens,
 }
 
-impl<'a> LoweredMirUnit<'a> {
+impl LoweredMirUnit<'_> {
     /// Consume this carrier, patch its unvalidated program, and return a
     /// replacement carrier only after validation succeeds.
     ///
@@ -1407,15 +1407,14 @@ impl<'a> MirLowerer<'a> {
     /// Missing callback bodies or call destinations fail closed before MIR
     /// validation/serialization.
     fn resolve_pending_tensor_limes(&mut self) {
-        let pending = match self.pending_tensor_limes.lock() {
-            Ok(mut pending) => std::mem::take(&mut *pending),
-            Err(_) => {
-                self.errors.push(MirError::unsupported(
-                    Span::default(),
-                    "tensor limes callback queue was poisoned during lowering",
-                ));
-                return;
-            }
+        let pending = if let Ok(mut pending) = self.pending_tensor_limes.lock() {
+            std::mem::take(&mut *pending)
+        } else {
+            self.errors.push(MirError::unsupported(
+                Span::default(),
+                "tensor limes callback queue was poisoned during lowering",
+            ));
+            return;
         };
         if pending.is_empty() {
             return;
@@ -1441,16 +1440,17 @@ impl<'a> MirLowerer<'a> {
                 continue;
             };
             let transform = match transform_def {
-                Some(def_id) => match functions_by_source.get(&def_id).copied() {
-                    Some(function) => Some(function),
-                    None => {
+                Some(def_id) => {
+                    if let Some(function) = functions_by_source.get(&def_id).copied() {
+                        Some(function)
+                    } else {
                         self.errors.push(MirError::unsupported(
                             pending.span,
                             "custom tensor limes transform callback has no lowered function",
                         ));
                         continue;
                     }
-                },
+                }
                 None => None,
             };
             let Some(function) = self
@@ -3366,15 +3366,16 @@ impl<'a> FunctionBuilder<'a> {
                     // the historical float constant instead of guessing.
                     return Some(MirOperand::Constant(MirConstant::Float(*value)));
                 };
-                match radix_codegen_shared::decimal::decimal_text_to_carrier(interner.resolve(*text), width) {
-                    Some(carrier) => Some(MirOperand::Constant(MirConstant::Int(carrier))),
-                    None => {
-                        self.errors.push(MirError::unsupported(
-                            span,
-                            "decimal literal carrier is outside the declared width",
-                        ));
-                        None
-                    }
+                if let Some(carrier) =
+                    radix_codegen_shared::decimal::decimal_text_to_carrier(interner.resolve(*text), width)
+                {
+                    Some(MirOperand::Constant(MirConstant::Int(carrier)))
+                } else {
+                    self.errors.push(MirError::unsupported(
+                        span,
+                        "decimal literal carrier is outside the declared width",
+                    ));
+                    None
                 }
             }
             // Non-decimal text literals keep the historical float constant.

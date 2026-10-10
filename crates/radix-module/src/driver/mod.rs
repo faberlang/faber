@@ -161,7 +161,10 @@ impl CarriedProviderUnit {
     #[must_use]
     pub fn lock_unit(&self) -> Option<ProviderUnitGuard<'_>> {
         match self {
-            Self::Unit(unit) => Some(ProviderUnitGuard(unit.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))),
+            Self::Unit(unit) => Some(ProviderUnitGuard(
+                unit.lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner),
+            )),
             Self::Failed { .. } => None,
         }
     }
@@ -2071,9 +2074,9 @@ pub fn apply_air_backward_bundle<'a>(
 /// against a concrete primal instance therefore recovers the exact
 /// `magnitudo` bindings without a backend-specific policy.
 #[cfg(feature = "device")]
-fn finalize_air_backward_shapes<'a>(
-    mut lowered: crate::mir::LoweredMirUnit<'a>,
-) -> Result<crate::mir::LoweredMirUnit<'a>, SpannedCodegenError> {
+fn finalize_air_backward_shapes(
+    mut lowered: crate::mir::LoweredMirUnit<'_>,
+) -> Result<crate::mir::LoweredMirUnit<'_>, SpannedCodegenError> {
     use crate::mir::MirMonomorphizationKey;
     use crate::mir::generic::MirShapeBindings;
 
@@ -2657,10 +2660,10 @@ impl FreshMirFunctionIds {
 }
 
 #[cfg(feature = "device")]
-fn replace_air_lane_mir<'a>(
-    lowered: crate::mir::LoweredMirUnit<'a>,
+fn replace_air_lane_mir(
+    lowered: crate::mir::LoweredMirUnit<'_>,
     air_mir: crate::mir::MirProgram,
-) -> Result<crate::mir::LoweredMirUnit<'a>, SpannedCodegenError> {
+) -> Result<crate::mir::LoweredMirUnit<'_>, SpannedCodegenError> {
     lowered
         .patch_program(|program| {
             let mut fresh_ids = FreshMirFunctionIds::after(program.functions.iter().map(|function| function.id));

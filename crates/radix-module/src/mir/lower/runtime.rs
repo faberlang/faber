@@ -900,20 +900,19 @@ impl FunctionBuilder<'_> {
                 ));
                 return None;
             };
-            match self.context.pending_tensor_limes.lock() {
-                Ok(mut queue) => queue.push(super::PendingTensorLimes {
+            if let Ok(mut queue) = self.context.pending_tensor_limes.lock() {
+                queue.push(super::PendingTensorLimes {
                     function: self.parent_function_id,
                     destination,
                     dispatch,
                     span: expr.span,
-                }),
-                Err(_) => {
-                    self.errors.push(MirError::unsupported(
-                        expr.span,
-                        "tensor limes callback queue was poisoned during lowering",
-                    ));
-                    return None;
-                }
+                });
+            } else {
+                self.errors.push(MirError::unsupported(
+                    expr.span,
+                    "tensor limes callback queue was poisoned during lowering",
+                ));
+                return None;
             }
         }
         Some(value)

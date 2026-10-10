@@ -434,7 +434,7 @@ fn digest_file(path: &str, span: Span) -> Result<String, RunnerError> {
 /// Largest single `read_range` request, in bytes (512 MiB).
 ///
 /// WHY: the A1 weight loader reads each tensor's byte range with ONE call, and
-/// the largest SmolLM2 F32 tensor, `token_embd.weight`, is 49152 x 960 x 4 =
+/// the largest `SmolLM2` F32 tensor, `token_embd.weight`, is 49152 x 960 x 4 =
 /// 188,743,680 bytes, which the former 64 MiB ceiling refused. This is an
 /// implementation ceiling, not a language constant (numeric-model.md: resource
 /// bounds are implementation ceilings); it bounds one read's allocation. The

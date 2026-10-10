@@ -296,17 +296,16 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                     .then_some((source, function.clone()))
             })
             .collect();
-        let next_id = match MirProgram::allocate_function_id(&lowerer.functions) {
-            Ok(id) => id,
-            Err(_) => {
-                // Unreachable minting: `run` aborts on lowering errors before
-                // any instance allocation.
-                lowerer.errors.push(MirError::validation(
-                    Span::new(0, 0),
-                    "package MIR function id space is exhausted",
-                ));
-                MirFunctionId(u32::MAX)
-            }
+        let next_id = if let Ok(id) = MirProgram::allocate_function_id(&lowerer.functions) {
+            id
+        } else {
+            // Unreachable minting: `run` aborts on lowering errors before
+            // any instance allocation.
+            lowerer.errors.push(MirError::validation(
+                Span::new(0, 0),
+                "package MIR function id space is exhausted",
+            ));
+            MirFunctionId(u32::MAX)
         };
         let function_index = MirFunctionIndex::for_functions(&lowerer.functions);
         let (mut contract_methods, genus_methods) = contract_dispatch_tables(&lowerer.unit.hir);
@@ -1197,16 +1196,17 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                         return false;
                     };
                     let transform = match transform {
-                        Some(def_id) => match callback_ids.get(&def_id).copied() {
-                            Some(function) => Some(function),
-                            None => {
+                        Some(def_id) => {
+                            if let Some(function) = callback_ids.get(&def_id).copied() {
+                                Some(function)
+                            } else {
                                 self.lowerer.errors.push(MirError::unsupported(
                                     pending.span,
                                     "generic tensor limes transform callback has no lowered function",
                                 ));
                                 return false;
                             }
-                        },
+                        }
                         None => None,
                     };
                     MirEdgePolicy::Custom { policy_def, remap, transform }

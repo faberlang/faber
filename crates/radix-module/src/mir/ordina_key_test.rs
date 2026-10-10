@@ -15,7 +15,7 @@ fn run_lines(source: &str) -> Vec<String> {
     host.stdout_lines
 }
 
-const PERSONAE: &str = r#"
+const PERSONAE: &str = r"
 genus Persona {
     varia textus nomen
     varia numerus aetas
@@ -24,7 +24,7 @@ genus Persona {
 functio nomina(lista<Persona> ps) → lista<textus> {
     redde ps.mappata(Persona p ∴ p.nomen)
 }
-"#;
+";
 
 #[test]
 fn ordinata_numeric_key_is_stable() {

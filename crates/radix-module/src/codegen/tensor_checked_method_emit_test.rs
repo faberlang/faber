@@ -6,7 +6,7 @@
 use crate::codegen::Target;
 use crate::{Compiler, Config, Output};
 
-const SOURCE: &str = r#"
+const SOURCE: &str = r"
 functio lege(tensor<f32, [2, 2]> grid) → f32 {
     fixum f32 got ← grid.accipe([0, 1])
     redde got
@@ -38,7 +38,7 @@ functio cepit(in tensor<f32, [2, 2]> grid, lista<numerus> idx) → f32 {
 
 incipit {
 }
-"#;
+";
 
 fn emit(target: Target) -> String {
     let result = Compiler::new(Config::default().with_target(target)).compile_str("tensor_checked.fab", SOURCE);

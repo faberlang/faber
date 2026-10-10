@@ -3649,11 +3649,11 @@ fn incipit_tacet_expected_block() {
 #[test]
 fn parses_entry_endpoint_and_extract_keywords() {
     let result = parse_ok(
-        r#"
+        r"
 incipit argumenta args exitus 1 {}
 incipiet argumenta argv {}
 ex source varia nomen ut name, ceteri reliqua
-"#,
+",
     );
 
     let program = result
@@ -5120,7 +5120,7 @@ fn eot_transfer_groups_around_calls_conversions_and_templates() {
 fn eot_transfer_binary_operators_group_into_the_value() {
     // ⇇ is locked at low precedence: every binary operator binds into the
     // value, never around the statement.
-    let result = parse_ok(r#"output ⇇ (q · kt) ⊙ s"#);
+    let result = parse_ok(r"output ⇇ (q · kt) ⊙ s");
     let expr = eot_transfer_expr(&result);
     let ExprKind::CopyInto(copy) = &expr.kind else {
         panic!("expected copy-into expression, got {:?}", expr.kind);

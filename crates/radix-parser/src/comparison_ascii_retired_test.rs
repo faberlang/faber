@@ -30,7 +30,7 @@ fn retired(source: &str) -> Vec<(String, String)> {
                 err.args
                     .iter()
                     .find(|arg| arg.name == name)
-                    .map(|arg| arg.value.to_string())
+                    .map(|arg| arg.value.clone())
                     .unwrap_or_default()
             };
             (arg("operator"), arg("glyph"))

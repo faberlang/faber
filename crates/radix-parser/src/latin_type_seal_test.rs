@@ -74,7 +74,7 @@ fn wrong_locale_types(result: &ParseResult) -> Vec<String> {
                 .args
                 .iter()
                 .find(|arg| arg.name == "type")
-                .map(|arg| arg.value.to_string())
+                .map(|arg| arg.value.clone())
                 .unwrap_or_default()
         })
         .collect()
@@ -127,7 +127,7 @@ fn en_file_names_its_own_spelling_in_the_diagnostic() {
         .iter()
         .flat_map(|error| error.args.iter())
         .find(|arg| arg.name == "expected")
-        .map(|arg| arg.value.to_string());
+        .map(|arg| arg.value.clone());
     assert_eq!(expected.as_deref(), Some("int"));
 }
 
@@ -161,7 +161,7 @@ fn expected_of(result: &ParseResult) -> Option<String> {
         .iter()
         .flat_map(|error| error.args.iter())
         .find(|arg| arg.name == "expected")
-        .map(|arg| arg.value.to_string())
+        .map(|arg| arg.value.clone())
 }
 
 #[test]

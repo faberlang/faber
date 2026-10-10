@@ -40,6 +40,7 @@ pub enum DenseKind {
 
 impl DenseKind {
     /// Bytes per element in the little-endian view.
+    #[must_use]
     pub const fn width(self) -> usize {
         match self {
             Self::U8 | Self::Bool => 1,
@@ -211,6 +212,7 @@ fn float_kind(width: NumericWidth) -> Option<DenseKind> {
 
 impl DenseStorage {
     /// `len` zero elements of `kind`.
+    #[must_use]
     pub fn zeros(kind: DenseKind, len: usize) -> Self {
         match kind {
             DenseKind::F32 => Self::F32(vec![0.0; len]),
@@ -230,6 +232,7 @@ impl DenseStorage {
     /// `Int` is `I64`, anything else (including empty) is `Values`. With a
     /// kind every value is narrowed as `set` would; if any value does not fit,
     /// nothing is lost and the result is `Values` (today's behaviour).
+    #[must_use]
     pub fn from_values(values: Vec<Value>, kind: Option<DenseKind>) -> Self {
         let kind = kind.or_else(|| match values.first()? {
             Value::Float(_) if values.iter().all(|v| matches!(v, Value::Float(_))) => {
@@ -259,6 +262,7 @@ impl DenseStorage {
     /// back exactly the boxed values (same carrier, same bits): a value that
     /// `set` would narrow, round or re-carrier keeps the whole array `Values`.
     /// This is the birth path of runner tensors: it never changes a read.
+    #[must_use]
     pub fn from_values_exact(values: Vec<Value>, kind: Option<DenseKind>) -> Self {
         match kind {
             Some(kind) if values.iter().all(|value| reads_back_exactly(kind, value)) => {
@@ -269,6 +273,7 @@ impl DenseStorage {
     }
 
     /// Element type, or `None` for `Values`.
+    #[must_use]
     pub fn kind(&self) -> Option<DenseKind> {
         match self {
             Self::F32(_) => Some(DenseKind::F32),
@@ -283,15 +288,18 @@ impl DenseStorage {
         }
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         with_typed!(self, items => items.len(), values => values.len())
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// The element as the runner reads it today; `None` out of bounds.
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<Value> {
         Some(match self {
             Self::F32(items) => Value::Float(f64::from(*items.get(index)?)),
@@ -327,6 +335,7 @@ impl DenseStorage {
     }
 
     /// Every element boxed, as today's `Vec<Value>` storage holds them.
+    #[must_use]
     pub fn to_values(&self) -> Vec<Value> {
         match self {
             Self::Values(items) => items.clone(),
@@ -335,6 +344,7 @@ impl DenseStorage {
     }
 
     /// The first `count` elements boxed; `count` must not exceed `len()`.
+    #[must_use]
     pub fn values_prefix(&self, count: usize) -> Vec<Value> {
         match self {
             Self::Values(items) => items[..count].to_vec(),
@@ -343,6 +353,7 @@ impl DenseStorage {
     }
 
     /// Typed slice; `None` when `T` is not this storage's element type.
+    #[must_use]
     pub fn slice<T: DenseElement>(&self) -> Option<&[T]> {
         T::view(self)
     }
@@ -494,6 +505,7 @@ impl Drop for BorrowGuard<'_> {
 }
 
 impl DenseCell {
+    #[must_use]
     pub fn new(storage: DenseStorage) -> Self {
         Self {
             inner: UnsafeCell::new(storage),
@@ -501,10 +513,12 @@ impl DenseCell {
         }
     }
 
+    #[must_use]
     pub fn zeros(kind: DenseKind, len: usize) -> Self {
         Self::new(DenseStorage::zeros(kind, len))
     }
 
+    #[must_use]
     pub fn from_values(values: Vec<Value>, kind: Option<DenseKind>) -> Self {
         Self::new(DenseStorage::from_values(values, kind))
     }

@@ -22,7 +22,7 @@ impl KeywordSurface for EnSurface {
         }
     }
 
-    fn type_surface(&self, _kind: TypeBindingKind) -> &str {
+    fn type_surface(&self, _kind: TypeBindingKind) -> &'static str {
         "tensor"
     }
 }
@@ -38,7 +38,7 @@ impl KeywordSurface for LaSurface {
         }
     }
 
-    fn type_surface(&self, _kind: TypeBindingKind) -> &str {
+    fn type_surface(&self, _kind: TypeBindingKind) -> &'static str {
         "tensor"
     }
 }

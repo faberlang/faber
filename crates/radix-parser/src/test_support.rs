@@ -49,6 +49,7 @@ pub fn parse_program(source: &str) -> ParseResult {
 ///
 /// For tests that exercise the `<` / `>` generics-vs-comparison split, whose
 /// ASCII comparison still recovers as a comparison but is no longer clean.
+#[must_use]
 pub fn parse_recovering_ascii_comparison(source: &str) -> ParseResult {
     let result = parse_program(source);
     assert!(

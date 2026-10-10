@@ -14,7 +14,7 @@ fn issues(result: &ParseResult) -> Vec<String> {
         .iter()
         .flat_map(|error| error.args.iter())
         .filter(|arg| arg.name == "issue")
-        .map(|arg| arg.value.to_string())
+        .map(|arg| arg.value.clone())
         .collect()
 }
 

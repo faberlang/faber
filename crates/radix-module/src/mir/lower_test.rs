@@ -3231,12 +3231,12 @@ incipit {
     );
 
     let braces_dump = dump_source(
-        r#"
+        r"
 incipit {
     varia tabula<textus, numerus> vides ← {}
     nota vides.longitudo()
 }
-"#,
+",
     );
     assert!(
         braces_dump.contains("construct map:"),
@@ -3244,12 +3244,12 @@ incipit {
     );
 
     let vacua_dump = dump_source(
-        r#"
+        r"
 incipit {
     varia tabula<textus, numerus> vides ← vacua
     nota vides.longitudo()
 }
-"#,
+",
     );
     assert!(
         vacua_dump.contains("construct map:"),

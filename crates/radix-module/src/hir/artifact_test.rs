@@ -1583,14 +1583,14 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         package.join("src/policy.fab"),
-        r#"@ public
+        r"@ public
 class ZeroGhost {
     @ public
     fn remap(vector<int, 1> coord) → vector<int, 1> {
         return coord - coord
     }
 }
-"#,
+",
     )
     .expect("policy module");
 

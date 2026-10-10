@@ -342,7 +342,7 @@ fn int(outcome: &Outcome) -> i64 {
     }
 }
 
-/// omnia { k() ; t = 5 } cape { t = 7 }
+/// omnia { `k()` ; t = 5 } cape { t = 7 }
 fn omnia_one_call() -> Vec<MirBlock> {
     let n = num();
     vec![
@@ -427,7 +427,7 @@ fn a_deliver_marker_takes_an_error_a_host_read_surfaced() {
     assert_eq!(int(&outcome), 7);
 }
 
-/// outer omnia { k() ; inner omnia { k() } cape { t = 2 } ; t = 1 } cape { t = 3 }
+/// outer omnia { `k()` ; inner omnia { `k()` } cape { t = 2 } ; t = 1 } cape { t = 3 }
 fn nested() -> Vec<MirBlock> {
     let n = num();
     vec![
@@ -491,7 +491,7 @@ fn plain_fac_waits_at_the_call() {
 fn omnia_dum_ends_the_loop_on_a_delivered_error() {
     let n = num();
     let b = MirType::semantic(TypeTable::new().primitive(Primitive::Bivalens));
-    let blocks = |_: ()| {
+    let blocks = |(): ()| {
         vec![
             block(
                 0,
@@ -677,7 +677,7 @@ fn deliver_markers_do_no_device_work() {
     );
 }
 
-/// omnia { out = k() ; read = out[0] ; t = 5 } cape { t = 7 }
+/// omnia { out = `k()` ; read = out[0] ; t = 5 } cape { t = 7 }
 fn omnia_host_read() -> Vec<MirBlock> {
     let n = num();
     let launch = MirTerminatorKind::TryCall {

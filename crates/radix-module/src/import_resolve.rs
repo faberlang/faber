@@ -245,6 +245,7 @@ fn resolve_template_import(
 ///
 /// Used by the `rest` portion of both `§name/rest` template resolvers (CLI
 /// and package loader; F-046 / S10-1).
+#[must_use]
 pub fn contains_path_traversal(path: &str) -> bool {
     path.starts_with('/') || path == ".." || path.starts_with("../") || path.contains("/../") || path.ends_with("/..")
 }
@@ -494,6 +495,7 @@ fn library_homes() -> Vec<PathBuf> {
 
 /// The primary library home: the configured home when set, else the in-tree
 /// `<repo>/lib`.
+#[must_use]
 pub fn library_home() -> Option<PathBuf> {
     library_homes().into_iter().next()
 }

@@ -131,7 +131,7 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         let span = expr.span;
         let result_ty = self.expr_ty(expr)?;
-        let Some(error_ty) = self.context.function_errors.get(&function).cloned() else {
+        let Some(error_ty) = self.context.function_errors.get(&function).copied() else {
             self.errors
                 .push(MirError::unsupported(span, "failable conversio function without an error type"));
             return None;

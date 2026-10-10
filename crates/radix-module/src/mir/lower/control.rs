@@ -700,17 +700,14 @@ impl FunctionBuilder<'_> {
             }
             let mut place = tensor;
             place.projections.push(MirProjection::Index(linear));
-            return Some(match stored {
-                Some(value) => {
-                    let value_ty = MirType::semantic(args[1].expr.ty?);
-                    self.assign(place, value, value_ty, span);
-                    MirOperand::Constant(MirConstant::Unit)
-                }
-                None => {
-                    let destination = self.push_temp(expr_ty, span);
-                    self.assign(MirPlace::temp(destination), MirOperand::Place(place), expr_ty, span);
-                    MirOperand::Temp(destination)
-                }
+            return Some(if let Some(value) = stored {
+                let value_ty = MirType::semantic(args[1].expr.ty?);
+                self.assign(place, value, value_ty, span);
+                MirOperand::Constant(MirConstant::Unit)
+            } else {
+                let destination = self.push_temp(expr_ty, span);
+                self.assign(MirPlace::temp(destination), MirOperand::Place(place), expr_ty, span);
+                MirOperand::Temp(destination)
             });
         }
 
@@ -2151,7 +2148,7 @@ impl FunctionBuilder<'_> {
             let pattern = self.discerne_switch_arm_pattern(arm)?;
             match pattern {
                 HirPattern::Literal(_) | HirPattern::NegatedLiteral(_) => {
-                    let scrutinee_ty = self.expr_ty(scrutinee).map(|ty| ty.semantic_id());
+                    let scrutinee_ty = self.expr_ty(scrutinee).map(radix_mir::MirType::semantic_id);
                     let constant = self.literal_pattern_switch_constant(pattern, scrutinee_ty, arm.span)?;
                     let target = self.fresh_block(arm.span);
                     cases.push(MirSwitchCase { value: constant, target });
@@ -2160,7 +2157,7 @@ impl FunctionBuilder<'_> {
                 // `casu 1 aut 2`: every alternative is a case value of the same switch
                 // target, so one arm body serves them all.
                 HirPattern::Or(alternatives) if is_literal_alternatives(alternatives) => {
-                    let scrutinee_ty = self.expr_ty(scrutinee).map(|ty| ty.semantic_id());
+                    let scrutinee_ty = self.expr_ty(scrutinee).map(radix_mir::MirType::semantic_id);
                     let target = self.fresh_block(arm.span);
                     for alternative in alternatives {
                         let constant = self.literal_pattern_switch_constant(alternative, scrutinee_ty, arm.span)?;
@@ -3237,7 +3234,7 @@ impl FunctionBuilder<'_> {
                 self.lower_range_stride(index, end_local, step_local, cond_id, bivalens, index_ty, range.span);
             }
             None => {
-                self.lower_default_range_step(index, end_local, step_local, cond_id, bivalens, index_ty, range.span)
+                self.lower_default_range_step(index, end_local, step_local, cond_id, bivalens, index_ty, range.span);
             }
         }
 
@@ -4485,7 +4482,7 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let mut coordinate_operands = Vec::with_capacity(iter.coordinates.len());
-        for (def_id, _) in iter.coordinates.iter() {
+        for (def_id, _) in iter.coordinates {
             let Some(binding) = self.bindings.get(def_id) else {
                 self.errors
                     .push(MirError::validation(iter.iter.span, "shaped itera coordinate has no binding"));

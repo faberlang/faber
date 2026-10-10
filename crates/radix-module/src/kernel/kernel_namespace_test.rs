@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::{
     KernelModule, KernelResolveError, is_kernel_import_path, kernel_manifest_entries, kernel_module_count,

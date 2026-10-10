@@ -1,6 +1,6 @@
 //! `const size` declarations survive a Faber format round trip byte-identically.
 //!
-//! SizeDecl lowers to a `size_decl`-flagged `HirLocal`; the emitter must print
+//! `SizeDecl` lowers to a `size_decl`-flagged `HirLocal`; the emitter must print
 //! the ruled modifier-first spelling (`const size` en / `const magnitudo` la)
 //! with `←` for the runtime lift and `=` for the static natural, not an
 //! inferred immutable binding.
@@ -36,7 +36,7 @@ impl KeywordSurface for EnSurface {
         }
     }
 
-    fn type_surface(&self, _kind: TypeBindingKind) -> &str {
+    fn type_surface(&self, _kind: TypeBindingKind) -> &'static str {
         "numerus"
     }
 }
@@ -127,13 +127,13 @@ fn size_decl_round_trips_through_faber_spelling() {
     let types = TypeTable::new();
     let hir = size_decl_module(&mut interner, "H", false);
     let code = emit_statement(&hir, &interner, &types);
-    assert_eq!(code.trim_end(), "const size H ← 3", "{}", code);
+    assert_eq!(code.trim_end(), "const size H ← 3", "{code}");
 
     // Static natural uses the compile-time `=` glyph per the glyph law.
     let mut interner = Interner::new();
     let hir = size_decl_module(&mut interner, "N", true);
     let code = emit_statement(&hir, &interner, &types);
-    assert_eq!(code.trim_end(), "const size N = 3", "{}", code);
+    assert_eq!(code.trim_end(), "const size N = 3", "{code}");
 
     // The emitted spellings re-parse (en pack) as size declarations.
     for expected in ["const size H ← 3", "const size N = 3"] {
@@ -149,7 +149,7 @@ fn size_decl_round_trips_through_faber_spelling() {
         let StmtKind::Block(body) = &program.statements[0].kind else {
             panic!("expected a block statement, got: {:?}", program.statements);
         };
-        assert_eq!(body.statements.len(), 1, "{}", source);
+        assert_eq!(body.statements.len(), 1, "{source}");
         assert!(
             matches!(body.statements[0].kind, StmtKind::SizeDecl(_)),
             "emitted form must re-parse as SizeDecl, got: {:?}",

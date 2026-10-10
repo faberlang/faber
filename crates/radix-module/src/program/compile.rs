@@ -944,6 +944,7 @@ fn apply_tensor_edge_policy_requirements(interface: &mut FileInterface, provider
 ///
 /// Public so the package-analysis path (radix-program) mints carriage through
 /// this same entry instead of forking the provider analysis config.
+#[must_use]
 pub fn provider_unit_for_target(
     session: &crate::driver::Session,
     target_path: &Path,

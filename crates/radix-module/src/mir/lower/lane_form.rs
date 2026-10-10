@@ -28,7 +28,12 @@
 //! no launch split yet and fails closed with a named issue.
 
 use super::control::CollectionIteraKind;
-use super::*;
+use super::{
+    BreakableContext, DefId, FunctionBuilder, HirBinOp, HirBlock, HirExpression, HirExpressionKind,
+    HirExpressionLoweringVisitor, HirIteraMode, HirStatement, HirStatementKind, HirVisitor, LocalBinding, MirBinOp,
+    MirConstant, MirError, MirFilumForm, MirLocalDecl, MirLocalId, MirOperand, MirPlace, MirProjection,
+    MirTerminatorKind, MirType, MirValueKind, NumericWidth, Primitive, Span, Symbol, TypeId, TypeTable,
+};
 
 /// Issue name: a second top-level `thread lane` loop in one kernel.
 pub(crate) const LANE_FORM_SECOND_REGION_ISSUE: &str = "lane_form_second_region";

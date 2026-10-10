@@ -32,6 +32,7 @@ pub fn check_diagnostics_for_source(name: &str, source: &str, permissive: bool) 
 }
 
 /// Run single-file check with an optional reader pack and collect normalized diagnostics without exiting.
+#[must_use]
 pub fn check_diagnostics_for_source_with_locale_pack(
     name: &str,
     source: &str,

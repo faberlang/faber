@@ -91,7 +91,7 @@ fn stub_artifact_round_trips_through_msgpack() {
     assert_eq!(original, decoded);
 }
 
-/// N7E-1: the policy-float cell survives the MessagePack wire at the current
+/// N7E-1: the policy-float cell survives the `MessagePack` wire at the current
 /// schema (the encode/decode pair validates the artifact on both sides).
 #[test]
 fn policy_float_cells_round_trip_through_msgpack() {

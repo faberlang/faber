@@ -122,7 +122,7 @@ impl super::FaberCodegen<'_> {
         loop {
             match self.types.get(ty) {
                 radix_types::Type::Alias(_, inner) | radix_types::Type::Ref(_, inner) => {
-                    ty = *inner
+                    ty = *inner;
                 }
                 radix_types::Type::Map(key, _) => {
                     let mut key = *key;
@@ -635,17 +635,14 @@ impl super::FaberCodegen<'_> {
                 // plus a leading run of pattern locals; re-sugar that run.
                 let pattern = self.destructure_run(&block.statements);
                 let start = pattern.map_or(0, |(binding, _)| binding.stmt_ids.len());
-                match pattern {
-                    Some((binding, _)) => {
-                        writer.write(super::stmt::destructure_keyword(binding, surface));
-                        writer.write(" ");
-                        self.write_destructure_pattern(&binding.pattern, surface, writer);
-                    }
-                    None => {
-                        writer.write(loop_binder_keyword(*mutable, surface));
-                        writer.write(" ");
-                        writer.write(&self.symbol_to_string(*binding_name));
-                    }
+                if let Some((binding, _)) = pattern {
+                    writer.write(super::stmt::destructure_keyword(binding, surface));
+                    writer.write(" ");
+                    self.write_destructure_pattern(&binding.pattern, surface, writer);
+                } else {
+                    writer.write(loop_binder_keyword(*mutable, surface));
+                    writer.write(" ");
+                    writer.write(&self.symbol_to_string(*binding_name));
                 }
                 writer.writeln(" {");
                 writer.indented(|writer| {

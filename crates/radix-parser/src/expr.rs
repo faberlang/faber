@@ -878,7 +878,7 @@ impl Parser {
             let operand = Box::new(self.nested(
                 ParseErrorKind::ExpressionInvalid,
                 start,
-                |parser| parser.parse_unary_inner(),
+                super::Parser::parse_unary_inner,
             )?);
             let span = start.merge(self.previous_span());
             let id = self.next_id();
