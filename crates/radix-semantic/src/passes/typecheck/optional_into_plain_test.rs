@@ -147,3 +147,20 @@ fn coalesced_and_narrowed_optional_at_other_stores_are_accepted() {
         "functio take(numerus v) → vacuum {\n    nota v\n}\nfunctio f(numerus ∪ nihil x) → numerus {\n    take(x vel 0)\n    si x non est nihil {\n        take(x)\n        redde x\n    }\n    redde x vel 0\n}",
     );
 }
+
+// A `sponte` parameter or field is an optional target: an optional value
+// stored into it is an optional-into-optional store, not an unwrap.
+
+#[test]
+fn optional_argument_into_sponte_parameter_is_accepted() {
+    assert_accepts(
+        "functio greet(textus nomen sponte) {\n    nota nomen\n}\n\nfunctio f(textus ∪ nihil x) {\n    greet(x)\n}",
+    );
+}
+
+#[test]
+fn optional_into_sponte_field_initializer_is_accepted() {
+    assert_accepts(
+        "genus Node {\n    varia textus name\n    varia textus parent sponte\n}\n\nfunctio f(textus ∪ nihil p) → Node {\n    redde Node {\n        name = \"n\",\n        parent = p\n    }\n}",
+    );
+}

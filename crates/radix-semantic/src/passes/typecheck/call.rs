@@ -446,7 +446,7 @@ impl TypeChecker<'_> {
 
         for (argument, (arg, param)) in args.iter_mut().zip(sig.params.iter()).enumerate() {
             let previous_shape_argument = self.current_shape_argument.replace(argument as u32);
-            let site = argument_site(arg.name);
+            let site = argument_site(arg.name).optional_slot(param.optional);
             let errors_before = self.errors.len();
             if markers {
                 self.check_call_marker(arg, param);

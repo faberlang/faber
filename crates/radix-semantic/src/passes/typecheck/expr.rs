@@ -1036,7 +1036,8 @@ impl TypeChecker<'_> {
                         | HirStoreKind::Field
                         | HirStoreKind::Element
                         | HirStoreKind::TuplePosition
-                ) && self.reject_optional_into_plain_cell(ty, expected, expr.span) =>
+                ) && !site.optional_slot
+                    && self.reject_optional_into_plain_cell(ty, expected, expr.span) =>
             {
                 // The named error stands alone: the node takes the slot's type.
                 expected

@@ -226,28 +226,33 @@ fn first_block_body(dump: &str) -> String {
 }
 
 fn unsupported_range_expr(numerus: crate::semantic::TypeId, span: crate::lexer::Span, first_id: u32) -> HirExpression {
+    // An interval clamp with a recovery value is the interval form MIR lowering
+    // still declines (stepped interval values lower since sb314).
+    let literal = |offset: u32, value: u64| HirExpression {
+        id: HirId(first_id + offset),
+        kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
+        ty: Some(numerus),
+        span,
+    };
     HirExpression {
         id: HirId(first_id),
-        kind: HirExpressionKind::Intervallum {
-            start: Box::new(HirExpression {
-                id: HirId(first_id + 1),
-                kind: HirExpressionKind::Literal(HirLiteral::Int(0)),
-                ty: Some(numerus),
-                span,
-            }),
-            end: Box::new(HirExpression {
+        kind: HirExpressionKind::Conversio {
+            source: Box::new(literal(1, 5)),
+            target: crate::hir::HirConversioTarget::Intervallum(Box::new(HirExpression {
                 id: HirId(first_id + 2),
-                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-                ty: Some(numerus),
-                span,
-            }),
-            step: Some(Box::new(HirExpression {
-                id: HirId(first_id + 3),
-                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+                kind: HirExpressionKind::Intervallum {
+                    start: Box::new(literal(3, 0)),
+                    end: Box::new(literal(4, 1)),
+                    step: None,
+                    kind: HirRangeKind::Exclusive,
+                },
                 ty: Some(numerus),
                 span,
             })),
-            kind: HirRangeKind::Exclusive,
+            params: Vec::new(),
+            recovery: Some(Box::new(literal(5, 0))),
+            route: None,
+            implicit: None,
         },
         ty: Some(numerus),
         span,
@@ -1352,7 +1357,7 @@ fn failed_local_initializer_does_not_bind_local() {
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
         builder.errors[0].issue,
-        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+        "unsupported_mir_lowering_interval_clamp_recovery_before_interval_mir_lowering"
     );
 
     let deferred = HirLocal {
@@ -1401,7 +1406,7 @@ fn failed_top_level_const_initializer_does_not_bind_const() {
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
         builder.errors[0].issue,
-        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+        "unsupported_mir_lowering_interval_clamp_recovery_before_interval_mir_lowering"
     );
 }
 
@@ -1846,7 +1851,7 @@ fn range_itera_stops_when_bounds_fail_to_lower() {
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
         builder.errors[0].issue,
-        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+        "unsupported_mir_lowering_interval_clamp_recovery_before_interval_mir_lowering"
     );
 }
 
@@ -4694,7 +4699,7 @@ fn collection_callback_errors_do_not_publish_synthetic_functions() {
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
         builder.errors[0].issue,
-        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+        "unsupported_mir_lowering_interval_clamp_recovery_before_interval_mir_lowering"
     );
 }
 
