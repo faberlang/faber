@@ -2108,6 +2108,10 @@ help = "أزل قائمة type argument الصريحة"
 message = "numeric {lista} elements مطلوبة"
 help = "استخدم numeric elements لـ {lista} intrinsic هذا"
 
+[diagnostics.SEM011.issues.sorted_key_retired]
+message = "تمت إزالة الطريقة `.مرتب(مفتاح)` ذات المفتاح؛ استخدم تعبير الفرز"
+help = "اكتب `{ordinata} {via} {ascendens} {ex} مصدر {fixum} x` متبوعا بكتلة تنتهي بـ `{redde}` مفتاح؛ و`{descendens}` يعطي الترتيب العكسي"
+
 [diagnostics.SEM011.issues.loop_collection_shape_change]
 message = "هذه الحلقة تمر على `{binding}` فلا يمكن لـ `{method}` تغيير شكلها أو ترتيبها"
 help = "حدّث عنصرا بالقوس المربع، أو استخدم {queue} مع {dum} لقائمة عمل"

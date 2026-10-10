@@ -2120,6 +2120,10 @@ help = "स्पष्ट type argument सूची हटाएँ"
 message = "numeric lista elements आवश्यक हैं"
 help = "इस lista intrinsic के लिए numeric elements का उपयोग करें"
 
+[diagnostics.SEM011.issues.sorted_key_retired]
+message = "कुंजी वाली `.क्रमबद्ध(कुंजी)` विधि हटा दी गई है; क्रमबद्ध करने वाले व्यंजक का उपयोग करें"
+help = "`{ordinata} {via} {ascendens} {ex} स्रोत {fixum} x` लिखें और उसके बाद ऐसा ब्लॉक दें जो `{redde}` कुंजी पर समाप्त हो; उल्टे क्रम के लिए `{descendens}` लिखें"
+
 [diagnostics.SEM011.issues.loop_collection_shape_change]
 message = "यह लूप `{binding}` पर चलता है, इसलिए `{method}` उसका आकार या क्रम नहीं बदल सकता"
 help = "किसी तत्व को बदलने के लिए ब्रैकेट स्टोर लिखें, या कार्य-सूची के लिए {dum} के साथ {queue} का उपयोग करें"

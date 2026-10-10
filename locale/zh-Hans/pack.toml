@@ -2108,6 +2108,10 @@ help = "移除显式 type argument 列表"
 message = "需要 numeric lista elements"
 help = "为此 lista intrinsic 使用 numeric elements"
 
+[diagnostics.SEM011.issues.sorted_key_retired]
+message = "带键的 `.已排序(键)` 方法已移除；请使用排序表达式"
+help = "写作 `{ordinata} {via} {ascendens} {ex} 源 {fixum} x`，后接以 `{redde}` 键 结尾的块；用 `{descendens}` 得到相反顺序"
+
 [diagnostics.SEM011.issues.loop_collection_shape_change]
 message = "此循环正在遍历 `{binding}`，因此 `{method}` 不能改变它的大小或顺序"
 help = "用方括号赋值来更新元素，或对工作列表使用 {queue} 加 {dum}"

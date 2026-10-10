@@ -708,9 +708,10 @@ impl FunctionBuilder<'_> {
                         let initial = &args[1].expr;
                         self.lower_cumulata(receiver, closure, initial, expr)
                     }
+                    // The keyed `ordinata(key)` is retired; only the
+                    // in-place `ordina(key)` reaches lowering.
                     crate::intrinsics::IntrinsicMirKind::HigherOrderSortBy => {
-                        let in_place = matches!(entry.return_kind, crate::intrinsics::IntrinsicReturnKind::Vacuum);
-                        self.lower_sort_by_key(receiver, closure, in_place, expr)
+                        self.lower_sort_by_key(receiver, closure, expr)
                     }
                     _ => None,
                 };

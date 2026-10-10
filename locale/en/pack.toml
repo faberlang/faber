@@ -3053,6 +3053,10 @@ help = "remove the explicit type argument list"
 message = "numeric {lista} elements required"
 help = "use numeric elements for this {lista} intrinsic"
 
+[diagnostics.SEM011.issues.sorted_key_retired]
+message = "the keyed `.sorted(key)` method was removed; use the sort expression"
+help = "write `{ordinata} {via} {ascendens} {ex} source {fixum} x` followed by a block that ends in `{redde}` key; `{descendens}` gives the reverse order"
+
 [diagnostics.SEM011.issues.loop_collection_shape_change]
 message = "this loop iterates `{binding}`, so `{method}` cannot change its shape or order"
 help = "update an element with a bracket store, or use a {queue} with {dum} for a worklist"

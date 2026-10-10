@@ -30,6 +30,10 @@ const ISSUE_DENSATA_REQUIRES_SPARSA_RECEIVER: &str = "densata_requires_sparsa_re
 const ISSUE_ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 const ISSUE_NUMERIC_LISTA_ELEMENTS_REQUIRED: &str = "numeric_lista_elements_required";
 const ISSUE_ORDINA_KEY_NOT_ORDERED: &str = "ordina_key_not_ordered";
+/// Need (ruling O2): the keyed `.sorted(key)` / `.ordinata(key)` is
+/// retired in favour of the sort expression.
+// FABER-2-SUNSET: delete with the retired-word diagnostics.
+const ISSUE_SORTED_KEY_RETIRED: &str = "sorted_key_retired";
 const ISSUE_TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
     "tensor_arithmetic_numeric_element_required";
 /// K5: a lifted transcendental math function (`radix`, `exponentia`, ...)
@@ -714,9 +718,11 @@ fn check_regex_replace_closure(
     textus
 }
 
-/// `ordina(key)` / `ordinata(key)` (D1.7): the key selector maps an element
-/// to a value that is ordered today — a number or `textus`. The result is the
-/// receiver's own element type, never the key type.
+/// `ordina(key)` (D1.7): the key selector maps an element to a value that is
+/// ordered today — a number or `textus`. The keyed in-place sort returns
+/// vacuum. The keyed `ordinata(key)` form is retired (need, ruling
+/// O2): the sort expression `sort via asc from <source> const x { return key }`
+/// replaces it, so it is refused by name.
 fn check_sort_by_key(
     checker: &mut TypeChecker<'_>,
     entry: &MethodIntrinsic,
@@ -731,6 +737,12 @@ fn check_sort_by_key(
     let key_fn = checker.types.function(simple_sig(vec![inner], key));
     let vacuum = checker.vacuum_type();
     checker.check_call_args(&simple_sig(vec![key_fn], vacuum), args, span);
+    if !matches!(entry.return_kind, IntrinsicReturnKind::Vacuum) {
+        // FABER-2-SUNSET: delete with the retired-word diagnostics.
+        checker.invalid_operand_types(ISSUE_SORTED_KEY_RETIRED, span);
+        // The result stays the copy's `lista` so the refusal does not cascade.
+        return checker.types.array(inner);
+    }
     let key = checker.resolve_inferred_type(key);
     if key != checker.error_type && !checker.is_numeric(key) && !checker.is_textus(key) {
         checker.invalid_operand_types(ISSUE_ORDINA_KEY_NOT_ORDERED, span);
@@ -739,10 +751,7 @@ fn check_sort_by_key(
     // WHY: MIR lowering carries the keys as a `lista<key>` through a
     // read-only type table; intern the carrier here where it is admitted.
     checker.types.array(key);
-    match entry.return_kind {
-        IntrinsicReturnKind::Vacuum => vacuum,
-        _ => checker.types.array(inner),
-    }
+    vacuum
 }
 
 /// Deferred tensor arithmetic intrinsics require a numeric element type.

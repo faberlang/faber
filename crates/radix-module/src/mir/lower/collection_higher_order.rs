@@ -482,14 +482,15 @@ impl FunctionBuilder<'_> {
         ))
     }
 
-    /// `ordina(key)` / `ordinata(key)` (D1.7): map the receiver to a key
-    /// `lista` with the ordinary map loop, then `SortByKeys` reorders the
-    /// receiver stably by those keys. The receiver is evaluated once.
+    /// `ordina(key)` (D1.7): map the receiver to a key `lista` with the
+    /// ordinary map loop, then `SortByKeys` reorders the receiver in place
+    /// stably by those keys. The receiver is evaluated once. The keyed
+    /// `ordinata(key)` copy form is retired; the sort
+    /// expression builds new lists.
     pub(super) fn lower_sort_by_key(
         &mut self,
         receiver: &HirExpression,
         closure: &HirExpression,
-        in_place: bool,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         let receiver_ty = receiver.ty?;
@@ -517,28 +518,16 @@ impl FunctionBuilder<'_> {
         let keys_ty = MirType::semantic(keys_ty);
         let key_fn = self.lower_closure_function(closure, MirType::semantic(key_ty))?;
         let collection_ty = MirType::semantic(receiver_ty);
-        if in_place {
-            let (place, ty) = self.lower_assignment_place_with_fallback(receiver, collection_ty)?;
-            let keys = self.lower_transform_over(place.clone(), key_fn, TransformKind::Map, keys_ty, expr.span)?;
-            let sorted = self.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
-                vec![MirOperand::Place(place.clone()), keys],
-                ty,
-                expr.span,
-            );
-            self.assign(place, sorted, ty, expr.span);
-            return Some(MirOperand::Constant(MirConstant::Unit));
-        }
-        let result_ty = self.expr_ty(expr)?;
-        let collection = self.lower_expr_value(receiver)?;
-        let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
-        let keys = self.lower_transform_over(collection.clone(), key_fn, TransformKind::Map, keys_ty, expr.span)?;
-        Some(self.runtime_call_value(
+        let (place, ty) = self.lower_assignment_place_with_fallback(receiver, collection_ty)?;
+        let keys = self.lower_transform_over(place.clone(), key_fn, TransformKind::Map, keys_ty, expr.span)?;
+        let sorted = self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
-            vec![MirOperand::Place(collection), keys],
-            result_ty,
+            vec![MirOperand::Place(place.clone()), keys],
+            ty,
             expr.span,
-        ))
+        );
+        self.assign(place, sorted, ty, expr.span);
+        Some(MirOperand::Constant(MirConstant::Unit))
     }
 
     /// Lower the sort expression `sort via asc|desc from|ref source [body]`

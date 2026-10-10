@@ -1,20 +1,21 @@
 +++
 term = "ordina"
 kind = "existing-home"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "fixum_decl", "expr_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "fixum_decl", "expr_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "call_expr", "call_suffix", "member_suffix", "sort_expr", "sort_direction", "sort_body", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "Sort a list by a key selector; equal keys keep their order."
-syntax = "<lista>.sort(<T x ∴ key>) | <lista>.sorted(<T x ∴ key>)"
+summary = "Sort a list by a key; equal keys keep their order."
+syntax = "sort via asc|desc from <lista> const x { return key } | <lista>.sort(<T x ∴ key>)"
 related = ["lista", "ordinata", "mappata"]
 locale = "en"
 +++
 # =============================================================================
-# lista — sort by a key selector
+# lista — sort by a key
 # =============================================================================
 #
 # What this teaches:
-#   • `sorted(key)` returns a new list ordered by the key each element maps to
+#   • `sort via asc from list const x { return key }` returns a new list
+#     ordered by the key each element maps to; `desc` reverses the order
 #   • `sort(key)` reorders a `var` list in place
 #   • keys are numbers or text; text orders by Unicode code point
 #   • the sort is stable: elements with equal keys keep their source order
@@ -54,14 +55,14 @@ main {
     ]
 
     # Text key: code-point order puts "É" (U+00C9) after every ASCII letter.
-    const list<Persona> per_nomen ← personae.sorted(Persona p ∴ p.nomen)
+    const list<Persona> per_nomen ← sort via asc from personae const p { return p.nomen }
     print nomina(per_nomen)
 
     # The source list is unchanged.
     print nomina(personae)
 
-    # A computed key: descending age via negation, still stable.
-    const list<Persona> senes ← personae.sorted(Persona p ∴ 0 - p.aetas)
+    # The direction is `desc`, not a negated key; equal keys stay stable.
+    const list<Persona> senes ← sort via desc from personae const p { return p.aetas }
     print nomina(senes)
 
     # Numeric key, stable: 25s keep Aulus before Cornelia; 30s keep
@@ -70,7 +71,7 @@ main {
     per_aetatem.sort(Persona p ∴ p.aetas)
     print nomina(per_aetatem)
 
-    # Without a key, sorting is unchanged.
+    # Without a body, the elements sort by their natural order.
     const list<int> numeri ← [3, 1, 2]
-    print numeri.sorted()
+    print sort via asc from numeri
 }

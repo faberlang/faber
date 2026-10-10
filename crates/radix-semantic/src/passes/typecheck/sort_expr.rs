@@ -148,7 +148,7 @@ pub(super) fn check_sort_expr(
     result
 }
 
-/// The orderings `.sort()` and `.sorted(key)` accept: numbers, text, bool.
+/// The orderings `.sort()` and the sort expression accept: numbers, text, bool.
 fn is_sort_orderable(checker: &TypeChecker<'_>, ty: TypeId) -> bool {
     checker.is_numeric(ty) || checker.is_textus(ty) || checker.is_bool(ty)
 }

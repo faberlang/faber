@@ -1,4 +1,4 @@
-//! Runner proof for the `ordina` / `ordinata` key selector (D1.7): the
+//! Runner proof for the `ordina` key selector (D1.7): the
 //! keyed sort is stable and orders `textus` keys by code point.
 
 use super::*;
@@ -27,17 +27,17 @@ functio nomina(lista<Persona> ps) → lista<textus> {
 ";
 
 #[test]
-fn ordinata_numeric_key_is_stable() {
+fn ordina_numeric_key_is_stable() {
     let lines = run_lines(&format!(
         "{PERSONAE}
 incipit {{
-    fixum lista<Persona> ps ← [Persona {{ nomen = \"c\", aetas = 2 }}, Persona {{ nomen = \"a\", aetas = 1 }}, Persona {{ nomen = \"b\", aetas = 2 }}, Persona {{ nomen = \"d\", aetas = 1 }}]
-    nota nomina(ps.ordinata(Persona p ∴ p.aetas))
+    varia lista<Persona> ps ← [Persona {{ nomen = \"c\", aetas = 2 }}, Persona {{ nomen = \"a\", aetas = 1 }}, Persona {{ nomen = \"b\", aetas = 2 }}, Persona {{ nomen = \"d\", aetas = 1 }}]
+    ps.ordina(Persona p ∴ p.aetas)
     nota nomina(ps)
 }}
 "
     ));
-    assert_eq!(lines, vec![r#"["a", "d", "c", "b"]"#, r#"["c", "a", "b", "d"]"#]);
+    assert_eq!(lines, vec![r#"["a", "d", "c", "b"]"#]);
 }
 
 #[test]

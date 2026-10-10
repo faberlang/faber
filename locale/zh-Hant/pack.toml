@@ -2108,6 +2108,10 @@ help = "移除明確的型別引數清單"
 message = "需要數值 lista 元素"
 help = "此 lista 內建項目請使用數值元素"
 
+[diagnostics.SEM011.issues.sorted_key_retired]
+message = "帶鍵的 `.已排序(鍵)` 方法已移除；請使用排序運算式"
+help = "寫作 `{ordinata} {via} {ascendens} {ex} 來源 {fixum} x`，後接以 `{redde}` 鍵 結尾的區塊；用 `{descendens}` 得到相反順序"
+
 [diagnostics.SEM011.issues.loop_collection_shape_change]
 message = "此迴圈正在走訪 `{binding}`，因此 `{method}` 不能改變它的大小或順序"
 help = "用方括號賦值來更新元素，或對工作清單使用 {queue} 加 {dum}"
