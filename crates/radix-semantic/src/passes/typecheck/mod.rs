@@ -93,6 +93,9 @@ mod at_read_test;
 #[path = "cfa_join_test.rs"]
 mod cfa_join_test;
 pub mod collect;
+#[cfg(test)]
+#[path = "const_share_into_var_test.rs"]
+mod const_share_into_var_test;
 mod contract_bound;
 #[cfg(test)]
 #[path = "contract_bound_test.rs"]
@@ -116,9 +119,6 @@ mod fieldless_type_access_test;
 #[cfg(test)]
 #[path = "loop_shape_test.rs"]
 mod loop_shape_test;
-#[cfg(test)]
-#[path = "const_share_into_var_test.rs"]
-mod const_share_into_var_test;
 #[cfg(test)]
 #[path = "mutating_intrinsic_test.rs"]
 mod mutating_intrinsic_test;

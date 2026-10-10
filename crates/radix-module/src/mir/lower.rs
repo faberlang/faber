@@ -75,6 +75,9 @@ mod async_surface;
 mod callable;
 mod collection_higher_order;
 
+#[cfg(test)]
+#[path = "lower/bounded_textus_run_test.rs"]
+mod bounded_textus_run_tests;
 mod context;
 mod control;
 mod conversio_route;
@@ -84,9 +87,6 @@ mod conversion_check_tests;
 #[cfg(test)]
 #[path = "lower/display_tokens_test.rs"]
 mod display_tokens_tests;
-#[cfg(test)]
-#[path = "lower/bounded_textus_run_test.rs"]
-mod bounded_textus_run_tests;
 #[cfg(test)]
 #[path = "lower/empty_dense_test.rs"]
 mod empty_dense_tests;
