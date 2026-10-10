@@ -148,18 +148,27 @@ fn text_range(text: &str, lo: i64, hi: i64) -> Result<Value, RunnerError> {
 fn text_range_past_the_end_dies() {
     let error = text_range("abcdef", 1, 99).expect_err("a range past the end must die");
     assert_eq!(error.issue, "runner_text_range_out_of_bounds");
+    assert_eq!(error.arg("start"), Some("1"));
+    assert_eq!(error.arg("end"), Some("99"));
+    assert_eq!(error.arg("len"), Some("6"));
 }
 
 #[test]
 fn text_range_wholly_outside_dies() {
     let error = text_range("abcdef", 10, 12).expect_err("a range outside must die");
     assert_eq!(error.issue, "runner_text_range_out_of_bounds");
+    assert_eq!(error.arg("start"), Some("10"));
+    assert_eq!(error.arg("end"), Some("12"));
+    assert_eq!(error.arg("len"), Some("6"));
 }
 
 #[test]
 fn text_range_reversed_dies() {
     let error = text_range("abcdef", 4, 2).expect_err("a reversed range must die");
     assert_eq!(error.issue, "runner_text_range_out_of_bounds");
+    assert_eq!(error.arg("start"), Some("4"));
+    assert_eq!(error.arg("end"), Some("2"));
+    assert_eq!(error.arg("len"), Some("6"));
 }
 
 #[test]

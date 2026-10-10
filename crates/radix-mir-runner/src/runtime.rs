@@ -1235,10 +1235,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 {
                     let items = cell.borrow();
                     if start > end || end > items.len() {
-                        return Err(RunnerError::internal_with_issue(
-                            span,
-                            format!("list range {start}‥{end} outside 0‥{}", items.len()),
-                            "runner_list_window_out_of_bounds",
+                        return Err(window_failure(
+                            RunnerError::internal_with_issue(
+                                span,
+                                format!("list range {start}‥{end} outside 0‥{}", items.len()),
+                                "runner_list_window_out_of_bounds",
+                            ),
+                            start,
+                            end,
+                            items.len(),
                         ));
                     }
                     return Ok(array_value(items[start..end].to_vec()));
@@ -4328,32 +4333,47 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         .map(|item| byte_from_value(item, span))
                         .collect::<Result<Vec<_>, _>>()?;
                     if start > end || end > bytes.len() {
-                        return Err(RunnerError::internal(span, "octeti index out of bounds"));
+                        return Err(window_failure(
+                            RunnerError::internal(span, "octeti index out of bounds"),
+                            start,
+                            end,
+                            bytes.len(),
+                        ));
                     }
                     return Ok(Value::Octeti(bytes[start..end].to_vec()));
                 }
                 let idx = index.as_index(span)?;
-                cell.borrow()
-                    .get(idx)
-                    .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "array index out of bounds"))
+                let items = cell.borrow();
+                items.get(idx).cloned().ok_or_else(|| {
+                    index_failure(
+                        RunnerError::internal(span, "array index out of bounds"),
+                        idx,
+                        items.len(),
+                    )
+                })
             }
             // A run-time lane select: the checked-index law (the failure is the
             // out-of-range `lista` index failure, text included).
             Value::Vector(lanes) => {
                 let idx = index.as_index(span)?;
-                lanes
-                    .borrow()
-                    .get(idx)
-                    .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "array index out of bounds"))
+                let lanes = lanes.borrow();
+                lanes.get(idx).cloned().ok_or_else(|| {
+                    index_failure(
+                        RunnerError::internal(span, "array index out of bounds"),
+                        idx,
+                        lanes.len(),
+                    )
+                })
             }
             Value::Tuple(elems) => {
                 let idx = index.as_index(span)?;
-                elems
-                    .get(idx)
-                    .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "tuple index out of bounds"))
+                elems.get(idx).cloned().ok_or_else(|| {
+                    index_failure(
+                        RunnerError::internal(span, "tuple index out of bounds"),
+                        idx,
+                        elems.len(),
+                    )
+                })
             }
             Value::Str(text) => {
                 // A range index is a char-window read (`textus[lo‥hi]` stays a
@@ -4365,10 +4385,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 {
                     let len = text.chars().count();
                     if start > end || end > len {
-                        return Err(RunnerError::internal_with_issue(
-                            span,
-                            format!("text range {start}‥{end} outside 0‥{len}"),
-                            "runner_text_range_out_of_bounds",
+                        return Err(window_failure(
+                            RunnerError::internal_with_issue(
+                                span,
+                                format!("text range {start}‥{end} outside 0‥{len}"),
+                                "runner_text_range_out_of_bounds",
+                            ),
+                            start,
+                            end,
+                            len,
                         ));
                     }
                     let window: String = text.chars().skip(start).take(end - start).collect();
@@ -4376,13 +4401,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
                 let idx = index.as_index(span)?;
                 crate::value::scalar_text_index(&text, idx, span)
+                    .map_err(|error| index_failure(error, idx, text.chars().count()))
             }
             Value::Ascii(byte) => {
                 let idx = index.as_index(span)?;
                 if idx == 0 {
                     Ok(Value::Ascii(byte))
                 } else {
-                    Err(RunnerError::internal(span, "text index out of bounds"))
+                    Err(index_failure(
+                        RunnerError::internal(span, "text index out of bounds"),
+                        idx,
+                        1,
+                    ))
                 }
             }
             Value::Octeti(bytes) => {
@@ -4390,7 +4420,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     window_bounds(index, span, "octeti index out of bounds")?
                 {
                     if start > end || end > bytes.len() {
-                        return Err(RunnerError::internal(span, "octeti index out of bounds"));
+                        return Err(window_failure(
+                            RunnerError::internal(span, "octeti index out of bounds"),
+                            start,
+                            end,
+                            bytes.len(),
+                        ));
                     }
                     return Ok(Value::Octeti(bytes[start..end].to_vec()));
                 }
@@ -4398,7 +4433,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 bytes
                     .get(idx)
                     .map(|byte| Value::Int(i64::from(*byte)))
-                    .ok_or_else(|| RunnerError::internal(span, "octeti index out of bounds"))
+                    .ok_or_else(|| {
+                        index_failure(
+                            RunnerError::internal(span, "octeti index out of bounds"),
+                            idx,
+                            bytes.len(),
+                        )
+                    })
             }
             Value::Map(cell) => {
                 let key = index.to_key(span)?;
@@ -5619,6 +5660,27 @@ fn window_interval(value: &Value) -> Option<(Value, Value, bool)> {
 
 /// The `[start, end)` window a range index selects, or `None` when `index`
 /// is not a range. An inclusive range ending at `usize::MAX` reports `overflow`.
+/// Attach the structured facts of an out-of-bounds window read (`start`, `end`,
+/// `len`) so a caller keys on the numbers, never on the rendered message.
+fn window_failure(mut error: RunnerError, start: usize, end: usize, len: usize) -> RunnerError {
+    error.args.extend([
+        ("start".to_owned(), start.to_string()),
+        ("end".to_owned(), end.to_string()),
+        ("len".to_owned(), len.to_string()),
+    ]);
+    error
+}
+
+/// Attach the structured facts of an out-of-bounds scalar index read (`index`,
+/// `len`).
+fn index_failure(mut error: RunnerError, index: usize, len: usize) -> RunnerError {
+    error.args.extend([
+        ("index".to_owned(), index.to_string()),
+        ("len".to_owned(), len.to_string()),
+    ]);
+    error
+}
+
 fn window_bounds(
     index: &Value,
     span: Span,
