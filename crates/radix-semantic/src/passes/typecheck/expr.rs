@@ -540,6 +540,12 @@ impl TypeChecker<'_> {
         }
         let saved_pending_conversion = self.pending_conversion.take();
         let store = self.pending_store.take();
+        // Need: `t.sum(axis n)` / `t.mean(axis n)` expand to the
+        // grouped reduction before the call is checked.
+        if let super::reduction::AxisReduction::Refused = self.desugar_axis_reduction(expr) {
+            self.pending_conversion = saved_pending_conversion;
+            return self.error_type;
+        }
         // ss1: a numeric method twin means its operator; rewrite it first.
         let in_place_twin = self.desugar_numeric_twin(expr);
         // Ruling 2026-10-08: `empty` at a dense tensor, vector, or matrix slot
@@ -778,19 +784,23 @@ impl TypeChecker<'_> {
                 body,
                 identity,
                 ..
-            } => super::reduction::check_reduction_expr(
-                self,
-                *op,
-                source,
-                coordinates,
-                group.as_mut(),
-                *filum,
-                *binding,
-                body.as_mut(),
-                identity.as_mut(),
-                expected,
-                expr.span,
-            ),
+            } => {
+                // An axis expansion supplies its own bucket shape.
+                let expected = self.axis_reduction_results.remove(&expr.id).or(expected);
+                super::reduction::check_reduction_expr(
+                    self,
+                    *op,
+                    source,
+                    coordinates,
+                    group.as_mut(),
+                    *filum,
+                    *binding,
+                    body.as_mut(),
+                    identity.as_mut(),
+                    expected,
+                    expr.span,
+                )
+            }
             HirExpressionKind::FirstMatch {
                 source,
                 coordinates,

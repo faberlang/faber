@@ -495,6 +495,9 @@ pub(crate) struct TypeChecker<'a> {
     /// assignment, or effect-hoisted block), handed to the presentation
     /// sidecar when the check finishes.
     numeric_twin_ids: Vec<HirId>,
+    /// Result type of each `t.sum(axis n)` expansion, read as the expected
+    /// bucket shape when the synthesized reduction node is checked.
+    axis_reduction_results: FxHashMap<HirId, TypeId>,
     /// Node ids of `empty` literals rewritten into the typed zero, handed to
     /// the presentation sidecar when the check finishes.
     pub(super) empty_dense_ids: Vec<HirId>,
@@ -874,6 +877,7 @@ impl<'a> TypeChecker<'a> {
             compile_time_locals: FxHashSet::default(),
             static_size_values: FxHashMap::default(),
             numeric_twin_ids: Vec::new(),
+            axis_reduction_results: FxHashMap::default(),
             empty_dense_ids: Vec::new(),
             inferred_constructor_ids: Vec::new(),
             alias_type_params: FxHashMap::default(),

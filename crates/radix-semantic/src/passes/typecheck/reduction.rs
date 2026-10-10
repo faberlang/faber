@@ -21,6 +21,172 @@ const ISSUE_REDUCTA_BODY_FORBIDS_IACE: &str = "reducta_body_forbids_iace";
 const ISSUE_REDUCTA_BODY_EFFECT: &str = "reducta_body_effect";
 const ISSUE_REDUCTA_BODY_CONTEXT: &str = "reducta_body_context";
 
+/// Coordinate names the axis expansion binds; interned before typecheck.
+pub(crate) const AXIS_REDUCTION_COORDINATES: [&str; 2] = ["__axis0", "__axis1"];
+
+const ISSUE_AXIS_REDUCTION_RANK_UNSUPPORTED: &str = "axis_reduction_rank_unsupported";
+const ISSUE_AXIS_REDUCTION_NOT_CONSTANT: &str = "axis_reduction_not_constant";
+const ISSUE_AXIS_REDUCTION_OUT_OF_RANGE: &str = "axis_reduction_out_of_range";
+const ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN: &str = "axis_reduction_extent_unknown";
+const ISSUE_AXIS_REDUCTION_MEAN_REQUIRES_FLOAT: &str = "axis_reduction_mean_requires_float";
+
+/// Outcome of the `t.sum(axis n)` / `t.mean(axis n)` expansion probe.
+pub(super) enum AxisReduction {
+    /// Not an axis reduction call: checked as written.
+    NotApplicable,
+    /// A named diagnostic was reported; the node is typed as an error.
+    Refused,
+    /// The call was rewritten to the grouped reduction.
+    Expanded,
+}
+
+impl TypeChecker<'_> {
+    /// Need: on a rank-2 tensor `t.sum(axis n)` is
+    /// `reduce via sum from t at [i, j] per k` with `k` the kept coordinate,
+    /// and `t.mean(axis n)` is that grouped sum divided by the extent of the
+    /// removed axis. The axis is a compile-time constant in `0..rank`; the
+    /// result is the receiver shape with that axis removed.
+    pub(super) fn desugar_axis_reduction(&mut self, expr: &mut HirExpression) -> AxisReduction {
+        let HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) =
+            &mut expr.kind
+        else {
+            return AxisReduction::NotApplicable;
+        };
+        if !type_args.is_empty()
+            || conversion.is_some()
+            || args.len() != 1
+            || args[0].marker != Some(radix_hir::HirArgMarker::Axis)
+            || args[0].spread
+            || args[0].name.is_some()
+        {
+            return AxisReduction::NotApplicable;
+        }
+        let Some(interner) = self.interner else {
+            return AxisReduction::NotApplicable;
+        };
+        let surface = interner.resolve(*name).to_owned();
+        let canonical = self
+            .locale_pack
+            .and_then(|pack| {
+                pack.intrinsic_canonical(radix_intrinsics::IntrinsicReceiver::Tensor, &surface)
+            })
+            .map_or(surface, str::to_owned);
+        let mean = match canonical.as_str() {
+            "summa" => false,
+            "media" => true,
+            _ => return AxisReduction::NotApplicable,
+        };
+        let Some(coordinate_names) = AXIS_REDUCTION_COORDINATES
+            .iter()
+            .map(|name| interner.lookup(name))
+            .collect::<Option<Vec<_>>>()
+        else {
+            return AxisReduction::NotApplicable;
+        };
+        let span = expr.span;
+        let receiver_ty = self.check_expr(receiver);
+        // The receiver is checked exactly once, whether the probe declines or
+        // the call is rewritten (see `twin_probed_receiver`).
+        self.twin_probed_receiver = Some((receiver.id, receiver_ty));
+        let resolved = self.resolve_inferred_type(receiver_ty);
+        let dispatch = self.types.peel_access_marker(resolved).1;
+        let (element, shape) = match self.types.get(dispatch) {
+            Type::Tensor(element, shape) => (*element, *shape),
+            _ => return AxisReduction::NotApplicable,
+        };
+        let element = self.resolve_inferred_type(element);
+        let dims = match self.types.get_index(shape) {
+            IndexExpr::Tuple(dims) if dims.len() == 2 => dims.clone(),
+            _ => {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_AXIS_REDUCTION_RANK_UNSUPPORTED,
+                    span,
+                );
+                return AxisReduction::Refused;
+            }
+        };
+        let axis_expr = &args[0].expr;
+        let Some(axis) = super::integer_range::const_int_value(axis_expr) else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_AXIS_REDUCTION_NOT_CONSTANT,
+                args[0].span,
+            );
+            return AxisReduction::Refused;
+        };
+        if !(0..2).contains(&axis) {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_AXIS_REDUCTION_OUT_OF_RANGE,
+                args[0].span,
+            );
+            return AxisReduction::Refused;
+        }
+        let axis = axis as usize;
+        let kept = 1 - axis;
+        let mut divisor = None;
+        if mean {
+            if !self.is_fractus(element) {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_AXIS_REDUCTION_MEAN_REQUIRES_FLOAT,
+                    span,
+                );
+                return AxisReduction::Refused;
+            }
+            match self.types.get_index(dims[axis]) {
+                IndexExpr::Literal(count) => divisor = Some(*count),
+                _ => {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN,
+                        span,
+                    );
+                    return AxisReduction::Refused;
+                }
+            }
+        }
+        let result = self.types.tensor_with_shape(element, dims[kept]);
+        let row = DefId(self.next_synthetic_def);
+        let column = DefId(self.next_synthetic_def + 1);
+        self.next_synthetic_def += 2;
+        let key = if kept == 0 { row } else { column };
+        let group = self.synthesized(HirExpressionKind::Path(key), span);
+        let kind = std::mem::replace(&mut expr.kind, HirExpressionKind::Vacua);
+        let HirExpressionKind::MethodCall(receiver, ..) = kind else {
+            return AxisReduction::NotApplicable;
+        };
+        let reduction = HirExpressionKind::Reduction {
+            op: HirReductionOp::Sum,
+            source: receiver,
+            coordinates: vec![(row, coordinate_names[0]), (column, coordinate_names[1])],
+            group: Some(Box::new(group)),
+            filum: None,
+            binding: None,
+            body: None,
+            identity: None,
+            mutable: false,
+        };
+        expr.kind = match divisor {
+            None => {
+                self.axis_reduction_results.insert(expr.id, result);
+                reduction
+            }
+            Some(count) => {
+                let sum = self.synthesized(reduction, span);
+                self.axis_reduction_results.insert(sum.id, result);
+                let count = self.synthesized(
+                    HirExpressionKind::Literal(radix_hir::HirLiteral::Float(count as f64)),
+                    span,
+                );
+                HirExpressionKind::Binary(radix_hir::HirBinOp::Div, Box::new(sum), Box::new(count))
+            }
+        };
+        AxisReduction::Expanded
+    }
+}
+
 /// Type one reduction from its source, body term, and expected bucket extent.
 pub(super) fn check_reduction_expr(
     checker: &mut TypeChecker<'_>,

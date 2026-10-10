@@ -52,6 +52,11 @@ pub(crate) fn intern_place_temporaries(
     for ordinal in 0..width.0 {
         interner.intern(&place_temporary_name(ordinal));
     }
+    // The coordinate names `t.sum(axis n)` binds when it expands to the
+    // grouped reduction.
+    for name in super::reduction::AXIS_REDUCTION_COORDINATES {
+        interner.intern(name);
+    }
 }
 
 /// What a numeric twin method means.
@@ -435,7 +440,11 @@ impl TypeChecker<'_> {
     }
 
     /// A synthesized expression with a fresh identity.
-    fn synthesized(&mut self, kind: HirExpressionKind, span: radix_lexer::Span) -> HirExpression {
+    pub(super) fn synthesized(
+        &mut self,
+        kind: HirExpressionKind,
+        span: radix_lexer::Span,
+    ) -> HirExpression {
         HirExpression {
             id: self.fresh_hir_id(),
             kind,

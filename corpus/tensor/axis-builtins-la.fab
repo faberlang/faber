@@ -1,0 +1,44 @@
++++
+term = "tensor"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Rank-2 tensor reductions along one axis with the axis marker."
+syntax = "tensor.summa(axis n) | tensor.media(axis n)"
+related = ["tensor", "fractus", "lista"]
+locale = "la"
++++
+
+# axis reductions: `t.summa(axis n)` and `t.media(axis n)` remove axis n
+#
+# grid = [[1,2,3],[4,5,6]] (shape [2, 3]):
+#   summa(axis 0) = [5, 7, 9]      shape [3]
+#   summa(axis 1) = [6, 15]        shape [2]
+#   media(axis 1) = [2, 5]
+#
+# EXPECTED stdout is the .expected file beside this exemplar.
+
+incipit {
+    fixum lista<f32> flat ← [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+    ]
+    varia tf32[2, 3] grid ← flat ↦ tf32[2, 3]
+
+    fixum tf32[3] down ← grid.summa(axis 0)
+    fixum tf32[2] across ← grid.summa(axis 1)
+    fixum tf32[2] means ← grid.media(axis 1)
+
+    nota down[0]
+    nota down[1]
+    nota down[2]
+    nota across[0]
+    nota across[1]
+    nota means[0]
+    nota means[1]
+}
