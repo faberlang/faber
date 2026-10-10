@@ -2,9 +2,9 @@
 locale = "en"
 +++
 
-# copula/ordinata.fab — key-ordered associative collection
+# sorted_map.fab — key-ordered associative collection
 #
-# Etymology: ordered_map — arranged collection; Latin locale spelling `ordinata`.
+# Etymology: sorted_map — key-sorted collection; Latin locale spelling `ordinata`.
 # Counterpart to tabula (hash-unordered map). Keys iterate in sorted order.
 #
 # NOTE: Generic record construction (`SortedMap<K, V> { ... }`) and generic
@@ -19,7 +19,7 @@ locale = "en"
 # backing, no ad routes, no I/O.
 #
 # Import: the file-namespace-imports goal (docs/factory/file-namespace-imports)
-# shipped; this file is imported directly as norma:ordered_map. The genus lives at
+# shipped; this file is imported directly as norma:sorted_map. The genus lives at
 # file top level.
 #
 # Morphologia: receiver methods on the SortedMap<K, V> genus (implicit ego),
