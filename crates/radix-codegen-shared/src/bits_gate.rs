@@ -18,7 +18,19 @@ use radix_types::{Type, TypeId, TypeTable};
 const ISSUE: &str = "bits_type_unsupported_on_target";
 
 /// Targets that carry `bN` faithfully. The Faber re-emitter keeps the authored
-        Target::HirFaber | Target::MirStepper | Target::HirGo | Target::HirSwift | Target::HirRust | Target::HirTypeScript
+/// marker; the MIR runner executes the type and does not reach codegen. The
+/// Phase 3 emitters carry it as an unsigned carrier: Rust and Go as u8..u64,
+/// Swift as UInt8..UInt64, TypeScript as `number` (b8, b16, b32) and `bigint`
+/// (b64).
+fn target_admits_bits(target: Target) -> bool {
+    matches!(
+        target,
+        Target::HirFaber
+            | Target::MirStepper
+            | Target::HirRust
+            | Target::HirTypeScript
+            | Target::HirGo
+            | Target::HirSwift
     )
 }
 

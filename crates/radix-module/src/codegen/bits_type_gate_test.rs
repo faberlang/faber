@@ -46,8 +46,8 @@ fn assert_rejected(target: Target, spelled: &str) {
 
 #[cfg(feature = "hir-rust")]
 #[test]
-fn rust_rejects_bits_before_emission() {
-    assert_rejected(Target::HirRust, "HirRust");
+fn rust_emitter_keeps_bits() {
+    assert_eq!(diagnostics(Target::HirRust), Vec::<(String, String)>::new());
 }
 
 #[cfg(feature = "hir-go")]
