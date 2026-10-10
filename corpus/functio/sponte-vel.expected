@@ -5,6 +5,6 @@ pagina 2 cum 25 rebus
 pagina 5 cum 10 rebus
 5
 5
-civis: Julia, aetas: 0, activus: verum
-civis: Julia, aetas: 25, activus: verum
-civis: Julia, aetas: 25, activus: falsum
+civis: Julia, aetas: 0, activus: true
+civis: Julia, aetas: 25, activus: true
+civis: Julia, aetas: 25, activus: false
