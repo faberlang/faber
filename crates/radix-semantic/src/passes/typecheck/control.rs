@@ -509,9 +509,27 @@ impl TypeChecker<'_> {
             }
             return self.type_check_refinement(*positive, expr, *ty);
         }
-        let HirExpressionKind::Binary(op, lhs, _) = &cond.kind else {
+        let HirExpressionKind::Binary(op, lhs, rhs) = &cond.kind else {
             return (None, None);
         };
+        // `x ≡ nulla` / `x ≢ nulla` (either operand order) is the null probe
+        // spelled as value equality; it narrows exactly like `x est nihil` /
+        // `x non est nihil`.
+        if let Some(equals) = match op {
+            HirBinOp::Eq | HirBinOp::StrictEq => Some(true),
+            HirBinOp::NotEq | HirBinOp::StrictNotEq => Some(false),
+            _ => None,
+        } {
+            let is_nil = |expr: &HirExpression| {
+                matches!(expr.kind, HirExpressionKind::Literal(HirLiteral::Nil))
+            };
+            let operand = match (is_nil(lhs), is_nil(rhs)) {
+                (false, true) => lhs,
+                (true, false) => rhs,
+                _ => return (None, None),
+            };
+            return self.nil_probe_refinement(equals, operand);
+        }
         // Compound conjunction: keep only the taken-branch refinement of the
         // left conjunct; the fallthrough of `and` is never narrowed.
         if matches!(op, HirBinOp::And) {
@@ -1056,7 +1074,12 @@ impl TypeChecker<'_> {
 
     fn statement_diverges(&self, stmt: &HirStatement) -> bool {
         match &stmt.kind {
-            HirStatementKind::Redde(_) => true,
+            // `perge` / `rumpe` leave the loop body, so the statements that
+            // follow in the enclosing block are reached only through the
+            // other edge. The loop-entry policy already drops facts for every
+            // binding the body assigns, and a body-scope fact never survives
+            // the loop, so ignoring the edge here cannot leak a stale fact.
+            HirStatementKind::Redde(_) | HirStatementKind::Rumpe | HirStatementKind::Perge => true,
             HirStatementKind::Expr(expr) => self.expression_diverges(expr),
             _ => false,
         }
