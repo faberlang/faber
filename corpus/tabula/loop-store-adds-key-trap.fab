@@ -1,7 +1,7 @@
 +++
 term = "tabula"
 kind = "type"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "itera_stmt", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "itera_stmt", "expression", "literal", "nota_stmt"]
 category = "collections"
 canonical = false
 summary = "A bracket store that adds a key to a map while a loop walks that map traps: map changed size during iteration."
