@@ -475,6 +475,33 @@ pub const FLOAT_F16_BITS_TO_F32: RuntimeItem = RuntimeItem {
     targets: &[Target::HirRust],
 };
 
+/// `float` row: the bfloat16 bit decode (`faber::float::bf16_bits_to_f32`),
+/// the `b16 ↦ bf16` conversion on the Rust target.
+pub const FLOAT_BF16_BITS_TO_F32: RuntimeItem = RuntimeItem {
+    ns: Namespace::Float,
+    name: "bf16_bits_to_f32",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+
+/// `float` row: the half-float bit encode (`faber::float::f32_to_f16_bits`),
+/// the `f16 ↦ b16` conversion on the Rust target.
+pub const FLOAT_F32_TO_F16_BITS: RuntimeItem = RuntimeItem {
+    ns: Namespace::Float,
+    name: "f32_to_f16_bits",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+
+/// `float` row: the bfloat16 bit encode (`faber::float::f32_to_bf16_bits`),
+/// the `bf16 ↦ b16` conversion on the Rust target.
+pub const FLOAT_F32_TO_BF16_BITS: RuntimeItem = RuntimeItem {
+    ns: Namespace::Float,
+    name: "f32_to_bf16_bits",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirRust],
+};
+
 /// `trap` rows (R0, `faber::trap`): the one place generated Rust fails. A
 /// failing index, key, conversion or assertion calls a `trap` function with a
 /// [`Trap`](`faber::Trap`) kind instead of writing `.expect(..)` / `panic!(..)`
@@ -1199,6 +1226,9 @@ pub const TABLE: &[RuntimeItem] = &[
     GEN_BLOCK_ON_TOKIO,
     GEN_SEND_OR_DROP,
     FLOAT_F16_BITS_TO_F32,
+    FLOAT_BF16_BITS_TO_F32,
+    FLOAT_F32_TO_F16_BITS,
+    FLOAT_F32_TO_BF16_BITS,
     TRAP_TRAP,
     TRAP_FAIL,
     TRAP_SOME,
