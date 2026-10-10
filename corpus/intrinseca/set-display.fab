@@ -1,0 +1,54 @@
++++
+term = "copia"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "expr_stmt"]
+category = "collection"
+canonical = false
+summary = "A set prints in list shape; element order is unspecified, so the exemplar never prints more than one element straight from a set."
+syntax = "print <copia>"
+related = ["copia", "lista", "intrinseca"]
+locale = "en"
++++
+# =============================================================================
+# copia — a set prints in list shape
+# =============================================================================
+#
+# What this teaches:
+#   • `print` shows a set as `[a, b]`, the same shape as a list, with each
+#     element rendered exactly as it renders inside a list.
+#   • An empty set prints `[]`.
+#   • Set order is unspecified (D19.2) and the print never sorts, so a set with
+#     more than one element is materialized to a list and sorted first.
+#
+# Common mistakes:
+#   • printing a multi-element set directly and expecting a fixed order
+#
+# See also: copia, lista, ↦
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   [3]
+#   ["x"]
+#   []
+#   [3, 5, 7]
+
+main {
+    var set<int> one ← empty
+    one.add(3)
+    print one
+
+    var set<string> name ← empty
+    name.add("x")
+    print name
+
+    const set<int> blank ← empty
+    print blank
+
+    var set<int> several ← empty
+    several.add(7)
+    several.add(3)
+    several.add(5)
+    var list<int> ordered ← several ↦ list<int>
+    ordered.sort()
+    print ordered
+}

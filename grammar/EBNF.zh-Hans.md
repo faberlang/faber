@@ -2078,6 +2078,16 @@ explicitly. `≡` on these types stays structural and does not depend on order.
 A map or set that promises an order is a separate library type, not a mode of
 `tabula` or `copia`.
 
+**Set display.** `print`, a `§` hole in a template and a composite print show a
+`copia` in the list shape: `[3, 7]` for a `copia<numerus>` and `["x"]` for a
+`copia<textus>`. Each element renders exactly as it renders inside a `lista`,
+through the display tokens of the code locale (`true`/`false`/`none`/`tuple`
+in `en`, `真`/`假`/`nihil`/`元组` in `la`); an empty set prints `[]`.
+The element order is the set's iteration order above: unspecified, not
+promised, and not sorted by the print. A program that needs a stable printed
+set sorts a list first (`s ↦ lista<T>`, then `.sort()`). A conforming target
+prints the same list shape up to element order.
+
 There is no iteration interface. `遍历 取自` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
 method that returns a cursor (`遍历 取自 arbor.nodi() 常量 n`); nothing is
