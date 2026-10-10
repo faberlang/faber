@@ -52,16 +52,23 @@ fn materialize(parent: &Path, root: &Path) -> io::Result<()> {
         ".faber-runtime-{EMBEDDED_RUNTIME_DIGEST}.{}.tmp",
         std::process::id()
     ));
-    let _ = fs::remove_dir_all(&staging);
+    discard_staging(&staging);
     let written = write_table(&staging).and_then(|()| fs::rename(&staging, root));
     if written.is_err() {
-        let _ = fs::remove_dir_all(&staging);
+        discard_staging(&staging);
         // Another caller completed first: use its directory.
         if root.join(COMPLETE_MARKER).is_file() {
             return Ok(());
         }
     }
     written
+}
+
+/// Remove a staging directory on a best-effort basis. The directory is usually
+/// absent, and a failed removal only leaves a stale temp dir; neither changes
+/// the materialize outcome, which is decided by the write and the rename.
+fn discard_staging(staging: &Path) {
+    fs::remove_dir_all(staging).ok();
 }
 
 fn write_table(dir: &Path) -> io::Result<()> {
