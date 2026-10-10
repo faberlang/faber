@@ -2321,6 +2321,26 @@ functio summaCrateris(MODUS Crater c) → numerus {
     );
 }
 
+/// Need: iterating a `copia` lowers through a `copia ↦ lista<T>`
+/// snapshot instead of failing closed.
+#[test]
+fn itera_ex_over_copia_lowers_through_a_list_snapshot() {
+    let dump = dump_source(
+        r"functio summa(copia<numerus> elementa) → numerus {
+  varia numerus total ← 0
+  itera ex elementa fixum x {
+    total ← total + x
+  }
+  redde total
+}",
+    );
+    assert!(
+        !dump.contains("itera collection before iterator MIR lowering"),
+        "itera ex over a copia must lower: {dump}"
+    );
+    assert!(dump.contains("convert"), "copia walk reads a list snapshot: {dump}");
+}
+
 /// Erase opaque `ty#N` ids from a dump so twin comparisons ignore the
 /// type-table interning shift a `de` marker's `Ref` wrapper introduces.
 fn erase_type_ids(dump: &str) -> String {

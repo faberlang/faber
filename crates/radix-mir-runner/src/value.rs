@@ -1174,6 +1174,9 @@ pub enum MapKey {
     Magnus(Magnus),
     Bool(bool),
     Str(String),
+    /// The `none` element of a `set<T ∪ none>` or key of a
+    /// `map<K ∪ none, V>` (reads back as [`Value::Nil`]); a `unit` value keys
+    /// to the same slot, since no collection type holds both.
     Unit,
     /// Composite `iuncta` key (D3.2): hashable when every part is.
     Tuple(Vec<MapKey>),
@@ -1189,7 +1192,7 @@ impl MapKey {
             MapKey::Magnus(v) => Value::Magnus(Rc::new(v.clone())),
             MapKey::Bool(v) => Value::Bool(*v),
             MapKey::Str(v) => Value::Str(v.clone()),
-            MapKey::Unit => Value::Unit,
+            MapKey::Unit => Value::Nil,
             MapKey::Tuple(parts) => Value::Tuple(parts.iter().map(MapKey::to_value).collect()),
         }
     }
@@ -1487,7 +1490,7 @@ impl Value {
             Value::Str(v) => Ok(MapKey::Str(v.clone())),
             Value::Ascii(b) => Ok(MapKey::Str(char::from(*b).to_string())),
             Value::Char(ch) => Ok(MapKey::Str(ch.to_string())),
-            Value::Unit => Ok(MapKey::Unit),
+            Value::Nil | Value::Unit => Ok(MapKey::Unit),
             Value::Tuple(items) => items
                 .iter()
                 .map(|item| item.to_key(span))

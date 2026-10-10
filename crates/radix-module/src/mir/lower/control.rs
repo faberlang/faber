@@ -199,6 +199,9 @@ pub(super) enum CollectionIteraKind {
     Stack(TypeId),
     MapKeys(TypeId),
     MapValues(TypeId),
+    /// `itera ex s` over a `copia`: walk a snapshot of the elements.
+    /// Order is unspecified (D19.2).
+    SetElements(TypeId),
     /// `itera ex m apud [k] fixum v` (D3.1): walk a key snapshot and read
     /// each value back by key; an `iuncta` key binds one name per part
     /// (D3.3). Order is unspecified (D19.2).
@@ -3958,6 +3961,7 @@ impl FunctionBuilder<'_> {
             Type::Map(key, value) if matches!(mode, HirIteraMode::Ex) && has_coordinates => {
                 CollectionIteraKind::MapEntries { key: *key, value: *value }
             }
+            Type::Set(element) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::SetElements(*element),
             Type::Map(key, _) if matches!(mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
             Type::Map(_, value) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
             // Borrowed receiver (`de`/`mut` param, or a field read through
@@ -4135,6 +4139,11 @@ impl FunctionBuilder<'_> {
             CollectionIteraKind::MapKeys(key) => {
                 let (snapshot_place, binding_ty) =
                     self.lower_map_itera_snapshot(collection, *key, MirCollectionOp::Keys, iter.iter.span)?;
+                (snapshot_place, binding_ty, false)
+            }
+            CollectionIteraKind::SetElements(element) => {
+                let (snapshot_place, binding_ty) =
+                    self.lower_set_itera_snapshot(collection, collection_semantic, *element, iter.iter.span)?;
                 (snapshot_place, binding_ty, false)
             }
             CollectionIteraKind::MapValues(value) => {
@@ -5013,6 +5022,44 @@ impl FunctionBuilder<'_> {
             .projections
             .push(MirProjection::Index(MirOperand::Place(MirPlace::local(key_local))));
         MirOperand::Place(value_read)
+    }
+
+    /// A `copia` walk reads a `copia ↦ lista<T>` snapshot of the elements, the
+    /// same conversion a written `↦ lista<T>` lowers to, so the loop shares
+    /// the array lane and the runner's unordered element order (D19.2).
+    fn lower_set_itera_snapshot(
+        &mut self,
+        collection: MirPlace,
+        set_ty: TypeId,
+        element: TypeId,
+        span: Span,
+    ) -> Option<(MirPlace, MirType)> {
+        let element_ty = MirType::semantic(element);
+        let Some(array) = self.types.find_array(element) else {
+            self.errors
+                .push(MirError::missing_type(span, "copia element list snapshot"));
+            return None;
+        };
+        let array_ty = MirType::semantic(array);
+        let snapshot = self.runtime_call_value(
+            MirIntrinsic::Convert(MirConversion {
+                store: None,
+                flavor: MirConversionFlavor::Runtime,
+                source_ty: MirType::semantic(set_ty),
+                target_ty: array_ty,
+                params: Vec::new(),
+                recovery: None,
+                struct_defaults: Vec::new(),
+            }),
+            vec![MirOperand::Place(collection)],
+            array_ty,
+            span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+        let snapshot_place = self.materialize_operand_place(snapshot, array_ty, span);
+        Some((snapshot_place, element_ty))
     }
 
     fn lower_map_itera_snapshot(

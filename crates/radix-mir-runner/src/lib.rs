@@ -3938,6 +3938,10 @@ mod arg_extremum_test;
 mod queue_stack_test;
 
 #[cfg(test)]
+#[path = "set_none_key_test.rs"]
+mod set_none_key_test;
+
+#[cfg(test)]
 #[path = "stats_test.rs"]
 mod stats_test;
 
