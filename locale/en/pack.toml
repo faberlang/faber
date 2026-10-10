@@ -451,18 +451,6 @@ munita = "escape"
 # en's effective diagnostics previously came from `inherits = "la"`; the flat
 # pack owns the canonical templates explicitly now. la stays byte-unchanged.
 # -----------------------------------------------------------------------------
-[diagnostics.UNRES001]
-message = "keyword '{keyword}' is not declared for reader locale '{pack}'"
-help = "use a keyword spelling declared in the reader pack for this grammar position"
-
-[diagnostics.UNRES002]
-message = "intrinsic '{intrinsic}' is not declared for reader locale '{pack}' on receiver family '{receiver}'"
-help = "use an intrinsic spelling declared in the reader pack for this receiver family"
-
-[diagnostics.UNRES003]
-message = "library member '{member}' is not declared for reader locale '{pack}' for identity '{identity}'"
-help = "use a member spelling declared in the reader pack for this library identity"
-
 [diagnostics.LOCALE002]
 message = "reader locale '{pack}' saw keyword-like spelling '{spelling}'"
 help = "use '{suggestion}' if you meant that keyword; '{spelling}' is a valid name as written"

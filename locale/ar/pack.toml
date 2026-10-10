@@ -219,18 +219,6 @@ scrinium = "إطار"
 meus = "إرسال"
 tuus = "استقبال"
 
-[diagnostics.UNRES001]
-message = "الكلمة '{keyword}' غير معلنة لحزمة القارئ '{pack}'"
-help = "استخدم تهجئة كلمة معلنة في حزمة القارئ لهذا الموضع النحوي"
-
-[diagnostics.UNRES002]
-message = "الدالة الجوهرية '{intrinsic}' غير معلنة لحزمة القارئ '{pack}' لعائلة المتلقي '{receiver}'"
-help = "استخدم تهجئة دالة جوهرية معلنة في حزمة القارئ لهذه العائلة"
-
-[diagnostics.UNRES003]
-message = "العضو '{member}' غير معلن لحزمة القارئ '{pack}' لهوية '{identity}'"
-help = "استخدم تهجئة عضو معلنة في حزمة القارئ لهذه الهوية"
-
 [diagnostics.LOCALE002]
 message = "حزمة القارئ '{pack}' وجدت كتابة تشبه كلمة مفتاحية '{spelling}'"
 help = "استخدم '{suggestion}' إذا كنت تقصد الكلمة المفتاحية؛ '{spelling}' اسم صالح كما هو مكتوب"

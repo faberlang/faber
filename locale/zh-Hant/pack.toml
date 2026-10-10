@@ -219,18 +219,6 @@ scrinium = "幀"
 meus = "發送"
 tuus = "接收"
 
-[diagnostics.UNRES001]
-message = "關鍵字 '{keyword}' 未在讀者語言包 '{pack}' 中宣告"
-help = "在此語法位置使用讀者語言包中宣告的關鍵字拼寫"
-
-[diagnostics.UNRES002]
-message = "內建函式 '{intrinsic}' 未在讀者語言包 '{pack}' 中為接收者族 '{receiver}' 宣告"
-help = "為此接收者族使用讀者語言包中宣告的內建函式拼寫"
-
-[diagnostics.UNRES003]
-message = "程式庫成員 '{member}' 未在讀者語言包 '{pack}' 中為識別 '{identity}' 宣告"
-help = "為此程式庫識別使用讀者語言包中宣告的成員拼寫"
-
 [diagnostics.LOCALE002]
 message = "讀者語言包 '{pack}' 發現類似關鍵字的寫法 '{spelling}'"
 help = "若本意是關鍵字請使用 '{suggestion}'；'{spelling}' 按原樣是合法名稱"

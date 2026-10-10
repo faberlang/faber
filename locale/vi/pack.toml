@@ -219,18 +219,6 @@ scrinium = "khung"
 meus = "gửi"
 tuus = "nhận"
 
-[diagnostics.UNRES001]
-message = "từ khóa '{keyword}' không được khai báo cho gói đọc '{pack}'"
-help = "dùng chính tả từ khóa được khai báo trong gói đọc cho vị trí ngữ pháp này"
-
-[diagnostics.UNRES002]
-message = "hàm nội tại '{intrinsic}' không được khai báo cho gói đọc '{pack}' trên họ bộ nhận '{receiver}'"
-help = "dùng chính tả hàm nội tại được khai báo trong gói đọc cho họ bộ nhận này"
-
-[diagnostics.UNRES003]
-message = "thành viên '{member}' không được khai báo cho gói đọc '{pack}' cho định danh '{identity}'"
-help = "dùng chính tả thành viên được khai báo trong gói đọc cho định danh thư viện này"
-
 [diagnostics.LOCALE002]
 message = "gói đọc '{pack}' thấy cách viết giống từ khóa '{spelling}'"
 help = "dùng '{suggestion}' nếu bạn muốn từ khóa đó; '{spelling}' vẫn là tên hợp lệ như đã viết"

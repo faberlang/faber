@@ -23,7 +23,6 @@ pub use diagnostic::{
 pub use span::Span;
 pub use spec::{
     DiagnosticSpec, locale_suggestion_spec, locale_unknown_spec, mixed_script_identifier_spec,
-    unresolved_intrinsic_spec, unresolved_keyword_spec, unresolved_library_member_spec,
 };
 
 #[cfg(test)]

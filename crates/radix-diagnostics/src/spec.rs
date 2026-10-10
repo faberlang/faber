@@ -17,39 +17,6 @@ pub struct DiagnosticSpec {
     pub help: Option<&'static str>,
 }
 
-/// Return the stable diagnostic spec for an unresolved keyword used in a
-/// grammar position: a spelling the reader pack does not declare as a keyword
-/// but that appears where a keyword is required.
-#[must_use]
-pub fn unresolved_keyword_spec() -> DiagnosticSpec {
-    DiagnosticSpec {
-        code: "UNRES001",
-        help: Some("use a keyword spelling declared in the reader pack"),
-    }
-}
-
-/// Return the stable diagnostic spec for an unresolved intrinsic called on a
-/// receiver family: a spelling the reader pack does not declare for the
-/// receiver's intrinsic surface.
-#[must_use]
-pub fn unresolved_intrinsic_spec() -> DiagnosticSpec {
-    DiagnosticSpec {
-        code: "UNRES002",
-        help: Some("use an intrinsic spelling declared in the reader pack for the receiver family"),
-    }
-}
-
-/// Return the stable diagnostic spec for an unresolved library member for an
-/// identity: a spelling the reader pack does not declare for the library
-/// member surface.
-#[must_use]
-pub fn unresolved_library_member_spec() -> DiagnosticSpec {
-    DiagnosticSpec {
-        code: "UNRES003",
-        help: Some("use a member spelling declared in the reader pack for the library identity"),
-    }
-}
-
 /// Return the stable diagnostic spec for reader-locale spelling suggestions.
 #[must_use]
 pub fn locale_suggestion_spec() -> DiagnosticSpec {

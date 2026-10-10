@@ -100,13 +100,10 @@ pub use catalog_syntax::{lex_spec, parse_message, parse_spec};
 use radix_diagnostics::DiagnosticSpec;
 
 /// Every diagnostic spec across the syntax and semantic catalogs plus the
-/// foundation unresolved/locale specs. Reader-locale packs validate their
+/// foundation locale specs. Reader-locale packs validate their
 /// templates against this list.
 pub fn all_diagnostic_specs() -> Vec<DiagnosticSpec> {
     let mut specs = vec![
-        radix_diagnostics::unresolved_keyword_spec(),
-        radix_diagnostics::unresolved_intrinsic_spec(),
-        radix_diagnostics::unresolved_library_member_spec(),
         radix_diagnostics::locale_suggestion_spec(),
         radix_diagnostics::locale_unknown_spec(),
         radix_diagnostics::mixed_script_identifier_spec(),

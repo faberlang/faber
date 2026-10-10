@@ -219,18 +219,6 @@ scrinium = "帧"
 meus = "发送"
 tuus = "接收"
 
-[diagnostics.UNRES001]
-message = "关键字 '{keyword}' 未在读者语言包 '{pack}' 中声明"
-help = "在此语法位置使用读者语言包中声明的关键字拼写"
-
-[diagnostics.UNRES002]
-message = "内建函数 '{intrinsic}' 未在读者语言包 '{pack}' 中为接收者族 '{receiver}' 声明"
-help = "为此接收者族使用读者语言包中声明的内建函数拼写"
-
-[diagnostics.UNRES003]
-message = "库成员 '{member}' 未在读者语言包 '{pack}' 中为标识 '{identity}' 声明"
-help = "为此库标识使用读者语言包中声明的成员拼写"
-
 [diagnostics.LOCALE002]
 message = "读者语言包 {pack} 发现类似关键字的写法 {spelling}"
 help = "若本意是关键字请使用 {suggestion}；{spelling} 按原样是合法名称"

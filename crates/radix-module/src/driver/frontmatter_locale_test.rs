@@ -96,6 +96,30 @@ fn compile_rejects_unknown_frontmatter_locale() {
 }
 
 #[test]
+fn locale_unknown_diagnostic_carries_the_locale_id_it_names() {
+    // LOCALE003's pack message is `unknown or invalid reader locale
+    // '{locale_id}'`: every emit site supplies the arg.
+    let config = Config::default().with_target(Target::HirRust);
+    let session = crate::driver::Session::new(config);
+    let source = "+++\nlocale = \"xx\"\n+++\n\nfunctio salve() { }";
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
+
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|d| d.code == Some("LOCALE003"))
+        .expect("LOCALE003 for an unknown frontmatter locale");
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "locale_id")
+            .map(|arg| arg.value.as_str()),
+        Some("xx")
+    );
+}
+
+#[test]
 fn compile_frontmatter_without_locale_falls_back_to_session() {
     let config = Config::default()
         .with_target(Target::HirRust)

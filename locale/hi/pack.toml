@@ -219,18 +219,6 @@ scrinium = "फ़्रेम"
 meus = "भेजना"
 tuus = "पाना"
 
-[diagnostics.UNRES001]
-message = "कीवर्ड '{keyword}' reader locale '{pack}' के लिए घोषित नहीं है"
-help = "इस व्याकरण स्थिति के लिए reader pack में घोषित कीवर्ड वर्तनी का उपयोग करें"
-
-[diagnostics.UNRES002]
-message = "इंट्रिंसिक '{intrinsic}' reader locale '{pack}' के लिए receiver family '{receiver}' पर घोषित नहीं है"
-help = "इस receiver family के लिए reader pack में घोषित इंट्रिंसिक वर्तनी का उपयोग करें"
-
-[diagnostics.UNRES003]
-message = "लाइब्रेरी सदस्य '{member}' identity '{identity}' के लिए reader locale '{pack}' में घोषित नहीं है"
-help = "इस लाइब्रेरी identity के लिए reader pack में घोषित सदस्य वर्तनी का उपयोग करें"
-
 [diagnostics.LOCALE002]
 message = "रीडर locale '{pack}' को keyword जैसी spelling '{spelling}' मिली"
 help = "यदि आप उस कीवर्ड का मतलब रखते हैं तो '{suggestion}' का उपयोग करें; '{spelling}' वैसा ही एक वैध नाम है"

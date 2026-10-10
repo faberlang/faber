@@ -6,10 +6,7 @@ use crate::diagnostics::is_known_diagnostic_code;
 use crate::lexer::{HOMOGLYPH_ISSUE, LexErrorKind};
 use crate::parser::ParseErrorKind;
 use crate::semantic::{SemanticErrorKind, WarningKind};
-use radix_diagnostics::{
-    DiagnosticArg, DiagnosticSpec, locale_suggestion_spec, locale_unknown_spec, unresolved_intrinsic_spec,
-    unresolved_keyword_spec, unresolved_library_member_spec,
-};
+use radix_diagnostics::{DiagnosticArg, DiagnosticSpec, locale_suggestion_spec, locale_unknown_spec};
 use radix_semantic::catalog::{arg_value, quote_arg};
 use radix_semantic::catalog_semantic::{semantic_help, semantic_spec};
 use radix_semantic::catalog_syntax::{lex_message, lex_spec, parse_message, parse_spec};
@@ -33,9 +30,6 @@ fn representative_codes_remain_stable() {
         semantic_spec(SemanticErrorKind::Warning(WarningKind::UnusedImport)).code,
         "WARN002"
     );
-    assert_eq!(unresolved_keyword_spec().code, "UNRES001");
-    assert_eq!(unresolved_intrinsic_spec().code, "UNRES002");
-    assert_eq!(unresolved_library_member_spec().code, "UNRES003");
     assert_eq!(locale_suggestion_spec().code, "LOCALE002");
 }
 
@@ -239,9 +233,6 @@ fn warning_codes_are_stable() {
 
 #[test]
 fn reader_codes_are_stable() {
-    assert_eq!(unresolved_keyword_spec().code, "UNRES001");
-    assert_eq!(unresolved_intrinsic_spec().code, "UNRES002");
-    assert_eq!(unresolved_library_member_spec().code, "UNRES003");
     assert_eq!(locale_suggestion_spec().code, "LOCALE002");
     assert_eq!(locale_unknown_spec().code, "LOCALE003");
 }
@@ -249,13 +240,7 @@ fn reader_codes_are_stable() {
 #[test]
 fn reader_codes_are_distinct() {
     // Each reader locale spec must have a unique code.
-    let codes = [
-        unresolved_keyword_spec().code,
-        unresolved_intrinsic_spec().code,
-        unresolved_library_member_spec().code,
-        locale_suggestion_spec().code,
-        locale_unknown_spec().code,
-    ];
+    let codes = [locale_suggestion_spec().code, locale_unknown_spec().code];
     let mut seen = std::collections::HashSet::new();
     for code in codes {
         assert!(seen.insert(code), "duplicate reader locale code {code}");
@@ -286,9 +271,9 @@ fn is_known_diagnostic_code_accepts_catalog_codes() {
     assert!(is_known_diagnostic_code("SEM004"));
     assert!(is_known_diagnostic_code("LEX001"));
     assert!(is_known_diagnostic_code("PARSE011"));
-    assert!(is_known_diagnostic_code("UNRES001"));
-    assert!(is_known_diagnostic_code("UNRES002"));
-    assert!(is_known_diagnostic_code("UNRES003"));
+    assert!(!is_known_diagnostic_code("UNRES001"));
+    assert!(!is_known_diagnostic_code("UNRES002"));
+    assert!(!is_known_diagnostic_code("UNRES003"));
 }
 
 #[test]

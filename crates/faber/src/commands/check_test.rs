@@ -48,3 +48,53 @@ entry = "main.fab"
         "an existing parent-relative package must not report ENOENT:\n{stderr}"
     );
 }
+
+/// A bodyless function in an `en` file (need, items 3 and 4).
+///
+/// Plain mode is terse by design for every coded diagnostic: code, location
+/// and source line, with no prose (the prose lives in the reader pack and
+/// shows under `--diagnostics`). The `--diagnostics` text names the `en`
+/// keyword `fn`, never the Latin `functio`.
+#[test]
+fn check_bodyless_function_in_en_file_plain_is_terse_and_diagnostics_prints_en_keyword() {
+    let root = tempfile::tempdir().expect("create check fixture root");
+    let file = root.path().join("bodyless.fab");
+    std::fs::write(
+        &file,
+        "+++\nlocale = \"en\"\n+++\nfn parse(string s) -> string\n",
+    )
+    .expect("write source");
+    let binary = super::format_test::faber_binary()
+        .canonicalize()
+        .expect("locate faber binary");
+
+    let plain = Command::new(&binary)
+        .args(["check"])
+        .arg(&file)
+        .output()
+        .expect("run faber check");
+    let plain = String::from_utf8_lossy(&plain.stderr);
+    assert!(
+        plain.contains("error[PARSE012]"),
+        "plain mode keeps the code header:\n{plain}"
+    );
+    assert!(
+        !plain.contains("expected function body"),
+        "plain mode is terse by design: no message prose:\n{plain}"
+    );
+
+    let expanded = Command::new(&binary)
+        .args(["check", "--diagnostics"])
+        .arg(&file)
+        .output()
+        .expect("run faber check --diagnostics");
+    let expanded = String::from_utf8_lossy(&expanded.stderr);
+    assert!(
+        expanded.contains("expected function body for 'fn' declaration"),
+        "--diagnostics names the en keyword:\n{expanded}"
+    );
+    assert!(
+        !expanded.contains("'functio'"),
+        "an en diagnostic must not print the Latin keyword:\n{expanded}"
+    );
+}
