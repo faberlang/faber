@@ -1279,11 +1279,11 @@ mod namespace_shadow_test;
 mod conditional_narrowing_test;
 
 #[cfg(test)]
-#[path = "diverging_guard_narrowing_test.rs"]
-mod diverging_guard_narrowing_test;
-#[cfg(test)]
 #[path = "compound_guard_narrowing_test.rs"]
 mod compound_guard_narrowing_test;
+#[cfg(test)]
+#[path = "diverging_guard_narrowing_test.rs"]
+mod diverging_guard_narrowing_test;
 #[cfg(test)]
 #[path = "member_privacy_test.rs"]
 mod member_privacy_test;
