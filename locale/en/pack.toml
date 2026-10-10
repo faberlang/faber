@@ -4813,6 +4813,14 @@ help = "use only constructs the build-time runner supports"
 message = "`{praefixum}` initializer of `{name}` reaches `{callee}`, an import that build-time evaluation does not run in this analysis"
 help = "evaluation follows calls into other modules of a package: move the computation into this module, or analyze the package"
 
+[diagnostics.SEM065]
+message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
+help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
+help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
+
 [diagnostics.WARN001]
 message = "unused variable"
 help = "remove the variable or prefix it with '_'"

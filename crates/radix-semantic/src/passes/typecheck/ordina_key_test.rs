@@ -77,7 +77,7 @@ fn ordinata_key_retirement_is_the_only_diagnostic() {
 #[test]
 fn ordina_key_sorts_varia_receiver_in_place() {
     accepts(&compile(&with_persona(
-        "    varia lista<Persona> m ← ps\n    m.ordina(Persona p ∴ p.nomen)\n    nota m.longitudo()",
+        "    varia lista<Persona> m ← copy ps\n    m.ordina(Persona p ∴ p.nomen)\n    nota m.longitudo()",
     )));
 }
 
@@ -85,7 +85,7 @@ fn ordina_key_sorts_varia_receiver_in_place() {
 fn ordina_genus_key_rejects() {
     rejects_with_issue(
         &compile(&with_persona(
-            "    varia lista<Persona> m ← ps\n    m.ordina(Persona p ∴ p)\n    nota m.longitudo()",
+            "    varia lista<Persona> m ← copy ps\n    m.ordina(Persona p ∴ p)\n    nota m.longitudo()",
         )),
         "ordina_key_not_ordered",
     );

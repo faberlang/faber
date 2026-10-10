@@ -3159,6 +3159,14 @@ help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions
 message = "@ radix lane \"{lane}\" 拒绝此函数体：`tacet` 不在 v1 AIR subset 之内"
 help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
 
+[diagnostics.SEM065]
+message = "`{name}` 会把只读值 `{binding}` 共享为可写名称（`{fixum}` 是深层的）"
+help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{varia} {name} ← {own} {binding}` 接管它"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` 会把只读值 `{binding}` 共享为可写名称（`{fixum}` 是深层的）"
+help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{varia} {name} ← {own} {binding}` 接管它"
+
 [diagnostics.WARN001]
 message = "未使用变量"
 help = "删除该变量，或加 '_' 前缀"

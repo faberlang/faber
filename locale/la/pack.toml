@@ -4390,6 +4390,14 @@ help = "use only constructs the build-time runner supports"
 message = "`{praefixum}` initializer of `{name}` reaches `{callee}`, an import that build-time evaluation does not run in this analysis"
 help = "evaluation follows calls into other modules of a package: move the computation into this module, or analyze the package"
 
+[diagnostics.SEM065]
+message = "`{name}` communicaret `{binding}`, valorem legendi tantum, ut nomen scribile (`{fixum}` est profundum)"
+help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, aut `{varia} {name} ← {own} {binding}` ut eum suscipias"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` communicaret `{binding}`, valorem legendi tantum, ut nomen scribile (`{fixum}` est profundum)"
+help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, aut `{varia} {name} ← {own} {binding}` ut eum suscipias"
+
 [diagnostics.WARN001]
 message = "unused variable"
 help = "remove the variable or prefix it with '_'"

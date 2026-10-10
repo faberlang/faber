@@ -35,6 +35,7 @@ const ISSUE_AWAIT_FAILABLE_REQUIRES_ALTERNATE_EXIT: &str = "await_failable_requi
 const ISSUE_AWAIT_FAILABLE_ALTERNATE_TYPE_MISMATCH: &str = "await_failable_alternate_type_mismatch";
 const ISSUE_INCOMPATIBLE_RETURN_TYPES: &str = "incompatible_return_types";
 const ISSUE_RETURN_TYPE_MISMATCH: &str = "return_type_mismatch";
+const ISSUE_CONST_SHARED_INTO_VAR: &str = "const_shared_into_var";
 
 impl TypeChecker<'_> {
     /// Validate a `redde` statement against the current normal return contract.
@@ -235,10 +236,80 @@ impl TypeChecker<'_> {
             .init
             .as_ref()
             .is_some_and(|init| self.is_provably_single_scalar_text(init));
+        self.reject_read_only_share_into_var(local, inferred);
         self.record_binding_name(local.def_id, local.name);
         self.insert_binding_with_scalar(local.def_id, inferred, scalar_text, local.mutable);
         if !local.mutable {
             self.const_locals.insert(local.def_id);
+        }
+    }
+
+    /// `const` is deep (need, rule 2): a plain `var T y ← x` of a
+    /// shareable (container or genus) value read through a `const` local
+    /// would make `y` a writable name for state `x` promises not to change.
+    /// The legal spellings are `← copy x` (an independent value) and
+    /// `← own x` (take it over); scalars copy by value and stay legal.
+    ///
+    /// A `ref` parameter source is not rejected here: the borrow pass already
+    /// tracks the alias and refuses its mutation (SEM056).
+    fn reject_read_only_share_into_var(&mut self, local: &HirLocal, slot_ty: TypeId) {
+        if !local.mutable {
+            return;
+        }
+        let Some(init) = local.init.as_ref() else {
+            return;
+        };
+        let resolved = self.resolve_inferred_type(slot_ty);
+        let (marker, payload) = self.types.peel_access_marker(resolved);
+        // `copy`/`own` are the legal spellings; `mut`/`ref` views are the
+        // borrow pass's rules.
+        if marker.is_some() || !self.is_shareable_payload(payload) {
+            return;
+        }
+        let Some(root) = Self::place_root(init) else {
+            return;
+        };
+        if !self.const_locals.contains(&root) {
+            return;
+        }
+        let name_of = |checker: &Self, symbol: Option<Symbol>| {
+            symbol
+                .and_then(|symbol| checker.interner.map(|interner| interner.resolve(symbol)))
+                .unwrap_or("value")
+                .to_owned()
+        };
+        let binding = name_of(self, self.binding_names.get(&root).copied());
+        let name = name_of(self, Some(local.name));
+        self.error_issue_with_args(
+            SemanticErrorKind::ConstSharedIntoVar,
+            ISSUE_CONST_SHARED_INTO_VAR,
+            init.span,
+            &[("binding", binding), ("name", name)],
+        );
+    }
+
+    /// A container or genus instance: a value a plain bind shares rather than
+    /// copies.
+    fn is_shareable_payload(&self, ty: TypeId) -> bool {
+        let ty = self.resolve_inferred_type(ty);
+        if self.types.is_aliasing_container_through_option(ty) {
+            return true;
+        }
+        match self.types.get(ty) {
+            Type::Struct(_) | Type::Interface(_) => true,
+            Type::Option(inner) | Type::Alias(_, inner) => self.is_shareable_payload(*inner),
+            _ => false,
+        }
+    }
+
+    /// The local at the root of a path/field/index/deref chain.
+    fn place_root(expr: &HirExpression) -> Option<radix_hir::DefId> {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => Some(*def_id),
+            HirExpressionKind::Field(object, _)
+            | HirExpressionKind::Index(object, _)
+            | HirExpressionKind::Deref(object) => Self::place_root(object),
+            _ => None,
         }
     }
 

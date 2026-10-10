@@ -117,6 +117,9 @@ mod fieldless_type_access_test;
 #[path = "loop_shape_test.rs"]
 mod loop_shape_test;
 #[cfg(test)]
+#[path = "const_share_into_var_test.rs"]
+mod const_share_into_var_test;
+#[cfg(test)]
 #[path = "mutating_intrinsic_test.rs"]
 mod mutating_intrinsic_test;
 #[cfg(test)]

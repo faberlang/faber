@@ -3171,6 +3171,14 @@ help = "v1 AIR subset को pure रखें: immutable locals, pure expressio
 message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `tacet` v1 AIR subset के बाहर है"
 help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
 
+[diagnostics.SEM065]
+message = "`{name}` केवल-पठन मान `{binding}` को लिखने योग्य नाम के रूप में साझा करेगा (`{fixum}` गहरा है)"
+help = "स्वतंत्र मान के लिए `{varia} {name} ← {copy} {binding}` लिखें, या उसे अपने अधीन लेने के लिए `{varia} {name} ← {own} {binding}`"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` केवल-पठन मान `{binding}` को लिखने योग्य नाम के रूप में साझा करेगा (`{fixum}` गहरा है)"
+help = "स्वतंत्र मान के लिए `{varia} {name} ← {copy} {binding}` लिखें, या उसे अपने अधीन लेने के लिए `{varia} {name} ← {own} {binding}`"
+
 [diagnostics.WARN001]
 message = "अप्रयुक्त variable"
 help = "variable हटाएँ या उसके आगे '_' लगाएँ"

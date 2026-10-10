@@ -3159,6 +3159,14 @@ help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و A
 message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: `{tacet}` خارج v1 AIR subset"
 help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
 
+[diagnostics.SEM065]
+message = "`{name}` سيشارك `{binding}`، وهو قيمة للقراءة فقط، كاسم قابل للكتابة (`{fixum}` عميق)"
+help = "اكتب `{varia} {name} ← {copy} {binding}` لقيمة مستقلة، أو `{varia} {name} ← {own} {binding}` لتولّي ملكيتها"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` سيشارك `{binding}`، وهو قيمة للقراءة فقط، كاسم قابل للكتابة (`{fixum}` عميق)"
+help = "اكتب `{varia} {name} ← {copy} {binding}` لقيمة مستقلة، أو `{varia} {name} ← {own} {binding}` لتولّي ملكيتها"
+
 [diagnostics.WARN001]
 message = "متغير غير مستخدم"
 help = "أزل المتغير أو ابدأه بـ '_'"

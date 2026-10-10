@@ -3159,6 +3159,14 @@ help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu t
 message = "@ radix lane \"{lane}\" từ chối thân hàm này: `tacet` nằm ngoài tập con AIR v1"
 help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
 
+[diagnostics.SEM065]
+message = "`{name}` sẽ chia sẻ `{binding}`, một giá trị chỉ đọc, dưới dạng tên có thể ghi (`{fixum}` là sâu)"
+help = "viết `{varia} {name} ← {copy} {binding}` để có giá trị độc lập, hoặc `{varia} {name} ← {own} {binding}` để tiếp quản nó"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` sẽ chia sẻ `{binding}`, một giá trị chỉ đọc, dưới dạng tên có thể ghi (`{fixum}` là sâu)"
+help = "viết `{varia} {name} ← {copy} {binding}` để có giá trị độc lập, hoặc `{varia} {name} ← {own} {binding}` để tiếp quản nó"
+
 [diagnostics.WARN001]
 message = "biến không được sử dụng"
 help = "xóa biến hoặc thêm tiền tố '_' vào biến"

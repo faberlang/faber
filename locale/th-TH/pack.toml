@@ -3171,6 +3171,14 @@ help = "รักษาเซตย่อย AIR v1 ให้บริสุท�
 message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: `tacet` อยู่นอกเซตย่อย AIR v1"
 help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
 
+[diagnostics.SEM065]
+message = "`{name}` จะแชร์ `{binding}` ซึ่งเป็นค่าแบบอ่านอย่างเดียว เป็นชื่อที่เขียนได้ (`{fixum}` ลึก)"
+help = "เขียน `{varia} {name} ← {copy} {binding}` เพื่อได้ค่าอิสระ หรือ `{varia} {name} ← {own} {binding}` เพื่อรับช่วงต่อ"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` จะแชร์ `{binding}` ซึ่งเป็นค่าแบบอ่านอย่างเดียว เป็นชื่อที่เขียนได้ (`{fixum}` ลึก)"
+help = "เขียน `{varia} {name} ← {copy} {binding}` เพื่อได้ค่าอิสระ หรือ `{varia} {name} ← {own} {binding}` เพื่อรับช่วงต่อ"
+
 [diagnostics.WARN001]
 message = "ตัวแปรไม่ได้ใช้"
 help = "ลบตัวแปรหรือเติม '_' นำหน้า"

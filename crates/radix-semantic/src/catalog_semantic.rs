@@ -58,6 +58,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::AssignToImmutableBorrow,
     SemanticErrorKind::ModeMismatch,
     SemanticErrorKind::TopLevelBindingForbidden,
+    SemanticErrorKind::ConstSharedIntoVar,
 ];
 
 pub(crate) const WARNING_KINDS: &[WarningKind] = &[
@@ -288,6 +289,10 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
             help: Some(
                 "a module-level value is a compile-time constant: `fixum T X = …`; a runtime value belongs in a function",
             ),
+        },
+        SemanticErrorKind::ConstSharedIntoVar => DiagnosticSpec {
+            code: "SEM065",
+            help: Some("write `← copy x` for an independent value, or `← own x` to take it over"),
         },
         SemanticErrorKind::Warning(kind) => warning_spec(kind),
     }
