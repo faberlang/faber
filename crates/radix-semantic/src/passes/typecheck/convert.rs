@@ -3255,8 +3255,16 @@ impl TypeChecker<'_> {
             self.types.get(effective_target),
             Type::Array(_) | Type::BoundedArray { .. }
         );
+        // WHY: a list literal ascribed to a list whose slot is optional
+        // (`[null, 1] ∷ list<int ∪ none>`) must be typed against that slot
+        // exactly as a declaration cell types it; without the expected type
+        // the bare literal joins `none` with `int` and fails SEM010.
+        let optional_slot_list_source = list_target
+            && matches!(&source.kind, HirExpressionKind::Array(_))
+            && self.list_slot_carries_optional(effective_target);
         let source_expected =
-            (constructor_source || (empty_list_source && list_target)).then_some(effective_target);
+            (constructor_source || (empty_list_source && list_target) || optional_slot_list_source)
+                .then_some(effective_target);
         let source_ty = if matches!(
             self.types.get(effective_target),
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(_, _)
@@ -3492,16 +3500,39 @@ impl TypeChecker<'_> {
         self.types.intern(Type::Applied(base_ty, witnesses))
     }
 
+    /// True when `ty` is a list whose element slot is optional, directly or
+    /// through nested lists (`list<int ∪ none>`, `list<list<int ∪ none>>`).
+    fn list_slot_carries_optional(&self, ty: TypeId) -> bool {
+        match self.types.get(self.resolve_inferred_type(ty)) {
+            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                self.slot_carries_optional(*elem)
+            }
+            _ => false,
+        }
+    }
+
+    fn slot_carries_optional(&self, slot: TypeId) -> bool {
+        let slot = self.resolve_inferred_type(slot);
+        matches!(self.types.get(slot), Type::Option(_)) || self.list_slot_carries_optional(slot)
+    }
+
     fn check_verte_array_target(&mut self, source: &mut HirExpression, elem_ty: TypeId) {
         let HirExpressionKind::Array(elements) = &mut source.kind else {
             self.check_expr(source);
             return;
         };
 
+        let optional_slot = self.slot_carries_optional(elem_ty);
         for element in elements {
             match element {
                 HirArrayElement::Expr(expr) => {
-                    let element_ty = self.check_expr(expr);
+                    // WHY: an optional (or nested optional) slot types its
+                    // element literals against the slot, as a declaration does.
+                    let element_ty = if optional_slot {
+                        self.check_expr_with_expected(expr, Some(elem_ty))
+                    } else {
+                        self.check_expr(expr)
+                    };
                     self.unify_join(
                         element_ty,
                         elem_ty,

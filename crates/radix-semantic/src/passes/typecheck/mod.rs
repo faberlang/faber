@@ -1153,6 +1153,10 @@ mod lista_operator_test;
 mod convert_test;
 
 #[cfg(test)]
+#[path = "ascription_optional_slot_test.rs"]
+mod ascription_optional_slot_test;
+
+#[cfg(test)]
 #[path = "element_relaxation_test.rs"]
 mod element_relaxation_test;
 
