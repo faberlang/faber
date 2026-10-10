@@ -3456,10 +3456,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             total_loss += row_loss;
         }
-        // Normalize by N = last_dim (class count), not by batch size.
-        // For rank-1 shape [C]: N = C, batch = 1.
-        // For rank-2 shape [B, C]: N = C, batch = B.
-        Ok(Value::Float(total_loss / last_dim as f64))
+        // Mean over the batch rows (ruling XENTDIV, 2026-10-08), not over classes.
+        // For rank-1 shape [C]: batch = 1.
+        // For rank-2 shape [B, C]: batch = B.
+        Ok(Value::Float(total_loss / batch as f64))
     }
 
     /// Matrix multiply / GEMV over runner `Value` tensors.

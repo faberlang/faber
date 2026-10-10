@@ -1601,15 +1601,72 @@ fn tensor_crux_entropia_rank2() {
     // --- 6. Verify ---
     // softmax row0 = [0.6652, 0.2447, 0.0900], row1 = [0.2119, 0.5761, 0.2119]
     // CE: row0 = -log(0.6652+ε) ≈ 0.4076, row1 = -log(0.5761+ε) ≈ 0.5514
-    // Loss = (0.4076 + 0.5514) / 3 ≈ 0.3197
+    // Loss = (0.4076 + 0.5514) / 2 (batch rows) ≈ 0.4795
     let Value::Float(loss) = result else {
         panic!("expected float loss, got {result:?}");
     };
-    let expected = 0.3197_f64;
+    let expected = 0.4795_f64;
     let diff = (loss - expected).abs();
     assert!(
         diff < 1e-3,
         "crux_entropia loss: actual={loss}, expected={expected}, diff={diff:.6e}"
+    );
+}
+
+/// XENTDIV: the loss is the sum over rows divided by the batch row count.
+/// Uniform logits over [2, 3] give a per-row loss of ln 3, so the mean is
+/// ln 3 (about 1.0986); dividing the sum by the class count 3 would give
+/// 2 ln 3 / 3 (about 0.7324).
+#[test]
+fn tensor_crux_entropia_rank2_divides_by_batch_rows() {
+    use crate::Value;
+    use crate::host::BufferHost;
+    use crate::value::TensorValue;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let tensor = |values: [f64; 6]| {
+        Value::Tensor(Rc::new(RefCell::new(TensorValue::contiguous(
+            values.into_iter().map(Value::Float).collect(),
+            vec![2, 3],
+        ))))
+    };
+    let logits_tensor = tensor([0.0; 6]);
+    let targets_tensor = tensor([1.0, 0.0, 0.0, 0.0, 0.0, 1.0]);
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    let frame = runner.frames.last_mut().unwrap();
+    frame.values.insert(MirValueId(0), logits_tensor);
+    frame.values.insert(MirValueId(1), targets_tensor);
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorCruxEntropia),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    let result = runner
+        .eval_runtime_call(&call, radix_lexer::Span::default())
+        .expect("crux_entropia dispatch should succeed");
+    let Value::Float(loss) = result else {
+        panic!("expected float loss, got {result:?}");
+    };
+    let expected = 3.0_f64.ln();
+    assert!(
+        (loss - expected).abs() < 1e-5,
+        "crux_entropia loss: actual={loss}, expected={expected}"
     );
 }
 
