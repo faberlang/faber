@@ -201,3 +201,74 @@ fn text_get_negative_index_is_nil() {
     assert_eq!(index("hé", 1, optional_textus), Value::Str("é".to_owned()));
     assert_eq!(index("hé", -1, optional_textus), Value::Nil);
 }
+
+/// `s[lo‥hi step n]`: the interval carrier with the step as a fourth part.
+fn stepped_text_range(text: &str, lo: i64, hi: i64, step: i64) -> Result<Value, RunnerError> {
+    eval_collection(
+        MirCollectionOp::Index,
+        vec![
+            Value::Str(text.to_owned()),
+            Value::Tuple(vec![
+                Value::Int(lo),
+                Value::Int(hi),
+                Value::Bool(false),
+                Value::Int(step),
+            ]),
+        ],
+        textus,
+    )
+}
+
+#[test]
+fn stepped_text_range_takes_every_nth_scalar() {
+    assert_eq!(
+        stepped_text_range("abcdef", 0, 6, 2).expect("stepped window"),
+        Value::Str("ace".to_owned())
+    );
+    assert_eq!(
+        stepped_text_range("héllo", 1, 5, 3).expect("stepped non-ASCII window"),
+        Value::Str("éo".to_owned())
+    );
+}
+
+#[test]
+fn stepped_text_range_past_the_end_dies() {
+    let error = stepped_text_range("abcdef", 0, 9, 2).expect_err("a range past the end must die");
+    assert_eq!(error.issue, "runner_text_range_out_of_bounds");
+}
+
+#[test]
+fn stepped_text_range_non_positive_step_dies() {
+    for step in [0, -1] {
+        let error =
+            stepped_text_range("abcdef", 0, 6, step).expect_err("a non-positive step must die");
+        assert_eq!(error.issue, "runner_range_step_not_positive");
+    }
+}
+
+#[test]
+fn stepped_list_range_takes_every_nth_element() {
+    let list = |items: &[i64]| {
+        Value::Array(std::rc::Rc::new(std::cell::RefCell::new(
+            items.iter().map(|n| Value::Int(*n)).collect(),
+        )))
+    };
+    let result = eval_collection(
+        MirCollectionOp::Index,
+        vec![
+            list(&[10, 11, 12, 13, 14, 15]),
+            Value::Tuple(vec![
+                Value::Int(1),
+                Value::Int(6),
+                Value::Bool(false),
+                Value::Int(2),
+            ]),
+        ],
+        |types| {
+            let int = types.primitive(Primitive::Numerus);
+            types.array(int)
+        },
+    )
+    .expect("stepped list window");
+    assert_eq!(result, list(&[11, 13, 15]));
+}

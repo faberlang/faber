@@ -36,17 +36,16 @@ impl FunctionBuilder<'_> {
         kind: HirRangeKind,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        if step.is_some() {
-            self.errors.push(MirError::unsupported(
-                expr.span,
-                "stepped interval value before interval MIR lowering",
-            ));
-            return None;
-        }
-        let fields = vec![
+        // A step is a positive stride over a window (`xs[a‥b per n]`): it rides
+        // as an optional third operand, checked positive where the window is
+        // read.
+        let mut fields = vec![
             MirAggregateItem::Operand(self.lower_expr_value(start)?),
             MirAggregateItem::Operand(self.lower_expr_value(end)?),
         ];
+        if let Some(step) = step {
+            fields.push(MirAggregateItem::Operand(self.lower_expr_value(step)?));
+        }
         let ty = self.expr_ty(expr)?;
         Some(self.construct_temp(
             MirAggregateKind::Interval { inclusive: matches!(kind, HirRangeKind::Inclusive) },

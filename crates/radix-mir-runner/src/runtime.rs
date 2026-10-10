@@ -683,12 +683,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 tensor_value_typed(self.types, vec![zero; count], Some(*element), shape, span)
             }
             MirAggregateKind::Interval { inclusive } => {
-                let [start, end] = self
-                    .eval_ordered_fields(&aggregate.fields, span)?
-                    .try_into()
-                    .map_err(|_| {
-                        RunnerError::internal(span, "interval construct requires two bounds")
-                    })?;
+                let mut bounds = self.eval_ordered_fields(&aggregate.fields, span)?;
+                let step = if bounds.len() == 3 {
+                    bounds.pop()
+                } else {
+                    None
+                };
+                let [start, end] = bounds.try_into().map_err(|_| {
+                    RunnerError::internal(span, "interval construct requires two bounds")
+                })?;
                 // F-082: reject reversed bounds (start > end) — an interval must
                 // be monotonic so every materialized element is reachable.
                 let reversed = match (&start, &end) {
@@ -709,7 +712,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         "interval bounds must be monotonic (start ≤ end)",
                     ));
                 }
-                Ok(interval_value(start, end, inclusive))
+                let mut interval = interval_value(start, end, inclusive);
+                if let (Value::Tuple(parts), Some(step)) = (&mut interval, step) {
+                    parts.push(step);
+                }
+                Ok(interval)
             }
             MirAggregateKind::Vector => {
                 let Type::Vector(_, width) = self.types.get(aggregate.ty.semantic_id()) else {
@@ -1246,7 +1253,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             items.len(),
                         ));
                     }
-                    return Ok(array_value(items[start..end].to_vec()));
+                    let step = window_step(&index, span)?;
+                    return Ok(array_value(
+                        items[start..end].iter().step_by(step).cloned().collect(),
+                    ));
                 }
                 let item = if matches!(self.types.get(return_ty.semantic_id()), Type::Option(_)) {
                     Self::optional_collection_index(receiver, &index, span)?
@@ -4340,7 +4350,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             bytes.len(),
                         ));
                     }
-                    return Ok(Value::Octeti(bytes[start..end].to_vec()));
+                    let step = window_step(index, span)?;
+                    return Ok(Value::Octeti(
+                        bytes[start..end].iter().step_by(step).copied().collect(),
+                    ));
                 }
                 let idx = index.as_index(span)?;
                 let items = cell.borrow();
@@ -4396,7 +4409,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             len,
                         ));
                     }
-                    let window: String = text.chars().skip(start).take(end - start).collect();
+                    let step = window_step(index, span)?;
+                    let window: String = text
+                        .chars()
+                        .skip(start)
+                        .take(end - start)
+                        .step_by(step)
+                        .collect();
                     return Ok(Value::Str(window));
                 }
                 let idx = index.as_index(span)?;
@@ -4427,7 +4446,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             bytes.len(),
                         ));
                     }
-                    return Ok(Value::Octeti(bytes[start..end].to_vec()));
+                    let step = window_step(index, span)?;
+                    return Ok(Value::Octeti(
+                        bytes[start..end].iter().step_by(step).copied().collect(),
+                    ));
                 }
                 let idx = index.as_index(span)?;
                 bytes
@@ -5652,10 +5674,36 @@ fn window_interval(value: &Value) -> Option<(Value, Value, bool)> {
     let Value::Tuple(parts) = value else {
         return None;
     };
-    let [start, end, Value::Bool(inclusive)] = parts.as_slice() else {
+    // A stepped window carries its step as a fourth part (`window_step`).
+    let ([start, end, Value::Bool(inclusive)] | [start, end, Value::Bool(inclusive), _]) =
+        parts.as_slice()
+    else {
         return None;
     };
     Some((start.clone(), end.clone(), *inclusive))
+}
+
+/// The positive stride of a range index: `1` for an unstepped window, the
+/// `per` step of `s[a‥b per n]` otherwise. A zero or negative step dies.
+fn window_step(index: &Value, span: Span) -> Result<usize, RunnerError> {
+    let Value::Tuple(parts) = index else {
+        return Ok(1);
+    };
+    let Some(step) = parts.get(3) else {
+        return Ok(1);
+    };
+    let positive = match step {
+        Value::Int(step) => usize::try_from(*step).ok().filter(|step| *step > 0),
+        Value::UInt(step) => usize::try_from(*step).ok().filter(|step| *step > 0),
+        _ => None,
+    };
+    positive.ok_or_else(|| {
+        RunnerError::internal_with_issue(
+            span,
+            "range step must be positive",
+            "runner_range_step_not_positive",
+        )
+    })
 }
 
 /// The `[start, end)` window a range index selects, or `None` when `index`

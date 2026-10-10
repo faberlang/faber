@@ -86,10 +86,15 @@ impl Validator<'_, '_> {
                     return;
                 };
                 let element = MirType::semantic(*element);
-                if items.len() != 2 {
-                    self.error(span, "interval aggregate requires two bounds");
+                if !matches!(items.len(), 2 | 3) {
+                    self.error(
+                        span,
+                        "interval aggregate requires two bounds and an optional step",
+                    );
                 }
-                for item in items {
+                // The optional third operand is a window step; it is numeric,
+                // not an element of the interval.
+                for item in items.iter().take(2) {
                     let MirAggregateItem::Operand(bound) = item else {
                         self.error(span, "interval aggregate bound cannot spread");
                         continue;
