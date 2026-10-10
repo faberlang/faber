@@ -725,6 +725,7 @@ impl Validator<'_, '_> {
             Type::Primitive(_)
             | Type::SizedNumeric(_, _)
             | Type::ModularWord(_)
+            | Type::Bits(_)
             | Type::SaturatingWord(_)
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_)

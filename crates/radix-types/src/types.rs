@@ -36,7 +36,7 @@
 use crate::DefId;
 use crate::index::{IndexExpr, IndexId};
 use crate::instans_precision::{InstansPrecision, is_instans_assignable};
-use crate::numeric_width::{NumericWidth, is_numeric_assignable};
+use crate::numeric_width::{BitsWidth, NumericWidth, is_numeric_assignable};
 use radix_lexer::Symbol as LexSymbol;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -530,6 +530,7 @@ impl TypeTable {
                 | Type::BoundedAscii { .. }
                 | Type::BoundedOcteti { .. }
                 | Type::SizedNumeric(_, _)
+                | Type::Bits(_)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
                 | Type::PolicyFloat(_, _)
@@ -833,6 +834,7 @@ impl TypeTable {
                     | Primitive::Instans
             ),
             Type::SizedNumeric(_, _)
+            | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
             | Type::PolicyFloat(_, _)
@@ -1035,6 +1037,11 @@ impl TypeTable {
         self.intern(Type::SizedNumeric(prim, width))
     }
 
+    /// Allocate a raw-bits `bN` type.
+    pub fn bits(&mut self, width: BitsWidth) -> TypeId {
+        self.intern(Type::Bits(width))
+    }
+
     /// Allocate `instans<N>` with an explicit precision marker.
     pub fn sized_instans(&mut self, precision: InstansPrecision) -> TypeId {
         self.intern(Type::SizedInstans(precision))
@@ -1130,6 +1137,7 @@ impl TypeTable {
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U8)
             ),
             (Type::SizedNumeric(pa, aw), Type::SizedNumeric(pb, bw)) => pa == pb && aw == bw,
+            (Type::Bits(aw), Type::Bits(bw)) => aw == bw,
             (Type::ModularWord(aw), Type::ModularWord(bw))
             | (Type::SaturatingWord(aw), Type::SaturatingWord(bw)) => aw == bw,
             (Type::PolicyFloat(ap, aw), Type::PolicyFloat(bp, bw)) => ap == bp && aw == bw,
@@ -1831,6 +1839,10 @@ pub enum Type {
     /// Sized `numerus<W>` or `fractus<W>` primitive.
     SizedNumeric(Primitive, NumericWidth),
 
+    /// Raw bits `b8` / `b16` / `b32` / `b64`: not a number, no widening to or
+    /// from any numeric type or other width. Equal only to the same width.
+    Bits(BitsWidth),
+
     /// Fixed-width unsigned modular word. The first supported width is `u32`.
     ModularWord(NumericWidth),
 
@@ -1951,6 +1963,7 @@ impl Hash for Type {
                 p.hash(state);
                 w.hash(state);
             }
+            Self::Bits(w) => w.hash(state),
             Self::ModularWord(w) | Self::SaturatingWord(w) => w.hash(state),
             Self::PolicyFloat(policy, w) => {
                 policy.hash(state);
@@ -2545,6 +2558,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         Type::Primitive(_)
         | Type::TensorEdgePolicy(_)
         | Type::SizedNumeric(_, _)
+        | Type::Bits(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
         | Type::PolicyFloat(_, _)

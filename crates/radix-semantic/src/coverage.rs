@@ -375,6 +375,7 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
     match ty {
         Type::Primitive(_)
         | Type::SizedNumeric(_, _)
+        | Type::Bits(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
         | Type::PolicyFloat(_, _)

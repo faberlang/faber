@@ -541,6 +541,7 @@ fn type_contains_param(
         | Type::BoundedAscii { .. }
         | Type::BoundedOcteti { .. }
         | Type::SizedNumeric(_, _)
+        | Type::Bits(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
         | Type::PolicyFloat(_, _)

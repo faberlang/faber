@@ -158,3 +158,30 @@ fn tensor_element_conversio_rejects_cross_family_sized_pair() {
     assert!(!super::tensor_element_conversio_allowed(&types, i64, u8));
     assert!(!super::tensor_element_conversio_allowed(&types, i32, f32));
 }
+
+#[test]
+fn bits_markers_resolve_as_bare_markers_and_stay_apart_from_numbers() {
+    use crate::test_support::{analyze_ok, analyze_source};
+    for marker in ["b8", "b16", "b32", "b64"] {
+        assert!(
+            is_numeric_width_type_sugar(marker),
+            "{marker} is bare marker sugar"
+        );
+        analyze_ok(&format!(
+            "functio f({marker} x) → {marker} {{\n    redde x\n}}\n"
+        ));
+    }
+    // Bits are not numbers and widths do not mix: no implicit edge either way.
+    for (param, ret) in [("b8", "u8"), ("u8", "b8"), ("b8", "b16"), ("b64", "i64")] {
+        let result = analyze_source(&format!(
+            "functio f({param} x) → {ret} {{\n    redde x\n}}\n"
+        ));
+        assert!(
+            !result.is_ok(),
+            "{param} must not convert to {ret} implicitly"
+        );
+    }
+    // Prefix sugar families do not extend to bits.
+    assert!(!is_numeric_width_type_sugar("tb8"));
+    assert!(standalone_width_type("b8").is_none());
+}

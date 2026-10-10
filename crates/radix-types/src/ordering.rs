@@ -57,6 +57,8 @@ pub fn ordering_kind(
         Type::SizedNumeric(Primitive::Numerus, width) if !width.is_decimal() => {
             Some(OrderingKind::Integer)
         }
+        // Bits order by bit pattern read as unsigned (ruling B2).
+        Type::Bits(_) => Some(OrderingKind::Integer),
         Type::Primitive(Primitive::Fractus) => Some(OrderingKind::Float),
         Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32 | NumericWidth::F64) => {
             Some(OrderingKind::Float)

@@ -6,7 +6,9 @@
 //! backend spells that carrier.
 
 use crate::{MirLayoutId, MirType};
-use radix_types::{IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_types::{
+    BitsWidth, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
@@ -619,6 +621,8 @@ fn layout_kind_for_type(
         // named arm or errors loudly; nothing reaches `OpaqueHandle` silently.
         Type::SizedNumeric(prim, width) => sized_numeric_layout(*prim, *width),
         Type::ModularWord(width) | Type::SaturatingWord(width) => int_layout(*width),
+        // A bN is an unsigned N-bit scalar with the size and alignment of uN.
+        Type::Bits(width) => bits_layout(*width),
         // N7E-3 (D2): a policy-float cell has the layout of the bare float of
         // its width; the policy only matters where a value is stored.
         Type::PolicyFloat(_, width) => sized_numeric_layout(Primitive::Fractus, *width),
@@ -1068,6 +1072,15 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
         }
     };
     LayoutResolution::Resolved(MirLayoutKind::Scalar(scalar))
+}
+
+fn bits_layout(width: BitsWidth) -> LayoutResolution {
+    LayoutResolution::Resolved(MirLayoutKind::Scalar(match width {
+        BitsWidth::B8 => MirScalarLayout::U8,
+        BitsWidth::B16 => MirScalarLayout::U16,
+        BitsWidth::B32 => MirScalarLayout::U32,
+        BitsWidth::B64 => MirScalarLayout::U64,
+    }))
 }
 
 fn int_layout(width: NumericWidth) -> LayoutResolution {

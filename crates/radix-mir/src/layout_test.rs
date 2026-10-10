@@ -126,9 +126,10 @@ fn intended_bucket(ty: &Type) -> Bucket {
             | Primitive::Valor
             | Primitive::Instans,
         ) => Bucket::OpaqueHandle,
-        Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SaturatingWord(_) => {
-            Bucket::Physical
-        }
+        Type::SizedNumeric(_, _)
+        | Type::ModularWord(_)
+        | Type::Bits(_)
+        | Type::SaturatingWord(_) => Bucket::Physical,
         // MLC-4: `sparsa` with a scalar element and resolvable figura rank
         // resolves a sparse-marker `DeviceView` row.
         Type::Tensor(_, _)

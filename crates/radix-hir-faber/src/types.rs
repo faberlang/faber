@@ -163,6 +163,9 @@ impl super::FaberCodegen<'_> {
                 width.faber_marker()
             ),
 
+            // A bare, locale-neutral marker like `u8`.
+            Type::Bits(width) => width.faber_marker().to_owned(),
+
             Type::SaturatingWord(width) => format!(
                 "{}<{}>",
                 surface.type_surface(TypeBindingKind::SaturatingWord),
@@ -626,6 +629,10 @@ impl super::FaberCodegen<'_> {
                     surface.type_surface(TypeBindingKind::Primitive(Primitive::Instans)),
                     precision.faber_marker()
                 ))
+            }
+            Type::Bits(width) => {
+                Self::expect_no_form_args(form)?;
+                Ok(width.faber_marker().to_owned())
             }
             Type::ModularWord(width) => {
                 Self::expect_no_form_args(form)?;

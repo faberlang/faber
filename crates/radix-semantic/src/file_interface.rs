@@ -356,6 +356,7 @@ pub enum InterfaceTypeSnapshot {
     Atomic(Box<InterfaceTypeSnapshot>),
     Intervallum(Box<InterfaceTypeSnapshot>),
     SizedNumeric(Primitive, NumericWidth),
+    Bits(radix_types::BitsWidth),
     ModularWord(NumericWidth),
     SaturatingWord(NumericWidth),
     PolicyFloat(FloatPolicy, NumericWidth),
@@ -857,6 +858,7 @@ fn snapshot_interface_type_inner(
         Type::SizedNumeric(primitive, width) => {
             Ok(InterfaceTypeSnapshot::SizedNumeric(*primitive, *width))
         }
+        Type::Bits(width) => Ok(InterfaceTypeSnapshot::Bits(*width)),
         Type::ModularWord(width) => Ok(InterfaceTypeSnapshot::ModularWord(*width)),
         Type::SaturatingWord(width) => Ok(InterfaceTypeSnapshot::SaturatingWord(*width)),
         Type::PolicyFloat(policy, width) => Ok(InterfaceTypeSnapshot::PolicyFloat(*policy, *width)),
@@ -1115,6 +1117,7 @@ fn import_interface_type_inner(
         InterfaceTypeSnapshot::SizedNumeric(primitive, width) => {
             Ok(types.sized_numeric(*primitive, *width))
         }
+        InterfaceTypeSnapshot::Bits(width) => Ok(types.intern(Type::Bits(*width))),
         InterfaceTypeSnapshot::ModularWord(width) => Ok(types.intern(Type::ModularWord(*width))),
         InterfaceTypeSnapshot::SaturatingWord(width) => {
             Ok(types.intern(Type::SaturatingWord(*width)))

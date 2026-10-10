@@ -140,6 +140,8 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             _ => "ignotum".to_owned(),
         },
 
+        Type::Bits(width) => width.faber_marker().to_owned(),
+
         Type::ModularWord(width) => format!("modulus<{}>", width.faber_marker()),
         Type::SaturatingWord(width) => format!("saturatus<{}>", width.faber_marker()),
         Type::PolicyFloat(policy, width) => {

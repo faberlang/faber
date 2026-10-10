@@ -105,6 +105,7 @@ impl Walk<'_> {
             | Type::BoundedAscii { .. }
             | Type::BoundedOcteti { .. }
             | Type::SizedNumeric(..)
+            | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
             | Type::TensorEdgePolicy(_)

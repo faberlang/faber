@@ -521,6 +521,7 @@ fn contains_unresolved_type(
     match types.get(type_id) {
         Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. } => true,
         Type::Primitive(_)
+        | Type::Bits(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
         | Type::PolicyFloat(_, _)

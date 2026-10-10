@@ -589,6 +589,7 @@ impl TypeName for Type {
                 // Leak for diagnostic brevity
                 Box::leak(format!("{p:?}<{w:?}>").into_boxed_str())
             }
+            Type::Bits(w) => w.faber_marker(),
             Type::SizedInstans(p) => Box::leak(format!("instans<{p:?}>").into_boxed_str()),
             Type::Array(_) => "lista",
             Type::BoundedArray { .. } => "lista_n",

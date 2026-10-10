@@ -331,7 +331,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::SizedNumeric(Primitive::Numerus, _) => {
                 self.check_device_layout(ty);
             }
-            Type::ModularWord(_) => self.check_device_layout(ty),
+            Type::ModularWord(_) | Type::Bits(_) => self.check_device_layout(ty),
             // D11.1: no device clamp lowering yet — fail closed.
             // N7E-1: the policy-float cell has no device lowering; D6 splits
             // `trapping` (a language rule) from `saturating` (temporary) in N7E-2.

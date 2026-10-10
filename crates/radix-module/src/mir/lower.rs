@@ -591,6 +591,8 @@ fn portable_tensor_edge_type_identity(
         | Type::AsyncCursor(_, _)
         | Type::Atomic(_)
         | Type::Intervallum(_)
+        // Bits have no tensor-edge provider identity.
+        | Type::Bits(_)
         | Type::Func(_)
         | Type::Param(_)
         | Type::Infer(_)

@@ -5,6 +5,7 @@
 //! Includes regression for Option→ignotum assignment (F2 regression) and
 //! bidirectional octeti↔lista<numerus<u8>> unify.
 
+use crate::BitsWidth;
 use crate::DefId;
 use crate::InstansPrecision;
 use crate::NumericWidth;
@@ -2131,4 +2132,71 @@ fn affine_index_arithmetic_is_structured_exact_and_natural() {
     assert_eq!(i64s_from_literal_index(shape, &types), None);
     let concrete = types.intern_index(IndexExpr::Tuple(vec![three, six]));
     assert_eq!(i64s_from_literal_index(concrete, &types), Some(vec![3, 6]));
+}
+
+/// Raw-bits family (`b8`/`b16`/`b32`/`b64`): interned per width, equal only to
+/// the same width, and joined to no numeric type or other width by any
+/// assignability or lattice edge. Bits are not numbers.
+#[test]
+fn bits_types_intern_per_width_and_equal_only_to_same_width() {
+    let mut types = TypeTable::new();
+    let b8 = types.bits(BitsWidth::B8);
+    let b16 = types.bits(BitsWidth::B16);
+    let b32 = types.bits(BitsWidth::B32);
+    let b64 = types.bits(BitsWidth::B64);
+
+    assert_eq!(types.bits(BitsWidth::B8), b8, "interning is stable");
+    assert_eq!(types.bits(BitsWidth::B64), b64);
+    let all = [b8, b16, b32, b64];
+    for (i, a) in all.iter().enumerate() {
+        for (j, b) in all.iter().enumerate() {
+            assert_eq!(types.equals(*a, *b), i == j, "equals {i} vs {j}");
+            assert_eq!(types.is_assignable(*a, *b), i == j, "assignable {i} vs {j}");
+        }
+    }
+    assert_eq!(BitsWidth::from_marker("b16"), Some(BitsWidth::B16));
+    assert_eq!(BitsWidth::B64.bits(), 64);
+    assert_eq!(BitsWidth::B32.faber_marker(), "b32");
+    assert_eq!(BitsWidth::from_marker("b7"), None);
+    assert_eq!(BitsWidth::from_marker("u8"), None);
+}
+
+#[test]
+fn bits_types_are_not_assignable_to_or_from_numeric_types() {
+    let mut types = TypeTable::new();
+    let b8 = types.bits(BitsWidth::B8);
+    let b64 = types.bits(BitsWidth::B64);
+    let numerics = [
+        types.sized_numeric(Primitive::Numerus, NumericWidth::U8),
+        types.sized_numeric(Primitive::Numerus, NumericWidth::U64),
+        types.sized_numeric(Primitive::Numerus, NumericWidth::I64),
+        types.primitive(Primitive::Numerus),
+        types.primitive(Primitive::Fractus),
+        types.primitive(Primitive::Octeti),
+    ];
+    for numeric in numerics {
+        for bits in [b8, b64] {
+            assert!(!types.equals(bits, numeric));
+            assert!(!types.is_assignable(bits, numeric), "bits -> numeric");
+            assert!(!types.is_assignable(numeric, bits), "numeric -> bits");
+        }
+    }
+    // The no-widening rule lives on the element: lista<b8> is not lista<u8>.
+    let lista_b8 = types.array(b8);
+    let u8 = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let lista_u8 = types.array(u8);
+    assert!(!types.is_assignable(lista_b8, lista_u8));
+    assert!(!types.is_assignable(lista_u8, lista_b8));
+    let b16 = types.bits(BitsWidth::B16);
+    let lista_b16 = types.array(b16);
+    assert!(!types.is_assignable(lista_b8, lista_b16));
+}
+
+#[test]
+fn bits_types_order_by_bit_pattern_as_unsigned_integer() {
+    use crate::ordering::{OrderingKind, ordering_kind};
+    let mut types = TypeTable::new();
+    let b8 = types.bits(BitsWidth::B8);
+    let kind = ordering_kind(&types, b8, &|_| false, &|_| false);
+    assert_eq!(kind, Some(OrderingKind::Integer));
 }

@@ -32,6 +32,54 @@ pub enum NumericWidth {
     Inf,
 }
 
+/// Raw-bits width marker (`b8`, `b16`, `b32`, `b64`).
+///
+/// Bits are not numbers: a `bN` is exactly N bits with no arithmetic and no
+/// numeric widening. The markers are locale-neutral, like `u8` and `f16`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum BitsWidth {
+    B8,
+    B16,
+    B32,
+    B64,
+}
+
+impl BitsWidth {
+    /// Parse a bare `bN` marker spelling.
+    #[must_use]
+    pub fn from_marker(marker: &str) -> Option<Self> {
+        match marker {
+            "b8" => Some(Self::B8),
+            "b16" => Some(Self::B16),
+            "b32" => Some(Self::B32),
+            "b64" => Some(Self::B64),
+            _ => None,
+        }
+    }
+
+    /// Number of bits in the container.
+    #[must_use]
+    pub fn bits(self) -> u32 {
+        match self {
+            Self::B8 => 8,
+            Self::B16 => 16,
+            Self::B32 => 32,
+            Self::B64 => 64,
+        }
+    }
+
+    /// Source marker spelling (also the diagnostic display).
+    #[must_use]
+    pub fn faber_marker(self) -> &'static str {
+        match self {
+            Self::B8 => "b8",
+            Self::B16 => "b16",
+            Self::B32 => "b32",
+            Self::B64 => "b64",
+        }
+    }
+}
+
 /// The removed `d32` marker spelling (D11.7): diagnosed, never parsed.
 pub const REMOVED_D32_MARKER: &str = "d32";
 
@@ -410,7 +458,9 @@ pub fn standalone_width_type(name: &str) -> Option<(Primitive, NumericWidth)> {
 /// dedicated removal diagnostic instead of an unknown identifier.
 #[must_use]
 pub fn is_standalone_width_name(name: &str) -> bool {
-    name == REMOVED_D32_MARKER || standalone_width_type(name).is_some()
+    name == REMOVED_D32_MARKER
+        || BitsWidth::from_marker(name).is_some()
+        || standalone_width_type(name).is_some()
 }
 
 /// Whether `name` is bare width sugar (`f32`), tensor sugar (`tf32`), vector
@@ -476,6 +526,13 @@ pub fn lower_standalone_width_type(
     if name == REMOVED_D32_MARKER {
         report(WidthLowerIssue::RemovedDecimalWidth);
         return Some(types.intern(Type::Error));
+    }
+    if let Some(bits) = BitsWidth::from_marker(name) {
+        if !params.is_empty() {
+            report(WidthLowerIssue::Params);
+            return Some(types.intern(Type::Error));
+        }
+        return Some(types.bits(bits));
     }
     let (prim, width) = standalone_width_type(name)?;
     if !params.is_empty() {

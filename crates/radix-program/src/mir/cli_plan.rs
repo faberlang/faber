@@ -1401,6 +1401,7 @@ pub(super) fn import_semantic_type_with_nominal(
         }
         Type::SizedNumeric(primitive, width) => target.sized_numeric(primitive, width),
         Type::ModularWord(width) => target.intern(Type::ModularWord(width)),
+        Type::Bits(width) => target.bits(width),
         Type::SaturatingWord(width) => target.intern(Type::SaturatingWord(width)),
         Type::PolicyFloat(policy, width) => target.intern(Type::PolicyFloat(policy, width)),
         Type::SizedInstans(precision) => target.intern(Type::SizedInstans(precision)),

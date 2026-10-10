@@ -371,6 +371,7 @@ impl UseVisitor<'_> {
             Type::Union(members) | Type::Intersection(members) => members,
             Type::Primitive(_)
             | Type::SizedNumeric(_, _)
+            | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
             | Type::PolicyFloat(_, _)

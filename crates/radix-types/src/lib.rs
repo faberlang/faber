@@ -68,16 +68,17 @@ pub use instans_precision::{
     is_instans_assignable, lower_sized_instans,
 };
 pub use numeric_width::{
-    DECIMAL_INDEX_SCALAR_MSG, DECIMAL_TENSOR_MEDIA_MSG, NumericWidth, TENSOR_ELEMENT_NUMERIC_MSG,
-    TENSOR_INDEX_VECTOR_MSG, WidthError, WidthLowerIssue, effective_width, float_holds_integer,
-    float_overflows, is_ascii_format_hint, is_code_point_hint, is_conversio_radix_hint,
-    is_decimal_index_scalar, is_integer_index_scalar, is_integer_index_vector,
-    is_numeric_assignable, is_numeric_width_type_sugar, is_tensor_element_type,
-    is_tensor_float_element, is_tensor_numeric_element, lista_sugar_width_marker,
-    lower_modular_word, lower_saturating_word, lower_standalone_width_type, lower_trapping_word,
-    matrix_sugar_width_marker, sparsa_sugar_width_marker, standalone_width_type,
-    tensor_element_conversio_allowed, tensor_media_width, tensor_method_requires_numeric_element,
-    tensor_sugar_width_marker, vector_sugar_width_marker,
+    BitsWidth, DECIMAL_INDEX_SCALAR_MSG, DECIMAL_TENSOR_MEDIA_MSG, NumericWidth,
+    TENSOR_ELEMENT_NUMERIC_MSG, TENSOR_INDEX_VECTOR_MSG, WidthError, WidthLowerIssue,
+    effective_width, float_holds_integer, float_overflows, is_ascii_format_hint,
+    is_code_point_hint, is_conversio_radix_hint, is_decimal_index_scalar, is_integer_index_scalar,
+    is_integer_index_vector, is_numeric_assignable, is_numeric_width_type_sugar,
+    is_tensor_element_type, is_tensor_float_element, is_tensor_numeric_element,
+    lista_sugar_width_marker, lower_modular_word, lower_saturating_word,
+    lower_standalone_width_type, lower_trapping_word, matrix_sugar_width_marker,
+    sparsa_sugar_width_marker, standalone_width_type, tensor_element_conversio_allowed,
+    tensor_media_width, tensor_method_requires_numeric_element, tensor_sugar_width_marker,
+    vector_sugar_width_marker,
 };
 pub use schema::{SchemaColumnDef, SchemaDef};
 pub use schema_subset::{
