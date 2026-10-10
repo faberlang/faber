@@ -118,7 +118,7 @@ fn collect_runtime_files(dir: &Path, files: &mut Vec<PathBuf>) {
                 collect_runtime_files(&path, files);
             }
         } else if path.is_file() {
-            let ts_lock = name.ends_with(".lock")
+            let ts_lock = path.extension().is_some_and(|ext| ext == "lock")
                 && path
                     .components()
                     .any(|c| c.as_os_str() == std::ffi::OsStr::new("typescript"));
