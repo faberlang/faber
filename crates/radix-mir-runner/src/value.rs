@@ -1424,7 +1424,7 @@ impl Value {
                 // whose type the caller could not resolve.
                 None => format!("{self:?}"),
             },
-            Value::Set(cell) => display_set(&cell.borrow(), order.tokens),
+            Value::Set(cell) => display_set(&cell.borrow(), interner, order, span, float_width)?,
             Value::GradientHandle(id) => format!("gradient-handle#{id}"),
             Value::Cursor(_) => "cursor".to_owned(),
         })
@@ -1562,20 +1562,41 @@ fn display_in_collection(
     })
 }
 
-/// A printed set keeps its Rust-Debug text (`Set(RefCell { value: {..} })`,
-/// hash order); only bool, none and tuple elements are spelled through the
-/// printing function's tokens instead of `Bool(true)` / `Unit` / `Tuple([..])`.
-fn display_set(items: &FxHashSet<MapKey>, tokens: &DisplayTokens) -> String {
-    let parts = items
+/// A printed set is list-shaped (`[3, 7]`, `["x"]`): every element is rendered
+/// exactly as a list element is, so the display tokens of the printing
+/// function apply the same way. A set has no defined order (D19.2/D19.6), so
+/// nothing sorts: the snapshot is shuffled under the test-only seed like a
+/// printed `tabula`, and no golden can quietly pin the runner's hash order.
+fn display_set(
+    items: &FxHashSet<MapKey>,
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+    float_width: Option<NumericWidth>,
+) -> Result<String, RunnerError> {
+    let mut keys: Vec<&MapKey> = items.iter().collect();
+    crate::shuffle::shuffle_unordered(&mut keys);
+    display_set_keys(&keys, interner, order, span, float_width)
+}
+
+/// Render the set elements `keys` in the given order, list-shaped.
+pub(crate) fn display_set_keys(
+    keys: &[&MapKey],
+    interner: &Interner,
+    order: FieldOrder<'_>,
+    span: Span,
+    float_width: Option<NumericWidth>,
+) -> Result<String, RunnerError> {
+    let values: Vec<Value> = keys
         .iter()
-        .map(|item| match item {
-            MapKey::Bool(v) => display_bivalens(*v, tokens).to_owned(),
-            MapKey::Unit => tokens.none.clone(),
-            MapKey::Tuple(parts) => display_tuple_key(parts, tokens),
-            other => format!("{other:?}"),
+        .map(|key| match key {
+            // A list prints its none element through the none token; the
+            // key's plain unit value would print as nothing.
+            MapKey::Unit => Value::Nil,
+            other => other.to_value(),
         })
-        .collect::<Vec<_>>();
-    format!("Set(RefCell {{ value: {{{}}} }})", parts.join(", "))
+        .collect();
+    display_list(&values, interner, order, span, float_width)
 }
 
 /// A composite key shown in a printed map: its parts comma-separated, a bool

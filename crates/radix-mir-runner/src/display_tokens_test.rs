@@ -263,14 +263,8 @@ fn english_tokens_print_bool_set_elements_as_true_false() {
     let (structs, variants) = Default::default();
     let tokens = english();
     let order = empty_order(&structs, &variants).with_tokens(&tokens);
-    assert_eq!(
-        show(&set_of(vec![MapKey::Bool(true)]), order),
-        "Set(RefCell { value: {true} })"
-    );
-    assert_eq!(
-        show(&set_of(vec![MapKey::Bool(false)]), order),
-        "Set(RefCell { value: {false} })"
-    );
+    assert_eq!(show(&set_of(vec![MapKey::Bool(true)]), order), "[true]");
+    assert_eq!(show(&set_of(vec![MapKey::Bool(false)]), order), "[false]");
 }
 
 #[test]
@@ -278,26 +272,50 @@ fn latin_tokens_print_bool_set_elements_as_verum_falsum() {
     let (structs, variants) = Default::default();
     let latin = DisplayTokens::latin();
     let order = empty_order(&structs, &variants).with_tokens(&latin);
-    assert_eq!(
-        show(&set_of(vec![MapKey::Bool(true)]), order),
-        "Set(RefCell { value: {verum} })"
-    );
-    assert_eq!(
-        show(&set_of(vec![MapKey::Bool(false)]), order),
-        "Set(RefCell { value: {falsum} })"
-    );
+    assert_eq!(show(&set_of(vec![MapKey::Bool(true)]), order), "[verum]");
+    assert_eq!(show(&set_of(vec![MapKey::Bool(false)]), order), "[falsum]");
 }
 
 #[test]
-fn int_set_display_text_is_unchanged() {
+fn one_element_sets_print_in_list_shape() {
     let (structs, variants) = Default::default();
     let tokens = english();
     let order = empty_order(&structs, &variants).with_tokens(&tokens);
-    let ints = set_of(vec![MapKey::UInt(3)]);
-    assert_eq!(show(&ints, order), format!("{ints:?}"));
-    assert_eq!(show(&ints, order), "Set(RefCell { value: {UInt(3)} })");
-    let texts = set_of(vec![MapKey::Str("x".to_owned())]);
-    assert_eq!(show(&texts, order), format!("{texts:?}"));
-    let empty = set_of(vec![]);
-    assert_eq!(show(&empty, order), format!("{empty:?}"));
+    assert_eq!(show(&set_of(vec![MapKey::UInt(3)]), order), "[3]");
+    assert_eq!(
+        show(&set_of(vec![MapKey::Str("x".to_owned())]), order),
+        "[\"x\"]"
+    );
+    assert_eq!(show(&set_of(vec![]), order), "[]");
+}
+
+#[test]
+fn three_element_set_prints_list_shape_with_the_same_multiset_under_two_seeds() {
+    let (structs, variants) = Default::default();
+    let tokens = english();
+    let order = empty_order(&structs, &variants).with_tokens(&tokens);
+    let items: FxHashSet<MapKey> = [3_u64, 7, 11].into_iter().map(MapKey::UInt).collect();
+    let multiset = |seed: u64| {
+        let mut keys: Vec<&MapKey> = items.iter().collect();
+        crate::shuffle::permute(&mut keys, seed);
+        let text = value::display_set_keys(&keys, &Interner::new(), order, Span::default(), None)
+            .expect("display");
+        assert!(text.starts_with('[') && text.ends_with(']'), "{text}");
+        let mut parts: Vec<String> = text[1..text.len() - 1]
+            .split(", ")
+            .map(str::to_owned)
+            .collect();
+        parts.sort();
+        parts
+    };
+    assert_eq!(multiset(1), multiset(2));
+    assert_eq!(multiset(1), ["11", "3", "7"]);
+    let printed = show(
+        &set_of(vec![MapKey::UInt(3), MapKey::UInt(7), MapKey::UInt(11)]),
+        order,
+    );
+    assert!(
+        printed.starts_with('[') && printed.ends_with(']'),
+        "{printed}"
+    );
 }
