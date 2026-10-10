@@ -41,3 +41,41 @@ main {
         Some(&radix_mir::DisplayTokensId(0))
     );
 }
+
+/// Need: the llvm and wasm hosts read the entry function's tokens
+/// once at start-up, so the entry carries its file's tokens even when the
+/// printing happens in another function.
+#[test]
+fn english_print_free_entry_carries_english_id_zero() {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let source = "+++
+locale = \"en\"
++++
+fn show() {
+    const int ∪ none x ← null
+    print x
+}
+
+main {
+    show()
+}
+";
+    let unit = analyze_source(&session, "tokens.fab", source, AnalyzeRequest::default()).expect("analyzes");
+    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("lowers");
+    let validation = lowered.validated.validation();
+    let program = lowered.validated.program();
+    let names = radix_mir::MirNames::new(
+        program,
+        validation.types.as_table(),
+        validation.interner.as_interner().expect("interner"),
+    );
+    let entry = names.explicit_entry_function().expect("entry function");
+    assert!(!holds_print_site(entry), "entry holds no print site");
+    assert_eq!(
+        validation
+            .display_tokens
+            .for_function(entry.id)
+            .map(|tokens| tokens.none.as_str()),
+        Some("none")
+    );
+}

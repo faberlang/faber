@@ -847,7 +847,7 @@ pub fn lower_analyzed_unit(
         let mut validation = maps.validation;
         align_function_signatures_with_mir_params(&mut validation, &program.functions);
         let display_tokens = display_tokens_for_file(unit);
-        record_function_display_tokens(&mut validation, &program.functions, &display_tokens);
+        record_function_display_tokens(&mut validation, &program, &types, &interner, &display_tokens);
         validation.layouts = MirLayoutTable::from_types(&types);
         validation.closure_environments = closure_environments
             .iter()
@@ -907,17 +907,25 @@ fn is_print_family(intrinsic: &MirIntrinsic) -> bool {
     )
 }
 
-/// Give every function holding a print-family site an id into the program's
-/// display-token table. The id rides per function, not per call: every site
-/// of a function comes from one file, and `MirRuntimeCall` has hundreds of
-/// struct-literal users across the backends.
+/// Give every function holding a print-family site, and the explicit entry
+/// function, an id into the program's display-token table. The id rides per
+/// function, not per call: every site of a function comes from one file, and
+/// `MirRuntimeCall` has hundreds of struct-literal users across the backends.
+/// The entry carries its file's tokens even when it holds no print site: the
+/// llvm and wasm hosts read the entry's tokens once at start-up and apply them
+/// to every print in the program.
 fn record_function_display_tokens(
     validation: &mut MirValidationContext<'_>,
-    functions: &[MirFunction],
+    program: &MirProgram,
+    types: &TypeTable,
+    interner: &Interner,
     tokens: &radix_runtime_contract::display_tokens::DisplayTokens,
 ) {
-    for function in functions {
-        if holds_print_site(function) {
+    let entry = radix_mir::MirNames::new(program, types, interner)
+        .explicit_entry_function()
+        .map(|function| function.id);
+    for function in &program.functions {
+        if holds_print_site(function) || Some(function.id) == entry {
             validation.display_tokens.assign(function.id, tokens);
         }
     }
