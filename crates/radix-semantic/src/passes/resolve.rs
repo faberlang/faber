@@ -3357,6 +3357,7 @@ fn lower_type_expr_with_context(
                                     }
                                 }),
                             optional: false,
+                            sponte: false,
                         }
                     })
                 })

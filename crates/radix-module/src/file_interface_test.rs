@@ -74,7 +74,7 @@ fn failable_generic_callable_round_trips() {
             constraint: TypeParamConstraint::OneOf(vec![textus, numerus]),
             default: Some(SemanticGenericParamDefault::Typus(numerus)),
         }],
-        params: vec![ParamType { ty: lista_t, mode: SemanticParamMode::Owned, optional: true }],
+        params: vec![ParamType { ty: lista_t, mode: SemanticParamMode::Owned, optional: true, sponte: true }],
         ret: param_ty,
         err: Some(textus),
         is_async: true,

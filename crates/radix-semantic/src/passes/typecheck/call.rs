@@ -155,6 +155,7 @@ impl TypeChecker<'_> {
                 ty: self.check_expr(&mut arg.expr),
                 mode: SemanticParamMode::Owned,
                 optional: false,
+                sponte: false,
             })
             .collect()
     }
@@ -446,7 +447,7 @@ impl TypeChecker<'_> {
 
         for (argument, (arg, param)) in args.iter_mut().zip(sig.params.iter()).enumerate() {
             let previous_shape_argument = self.current_shape_argument.replace(argument as u32);
-            let site = argument_site(arg.name).optional_slot(param.optional);
+            let site = argument_site(arg.name).optional_slot(param.sponte);
             let errors_before = self.errors.len();
             if markers {
                 self.check_call_marker(arg, param);
@@ -1253,6 +1254,7 @@ impl TypeChecker<'_> {
                     ty: payload_ty,
                     mode: SemanticParamMode::Move,
                     optional: false,
+                    sponte: false,
                 }],
                 vacuum_ty,
                 span,

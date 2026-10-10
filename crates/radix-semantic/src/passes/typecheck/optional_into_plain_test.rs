@@ -164,3 +164,22 @@ fn optional_into_sponte_field_initializer_is_accepted() {
         "genus Node {\n    varia textus name\n    varia textus parent sponte\n}\n\nfunctio f(textus ∪ nihil p) → Node {\n    redde Node {\n        name = \"n\",\n        parent = p\n    }\n}",
     );
 }
+
+// Need: only a `sponte` parameter is an optional target. A parameter
+// that merely has a default is omittable but still a plain slot, so an optional
+// argument into it is `SEM010`.
+
+#[test]
+fn optional_argument_into_defaulted_parameter_is_rejected() {
+    assert_rejects_with_issue(
+        "functio take(numerus n vel 3) {\n    nota n\n}\n\nfunctio f(numerus ∪ nihil x) {\n    take(x)\n}",
+        ISSUE,
+    );
+}
+
+#[test]
+fn omitted_defaulted_parameter_is_accepted() {
+    assert_accepts(
+        "functio take(numerus n vel 3) {\n    nota n\n}\n\nfunctio f() {\n    take()\n}",
+    );
+}

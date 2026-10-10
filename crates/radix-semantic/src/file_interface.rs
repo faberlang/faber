@@ -1397,6 +1397,7 @@ fn import_interface_callable_inner(
                     ty: import_interface_type_inner(&param.ty, types, interner, resolver)?,
                     mode: param.mode,
                     optional: param.optional,
+                    sponte: param.optional,
                 })
             })
             .collect::<FileInterfaceResult<Vec<_>>>()?,

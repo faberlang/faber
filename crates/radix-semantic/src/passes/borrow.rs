@@ -456,6 +456,7 @@ impl<'a> BorrowChecker<'a> {
                     HirParamMode::Ex => SemanticParamMode::Move,
                 },
                 optional: param.optional,
+                sponte: param.sponte,
             })
             .collect();
         self.func_params.insert(def_id, params);

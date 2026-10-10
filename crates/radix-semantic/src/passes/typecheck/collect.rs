@@ -63,6 +63,7 @@ impl TypeChecker<'_> {
                 ty: param.ty,
                 mode: param_mode_from_hir(param.mode),
                 optional: param.optional,
+                sponte: param.sponte,
             })
             .collect()
     }

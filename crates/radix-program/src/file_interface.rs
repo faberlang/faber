@@ -435,6 +435,7 @@ fn snapshot_interface_method(
                 ty: param.ty,
                 mode: param_mode(param.mode),
                 optional: param.optional,
+                sponte: param.sponte,
             })
             .collect(),
         ret,
@@ -564,6 +565,7 @@ fn snapshot_struct_method(
                 ty: param.ty,
                 mode: param_mode(param.mode),
                 optional: param.optional,
+                sponte: param.sponte,
             })
             .collect(),
         ret,
@@ -648,6 +650,7 @@ fn snapshot_function(
                 ty: param.ty,
                 mode: param_mode(param.mode),
                 optional: param.optional,
+                sponte: param.sponte,
             })
             .collect(),
         ret,

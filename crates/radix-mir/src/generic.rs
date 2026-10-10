@@ -1271,6 +1271,7 @@ fn instantiate_type_id<W: InstantiateWalk>(
                             ty,
                             mode: param.mode,
                             optional: param.optional,
+                            sponte: param.sponte,
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()?,

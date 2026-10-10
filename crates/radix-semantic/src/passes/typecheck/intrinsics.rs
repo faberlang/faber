@@ -875,6 +875,7 @@ fn simple_sig(params: Vec<TypeId>, ret: TypeId) -> FuncSig {
                 ty,
                 mode: SemanticParamMode::Owned,
                 optional: false,
+                sponte: false,
             })
             .collect(),
         ret,
@@ -896,6 +897,7 @@ fn resolve_param_types(
             ty: resolve_param_kind(checker, *kind, ctx),
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         })
         .collect()
 }

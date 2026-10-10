@@ -1583,6 +1583,7 @@ impl RowHarness {
                 ty: self.types.primitive(Primitive::Vacuum),
                 mode: SemanticParamMode::Owned,
                 optional: false,
+                sponte: false,
             }],
             ret: self.types.primitive(Primitive::Vacuum),
             err,

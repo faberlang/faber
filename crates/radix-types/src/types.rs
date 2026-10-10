@@ -2775,7 +2775,11 @@ pub struct ResolvedGenericCall {
 pub struct ParamType {
     pub ty: TypeId,
     pub mode: SemanticParamMode,
+    /// Whether callers may omit this argument (a `sponte` marker or a default).
     pub optional: bool,
+    /// Whether the parameter is a source `sponte` slot: an optional value may be
+    /// stored into it. A merely defaulted parameter is omittable but not sponte.
+    pub sponte: bool,
 }
 
 /// Parameter ownership/borrowing mode as seen by semantic analysis.

@@ -3077,6 +3077,7 @@ functio mensura(lista<numerus> f) → numerus ⇥ FormaError {
                 ty: param.ty,
                 mode: crate::semantic::SemanticParamMode::Owned,
                 optional: param.optional,
+                sponte: param.sponte,
             })
             .collect(),
         ret: mensura_function.ret_ty.expect("mensura return type"),

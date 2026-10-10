@@ -137,6 +137,7 @@ pub(super) fn check_sort_expr(
                 ty: element,
                 mode: SemanticParamMode::Owned,
                 optional: false,
+                sponte: false,
             }],
             ret: key,
             err: None,

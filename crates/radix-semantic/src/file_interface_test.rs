@@ -154,6 +154,7 @@ fn twin_sig(types: &mut TypeTable, interner: &mut Interner) -> FuncSig {
             ty: tensor,
             mode: crate::SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         ret: tensor,
         err: None,
