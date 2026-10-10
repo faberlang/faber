@@ -22,7 +22,7 @@ main {
         5.0,
         6.0
     ]
-    var tf32[2, 3] grid ← flat ↦ tf32[2, 3]
+    const tf32[2, 3] grid ← flat ↦ tf32[2, 3]
 
     const tf32[3] bad ← grid.sum(axis 2)
 

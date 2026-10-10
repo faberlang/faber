@@ -28,7 +28,7 @@ incipit {
         5.0,
         6.0
     ]
-    varia tf32[2, 3] grid ← flat ↦ tf32[2, 3]
+    fixum tf32[2, 3] grid ← flat ↦ tf32[2, 3]
 
     fixum tf32[3] down ← grid.summa(axis 0)
     fixum tf32[2] across ← grid.summa(axis 1)
