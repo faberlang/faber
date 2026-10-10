@@ -2469,12 +2469,15 @@ impl Parser {
             .with_arg("replacement", self.null_value_surface())
     }
 
-    /// The current word is the bare Latin `nihil` in value position.
+    /// The current word is the bare Latin `nihil` in value position and no
+    /// value binding or parameter named `nihil` has been declared (a binding
+    /// may shadow the retired spelling; operator ruling 2026-10-01).
     fn is_retired_null_value_spelling(&self) -> bool {
         let TokenKind::Ident(sym) = self.peek().kind else {
             return false;
         };
         self.interner.resolve(sym) == "nihil"
+            && !self.nihil_value_bound
             && !matches!(
                 self.peek_at(1).kind,
                 TokenKind::LParen | TokenKind::Dot | TokenKind::LBrace | TokenKind::LtAscii

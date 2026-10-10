@@ -197,6 +197,12 @@ pub struct Parser {
     /// inside it (D4.6 one-level rule). [`Parser::restore`] drops entries a
     /// discarded speculative parse built.
     conditionals: Vec<(NodeId, Span)>,
+    /// A value binding or parameter named `nihil` has been parsed. The bare
+    /// `nihil` retired-null spelling (`PARSE030`) is then an ordinary read of
+    /// that binding: keywords are contextual and a binding may shadow them.
+    /// Monotone over the file; `nihil` in an earlier, unrelated scope is not
+    /// distinguished from the declared name.
+    nihil_value_bound: bool,
 }
 
 /// Contextual parser policy supplied by compiler frontends.
@@ -355,6 +361,7 @@ impl Parser {
             budget_exhausted: false,
             budget_diagnostic: None,
             conditionals: Vec::new(),
+            nihil_value_bound: false,
         };
         parser.declared_type_names = parser.scan_declared_type_names();
         parser.imported_type_names = parser.scan_imported_type_names();
@@ -1689,6 +1696,14 @@ impl Parser {
         }
     }
 
+    /// Record a value binding or parameter name so a later bare `nihil` read
+    /// resolves to it instead of the retired null spelling.
+    fn note_value_binding(&mut self, ident: &Ident) {
+        if self.interner.resolve(ident.name) == "nihil" {
+            self.nihil_value_bound = true;
+        }
+    }
+
     fn keyword_ident(&mut self, name: &str, span: Span) -> Ident {
         let sym = self.interner.intern(name);
         Ident { name: sym, span }
@@ -1758,6 +1773,10 @@ mod contract_bound_test;
 #[cfg(test)]
 #[path = "nexum_removed_test.rs"]
 mod nexum_removed_test;
+
+#[cfg(test)]
+#[path = "nihil_binding_test.rs"]
+mod nihil_binding_test;
 
 #[cfg(test)]
 #[path = "region_decl_test.rs"]

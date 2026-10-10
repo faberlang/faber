@@ -565,6 +565,7 @@ impl Parser {
         }
 
         let ident = self.parse_contextual_ident(KeywordOwner::BindingTarget)?;
+        self.note_value_binding(&ident);
         Ok(BindingPattern::Ident(ident))
     }
 
@@ -810,11 +811,14 @@ impl Parser {
             let ty = self.parse_type()?;
 
             let name = self.parse_param_name()?;
+            self.note_value_binding(&name);
 
             let sponte = self.parse_post_name_marker();
 
             let alias = if self.eat_keyword_ident(TokenKind::Ut) {
-                Some(self.parse_param_name()?)
+                let alias = self.parse_param_name()?;
+                self.note_value_binding(&alias);
+                Some(alias)
             } else {
                 None
             };
