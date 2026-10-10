@@ -17,7 +17,7 @@ fn encode(bytes data) → bytes {
         return "0\r\n\r\n" ↦ bytes
     }
     const string size_line ← hex_string(data.length()) + "\r\n"
-    var list<u8> out ← bytes_list(size_line ↦ bytes)
+    var list<b8> out ← bytes_list(size_line ↦ bytes)
     out ← extend(out, data)
     out ← extend(out, "\r\n0\r\n\r\n" ↦ bytes)
     const bytes result ← out
@@ -28,7 +28,7 @@ fn encode(bytes data) → bytes {
 # illegal extensions, missing CRLF, and trailing bytes after the last-chunk.
 @ public
 fn decode(bytes data) → bytes ⇥ string {
-    var list<u8> body ← []
+    var list<b8> body ← []
     var int i ← 0
     const int n ← data.length()
     while i ≺ n {
@@ -45,7 +45,7 @@ fn decode(bytes data) → bytes ⇥ string {
         if i + size + 2 ≻ n then throw "norma:http/chunked.decode: truncated"
         var int k ← 0
         while k ≺ size {
-            body.append(data.get(i + k) coalesce (0 ∷ u8))
+            body.append(data.get(i + k) coalesce (0 ∷ b8))
             k ← k + 1
         }
         i ← i + size
@@ -68,28 +68,28 @@ fn hex_string(int n) → string {
     return acc
 }
 
-fn bytes_list(bytes src) → list<u8> {
-    var list<u8> out ← []
+fn bytes_list(bytes src) → list<b8> {
+    var list<b8> out ← []
     var int i ← 0
     while i ≺ src.length() {
-        out.append(src.get(i) coalesce (0 ∷ u8))
+        out.append(src.get(i) coalesce (0 ∷ b8))
         i ← i + 1
     }
     return out
 }
 
-fn extend(list<u8> dest, bytes src) → list<u8> {
-    var copy list<u8> out ← dest
+fn extend(list<b8> dest, bytes src) → list<b8> {
+    var copy list<b8> out ← dest
     var int i ← 0
     while i ≺ src.length() {
-        out.append(src.get(i) coalesce (0 ∷ u8))
+        out.append(src.get(i) coalesce (0 ∷ b8))
         i ← i + 1
     }
     return out
 }
 
 fn byte_at(bytes data, int i) → int {
-    return data.get(i) coalesce (0 ∷ u8) ↦ int
+    return (data.get(i) coalesce (0 ∷ b8)) ↦ u8 ↦ int
 }
 
 fn at_crlf(bytes data, int i) → bool {
@@ -237,7 +237,7 @@ fn bytes_eq(bytes a, bytes b) → bool {
     if a.length() ≢ b.length() then return false
     var int i ← 0
     while i ≺ a.length() {
-        if (a.get(i) coalesce (0 ∷ u8)) ≢ (b.get(i) coalesce (1 ∷ u8)) {
+        if (a.get(i) coalesce (0 ∷ b8)) ≢ (b.get(i) coalesce (1 ∷ b8)) {
             return false
         }
         i ← i + 1

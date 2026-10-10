@@ -55,7 +55,7 @@ fn is_terminator(string c) → bool {
 fn is_control(string c) → bool {
     const bytes encoded ← c ↦ bytes
     if encoded.length() ≢ 1 then return false
-    return encoded.get(0) coalesce 32 ∷ u8 ≺ 32 ∷ u8
+    return (encoded.get(0) coalesce (32 ∷ b8)) ≺ (32 ∷ b8)
 }
 
 # =========================================================================
@@ -73,7 +73,7 @@ fn escape_char(string c) → string ∪ none {
     if c ≡ "\t" then return "\\t"
     if is_control(c) {
         const bytes encoded ← c ↦ bytes
-        const int code ← encoded.get(0) coalesce 0 ∷ u8 ↦ int
+        const int code ← (encoded.get(0) coalesce (0 ∷ b8)) ↦ u8 ↦ int
         if code ≡ 8 then return "\\b"
         if code ≡ 12 then return "\\f"
     }
@@ -93,7 +93,7 @@ fn needs_escape(string c) → bool {
 @ public
 fn control_escape(string c) → string {
     const bytes encoded ← c ↦ bytes
-    const int code ← encoded.get(0) coalesce 0 ∷ u8 ↦ int
+    const int code ← (encoded.get(0) coalesce (0 ∷ b8)) ↦ u8 ↦ int
     return "\u00§§"(hex_digit(code / 16), hex_digit(code % 16))
 }
 
