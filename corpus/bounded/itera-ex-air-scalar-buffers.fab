@@ -9,6 +9,7 @@ syntax = "@ radix lane \"air\"; itera ex bytes<N> | ascii<N> | string<N>"
 related = ["bytes", "ascii", "string", "ex", "itera", "radix"]
 locale = "en"
 no_expected = "rejects"
+diagnostic = "SEM059:runtime_conversion"
 +++
 
 # =============================================================================
