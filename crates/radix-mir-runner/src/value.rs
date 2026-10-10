@@ -2777,13 +2777,20 @@ pub fn ascii1_from_scalar(ch: char, span: Span) -> Result<Value, RunnerError> {
     Ok(Value::Ascii(ch as u8))
 }
 
-/// Scalar `[i]` on a textus/ascii payload as `ascii<1>`, not a heap `String`.
+/// Scalar `[i]` on a textus/ascii payload: the i-th Unicode character. An
+/// ASCII character keeps the compact one-byte `ascii<1>` carrier; any other
+/// scalar is a one-character heap textus (the one-byte carrier cannot hold it).
+/// Fails only when `index` is past the last character.
 pub fn scalar_text_index(text: &str, index: usize, span: Span) -> Result<Value, RunnerError> {
     let ch = text
         .chars()
         .nth(index)
         .ok_or_else(|| RunnerError::internal(span, "text index out of bounds"))?;
-    ascii1_from_scalar(ch, span)
+    if ch.is_ascii() {
+        ascii1_from_scalar(ch, span)
+    } else {
+        Ok(Value::Str(ch.to_string()))
+    }
 }
 
 /// Text of a value a `textus` consumer accepts. A scalar bracket projection

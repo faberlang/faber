@@ -178,3 +178,12 @@ fn text_range_empty_at_the_end_is_the_empty_string() {
         Value::Str(String::new())
     );
 }
+
+#[test]
+fn textus_get_non_ascii_is_the_ith_character_or_nil() {
+    assert_eq!(
+        index("Grüße", 2, optional_textus),
+        Value::Str("ü".to_owned())
+    );
+    assert_eq!(index("Grüße", 9, optional_textus), Value::Nil);
+}
