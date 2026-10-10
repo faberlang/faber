@@ -46,7 +46,7 @@ main {
     const vector<f32, 3> ∪ none hit ← normal(1)
     print hit![2]
     print v[0] + v[1] + v[2]
-    var vector<f32, 3> u ← copy v
+    var vector<f32, 3> u ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
     u[1] ← 9.0
     print u
 }
