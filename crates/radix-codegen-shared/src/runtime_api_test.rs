@@ -1008,7 +1008,7 @@ fn the_rust_gen_and_float_rows_spell_as_the_crate_root_types_and_a_float_functio
 fn the_rust_trap_rows_spell_as_faber_trap_functions_and_the_crate_root_trap_type() {
     let rows: Vec<&RuntimeItem> = TABLE
         .iter()
-        .filter(|row| row.ns == Namespace::Trap)
+        .filter(|row| row.ns == Namespace::Trap && row.targets.contains(&Target::HirRust))
         .collect();
     let spelled: Vec<(String, RuntimeKind)> = rows
         .iter()

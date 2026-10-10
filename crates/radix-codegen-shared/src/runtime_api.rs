@@ -841,6 +841,23 @@ pub const SERMO_AS_TUUS: RuntimeItem = sermo_row("as_tuus", RuntimeKind::Fn);
 pub const SERMO_READ_TEXT: RuntimeItem = sermo_row("read_text", RuntimeKind::Fn);
 pub const SERMO_READ_NUMERUS: RuntimeItem = sermo_row("read_numerus", RuntimeKind::Fn);
 pub const SERMO_DRAIN: RuntimeItem = sermo_row("drain", RuntimeKind::Fn);
+/// `sermo.read_line`: one process-wide stdin line as `string ∪ none` (Go).
+pub const SERMO_READ_LINE: RuntimeItem = sermo_row("read_line", RuntimeKind::Fn);
+
+/// `trap.text_window`: `text[start‥end]` by Unicode character, dying outside
+/// `0‥len` like the MIR runner (Go; the Rust runtime has no such helper).
+pub const TRAP_TEXT_WINDOW: RuntimeItem = RuntimeItem {
+    ns: Namespace::Trap,
+    name: "text_window",
+    kind: RuntimeKind::Fn,
+    targets: &[Target::HirGo],
+};
+
+/// The property a thrown TypeScript assertion failure carries. It is a marker
+/// on the thrown `Error`, not a runtime helper, so it has no table row; the
+/// failable conversion wrapper reads it to rethrow a program defect instead of
+/// folding it into a conversion failure.
+pub const TS_ASSERTION_MARKER: &str = "__faberAssertion";
 
 /// The targets whose runtime package carries each `regex` row. Rows differ by
 /// target: the Rust runtime carries the match operations as free functions in
@@ -1303,6 +1320,8 @@ pub const TABLE: &[RuntimeItem] = &[
     SERMO_READ_TEXT,
     SERMO_READ_NUMERUS,
     SERMO_DRAIN,
+    SERMO_READ_LINE,
+    TRAP_TEXT_WINDOW,
     REGEX_MATCHES,
     REGEX_FIND,
     REGEX_FIND_ALL,
