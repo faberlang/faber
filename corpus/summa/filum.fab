@@ -8,6 +8,7 @@ summary = "Distributed reducta via summa ex … filum kernel inside @ nucleum."
 syntax = "reducta via summa ex <tf32[32]> apud [i] filum f fixum s { redde <term> }"
 related = ["summa", "filum", "tensor"]
 locale = "la"
+no_expected = "needs-device"
 +++
 # =============================================================================
 # summa filum — distributed sum-reduce admit inside @ nucleum

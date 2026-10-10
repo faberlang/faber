@@ -8,6 +8,7 @@ summary = "Value iteration over runtime-length bytes<N> / ascii<N> / string<N> (
 syntax = "for from bytes<N> | ascii<N> | string<N> const x { }"
 related = ["bytes", "ascii", "string", "ex", "itera", "longitudo"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 # =============================================================================
 # itera-ex-scalar-buffers — Route B runtime-len scalar buffer iteration.

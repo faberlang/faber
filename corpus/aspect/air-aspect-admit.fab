@@ -8,6 +8,7 @@ summary = "Shapes the AIR proof-aspect report admits: a literal-range itera ab l
 syntax = "itera ab <literal range> fixum <ident>; return <path>"
 related = ["itera", "ab", "air-aspect-decline"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 # =============================================================================
 # air-aspect-admit — admitted AIR proof-aspect shapes.

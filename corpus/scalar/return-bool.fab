@@ -9,6 +9,7 @@ syntax = "redde <bool-literal>"
 aliases = ["return"]
 related = ["verum", "falsum", "bivalens", "functio"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 # =============================================================================
 # redde — Functions returning boolean literals via redde verum and redde falsum.

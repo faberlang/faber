@@ -7,6 +7,7 @@ summary = "Distributed `reduce via sum from … thread …` kernel inside @ kern
 syntax = "reduce via sum from <tf32[32]> at [i] thread f const s { return <term> }"
 related = ["summa", "filum", "tensor"]
 locale = "en"
+no_expected = "needs-device"
 +++
 # =============================================================================
 # sum thread — distributed sum-reduce admit inside @ kernel

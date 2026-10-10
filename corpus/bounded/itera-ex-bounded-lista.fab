@@ -8,6 +8,7 @@ summary = "Value iteration over a runtime-length list<T, N> (N <= 10) lowers to 
 syntax = "for from list<T, N> const x { }"
 related = ["lista", "ex", "itera", "longitudo"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 # =============================================================================
 # itera-ex-bounded-lista — Route B runtime-len lista iteration.

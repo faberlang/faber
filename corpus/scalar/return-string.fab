@@ -9,6 +9,7 @@ syntax = "redde <string-literal>"
 aliases = ["return"]
 related = ["textus", "functio"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 # =============================================================================
 # redde — Function returning a string literal via redde "textus".

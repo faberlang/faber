@@ -8,6 +8,7 @@ summary = "Shapes the aspect report declines: a non-literal itera ab range emits
 syntax = "itera ab <runtime range>; return <a + b>"
 related = ["radix-lane", "itera", "ab", "air-aspect-admit"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 # =============================================================================
 # air-aspect-decline — declined AIR proof-aspect shapes.

@@ -8,6 +8,7 @@ summary = "Queue and stack core kinds with optional capacity parameters."
 syntax = "queue<T[, N]> / stack<T[, N]>"
 related = ["queue", "stack"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 # =============================================================================
 # queue<T[, N]> / stack<T[, N]> — C1 declaration surface

@@ -7,6 +7,7 @@ summary = "Distributed rank-2 reduction: reducta via summa ex … apud [i, j] fi
 syntax = "reducta via summa ex <tensor> apud [i, j] filum f fixum s { redde <term> }"
 related = ["summa", "filum", "apud", "tensor"]
 locale = "la"
+no_expected = "needs-device"
 +++
 # =============================================================================
 # summa filum rank-2 — distributed reduction with two coordinates

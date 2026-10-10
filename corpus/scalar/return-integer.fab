@@ -9,6 +9,7 @@ syntax = "redde <integer-literal>"
 aliases = ["return"]
 related = ["vacuum", "functio"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 # =============================================================================
 # redde — Function returning an integer literal via redde 42.
