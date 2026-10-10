@@ -77,7 +77,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         }
         ExprKind::Ident(ident) => lowerer.lower_nomen(ident),
         ExprKind::Binary(bin) => lowerer.lower_binarius(bin),
-        ExprKind::Unary(unary) => lowerer.lower_unarius(unary),
+        ExprKind::Unary(unary) => lowerer.lower_unarius(unary, id),
         ExprKind::Ternary(ternary) => lowerer.lower_ternary(ternary),
         ExprKind::Call(call) => lowerer.lower_vocare(call, id),
         ExprKind::Member(member) => lowerer.lower_membrum(member, id),
@@ -503,7 +503,7 @@ impl Lowerer<'_> {
     }
 
     /// Lower unary expression (unarius)
-    fn lower_unarius(&mut self, unary: &UnaryExpr) -> HirExpressionKind {
+    fn lower_unarius(&mut self, unary: &UnaryExpr, id: HirId) -> HirExpressionKind {
         let operand = lower_expr(self, &unary.operand);
 
         let op = match unary.op {
@@ -514,11 +514,18 @@ impl Lowerer<'_> {
             // method twins (`pavimentum`, `tectum`, `rotunda`). The private
             // marker name lets typecheck reject a tensor operand by name and
             // then rewrite to the active pack's intrinsic surface.
+            // The node id is recorded with the glyph ids so Faber re-emission
+            // prints the authored delimiters instead of the method twin.
             radix_syntax::UnOp::Floor => {
+                self.presentation.glyph_transpose_ids.push(id);
                 return self.lower_rounding_glyph("pavimentum", operand);
             }
-            radix_syntax::UnOp::Ceil => return self.lower_rounding_glyph("tectum", operand),
+            radix_syntax::UnOp::Ceil => {
+                self.presentation.glyph_transpose_ids.push(id);
+                return self.lower_rounding_glyph("tectum", operand);
+            }
             radix_syntax::UnOp::Nearest => {
+                self.presentation.glyph_transpose_ids.push(id);
                 return self.lower_rounding_glyph("rotunda", operand);
             }
         };

@@ -1322,6 +1322,97 @@ fn transpose_without_a_recorded_glyph_stays_a_method_call() {
     );
 }
 
+/// An English-pack stand-in: the rounding twins project to their `en`
+/// intrinsic spellings, as a non-`la` reader pack does.
+struct EnRoundingSurface;
+
+impl KeywordSurface for EnRoundingSurface {
+    fn keyword(&self, kind: TokenKind) -> &str {
+        TestSurface.keyword(kind)
+    }
+
+    fn contextual_keyword(&self, key: &'static str) -> &str {
+        key
+    }
+
+    fn intrinsic_surface(&self, canonical: &str) -> Option<String> {
+        match canonical {
+            "pavimentum" => Some("floor".to_owned()),
+            "tectum" => Some("ceiling".to_owned()),
+            "rotunda" => Some("round".to_owned()),
+            _ => None,
+        }
+    }
+
+    fn type_surface(&self, kind: TypeBindingKind) -> &str {
+        TestSurface.type_surface(kind)
+    }
+}
+
+/// Render `(1 + 2).<method>()` as the printer sees a rounding twin, optionally
+/// with the node id recorded as an authored rounding glyph.
+fn render_rounding(method: &str, glyph: bool, surface: &impl KeywordSurface) -> String {
+    let types = TypeTable::new();
+    let mut interner = Interner::new();
+    let method = interner.intern(method);
+    let mut codegen = FaberCodegen::new(&types, &interner);
+    let node = HirId(300);
+    if glyph {
+        codegen.glyph_transpose_ids.insert(node);
+    }
+    let call = HirExpression {
+        id: node,
+        kind: HirExpressionKind::MethodCall(
+            Box::new(HirExpression {
+                id: HirId(301),
+                kind: sum_of_two_literals(),
+                ty: None,
+                span: span(),
+            }),
+            method,
+            Vec::new(),
+            Vec::new(),
+            None,
+        ),
+        ty: None,
+        span: span(),
+    };
+    let mut writer = radix_codegen_shared::CodeWriter::new();
+    codegen.write_expr(
+        &call,
+        &rustc_hash::FxHashMap::default(),
+        surface,
+        &mut writer,
+    );
+    writer.finish()
+}
+
+#[test]
+fn rounding_glyph_prints_its_delimiters_for_a_recorded_id() {
+    // The same three delimiter pairs in every locale: the glyphs are not
+    // translated, only the method spellings are.
+    for (canonical, localized, glyph) in [
+        ("pavimentum", "floor", "⌊1 + 2⌋"),
+        ("tectum", "ceiling", "⌈1 + 2⌉"),
+        ("rotunda", "round", "⌊1 + 2⌉"),
+    ] {
+        assert_eq!(render_rounding(canonical, true, &TestSurface), glyph);
+        assert_eq!(render_rounding(localized, true, &EnRoundingSurface), glyph);
+    }
+}
+
+#[test]
+fn rounding_twin_without_a_recorded_glyph_stays_a_method_call() {
+    assert_eq!(
+        render_rounding("pavimentum", false, &TestSurface),
+        "(1 + 2).pavimentum()"
+    );
+    assert_eq!(
+        render_rounding("floor", false, &EnRoundingSurface),
+        "(1 + 2).floor()"
+    );
+}
+
 /// Render `<place> ← <place> <op> 2` (or the unary form) as the printer sees
 /// the desugared in-place numeric twin, optionally recorded on the sidecar.
 fn render_in_place_twin(unary: bool, recorded: bool) -> String {

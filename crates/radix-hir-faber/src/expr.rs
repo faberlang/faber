@@ -270,6 +270,21 @@ impl super::FaberCodegen<'_> {
                     writer.write(")");
                 }
             }
+            HirExpressionKind::MethodCall(receiver, name, type_args, args, _)
+                if type_args.is_empty()
+                    && args.is_empty()
+                    && self.glyph_transpose_ids.contains(&expr.id)
+                    && self.rounding_delimiters(*name, surface).is_some() =>
+            {
+                // Authored `⌊x⌋` / `⌈x⌉` / `⌊x⌉`: lowering recorded the node
+                // id, typecheck rewrote the marker to the rounding twin and
+                // kept the id; the delimiters are the authored surface.
+                if let Some((open, close)) = self.rounding_delimiters(*name, surface) {
+                    writer.write(open);
+                    self.write_expr(receiver, names, surface, writer);
+                    writer.write(close);
+                }
+            }
             HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
                 if type_args.is_empty()
                     && args.is_empty()
@@ -2057,7 +2072,18 @@ impl super::FaberCodegen<'_> {
         if self.expr_precedence(receiver) > 13 {
             return None;
         }
-        let spelling = self.symbol_to_string(*name);
+        let (open, close) = self.rounding_delimiters(*name, surface)?;
+        Some((&**receiver, open, close))
+    }
+
+    /// The glyph delimiters of a rounding twin (`pavimentum` floor, `tectum`
+    /// ceiling, `rotunda` nearest), matched by canonical or localized name.
+    fn rounding_delimiters(
+        &self,
+        name: Symbol,
+        surface: &impl KeywordSurface,
+    ) -> Option<(&'static str, &'static str)> {
+        let spelling = self.symbol_to_string(name);
         let delimiters = [
             ("pavimentum", "⌊", "⌋"),
             ("tectum", "⌈", "⌉"),
@@ -2065,11 +2091,8 @@ impl super::FaberCodegen<'_> {
         ];
         delimiters.into_iter().find_map(|(canonical, open, close)| {
             let localized = surface.intrinsic_surface(canonical);
-            (spelling == canonical || localized.as_deref() == Some(spelling.as_str())).then_some((
-                &**receiver,
-                open,
-                close,
-            ))
+            (spelling == canonical || localized.as_deref() == Some(spelling.as_str()))
+                .then_some((open, close))
         })
     }
 

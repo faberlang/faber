@@ -2271,6 +2271,9 @@ pub struct HirPresentation {
     /// transpose suffix. Typecheck rewrites the glyph marker to the canonical
     /// transpose intrinsic and keeps the node id; Faber re-emission prints the
     /// glyph form (`xᵀ`) for exactly these ids instead of `.transpose()`.
+    /// Rounding delimiters (`⌊x⌋`, `⌈x⌉`, `⌊x⌉`) record their node id here too:
+    /// the id marks a glyph-authored method twin, and emission picks the
+    /// delimiters from the rewritten twin's name.
     #[serde(default)]
     pub glyph_transpose_ids: Vec<HirId>,
 
