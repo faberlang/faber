@@ -311,6 +311,9 @@ mod copy_conversio_tests;
 #[cfg(test)]
 #[path = "copy_duplicate_test.rs"]
 mod copy_duplicate_tests;
+#[cfg(test)]
+#[path = "generic_receiver_call_test.rs"]
+mod generic_receiver_call_tests;
 #[cfg(all(test, target_os = "macos"))]
 #[path = "copy_into_device_test.rs"]
 mod copy_into_device_tests;

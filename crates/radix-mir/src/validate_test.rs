@@ -14,7 +14,9 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
-use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
+use radix_types::{
+    AppliedArg, IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable,
+};
 use rustc_hash::FxHashMap;
 
 // -----------------------------------------------------------------------
@@ -5060,5 +5062,99 @@ fn tensor_extent_non_numerus_result_is_rejected() {
     assert!(
         errors.iter().any(|e| e.contains("result is not numerus")),
         "expected a result type error, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Applied (instantiated generic class) receiver for a Struct `self`
+// -----------------------------------------------------------------------
+
+/// `caller` holds a value of type `receiver` and calls `callee(self: Struct(def))`.
+fn applied_receiver_call_program(types: &mut TypeTable, base_def: DefId) -> MirProgram {
+    let class_def = DefId(1);
+    let struct_ty = types.intern(Type::Struct(class_def));
+    let base = types.intern(Type::Struct(base_def));
+    let size = types.intern_index(IndexExpr::Literal(3));
+    let applied = types.intern(Type::Applied(base, vec![AppliedArg::Size(size)]));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let block = |statements| MirBlock {
+        id: MirBlockId(0),
+        statements,
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(None),
+            span: Span::default(),
+        },
+        span: Span::default(),
+    };
+    let caller = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: MirType::semantic(applied),
+            mutable: false,
+            span: Span::default(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![block(vec![MirStatement {
+            kind: MirStatementKind::Call {
+                destination: None,
+                callee: MirCallee::Function(MirFunctionId(1)),
+                args: vec![MirOperand::Place(MirPlace {
+                    base: MirPlaceBase::Local(MirLocalId(0)),
+                    projections: Vec::new(),
+                })],
+            },
+            span: Span::default(),
+        }])],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let callee = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: MirType::semantic(struct_ty),
+            mode: MirParamMode::Owned,
+            span: Span::default(),
+        }],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![block(Vec::new())],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    MirProgram {
+        functions: vec![caller, callee],
+    }
+}
+
+#[test]
+fn applied_receiver_of_the_same_class_satisfies_a_struct_self_parameter() {
+    let mut types = TypeTable::new();
+    let program = applied_receiver_call_program(&mut types, DefId(1));
+    assert!(validate(&program, &types).is_empty());
+
+    let mut types = TypeTable::new();
+    let program = applied_receiver_call_program(&mut types, DefId(2));
+    assert!(
+        validate(&program, &types)
+            .iter()
+            .any(|message| message.contains("call argument type mismatch")),
+        "an Applied receiver of a different class is still a mismatch"
     );
 }
