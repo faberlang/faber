@@ -186,7 +186,9 @@ impl TypeChecker<'_> {
         decimal_constants: bool,
     ) -> (TypeId, TypeId) {
         let lhs_ty = self.check_comparison_operand(lhs);
-        let rhs_ty = if self.is_littera(lhs_ty) && is_ascii_literal(rhs) {
+        let rhs_ty = if let Some(ty) = self.bits_peer_literal(rhs, lhs_ty) {
+            ty
+        } else if self.is_littera(lhs_ty) && is_ascii_literal(rhs) {
             self.check_expr_with_expected(rhs, Some(lhs_ty))
         } else if let Some(ty) = decimal_constants
             .then(|| self.check_constant_beside_decimal(rhs, lhs_ty))
@@ -196,6 +198,9 @@ impl TypeChecker<'_> {
         } else {
             self.check_comparison_operand(rhs)
         };
+        if let Some(ty) = self.bits_peer_literal(lhs, rhs_ty) {
+            return (ty, rhs_ty);
+        }
         let lhs_ty = decimal_constants
             .then(|| self.check_constant_beside_decimal(lhs, rhs_ty))
             .flatten()

@@ -728,6 +728,15 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "octeti_literal_template_application" => {
             Some("use textus formatting instead of octeti literal calls".to_owned())
         }
+        "bits_arithmetic_refused" => Some(
+            "bits have no arithmetic; use the bit operations, or convert to a number type with ↦ first".to_owned(),
+        ),
+        "bits_operand_mismatch" => Some(
+            "use two values of the same bN width; a bN does not mix with numbers or other widths".to_owned(),
+        ),
+        "bits_literal_out_of_range" => {
+            Some("write a literal that fits in the bits width, such as 0xff for a b8".to_owned())
+        }
         "same_width_integer_operands_required" => {
             Some("convert integer operands to the same width before applying this operator".to_owned())
         }

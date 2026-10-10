@@ -732,7 +732,7 @@ impl TypeChecker<'_> {
         self.preferred_numeric_result_ty(lhs_resolved, rhs_resolved, lhs_shape)
     }
 
-    fn integer_shape(&self, ty: TypeId) -> Option<NumericShape> {
+    pub(super) fn integer_shape(&self, ty: TypeId) -> Option<NumericShape> {
         let shape = self.numeric_shape(ty)?;
         (shape.prim == Primitive::Numerus).then_some(shape)
     }
@@ -1063,11 +1063,18 @@ impl TypeChecker<'_> {
                     self.check_const_operand(operand);
                     return self.numerus_type();
                 }
+                if let Some(result) = self.bits_negation(operand, None, expected) {
+                    self.check_expr(operand);
+                    return result;
+                }
                 let expected = self.unary_operand_expected(operand, expected);
                 let expected = self.unary_float_cell_expected(operand, expected);
                 let operand_ty = self.check_expr_with_expected(operand, expected);
                 if self.is_error(operand_ty) {
                     return self.error_type;
+                }
+                if let Some(result) = self.bits_negation(operand, Some(operand_ty), None) {
+                    return result;
                 }
                 if self.is_infer(self.resolve_inferred_type(operand_ty)) {
                     let numerus = self.numerus_type();
@@ -1130,6 +1137,10 @@ impl TypeChecker<'_> {
                     );
                     return self.numerus_type();
                 }
+                if self.bits_width_of(operand_resolved).is_some() {
+                    // `¬` flips exactly N bits and keeps the `bN`.
+                    return self.numeric_expected_type(operand_resolved);
+                }
                 if self.integer_shape(operand_resolved).is_none() {
                     self.invalid_operand_types(INTEGER_OPERAND_REQUIRED, operand.span);
                     return self.error_type;
@@ -1165,11 +1176,17 @@ impl TypeChecker<'_> {
             (true, true) => (self.check_const_operand(lhs), self.check_const_operand(rhs)),
             (true, false) => {
                 let rhs_ty = self.check_expr(rhs);
+                if let Some(lhs_ty) = self.bits_peer_literal(lhs, rhs_ty) {
+                    return (lhs_ty, rhs_ty);
+                }
                 let peer = self.arith_peer_type(rhs_ty);
                 (self.check_const_beside(lhs, peer, expected), rhs_ty)
             }
             (false, true) => {
                 let lhs_ty = self.check_expr(lhs);
+                if let Some(rhs_ty) = self.bits_peer_literal(rhs, lhs_ty) {
+                    return (lhs_ty, rhs_ty);
+                }
                 let peer = self.arith_peer_type(lhs_ty);
                 (lhs_ty, self.check_const_beside(rhs, peer, expected))
             }
@@ -1195,6 +1212,9 @@ impl TypeChecker<'_> {
             }
             (Some(_), None) => {
                 let rhs_ty = self.check_expr(rhs);
+                if let Some(lhs_ty) = self.bits_peer_literal(lhs, rhs_ty) {
+                    return (lhs_ty, rhs_ty);
+                }
                 let peer = self.arith_peer_type(rhs_ty);
                 let lhs_expected = self
                     .literal_numeric_expected_from_peer(lhs, peer)
@@ -1204,6 +1224,9 @@ impl TypeChecker<'_> {
             }
             (None, Some(_)) => {
                 let lhs_ty = self.check_expr(lhs);
+                if let Some(rhs_ty) = self.bits_peer_literal(rhs, lhs_ty) {
+                    return (lhs_ty, rhs_ty);
+                }
                 let peer = self.arith_peer_type(lhs_ty);
                 let rhs_expected = self
                     .literal_numeric_expected_from_peer(rhs, peer)
@@ -1286,6 +1309,9 @@ impl TypeChecker<'_> {
         match op {
             HirBinOp::Add => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
                 let lhs_text = self.is_textus(lhs_ty) || self.is_ascii(lhs_ty);
                 let rhs_text = self.is_textus(rhs_ty) || self.is_ascii(rhs_ty);
                 if self.is_infer(self.resolve_inferred_type(lhs_ty)) && rhs_text {
@@ -1323,6 +1349,9 @@ impl TypeChecker<'_> {
             }
             HirBinOp::Sub => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
                 if let Some(result) =
                     self.check_queue_stack_arithmetic_bin(HirBinOp::Sub, lhs_ty, rhs_ty, lhs.span)
                 {
@@ -1345,6 +1374,9 @@ impl TypeChecker<'_> {
             }
             HirBinOp::Mul | HirBinOp::Div => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
                 if let Some(result) =
                     self.check_queue_stack_arithmetic_bin(op, lhs_ty, rhs_ty, lhs.span)
                 {
@@ -1363,6 +1395,9 @@ impl TypeChecker<'_> {
             }
             HirBinOp::Mod => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
                 if let Some(result) = self.check_lista_arithmetic_bin(op, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     return result;
@@ -1374,6 +1409,9 @@ impl TypeChecker<'_> {
             }
             HirBinOp::TrueDiv => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
+                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
                 if let Some(result) = self.check_lista_arithmetic_bin(op, lhs, rhs, lhs_ty, rhs_ty)
                 {
                     return result;
@@ -1418,6 +1456,9 @@ impl TypeChecker<'_> {
             | HirBinOp::Is
             | HirBinOp::IsNot => {
                 let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, false);
+                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
                 if !matches!(op, HirBinOp::Is | HirBinOp::IsNot)
                     && let Some(result) =
                         self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty)
@@ -1443,6 +1484,9 @@ impl TypeChecker<'_> {
             }
             HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq => {
                 let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, true);
+                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
                 if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
@@ -1493,9 +1537,12 @@ impl TypeChecker<'_> {
             | HirBinOp::BitXor
             | HirBinOp::Shl
             | HirBinOp::Shr => {
-                let (lhs_ty, rhs_ty) = self.check_integer_operands(lhs, rhs, expected);
+                let (lhs_ty, rhs_ty) = self.check_integer_operands(op, lhs, rhs, expected);
                 if self.reject_negative_shift_count(op, rhs) {
                     return self.error_type;
+                }
+                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
                 }
                 if let Some(result) =
                     self.bitwise_range_type(op, lhs, rhs, lhs_ty, rhs_ty, expected, lhs.span)
@@ -2127,10 +2174,13 @@ impl TypeChecker<'_> {
 
     fn check_integer_operands(
         &mut self,
+        op: HirBinOp,
         lhs: &mut HirExpression,
         rhs: &mut HirExpression,
         expected: Option<TypeId>,
     ) -> (TypeId, TypeId) {
+        // A shift count is an integer of any width, never a `bN`.
+        let shift = matches!(op, HirBinOp::Shl | HirBinOp::Shr);
         if !self.current_device_function {
             match (
                 integer_range::is_const_int(lhs),
@@ -2141,10 +2191,21 @@ impl TypeChecker<'_> {
                 }
                 (true, false) => {
                     let rhs_ty = self.check_expr(rhs);
+                    if !shift && let Some(lhs_ty) = self.bits_peer_literal(lhs, rhs_ty) {
+                        return (lhs_ty, rhs_ty);
+                    }
                     return (self.check_const_beside(lhs, rhs_ty, expected), rhs_ty);
                 }
                 (false, true) => {
                     let lhs_ty = self.check_expr(lhs);
+                    if self.bits_width_of(lhs_ty).is_some() {
+                        if shift {
+                            return (lhs_ty, self.check_expr(rhs));
+                        }
+                        if let Some(rhs_ty) = self.bits_peer_literal(rhs, lhs_ty) {
+                            return (lhs_ty, rhs_ty);
+                        }
+                    }
                     return (lhs_ty, self.check_const_beside(rhs, lhs_ty, expected));
                 }
                 _ => {}
@@ -2152,6 +2213,9 @@ impl TypeChecker<'_> {
         }
         if is_numeric_literal(lhs) && !is_numeric_literal(rhs) {
             let rhs_ty = self.check_expr(rhs);
+            if !shift && let Some(lhs_ty) = self.bits_peer_literal(lhs, rhs_ty) {
+                return (lhs_ty, rhs_ty);
+            }
             let lhs_ty = if self
                 .integer_shape(self.resolve_inferred_type(rhs_ty))
                 .is_some()
@@ -2164,6 +2228,9 @@ impl TypeChecker<'_> {
         }
 
         let lhs_ty = self.check_expr(lhs);
+        if !shift && let Some(rhs_ty) = self.bits_peer_literal(rhs, lhs_ty) {
+            return (lhs_ty, rhs_ty);
+        }
         let rhs_ty = if is_numeric_literal(rhs)
             && self
                 .integer_shape(self.resolve_inferred_type(lhs_ty))

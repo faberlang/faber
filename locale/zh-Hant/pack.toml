@@ -1596,6 +1596,10 @@ help = "write a value the slot holds"
 message = "整數字面量超出 numerus 的範圍"
 help = "寫 -9223372036854775808 到 9223372036854775807 之間的值，或把更大的非負值存入 `u64` 槽，或將槽宣告為 `inf`"
 
+[diagnostics.SEM010.issues.bits_literal_out_of_range]
+message = "字面量超出 bits 寬度"
+help = "寫出能放入 bits 寬度的字面量，例如 b8 使用 0xff"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "整數不能隱式轉換為浮點數"
 help = "使用 `↦` 明確轉換整數"
@@ -2083,6 +2087,14 @@ help = "移除明確的型別引數清單"
 [diagnostics.SEM011.issues.same_width_integer_operands_required]
 message = "需要相同寬度的整數運算元"
 help = "套用此運算子前，先將整數運算元轉換為相同寬度"
+
+[diagnostics.SEM011.issues.bits_arithmetic_refused]
+message = "bits 沒有算術運算"
+help = "使用位元運算，或先以 ↦ 轉換為數值型別"
+
+[diagnostics.SEM011.issues.bits_operand_mismatch]
+message = "位元運算元必須具有相同寬度，且不能與數值混用"
+help = "使用兩個相同寬度的 bN 值；bN 不與數值或其他寬度混用"
 
 [diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
 message = "字尾遞增／遞減需要 numerus 運算元"

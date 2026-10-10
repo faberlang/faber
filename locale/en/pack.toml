@@ -2297,6 +2297,10 @@ help = "write a value the slot holds"
 message = "integer literal is outside the numerus range"
 help = "write a value from -9223372036854775808 to 9223372036854775807, store a larger non-negative value in a `u64` slot, or declare the slot `inf` to hold any integer"
 
+[diagnostics.SEM010.issues.bits_literal_out_of_range]
+message = "literal does not fit in the bits width"
+help = "write a literal that fits in the bits width, such as 0xff for a b8"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
 help = "convert the integer explicitly with `↦`"
@@ -3036,6 +3040,14 @@ help = "remove the explicit type argument list"
 [diagnostics.SEM011.issues.same_width_integer_operands_required]
 message = "same-width integer operands required"
 help = "convert integer operands to the same width before applying this operator"
+
+[diagnostics.SEM011.issues.bits_arithmetic_refused]
+message = "bits have no arithmetic"
+help = "use the bit operations, or convert to a number type with ↦ first"
+
+[diagnostics.SEM011.issues.bits_operand_mismatch]
+message = "bit operands must have the same width and may not mix with numbers"
+help = "use two values of the same bN width; a bN does not mix with numbers or other widths"
 
 [diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
 message = "postfix increment/decrement requires int operand"

@@ -563,6 +563,9 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         match lit {
             HirLiteral::Int(value) => {
+                if let Some(width) = self.expected_bits_width(expected) {
+                    return self.bits_literal_type(Some(*value), width, expected, span);
+                }
                 if let Some(float_ty) = self.expected_float_slot_type(expected) {
                     return self.integer_constant_in_float_slot(*value, float_ty, span);
                 }
@@ -603,7 +606,13 @@ impl TypeChecker<'_> {
                     literal_ty
                 }
             }
-            HirLiteral::BigInt(digits) => self.big_integer_literal_type(digits, span, expected),
+            HirLiteral::BigInt(digits) => {
+                if let Some(width) = self.expected_bits_width(expected) {
+                    // Beyond `u64`: fits no `bN`.
+                    return self.bits_literal_type(None, width, expected, span);
+                }
+                self.big_integer_literal_type(digits, span, expected)
+            }
             HirLiteral::Float(_) => self
                 .expected_fractus_literal_type(expected)
                 .unwrap_or_else(|| self.fractus_type()),

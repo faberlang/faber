@@ -133,6 +133,7 @@ mod shape_obligations_test;
 mod slot_lift_test;
 mod tensor_edge_policy_generic;
 
+mod bits;
 mod closing;
 #[cfg(test)]
 #[path = "construction_source_test.rs"]
@@ -1274,6 +1275,10 @@ mod bounded_string_conversio_test;
 #[cfg(test)]
 #[path = "bits_conversio_test.rs"]
 mod bits_conversio_test;
+
+#[cfg(test)]
+#[path = "bits_operator_test.rs"]
+mod bits_operator_test;
 
 #[cfg(test)]
 #[path = "ordo_conversio_test.rs"]

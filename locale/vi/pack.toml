@@ -1596,6 +1596,10 @@ help = "write a value the slot holds"
 message = "integer literal is outside the numerus range"
 help = "write a value from -9223372036854775808 to 9223372036854775807, store a larger non-negative value in a `u64` slot, or declare the slot `inf` to hold any integer"
 
+[diagnostics.SEM010.issues.bits_literal_out_of_range]
+message = "hằng số không vừa với độ rộng của bits"
+help = "viết hằng số vừa với độ rộng của bits, ví dụ 0xff cho b8"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
 help = "convert the integer explicitly with `↦`"
@@ -2083,6 +2087,14 @@ help = "xóa danh sách đối số kiểu được chỉ rõ"
 [diagnostics.SEM011.issues.same_width_integer_operands_required]
 message = "cần các toán hạng số nguyên cùng độ rộng"
 help = "chuyển các toán hạng số nguyên về cùng độ rộng trước khi áp dụng toán tử này"
+
+[diagnostics.SEM011.issues.bits_arithmetic_refused]
+message = "bits không có phép tính số học"
+help = "dùng các phép toán bit, hoặc chuyển sang kiểu số bằng ↦ trước"
+
+[diagnostics.SEM011.issues.bits_operand_mismatch]
+message = "các toán hạng bit phải cùng độ rộng và không được trộn với số"
+help = "dùng hai giá trị bN cùng độ rộng; bN không trộn với số hoặc độ rộng khác"
 
 [diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
 message = "tăng/giảm hậu tố cần toán hạng numerus"

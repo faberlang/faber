@@ -1596,6 +1596,10 @@ help = "write a value the slot holds"
 message = "integer literal is outside the numerus range"
 help = "write a value from -9223372036854775808 to 9223372036854775807, store a larger non-negative value in a `u64` slot, or declare the slot `inf` to hold any integer"
 
+[diagnostics.SEM010.issues.bits_literal_out_of_range]
+message = "literal لا يتسع في width البتات"
+help = "اكتب literal يتسع في width البتات، مثل 0xff لـ b8"
+
 [diagnostics.SEM010.issues.integer_to_float_requires_conversio]
 message = "integer cannot convert to a float implicitly"
 help = "convert the integer explicitly with `↦`"
@@ -2083,6 +2087,14 @@ help = "أزل قائمة type argument الصريحة"
 [diagnostics.SEM011.issues.same_width_integer_operands_required]
 message = "same-width integer operands مطلوبة"
 help = "حول integer operands إلى نفس width قبل تطبيق هذا العامل"
+
+[diagnostics.SEM011.issues.bits_arithmetic_refused]
+message = "لا توجد عمليات حسابية على bits"
+help = "استخدم عمليات البتات، أو حوّل إلى نوع رقمي باستخدام ↦ أولاً"
+
+[diagnostics.SEM011.issues.bits_operand_mismatch]
+message = "يجب أن تكون operands البتات بنفس width ولا تختلط مع الأرقام"
+help = "استخدم قيمتين بنفس width لـ bN؛ لا يختلط bN مع الأرقام أو widths أخرى"
 
 [diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
 message = "postfix increment/decrement يتطلب {numerus} operand"
