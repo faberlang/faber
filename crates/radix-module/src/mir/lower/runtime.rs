@@ -829,6 +829,27 @@ impl FunctionBuilder<'_> {
             };
             return self.lower_checked_tensor_access(op, lowered_args, &[receiver_ty, index_ty], expr_ty, expr.span);
         }
+        if op == MirCollectionOp::Append
+            && self.is_bounded_append_under_handler(receiver)
+            && let (Some(item_ty), Some(receiver_ty)) =
+                (self.expr_ty(&args[0].expr), self.checked_tensor_receiver_ty(receiver))
+        {
+            // A bounded append that overflows is a recoverable failure. The
+            // bare runtime call has no error edge, so inside a `fac … cape` or
+            // `capta` it goes through a failable helper whose `TryCall` error
+            // block is the enclosing handler (the same seam as the checked
+            // tensor access above).
+            let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+            let helper = self.push_bounded_append_helper(receiver_ty, item_ty, call_ty, textus, expr.span);
+            return self.lower_failable_call(
+                MirCallee::Function(helper),
+                lowered_args,
+                call_ty,
+                textus,
+                None,
+                expr.span,
+            );
+        }
         let value = self.runtime_call_value(MirIntrinsic::Collection(op), lowered_args, call_ty, expr.span);
         if call_ty != expr_ty && self.types.nullable_inner(expr_ty.semantic_id()) == Some(call_ty.semantic_id()) {
             return Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Some(value)), expr_ty, expr.span));
@@ -4214,6 +4235,88 @@ impl FunctionBuilder<'_> {
     fn checked_tensor_receiver_ty(&mut self, receiver: &HirExpression) -> Option<MirType> {
         let ty = self.expr_ty(receiver)?;
         Some(MirType::semantic(self.method_receiver_payload_id(ty.semantic_id())))
+    }
+
+    /// Whether this `append` targets a fixed-capacity list while a `cape`
+    /// handler or `capta` boundary is open. Device bodies keep the bare op.
+    fn is_bounded_append_under_handler(&self, receiver: &HirExpression) -> bool {
+        let Some(receiver_ty) = receiver.ty else {
+            return false;
+        };
+        self.device_role.is_none()
+            && (!self.handlers.is_empty() || !self.traps.is_empty())
+            && matches!(
+                self.types.get(self.method_receiver_payload_id(receiver_ty)),
+                Type::BoundedArray { .. }
+            )
+    }
+
+    /// The helper body, for `(in receiver, item) ⇥ textus`: one `Append`.
+    /// Its capacity failure leaves the helper frame as the `textus` error, so
+    /// the caller's `TryCall` routes it to the enclosing handler.
+    fn push_bounded_append_helper(
+        &mut self,
+        receiver_ty: MirType,
+        item_ty: MirType,
+        return_ty: MirType,
+        error_ty: MirType,
+        span: Span,
+    ) -> MirFunctionId {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            Some(error_ty),
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        let mut locals = Vec::with_capacity(2);
+        for (ty, mode) in [(receiver_ty, MirParamMode::MutRef), (item_ty, MirParamMode::Owned)] {
+            let local = nested.next_local_id();
+            nested
+                .params
+                .push(MirParam { local, name: None, ty, mode, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: local, name: None, ty, mutable: false, span });
+            locals.push(local);
+        }
+        let entry = nested.fresh_block(span);
+        nested.switch_to(entry);
+        nested.runtime_call_to_place(
+            None,
+            MirIntrinsic::Collection(MirCollectionOp::Append),
+            vec![
+                MirOperand::Place(MirPlace::local(locals[0])),
+                MirOperand::Place(MirPlace::local(locals[1])),
+            ],
+            return_ty,
+            span,
+        );
+        nested.terminate_current(MirTerminatorKind::Return(None), span);
+        let blocks = nested.finish_blocks();
+        self.errors.extend(nested.errors);
+        self.synthetic_functions.push(MirFunction {
+            id,
+            source: None,
+            name: None,
+            params: nested.params,
+            locals: nested.locals,
+            temps: nested.temps,
+            blocks,
+            return_ty,
+            error_ty: Some(error_ty),
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        });
+        id
     }
 
     /// K11: whether this tensor `ponde` / `accipe` method call is the checked

@@ -7330,3 +7330,28 @@ fn a_host_function_keeps_the_storage_preserving_copy_into() {
 
     assert_eq!(dump.matches("tensor_copy_into").count(), 1, "{dump}");
 }
+
+#[test]
+fn bounded_append_inside_fac_cape_lowers_through_a_failable_helper() {
+    // Need: a fixed-capacity `appende` is a bare runtime call with no
+    // error edge, so a `fac … cape` directly around it never caught the
+    // capacity failure. Inside a handler it must lower to a `try_call` of a
+    // `textus`-channel helper whose error edge is the handler.
+    let dump = dump_source(
+        r"
+functio exemplo() → vacuum {
+    varia lista<numerus, 2> xs ← [1, 2]
+    fac { xs.appende(3) } cape err { nota err }
+}
+",
+    );
+
+    assert!(
+        dump.contains("try_call"),
+        "the append reaches the handler through a try_call: {dump}"
+    );
+    assert!(
+        dump.contains("function f1 -> ty#") && dump.contains("append"),
+        "the synthesized helper performs the append: {dump}"
+    );
+}
