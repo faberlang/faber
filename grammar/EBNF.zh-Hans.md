@@ -253,7 +253,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 # [121] dum_stmt
 dum_stmt ::= '当' expression (block_stmt | ergo_joint statement) cape_clause?
 # [122] itera_stmt
-itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expression | '范围' expression (',' expression)*) apud_clause? ('常量' | '变量') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expression | '范围' expression (',' expression)*) apud_clause? filum_clause? ('常量' | '变量') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [123] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [124] apud_clause
@@ -2849,6 +2849,13 @@ en reader spelling is "at": `遍历 取自 grid 于 [r, c]` reads as iterating
   (element iteration); `遍历 范围` range loops and `遍历 借自` reject it.
 - The coordinate names are immutable index bindings scoped to the loop body,
   distinct from the element binder that follows the clause.
+- **`线程` lane binder (FLD K2).** An optional `线程 IDENTIFIER` clause
+  (`filum_clause`, shared with `归约`) follows the `于` clause and
+  precedes the mutability marker: `遍历 取自 t 于 [i, j] 线程 f 常量 v { … }`.
+  The clause also parses without `于` (`遍历 取自 t 线程 f 常量 v { … }`).
+  The parser claims `线程` only in that slot, so a binder named `线程` after
+  the mutability marker stays an ordinary name. The binder is declared
+  metadata; semantic passes own what it binds.
 
 **Composite-key index (D3.2, D3.3).** The same bracket-list shape indexes a
 composite key outside a loop, too: on a `tabula<元组<K1, …, Kn>, V>`,
@@ -2885,7 +2892,6 @@ typing, and lowering work is complete; each row records that state.
 | Construct | State |
 | --------- | ----- |
 | `执行 全部 { … } 捕获 e { … }` (en `do all`) | admitted (FLD K1); `执行 全部` is `PARSE001` |
-| `遍历 取自 t 于 [i, j] 线程 f 常量 v { … }` | admitted (FLD K2); `遍历` does not own a `线程` clause. Reduction forms own that clause. |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `匹配` lowering | parses and is coverage-checked; lowered only by the Rust emitter |

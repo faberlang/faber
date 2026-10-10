@@ -253,7 +253,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 # [121] dum_stmt
 dum_stmt ::= 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 # [122] itera_stmt
-itera_stmt ::= 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [123] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [124] apud_clause
@@ -2849,6 +2849,13 @@ en reader spelling is "at": `itera ex grid apud [r, c]` reads as iterating
   (element iteration); `itera ab` range loops and `itera de` reject it.
 - The coordinate names are immutable index bindings scoped to the loop body,
   distinct from the element binder that follows the clause.
+- **`filum` lane binder (FLD K2).** An optional `filum IDENTIFIER` clause
+  (`filum_clause`, shared with `reducta`) follows the `apud` clause and
+  precedes the mutability marker: `itera ex t apud [i, j] filum f fixum v { … }`.
+  The clause also parses without `apud` (`itera ex t filum f fixum v { … }`).
+  The parser claims `filum` only in that slot, so a binder named `filum` after
+  the mutability marker stays an ordinary name. The binder is declared
+  metadata; semantic passes own what it binds.
 
 **Composite-key index (D3.2, D3.3).** The same bracket-list shape indexes a
 composite key outside a loop, too: on a `tabula<iuncta<K1, …, Kn>, V>`,
@@ -2885,7 +2892,6 @@ typing, and lowering work is complete; each row records that state.
 | Construct | State |
 | --------- | ----- |
 | `fac omnia { … } cape e { … }` (en `do all`) | admitted (FLD K1); `fac omnia` is `PARSE001` |
-| `itera ex t apud [i, j] filum f fixum v { … }` | admitted (FLD K2); `itera` does not own a `filum` clause. Reduction forms own that clause. |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |

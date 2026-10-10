@@ -1231,7 +1231,7 @@ dum_stmt  := 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 # identifier, not a destructuring wildcard. `ex` and `ab` admit the
 # comma-separated source series (`ex` lockstep zip, `ab` Cartesian product);
 # `de` stays single-source. Patterns bind only the single-source form.
-itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 itera_binding := array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # `apud` (C7, D3.1-D3.4): one name binds a `lista` position, a `tabula` key,
 # or (for a composite `tabula<iuncta<K1, …, Kn>, V>`) N names for the parts of
