@@ -7,6 +7,8 @@ summary = "A name declared outside a loop and given away inside its body moves o
 syntax = "while c { eat(own a) }"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM050:moved_in_loop"
 +++
 # =============================================================================
 # mutabilitas — own argument: moved in loop (moved_in_loop)

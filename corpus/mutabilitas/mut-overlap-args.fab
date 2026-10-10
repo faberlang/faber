@@ -7,6 +7,8 @@ summary = "MU-4 red: the same value passed to two mut parameters conflicts."
 syntax = "fn swap(mut list<int> a, mut list<int> b); swap(xs, xs)"
 related = ["mut"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM052:mutable_borrow_conflict"
 +++
 # =============================================================================
 # mutabilitas — overlapping mut arguments (MU-4)

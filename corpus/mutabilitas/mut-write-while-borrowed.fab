@@ -7,6 +7,8 @@ summary = "MU-4 red: write of a source while a mut local borrows it is SEM052."
 syntax = "var mut list<int> b ← a; a.append(4)"
 related = ["mut"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM052:write_while_borrowed"
 +++
 # =============================================================================
 # mutabilitas — write while borrowed (MU-4)

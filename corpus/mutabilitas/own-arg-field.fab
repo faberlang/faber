@@ -7,6 +7,8 @@ summary = "An own argument must be a whole local binding: a field is own_argumen
 syntax = "eat(own b.xs)"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:own_argument_not_local_binding"
 +++
 # =============================================================================
 # mutabilitas — own argument: field (own_argument_not_local_binding)

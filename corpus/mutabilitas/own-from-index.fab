@@ -7,6 +7,8 @@ summary = "MU-3 red: index projection into own rejects with copy suggestion."
 syntax = "const own list<int> b ← xs[0]"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:index_into_own"
 +++
 # =============================================================================
 # mutabilitas — index into own bind (MU-3)

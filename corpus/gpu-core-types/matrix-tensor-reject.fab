@@ -7,6 +7,8 @@ summary = "matrix<T, [R, C]> is not a tensor<T, [R, C]> alias."
 syntax = "matrix<T, [R, C]> != tensor<T, [R, C]>"
 related = ["tensor"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:expression_type_mismatch"
 +++
 # =============================================================================
 # matrix — matrix<T, [R, C]> is not a tensor<T, [R, C]> alias

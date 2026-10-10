@@ -7,6 +7,8 @@ summary = "MU-4 red: mut local after a live ref local of the same source is SEM0
 syntax = "const ref list<int> r ← a; var mut list<int> b ← a"
 related = ["mut", "ref"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM052:mutable_borrow_conflict"
 +++
 # =============================================================================
 # mutabilitas — mut vs live ref (MU-4)

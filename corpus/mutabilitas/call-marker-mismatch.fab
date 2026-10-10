@@ -7,6 +7,8 @@ summary = "A call marker that differs from the parameter marker is call_marker_m
 syntax = "bump(own a) where bump takes mut"
 related = ["mut"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:call_marker_mismatch"
 +++
 # =============================================================================
 # mutabilitas — call marker mismatch (SEM057)

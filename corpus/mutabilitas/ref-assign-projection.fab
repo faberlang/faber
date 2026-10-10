@@ -7,6 +7,8 @@ summary = "MU-2 red: projection assignment through a ref root is rejected."
 syntax = "const ref list<int> xs; xs[0] ← 9"
 related = ["ref", "lista"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM056:assign_through_ref"
 +++
 # =============================================================================
 # mutabilitas — ref projection assignment (MU-2)

@@ -8,6 +8,8 @@ summary = "Retired numeric marker hole numerus<_> (expect parse error)."
 syntax = "numerus<_> — retired marker hole, rejected at parse time (numeric_wrapper_retired); write bare numerus or a bare marker"
 related = ["numerus", "fractus"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE040:numeric_wrapper_retired"
 +++
 
 # =============================================================================

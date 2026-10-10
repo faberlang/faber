@@ -7,6 +7,8 @@ summary = "A write or ownership marker on a read-only parameter is call_marker_o
 syntax = "peek(mut a) where peek takes a read parameter"
 related = ["mut"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:call_marker_on_read_only"
 +++
 # =============================================================================
 # mutabilitas — call marker on read only (SEM057)

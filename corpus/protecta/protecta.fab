@@ -10,6 +10,8 @@ syntax = "@ protecta"
 aliases = ["protected"]
 related = ["publica", "privata"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM018:protecta_reserved"
 +++
 
 # =============================================================================

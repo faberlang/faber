@@ -7,6 +7,8 @@ summary = "MU-3 red: use of an own source after bind-site transfer is SEM050."
 syntax = "const own list<int> b ← a; print a"
 related = ["own"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM050:use_after_move"
 +++
 # =============================================================================
 # mutabilitas — own use after move (MU-3)

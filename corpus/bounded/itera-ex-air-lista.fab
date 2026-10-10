@@ -8,6 +8,8 @@ summary = "AIR-lane itera ex over a proven-full bounded lista unrolls guard-free
 syntax = "@ radix lane \"air\"; itera ex lista<T, N>"
 related = ["lista", "ex", "itera", "radix"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM059:itera_loop"
 +++
 
 # =============================================================================

@@ -7,6 +7,8 @@ summary = "An own argument must be a whole local binding: an element is own_argu
 syntax = "eat(own rows[0])"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:own_argument_not_local_binding"
 +++
 # =============================================================================
 # mutabilitas — own argument: element (own_argument_not_local_binding)

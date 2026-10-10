@@ -7,6 +7,8 @@ summary = "atomic<T> v1 accepts only i32 and u32 elements."
 syntax = "atomic<i32> | atomic<u32>"
 related = ["numerus"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:atomic_element"
 +++
 # =============================================================================
 # atomic — atomic<T> v1 accepts only i32 and u32 elements

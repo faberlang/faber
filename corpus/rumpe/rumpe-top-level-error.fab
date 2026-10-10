@@ -7,6 +7,8 @@ canonical = false
 summary = "compile error when rumpe has no enclosing breakable block"
 related = ["fac", "dum"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM030:break_outside_breakable"
 +++
 
 # =============================================================================

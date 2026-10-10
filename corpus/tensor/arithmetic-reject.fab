@@ -8,6 +8,8 @@ summary = "Tensor arithmetic rejects non-numeric elements and mixed numeric widt
 syntax = "tensor + other"
 related = ["tensor", "typus", "conversio"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:expression_type_mismatch"
 +++
 
 # =============================================================================

@@ -7,6 +7,8 @@ summary = "MU-3 red: live unmarked source into own rejects with copy suggestion.
 syntax = "const own list<int> b ← unmarked_a"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:unmarked_into_own"
 +++
 # =============================================================================
 # mutabilitas — unmarked live into own (MU-3)

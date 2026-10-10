@@ -8,6 +8,8 @@ summary = "sparsa rejects non-numeric element types in v1."
 syntax = "sparsa<textus, [N]> — rejected"
 related = ["sparsa", "tensor"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:sparsa_element_non_numeric"
 +++
 
 # =============================================================================

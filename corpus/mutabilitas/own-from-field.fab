@@ -7,6 +7,8 @@ summary = "MU-3 red: field projection into own rejects with copy suggestion."
 syntax = "const own list<int> b ← p.friends"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:field_into_own"
 +++
 # =============================================================================
 # mutabilitas — field into own bind (MU-3)

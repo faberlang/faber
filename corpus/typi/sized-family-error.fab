@@ -8,6 +8,8 @@ summary = "Retired wrapped numeric type with a float marker (expect parse error)
 syntax = "numerus<f32> — retired wrapped form, rejected at parse time (numeric_wrapper_retired); use f32"
 related = ["numerus", "fractus"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE040:numeric_wrapper_retired"
 +++
 
 # =============================================================================

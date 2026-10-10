@@ -7,6 +7,8 @@ summary = "MU-2 red: passing a ref value into a mut position is rejected."
 syntax = "fn poke(mut list<int> xs); poke(ref_value)"
 related = ["ref", "mut"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:ref_to_mut_or_own_position"
 +++
 # =============================================================================
 # mutabilitas — ref into mut (MU-2)

@@ -7,6 +7,8 @@ summary = "A module constant cannot be given away as own: own_argument_module_co
 syntax = "eat(own K)"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:own_argument_module_constant"
 +++
 # =============================================================================
 # mutabilitas — own argument: module constant (own_argument_module_constant)

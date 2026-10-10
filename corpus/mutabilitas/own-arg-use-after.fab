@@ -7,6 +7,8 @@ summary = "After eat(own a) the name a is dead: a later use is use_after_own, bl
 syntax = "eat(own a); a.length()"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM050:use_after_own"
 +++
 # =============================================================================
 # mutabilitas — own argument: use after own (use_after_own)

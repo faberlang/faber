@@ -8,6 +8,8 @@ summary = "Dense/sparse conversio rejects shape-changing representation conversi
 syntax = "tensor<T, F> ↦ sparsa<T, G> — rejected when F != G"
 related = ["sparsa", "tensor", "↦"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM016:sparsa_tensor_shape_mismatch"
 +++
 
 # =============================================================================

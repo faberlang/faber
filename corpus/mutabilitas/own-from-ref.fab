@@ -7,6 +7,8 @@ summary = "MU-3 red: ref source into own rejects with copy suggestion."
 syntax = "const own list<int> b ← ref_a"
 related = ["own", "ref", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:ref_into_own"
 +++
 # =============================================================================
 # mutabilitas — ref into own bind (MU-3)

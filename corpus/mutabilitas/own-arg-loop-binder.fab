@@ -7,6 +7,8 @@ summary = "An itera binder aliases a live element and cannot be given away as ow
 syntax = "for from rows const row { eat(own row) }"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:own_argument_loop_binder"
 +++
 # =============================================================================
 # mutabilitas — own argument: loop binder (own_argument_loop_binder)

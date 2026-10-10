@@ -7,6 +7,8 @@ summary = "A closure that captured a name before it was given away reads a dead 
 syntax = "const f ← () → int ∴ a.length(); eat(own a); f()"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM050:moved_name_captured_by_closure"
 +++
 # =============================================================================
 # mutabilitas — own argument: captured by closure (moved_name_captured_by_closure)

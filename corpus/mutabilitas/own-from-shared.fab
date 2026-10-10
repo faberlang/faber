@@ -7,6 +7,8 @@ summary = "MU-3 red: branched shared RHS into own rejects with copy suggestion."
 syntax = "const own list<int> c ← if cond { a } else { b }"
 related = ["own", "copy"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:shared_into_own"
 +++
 # =============================================================================
 # mutabilitas — shared branch into own bind (MU-3)

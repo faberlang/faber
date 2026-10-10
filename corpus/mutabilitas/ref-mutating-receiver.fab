@@ -7,6 +7,8 @@ summary = "MU-2 red: mutating receiver intrinsic through a ref root is rejected.
 syntax = "const ref list<int> xs; xs.append(4)"
 related = ["ref", "lista"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM056:mutating_receiver_through_ref"
 +++
 # =============================================================================
 # mutabilitas — ref mutating receiver (MU-2)

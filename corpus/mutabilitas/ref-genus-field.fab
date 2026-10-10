@@ -7,6 +7,8 @@ summary = "MU-2 red: mutating a referential field of a ref genus is rejected."
 syntax = "const ref Person p; p.friends.append(3)"
 related = ["ref", "genus"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM056:mutating_receiver_through_ref"
 +++
 # =============================================================================
 # mutabilitas — ref genus field transitivity (MU-2)

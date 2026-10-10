@@ -7,6 +7,8 @@ summary = "A mut parameter called without the mut marker is call_marker_missing.
 syntax = "bump(a) where bump takes mut"
 related = ["mut"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:call_marker_missing"
 +++
 # =============================================================================
 # mutabilitas — call marker missing (SEM057)

@@ -7,6 +7,8 @@ summary = "MU-2 red: passing a ref value into an own position is rejected."
 syntax = "fn take(own list<int> xs); take(ref_value)"
 related = ["ref", "own"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:ref_to_mut_or_own_position"
 +++
 # =============================================================================
 # mutabilitas — ref into own (MU-2)
