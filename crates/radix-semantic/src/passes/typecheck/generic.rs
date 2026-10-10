@@ -365,7 +365,9 @@ impl TypeChecker<'_> {
         // diagnosed error. The scalar result type is not the tensor the
         // caller meant, so the call takes the type its context expects
         // instead of cascading a second mismatch.
-        if self.check_call_args_lifting(&sig, args, span, user_function, markers) {
+        let axis_key = callee.or(if user_function { None } else { policy_callee });
+        let axis = axis_key.and_then(|key| self.axis_params.get(&key).cloned());
+        if self.check_call_args_lifting(&sig, args, span, user_function, markers, axis.as_deref()) {
             return expected.unwrap_or(self.error_type);
         }
         // A result that only needs a checked integer store to reach the slot

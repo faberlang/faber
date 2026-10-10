@@ -350,6 +350,9 @@ pub(crate) struct TypeChecker<'a> {
     /// reduction body may call them; the filum pass proves the callee body
     /// writes nothing.
     pub inlinable_kernels: FxHashSet<DefId>,
+    /// Per declared function or method, which parameters are `axis`
+    /// markers: the call must echo `axis` on exactly those.
+    pub axis_params: FxHashMap<DefId, Vec<bool>>,
 
     /// Method nucleum roles keyed by (struct-or-interface def, method name).
     pub method_nucleum_roles: FxHashMap<(DefId, Symbol), NucleumRole>,
@@ -814,6 +817,7 @@ impl<'a> TypeChecker<'a> {
             functions: FxHashMap::default(),
             nucleum_roles: FxHashMap::default(),
             inlinable_kernels: FxHashSet::default(),
+            axis_params: FxHashMap::default(),
             method_nucleum_roles: FxHashMap::default(),
             method_defs: FxHashMap::default(),
             instance_method_defs: FxHashSet::default(),
@@ -1072,6 +1076,10 @@ pub mod test_support;
 #[cfg(test)]
 #[path = "access_operand_test.rs"]
 mod access_operand_test;
+
+#[cfg(test)]
+#[path = "axis_marker_test.rs"]
+mod axis_marker_test;
 
 #[cfg(test)]
 #[path = "ascii_cursor_test.rs"]
