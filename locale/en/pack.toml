@@ -1164,6 +1164,10 @@ help = "use the type spelling declared by this reader locale{?expected|: '|'}"
 message = "'{value}' is the null value, not a type"
 help = "the null type is '{type}'; write '{type}' where a type is required"
 
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`is` tests types; '{value}' is a value"
+help = "compare values with the equality family: `≡` (strict), `≅` (promoted-exact), `≈` (fuzzy); to test for the null type, write `x is {type}`"
+
 [diagnostics.PARSE041]
 message = "invalid type annotation"
 help = "check type annotation form"

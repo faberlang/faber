@@ -941,6 +941,10 @@ help = "utere scriptura typi in hac lectoris lingua declarata{?expected|: '|'}"
 message = "'{value}' est valor nullus, non typus"
 help = "typus nullus est '{type}'; scribe '{type}' ubi typus requiritur"
 
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` typos probat; '{value}' est valor"
+help = "compara valores per familiam aequalitatis: `≡` (stricta), `≅` (promota-exacta), `≈` (fuzzy); ut typum nullum probes, scribe `x est {type}`"
+
 [diagnostics.PARSE041]
 message = "invalid type annotation"
 help = "check type annotation form"

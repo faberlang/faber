@@ -731,6 +731,10 @@ help = "viết `{bare}` thay vì `{form}`; dấu hiệu độ rộng tự nó l�
 message = "type '{type}' is not declared on this reader surface"
 help = "dùng chính tả kiểu được khai báo trong ngôn ngữ đọc này{?expected|: '|'}"
 
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` kiểm tra kiểu; '{value}' là một giá trị"
+help = "so sánh giá trị bằng họ toán tử bằng nhau: `≡` (chặt), `≅` (chính xác sau khi nâng kiểu), `≈` (mờ); để kiểm tra kiểu null, viết `x est {type}`"
+
 [diagnostics.PARSE041]
 message = "chú thích kiểu không hợp lệ"
 help = "kiểm tra dạng chú thích kiểu"

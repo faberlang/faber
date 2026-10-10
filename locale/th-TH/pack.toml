@@ -731,6 +731,10 @@ help = "เขียน `{bare}` แทน `{form}`; ตัวระบุคว
 message = "type '{type}' is not declared on this reader surface"
 help = "ใช้การสะกดชนิดที่ประกาศในภาษาของตัวอ่านนี้{?expected|: '|'}"
 
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` ทดสอบชนิด; '{value}' เป็นค่า"
+help = "เปรียบเทียบค่าด้วยกลุ่มตัวดำเนินการความเท่ากัน: `≡` (เข้มงวด), `≅` (ตรงเป๊ะหลังการเลื่อนชนิด), `≈` (คลุมเครือ); หากต้องการทดสอบชนิด null ให้เขียน `x est {type}`"
+
 [diagnostics.PARSE041]
 message = "คำอธิบายชนิดไม่ถูกต้อง"
 help = "ตรวจรูปแบบคำอธิบายชนิด"

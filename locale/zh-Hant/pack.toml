@@ -731,6 +731,10 @@ help = "寫 `{bare}`，不要寫 `{form}`；寬度標記本身就是型別"
 message = "type '{type}' is not declared on this reader surface"
 help = "使用此讀者語言中宣告的類型拼寫{?expected|：'|'}"
 
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` 用於測試型別；'{value}' 是一個值"
+help = "請用相等運算子家族比較值：`≡`（嚴格）、`≅`（提升後精確）、`≈`（模糊）；要測試 null 型別，請寫 `x est {type}`"
+
 [diagnostics.PARSE041]
 message = "無效型別註記"
 help = "檢查型別註記形式"

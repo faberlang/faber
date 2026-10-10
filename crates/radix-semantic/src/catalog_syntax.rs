@@ -915,6 +915,10 @@ fn invalid_type_message(args: &[DiagnosticArg]) -> Option<String> {
             let value = arg_value(args, "value")?;
             Some(format!("`{value}` is the null value, not a type"))
         }
+        "est_value_literal_names_equality" => {
+            let value = arg_value(args, "value")?;
+            Some(format!("`est` tests types; `{value}` is a value"))
+        }
         "lista_sugar_bracket_form" => Some("lista sugar has no bracket form".to_owned()),
         "matrix_sugar_missing_shape" => {
             Some("matrix sugar requires a two-dimensional bracket shape".to_owned())
@@ -950,6 +954,12 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
             let ty = arg_value(args, "type")?;
             Some(format!(
                 "the null type is `{ty}`; write `{ty}` where a type is required"
+            ))
+        }
+        "est_value_literal_names_equality" => {
+            let ty = arg_value(args, "type")?;
+            Some(format!(
+                "compare values with the equality family: `≡` (strict), `≅` (promoted-exact), `≈` (fuzzy); to test for the null type, write `x est {ty}`"
             ))
         }
         "lista_sugar_bracket_form" => Some("use tensor sugar for shaped buffers".to_owned()),

@@ -731,6 +731,10 @@ help = "اكتب `{bare}` بدلا من `{form}`؛ علامة العرض هي ن
 message = "type '{type}' is not declared on this reader surface"
 help = "استخدم تهجئة النوع المعلنة في لغة القارئ هذه{?expected|: '|'}"
 
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` يختبر الأنواع؛ '{value}' قيمة"
+help = "قارن القيم بعائلة المساواة: `≡` (صارمة)، `≅` (دقيقة بعد الترقية)، `≈` (تقريبية)؛ لاختبار النوع الفارغ اكتب `x est {type}`"
+
 [diagnostics.PARSE041]
 message = "تعليمة نوع غير صالحة"
 help = "تحقق من صيغة تعليمة النوع"

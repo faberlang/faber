@@ -731,6 +731,10 @@ help = "`{form}` की जगह `{bare}` लिखें; width marker स्�
 message = "type '{type}' is not declared on this reader surface"
 help = "इस reader locale में घोषित टाइप वर्तनी का उपयोग करें{?expected|: '|'}"
 
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` प्रकार जाँचता है; '{value}' एक मान है"
+help = "मानों की तुलना समानता परिवार से करें: `≡` (सख्त), `≅` (प्रोमोशन के बाद सटीक), `≈` (अस्पष्ट); null प्रकार जाँचने के लिए `x est {type}` लिखें"
+
 [diagnostics.PARSE041]
 message = "अमान्य प्रकार annotation"
 help = "प्रकार annotation रूप जांचें"
