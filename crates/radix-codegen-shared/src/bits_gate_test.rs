@@ -17,16 +17,20 @@ fn width_changing_list_decode_is_refused_by_name() {
     let (source, target) = (list_of(&mut types, b8), list_of(&mut types, u16_ty));
     let error = reject_list_width_decode(&types, Some(source), target, true, "HirRust")
         .expect_err("a width-changing list decode is refused");
+    let args = error
+        .args
+        .iter()
+        .map(|arg| (arg.name, arg.value.as_str()))
+        .collect::<Vec<_>>();
     assert_eq!(
-        error.message,
-        "the conversion `list<b8>` to `list<u16>` through a byte order (`via Le` or `via Be`) \
-         is not supported on the HirRust target yet"
-    );
-    assert!(
-        error
-            .args
-            .iter()
-            .any(|arg| format!("{arg:?}").contains("bits_conversion_unsupported_on_target"))
+        args,
+        [
+            ("issue", "bits_conversion_unsupported_on_target"),
+            ("from", "list<b8>"),
+            ("to", "list<u16>"),
+            ("target", "HirRust"),
+        ],
+        "{error:?}"
     );
 }
 
@@ -57,10 +61,20 @@ fn list_text_conversion_matches_both_directions_of_bits_and_text() {
     );
     let error = reject_list_text_conversion(&types, Some(bytes), text, "HirGo")
         .expect_err("the text decode is refused");
+    let args = error
+        .args
+        .iter()
+        .map(|arg| (arg.name, arg.value.as_str()))
+        .collect::<Vec<_>>();
     assert_eq!(
-        error.message,
-        "the conversion `list<b8>` to `string` (UTF-8, UTF-16 or UTF-32 text) \
-         is not supported on the HirGo target yet"
+        args,
+        [
+            ("issue", "bits_conversion_unsupported_on_target"),
+            ("from", "list<b8>"),
+            ("to", "string"),
+            ("target", "HirGo"),
+        ],
+        "{error:?}"
     );
 }
 

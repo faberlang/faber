@@ -269,7 +269,10 @@ fn octeti_literal_matches_in_elige_pattern() {
 #[test]
 fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
     let session = test_session(Target::HirRust);
-    let source = "functio firstByte(octeti buf) → u8 {\n    fixum b8 b ← buf.accipe(0)\n    redde b ↦ u8\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    fixum u8 a ← firstByte(sig)\n    fixum b8 raw ← sig.accipe(1)\n    sig.appende(raw)\n    nota a\n}\n";
+    // `accipe` is the optional read (`b8 ∪ nihil`), and an optional into a plain
+    // cell is SEM010 optional_into_plain_cell (sb300 1d034eee1e, need),
+    // so each read is coalesced with a b8 default.
+    let source = "functio firstByte(octeti buf) → u8 {\n    fixum b8 b ← buf.accipe(0) vel (0 ∷ b8)\n    redde b ↦ u8\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    fixum u8 a ← firstByte(sig)\n    fixum b8 raw ← sig.accipe(1) vel (0 ∷ b8)\n    sig.appende(raw)\n    nota a\n}\n";
     let result = compile(&session, "octet_builtin.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;

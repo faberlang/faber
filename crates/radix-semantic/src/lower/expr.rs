@@ -534,7 +534,7 @@ impl Lowerer<'_> {
         operand: HirExpression,
     ) -> HirExpressionKind {
         // Intern the pack surface so typecheck's lookup finds it.
-        let _ = self.intrinsic_surface_symbol(canonical);
+        self.intrinsic_surface_symbol(canonical);
         let marker = self
             .interner
             .intern(&format!("{ROUNDING_GLYPH_MARKER}{canonical}"));

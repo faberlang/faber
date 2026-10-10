@@ -1440,7 +1440,7 @@ fn first_match_over_array_literal_reemits_with_meaning_intact() {
         result
             .diagnostics
             .iter()
-            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .map(|diag| (diag.code, diag.issue(), &diag.args))
             .collect::<Vec<_>>()
     );
     let emitted = result.output.expect("emit should produce output").code;
