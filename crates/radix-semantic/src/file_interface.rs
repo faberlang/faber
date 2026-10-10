@@ -347,6 +347,7 @@ pub enum InterfaceTypeSnapshot {
     Stack(Box<InterfaceTypeSnapshot>),
     BoundedStack(Box<InterfaceTypeSnapshot>, InterfaceIndexSnapshot),
     Map(Box<InterfaceTypeSnapshot>, Box<InterfaceTypeSnapshot>),
+    Ledger(Box<InterfaceTypeSnapshot>, Box<InterfaceTypeSnapshot>),
     Record(BTreeMap<String, InterfaceTypeSnapshot>),
     Set(Box<InterfaceTypeSnapshot>),
     Promissum(Box<InterfaceTypeSnapshot>),
@@ -738,6 +739,22 @@ fn snapshot_interface_type_inner(
             )?),
             snapshot_interface_index(*capacity, types, interner)?,
         )),
+        Type::Ledger(key, value) => Ok(InterfaceTypeSnapshot::Ledger(
+            Box::new(snapshot_interface_type_inner(
+                *key,
+                types,
+                interner,
+                resolver,
+                module_identity,
+            )?),
+            Box::new(snapshot_interface_type_inner(
+                *value,
+                types,
+                interner,
+                resolver,
+                module_identity,
+            )?),
+        )),
         Type::Map(key, value) => Ok(InterfaceTypeSnapshot::Map(
             Box::new(snapshot_interface_type_inner(
                 *key,
@@ -1057,6 +1074,11 @@ fn import_interface_type_inner(
             let key = import_interface_type_inner(key, types, interner, resolver)?;
             let value = import_interface_type_inner(value, types, interner, resolver)?;
             Ok(types.map(key, value))
+        }
+        InterfaceTypeSnapshot::Ledger(key, value) => {
+            let key = import_interface_type_inner(key, types, interner, resolver)?;
+            let value = import_interface_type_inner(value, types, interner, resolver)?;
+            Ok(types.ledger(key, value))
         }
         InterfaceTypeSnapshot::Record(fields) => {
             let mut remapped = Vec::with_capacity(fields.len());

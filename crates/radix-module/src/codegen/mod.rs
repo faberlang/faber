@@ -87,6 +87,10 @@ mod copy_into_emit_test;
 #[cfg(test)]
 #[path = "bits_type_gate_test.rs"]
 mod bits_type_gate_test;
+
+#[cfg(test)]
+#[path = "ledger_type_gate_test.rs"]
+mod ledger_type_gate_test;
 #[cfg(test)]
 #[path = "list_window_gate_test.rs"]
 mod list_window_gate_test;
@@ -372,6 +376,7 @@ pub fn generate_from_analyzed_with_options(
 ) -> Result<crate::Output, CodegenError> {
     radix_codegen_shared::reject_hir_errors(&analysis.hir)?;
     radix_codegen_shared::reject_bits_type(&analysis.types, target)?;
+    radix_codegen_shared::reject_ledger_type(&analysis.types, target)?;
     if !target.is_available() {
         return Err(unavailable_target_error(target));
     }
@@ -1096,6 +1101,7 @@ pub fn generate_rust_cli(
     {
         radix_codegen_shared::reject_hir_errors(hir)?;
         radix_codegen_shared::reject_bits_type(types, Target::HirRust)?;
+        radix_codegen_shared::reject_ledger_type(types, Target::HirRust)?;
         reject_rust_unsupported_types(types)?;
         let hir = hir.without_unavailable_declarations(interner);
         let hir = &*hir;
@@ -1121,6 +1127,7 @@ pub fn generate_go_cli(
     #[cfg(feature = "hir-go")]
     {
         radix_codegen_shared::reject_bits_type(types, Target::HirGo)?;
+        radix_codegen_shared::reject_ledger_type(types, Target::HirGo)?;
         let hir = hir.without_unavailable_declarations(interner);
         go::generate_go_cli(&hir, types, interner, cli_program)
     }

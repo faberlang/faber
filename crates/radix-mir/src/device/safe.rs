@@ -347,6 +347,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             Type::Array(_)
             | Type::Tuple(_)
             | Type::Map(_, _)
+            | Type::Ledger(_, _)
             | Type::Record(_)
             | Type::Set(_)
             | Type::Promissum(_)

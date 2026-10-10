@@ -1961,6 +1961,7 @@ matrix and the numeric model; this file states only the language.
 | `stack<T>`     | shipped; unbounded LIFO stack |
 | `stack<T, N>`  | shipped; bounded LIFO stack; `N` is a `kích_thước` / `NATURAL` capacity, not a width marker. `stack<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `tabula<K,V>`  | map      |
+| `tabulae<K,V>` | ledger: a map that keeps its entries in insertion order (en `ledger`); `tabula` and `tabulae` sit one letter apart on purpose, "two shades of the same thing" (Roman account books were `tabulae`). Parses and type-checks in every type slot a map is accepted; every operation on a ledger value is refused (`ledger_operation_not_implemented`) until the operations land. |
 | `copia<T>`     | set      |
 | `promissum<T>` | promise  |
 | `cursor<T>`    | iterator |
@@ -2085,14 +2086,17 @@ iteration of its own axis.
 
 **Iteration order.** A type whose order is part of its value iterates in that
 order. `lista` iterates by index. `textus` iterates its characters in order.
-`tensor`, `vector`, and `matrix` iterate by index, outer axis first
-(row-major). Two equal values always iterate identically.
+`tabulae` (the ledger) iterates its entries in insertion order; updating the
+value of an existing key keeps the key's position, and removing a key then
+adding it again appends it. `tensor`, `vector`, and `matrix` iterate by index,
+outer axis first (row-major). Two equal values always iterate identically; for
+a `tabulae` the order is part of its value, so two ledgers with the same
+entries in a different order are not equal.
 
 `copia` and `tabula` iterate in unspecified order. The order is not promised
 and not deliberately random; backends may differ. When order matters, sort
-explicitly. `≡` on these types stays structural and does not depend on order.
-A map or set that promises an order is a separate library type, not a mode of
-`tabula` or `copia`.
+explicitly, or use a `tabulae`. `≡` on these types stays structural and does
+not depend on order.
 
 **Set display.** `print`, a `§` hole in a template and a composite print show a
 `copia` in the list shape: `[3, 7]` for a `copia<numerus>` and `["x"]` for a

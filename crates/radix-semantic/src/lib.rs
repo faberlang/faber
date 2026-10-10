@@ -686,6 +686,10 @@ pub fn analyze_with_cli(
         }
         Err(e) => diagnostics.extend(e),
     }
+    {
+        let refusals = passes::ledger_gate::check(&hir, &types);
+        passes::ledger_gate::replace_cascades(&mut diagnostics, refusals);
+    }
     if !diagnostics.iter().any(SemanticError::is_error) {
         diagnostics.extend(passes::filum_independence::check(&hir, &types, interner));
     }

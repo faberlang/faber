@@ -292,7 +292,7 @@ fn child_types(ty: &Type, out: &mut Vec<TypeId>) {
         Type::BoundedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. } => out.push(*element),
-        Type::Map(key, value) => out.extend([*key, *value]),
+        Type::Map(key, value) | Type::Ledger(key, value) => out.extend([*key, *value]),
         Type::Record(fields) => out.extend(fields.values().copied()),
         Type::Tuple(members) | Type::Union(members) => out.extend(members.iter().copied()),
         Type::Applied(base, args) => {

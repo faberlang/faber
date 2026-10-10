@@ -74,6 +74,7 @@ mod kernel_legality_types;
 pub mod kernel_namespace;
 pub mod kernel_requirements;
 pub mod leading_underscore;
+pub mod ledger_gate;
 pub mod lint;
 pub mod live_tuus_cursor_escape;
 pub mod local_constants;
@@ -311,6 +312,10 @@ mod ratio_test;
 #[cfg(test)]
 #[path = "typecheck/ratio_hole_test.rs"]
 mod ratio_hole_test;
+
+#[cfg(test)]
+#[path = "ledger_gate_test.rs"]
+mod ledger_gate_test;
 
 #[cfg(test)]
 #[path = "local_constants_test.rs"]

@@ -192,6 +192,8 @@ quidlibet = "مهما"
 lista = "قائمة"
 # Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
 tabula = "جدول"
+# PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
+tabulae = "دفتر"
 copia = "مجموعة"
 promissum = "وعد"
 cursor = "مؤشر"
@@ -976,6 +978,10 @@ help = "استخدم {lista}<T>؛ lista<T, N> شكل محدود مشحون"
 message = "{tabula} يتطلب معاملي نوع"
 help = "أصلح تركيب AST للتخفيض"
 
+[diagnostics.SEM008.issues.tabulae_arity]
+message = "{tabulae} يتطلب معاملي نوع"
+help = "أصلح تركيب AST للتخفيض"
+
 [diagnostics.SEM008.issues.saturating_word_width_required]
 message = "saturating type requires exactly one integer width"
 help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
@@ -1479,6 +1485,14 @@ help = "use `from` to sort the values of a list or a set, or sort a map with `re
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
 message = "a tensor cannot be the source of a sort expression"
 help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+
+[diagnostics.SEM010.issues.ledger_operation_not_implemented]
+message = "لا يمكن استخدام قيمة دفتر بعد: أنواع {tabulae} مقبولة في التصريحات ولا توجد أي عملية منفذة عليها"
+help = "صرّح بالنوع فقط؛ استخدم {tabula} حتى تتوفر عمليات الدفتر"
+
+[diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
+message = "نوع الدفتر غير مدعوم في هذا الهدف بعد"
+help = "استخدم مشغّل MIR أو مُصدِر مصدر Faber أو {tabula} حتى يدعم هذا الهدف الدفتر"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"

@@ -957,6 +957,13 @@ fn instantiate_type_id<W: InstantiateWalk>(
                 instantiate_type_id(types, value, generic_bindings, shape_bindings, span, index)?;
             resolve_type(types, &Type::Map(key, value), span, index)
         }
+        Type::Ledger(key, value) => {
+            let key =
+                instantiate_type_id(types, key, generic_bindings, shape_bindings, span, index)?;
+            let value =
+                instantiate_type_id(types, value, generic_bindings, shape_bindings, span, index)?;
+            resolve_type(types, &Type::Ledger(key, value), span, index)
+        }
         Type::Record(fields) => {
             let fields = fields
                 .iter()
@@ -1770,6 +1777,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::BoundedAscii { capacity }
         | Type::BoundedOcteti { capacity } => index_contains_param(types, *capacity),
         Type::Map(key, value)
+        | Type::Ledger(key, value)
         | Type::PromissumFailable(key, value)
         | Type::AsyncCursor(key, value) => {
             type_contains_param_inner(types, *key, seen)

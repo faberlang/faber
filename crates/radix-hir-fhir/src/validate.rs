@@ -719,7 +719,7 @@ fn validate_type_form(
                         _ => {}
                     }
                 }
-                radix_types::Type::Map(key, value) => {
+                radix_types::Type::Map(key, value) | radix_types::Type::Ledger(key, value) => {
                     if level.0 != 0 || (!form.args.is_empty() && form.args.len() != 2) {
                         return Err(type_presentation_issue("map_shape", site));
                     }
@@ -3451,7 +3451,7 @@ pub(crate) fn validate_referential_integrity(
                 checks.check_type(*t)?;
                 checks.check_type(*e)?;
             }
-            radix_types::Type::Map(k, v) => {
+            radix_types::Type::Map(k, v) | radix_types::Type::Ledger(k, v) => {
                 checks.check_type(*k)?;
                 checks.check_type(*v)?;
             }

@@ -2200,3 +2200,23 @@ fn bits_types_order_by_bit_pattern_as_unsigned_integer() {
     let kind = ordering_kind(&types, b8, &|_| false, &|_| false);
     assert_eq!(kind, Some(OrderingKind::Integer));
 }
+
+#[test]
+fn ledger_is_a_distinct_two_argument_collection_from_map() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let numerus = types.primitive(Primitive::Numerus);
+    let map = CollectionKind::Tabula.lower(&mut types, &[textus, numerus]);
+    let ledger = CollectionKind::Tabulae.lower(&mut types, &[textus, numerus]);
+
+    assert_eq!(
+        CollectionKind::from_name("tabulae"),
+        Some(CollectionKind::Tabulae)
+    );
+    assert_eq!(CollectionKind::Tabulae.arity(), 2);
+    assert!(matches!(types.get(ledger), Type::Ledger(k, v) if *k == textus && *v == numerus));
+    assert_ne!(map, ledger);
+    assert!(!types.equals(map, ledger));
+    assert!(!types.is_assignable(map, ledger));
+    assert!(!types.is_assignable(ledger, map));
+}

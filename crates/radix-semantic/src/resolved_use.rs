@@ -346,7 +346,7 @@ impl UseVisitor<'_> {
             | Type::Sparsa(inner, _) => {
                 vec![inner]
             }
-            Type::Map(key, value) => vec![key, value],
+            Type::Map(key, value) | Type::Ledger(key, value) => vec![key, value],
             Type::Record(fields) => fields.into_values().collect(),
             Type::Func(sig) => {
                 let mut children = sig

@@ -402,7 +402,7 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         Type::PromissumFailable(first, alternate) | Type::AsyncCursor(first, alternate) => {
             vec![*first, *alternate]
         }
-        Type::Map(key, value) => vec![*key, *value],
+        Type::Map(key, value) | Type::Ledger(key, value) => vec![*key, *value],
         Type::Record(fields) => fields.values().copied().collect(),
         Type::Tensor(element, _)
         | Type::Vector(element, _)

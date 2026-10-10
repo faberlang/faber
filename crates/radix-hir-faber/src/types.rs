@@ -78,6 +78,14 @@ impl super::FaberCodegen<'_> {
                 surface,
             ),
 
+            Type::Ledger(key, value) => self.format_binary_type(
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Tabulae)),
+                *key,
+                *value,
+                names,
+                surface,
+            ),
+
             Type::Record(fields) => self.format_record_type(fields, names, surface),
 
             Type::Set(elem) => self.format_unary_type(
@@ -731,6 +739,15 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Tabula)),
+                    members[0],
+                    members[1]
+                ))
+            }
+            Type::Ledger(_, _) => {
+                let members = self.exact_type_form_children(form, 2, names, surface)?;
+                Ok(format!(
+                    "{}<{}, {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Tabulae)),
                     members[0],
                     members[1]
                 ))

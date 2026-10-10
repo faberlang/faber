@@ -716,7 +716,7 @@ impl Validator<'_, '_> {
                 self.validate_type_id(success, span, seen);
                 self.validate_type_id(alternate, span, seen);
             }
-            Type::Map(key, value) => {
+            Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.validate_type_id(key, span, seen);
                 self.validate_type_id(value, span, seen);
             }

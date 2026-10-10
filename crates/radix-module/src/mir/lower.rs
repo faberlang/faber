@@ -587,6 +587,7 @@ fn portable_tensor_edge_type_identity(
         | Type::BoundedAscii { .. }
         | Type::BoundedOcteti { .. }
         | Type::Map(_, _)
+        | Type::Ledger(_, _)
         | Type::Set(_)
         | Type::Promissum(_)
         | Type::PromissumFailable(_, _)

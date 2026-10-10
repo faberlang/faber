@@ -39,7 +39,7 @@ impl TypeChecker<'_> {
             return;
         }
         let children: Vec<TypeId> = match self.types.get(ty) {
-            Type::Map(key, value) => {
+            Type::Map(key, value) | Type::Ledger(key, value) => {
                 if !self.is_hashable(*key, &mut FxHashSet::default()) {
                     found.push(ISSUE_TABULA_KEY_NOT_HASHABLE);
                 }
@@ -95,6 +95,7 @@ impl TypeChecker<'_> {
             Type::Array(_)
             | Type::BoundedArray { .. }
             | Type::Map(_, _)
+            | Type::Ledger(_, _)
             | Type::Set(_)
             | Type::Queue(_)
             | Type::BoundedQueue { .. }

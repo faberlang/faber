@@ -552,6 +552,7 @@ fn contains_unresolved_type(
             !concrete_index(*capacity, types, &mut FxHashSet::default())
         }
         Type::Map(key, value)
+        | Type::Ledger(key, value)
         | Type::PromissumFailable(key, value)
         | Type::AsyncCursor(key, value) => {
             contains_unresolved_type(*key, types, seen)
@@ -772,6 +773,10 @@ fn substitute_type(
             capacity: substitute_index(capacity, index_map, types),
         },
         Type::Map(key, value) => Type::Map(
+            substitute_type(key, type_map, index_map, types, interner),
+            substitute_type(value, type_map, index_map, types, interner),
+        ),
+        Type::Ledger(key, value) => Type::Ledger(
             substitute_type(key, type_map, index_map, types, interner),
             substitute_type(value, type_map, index_map, types, interner),
         ),

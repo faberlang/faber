@@ -639,7 +639,11 @@ fn layout_kind_for_type(
         | Type::MarkerHole { .. }
         | Type::Error => LayoutResolution::NoLayout,
         Type::Array(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Array)),
-        Type::Map(_, _) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Map)),
+        // A ledger is a map underneath; its own carrier lands with the ledger
+        // operations (need, L2+).
+        Type::Map(_, _) | Type::Ledger(_, _) => {
+            LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Map))
+        }
         Type::Record(_) => {
             LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Record))
         }

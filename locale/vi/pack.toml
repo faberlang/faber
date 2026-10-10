@@ -192,6 +192,8 @@ quidlibet = "bất_kỳ"
 lista = "danh_sách"
 # Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
 tabula = "bảng"
+# PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
+tabulae = "sổ_cái"
 copia = "tập_hợp"
 promissum = "lời_hứa"
 cursor = "bộ_lặp"
@@ -976,6 +978,10 @@ help = "dùng {lista}<T>; lista<T, N> là dạng bounded đã phát hành"
 message = "tabula yêu cầu hai tham số kiểu"
 help = "sửa cấu trúc AST để hạ mức"
 
+[diagnostics.SEM008.issues.tabulae_arity]
+message = "tabulae yêu cầu hai tham số kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
 [diagnostics.SEM008.issues.saturating_word_width_required]
 message = "saturating type requires exactly one integer width"
 help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
@@ -1479,6 +1485,14 @@ help = "use `from` to sort the values of a list or a set, or sort a map with `re
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
 message = "a tensor cannot be the source of a sort expression"
 help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+
+[diagnostics.SEM010.issues.ledger_operation_not_implemented]
+message = "chưa thể dùng giá trị ledger: kiểu {tabulae} được chấp nhận trong khai báo, nhưng chưa có phép toán nào trên giá trị ledger"
+help = "chỉ khai báo kiểu; dùng map ({tabula}) cho đến khi các phép toán của ledger sẵn sàng"
+
+[diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
+message = "kiểu ledger chưa được hỗ trợ trên đích này"
+help = "dùng MIR runner hoặc bộ phát nguồn Faber, hoặc dùng map ({tabula})"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"

@@ -192,6 +192,8 @@ quidlibet = "任意"
 lista = "列表"
 # Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
 tabula = "映射"
+# PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
+tabulae = "账本"
 copia = "集合"
 promissum = "期约"
 cursor = "游标"
@@ -976,6 +978,10 @@ help = "使用 {lista}<T>；lista<T, N> 是已交付的有界形式"
 message = "tabula 需要两个 type parameters"
 help = "修正用于 lowering 的 AST construct"
 
+[diagnostics.SEM008.issues.tabulae_arity]
+message = "tabulae 需要两个 type parameters"
+help = "修正用于 lowering 的 AST construct"
+
 [diagnostics.SEM008.issues.saturating_word_width_required]
 message = "saturating 类型需要恰好一个整数宽度"
 help = "为 saturating 类型写一个整数宽度，如 saturating<u8> 或 saturating<i16>"
@@ -1479,6 +1485,14 @@ help = "use `from` to sort the values of a list or a set, or sort a map with `re
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
 message = "a tensor cannot be the source of a sort expression"
 help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+
+[diagnostics.SEM010.issues.ledger_operation_not_implemented]
+message = "ledger 值暂时不能使用：{tabulae} 类型可用于声明，但尚未实现对 ledger 值的任何操作"
+help = "仅声明该类型；在 ledger 操作可用之前请使用 map ({tabula})"
+
+[diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
+message = "此目标暂不支持 ledger 类型"
+help = "请使用 MIR runner 或 Faber 源码发射器，或改用 map ({tabula})"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"

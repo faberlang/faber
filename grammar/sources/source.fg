@@ -1191,6 +1191,12 @@ hole_type       := '_'
 # head by the type parser, so `modulus<u32>` is an ordinary applied type
 # (`exactus` and `saturatus` are plain identifiers). Outside a type slot the
 # spelling is an ordinary identifier.
+# The collection type words `tabula` (map, unordered) and `tabulae` (ledger,
+# insertion-ordered) are ordinary type names here: `tabulae<K, V>` is an applied
+# `qualified_type`, accepted wherever `tabula<K, V>` is. The two spellings sit
+# one letter apart on purpose ("two shades of the same thing"; Roman account
+# books were called tabulae). It is not a typo and must not be "fixed" later
+# (operator ruling 2026-10-10, need).
 qualified_type  := type_head ('.' IDENTIFIER)*
 type_head       := IDENTIFIER | 'modulus'
 # The bare numeric type words `numerus` and `fractus` (and their locale words)

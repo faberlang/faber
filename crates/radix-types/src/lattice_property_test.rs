@@ -601,6 +601,7 @@ impl TypeName for Type {
             Type::BoundedAscii { .. } => "ascii_n",
             Type::BoundedOcteti { .. } => "octeti_n",
             Type::Map(_, _) => "tabula",
+            Type::Ledger(_, _) => "tabulae",
             Type::Option(_) => "option",
             Type::Set(_) => "copia",
             Type::Promissum(_) | Type::PromissumFailable(_, _) => "promissum",

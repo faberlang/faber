@@ -192,6 +192,8 @@ quidlibet = "कुछभी"
 lista = "सूची"
 # Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
 tabula = "तालिका"
+# PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
+tabulae = "बही"
 copia = "समुच्चय"
 promissum = "वादा"
 cursor = "कर्सर"
@@ -988,6 +990,10 @@ help = "{lista}<T> का उपयोग करें; lista<T, N> shipped boun
 message = "tabula के लिए दो type parameters आवश्यक हैं"
 help = "lowering के लिए AST construct ठीक करें"
 
+[diagnostics.SEM008.issues.tabulae_arity]
+message = "tabulae के लिए दो type parameters आवश्यक हैं"
+help = "lowering के लिए AST construct ठीक करें"
+
 [diagnostics.SEM008.issues.saturating_word_width_required]
 message = "saturating type requires exactly one integer width"
 help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
@@ -1491,6 +1497,14 @@ help = "use `from` to sort the values of a list or a set, or sort a map with `re
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
 message = "a tensor cannot be the source of a sort expression"
 help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+
+[diagnostics.SEM010.issues.ledger_operation_not_implemented]
+message = "ledger मान अभी उपयोग नहीं किया जा सकता: {tabulae} प्रकार घोषणाओं में स्वीकार्य हैं, पर ledger मान पर कोई संक्रिया लागू नहीं है"
+help = "केवल प्रकार घोषित करें; ledger संक्रियाएँ आने तक map ({tabula}) उपयोग करें"
+
+[diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
+message = "इस लक्ष्य पर ledger प्रकार अभी समर्थित नहीं है"
+help = "MIR runner या Faber source emitter उपयोग करें, या map ({tabula}) उपयोग करें"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"

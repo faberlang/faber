@@ -1278,6 +1278,7 @@ fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
     match message {
         "lista requires one or two type parameters" => issue_args("lista_arity"),
         "tabula requires two type parameters" => issue_args("tabula_arity"),
+        "tabulae requires two type parameters" => issue_args("tabulae_arity"),
         "copia requires one type parameter" => issue_args("copia_arity"),
         "promissum requires one type parameter" => issue_args("promissum_arity"),
         "cursor requires one type parameter" => issue_args("cursor_arity"),

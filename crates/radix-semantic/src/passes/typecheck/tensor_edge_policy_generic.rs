@@ -514,6 +514,7 @@ fn type_contains_param(
         | Type::Matrix(element, _)
         | Type::Sparsa(element, _) => contains(*element, seen),
         Type::Map(key, value)
+        | Type::Ledger(key, value)
         | Type::PromissumFailable(key, value)
         | Type::AsyncCursor(key, value) => contains(*key, seen) || contains(*value, seen),
         Type::Record(fields) => fields.values().any(|field| contains(*field, seen)),

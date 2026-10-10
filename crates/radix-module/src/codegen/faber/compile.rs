@@ -715,6 +715,11 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
             canonical_type_shape(analysis, *key, active),
             canonical_type_shape(analysis, *value, active)
         ),
+        Type::Ledger(key, value) => format!(
+            "ledger<{},{}>",
+            canonical_type_shape(analysis, *key, active),
+            canonical_type_shape(analysis, *value, active)
+        ),
         Type::Record(fields) => {
             let mut fields = fields
                 .iter()

@@ -1317,6 +1317,11 @@ pub(super) fn import_semantic_type_with_nominal(
             let value = import_semantic_type_with_nominal(source, target, value, imported, nominal);
             target.map(key, value)
         }
+        Type::Ledger(key, value) => {
+            let key = import_semantic_type_with_nominal(source, target, key, imported, nominal);
+            let value = import_semantic_type_with_nominal(source, target, value, imported, nominal);
+            target.ledger(key, value)
+        }
         Type::Record(fields) => {
             let fields = fields
                 .into_iter()

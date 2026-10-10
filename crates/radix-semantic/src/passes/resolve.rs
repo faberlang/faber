@@ -2195,6 +2195,7 @@ fn collection_arity_issue(collection: CollectionKind) -> &'static str {
     match collection {
         CollectionKind::Lista => "lista_arity",
         CollectionKind::Tabula => "tabula_arity",
+        CollectionKind::Tabulae => "tabulae_arity",
         CollectionKind::Copia => "copia_arity",
         CollectionKind::Promissum => "promissum_arity",
         CollectionKind::Cursor => "cursor_arity",
@@ -2785,6 +2786,7 @@ fn is_builtin_type(name: &str) -> bool {
             | "quidlibet"
             | "lista"
             | "tabula"
+            | "tabulae"
             | "copia"
             | "promissum"
             | "cursor"

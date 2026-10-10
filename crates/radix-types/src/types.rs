@@ -505,6 +505,7 @@ impl TypeTable {
                 | Type::Matrix(element, _)
                 | Type::Sparsa(element, _) => child(*element, seen),
                 Type::Map(key, value)
+                | Type::Ledger(key, value)
                 | Type::PromissumFailable(key, value)
                 | Type::AsyncCursor(key, value) => child(*key, seen) || child(*value, seen),
                 Type::Record(fields) => fields.values().any(|field| child(*field, seen)),
@@ -793,6 +794,7 @@ impl TypeTable {
             | Type::Stack(_)
             | Type::BoundedStack { .. }
             | Type::Map(..)
+            | Type::Ledger(..)
             | Type::Set(_)
             | Type::Tensor(..)
             | Type::Sparsa(..)
@@ -891,6 +893,11 @@ impl TypeTable {
     /// Allocate a `tabula<K, V>` semantic collection.
     pub fn map(&mut self, key: TypeId, value: TypeId) -> TypeId {
         self.intern(Type::Map(key, value))
+    }
+
+    /// Allocate a `tabulae<K, V>` ledger (an insertion-ordered map).
+    pub fn ledger(&mut self, key: TypeId, value: TypeId) -> TypeId {
+        self.intern(Type::Ledger(key, value))
     }
 
     /// Allocate a `copia<T>` semantic collection.
@@ -1223,7 +1230,8 @@ impl TypeTable {
             (Type::AsyncCursor(ai, ae), Type::AsyncCursor(bi, be)) => {
                 self.equals(*ai, *bi) && self.equals(*ae, *be)
             }
-            (Type::Map(ak, av), Type::Map(bk, bv)) => {
+            (Type::Map(ak, av), Type::Map(bk, bv))
+            | (Type::Ledger(ak, av), Type::Ledger(bk, bv)) => {
                 self.equals(*ak, *bk) && self.equals(*av, *bv)
             }
             (Type::Record(a_fields), Type::Record(b_fields)) => {
@@ -1626,7 +1634,8 @@ impl TypeTable {
                 self.is_assignable(*fi, *ti) && self.is_assignable(*fe, *te)
             }
 
-            (Type::Map(from_key, from_val), Type::Map(to_key, to_val)) => {
+            (Type::Map(from_key, from_val), Type::Map(to_key, to_val))
+            | (Type::Ledger(from_key, from_val), Type::Ledger(to_key, to_val)) => {
                 self.is_assignable(*from_key, *to_key) && self.is_assignable(*from_val, *to_val)
             }
 
@@ -1800,6 +1809,9 @@ pub enum Type {
     /// `tabula<K, V>` collection.
     Map(TypeId, TypeId),
 
+    /// `tabulae<K, V>` ledger: a map that keeps its entries in insertion order.
+    Ledger(TypeId, TypeId),
+
     /// Structural record type used for compiler-synthesized contracts.
     Record(FxHashMap<LexSymbol, TypeId>),
 
@@ -1930,7 +1942,7 @@ impl Hash for Type {
                 t.hash(state);
                 e.hash(state);
             }
-            Self::Map(k, v) => {
+            Self::Map(k, v) | Self::Ledger(k, v) => {
                 k.hash(state);
                 v.hash(state);
             }
@@ -2227,6 +2239,10 @@ pub fn lookup_primitive_type_spec(text: &str) -> Option<&'static PrimitiveTypeSp
 pub enum CollectionKind {
     Lista,
     Tabula,
+    /// The ledger: an insertion-ordered map. The spelling `tabulae` sits one
+    /// letter from `tabula` on purpose ("two shades of the same thing"; Roman
+    /// account books were called tabulae). It is not a typo; do not "fix" it.
+    Tabulae,
     Copia,
     Promissum,
     Cursor,
@@ -2249,7 +2265,7 @@ impl CollectionKind {
             | Self::Cursor
             | Self::Queue
             | Self::Stack => 1,
-            Self::Tabula => 2,
+            Self::Tabula | Self::Tabulae => 2,
         }
     }
 
@@ -2271,6 +2287,7 @@ impl CollectionKind {
         match self {
             Self::Lista => "lista requires one or two type parameters",
             Self::Tabula => "tabula requires two type parameters",
+            Self::Tabulae => "tabulae requires two type parameters",
             Self::Copia => "copia requires one type parameter",
             Self::Promissum => "promissum requires one type parameter",
             Self::Cursor => "cursor requires one type parameter",
@@ -2284,6 +2301,7 @@ impl CollectionKind {
         match self {
             Self::Lista => types.array(params[0]),
             Self::Tabula => types.map(params[0], params[1]),
+            Self::Tabulae => types.ledger(params[0], params[1]),
             Self::Copia => types.set(params[0]),
             Self::Promissum => types.promissum(params[0]),
             Self::Cursor => types.cursor(params[0]),
@@ -2316,6 +2334,13 @@ pub static COLLECTION_TYPE_SPECS: &[CollectionTypeSpec] = &[
     CollectionTypeSpec {
         text: "tabula",
         kind: CollectionKind::Tabula,
+        canonical: true,
+    },
+    // `tabulae` (ledger) is one letter from `tabula` (map) by design: "two
+    // shades of the same thing" (operator ruling 2026-10-10, need).
+    CollectionTypeSpec {
+        text: "tabulae",
+        kind: CollectionKind::Tabulae,
         canonical: true,
     },
     CollectionTypeSpec {
@@ -2519,9 +2544,10 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::Intervallum(e)
         | Type::Ref(_, e)
         | Type::Alias(_, e) => type_in_bounds(e),
-        Type::Map(k, v) | Type::PromissumFailable(k, v) | Type::AsyncCursor(k, v) => {
-            type_in_bounds(k) && type_in_bounds(v)
-        }
+        Type::Map(k, v)
+        | Type::Ledger(k, v)
+        | Type::PromissumFailable(k, v)
+        | Type::AsyncCursor(k, v) => type_in_bounds(k) && type_in_bounds(v),
         Type::Record(fields) => fields.values().all(type_in_bounds),
         Type::Tuple(elems) => elems.iter().all(type_in_bounds),
         Type::Union(members) | Type::Intersection(members) => members.iter().all(type_in_bounds),

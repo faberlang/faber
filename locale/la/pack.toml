@@ -199,6 +199,10 @@ quidlibet = "quidlibet"
 lista = "lista"
 # Proposed bounded forms (not shipped): lista<T, N>, textus<N>, ascii<N>, octeti<N>.
 tabula = "tabula"
+# tabulae (ledger, an insertion-ordered map) is one letter from tabula (map) on purpose:
+# "two shades of the same thing" (Roman account books were tabulae). Not a typo;
+# do not "fix" it (operator ruling 2026-10-10, need).
+tabulae = "tabulae"
 copia = "copia"
 promissum = "promissum"
 cursor = "cursor_t"
@@ -1272,6 +1276,10 @@ help = "use {lista}<T>; lista<T, N> is proposed, not yet shipped"
 message = "tabula requires two type parameters"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.tabulae_arity]
+message = "tabulae requires two type parameters"
+help = "fix the AST construct for lowering"
+
 [diagnostics.SEM008.issues.saturating_word_width_required]
 message = "saturatus unam latitudinem integram requirit"
 help = "scribe saturatus cum una latitudine integra, ut saturatus<u8> aut saturatus<i16>"
@@ -1928,6 +1936,14 @@ help = "utere `ex` ad valores listae vel copiae ordinandos, aut ordina tabulam p
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
 message = "tensor fons ordinationis esse non potest"
 help = "converte tensorem in listam primum"
+
+[diagnostics.SEM010.issues.ledger_operation_not_implemented]
+message = "valor tabulae nondum adhiberi potest: typi {tabulae} in declarationibus admittuntur, operatio in valore tabulae nulla praestatur"
+help = "typum tantum declara; tabula ({tabula}) utere donec operationes tabulae adsint"
+
+[diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
+message = "typus tabulae in hoc proposito nondum adhibetur"
+help = "exsecutore MIR aut emissore fontis Faber utere, aut tabula ({tabula}), donec hoc propositum tabulas ferat"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "elementa ordinem naturalem non habent"

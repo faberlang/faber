@@ -207,6 +207,8 @@ quidlibet = "any"
 lista = "list"
 # Proposed bounded forms (not shipped): lista<T, N>, textus<N>, ascii<N>, octeti<N>.
 tabula = "map"
+# ledger: insertion-ordered map; la tabulae sits beside tabula on purpose.
+tabulae = "ledger"
 copia = "set"
 promissum = "promise"
 cursor = "iterator"
@@ -1496,6 +1498,10 @@ help = "use {lista}<T>; list<T, N> is proposed, not yet shipped"
 message = "map requires two type parameters"
 help = "fix the AST construct for lowering"
 
+[diagnostics.SEM008.issues.tabulae_arity]
+message = "ledger requires two type parameters"
+help = "fix the AST construct for lowering"
+
 [diagnostics.SEM008.issues.saturating_word_width_required]
 message = "saturating type requires exactly one integer width"
 help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
@@ -2152,6 +2158,14 @@ help = "use `from` to sort the values of a list or a set, or sort a map with `re
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
 message = "a tensor cannot be the source of a sort expression"
 help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+
+[diagnostics.SEM010.issues.ledger_operation_not_implemented]
+message = "a ledger value cannot be used yet: {tabulae} types are accepted in declarations, and no operation on a ledger value is implemented"
+help = "declare the type only; use a map ({tabula}) until the ledger operations land"
+
+[diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
+message = "the ledger type is not supported on this target yet"
+help = "use the MIR runner or the Faber source emitter, or a map ({tabula}), until this target carries a ledger"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"

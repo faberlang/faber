@@ -1639,6 +1639,7 @@ impl Parser {
                 | "instans"
                 | "lista"
                 | "tabula"
+                | "tabulae"
                 | "copia"
                 | "promissum"
                 | "cursor"

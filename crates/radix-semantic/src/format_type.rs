@@ -68,6 +68,12 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             format_faber_type(*value, types, interner, resolve_def)
         ),
 
+        Type::Ledger(key, value) => format!(
+            "tabulae<{}, {}>",
+            format_faber_type(*key, types, interner, resolve_def),
+            format_faber_type(*value, types, interner, resolve_def)
+        ),
+
         Type::Record(fields) => format_record_type(fields, types, interner, resolve_def),
 
         Type::Set(elem) => format!(

@@ -61,6 +61,7 @@ impl Walk<'_> {
             Type::Queue(_) => Some("queue"),
             Type::Stack(_) => Some("stack"),
             Type::Map(..) => Some("tabula"),
+            Type::Ledger(..) => Some("tabulae"),
             Type::Set(_) => Some("copia"),
             Type::Promissum(_) | Type::PromissumFailable(..) => Some("promissum"),
             Type::Cursor(_) | Type::AsyncCursor(..) => Some("cursor"),
