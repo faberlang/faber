@@ -6878,6 +6878,19 @@ fn conversio_assign_call_recovery_is_deferred_out_of_the_main_flow() {
 }
 
 #[test]
+fn conversio_recovery_with_branching_fallback_validates_as_a_recovery_region() {
+    // need: a `⊥` fallback with its own branches (`c ✓ fb() ✗ 0`)
+    // lowers into a detached multi-block recovery region; validation must
+    // accept the whole region, not only its tail block.
+    let source = "functio fb() → numerus {\n  redde 7\n}\nincipit {\n  fixum bivalens c ← verum\n  \
+                  fixum numerus n ← \"x\" ↦ numerus ⊥ (c ✓ fb() ✗ 0)\n  nota n\n}\n";
+    let unit = analyze(source);
+    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("MIR lowering succeeds");
+    validate_program(lowered.validated.program(), lowered.validated.validation())
+        .expect("branching conversion recovery validates");
+}
+
+#[test]
 fn conversio_assign_chain_lowers_inner_then_outer_conversion() {
     // Right-associated chain `a ↤ b ↤ "42"`: the inner conversion feeds the
     // outer conversion; exactly two conversions, one store per link.

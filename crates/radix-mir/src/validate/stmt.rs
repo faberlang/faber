@@ -457,14 +457,19 @@ impl Validator<'_, '_> {
         let mut recovery_region = FxHashSet::default();
         let mut recovery_stack = Vec::new();
         for block in &function.blocks {
-            let stores_recovery = block.statements.iter().any(|statement| {
-                matches!(
-                    &statement.kind,
-                    MirStatementKind::Assign {
-                        place: crate::MirPlace { base: MirPlaceBase::Temp(temp), .. },
-                        ..
-                    } if recovery_temps.contains(temp)
-                )
+            // The region tail either stores the recovery temp itself or, when
+            // the fallback has its own branches, copies the finished recovery
+            // value into the conversion destination.
+            let stores_recovery = block.statements.iter().any(|statement| match &statement.kind {
+                MirStatementKind::Assign { place, value } => {
+                    matches!(&place.base, MirPlaceBase::Temp(temp) if recovery_temps.contains(temp))
+                        || matches!(
+                            &value.kind,
+                            crate::MirValueKind::Operand(MirOperand::Temp(temp))
+                                if recovery_temps.contains(temp)
+                        )
+                }
+                _ => false,
             });
             let joins_reachable = terminator_successors(&block.terminator.kind)
                 .into_iter()
