@@ -2281,19 +2281,6 @@ pub fn float_to_numerus_width(value: f64, width: NumericWidth) -> Value {
 pub(crate) use radix_codegen_shared::decimal::decimal_scale_factor;
 pub(crate) use radix_codegen_shared::decimal::round_half_even_quotient;
 
-/// Checked round-half-even division with the runner's standard arithmetic
-/// diagnostics. Decimal parsing uses the pure quotient helper so it can
-/// distinguish malformed text from a carrier overflow.
-pub(crate) fn round_half_even_division(
-    numerator: i128,
-    denominator: i128,
-    span: Span,
-    error: &'static str,
-) -> Result<i128, RunnerError> {
-    round_half_even_quotient(numerator, denominator)
-        .ok_or_else(|| RunnerError::internal(span, error))
-}
-
 /// Execute one decimal arithmetic operation over exact decimal values.
 pub(crate) fn decimal_numeric_binop(
     left: Value,

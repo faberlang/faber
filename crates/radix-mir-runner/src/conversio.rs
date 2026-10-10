@@ -8,8 +8,8 @@
 use super::regex_program::RegexProgram;
 use super::value::{
     MapKey, SermoValue, Value, decimal_scale_factor, float_to_numerus_width,
-    float_truncation_fits_width, int_width_range, modular_word_result, round_half_even_division,
-    saturating_word_result, trapping_float_store_fails,
+    float_truncation_fits_width, int_width_range, modular_word_result, saturating_word_result,
+    trapping_float_store_fails,
 };
 use super::{Runner, RunnerError};
 use radix_lexer::{Span, Symbol};
@@ -31,6 +31,9 @@ mod littera;
 #[cfg(test)]
 mod littera_test;
 mod octeti_tensor;
+mod rounding;
+#[cfg(test)]
+mod rounding_test;
 mod scalar;
 
 #[derive(Clone, Copy)]
@@ -157,10 +160,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.convert_to_numerus_from(value, source_ty, params, width, recovery, span)
             }
             Type::ModularWord(width) => {
-                self.convert_to_modular_word(value, source_ty, *width, span)
+                self.convert_to_modular_word(value, source_ty, *width, params, recovery, span)
             }
             Type::SaturatingWord(width) => {
-                self.convert_to_saturating_word(value, source_ty, *width, span)
+                self.convert_to_saturating_word(value, source_ty, *width, params, recovery, span)
             }
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
                 let width = match &target {

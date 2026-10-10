@@ -24,6 +24,8 @@ use super::*;
 use radix_codegen_shared::hints::{self, EndianHint};
 use radix_types::IndexExpr;
 
+use super::rounding::RoundingMode;
+
 fn octeti_array<const N: usize>(bytes: &[u8]) -> [u8; N] {
     let mut arr = [0_u8; N];
     arr.copy_from_slice(bytes);
@@ -166,7 +168,14 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             return self.convert_to_decimal(value, source_ty, width, recovery, span);
         }
         if let Some(source_width) = decimal_source_width(self.types, source_ty) {
-            return self.convert_decimal_to_integer(value, source_width, width, recovery, span);
+            return self.convert_decimal_to_integer(
+                value,
+                source_width,
+                width,
+                self.rounding_hint(params),
+                recovery,
+                span,
+            );
         }
         match value {
             // `inf ↦ int<W>` (ruling 40): a `Magnus` is canonically beyond the
@@ -191,13 +200,20 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 }
             },
             // D1.11 / D11.8: `fractus ↦ numerus<W>` is a check. The fraction
-            // truncates toward zero; a NaN, an infinity, or a truncation
-            // outside `W`'s range fails the conversion (never saturates).
-            Value::Float(v) if float_truncation_fits_width(v, width) => {
-                Ok(float_to_numerus_width(v, width))
-            }
-            Value::Float(_) => {
-                self.recover_or_fail(recovery, span, "fractus to numerus conversion out of range")
+            // goes by the `via` rounding (`Trunc`, toward zero, when none is
+            // named); a NaN, an infinity, or a rounded value outside `W`'s
+            // range fails the conversion (never saturates).
+            Value::Float(v) => {
+                let rounded = self.float_rounding(params, v);
+                if float_truncation_fits_width(rounded, width) {
+                    Ok(float_to_numerus_width(rounded, width))
+                } else {
+                    self.recover_or_fail(
+                        recovery,
+                        span,
+                        "fractus to numerus conversion out of range",
+                    )
+                }
             }
             Value::Bool(v) => Ok(Value::Int(if v { 1 } else { 0 })),
             Value::Int(v) => {
@@ -307,12 +323,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         &mut self,
         value: Value,
         source_width: NumericWidth,
+        mode: RoundingMode,
         span: Span,
     ) -> Result<i128, RunnerError> {
         if let Value::Dec(carrier, scale) = value {
-            return crate::decimal::round_to_integer(carrier, scale).ok_or_else(|| {
-                RunnerError::conversion(span, "decimal to numerus conversion failed")
-            });
+            return crate::decimal::pow10(scale)
+                .and_then(|factor| mode.round_quotient(carrier, factor))
+                .ok_or_else(|| {
+                    RunnerError::conversion(span, "decimal to numerus conversion failed")
+                });
         }
         let raw = match value {
             Value::Int(value) => decimal_carrier_value(value, source_width, span),
@@ -320,7 +339,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 .map_err(|error| decimal_text_error(error, span)),
             Value::Sermo(sermo) => {
                 let value = self.sermo_first_item(&sermo, span)?;
-                return self.decimal_integer_value(value, source_width, span);
+                return self.decimal_integer_value(value, source_width, mode, span);
             }
             other => Err(RunnerError::internal(
                 span,
@@ -330,13 +349,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         let scale = decimal_scale_factor(source_width).ok_or_else(|| {
             RunnerError::internal(span, "decimal conversion requires decimal width")
         })?;
-        round_half_even_division(
-            i128::from(raw),
-            scale,
-            span,
-            "decimal to numerus conversion failed",
-        )
-        .map_err(|error| RunnerError::conversion(span, error.message))
+        mode.round_quotient(i128::from(raw), scale)
+            .ok_or_else(|| RunnerError::conversion(span, "decimal to numerus conversion failed"))
     }
 
     fn convert_decimal_to_integer(
@@ -344,10 +358,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         value: Value,
         source_width: NumericWidth,
         target_width: NumericWidth,
+        mode: Option<RoundingMode>,
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
-        let rounded = self.decimal_integer_value(value, source_width, span)?;
+        // A decimal with no `via` rounding keeps the half-even default.
+        let mode = mode.unwrap_or(RoundingMode::HalfEven);
+        let rounded = self.decimal_integer_value(value, source_width, mode, span)?;
         let (lo, hi) = int_width_range(target_width);
         if !(lo..=hi).contains(&rounded) {
             return self.recover_or_fail(
@@ -438,6 +455,18 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         })
     }
 
+    /// A float rounded by the `via` clause (`Trunc` when none is named).
+    fn float_rounding(&self, params: &[Symbol], value: f64) -> f64 {
+        self.rounding_hint(params)
+            .unwrap_or(RoundingMode::Trunc)
+            .round_float(value)
+    }
+
+    /// A float source whose rounded value is NaN or infinite has no integer.
+    fn float_fails_rounding(&self, value: &Value, params: &[Symbol]) -> bool {
+        matches!(value, Value::Float(v) if !self.float_rounding(params, *v).is_finite())
+    }
+
     /// D11.6 ruling 24: the exact integer a `wrapping`/`saturating` conversion
     /// applies its policy to. Integer sources of any family carry it directly;
     /// a `d64` source reduces to an integer exactly as `d64 ↦ numerus<W>` does.
@@ -445,14 +474,21 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         &mut self,
         value: Value,
         source_ty: TypeId,
+        params: &[Symbol],
         span: Span,
     ) -> Result<i128, RunnerError> {
         if let Some(source_width) = decimal_source_width(self.types, source_ty) {
-            return self.decimal_integer_value(value, source_width, span);
+            let mode = self.rounding_hint(params).unwrap_or(RoundingMode::HalfEven);
+            return self.decimal_integer_value(value, source_width, mode, span);
         }
         match value {
             Value::Int(value) => Ok(i128::from(value)),
             Value::UInt(value) => Ok(i128::from(value)),
+            // `fractus ↦ wrapping<W>` / `saturating<W>`: the `via` rounding
+            // makes the integer (the callers fail NaN and infinity first); a
+            // magnitude beyond i128 saturates there and the policy word then
+            // clamps or reduces it like any large integer.
+            Value::Float(value) => Ok(self.float_rounding(params, value) as i128),
             _ => Err(RunnerError::internal(
                 span,
                 "wrapping/saturating conversion requires an integer value",
@@ -466,13 +502,22 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         value: Value,
         source_ty: TypeId,
         width: NumericWidth,
+        params: &[Symbol],
+        recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
         // `inf ↦ wrapping<W>`: reduce the exact bignum mod 2^W (ruling 40).
         if let Value::Magnus(big) = &value {
             return Ok(crate::inf::wrap_to_width(big, width));
         }
-        let exact = self.policy_word_source_value(value, source_ty, span)?;
+        if self.float_fails_rounding(&value, params) {
+            return self.recover_or_fail(
+                recovery,
+                span,
+                "fractus to numerus conversion out of range",
+            );
+        }
+        let exact = self.policy_word_source_value(value, source_ty, params, span)?;
         Ok(modular_word_result(exact, width))
     }
 
@@ -482,13 +527,22 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         value: Value,
         source_ty: TypeId,
         width: NumericWidth,
+        params: &[Symbol],
+        recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
         // `inf ↦ saturating<W>`: clamp the exact bignum to `W` (ruling 40).
         if let Value::Magnus(big) = &value {
             return Ok(crate::inf::clamp_to_width(big, width));
         }
-        let exact = self.policy_word_source_value(value, source_ty, span)?;
+        if self.float_fails_rounding(&value, params) {
+            return self.recover_or_fail(
+                recovery,
+                span,
+                "fractus to numerus conversion out of range",
+            );
+        }
+        let exact = self.policy_word_source_value(value, source_ty, params, span)?;
         Ok(saturating_word_result(exact, width))
     }
 

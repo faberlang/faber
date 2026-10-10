@@ -9,6 +9,7 @@
 //! `crate::inf`); the rows *into* `inf` and the `octeti via Be/Le` pair live
 //! here.
 
+use super::rounding::RoundingMode;
 use super::{Runner, RunnerError, Value};
 use crate::inf::{from_magnus, to_magnus};
 use handroll::{Magnus, Radix};
@@ -52,13 +53,18 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         if let Some(source_width) =
             effective_width(self.types, source_ty).filter(|width| width.is_decimal())
         {
-            let rounded = self.decimal_integer_value(value, source_width, span)?;
+            let mode = self.rounding_hint(params).unwrap_or(RoundingMode::HalfEven);
+            let rounded = self.decimal_integer_value(value, source_width, mode, span)?;
             return Ok(from_magnus(Magnus::from_i128(rounded)));
         }
         match value {
             Value::Int(_) | Value::UInt(_) | Value::Magnus(_) => Ok(value),
             Value::Bool(v) => Ok(Value::Int(i64::from(v))),
-            Value::Float(v) => match Magnus::from_f64(v) {
+            Value::Float(v) => match Magnus::from_f64(
+                self.rounding_hint(params)
+                    .unwrap_or(RoundingMode::Trunc)
+                    .round_float(v),
+            ) {
                 Ok(exact) => Ok(from_magnus(exact)),
                 Err(_) => self.recover_or_fail(
                     recovery,

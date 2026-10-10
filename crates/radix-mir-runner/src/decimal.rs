@@ -189,11 +189,6 @@ pub(crate) fn format(carrier: i128, scale: u32) -> String {
     }
 }
 
-/// Round an exact decimal to the nearest integer, half-even.
-pub(crate) fn round_to_integer(carrier: i128, scale: u32) -> Option<i128> {
-    round_half_even_quotient(carrier, pow10(scale)?)
-}
-
 #[cfg(test)]
 #[path = "decimal_exact_test.rs"]
 mod tests;
