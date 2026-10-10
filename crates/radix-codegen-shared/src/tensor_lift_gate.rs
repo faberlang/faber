@@ -307,6 +307,20 @@ fn lifted_form(
             };
             Some((Family::TensorEquality, spelling.to_owned()))
         }
+        // `≅ ≇ ÷ < ≤ > ≥` over a tensor and a tensor or a scalar: the
+        // TypeScript carrier lifts them with `Tensor.lift`, one JS operator per
+        // element pair, so that target is exempt from exactly these forms.
+        HirExpressionKind::Binary(
+            HirBinOp::ApproxEq
+            | HirBinOp::ApproxNotEq
+            | HirBinOp::TrueDiv
+            | HirBinOp::Lt
+            | HirBinOp::Gt
+            | HirBinOp::LtEq
+            | HirBinOp::GtEq,
+            _,
+            _,
+        ) if matches!(target, Target::HirTypeScript) => None,
         HirExpressionKind::Binary(op, lhs, rhs) => binary_label(
             types,
             *op,

@@ -42,11 +42,38 @@ const LIFTED: &[&str] = &[
     "fixum tensor<f32, [2]> r ← a ÷ b",
 ];
 
+/// The forms the TypeScript carrier lifts itself (`Tensor.lift`).
+#[cfg(feature = "hir-ts")]
+const TS_LIFTED: &[&str] = &[
+    "fixum tensor<bivalens, [2]> r ← a ≻ b",
+    "fixum tensor<f32, [2]> r ← a ÷ b",
+    "fixum tensor<bivalens, [2]> r ← a ≅ b",
+    "fixum tensor<bivalens, [2]> r ← a ≇ 2.0",
+    "fixum tensor<bivalens, [2]> r ← a ≤ b",
+];
+
 #[cfg(feature = "hir-ts")]
 #[test]
 fn typescript_rejects_the_lifted_forms() {
     for body in LIFTED {
+        if TS_LIFTED.contains(body) {
+            continue;
+        }
         assert_rejected(Target::HirTypeScript, body);
+    }
+}
+
+#[cfg(feature = "hir-ts")]
+#[test]
+fn typescript_admits_the_comparison_and_true_division_lift() {
+    for body in TS_LIFTED {
+        let found = issues(Target::HirTypeScript, body);
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == "tensor_lift_unsupported_on_target"),
+            "TypeScript `{body}` is gated: {found:?}"
+        );
     }
 }
 
