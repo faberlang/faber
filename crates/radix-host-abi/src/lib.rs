@@ -137,6 +137,10 @@ abi_string_family! {
         SYMBOL_FORMAT_TEXT_TEXT_TEXT = "__faber_rt_v1_format_text_text_text",
         SYMBOL_FORMAT_TEXT_I64_I1 = "__faber_rt_v1_format_text_i64_i1",
         SYMBOL_FORMAT_1_PTR_TO_PTR = "__faber_rt_v1_format_1_ptr_to_ptr",
+        // One option (`T ∪ none`) argument plus its payload value kind: the
+        // null-encoded option carries no kind, so the call site supplies it
+        // (the format twin of `__faber_rt_v1_diagnostic_nota_option`).
+        SYMBOL_FORMAT_OPTION = "__faber_rt_v1_format_option",
         SYMBOL_TEXT_LENGTH = "__faber_rt_v1_text_length",
         SYMBOL_TEXT_CONCAT = "__faber_rt_v1_text_concat",
         SYMBOL_TEXT_EQ = "__faber_rt_v1_text_eq",
