@@ -2030,7 +2030,25 @@ fn modular_word_bits(width: NumericWidth) -> u32 {
 /// Reduce an exact integer into the representatives of `width`.
 pub(crate) fn modular_word_reduce(value: i128, width: NumericWidth) -> i128 {
     let (lo, hi) = modular_word_range(width);
-    lo + (value - lo).rem_euclid(hi - lo + 1)
+    let modulus = hi - lo + 1;
+    // Reduce into `0..modulus` first, then shift to the signed window: the
+    // representative never needs `value - lo`, which overflows near `i128::MIN`
+    // and `i128::MAX` for a signed word.
+    let residue = value.rem_euclid(modulus);
+    if residue > hi {
+        residue - modulus
+    } else {
+        residue
+    }
+}
+
+/// Reduce an integer-valued float into the ring of `width` exactly. Every
+/// finite double is an exact integer here, so `% 2^W` (an exact `fmod`) gives
+/// the residue without first narrowing the magnitude through `i128`.
+pub(crate) fn modular_word_float_result(value: f64, width: NumericWidth) -> Value {
+    let modulus = 2f64.powi(i32::try_from(modular_word_bits(width)).unwrap_or(64));
+    // `|residue| < 2^W <= 2^64`, so the cast is exact.
+    modular_word_result((value % modulus) as i128, width)
 }
 
 /// Reduce `value` into the ring and surface it in the width's carrier.

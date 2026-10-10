@@ -8,8 +8,8 @@
 use super::regex_program::RegexProgram;
 use super::value::{
     MapKey, SermoValue, Value, decimal_scale_factor, float_to_numerus_width,
-    float_truncation_fits_width, int_width_range, modular_word_result, saturating_word_result,
-    trapping_float_store_fails,
+    float_truncation_fits_width, int_width_range, modular_word_float_result, modular_word_result,
+    saturating_word_result, trapping_float_store_fails,
 };
 use super::{Runner, RunnerError};
 use radix_lexer::{Span, Symbol};

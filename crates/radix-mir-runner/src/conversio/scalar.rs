@@ -517,6 +517,14 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 "fractus to numerus conversion out of range",
             );
         }
+        // A float source reduces by its exact integer value: narrowing it
+        // through `i128` first would saturate a huge magnitude before the ring.
+        if let Value::Float(float) = value {
+            return Ok(modular_word_float_result(
+                self.float_rounding(params, float),
+                width,
+            ));
+        }
         let exact = self.policy_word_source_value(value, source_ty, params, span)?;
         Ok(modular_word_result(exact, width))
     }
