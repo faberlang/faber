@@ -8,29 +8,17 @@
 use super::LocalePack;
 use crate::lexer::{keyword_specs, lex_with_locale_pack};
 use crate::parser::{ParseErrorKind, parse};
+use radix_lexer::KeywordScope;
 use std::collections::BTreeSet;
 
 const INSTALLED_LOCALES: &[&str] = &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
 const CONTEXTUAL_SUMMA_KEYWORDS: &[&str] = &["summa", "filum"];
 
-/// The conversion annotation has one sealed source spelling per settled
-/// reader surface. The registry retains `conversion` as an identity alias so
-/// other packs and tooling can name the family, but these two installed packs
-/// must not declare that alias as source syntax.
-///
-/// `la:nihil` is the same shape (D23.2, closed by c5b349bff): the registry
-/// keeps `nihil` as a transitional `Alias { canonical: "nulla" }` row for the
-/// public-grammar vocabulary triple, but the Latin pack dropped its
-/// `[keywords] nihil` alias so `nihil` resolves only as the permanent `[types]`
-/// null-type word and the value literal is `nulla`.
-const SEALED_CONVERSIO_ALIAS_OMISSIONS: &[(&str, &str)] =
-    &[("en", "conversion"), ("la", "conversion"), ("la", "nihil")];
-
-fn is_sealed_conversio_alias_omission(locale: &str, key: &str) -> bool {
-    SEALED_CONVERSIO_ALIAS_OMISSIONS
-        .iter()
-        .any(|&(sealed_locale, omitted_key)| sealed_locale == locale && omitted_key == key)
-}
+// The registry retains `conversion` as an identity alias row
+// (`KeywordScope::Alias`) so tooling can name the family, but no installed
+// pack declares an alias as source syntax: every pack spells the annotation
+// through its `conversio` row. `nihil` is the same shape (D23.2): it is the
+// permanent `[types]` null-type word and the value literal is `nulla`.
 
 /// Load a pack's **owned** rows from the raw file (no `inherits` merge).
 fn owned_installed_pack(locale: &str) -> LocalePack {
@@ -47,6 +35,7 @@ fn owned_installed_pack(locale: &str) -> LocalePack {
 fn every_installed_pack_covers_grammar_keyword_rows() {
     let required: BTreeSet<&str> = keyword_specs()
         .iter()
+        .filter(|spec| !matches!(spec.scope, KeywordScope::Alias { .. }))
         .map(|spec| spec.text)
         .chain(CONTEXTUAL_SUMMA_KEYWORDS.iter().copied())
         .collect();
@@ -55,9 +44,6 @@ fn every_installed_pack_covers_grammar_keyword_rows() {
     for &locale in INSTALLED_LOCALES {
         let pack = owned_installed_pack(locale);
         for &key in &required {
-            if is_sealed_conversio_alias_omission(locale, key) {
-                continue;
-            }
             if !pack.keywords.contains_key(key) {
                 missing.push(format!("{locale}:{key}"));
             }
@@ -118,4 +104,70 @@ fn conversion_annotation_rows_follow_the_sealed_locale_surface() {
             "{locale} must not declare the cross-locale `conversion` alias"
         );
     }
+}
+
+/// Per-section key-set drift between packs, naming both sets. `sections`
+/// pairs a locale with the keys its pack owns for one table.
+fn key_set_drift(section: &str, sections: &[(&str, BTreeSet<String>)]) -> Vec<String> {
+    let union: BTreeSet<&String> = sections.iter().flat_map(|(_, keys)| keys).collect();
+    let mut drift = Vec::new();
+    for (locale, keys) in sections {
+        let missing: Vec<&&String> = union.iter().filter(|key| !keys.contains(**key)).collect();
+        if !missing.is_empty() {
+            drift.push(format!(
+                "[{section}] {locale} lacks {missing:?} (carries {} of {} union keys)",
+                keys.len(),
+                union.len()
+            ));
+        }
+    }
+    drift
+}
+
+/// The eight installed packs carry one key set per table, so the locale table
+/// can join them on the Latin key. `[keywords]` and `[types]` are compared
+/// across all eight; `[intrinsics]` across the seven non-la packs (la owns no
+/// section: identity-by-absence, asserted by the intrinsic completeness gate).
+/// Keys are read from the parsed binding maps, so a table-valued row such as
+/// en `approximata = { canonical = "approx", .. }` counts like a string row.
+#[test]
+fn installed_packs_carry_one_key_set_per_section() {
+    let packs: Vec<(&str, LocalePack)> = INSTALLED_LOCALES
+        .iter()
+        .map(|&locale| (locale, owned_installed_pack(locale)))
+        .collect();
+    let keys = |select: &dyn Fn(&LocalePack) -> BTreeSet<String>, skip_la: bool| {
+        packs
+            .iter()
+            .filter(|(locale, _)| !(skip_la && *locale == "la"))
+            .map(|(locale, pack)| (*locale, select(pack)))
+            .collect::<Vec<_>>()
+    };
+
+    let mut drift = key_set_drift("keywords", &keys(&|p| p.keywords.keys().cloned().collect(), false));
+    drift.extend(key_set_drift("types", &keys(&|p| p.types.keys().cloned().collect(), false)));
+    drift.extend(key_set_drift(
+        "intrinsics",
+        &keys(&|p| p.intrinsics.keys().cloned().collect(), true),
+    ));
+    assert!(drift.is_empty(), "locale pack key-set drift: {drift:#?}");
+
+    let en = &packs
+        .iter()
+        .find(|(locale, _)| *locale == "en")
+        .expect("en pack")
+        .1;
+    assert!(
+        en.intrinsics.contains_key("approximata"),
+        "table-valued en `approximata` row must be counted by the parity check"
+    );
+}
+
+#[test]
+fn key_set_drift_names_the_pack_and_the_missing_keys() {
+    let full: BTreeSet<String> = ["a", "b"].iter().map(|key| (*key).to_owned()).collect();
+    let short: BTreeSet<String> = ["a"].iter().map(|key| (*key).to_owned()).collect();
+    let drift = key_set_drift("keywords", &[("en", full), ("ar", short)]);
+    assert_eq!(drift.len(), 1, "{drift:?}");
+    assert!(drift[0].contains("ar lacks") && drift[0].contains("\"b\""), "{drift:?}");
 }
