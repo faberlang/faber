@@ -288,37 +288,18 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         match self.types.get(target) {
             Type::Struct(def_id) => {
-                let Some(entries) = entries else {
-                    self.errors.push(MirError::unsupported(
-                        expr.span,
-                        "struct construction without object entries before aggregate MIR lowering",
-                    ));
-                    return None;
+                let def_id = *def_id;
+                self.lower_verte_struct(def_id, target, entries, expr)
+            }
+            // An explicitly parameterised constructor (`Cista<int> { … }`)
+            // carries the applied type as the cast target: construct the
+            // struct at that applied type, as the inferred form does.
+            Type::Applied(base, _) if matches!(self.types.get(*base), Type::Struct(_)) => {
+                let Type::Struct(def_id) = self.types.get(*base) else {
+                    unreachable!("guard proved a struct base")
                 };
-                let fields = self.lower_struct_object_fields(*def_id, entries, expr.span)?;
-                // A generic struct written bare (`Box { … }`) carries the
-                // written raw head in `target`; the checker's contextual
-                // instantiation records the applied type (`Box<N>`) on the
-                // expression. Construct at the applied type so generic-
-                // template instantiation can specialize the temp.
-                let ty = self
-                    .expr_ty(expr)
-                    .filter(|ty| match self.types.get(ty.semantic_id()) {
-                        Type::Applied(base, _) => matches!(
-                            self.types.get(*base),
-                            Type::Struct(expr_def) if expr_def == def_id
-                        ),
-                        _ => false,
-                    })
-                    .unwrap_or(MirType::semantic(target));
-                let constructed = self.construct_temp(
-                    MirAggregateKind::Struct(*def_id),
-                    MirAggregateFields::Named(fields),
-                    ty,
-                    expr.span,
-                );
-                self.call_creo_hook(*def_id, &constructed, expr.span);
-                Some(constructed)
+                let def_id = *def_id;
+                self.lower_verte_struct(def_id, target, entries, expr)
             }
             Type::Record(_) => {
                 let Some(entries) = entries else {
@@ -443,6 +424,48 @@ impl FunctionBuilder<'_> {
                 Some(self.assign_temp(MirValueKind::Operand(operand), ty, expr.span))
             }
         }
+    }
+
+    /// Lower a struct construction whose cast target is the struct (or the
+    /// struct applied to type/size arguments) to a struct aggregate.
+    fn lower_verte_struct(
+        &mut self,
+        def_id: DefId,
+        target: TypeId,
+        entries: Option<&Vec<HirObjectField>>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let Some(entries) = entries else {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "struct construction without object entries before aggregate MIR lowering",
+            ));
+            return None;
+        };
+        let fields = self.lower_struct_object_fields(def_id, entries, expr.span)?;
+        // A generic struct written bare (`Box { … }`) carries the
+        // written raw head in `target`; the checker's contextual
+        // instantiation records the applied type (`Box<N>`) on the
+        // expression. Construct at the applied type so generic-
+        // template instantiation can specialize the temp.
+        let ty = self
+            .expr_ty(expr)
+            .filter(|ty| match self.types.get(ty.semantic_id()) {
+                Type::Applied(base, _) => matches!(
+                    self.types.get(*base),
+                    Type::Struct(expr_def) if *expr_def == def_id
+                ),
+                _ => false,
+            })
+            .unwrap_or(MirType::semantic(target));
+        let constructed = self.construct_temp(
+            MirAggregateKind::Struct(def_id),
+            MirAggregateFields::Named(fields),
+            ty,
+            expr.span,
+        );
+        self.call_creo_hook(def_id, &constructed, expr.span);
+        Some(constructed)
     }
 
     /// The `∷` ascription cast for a `bivalens` source into a `numerus`

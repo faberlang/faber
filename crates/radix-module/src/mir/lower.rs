@@ -90,6 +90,9 @@ mod empty_dense_tests;
 #[cfg(test)]
 #[path = "lower/entry_args_test.rs"]
 mod entry_args_tests;
+#[cfg(test)]
+#[path = "lower/explicit_generic_constructor_test.rs"]
+mod explicit_generic_constructor_tests;
 mod expr;
 #[cfg(test)]
 #[path = "lower/first_match_test.rs"]
