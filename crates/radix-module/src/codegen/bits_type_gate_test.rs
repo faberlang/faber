@@ -71,8 +71,8 @@ fn swift_emitter_keeps_bits() {
 
 #[cfg(feature = "mir-llvm")]
 #[test]
-fn llvm_rejects_bits_before_emission() {
-    assert_rejected(Target::MirLlvm, "MirLlvm");
+fn llvm_emitter_keeps_bits() {
+    assert_eq!(diagnostics(Target::MirLlvm), Vec::<(String, String)>::new());
 }
 
 #[cfg(feature = "mir-wasm")]

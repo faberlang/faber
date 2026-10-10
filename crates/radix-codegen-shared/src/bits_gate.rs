@@ -21,8 +21,9 @@ const ISSUE: &str = "bits_type_unsupported_on_target";
 /// marker; the MIR runner executes the type and does not reach codegen. The
 /// Phase 3 emitters carry it as an unsigned carrier: Rust and Go as u8..u64,
 /// Swift as UInt8..UInt64, TypeScript as `number` (b8, b16, b32) and `bigint`
-/// (b64), and the MIR sexp target as a non-negative exact Racket integer kept
-/// inside its N bits.
+/// (b64), the MIR sexp target as a non-negative exact Racket integer kept
+/// inside its N bits, the MIR wasm target as i32 (b8..b32) and i64 (b64) kept
+/// zero-extended in N bits, and the MIR llvm target as iN.
 fn target_admits_bits(target: Target) -> bool {
     matches!(
         target,
@@ -34,6 +35,7 @@ fn target_admits_bits(target: Target) -> bool {
             | Target::HirSwift
             | Target::MirSexp
             | Target::MirWasm
+            | Target::MirLlvm
     )
 }
 
