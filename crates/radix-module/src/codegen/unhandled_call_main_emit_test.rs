@@ -111,9 +111,9 @@ fn go_panics_on_an_unhandled_failable_call_in_main() {
 fn swift_aborts_on_an_unhandled_failable_call_in_main() {
     let code = emit(Target::HirSwift, &format!("{DECLS}{MAIN}"));
     let main = main_body(&code, "struct Main");
-    assert!(main.contains("fatalError(\"\\(e)\")"), "{main}");
-    assert!(main.contains("})(check(n: 1))"), "{main}");
-    assert!(main.contains("})(risky(n: 2))"), "{main}");
+    assert!(main.contains("try! check(n: 1)"), "{main}");
+    assert!(main.contains("try! risky(n: 2)"), "{main}");
+    assert!(main.contains("try! k.nimm(n: 1)"), "{main}");
 }
 
 #[test]
