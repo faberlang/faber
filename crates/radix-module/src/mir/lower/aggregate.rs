@@ -333,14 +333,24 @@ impl FunctionBuilder<'_> {
                 Some(self.construct_temp(MirAggregateKind::Record, MirAggregateFields::Named(fields), ty, expr.span))
             }
             Type::Map(_, _) => {
-                let Some(entries) = entries else {
-                    self.errors.push(MirError::unsupported(
-                        expr.span,
-                        "map construction without object entries before aggregate MIR lowering",
-                    ));
-                    return None;
+                // A bare `{ "k": v }` literal ascribed with `∷` stays a JSON
+                // valor literal source (it has no object entries); its members
+                // are the key/value pairs of the ascribed map type, exactly as
+                // the declaration form lowers them.
+                let fields = match (entries, &source.kind) {
+                    (Some(entries), _) => self.lower_map_object_fields(entries, expr.span)?,
+                    (
+                        None,
+                        HirExpressionKind::Literal(HirLiteral::JsonValor(crate::syntax::JsonValue::Object(members))),
+                    ) => self.lower_json_map_members(members, expr.span)?,
+                    (None, _) => {
+                        self.errors.push(MirError::unsupported(
+                            expr.span,
+                            "map construction without object entries before aggregate MIR lowering",
+                        ));
+                        return None;
+                    }
                 };
-                let fields = self.lower_map_object_fields(entries, expr.span)?;
                 let ty = MirType::semantic(target);
                 Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(fields), ty, expr.span))
             }

@@ -7415,3 +7415,24 @@ functio exemplo() → vacuum {
         "the synthesized helper performs the append: {dump}"
     );
 }
+
+#[test]
+fn ascribed_json_object_literal_constructs_the_typed_map() {
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    const _ a ← {"a": 1} ∷ map<string, int>
+    const _ b ← {"a": null} ∷ map<string, int ∪ none>
+    print a
+    print b
+}
+"#,
+    );
+    assert_eq!(
+        dump.matches("construct map:").count(),
+        2,
+        "each ascribed JSON object literal must build the ascribed map: {dump}"
+    );
+}
