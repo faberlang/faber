@@ -38,7 +38,7 @@ incipit {
     nota high ≥ same
     nota high ≤ low
     nota high ≡ same
-    nota high ≠ low
+    nota high ≢ low
     nota high ≡ 0x80
     nota 0x7f ≺ high
 

@@ -80,7 +80,7 @@ fn f32le(bytes buf, int off) → f32 {
     const int exp ← (raw ⇒ 23) % 256
     const int frac ← raw % 8388608
     var float signFactor ← 1.0
-    if sign ≠ 0 {
+    if sign ≢ 0 {
         signFactor ← -1.0
     }
     const float fracRatio ← (frac ↦ float) / 8388608.0

@@ -54,7 +54,7 @@ fn is_terminator(string c) → bool {
 @ public
 fn is_control(string c) → bool {
     const bytes encoded ← c ↦ bytes
-    if encoded.length() ≠ 1 then return false
+    if encoded.length() ≢ 1 then return false
     return encoded.get(0) coalesce 32 ∷ u8 ≺ 32 ∷ u8
 }
 

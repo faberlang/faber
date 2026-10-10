@@ -38,7 +38,7 @@ fn decode(bytes data) → bytes ⇥ string {
         i ← line_end + 2
         if size ≡ 0 {
             i ← skip_trailers(data, i)
-            if i ≠ n then throw "norma:http/chunked.decode: trailing data"
+            if i ≢ n then throw "norma:http/chunked.decode: trailing data"
             const bytes result ← body
             return result
         }
@@ -140,7 +140,7 @@ fn hex_digit(int n) → int {
 fn parse_extensions(bytes data, int start, int end) → void ⇥ string {
     var int i ← skip_bws(data, start, end)
     while i ≺ end {
-        if byte_at(data, i) ≠ 59 then throw "norma:http/chunked.decode: illegal extension"
+        if byte_at(data, i) ≢ 59 then throw "norma:http/chunked.decode: illegal extension"
         i ← skip_bws(data, i + 1, end)
         if i ≥ end or not is_tchar(byte_at(data, i)) {
             throw "norma:http/chunked.decode: illegal extension"
@@ -191,7 +191,7 @@ fn skip_bws(bytes data, int start, int end) → int {
     var int i ← start
     while i ≺ end {
         const int n ← byte_at(data, i)
-        if n ≠ 32 and n ≠ 9 then return i
+        if n ≢ 32 and n ≢ 9 then return i
         i ← i + 1
     }
     return i
@@ -234,10 +234,10 @@ fn skip_trailers(bytes data, int start) → int ⇥ string {
 }
 
 fn bytes_eq(bytes a, bytes b) → bool {
-    if a.length() ≠ b.length() then return false
+    if a.length() ≢ b.length() then return false
     var int i ← 0
     while i ≺ a.length() {
-        if (a.get(i) coalesce (0 ∷ u8)) ≠ (b.get(i) coalesce (1 ∷ u8)) {
+        if (a.get(i) coalesce (0 ∷ u8)) ≢ (b.get(i) coalesce (1 ∷ u8)) {
             return false
         }
         i ← i + 1

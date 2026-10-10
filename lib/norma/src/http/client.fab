@@ -451,7 +451,7 @@ fn is_scheme(string scheme) → bool {
     var int i ← 1
     while i ≺ scheme.length() {
         const string c ← scheme.slice(i, i + 1)
-        if not is_alpha(c) and not is_digit(c) and c ≠ "+" and c ≠ "-" and c ≠ "." {
+        if not is_alpha(c) and not is_digit(c) and c ≢ "+" and c ≢ "-" and c ≢ "." {
             return false
         }
         i ← i + 1
@@ -540,7 +540,7 @@ fn port_of(string hostport, string scheme) → int ∪ none {
         if i ≡ hostport.length() {
             return default_port(scheme)
         }
-        if hostport.slice(i, i + 1) ≠ ":" then return null
+        if hostport.slice(i, i + 1) ≢ ":" then return null
         digits ← hostport.slice(i + 1, hostport.length())
     }
     else {

@@ -102,9 +102,9 @@ main {
     const f64 from_value ← clamp_f64(not_a_number, 0.0, 1.0)
     const f64 from_low ← clamp_f64(0.5, not_a_number, 1.0)
     const f64 from_high ← clamp_f64(0.5, 0.0, not_a_number)
-    print from_value ≠ from_value
-    print from_low ≠ from_low
-    print from_high ≠ from_high
+    print from_value ≢ from_value
+    print from_low ≢ from_low
+    print from_high ≢ from_high
 
     # 5. IEEE 754-2019: -0.0 orders below +0.0.
     const f64 pos_zero ← 0.0

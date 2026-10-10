@@ -83,14 +83,14 @@ main {
     assert ln10.approx(2.0, 0.000001)
     # IEEE 754 results (operator ruling 2026-09-24): NaN ≠ NaN, so `x ≠ x`
     # is the NaN probe; out-of-domain input yields NaN or ±∞, never 0.0.
-    assert neg_sqrt ≠ neg_sqrt
-    assert neg_log ≠ neg_log
+    assert neg_sqrt ≢ neg_sqrt
+    assert neg_log ≢ neg_log
     assert pole_tan ≻ 1.0e15
     assert zero_log ≡ -∞
     assert pow_cat ≡ 8.0
     assert pow_recv ≡ pow_cat
     assert neg_pow_recv ≡ 4.0
     assert neg_cube ≡ -8.0
-    assert neg_root ≠ neg_root
+    assert neg_root ≢ neg_root
     assert mathesis.pow(-2.0, 2.0) ≡ 4.0
 }

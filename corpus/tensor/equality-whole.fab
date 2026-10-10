@@ -46,8 +46,8 @@ main {
 
     print a ≡ same
     print a ≡ other
-    print a ≠ other
-    print a ≠ same
+    print a ≢ other
+    print a ≢ same
 
     const tensor<bool, [4]> mask ← a ≅ other
     print mask.flatten()
@@ -61,7 +61,7 @@ main {
     const tensor<f32, [4]> nans ← zeros ÷ zeros
     print nans.flatten()
     print nans ≡ nans
-    print nans ≠ nans
+    print nans ≢ nans
 
     const int n ← runtime_extent(2)
     const int m ← runtime_extent(3)
@@ -70,6 +70,6 @@ main {
     const tensor<f32, [size n]> short ← flat_short ↦ tensor<f32, [size n]>
     const tensor<f32, [size m]> long ← flat_long ↦ tensor<f32, [size m]>
     print short ≡ long
-    print short ≠ long
+    print short ≢ long
     print short ≡ short
 }

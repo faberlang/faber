@@ -19,7 +19,7 @@ import from "norma:chorda" chorda
 
 main {
     const ascii ∪ none present ← chorda.try_to_ascii("Authorization")
-    assert present ≠ null
+    assert present ≢ null
 
     const ascii ∪ none absent ← chorda.try_to_ascii("π")
     assert absent ≡ null

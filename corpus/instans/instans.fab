@@ -65,7 +65,7 @@ main {
     const value rightWire ← "1979-05-27T07:32:00.123999Z"
     const instant<ns> left ← leftWire ↦ instant<ns>
     const instant<ns> right ← rightWire ↦ instant<ns>
-    assert left ≠ right panic "sub-millisecond bits differ at nanosecond precision"
+    assert left ≢ right panic "sub-millisecond bits differ at nanosecond precision"
     const instant<ms> leftMs ← left ↦ instant<ms>
     const instant<ms> rightMs ← right ↦ instant<ms>
     assert leftMs ≡ rightMs panic "same millisecond at declared ms precision"

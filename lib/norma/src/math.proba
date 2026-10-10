@@ -19,7 +19,7 @@ fn is_nan(float x) → bool {
     const u64 bits ← wide ↦ u64 via Bits
     const u64 exponent ← (bits ⇒ 52) ∧ (2047 ∷ u64)
     const u64 fraction ← bits ∧ (4503599627370495 ∷ u64)
-    return exponent ≡ (2047 ∷ u64) and fraction ≠ (0 ∷ u64)
+    return exponent ≡ (2047 ∷ u64) and fraction ≢ (0 ∷ u64)
 }
 
 describe "math catalog" {

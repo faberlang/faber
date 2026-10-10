@@ -38,7 +38,7 @@ main {
     print high ≥ same
     print high ≤ low
     print high ≡ same
-    print high ≠ low
+    print high ≢ low
     print high ≡ 0x80
     print 0x7f ≺ high
 

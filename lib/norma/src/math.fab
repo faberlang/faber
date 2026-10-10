@@ -287,7 +287,7 @@ fn sqrt(float x) → float {
     }
     e ← e + biased_exponent(m) - 1023
     m ← unit_mantissa(m)
-    if e % 2 ≠ 0 {
+    if e % 2 ≢ 0 {
         m ← m * 2.0
         e ← e - 1
     }
@@ -338,13 +338,13 @@ fn biased_exponent(float x) → int {
 @ private
 fn is_nan(float x) → bool {
     const u64 fraction ← bits(x) ∧ (4503599627370495 ∷ u64)
-    return biased_exponent(x) ≡ 2047 and fraction ≠ (0 ∷ u64)
+    return biased_exponent(x) ≡ 2047 and fraction ≢ (0 ∷ u64)
 }
 
 # Why: Finite test on the exponent field (excludes ±∞ and NaN).
 @ private
 fn is_finite(float x) → bool {
-    return biased_exponent(x) ≠ 2047
+    return biased_exponent(x) ≢ 2047
 }
 
 # Why: Replace the exponent of normal x with 0 — mantissa in [1, 2).

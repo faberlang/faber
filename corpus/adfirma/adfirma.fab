@@ -17,7 +17,7 @@ test "assertions validate invariants" {
     assert x ≡ 10 panic "x decem esse debet"
     const string nomen ← "Marcus"
     assert nomen ≡ "Marcus"
-    assert nomen ≠ "" panic "nomen vacuum non sit"
+    assert nomen ≢ "" panic "nomen vacuum non sit"
     const bool viget ← true
     assert viget
     assert viget ≡ true panic "vigere debet"
@@ -64,7 +64,7 @@ main {
     # Multiple assertions
     const string nomen ← "Marcus"
     assert nomen ≡ "Marcus"
-    assert nomen ≠ "" panic "nomen vacuum non sit"
+    assert nomen ≢ "" panic "nomen vacuum non sit"
 
     # Boolean assertions
     const bool viget ← true

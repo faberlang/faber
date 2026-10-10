@@ -14,7 +14,7 @@ describe "terminus_different_endpoints" {
     test "different endpoints" {
         const terminus.Endpoint local ← terminus.Endpoint { host = "127.0.0.1", port = 8080 }
         const terminus.Endpoint remote ← terminus.Endpoint { host = "192.168.1.1", port = 443 }
-        assert local.host ≠ remote.host
-        assert local.port ≠ remote.port
+        assert local.host ≢ remote.host
+        assert local.port ≢ remote.port
     }
 }

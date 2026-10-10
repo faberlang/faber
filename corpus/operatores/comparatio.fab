@@ -12,7 +12,7 @@ locale = "en"
 +++
 test "equal and not-equal comparisons" {
     assert 10 ≡ 10
-    assert 10 ≠ 5
+    assert 10 ≢ 5
 }
 
 test "ordering and chained interval" {
@@ -48,7 +48,7 @@ test "ordering and chained interval" {
 main {
     const bool aequalis ← 10 ≡ 10
     print aequalis
-    const bool diversus ← 10 ≠ 5
+    const bool diversus ← 10 ≢ 5
     print diversus
     const bool nonMaior ← 5 ≤ 10
     print nonMaior

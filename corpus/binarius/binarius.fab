@@ -74,7 +74,7 @@ main {
     # Comparationes
     let aequalis ← 10 ≡ 10
     print aequalis
-    let diversus ← 10 ≠ 5
+    let diversus ← 10 ≢ 5
     print diversus
     let minor ← 5 ≺ 10
     print minor

@@ -209,7 +209,7 @@ fn remove_at<K>(mut list<K> index, int positio) → void {
             i ← i + 1
             continue
         }
-        if i ≠ positio {
+        if i ≢ positio {
             out.append(extans)
         }
         i ← i + 1

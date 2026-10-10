@@ -162,7 +162,7 @@ fn pad32(bytes data) → list<u8> {
         padded.append(data.get(i) coalesce (0 ∷ u8))
     }
     padded.append(0x80 ∷ u8)
-    while (padded.length() % 64) ≠ 56 {
+    while (padded.length() % 64) ≢ 56 {
         padded.append(0 ∷ u8)
     }
     for range 0‥8 const i {
@@ -310,7 +310,7 @@ fn pad64(bytes data) → list<u8> {
         padded.append(data.get(i) coalesce (0 ∷ u8))
     }
     padded.append(0x80 ∷ u8)
-    while (padded.length() % 128) ≠ 112 {
+    while (padded.length() % 128) ≢ 112 {
         padded.append(0 ∷ u8)
     }
     # 128-bit length field: high 64 bits are zero under the 64 MiB limit.

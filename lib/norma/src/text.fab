@@ -318,7 +318,7 @@ fn split_frontmatter(string document, string delimiter) → list<string> ⇥ str
     # block, delimiter slicing is safe and semantically meaningful.
     if delim_len ≡ 0 then throw "empty delimiter"
     if document.length() ≺ delim_len then throw "missing opening delimiter"
-    if document.slice(0, delim_len) ≠ delimiter then throw "missing opening delimiter"
+    if document.slice(0, delim_len) ≢ delimiter then throw "missing opening delimiter"
 
     var int meta_start ← delim_len
     const string nl ← newline()

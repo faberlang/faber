@@ -120,7 +120,7 @@ main {
     # Identical types join exactly (P1 ints, P7 decimals); every other family
     # pair is SEM010:equality_exact_types_required.
     print a ≡ b
-    print a ≠ 8
+    print a ≢ 8
     print d64v ≡ d64w
 
     # --------------------------------------------------- ≅ / ≇ (all joins)

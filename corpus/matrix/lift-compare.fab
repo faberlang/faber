@@ -77,6 +77,6 @@ main {
     print lt ✓ 9.0 ✗ a
     print clamped(a, 3.5)
     print a ≡ b
-    print a ≠ b
+    print a ≢ b
     print a ≡ a
 }

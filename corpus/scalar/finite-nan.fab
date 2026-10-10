@@ -62,7 +62,7 @@ fn finite(f32 x) → bool {
     const _ bits ← x ↦ u32 via Bits
     const _ exponent ← bits ⇒ 23 ∧ 255 ∷ u32
     const _ omnino ← 255 ∷ u32
-    return exponent ≠ omnino
+    return exponent ≢ omnino
 }
 
 # nan() — the same field gate narrowed to NaN only (exponent 0xFF, fraction ≠ 0).
@@ -71,7 +71,7 @@ fn nan(f32 x) → bool {
     const _ exponent ← bits ⇒ 23 ∧ 255 ∷ u32
     const _ fraction ← bits ∧ 8388607 ∷ u32
     const _ omnino ← exponent ≡ 255 ∷ u32
-    const _ non_nihil ← fraction ≠ 0 ∷ u32
+    const _ non_nihil ← fraction ≢ 0 ∷ u32
     return omnino and non_nihil
 }
 

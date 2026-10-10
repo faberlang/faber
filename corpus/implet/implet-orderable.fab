@@ -75,7 +75,7 @@ main {
     # Through the contract NaN is the largest float, so `larger` returns it
     # (NaN is never equal to itself). The bare glyph stays IEEE: false.
     const f64 top ← larger(1.5, nan)
-    print top ≠ top
+    print top ≢ top
     print top ≻ 1.5
 
     const tuple<int, string> first ← tuple<int, string>[2, "b"]

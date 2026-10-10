@@ -283,7 +283,7 @@ fn line_has_token(string line, string folded_want) → bool {
     while i ≺ n {
         while i ≺ n {
             const string c ← line.slice(i, i + 1)
-            if c ≠ " " and c ≠ "\t" and c ≠ "," {
+            if c ≢ " " and c ≢ "\t" and c ≢ "," {
                 break
             }
             i ← i + 1

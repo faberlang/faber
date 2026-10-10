@@ -17,7 +17,7 @@ test "falsum is the false literal" {
 }
 
 test "falsum contrasts with verum" {
-    assert false ≠ true
+    assert false ≢ true
     assert false ≡ false
 }
 # =============================================================================

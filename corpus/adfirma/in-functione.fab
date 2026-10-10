@@ -41,7 +41,7 @@ locale = "en"
 
 # Validate input at function start
 fn divide(int a, int b) → int {
-    assert b ≠ 0 panic "divisor non sit nihil"
+    assert b ≢ 0 panic "divisor non sit nihil"
     return a / b
 }
 

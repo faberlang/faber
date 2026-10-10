@@ -77,7 +77,7 @@ fn decode_query_field(string query, string name) → string ∪ none {
     var int i ← 0
     while i ≤ query.length() {
         var int amp ← i
-        while amp ≺ query.length() and query.slice(amp, amp + 1) ≠ "&" {
+        while amp ≺ query.length() and query.slice(amp, amp + 1) ≢ "&" {
             amp ← amp + 1
         }
         const string pair ← query.slice(i, amp)

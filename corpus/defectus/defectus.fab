@@ -43,7 +43,7 @@ locale = "en"
 #   closed until they emit `capta`.
 
 fn half(int n) → int ⇥ string {
-    if n % 2 ≠ 0 {
+    if n % 2 ≢ 0 {
         throw "odd"
     }
     return n / 2

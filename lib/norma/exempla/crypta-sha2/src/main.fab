@@ -15,11 +15,11 @@ import from "norma:crypta" crypta
 # algorithm names (empty, unknown, mixed-case, hyphenated).
 
 fn expect(bytes got, bytes want, string label) → void ⇥ string {
-    if got.length() ≠ want.length() then throw "§: wrong length"(label)
+    if got.length() ≢ want.length() then throw "§: wrong length"(label)
     for range 0‥got.length() const i {
         const u8 g ← got.get(i) coalesce (0 ∷ u8)
         const u8 w ← want.get(i) coalesce (0 ∷ u8)
-        if g ≠ w then throw "§: byte mismatch at §"(label, i)
+        if g ≢ w then throw "§: byte mismatch at §"(label, i)
     }
 }
 
