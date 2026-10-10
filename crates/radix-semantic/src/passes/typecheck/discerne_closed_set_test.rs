@@ -101,3 +101,42 @@ fn numeric_member_of_a_union_is_accepted() {
 }",
     );
 }
+
+#[test]
+fn literal_arm_over_numeric_subject_is_rejected() {
+    test_support::assert_rejects_with_issue(
+        r"functio probe(numerus n) → vacuum {
+    discerne n {
+        casu 1 { tacet }
+        casu _ { tacet }
+    }
+}",
+        ISSUE,
+    );
+}
+
+#[test]
+fn bool_literal_arms_over_bivalens_are_accepted() {
+    test_support::assert_accepts(
+        r"functio probe(bivalens b) → vacuum {
+    discerne b {
+        casu verum { tacet }
+        casu falsum { tacet }
+    }
+}",
+    );
+}
+
+#[test]
+fn same_variant_in_two_subject_positions_is_accepted() {
+    test_support::assert_accepts(
+        r"discretio Forma { Circulus, Quadratum }
+
+functio probe(Forma a, Forma b) → vacuum {
+    discerne a et b {
+        casu Circulus et Circulus { tacet }
+        casu _ et _ { tacet }
+    }
+}",
+    );
+}

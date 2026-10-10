@@ -109,6 +109,7 @@ const ISSUE_TENSOR_MISSING_FIGURA: &str = "tensor_missing_figura";
 const ISSUE_TYPE_ALIAS_CYCLE: &str = "type_alias_cycle";
 const ISSUE_TYPE_NAME_NOT_TYPE: &str = "type_name_not_type";
 const ISSUE_VARIANT_AMBIGUOUS: &str = "variant_ambiguous";
+const ISSUE_DISCERNE_PATTERN_NOT_IN_CLOSED_SET: &str = "discerne_pattern_not_in_closed_set";
 const ISSUE_UNION_ONLY_NIHIL: &str = "union_only_nihil";
 /// `x est V` where `V` names a value, not a type (DECISIONS D23.1).
 const ISSUE_EST_VALUE_RHS: &str = "est_value_rhs";
@@ -923,6 +924,14 @@ fn resolve_discerne(
     resolver.exit_scope();
 }
 
+fn push_closed_set_refusal(span: radix_lexer::Span, errors: &mut Vec<SemanticError>) {
+    errors.push(
+        SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
+            .with_arg("issue", ISSUE_DISCERNE_PATTERN_NOT_IN_CLOSED_SET)
+            .with_arg("pattern", "literal"),
+    );
+}
+
 fn resolve_pattern(
     resolver: &mut Resolver,
     _interner: &Interner,
@@ -931,7 +940,20 @@ fn resolve_pattern(
 ) {
     match pattern {
         Pattern::Wildcard(_) => {}
-        Pattern::Literal(_, _) | Pattern::NegatedLiteral(_, _) => {}
+        // `discerne` matches a closed set (union members, enum variants). The
+        // two-valued `bivalens` literals and the absent literal discriminate a
+        // closed set; any other literal is a value test over an open set and
+        // belongs to `elige` (operator ruling 2026-10-02). `elige` has its own
+        // statement and never reaches this resolver arm.
+        Pattern::Literal(literal, span) => {
+            if !matches!(
+                literal,
+                radix_syntax::Literal::Bool(_) | radix_syntax::Literal::Nil
+            ) {
+                push_closed_set_refusal(*span, errors);
+            }
+        }
+        Pattern::NegatedLiteral(_, span) => push_closed_set_refusal(*span, errors),
         Pattern::Type(_ty, bind) => {
             // The type pattern is classified before resolution. Only its
             // optional value binding enters the arm scope; the type name and
@@ -941,26 +963,29 @@ fn resolve_pattern(
         }
         Pattern::Ident(ident, bind) => {
             // A bare name that two or more unions define is an ambiguous
-            // variant pattern; report it and never bind it silently. The
-            // single-union case keeps today's behavior exactly (a Local is
-            // still defined for the arm body; lowering owns the variant shape).
-            if matches!(
-                resolver.lookup_variant_bare(ident.name),
-                BareVariantLookup::Ambiguous { .. }
-            ) {
+            // variant pattern; report it and never bind it silently. A name
+            // that exactly one union defines is a variant constructor
+            // pattern, not a binding (lowering owns the variant shape), so it
+            // defines no local: the same variant may appear in several subject
+            // positions of one multi-subject arm without a duplicate
+            // definition.
+            let lookup = resolver.lookup_variant_bare(ident.name);
+            if matches!(lookup, BareVariantLookup::Ambiguous { .. }) {
                 errors.push(
                     SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
                         .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
                 );
             }
-            define_symbol(
-                resolver,
-                ident.name,
-                ident.span,
-                SymbolKind::Local,
-                false,
-                errors,
-            );
+            if !matches!(lookup, BareVariantLookup::Single(_)) {
+                define_symbol(
+                    resolver,
+                    ident.name,
+                    ident.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+            }
             resolve_pattern_bind(resolver, bind.as_ref(), errors);
         }
         Pattern::Or(alternatives) => {
