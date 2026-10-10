@@ -39,19 +39,10 @@ fn target_admits_bits(target: Target) -> bool {
     )
 }
 
-/// The first raw-bits marker (`b8`) the type table names, if any.
+/// The first raw-bits marker (`b8`) a module wrote, if any. The `lista<b8>`
+/// the `octeti` word names is not one: it is seeded unmarked.
 fn first_bits_marker(types: &TypeTable) -> Option<&'static str> {
-    (0..types.type_count()).find_map(|index| {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "TypeId is u32 by design; type_count is bounded by u32::MAX"
-        )]
-        let ty = TypeId(index as u32);
-        match types.get(ty) {
-            Type::Bits(width) => Some(width.faber_marker()),
-            _ => None,
-        }
-    })
+    types.first_authored_bits().map(|width| width.faber_marker())
 }
 
 /// # Errors

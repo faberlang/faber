@@ -94,6 +94,11 @@ pub struct TypeTable {
     /// Updated on every `intern` that inserts a `ModularWord` when unset. Snapshot
     /// restore recomputes from the types arena so the flag stays consistent.
     first_modular_word: Option<NumericWidth>,
+    /// Raw-bits widths interned through [`Self::intern`] (bit 0 `b8` .. bit 3
+    /// `b64`). The `lista<b8>` the `octeti` word names is seeded without
+    /// setting a bit, so a module that never writes a `bN` marker has none.
+    authored_bits: u8,
+    
 
     /// Parent enum definition for each variant constructor [`DefId`].
     ///
@@ -187,6 +192,7 @@ impl TypeTable {
             assignable_memo: RefCell::new(FxHashMap::default()),
             find_equal_memo: RefCell::new(FxHashMap::default()),
             first_modular_word: None,
+            authored_bits: 0,
             variant_parent: FxHashMap::default(),
             resolved_generic_calls: Vec::new(),
             ordering_contract: None,
@@ -232,6 +238,33 @@ impl TypeTable {
     /// order-insensitive unions share one arena entry.
     #[allow(clippy::cast_possible_truncation)]
     pub fn intern(&mut self, ty: Type) -> TypeId {
+        if let Type::Bits(width) = &ty {
+            self.authored_bits |= Self::bits_mask(*width);
+        }
+        self.intern_unmarked(ty)
+    }
+
+    fn bits_mask(width: BitsWidth) -> u8 {
+        match width {
+            BitsWidth::B8 => 1,
+            BitsWidth::B16 => 2,
+            BitsWidth::B32 => 4,
+            BitsWidth::B64 => 8,
+        }
+    }
+
+    /// The narrowest raw-bits width a module wrote through [`Self::intern`],
+    /// `None` when only the `octeti` byte list (or nothing) names one. O(1)
+    /// probe used by backend rejection.
+    #[must_use]
+    pub fn first_authored_bits(&self) -> Option<BitsWidth> {
+        [BitsWidth::B8, BitsWidth::B16, BitsWidth::B32, BitsWidth::B64]
+            .into_iter()
+            .find(|width| self.authored_bits & Self::bits_mask(*width) != 0)
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn intern_unmarked(&mut self, ty: Type) -> TypeId {
         let ty = Self::canonicalize_for_intern(ty);
         if let Some(&id) = self.intern_map.get(&ty) {
             return id;
@@ -418,7 +451,15 @@ impl TypeTable {
         }
         let mut intern_map = FxHashMap::default();
         let mut first_modular_word = None;
+        // A restored table cannot tell an authored `b8` from the seeded
+        // `octeti` byte list, so it keeps only the wider widths as authored.
+        let mut authored_bits = 0_u8;
         for (index, ty) in snapshot.types.iter().enumerate() {
+            if let Type::Bits(width) = ty
+                && *width != BitsWidth::B8
+            {
+                authored_bits |= Self::bits_mask(*width);
+            }
             // First occupancy wins — matches historical linear-scan first match.
             intern_map.entry(ty.clone()).or_insert(TypeId(index as u32));
             if first_modular_word.is_none()
@@ -438,6 +479,7 @@ impl TypeTable {
             assignable_memo: RefCell::new(FxHashMap::default()),
             find_equal_memo: RefCell::new(FxHashMap::default()),
             first_modular_word,
+            authored_bits,
             variant_parent: FxHashMap::default(),
             resolved_generic_calls: Vec::new(),
             ordering_contract: None,
@@ -1053,7 +1095,9 @@ impl TypeTable {
     /// `|de ad be ef|` literal and `insere` of a file produce (need,
     /// ruling B9).
     pub fn octeti_list(&mut self) -> TypeId {
-        let byte = self.bits(BitsWidth::B8);
+        // Seeded without marking the width: the byte list is the host-carried
+        // `octeti` word, not an authored `b8` (device gates key on the latter).
+        let byte = self.intern_unmarked(Type::Bits(BitsWidth::B8));
         self.array(byte)
     }
 
