@@ -1955,6 +1955,10 @@ help = "两个列表的逐元素乘法请用 ⊙；`*` 的一侧须为标量"
 message = "不支持对位值列表排序；位列表只有整值相等"
 help = "请用 `≡`/`≢` 比较整个列表，或先用 `↦` 把元素转为数字；位不是数字，所以 `≺ ≻ ≤ ≥` 不会逐元素提升"
 
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} 比较数字；不是数值张量的 {kind} 不能用它比较"
+help = "请用数值运算符逐元素比较，或用 `≡`/`≢` 比较整个值"
+
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "不支持 list `/` list；请用 ⊘（逐元素，同 `/`）或 ÷（逐元素真除法）"
 help = "逐对相除（同 `/`）请用 ⊘，真除法请用 ÷"

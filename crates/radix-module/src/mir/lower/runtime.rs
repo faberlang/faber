@@ -1074,6 +1074,8 @@ impl FunctionBuilder<'_> {
             HirBinOp::GtEq => MirCollectionOp::ArrayGtEq,
             HirBinOp::ApproxEq => MirCollectionOp::ArrayValueEq,
             HirBinOp::ApproxNotEq => MirCollectionOp::ArrayValueNotEq,
+            HirBinOp::And => MirCollectionOp::ArrayAnd,
+            HirBinOp::Or => MirCollectionOp::ArrayOr,
             _ => {
                 self.errors.push(MirError::unsupported(
                     expr.span,
@@ -1093,10 +1095,11 @@ impl FunctionBuilder<'_> {
         ))
     }
 
-    /// Lower unary `-` over a `lista` to the elementwise negation op. `None`
-    /// means the operand is not a list.
+    /// Lower unary `-` (or `non` over a `lista<bivalens>`) to the elementwise
+    /// collection op. `None` means the operand is not a list.
     pub(super) fn lower_lista_negate(
         &mut self,
+        op: HirUnOp,
         operand: &HirExpression,
         expr: &HirExpression,
     ) -> Option<Option<MirOperand>> {
@@ -1109,7 +1112,11 @@ impl FunctionBuilder<'_> {
             let value = self.lower_expr_value(operand)?;
             let result_ty = self.expr_ty(expr)?;
             Some(self.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::ArrayNeg),
+                MirIntrinsic::Collection(if op == HirUnOp::Not {
+                    MirCollectionOp::ArrayNot
+                } else {
+                    MirCollectionOp::ArrayNeg
+                }),
                 vec![value],
                 result_ty,
                 expr.span,

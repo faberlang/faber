@@ -1114,6 +1114,9 @@ impl TypeChecker<'_> {
                 if let Some(result) = self.check_tensor_lift_not(operand, operand_ty) {
                     return result;
                 }
+                if let Some(result) = self.check_lista_not(operand, operand_ty) {
+                    return result;
+                }
                 if self.is_infer(self.resolve_inferred_type(operand_ty)) {
                     let bivalens = self.bool_type();
                     self.unify_assign_issue(
@@ -1454,6 +1457,11 @@ impl TypeChecker<'_> {
                 if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
+                if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq)
+                    && let Some(result) = self.check_approx_aggregate(op, lhs_ty, rhs_ty, lhs.span)
+                {
+                    return result;
+                }
                 if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty)
                     && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
                 {
@@ -1543,6 +1551,9 @@ impl TypeChecker<'_> {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
                 if let Some(result) = self.check_tensor_lift_logic(lhs, lhs_ty, rhs_ty) {
+                    return result;
+                }
+                if let Some(result) = self.check_lista_logic(op, lhs, lhs_ty, rhs_ty) {
                     return result;
                 }
                 self.bool_bin(lhs_ty, rhs_ty, lhs.span)
@@ -2618,6 +2629,8 @@ fn lista_operator_spelling(op: HirBinOp) -> &'static str {
         HirBinOp::GtEq => "≥",
         HirBinOp::ApproxEq => "≅",
         HirBinOp::ApproxNotEq => "≇",
+        HirBinOp::And => "and",
+        HirBinOp::Or => "or",
         _ => unreachable!("non-list operator"),
     }
 }

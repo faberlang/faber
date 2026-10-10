@@ -1603,6 +1603,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.array_lift(args, span, MirLiftOp::TrueDiv, return_ty)
             }
             MirCollectionOp::ArrayNeg => self.array_lift(args, span, MirLiftOp::Neg, return_ty),
+            MirCollectionOp::ArrayAnd => self.array_lift(args, span, MirLiftOp::And, return_ty),
+            MirCollectionOp::ArrayOr => self.array_lift(args, span, MirLiftOp::Or, return_ty),
+            MirCollectionOp::ArrayNot => self.array_lift(args, span, MirLiftOp::Not, return_ty),
             MirCollectionOp::ArrayLt => self.array_lift(args, span, MirLiftOp::Lt, return_ty),
             MirCollectionOp::ArrayGt => self.array_lift(args, span, MirLiftOp::Gt, return_ty),
             MirCollectionOp::ArrayLtEq => self.array_lift(args, span, MirLiftOp::LtEq, return_ty),
@@ -6545,6 +6548,9 @@ fn lista_label(op: MirLiftOp) -> &'static str {
         MirLiftOp::GtEq => "lista gt-eq",
         MirLiftOp::Eq => "lista value-eq",
         MirLiftOp::NotEq => "lista value-not-eq",
+        MirLiftOp::And => "lista and",
+        MirLiftOp::Or => "lista or",
+        MirLiftOp::Not => "lista not",
         _ => "lista neg",
     }
 }

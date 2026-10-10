@@ -3565,8 +3565,8 @@ impl<'a> FunctionBuilder<'a> {
         {
             return lowered;
         }
-        if op == HirUnOp::Neg
-            && let Some(lowered) = self.lower_lista_negate(operand, expr)
+        if matches!(op, HirUnOp::Neg | HirUnOp::Not)
+            && let Some(lowered) = self.lower_lista_negate(op, operand, expr)
         {
             return lowered;
         }
@@ -3649,6 +3649,16 @@ impl<'a> FunctionBuilder<'a> {
             op,
             HirBinOp::Mod | HirBinOp::TrueDiv | HirBinOp::Hadamard | HirBinOp::HadamardDiv
         ) && self.is_lista_or_queue_stack_arithmetic_operand(lhs, rhs)
+        {
+            return self.lower_lista_elementwise(op, lhs, rhs, expr);
+        }
+        // `et` / `aut` over a `lista<bivalens>` lift per element (Q-C of the
+        // 2026-10-04 comparisons ruling); both sides are always evaluated, so
+        // it precedes the short-circuit.
+        if matches!(op, HirBinOp::And | HirBinOp::Or)
+            && expr
+                .ty
+                .is_some_and(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
         {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }

@@ -2542,6 +2542,10 @@ help = "utere ⊙ ad multiplicationem duarum listarum per elementa; `*` scalare 
 message = "ordinatio listae bituum non licet; lista bituum aequalitatem totius valoris tantum habet"
 help = "listas totas per `≡`/`≢` compara, vel elementa prius ad numeros per `↦` converte; bitus numeri non sunt, ergo `≺ ≻ ≤ ≥` super eos non elevantur"
 
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} numeros comparat; {kind} quae non est tensor numericus eo comparari non potest"
+help = "elementa per operatorem numericum compara, vel `≡`/`≢` ad totos valores comparandos adhibe"
+
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "lista `/` lista non licet; utere ⊘ (elementwise, ut `/`) aut ÷ (divisio vera per elementa)"
 help = "utere ⊘ ad singula paria sicut `/` dividenda, aut ÷ ad divisionem veram"
