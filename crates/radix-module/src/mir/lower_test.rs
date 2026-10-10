@@ -3923,14 +3923,25 @@ incipit {
 
 #[test]
 fn rejects_unsupported_runtime_method_shapes() {
-    let unit = analyze(r"functio malum(lista<numerus> xs) → numerus { redde xs.praepone(1) }");
-    let errors =
-        lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect_err("unsupported method remains fail-closed");
+    // Need: a method absent from a builtin receiver's registry is
+    // refused at the checker as `unknown_method`, so the call never reaches
+    // MIR lowering. The fail-closed boundary moved from lowering to analysis.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let diagnostics = crate::driver::analyze_source(
+        &session,
+        "test.fab",
+        r"functio malum(lista<numerus> xs) → numerus { redde xs.praepone(1) }",
+        AnalyzeRequest::default(),
+    )
+    .map(|_| ())
+    .expect_err("unsupported method remains fail-closed at analysis");
 
     assert!(
-        errors
+        diagnostics.iter().any(|diag| diag
+            .args
             .iter()
-            .any(|err| err.issue == "unsupported_mir_lowering_method_call_before_runtime_provider_mir_lowering")
+            .any(|arg| arg.name == "issue" && arg.value == "unknown_method")),
+        "expected the named unknown_method error: {diagnostics:?}"
     );
 }
 
