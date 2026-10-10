@@ -3618,6 +3618,45 @@ functio nomina(Condicio s) → textus {
 }
 
 #[test]
+fn lowers_all_returning_bivalens_discerne_without_fallthrough_return() {
+    let dump = dump_source(
+        r#"
+functio signum(bivalens b) → numerus {
+    discerne b {
+        casu verum { redde 1 }
+        casu falsum { redde 0 }
+    }
+}
+"#,
+    );
+
+    assert!(dump.contains("return %") || dump.contains("return 1"));
+    assert!(
+        !dump.contains("return\n"),
+        "all-returning bivalens discerne must not synthesize a no-value return: {dump}"
+    );
+}
+
+#[test]
+fn lowers_all_returning_type_test_discerne_without_fallthrough_return() {
+    let dump = dump_source(
+        r#"
+functio mensura(numerus ∪ textus u) → numerus {
+    discerne u {
+        casu numerus fixum n { redde n }
+        casu textus fixum s { redde 0 }
+    }
+}
+"#,
+    );
+
+    assert!(
+        !dump.contains("return\n"),
+        "all-returning type-test discerne must not synthesize a no-value return: {dump}"
+    );
+}
+
+#[test]
 fn lowers_scalar_verte_as_target_typed_passthrough() {
     let dump = dump_source(
         r"

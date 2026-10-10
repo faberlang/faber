@@ -2199,9 +2199,18 @@ impl FunctionBuilder<'_> {
             return Some(MirOperand::Constant(MirConstant::Unit));
         }
 
+        // A closed-set switch with no default (`casu verum` / `casu falsum`)
+        // has no value that misses every case: its default edge is dead, so
+        // it must not fall through to the join as a no-value return.
+        let default_is_dead = default_body.is_none() && self.discerne_is_total(scrutinees, arms);
+        if default_is_dead {
+            default_id = self.fresh_block(expr.span);
+            self.seal_unreachable(default_id, expr.span);
+        }
+
         self.terminate_current(MirTerminatorKind::Switch { value, cases, default: default_id }, expr.span);
 
-        let mut reaches_join = default_body.is_none();
+        let mut reaches_join = default_body.is_none() && !default_is_dead;
 
         for (target, body, span) in bodies {
             self.switch_to(target);
@@ -2221,6 +2230,17 @@ impl FunctionBuilder<'_> {
             self.seal_unreachable(join_id, expr.span);
         }
         Some(MirOperand::Constant(MirConstant::Unit))
+    }
+
+    /// Whether semantic coverage proves every scrutinee value matches an arm,
+    /// so a match with no default arm has no fallthrough edge.
+    fn discerne_is_total(&self, scrutinees: &[HirExpression], arms: &[HirCasuArm]) -> bool {
+        radix_semantic::passes::exhaustive::discerne_definitely_covered(
+            scrutinees,
+            arms,
+            self.types,
+            &self.context.enum_variants,
+        )
     }
 
     fn lower_type_test_discerne_expr(
@@ -2302,7 +2322,15 @@ impl FunctionBuilder<'_> {
             // the MIR CFG total for the runner by routing the statically
             // unreachable fallthrough to the join rather than emitting a
             // runner-unsupported `Unreachable` terminator.
-            reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), expr.span);
+            if self.discerne_is_total(std::slice::from_ref(scrutinee), arms) {
+                // Every member is matched by an arm above, so the last probe's
+                // else edge is dead; it must not reach the join.
+                if let Some(current) = self.current {
+                    self.seal_unreachable(current, expr.span);
+                }
+            } else {
+                reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), expr.span);
+            }
         }
         if reaches_join {
             self.switch_to(join_id);
