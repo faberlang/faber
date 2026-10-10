@@ -1,0 +1,35 @@
++++
+term = "bits"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Arithmetic on bits is refused; use the bit operations or convert with ↦ first."
+syntax = "a + b on b8 — rejected"
+related = ["bits", "↦"]
+locale = "la"
+no_expected = "rejects"
+diagnostic = "SEM011:bits_arithmetic_refused"
++++
+# =============================================================================
+# bits — Arithmetic on bits is refused; use the bit operations or convert with ↦ first.
+# =============================================================================
+#
+# What this teaches:
+#   • bits have no arithmetic; + - * / % are errors that name the bit operations
+#
+# Common mistakes:
+#   • reaching for + to combine bits — write a ∨ b or convert to a number with ↦
+#
+# See also: bits-operations, bits-literals
+# =============================================================================
+
+# bits reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+incipit {
+    fixum b8 a ← 0x01
+    fixum b8 b ← 0x02
+    nota a + b
+}

@@ -1,0 +1,35 @@
++++
+term = "bits"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A bits value does not mix with a number or another width."
+syntax = "a ∧ n on b8 and u8 — rejected"
+related = ["bits", "↦"]
+locale = "la"
+no_expected = "rejects"
+diagnostic = "SEM011:bits_operand_mismatch"
++++
+# =============================================================================
+# bits — A bits value does not mix with a number or another width.
+# =============================================================================
+#
+# What this teaches:
+#   • a bit operation takes two values of the same bN width
+#
+# Common mistakes:
+#   • mixing a b8 with a u8 — convert the number with ↦ first
+#
+# See also: bits-operations, bits-literals
+# =============================================================================
+
+# bits reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+incipit {
+    fixum b8 a ← 0x0f
+    fixum u8 n ← 3
+    nota a ∧ n
+}

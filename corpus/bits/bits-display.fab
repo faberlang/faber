@@ -1,0 +1,43 @@
++++
+term = "bits"
+kind = "display"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = true
+summary = "print shows a bits value as hex at its full width, alone or inside a list."
+syntax = "print x | print list<b8>"
+related = ["bits", "print"]
+locale = "en"
++++
+# =============================================================================
+# bits — Display is hex at full width
+# =============================================================================
+#
+# What this teaches:
+#   • a b8 prints as two hex digits, b16 as four, b32 as eight, b64 as sixteen
+#   • leading zeros are kept: the display shows the whole width
+#   • a list of bits prints each element the same way
+#
+# Common mistakes:
+#   • expecting decimal output — bits are patterns, not quantities
+#
+# See also: bits-literals, bits-operations
+# =============================================================================
+
+# bits — hex print at full width
+#
+# EXPECTED stdout: see bits-display.expected
+
+main {
+    const b8 one8 ← 0x01
+    const b16 one16 ← 0x0001
+    const b32 one32 ← 0x00000001
+    const b64 one64 ← 0x0000000000000001
+    print one8
+    print one16
+    print one32
+    print one64
+
+    const list<b8> bytes ← [0x00, 0x0f, 0xa5, 0xff]
+    print bytes
+}

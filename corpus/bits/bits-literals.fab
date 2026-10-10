@@ -1,0 +1,56 @@
++++
+term = "bits"
+kind = "literal"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "literal"
+canonical = true
+summary = "A hex, binary or decimal integer literal in a bits cell takes the cell's type at all four widths."
+syntax = "const b8 x ← 0xff | const b16 x ← 0b1010 | const b64 x ← 255"
+related = ["bits", "u8"]
+locale = "en"
++++
+# =============================================================================
+# bits — Literals take the cell's type
+# =============================================================================
+#
+# What this teaches:
+#   • an integer literal in a bN cell is a bN value, not a number
+#   • hex, binary and decimal spellings are all accepted
+#   • the literal must fit the width: 0xff fits a b8, 0x1ff does not
+#
+# Common mistakes:
+#   • writing a literal wider than the cell — that is a compile error
+#
+# See also: bits-display, bits-literal-range-reject
+# =============================================================================
+
+# bits — hex, binary and decimal literals at every width
+#
+# EXPECTED stdout: see bits-literals.expected
+
+main {
+    const b8 hex8 ← 0xff
+    const b8 bin8 ← 0b10100101
+    const b8 dec8 ← 255
+    const b16 hex16 ← 0xffff
+    const b16 bin16 ← 0b1010
+    const b16 dec16 ← 65535
+    const b32 hex32 ← 0xffffffff
+    const b32 bin32 ← 0b1
+    const b32 dec32 ← 4294967295
+    const b64 hex64 ← 0xffffffffffffffff
+    const b64 bin64 ← 0b1000
+    const b64 dec64 ← 255
+    print hex8
+    print bin8
+    print dec8
+    print hex16
+    print bin16
+    print dec16
+    print hex32
+    print bin32
+    print dec32
+    print hex64
+    print bin64
+    print dec64
+}

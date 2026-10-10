@@ -1,0 +1,61 @@
++++
+term = "bits"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = true
+summary = "b8, b16, b32 and b64 are raw bits: ∧ ∨ ⊻ ¬ ⇐ ⇒ act at the type's own width, every time."
+syntax = "a ∧ b | a ∨ b | a ⊻ b | ¬ a | a ⇐ n | a ⇒ n"
+related = ["bits", "u8", "u64"]
+locale = "en"
++++
+# =============================================================================
+# bits — Bit operations act at the type's width
+# =============================================================================
+#
+# What this teaches:
+#   • A bN is exactly N bits; no wider value exists in the middle of an expression
+#   • ∧ ∨ ⊻ combine two bits values of the same width; ¬ flips exactly N bits
+#   • ⇐ shifts left and drops bits off the top; ⇒ shifts right and fills with zeros
+#   • A shift by N or more gives all zeros; the count is not wrapped
+#   • (b ⇐ 4) ⇒ 4 on a b8 clears the high nibble
+#
+# Common mistakes:
+#   • expecting a left shift to widen the value — a b8 stays eight bits
+#   • using + or - on bits — bits have no arithmetic; convert with ↦ first
+#
+# See also: bits-order, bits-literals, bits-display
+# =============================================================================
+
+# bits — operations at the type's own width
+#
+# WHY: an operation does what its own domain expects. Bit movement expects the
+# container's edge, so bits have their width always.
+#
+# EXPECTED stdout: see bits-operations.expected
+
+main {
+    const b8 a ← 0xf3
+    const b8 mask ← 0x0f
+    print a ∧ mask
+    print a ∨ mask
+    print a ⊻ mask
+    print ¬ a
+    print a ⇐ 4
+    print a ⇒ 4
+    const b8 cleared ← (a ⇐ 4) ⇒ 4
+    print cleared
+    print a ⇐ 8
+    print a ⇒ 8
+
+    const b64 wide ← 0xf0f0f0f0f0f0f0f0
+    const b64 low ← 0x00000000ffffffff
+    print wide ∧ low
+    print wide ∨ low
+    print wide ⊻ low
+    print ¬ wide
+    print wide ⇐ 4
+    print wide ⇒ 60
+    print wide ⇐ 64
+    print wide ⇒ 64
+}

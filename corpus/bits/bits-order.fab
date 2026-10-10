@@ -1,0 +1,49 @@
++++
+term = "bits"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = true
+summary = "bits values compare for equality and order by bit pattern read as unsigned."
+syntax = "a ≡ b | a ≠ b | a ≺ b | a ≻ b | a ≤ b | a ≥ b"
+related = ["bits", "u8"]
+locale = "en"
++++
+# =============================================================================
+# bits — Equality and unsigned ordering
+# =============================================================================
+#
+# What this teaches:
+#   • bits values have equality, and order by bit pattern read as unsigned
+#   • 0x80 is greater than 0x7f on a b8: there is no sign bit
+#   • an integer literal beside a bits operand takes the bits type
+#
+# Common mistakes:
+#   • reading the top bit as a sign — a bN is never negative
+#   • comparing a bN with a number — convert with ↦ first
+#
+# See also: bits-operations, bits-literals
+# =============================================================================
+
+# bits — ordering is unsigned
+#
+# EXPECTED stdout: see bits-order.expected
+
+main {
+    const b8 high ← 0x80
+    const b8 low ← 0x7f
+    const b8 same ← 0x80
+    print high ≻ low
+    print high ≺ low
+    print high ≥ same
+    print high ≤ low
+    print high ≡ same
+    print high ≠ low
+    print high ≡ 0x80
+    print 0x7f ≺ high
+
+    const b64 big ← 0x8000000000000000
+    const b64 small ← 0x7fffffffffffffff
+    print big ≻ small
+    print big ≡ small
+}
