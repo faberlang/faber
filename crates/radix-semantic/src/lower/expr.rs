@@ -517,15 +517,15 @@ impl Lowerer<'_> {
             // The node id is recorded with the glyph ids so Faber re-emission
             // prints the authored delimiters instead of the method twin.
             radix_syntax::UnOp::Floor => {
-                self.presentation.glyph_transpose_ids.push(id);
+                self.presentation.glyph_ids.push(id);
                 return self.lower_rounding_glyph("pavimentum", operand);
             }
             radix_syntax::UnOp::Ceil => {
-                self.presentation.glyph_transpose_ids.push(id);
+                self.presentation.glyph_ids.push(id);
                 return self.lower_rounding_glyph("tectum", operand);
             }
             radix_syntax::UnOp::Nearest => {
-                self.presentation.glyph_transpose_ids.push(id);
+                self.presentation.glyph_ids.push(id);
                 return self.lower_rounding_glyph("rotunda", operand);
             }
         };
@@ -629,7 +629,7 @@ impl Lowerer<'_> {
                 let (recv, name) = self.flatten_dotted_method_callee(member);
                 let name = self.canonicalize_namespace_member(&recv, name);
                 if self.interner.resolve(name) == GLYPH_TRANSPOSE_MARKER {
-                    self.presentation.glyph_transpose_ids.push(id);
+                    self.presentation.glyph_ids.push(id);
                 }
                 let args = self.lower_call_args(&call.args);
                 HirExpressionKind::MethodCall(Box::new(recv), name, type_args, args, None)

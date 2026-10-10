@@ -1140,6 +1140,35 @@ fn format_cli_keeps_the_transpose_glyph() {
         .expect("reparse");
 }
 
+/// Need: the glyph id set covers the rounding delimiters and the
+/// transpose suffix alike, so `faber format` keeps `⌊x⌋`, `⌈x⌉`, `⌊x⌉` and `ᵀ`
+/// exactly as authored in both code locales: the output equals the input and
+/// re-parses.
+#[test]
+fn format_cli_round_trips_rounding_and_transpose_glyphs() {
+    let english = "+++\nlocale = \"en\"\n+++\nfn flipped(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    return aᵀ.materialize()\n}\n\nmain {\n    const float half ← 2.5\n    print ⌊half⌋\n    print ⌈half⌉\n    print ⌊half⌉\n}\n";
+    let latin = "+++\nlocale = \"la\"\n+++\nfunctio versa(tensor<f32, [2, 2]> a) → tensor<f32, [2, 2]> {\n    redde aᵀ.materialize()\n}\n\nincipit {\n    fixum fractus dimidium ← 2.5\n    nota ⌊dimidium⌋\n    nota ⌈dimidium⌉\n    nota ⌊dimidium⌉\n}\n";
+
+    for (locale, source, pack) in [("en", english, english_pack()), ("la", latin, latin_pack())] {
+        let fixture =
+            std::env::temp_dir().join(format!("faber-format-glyph-roundtrip-{locale}.fab"));
+        fs::write(&fixture, source).expect("write glyph round-trip fixture");
+
+        let formatted = run_faber_format_stdout(&fixture);
+        let _ = fs::remove_file(&fixture);
+
+        assert_eq!(
+            formatted, source,
+            "format must be byte-identical for the {locale} glyph source"
+        );
+        let body = radix::module::driver::split_frontmatter(&formatted)
+            .expect("split")
+            .body;
+        assert_canonical_reparses_with(body, "glyph round-trip CLI --stdout", Some(&pack))
+            .expect("reparse");
+    }
+}
+
 /// Need: `faber format` keeps an authored in-place numeric twin
 /// (`a.add(2)`) instead of respelling it as the desugared `a ← a + 2`.
 #[test]

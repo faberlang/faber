@@ -135,7 +135,7 @@ fn empty_presentation() -> HirPresentation {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -282,7 +282,7 @@ fn emits_statement_trivia_before_each_statement() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -375,7 +375,7 @@ fn emits_block_end_trivia_before_closing_brace() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -428,7 +428,7 @@ fn emits_program_end_trivia_before_eof() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -482,7 +482,7 @@ fn emits_item_trivia_before_item() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -523,7 +523,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -629,7 +629,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -698,7 +698,7 @@ fn emits_trivia_before_annotation_sequence() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -781,7 +781,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -897,7 +897,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -1025,7 +1025,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -1093,7 +1093,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -1158,7 +1158,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -1229,7 +1229,7 @@ fn rendering_is_deterministic() {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),
@@ -1260,7 +1260,7 @@ fn render_transpose(receiver: HirExpressionKind, glyph: bool) -> String {
     let mut codegen = FaberCodegen::new(&types, &interner);
     let node = HirId(100);
     if glyph {
-        codegen.glyph_transpose_ids.insert(node);
+        codegen.glyph_ids.insert(node);
     }
     let call = HirExpression {
         id: node,
@@ -1358,7 +1358,7 @@ fn render_rounding(method: &str, glyph: bool, surface: &impl KeywordSurface) -> 
     let mut codegen = FaberCodegen::new(&types, &interner);
     let node = HirId(300);
     if glyph {
-        codegen.glyph_transpose_ids.insert(node);
+        codegen.glyph_ids.insert(node);
     }
     let call = HirExpression {
         id: node,

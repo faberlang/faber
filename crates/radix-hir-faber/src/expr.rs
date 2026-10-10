@@ -273,7 +273,7 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _)
                 if type_args.is_empty()
                     && args.is_empty()
-                    && self.glyph_transpose_ids.contains(&expr.id)
+                    && self.glyph_ids.contains(&expr.id)
                     && self.rounding_delimiters(*name, surface).is_some() =>
             {
                 // Authored `⌊x⌋` / `⌈x⌉` / `⌊x⌉`: lowering recorded the node
@@ -286,9 +286,7 @@ impl super::FaberCodegen<'_> {
                 }
             }
             HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
-                if type_args.is_empty()
-                    && args.is_empty()
-                    && self.glyph_transpose_ids.contains(&expr.id) =>
+                if type_args.is_empty() && args.is_empty() && self.glyph_ids.contains(&expr.id) =>
             {
                 // Authored `xᵀ`: typecheck rewrote the glyph marker to the
                 // transpose intrinsic and kept the node id; a compound
@@ -2065,8 +2063,7 @@ impl super::FaberCodegen<'_> {
         let HirExpressionKind::MethodCall(receiver, name, type_args, args, _) = &expr.kind else {
             return None;
         };
-        if !type_args.is_empty() || !args.is_empty() || self.glyph_transpose_ids.contains(&expr.id)
-        {
+        if !type_args.is_empty() || !args.is_empty() || self.glyph_ids.contains(&expr.id) {
             return None;
         }
         if self.expr_precedence(receiver) > 13 {

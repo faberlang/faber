@@ -566,7 +566,7 @@ pub struct FunctionProvenanceTableWire {
 /// `HirExpressionKind::Widen` (the implicit lossless bounded-integer → `inf`
 /// widening typecheck inserts, inf-wn), shifting the serde ordinal of the
 /// variants after `Conversio`; schema-v25 artifacts fail closed. Version 27 adds
-/// `HirPresentation::glyph_transpose_ids` (which transpose calls were authored
+/// `HirPresentation::glyph_ids` (which transpose calls were authored
 /// with the `ᵀ` glyph); schema-v26 artifacts fail closed. Version 28 adds
 /// `HirPresentation::numeric_twin_ids` (which assignments are desugared
 /// in-place numeric twin method calls); schema-v27 artifacts fail closed.
