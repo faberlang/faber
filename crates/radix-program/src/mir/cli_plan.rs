@@ -482,8 +482,7 @@ pub(super) fn parse_cli_arguments_with_mode(
                 };
                 value.clone()
             };
-            option_fields[option_index].value =
-                MirRuntimeRecordValue::Operand(cli_option_value(unit, option, &raw, diagnostics)?);
+            option_fields[option_index].value = cli_option_value(unit, option, &raw, diagnostics)?;
             argument_index += 1;
             continue;
         }
@@ -509,8 +508,7 @@ pub(super) fn parse_cli_arguments_with_mode(
                 push_cli_option_missing_value_diagnostic(unit, argument, diagnostics);
                 return None;
             };
-            option_fields[option_index].value =
-                MirRuntimeRecordValue::Operand(cli_option_value(unit, option, raw, diagnostics)?);
+            option_fields[option_index].value = cli_option_value(unit, option, raw, diagnostics)?;
             argument_index += 1;
             continue;
         }
@@ -880,7 +878,9 @@ pub(super) fn add_runtime_field_type_rewrites(
     locals.sort_by_key(|(local, _)| local.0);
     for (_, fields) in locals {
         for field in fields {
-            if let MirRuntimeRecordValue::Array { ty, .. } = &field.value {
+            if let MirRuntimeRecordValue::Array { ty, .. }
+            | MirRuntimeRecordValue::Rows { ty, .. } = &field.value
+            {
                 let source = ty.semantic_id();
                 let target = import_semantic_type(source_types, target_types, source, imported);
                 push_type_rewrite(&mut rewrite.types, source, target);

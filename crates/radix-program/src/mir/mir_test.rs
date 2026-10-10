@@ -419,6 +419,57 @@ fn is_known_fmir_kernel_requirement_rejects_missing_verb() {
     assert!(!is_known_fmir_kernel_requirement("kernel:tempus"));
 }
 
+#[test]
+fn package_mir_accepts_octeti_option_operand_and_rest_operand() {
+    use super::cli_values::{
+        cli_record_type, is_package_mir_supported_operand, is_package_mir_supported_option,
+    };
+    use radix_module::cli::{CliOperand, CliOption, CliType};
+    let mut interner = radix_module::lexer::Interner::default();
+    let data = interner.intern("data");
+    let operand = |rest| CliOperand {
+        binding: "data".to_owned(),
+        binding_symbol: data,
+        ty: CliType::Octeti,
+        rest,
+        description: None,
+        global: false,
+        default: None,
+        span: Span::default(),
+    };
+    // A plain and a final rest octeti operand are both package-MIR operands.
+    assert!(is_package_mir_supported_operand(&operand(false), true));
+    assert!(is_package_mir_supported_operand(&operand(true), true));
+    assert!(!is_package_mir_supported_operand(&operand(true), false));
+
+    let option = CliOption {
+        binding: "data".to_owned(),
+        binding_symbol: data,
+        ty: CliType::Octeti,
+        long: Some("data".to_owned()),
+        short: None,
+        flag: false,
+        description: None,
+        global: false,
+        default: None,
+        span: Span::default(),
+    };
+    assert!(is_package_mir_supported_option(&option));
+
+    // The record field type is `list<b8>`; a rest operand is a list of those.
+    let mut types = radix_module::semantic::TypeTable::new();
+    let bytes = types.octeti_list();
+    assert_eq!(
+        cli_record_type(&mut types, &CliType::Octeti, false),
+        Some(bytes)
+    );
+    let rows = types.array(bytes);
+    assert_eq!(
+        cli_record_type(&mut types, &CliType::Octeti, true),
+        Some(rows)
+    );
+}
+
 // ── is_bridged_norma_import_path ───────────────────────────────────────────
 
 #[test]

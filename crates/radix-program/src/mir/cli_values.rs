@@ -165,6 +165,21 @@ pub(super) fn cli_operand_list_value(
         &operand.operand.ty,
         operand.operand.rest,
     )?;
+    if matches!(operand.operand.ty, CliType::Octeti) {
+        let rows = values
+            .into_iter()
+            .map(|value| {
+                value
+                    .bytes()
+                    .map(|byte| MirOperand::Constant(MirConstant::UInt(u64::from(byte))))
+                    .collect()
+            })
+            .collect();
+        return Some(MirRuntimeRecordValue::Rows {
+            ty: MirType::semantic(ty),
+            rows,
+        });
+    }
     let items = values
         .into_iter()
         .map(|value| cli_operand_list_item_value(unit, operand, value, diagnostics))
@@ -221,7 +236,7 @@ pub(super) fn cli_option_value(
     option: &PlannedCliOption<'_>,
     value: &str,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Option<MirOperand> {
+) -> Option<MirRuntimeRecordValue> {
     let constant = match &option.option.ty {
         CliType::Textus | CliType::Ignotum => {
             let payload = textus_literal_payload(value);
@@ -251,9 +266,12 @@ pub(super) fn cli_option_value(
                 return None;
             }
         }
-        CliType::Octeti | CliType::ListaTextus | CliType::ListaNumerus => return None,
+        CliType::Octeti => return Some(cli_octeti_operand_value(unit, value)),
+        CliType::ListaTextus | CliType::ListaNumerus => return None,
     };
-    Some(MirOperand::Constant(constant))
+    Some(MirRuntimeRecordValue::Operand(MirOperand::Constant(
+        constant,
+    )))
 }
 
 pub(super) fn cli_default_operand_value(
@@ -473,7 +491,7 @@ pub(super) fn is_package_mir_supported_operand(operand: &CliOperand, is_final: b
         return false;
     }
     if operand.rest {
-        return is_final && !matches!(operand.ty, CliType::Octeti);
+        return is_final;
     }
     if matches!(operand.ty, CliType::ListaTextus | CliType::ListaNumerus) {
         return is_final;
@@ -523,6 +541,7 @@ pub(super) fn is_package_mir_scalar_option(option: &CliOption) -> bool {
             | CliType::Numerus
             | CliType::Fractus
             | CliType::Bivalens
+            | CliType::Octeti
     ) && option
         .default
         .as_ref()

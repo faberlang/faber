@@ -659,7 +659,16 @@ impl MirRuntimeRecordField {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MirRuntimeRecordValue {
     Operand(MirOperand),
-    Array { ty: MirType, items: Vec<MirOperand> },
+    Array {
+        ty: MirType,
+        items: Vec<MirOperand>,
+    },
+    /// An array of arrays (a rest `octeti` operand): `ty` is the outer array
+    /// type, and each row is one inner array typed by its element type.
+    Rows {
+        ty: MirType,
+        rows: Vec<Vec<MirOperand>>,
+    },
 }
 
 /// Lower a semantically analyzed HIR unit into a validated MIR unit.
@@ -1071,6 +1080,14 @@ fn cli_descriptor_record_fields<'a>(
                 Some(CliDefault::Bool(value)) => *value,
                 _ => false,
             })))
+        } else if matches!(option.ty, CliType::Octeti) {
+            if option.default.is_some() {
+                // A defaulted octeti option is a non-optional `list<b8>`; the
+                // runtime rebinds the bytes from argv.
+                MirRuntimeRecordValue::Array { ty: MirType::semantic(types.octeti_list()), items: Vec::new() }
+            } else {
+                MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Nil))
+            }
         } else if matches!(option.ty, CliType::ListaTextus | CliType::ListaNumerus) {
             if option.default.is_some() {
                 // Defaulted list options are non-optional `array(element)`; no
@@ -1092,7 +1109,11 @@ fn cli_descriptor_record_fields<'a>(
         fields.push(MirRuntimeRecordField { name: option.binding_symbol, value });
     }
     for operand in operands {
-        let value = if operand.rest || matches!(operand.ty, CliType::ListaTextus | CliType::ListaNumerus) {
+        let value = if matches!(operand.ty, CliType::Octeti) && !operand.rest {
+            // An octeti operand is one `list<b8>` array; the runtime rebinds
+            // the bytes from argv.
+            MirRuntimeRecordValue::Array { ty: MirType::semantic(types.octeti_list()), items: Vec::new() }
+        } else if operand.rest || matches!(operand.ty, CliType::ListaTextus | CliType::ListaNumerus) {
             let element = cli_record_base_type(types, &operand.ty);
             MirRuntimeRecordValue::Array { ty: MirType::semantic(types.array(element)), items: Vec::new() }
         } else if let Some(default) = &operand.default {
@@ -1109,13 +1130,13 @@ fn cli_descriptor_record_fields<'a>(
 
 /// Map a CLI boundary type to the semantic primitive used as its record-field
 /// base (mirroring `cli_value_type` in the HIR lowerer).
-fn cli_record_base_type(types: &TypeTable, ty: &CliType) -> TypeId {
+fn cli_record_base_type(types: &mut TypeTable, ty: &CliType) -> TypeId {
     match ty {
         CliType::Textus | CliType::Ignotum => types.primitive(Primitive::Textus),
         CliType::Numerus => types.primitive(Primitive::Numerus),
         CliType::Fractus => types.primitive(Primitive::Fractus),
         CliType::Bivalens => types.primitive(Primitive::Bivalens),
-        CliType::Octeti => types.primitive(Primitive::Octeti),
+        CliType::Octeti => types.octeti_list(),
         CliType::ListaTextus => types.primitive(Primitive::Textus),
         CliType::ListaNumerus => types.primitive(Primitive::Numerus),
     }
@@ -1143,10 +1164,10 @@ fn cli_type_zero_operand(interner: &mut Interner, ty: &CliType) -> MirOperand {
         CliType::Numerus => MirConstant::Int(0),
         CliType::Fractus => MirConstant::Float(0.0),
         CliType::Bivalens => MirConstant::Bool(false),
-        CliType::Octeti => MirConstant::Octeti(Vec::new()),
-        // List-shaped fields are always array aggregates in the record;
-        // a zero constant is only reachable for a non-list fallback path.
-        CliType::ListaTextus | CliType::ListaNumerus => MirConstant::Nil,
+        // List-shaped fields (including octeti, a `list<b8>`) are always
+        // array aggregates in the record; a zero constant is only reachable
+        // for a non-list fallback path.
+        CliType::Octeti | CliType::ListaTextus | CliType::ListaNumerus => MirConstant::Nil,
     };
     MirOperand::Constant(constant)
 }
@@ -2707,6 +2728,25 @@ impl<'a> FunctionBuilder<'a> {
                         ty,
                         span,
                     ),
+                    MirRuntimeRecordValue::Rows { ty, rows } => {
+                        let row_ty = match self.types.get(ty.semantic_id()) {
+                            Type::Array(element) => MirType::semantic(*element),
+                            _ => ty,
+                        };
+                        let items = rows
+                            .into_iter()
+                            .map(|row| {
+                                let items = row.into_iter().map(MirAggregateItem::Operand).collect();
+                                MirAggregateItem::Operand(self.construct_temp(
+                                    MirAggregateKind::Array,
+                                    MirAggregateFields::Ordered(items),
+                                    row_ty,
+                                    span,
+                                ))
+                            })
+                            .collect();
+                        self.construct_temp(MirAggregateKind::Array, MirAggregateFields::Ordered(items), ty, span)
+                    }
                 };
                 MirNamedOperand { name: field.name, value }
             })
