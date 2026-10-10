@@ -330,11 +330,25 @@ fn rounding_ops_return_numerus_so_bound_compares_do_not_mismatch() {
             .expect("round 1.0"),
         Value::Int(1)
     );
+    // Nearest rounding ties to even on the runner (sb260 b3410a4863, need
+    // ea7cfde1): 0.5 -> 0, 1.5 -> 2, 2.5 -> 2, -0.5 -> 0; never ties-away.
     assert_eq!(
         runner
             .eval_runtime_call(&round(0.5), radix_lexer::Span::default())
             .expect("round 0.5"),
-        Value::Int(1)
+        Value::Int(0)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&round(1.5), radix_lexer::Span::default())
+            .expect("round 1.5"),
+        Value::Int(2)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&round(2.5), radix_lexer::Span::default())
+            .expect("round 2.5"),
+        Value::Int(2)
     );
     assert_eq!(
         runner
@@ -346,7 +360,7 @@ fn rounding_ops_return_numerus_so_bound_compares_do_not_mismatch() {
         runner
             .eval_runtime_call(&round(-0.5), radix_lexer::Span::default())
             .expect("round -0.5"),
-        Value::Int(-1)
+        Value::Int(0)
     );
 
     let abs_float = MirRuntimeCall {
@@ -6400,7 +6414,10 @@ fn pd25_row_softmax_preserves_values_and_errors() {
     let Value::Float(entropia) = entropia else {
         panic!("entropia must return a float");
     };
-    assert_eq!(entropia.to_bits(), 4599430525009988060);
+    // Cross-entropy divides by the batch row count, not the last dimension
+    // (sb264 917bdd5297, XENTDIV, need item 8): the mean of the two
+    // row losses ln(1 + e^-1 + e^-2) and ln(1 + 2e^-1) is 0.47952517...
+    assert_eq!(entropia.to_bits(), 4602309977556029130);
 
     let cases = [
         (
