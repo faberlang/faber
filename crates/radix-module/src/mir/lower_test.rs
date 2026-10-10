@@ -149,7 +149,7 @@ fn decimal_literal_switch_matches_at_the_exact_carrier() {
         "decimal-exact-switch.fab",
         r#"incipit {
     fixum d64 x ← 4.2
-    discerne x {
+    elige x {
         casu 4.2 { nota "hit" }
         ceterum { nota "miss" }
     }
