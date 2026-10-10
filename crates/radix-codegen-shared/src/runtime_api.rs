@@ -742,6 +742,9 @@ pub const ORDER_COMPARE: RuntimeItem = RuntimeItem {
     kind: RuntimeKind::Fn,
     targets: CARRIER_GO_TS,
 };
+/// `order.equal`: the structural `≡` / `≢` over a genus (a Go `*Name` compares
+/// by identity under `==`), a list, map, set, tuple or optional of one.
+pub const ORDER_EQUAL: RuntimeItem = carrier_row(Namespace::Order, "equal", RuntimeKind::Fn);
 /// `order.text_compare` (T1-T13): code-point text compare of the TypeScript
 /// runtime (`order.textCompare`). Go compares strings by UTF-8 byte order,
 /// which equals code-point order, so it needs no such helper.
@@ -1289,6 +1292,7 @@ pub const TABLE: &[RuntimeItem] = &[
     SPARSA_NEW,
     ORDER_ORDER,
     ORDER_COMPARE,
+    ORDER_EQUAL,
     ORDER_TEXT_COMPARE,
     DUP_DUPLICATE,
     INTERVALLUM_INTERVALLUM,
