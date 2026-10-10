@@ -26,6 +26,7 @@ const ISSUE_OCTETI_INDEX_MUST_BE_NUMERUS_OR_RANGE: &str = "octeti_index_must_be_
 const ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS: &str = "octeti_index_out_of_bounds";
 const ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS: &str = "array_index_must_be_numerus";
 const ISSUE_INDEXING_REQUIRES_ARRAY_OR_MAP: &str = "indexing_requires_array_or_map";
+const ISSUE_WINDOW_REQUIRES_LIST: &str = "window_requires_list";
 const ISSUE_MAP_INDEX_TYPE_MISMATCH: &str = "map_index_type_mismatch";
 const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str = "tensor_index_vector_integer_elements";
 const ISSUE_TENSOR_SCALAR_INDEX_RANK: &str = "tensor_scalar_index_rank";
@@ -260,6 +261,25 @@ impl TypeChecker<'_> {
                 return self.types.primitive(Primitive::Octeti);
             }
             return self.byte_element_type();
+        }
+        // WHY: `xs[lo‥hi]` is a window on every list (ruling B10 of need
+        // 6a13d711): a new `lista<T>` holding the range, fully in bounds or a
+        // failure at run time. A range over anything that is not a list, text
+        // or octeti is one named issue.
+        if self.is_range_index(idx_ty) {
+            match &resolved_kind {
+                Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                    if !self.is_textus_index_type(idx_ty) {
+                        self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index_span);
+                    }
+                    return self.types.array(*elem);
+                }
+                Type::Tensor(..) | Type::Vector(..) | Type::Tuple(_) | Type::Primitive(_) => {
+                    self.invalid_operand_types(ISSUE_WINDOW_REQUIRES_LIST, object_span);
+                    return self.error_type;
+                }
+                _ => {}
+            }
         }
         if let Type::Tensor(elem, shape) = resolved_kind {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);
@@ -933,7 +953,11 @@ impl TypeChecker<'_> {
         }
         let resolved = self.resolve_inferred_type(obj_ty);
         if let Type::Tuple(elements) = self.types.get(resolved).clone() {
-            let idx_ty = self.check_expr(index);
+            let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+            if self.is_range_index(idx_ty) {
+                self.invalid_operand_types(ISSUE_WINDOW_REQUIRES_LIST, object.span);
+                return self.error_type;
+            }
             return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
         }
         let idx_ty = match self.check_tuple_key_bracket(resolved, index) {
@@ -1063,6 +1087,17 @@ impl TypeChecker<'_> {
         }
         if let Type::Tuple(elements) = self.types.get(resolved).clone() {
             return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
+        }
+        // A window is a read: a range index on a list write keeps the
+        // integer-index refusal.
+        if self.is_range_index(idx_ty)
+            && matches!(
+                self.types.get(resolved),
+                Type::Array(_) | Type::BoundedArray { .. }
+            )
+        {
+            self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index.span);
+            return self.error_type;
         }
         let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
         super::tensor_index::check_vector_lane_index(self, obj_ty, index);

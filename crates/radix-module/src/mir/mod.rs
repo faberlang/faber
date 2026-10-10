@@ -386,6 +386,9 @@ mod saturating_word_tests;
 #[cfg(test)]
 #[path = "sort_expr_test.rs"]
 mod sort_expr_tests;
+#[cfg(test)]
+#[path = "list_window_test.rs"]
+mod list_window_tests;
 
 #[cfg(test)]
 #[path = "tensor_lift_test.rs"]

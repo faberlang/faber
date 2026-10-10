@@ -2204,6 +2204,10 @@ help = "กำหนดบริบท lista, tabula, copia, tensor หรือ
 message = "ดัชนี textus ต้องเป็น numerus หรือ range"
 help = "ใช้ numerus หรือช่วง integer เพื่อทำดัชนี textus"
 
+[diagnostics.SEM011.issues.window_requires_list]
+message = "window [lo‥hi] ต้องใช้ list"
+help = "ใช้ window [lo‥hi] กับค่า lista, textus หรือ octeti เท่านั้น"
+
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "ดัชนี array ต้องเป็น numerus"
 help = "ใช้ numerus เพื่อทำดัชนีค่า lista"

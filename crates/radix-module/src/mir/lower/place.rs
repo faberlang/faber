@@ -73,10 +73,36 @@ impl FunctionBuilder<'_> {
         {
             return self.lower_tensor_bracket_get(object, index, expr);
         }
+        // WHY: `xs[lo‥hi]` over a list is a window (ruling B10 of need
+        // 6a13d711): a copied `lista<T>` read through the `Index` collection
+        // op, whose declared return type tells the runner it is a window and
+        // not an octeti carrier read.
+        if self.is_list_window(object, index) {
+            let receiver = self.lower_expr_value(object)?;
+            let range = self.lower_expr_value(index)?;
+            let ty = self.expr_ty(expr)?;
+            return Some(self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Index),
+                vec![receiver, range],
+                ty,
+                expr.span,
+            ));
+        }
         let mut place = self.lower_projectable_place(object)?;
         let projection = self.lower_index_projection(&place, object.ty, index)?;
         place.projections.push(projection);
         Some(MirOperand::Place(place))
+    }
+
+    /// Whether `object[index]` is a list window: a list receiver and a range
+    /// index.
+    fn is_list_window(&self, object: &HirExpression, index: &HirExpression) -> bool {
+        let (Some(object_ty), Some(index_ty)) = (object.ty, index.ty) else {
+            return false;
+        };
+        let object_ty = self.types.peel_access_marker(object_ty).1;
+        matches!(self.normalized_type(object_ty), Type::Array(_) | Type::BoundedArray { .. })
+            && matches!(self.normalized_type(index_ty), Type::Intervallum(_))
     }
 
     /// The projection of `base[index]`.

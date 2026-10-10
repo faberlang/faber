@@ -2949,6 +2949,10 @@ help = "'¶' formats numbers, {textus}, and {instans}; write a function that ret
 message = "octeti index requirit numerus vel intervallum"
 help = "indica octeti per numerus vel intervallum integrum"
 
+[diagnostics.SEM011.issues.window_requires_list]
+message = "a window [lo‥hi] needs a list"
+help = "take a window [lo‥hi] only of a {lista}, {textus} or octeti value"
+
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "array index must be numerus"
 help = "index {lista} values with numerus"

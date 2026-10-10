@@ -2192,6 +2192,10 @@ help = "cung cấp cho vacua context lista, tabula, copia, tensor hoặc sparsa"
 message = "chỉ mục textus phải là numerus hoặc range"
 help = "lập chỉ mục textus bằng numerus hoặc range số nguyên"
 
+[diagnostics.SEM011.issues.window_requires_list]
+message = "cửa sổ [lo‥hi] cần một danh sách"
+help = "chỉ lấy cửa sổ [lo‥hi] từ giá trị lista, textus hoặc octeti"
+
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "chỉ mục mảng phải là numerus"
 help = "lập chỉ mục các giá trị lista bằng numerus"

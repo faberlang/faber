@@ -1226,6 +1226,23 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 };
                 let receiver = self.eval_operand(receiver, span)?;
                 let index = self.eval_operand(index, span)?;
+                // A list window: a range over a list whose declared result is
+                // a list is a copied range, fully in bounds or a failure.
+                if let (Value::Array(cell), Type::Array(_)) =
+                    (&receiver, self.types.get(return_ty.semantic_id()))
+                    && let Some((start, end)) =
+                        window_bounds(&index, span, "list window out of bounds")?
+                {
+                    let items = cell.borrow();
+                    if start > end || end > items.len() {
+                        return Err(RunnerError::internal_with_issue(
+                            span,
+                            "list window out of bounds",
+                            "runner_list_window_out_of_bounds",
+                        ));
+                    }
+                    return Ok(array_value(items[start..end].to_vec()));
+                }
                 let item = if matches!(self.types.get(return_ty.semantic_id()), Type::Option(_)) {
                     Self::optional_collection_index(receiver, &index, span)?
                 } else {

@@ -21,10 +21,43 @@ fn octeti_index_rejects_textus_key() {
 }
 
 #[test]
-fn lista_range_index_still_rejects() {
-    test_support::assert_rejects_with_issue(
+fn lista_window_accepts_as_new_lista() {
+    test_support::assert_accepts(
         "functio win(lista<numerus> xs) → lista<numerus> { redde xs[0‥4] }",
+    );
+}
+
+#[test]
+fn lista_textus_window_accepts_as_new_lista() {
+    test_support::assert_accepts("functio win(lista<textus> xs) → lista<textus> { redde xs[1‥3] }");
+}
+
+#[test]
+fn lista_bits_window_accepts_as_new_lista() {
+    test_support::assert_accepts("functio win(lista<b8> xs) → lista<b8> { redde xs[0‥2] }");
+}
+
+#[test]
+fn lista_window_is_not_an_element() {
+    test_support::assert_rejects_with_issue(
+        "functio win(lista<numerus> xs) → numerus { redde xs[0‥4] }",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn lista_window_write_rejects() {
+    test_support::assert_rejects_with_issue(
+        "functio win(lista<numerus> xs) { xs[0‥2] ← [1, 2] }",
         "array_index_must_be_numerus",
+    );
+}
+
+#[test]
+fn window_over_a_number_rejects() {
+    test_support::assert_rejects_with_issue(
+        "functio win(numerus n) → numerus { redde n[0‥2] }",
+        "window_requires_list",
     );
 }
 

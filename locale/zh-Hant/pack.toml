@@ -2192,6 +2192,10 @@ help = "為 vacua 提供 lista、tabula、copia、tensor 或 sparsa 內容"
 message = "textus 索引必須是 numerus 或範圍"
 help = "使用 numerus 或整數範圍索引 textus"
 
+[diagnostics.SEM011.issues.window_requires_list]
+message = "視窗 [lo‥hi] 需要列表"
+help = "只能對 lista、textus 或 octeti 取視窗 [lo‥hi]"
+
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "陣列索引必須是 numerus"
 help = "使用 numerus 索引 lista 值"

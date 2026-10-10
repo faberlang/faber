@@ -290,6 +290,31 @@ impl Validator<'_, '_> {
         span: Span,
     ) -> Option<MirType> {
         match self.type_kind(base_ty).clone() {
+            Type::Array(inner) | Type::BoundedArray { element: inner, .. }
+                if index.is_some_and(|(_, index_ty)| {
+                    matches!(self.type_kind(index_ty), Type::Intervallum(_))
+                }) =>
+            {
+                // A range index is a window: a new `lista<T>` of the range
+                // (fully in bounds or a failure; never short, never padded).
+                let (_, index_ty) = index?;
+                if let Type::Intervallum(bound) = self.type_kind(index_ty).clone() {
+                    self.require_assignable(
+                        MirType::semantic(bound),
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "list window range bounds are not numerus",
+                    );
+                }
+                let window = self.context.types.as_table().find_array(inner);
+                if window.is_none() {
+                    self.error(
+                        span,
+                        "list window result type is missing from the type table",
+                    );
+                }
+                window.map(MirType::semantic)
+            }
             Type::Array(inner) => {
                 if let Some((_, index_ty)) = index {
                     self.require_assignable(

@@ -2192,6 +2192,10 @@ help = "أعط vacua سياق {lista} أو {tabula} أو {copia} أو tensor أ�
 message = "{textus} index يجب أن يكون {numerus} أو range"
 help = "فهرس {textus} بـ {numerus} أو integer range"
 
+[diagnostics.SEM011.issues.window_requires_list]
+message = "النافذة [lo‥hi] تتطلب قائمة"
+help = "خذ نافذة [lo‥hi] فقط من قيمة {lista} أو {textus} أو octeti"
+
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "array index يجب أن يكون {numerus}"
 help = "فهرس قيم {lista} بـ {numerus}"

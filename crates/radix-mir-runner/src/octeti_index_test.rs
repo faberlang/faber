@@ -188,3 +188,118 @@ fn octeti_index_scalar_still_returns_byte() {
         .expect("in-bounds octeti scalar");
     assert_eq!(result, Value::Int(0xad));
 }
+
+fn list_of(items: Vec<Value>) -> Value {
+    Value::Array(std::rc::Rc::new(std::cell::RefCell::new(items)))
+}
+
+fn eval_list_window(
+    receiver: Value,
+    index: Value,
+    element: impl FnOnce(&mut TypeTable) -> TypeId,
+) -> Result<Value, RunnerError> {
+    let mut type_table = TypeTable::new();
+    let element = element(&mut type_table);
+    let list = type_table.array(element);
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(list),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    });
+    let mut host = crate::host::BufferHost::default();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    let frame = runner.frames.last_mut().unwrap();
+    frame.values.insert(MirValueId(0), receiver);
+    frame.values.insert(MirValueId(1), index);
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::Index),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(list),
+    };
+    runner.eval_runtime_call(&call, Span::default())
+}
+
+fn numerus_element(types: &mut TypeTable) -> TypeId {
+    types.primitive(radix_types::Primitive::Numerus)
+}
+
+#[test]
+fn list_window_over_numerus_copies_the_range() {
+    let receiver = list_of((10..15).map(Value::Int).collect());
+    let result = eval_list_window(receiver, exclusive_range(1, 4), numerus_element)
+        .expect("in-bounds list window");
+    assert_eq!(
+        result,
+        list_of(vec![Value::Int(11), Value::Int(12), Value::Int(13)])
+    );
+}
+
+#[test]
+fn list_window_over_textus_copies_the_range() {
+    let receiver = list_of(vec![
+        Value::Str("a".into()),
+        Value::Str("b".into()),
+        Value::Str("c".into()),
+    ]);
+    let result = eval_list_window(receiver, exclusive_range(1, 3), |types| {
+        types.primitive(radix_types::Primitive::Textus)
+    })
+    .expect("in-bounds textus list window");
+    assert_eq!(
+        result,
+        list_of(vec![Value::Str("b".into()), Value::Str("c".into())])
+    );
+}
+
+#[test]
+fn list_window_over_bits_b8_copies_the_range() {
+    let receiver = list_of(vec![Value::Int(0xde), Value::Int(0xad), Value::Int(0xbe)]);
+    let result = eval_list_window(receiver, exclusive_range(0, 2), |types| {
+        types.bits(radix_types::BitsWidth::B8)
+    })
+    .expect("in-bounds b8 list window");
+    assert_eq!(result, list_of(vec![Value::Int(0xde), Value::Int(0xad)]));
+}
+
+#[test]
+fn list_window_past_the_end_fails_not_short() {
+    let receiver = list_of((0..3).map(Value::Int).collect());
+    let error = eval_list_window(receiver, exclusive_range(1, 4), numerus_element)
+        .expect_err("a window past the end must fail");
+    assert_eq!(error.issue, "runner_list_window_out_of_bounds");
+}
+
+#[test]
+fn list_window_empty_range_is_an_empty_list() {
+    let receiver = list_of((0..3).map(Value::Int).collect());
+    let result = eval_list_window(receiver, exclusive_range(2, 2), numerus_element)
+        .expect("empty list window");
+    assert_eq!(result, list_of(vec![]));
+}
+
+#[test]
+fn list_window_inclusive_range_keeps_the_end() {
+    let receiver = list_of((0..4).map(Value::Int).collect());
+    let inclusive = Value::Tuple(vec![Value::Int(1), Value::Int(2), Value::Bool(true)]);
+    let result =
+        eval_list_window(receiver, inclusive, numerus_element).expect("inclusive list window");
+    assert_eq!(result, list_of(vec![Value::Int(1), Value::Int(2)]));
+}

@@ -2204,6 +2204,10 @@ help = "vacua को lista, tabula, copia, tensor या sparsa context दे�
 message = "textus index numerus या range होना चाहिए"
 help = "textus को numerus या integer range से index करें"
 
+[diagnostics.SEM011.issues.window_requires_list]
+message = "window [lo‥hi] के लिए list आवश्यक है"
+help = "window [lo‥hi] केवल lista, textus या octeti value से लें"
+
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "array index numerus होना चाहिए"
 help = "lista values को numerus से index करें"
