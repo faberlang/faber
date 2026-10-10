@@ -172,9 +172,12 @@ fn residency_fault_surfaces_from_an_element_read() {
     let mut host = BufferHost::default();
     let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
     let cell = Rc::new(RefCell::new(faulting_tensor()));
-    let error = runner
-        .collection_index(Value::Tensor(cell.clone()), Value::Int(2), Span::default())
-        .expect_err("the failed download must stop the element read");
+    let error = Runner::<BufferHost>::collection_index(
+        Value::Tensor(cell.clone()),
+        &Value::Int(2),
+        Span::default(),
+    )
+    .expect_err("the failed download must stop the element read");
     assert_eq!(error.issue, "stub_device_fault");
     // The fallible logical read (optional-access path) reports it too.
     let cell = Rc::new(RefCell::new(faulting_tensor()));

@@ -5,18 +5,6 @@
 //! Control-flow stepping stays in `lib.rs`. Target-directed `↦` conversion
 //! stays in `conversio`.
 
-#![allow(
-    clippy::bool_to_int_with_if,
-    clippy::cast_lossless,
-    clippy::float_cmp,
-    clippy::match_bool,
-    clippy::match_same_arms,
-    clippy::match_wildcard_for_single_variants,
-    clippy::needless_pass_by_value,
-    clippy::too_many_lines,
-    clippy::map_unwrap_or,
-    clippy::unused_self
-)]
 // Semantic numeric conversions between host value kinds: collection and
 // tensor sizes/shapes surface as `Value::Int` (usize/i64), indexes narrow to
 // `usize`, and mixed-carrier math promotes to f64. Loss beyond the i64/f64
@@ -983,7 +971,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             (
                 Value::Bool(v),
                 Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _),
-            ) => Ok(Value::Int(if v { 1 } else { 0 })),
+            ) => Ok(Value::Int(i64::from(v))),
             (other, target) => Err(RunnerError::internal(
                 span,
                 format!("unsupported cast from {other:?} to {target:?}"),
@@ -1234,9 +1222,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let receiver = self.eval_operand(receiver, span)?;
                 let index = self.eval_operand(index, span)?;
                 let item = if matches!(self.types.get(return_ty.semantic_id()), Type::Option(_)) {
-                    self.optional_collection_index(receiver, index, span)?
+                    Self::optional_collection_index(receiver, &index, span)?
                 } else {
-                    self.collection_index(receiver, index, span)?
+                    Self::collection_index(receiver, &index, span)?
                 };
                 Ok(self.widen_declared_textus(return_ty.semantic_id(), item))
             }
@@ -1246,9 +1234,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 };
                 let receiver = self.eval_operand(receiver, span)?;
                 let needle = self.eval_operand(needle, span)?;
-                Ok(Value::Bool(
-                    self.collection_contains(receiver, needle, span)?,
-                ))
+                Ok(Value::Bool(Self::collection_contains(
+                    receiver, needle, span,
+                )?))
             }
             MirCollectionOp::Append => {
                 let [receiver_operand, item] = args else {
@@ -1286,7 +1274,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         }
                     }
                     Value::Octeti(mut bytes) => {
-                        bytes.push(byte_from_value(item, span)?);
+                        bytes.push(byte_from_value(&item, span)?);
                         // F-086: when the receiver is a Place, write back so
                         // the mutation persists in the frame; otherwise return
                         // the owned modified value (same pattern as Str).
@@ -1835,7 +1823,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let count = borrow
             .logical_len()
             .ok_or_else(|| RunnerError::internal(span, "tensor reshape input layout is invalid"))?;
-        self.ensure_tensor_element_count(&shape, count, span, ERR_FORMA_ELEMENT_COUNT)?;
+        Self::ensure_tensor_element_count(&shape, count, span, ERR_FORMA_ELEMENT_COUNT)?;
         let view = borrow.reshaped_view(shape).ok_or_else(|| {
             RunnerError::internal(span, "tensor reshape requires a layout-preserving view")
         })?;
@@ -2250,7 +2238,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let flat = self.array_arg(flat, span)?;
         let shape = self.conversion_shape_arg(shape, span)?;
         let shape = static_shape.unwrap_or(shape);
-        self.ensure_tensor_element_count(
+        Self::ensure_tensor_element_count(
             &shape,
             flat.len(),
             span,
@@ -2505,14 +2493,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Some(coordinate) = snapshot.logical_coordinates(logical_index) else {
             return Ok(None);
         };
-        self.tensor_read_edge_chain(&snapshot, snapshot.edge_ops.len(), coordinate, span)
+        self.tensor_read_edge_chain(&snapshot, snapshot.edge_ops.len(), &coordinate, span)
     }
 
     fn tensor_read_edge_chain(
         &mut self,
         tensor: &TensorValue,
         operation_count: usize,
-        coordinate: Vec<usize>,
+        coordinate: &[usize],
         span: Span,
     ) -> Result<Option<Value>, RunnerError> {
         if operation_count == 0 {
@@ -2521,7 +2509,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .as_ref()
                 .ok_or_else(|| RunnerError::internal(span, "tensor edge base layout is missing"))?;
             let physical = TensorValue::physical_offset_in_layout(
-                &coordinate,
+                coordinate,
                 &base.shape,
                 &base.strides,
                 base.offset,
@@ -2542,22 +2530,22 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 output_shape,
                 inverse,
             } => {
-                if !coordinate_fits(&coordinate, output_shape) {
+                if !coordinate_fits(coordinate, output_shape) {
                     return Ok(None);
                 }
                 let mapped =
-                    inverse_view_coordinate(&coordinate, input_shape, output_shape, inverse)
+                    inverse_view_coordinate(coordinate, input_shape, output_shape, inverse)
                         .ok_or_else(|| {
                             RunnerError::internal(span, "tensor edge view mapping is invalid")
                         })?;
-                self.tensor_read_edge_chain(tensor, operation_count - 1, mapped, span)
+                self.tensor_read_edge_chain(tensor, operation_count - 1, &mapped, span)
             }
             TensorEdgeOp::Shift {
                 input_shape,
                 descriptor,
             } => {
                 let extents = tensor_extents(input_shape, span)?;
-                let coordinate = coordinates_as_i128(&coordinate, span)?;
+                let coordinate = coordinates_as_i128(coordinate, span)?;
                 match &descriptor.resolution {
                     TensorEdgeResolution::Optional => {
                         let Some(mapped) = super::tensor_edge::resolve_optional(
@@ -2567,7 +2555,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         ) else {
                             return Ok(Some(Value::Nil));
                         };
-                        self.tensor_read_edge_chain(tensor, operation_count - 1, mapped, span)
+                        self.tensor_read_edge_chain(tensor, operation_count - 1, &mapped, span)
                     }
                     TensorEdgeResolution::Builtin(policy) => {
                         let Some(mapped) = super::tensor_edge::resolve_builtin(
@@ -2578,7 +2566,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         ) else {
                             return Ok(None);
                         };
-                        self.tensor_read_edge_chain(tensor, operation_count - 1, mapped, span)
+                        self.tensor_read_edge_chain(tensor, operation_count - 1, &mapped, span)
                     }
                     TensorEdgeResolution::Custom(policy) => {
                         let receiver = Value::Struct(
@@ -2604,7 +2592,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                                     .tensor_read_edge_chain(
                                         tensor,
                                         operation_count - 1,
-                                        mapped.to_vec(),
+                                        mapped,
                                         span,
                                     )?
                                     .ok_or_else(|| {
@@ -3218,21 +3206,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Float(result))
     }
 
-    #[rustfmt::skip]
-    pub(super)
-    fn map_tensor_unary(
+    pub(super) fn map_tensor_unary(
         &mut self,
-        tensor: Rc<RefCell<TensorValue>>,
+        tensor: &Rc<RefCell<TensorValue>>,
         span: Span,
         op: &mut dyn FnMut(&Value) -> Result<Value, RunnerError>,
     ) -> Result<Value, RunnerError> {
         let shape = tensor.borrow().shape.clone();
-        let values = self.tensor_logical_values(&tensor, span)?;
-        let data = values
-            .iter()
-            .map(&mut *op)
-            .collect::<Result<Vec<_>, _>>()?;
-        tensor_value_kind(data, tensor_kind(&tensor), shape, span)
+        let values = self.tensor_logical_values(tensor, span)?;
+        let data = values.iter().map(&mut *op).collect::<Result<Vec<_>, _>>()?;
+        tensor_value_kind(data, tensor_kind(tensor), shape, span)
     }
 
     fn tensor_neg(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -3240,7 +3223,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor neg arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        self.map_tensor_unary(tensor, span, &mut |v| {
+        self.map_tensor_unary(&tensor, span, &mut |v| {
             Ok(match v {
                 Value::Int(n) => Value::Int(-n),
                 Value::Float(f) => Value::Float(-f),
@@ -3352,7 +3335,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor gelu arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        self.map_tensor_unary(tensor, span, &mut |v| match v {
+        self.map_tensor_unary(&tensor, span, &mut |v| match v {
             Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
             _ => Err(RunnerError::internal(
                 span,
@@ -3366,7 +3349,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor relu arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        self.map_tensor_unary(tensor, span, &mut |v| match v {
+        self.map_tensor_unary(&tensor, span, &mut |v| match v {
             Value::Float(f) => Ok(Value::Float(f.max(0.0))),
             Value::Int(i) => Ok(Value::Int((*i).max(0))),
             _ => Err(RunnerError::internal(
@@ -4343,9 +4326,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     pub(crate) fn collection_index(
-        &self,
         receiver: Value,
-        index: Value,
+        index: &Value,
         span: Span,
     ) -> Result<Value, RunnerError> {
         match receiver {
@@ -4354,20 +4336,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // A semantically octeti local can retain the array carrier
                 // after a lista<u8> assignment; normalize its window back to
                 // octeti so endian conversion sees the declared source type.
-                if let Some((start, end, inclusive)) = window_interval(&index) {
-                    let start = start.as_index(span)?;
-                    let end = end.as_index(span)?;
-                    let end = if inclusive {
-                        end.checked_add(1).ok_or_else(|| {
-                            RunnerError::internal(span, "octeti index out of bounds")
-                        })?
-                    } else {
-                        end
-                    };
+                if let Some((start, end)) =
+                    window_bounds(index, span, "octeti index out of bounds")?
+                {
                     let bytes = cell
                         .borrow()
                         .iter()
-                        .map(|item| byte_from_value(item.clone(), span))
+                        .map(|item| byte_from_value(item, span))
                         .collect::<Result<Vec<_>, _>>()?;
                     if start > end || end > bytes.len() {
                         return Err(RunnerError::internal(span, "octeti index out of bounds"));
@@ -4402,16 +4377,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // textus substring). Mirrors the octeti window above, but walks
                 // chars and truncates past the end like Rust codegen's
                 // `chars().skip(lo).take(hi - lo)` — no out-of-bounds trap.
-                if let Some((start, end, inclusive)) = window_interval(&index) {
-                    let start = start.as_index(span)?;
-                    let end = end.as_index(span)?;
-                    let end = if inclusive {
-                        end.checked_add(1).ok_or_else(|| {
-                            RunnerError::internal(span, "textus index out of bounds")
-                        })?
-                    } else {
-                        end
-                    };
+                if let Some((start, end)) =
+                    window_bounds(index, span, "textus index out of bounds")?
+                {
                     let window: String = text
                         .chars()
                         .skip(start)
@@ -4431,16 +4399,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 }
             }
             Value::Octeti(bytes) => {
-                if let Some((start, end, inclusive)) = window_interval(&index) {
-                    let start = start.as_index(span)?;
-                    let end = end.as_index(span)?;
-                    let end = if inclusive {
-                        end.checked_add(1).ok_or_else(|| {
-                            RunnerError::internal(span, "octeti index out of bounds")
-                        })?
-                    } else {
-                        end
-                    };
+                if let Some((start, end)) =
+                    window_bounds(index, span, "octeti index out of bounds")?
+                {
                     if start > end || end > bytes.len() {
                         return Err(RunnerError::internal(span, "octeti index out of bounds"));
                     }
@@ -4475,9 +4436,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn optional_collection_index(
-        &self,
         receiver: Value,
-        index: Value,
+        index: &Value,
         span: Span,
     ) -> Result<Value, RunnerError> {
         if let Value::Map(cell) = receiver {
@@ -4487,10 +4447,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .cloned()
                 .unwrap_or(Value::Nil));
         }
-        let optional_index = match &index {
+        let optional_index = match index {
             Value::Int(value) if *value >= 0 => Some(*value as usize),
             Value::Int(_) => None,
-            _ => return self.collection_index(receiver, index, span),
+            _ => return Self::collection_index(receiver, index, span),
         };
         match receiver {
             Value::Array(cell) => Ok(optional_index
@@ -4506,7 +4466,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .and_then(|idx| bytes.get(idx).copied())
                 .map(|byte| Value::Int(i64::from(byte)))
                 .unwrap_or(Value::Nil)),
-            other => self.collection_index(other, index, span),
+            other => Self::collection_index(other, index, span),
         }
     }
 
@@ -4605,7 +4565,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn ensure_tensor_element_count(
-        &self,
         shape: &[i64],
         actual: usize,
         span: Span,
@@ -4654,7 +4613,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn collection_contains(
-        &self,
         receiver: Value,
         needle: Value,
         span: Span,
@@ -5172,10 +5130,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let other = self.fuzzy_operand(other, span)?;
                 let rel_tol = numeric_as_f64(&self.eval_operand(rel_tol, span)?, span)?;
                 let abs_tol = numeric_as_f64(&self.eval_operand(abs_tol, span)?, span)?;
-                let receiver = self.fuzzy_value(receiver, width);
-                let other = self.fuzzy_value(other, width);
-                let rel_tol = self.fuzzy_value(rel_tol, width);
-                let abs_tol = self.fuzzy_value(abs_tol, width);
+                let receiver = Self::fuzzy_value(receiver, width);
+                let other = Self::fuzzy_value(other, width);
+                let rel_tol = Self::fuzzy_value(rel_tol, width);
+                let abs_tol = Self::fuzzy_value(abs_tol, width);
                 let limit = (rel_tol * receiver.abs().max(other.abs())).max(abs_tol);
                 let equal = (receiver - other).abs() <= limit;
                 Ok(Value::Bool(if negated { !equal } else { equal }))
@@ -5187,6 +5145,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// `≈` between two integer operands (neither a decimal, by static type):
     /// the exact relative-1e-9 rule of [`crate::inf::fuzzy_equal`], for the
     /// tolerances the lowering emits (`1e-9`, `0`). `None` for any other pair.
+    #[expect(
+        clippy::float_cmp,
+        reason = "exact test for the default tolerance pair, not a closeness check"
+    )]
     fn integer_fuzzy_equality(
         &mut self,
         lhs: &MirOperand,
@@ -5228,13 +5190,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         numeric_as_f64(&value, span)
     }
 
-    fn fuzzy_value(&self, value: f64, width: NumericWidth) -> f64 {
+    fn fuzzy_value(value: f64, width: NumericWidth) -> f64 {
         if matches!(width, NumericWidth::F64) {
             value
         } else {
             #[expect(clippy::cast_possible_truncation)]
             {
-                value as f32 as f64
+                f64::from(value as f32)
             }
         }
     }
@@ -5298,7 +5260,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             MirOptionChainLink::Index(index) => {
                 let index = self.eval_operand(index, span)?;
-                self.optional_collection_index(current, index, span)
+                Self::optional_collection_index(current, &index, span)
             }
             MirOptionChainLink::Call { .. } => {
                 Err(RunnerError::unsupported(span, "option chain call"))
@@ -5321,7 +5283,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             radix_mir::MirProjection::Index(index) => {
                 let index = self.eval_operand(index, span)?;
-                self.collection_index(value, index, span)
+                Self::collection_index(value, &index, span)
             }
             radix_mir::MirProjection::VectorLane(lane) => match value {
                 Value::Vector(lanes) => lanes
@@ -5585,9 +5547,9 @@ pub(crate) fn integer_tag_matches(value: &Value, target: &Type) -> bool {
         }
 }
 
-fn byte_from_value(value: Value, span: Span) -> Result<u8, RunnerError> {
+fn byte_from_value(value: &Value, span: Span) -> Result<u8, RunnerError> {
     match value {
-        Value::Int(value) => u8::try_from(value)
+        Value::Int(value) => u8::try_from(*value)
             .map_err(|_| RunnerError::internal(span, "octeti append byte out of range")),
         _ => Err(RunnerError::internal(
             span,
@@ -5699,6 +5661,27 @@ fn window_interval(value: &Value) -> Option<(Value, Value, bool)> {
     Some((start.clone(), end.clone(), *inclusive))
 }
 
+/// The `[start, end)` window a range index selects, or `None` when `index`
+/// is not a range. An inclusive range ending at `usize::MAX` reports `overflow`.
+fn window_bounds(
+    index: &Value,
+    span: Span,
+    overflow: &'static str,
+) -> Result<Option<(usize, usize)>, RunnerError> {
+    let Some((start, end, inclusive)) = window_interval(index) else {
+        return Ok(None);
+    };
+    let start = start.as_index(span)?;
+    let end = end.as_index(span)?;
+    let end = if inclusive {
+        end.checked_add(1)
+            .ok_or_else(|| RunnerError::internal(span, overflow))?
+    } else {
+        end
+    };
+    Ok(Some((start, end)))
+}
+
 fn interval_parts(value: &Value, span: Span) -> Result<(Value, Value, bool), RunnerError> {
     let Value::Tuple(parts) = value else {
         return Err(RunnerError::internal(
@@ -5712,6 +5695,10 @@ fn interval_parts(value: &Value, span: Span) -> Result<(Value, Value, bool), Run
     Ok((start.clone(), end.clone(), *inclusive))
 }
 
+#[expect(
+    clippy::float_cmp,
+    reason = "a closed interval keeps a single point, so equal endpoints compare exactly"
+)]
 fn interval_intersection(
     left: &Value,
     right: &Value,

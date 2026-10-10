@@ -3251,7 +3251,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 Value::Float(_) => Err(RunnerError::internal(span, "sqrt of negative float")),
                 Value::Int(v) if v >= 0 => Ok(Value::Float((v as f64).sqrt())),
                 Value::UInt(v) => Ok(Value::Float((v as f64).sqrt())),
-                Value::Tensor(tensor) => self.map_tensor_unary(tensor, span, &mut |v| match v {
+                Value::Tensor(tensor) => self.map_tensor_unary(&tensor, span, &mut |v| match v {
                     Value::Float(f) if *f >= 0.0 => Ok(Value::Float(f.sqrt())),
                     Value::Float(_) => {
                         Err(RunnerError::internal(span, "tensor sqrt of negative float"))
@@ -3275,7 +3275,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             },
             MirUnOp::Gelu => match value {
                 Value::Float(v) => Ok(Value::Float(gelu_f64(v))),
-                Value::Tensor(tensor) => self.map_tensor_unary(tensor, span, &mut |v| match v {
+                Value::Tensor(tensor) => self.map_tensor_unary(&tensor, span, &mut |v| match v {
                     Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
                     _ => Err(RunnerError::internal(
                         span,
@@ -3286,7 +3286,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             },
             MirUnOp::Tanh => match value {
                 Value::Float(v) => Ok(Value::Float(v.tanh())),
-                Value::Tensor(tensor) => self.map_tensor_unary(tensor, span, &mut |v| match v {
+                Value::Tensor(tensor) => self.map_tensor_unary(&tensor, span, &mut |v| match v {
                     Value::Float(f) => Ok(Value::Float(f.tanh())),
                     _ => Err(RunnerError::internal(
                         span,
@@ -3301,7 +3301,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     Value::Int(v) => (v as f64).exp(),
                     Value::UInt(v) => (v as f64).exp(),
                     Value::Tensor(tensor) => {
-                        return self.map_tensor_unary(tensor, span, &mut |v| match v {
+                        return self.map_tensor_unary(&tensor, span, &mut |v| match v {
                             Value::Float(f) => {
                                 let r = f.exp();
                                 if r.is_finite() {
@@ -3351,7 +3351,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     Value::Int(v) => Ok(Value::Float(f16_round_f64(v as f64))),
                     Value::UInt(v) => Ok(Value::Float(f16_round_f64(v as f64))),
                     Value::Tensor(tensor) => {
-                        self.map_tensor_unary(tensor, span, &mut |element| match element {
+                        self.map_tensor_unary(&tensor, span, &mut |element| match element {
                             Value::Float(v) => Ok(Value::Float(f16_round_f64(*v))),
                             _ => Err(RunnerError::internal(
                                 span,
