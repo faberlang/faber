@@ -690,6 +690,14 @@ impl TypeChecker<'_> {
             }
             if recovery.is_some() {
                 self.invalid_conversion(ISSUE_WORD_CONVERSIO_RECOVERY_UNSUPPORTED, span);
+            } else if self.float_word_conversio_can_fail(source, source_ty)
+                && self.current_error.is_some()
+            {
+                // A float into a word fails only at NaN and ±∞ (need
+                // e97acf45): an active channel carries the text payload like
+                // any other failable numeric `↦`, so a direct `fac`/`cape`
+                // infers `textus` instead of the `ignotum` escape.
+                self.check_text_failure_channel(source_ty, target_resolved, span);
             }
             return target_resolved;
         }
@@ -2740,6 +2748,16 @@ impl TypeChecker<'_> {
             self.types.get(self.peel_alias_chain(ty)),
             Type::ModularWord(_) | Type::SaturatingWord(_)
         )
+    }
+
+    /// A float source into a policy word can fail at run time (NaN, ±∞)
+    /// unless the source is a finite literal.
+    fn float_word_conversio_can_fail(&self, source: &HirExpression, source_ty: TypeId) -> bool {
+        let source_ty = self.peel_alias_chain(self.resolve_inferred_type(source_ty));
+        matches!(
+            self.types.get(source_ty),
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+        ) && static_float_magnitude(source).is_none_or(|value| !value.is_finite())
     }
 
     /// Sources of a `wrapping`/`saturating` conversion (ruling 24): integers of
