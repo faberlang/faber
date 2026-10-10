@@ -1,4 +1,4 @@
-//! Need, unit 1.4a: same-width `bN ↔ uN` conversions (scalars and
+//! Need, unit 1.4a: same-width `bN ↔ uN | iN | fN` conversions (scalars and
 //! lists, no `via` clause) run on the MIR runner and keep the bit pattern.
 
 use crate::codegen::Target;
@@ -37,6 +37,33 @@ fn lists_convert_element_wise_at_the_same_width_in_both_directions() {
     assert_eq!(ok("fixum lista<u8> l ← [1, 255]\nnota l ↦ lista<b8>"), ["[0x01, 0xff]"]);
 }
 
+#[test]
+fn signed_conversions_read_two_complement_in_both_directions() {
+    assert_eq!(ok("fixum b8 a ← 0xff\nnota a ↦ i8"), ["-1"]);
+    assert_eq!(ok("fixum i8 n ← -1\nnota n ↦ b8"), ["0xff"]);
+    assert_eq!(ok("fixum b16 a ← 0x8000\nnota a ↦ i16"), ["-32768"]);
+    assert_eq!(ok("fixum i32 n ← -2\nnota n ↦ b32"), ["0xfffffffe"]);
+    assert_eq!(ok("fixum b64 a ← 0xffffffffffffffff\nnota a ↦ i64"), ["-1"]);
+    assert_eq!(ok("fixum lista<b8> l ← [0x01, 0xff]\nnota l ↦ lista<i8>"), ["[1, -1]"]);
+}
+
+#[test]
+fn float_conversions_read_and_write_the_pattern() {
+    assert_eq!(ok("fixum b16 a ← 0xc000\nnota a ↦ f16"), ["-2.0"]);
+    assert_eq!(ok("fixum b32 a ← 0x3f800000\nnota a ↦ f32"), ["1.0"]);
+    assert_eq!(ok("fixum b64 a ← 0x3ff8000000000000\nnota a ↦ f64"), ["1.5"]);
+    assert_eq!(ok("fixum b16 a ← 0x3fc0\nnota a ↦ bf16"), ["1.5"]);
+    assert_eq!(ok("fixum f32 x ← 1.5\nnota x ↦ b32"), ["0x3fc00000"]);
+    assert_eq!(ok("fixum f64 x ← 1.5\nnota x ↦ b64"), ["0x3ff8000000000000"]);
+    assert_eq!(ok("fixum f16 x ← 1.5\nnota x ↦ b16"), ["0x3e00"]);
+    assert_eq!(ok("fixum bf16 x ← 1.5\nnota x ↦ b16"), ["0x3fc0"]);
+}
+
+#[test]
+fn number_to_float_stays_a_value_conversion() {
+    assert_eq!(ok("fixum u16 n ← 15872\nnota n ↦ f32"), ["15872.0"]);
+}
+
 fn refused(body: &str) -> String {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let source = format!("incipit {{\n{body}\n}}\n");
@@ -49,14 +76,14 @@ fn refused(body: &str) -> String {
 }
 
 #[test]
-fn width_changing_and_unsettled_conversions_are_refused_by_name() {
+fn width_changing_conversions_are_refused_by_name() {
     let cases = [
         ("fixum b8 a ← 1\nnota a ↦ u16", "bits_conversion_width_mismatch"),
         ("fixum b16 a ← 1\nnota a ↦ u8", "bits_conversion_width_mismatch"),
         ("fixum b8 a ← 1\nnota a ↦ numerus", "bits_conversion_width_mismatch"),
         ("fixum lista<b8> a ← [1]\nnota a ↦ lista<b16>", "bits_conversion_width_mismatch"),
-        ("fixum b8 a ← 1\nnota a ↦ i8", "bits_signed_conversion_unsettled"),
-        ("fixum b32 a ← 1\nnota a ↦ f32", "bits_float_conversion_unsettled"),
+        ("fixum b8 a ← 1\nnota a ↦ i16", "bits_conversion_width_mismatch"),
+        ("fixum b32 a ← 1\nnota a ↦ f64", "bits_conversion_width_mismatch"),
         ("fixum b8 a ← 1\nnota a ↦ u8 via Le", "bits_via_clause_not_allowed"),
         ("fixum u8 a ← 1\nnota a ↦ b8 via Be", "bits_via_clause_not_allowed"),
     ];

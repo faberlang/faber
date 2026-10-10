@@ -2421,16 +2421,8 @@ message = "conversion من {numerus} أو {fractus} أو {bivalens} إلى {octe
 help = "استخدم chorda أو explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
-message = "a bN converts only to the unsigned number or bits type of the same width"
-help = "convert a bN only to the unsigned number or bits type of the same width, such as b8 to u8"
-
-[diagnostics.SEM016.issues.bits_signed_conversion_unsettled]
-message = "conversion between bits and a signed integer is not settled"
-help = "convert to the unsigned type of the same width (u8 for b8); bN to signed iN is not settled yet"
-
-[diagnostics.SEM016.issues.bits_float_conversion_unsettled]
-message = "conversion between bits and a float is not settled"
-help = "convert to the unsigned type of the same width; bN to float is not settled yet"
+message = "a bN converts only to a number or bits type of the same width"
+help = "convert a bN only to an integer, float or bits type of the same width, such as b8 to u8 or b32 to f32"
 
 [diagnostics.SEM016.issues.bits_via_clause_not_allowed]
 message = "a same-width bits conversion takes no via clause"

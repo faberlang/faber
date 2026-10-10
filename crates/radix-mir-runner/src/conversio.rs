@@ -17,7 +17,7 @@ use radix_mir::lista_tensor_conversio::{ListaToTensorShape, resolve_lista_to_ten
 use radix_mir::{MirConversion, MirNamedOperand, MirOperand, MirStructFieldDefaults};
 use radix_runtime_contract::instans::{Instans, InstansPraecisio};
 use radix_types::{
-    FloatPolicy, InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable,
+    BitsWidth, FloatPolicy, InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable,
     effective_width,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -108,6 +108,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(value) => Ok(value),
                 Err(_) => self.recover_or_fail(recovery, span, &dynamic_conversion_error(&target)),
             };
+        }
+        // Same-width bN <-> iN and bN <-> fN (need, C2 and C3): the
+        // pattern is kept and read as the other type.
+        if let Some(reinterpreted) = self.reinterpret_bits(&value, source_ty, &target) {
+            return Ok(reinterpreted);
         }
         match &target {
             Type::Primitive(Primitive::Textus) => {
@@ -216,6 +221,46 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// `bN ↦ iN`, `iN ↦ bN`, `bN ↦ fN` and `fN ↦ bN` at one width. The
+    /// checker admits only exact width matches. `None` when neither side is a
+    /// `bN` paired with a signed integer or a float, so the ordinary rows run.
+    fn reinterpret_bits(&self, value: &Value, source_ty: TypeId, target: &Type) -> Option<Value> {
+        let source = self.types.get(self.resolve_conversion_target(source_ty));
+        match (source, target) {
+            (Type::Bits(width), Type::SizedNumeric(Primitive::Numerus, signed))
+                if is_signed_width(*signed) =>
+            {
+                let pattern = bits_pattern(value)?;
+                let shift = 64 - width.bits();
+                Some(Value::Int(((pattern << shift) as i64) >> shift))
+            }
+            (Type::Bits(width), Type::SizedNumeric(Primitive::Fractus, float)) => {
+                float_from_pattern(bits_pattern(value)?, *width, *float)
+            }
+            (Type::Bits(width), Type::Primitive(Primitive::Fractus)) => {
+                float_from_pattern(bits_pattern(value)?, *width, NumericWidth::F64)
+            }
+            (Type::SizedNumeric(Primitive::Numerus, signed), Type::Bits(width))
+                if is_signed_width(*signed) =>
+            {
+                let Value::Int(v) = value else { return None };
+                let mask = if width.bits() == 64 {
+                    u64::MAX
+                } else {
+                    (1u64 << width.bits()) - 1
+                };
+                Some(Value::UInt((*v as u64) & mask))
+            }
+            (Type::SizedNumeric(Primitive::Fractus, float), Type::Bits(width)) => {
+                pattern_from_float(value, *float, *width)
+            }
+            (Type::Primitive(Primitive::Fractus), Type::Bits(width)) => {
+                pattern_from_float(value, NumericWidth::F64, *width)
+            }
+            _ => None,
+        }
+    }
+
     fn is_dynamic_source(&self, source_ty: TypeId) -> bool {
         matches!(
             self.types.get(source_ty),
@@ -229,6 +274,77 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         target_ty
     }
+}
+
+fn is_signed_width(width: NumericWidth) -> bool {
+    matches!(
+        width,
+        NumericWidth::I8 | NumericWidth::I16 | NumericWidth::I32 | NumericWidth::I64
+    )
+}
+
+/// The unsigned pattern a `bN` cell holds.
+fn bits_pattern(value: &Value) -> Option<u64> {
+    match value {
+        Value::UInt(v) => Some(*v),
+        Value::Int(v) => Some(*v as u64),
+        _ => None,
+    }
+}
+
+/// Read a `bN` pattern as the float of the same width (`f16` and `bf16` pair
+/// with `b16`, `f32` with `b32`, `f64` with `b64`).
+fn float_from_pattern(pattern: u64, width: BitsWidth, float: NumericWidth) -> Option<Value> {
+    let value = match (width, float) {
+        (BitsWidth::B16, NumericWidth::F16) => {
+            let bits = pattern as u16;
+            // A NaN keeps its payload: the half seam canonicalizes it.
+            if bits & 0x7c00 == 0x7c00 && bits & 0x03ff != 0 {
+                let sign = u32::from(bits >> 15) << 31;
+                let payload = u32::from(bits & 0x03ff) << 13;
+                f64::from(f32::from_bits(sign | 0x7f80_0000 | payload))
+            } else {
+                f64::from(super::half_to_f32(bits))
+            }
+        }
+        (BitsWidth::B16, NumericWidth::BF16) => {
+            f64::from(f32::from_bits((pattern as u32 & 0xffff) << 16))
+        }
+        (BitsWidth::B32, NumericWidth::F32) => f64::from(f32::from_bits(pattern as u32)),
+        (BitsWidth::B64, NumericWidth::F64) => f64::from_bits(pattern),
+        _ => return None,
+    };
+    Some(Value::Float(value))
+}
+
+/// Write a float as the `bN` pattern of the same width.
+fn pattern_from_float(value: &Value, float: NumericWidth, width: BitsWidth) -> Option<Value> {
+    let Value::Float(v) = value else { return None };
+    let pattern = match (float, width) {
+        (NumericWidth::F16, BitsWidth::B16) => {
+            let wide = (*v as f32).to_bits();
+            if v.is_nan() {
+                // Keep the sign and the top payload bits; never collapse to infinity.
+                let payload = ((wide >> 13) & 0x03ff).max(0x0200);
+                u64::from((((wide >> 16) & 0x8000) | 0x7c00 | payload) as u16)
+            } else {
+                u64::from(super::f32_to_f16_rn(*v as f32))
+            }
+        }
+        (NumericWidth::BF16, BitsWidth::B16) => {
+            let wide = (*v as f32).to_bits();
+            if v.is_nan() {
+                u64::from(((wide >> 16) | 0x0040) as u16)
+            } else {
+                let rounded = wide.wrapping_add(0x7fff + ((wide >> 16) & 1));
+                u64::from((rounded >> 16) as u16)
+            }
+        }
+        (NumericWidth::F32, BitsWidth::B32) => u64::from((*v as f32).to_bits()),
+        (NumericWidth::F64, BitsWidth::B64) => v.to_bits(),
+        _ => return None,
+    };
+    Some(Value::UInt(pattern))
 }
 
 fn dynamic_conversion_error(target: &Type) -> String {

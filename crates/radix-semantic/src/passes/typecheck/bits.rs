@@ -18,21 +18,16 @@ const BITS_OPERAND_MISMATCH: &str = "bits_operand_mismatch";
 pub(super) const BITS_LITERAL_OUT_OF_RANGE: &str = "bits_literal_out_of_range";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";
 const BITS_CONVERSION_WIDTH_MISMATCH: &str = "bits_conversion_width_mismatch";
-const BITS_SIGNED_CONVERSION_UNSETTLED: &str = "bits_signed_conversion_unsettled";
-const BITS_FLOAT_CONVERSION_UNSETTLED: &str = "bits_float_conversion_unsettled";
 const BITS_VIA_CLAUSE_NOT_ALLOWED: &str = "bits_via_clause_not_allowed";
 
 /// What the other side of a `bN` conversion is, for the same-width rows
 /// (need, unit 1.4a).
 enum BitsConversioPeer {
-    /// The same bit width, as `bN` or `uN`: representation preserving.
+    /// The same bit width, as `bN`, `uN`, `iN` or an IEEE float: the pattern
+    /// is kept and read as the other type (rulings C2 and C3).
     SameWidth,
     /// A bit width or number of a different (or no) width.
     WidthMismatch,
-    /// A signed `iN` (ruling C2 pending).
-    Signed,
-    /// An IEEE float (ruling C3 pending).
-    Float,
 }
 
 impl TypeChecker<'_> {
@@ -238,11 +233,12 @@ impl TypeChecker<'_> {
             Type::SizedNumeric(_, W::U16) => Some(same(16)),
             Type::SizedNumeric(_, W::U32) => Some(same(32)),
             Type::SizedNumeric(_, W::U64) => Some(same(64)),
-            Type::SizedNumeric(_, W::I8 | W::I16 | W::I32 | W::I64) => {
-                Some(BitsConversioPeer::Signed)
+            Type::SizedNumeric(_, W::I8) => Some(same(8)),
+            Type::SizedNumeric(_, W::I16 | W::F16 | W::BF16) => Some(same(16)),
+            Type::SizedNumeric(_, W::I32 | W::F32) => Some(same(32)),
+            Type::SizedNumeric(_, W::I64 | W::F64) | Type::Primitive(Primitive::Fractus) => {
+                Some(same(64))
             }
-            Type::SizedNumeric(_, W::F16 | W::BF16 | W::F32 | W::F64)
-            | Type::Primitive(Primitive::Fractus) => Some(BitsConversioPeer::Float),
             Type::SizedNumeric(_, W::D64 | W::Inf) | Type::Primitive(Primitive::Numerus) => {
                 Some(BitsConversioPeer::WidthMismatch)
             }
@@ -250,9 +246,9 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// `bN` conversions: scalar `bN ↔ uN` and `lista<bN> ↔ lista<uN>` at the
-    /// same N take no `via` clause and keep the pattern; every other number
-    /// pairing is a named refusal. `None` when no side is a `bN` (or the
+    /// `bN` conversions: scalar `bN ↔ uN | iN | fN` and the element-wise list
+    /// forms at the same N take no `via` clause and keep the pattern; every
+    /// other number pairing is a named refusal. `None` when no side is a `bN` (or the
     /// other side is not a number or bits), so the ordinary rows run.
     pub(super) fn check_bits_conversio(
         &mut self,
@@ -307,8 +303,6 @@ impl TypeChecker<'_> {
             BitsConversioPeer::SameWidth if has_hint => BITS_VIA_CLAUSE_NOT_ALLOWED,
             BitsConversioPeer::SameWidth => return Some(self.resolve_inferred_type(target)),
             BitsConversioPeer::WidthMismatch => BITS_CONVERSION_WIDTH_MISMATCH,
-            BitsConversioPeer::Signed => BITS_SIGNED_CONVERSION_UNSETTLED,
-            BitsConversioPeer::Float => BITS_FLOAT_CONVERSION_UNSETTLED,
         };
         self.invalid_conversion(issue, span);
         Some(self.error_type)

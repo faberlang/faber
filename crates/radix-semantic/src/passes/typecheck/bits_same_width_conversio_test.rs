@@ -1,6 +1,7 @@
 //! Typecheck pins for same-width `bN ↔ uN` conversions (need, unit
-//! 1.4a): accepted without a `via` clause, scalars and lists; every other
-//! number pairing is a named refusal.
+//! 1.4a, C2 and C3): accepted without a `via` clause, scalars and lists, at
+//! the same width as `uN`, `iN` and the IEEE floats; every other pairing is a
+//! named refusal.
 
 use crate::test_support;
 
@@ -35,22 +36,67 @@ fn width_change_is_a_named_refusal() {
 }
 
 #[test]
-fn signed_and_float_conversions_are_unsettled_refusals() {
+fn same_width_signed_conversions_accept_both_directions() {
+    test_support::assert_accepts("functio f(b8 a) → i8 { redde a ↦ i8 }");
+    test_support::assert_accepts("functio f(i8 a) → b8 { redde a ↦ b8 }");
+    test_support::assert_accepts("functio f(b16 a) → i16 { redde a ↦ i16 }");
+    test_support::assert_accepts("functio f(i32 a) → b32 { redde a ↦ b32 }");
+    test_support::assert_accepts("functio f(b64 a) → i64 { redde a ↦ i64 }");
+}
+
+#[test]
+fn same_width_float_conversions_accept_both_directions() {
+    test_support::assert_accepts("functio f(b16 a) → f16 { redde a ↦ f16 }");
+    test_support::assert_accepts("functio f(b16 a) → bf16 { redde a ↦ bf16 }");
+    test_support::assert_accepts("functio f(b32 a) → f32 { redde a ↦ f32 }");
+    test_support::assert_accepts("functio f(b64 a) → f64 { redde a ↦ f64 }");
+    test_support::assert_accepts("functio f(f16 a) → b16 { redde a ↦ b16 }");
+    test_support::assert_accepts("functio f(bf16 a) → b16 { redde a ↦ b16 }");
+    test_support::assert_accepts("functio f(f32 a) → b32 { redde a ↦ b32 }");
+    test_support::assert_accepts("functio f(f64 a) → b64 { redde a ↦ b64 }");
+}
+
+#[test]
+fn signed_and_float_width_mismatch_is_a_named_refusal() {
+    for source in [
+        "functio f(b8 a) → i16 { redde a ↦ i16 }",
+        "functio f(i32 a) → b64 { redde a ↦ b64 }",
+        "functio f(b16 a) → f32 { redde a ↦ f32 }",
+        "functio f(b32 a) → f64 { redde a ↦ f64 }",
+        "functio f(b8 a) → f16 { redde a ↦ f16 }",
+        "functio f(f64 a) → b32 { redde a ↦ b32 }",
+        "functio f(f16 a) → b8 { redde a ↦ b8 }",
+    ] {
+        test_support::assert_rejects_with_issue(source, "bits_conversion_width_mismatch");
+    }
+}
+
+#[test]
+fn signed_and_float_lists_convert_element_wise_at_the_same_width() {
+    test_support::assert_accepts("functio f(lista<b8> a) → lista<i8> { redde a ↦ lista<i8> }");
+    test_support::assert_accepts("functio f(lista<i16> a) → lista<b16> { redde a ↦ lista<b16> }");
+    test_support::assert_accepts("functio f(lista<b32> a) → lista<f32> { redde a ↦ lista<f32> }");
     test_support::assert_rejects_with_issue(
-        "functio f(b8 a) → i8 { redde a ↦ i8 }",
-        "bits_signed_conversion_unsettled",
+        "functio f(lista<b8> a) → lista<f32> { redde a ↦ lista<f32> }",
+        "bits_conversion_width_mismatch",
+    );
+}
+
+#[test]
+fn number_to_float_is_still_a_value_conversion() {
+    test_support::assert_accepts("functio f(u16 a) → f16 { redde a ↦ f16 }");
+    test_support::assert_accepts("functio f(i32 a) → f32 { redde a ↦ f32 }");
+}
+
+#[test]
+fn signed_and_float_conversions_refuse_a_via_clause() {
+    test_support::assert_rejects_with_issue(
+        "functio f(b8 a) → i8 { redde a ↦ i8 via Le }",
+        "bits_via_clause_not_allowed",
     );
     test_support::assert_rejects_with_issue(
-        "functio f(i32 a) → b32 { redde a ↦ b32 }",
-        "bits_signed_conversion_unsettled",
-    );
-    test_support::assert_rejects_with_issue(
-        "functio f(b16 a) → f16 { redde a ↦ f16 }",
-        "bits_float_conversion_unsettled",
-    );
-    test_support::assert_rejects_with_issue(
-        "functio f(f64 a) → b64 { redde a ↦ b64 }",
-        "bits_float_conversion_unsettled",
+        "functio f(b32 a) → f32 { redde a ↦ f32 via Be }",
+        "bits_via_clause_not_allowed",
     );
 }
 

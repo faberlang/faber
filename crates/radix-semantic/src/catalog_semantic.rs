@@ -739,13 +739,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             "use two values of the same bN width; a bN does not mix with numbers or other widths".to_owned(),
         ),
         "bits_conversion_width_mismatch" => Some(
-            "convert a bN only to the unsigned number or bits type of the same width, such as b8 to u8".to_owned(),
-        ),
-        "bits_signed_conversion_unsettled" => Some(
-            "convert to the unsigned type of the same width (u8 for b8); bN to signed iN is not settled yet".to_owned(),
-        ),
-        "bits_float_conversion_unsettled" => Some(
-            "convert to the unsigned type of the same width; bN to float is not settled yet".to_owned(),
+            "convert a bN only to an integer, float or bits type of the same width, such as b8 to u8 or b32 to f32".to_owned(),
         ),
         "bits_via_clause_not_allowed" => Some(
             "remove the via clause; a same-width bN conversion keeps the bit pattern and takes no hint".to_owned(),
