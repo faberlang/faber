@@ -41,6 +41,7 @@ use super::store::StoreSite;
 // parent module provides shared imports for typechecking
 use super::*;
 use radix_hir::HirStoreKind;
+use radix_hir::HirUnOp;
 use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 
 /// A snapshot of the visible binding state at one control-flow edge.
@@ -54,10 +55,18 @@ struct FlowState {
     invalidated: FxHashSet<DefId>,
 }
 
-/// `(then_refinement, else_refinement)` pair for condition narrowing
-/// (nn-u1 null checks, U1R nominal `est M` tests): each side is an optional
+/// One leaf condition's `(then_refinement, else_refinement)` pair (nn-u1 null
+/// checks, U1R nominal `est M` tests): each side is an optional
 /// `(DefId, narrowed TypeId)` for the visible binding.
-type ConditionRefinement = (Option<(DefId, TypeId)>, Option<(DefId, TypeId)>);
+type LeafRefinement = (Option<(DefId, TypeId)>, Option<(DefId, TypeId)>);
+
+/// The facts that hold on one edge of a condition: every `(DefId, narrowed
+/// TypeId)` that is true when the edge is taken.
+type Facts = Vec<(DefId, TypeId)>;
+
+/// `(then_facts, else_facts)` for a whole condition, including compound
+/// `and` / `or` / `not` shapes.
+type ConditionRefinement = (Facts, Facts);
 
 pub(super) const ISSUE_TRAP_MEMBER_TYPE_MISMATCH: &str = "trap_member_type_mismatch";
 pub(super) const ISSUE_TRAP_UNION_COLLAPSED: &str = "trap_union_collapsed";
@@ -378,8 +387,9 @@ impl TypeChecker<'_> {
     /// visible binding (`x non est nihil` / `x est nihil`), the taken branch is
     /// checked with the binding temporarily recorded as its non-null core
     /// `T`; the fallthrough keeps `T ∪ null`. Compound conditions stay
-    /// conservative (nn-u2): `x non est nihil et …` narrows the taken branch
-    /// only; `or` never narrows. The override is restored before the branch
+    /// compositional: `et` narrows the taken branch with every
+    /// conjunct, `aut` narrows the fallthrough with every disjunct's negation,
+    /// `non` swaps. The override is restored before the branch
     /// type is joined, so the narrowed type never escapes its block.
     pub fn check_if(
         &mut self,
@@ -486,20 +496,51 @@ impl TypeChecker<'_> {
     /// mirrors. A member test on a union that lacks `M` refines nothing (the
     /// dead-test WARN fires at the expression site).
     ///
-    /// Compound conditions are conservative (nn-u2). `x non est nihil et …`
-    /// narrows the taken branch only: the whole conjunction being true
-    /// requires the left null-check conjunct to hold, but its falsity does
-    /// not force the conjunct's falsity, so the else branch gets no
-    /// refinement (the mirror `x est nihil et …` else-narrowing would be
-    /// unsound — `x` can be null while `x est nihil et y` is false). `or`
-    /// never narrows: the disjunction's truth does not force the left
-    /// operand's truth, so neither branch is refined. Non-`and` compound
-    /// shapes (and tests that are not the leftmost `and` conjunct)
-    /// stay un-narrowed.
+    /// Compound conditions compose the facts of their parts.
+    /// `A et B` holds both parts' then-facts in the taken branch, at any
+    /// depth; its falsity forces neither part, so the else edge learns
+    /// nothing (`x est nihil et y` can be false while `x` is null). `A aut B`
+    /// is the mirror: both parts' else-facts hold when it is false (the
+    /// fallthrough of a diverging `si A aut B { redde }`), and its truth
+    /// forces neither part. `non (...)` swaps the two edges.
     ///
-    /// Returns `(then_refinement, else_refinement)`, each an optional
-    /// `(DefId, narrowed TypeId)` for the visible binding.
+    /// Returns `(then_facts, else_facts)`, each a list of
+    /// `(DefId, narrowed TypeId)` for visible bindings.
     fn condition_refinement(&mut self, cond: &HirExpression) -> ConditionRefinement {
+        match &cond.kind {
+            // Both conjuncts hold when `A and B` is true, at any depth. Its
+            // falsity forces neither conjunct, so the else edge learns nothing.
+            HirExpressionKind::Binary(HirBinOp::And, lhs, rhs) => {
+                let (mut then_facts, _) = self.condition_refinement(lhs);
+                then_facts.extend(self.condition_refinement(rhs).0);
+                (then_facts, Vec::new())
+            }
+            // Both disjuncts are false when `A or B` is false, so the else
+            // edge (and the fallthrough of a diverging `si A aut B`) carries
+            // both negations. Its truth forces neither disjunct.
+            HirExpressionKind::Binary(HirBinOp::Or, lhs, rhs) => {
+                let (_, mut else_facts) = self.condition_refinement(lhs);
+                else_facts.extend(self.condition_refinement(rhs).1);
+                (Vec::new(), else_facts)
+            }
+            // `non (...)` swaps the edges.
+            HirExpressionKind::Unary(HirUnOp::Not, inner) => {
+                let (then_facts, else_facts) = self.condition_refinement(inner);
+                (else_facts, then_facts)
+            }
+            _ => {
+                let (then_fact, else_fact) = self.leaf_refinement(cond);
+                (
+                    then_fact.into_iter().collect(),
+                    else_fact.into_iter().collect(),
+                )
+            }
+        }
+    }
+
+    /// Refinement for one non-compound condition (null probe, member test,
+    /// or null equality).
+    fn leaf_refinement(&mut self, cond: &HirExpression) -> LeafRefinement {
         if let HirExpressionKind::TypeCheck { positive, expr, ty } = &cond.kind {
             // A type test against the null type is the null-presence probe:
             // `x non est nihil` narrows the taken branch, `x est nihil` the
@@ -530,12 +571,6 @@ impl TypeChecker<'_> {
             };
             return self.nil_probe_refinement(equals, operand);
         }
-        // Compound conjunction: keep only the taken-branch refinement of the
-        // left conjunct; the fallthrough of `and` is never narrowed.
-        if matches!(op, HirBinOp::And) {
-            let (then_refine, _) = self.condition_refinement(lhs);
-            return (then_refine, None);
-        }
         (None, None)
     }
 
@@ -551,11 +586,7 @@ impl TypeChecker<'_> {
     /// narrows the taken branch, `x est nihil` the fallthrough, nn-u1).
     ///
     /// The operand must be a binding path whose type peels a null member.
-    fn nil_probe_refinement(
-        &mut self,
-        positive: bool,
-        expr: &HirExpression,
-    ) -> ConditionRefinement {
+    fn nil_probe_refinement(&mut self, positive: bool, expr: &HirExpression) -> LeafRefinement {
         let HirExpressionKind::Path(def_id) = &expr.kind else {
             return (None, None);
         };
@@ -587,7 +618,7 @@ impl TypeChecker<'_> {
         positive: bool,
         expr: &HirExpression,
         member: TypeId,
-    ) -> ConditionRefinement {
+    ) -> LeafRefinement {
         let HirExpressionKind::Path(def_id) = &expr.kind else {
             return (None, None);
         };
@@ -740,12 +771,12 @@ impl TypeChecker<'_> {
         &mut self,
         block: &mut HirBlock,
         expected: Option<TypeId>,
-        refine: Option<(DefId, TypeId)>,
+        refine: Facts,
     ) -> (TypeId, FlowState) {
-        let (refined_def, saved) = match refine {
-            Some((def_id, ty)) => (Some(def_id), self.override_binding(def_id, ty)),
-            None => (None, None),
-        };
+        let saved: Vec<(DefId, Option<BindingInfo>)> = refine
+            .into_iter()
+            .map(|(def_id, ty)| (def_id, self.override_binding(def_id, ty)))
+            .collect();
 
         self.push_scope();
         self.push_assert_refinement_frame();
@@ -762,8 +793,10 @@ impl TypeChecker<'_> {
         self.pop_assert_refinement_frame();
         self.pop_scope();
 
-        if let (Some(def_id), Some(original)) = (refined_def, saved) {
-            self.restore_binding(def_id, original);
+        for (def_id, original) in saved.into_iter().rev() {
+            if let Some(original) = original {
+                self.restore_binding(def_id, original);
+            }
         }
         (ty, state)
     }
@@ -922,14 +955,16 @@ impl TypeChecker<'_> {
     }
 
     /// Return an edge snapshot with one condition refinement applied.
-    fn state_with_refinement(&mut self, refine: Option<(DefId, TypeId)>) -> FlowState {
-        let Some((def_id, ty)) = refine else {
-            return self.snapshot_flow_state();
-        };
-        let saved = self.override_binding(def_id, ty);
+    fn state_with_refinement(&mut self, refine: Facts) -> FlowState {
+        let saved: Vec<(DefId, Option<BindingInfo>)> = refine
+            .into_iter()
+            .map(|(def_id, ty)| (def_id, self.override_binding(def_id, ty)))
+            .collect();
         let state = self.snapshot_flow_state();
-        if let Some(original) = saved {
-            self.restore_binding(def_id, original);
+        for (def_id, original) in saved.into_iter().rev() {
+            if let Some(original) = original {
+                self.restore_binding(def_id, original);
+            }
         }
         state
     }
@@ -1049,15 +1084,15 @@ impl TypeChecker<'_> {
         let HirExpressionKind::Adfirma(cond, _) = &expr.kind else {
             return;
         };
-        let Some((def_id, ty)) = self.condition_refinement(cond).0 else {
-            return;
-        };
+        let facts = self.condition_refinement(cond).0;
         if self.assert_refinements.is_empty() {
             return;
         }
-        let saved = self.override_binding(def_id, ty);
-        if let Some(frame) = self.assert_refinements.last_mut() {
-            frame.push((def_id, saved));
+        for (def_id, ty) in facts {
+            let saved = self.override_binding(def_id, ty);
+            if let Some(frame) = self.assert_refinements.last_mut() {
+                frame.push((def_id, saved));
+            }
         }
     }
 
