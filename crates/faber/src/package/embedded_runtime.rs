@@ -10,6 +10,7 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 include!(concat!(env!("OUT_DIR"), "/runtime_embedded.rs"));
 
@@ -21,12 +22,16 @@ const COMPLETE_MARKER: &str = ".faber-runtime-complete";
 /// Repository-shaped root holding the embedded runtime sources, extracted on
 /// first use. `None` on any I/O failure (callers fail closed).
 pub(crate) fn embedded_runtime_root() -> Option<PathBuf> {
-    let parent = cache_dir();
+    embedded_runtime_root_in(&cache_dir())
+}
+
+/// [`embedded_runtime_root`] under an explicit cache directory.
+fn embedded_runtime_root_in(parent: &Path) -> Option<PathBuf> {
     let root = parent.join(format!("faber-runtime-{EMBEDDED_RUNTIME_DIGEST}"));
     if root.join(COMPLETE_MARKER).is_file() {
         return Some(root);
     }
-    materialize(&parent, &root).ok()?;
+    materialize(parent, &root).ok()?;
     root.join(COMPLETE_MARKER).is_file().then_some(root)
 }
 
@@ -48,9 +53,13 @@ fn cache_dir() -> PathBuf {
 /// rename race (the winner's directory already exists) is success.
 fn materialize(parent: &Path, root: &Path) -> io::Result<()> {
     fs::create_dir_all(parent)?;
+    // Unique per call: concurrent callers in one process (parallel tests,
+    // threads) must not share, write into, or discard each other's staging.
+    static STAGING_SEQ: AtomicU64 = AtomicU64::new(0);
     let staging = parent.join(format!(
-        ".faber-runtime-{EMBEDDED_RUNTIME_DIGEST}.{}.tmp",
-        std::process::id()
+        ".faber-runtime-{EMBEDDED_RUNTIME_DIGEST}.{}.{}.tmp",
+        std::process::id(),
+        STAGING_SEQ.fetch_add(1, Ordering::Relaxed)
     ));
     discard_staging(&staging);
     let written = write_table(&staging).and_then(|()| fs::rename(&staging, root));
