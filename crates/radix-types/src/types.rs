@@ -98,7 +98,6 @@ pub struct TypeTable {
     /// `b64`). The `lista<b8>` the `octeti` word names is seeded without
     /// setting a bit, so a module that never writes a `bN` marker has none.
     authored_bits: u8,
-    
 
     /// Parent enum definition for each variant constructor [`DefId`].
     ///
@@ -258,9 +257,14 @@ impl TypeTable {
     /// probe used by backend rejection.
     #[must_use]
     pub fn first_authored_bits(&self) -> Option<BitsWidth> {
-        [BitsWidth::B8, BitsWidth::B16, BitsWidth::B32, BitsWidth::B64]
-            .into_iter()
-            .find(|width| self.authored_bits & Self::bits_mask(*width) != 0)
+        [
+            BitsWidth::B8,
+            BitsWidth::B16,
+            BitsWidth::B32,
+            BitsWidth::B64,
+        ]
+        .into_iter()
+        .find(|width| self.authored_bits & Self::bits_mask(*width) != 0)
     }
 
     #[allow(clippy::cast_possible_truncation)]
