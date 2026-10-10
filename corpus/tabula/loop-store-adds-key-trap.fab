@@ -1,0 +1,38 @@
++++
+term = "tabula"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "collections"
+canonical = false
+summary = "A bracket store that adds a key to a map while a loop walks that map traps: map changed size during iteration."
+syntax = "for from <map> const <value> { <map>[<new key>] ← <value> }"
+related = ["tabula", "itera", "ex"]
+locale = "en"
++++
+# =============================================================================
+# loop-store-adds-key-trap — adding a key inside the loop over the same map.
+# =============================================================================
+#
+# What this teaches:
+#   • A bracket store that adds a key to the map being walked changes its
+#     size; the loop notices at its next step and the program aborts with
+#     "map changed size during iteration".
+#   • Methods that change the shape are rejected at check time; the bracket
+#     store is the "developer knows best" surface, so it traps instead.
+#
+# Common mistakes:
+#   • Collecting new entries by storing them into the map being walked —
+#     gather them in a second map and merge after the loop.
+#
+# See also: tabula, itera, loop-store-adds-key
+# =============================================================================
+
+main {
+    var map<string, int> stock ← { "pear": 3 }
+    print "before"
+    for from stock const count {
+        stock["fig"] ← count
+        print "stored"
+    }
+    print "unreached"
+}

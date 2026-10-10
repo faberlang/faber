@@ -346,6 +346,7 @@ impl<'a> LoweringContextMaps<'a> {
             diagnostic_ordo_no_member: diagnostics.ordo_no_member,
             diagnostic_potentia_negative_exponent: diagnostics.potentia_negative_exponent,
             diagnostic_range_step_not_positive: diagnostics.range_step_not_positive,
+            diagnostic_map_changed_size: diagnostics.map_changed_size,
             diagnostic_ponde_invalid_index: diagnostics.ponde_invalid_index,
             diagnostic_accipe_invalid_index: diagnostics.accipe_invalid_index,
             fault_delivery: self.frozen.fault_delivery,

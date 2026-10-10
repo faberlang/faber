@@ -433,6 +433,7 @@ impl FunctionBuilder<'_> {
             diagnostic_ordo_no_member: context.diagnostic_ordo_no_member,
             diagnostic_potentia_negative_exponent: context.diagnostic_potentia_negative_exponent,
             diagnostic_range_step_not_positive: context.diagnostic_range_step_not_positive,
+            diagnostic_map_changed_size: context.diagnostic_map_changed_size,
             diagnostic_ponde_invalid_index: context.diagnostic_ponde_invalid_index,
             diagnostic_accipe_invalid_index: context.diagnostic_accipe_invalid_index,
             fault_delivery: context.fault_delivery,

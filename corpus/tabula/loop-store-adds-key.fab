@@ -1,0 +1,43 @@
++++
+term = "tabula"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "collections"
+canonical = false
+summary = "A bracket store in a loop over the same map may update existing keys; it may not add one."
+syntax = "for from <map> at [<key>] const <value> { <map>[<key>] ← <value> }"
+related = ["tabula", "itera", "ex"]
+locale = "en"
++++
+# =============================================================================
+# loop-store-adds-key — updating existing keys while looping over the map.
+# =============================================================================
+#
+# What this teaches:
+#   • A bracket store `m[k] ← v` inside `for from m …` is allowed when `k` is
+#     already a key: the map keeps its size, so the loop is undisturbed.
+#   • The loop remembers the map's size when it starts and compares it at each
+#     step; a bracket store that adds a key traps (see
+#     loop-store-adds-key-trap.fab).
+#
+# Common mistakes:
+#   • Adding a new key from inside the loop that walks the map — the program
+#     traps with "map changed size during iteration".
+#
+# See also: tabula, itera, loop-store-adds-key-trap
+# =============================================================================
+
+main {
+    var map<string, int> stock ← { "pear": 3, "apple": 5, "fig": 1 }
+    for from stock at [name] const count {
+        stock[name] ← count * 10
+    }
+    var list<string> rows ← empty
+    for from stock at [name] const count {
+        rows.append("§=§"(name, count))
+    }
+    rows.sort()
+    for from rows const row {
+        print row
+    }
+}

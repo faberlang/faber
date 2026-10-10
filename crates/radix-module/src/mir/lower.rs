@@ -97,6 +97,9 @@ mod first_match_tests;
 mod fractus_potentia;
 mod item;
 pub(crate) mod lane_form;
+#[cfg(test)]
+#[path = "lower/map_size_guard_test.rs"]
+mod map_size_guard_tests;
 mod monomorphize;
 mod package_instantiate;
 mod place;
@@ -721,6 +724,7 @@ pub fn lower_analyzed_unit(
         ordo_no_member: interner.intern("no ordo member has this value"),
         potentia_negative_exponent: interner.intern("numerus potentia failed: negative exponent"),
         range_step_not_positive: interner.intern("range step must be positive"),
+        map_changed_size: interner.intern("map changed size during iteration"),
         ponde_invalid_index: interner.intern(crate::runtime_contract::tensor::ERR_PONDE_INVALID_INDEX),
         accipe_invalid_index: interner.intern(crate::runtime_contract::tensor::ERR_ACCIPE_INVALID_INDEX),
     };
@@ -1291,6 +1295,8 @@ struct DiagnosticSymbols {
     /// A range step that is zero or negative at run time (ruling 2026-10-02):
     /// the stride guard's panic textus.
     range_step_not_positive: Symbol,
+    /// Bracket store added a key to a map while a loop over it ran (need, O1(3)).
+    map_changed_size: Symbol,
     /// The checked `ponde` store's out-of-range error textus (K11): the
     /// runtime-contract message the fatal index form also reports.
     ponde_invalid_index: Symbol,
@@ -2177,6 +2183,7 @@ struct FunctionBuilderContext<'a> {
     diagnostic_ordo_no_member: Symbol,
     diagnostic_potentia_negative_exponent: Symbol,
     diagnostic_range_step_not_positive: Symbol,
+    diagnostic_map_changed_size: Symbol,
     diagnostic_ponde_invalid_index: Symbol,
     diagnostic_accipe_invalid_index: Symbol,
     /// A `⇥` kernel exists in the unit: handled blocks emit the device
@@ -2274,6 +2281,7 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_ordo_no_member: Symbol(0),
             diagnostic_potentia_negative_exponent: Symbol(0),
             diagnostic_range_step_not_positive: Symbol(0),
+            diagnostic_map_changed_size: Symbol(0),
             diagnostic_ponde_invalid_index: Symbol(0),
             diagnostic_accipe_invalid_index: Symbol(0),
             fault_delivery: false,

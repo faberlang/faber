@@ -45,6 +45,45 @@ fn filum_term_type(body: &HirBlock) -> Option<MirType> {
     Some(MirType::semantic(term.0?))
 }
 
+/// Whether `body` holds a bracket store `place[k] ← v` whose `place` is the
+/// local or parameter `def` (need, ruling O1(3)). A bracket store can
+/// add a key to a map but never remove one, so a length comparison at each loop
+/// step catches every insert; the method forms are rejected at check time.
+fn body_bracket_stores_into(body: &HirBlock, def: DefId) -> bool {
+    struct Stores {
+        def: DefId,
+        found: bool,
+    }
+    impl Stores {
+        fn is_target(&self, target: &HirExpression) -> bool {
+            let HirExpressionKind::Index(object, _) = &target.kind else {
+                return false;
+            };
+            let object = match &object.kind {
+                HirExpressionKind::NonNull(inner, radix_hir::HirNonNullKind::Value) => inner,
+                _ => object,
+            };
+            matches!(&object.kind, HirExpressionKind::Path(def) if *def == self.def)
+        }
+    }
+    impl HirVisitor for Stores {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            match &expr.kind {
+                HirExpressionKind::Assign(target, _) | HirExpressionKind::ConversioAssign { target, .. }
+                    if self.is_target(target) =>
+                {
+                    self.found = true;
+                }
+                _ => {}
+            }
+            crate::hir::visit::walk_expr(self, expr);
+        }
+    }
+    let mut stores = Stores { def, found: false };
+    stores.visit_block(body);
+    stores.found
+}
+
 fn mir_reduce_op(op: radix_hir::HirReductionOp) -> MirReduceOp {
     match op {
         radix_hir::HirReductionOp::Sum => MirReduceOp::Sum,
@@ -4065,6 +4104,21 @@ impl FunctionBuilder<'_> {
         // The map itself stays addressable for the per-key value read.
         let entries_map =
             matches!(&collection_kind, CollectionIteraKind::MapEntries { .. }).then(|| collection.clone());
+        // O1(3): a loop over a map whose body bracket-stores into that same
+        // map remembers the size at entry and compares it at every step.
+        let size_guard_map = (matches!(
+            &collection_kind,
+            CollectionIteraKind::MapKeys(_)
+                | CollectionIteraKind::MapValues(_)
+                | CollectionIteraKind::MapEntries { .. }
+        ) && {
+            let source = match &iter.iter.kind {
+                HirExpressionKind::NonNull(inner, radix_hir::HirNonNullKind::Value) => inner,
+                _ => iter.iter,
+            };
+            matches!(&source.kind, HirExpressionKind::Path(def) if body_bracket_stores_into(iter.body, *def))
+        })
+        .then(|| collection.clone());
         let (iteration_place, binding_ty, array_de) = match &collection_kind {
             CollectionIteraKind::Array(item) => {
                 let item_ty = MirType::semantic(*item);
@@ -4115,6 +4169,15 @@ impl FunctionBuilder<'_> {
             }
         };
 
+        let size_guard = size_guard_map.map(|map_place| {
+            let start = self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Length),
+                vec![MirOperand::Place(map_place.clone())],
+                numerus,
+                iter.span,
+            );
+            (map_place, start)
+        });
         if let CollectionIteraKind::BoundedArray(_, capacity) = &collection_kind {
             let text = matches!(
                 self.normalized_type(collection_semantic),
@@ -4181,6 +4244,33 @@ impl FunctionBuilder<'_> {
         self.terminate_current(MirTerminatorKind::Goto(cond_id), iter.span);
 
         self.switch_to(cond_id);
+        if let Some((map_place, start)) = size_guard {
+            let current = self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Length),
+                vec![MirOperand::Place(map_place)],
+                numerus,
+                iter.span,
+            );
+            let changed = self.binary_temp(MirBinOp::NotEq, current, start, bivalens, iter.span);
+            let trap_id = self.fresh_block(iter.span);
+            let step_id = self.fresh_block(iter.span);
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition: changed, then_block: trap_id, else_block: step_id },
+                iter.span,
+            );
+            self.switch_to(trap_id);
+            let message = MirOperand::Constant(MirConstant::String(self.context.diagnostic_map_changed_size));
+            let numquam = MirType::semantic(self.types.primitive(Primitive::Numquam));
+            self.append_stmt(MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: None,
+                    call: MirRuntimeCall { intrinsic: MirIntrinsic::Panic, args: vec![message], return_ty: numquam },
+                },
+                span: iter.span,
+            });
+            self.terminate_current(MirTerminatorKind::Unreachable, iter.span);
+            self.switch_to(step_id);
+        }
         let length = match hoisted_length {
             Some(length) => length,
             None => self.runtime_call_value(
