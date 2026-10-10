@@ -178,6 +178,17 @@ pub enum MirCollectionOp {
     ArrayTrueDiv,
     /// Elementwise unary `-` over a `lista`: one operand.
     ArrayNeg,
+    /// Elementwise ordering over a numeric `lista` (`≺ ≻ ≤ ≥`): two operands,
+    /// a list pair or a list and a scalar in either order; the result is a
+    /// `lista<bivalens>` of the live length.
+    ArrayLt,
+    ArrayGt,
+    ArrayLtEq,
+    ArrayGtEq,
+    /// Elementwise value equality over a numeric `lista` (`≅ ≇`): the same
+    /// pairing and result as the orderings.
+    ArrayValueEq,
+    ArrayValueNotEq,
     Append,
     AppendImmutable,
     Put,

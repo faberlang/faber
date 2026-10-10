@@ -1603,6 +1603,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.array_lift(args, span, MirLiftOp::TrueDiv, return_ty)
             }
             MirCollectionOp::ArrayNeg => self.array_lift(args, span, MirLiftOp::Neg, return_ty),
+            MirCollectionOp::ArrayLt => self.array_lift(args, span, MirLiftOp::Lt, return_ty),
+            MirCollectionOp::ArrayGt => self.array_lift(args, span, MirLiftOp::Gt, return_ty),
+            MirCollectionOp::ArrayLtEq => self.array_lift(args, span, MirLiftOp::LtEq, return_ty),
+            MirCollectionOp::ArrayGtEq => self.array_lift(args, span, MirLiftOp::GtEq, return_ty),
+            MirCollectionOp::ArrayValueEq => self.array_lift(args, span, MirLiftOp::Eq, return_ty),
+            MirCollectionOp::ArrayValueNotEq => {
+                self.array_lift(args, span, MirLiftOp::NotEq, return_ty)
+            }
             MirCollectionOp::TensorSumAxis => self.tensor_sum_axis(args, span, return_ty),
             MirCollectionOp::TensorShape => self.tensor_shape(args, span),
             MirCollectionOp::TensorReshape => self.tensor_reshape(args, span),
@@ -6527,6 +6535,12 @@ fn lista_label(op: MirLiftOp) -> &'static str {
         MirLiftOp::Div => "lista div",
         MirLiftOp::Mod => "lista mod",
         MirLiftOp::TrueDiv => "lista true div",
+        MirLiftOp::Lt => "lista lt",
+        MirLiftOp::Gt => "lista gt",
+        MirLiftOp::LtEq => "lista lt-eq",
+        MirLiftOp::GtEq => "lista gt-eq",
+        MirLiftOp::Eq => "lista value-eq",
+        MirLiftOp::NotEq => "lista value-not-eq",
         _ => "lista neg",
     }
 }

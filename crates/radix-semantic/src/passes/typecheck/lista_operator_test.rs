@@ -360,3 +360,109 @@ fn lista_arithmetic_diagnostics_are_localized_in_en_and_la() {
         }
     }
 }
+
+// 2026-10-04 operator ruling, kept 2026-10-10: the ordering
+// glyphs and `≅ ≇` lift per element over a numeric list, like `+`.
+#[test]
+fn numeric_lista_comparisons_lift_to_a_list_of_bivalens() {
+    assert_accepts(
+        r"functio ordered(lista<numerus> a, lista<numerus> b) → lista<bivalens> {
+    redde a ≺ b
+}
+functio above(lista<f64> a) → lista<bivalens> {
+    redde a ≻ 2.0
+}
+functio scalar_left(lista<numerus> a) → lista<bivalens> {
+    redde 3 ≤ a
+}
+functio equal(lista<numerus> a, lista<numerus> b) → lista<bivalens> {
+    redde a ≅ b
+}
+functio apart(lista<numerus> a, lista<numerus> b) → lista<bivalens> {
+    redde a ≇ b
+}
+functio bounded(lista<numerus, 4> a, lista<numerus, 4> b) → lista<bivalens, 4> {
+    redde a ≥ b
+}",
+    );
+}
+
+#[test]
+fn numeric_lista_comparison_result_is_not_a_single_bivalens() {
+    assert_rejects_with_issue(
+        r"functio single(lista<numerus> a, lista<numerus> b) → bivalens {
+    redde a ≺ b
+}",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn numeric_lista_whole_value_equality_stays_one_bivalens() {
+    assert_accepts(
+        r"functio same(lista<numerus> a, lista<numerus> b) → bivalens {
+    redde a ≡ b
+}
+functio text_equal(lista<textus> a, lista<textus> b) → bivalens {
+    redde a ≅ b
+}",
+    );
+}
+
+#[test]
+fn numeric_lista_comparison_keeps_the_capacity_law() {
+    assert_rejects_with_issue(
+        r"functio mismatched(lista<numerus, 4> a, lista<numerus, 8> b) → lista<bivalens, 4> {
+    redde a ≺ b
+}",
+        "lista_capacity_mismatch",
+    );
+}
+
+#[test]
+fn lista_of_bits_orders_with_whole_value_equality_only() {
+    assert_rejects_with_issue(
+        r"functio ordered(lista<b8> a, lista<b8> b) → lista<bivalens> {
+    redde a ≺ b
+}",
+        "lista_bits_whole_equality_only",
+    );
+    assert_accepts(
+        r"functio same(lista<b8> a, lista<b8> b) → bivalens {
+    redde a ≡ b
+}",
+    );
+}
+
+#[test]
+fn non_numeric_lista_ordering_is_still_refused() {
+    assert_rejects_with_issue(
+        r"functio ordered(lista<textus> a, lista<textus> b) → lista<bivalens> {
+    redde a ≺ b
+}",
+        "numeric_operands_required",
+    );
+}
+
+#[test]
+fn lista_bits_whole_equality_only_is_localized_in_en_and_la() {
+    let diagnostic = Diagnostic::error("SEM011")
+        .with_code("SEM011")
+        .with_arg("issue", "lista_bits_whole_equality_only");
+    for locale in ["en", "la"] {
+        let path = crate::locale::workspace_locale_pack_path(locale);
+        let pack = LocalePack::from_toml_path(path).expect("locale pack");
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .expect("diagnostic template")
+            .expect("SEM011 row");
+        assert!(
+            rendered.message.contains(match locale {
+                "en" => "whole-value equality only",
+                _ => "aequalitatem totius valoris tantum",
+            }),
+            "{locale}: {}",
+            rendered.message
+        );
+    }
+}

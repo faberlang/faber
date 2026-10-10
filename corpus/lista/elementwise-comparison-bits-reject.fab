@@ -1,0 +1,36 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Ordering a list of bits is refused: a bits list has whole-value equality only."
+syntax = "xs ≺ ys on list<b8> — rejected"
+related = ["bits", "≡"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:lista_bits_whole_equality_only"
++++
+# =============================================================================
+# lista — A list of bits has whole-value equality only.
+# =============================================================================
+#
+# What this teaches:
+#   • `≺ ≻ ≤ ≥` lift per element over numeric lists; bits are not numbers
+#   • compare whole bits lists with `≡`, or convert the elements with `↦`
+#
+# Common mistakes:
+#   • looking for a missing feature — a bits list is not ordered by design
+#
+# See also: elementwise-comparison, bits
+# =============================================================================
+
+# lista reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    const list<b8> xs ← [0x01, 0x02]
+    const list<b8> ys ← [0x01, 0x03]
+    print xs ≺ ys
+}

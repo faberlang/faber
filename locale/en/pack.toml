@@ -2729,6 +2729,10 @@ help = "use numeric operands for this operator"
 message = "list `*` list is unsupported; use ⊙ (elementwise)"
 help = "use ⊙ for elementwise multiplication of two lists; `*` takes a scalar on one side"
 
+[diagnostics.SEM011.issues.lista_bits_whole_equality_only]
+message = "ordering a list of bit values is unsupported; a bits list has whole-value equality only"
+help = "compare whole lists with `≡`/`≢`, or convert the elements to numbers with `↦` first; bits are not numbers, so `≺ ≻ ≤ ≥` do not lift over them"
+
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "list `/` list is unsupported; use ⊘ (elementwise, like `/`) or ÷ (elementwise true division)"
 help = "use ⊘ to divide each pair of elements like `/`, or ÷ for true division"

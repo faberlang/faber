@@ -880,6 +880,12 @@ impl Validator<'_, '_> {
             | MirCollectionOp::ArrayDiv
             | MirCollectionOp::ArrayMod
             | MirCollectionOp::ArrayTrueDiv
+            | MirCollectionOp::ArrayLt
+            | MirCollectionOp::ArrayGt
+            | MirCollectionOp::ArrayLtEq
+            | MirCollectionOp::ArrayGtEq
+            | MirCollectionOp::ArrayValueEq
+            | MirCollectionOp::ArrayValueNotEq
             | MirCollectionOp::Append
             | MirCollectionOp::SortByKeys
             | MirCollectionOp::Compare
@@ -1877,7 +1883,13 @@ impl Validator<'_, '_> {
             | MirCollectionOp::ArrayMul
             | MirCollectionOp::ArrayDiv
             | MirCollectionOp::ArrayMod
-            | MirCollectionOp::ArrayTrueDiv => {
+            | MirCollectionOp::ArrayTrueDiv
+            | MirCollectionOp::ArrayLt
+            | MirCollectionOp::ArrayGt
+            | MirCollectionOp::ArrayLtEq
+            | MirCollectionOp::ArrayGtEq
+            | MirCollectionOp::ArrayValueEq
+            | MirCollectionOp::ArrayValueNotEq => {
                 let Some(left_ty) = first_arg_ty else {
                     return;
                 };
@@ -1921,7 +1933,18 @@ impl Validator<'_, '_> {
                 // exact result is stored under it), so a wider result element
                 // is fine and a narrower one is not. `÷` converts integers to
                 // a float first, so its result element is any numeric type.
-                let flows = op != MirCollectionOp::ArrayTrueDiv;
+                // A comparison yields a `lista<bivalens>`, so its operands never
+                // flow into the result element either.
+                let flows = !matches!(
+                    op,
+                    MirCollectionOp::ArrayTrueDiv
+                        | MirCollectionOp::ArrayLt
+                        | MirCollectionOp::ArrayGt
+                        | MirCollectionOp::ArrayLtEq
+                        | MirCollectionOp::ArrayGtEq
+                        | MirCollectionOp::ArrayValueEq
+                        | MirCollectionOp::ArrayValueNotEq
+                );
                 match (left_kind, right_kind) {
                     (Some(left_kind), Some(right_kind)) => {
                         if left_kind != right_kind {

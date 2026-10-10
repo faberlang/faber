@@ -4,8 +4,9 @@
 //! `+ -` between two lists, keep their HIR emitters. The forms added with the
 //! 2026-10-04 aggregate-operator rulings have only the MIR runner as their
 //! executor: `%` and `÷` over a list, unary `-` over a list, the glyph forms
-//! `⊙ ⊘` over two lists, and a list against a scalar whose type joins the
-//! element to a wider one (`list<u8> + 300`). Left alone, a HIR emitter would
+//! `⊙ ⊘` over two lists, the per-element comparisons `≺ ≻ ≤ ≥ ≅ ≇` over
+//! numeric lists, and a list against a scalar whose type joins the element to
+//! a wider one (`list<u8> + 300`). Left alone, a HIR emitter would
 //! print the scalar operator between a list and a number, which is a wrong
 //! program, not a missing one. This gate rejects those expressions before any
 //! HIR emitter runs, naming the operator and the target.
@@ -92,6 +93,25 @@ fn lista_form(types: &TypeTable, expr: &HirExpression) -> Option<&'static str> {
                 HirBinOp::TrueDiv => "÷",
                 HirBinOp::Hadamard => "⊙",
                 HirBinOp::HadamardDiv => "⊘",
+                // A numeric list compared per element types as a list of
+                // `bivalens`; a whole-value `≅` over other lists stays one
+                // `bivalens` and keeps its emitters.
+                HirBinOp::Lt
+                | HirBinOp::Gt
+                | HirBinOp::LtEq
+                | HirBinOp::GtEq
+                | HirBinOp::ApproxEq
+                | HirBinOp::ApproxNotEq => {
+                    lista_element(types, expr.ty)?;
+                    match op {
+                        HirBinOp::Lt => "≺",
+                        HirBinOp::Gt => "≻",
+                        HirBinOp::LtEq => "≤",
+                        HirBinOp::GtEq => "≥",
+                        HirBinOp::ApproxEq => "≅",
+                        _ => "≇",
+                    }
+                }
                 HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div => {
                     // The existing emitters take a list element and a scalar of
                     // that same type; a join to a wider element is new.

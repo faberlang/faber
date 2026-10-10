@@ -173,3 +173,69 @@ incipit {
         ]
     );
 }
+
+// Need (cmp-lift-list): `≺ ≻ ≤ ≥ ≅ ≇` lift per element over a numeric
+// list, between two lists or a list and a scalar in either order.
+#[test]
+fn lista_comparisons_lift_per_element_on_the_runner() {
+    let source = r"
+incipit {
+    fixum lista<numerus> xs ← [1, 5, 3]
+    fixum lista<numerus> ys ← [2, 4, 3]
+    nota xs ≺ ys
+    nota xs ≻ ys
+    nota xs ≤ ys
+    nota xs ≥ ys
+    nota xs ≅ ys
+    nota xs ≇ ys
+    nota xs ≤ 3
+    nota 3 ≤ xs
+    nota [1, 2] ≺ [1, 3]
+    nota [1, 2] ≤ 2
+    nota xs ≡ ys
+}
+";
+    assert_eq!(
+        run(source),
+        [
+            "[verum, falsum, falsum]",
+            "[falsum, verum, falsum]",
+            "[verum, falsum, verum]",
+            "[falsum, verum, verum]",
+            "[falsum, falsum, verum]",
+            "[verum, verum, falsum]",
+            "[verum, falsum, verum]",
+            "[falsum, verum, verum]",
+            "[falsum, verum]",
+            "[verum, verum]",
+            "falsum",
+        ]
+    );
+}
+
+#[test]
+fn lista_comparison_pairs_the_live_length_and_fails_on_a_mismatch() {
+    let bounded = r"
+incipit {
+    varia lista<numerus, 4> a ← vacua
+    a.appende(1)
+    a.appende(7)
+    fixum lista<bivalens, 4> mask ← a ≥ 2
+    nota mask
+    nota mask.longitudo()
+}
+";
+    assert_eq!(run(bounded), ["[falsum, verum]", "2"]);
+    let mismatch = r"
+incipit {
+    fixum lista<numerus> xs ← [1, 2, 3]
+    fixum lista<numerus> ys ← [1, 2]
+    nota xs ≺ ys
+}
+";
+    assert!(
+        runner_failure(mismatch).contains("length mismatch"),
+        "{}",
+        runner_failure(mismatch)
+    );
+}

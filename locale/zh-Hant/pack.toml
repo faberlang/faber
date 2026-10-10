@@ -1920,6 +1920,10 @@ help = "對此運算子使用數值運算元"
 message = "不支援 list `*` list；逐元素乘法請用 ⊙"
 help = "兩個列表的逐元素乘法請用 ⊙；`*` 的一側須為純量"
 
+[diagnostics.SEM011.issues.lista_bits_whole_equality_only]
+message = "不支援對位元值列表排序；位元列表只有整值相等"
+help = "請用 `≡`/`≢` 比較整個列表，或先用 `↦` 把元素轉為數字；位元不是數字，所以 `≺ ≻ ≤ ≥` 不會逐元素提升"
+
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "不支援 list `/` list；請用 ⊘（逐元素，同 `/`）或 ÷（逐元素真除法）"
 help = "逐對相除（同 `/`）請用 ⊘，真除法請用 ÷"

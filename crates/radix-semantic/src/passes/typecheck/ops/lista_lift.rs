@@ -27,6 +27,8 @@ const ISSUE_LISTA_DIVIDE_REQUIRES_GLYPH: &str = "lista_divide_requires_glyph";
 const ISSUE_LISTA_SCALAR_REQUIRED: &str = "lista_scalar_required";
 /// Two lists with different literal capacities are different types (D4).
 const ISSUE_LISTA_CAPACITY_MISMATCH: &str = "lista_capacity_mismatch";
+/// Bits are not numbers: a `lista<bN>` has whole-value equality only.
+const ISSUE_LISTA_BITS_WHOLE_EQUALITY_ONLY: &str = "lista_bits_whole_equality_only";
 /// Decimal elements have no `÷` yet.
 const ISSUE_LISTA_DECIMAL_ELEMENT: &str = "lista_decimal_element_unsupported";
 
@@ -139,6 +141,75 @@ impl TypeChecker<'_> {
             (None, None) => return None,
         };
         Some(self.lista_result(result_element, result_capacity))
+    }
+
+    /// `≺ ≻ ≤ ≥ ≅ ≇` over numeric lists (advisor rulings 2026-10-04, Q-B): the
+    /// glyph applies per element, between two lists or a list and a scalar in
+    /// either order, and gives a `lista<bivalens>` of the list shape. The
+    /// element rule is the scalar rule for the glyph (the same one a tensor
+    /// uses). `None` means the pair is not lifted here: no list, or a list
+    /// whose elements are not numbers (whole-value `≅`, or the scalar rule's
+    /// own refusal). A `lista<bN>` ordering names the whole-value-only rule.
+    pub(in crate::passes::typecheck) fn check_lista_compare(
+        &mut self,
+        op: HirBinOp,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let left = self.lista_arithmetic_shape(lhs_ty);
+        let right = self.lista_arithmetic_shape(rhs_ty);
+        if left.is_none() && right.is_none() {
+            return None;
+        }
+        let ordering = matches!(
+            op,
+            HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq
+        );
+        let lists = [left, right];
+        if ordering
+            && lists
+                .iter()
+                .flatten()
+                .any(|shape| self.bits_width_of(shape.element).is_some())
+        {
+            self.invalid_operand_types(ISSUE_LISTA_BITS_WHOLE_EQUALITY_ONLY, span);
+            return Some(self.error_type);
+        }
+        let numeric = |checker: &Self, element: TypeId| {
+            let resolved = checker.resolve_inferred_type(element);
+            checker.numeric_shape(resolved).is_some()
+        };
+        if lists
+            .iter()
+            .flatten()
+            .any(|shape| !numeric(self, shape.element))
+        {
+            return None;
+        }
+        let (l_elem, r_elem, capacity) = match (left, right) {
+            (Some(left), Some(right)) => {
+                let capacity = self.lista_pair_capacity(left, right, span, op)?;
+                (left.element, right.element, capacity)
+            }
+            (Some(list), None) => (list.element, rhs_ty, list.capacity),
+            (None, Some(list)) => (lhs_ty, list.element, list.capacity),
+            (None, None) => return None,
+        };
+        if self.is_error(l_elem) || self.is_error(r_elem) {
+            return Some(self.error_type);
+        }
+        let before = self.errors.len();
+        if ordering {
+            self.numeric_ordering_bin(l_elem, r_elem, span);
+        } else {
+            self.numeric_value_equality_types(l_elem, r_elem, span);
+        }
+        if self.errors.len() != before {
+            return Some(self.error_type);
+        }
+        let bivalens = self.bool_type();
+        Some(self.lista_result(bivalens, capacity))
     }
 
     /// `⊙` and `⊘` over two lists: the element is the shared element type and

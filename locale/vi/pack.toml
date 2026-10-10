@@ -1920,6 +1920,10 @@ help = "dùng các toán hạng số cho toán tử này"
 message = "không hỗ trợ list `*` list; dùng ⊙ (theo phần tử)"
 help = "dùng ⊙ để nhân hai danh sách theo phần tử; `*` nhận một số vô hướng ở một phía"
 
+[diagnostics.SEM011.issues.lista_bits_whole_equality_only]
+message = "không hỗ trợ sắp thứ tự danh sách giá trị bit; danh sách bit chỉ có so sánh bằng toàn giá trị"
+help = "so sánh cả danh sách bằng `≡`/`≢`, hoặc chuyển các phần tử sang số bằng `↦` trước; bit không phải số nên `≺ ≻ ≤ ≥` không áp theo từng phần tử"
+
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "không hỗ trợ list `/` list; dùng ⊘ (theo phần tử, như `/`) hoặc ÷ (chia thực theo phần tử)"
 help = "dùng ⊘ để chia từng cặp như `/`, hoặc ÷ để chia thực"

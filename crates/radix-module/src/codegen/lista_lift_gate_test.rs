@@ -42,6 +42,10 @@ const RUNNER_ONLY: &[&str] = &[
     "fixum lista<numerus> r ← a ⊘ b",
     "fixum lista<numerus> r ← -a",
     "fixum lista<u16> r ← bytes + 300",
+    "fixum lista<bivalens> r ← a ≺ b",
+    "fixum lista<bivalens> r ← a ≥ 8",
+    "fixum lista<bivalens> r ← 8 ≅ a",
+    "fixum lista<bivalens> r ← a ≇ b",
 ];
 
 const KEPT: &[&str] = &[

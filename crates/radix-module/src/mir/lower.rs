@@ -3694,6 +3694,18 @@ impl<'a> FunctionBuilder<'a> {
         {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
+        // `≺ ≻ ≤ ≥ ≅ ≇` over a numeric list lift per element to a `lista<bivalens>`
+        // (the typechecker types the result as a list; a whole-value `≅` over
+        // non-numeric lists stays one `bivalens`).
+        if matches!(
+            op,
+            HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq | HirBinOp::ApproxEq | HirBinOp::ApproxNotEq
+        ) && expr
+            .ty
+            .is_some_and(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
+        {
+            return self.lower_lista_elementwise(op, lhs, rhs, expr);
+        }
         if matches!(op, HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq)
             && lhs
                 .ty

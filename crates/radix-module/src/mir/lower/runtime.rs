@@ -1024,7 +1024,8 @@ impl FunctionBuilder<'_> {
         Some(MirOperand::Constant(MirConstant::ShapeSize { shape, axis: None }))
     }
 
-    /// Lower A1/C5 numeric collection arithmetic and the list-only `% ÷ ⊙ ⊘`.
+    /// Lower A1/C5 numeric collection arithmetic, the list-only `% ÷ ⊙ ⊘` and
+    /// the per-element comparisons `≺ ≻ ≤ ≥ ≅ ≇` of a numeric `lista`.
     ///
     /// Every pair reaches one collection runtime op, so the runner pairs the
     /// live lengths (a mismatch is an error) and stores each exact result under
@@ -1045,6 +1046,12 @@ impl FunctionBuilder<'_> {
             HirBinOp::Div | HirBinOp::HadamardDiv => MirCollectionOp::ArrayDiv,
             HirBinOp::Mod => MirCollectionOp::ArrayMod,
             HirBinOp::TrueDiv => MirCollectionOp::ArrayTrueDiv,
+            HirBinOp::Lt => MirCollectionOp::ArrayLt,
+            HirBinOp::Gt => MirCollectionOp::ArrayGt,
+            HirBinOp::LtEq => MirCollectionOp::ArrayLtEq,
+            HirBinOp::GtEq => MirCollectionOp::ArrayGtEq,
+            HirBinOp::ApproxEq => MirCollectionOp::ArrayValueEq,
+            HirBinOp::ApproxNotEq => MirCollectionOp::ArrayValueNotEq,
             _ => {
                 self.errors.push(MirError::unsupported(
                     expr.span,

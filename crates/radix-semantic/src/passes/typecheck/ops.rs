@@ -1439,6 +1439,9 @@ impl TypeChecker<'_> {
                 let lhs_ty = self
                     .check_constant_beside_decimal(lhs, rhs_ty)
                     .unwrap_or(lhs_ty);
+                if let Some(result) = self.check_lista_compare(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
                 if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
                     return result;
                 }
@@ -1485,6 +1488,9 @@ impl TypeChecker<'_> {
             HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq => {
                 let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, true);
                 if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+                    return result;
+                }
+                if let Some(result) = self.check_lista_compare(op, lhs_ty, rhs_ty, lhs.span) {
                     return result;
                 }
                 if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
@@ -2571,7 +2577,13 @@ fn lista_operator_spelling(op: HirBinOp) -> &'static str {
         HirBinOp::TrueDiv => "÷",
         HirBinOp::Hadamard => "⊙",
         HirBinOp::HadamardDiv => "⊘",
-        _ => unreachable!("non-list arithmetic operator"),
+        HirBinOp::Lt => "≺",
+        HirBinOp::Gt => "≻",
+        HirBinOp::LtEq => "≤",
+        HirBinOp::GtEq => "≥",
+        HirBinOp::ApproxEq => "≅",
+        HirBinOp::ApproxNotEq => "≇",
+        _ => unreachable!("non-list operator"),
     }
 }
 
