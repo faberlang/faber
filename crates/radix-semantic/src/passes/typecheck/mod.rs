@@ -605,6 +605,11 @@ pub(crate) struct TypeChecker<'a> {
     /// until finalize so later flows keep accumulating.
     pub union_members: RefCell<FxHashMap<InferVar, Vec<TypeId>>>,
 
+    /// Union holes synthesized for a `trap { … }` result whose body has been
+    /// fully checked: their accumulated member set is complete, so an `is`
+    /// test over a binding of that hole can narrow before finalize solves it.
+    pub(super) closed_trap_holes: FxHashSet<InferVar>,
+
     /// Index shape inference state (parallel to type inference above).
     pub index_infer: IndexInferState,
 
@@ -864,6 +869,7 @@ impl<'a> TypeChecker<'a> {
             canonical_cache: FxHashMap::default(),
             occurs_cache: FxHashMap::default(),
             union_members: RefCell::new(FxHashMap::default()),
+            closed_trap_holes: FxHashSet::default(),
             index_infer,
             shape_witnesses: FxHashMap::default(),
             static_collection_lengths: FxHashMap::default(),

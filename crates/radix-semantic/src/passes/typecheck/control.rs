@@ -147,6 +147,8 @@ impl TypeChecker<'_> {
         // The success member rides the same accumulation arm as the errors.
         self.accumulate_into_union_hole(var, body_ty, span, ISSUE_TRAP_MEMBER_TYPE_MISMATCH);
 
+        self.closed_trap_holes.insert(var);
+
         let collapsed = if error_flowed {
             self.trap_collapsed_member(var)
         } else {
@@ -572,6 +574,9 @@ impl TypeChecker<'_> {
             return (None, None);
         }
         let binding_ty = self.resolve_inferred_type(binding.ty);
+        let binding_ty = self
+            .closed_trap_hole_union(binding_ty)
+            .unwrap_or(binding_ty);
         let Some(members) = self.union_members_of(binding_ty) else {
             return (None, None);
         };
@@ -589,6 +594,38 @@ impl TypeChecker<'_> {
         } else {
             (remainder.map(|ty| (*def_id, ty)), Some((*def_id, member)))
         }
+    }
+
+    /// The member set of a trap result hole, as a union type, once the trap
+    /// body has been fully checked.
+    ///
+    /// A `_` or `∪` binding of `trap { … }` keeps the open `InferUnion` hole
+    /// until finalize, so `is` narrowing would otherwise see no members and
+    /// leave the binding at the whole union. The hole's accumulated set is
+    /// complete when the trap boundary closes, so the narrowing reads it
+    /// directly. Returns `None` for any other type, and for a set that has
+    /// fewer than two distinct members (the collapse diagnostic owns that).
+    fn closed_trap_hole_union(&mut self, ty: TypeId) -> Option<TypeId> {
+        let Type::InferUnion(var) = *self.types.get(ty) else {
+            return None;
+        };
+        if !self.closed_trap_holes.contains(&var) {
+            return None;
+        }
+        let members: Vec<TypeId> = {
+            let borrowed = self.union_members.borrow();
+            borrowed.get(&var).cloned().unwrap_or_default()
+        };
+        let mut distinct: Vec<TypeId> = Vec::new();
+        for member in members {
+            let member = self.resolve_inferred_type(member);
+            if member != self.error_type
+                && !distinct.iter().any(|seen| self.types.equals(*seen, member))
+            {
+                distinct.push(member);
+            }
+        }
+        (distinct.len() >= 2).then(|| self.types.intern(Type::Union(distinct)))
     }
 
     /// WARN when a `TypeCheck` tests a member its operand union cannot hold

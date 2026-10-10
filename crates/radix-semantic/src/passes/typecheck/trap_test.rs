@@ -99,6 +99,38 @@ fn trap_supports_explicit_union_annotation_and_narrowing() {
 }
 
 #[test]
+fn trap_inferred_hole_narrows_under_is_test() {
+    // The same idiom over a `_` binding (no `T ∪ E` annotation): the closed
+    // trap hole supplies the members, so the taken branch is `numerus` and the
+    // fallthrough is `textus` — `textus` members are reachable only there.
+    test_support::assert_accepts(concat!(
+        "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
+        "incipit {\n",
+        "    fixum _ r ← capta { f() }\n",
+        "    si r est numerus {\n        nota r\n    } secus {\n",
+        "        nota r.longitudo()\n    }\n",
+        "}\n",
+    ));
+}
+
+#[test]
+fn trap_inferred_hole_narrowed_branch_is_the_tested_member() {
+    // Under narrowing the taken branch of `r est numerus` is `numerus`, so a
+    // textus-only member access there is a typed error rather than an open hole
+    // that defers to MIR validation.
+    test_support::assert_rejects_with_issue(
+        concat!(
+            "functio f() → numerus ⇥ textus {\n    redde 42\n}\n\n",
+            "incipit {\n",
+            "    fixum _ r ← capta { f() }\n",
+            "    si r est numerus {\n        nota r.longitudo()\n    }\n",
+            "}\n",
+        ),
+        "unknown_method",
+    );
+}
+
+#[test]
 fn trap_captures_iace_payload() {
     // An explicit `iace` inside the body is an alternate exit toward the
     // same trap hole — no channel-specific typing.
