@@ -52,8 +52,8 @@ fn rust_rejects_bits_before_emission() {
 
 #[cfg(feature = "hir-go")]
 #[test]
-fn go_rejects_bits_before_emission() {
-    assert_rejected(Target::HirGo, "HirGo");
+fn go_emitter_keeps_bits() {
+    assert_eq!(diagnostics(Target::HirGo), Vec::<(String, String)>::new());
 }
 
 #[cfg(feature = "hir-ts")]
@@ -64,8 +64,8 @@ fn typescript_rejects_bits_before_emission() {
 
 #[cfg(feature = "hir-swift")]
 #[test]
-fn swift_rejects_bits_before_emission() {
-    assert_rejected(Target::HirSwift, "HirSwift");
+fn swift_emitter_keeps_bits() {
+    assert_eq!(diagnostics(Target::HirSwift), Vec::<(String, String)>::new());
 }
 
 #[cfg(feature = "mir-llvm")]
