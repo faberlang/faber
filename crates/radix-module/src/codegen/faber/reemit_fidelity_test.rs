@@ -1427,3 +1427,25 @@ fn inferred_constructor_at_an_optional_slot_reemits_as_the_hole() {
         "optional map hole must re-emit as the hole:\n{code}"
     );
 }
+
+#[test]
+fn first_match_over_array_literal_reemits_with_meaning_intact() {
+    let source = "functio elige() → fractus ∪ nihil {\n    redde primus_quem([1.0, -2.0, 3.0], ubi x { x ≻ 0.0 })\n}\n";
+    let session = Session::new(Config::default().with_dev_locale_root());
+    let emit_pack = crate::locale::latin_locale_pack();
+    let result = reemit_faber(&session, &emit_pack, "first_match.fab", source);
+    assert!(
+        result.success(),
+        "re-emit refused: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
+            .collect::<Vec<_>>()
+    );
+    let emitted = result.output.expect("emit should produce output").code;
+    assert!(
+        emitted.contains("primus_quem([1.0, -2.0, 3.0]"),
+        "first-match head kept: {emitted}"
+    );
+}

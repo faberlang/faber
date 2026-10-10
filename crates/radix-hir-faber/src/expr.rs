@@ -1294,10 +1294,40 @@ impl super::FaberCodegen<'_> {
                     writer.write("}");
                 }
             }
-            HirExpressionKind::FirstMatch { .. } => {
-                // AFM-2 is source-shaped only; keep re-emission fail-closed
-                // until AFM-3 provides a valid Faber surface.
-                writer.write(surface.contextual_keyword("nulla"));
+            HirExpressionKind::FirstMatch {
+                source,
+                coordinates,
+                binding,
+                body,
+            } => {
+                // `primus_quem(source [apud [i, j]], ubi x { predicate })`: the
+                // head and the `ubi` tail are contextual keywords; the source
+                // is a complete expression, so it needs no parentheses.
+                writer.write(surface.contextual_keyword("primus_quem"));
+                writer.write("(");
+                self.write_expr(source, names, surface, writer);
+                if !coordinates.is_empty() {
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Apud));
+                    writer.write(" [");
+                    for (index, (_, name)) in coordinates.iter().enumerate() {
+                        if index > 0 {
+                            writer.write(", ");
+                        }
+                        writer.write(&self.symbol_to_string(*name));
+                    }
+                    writer.write("]");
+                }
+                writer.write(", ");
+                writer.write(surface.contextual_keyword("ubi"));
+                writer.write(" ");
+                writer.write(&self.symbol_to_string(binding.1));
+                writer.writeln(" {");
+                writer.indented(|writer| {
+                    self.write_block(body, names, surface, writer);
+                    self.write_block_end_trivia(body, writer);
+                });
+                writer.write("})");
             }
             HirExpressionKind::CopyInto { target, value } => {
                 // `target ⇇ value` — the glyph is an operator token, never a
