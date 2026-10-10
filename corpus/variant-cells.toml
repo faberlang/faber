@@ -887,6 +887,16 @@ required = true
 note = "N1 ruling 2+3; type-pattern predicate shares the est member rule"
 
 [[cells]]
+id = "cast.discerne-multi-subject"
+family = "casts"
+cell = "discerne over several scrutinees: `match a and b`, one pattern per subject, first matching arm runs, `_` and default arms, per-arm const bindings"
+status = "direct"
+exemplum = "discerne/multi-subject.fab"
+expected = true
+required = true
+note = "need (M4): MIR runner, Rust, canonical, wasm, llvm, sexp pass; Go, TypeScript and Swift pin known-fail in corpus-suites/full/outcomes.json until their multi-subject lowering lands"
+
+[[cells]]
 id = "cast.discerne-closed-set-decline"
 family = "casts"
 cell = "REJECT: discerne width / length-shape pattern outside the closed set (SEM010 discerne_pattern_not_in_closed_set)"
