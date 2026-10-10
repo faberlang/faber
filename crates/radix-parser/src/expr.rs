@@ -1815,6 +1815,89 @@ impl Parser {
         })
     }
 
+    /// Parse the `ordinata via Direction (ex | de) source [body]` expression.
+    ///
+    /// The direction word is claimed by Latin key after `via`; the source word
+    /// is `ex` (values) or `de` (keys); the optional body is the reduce body
+    /// form `(fixum | varia) IDENTIFIER block` and returns the sort key.
+    fn parse_sort_expr(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        self.advance();
+        if !self.eat_keyword_ident(TokenKind::Via) {
+            return Err(self.sort_error("sort_requires_via", "directions"));
+        }
+        let direction = match self.peek().kind {
+            TokenKind::Ident(sym) => match self.keyword_claim_key(sym) {
+                Some("ascendens") => SortDirection::Ascending,
+                Some("descendens") => SortDirection::Descending,
+                _ => return Err(self.sort_error("sort_unknown_direction", "directions")),
+            },
+            _ => return Err(self.sort_error("sort_unknown_direction", "directions")),
+        };
+        self.advance();
+        let source_mode = if self.eat_keyword_ident(TokenKind::Ex) {
+            SortSourceMode::Values
+        } else if self.eat_keyword_ident(TokenKind::De) {
+            SortSourceMode::Keys
+        } else {
+            return Err(self.sort_error("sort_requires_source", "sources"));
+        };
+        // Captured before the source parses: a nested expression context
+        // moves the counter, and the bar applies to this expression's depth.
+        let body_barred = self.sort_body_barred_at == Some(self.expression_contexts);
+        let source = self.parse_expression()?;
+        let has_body = !body_barred
+            && matches!(
+                self.keyword_ident_at(0),
+                Some(TokenKind::Fixum | TokenKind::Varia)
+            )
+            && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+            && self.peek_at(2).kind == TokenKind::LBrace;
+        let (mutability, binding, body) = if has_body {
+            (
+                self.parse_mutability()?,
+                Some(self.parse_ident()?),
+                Some(self.parse_block()?),
+            )
+        } else {
+            (AstMutability::Immutable, None, None)
+        };
+        Ok(Expr {
+            id: self.next_id(),
+            kind: ExprKind::Sort(Box::new(SortExpr {
+                direction,
+                source_mode,
+                source: Box::new(source),
+                mutability,
+                binding,
+                body,
+            })),
+            span: start.merge(self.previous_span()),
+        })
+    }
+
+    /// Malformed sort expression: a named `PARSE001` issue listing the words
+    /// the active locale pack accepts in the failing slot.
+    fn sort_error(&self, issue: &'static str, list: &'static str) -> ParseError {
+        let keys: &[&str] = if list == "directions" {
+            &["ascendens", "descendens"]
+        } else {
+            &["ex", "de"]
+        };
+        let words = keys
+            .iter()
+            .map(|key| {
+                self.reader_keyword_surfaces
+                    .get(*key)
+                    .map_or(*key, String::as_str)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        ParseError::structured(ParseErrorKind::Expected, self.current_span())
+            .with_arg("issue", issue)
+            .with_arg(list, words)
+    }
+
     fn reducta_operator_error(&self, issue: &'static str) -> ParseError {
         let operators = [
             "summa",
@@ -1971,6 +2054,14 @@ impl Parser {
             )
         {
             return self.parse_reducta_expr();
+        }
+        if self.is_keyword_key("ordinata")
+            && matches!(
+                self.keyword_ident_at(1),
+                Some(TokenKind::Via | TokenKind::Ex)
+            )
+        {
+            return self.parse_sort_expr();
         }
         if let Some(head) = self.retired_reduction_expr_head() {
             return self.parse_retired_reduction_expr(head);

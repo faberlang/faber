@@ -413,7 +413,7 @@ template_argument ::= 'انشر'? IDENTIFIER ':' expression
 # [201] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'خال' | '∞' | 'nan'
 # [202] primary
-primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
 # [203] ad_expr
 ad_expr ::= 'اتصل' ASCII_STRING ad_opener?
 # [204] ad_opener
@@ -472,77 +472,83 @@ reducta_group ::= 'حسب' expression
 reducta_body ::= ('ثابت' | 'متغير') IDENTIFIER block_stmt
 # [231] reducta_identity
 reducta_identity ::= 'عوض' expression
-# [232] filum_clause
+# [232] sort_expr
+sort_expr ::= 'رتب' 'عبر' sort_direction ('من' | 'عن') expression sort_body?
+# [233] sort_direction
+sort_direction ::= 'تصاعدي' | 'تنازلي'
+# [234] sort_body
+sort_body ::= ('ثابت' | 'متغير') IDENTIFIER block_stmt
+# [235] filum_clause
 filum_clause ::= 'خيط' IDENTIFIER
-# [233] capta_expr
+# [236] capta_expr
 capta_expr ::= 'فخ' block_stmt
-# [234] object_pattern
+# [237] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [235] pattern_property
+# [238] pattern_property
 pattern_property ::= 'باقي'? IDENTIFIER ('كـ' IDENTIFIER)?
-# [236] array_pattern
+# [239] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [237] array_pattern_element
+# [240] array_pattern_element
 array_pattern_element ::= '_' | 'باقي'? IDENTIFIER
-# [238] nota_stmt
+# [241] nota_stmt
 nota_stmt ::= ('اعرض' | 'شاهد' | 'نبه' | 'اكتب') expression (',' expression)*
-# [239] entry_header
+# [242] entry_header
 entry_header ::= ('وسائط' IDENTIFIER)? ('مخرج' expression)?
-# [240] incipit_stmt
+# [243] incipit_stmt
 incipit_stmt ::= 'بداية' entry_header block_stmt
-# [241] incipiet_stmt
+# [244] incipiet_stmt
 incipiet_stmt ::= 'استهلال' entry_header block_stmt
-# [242] probandum_decl
+# [245] probandum_decl
 probandum_decl ::= 'مختبر' STRING proba_modifier* '{' probandum_body '}'
-# [243] probandum_body
+# [246] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [244] proba_stmt
+# [247] proba_stmt
 proba_stmt ::= 'اختبر' STRING proba_modifier* block_stmt
-# [245] proba_modifier
+# [248] proba_modifier
 proba_modifier ::= 'توقع_الفشل' | 'أهمل' STRING | 'مستقبلي' STRING | 'فقط' | 'وسم' STRING | 'زمني' NATURAL | 'قس' | 'معاد' NATURAL | 'هش' NATURAL | 'حصري' STRING
-# [246] praepara_block
+# [249] praepara_block
 praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'الكل'? block_stmt
-# [247] fac_stmt
+# [250] fac_stmt
 fac_stmt ::= 'افعل' block_stmt cape_clause? ('طالما' expression)?
-# [248] IDENTIFIER
+# [251] IDENTIFIER
 IDENTIFIER ::=
-# [249] NUMBER
+# [252] NUMBER
 NUMBER ::=
-# [250] NATURAL
+# [253] NATURAL
 NATURAL ::=
-# [251] STRING
+# [254] STRING
 STRING ::=
-# [252] ASCII_STRING
+# [255] ASCII_STRING
 ASCII_STRING ::=
-# [253] BACKTICK_STRING
+# [256] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [254] OCTETI_STRING
+# [257] OCTETI_STRING
 OCTETI_STRING ::=
-# [255] NEWLINE
+# [258] NEWLINE
 NEWLINE ::=
-# [256] WIDTH_MARKER
+# [259] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [257] LISTA_WIDTH_SUGAR
+# [260] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [258] TENSOR_WIDTH_SUGAR
+# [261] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [259] SPARSA_WIDTH_SUGAR
+# [262] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [260] VECTOR_WIDTH_SUGAR
+# [263] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [261] MATRIX_WIDTH_SUGAR
+# [264] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [262] FRONTMATTER_DELIMITER
+# [265] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [263] TOML_LINES
+# [266] TOML_LINES
 TOML_LINES ::=
-# [264] ANNOTATION_NAME
+# [267] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [265] ANNOTATION_FIELD_NAME
+# [268] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [266] NON_NEWLINE_TOKEN
+# [269] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [267] NO_NEWLINE
+# [270] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -801,6 +807,9 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#اختزل-group` | live |
 | [`reducta_body`](#reducta-body) | `#اختزل-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#اختزل-identity` | live |
+| [`sort_expr`](#sort-expr) | `#sort-expr` | live |
+| [`sort_direction`](#sort-direction) | `#sort-direction` | live |
+| [`sort_body`](#sort-body) | `#sort-body` | live |
 | [`filum_clause`](#filum-clause) | `#خيط-clause` | live |
 | [`capta_expr`](#capta-expr) | `#فخ-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
@@ -861,6 +870,7 @@ productions. It is not a second keyword authority.
 | Expression | `فهرس_الأكبر` | argmax reduction operator (en `argmax`) |
 | Expression | `فهرس_الأصغر` | argmin reduction operator (en `argmin`) |
 | Params | `وسائط` | CLI arguments modifier |
+| Expression | `تصاعدي` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `أو` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `التقط` | local handler |
@@ -875,6 +885,7 @@ productions. It is not a second keyword authority.
 | Type | `نسخة` | copy ownership |
 | Control | `احرس` | guard |
 | Type | `عن` | borrow / for-in keys |
+| Expression | `تنازلي` | descending sort direction (en `desc`; contextual) |
 | Control | `طابق` | pattern match |
 | Declarations | `تمايز` | tagged union |
 | Control | `طالما` | while / postfix until |
@@ -938,6 +949,7 @@ productions. It is not a second keyword authority.
 | Testing | `أهمل` | skip |
 | Params | `الكل` | all reduction operator / glob |
 | Params | `خيارات` | options modifier |
+| Expression | `رتب` | sort expression head (en `sort`; contextual) |
 | Declarations | `ترتيب` | enum |
 | Type | `ملك` | owned |
 | Iteration | `كل` | range step |
@@ -988,7 +1000,7 @@ productions. It is not a second keyword authority.
 | Async | `انتظر_متغير` | await-bind mutable |
 | Boolean | `عوض` | nullable default / explicit reduction identity |
 | Boolean | `صواب` | true |
-| Conversion | `عبر` | convert-hint clause or reduction operator clause (contextual) |
+| Conversion | `عبر` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
 | Diagnostics | `شاهد` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -2641,6 +2653,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 
 The old `المجموع من`, `الأقصى من`, and `الأدنى من` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `اختزل عبر المجموع`, `اختزل عبر الأقصى`, or `اختزل عبر الأدنى`; the operator words remain ordinary identifiers outside the `عبر` clause.
 
+`رتب عبر <direction> (من | عن) source [(ثابت | متغير) x { أعد key }]` is the sort expression (en `sort عبر asc from xs`). `عبر` is mandatory and selects `تصاعدي` or `تنازلي` (en `asc`, `desc`). `من` (en `from`) orders a list, a set, or a map's values; `عن` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `رتب`, `تصاعدي`, and `تنازلي` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
+
 `حرر` and `اقرأ`/`سطرا` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -2834,9 +2848,9 @@ surfaces are not Norma declarations.
 the owned predicate-tail introducer of the `أول_مطابقة` first-match expression
 (see Special Expressions), not collection syntax.
 
-`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `ordinata(key)`
+`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `رتب(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument
-forms `ordina()` / `ordinata()` sort by the element's natural order. Both are a
+forms `ordina()` / `رتب()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 

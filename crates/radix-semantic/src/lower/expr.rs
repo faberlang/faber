@@ -127,6 +127,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
         ExprKind::Construct(ty) => lowerer.lower_construct(ty, id, expr.span),
         ExprKind::Reducta(reduction) => lower_reducta(lowerer, reduction),
+        ExprKind::Sort(sort) => lower_sort(lowerer, sort),
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.
         ExprKind::CopyInto(copy) => lowerer.lower_copy_into(copy),
@@ -215,6 +216,37 @@ fn lower_reducta(
         body,
         identity,
         mutable: reduction.mutability == radix_syntax::AstMutability::Mutable,
+    }
+}
+
+/// Lower the source shape of `ordinata via <Direction>` while preserving its
+/// declaration in HIR.
+///
+/// The optional key body binds its element name in its own scope, as the
+/// reduction body does. Typecheck owns the source and key rules.
+fn lower_sort(lowerer: &mut Lowerer, sort: &radix_syntax::SortExpr) -> HirExpressionKind {
+    let source = Box::new(lower_expr(lowerer, &sort.source));
+    lowerer.push_scope();
+    let binding = sort.binding.as_ref().map(|ident| {
+        let id = lowerer.next_def_id();
+        lowerer.bind_local(ident.name, id);
+        (id, ident.name)
+    });
+    let body = sort.body.as_ref().map(|body| lowerer.lower_block(body));
+    lowerer.pop_scope();
+    HirExpressionKind::Sort {
+        direction: match sort.direction {
+            radix_syntax::SortDirection::Ascending => radix_hir::HirSortDirection::Ascending,
+            radix_syntax::SortDirection::Descending => radix_hir::HirSortDirection::Descending,
+        },
+        source_mode: match sort.source_mode {
+            radix_syntax::SortSourceMode::Values => radix_hir::HirSortSource::Values,
+            radix_syntax::SortSourceMode::Keys => radix_hir::HirSortSource::Keys,
+        },
+        source,
+        binding,
+        body,
+        mutable: sort.mutability == radix_syntax::AstMutability::Mutable,
     }
 }
 

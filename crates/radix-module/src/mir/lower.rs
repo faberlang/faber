@@ -4771,6 +4771,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
             "range-product itera before ordered-walk MIR lowering"
         }
         HirExpressionKind::Reduction { .. } => "reducta_not_lowered",
+        HirExpressionKind::Sort { .. } => "sort_expression_not_lowered",
         // Unreachable from the lowering dispatcher (first-match lowers through
         // `collection_higher_order`); kept so this naming match stays exhaustive.
         HirExpressionKind::FirstMatch { .. } => "primus_quem before first-match MIR lowering",

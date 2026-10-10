@@ -1636,6 +1636,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 
 The old `summa ex`, `maxima ex`, and `minima ex` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `reducta via summa`, `reducta via maxima`, or `reducta via minima`; the operator words remain ordinary identifiers outside the `via` clause.
 
+`ordinata via <direction> (ex | de) source [(fixum | varia) x { redde key }]` is the sort expression (en `sort via asc from xs`). `via` is mandatory and selects `ascendens` or `descendens` (en `asc`, `desc`). `ex` (en `from`) orders a list, a set, or a map's values; `de` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `ordinata`, `ascendens`, and `descendens` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
+
 `scriptum` and `lege`/`lineam` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule

@@ -413,7 +413,7 @@ template_argument ::= 'กระจาย'? IDENTIFIER ':' expression
 # [201] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'จริง' | 'เท็จ' | 'ว่างเปล่า' | '∞' | 'nan'
 # [202] primary
-primary ::= IDENTIFIER | literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
 # [203] ad_expr
 ad_expr ::= 'ถึง' ASCII_STRING ad_opener?
 # [204] ad_opener
@@ -472,77 +472,83 @@ reducta_group ::= 'ตาม' expression
 reducta_body ::= ('คงที่' | 'แปร') IDENTIFIER block_stmt
 # [231] reducta_identity
 reducta_identity ::= 'หรือว่าง' expression
-# [232] filum_clause
+# [232] sort_expr
+sort_expr ::= 'เรียง' 'ผ่านทาง' sort_direction ('ออก' | 'จาก') expression sort_body?
+# [233] sort_direction
+sort_direction ::= 'น้อยไปมาก' | 'มากไปน้อย'
+# [234] sort_body
+sort_body ::= ('คงที่' | 'แปร') IDENTIFIER block_stmt
+# [235] filum_clause
 filum_clause ::= 'เส้นใย' IDENTIFIER
-# [233] capta_expr
+# [236] capta_expr
 capta_expr ::= 'ดัก' block_stmt
-# [234] object_pattern
+# [237] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [235] pattern_property
+# [238] pattern_property
 pattern_property ::= 'ที่เหลือ'? IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [236] array_pattern
+# [239] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [237] array_pattern_element
+# [240] array_pattern_element
 array_pattern_element ::= '_' | 'ที่เหลือ'? IDENTIFIER
-# [238] nota_stmt
+# [241] nota_stmt
 nota_stmt ::= ('บันทึก' | 'ดู' | 'เตือน' | 'เขียน') expression (',' expression)*
-# [239] entry_header
+# [242] entry_header
 entry_header ::= ('อาร์กิวเมนต์' IDENTIFIER)? ('ทางออก' expression)?
-# [240] incipit_stmt
+# [243] incipit_stmt
 incipit_stmt ::= 'เริ่ม' entry_header block_stmt
-# [241] incipiet_stmt
+# [244] incipiet_stmt
 incipiet_stmt ::= 'เริ่มอะซิงก์' entry_header block_stmt
-# [242] probandum_decl
+# [245] probandum_decl
 probandum_decl ::= 'ทดสอบชุด' STRING proba_modifier* '{' probandum_body '}'
-# [243] probandum_body
+# [246] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [244] proba_stmt
+# [247] proba_stmt
 proba_stmt ::= 'ทดสอบ' STRING proba_modifier* block_stmt
-# [245] proba_modifier
+# [248] proba_modifier
 proba_modifier ::= 'คาดหวัง_ล้มเหลว' | 'ละเว้น' STRING | 'ค้าง' STRING | 'เฉพาะ' | 'แท็ก' STRING | 'เวลา' NATURAL | 'วัด' | 'ทำซ้ำ' NATURAL | 'เปราะบาง' NATURAL | 'เฉพาะใน' STRING
-# [246] praepara_block
+# [249] praepara_block
 praepara_block ::= ('เตรียม' | 'จะเตรียม' | 'หลังเตรียม' | 'จะหลังเตรียม') 'ทั้งหมด'? block_stmt
-# [247] fac_stmt
+# [250] fac_stmt
 fac_stmt ::= 'ทำ' block_stmt cape_clause? ('ขณะ' expression)?
-# [248] IDENTIFIER
+# [251] IDENTIFIER
 IDENTIFIER ::=
-# [249] NUMBER
+# [252] NUMBER
 NUMBER ::=
-# [250] NATURAL
+# [253] NATURAL
 NATURAL ::=
-# [251] STRING
+# [254] STRING
 STRING ::=
-# [252] ASCII_STRING
+# [255] ASCII_STRING
 ASCII_STRING ::=
-# [253] BACKTICK_STRING
+# [256] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [254] OCTETI_STRING
+# [257] OCTETI_STRING
 OCTETI_STRING ::=
-# [255] NEWLINE
+# [258] NEWLINE
 NEWLINE ::=
-# [256] WIDTH_MARKER
+# [259] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [257] LISTA_WIDTH_SUGAR
+# [260] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [258] TENSOR_WIDTH_SUGAR
+# [261] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [259] SPARSA_WIDTH_SUGAR
+# [262] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [260] VECTOR_WIDTH_SUGAR
+# [263] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [261] MATRIX_WIDTH_SUGAR
+# [264] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [262] FRONTMATTER_DELIMITER
+# [265] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [263] TOML_LINES
+# [266] TOML_LINES
 TOML_LINES ::=
-# [264] ANNOTATION_NAME
+# [267] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [265] ANNOTATION_FIELD_NAME
+# [268] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [266] NON_NEWLINE_TOKEN
+# [269] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [267] NO_NEWLINE
+# [270] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -801,6 +807,9 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#ลดรูป-group` | live |
 | [`reducta_body`](#reducta-body) | `#ลดรูป-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#ลดรูป-identity` | live |
+| [`sort_expr`](#sort-expr) | `#sort-expr` | live |
+| [`sort_direction`](#sort-direction) | `#sort-direction` | live |
+| [`sort_body`](#sort-body) | `#sort-body` | live |
 | [`filum_clause`](#filum-clause) | `#เส้นใย-clause` | live |
 | [`capta_expr`](#capta-expr) | `#ดัก-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
@@ -861,6 +870,7 @@ productions. It is not a second keyword authority.
 | Expression | `ดัชนีค่าสูงสุด` | argmax reduction operator (en `argmax`) |
 | Expression | `ดัชนีค่าต่ําสุด` | argmin reduction operator (en `argmin`) |
 | Params | `อาร์กิวเมนต์` | CLI arguments modifier |
+| Expression | `น้อยไปมาก` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `หรือ` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `จับ` | local handler |
@@ -875,6 +885,7 @@ productions. It is not a second keyword authority.
 | Type | `สำเนา` | copy ownership |
 | Control | `คุ้มครอง` | guard |
 | Type | `จาก` | borrow / for-in keys |
+| Expression | `มากไปน้อย` | descending sort direction (en `desc`; contextual) |
 | Control | `แยก` | pattern match |
 | Declarations | `สหภาพแยก` | tagged union |
 | Control | `ขณะ` | while / postfix until |
@@ -938,6 +949,7 @@ productions. It is not a second keyword authority.
 | Testing | `ละเว้น` | skip |
 | Params | `ทั้งหมด` | all reduction operator / glob |
 | Params | `ทางเลือก` | options modifier |
+| Expression | `เรียง` | sort expression head (en `sort`; contextual) |
 | Declarations | `ลำดับ` | enum |
 | Type | `เป็นเจ้าของ` | owned |
 | Iteration | `ต่อ` | range step |
@@ -988,7 +1000,7 @@ productions. It is not a second keyword authority.
 | Async | `รอแปร` | await-bind mutable |
 | Boolean | `หรือว่าง` | nullable default / explicit reduction identity |
 | Boolean | `จริง` | true |
-| Conversion | `ผ่านทาง` | convert-hint clause or reduction operator clause (contextual) |
+| Conversion | `ผ่านทาง` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
 | Diagnostics | `ดู` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -2641,6 +2653,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 
 The old `ผลรวม ออก`, `สูงสุด ออก`, and `ต่ำสุด ออก` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `ลดรูป ผ่านทาง ผลรวม`, `ลดรูป ผ่านทาง สูงสุด`, or `ลดรูป ผ่านทาง ต่ำสุด`; the operator words remain ordinary identifiers outside the `ผ่านทาง` clause.
 
+`เรียง ผ่านทาง <direction> (ออก | จาก) source [(คงที่ | แปร) x { คืน key }]` is the sort expression (en `sort ผ่านทาง asc from xs`). `ผ่านทาง` is mandatory and selects `น้อยไปมาก` or `มากไปน้อย` (en `asc`, `desc`). `ออก` (en `from`) orders a list, a set, or a map's values; `จาก` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `เรียง`, `น้อยไปมาก`, and `มากไปน้อย` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
+
 `จารึก` and `อ่าน`/`บรรทัด` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -2834,9 +2848,9 @@ surfaces are not Norma declarations.
 the owned predicate-tail introducer of the `ตรงแรก` first-match expression
 (see Special Expressions), not collection syntax.
 
-`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `ordinata(key)`
+`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `เรียง(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument
-forms `ordina()` / `ordinata()` sort by the element's natural order. Both are a
+forms `ordina()` / `เรียง()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 

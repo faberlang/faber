@@ -434,6 +434,12 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 scan_go_expr(identity, file, diagnostics);
             }
         }
+        ExprKind::Sort(sort) => {
+            scan_go_expr(&sort.source, file, diagnostics);
+            if let Some(body) = &sort.body {
+                scan_go_block(body, file, diagnostics);
+            }
+        }
         ExprKind::FirstMatch(first_match) => {
             scan_go_expr(&first_match.source, file, diagnostics);
             scan_go_block(&first_match.body, file, diagnostics);
@@ -809,6 +815,12 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
             if let Some(identity) = &reduction.identity {
                 scan_rust_expr(identity, file, diagnostics);
+            }
+        }
+        ExprKind::Sort(sort) => {
+            scan_rust_expr(&sort.source, file, diagnostics);
+            if let Some(body) = &sort.body {
+                scan_rust_block(body, file, diagnostics);
             }
         }
         ExprKind::FirstMatch(first_match) => {

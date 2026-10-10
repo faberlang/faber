@@ -572,6 +572,15 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 visitor.visit_expr(identity);
             }
         }
+        ExprKind::Sort(sort) => {
+            visitor.visit_expr(&sort.source);
+            if let Some(binding) = &sort.binding {
+                visitor.visit_ident(binding);
+            }
+            if let Some(body) = &sort.body {
+                visitor.visit_block(body);
+            }
+        }
         ExprKind::FirstMatch(first_match) => {
             visitor.visit_expr(&first_match.source);
             for coordinate in &first_match.apud {

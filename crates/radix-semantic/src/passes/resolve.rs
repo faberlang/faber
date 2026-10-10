@@ -1390,6 +1390,24 @@ fn resolve_expr(
             }
             resolver.exit_scope();
         }
+        ExprKind::Sort(expr) => {
+            resolve_expr(resolver, interner, &expr.source, errors);
+            resolver.enter_scope(ScopeKind::Block);
+            if let Some(binding) = &expr.binding {
+                define_symbol(
+                    resolver,
+                    binding.name,
+                    binding.span,
+                    SymbolKind::Local,
+                    expr.mutability == radix_syntax::AstMutability::Mutable,
+                    errors,
+                );
+            }
+            if let Some(body) = &expr.body {
+                resolve_block(resolver, interner, body, errors);
+            }
+            resolver.exit_scope();
+        }
         ExprKind::FirstMatch(expr) => {
             resolve_expr(resolver, interner, &expr.source, errors);
             resolver.enter_scope(ScopeKind::Block);

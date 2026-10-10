@@ -1261,6 +1261,39 @@ impl super::FaberCodegen<'_> {
                     self.write_expr(identity, names, surface, writer);
                 }
             }
+            HirExpressionKind::Sort {
+                direction,
+                source_mode,
+                source,
+                binding,
+                body,
+                mutable,
+            } => {
+                writer.write(surface.contextual_keyword("ordinata"));
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Via));
+                writer.write(" ");
+                writer.write(surface.contextual_keyword(direction.keyword_key()));
+                writer.write(" ");
+                writer.write(surface.keyword(match source_mode {
+                    radix_hir::HirSortSource::Values => TokenKind::Ex,
+                    radix_hir::HirSortSource::Keys => TokenKind::De,
+                }));
+                writer.write(" ");
+                self.write_expr_prec(source, 12, names, surface, writer);
+                if let (Some(binding), Some(body)) = (binding, body) {
+                    writer.write(" ");
+                    writer.write(loop_binder_keyword(*mutable, surface));
+                    writer.write(" ");
+                    writer.write(&self.symbol_to_string(binding.1));
+                    writer.writeln(" {");
+                    writer.indented(|writer| {
+                        self.write_block(body, names, surface, writer);
+                        self.write_block_end_trivia(body, writer);
+                    });
+                    writer.write("}");
+                }
+            }
             HirExpressionKind::FirstMatch { .. } => {
                 // AFM-2 is source-shaped only; keep re-emission fail-closed
                 // until AFM-3 provides a valid Faber surface.

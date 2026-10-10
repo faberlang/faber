@@ -353,6 +353,13 @@ impl AirPurityChecker<'_> {
                     self.check_expr(identity);
                 }
             }
+            HirExpressionKind::Sort { source, body, .. } => {
+                self.reject(expr.span, "sort_expression_unsupported");
+                self.check_expr(source);
+                if let Some(body) = body {
+                    self.check_block(body);
+                }
+            }
             HirExpressionKind::FirstMatch {
                 source,
                 coordinates,

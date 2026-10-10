@@ -186,12 +186,13 @@ impl Parser {
                 .with_arg("expected", "'ex', 'de', or 'ab'"));
         };
 
-        let mut sources = vec![self.parse_expression()?];
-        if matches!(mode, IteraMode::Ex | IteraMode::Ab) {
-            while self.eat(&TokenKind::Comma) {
-                sources.push(self.parse_expression()?);
-            }
-        }
+        // The loop binder `fixum name {` is not a sort key body: bar the sort
+        // expression's body at the source's own expression depth.
+        let previous_sort_bar = self.sort_body_barred_at;
+        self.sort_body_barred_at = Some(self.expression_contexts.saturating_add(1));
+        let sources = self.parse_itera_sources(mode);
+        self.sort_body_barred_at = previous_sort_bar;
+        let sources = sources?;
         let apud = if self.eat_keyword_ident(TokenKind::Apud) {
             self.parse_apud_clause()?
         } else {
@@ -253,6 +254,17 @@ impl Parser {
             body,
             catch,
         }))
+    }
+
+    /// Parse the comma-separated source list of an `itera` head.
+    fn parse_itera_sources(&mut self, mode: IteraMode) -> Result<Vec<Expr>, ParseError> {
+        let mut sources = vec![self.parse_expression()?];
+        if matches!(mode, IteraMode::Ex | IteraMode::Ab) {
+            while self.eat(&TokenKind::Comma) {
+                sources.push(self.parse_expression()?);
+            }
+        }
+        Ok(sources)
     }
 
     /// Parse the bracketed coordinate names claimed by an `apud` clause.

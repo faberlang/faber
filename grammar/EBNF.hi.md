@@ -413,7 +413,7 @@ template_argument ::= 'फैलाओ'? IDENTIFIER ':' expression
 # [201] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'सत्य' | 'असत्य' | 'शून्यवत्' | '∞' | 'nan'
 # [202] primary
-primary ::= IDENTIFIER | literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
 # [203] ad_expr
 ad_expr ::= 'सेवा' ASCII_STRING ad_opener?
 # [204] ad_opener
@@ -472,77 +472,83 @@ reducta_group ::= 'अनुसार' expression
 reducta_body ::= ('स्थिर' | 'चर') IDENTIFIER block_stmt
 # [231] reducta_identity
 reducta_identity ::= 'डिफ़ॉल्ट' expression
-# [232] filum_clause
+# [232] sort_expr
+sort_expr ::= 'क्रमबद्ध_करो' 'द्वारा' sort_direction ('सेवन' | 'से') expression sort_body?
+# [233] sort_direction
+sort_direction ::= 'आरोही' | 'अवरोही'
+# [234] sort_body
+sort_body ::= ('स्थिर' | 'चर') IDENTIFIER block_stmt
+# [235] filum_clause
 filum_clause ::= 'धागा' IDENTIFIER
-# [233] capta_expr
+# [236] capta_expr
 capta_expr ::= 'जाल' block_stmt
-# [234] object_pattern
+# [237] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [235] pattern_property
+# [238] pattern_property
 pattern_property ::= 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
-# [236] array_pattern
+# [239] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [237] array_pattern_element
+# [240] array_pattern_element
 array_pattern_element ::= '_' | 'बाकी'? IDENTIFIER
-# [238] nota_stmt
+# [241] nota_stmt
 nota_stmt ::= ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
-# [239] entry_header
+# [242] entry_header
 entry_header ::= ('तर्क' IDENTIFIER)? ('निर्गम' expression)?
-# [240] incipit_stmt
+# [243] incipit_stmt
 incipit_stmt ::= 'आरंभ' entry_header block_stmt
-# [241] incipiet_stmt
+# [244] incipiet_stmt
 incipiet_stmt ::= 'आरंभasync' entry_header block_stmt
-# [242] probandum_decl
+# [245] probandum_decl
 probandum_decl ::= 'परीक्षणसमूह' STRING proba_modifier* '{' probandum_body '}'
-# [243] probandum_body
+# [246] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [244] proba_stmt
+# [247] proba_stmt
 proba_stmt ::= 'परीक्षण' STRING proba_modifier* block_stmt
-# [245] proba_modifier
+# [248] proba_modifier
 proba_modifier ::= 'अपेक्षित_विफलता' | 'छोड़ो' STRING | 'लंबित' STRING | 'केवल' | 'टैग' STRING | 'समय' NATURAL | 'मापो' | 'पुनरावृत्ति' NATURAL | 'नाज़ुक' NATURAL | 'केवलमें' STRING
-# [246] praepara_block
+# [249] praepara_block
 praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सभी'? block_stmt
-# [247] fac_stmt
+# [250] fac_stmt
 fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
-# [248] IDENTIFIER
+# [251] IDENTIFIER
 IDENTIFIER ::=
-# [249] NUMBER
+# [252] NUMBER
 NUMBER ::=
-# [250] NATURAL
+# [253] NATURAL
 NATURAL ::=
-# [251] STRING
+# [254] STRING
 STRING ::=
-# [252] ASCII_STRING
+# [255] ASCII_STRING
 ASCII_STRING ::=
-# [253] BACKTICK_STRING
+# [256] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [254] OCTETI_STRING
+# [257] OCTETI_STRING
 OCTETI_STRING ::=
-# [255] NEWLINE
+# [258] NEWLINE
 NEWLINE ::=
-# [256] WIDTH_MARKER
+# [259] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [257] LISTA_WIDTH_SUGAR
+# [260] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [258] TENSOR_WIDTH_SUGAR
+# [261] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [259] SPARSA_WIDTH_SUGAR
+# [262] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [260] VECTOR_WIDTH_SUGAR
+# [263] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [261] MATRIX_WIDTH_SUGAR
+# [264] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [262] FRONTMATTER_DELIMITER
+# [265] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [263] TOML_LINES
+# [266] TOML_LINES
 TOML_LINES ::=
-# [264] ANNOTATION_NAME
+# [267] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [265] ANNOTATION_FIELD_NAME
+# [268] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [266] NON_NEWLINE_TOKEN
+# [269] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [267] NO_NEWLINE
+# [270] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -801,6 +807,9 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#समेटो-group` | live |
 | [`reducta_body`](#reducta-body) | `#समेटो-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#समेटो-identity` | live |
+| [`sort_expr`](#sort-expr) | `#sort-expr` | live |
+| [`sort_direction`](#sort-direction) | `#sort-direction` | live |
+| [`sort_body`](#sort-body) | `#sort-body` | live |
 | [`filum_clause`](#filum-clause) | `#धागा-clause` | live |
 | [`capta_expr`](#capta-expr) | `#जाल-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
@@ -861,6 +870,7 @@ productions. It is not a second keyword authority.
 | Expression | `argmax` | argmax reduction operator (en `argmax`) |
 | Expression | `argmin` | argmin reduction operator (en `argmin`) |
 | Params | `तर्क` | CLI arguments modifier |
+| Expression | `आरोही` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `या` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `पकड़ो` | local handler |
@@ -875,6 +885,7 @@ productions. It is not a second keyword authority.
 | Type | `प्रतिलिपि` | copy ownership |
 | Control | `रक्षक` | guard |
 | Type | `से` | borrow / for-in keys |
+| Expression | `अवरोही` | descending sort direction (en `desc`; contextual) |
 | Control | `मिलाओ` | pattern match |
 | Declarations | `विभेद` | tagged union |
 | Control | `जबतक` | while / postfix until |
@@ -938,6 +949,7 @@ productions. It is not a second keyword authority.
 | Testing | `छोड़ो` | skip |
 | Params | `सभी` | all reduction operator / glob |
 | Params | `चयन` | options modifier |
+| Expression | `क्रमबद्ध_करो` | sort expression head (en `sort`; contextual) |
 | Declarations | `क्रम` | enum |
 | Type | `स्वामित्व` | owned |
 | Iteration | `प्रति` | range step |
@@ -988,7 +1000,7 @@ productions. It is not a second keyword authority.
 | Async | `रुको_चर` | await-bind mutable |
 | Boolean | `डिफ़ॉल्ट` | nullable default / explicit reduction identity |
 | Boolean | `सत्य` | true |
-| Conversion | `द्वारा` | convert-hint clause or reduction operator clause (contextual) |
+| Conversion | `द्वारा` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
 | Diagnostics | `देखो` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -2641,6 +2653,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 
 The old `योग सेवन`, `अधिकतम सेवन`, and `न्यूनतम सेवन` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `समेटो द्वारा योग`, `समेटो द्वारा अधिकतम`, or `समेटो द्वारा न्यूनतम`; the operator words remain ordinary identifiers outside the `द्वारा` clause.
 
+`क्रमबद्ध_करो द्वारा <direction> (सेवन | से) source [(स्थिर | चर) x { लौटाओ key }]` is the sort expression (en `sort द्वारा asc from xs`). `द्वारा` is mandatory and selects `आरोही` or `अवरोही` (en `asc`, `desc`). `सेवन` (en `from`) orders a list, a set, or a map's values; `से` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `क्रमबद्ध_करो`, `आरोही`, and `अवरोही` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
+
 `लिखित` and `पढ़ो`/`पंक्ति` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -2834,9 +2848,9 @@ surfaces are not Norma declarations.
 the owned predicate-tail introducer of the `प्रथम_मेल` first-match expression
 (see Special Expressions), not collection syntax.
 
-`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `ordinata(key)`
+`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `क्रमबद्ध_करो(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument
-forms `ordina()` / `ordinata()` sort by the element's natural order. Both are a
+forms `ordina()` / `क्रमबद्ध_करो()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 

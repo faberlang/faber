@@ -413,7 +413,7 @@ template_argument ::= '展開'? IDENTIFIER ':' expression
 # [201] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '可空' | '∞' | 'nan'
 # [202] primary
-primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
 # [203] ad_expr
 ad_expr ::= '端點' ASCII_STRING ad_opener?
 # [204] ad_opener
@@ -472,77 +472,83 @@ reducta_group ::= '按' expression
 reducta_body ::= ('定值' | '變值') IDENTIFIER block_stmt
 # [231] reducta_identity
 reducta_identity ::= '或取' expression
-# [232] filum_clause
+# [232] sort_expr
+sort_expr ::= '排序' '經由' sort_direction ('取自' | '從') expression sort_body?
+# [233] sort_direction
+sort_direction ::= '升序' | '降序'
+# [234] sort_body
+sort_body ::= ('定值' | '變值') IDENTIFIER block_stmt
+# [235] filum_clause
 filum_clause ::= '執行緒' IDENTIFIER
-# [233] capta_expr
+# [236] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [234] object_pattern
+# [237] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [235] pattern_property
+# [238] pattern_property
 pattern_property ::= '其餘'? IDENTIFIER ('作為' IDENTIFIER)?
-# [236] array_pattern
+# [239] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [237] array_pattern_element
+# [240] array_pattern_element
 array_pattern_element ::= '_' | '其餘'? IDENTIFIER
-# [238] nota_stmt
+# [241] nota_stmt
 nota_stmt ::= ('註記' | '檢視' | '警告' | '寫出') expression (',' expression)*
-# [239] entry_header
+# [242] entry_header
 entry_header ::= ('引數' IDENTIFIER)? ('出口' expression)?
-# [240] incipit_stmt
+# [243] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [241] incipiet_stmt
+# [244] incipiet_stmt
 incipiet_stmt ::= '非同步入口' entry_header block_stmt
-# [242] probandum_decl
+# [245] probandum_decl
 probandum_decl ::= '測試規格' STRING proba_modifier* '{' probandum_body '}'
-# [243] probandum_body
+# [246] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [244] proba_stmt
+# [247] proba_stmt
 proba_stmt ::= '測試' STRING proba_modifier* block_stmt
-# [245] proba_modifier
+# [248] proba_modifier
 proba_modifier ::= '預期失敗' | '略過' STRING | '預期' STRING | '僅限' | '標籤' STRING | '時限' NATURAL | '測量' | '重複' NATURAL | '脆弱' NATURAL | '僅限於' STRING
-# [246] praepara_block
+# [249] praepara_block
 praepara_block ::= ('準備' | '準備非同步' | '後置準備' | '後置準備非同步') '全部'? block_stmt
-# [247] fac_stmt
+# [250] fac_stmt
 fac_stmt ::= '執行' block_stmt cape_clause? ('當' expression)?
-# [248] IDENTIFIER
+# [251] IDENTIFIER
 IDENTIFIER ::=
-# [249] NUMBER
+# [252] NUMBER
 NUMBER ::=
-# [250] NATURAL
+# [253] NATURAL
 NATURAL ::=
-# [251] STRING
+# [254] STRING
 STRING ::=
-# [252] ASCII_STRING
+# [255] ASCII_STRING
 ASCII_STRING ::=
-# [253] BACKTICK_STRING
+# [256] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [254] OCTETI_STRING
+# [257] OCTETI_STRING
 OCTETI_STRING ::=
-# [255] NEWLINE
+# [258] NEWLINE
 NEWLINE ::=
-# [256] WIDTH_MARKER
+# [259] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [257] LISTA_WIDTH_SUGAR
+# [260] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [258] TENSOR_WIDTH_SUGAR
+# [261] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [259] SPARSA_WIDTH_SUGAR
+# [262] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [260] VECTOR_WIDTH_SUGAR
+# [263] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [261] MATRIX_WIDTH_SUGAR
+# [264] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [262] FRONTMATTER_DELIMITER
+# [265] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [263] TOML_LINES
+# [266] TOML_LINES
 TOML_LINES ::=
-# [264] ANNOTATION_NAME
+# [267] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [265] ANNOTATION_FIELD_NAME
+# [268] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [266] NON_NEWLINE_TOKEN
+# [269] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [267] NO_NEWLINE
+# [270] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -801,6 +807,9 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#歸約-group` | live |
 | [`reducta_body`](#reducta-body) | `#歸約-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#歸約-identity` | live |
+| [`sort_expr`](#sort-expr) | `#sort-expr` | live |
+| [`sort_direction`](#sort-direction) | `#sort-direction` | live |
+| [`sort_body`](#sort-body) | `#sort-body` | live |
 | [`filum_clause`](#filum-clause) | `#執行緒-clause` | live |
 | [`capta_expr`](#capta-expr) | `#陷阱-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
@@ -861,6 +870,7 @@ productions. It is not a second keyword authority.
 | Expression | `最大值索引` | argmax reduction operator (en `argmax`) |
 | Expression | `最小值索引` | argmin reduction operator (en `argmin`) |
 | Params | `引數` | CLI arguments modifier |
+| Expression | `升序` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `或` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `捕捉` | local handler |
@@ -875,6 +885,7 @@ productions. It is not a second keyword authority.
 | Type | `拷貝` | copy ownership |
 | Control | `守衛` | guard |
 | Type | `從` | borrow / for-in keys |
+| Expression | `降序` | descending sort direction (en `desc`; contextual) |
 | Control | `比對` | pattern match |
 | Declarations | `分支聯集` | tagged union |
 | Control | `當` | while / postfix until |
@@ -938,6 +949,7 @@ productions. It is not a second keyword authority.
 | Testing | `略過` | skip |
 | Params | `全部` | all reduction operator / glob |
 | Params | `可選項` | options modifier |
+| Expression | `排序` | sort expression head (en `sort`; contextual) |
 | Declarations | `列舉` | enum |
 | Type | `擁有` | owned |
 | Iteration | `每` | range step |
@@ -988,7 +1000,7 @@ productions. It is not a second keyword authority.
 | Async | `等變` | await-bind mutable |
 | Boolean | `或取` | nullable default / explicit reduction identity |
 | Boolean | `真` | true |
-| Conversion | `經由` | convert-hint clause or reduction operator clause (contextual) |
+| Conversion | `經由` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
 | Diagnostics | `檢視` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -2641,6 +2653,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 
 The old `求和 取自`, `最大 取自`, and `最小 取自` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `歸約 經由 求和`, `歸約 經由 最大`, or `歸約 經由 最小`; the operator words remain ordinary identifiers outside the `經由` clause.
 
+`排序 經由 <direction> (取自 | 從) source [(定值 | 變值) x { 傳回 key }]` is the sort expression (en `sort 經由 asc from xs`). `經由` is mandatory and selects `升序` or `降序` (en `asc`, `desc`). `取自` (en `from`) orders a list, a set, or a map's values; `從` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `排序`, `升序`, and `降序` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
+
 `格式文字` and `讀取`/`行` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -2834,9 +2848,9 @@ surfaces are not Norma declarations.
 the owned predicate-tail introducer of the `首個匹配` first-match expression
 (see Special Expressions), not collection syntax.
 
-`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `ordinata(key)`
+`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `排序(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument
-forms `ordina()` / `ordinata()` sort by the element's natural order. Both are a
+forms `ordina()` / `排序()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 

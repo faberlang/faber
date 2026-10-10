@@ -750,6 +750,9 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Expression | `maxima` | maximum reduction operator (en `max`) |
 # | Expression | `minima` | minimum reduction operator (en `min`) |
 # | Expression | `numeratio` | count reduction operator (en `count`) |
+# | Expression | `ordinata` | sort expression head (en `sort`; contextual) |
+# | Expression | `ascendens` | ascending sort direction (en `asc`; contextual) |
+# | Expression | `descendens` | descending sort direction (en `desc`; contextual) |
 # | Expression | `pro` | grouped reduction clause (en `per`; contextual) |
 # | Expression | `quilibet` | any reduction operator (en `any`; contextual) |
 # | Expression | `reducta` | reduction expression head (en `reduce`; contextual) |
@@ -762,7 +765,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Objects | `praefixum` | prefix expression |
 # | Grammar | `primus_quem` | first-match selection head |
 # | Grammar | `ubi` | first-match predicate tail |
-# | Conversion | `via` | convert-hint clause or reduction operator clause (contextual) |
+# | Conversion | `via` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
 # | Type | `in` | ownership in |
@@ -1434,6 +1437,7 @@ primary := IDENTIFIER | literal | 'ego'
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
          | first_match_expr
          | reducta_expr
+         | sort_expr
          | capta_expr
          | '(' expression ')'
 ad_expr    := 'ad' ASCII_STRING ad_opener?
@@ -1517,6 +1521,14 @@ reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminim
 reducta_group := 'pro' expression
 reducta_body := ('fixum' | 'varia') IDENTIFIER block_stmt
 reducta_identity := 'vel' expression
+# Sort expression. `via` is mandatory and selects the direction; `ex` sorts a
+# list, set or map's values and `de` sorts a map's keys. The optional body is
+# the reduce body form and returns the sort key; without one the source
+# elements are the keys. The result is always a new list. `ordinata`,
+# `ascendens` and `descendens` stay ordinary identifiers outside their slots.
+sort_expr := 'ordinata' 'via' sort_direction ('ex' | 'de') expression sort_body?
+sort_direction := 'ascendens' | 'descendens'
+sort_body := ('fixum' | 'varia') IDENTIFIER block_stmt
 # `filum` is claimed by exact spelling only inside a reduction production.
 filum_clause := 'filum' IDENTIFIER
 # Capture boundary: `capta` claims its spelling only in expression-primary

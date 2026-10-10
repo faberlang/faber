@@ -170,6 +170,13 @@ pub struct Parser {
     /// Range-bound and construction-source entries suppress it until their nested
     /// `parse_expression` calls begin a new expression context.
     conversio_postfix_enabled: bool,
+    /// Expression-context depth at which a sort expression may not claim a
+    /// `(fixum | varia) IDENT {` key body.
+    ///
+    /// Set while an `itera` source parses: the loop's own binder has the same
+    /// shape as a sort key body, so the binder belongs to the loop. A
+    /// parenthesized source opens a deeper context and may carry a body.
+    sort_body_barred_at: Option<u32>,
     /// Set while the annotated top-level `functio` or genus method that follows
     /// a `@ nondum` annotation is about to parse, so its signature may omit the
     /// body.
@@ -357,6 +364,7 @@ impl Parser {
             folded_operators: 0,
             expression_contexts: 0,
             conversio_postfix_enabled: true,
+            sort_body_barred_at: None,
             nondum_function_pending: false,
             budget_exhausted: false,
             budget_diagnostic: None,
@@ -1865,6 +1873,9 @@ mod summa_disambiguation_test;
 #[cfg(test)]
 #[path = "reducta_test.rs"]
 mod reducta_test;
+#[cfg(test)]
+#[path = "sort_test.rs"]
+mod sort_test;
 
 #[cfg(test)]
 #[path = "max_min_disambiguation_test.rs"]

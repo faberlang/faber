@@ -1611,6 +1611,53 @@ pub enum HirExpressionKind {
         identity: Option<Box<HirExpression>>,
         mutable: bool,
     },
+    /// Sort expression `sort via asc|desc from|ref source [body]`.
+    ///
+    /// Source-shaped like `Reduction`: `binding` and `body` are jointly
+    /// present or absent, and the body returns the sort key. Typecheck owns
+    /// the source, key-order and direction rules; the result is a new list.
+    Sort {
+        direction: HirSortDirection,
+        source_mode: HirSortSource,
+        source: Box<HirExpression>,
+        binding: Option<(DefId, Symbol)>,
+        body: Option<HirBlock>,
+        mutable: bool,
+    },
+}
+
+/// Sort direction; locale packs own the words.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirSortDirection {
+    Ascending,
+    Descending,
+}
+
+impl HirSortDirection {
+    #[must_use]
+    pub const fn keyword_key(self) -> &'static str {
+        match self {
+            Self::Ascending => "ascendens",
+            Self::Descending => "descendens",
+        }
+    }
+}
+
+/// Which side of the source a sort orders: values (`ex`) or keys (`de`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirSortSource {
+    Values,
+    Keys,
+}
+
+impl HirSortSource {
+    #[must_use]
+    pub const fn keyword_key(self) -> &'static str {
+        match self {
+            Self::Values => "ex",
+            Self::Keys => "de",
+        }
+    }
 }
 
 /// Reduction identities are stable; locale packs own their words.

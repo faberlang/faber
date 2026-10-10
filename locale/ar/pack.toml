@@ -158,6 +158,10 @@ numeratio = "العدّ"
 quilibet = "أي"
 argmaxima = "فهرس_الأكبر"
 argminima = "فهرس_الأصغر"
+# Sort expression surface (`ordinata via Dir ex source`).
+ordinata = "رتب"
+ascendens = "تصاعدي"
+descendens = "تنازلي"
 
 [types]
 ascii = "أسكي"

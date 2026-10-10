@@ -1147,6 +1147,8 @@ pub enum ExprKind {
     Construct(TypeExpr),
     /// Owned reduction expression: `reducta via Op ex source ...`.
     Reducta(Box<ReductaExpr>),
+    /// Owned sort expression: `ordinata via ascendens ex source [fixum x { key }]`.
+    Sort(Box<SortExpr>),
     /// Dedicated first-match selection: `primus_quem(source, ubi binder { predicate })`.
     ///
     /// The parser claims this spelling only in expression-head position when
@@ -1252,6 +1254,32 @@ pub enum ReductaOp {
     All,
     Any,
     Count,
+}
+
+/// Sort expression: direction word, `ex` (values) or `de` (keys), a source and
+/// an optional key body in the reduce body form.
+#[derive(Debug)]
+pub struct SortExpr {
+    pub direction: SortDirection,
+    pub source_mode: SortSourceMode,
+    pub source: Box<Expr>,
+    pub mutability: AstMutability,
+    pub binding: Option<Ident>,
+    pub body: Option<BlockStmt>,
+}
+
+/// Sort direction; the surface words belong to the active locale pack.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortDirection {
+    Ascending,
+    Descending,
+}
+
+/// Which side of a source the sort orders: values (`ex`) or keys (`de`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortSourceMode {
+    Values,
+    Keys,
 }
 
 #[derive(Debug)]

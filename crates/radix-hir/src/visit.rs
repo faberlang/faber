@@ -472,6 +472,20 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
                 visitor.visit_expr(identity);
             }
         }
+        HirExpressionKind::Sort {
+            source,
+            binding,
+            body,
+            ..
+        } => {
+            visitor.visit_expr(source);
+            if let Some((id, name)) = binding {
+                visitor.visit_def(*id, *name);
+            }
+            if let Some(body) = body {
+                visitor.visit_block(body);
+            }
+        }
         HirExpressionKind::FirstMatch {
             source,
             coordinates,
@@ -1076,6 +1090,20 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             }
             if let Some(identity) = identity {
                 visitor.visit_expr_mut(identity);
+            }
+        }
+        HirExpressionKind::Sort {
+            source,
+            binding,
+            body,
+            ..
+        } => {
+            visitor.visit_expr_mut(source);
+            if let Some((id, name)) = binding {
+                visitor.visit_def(*id, *name);
+            }
+            if let Some(body) = body {
+                visitor.visit_block_mut(body);
             }
         }
         HirExpressionKind::FirstMatch {

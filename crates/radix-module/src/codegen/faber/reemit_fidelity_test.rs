@@ -116,6 +116,76 @@ fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
     }
 }
 
+/// `ordinata via Dir (ex | de) source [body]` re-emits at the source locale,
+/// the loop binder stays the loop's, the words stay plain identifiers
+/// elsewhere, and a non-HirFaber target refuses the node by name until the
+/// typecheck unit lands.
+#[test]
+fn sort_expression_round_trips_in_latin_and_english_and_is_refused_by_typecheck() {
+    let cases = [
+        (
+            "la",
+            "functio f(lista<numerus> xs, tabula<textus, numerus> m) → vacuum {\n    fixum lista<numerus> a ← ordinata via ascendens ex xs\n    fixum lista<textus> k ← ordinata via descendens de m\n    fixum lista<numerus> b ← ordinata via ascendens ex xs fixum p {\n        redde p\n    }\n    itera ex ordinata via ascendens de m fixum n {\n        scribe n\n    }\n    varia numerus ordinata ← 1\n    varia numerus ascendens ← 2\n    varia lista<numerus> ys ← [3, 1]\n    ys.ordina()\n}\n",
+            [
+                "ordinata via ascendens ex xs",
+                "ordinata via descendens de m",
+                "ordinata via ascendens ex xs fixum p {",
+            ],
+        ),
+        (
+            "en",
+            "fn f(list<int> xs, map<string, int> m) → none {\n    const list<int> a ← sort via asc from xs\n    const list<string> k ← sort via desc ref m\n    const list<int> b ← sort via asc from xs const p {\n        return p\n    }\n    for from sort via asc ref m const n {\n        print n\n    }\n    var int sort ← 1\n    var int asc ← 2\n    var list<int> ys ← [3, 1]\n    ys.sort()\n}\n",
+            [
+                "sort via asc from xs",
+                "sort via desc ref m",
+                "sort via asc from xs const p {",
+            ],
+        ),
+    ];
+    for (locale, source, surfaces) in cases {
+        let source = if locale == "la" {
+            format!("+++\nlocale = \"la\"\n+++\n{source}")
+        } else {
+            source.to_owned()
+        };
+        let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
+            .unwrap_or_else(|error| panic!("{locale} pack loads: {error:?}"));
+        let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+        let emit = |input: &str| {
+            let result = reemit_faber(&session, &pack, "sort.fab", input);
+            assert!(
+                result.success(),
+                "{locale}: {:?}",
+                result
+                    .diagnostics
+                    .iter()
+                    .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+                    .collect::<Vec<_>>()
+            );
+            result.output.expect("re-emitted program").code
+        };
+        let first = emit(&source);
+        for surface in surfaces {
+            assert!(first.contains(surface), "{locale}: missing `{surface}` in\n{first}");
+        }
+        assert_eq!(emit(&first), first, "{locale} sort output is not idempotent");
+
+        // Typecheck refuses the node on every other target.
+        let mut check_session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+        check_session.config.target = Target::HirRust;
+        let diagnostics = match analyze_source(&check_session, "sort-check.fab", &first, AnalyzeRequest::default()) {
+            Ok(unit) => unit.diagnostics,
+            Err(diagnostics) => diagnostics,
+        };
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.issue() == Some("sort_expression_not_typechecked")),
+            "{locale}: missing sort_expression_not_typechecked: {diagnostics:?}"
+        );
+    }
+}
+
 #[test]
 fn trap_body_comments_survive_round_trip() {
     for source in [

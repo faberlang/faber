@@ -1326,6 +1326,20 @@ fn collect_expr_defs(
                 collect_expr_defs(identity, registry);
             }
         }
+        HirExpressionKind::Sort {
+            source,
+            binding,
+            body,
+            ..
+        } => {
+            collect_expr_defs(source, registry);
+            if let Some((id, _)) = binding {
+                registry.insert(*id);
+            }
+            if let Some(body) = body {
+                collect_block_defs(body, registry);
+            }
+        }
         HirExpressionKind::FirstMatch {
             source,
             coordinates,
@@ -1712,6 +1726,12 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 }
                 if let Some(identity) = identity {
                     collect_expr(identity, registry);
+                }
+            }
+            HirExpressionKind::Sort { source, body, .. } => {
+                collect_expr(source, registry);
+                if let Some(body) = body {
+                    collect_block(body, registry);
                 }
             }
             HirExpressionKind::FirstMatch { source, body, .. } => {
@@ -2696,6 +2716,21 @@ pub(crate) fn validate_referential_integrity(
                 }
                 if let Some(identity) = identity {
                     validate_expr(identity, checks)?;
+                }
+            }
+            HirExpressionKind::Sort {
+                source,
+                binding,
+                body,
+                ..
+            } => {
+                validate_expr(source, checks)?;
+                if let Some((id, name)) = binding {
+                    checks.check_def(*id)?;
+                    checks.check_symbol(*name)?;
+                }
+                if let Some(body) = body {
+                    validate_block(body, checks)?;
                 }
             }
             HirExpressionKind::FirstMatch {

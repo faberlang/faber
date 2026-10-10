@@ -158,6 +158,10 @@ numeratio = "गिनती"
 quilibet = "कोई"
 argmaxima = "argmax"
 argminima = "argmin"
+# Sort expression surface (`ordinata via Dir ex source`).
+ordinata = "क्रमबद्ध_करो"
+ascendens = "आरोही"
+descendens = "अवरोही"
 
 [types]
 ascii = "ascii"

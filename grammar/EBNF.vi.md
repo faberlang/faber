@@ -413,7 +413,7 @@ template_argument ::= 'rải'? IDENTIFIER ':' expression
 # [201] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'đúng' | 'sai' | 'không_gì' | '∞' | 'nan'
 # [202] primary
-primary ::= IDENTIFIER | literal | 'tôi' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | 'tôi' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
 # [203] ad_expr
 ad_expr ::= 'gọi' ASCII_STRING ad_opener?
 # [204] ad_opener
@@ -472,77 +472,83 @@ reducta_group ::= 'theo' expression
 reducta_body ::= ('hằng' | 'biến') IDENTIFIER block_stmt
 # [231] reducta_identity
 reducta_identity ::= 'hoặc_nếu_rỗng' expression
-# [232] filum_clause
+# [232] sort_expr
+sort_expr ::= 'sắp_xếp' 'thông_qua' sort_direction ('từ' | 'ra') expression sort_body?
+# [233] sort_direction
+sort_direction ::= 'tăng_dần' | 'giảm_dần'
+# [234] sort_body
+sort_body ::= ('hằng' | 'biến') IDENTIFIER block_stmt
+# [235] filum_clause
 filum_clause ::= 'sợi' IDENTIFIER
-# [233] capta_expr
+# [236] capta_expr
 capta_expr ::= 'bẫy' block_stmt
-# [234] object_pattern
+# [237] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [235] pattern_property
+# [238] pattern_property
 pattern_property ::= 'còn_lại'? IDENTIFIER ('như' IDENTIFIER)?
-# [236] array_pattern
+# [239] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [237] array_pattern_element
+# [240] array_pattern_element
 array_pattern_element ::= '_' | 'còn_lại'? IDENTIFIER
-# [238] nota_stmt
+# [241] nota_stmt
 nota_stmt ::= ('ghi_chú' | 'xem' | 'cảnh_báo' | 'viết') expression (',' expression)*
-# [239] entry_header
+# [242] entry_header
 entry_header ::= ('đối_số' IDENTIFIER)? ('thoát' expression)?
-# [240] incipit_stmt
+# [243] incipit_stmt
 incipit_stmt ::= 'bắt_đầu' entry_header block_stmt
-# [241] incipiet_stmt
+# [244] incipiet_stmt
 incipiet_stmt ::= 'bắt_đầu_bất_đồng_bộ' entry_header block_stmt
-# [242] probandum_decl
+# [245] probandum_decl
 probandum_decl ::= 'đối_tượng_kiểm_thử' STRING proba_modifier* '{' probandum_body '}'
-# [243] probandum_body
+# [246] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [244] proba_stmt
+# [247] proba_stmt
 proba_stmt ::= 'kiểm_thử' STRING proba_modifier* block_stmt
-# [245] proba_modifier
+# [248] proba_modifier
 proba_modifier ::= 'mong_đợi_thất_bại' | 'bỏ_qua' STRING | 'việc_cần_làm' STRING | 'chỉ' | 'nhãn' STRING | 'thời_gian' NATURAL | 'đo_lường' | 'lặp_lại' NATURAL | 'mong_manh' NATURAL | 'chỉ_trong' STRING
-# [246] praepara_block
+# [249] praepara_block
 praepara_block ::= ('chuẩn_bị' | 'sẽ_chuẩn_bị' | 'sau_chuẩn_bị' | 'sẽ_sau_chuẩn_bị') 'tất_cả'? block_stmt
-# [247] fac_stmt
+# [250] fac_stmt
 fac_stmt ::= 'làm' block_stmt cape_clause? ('trong_khi' expression)?
-# [248] IDENTIFIER
+# [251] IDENTIFIER
 IDENTIFIER ::=
-# [249] NUMBER
+# [252] NUMBER
 NUMBER ::=
-# [250] NATURAL
+# [253] NATURAL
 NATURAL ::=
-# [251] STRING
+# [254] STRING
 STRING ::=
-# [252] ASCII_STRING
+# [255] ASCII_STRING
 ASCII_STRING ::=
-# [253] BACKTICK_STRING
+# [256] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [254] OCTETI_STRING
+# [257] OCTETI_STRING
 OCTETI_STRING ::=
-# [255] NEWLINE
+# [258] NEWLINE
 NEWLINE ::=
-# [256] WIDTH_MARKER
+# [259] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [257] LISTA_WIDTH_SUGAR
+# [260] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [258] TENSOR_WIDTH_SUGAR
+# [261] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [259] SPARSA_WIDTH_SUGAR
+# [262] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [260] VECTOR_WIDTH_SUGAR
+# [263] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [261] MATRIX_WIDTH_SUGAR
+# [264] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [262] FRONTMATTER_DELIMITER
+# [265] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [263] TOML_LINES
+# [266] TOML_LINES
 TOML_LINES ::=
-# [264] ANNOTATION_NAME
+# [267] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [265] ANNOTATION_FIELD_NAME
+# [268] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [266] NON_NEWLINE_TOKEN
+# [269] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [267] NO_NEWLINE
+# [270] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -801,6 +807,9 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#rút_gọn-group` | live |
 | [`reducta_body`](#reducta-body) | `#rút_gọn-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#rút_gọn-identity` | live |
+| [`sort_expr`](#sort-expr) | `#sort-expr` | live |
+| [`sort_direction`](#sort-direction) | `#sort-direction` | live |
+| [`sort_body`](#sort-body) | `#sort-body` | live |
 | [`filum_clause`](#filum-clause) | `#sợi-clause` | live |
 | [`capta_expr`](#capta-expr) | `#bẫy-expr` | live |
 | [`object_pattern`](#object-pattern) | `#object-pattern` | live |
@@ -861,6 +870,7 @@ productions. It is not a second keyword authority.
 | Expression | `argmax` | argmax reduction operator (en `argmax`) |
 | Expression | `argmin` | argmin reduction operator (en `argmin`) |
 | Params | `đối_số` | CLI arguments modifier |
+| Expression | `tăng_dần` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `hoặc` | or |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `bắt` | local handler |
@@ -875,6 +885,7 @@ productions. It is not a second keyword authority.
 | Type | `sao_chép` | copy ownership |
 | Control | `canh_gác` | guard |
 | Type | `ra` | borrow / for-in keys |
+| Expression | `giảm_dần` | descending sort direction (en `desc`; contextual) |
 | Control | `phân_tích` | pattern match |
 | Declarations | `hợp_nhất` | tagged union |
 | Control | `trong_khi` | while / postfix until |
@@ -938,6 +949,7 @@ productions. It is not a second keyword authority.
 | Testing | `bỏ_qua` | skip |
 | Params | `tất_cả` | all reduction operator / glob |
 | Params | `lựa_chọn` | options modifier |
+| Expression | `sắp_xếp` | sort expression head (en `sort`; contextual) |
 | Declarations | `liệt_kê` | enum |
 | Type | `sở_hữu` | owned |
 | Iteration | `qua` | range step |
@@ -988,7 +1000,7 @@ productions. It is not a second keyword authority.
 | Async | `đợi_biến` | await-bind mutable |
 | Boolean | `hoặc_nếu_rỗng` | nullable default / explicit reduction identity |
 | Boolean | `đúng` | true |
-| Conversion | `thông_qua` | convert-hint clause or reduction operator clause (contextual) |
+| Conversion | `thông_qua` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
 | Diagnostics | `xem` | debug |
 | Declarations | `visibilitas` | visibility field |
 
@@ -2641,6 +2653,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 
 The old `tổng từ`, `lớn_nhất từ`, and `nhỏ_nhất từ` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `rút_gọn thông_qua tổng`, `rút_gọn thông_qua lớn_nhất`, or `rút_gọn thông_qua nhỏ_nhất`; the operator words remain ordinary identifiers outside the `thông_qua` clause.
 
+`sắp_xếp thông_qua <direction> (từ | ra) source [(hằng | biến) x { trả key }]` is the sort expression (en `sort thông_qua asc from xs`). `thông_qua` is mandatory and selects `tăng_dần` or `giảm_dần` (en `asc`, `desc`). `từ` (en `from`) orders a list, a set, or a map's values; `ra` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `sắp_xếp`, `tăng_dần`, and `giảm_dần` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
+
 `văn_bản_hóa` and `đọc`/`dòng` are builtin claims that resolve to a user binding
 when the surface spelling is bound in scope (parameter, local, function, or any
 in-scope definition); otherwise they are the builtin. The same binding-wins rule
@@ -2834,9 +2848,9 @@ surfaces are not Norma declarations.
 the owned predicate-tail introducer of the `khớp_đầu_tiên` first-match expression
 (see Special Expressions), not collection syntax.
 
-`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `ordinata(key)`
+`ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `sắp_xếp(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument
-forms `ordina()` / `ordinata()` sort by the element's natural order. Both are a
+forms `ordina()` / `sắp_xếp()` sort by the element's natural order. Both are a
 **stable** sort. The key selector's result must be a number or `textus`; other
 key types are rejected.
 

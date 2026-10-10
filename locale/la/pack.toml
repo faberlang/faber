@@ -164,6 +164,10 @@ numeratio = "numeratio"
 quilibet = "quilibet"
 argmaxima = "argmaxima"
 argminima = "argminima"
+# Sort expression surface (`ordinata via Dir ex source`).
+ordinata = "ordinata"
+ascendens = "ascendens"
+descendens = "descendens"
 
 [types]
 ascii = "ascii"

@@ -158,6 +158,10 @@ numeratio = "đếm"
 quilibet = "bất_kỳ"
 argmaxima = "argmax"
 argminima = "argmin"
+# Sort expression surface (`ordinata via Dir ex source`).
+ordinata = "sắp_xếp"
+ascendens = "tăng_dần"
+descendens = "giảm_dần"
 
 [types]
 ascii = "ascii"

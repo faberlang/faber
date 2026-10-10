@@ -158,6 +158,10 @@ numeratio = "นับ"
 quilibet = "ใดก็ได้"
 argmaxima = "ดัชนีค่าสูงสุด"
 argminima = "ดัชนีค่าต่ําสุด"
+# Sort expression surface (`ordinata via Dir ex source`).
+ordinata = "เรียง"
+ascendens = "น้อยไปมาก"
+descendens = "มากไปน้อย"
 
 [types]
 ascii = "ascii"

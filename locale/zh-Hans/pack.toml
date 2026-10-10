@@ -158,6 +158,10 @@ numeratio = "计数"
 quilibet = "任一"
 argmaxima = "最大值索引"
 argminima = "最小值索引"
+# Sort expression surface (`ordinata via Dir ex source`).
+ordinata = "排序"
+ascendens = "升序"
+descendens = "降序"
 
 [types]
 ascii = "窄字串"

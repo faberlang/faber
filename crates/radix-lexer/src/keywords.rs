@@ -198,6 +198,13 @@ pub enum KeywordOwner {
 
     /// Grouping word after the source and optional `apud` clause (`pro`).
     ReductionGroup,
+
+    /// Head of the `ordinata via Dir ex source …` sort expression
+    /// (`ordinata`, with `via` as the mandatory direction introducer).
+    SortHead,
+
+    /// Direction word after `ordinata via` (`ascendens` / `descendens`).
+    SortDirection,
 }
 
 /// Keyword grouping used by diagnostics, explain data, and registry consumers.
@@ -352,6 +359,8 @@ const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
 const REDUCTION_HEAD: &[KeywordOwner] = &[KeywordOwner::ReductionHead];
 const REDUCTION_OPERATOR: &[KeywordOwner] = &[KeywordOwner::ReductionOperator];
 const REDUCTION_GROUP: &[KeywordOwner] = &[KeywordOwner::ReductionGroup];
+const SORT_HEAD: &[KeywordOwner] = &[KeywordOwner::SortHead];
+const SORT_DIRECTION: &[KeywordOwner] = &[KeywordOwner::SortDirection];
 // WHY: `omnia` keeps its declaration-marker owner and `via` keeps its
 // convert-hint owner. Each also gains the reduction owner for its new slot.
 const DECLARATION_MARKER_OR_REDUCTION_OPERATOR: &[KeywordOwner] = &[
@@ -917,6 +926,28 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         text: "argminima",
         token_kind: None,
         scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
+        category: KeywordKind::Misc,
+    },
+    // === Keywords: Sort expression (`ordinata via Dir ex source`) ===
+    // `ordinata` heads the expression and `ascendens` / `descendens` name the
+    // direction after `via`. All three are tokenless: each lexes as an
+    // ordinary identifier and is claimed by Latin key only in its grammar slot.
+    KeywordSpec {
+        text: "ordinata",
+        token_kind: None,
+        scope: KeywordScope::Contextual(SORT_HEAD),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "ascendens",
+        token_kind: None,
+        scope: KeywordScope::Contextual(SORT_DIRECTION),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "descendens",
+        token_kind: None,
+        scope: KeywordScope::Contextual(SORT_DIRECTION),
         category: KeywordKind::Misc,
     },
     // === Keywords: First-match selection ===
@@ -1551,7 +1582,9 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::ConversionHint
         | KeywordOwner::ReductionHead
         | KeywordOwner::ReductionOperator
-        | KeywordOwner::ReductionGroup => false,
+        | KeywordOwner::ReductionGroup
+        | KeywordOwner::SortHead
+        | KeywordOwner::SortDirection => false,
     }
 }
 
