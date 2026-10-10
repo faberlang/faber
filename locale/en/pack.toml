@@ -1244,6 +1244,10 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 message = "variant name is ambiguous across in-scope unions"
 help = "qualify the variant with its union name (e.g. A.X)"
 
+[diagnostics.SEM001.issues.name_not_value]
+message = "name does not denote a value"
+help = "use a value, or call the name if it is a function"
+
 [diagnostics.SEM002]
 message = "undefined type"
 help = "declare the type or import it"
@@ -1307,6 +1311,10 @@ help = "declare the type or import it"
 [diagnostics.SEM002.issues.width_marker_params]
 message = "width marker cannot accept parameters"
 help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.qualified_type_middle_not_namespace]
+message = "qualified type path segment is not a namespace"
+help = "qualify through a module namespace"
 
 [diagnostics.SEM003]
 message = "undefined function"
@@ -1428,6 +1436,22 @@ help = "declare each commune field once in the union region"
 message = "variant redeclares a commune field"
 help = "omit the commune field from the variant payload"
 
+[diagnostics.SEM005.issues.companion_name_collision]
+message = "companion name collides with another definition"
+help = "rename the companion or the other definition"
+
+[diagnostics.SEM005.issues.selective_import_duplicate_alias]
+message = "selective import alias is already used"
+help = "use a distinct alias for each imported member"
+
+[diagnostics.SEM005.issues.conversio_registry_builtin_shadow]
+message = "conversion row shadows a built-in conversion"
+help = "remove the row or convert through a different pair"
+
+[diagnostics.SEM005.issues.conversio_registry_duplicate_pair]
+message = "conversion pair is registered more than once"
+help = "keep one conversion row per source and destination pair"
+
 [diagnostics.SEM006]
 message = "import not found"
 help = "check the import path"
@@ -1459,6 +1483,38 @@ help = "import `@ interna` names only from a file in the same package"
 [diagnostics.SEM006.issues.import_module_private]
 message = "`{name}` is module-private and cannot be imported"
 help = "mark the declaration `@ publica` to export it, or `@ interna` for same-package use"
+
+[diagnostics.SEM006.issues.import_absolute_path]
+message = "absolute import path"
+help = "use a relative or scheme-based import path"
+
+[diagnostics.SEM006.issues.import_bare_glyph]
+message = "bare glyph in import path"
+help = "name the module after the glyph"
+
+[diagnostics.SEM006.issues.import_multiple_holes]
+message = "import path has more than one hole"
+help = "use at most one hole in an import path"
+
+[diagnostics.SEM006.issues.import_parent_traversal]
+message = "import path traverses to a parent directory"
+help = "import from inside the package root"
+
+[diagnostics.SEM006.issues.import_positional_hole]
+message = "positional hole in import path"
+help = "name the hole in the import path"
+
+[diagnostics.SEM006.issues.import_unknown_scheme]
+message = "unknown import scheme"
+help = "use a supported import scheme"
+
+[diagnostics.SEM006.issues.import_unknown_template]
+message = "unknown import template"
+help = "use a declared import template"
+
+[diagnostics.SEM006.issues.selective_import_missing_member]
+message = "selective import names a member the module does not export"
+help = "import a member the module exports"
 
 [diagnostics.SEM007]
 message = "circular dependency"
@@ -2020,6 +2076,38 @@ help = "use an integer width for {saturatus}: i8, i16, i32, i64, u8, u16, u32, o
 [diagnostics.SEM008.issues.unsupported_trapping_word_width]
 message = "{exactus} width must be an integer width or d64"
 help = "use an integer width or d64 for {exactus}: i8, i16, i32, i64, u8, u16, u32, u64, or d64"
+
+[diagnostics.SEM008.issues.itera_binder_pattern_unsupported]
+message = "iteration binder pattern is not supported"
+help = "bind a plain name"
+
+[diagnostics.SEM008.issues.itera_filum_requires_single_source]
+message = "filum iteration requires a single source"
+help = "iterate one filum source"
+
+[diagnostics.SEM008.issues.itera_lockstep_binder_pattern_unsupported]
+message = "lockstep binder pattern is not supported"
+help = "bind plain names"
+
+[diagnostics.SEM008.issues.empty_intersection_type]
+message = "intersection type has no operands"
+help = "list at least one operand type"
+
+[diagnostics.SEM008.issues.intersection_primitive_operand]
+message = "intersection operand is a primitive type"
+help = "intersect only genus or interface types"
+
+[diagnostics.SEM008.issues.scalar_access_marker]
+message = "scalar type takes no access marker"
+help = "remove the access marker"
+
+[diagnostics.SEM008.issues.bounded_capacity_not_natural]
+message = "bounded capacity is not a natural number"
+help = "use a natural number or a size name"
+
+[diagnostics.SEM008.issues.qualified_type_middle_not_namespace]
+message = "qualified type path segment is not a namespace"
+help = "qualify through a module namespace"
 
 [diagnostics.SEM009]
 message = "CLI validation error"
@@ -3345,6 +3433,22 @@ help = "use an index from 0 up to one below the bound"
 message = "the left side of '⇇' must be tensor storage"
 help = "'⇇' copies into an existing tensor; a scalar, list, matrix, or vector is written with '←'"
 
+[diagnostics.SEM011.issues.failable_call_conversion_absent]
+message = "failable call has no conversion to the error type"
+help = "add a conversion from the failure type to the declared error type"
+
+[diagnostics.SEM011.issues.tensor_bracket_index_decimal_rejected]
+message = "decimal values are not valid tensor bracket indices"
+help = "index the tensor with an integer"
+
+[diagnostics.SEM011.issues.tensor_media_decimal_rejected]
+message = "decimal values are not valid tensor media operands"
+help = "use a non-decimal numeric type"
+
+[diagnostics.SEM011.issues.tensor_shape_hole_requires_shape_argument]
+message = "a shape hole requires a shape argument"
+help = "provide the shape in the constructor call"
+
 [diagnostics.SEM012]
 message = "not callable"
 help = "call a function or closure"
@@ -3765,6 +3869,50 @@ help = "use literal scalar leaves in the nested {lista}"
 message = "a conversion to {bivalens} cannot fail, so it takes no `⊥` default"
 help = "remove the recovery arm; use the truthiness result directly"
 
+[diagnostics.SEM016.issues.decimal_endianness_hint_rejected]
+message = "decimal conversion does not take an endianness hint"
+help = "remove the endianness hint"
+
+[diagnostics.SEM016.issues.decimal_radix_hint_rejected]
+message = "decimal conversion does not take a radix hint"
+help = "remove the radix hint"
+
+[diagnostics.SEM016.issues.lista_to_tensor_capacity_mismatch]
+message = "list length does not match the tensor capacity"
+help = "use a list whose length equals the tensor capacity"
+
+[diagnostics.SEM016.issues.octeti_to_vector_unspecified]
+message = "octeti to vector conversion needs an element type"
+help = "name the vector element type"
+
+[diagnostics.SEM016.issues.vector_to_octeti_unspecified]
+message = "vector to octeti conversion needs an element type"
+help = "name the vector element type"
+
+[diagnostics.SEM016.issues.register_bridge_element_unsupported]
+message = "register bridge element type is not supported"
+help = "use a supported register element type"
+
+[diagnostics.SEM016.issues.register_bridge_width_mismatch]
+message = "register bridge width does not match"
+help = "use matching register widths"
+
+[diagnostics.SEM016.issues.register_out_element_mismatch]
+message = "register output element type does not match"
+help = "use a matching output element type"
+
+[diagnostics.SEM016.issues.register_window_width_mismatch]
+message = "register window width does not match"
+help = "use matching window widths"
+
+[diagnostics.SEM016.issues.unsupported_conversio]
+message = "conversion is not supported"
+help = "use a supported conversion or add a conversion row"
+
+[diagnostics.SEM016.issues.valor_to_sized_numeric_unsupported]
+message = "valor extraction to a sized numeric type is not supported"
+help = "extract to an unsized numeric type and convert"
+
 [diagnostics.SEM017]
 message = "unavailable declaration"
 help = "use an available declaration or implement the marked surface"
@@ -3949,6 +4097,42 @@ help = "use a string, number, boolean, or `{nulla}` literal matching the field t
 message = "this annotation contract attaches only to `{expected}` declarations"
 help = "apply this contract only to {functio} declarations"
 
+[diagnostics.SEM018.issues.json_annotation_unsupported_site]
+message = "json annotation is not valid at this site"
+help = "move the annotation to a supported site"
+
+[diagnostics.SEM018.issues.json_field_annotation_option]
+message = "json field annotation option is not recognised"
+help = "use a supported json field option"
+
+[diagnostics.SEM018.issues.json_field_annotation_outside_json_genus]
+message = "json field annotation outside a json genus"
+help = "mark the enclosing genus as json"
+
+[diagnostics.SEM018.issues.json_field_nomen_empty]
+message = "json field name is empty"
+help = "give the json field a non-empty name"
+
+[diagnostics.SEM018.issues.json_genus_duplicate_field_name]
+message = "json genus has a duplicate field name"
+help = "give each json field a distinct name"
+
+[diagnostics.SEM018.issues.json_genus_field_type_unsupported]
+message = "json genus field type is not supported"
+help = "use a json-serialisable field type"
+
+[diagnostics.SEM018.issues.json_genus_map_key_not_textus]
+message = "json map key is not text"
+help = "use text as the map key type"
+
+[diagnostics.SEM018.issues.json_genus_nested_requires_json]
+message = "nested genus is not marked json"
+help = "mark the nested genus as json"
+
+[diagnostics.SEM018.issues.union_conversio_misplaced]
+message = "union conversion annotation is misplaced"
+help = "place the conversion annotation on a supported declaration"
+
 [diagnostics.SEM019]
 message = "conflicting visibility annotations"
 help = "use a single visibility tier per declaration"
@@ -4076,6 +4260,10 @@ help = "remove the duplicate pattern"
 [diagnostics.SEM042.issues.duplicate_literal]
 message = "duplicate case value{?value| |}"
 help = "remove the duplicate pattern"
+
+[diagnostics.SEM042.issues.duplicate_type_pattern]
+message = "duplicate type pattern"
+help = "remove the repeated type pattern"
 
 [diagnostics.SEM043]
 message = "omnia requires an enum scrutinee"
@@ -4465,6 +4653,10 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: `tacet` is outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
+[diagnostics.SEM059.issues.closure_capture]
+message = "closure capture is not allowed here"
+help = "pass the value as a parameter instead of capturing it"
+
 [diagnostics.SEM060]
 message = "invalid constant initializer"
 help = "move the computation into a function, or use a `{praefixum}` block"
@@ -4480,6 +4672,14 @@ help = "a `=` constant must fit its type whatever the overflow policy; use a wid
 [diagnostics.SEM060.issues.constant_division_by_zero]
 message = "the initializer of constant `{name}` divides by zero"
 help = "fix the divisor"
+
+[diagnostics.SEM060.issues.constant_deferred]
+message = "constant initializer is deferred"
+help = "use a compile-time computable initializer"
+
+[diagnostics.SEM060.issues.constant_dependency]
+message = "constant initializer depends on a non-constant"
+help = "depend only on other constants"
 
 [diagnostics.SEM061]
 message = "invalid build-time embed"
@@ -4661,6 +4861,10 @@ help = "change '{in}' to '{de}' if mutation is unnecessary"
 message = "`in` parameter is never mutated; consider `de`"
 help = "change '{in}' to '{de}' if mutation is unnecessary"
 
+[diagnostics.WARN008.issues.unused_mut_parameter]
+message = "mutable parameter is never mutated"
+help = "drop the mut marker or mutate the parameter"
+
 [diagnostics.WARN009]
 message = "unused move parameter"
 help = "change '{ex}' to '{de}' if ownership transfer is unnecessary"
@@ -4668,6 +4872,10 @@ help = "change '{ex}' to '{de}' if ownership transfer is unnecessary"
 [diagnostics.WARN009.issues.unused_ex_parameter]
 message = "`ex` parameter is never consumed; consider `de`"
 help = "change '{ex}' to '{de}' if ownership transfer is unnecessary"
+
+[diagnostics.WARN009.issues.unused_own_parameter]
+message = "owned parameter is never consumed"
+help = "drop the own marker or consume the parameter"
 
 [diagnostics.WARN010]
 message = "explicit ignotum annotation"
@@ -4777,6 +4985,14 @@ help = "align the constituent signatures or rename one method to keep it common"
 message = "method `{method}` is not common in `{union}`: constituent signatures disagree"
 help = "align the constituent signatures or rename one method to keep it common"
 
+[diagnostics.WARN027]
+message = "function exceeds the complexity budget"
+help = "split the function or raise the complexity budget for this check"
+
+[diagnostics.WARN027.issues.complexity_budget_exceeded]
+message = "function exceeds the complexity budget"
+help = "split the function or raise the budget"
+
 [diagnostics.WARN028]
 message = "member visibility annotation is redundant"
 help = "remove the annotation; members are public by default"
@@ -4841,6 +5057,114 @@ help = "move the call out of the reduction, or call a private kernel helper"
 [diagnostics.SEM010.issues.reducta_body_effect]
 message = "a reduction body must not write or call effects outside its own values: {reason}"
 help = "keep the term pure: write only locals the body declares, and call only helpers that write nothing"
+
+[diagnostics.SEM010.issues.await_bind_requires_async_context]
+message = "await binding outside an async context"
+help = "use the await binding only inside an async function"
+
+[diagnostics.SEM010.issues.await_bind_requires_promissum]
+message = "await binding source is not a promise"
+help = "bind an awaitable promise value"
+
+[diagnostics.SEM010.issues.await_failable_alternate_type_mismatch]
+message = "failable await alternate has the wrong type"
+help = "make the alternate value match the awaited success type"
+
+[diagnostics.SEM010.issues.await_failable_requires_alternate_exit]
+message = "failable await needs an alternate exit"
+help = "provide an alternate value or exit for the failure case"
+
+[diagnostics.SEM010.issues.cede_requires_generator]
+message = "cede is only valid in a generator"
+help = "use cede inside a generator function"
+
+[diagnostics.SEM010.issues.cede_requires_promissum]
+message = "cede operand is not a promise"
+help = "cede an awaitable promise value"
+
+[diagnostics.SEM010.issues.reddet_requires_async_function]
+message = "reddet requires an async function"
+help = "use reddet only inside an async function"
+
+[diagnostics.SEM010.issues.tacebit_requires_async_context]
+message = "tacebit requires an async context"
+help = "use tacebit only inside an async function"
+
+[diagnostics.SEM010.issues.first_match_requires_shaped_iterable]
+message = "first-match source is not a shaped iterable"
+help = "iterate a shaped iterable such as a list or tensor"
+
+[diagnostics.SEM010.issues.first_match_predicate_type]
+message = "first-match predicate is not a boolean"
+help = "make the predicate body evaluate to a boolean"
+
+[diagnostics.SEM010.issues.intervallum_value_step_unsupported]
+message = "value step is not supported for this range"
+help = "use a supported range step form"
+
+[diagnostics.SEM010.issues.itera_lockstep_at_coordinate_cardinality]
+message = "lockstep coordinate binder count does not match the sources"
+help = "bind one coordinate per lockstep source"
+
+[diagnostics.SEM010.issues.itera_lockstep_length_mismatch]
+message = "lockstep sources have different lengths"
+help = "use sources of equal length"
+
+[diagnostics.SEM010.issues.itera_lockstep_source_binder_arity_mismatch]
+message = "lockstep binder count does not match the source count"
+help = "bind one name per lockstep source"
+
+[diagnostics.SEM010.issues.itera_lockstep_source_requires_lista]
+message = "lockstep source is not a list"
+help = "use list sources in a lockstep iteration"
+
+[diagnostics.SEM010.issues.itera_range_extent_binder_shadowing]
+message = "range extent binder shadows another binding"
+help = "rename the extent binder"
+
+[diagnostics.SEM010.issues.itera_range_mixed_source]
+message = "range iteration mixes range and non-range sources"
+help = "use only range sources or only iterable sources"
+
+[diagnostics.SEM010.issues.itera_range_source_binder_arity_mismatch]
+message = "range binder count does not match the source count"
+help = "bind one name per range source"
+
+[diagnostics.SEM010.issues.reducta_body_forbids_cape]
+message = "reduction body may not contain cape"
+help = "remove the cape from the reduction body"
+
+[diagnostics.SEM010.issues.reducta_body_forbids_cede]
+message = "reduction body may not contain cede"
+help = "remove the cede from the reduction body"
+
+[diagnostics.SEM010.issues.reducta_body_forbids_iace]
+message = "reduction body may not contain iace"
+help = "remove the iace from the reduction body"
+
+[diagnostics.SEM010.issues.reducta_body_forbids_rumpe]
+message = "reduction body may not contain rumpe"
+help = "remove the rumpe from the reduction body"
+
+[diagnostics.SEM010.issues.reducta_body_requires_single_redde]
+message = "reduction body must be a single redde"
+help = "write the reduction body as one redde expression"
+
+[diagnostics.SEM010.issues.reducta_filum_requires_nucleum_kernel]
+message = "filum reduction requires a nucleum kernel"
+help = "use the filum reduction only inside a nucleum kernel"
+
+[diagnostics.SEM010.issues.reducta_requires_shaped_iterable]
+message = "reduction source is not a shaped iterable"
+help = "reduce a shaped iterable such as a list or tensor"
+
+[diagnostics.SEM010.issues.reducta_tail_not_aligned]
+message = "reduction tail is not aligned"
+help = "use an extent aligned to the reduction width"
+
+[diagnostics.SEM010.issues.reducta_term_type_non_scalar]
+message = "reduction term type is not scalar"
+help = "use a scalar term type for the reduction"
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "expected '>' after type arguments"
