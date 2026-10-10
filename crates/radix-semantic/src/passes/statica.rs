@@ -116,12 +116,44 @@ pub fn export_value(
         .and_then(|folded| evaluator.fit_slot(folded, declared, value.span))
         .ok()?;
     match folded {
+        Value::Opaque => export_list(&mut evaluator, value, interner),
+        scalar => scalar_value(scalar),
+    }
+}
+
+fn scalar_value(value: Value) -> Option<InterfaceConstValue> {
+    match value {
         Value::Int(v) => Some(InterfaceConstValue::Int(v)),
         Value::Float(v) => Some(InterfaceConstValue::Float(v)),
         Value::Bool(b) => Some(InterfaceConstValue::Bool(b)),
         Value::Text(text) => Some(InterfaceConstValue::Text(text)),
         Value::Opaque => None,
     }
+}
+
+/// A list literal whose every element folds to a scalar or text, as the
+/// interface value of a list constant. Spreads, holes and non-scalar elements
+/// leave the constant value-less.
+fn export_list(
+    evaluator: &mut Evaluator<'_>,
+    value: &HirExpression,
+    interner: &Interner,
+) -> Option<InterfaceConstValue> {
+    let HirExpressionKind::Array(elements) = &value.kind else {
+        return None;
+    };
+    let mut items = Vec::with_capacity(elements.len());
+    for element in elements {
+        let HirArrayElement::Expr(inner) = element else {
+            return None;
+        };
+        let folded = evaluator
+            .eval(inner, interner)
+            .and_then(|folded| evaluator.fit_slot(folded, inner.ty, inner.span))
+            .ok()?;
+        items.push(scalar_value(folded)?);
+    }
+    Some(InterfaceConstValue::List(items))
 }
 
 fn fold_inner(
@@ -406,6 +438,7 @@ impl Evaluator<'_> {
                 InterfaceConstValue::Float(v) => Value::Float(*v),
                 InterfaceConstValue::Bool(b) => Value::Bool(*b),
                 InterfaceConstValue::Text(text) => Value::Text(text.clone()),
+                InterfaceConstValue::List(_) => Value::Opaque,
             },
         )
     }

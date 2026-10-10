@@ -152,6 +152,29 @@ impl FunctionBuilder<'_> {
         kind: MirAggregateKind,
     ) -> Option<MirOperand> {
         let fields = self.lower_array_items(elements)?;
+        self.construct_ordered(kind, fields, expr)
+    }
+
+    /// Build the list a folded imported list constant stands for, from its
+    /// already lowered element operands.
+    pub(super) fn construct_array_from_operands(
+        &mut self,
+        operands: Vec<MirOperand>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let fields = operands
+            .into_iter()
+            .map(MirAggregateItem::Operand)
+            .collect();
+        self.construct_ordered(MirAggregateKind::Array, fields, expr)
+    }
+
+    fn construct_ordered(
+        &mut self,
+        kind: MirAggregateKind,
+        fields: Vec<MirAggregateItem>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
         let ty = self.expr_ty(expr)?;
         let ty = MirType::semantic(self.ordered_literal_carrier(ty.semantic_id()));
         Some(self.construct_temp(kind, MirAggregateFields::Ordered(fields), ty, expr.span))

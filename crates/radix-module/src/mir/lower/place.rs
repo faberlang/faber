@@ -296,6 +296,18 @@ impl FunctionBuilder<'_> {
                 self.adapt_narrowed_place(MirPlace::local(binding.local), Some(binding.ty), expr)
             }
             HirExpressionKind::Field(object, name) => {
+                // A folded imported module constant (`module.NAME`) has no
+                // local base to project from: materialize its value first.
+                if let HirExpressionKind::Path(module) = &object.kind
+                    && self
+                        .context
+                        .imported_constants
+                        .contains_key(&(*module, *name))
+                {
+                    let ty = self.expr_ty(expr)?;
+                    let operand = self.lower_expr_value(expr)?;
+                    return Some(self.materialize_operand_place(operand, ty, expr.span));
+                }
                 if let Some(result) = self.lower_union_field_read(object, *name, expr) {
                     let ty = self.expr_ty(expr)?;
                     let operand = result?;

@@ -3343,19 +3343,41 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Lower a folded imported module constant to the constant its interface
     /// carries. Text values stay unlowered (the borrowed interner cannot mint
-    /// the symbol), so they keep the original unresolved-path diagnostic.
+    /// the symbol), so they keep the original unresolved-path diagnostic. A
+    /// list constant is rebuilt in the importing function from its element
+    /// values, the way a same-module list literal lowers.
     fn lower_imported_constant(&mut self, value: &InterfaceConstValue, expr: &HirExpression) -> Option<MirOperand> {
+        if let InterfaceConstValue::List(items) = value {
+            let element_ty = match self.normalized_type(expr.ty?) {
+                Type::Array(element) => Some(*element),
+                _ => None,
+            };
+            let mut operands = Vec::with_capacity(items.len());
+            for item in items {
+                operands.push(self.lower_imported_scalar(item, element_ty, expr.span)?);
+            }
+            return self.construct_array_from_operands(operands, expr);
+        }
+        self.lower_imported_scalar(value, expr.ty, expr.span)
+    }
+
+    fn lower_imported_scalar(
+        &mut self,
+        value: &InterfaceConstValue,
+        ty: Option<TypeId>,
+        span: Span,
+    ) -> Option<MirOperand> {
         match value {
             InterfaceConstValue::Int(value) => {
                 if let Ok(unsigned) = u64::try_from(*value) {
-                    return self.lower_literal(&HirLiteral::Int(unsigned), expr.ty, expr.span);
+                    return self.lower_literal(&HirLiteral::Int(unsigned), ty, span);
                 }
                 let signed = i64::try_from(*value).ok()?;
                 Some(MirOperand::Constant(MirConstant::Int(signed)))
             }
-            InterfaceConstValue::Float(value) => self.lower_literal(&HirLiteral::Float(*value), expr.ty, expr.span),
+            InterfaceConstValue::Float(value) => self.lower_literal(&HirLiteral::Float(*value), ty, span),
             InterfaceConstValue::Bool(value) => Some(MirOperand::Constant(MirConstant::Bool(*value))),
-            InterfaceConstValue::Text(_) => None,
+            InterfaceConstValue::Text(_) | InterfaceConstValue::List(_) => None,
         }
     }
 

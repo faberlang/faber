@@ -185,13 +185,17 @@ pub enum FileExportKind {
 }
 
 /// Folded compile-time value of an exported constant: the scalar or text the
-/// exporter's initializer evaluates to (the `statica` fold domain).
+/// exporter's initializer evaluates to (the `statica` fold domain), or an
+/// ordered list literal whose elements all fold to scalars or text.
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterfaceConstValue {
     Int(i128),
     Float(f64),
     Bool(bool),
     Text(String),
+    /// A list constant's elements, in order. Elements are scalar values
+    /// (never nested lists); a list that holds anything else carries no value.
+    List(Vec<InterfaceConstValue>),
 }
 
 /// Type-alias export: ordered declaration parameters plus the resolved body.

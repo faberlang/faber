@@ -659,6 +659,9 @@ fn go_imported_constants(
                     InterfaceConstValue::Float(v) => go::ImportedConst::Float(*v),
                     InterfaceConstValue::Bool(v) => go::ImportedConst::Bool(*v),
                     InterfaceConstValue::Text(v) => go::ImportedConst::Text(v.clone()),
+                    // The Go emitter inlines scalars only; a list keeps the
+                    // package-linked read.
+                    InterfaceConstValue::List(_) => return crate::hir::visit::walk_expr(self, expr),
                 };
                 self.found.insert((*module, *member), value);
             }
