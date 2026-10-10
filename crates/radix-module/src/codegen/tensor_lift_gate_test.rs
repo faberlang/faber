@@ -121,8 +121,9 @@ fn typescript_still_rejects_coalesce_over_a_shifted_view() {
     assert_rejected(Target::HirTypeScript, "fixum tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
 }
 
-/// `≡ ≠` between two tensors compare whole values; the runner is their only
-/// executor, so every HIR-backed target names `tensor_equality_unsupported_on_target`.
+/// `≡ ≠` between two tensors compare whole values; the runner and the
+/// TypeScript emitter are their only executors, so every other HIR-backed
+/// target names `tensor_equality_unsupported_on_target`.
 const WHOLE_EQUALITY: &[&str] = &[
     "fixum bivalens r ← a ≡ b",
     "fixum bivalens r ← a ≠ b",
@@ -147,9 +148,15 @@ fn assert_equality_rejected(target: Target, body: &str) {
 
 #[cfg(feature = "hir-ts")]
 #[test]
-fn typescript_rejects_whole_tensor_equality_by_name() {
+fn typescript_emits_whole_tensor_equality() {
     for body in WHOLE_EQUALITY {
-        assert_equality_rejected(Target::HirTypeScript, body);
+        let found = issues(Target::HirTypeScript, body);
+        assert!(
+            !found
+                .iter()
+                .any(|issue| issue == "tensor_equality_unsupported_on_target"),
+            "TypeScript `{body}` is gated: {found:?}"
+        );
     }
 }
 
