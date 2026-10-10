@@ -57,7 +57,7 @@ fn partem_reads_the_requested_range() {
         &program(&format!(
             "    fixum lista<valor> args ← [\"{path}\", 2, 3]\n    \
              fixum octeti bytes ← ad 'solum:partem' (args) ↦ octeti\n    \
-             nota bytes[0]\n    nota bytes[2]"
+             nota bytes[0] ↦ u8\n    nota bytes[2] ↦ u8"
         )),
     );
     assert_eq!(host.stdout_lines, [b'c'.to_string(), b'e'.to_string()]);
@@ -88,10 +88,10 @@ fn hauri_returns_the_bytes_and_honours_the_ceiling() {
         "route-hauri.fab",
         &program(&format!(
             "    fixum octeti all ← ad 'solum:hauri' (\"{path}\") ↦ octeti\n    \
-             nota all[0]\n    nota all[2]\n    \
+             nota all[0] ↦ u8\n    nota all[2] ↦ u8\n    \
              fixum lista<valor> args ← [\"{path}\", 3]\n    \
              fixum octeti capped ← ad 'solum:hauri' (args) ↦ octeti\n    \
-             nota capped[1]"
+             nota capped[1] ↦ u8"
         )),
     );
     assert_eq!(host.stdout_lines, [b'x'.to_string(), b'z'.to_string(), b'y'.to_string()]);

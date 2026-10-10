@@ -1,4 +1,5 @@
-//! Byte-value iteration preserves the opaque octeti carrier and its u8 index row.
+//! Byte-value iteration over `octeti` (`lista<b8>`): the binding is a `b8`, the
+//! number comes from an explicit `↦ u8`.
 
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, Session};
@@ -13,7 +14,7 @@ fn octeti_itera_ex_validates_byte_binding_and_runtime_bound() {
     let source = r"functio byte_list(octeti input) → lista<u8> {
     varia lista<u8> out ← vacua
     itera ex input fixum byte {
-        out.appende(byte)
+        out.appende(byte ↦ u8)
     }
     redde out
 }";
@@ -42,7 +43,7 @@ incipit {
     itera ex copied fixum byte {
         nota byte
     }
-    nota input[3]
+    nota input[3] ↦ u8
     nota byte_list(||).longitudo()
 }";
     let mut host = BufferHost::default();
@@ -62,7 +63,7 @@ fn octeti_itera_ex_preserves_continue_and_break() {
         si byte ≡ 255 {
             rumpe
         }
-        nota byte
+        nota byte ↦ u8
     }
 }";
     let mut host = BufferHost::default();
@@ -79,12 +80,12 @@ fn octeti_itera_de_keeps_existing_fail_closed_admission() {
     }
 }";
     let unit = crate::driver::analyze_source(&session(), "byte-indices.fab", source, AnalyzeRequest::default())
-        .expect("the checker admits the index surface while MIR owns its decline");
-    let errors = lower_analyzed_unit(&unit, MirLoweringOptions::default())
-        .expect_err("this repair only implements byte value iteration");
-    assert!(
-        errors
-            .iter()
-            .any(|error| error.issue == "unsupported_mir_lowering_itera_collection_before_iterator_mir_lowering")
-    );
+        .expect("the checker admits index iteration over a list of bytes");
+    // Need: `octeti` is `lista<b8>`, an ordinary list, so `itera de`
+    // is the ordinary list index iteration. MIR no longer declines it (the
+    // retired opaque carrier only offered value iteration).
+    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+        .expect("index iteration over lista<b8> lowers like every list");
+    crate::mir::validate_program(lowered.validated.program(), lowered.validated.validation())
+        .expect("the index iteration of a byte list must pass MIR validation");
 }

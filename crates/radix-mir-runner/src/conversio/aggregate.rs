@@ -670,6 +670,16 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 })
             }
             Type::Array(element) => {
+                // A host byte value extracts as the `lista<b8>` it stands
+                // for.
+                if matches!(value, Value::Octeti(_))
+                    && matches!(
+                        self.types.get(*element),
+                        Type::Bits(radix_types::BitsWidth::B8)
+                    )
+                {
+                    return Ok(super::octeti_into_bits_list(value));
+                }
                 let Value::Array(items) = value else {
                     return Err(RunnerError::conversion(
                         span,

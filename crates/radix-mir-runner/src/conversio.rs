@@ -132,6 +132,39 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         {
             return Ok(Self::convert_textus_to_bits_list(text, width));
         }
+        // A `lista<b8>` value read as a number or as ascii (`bytes ↦ u16 via
+        // Le`, `bytes ↦ inf via Be`) takes the byte rows: gather the patterns
+        // into the byte carrier those rows decode.
+        let value = match &value {
+            Value::Array(cell)
+                if matches!(
+                    target,
+                    Type::Primitive(Primitive::Numerus | Primitive::Fractus | Primitive::Ascii)
+                        | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+                ) && self.is_bytes_list_type(source_ty) =>
+            {
+                cell.borrow()
+                    .iter()
+                    .map(|item| bits_pattern(item).and_then(|p| u8::try_from(p).ok()))
+                    .collect::<Option<Vec<u8>>>()
+                    .map_or_else(|| value.clone(), Value::Octeti)
+            }
+            _ => value,
+        };
+        // Need: `octeti` is `lista<b8>`. A byte source that is not
+        // already a list (a conversation reply, an `inf` via `Le|Be`, a
+        // tensor, a text) takes the byte conversion and lands as a list of
+        // byte patterns.
+        if let Type::Array(elem) = &target
+            && !matches!(value, Value::Array(_))
+            && matches!(
+                self.types.get(self.resolve_conversion_target(*elem)),
+                Type::Bits(BitsWidth::B8)
+            )
+        {
+            let bytes = self.convert_to_octeti_from(value, source_ty, params, span)?;
+            return Ok(octeti_into_bits_list(bytes));
+        }
         match &target {
             Type::Primitive(Primitive::Textus) => {
                 self.convert_to_textus(value, source_ty, recovery, span)
@@ -328,6 +361,20 @@ fn is_signed_width(width: NumericWidth) -> bool {
         width,
         NumericWidth::I8 | NumericWidth::I16 | NumericWidth::I32 | NumericWidth::I64
     )
+}
+
+/// A byte value as the `lista<b8>` the language sees: one unsigned pattern
+/// per byte. Any other value passes through unchanged.
+pub(crate) fn octeti_into_bits_list(value: Value) -> Value {
+    match value {
+        Value::Octeti(bytes) => Value::Array(Rc::new(RefCell::new(
+            bytes
+                .into_iter()
+                .map(|byte| Value::UInt(u64::from(byte)))
+                .collect(),
+        ))),
+        other => other,
+    }
 }
 
 /// The unsigned pattern a `bN` cell holds.

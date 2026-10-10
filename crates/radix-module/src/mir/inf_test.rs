@@ -341,13 +341,13 @@ fn octeti_via_endian_is_minimal_two_complement() {
     // ruling 40: Java `toByteArray` semantics, and the exact inverse on decode.
     assert_eq!(
         ok(
-            "fixum inf z ← 0\nfixum inf p ← 128\nfixum inf n ← -129\nfixum octeti a ← z ↦ octeti via Be\nfixum octeti b ← p ↦ octeti via Be\nfixum octeti c ← n ↦ octeti via Be\nnota a.longitudo()\nnota b.longitudo()\nnota c.longitudo()\nnota a[0]\nnota b[0]\nnota b[1]\nnota c[0]\nnota c[1]"
+            "fixum inf z ← 0\nfixum inf p ← 128\nfixum inf n ← -129\nfixum octeti a ← z ↦ octeti via Be\nfixum octeti b ← p ↦ octeti via Be\nfixum octeti c ← n ↦ octeti via Be\nnota a.longitudo()\nnota b.longitudo()\nnota c.longitudo()\nnota a[0] ↦ u8\nnota b[0] ↦ u8\nnota b[1] ↦ u8\nnota c[0] ↦ u8\nnota c[1] ↦ u8"
         ),
         ["1", "2", "2", "0", "0", "128", "255", "127"]
     );
     assert_eq!(
         ok(&format!(
-            "fixum inf big ← {TWO_64}\nfixum octeti le ← big ↦ octeti via Le\nnota le.longitudo()\nnota le[8]\nfixum inf back ← le ↦ inf via Le ⊥ 0\nnota back\nfixum octeti be ← big ↦ octeti via Be\nfixum inf back2 ← be ↦ inf via Be ⊥ 0\nnota back2"
+            "fixum inf big ← {TWO_64}\nfixum octeti le ← big ↦ octeti via Le\nnota le.longitudo()\nnota le[8] ↦ u8\nfixum inf back ← le ↦ inf via Le ⊥ 0\nnota back\nfixum octeti be ← big ↦ octeti via Be\nfixum inf back2 ← be ↦ inf via Be ⊥ 0\nnota back2"
         )),
         ["9", "1", "18446744073709551616", "18446744073709551616"]
     );

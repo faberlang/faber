@@ -1035,7 +1035,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         Value::Ascii(_),
                         Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. }
                     )
-                    | (Value::Octeti(_), Type::Primitive(Primitive::Octeti))
+                    | (
+                        Value::Octeti(_),
+                        Type::Primitive(Primitive::Octeti) | Type::Array(_)
+                    )
                     | (Value::Array(_), Type::Array(_))
                     | (Value::Map(_), Type::Map(_, _))
                     | (Value::Set(_), Type::Set(_))
@@ -5499,6 +5502,9 @@ pub(crate) fn integer_tag_matches(value: &Value, target: &Type) -> bool {
 fn byte_from_value(value: &Value, span: Span) -> Result<u8, RunnerError> {
     match value {
         Value::Int(value) => u8::try_from(*value)
+            .map_err(|_| RunnerError::internal(span, "octeti append byte out of range")),
+        // A `b8` cell holds its unsigned pattern.
+        Value::UInt(value) => u8::try_from(*value)
             .map_err(|_| RunnerError::internal(span, "octeti append byte out of range")),
         _ => Err(RunnerError::internal(
             span,

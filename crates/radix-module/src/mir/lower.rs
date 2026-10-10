@@ -3535,7 +3535,36 @@ impl<'a> FunctionBuilder<'a> {
                 .push(MirError::unsupported(span, "octeti literal failed decode before MIR lowering"));
             return None;
         };
+        // Need: a byte literal is a `lista<b8>`, so it lowers to a
+        // list of byte patterns typed by the cell; the opaque `Octeti`
+        // constant remains only for a legacy primitive-typed slot.
+        if let Some(list_ty) = ty.filter(|ty| self.is_bits_byte_list(*ty)) {
+            let items = bytes
+                .into_iter()
+                .map(|byte| MirAggregateItem::Operand(MirOperand::Constant(MirConstant::UInt(u64::from(byte)))))
+                .collect();
+            return Some(self.construct_temp(
+                MirAggregateKind::Array,
+                MirAggregateFields::Ordered(items),
+                MirType::semantic(list_ty),
+                span,
+            ));
+        }
         Some(MirOperand::Constant(MirConstant::Octeti(bytes)))
+    }
+
+    /// Whether `ty` is `lista<b8>` (aliases looked through).
+    fn is_bits_byte_list(&self, mut ty: TypeId) -> bool {
+        while let Type::Alias(_, inner) = self.types.get(ty) {
+            ty = *inner;
+        }
+        let Type::Array(mut element) = *self.types.get(ty) else {
+            return false;
+        };
+        while let Type::Alias(_, inner) = self.types.get(element) {
+            element = *inner;
+        }
+        matches!(self.types.get(element), Type::Bits(radix_types::BitsWidth::B8))
     }
 
     fn lower_unary(&mut self, op: HirUnOp, operand: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
