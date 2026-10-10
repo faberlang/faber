@@ -285,11 +285,11 @@ mod abi_tests;
 #[path = "ai_workbench_stage5_test.rs"]
 mod ai_workbench_stage5_tests;
 #[cfg(test)]
-#[path = "bits_ops_test.rs"]
-mod bits_ops_tests;
-#[cfg(test)]
 #[path = "bits_conversio_run_test.rs"]
 mod bits_conversio_run_tests;
+#[cfg(test)]
+#[path = "bits_ops_test.rs"]
+mod bits_ops_tests;
 #[cfg(test)]
 #[path = "capability_test.rs"]
 mod capability_tests;
@@ -351,6 +351,9 @@ mod infinity_literal_tests;
 #[path = "layout_test.rs"]
 mod layout_tests;
 #[cfg(test)]
+#[path = "list_window_test.rs"]
+mod list_window_tests;
+#[cfg(test)]
 #[path = "membership_test.rs"]
 mod membership_tests;
 #[cfg(test)]
@@ -386,9 +389,6 @@ mod saturating_word_tests;
 #[cfg(test)]
 #[path = "sort_expr_test.rs"]
 mod sort_expr_tests;
-#[cfg(test)]
-#[path = "list_window_test.rs"]
-mod list_window_tests;
 
 #[cfg(test)]
 #[path = "tensor_lift_test.rs"]
