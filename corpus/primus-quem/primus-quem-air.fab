@@ -8,6 +8,8 @@ summary = "AIR-lane admission rows for primus_quem: Route T literal array, Route
 syntax = "@ radix lane \"air\"; primus_quem(<bounded source>, ubi <binder> { <predicate> })"
 related = ["primus_quem", "ubi", "tensor"]
 locale = "la"
+no_expected = "awaiting-ruling"
+ruling = "0b17133a"
 +++
 
 # =============================================================================

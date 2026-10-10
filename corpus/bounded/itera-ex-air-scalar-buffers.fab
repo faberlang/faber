@@ -8,6 +8,8 @@ summary = "AIR-lane itera ex over full-literal bytes<N> / ascii<N> / string<N> u
 syntax = "@ radix lane \"air\"; itera ex bytes<N> | ascii<N> | string<N>"
 related = ["bytes", "ascii", "string", "ex", "itera", "radix"]
 locale = "en"
+no_expected = "awaiting-ruling"
+ruling = "0b17133a"
 +++
 
 # =============================================================================

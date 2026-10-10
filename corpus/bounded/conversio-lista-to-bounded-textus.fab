@@ -7,6 +7,8 @@ summary = "Compile-admitted bounded lista<T,N> to bounded textus<M> conversion r
 syntax = "lista<T, N> ↦ textus<M>"
 related = ["↦", "lista", "textus"]
 locale = "en"
+no_expected = "awaiting-ruling"
+ruling = "bb14ae2d"
 +++
 # =============================================================================
 # bounded lista to bounded textus — compile-admitted route

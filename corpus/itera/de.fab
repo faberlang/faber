@@ -8,6 +8,7 @@ summary = "Introduces borrowed iteration or borrowed parameters."
 syntax = "de <expression>"
 related = ["ex", "in"]
 locale = "en"
+no_expected = "nondeterministic-by-design"
 +++
 # =============================================================================
 # de — Introduces borrowed iteration or borrowed parameters.

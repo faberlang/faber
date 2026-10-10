@@ -8,6 +8,7 @@ summary = "AIR Tier 0.5 admission rows for locally-resolved handlers: per-arm si
 syntax = "@ radix lane \"air\"; si <cond> { iace } cape <err> { redde <outer value> } secus { … }"
 related = ["cape", "si", "secus", "sin", "fac", "elige", "iace", "conversio", "receptio-decline"]
 locale = "la"
+no_expected = "declaration-only"
 +++
 
 # =============================================================================

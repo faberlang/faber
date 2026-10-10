@@ -8,6 +8,7 @@ summary = "AIR-lane itera ex over a rank-1 tensor unrolls into guard-free elemen
 syntax = "@ radix lane \"air\"; itera ex tensor<T, [N]>"
 related = ["tensor", "ex", "itera", "radix"]
 locale = "en"
+no_expected = "declaration-only"
 +++
 
 # =============================================================================

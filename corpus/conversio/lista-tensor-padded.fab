@@ -8,6 +8,8 @@ summary = "Route C: numeric list<T, N> ↦ tensor<T, [N]> pads spare slots with 
 syntax = "xs ↦ tensor<T, [N]> [⊥ fill]"
 related = ["lista", "tensor", "itera", "ex"]
 locale = "en"
+no_expected = "awaiting-ruling"
+ruling = "0b17133a"
 +++
 
 # =============================================================================

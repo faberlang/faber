@@ -7,6 +7,8 @@ summary = "Compile-admitted bounded lista<u8,N> to bounded octeti<M> route."
 syntax = "lista<u8, N> ↦ octeti<M>"
 related = ["↦", "lista", "octeti", "u8"]
 locale = "en"
+no_expected = "awaiting-ruling"
+ruling = "6a13d711"
 +++
 # =============================================================================
 # bounded lista to octeti — compile-admitted byte carrier route

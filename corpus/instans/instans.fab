@@ -9,6 +9,7 @@ summary = "Absolute point-in-time primitive with precision contract."
 syntax = "instans | instans<ms> | instans<us> | instans<ns>"
 related = ["↦", "⊥", "textus"]
 locale = "en"
+no_expected = "nondeterministic-by-design"
 +++
 # =============================================================================
 # instans — Absolute point-in-time primitive with precision contract

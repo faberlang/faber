@@ -5,6 +5,8 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "type"
 canonical = true
 locale = "en"
+no_expected = "awaiting-ruling"
+ruling = "F-65"
 +++
 # =============================================================================
 # json — JSON serialization and deserialization

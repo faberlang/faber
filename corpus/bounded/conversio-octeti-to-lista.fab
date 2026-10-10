@@ -7,6 +7,8 @@ summary = "Bounded octeti<N> converts to an unbounded list<u8> prefix."
 syntax = "octeti<N> ↦ list<u8>"
 related = ["↦", "octeti", "lista", "u8"]
 locale = "en"
+no_expected = "awaiting-ruling"
+ruling = "6a13d711"
 +++
 # =============================================================================
 # bounded octeti to lista — compile-admitted byte-list bridge

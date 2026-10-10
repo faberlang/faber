@@ -8,6 +8,7 @@ summary = "Tensor method hard-error policy for structa count mismatch."
 syntax = "tensor.from_flat(flat, shape)"
 related = ["tensor", "structa"]
 locale = "en"
+no_expected = "traps-by-design"
 +++
 
 # =============================================================================
