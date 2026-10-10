@@ -626,6 +626,10 @@ help = "ใช้ expression ของกรณีที่ถูกต้อง
 message = "นิพจน์ไม่ถูกต้อง"
 help = "ตรวจไวยากรณ์นิพจน์"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "ตัวคั่น ceiling `⌈` และ `⌉` ปิด ceiling; `⌈x⌋` ไม่ใช่รูปแบบการปัดเศษ"
+help = "เขียน `⌊x⌉` เพื่อปัดเป็นจำนวนเต็มที่ใกล้ที่สุด เมื่อเสมอให้เลือกเพื่อนบ้านที่เป็นเลขคู่; เขียน `⌈x⌉` สำหรับ ceiling หรือ `⌊x⌋` สำหรับ floor"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` เป็นตัวดำเนินการที่เลิกใช้แล้ว; การปฏิเสธของ `≡` เขียนเป็น `{replacement}`"
 help = "เขียน `{replacement}` แทน `{glyph}`; สัญลักษณ์ปฏิเสธทุกตัวมีจำนวนเส้นเท่ากับสัญลักษณ์ที่มันปฏิเสธ (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -1921,6 +1925,10 @@ help = "gradient selection (`∇`) เป็นเพียง parse-only ใน
 [diagnostics.SEM011]
 message = "ชนิดตัวถูกดำเนินการไม่ถูกต้อง"
 help = "ใช้ชนิดตัวถูกดำเนินการที่เข้ากันได้"
+
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "สัญลักษณ์การปัดเศษยังใช้กับค่า tensor ไม่ได้"
+help = "ปัดเศษแต่ละ element ด้วยลูปหรือเมธอดปัดเศษแบบ scalar; การยก per-element ยังไม่ได้สร้าง"
 
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "พารามิเตอร์ค่า {param} ใช้ตำแหน่ง extent ในลายเซ็นไม่ได้"

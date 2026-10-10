@@ -1,0 +1,29 @@
++++
+term = "⌈x⌋"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "unary_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "The mixed rounding delimiters ⌈x⌋ are an error; ⌊x⌉ is nearest."
+syntax = "⌈x⌋ — rejected; write ⌊x⌉"
+related = ["⌊x⌋", "⌈x⌉", "⌊x⌉"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE030:ceiling_floor_delimiters"
++++
+# =============================================================================
+# ⌈x⌋ — Mixed rounding delimiters are a named error.
+# =============================================================================
+#
+# What this teaches:
+#   • `⌈x⌋` is not a rounding form; the diagnostic points at `⌊x⌉` (nearest).
+#
+# See also: ⌊x⌉
+# =============================================================================
+
+# This exemplum intentionally fails to compile.
+
+main {
+    const float x ← 2.5
+    print ⌈x⌋
+}

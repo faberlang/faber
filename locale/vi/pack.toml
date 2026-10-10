@@ -626,6 +626,10 @@ help = "dùng một biểu thức case hợp lệ"
 message = "biểu thức không hợp lệ"
 help = "kiểm tra cú pháp biểu thức"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "dấu phân cách trần `⌈` và `⌉` đóng một phép lấy trần; `⌈x⌋` không phải dạng làm tròn"
+help = "viết `⌊x⌉` để làm tròn tới số nguyên gần nhất, khi hòa chọn số chẵn lân cận; viết `⌈x⌉` cho trần hoặc `⌊x⌋` cho sàn"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` là toán tử đã bị loại bỏ; phủ định của `≡` được viết là `{replacement}`"
 help = "viết `{replacement}` thay cho `{glyph}`; mỗi ký hiệu phủ định có cùng số gạch ngang với ký hiệu mà nó phủ định (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -1909,6 +1913,10 @@ help = "gradient selection (`∇`) chỉ parse-only trong Phase 2A; các quy t�
 [diagnostics.SEM011]
 message = "kiểu toán hạng không hợp lệ"
 help = "dùng các kiểu toán hạng tương thích"
+
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "các ký hiệu làm tròn chưa áp dụng được cho giá trị tensor"
+help = "làm tròn từng phần tử bằng vòng lặp hoặc phương thức làm tròn vô hướng; phép nâng theo từng phần tử chưa được xây dựng"
 
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "tham số giá trị {param} không thể chiếm vị trí extent trong chữ ký"

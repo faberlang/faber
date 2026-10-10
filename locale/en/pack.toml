@@ -1010,6 +1010,10 @@ help = "write `{glyph}` for `{operator}` (`≤` and `≥` for the non-strict for
 message = "the typed zero exists only for tensor, vector and matrix types; a collection type such as list is not claimed"
 help = "write a tensor, vector or matrix type followed by empty braces, or build the collection with a literal"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "the ceiling delimiters `⌈` and `⌉` close a ceiling; `⌈x⌋` is not a rounding form"
+help = "write `⌊x⌉` to round to the nearest integer, ties to the even neighbour; write `⌈x⌉` for the ceiling or `⌊x⌋` for the floor"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` is a retired operator; the negation of `≡` is spelled `{replacement}`"
 help = "write `{replacement}` for `{glyph}`; every negation glyph has the same number of lines as the glyph it negates (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -2698,6 +2702,10 @@ help = "write the copy as its own statement; to rebind a name to a tensor, use '
 [diagnostics.SEM011]
 message = "invalid operand types"
 help = "use compatible operand types"
+
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "the rounding glyphs do not apply to tensor values yet"
+help = "round each element with a loop or a scalar rounding method; the per-element lift is not built"
 
 [diagnostics.SEM011.issues.generic_type_arg_bound]
 message = "type argument {rejected} does not satisfy {param} {implet} {contract}"

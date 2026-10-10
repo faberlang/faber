@@ -788,6 +788,10 @@ help = "write `{glyph}` for `{operator}` (`≤` and `≥` for the non-strict for
 message = "nihil generis solum pro tensore, vectore et matrice est; genus collectionis ut lista non vindicatur"
 help = "scribe genus tensoris, vectoris vel matricis cum uncis vacuis, vel collectionem per litteram aedifica"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "fines tecti `⌈` et `⌉` tectum claudunt; `⌈x⌋` forma rotundandi non est"
+help = "scribe `⌊x⌉` ad proximum integrum rotundandum, paria ad vicinum parem; scribe `⌈x⌉` pro tecto vel `⌊x⌋` pro pavimento"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` signum retractum est; negatio `≡` scribitur `{replacement}`"
 help = "scribe `{replacement}` pro `{glyph}`; omne signum negationis easdem lineas habet quas signum negatum (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -2476,6 +2480,10 @@ help = "write the copy as its own statement; to rebind a name to a tensor, use '
 [diagnostics.SEM011]
 message = "invalid operand types"
 help = "use compatible operand types"
+
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "signa rotundandi nondum ad valores tensoris pertinent"
+help = "rotunda quemque elementum per ambitum vel methodum rotundandi scalarem; elevatio per elementum nondum aedificata est"
 
 [diagnostics.SEM011.issues.generic_type_arg_bound]
 message = "type argument {rejected} does not satisfy {param} {implet} {contract}"

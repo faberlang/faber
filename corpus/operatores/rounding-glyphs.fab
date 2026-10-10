@@ -1,0 +1,38 @@
++++
+term = "⌊x⌉"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "unary_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Rounding glyphs: floor, ceiling, and nearest with ties to the even neighbour."
+syntax = "⌊x⌋ floor | ⌈x⌉ ceiling | ⌊x⌉ nearest (ties to even)"
+related = ["⌊x⌋", "⌈x⌉", "⌊x⌉"]
+locale = "en"
++++
+# =============================================================================
+# ⌊x⌉ — Rounding glyphs: floor, ceiling, and nearest with ties to even.
+# =============================================================================
+#
+# What this teaches:
+#   • `⌊x⌋` floor, `⌈x⌉` ceiling, `⌊x⌉` nearest.
+#   • Nearest sends a tie to the even neighbour: `⌊2.5⌉` is 2, `⌊3.5⌉` is 4.
+#
+# Common mistakes:
+#   • Writing `⌈x⌋` — it is a named error; write `⌊x⌉` for nearest.
+#
+# See also: ⌊x⌋, ⌈x⌉
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   2, 3, 2, 4, -2, 2, 3
+
+main {
+    const float half ← 2.5
+    print ⌊half⌋
+    print ⌈half⌉
+    print ⌊half⌉
+    print ⌊3.5⌉
+    print ⌊-2.5⌉
+    print ⌊2.4⌉
+    print ⌊2.6⌉
+}

@@ -1686,7 +1686,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 args,
                 span,
                 return_ty,
-                f64::round,
+                f64::round_ties_even,
                 std::convert::identity,
                 None,
             ),

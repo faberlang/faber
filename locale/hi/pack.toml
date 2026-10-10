@@ -626,6 +626,10 @@ help = "मान्य case expression उपयोग करें"
 message = "अमान्य अभिव्यक्ति"
 help = "अभिव्यक्ति syntax जांचें"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "ceiling के delimiter `⌈` और `⌉` ceiling बंद करते हैं; `⌈x⌋` rounding का रूप नहीं है"
+help = "निकटतम पूर्णांक के लिए `⌊x⌉` लिखें, बराबरी पर सम पड़ोसी चुना जाता है; ceiling के लिए `⌈x⌉` या floor के लिए `⌊x⌋` लिखें"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` एक retired operator है; `≡` का निषेध `{replacement}` लिखा जाता है"
 help = "`{glyph}` की जगह `{replacement}` लिखें; हर निषेध चिह्न में उतनी ही रेखाएँ होती हैं जितनी उस चिह्न में जिसे वह उलटता है (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -1921,6 +1925,10 @@ help = "Phase 2A में gradient selection (`∇`) केवल parse-only �
 [diagnostics.SEM011]
 message = "ऑपरेंड प्रकार अमान्य हैं"
 help = "संगत ऑपरेंड प्रकारों का उपयोग करें"
+
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "rounding glyph अभी tensor मानों पर लागू नहीं होते"
+help = "हर element को लूप या scalar rounding method से round करें; per-element lift अभी बना नहीं है"
 
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "मान पैरामीटर {param} सिग्नेचर के extent स्थान पर नहीं रह सकता"

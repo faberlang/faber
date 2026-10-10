@@ -925,7 +925,59 @@ impl Parser {
             return self.parse_variant_expr();
         }
 
+        if matches!(self.peek().kind, TokenKind::FloorOpen | TokenKind::CeilOpen) {
+            return self.parse_rounding_glyph();
+        }
+
         self.parse_postfix_inner()
+    }
+
+    /// Parse the paired rounding delimiters.
+    ///
+    /// GRAMMAR:
+    ///   rounding := '⌊' expression '⌋'   floor
+    ///             | '⌈' expression '⌉'   ceiling
+    ///             | '⌊' expression '⌉'   nearest (ties to the even neighbour)
+    ///
+    /// `⌈x⌋` is a named error (`PARSE030 ceiling_floor_delimiters`) that
+    /// points at `⌊x⌉`; the parse continues as nearest so one file reports
+    /// every site.
+    fn parse_rounding_glyph(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        let open = self.peek().kind.clone();
+        self.advance();
+        let operand = Box::new(self.parse_expression()?);
+        let close_span = self.current_span();
+        let op = match (&open, &self.peek().kind) {
+            (TokenKind::FloorOpen, TokenKind::FloorClose) => UnOp::Floor,
+            (TokenKind::CeilOpen, TokenKind::CeilClose) => UnOp::Ceil,
+            (TokenKind::FloorOpen, TokenKind::CeilClose) => UnOp::Nearest,
+            (TokenKind::CeilOpen, TokenKind::FloorClose) => {
+                self.errors.push(
+                    ParseError::structured(
+                        ParseErrorKind::ExpressionInvalid,
+                        start.merge(close_span),
+                    )
+                    .with_arg("issue", "ceiling_floor_delimiters")
+                    .with_arg("replacement", "⌊x⌉"),
+                );
+                UnOp::Nearest
+            }
+            _ => {
+                return Err(ParseError::structured(
+                    ParseErrorKind::UnterminatedGroup,
+                    start,
+                ));
+            }
+        };
+        self.advance();
+        let span = start.merge(self.previous_span());
+        let id = self.next_id();
+        Ok(Expr {
+            id,
+            kind: ExprKind::Unary(UnaryExpr { op, operand }),
+            span,
+        })
     }
 
     fn can_start_expression(kind: &TokenKind) -> bool {
@@ -947,6 +999,8 @@ impl Parser {
                 | TokenKind::Solum
                 | TokenKind::Minus
                 | TokenKind::BitwiseNot
+                | TokenKind::FloorOpen
+                | TokenKind::CeilOpen
                 | TokenKind::Nulla
                 | TokenKind::Cede
         )

@@ -1363,7 +1363,12 @@ multiplicative_expr := vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' |
 vel_expr   := unary_expr ('vel' vel_rhs)*
 vel_rhs     := unary_expr vel_range_tail?
 vel_range_tail := ('‥' | '…' | 'ante' | 'usque') unary_expr ('per' unary_expr)?
-unary_expr      := ('-' | '¬' | 'non') unary_expr | finge_expr | cast_expr
+unary_expr      := ('-' | '¬' | 'non') unary_expr | rounding_expr | finge_expr | cast_expr
+# Paired rounding delimiters: `⌊x⌋` floor, `⌈x⌉` ceiling, `⌊x⌉` nearest with
+# ties to the even neighbour (`⌊2.5⌉` is 2). `⌈x⌋` parses as nearest and is the
+# named error `PARSE030 ceiling_floor_delimiters`; a tensor operand is the named
+# check error `SEM011 glyph_rounding_tensor_unsupported` until the lift is built.
+rounding_expr   := '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
 # `∇` is a structural POSTFIX gradient-selection operator, never a prefix unary
 # form. It binds in the expression postfix fold after calls have been formed,
 # and its optional selector bracket is consumed as part of the gradient suffix

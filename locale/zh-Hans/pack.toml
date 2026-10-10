@@ -626,6 +626,10 @@ help = "使用有效的 case 表达式"
 message = "无效表达式"
 help = "检查表达式语法"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "上取整的定界符是 `⌈` 和 `⌉`；`⌈x⌋` 不是取整形式"
+help = "用 `⌊x⌉` 取最近整数，平局取偶数邻值；用 `⌈x⌉` 上取整，或用 `⌊x⌋` 下取整"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` 是已废弃的运算符；`≡` 的否定写作 `{replacement}`"
 help = "用 `{replacement}` 代替 `{glyph}`；每个否定符号的横线数与其所否定的符号相同（`≡`/`≢`、`≅`/`≇`、`≈`/`≉`）"
@@ -1909,6 +1913,10 @@ help = "Phase 2A 中 gradient selection（`∇`）仅为 parse-only；eligibilit
 [diagnostics.SEM011]
 message = "无效 operand 类型"
 help = "使用兼容的 operand 类型"
+
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "取整符号暂不适用于张量值"
+help = "用循环或标量取整方法逐元素取整；逐元素提升尚未实现"
 
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "值参数 {param} 不能占据签名的 extent 位置"

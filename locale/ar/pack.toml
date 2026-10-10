@@ -626,6 +626,10 @@ help = "استخدم تعبير case صالحا"
 message = "تعبير غير صالح"
 help = "تحقق من صياغة التعبير"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "حدّا السقف `⌈` و`⌉` يغلقان السقف؛ `⌈x⌋` ليس صيغة تقريب"
+help = "اكتب `⌊x⌉` للتقريب إلى أقرب عدد صحيح مع توجيه التعادل إلى الجار الزوجي؛ واكتب `⌈x⌉` للسقف أو `⌊x⌋` للأرضية"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` عامل ملغى؛ نفي `≡` يُكتب `{replacement}`"
 help = "اكتب `{replacement}` بدل `{glyph}`؛ لكل رمز نفي عدد الخطوط نفسه الذي في الرمز الذي ينفيه (`≡`/`≢`، `≅`/`≇`، `≈`/`≉`)"
@@ -1909,6 +1913,10 @@ help = "gradient selection (`∇`) للتحليل فقط في Phase 2A؛ قوا�
 [diagnostics.SEM011]
 message = "أنواع operands غير صالحة"
 help = "استخدم أنواع operands متوافقة"
+
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "رموز التقريب لا تنطبق على قيم المصفوفات بعد"
+help = "قرّب كل عنصر بحلقة أو بطريقة تقريب عددية؛ الرفع لكل عنصر غير مبني"
 
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "معامل القيمة {param} لا يمكن أن يشغل موضع مدى في التوقيع"

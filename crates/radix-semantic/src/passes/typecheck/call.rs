@@ -723,7 +723,29 @@ impl TypeChecker<'_> {
         }
         self.canonicalize_sermo_view_method(receiver_ty, name);
         let method_name = self.method_display_name(*name);
-        let method_name = if method_name == super::tensor_index::GLYPH_TRANSPOSE_METHOD {
+        let method_name = if let Some(canonical) = method_name.strip_prefix("__faber_glyph_round:")
+        {
+            // Rounding glyphs lift per element over tensors in principle; the
+            // build is deferred, so a tensor-shaped operand is a named error.
+            let resolved = self.resolve_inferred_type(receiver_ty);
+            let (_, payload) = self.types.peel_access_marker(resolved);
+            if matches!(
+                self.types.get(payload),
+                Type::Tensor(..) | Type::Matrix(..) | Type::Vector(..)
+            ) {
+                self.invalid_operand_types("glyph_rounding_tensor_unsupported", receiver.span);
+                return self.error_type;
+            }
+            let surface = self
+                .locale_pack
+                .map_or(canonical, |pack| pack.intrinsic_surface(canonical));
+            if let Some(interner) = self.interner
+                && let Some(symbol) = interner.lookup(surface)
+            {
+                *name = symbol;
+            }
+            surface.to_owned()
+        } else if method_name == super::tensor_index::GLYPH_TRANSPOSE_METHOD {
             if !explicit_type_args.is_empty() || !args.is_empty() {
                 self.typecheck_call_arg_exprs(args);
                 self.invalid_operand_types(
