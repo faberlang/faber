@@ -276,7 +276,7 @@ impl TypeChecker<'_> {
                     &source.kind,
                     HirExpressionKind::Literal(HirLiteral::JsonValor(
                         radix_syntax::JsonValue::Object(_)
-                    ))
+                    )) | HirExpressionKind::Array(_)
                 ))
     }
 
@@ -450,6 +450,70 @@ impl TypeChecker<'_> {
         None
     }
 
+    /// `_ [ … ]` and a bare `[ … ]` against a tuple cell. The hole form
+    /// (`Verte` with an `Infer` target over an array) builds the expected
+    /// bracket type: a tuple cell makes the tuple, any other cell gets the
+    /// plain array literal (and its ordinary checking), and no expected type
+    /// is a named error. A bare array literal takes a tuple cell's type too
+    /// (the literal is a hole with a default; no cell leaves it a list).
+    /// Returns `Some(type)` when the node is settled here.
+    fn desugar_bracket_literal_shape(
+        &mut self,
+        expr: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> Option<TypeId> {
+        let hole = match &expr.kind {
+            HirExpressionKind::Verte {
+                source,
+                target,
+                entries: None,
+            } => {
+                matches!(source.kind, HirExpressionKind::Array(_))
+                    && self.is_infer(self.resolve_inferred_type(*target))
+            }
+            _ => false,
+        };
+        let bare = matches!(expr.kind, HirExpressionKind::Array(_));
+        if !hole && !bare {
+            return None;
+        }
+        let concrete = expected
+            .map(|ty| self.resolve_inferred_type(ty))
+            .filter(|ty| !self.is_infer(*ty));
+        if hole && concrete.is_none() {
+            self.invalid_conversion(
+                super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                expr.span,
+            );
+            return Some(self.error_type);
+        }
+        let is_tuple = concrete.is_some_and(|ty| matches!(self.types.get(ty), Type::Tuple(_)));
+        if hole {
+            let placeholder = HirExpressionKind::Tuple(Vec::new(), None);
+            if let HirExpressionKind::Verte { source, .. } =
+                std::mem::replace(&mut expr.kind, placeholder)
+            {
+                expr.kind = source.kind;
+            }
+        }
+        if is_tuple
+            && let HirExpressionKind::Array(elements) = &mut expr.kind
+            && elements
+                .iter()
+                .all(|element| matches!(element, HirArrayElement::Expr(_)))
+        {
+            let items = std::mem::take(elements)
+                .into_iter()
+                .filter_map(|element| match element {
+                    HirArrayElement::Expr(item) => Some(item),
+                    _ => None,
+                })
+                .collect();
+            expr.kind = HirExpressionKind::Tuple(items, None);
+        }
+        None
+    }
+
     /// Synthesizes an expression type, optionally using an expected type as
     /// context for shape-sensitive expressions.
     ///
@@ -494,6 +558,9 @@ impl TypeChecker<'_> {
             Err(slot) => return slot,
         };
         if let Some(settled) = self.desugar_inferred_constructor_shape(expr, expected) {
+            return settled;
+        }
+        if let Some(settled) = self.desugar_bracket_literal_shape(expr, expected) {
             return settled;
         }
         let ty = match &mut expr.kind {

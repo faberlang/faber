@@ -2658,6 +2658,55 @@ fn inferred_constructor_against_union_of_several_types_is_named_error() {
 }
 
 #[test]
+fn inferred_bracket_literal_builds_expected_tuple_in_binding_return_and_argument() {
+    test_support::assert_accepts(
+        "
+functio f() → iuncta<numerus, textus> { redde _ [1, \"a\"] }
+functio g(iuncta<numerus, textus> t) → numerus { redde t[0] }
+incipit {
+    fixum iuncta<numerus, textus> t ← _ [1, \"a\"]
+    fixum iuncta<numerus, numerus> v ← [5, 6]
+    fixum lista<numerus> xs ← _ [1, 2]
+    nota g(_ [3, \"c\"])
+    nota g([4, \"d\"])
+}
+",
+    );
+}
+
+#[test]
+fn inferred_bracket_literal_without_expected_type_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "incipit { nota _ [1, 2] }",
+        "inferred_constructor_no_expected_type",
+    );
+}
+
+#[test]
+fn inferred_bracket_literal_with_wrong_tuple_arity_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum iuncta<numerus, numerus> t ← _ [1, 2, 3] }",
+        "iuncta_construction_arity_mismatch",
+    );
+}
+
+#[test]
+fn bare_field_literal_takes_the_class_cell_type() {
+    test_support::assert_accepts(
+        "
+genus P { varia numerus x = 0 varia numerus y = 0 }
+functio f() → P { redde { x = 1, y = 2 } }
+functio g(P p) → numerus { redde p.x }
+incipit {
+    fixum P p ← { x = 1 }
+    nota g({ x = 2, y = 3 })
+    nota f().y
+}
+",
+    );
+}
+
+#[test]
 fn inferred_constructor_against_only_none_is_the_no_expected_type_error() {
     test_support::assert_rejects_with_issue(
         "incipit { fixum nihil p ← _ { x = 1 } }",

@@ -2423,12 +2423,33 @@ impl Parser {
                 let hole_span = self.peek().span;
                 self.advance();
                 self.advance();
-                let mut fields = self.parse_object_fields()?;
-                self.expect_token(&TokenKind::RBrace, "expected '}'")?;
-                self.parse_construction_source(&mut fields)?;
-                let object = Expr {
+                self.finish_inferred_field_constructor(hole_span)?
+            }
+
+            // Bare `{ field = value, … }`: the type slot is left out, which
+            // implies the hole (operator ruling 2026-10-10, need).
+            // Same `Verte` node as `_ { … }`; the cell supplies the type.
+            TokenKind::LBrace
+                if matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+                    && matches!(self.peek_at(2).kind, TokenKind::Eq) =>
+            {
+                let hole_span = self.peek().span;
+                self.advance();
+                self.finish_inferred_field_constructor(hole_span)?
+            }
+
+            // `_ [ a, b, … ]`: the inferred constructor with ELEMENTS. The
+            // hole takes the expected bracket type (tuple, list); the checker
+            // decides, and names the error when no type is expected.
+            TokenKind::Underscore(_) if matches!(self.peek_at(1).kind, TokenKind::LBracket) => {
+                let hole_span = self.peek().span;
+                self.advance();
+                self.advance();
+                let elements = self.parse_array_elements()?;
+                self.expect_token(&TokenKind::RBracket, "expected ']'")?;
+                let array = Expr {
                     id: self.next_id(),
-                    kind: ExprKind::Object(ObjectExpr { fields }),
+                    kind: ExprKind::Array(ArrayExpr { elements }),
                     span: hole_span.merge(self.previous_span()),
                 };
                 let ty = TypeExpr {
@@ -2440,7 +2461,7 @@ impl Parser {
                     iuncta_label: None,
                 };
                 ExprKind::Verte(VerteExpr {
-                    expr: Box::new(object),
+                    expr: Box::new(array),
                     ty,
                 })
             }
@@ -3524,6 +3545,35 @@ impl Parser {
     fn json_unexpected_error(&self, issue: &'static str) -> ParseError {
         ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
             .with_arg("issue", issue)
+    }
+
+    /// Finish `_ { field = value, … }` (or the bare `{ … }` form) once the
+    /// opening brace is consumed: fields, closing brace, and the `Verte` node
+    /// with an `Infer` target.
+    fn finish_inferred_field_constructor(
+        &mut self,
+        hole_span: Span,
+    ) -> Result<ExprKind, ParseError> {
+        let mut fields = self.parse_object_fields()?;
+        self.expect_token(&TokenKind::RBrace, "expected '}'")?;
+        self.parse_construction_source(&mut fields)?;
+        let object = Expr {
+            id: self.next_id(),
+            kind: ExprKind::Object(ObjectExpr { fields }),
+            span: hole_span.merge(self.previous_span()),
+        };
+        let ty = TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Infer,
+            span: hole_span,
+            form: TypeFormLevel::LONG,
+            iuncta_label: None,
+        };
+        Ok(ExprKind::Verte(VerteExpr {
+            expr: Box::new(object),
+            ty,
+        }))
     }
 
     fn looks_like_typed_constructor_fields(&self) -> bool {

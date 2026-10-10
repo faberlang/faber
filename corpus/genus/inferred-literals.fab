@@ -1,0 +1,64 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "array_literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A tuple cell takes `_ [ … ]` or a bare `[ … ]`; a class cell takes a bare `{ field = value }`."
+syntax = "<type> <name> ← _ [ <value>, … ]  |  <type> <name> ← { <field> = <value>, … }"
+related = ["genus"]
+locale = "en"
++++
+# =============================================================================
+# genus — literals that take the cell's type
+# =============================================================================
+#
+# What this teaches:
+#   • `_ [ a, b ]` builds the expected tuple (or list) from its cell.
+#   • A bare `[ a, b ]` takes a tuple cell's type; with no typed cell it stays a list.
+#   • A bare `{ field = value }` takes a class cell's type, like `_ { … }`.
+#
+# See also: genus
+# =============================================================================
+
+class Punctum {
+    var int x = 0
+    var int y = 0
+}
+
+fn par() → tuple<int, string> {
+    return _ [3, "c"]
+}
+
+fn origo() → Punctum {
+    return { x = 7, y = 9 }
+}
+
+fn summa(Punctum p) → int {
+    return p.x + p.y
+}
+
+main {
+    const tuple<int, string> t ← _ [1, "a"]
+    print t[0]
+    print t[1]
+
+    const tuple<int, string> u ← par()
+    print u[0]
+
+    const tuple<int, int> v ← [5, 6]
+    print v[1]
+
+    const Punctum p ← { x = 1, y = 2 }
+    print p.x
+    print p.y
+
+    const Punctum q ← origo()
+    print q.y
+    print summa({ x = 10, y = 20 })
+
+    const list<int> xs ← _ [1, 2, 3]
+    print xs.length()
+    const list<int> ys ← [4, 5]
+    print ys.length()
+}

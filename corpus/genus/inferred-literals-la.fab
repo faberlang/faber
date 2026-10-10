@@ -1,0 +1,59 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "array_literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A tuple cell takes `_ [ … ]` or a bare `[ … ]`; a class cell takes a bare `{ field = value }`."
+syntax = "<type> <name> ← _ [ <value>, … ]  |  <type> <name> ← { <field> = <value>, … }"
+related = ["genus"]
+locale = "la"
++++
+# =============================================================================
+# genus — literals that take the cell's type
+# =============================================================================
+#
+# What this teaches:
+#   • `_ [ a, b ]` builds the expected tuple (or list) from its cell.
+#   • A bare `[ a, b ]` takes a tuple cell's type; with no typed cell it stays a list.
+#   • A bare `{ field = value }` takes a class cell's type, like `_ { … }`.
+#
+# See also: genus
+# =============================================================================
+
+genus Punctum {
+    varia numerus x = 0
+    varia numerus y = 0
+}
+
+functio par() → iuncta<numerus, textus> {
+    redde _ [3, "c"]
+}
+
+functio origo() → Punctum {
+    redde { x = 7, y = 9 }
+}
+
+functio summa(Punctum p) → numerus {
+    redde p.x + p.y
+}
+
+incipit {
+    fixum iuncta<numerus, textus> t ← _ [1, "a"]
+    nota t[0]
+    nota t[1]
+    fixum iuncta<numerus, textus> u ← par()
+    nota u[0]
+    fixum iuncta<numerus, numerus> v ← [5, 6]
+    nota v[1]
+    fixum Punctum p ← { x = 1, y = 2 }
+    nota p.x
+    nota p.y
+    fixum Punctum q ← origo()
+    nota q.y
+    nota summa({ x = 10, y = 20 })
+    fixum lista<numerus> xs ← _ [1, 2, 3]
+    nota xs.longitudo()
+    fixum lista<numerus> ys ← [4, 5]
+    nota ys.longitudo()
+}
