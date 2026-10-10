@@ -146,3 +146,47 @@ fn integer_and_float_to_float_and_decimal_conversions_are_unchanged() {
     test_support::assert_accepts("functio r(f32 x) → f64 { redde x ↦ f64 }");
     test_support::assert_accepts("functio r(d64 x) → d64 { redde x ↦ d64 }");
 }
+
+/// Need: a literal float is rounded by the `via` mode before the
+/// static fit check, so `255.5 ↦ u8 via HalfEven` (256) is failable while
+/// `255.5 ↦ u8 via Floor` (255) is not. A literal that fits after rounding
+/// needs no handler; one that does not is the failable-conversion diagnostic.
+#[test]
+fn literal_float_failability_follows_the_rounding_mode() {
+    const MODES: [&str; 4] = ["Floor", "Ceil", "HalfEven", "Trunc"];
+    // Literal and its rounded value under Floor, Ceil, HalfEven, Trunc.
+    let rows: [(&str, [i128; 4]); 6] = [
+        ("2.5", [2, 3, 2, 2]),
+        ("3.5", [3, 4, 4, 3]),
+        ("-2.5", [-3, -2, -2, -2]),
+        ("-0.5", [-1, 0, 0, 0]),
+        ("255.5", [255, 256, 256, 255]),
+        ("256.0", [256, 256, 256, 256]),
+    ];
+    let targets: [(&str, i128, i128); 3] = [
+        ("u8", 0, 255),
+        ("i8", -128, 127),
+        ("i32", i128::from(i32::MIN), i128::from(i32::MAX)),
+    ];
+    for (literal, rounded) in rows {
+        for (mode, value) in MODES.iter().zip(rounded) {
+            for (target, lo, hi) in targets {
+                let source =
+                    format!("functio r() → {target} {{ redde {literal} ↦ {target} via {mode} }}");
+                if (lo..=hi).contains(&value) {
+                    test_support::assert_accepts(&source);
+                } else {
+                    test_support::assert_rejects_with_issue(
+                        &source,
+                        "failable_conversio_requires_handler",
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn failing_literal_float_conversion_accepts_a_default() {
+    test_support::assert_accepts("functio r() → u8 { redde 255.5 ↦ u8 via HalfEven ⊥ 0 }");
+}
