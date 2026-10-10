@@ -463,6 +463,7 @@ impl FunctionBuilder<'_> {
             top_level_consts: Arc::clone(&context.top_level_consts),
             static_fields: Arc::clone(&context.static_fields),
             imported_static_fields: Arc::clone(&context.imported_static_fields),
+            imported_constants: Arc::clone(&context.imported_constants),
             provider_imports: Arc::clone(&context.provider_imports),
             imported_type_members: Arc::clone(&context.imported_type_members),
             method_targets: Arc::clone(&context.method_targets),

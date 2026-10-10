@@ -109,3 +109,43 @@ fn static_field_read_through_an_imported_genus_inlines_the_interface_initializer
     let dump = crate::mir::dump_analyzed_unit(&unit).expect("imported static read lowers");
     assert!(dump.contains("4242"), "expected the inlined initializer, got:\n{dump}");
 }
+
+#[test]
+fn imported_module_constant_read_and_index_lower_to_the_interface_value() {
+    use crate::driver::{AnalyzeRequest, ModuleImportContract};
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceConstValue, InterfaceTypeSnapshot,
+    };
+    use crate::semantic::Primitive;
+    use crate::semantic::passes::visibility_annotation::VisibilityTier;
+    use std::collections::BTreeMap;
+
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "BASE".to_owned(),
+        kind: FileExportKind::Const(
+            InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+            Some(InterfaceConstValue::Int(5)),
+        ),
+    });
+    let contract = ModuleImportContract {
+        namespace_exports: BTreeMap::from([(
+            "constantia".to_owned(),
+            BTreeMap::from([("BASE".to_owned(), VisibilityTier::Publica)]),
+        )]),
+        file_interfaces: BTreeMap::from([("constantia".to_owned(), interface)]),
+        ..ModuleImportContract::default()
+    };
+    let session = Session::new(Config::default().with_dev_locale_root());
+    let source = "importa ex \"./constantia\" constantia\n\
+        functio pick(lista<numerus> xs) → numerus { redde xs[constantia.BASE] }\n";
+    let unit = crate::driver::analyze_source(
+        &session,
+        "imported_constant_index.fab",
+        source,
+        AnalyzeRequest { cli_program: None, contract },
+    )
+    .expect("imported constant index analyzes");
+    let dump = crate::mir::dump_analyzed_unit(&unit).expect("imported constant index lowers in single-file MIR");
+    assert!(dump.contains("5"), "expected the inlined constant, got:\n{dump}");
+}

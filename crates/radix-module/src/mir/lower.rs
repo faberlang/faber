@@ -34,6 +34,7 @@
 use crate::cli::{CliDefault, CliOperand, CliOption, CliType};
 use crate::driver::AnalyzedModule;
 pub use crate::driver::KernelLowering;
+use crate::file_interface::InterfaceConstValue;
 use crate::hir::visit::{HirVisitor, walk_expr, walk_program};
 use crate::hir::{
     DefId, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget, HirExpression,
@@ -2222,6 +2223,7 @@ struct FunctionBuilderContext<'a> {
     /// Static (`generis`) fields of imported genus exports by `(struct, field)`:
     /// the interface's folded initializer, inlined by a `module.Tab.Z` read.
     imported_static_fields: Arc<FxHashMap<(DefId, Symbol), HirExpression>>,
+    imported_constants: Arc<FxHashMap<(DefId, Symbol), InterfaceConstValue>>,
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
     imported_type_members: Arc<FxHashMap<(DefId, Symbol), MirType>>,
     method_targets: Arc<FxHashMap<(DefId, Symbol), MethodTarget>>,
@@ -2300,6 +2302,7 @@ impl<'a> FunctionBuilderContext<'a> {
             top_level_consts: Arc::new(FxHashMap::default()),
             static_fields: Arc::new(FxHashMap::default()),
             imported_static_fields: Arc::new(FxHashMap::default()),
+            imported_constants: Arc::new(FxHashMap::default()),
             provider_imports: Arc::new(FxHashMap::default()),
             imported_type_members: Arc::new(FxHashMap::default()),
             method_targets: Arc::new(FxHashMap::default()),
@@ -3334,6 +3337,24 @@ impl<'a> FunctionBuilder<'a> {
 
         let place = self.adapt_narrowed_place(MirPlace::local(binding.local), Some(binding.ty), expr)?;
         Some(MirOperand::Place(place))
+    }
+
+    /// Lower a folded imported module constant to the constant its interface
+    /// carries. Text values stay unlowered (the borrowed interner cannot mint
+    /// the symbol), so they keep the original unresolved-path diagnostic.
+    fn lower_imported_constant(&mut self, value: &InterfaceConstValue, expr: &HirExpression) -> Option<MirOperand> {
+        match value {
+            InterfaceConstValue::Int(value) => {
+                if let Ok(unsigned) = u64::try_from(*value) {
+                    return self.lower_literal(&HirLiteral::Int(unsigned), expr.ty, expr.span);
+                }
+                let signed = i64::try_from(*value).ok()?;
+                Some(MirOperand::Constant(MirConstant::Int(signed)))
+            }
+            InterfaceConstValue::Float(value) => self.lower_literal(&HirLiteral::Float(*value), expr.ty, expr.span),
+            InterfaceConstValue::Bool(value) => Some(MirOperand::Constant(MirConstant::Bool(*value))),
+            InterfaceConstValue::Text(_) => None,
+        }
     }
 
     fn lower_literal(&mut self, literal: &HirLiteral, ty: Option<TypeId>, span: Span) -> Option<MirOperand> {

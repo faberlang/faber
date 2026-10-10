@@ -27,6 +27,7 @@ use super::package_instantiate::ImportedDeviceRoute;
 // parent module provides shared imports for lowering context
 use super::*;
 use crate::driver::AnalyzedModule;
+use crate::file_interface::InterfaceConstValue;
 use crate::hir::visit::HirVisitor;
 use crate::hir::{
     HirAnnotation, HirAnnotationValue, HirConst, HirEnum, HirExpression, HirExpressionKind, HirFunction, HirImport,
@@ -38,6 +39,7 @@ use crate::kernel::{
 use crate::mir::MirExternalFunctionIdentity;
 use crate::mir::MirProviderKind;
 use crate::mir::{MirFunctionSignature, MirLayoutTable, MirParamSignature};
+use crate::semantic::SymbolKind;
 use std::sync::Arc;
 
 /// Callable parameter metadata preserved for MIR call lowering.
@@ -71,6 +73,9 @@ struct FrozenMaps<'a> {
     /// Static (`generis`) fields of imported genus exports by `(struct, field)`:
     /// the interface's folded initializer, inlined by a `module.Tab.Z` read.
     imported_static_fields: Arc<FxHashMap<(DefId, Symbol), HirExpression>>,
+    /// Folded scalar values of imported module constants by `(module, member)`:
+    /// a single-file `module.NAME` read inlines the interface's value.
+    imported_constants: Arc<FxHashMap<(DefId, Symbol), InterfaceConstValue>>,
     /// Producer-side defaults for imported class fields, keyed by importer-local type.
     imported_struct_defaults: Arc<FxHashMap<DefId, Vec<(Symbol, HirExpression)>>>,
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
@@ -112,6 +117,7 @@ pub(super) struct LoweringContextMaps<'a> {
     top_level_consts: FxHashMap<DefId, &'a HirConst>,
     static_fields: FxHashMap<(DefId, Symbol), &'a HirField>,
     imported_static_fields: FxHashMap<(DefId, Symbol), HirExpression>,
+    imported_constants: FxHashMap<(DefId, Symbol), InterfaceConstValue>,
     provider_imports: FxHashMap<DefId, ProviderImport>,
     imported_type_members: FxHashMap<(DefId, Symbol), MirType>,
     imported_method_providers: FxHashMap<(DefId, Symbol), ImportedMethodProvider>,
@@ -182,6 +188,7 @@ impl<'a> LoweringContextMaps<'a> {
             top_level_consts: FxHashMap::default(),
             static_fields: FxHashMap::default(),
             imported_static_fields: FxHashMap::default(),
+            imported_constants: FxHashMap::default(),
             provider_imports: FxHashMap::default(),
             imported_type_members: FxHashMap::default(),
             imported_method_providers: FxHashMap::default(),
@@ -208,6 +215,7 @@ impl<'a> LoweringContextMaps<'a> {
                 top_level_consts: Arc::new(FxHashMap::default()),
                 static_fields: Arc::new(FxHashMap::default()),
                 imported_static_fields: Arc::new(FxHashMap::default()),
+                imported_constants: Arc::new(FxHashMap::default()),
                 imported_struct_defaults: Arc::new(FxHashMap::default()),
                 provider_imports: Arc::new(FxHashMap::default()),
                 imported_type_members: Arc::new(FxHashMap::default()),
@@ -262,6 +270,7 @@ impl<'a> LoweringContextMaps<'a> {
         }
         maps.record_imported_struct_items(unit);
         maps.record_imported_type_members(unit);
+        maps.record_imported_constants(unit);
         maps.record_imported_enum_items(unit);
         for item in &unit.hir.items {
             match &item.kind {
@@ -293,6 +302,7 @@ impl<'a> LoweringContextMaps<'a> {
             top_level_consts: Arc::new(core::mem::take(&mut maps.top_level_consts)),
             static_fields: Arc::new(core::mem::take(&mut maps.static_fields)),
             imported_static_fields: Arc::new(core::mem::take(&mut maps.imported_static_fields)),
+            imported_constants: Arc::new(core::mem::take(&mut maps.imported_constants)),
             imported_struct_defaults: Arc::new(core::mem::take(&mut maps.imported_struct_defaults)),
             provider_imports: Arc::new(core::mem::take(&mut maps.provider_imports)),
             imported_type_members: Arc::new(core::mem::take(&mut maps.imported_type_members)),
@@ -366,6 +376,7 @@ impl<'a> LoweringContextMaps<'a> {
             top_level_consts: Arc::clone(&self.frozen.top_level_consts),
             static_fields: Arc::clone(&self.frozen.static_fields),
             imported_static_fields: Arc::clone(&self.frozen.imported_static_fields),
+            imported_constants: Arc::clone(&self.frozen.imported_constants),
             provider_imports: Arc::clone(&self.frozen.provider_imports),
             imported_type_members: Arc::clone(&self.frozen.imported_type_members),
             method_targets: Arc::clone(&self.frozen.method_targets),
@@ -688,6 +699,38 @@ impl<'a> LoweringContextMaps<'a> {
                 }
             }
         }
+    }
+
+    /// Record folded imported module constants read as `module.NAME`.
+    ///
+    /// A direct single-file route has no sibling body to link, so the read
+    /// inlines the value the file interface carries (the same value the
+    /// module-constant fold uses). Package-aware callers rewrite these reads
+    /// to linked definitions before lowering, so they never reach this map.
+    fn record_imported_constants(&mut self, unit: &AnalyzedModule) {
+        struct Reads<'u> {
+            unit: &'u AnalyzedModule,
+            found: FxHashMap<(DefId, Symbol), InterfaceConstValue>,
+        }
+        impl HirVisitor for Reads<'_> {
+            fn visit_expr(&mut self, expr: &HirExpression) {
+                if let HirExpressionKind::Field(object, member) = &expr.kind
+                    && let HirExpressionKind::Path(module) = &object.kind
+                    && let Some(namespace) = self.unit.resolver.get_symbol(*module)
+                    && namespace.kind == SymbolKind::Module
+                    && let Some(value) = self
+                        .unit
+                        .resolver
+                        .namespace_file_const_value_canonical(namespace.name, *member)
+                {
+                    self.found.insert((*module, *member), value.clone());
+                }
+                crate::hir::visit::walk_expr(self, expr);
+            }
+        }
+        let mut reads = Reads { unit, found: FxHashMap::default() };
+        crate::hir::visit::walk_program(&mut reads, &unit.hir);
+        self.imported_constants = reads.found;
     }
 
     fn record_method_item(&mut self, owner_def_id: DefId, receiver_ty: TypeId, method: &HirMethod) {

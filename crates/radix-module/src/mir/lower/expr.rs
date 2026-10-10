@@ -484,6 +484,18 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         {
             return self.lower_expr_value(&init);
         }
+        // A folded imported module constant (`module.NAME`) read without a
+        // package link: the interface's value is the read.
+        if let HirExpressionKind::Path(def_id) = &object.kind
+            && let Some(value) = self
+                .context
+                .imported_constants
+                .get(&(*def_id, name))
+                .cloned()
+            && let Some(operand) = self.lower_imported_constant(&value, expr)
+        {
+            return Some(operand);
+        }
         self.lower_field(object, name, expr)
     }
 
