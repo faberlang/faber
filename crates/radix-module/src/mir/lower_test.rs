@@ -7415,3 +7415,35 @@ functio exemplo() → vacuum {
         "the synthesized helper performs the append: {dump}"
     );
 }
+
+#[test]
+fn missing_array_row_is_a_named_lowering_error_not_a_dropped_statement() {
+    // Loop and reduction lowering reach `lista<T>` rows through
+    // `require_array`; a bare `find_array(..)?` returned `None` with no
+    // diagnostic and the enclosing loop vanished from MIR. Lowering
+    // pre-interns the rows source programs need, so the missing row is pinned
+    // at the helper every loop site shares.
+    let types = TypeTable::new();
+    let fractus = types.primitive(Primitive::Fractus);
+    assert!(types.find_array(fractus).is_none(), "the fixture row must start absent");
+    let mut builder = FunctionBuilder::new(&types);
+    assert_eq!(
+        builder.require_array(fractus, Span::default(), "itera cursor element list"),
+        None
+    );
+    assert_eq!(builder.errors.len(), 1, "the miss must push exactly one error");
+    assert_eq!(
+        builder.errors[0].issue,
+        "missing_type_information_for_mir_lowering_itera_cursor_element_list"
+    );
+
+    let mut types = TypeTable::new();
+    let fractus = types.primitive(Primitive::Fractus);
+    let array = types.array(fractus);
+    let mut builder = FunctionBuilder::new(&types);
+    assert_eq!(
+        builder.require_array(fractus, Span::default(), "itera cursor element list"),
+        Some(array)
+    );
+    assert!(builder.errors.is_empty(), "the happy path pushes nothing");
+}
