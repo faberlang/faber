@@ -90,7 +90,6 @@ pub mod mir;
 pub mod tensor_goal_gate;
 pub use radix_lexer::octeti_literal;
 pub mod parser;
-pub mod paths;
 pub mod program;
 pub mod runtime_contract;
 pub mod semantic;
