@@ -1,7 +1,7 @@
 +++
 term = "textus"
 kind = "type"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "index_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "register"
 canonical = false
 summary = "s[i] on a string is the i-th Unicode character, not the i-th byte; it dies only when i is out of range."
