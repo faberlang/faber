@@ -36,6 +36,7 @@
 //! - Finalization consumes the writer so no later writes can silently diverge
 //!   from the returned source string.
 
+pub mod bits_gate;
 pub mod breakable;
 pub mod conversio_arm;
 pub mod decimal;
@@ -300,6 +301,7 @@ pub trait Codegen {
     ) -> Result<Self::Output, CodegenError>;
 }
 
+pub use bits_gate::reject_bits_type;
 pub use device_ident::{MANGLE_PREFIX, is_device_reserved, mangle_device_ident};
 pub use ident::{
     SCALAR_LOOP_CANDIDATES, SCALAR_LOOP_FALLBACK, VALUE_JOIN_CANDIDATES, VALUE_JOIN_FALLBACK,

@@ -85,6 +85,9 @@ mod statica_emit_test;
 mod copy_into_emit_test;
 
 #[cfg(test)]
+#[path = "bits_type_gate_test.rs"]
+mod bits_type_gate_test;
+#[cfg(test)]
 #[path = "lista_lift_gate_test.rs"]
 mod lista_lift_gate_test;
 #[cfg(test)]
@@ -365,6 +368,7 @@ pub fn generate_from_analyzed_with_options(
     module_name: Option<&str>,
 ) -> Result<crate::Output, CodegenError> {
     radix_codegen_shared::reject_hir_errors(&analysis.hir)?;
+    radix_codegen_shared::reject_bits_type(&analysis.types, target)?;
     if !target.is_available() {
         return Err(unavailable_target_error(target));
     }
@@ -1088,6 +1092,7 @@ pub fn generate_rust_cli(
     #[cfg(feature = "hir-rust")]
     {
         radix_codegen_shared::reject_hir_errors(hir)?;
+        radix_codegen_shared::reject_bits_type(types, Target::HirRust)?;
         reject_rust_unsupported_types(types)?;
         let hir = hir.without_unavailable_declarations(interner);
         let hir = &*hir;
@@ -1112,6 +1117,7 @@ pub fn generate_go_cli(
 ) -> Result<crate::GoOutput, CodegenError> {
     #[cfg(feature = "hir-go")]
     {
+        radix_codegen_shared::reject_bits_type(types, Target::HirGo)?;
         let hir = hir.without_unavailable_declarations(interner);
         go::generate_go_cli(&hir, types, interner, cli_program)
     }

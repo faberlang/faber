@@ -630,6 +630,9 @@ fn generate_output(
     emit_nvvm_device_module: bool,
     target_bindings: &TargetBindings,
 ) -> Result<crate::Output, SpannedCodegenError> {
+    // Raw-bits types (b8..b64) have a carrier only on the Faber source emitter
+    // and the MIR runner; every other target fails closed, named, before emit.
+    radix_codegen_shared::reject_bits_type(&analysis.types, target)?;
     match target {
         Target::MirStepper => Err(codegen::CodegenError {
             message: "stepper is the core interpreter target; run through the MIR stepper, not codegen emit".to_owned(),
