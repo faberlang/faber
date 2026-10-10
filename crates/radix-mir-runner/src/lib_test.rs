@@ -238,6 +238,43 @@ fn scalar_mut_param_propagates_through_runner_frames() {
 }
 
 #[test]
+fn vide_writes_stderr_and_nota_writes_stdout() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{Primitive, TypeTable};
+
+    let types = TypeTable::new();
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let span = Span::default();
+    let mut interner = Interner::new();
+    let trace = interner.intern("trace");
+    let shown = interner.intern("shown");
+    let program = MirProgram::new();
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    for (kind, text) in [
+        (MirDiagnosticKind::Vide, trace),
+        (MirDiagnosticKind::Nota, shown),
+    ] {
+        runner
+            .eval_runtime_call(
+                &MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Diagnostic(kind),
+                    args: vec![MirOperand::Constant(MirConstant::String(text))],
+                    return_ty: MirType::semantic(vacuum),
+                },
+                span,
+            )
+            .expect("diagnostic should execute");
+    }
+    drop(runner);
+    assert_eq!(host.stderr_lines, ["trace"]);
+    assert_eq!(host.stdout_lines, ["shown"]);
+}
+
+#[test]
 fn converts_numeric_array_to_octeti_in_one_step() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;

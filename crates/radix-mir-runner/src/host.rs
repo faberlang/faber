@@ -299,7 +299,7 @@ impl Host for BufferHost {
     }
 
     fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), RunnerError> {
-        if kind == MirDiagnosticKind::Mone {
+        if matches!(kind, MirDiagnosticKind::Mone | MirDiagnosticKind::Vide) {
             self.stderr_lines.push(text.to_owned());
         } else {
             let mut line = std::mem::take(&mut self.pending_stdout);
@@ -419,7 +419,7 @@ impl Host for StdioHost {
 
     fn scribe(&mut self, kind: MirDiagnosticKind, text: &str) -> Result<(), RunnerError> {
         let target: &mut dyn Write = match kind {
-            MirDiagnosticKind::Mone => &mut io::stderr(),
+            MirDiagnosticKind::Mone | MirDiagnosticKind::Vide => &mut io::stderr(),
             _ => &mut io::stdout(),
         };
         writeln!(target, "{text}")
