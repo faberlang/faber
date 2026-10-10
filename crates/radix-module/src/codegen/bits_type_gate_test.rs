@@ -157,8 +157,41 @@ fn wasm_bits_equality_and_order_read_the_pattern_unsigned() {
 
 #[cfg(feature = "mir-wasm")]
 #[test]
-fn wasm_refuses_display_of_a_list_of_bits_by_name() {
-    let source = "incipit {\nfixum lista<b8> xs ← [0x00, 0x0f]\nnota xs\n}\n";
+fn wasm_displays_a_list_of_bits_in_module_at_full_width() {
+    let text = wasm_text("fixum lista<b8> xs ← [0x00, 0x0f]\nfixum lista<b32> ys ← [0x01]\nnota xs\nnota ys");
+    // One helper per displayed element width, joined `[a, b]` from the
+    // bracket and separator rows, reading the existing array rows.
+    for digits in [2, 8] {
+        assert!(
+            text.contains(&format!("(func $faber_bits_list_hex_{digits} (param $a i32) (result i32)")),
+            "{digits}: {text}"
+        );
+        assert!(
+            text.contains(&format!("(call $faber_bits_list_hex_{digits} (local.get $l")),
+            "{digits}: {text}"
+        );
+    }
+    assert!(!text.contains("(func $faber_bits_list_hex_4"), "{text}");
+    assert!(!text.contains("(func $faber_bits_list_hex_16"), "{text}");
+    assert!(text.contains(r#"(import "faber_rt_v1" "__faber_rt_v1_array_length" (func $faber_bits_list_len (param i32) (result i64)))"#), "{text}");
+    assert!(text.contains(r#"(import "faber_rt_v1" "__faber_rt_v1_array_get" (func $faber_bits_list_get (param i32 i64) (result i64)))"#), "{text}");
+    assert!(
+        text.contains("(call $faber_bits_hex (call $faber_bits_list_get (local.get $a) (local.get $i)) (i32.const 2))"),
+        "{text}"
+    );
+    assert!(
+        text.contains("(br_if $done (i64.ge_s (local.get $i) (local.get $n)))"),
+        "{text}"
+    );
+    for literal in ["\"[\"", "\", \"", "\"]\""] {
+        assert!(text.contains(literal), "{literal}: {text}");
+    }
+}
+
+#[cfg(feature = "mir-wasm")]
+#[test]
+fn wasm_refuses_display_of_a_nested_list_of_bits_by_name() {
+    let source = "incipit {\nfixum lista<b8> xs ← [0x00]\nfixum lista<lista<b8>> ys ← [xs, xs]\nnota ys\n}\n";
     let session = Session::new(
         Config::default()
             .with_target(Target::MirWasm)
@@ -167,7 +200,7 @@ fn wasm_refuses_display_of_a_list_of_bits_by_name() {
     let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
     assert!(result.output.is_none(), "{:?}", result.diagnostics);
     let message = format!("{:?}", result.diagnostics);
-    assert!(message.contains("display of a collection of raw bits"), "{message}");
+    assert!(message.contains("nested collection of raw bits"), "{message}");
 }
 
 #[cfg(feature = "mir-sexp")]
