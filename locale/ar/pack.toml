@@ -630,11 +630,11 @@ help = "استخدم ⊥؛ {vel} للـ nullish coalescing فقط"
 
 [diagnostics.PARSE030.issues.conversio_via_missing_hint]
 message = "`via` needs a convert hint after it"
-help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, Bits, and Code"
+help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, and Code"
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "a convert hint is not a type argument"
-help = "write the hint as a via clause after the target: `u32 via Bits`, `ascii<8> via Hex`, `littera via Code`"
+help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "a convert hint does not follow the target in angle brackets"
@@ -2466,15 +2466,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, Bits, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
 
-[diagnostics.SEM016.issues.bits_pair_width_mismatch]
-message = "the Bits bitcast requires exact-width pairs: u16 ↔ bf16 or f16, u32 ↔ f32 and u64 ↔ f64"
-help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64"
+[diagnostics.SEM016.issues.conversio_via_bits_retired]
+message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
+help = "write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "conversion من {octeti} إلى {bivalens} بلا default meaning؛ فك إلى {textus} أو قارن bytes صراحة"

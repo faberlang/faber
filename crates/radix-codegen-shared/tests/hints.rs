@@ -1,16 +1,11 @@
-use radix_codegen_shared::hints::{EndianHint, classify, endian_hint, has_bits_hint};
-
-fn classify_names(names: &[&str]) -> (Option<EndianHint>, bool) {
-    (
-        endian_hint(names, |name| classify(name)),
-        has_bits_hint(names, |name| classify(name)),
-    )
-}
+use radix_codegen_shared::hints::{EndianHint, classify, endian_hint};
 
 #[test]
-fn recognizes_endian_and_bits_hints() {
+fn recognizes_endian_hints_and_no_bits_hint() {
     assert_eq!(
-        classify_names(&["Unused", "Le", "Bits"]),
-        (Some(EndianHint::Le), true)
+        endian_hint(&["Unused", "Le", "Bits"], |name| classify(name)),
+        Some(EndianHint::Le)
     );
+    // `via Bits` retired: `Bits` is no hint at all.
+    assert_eq!(endian_hint(&["Bits"], |name| classify(name)), None);
 }

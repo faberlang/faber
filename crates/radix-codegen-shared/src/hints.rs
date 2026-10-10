@@ -10,7 +10,6 @@ pub enum EndianHint {
 pub enum HintKind {
     Be,
     Le,
-    Bits,
     Other,
 }
 
@@ -19,7 +18,6 @@ pub fn classify(name: &str) -> HintKind {
     match name {
         "Be" => HintKind::Be,
         "Le" => HintKind::Le,
-        "Bits" => HintKind::Bits,
         _ => HintKind::Other,
     }
 }
@@ -32,16 +30,6 @@ where
     params.iter().find_map(|param| match classify_param(param) {
         HintKind::Be => Some(EndianHint::Be),
         HintKind::Le => Some(EndianHint::Le),
-        HintKind::Bits | HintKind::Other => None,
+        HintKind::Other => None,
     })
-}
-
-#[must_use]
-pub fn has_bits_hint<S, F>(params: &[S], mut classify_param: F) -> bool
-where
-    F: FnMut(&S) -> HintKind,
-{
-    params
-        .iter()
-        .any(|param| matches!(classify_param(param), HintKind::Bits))
 }

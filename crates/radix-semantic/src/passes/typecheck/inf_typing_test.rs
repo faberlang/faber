@@ -499,12 +499,12 @@ fn inf_and_valor_convert_both_ways() {
 #[test]
 fn inf_has_no_bits_view() {
     assert_rejects(
-        &conversion("inf a", "f32", "a ↦ f32 via Bits"),
-        "bits_pair_width_mismatch",
+        &conversion("inf a", "b32", "a ↦ b32"),
+        "bits_conversion_width_mismatch",
     );
     assert_rejects(
-        &conversion("f64 a", "inf", "a ↦ inf via Bits"),
-        "bits_pair_width_mismatch",
+        &conversion("b64 a", "inf", "a ↦ inf"),
+        "bits_conversion_width_mismatch",
     );
 }
 

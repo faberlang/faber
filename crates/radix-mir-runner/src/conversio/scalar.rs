@@ -157,19 +157,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
-        if self.has_bits_hint(params) {
-            // `u16|u32|u64 via Bits` reinterprets float bits; exact pairs
-            // only, NaN payloads pass through bit-identical.
-            if let Value::Float(value) = value {
-                return match width {
-                    NumericWidth::U16 => Ok(Value::UInt(u64::from(f64_to_f16_bits(value)))),
-                    NumericWidth::U32 => Ok(Value::UInt(u64::from((value as f32).to_bits()))),
-                    NumericWidth::U64 => Ok(Value::UInt(value.to_bits())),
-                    _ => self.recover_or_fail(recovery, span, "bits pair width mismatch"),
-                };
-            }
-            return self.recover_or_fail(recovery, span, "bits pair width mismatch");
-        }
         // Ruling 40: every source into `inf` is exact; the row table lives in
         // `conversio/inf.rs`.
         if width.is_unbounded() {
@@ -451,12 +438,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         })
     }
 
-    fn has_bits_hint(&self, params: &[Symbol]) -> bool {
-        hints::has_bits_hint(params, |param| {
-            hints::classify(self.interner.resolve(*param))
-        })
-    }
-
     /// D11.6 ruling 24: the exact integer a `wrapping`/`saturating` conversion
     /// applies its policy to. Integer sources of any family carry it directly;
     /// a `d64` source reduces to an integer exactly as `d64 ↦ numerus<W>` does.
@@ -602,9 +583,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         if let Some(source_width) = decimal_source_width(self.types, source_ty) {
-            if self.has_bits_hint(params) {
-                return self.recover_or_fail(recovery, span, "bits pair width mismatch");
-            }
             let (carrier, scale) = match value {
                 Value::Int(value) => {
                     let scale = decimal_scale_factor(source_width).ok_or_else(|| {
@@ -647,29 +625,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 value as f32 as f64
             };
             return Ok(Value::Float(value));
-        }
-        if self.has_bits_hint(params) {
-            // `f16|f32|f64 via Bits` reinterprets integer bits; exact pairs
-            // only, NaN payloads pass through bit-identical.
-            return match (value, width) {
-                (Value::Int(value), NumericWidth::F16) => Ok(Value::Float(f64::from(
-                    super::super::half_to_f32(value as u16),
-                ))),
-                (Value::UInt(value), NumericWidth::F16) => Ok(Value::Float(f64::from(
-                    super::super::half_to_f32(value as u16),
-                ))),
-                (Value::Int(value), NumericWidth::F32) => {
-                    Ok(Value::Float(f64::from(f32::from_bits(value as u32))))
-                }
-                (Value::Int(value), NumericWidth::F64) => {
-                    Ok(Value::Float(f64::from_bits(value as u64)))
-                }
-                (Value::UInt(value), NumericWidth::F32) => {
-                    Ok(Value::Float(f64::from(f32::from_bits(value as u32))))
-                }
-                (Value::UInt(value), NumericWidth::F64) => Ok(Value::Float(f64::from_bits(value))),
-                _ => self.recover_or_fail(recovery, span, "bits pair width mismatch"),
-            };
         }
         // `inf ↦ f16/bf16/f32/f64` (ruling 40): nearest-even, ±∞ beyond the
         // float's finite range. An `inf`-typed value the 64-bit carriers
@@ -1438,15 +1393,6 @@ fn format_decimal_carrier(value: i64, width: NumericWidth) -> String {
     } else {
         format!("{integer}.{fraction}")
     }
-}
-
-/// Encode the width-agnostic `Value::Float` (f64) carrier back to f16 bits via
-/// the runner's manual half seam. A NaN carrier re-canonicalizes to the seam's
-/// 0x7E00 payload, so the `u16 ↦ f16 via Bits ↦ u16 via Bits` round
-/// trip returns the original payload bits.
-#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
-fn f64_to_f16_bits(v: f64) -> u16 {
-    super::super::f32_to_f16_rn(v as f32)
 }
 
 /// `true` when `v` fits the signed range of `width`. Mirrors Rust codegen's

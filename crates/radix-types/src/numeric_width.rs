@@ -415,14 +415,14 @@ pub fn decimal_text_to_scaled(text: &str) -> Option<(i128, i32)> {
 /// Conversio hints, spelled in the `via` clause after the target (D11.9).
 ///
 /// `Hex` / `Bin` / `Oct` are text-parse radices. `Be` / `Le` are endian
-/// unpack rules for `octeti` windows — same clause, not bases. `Bits` is an
-/// exact-width bitcast (`u32↔f32`, `u64↔f64`) — reinterpretation, not a
-/// radix, and never legal in a `from_str_radix` base. `Code` (D10.6) reads a
+/// unpack rules for `octeti` windows — same clause, not bases. (`Bits`
+/// retired with need: a bit pattern is a `bN` value, written
+/// `↦ bN`.) `Code` (D10.6) reads a
 /// `littera` as its code point (`'A' ↦ u32 via Code`); it is not a
 /// radix either.
 #[must_use]
 pub fn is_conversio_radix_hint(marker: &str) -> bool {
-    matches!(marker, "Hex" | "Bin" | "Oct" | "Be" | "Le" | "Bits") || is_code_point_hint(marker)
+    matches!(marker, "Hex" | "Bin" | "Oct" | "Be" | "Le") || is_code_point_hint(marker)
 }
 
 /// D10.6 code-point hint: `'A' ↦ u32 via Code` and `65 ↦ littera via Code`.

@@ -1,93 +1,92 @@
-//! Typecheck pins for the `Bits` bitcast hint (`numerus<u32|u64> ↔ fractus<f32|f64>`).
+//! Typecheck pins for the retired `via Bits` hint (need, ruling
+//! 1dce2442 C3 ADDITION 1): every spelling is the named retirement
+//! diagnostic, and the `bN` replacements type.
 
 use crate::test_support;
 
+const RETIRED: &str = "conversio_via_bits_retired";
+
 #[test]
-fn u32_to_f32_bits_accepts() {
-    test_support::assert_accepts("functio bits(u32 n) → f32 { redde n ↦ f32 via Bits }");
+fn via_bits_is_retired_for_every_pair() {
+    for (param, ret, body) in [
+        ("u32 n", "f32", "n ↦ f32 via Bits"),
+        ("f32 x", "u32", "x ↦ u32 via Bits"),
+        ("u64 n", "f64", "n ↦ f64 via Bits"),
+        ("f64 x", "u64", "x ↦ u64 via Bits"),
+        ("u16 n", "f16", "n ↦ f16 via Bits"),
+        ("f16 x", "u16", "x ↦ u16 via Bits"),
+        ("u16 n", "bf16", "n ↦ bf16 via Bits"),
+        ("bf16 x", "u16", "x ↦ u16 via Bits"),
+        ("u16 n", "f32", "n ↦ f32 via Bits"),
+        ("u32 n", "f64", "n ↦ f64 via Bits"),
+        ("d64 n", "f32", "n ↦ f32 via Bits"),
+        ("inf a", "f32", "a ↦ f32 via Bits"),
+    ] {
+        test_support::assert_rejects_with_issue(
+            &format!("functio bits({param}) → {ret} {{ redde {body} }}"),
+            RETIRED,
+        );
+    }
 }
 
 #[test]
-fn f32_to_u32_bits_accepts() {
-    test_support::assert_accepts("functio bits(f32 x) → u32 { redde x ↦ u32 via Bits }");
-}
-
-#[test]
-fn u64_to_f64_bits_accepts() {
-    test_support::assert_accepts("functio bits(u64 n) → f64 { redde n ↦ f64 via Bits }");
-}
-
-#[test]
-fn f64_to_u64_bits_accepts() {
-    test_support::assert_accepts("functio bits(f64 x) → u64 { redde x ↦ u64 via Bits }");
-}
-
-// U1 red drivers (goal `bits-f16-pair`, unit U1) flipped green by U2: the
-// `u16 ↔ f16` `Bits` row is admitted both directions in `bits_pair_issue`.
-//
-// Expected accept values fixed in advance for the runner pin (U3):
-//   u16 0x3C00 ↔ 1.0, 0x3E00 ↔ 1.5, 0xBC00 ↔ -1.0, 0x7BFF ↔ 65504,
-//   subnormal 0x0001, NaN payload 0x7E00 round-trips to the original bits.
-
-#[test]
-fn u16_to_f16_bits_accepts() {
-    test_support::assert_accepts("functio bits(u16 n) → f16 { redde n ↦ f16 via Bits }");
-}
-
-#[test]
-fn f16_to_u16_bits_accepts() {
-    test_support::assert_accepts("functio bits(f16 x) → u16 { redde x ↦ u16 via Bits }");
-}
-
-#[test]
-fn u16_to_f32_bits_rejects() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(u16 n) → f32 { redde n ↦ f32 via Bits }",
-        "bits_pair_width_mismatch",
+fn retirement_help_names_the_bn_replacement() {
+    let help = crate::catalog_semantic::semantic_help(
+        crate::error::SemanticErrorKind::ConversionInvalid,
+        &[radix_diagnostics::DiagnosticArg::new("issue", RETIRED)],
+    )
+    .expect("catalog carries help for the retirement");
+    assert!(
+        help.contains("↦ b32"),
+        "help names the bN replacement: {help}"
+    );
+    assert!(
+        help.contains("u16 ↦ b16 ↦ f16"),
+        "help shows the number route: {help}"
     );
 }
 
 #[test]
-fn u16_to_f64_bits_rejects() {
+fn float_to_pattern_is_the_bn_marker() {
+    test_support::assert_accepts("functio bits(f32 x) → b32 { redde x ↦ b32 }");
+    test_support::assert_accepts("functio bits(f64 x) → b64 { redde x ↦ b64 }");
+    test_support::assert_accepts("functio bits(f16 x) → b16 { redde x ↦ b16 }");
+    test_support::assert_accepts("functio bits(bf16 x) → b16 { redde x ↦ b16 }");
+}
+
+#[test]
+fn pattern_to_float_is_the_bn_marker() {
+    test_support::assert_accepts("functio bits(b32 x) → f32 { redde x ↦ f32 }");
+    test_support::assert_accepts("functio bits(b64 x) → f64 { redde x ↦ f64 }");
+    test_support::assert_accepts("functio bits(b16 x) → f16 { redde x ↦ f16 }");
+    test_support::assert_accepts("functio bits(b16 x) → bf16 { redde x ↦ bf16 }");
+}
+
+#[test]
+fn number_holding_a_pattern_goes_through_its_marker() {
+    // `u16 ↦ b16 ↦ f16`: the author says the u16 holds a pattern, then reads
+    // it as a half float.
+    test_support::assert_accepts("functio bits(u16 n) → f16 { redde n ↦ b16 ↦ f16 }");
+    test_support::assert_accepts("functio bits(u16 n) → f32 { redde n ↦ b16 ↦ f16 ↦ f32 }");
+    test_support::assert_accepts("functio bits(u16 n) → bf16 { redde n ↦ b16 ↦ bf16 }");
+    test_support::assert_accepts("functio bits(u32 n) → f32 { redde n ↦ b32 ↦ f32 }");
+    test_support::assert_accepts("functio bits(u64 n) → f64 { redde n ↦ b64 ↦ f64 }");
+    test_support::assert_accepts("functio bits(f32 x) → u32 { redde x ↦ b32 ↦ u32 }");
+}
+
+#[test]
+fn bit_width_must_match_the_float() {
     test_support::assert_rejects_with_issue(
-        "functio bits(u16 n) → f64 { redde n ↦ f64 via Bits }",
-        "bits_pair_width_mismatch",
+        "functio bits(u16 n) → f32 { redde n ↦ b16 ↦ f32 }",
+        "bits_conversion_width_mismatch",
     );
 }
 
 #[test]
-fn unsized_fractus_to_u32_bits_rejects() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(fractus x) → u32 { redde x ↦ u32 via Bits }",
-        "bits_pair_width_mismatch",
-    );
-}
-
-#[test]
-fn u32_to_f64_bits_rejects() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(u32 n) → f64 { redde n ↦ f64 via Bits }",
-        "bits_pair_width_mismatch",
-    );
-}
-
-#[test]
-fn f16_to_u32_bits_rejects() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(f16 x) → u32 { redde x ↦ u32 via Bits }",
-        "bits_pair_width_mismatch",
-    );
-}
-
-// OQ3 (settled by U2): `Bits` never co-occurs with `Hex`/`Bin`/`Oct` in one
-// conversion — one interpretation family per `↦`. Since D11.9 a conversion
-// carries exactly one hint in its `via` clause, so the combination cannot be
-// written; the parser pins the multi-hint spellings as retired forms
-// (`radix-parser` `via_hint_test`).
-
-#[test]
-fn without_bits_value_conversion_stays() {
+fn without_a_marker_value_conversion_stays() {
     test_support::assert_accepts("functio val(u32 n) → f64 { redde n ↦ f64 }");
+    test_support::assert_accepts("functio val(u16 dbits) → f32 { redde dbits ↦ f32 }");
+    test_support::assert_accepts("functio val(u16 dbits) → f16 { redde dbits ↦ f16 }");
 }
 
 #[test]
@@ -95,58 +94,16 @@ fn radix_hint_accept_row_stays_green() {
     test_support::assert_accepts("incipit { fixum _ n ← \"ff\" ↦ u32 via Hex }");
 }
 
-// U4 chain + derived-form pins (goal `bits-f16-pair`, unit U4): the
-// left-folded chain types as exact widen, the `↤` typed-destination form
-// routes through the same conversion table (zero new implementation), and
-// the no-hint form stays the distinct integer-value conversion.
-
-#[test]
-fn u16_bits_chain_to_f32_types_as_exact_widen() {
-    // `dbits ↦ f16 via Bits ↦ fractus<f32>`: Bits hop then the exact
-    // f16 → f32 widen — the value-level "no intermediate binding" proof is
-    // U5's runner exemplum; the type level pins the fold here.
-    test_support::assert_accepts(
-        "functio fold(u16 dbits) → f32 { redde dbits ↦ f16 via Bits ↦ f32 }",
-    );
-}
-
-#[test]
-fn u16_bits_chain_to_f32_typed_destination_accepts() {
-    // `df` names `fractus<f32>`; the chain must fold to exactly that type
-    // (not `fractus<f16>`), or the declaration rejects.
-    test_support::assert_accepts(
-        "incipit {\n  fixum u16 dbits ← 0x3E00\n  fixum f32 df ← dbits ↦ f16 via Bits ↦ f32\n}",
-    );
-}
-
 #[test]
 fn typed_destination_conversio_assign_accepts_u16_to_f16() {
-    // `↤` routes the right side through the same conversion registry as an
-    // explicit `dbits ↦ fractus<f16>` — the destination type picks the pair
-    // implicitly. Derived test: zero new implementation by design.
     test_support::assert_accepts("incipit {\n  fixum u16 dbits ← 0x3E00\n  fixum f16 d ↤ dbits\n}");
-}
-
-#[test]
-fn u16_to_f32_without_bits_stays_integer_value_conversion() {
-    // No `Bits` hint: this is the integer-value conversion, distinct from the
-    // reinterpretation row — u16 0x3E00 (15872) becomes f32 15872.0, not the
-    // f16-bits value 1.0. The value-level distinction is U5's corpus exemplum
-    // on the runner; the type level pins the distinct admission here.
-    test_support::assert_accepts("functio val(u16 dbits) → f32 { redde dbits ↦ f32 }");
-}
-
-#[test]
-fn u16_to_f16_without_bits_stays_integer_value_conversion() {
-    // Same distinct-value rule at the f16 width: no hint, no reinterpretation.
-    test_support::assert_accepts("functio val(u16 dbits) → f16 { redde dbits ↦ f16 }");
 }
 
 // --- CTR-02: channel contract for the builtin `Bits` rows ---
 //
-// The `Bits` bitcast is a total conversion: a bare `↦` in a failable function
-// needs no inline recovery and composes no failure channel, whatever the
-// alternate-exit payload. And a builtin row (no conversion function, hence no
+// A `↦ bN` reinterpretation is a total conversion: a bare `↦` in a failable
+// function needs no inline recovery and composes no failure channel, whatever
+// the alternate-exit payload. And a builtin row (no conversion function, hence no
 // declared `⇥ E`) never admits failable-call propagation through the registry
 // seam — the SEM010-shaped absence diagnostic is retained.
 
@@ -157,10 +114,10 @@ use radix_lexer::{Interner, Span};
 use radix_target::Target;
 
 #[test]
-fn bits_bitcast_bare_arrow_needs_no_recovery_in_failable_function() {
-    test_support::assert_accepts("functio bits(u32 n) → f32 ⇥ textus { redde n ↦ f32 via Bits }");
-    test_support::assert_accepts("functio bits(u32 n) → f32 ⇥ numerus { redde n ↦ f32 via Bits }");
-    test_support::assert_accepts("functio bits(u64 n) → f64 ⇥ textus { redde n ↦ f64 via Bits }");
+fn bn_reinterpretation_bare_arrow_needs_no_recovery_in_failable_function() {
+    test_support::assert_accepts("functio bits(f32 x) → b32 ⇥ textus { redde x ↦ b32 }");
+    test_support::assert_accepts("functio bits(f32 x) → b32 ⇥ numerus { redde x ↦ b32 }");
+    test_support::assert_accepts("functio bits(f64 x) → b64 ⇥ textus { redde x ↦ b64 }");
 }
 
 #[test]

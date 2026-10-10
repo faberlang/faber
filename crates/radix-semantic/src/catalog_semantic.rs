@@ -454,14 +454,14 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "octeti_to_tensor_length_mismatch" => {
             Some("size the byte window to product(shape) times the element width, or change the tensor shape".to_owned())
         }
-        "bits_pair_width_mismatch" => {
-            Some("convert to the matching IEEE width first: u16 pairs with bf16 or f16, u32 with f32, or u64 with f64".to_owned())
+        "conversio_via_bits_retired" => {
+            Some("write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`".to_owned())
         }
         "code_hint_pair_mismatch" => {
             Some("Code reads a code point as littera ↦ u32 via Code or builds one as numerus ↦ littera via Code".to_owned())
         }
         "conversio_via_unknown_hint" => {
-            Some("use one of Hex, Bin, Oct, Be, Le, Bits, or Code after via".to_owned())
+            Some("use one of Hex, Bin, Oct, Be, Le, or Code after via".to_owned())
         }
         "conversio_via_target_takes_no_hint" => {
             Some("drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint".to_owned())

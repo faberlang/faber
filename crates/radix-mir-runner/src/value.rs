@@ -2260,9 +2260,8 @@ pub fn float_to_numerus_width(value: f64, width: NumericWidth) -> Value {
         NumericWidth::U16 => Value::UInt(u64::from(value as u16)),
         NumericWidth::U32 => Value::UInt(u64::from(value as u32)),
         NumericWidth::U64 => Value::UInt(value as u64),
-        // Float and decimal widths keep the width-agnostic saturating carrier:
-        // `W via Bits` reinterprets bits before reaching a numeric cast,
-        // and decimals convert through the decimal carrier path.
+        // Float and decimal widths keep the width-agnostic saturating carrier;
+        // decimals convert through the decimal carrier path.
         NumericWidth::F16
         | NumericWidth::BF16
         | NumericWidth::F32

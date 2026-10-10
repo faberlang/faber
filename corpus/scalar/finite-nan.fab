@@ -5,14 +5,14 @@ kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "conversio_expr", "cast_expr", "comparison", "equality", "equality_tail", "expression", "literal", "range_expr", "range_tail", "nota_stmt"]
 category = "conversion"
 canonical = true
-summary = "finite()-style NaN detection on float payloads via the Bits field-read gate (exponent 0xFF, fraction ≠ 0), never via x ≠ x."
-syntax = "x ↦ u32 via Bits field reads: (bits ⇒ 23) ∧ 255 and bits ∧ 8388607"
+summary = "finite()-style NaN detection on float payloads via the bN field-read gate (exponent 0xFF, fraction ≠ 0), never via x ≠ x."
+syntax = "x ↦ b32 ↦ u32 field reads: (bits ⇒ 23) ∧ 255 and bits ∧ 8388607"
 related = ["↦", "fractus", "functio"]
 locale = "en"
 +++
 
 # =============================================================================
-# ↦ — finite()/NaN detection through the Bits field-read gate.
+# ↦ — finite()/NaN detection through the bN field-read gate.
 # =============================================================================
 #
 # What this teaches:
@@ -21,7 +21,7 @@ locale = "en"
 #     for `≠` (value ≠ value never fires there), so a dtype.fab-style
 #     `x ≠ x then return false` finite() gate is undermined on that lane; the
 #     field-read gate below is lane-stable (native check + faber run agree).
-#   • `x ↦ u32 via Bits` gives the IEEE binary32 payload for inspection, and
+#   • `x ↦ b32 ↦ u32` gives the IEEE binary32 payload for inspection, and
 #     the canonical quiet NaN 0x7FC00000 survives the round trip bit-identically
 #     through both lanes (see conversio/bits-conversio.fab).
 #   • ±Inf shares exponent 0xFF with a zero fraction, so the same gate excludes
@@ -59,7 +59,7 @@ locale = "en"
 # A value is finite iff its exponent field is not all-ones (0xFF); the
 # fraction field (≠ 0) is what separates NaN from ±Inf inside that class.
 fn finite(f32 x) → bool {
-    const _ bits ← x ↦ u32 via Bits
+    const _ bits ← x ↦ b32 ↦ u32
     const _ exponent ← bits ⇒ 23 ∧ 255 ∷ u32
     const _ omnino ← 255 ∷ u32
     return exponent ≢ omnino
@@ -67,7 +67,7 @@ fn finite(f32 x) → bool {
 
 # nan() — the same field gate narrowed to NaN only (exponent 0xFF, fraction ≠ 0).
 fn nan(f32 x) → bool {
-    const _ bits ← x ↦ u32 via Bits
+    const _ bits ← x ↦ b32 ↦ u32
     const _ exponent ← bits ⇒ 23 ∧ 255 ∷ u32
     const _ fraction ← bits ∧ 8388607 ∷ u32
     const _ omnino ← exponent ≡ 255 ∷ u32
@@ -77,13 +77,13 @@ fn nan(f32 x) → bool {
 
 main {
     # 0x3FC00000 = 1.5f32 — finite.
-    const _ one_and_half ← 1069547520 ∷ u32 ↦ f32 via Bits
+    const _ one_and_half ← 1069547520 ∷ u32 ↦ b32 ↦ f32
 
     # 0x7FC00000 — canonical quiet NaN.
-    const _ quiet_nan ← 2143289344 ∷ u32 ↦ f32 via Bits
+    const _ quiet_nan ← 2143289344 ∷ u32 ↦ b32 ↦ f32
 
     # 0x7F800000 — +Inf.
-    const _ infinitas ← 2139095040 ∷ u32 ↦ f32 via Bits
+    const _ infinitas ← 2139095040 ∷ u32 ↦ b32 ↦ f32
     print finite(one_and_half)
     print finite(quiet_nan)
     print finite(infinitas)
@@ -92,7 +92,7 @@ main {
     # The canonical quiet NaN payload survives the round trip bit-identically
     # on both lanes (the 0xFE00→0x7E00 re-canonicalization residual only
     # touches non-canonical spellings — see the header note).
-    const _ back ← quiet_nan ↦ u32 via Bits
+    const _ back ← quiet_nan ↦ b32 ↦ u32
     print back
     print back ≡ (2143289344 ∷ u32)
 }

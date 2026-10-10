@@ -624,15 +624,8 @@ fn single_file_rust_runtime_plan(
         || analysis.hir.items.iter().any(
             |item| matches!(&item.kind, radix::module::hir::HirItemKind::Function(f) if f.is_async),
         );
-    // The half-float decode lives in `faber::float`; its detection needs the
-    // interner to spell the `Bits` hint, so it is not part of `collect_rust_needs`.
-    let needs_f16_decode = radix_hir_rust::half_float::hir_needs_f16_bits_helper(
-        &analysis.hir,
-        &analysis.types,
-        &|symbol| analysis.interner.resolve(symbol) == "Bits",
-    );
     Ok(super::RustRuntimePlan {
-        needs_faber: needs.needs_faber_runtime || needs_f16_decode,
+        needs_faber: needs.needs_faber_runtime,
         needs_tokio,
         needs_regex: needs.needs_regex,
         host: None,

@@ -107,12 +107,10 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     assert!(filum.contains("reducta via summa ex"));
     assert!(filum.contains("@ nucleum"));
 
-    // Bits lists the four exact pairs, including both u16 rows.
+    // Bits names its retirement and the bN replacement.
     let bits = render_plain(&registry.lookup("Bits").expect("Bits"));
-    assert!(bits.contains("u16↔f16"));
-    assert!(bits.contains("u16↔bf16"));
-    assert!(bits.contains("u32↔f32"));
-    assert!(bits.contains("u64↔f64"));
+    assert!(bits.contains("retired"));
+    assert!(bits.contains("b16"));
 
     // finite teaches the bit-field read gate, never x ≠ x.
     let finite = render_plain(&registry.lookup("finite").expect("finite"));

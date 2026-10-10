@@ -4,28 +4,29 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "conversio_expr", "cast_expr", "comparison", "equality", "equality_tail", "expression", "literal", "range_expr", "range_tail", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "Exact-width IEEE bitcast between int and float through the Bits hint, including the u16↔f16 row and the extended composition law."
-syntax = "u16|u32|u64 ↦ f16|f32|f64 via Bits and f16|f32|f64 ↦ u16|u32|u64 via Bits"
+summary = "Exact-width IEEE bit patterns between int and float through the raw-bits markers b16, b32 and b64, including the u16↔f16 row and the extended composition law."
+syntax = "u16|u32|u64 ↦ b16|b32|b64 ↦ f16|f32|f64 and f16|f32|f64 ↦ b16|b32|b64 ↦ u16|u32|u64"
 related = ["↦", "int", "float", "octeti"]
 locale = "en"
 +++
 
 # =============================================================================
-# ↦ — Exact-width bitcast via the Bits hint.
+# ↦ — Exact-width bit patterns through the b16, b32 and b64 markers.
 # =============================================================================
 #
 # What this teaches:
-#   • Both directions — `n ↦ f32 via Bits` and `x ↦ u32 via Bits` (plus the u16/f16 and u64/f64 twins).
-#   • Exact pairs only — u16 pairs with f16, u32 with f32, u64 with f64; anything else rejects.
+#   • The rule, once — from a number, `↦` converts the value; from bits, `↦` to a same-width type reads those bits as that type.
+#   • Both directions — `n ↦ b32 ↦ f32` reads a pattern held in a u32 as a float, and `x ↦ b32 ↦ u32` takes the pattern out of a float (plus the u16/f16 and u64/f64 twins).
+#   • Exact pairs only — b16 pairs with f16, b32 with f32, b64 with f64; anything else rejects.
 #   • Bit-identical for the pinned payloads; the runner seam re-canonicalizes non-0x7E00 NaN spellings (0xFE00→0x7E00) — see the bits-f16 goal ledger residual.
-#   • The chain — `octeti[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32` widens the f16 value exactly, with no intermediate binding.
-#   • Extended composition law, observable side — `octeti[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32` equals the oracle f32 value. The direct `octeti[0‥2] ↦ f16 via Le` window row is unshipped (OQ1); the equivalence to it is the derived claim, not executed here.
-#   • Bits is reinterpretation, not value conversion — the same u16 window prints 15872.0 without the hint and 1.5 through `f16 via Bits`.
+#   • The chain — `octeti[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32` widens the f16 value exactly, with no intermediate binding.
+#   • Extended composition law, observable side — `octeti[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32` equals the oracle f32 value. The direct `octeti[0‥2] ↦ f16 via Le` window row is unshipped (OQ1); the equivalence to it is the derived claim, not executed here.
+#   • A pattern is not a value conversion — the same u16 window prints 15872.0 without the marker and 1.5 through `b16 ↦ f16`.
 #
 # Common mistakes:
-#   • Wrong pair — `n ↦ f64 via Bits` from u32 rejects (bits_pair_width_mismatch).
-#   • Missing width — unsized float sources reject; Bits needs both widths exact.
-#   • A float source is never a Bits row — `1.0 ↦ f64 via Bits` rejects; spell the u64 bit pattern with the typed-literal form (`4607182418800017408 ∷ u64`).
+#   • `via Bits` — retired; the hint is `SEM016 conversio_via_bits_retired`. Write the pattern as a bN value.
+#   • Wrong width — `n ↦ b16 ↦ f32` rejects: a b16 reads as a 16-bit float only.
+#   • A float source is never a pattern source for a number — `1.0 ↦ f64` is the value; spell the u64 bit pattern with the typed-literal form (`4607182418800017408 ∷ u64`).
 #
 # See also: ↦, int, float, octeti
 # =============================================================================
@@ -35,7 +36,7 @@ locale = "en"
 #   2143289344
 #   2143289344
 #   4607182418800017408
-#   verum
+#   true
 #   15360
 #   32256
 #   31744
@@ -46,50 +47,49 @@ locale = "en"
 #
 # BACKEND:
 #   HIR-direct Rust emits to_bits / from_bits. MIR-stepper reinterprets the
-#   same bits. Go uses math.Float{32,64}bits / frombits; TS uses DataView
-#   set/get pairs. The u16↔f16 row runs on the MIR runner; rust/go/ts fail
-#   closed (no half carrier), and swift has no Bits emission — `Float16(15872)`
-#   is the value conversion, not the reinterpretation.
+#   same bits. The u16↔f16 row runs on the MIR runner; targets without a half
+#   carrier refuse it by name, and swift has no raw-bits emission —
+#   `Float16(15872)` is the value conversion, not the reinterpretation.
 
 main {
     # 0x7fc00000 is a quiet NaN payload; it must survive the round trip.
     const _ nan_bits ← |00 00 c0 7f|[0‥4] ↦ u32 via Le
-    const _ nan ← nan_bits ↦ f32 via Bits
-    const _ back ← nan ↦ u32 via Bits
+    const _ nan ← nan_bits ↦ b32 ↦ f32
+    const _ back ← nan ↦ b32 ↦ u32
 
     # Composition algebra: endian read + bitcast ≡ direct float endian read.
-    const _ composed ← |00 00 c0 7f|[0‥4] ↦ u32 via Le ↦ f32 via Bits
+    const _ composed ← |00 00 c0 7f|[0‥4] ↦ u32 via Le ↦ b32 ↦ f32
     const _ direct ← |00 00 c0 7f|[0‥4] ↦ f32 via Le
-    const _ composed_bits ← composed ↦ u32 via Bits
-    const _ direct_bits ← direct ↦ u32 via Bits
+    const _ composed_bits ← composed ↦ b32 ↦ u32
+    const _ direct_bits ← direct ↦ b32 ↦ u32
 
     # u64/f64 twin: 1.0f64 is 0x3ff0000000000000.
-    const _ one_f64 ← 4607182418800017408 ∷ u64 ↦ f64 via Bits
-    const _ one_bits ← one_f64 ↦ u64 via Bits
-    const _ one_back ← one_bits ↦ f64 via Bits
-    const _ roundtrip_holds ← one_back ↦ u64 via Bits ≡ one_bits
+    const _ one_f64 ← 4607182418800017408 ∷ u64 ↦ b64 ↦ f64
+    const _ one_bits ← one_f64 ↦ b64 ↦ u64
+    const _ one_back ← one_bits ↦ b64 ↦ f64
+    const _ roundtrip_holds ← one_back ↦ b64 ↦ u64 ≡ one_bits
 
     # u16/f16 twin: 0x3C00 is 1.0f16; the NaN / ±Inf / subnormal payloads
     # survive the round trip bit-identically.
-    const _ one_f16 ← 15360 ∷ u16 ↦ f16 via Bits
-    const _ one_bits16 ← one_f16 ↦ u16 via Bits
-    const _ nan_f16 ← 32256 ∷ u16 ↦ f16 via Bits
-    const _ nan_bits16 ← nan_f16 ↦ u16 via Bits
-    const _ inf_f16 ← 31744 ∷ u16 ↦ f16 via Bits
-    const _ inf_bits16 ← inf_f16 ↦ u16 via Bits
-    const _ sub_f16 ← 1 ∷ u16 ↦ f16 via Bits
-    const _ sub_bits16 ← sub_f16 ↦ u16 via Bits
+    const _ one_f16 ← 15360 ∷ u16 ↦ b16 ↦ f16
+    const _ one_bits16 ← one_f16 ↦ b16 ↦ u16
+    const _ nan_f16 ← 32256 ∷ u16 ↦ b16 ↦ f16
+    const _ nan_bits16 ← nan_f16 ↦ b16 ↦ u16
+    const _ inf_f16 ← 31744 ∷ u16 ↦ b16 ↦ f16
+    const _ inf_bits16 ← inf_f16 ↦ b16 ↦ u16
+    const _ sub_f16 ← 1 ∷ u16 ↦ b16 ↦ f16
+    const _ sub_bits16 ← sub_f16 ↦ b16 ↦ u16
 
-    # Extended composition law, observable side: u16 Le window → Bits → widen
-    # f32. `|00 3c|` is 0x3C00 = 1.0f16, so the fold equals the oracle f32
+    # Extended composition law, observable side: u16 Le window → b16 → f16 →
+    # widen f32. `|00 3c|` is 0x3C00 = 1.0f16, so the fold equals the oracle f32
     # value 1.0. The direct `f16 via Le` window row is unshipped (OQ1);
     # the equivalence to it is the derived claim, not executed here.
-    const _ folded ← |00 3c|[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32
+    const _ folded ← |00 3c|[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32
 
-    # Bits is reinterpretation, not value conversion: the same 0x3E00 window
-    # is 15872 as an integer value, 1.5 as f16 bits.
+    # A pattern is reinterpretation, not value conversion: the same 0x3E00
+    # window is 15872 as an integer value, 1.5 as f16 bits.
     const _ value ← |00 3e|[0‥2] ↦ u16 via Le ↦ f32
-    const _ reinterp ← |00 3e|[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32
+    const _ reinterp ← |00 3e|[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32
 
     print back
     print direct_bits

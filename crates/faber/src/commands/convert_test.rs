@@ -509,7 +509,7 @@ main {
     const bytes raw ← |3c 00 00 00|
     const char big ← 'A'
     const u16 a ← raw[0‥2] ↦ u16 via Le
-    const f16 b ← a ↦ f16 via Bits
+    const f16 b ← a ↦ b16 ↦ f16
     const int c ← "ff" ↦ i32 via Hex ⊥ 0
     const u32 d ← big ↦ u32 via Code
     const char e ← 65 ↦ char via Code ⊥ '?'
@@ -529,7 +529,7 @@ fn convert_keeps_hints_in_the_via_clause() {
 
     for (needle, what) in [
         ("↦ u16 via Le", "the endian read keeps its clause"),
-        ("↦ f16 via Bits", "the bitcast keeps its clause"),
+        ("(a ↦ b16) ↦ f16", "the pattern chain stays"),
         ("↦ i32 via Hex ⊥ 0", "the clause binds before the default"),
         ("↦ u32 via Code", "the code-point read"),
         (
@@ -584,7 +584,7 @@ fn convert_spells_the_via_clause_in_each_pack_and_reads_it_back() {
             run_faber_convert_stdout_with_args(&["convert", "--to", locale, "--stdout", path]);
         assert!(
             localized.contains(&format!(" {word} Le"))
-                && localized.contains(&format!(" {word} Bits")),
+                && localized.contains(&format!(" {word} Hex")),
             "{locale} must spell the clause `{word}`:\n{localized}"
         );
         // Re-reading the localized source and converting back to Latin must

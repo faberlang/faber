@@ -25,8 +25,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 mod aggregate;
-#[cfg(test)]
-mod bits_f16_test;
 mod inf;
 mod littera;
 #[cfg(test)]

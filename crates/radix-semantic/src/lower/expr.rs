@@ -1832,7 +1832,12 @@ impl Lowerer<'_> {
         params: &mut Vec<radix_lexer::Symbol>,
     ) {
         let hint = self.interner.resolve(via.name).to_owned();
-        let issue = if !crate::numeric_width::is_conversio_radix_hint(&hint) {
+        // FABER-2-SUNSET: delete with the retired-word diagnostics.
+        // Need (ruling 1dce2442, C3): `via Bits` retired entirely;
+        // a bit pattern is a `bN` value and `↦ bN` reads or writes it.
+        let issue = if hint == "Bits" {
+            Some("conversio_via_bits_retired")
+        } else if !crate::numeric_width::is_conversio_radix_hint(&hint) {
             Some("conversio_via_unknown_hint")
         } else if !via_target_takes_hint(self, target) {
             Some("conversio_via_target_takes_no_hint")

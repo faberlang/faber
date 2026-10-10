@@ -50,23 +50,11 @@ incipit {
 }
 
 #[test]
-fn u16_to_bf16_bits_accepts() {
-    test_support::assert_accepts("functio bits(u16 n) → bf16 { redde n ↦ bf16 via Bits }");
+fn u16_to_bf16_pattern_accepts() {
+    test_support::assert_accepts("functio bits(u16 n) → bf16 { redde n ↦ b16 ↦ bf16 }");
 }
 
 #[test]
-fn bf16_to_u16_bits_accepts() {
-    test_support::assert_accepts("functio bits(bf16 x) → u16 { redde x ↦ u16 via Bits }");
-}
-
-#[test]
-fn bf16_and_f16_bits_are_not_a_pair() {
-    test_support::assert_rejects_with_issue(
-        "functio bits(bf16 x) → f16 { redde x ↦ f16 via Bits }",
-        "bits_pair_width_mismatch",
-    );
-    test_support::assert_rejects_with_issue(
-        "functio bits(f16 x) → bf16 { redde x ↦ bf16 via Bits }",
-        "bits_pair_width_mismatch",
-    );
+fn bf16_to_u16_pattern_accepts() {
+    test_support::assert_accepts("functio bits(bf16 x) → u16 { redde x ↦ b16 ↦ u16 }");
 }

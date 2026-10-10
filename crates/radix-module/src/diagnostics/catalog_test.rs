@@ -300,12 +300,9 @@ fn is_known_diagnostic_code_rejects_unknown_codes() {
 }
 
 #[test]
-fn width_issue_prose_names_fractus_bf16_guidance() {
-    // S03-1: width lowering helpers report typed issues, not prose; S03-3
-    // then removed the TypeUndefined message tables, so the surviving
-    // catalog authority for width-family bf16 guidance is this help twin.
-    let args = vec![DiagnosticArg::new("issue", "bits_pair_width_mismatch")];
+fn via_bits_retirement_help_names_the_bn_replacement() {
+    let args = vec![DiagnosticArg::new("issue", "conversio_via_bits_retired")];
     let help = semantic_help(SemanticErrorKind::ConversionInvalid, &args)
-        .unwrap_or_else(|| panic!("catalog help missing for bits_pair_width_mismatch"));
-    assert!(help.contains("bf16"), "width prose should name bf16: {help}");
+        .unwrap_or_else(|| panic!("catalog help missing for conversio_via_bits_retired"));
+    assert!(help.contains("b32"), "retirement help should name bN: {help}");
 }

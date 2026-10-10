@@ -1407,7 +1407,7 @@ interval_target       := range_expr
 # `via` is contextual: it is claimed only on the conversion's own line,
 # immediately after the target type; everywhere else it is an ordinary
 # identifier. The hint is a compile-time identifier (`Hex`, `Bin`, `Oct`,
-# `Be`, `Le`, `Bits`, `Code`) that selects the conversion row; whether the
+# `Be`, `Le`, `Code`) that selects the conversion row; whether the
 # hint is known, and whether the target takes one, is semantic.
 via_clause            := 'via' IDENTIFIER
 # `⊥` (U+22A5) is the default channel (D17.7): it binds looser than `↦ T`.

@@ -296,13 +296,15 @@ fn ascii_format_hints_are_hex_bin_oct_only() {
             "{marker} stays in the shared conversio hint set"
         );
     }
-    for marker in ["Be", "Le", "Bits"] {
+    for marker in ["Be", "Le"] {
         assert!(
             !is_ascii_format_hint(marker),
-            "{marker} is endian/bitcast, not an ascii digit base"
+            "{marker} is endian, not an ascii digit base"
         );
         assert!(is_conversio_radix_hint(marker));
     }
+    // `via Bits` retired: no longer a conversio hint.
+    assert!(!is_conversio_radix_hint("Bits"));
 }
 
 // S03-1: lowering failures cross the producer boundary as typed issues, not

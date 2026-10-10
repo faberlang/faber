@@ -323,7 +323,7 @@ fn LN2_LO() → float {
 @ private
 fn bits(float x) → u64 {
     const f64 wide ← x ↦ f64
-    return wide ↦ u64 via Bits
+    return wide ↦ b64 ↦ u64
 }
 
 # Why: Biased exponent field (0 = zero/subnormal, 2047 = ∞/NaN).
@@ -352,7 +352,7 @@ fn is_finite(float x) → bool {
 fn unit_mantissa(float x) → float {
     const u64 fraction ← bits(x) ∧ (4503599627370495 ∷ u64)
     const u64 unit ← fraction ∨ (4607182418800017408 ∷ u64)
-    const f64 wide ← unit ↦ f64 via Bits
+    const f64 wide ← unit ↦ b64 ↦ f64
     return wide
 }
 
@@ -361,7 +361,10 @@ fn unit_mantissa(float x) → float {
 fn pow2(int k) → float {
     # k ≥ -1022 keeps k + 1023 non-negative, so the default never applies.
     const u64 field ← (k + 1023) ↦ u64 ⊥ 0
-    const f64 wide ← (field ⇐ 52) ↦ f64 via Bits
+    # The shift is bit movement: it acts on the b64 pattern, then the pattern
+    # is read as a float.
+    const b64 shifted ← (field ↦ b64) ⇐ 52
+    const f64 wide ← shifted ↦ f64
     return wide
 }
 

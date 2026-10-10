@@ -147,8 +147,8 @@ fn missing_hint_is_unspecified_for_one_byte_elements_too() {
 }
 
 #[test]
-fn bits_and_hex_hints_are_unspecified() {
-    for hint in ["Bits", "Hex"] {
+fn hex_hint_is_unspecified() {
+    for hint in ["Hex"] {
         assert_rejects_with_issue(&read("f32", "[1]", hint), UNSPECIFIED);
     }
 }

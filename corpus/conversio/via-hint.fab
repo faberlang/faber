@@ -4,7 +4,7 @@ kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "conversio_expr", "inline_default", "expression", "literal", "nota_stmt"]
 category = "conversion"
 summary = "A convert hint is a via clause on the conversion: `x ↦ u32 via Hex`. The clause binds tighter than the ⊥ default and chains."
-syntax = "<expr> ↦ <type> via Hex|Bin|Oct|Be|Le|Bits|Code [⊥ <default>]"
+syntax = "<expr> ↦ <type> via Hex|Bin|Oct|Be|Le|Code [⊥ <default>]"
 aliases = ["via clause", "convert hint"]
 related = ["↦", "⊥", "Bits", "Code", "octeti"]
 locale = "en"
@@ -24,12 +24,12 @@ locale = "en"
 #     `"ff" ↦ u32 via Hex ↦ f64` parses hexadecimal text as an unsigned
 #     integer, then widens it to a float.
 #   • The hints are compile-time identifiers, spelled the same in every
-#     locale: Hex, Bin, Oct, Be, Le, Bits, Code. `via` itself is contextual;
+#     locale: Hex, Bin, Oct, Be, Le, Code. `via` itself is contextual;
 #     it stays an ordinary name everywhere a clause cannot start.
 #
 # Common mistakes:
-#   • writing the hint as a type argument — `int<u32, Bits>` is the retired
-#     form; write `u32 via Bits`
+#   • writing the hint as a type argument — `int<u32, Be>` is the retired
+#     form; write `u32 via Be`
 #   • an unknown hint, or a hint on a target that takes none —
 #     `n ↦ string via Hex` is rejected
 #
@@ -82,9 +82,10 @@ main {
     const char built ← 65 ↦ char via Code ⊥ '?'
     print built
 
-    # Bit reinterpretation: the pattern 0x3f800000 is the float 1.0.
+    # Bit reinterpretation goes through the bN marker, not a hint: the
+    # pattern 0x3f800000 is the float 1.0.
     const u32 pattern ← 1065353216
-    const f32 one ← pattern ↦ f32 via Bits
+    const f32 one ← pattern ↦ b32 ↦ f32
     print one
 
     # `via` is an ordinary name outside the clause.

@@ -122,25 +122,16 @@ fn endian_unpack_into_integer_still_accepts() {
     );
 }
 
-// --- wrong site class: Bits bitcast ---
+// --- wrong site class: retired Bits hint ---
 
 #[test]
-fn bits_bitcast_from_decimal_source_rejects() {
+fn via_bits_on_a_decimal_is_the_retirement_diagnostic() {
     test_support::assert_rejects_with_issue(
         "functio bits(d64 n) → f32 { redde n ↦ f32 via Bits }",
-        "decimal_bits_hint_rejected",
+        "conversio_via_bits_retired",
     );
-}
-
-#[test]
-fn bits_bitcast_into_decimal_target_rejects() {
     test_support::assert_rejects_with_issue(
         "functio bits(f32 x) → d64 { redde x ↦ d64 via Bits }",
-        "decimal_bits_hint_rejected",
+        "conversio_via_bits_retired",
     );
-}
-
-#[test]
-fn bits_bitcast_integer_pair_still_accepts() {
-    test_support::assert_accepts("functio bits(u32 n) → f32 { redde n ↦ f32 via Bits }");
 }

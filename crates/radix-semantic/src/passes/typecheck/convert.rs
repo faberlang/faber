@@ -66,14 +66,12 @@ const ISSUE_OCTETI_TO_TENSOR_ELEMENT_UNSUPPORTED: &str = "octeti_to_tensor_eleme
 const ISSUE_OCTETI_TO_TENSOR_LENGTH_MISMATCH: &str = "octeti_to_tensor_length_mismatch";
 const ISSUE_TENSOR_TO_OCTETI_UNSPECIFIED: &str = "tensor_to_octeti_unspecified";
 const ISSUE_TENSOR_TO_OCTETI_ELEMENT_UNSUPPORTED: &str = "tensor_to_octeti_element_unsupported";
-const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
 // decimal-widths D2 (wildcard audit): the conversio `via` hints are
 // integer-family machinery. Radix text parse (Hex/Bin/Oct), endian unpack
-// (Be/Le), and the IEEE bitcast (Bits) all reject decimal targets/sources
-// with named teaching issues instead of a generic mismatch.
+// (Be/Le) all reject decimal targets/sources with named teaching issues
+// instead of a generic mismatch.
 const ISSUE_DECIMAL_RADIX_HINT_REJECTED: &str = "decimal_radix_hint_rejected";
 const ISSUE_DECIMAL_ENDIAN_HINT_REJECTED: &str = "decimal_endianness_hint_rejected";
-const ISSUE_DECIMAL_BITS_HINT_REJECTED: &str = "decimal_bits_hint_rejected";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_LISTA_TO_TEXTUS_UNSUPPORTED: &str = "lista_to_textus_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
@@ -615,7 +613,7 @@ impl TypeChecker<'_> {
         }
         // decimal-widths D2 (wildcard audit): any conversio `via` hint aimed
         // at a decimal numerus target rejects here — radix text parse, endian
-        // unpack, and the Bits bitcast are integer/IEEE-family only.
+        // and unpack are integer-family only.
         if let Some(issue) = self.decimal_target_hint_issue(target_resolved, params) {
             self.invalid_conversion(issue, span);
             return self.error_type;
@@ -991,11 +989,7 @@ impl TypeChecker<'_> {
             self.note_conversio_recovery_checked(recovery, target_resolved);
         } else {
             self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            // An exact-width `Bits` bitcast (validated by `bits_pair_issue`)
-            // reinterprets the same bits and cannot fail.
-            if !self.conversio_has_bits_hint(params)
-                && self.numeric_conversio_can_fail(source, source_ty, target_resolved)
-            {
+            if self.numeric_conversio_can_fail(source, source_ty, target_resolved) {
                 self.check_text_failure_channel(source_ty, target_resolved, span);
             }
         }
@@ -1644,14 +1638,7 @@ impl TypeChecker<'_> {
             (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Bivalens) => {
                 Some(ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED)
             }
-            // `Bits` is also checked for same-family pairs below. That keeps
-            // `bf16 ↔ f16` a value conversion only; it is never an integer
-            // view or a silently widened f32 route.
-            (PrimitiveConversioFamily::Numerus, PrimitiveConversioFamily::Fractus)
-            | (PrimitiveConversioFamily::Fractus, PrimitiveConversioFamily::Numerus) => {
-                self.bits_pair_issue(source_ty, target_resolved, params)
-            }
-            _ => self.bits_pair_issue(source_ty, target_resolved, params),
+            _ => None,
         };
 
         if let Some(issue) = issue {
@@ -1737,82 +1724,8 @@ impl TypeChecker<'_> {
             .find_map(|param| match interner.resolve(*param) {
                 "Hex" | "Bin" | "Oct" => Some(ISSUE_DECIMAL_RADIX_HINT_REJECTED),
                 "Be" | "Le" => Some(ISSUE_DECIMAL_ENDIAN_HINT_REJECTED),
-                "Bits" => Some(ISSUE_DECIMAL_BITS_HINT_REJECTED),
                 _ => None,
             })
-    }
-
-    /// `Bits` is an exact-width IEEE bitcast: `u16↔bf16`, `u16↔f16`,
-    /// `u32↔f32`, and `u64↔f64` only. `bf16` is the top half of an f32
-    /// value, not an f16 representation, so `bf16↔f16` remains an ordinary
-    /// value conversion. Any other pair (or unsized primitive) fail-closes;
-    /// without the hint the ordinary value-conversion families stay in charge.
-    fn bits_pair_issue(
-        &self,
-        source_ty: TypeId,
-        target_resolved: TypeId,
-        params: &[Symbol],
-    ) -> Option<&'static str> {
-        if !self.conversio_has_bits_hint(params) {
-            return None;
-        }
-        let source = self.types.get(self.resolve_inferred_type(source_ty));
-        let target = self.types.get(target_resolved);
-        // `octeti ↦ tensor` answers every hint other than Be/Le with its own
-        // `octeti_to_tensor_unspecified`, never a Bits width mismatch.
-        if matches!(
-            source,
-            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. }
-        ) && matches!(target, Type::Tensor(..))
-        {
-            return None;
-        }
-        // decimal-widths D2 (wildcard audit): a decimal carrier never bitcasts
-        // — the scaled-integer representation is not an IEEE bit pattern.
-        if matches!(source, Type::SizedNumeric(Primitive::Numerus, w) if w.is_decimal())
-            || matches!(target, Type::SizedNumeric(Primitive::Numerus, w) if w.is_decimal())
-        {
-            return Some(ISSUE_DECIMAL_BITS_HINT_REJECTED);
-        }
-        // Ruling 40: `inf` has no fixed width, so no `Bits` pair holds it; it
-        // falls through to the width-mismatch answer below (`inf` is neither
-        // `u16`, `u32` nor `u64`).
-        let exact_pair = matches!(
-            (source, target),
-            (
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16),
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16 | NumericWidth::F16)
-            ) | (
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32),
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
-            ) | (
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64),
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
-            ) | (
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16 | NumericWidth::F16),
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16)
-            ) | (
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
-            ) | (
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64),
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
-            )
-        );
-        if exact_pair {
-            None
-        } else {
-            Some(ISSUE_BITS_PAIR_WIDTH_MISMATCH)
-        }
-    }
-
-    fn conversio_has_bits_hint(&self, params: &[Symbol]) -> bool {
-        let Some(interner) = self.interner else {
-            return false;
-        };
-        params
-            .iter()
-            .any(|param| matches!(interner.resolve(*param), "Bits"))
     }
 
     /// `n ↦ ascii<N> via Hex|Bin|Oct`: N is digit width; Hex/Bin/Oct are `via`

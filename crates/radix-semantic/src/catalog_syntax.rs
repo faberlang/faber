@@ -1029,10 +1029,10 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
     match issue {
         "conversio_recovery_uses_vel" => Some("use ⊥; vel is nullish coalescing only".to_owned()),
         "conversio_via_missing_hint" => Some(
-            "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, Bits, and Code".to_owned(),
+            "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, and Code".to_owned(),
         ),
         "conversio_hint_type_argument" => Some(
-            "write the hint as a via clause after the target: `u32 via Bits`, `ascii<8> via Hex`, `littera via Code`".to_owned(),
+            "write the hint as a via clause after the target: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`".to_owned(),
         ),
         "conversio_hint_tail_argument" => Some(
             "write the hint as a via clause after the target: `octeti<16> via Le`".to_owned(),

@@ -146,18 +146,6 @@ const ROWS: &[Row] = &[
         via: "↦ f32 via Le",
     },
     Row {
-        name: "Bits u32 to f32",
-        frame: "functio f(u32 n) → f32 {{ redde n {} }}",
-        legacy: "↦ fractus<f32, Bits>",
-        via: "↦ f32 via Bits",
-    },
-    Row {
-        name: "Bits f64 to u64",
-        frame: "functio f(f64 x) → u64 {{ redde x {} }}",
-        legacy: "↦ numerus<u64, Bits>",
-        via: "↦ u64 via Bits",
-    },
-    Row {
         name: "Code read",
         frame: "functio f(littera c) → u32 {{ redde c {} }}",
         legacy: "↦ numerus<u32, Code>",
@@ -244,7 +232,6 @@ fn the_retired_type_argument_is_rejected_under_the_english_surface() {
 fn every_hint_routes_under_the_english_surface() {
     for source in [
         "fn f(string s) → i32 { return s ↦ i32 via Hex ⊥ 0 }",
-        "fn f(u32 n) → f32 { return n ↦ f32 via Bits }",
         "fn f(char c) → u32 { return c ↦ u32 via Code }",
         "main { const _ v ← |de ad be ef|[0‥4] ↦ u32 via Be }",
     ] {
@@ -266,11 +253,11 @@ fn the_conversion_node_carries_the_via_hint() {
 }
 
 #[test]
-fn the_f16_bits_row_carries_its_hint() {
-    // The Rust target has no half-float carrier, so this row is read at the
-    // HIR conversion node instead of through generated code.
-    let via = entry_conversions("incipit { fixum u16 n ← 15360\n fixum _ x ← n ↦ f16 via Bits }");
-    assert_eq!(via[0].1, vec!["Bits".to_owned()]);
+fn via_bits_is_the_retirement_diagnostic_not_a_hint() {
+    assert_issue(
+        &diagnostics_with(latin_config(), "incipit { fixum u16 n ← 15360\n fixum _ x ← n ↦ f16 via Bits }"),
+        "conversio_via_bits_retired",
+    );
 }
 
 #[test]
@@ -288,13 +275,17 @@ fn the_default_binds_after_the_via_clause() {
 
 #[test]
 fn chained_conversions_carry_one_hint_per_hop() {
-    let via = entry_conversions(
-        "incipit { fixum octeti b ← |3c 00|\n fixum _ x ← b[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32 }",
-    );
+    let via =
+        entry_conversions("incipit { fixum octeti b ← |3c 00|\n fixum _ x ← b[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32 }");
     let hints: Vec<_> = via.iter().map(|(_, hints)| hints.clone()).collect();
     assert_eq!(
         hints,
-        vec![Vec::<String>::new(), vec!["Bits".to_owned()], vec!["Le".to_owned()]],
+        vec![
+            Vec::<String>::new(),
+            Vec::<String>::new(),
+            Vec::<String>::new(),
+            vec!["Le".to_owned()]
+        ],
         "outermost hop first: the last hop has no hint"
     );
 }
@@ -305,7 +296,7 @@ fn existing_pair_rules_still_reject_through_the_via_clause() {
     // the same structured issue it failed with as a type argument.
     assert_issue(
         &diagnostics_with(latin_config(), "functio f(u16 n) → f32 { redde n ↦ f32 via Bits }"),
-        "bits_pair_width_mismatch",
+        "conversio_via_bits_retired",
     );
     assert_issue(
         &diagnostics_with(latin_config(), "functio f(textus s) → u32 { redde s ↦ u32 via Code }"),
@@ -325,7 +316,7 @@ fn an_unknown_hint_after_via_is_a_structured_error() {
 fn via_on_a_target_that_takes_no_hint_is_a_structured_error() {
     for source in [
         "functio f(numerus n) → textus { redde n ↦ textus via Hex }",
-        "functio f(numerus n) → bivalens { redde n ↦ bivalens via Bits }",
+        "functio f(numerus n) → bivalens { redde n ↦ bivalens via Le }",
         "functio f(numerus n) → lista<numerus> { redde n ↦ lista<numerus> via Hex }",
         "functio f(numerus n) → numerus { redde n ↦ 0‥10 via Hex }",
     ] {

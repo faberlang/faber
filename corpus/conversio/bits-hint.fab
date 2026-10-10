@@ -4,52 +4,52 @@ explains = ["Bits"]
 kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "cast_expr", "assignment", "transfer", "expression", "literal", "redde_stmt"]
 category = "conversion"
-summary = "The Bits conversio hint is an exact-width IEEE bitcast — u16↔f16, u16↔bf16, u32↔f32, u64↔f64 only — never a value conversion."
-syntax = "u16|u32|u64 ↦ f16|bf16|f32|f64 via Bits and f16|bf16|f32|f64 ↦ u16|u32|u64 via Bits"
+summary = "The Bits conversio hint is retired: a bit pattern is a b16, b32 or b64 value, and ↦ bN reads or writes it — u16↔f16, u16↔bf16, u32↔f32, u64↔f64 only."
+syntax = "u16|u32|u64 ↦ b16|b32|b64 ↦ f16|bf16|f32|f64 and f16|bf16|f32|f64 ↦ b16|b32|b64 ↦ u16|u32|u64"
 aliases = ["Bits hint"]
 related = ["↦", "fractus", "octeti"]
 locale = "la"
 +++
 # =============================================================================
-# Bits — exact-width bitcast hint on the ↦ conversio.
+# Bits — retired hint; the bit pattern is a bN value.
 # =============================================================================
 #
 # What this teaches:
-#   • Exact pairs only — u16 pairs with f16 and bf16, u32 with f32, u64 with
+#   • The rule, once — from a number, `↦` converts the value; from bits,
+#     `↦` to a same-width type reads those bits as that type
+#   • A number holding a pattern says so in one step — `u16 ↦ b16 ↦ f16`;
+#     a float to its pattern is `x ↦ b16` (b32, b64 by width)
+#   • Exact pairs only — b16 pairs with f16 and bf16, b32 with f32, b64 with
 #     f64; any other width pairing rejects at the semantic gate with
-#     `bits_pair_width_mismatch`
-#   • Reinterpretation, not conversion — Bits copies the bit pattern
-#     verbatim; the same u16 payload is a different value through a plain
-#     `↦` than through `↦ … via Bits`
+#     `bits_conversion_width_mismatch`
 #   • bf16 is not f16 — bf16 is the top half of an f32 value, not an f16
-#     representation, so bf16↔f16 remains an ordinary value conversion and
-#     is never a Bits row
-#   • Both directions — integer↦float and float↦integer through the hint are
+#     representation, so bf16↔f16 remains an ordinary value conversion
+#   • Both directions — integer↦pattern↦float and float↦pattern↦integer are
 #     admitted symmetrically
 #
 # Common mistakes:
-#   • cross-width pairing — `n ↦ f32 via Bits` from u16
-#     rejects (bits_pair_width_mismatch)
-#   • expecting a float source to be a Bits row — a plain float→float hop
-#     with the hint rejects; spell the integer bit pattern side instead
+#   • `via Bits` — retired; it is `conversio_via_bits_retired` and its help
+#     names the `↦ bN` replacement
+#   • cross-width pairing — `n ↦ b16 ↦ f32` from u16 rejects
+#     (bits_conversion_width_mismatch)
 #
 # See also: ↦, fractus, octeti
 # =============================================================================
 
 functio in_f16(u16 n) → f16 {
-    redde n ↦ f16 via Bits
+    redde n ↦ b16 ↦ f16
 }
 
 functio ex_bf16(bf16 x) → u16 {
-    redde x ↦ u16 via Bits
+    redde x ↦ b16 ↦ u16
 }
 
 functio in_f32(u32 n) → f32 {
-    redde n ↦ f32 via Bits
+    redde n ↦ b32 ↦ f32
 }
 
 functio ex_f64(f64 x) → u64 {
-    redde x ↦ u64 via Bits
+    redde x ↦ b64 ↦ u64
 }
 
 incipit {

@@ -211,6 +211,6 @@ fn infallible_text_rows_are_exempt() {
 }
 
 #[test]
-fn exact_width_bits_bitcast_is_exempt() {
-    assert_accepts("functio bits(f32 x) → u32 {\n    redde x ↦ u32 via Bits\n}\n");
+fn bn_reinterpretation_is_exempt() {
+    assert_accepts("functio bits(f32 x) → b32 {\n    redde x ↦ b32\n}\n");
 }
