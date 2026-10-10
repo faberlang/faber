@@ -683,3 +683,15 @@ fn from_type_maps_collection_and_ml_families() {
         Some(ConversioTypeFamily::Intervallum)
     );
 }
+
+#[test]
+fn tensor_octeti_is_dedicated_on_rust_and_declined_by_name_on_ts_go_sexp() {
+    use ConversioCoverageTarget::{Go, Rust, Sexp, TypeScript};
+    use ConversioTypeFamily::{Octeti, Tensor};
+    for (src, tgt) in [(Tensor, Octeti), (Octeti, Tensor)] {
+        assert_eq!(classify_conversio_coverage(src, tgt, Rust), ConversioCoverage::Dedicated);
+        for target in [TypeScript, Go, Sexp] {
+            assert_eq!(classify_conversio_coverage(src, tgt, target), ConversioCoverage::NotEmitted);
+        }
+    }
+}

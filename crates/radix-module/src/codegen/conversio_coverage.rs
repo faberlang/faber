@@ -343,9 +343,11 @@ pub fn classify_conversio_coverage(
             }
         }
         ConversioCoverageTarget::TypeScript => {
-            // `octeti ↦ tensor via Le|Be` declines by name on TypeScript and Go
+            // `octeti ↦ tensor via Le|Be` and its inverse `tensor ↦ octeti via
+            // Le|Be` decline by name on TypeScript and Go
             // (`ts_octeti_tensor_conversio_unsupported`,
-            // `go_octeti_tensor_conversio_unsupported`).
+            // `go_octeti_tensor_conversio_unsupported`, and the
+            // `*_tensor_octeti_conversio_unsupported` pair).
             if driver_modular_word_blocked(src, tgt) || octeti_tensor_declined(src, tgt) {
                 ConversioCoverage::NotEmitted
             } else if ts_has_dedicated_conversio_arm(src, tgt) {
@@ -404,9 +406,9 @@ pub fn classify_conversio_coverage(
         // text-shaped sources, text formatting from scalar/text sources,
         // and the identity vector cell. Everything else is not emitted.
         ConversioCoverageTarget::SexpStructural | ConversioCoverageTarget::Sexp => {
-            // The structural dump carries `octeti ↦ tensor via Le|Be`; the
-            // executable `sexp` emitter has no route for it ("tensor
-            // conversion contract").
+            // The structural dump carries `octeti ↦ tensor via Le|Be` and its
+            // inverse; the executable `sexp` emitter has no route for either
+            // ("tensor conversion contract").
             if target == ConversioCoverageTarget::Sexp && octeti_tensor_declined(src, tgt) {
                 ConversioCoverage::NotEmitted
             } else if sexp_lowers_conversio(src, tgt) {
@@ -418,10 +420,15 @@ pub fn classify_conversio_coverage(
     }
 }
 
-/// `octeti ↦ tensor<E, [shape]> via Le|Be`: the pair TypeScript and Go decline
-/// by name rather than mis-emit through the list arm.
+/// `octeti ↦ tensor<E, [shape]> via Le|Be` and its inverse
+/// `tensor<E, [shape]> ↦ octeti via Le|Be`: the pairs TypeScript and Go decline
+/// by name rather than mis-emit through the list or text arms.
 fn octeti_tensor_declined(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> bool {
-    src == ConversioTypeFamily::Octeti && tgt == ConversioTypeFamily::Tensor
+    matches!(
+        (src, tgt),
+        (ConversioTypeFamily::Octeti, ConversioTypeFamily::Tensor)
+            | (ConversioTypeFamily::Tensor, ConversioTypeFamily::Octeti)
+    )
 }
 
 /// Mirrors the mir-sexp emitter's admitted conversio surface
@@ -689,8 +696,9 @@ fn rust_dedicated_composite_arm(src: ConversioTypeFamily, tgt: ConversioTypeFami
         return true;
     }
 
-    // `octeti ↦ tensor<E, [shape]> via Le|Be`: chunked `from_*_bytes` decode.
-    if (src, tgt) == (Octeti, Tensor) {
+    // `octeti ↦ tensor<E, [shape]> via Le|Be`: chunked `from_*_bytes` decode;
+    // `tensor<E, [shape]> ↦ octeti via Le|Be`: `to_*_bytes` flatten.
+    if matches!((src, tgt), (Octeti, Tensor) | (Tensor, Octeti)) {
         return true;
     }
 
