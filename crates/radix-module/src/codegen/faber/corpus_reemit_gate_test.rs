@@ -27,7 +27,20 @@ use std::path::{Path, PathBuf};
 /// Meaning divergences that exist today. Each needs a fix outside the emitter
 /// leaf (or an exemplum repair) and is tracked here so the gate stays green
 /// only while the list is exact.
-const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[];
+const KNOWN_MEANING_GAPS: &[(&str, &str)] = &[
+    // Temporary exact-list entries (2026-10-10): unit sb170 made these two files
+    // analyzable (first-match admits an array literal source) and the re-emit
+    // validation then reports a first-match over a literal array as `nihil`.
+    // Owner: unit sb182; it removes both rows when fixed.
+    (
+        "primus-quem/primus-quem-air.fab",
+        "re-emit of primus_quem over an array literal re-validates as nihil (sb182)",
+    ),
+    (
+        "primus-quem/primus-quem.fab",
+        "re-emit of primus_quem over an array literal re-validates as nihil (sb182)",
+    ),
+];
 
 /// Files the structure check refuses (`CODEGEN006` / `ast_construct_dropped`): HIR keeps no
 /// representation for the construct, so a re-emit would silently delete it.
