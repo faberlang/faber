@@ -1129,7 +1129,7 @@ functio g() → numerus {
     let optional = air_errors(
         r#"
 @ radix lane "air"
-functio h() → numerus {
+functio h() → numerus ∪ nihil {
     fixum lista<numerus> xs ← [1, 2, 3]
     redde xs?[0]
 }

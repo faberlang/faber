@@ -215,6 +215,11 @@ impl TypeChecker<'_> {
                 return ty;
             }
             let ty = self.check_expr(expr);
+            // Need: a thrown, yielded or element-stored optional
+            // does not unwrap silently into a plain slot.
+            if self.reject_optional_into_plain_cell(ty, slot_ty, expr.span) {
+                return slot_ty;
+            }
             if let Some(widened) = self.widen_into_inf(expr, ty, slot_ty) {
                 return widened;
             }

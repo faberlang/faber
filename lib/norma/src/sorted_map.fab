@@ -176,13 +176,11 @@ fn remove<K>(mut list<K> index, K key) → void {
     var int i ← 0
     while i ≺ index.length() {
         const K ∪ none extans ← index.get(i)
-        if extans ≡ null {
-            i ← i + 1
-            continue
-        }
-        if equals<K>(extans, key) {
-            remove_at<K>(mut index, i)
-            return
+        if extans not is none {
+            if equals<K>(extans, key) {
+                remove_at<K>(mut index, i)
+                return
+            }
         }
         i ← i + 1
     }
