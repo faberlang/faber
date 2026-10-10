@@ -109,7 +109,7 @@ const ISSUE_TENSOR_MISSING_FIGURA: &str = "tensor_missing_figura";
 const ISSUE_TYPE_ALIAS_CYCLE: &str = "type_alias_cycle";
 const ISSUE_TYPE_NAME_NOT_TYPE: &str = "type_name_not_type";
 const ISSUE_VARIANT_AMBIGUOUS: &str = "variant_ambiguous";
-const ISSUE_DISCERNE_PATTERN_NOT_IN_CLOSED_SET: &str = "discerne_pattern_not_in_closed_set";
+const ISSUE_DISCERNE_LITERAL_ARM_NOT_IN_CLOSED_SET: &str = "discerne_literal_arm_not_in_closed_set";
 const ISSUE_UNION_ONLY_NIHIL: &str = "union_only_nihil";
 /// `x est V` where `V` names a value, not a type (DECISIONS D23.1).
 const ISSUE_EST_VALUE_RHS: &str = "est_value_rhs";
@@ -927,7 +927,7 @@ fn resolve_discerne(
 fn push_closed_set_refusal(span: radix_lexer::Span, errors: &mut Vec<SemanticError>) {
     errors.push(
         SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
-            .with_arg("issue", ISSUE_DISCERNE_PATTERN_NOT_IN_CLOSED_SET)
+            .with_arg("issue", ISSUE_DISCERNE_LITERAL_ARM_NOT_IN_CLOSED_SET)
             .with_arg("pattern", "literal"),
     );
 }

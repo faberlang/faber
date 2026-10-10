@@ -7,6 +7,8 @@
 use crate::test_support;
 
 const ISSUE: &str = "discerne_pattern_not_in_closed_set";
+const LITERAL_ISSUE: &str = "discerne_literal_arm_not_in_closed_set";
+const SUBJECT_ISSUE: &str = "discerne_subject_not_in_closed_set";
 
 #[test]
 fn bounded_list_pattern_over_unbounded_list_is_rejected() {
@@ -111,7 +113,93 @@ fn literal_arm_over_numeric_subject_is_rejected() {
         casu _ { tacet }
     }
 }",
-        ISSUE,
+        LITERAL_ISSUE,
+    );
+}
+
+#[test]
+fn literal_arm_refusal_row_hints_at_the_value_switch_in_en_and_la() {
+    // The hint is the issue's own locale row; its stable key is the issue
+    // slug and the `{elige}` placeholder (the locale's spelling of `switch`).
+    for id in ["en", "la"] {
+        let pack = crate::locale::LocalePack::from_toml_path(format!(
+            "{}/../../locale/{id}/pack.toml",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap_or_else(|err| panic!("load reader pack `{id}`: {err:?}"));
+        let row = pack
+            .diagnostics
+            .get("SEM010")
+            .and_then(|code| code.issues.get(LITERAL_ISSUE))
+            .unwrap_or_else(|| panic!("{id}: missing SEM010.{LITERAL_ISSUE} row"));
+        assert!(
+            row.help
+                .as_deref()
+                .is_some_and(|help| help.contains("{elige}")),
+            "{id}: help does not name the switch keyword"
+        );
+    }
+}
+
+#[test]
+fn multi_subject_match_over_a_numeric_subject_is_rejected_by_name() {
+    let diagnostics = test_support::analyze_and_get_diagnostics(
+        r"discretio Forma { Circulus, Quadratum }
+
+functio probe(Forma a, numerus n) → vacuum {
+    discerne a et n {
+        casu _ et _ { tacet }
+    }
+}",
+    );
+    let error = diagnostics
+        .iter()
+        .find(|err| test_support::semantic_error_has_issue(err, SUBJECT_ISSUE))
+        .expect("multi-subject closed-set rejection");
+    let position = error.args.iter().find(|arg| arg.name == "position");
+    assert_eq!(position.map(|arg| arg.value.as_str()), Some("2"));
+}
+
+#[test]
+fn multi_subject_match_over_text_subjects_is_rejected_by_name() {
+    test_support::assert_rejects_with_issue(
+        r"functio probe(textus a, textus b) → vacuum {
+    discerne a et b {
+        casu _ et _ { tacet }
+    }
+}",
+        SUBJECT_ISSUE,
+    );
+}
+
+#[test]
+fn multi_subject_match_over_two_closed_sets_is_accepted() {
+    test_support::assert_accepts(
+        r"discretio Forma { Circulus, Quadratum }
+
+functio probe(Forma a, bivalens b) → vacuum {
+    discerne a et b {
+        casu Circulus et verum { tacet }
+        casu _ et _ { tacet }
+    }
+}",
+    );
+}
+
+#[test]
+fn single_subject_numeric_match_with_a_catchall_is_not_a_subject_refusal() {
+    let diagnostics = test_support::analyze_and_get_diagnostics(
+        r"functio probe(numerus n) → vacuum {
+    discerne n {
+        casu _ { tacet }
+    }
+}",
+    );
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|err| test_support::semantic_error_has_issue(err, SUBJECT_ISSUE)),
+        "{diagnostics:?}"
     );
 }
 

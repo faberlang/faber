@@ -2489,6 +2489,14 @@ help = "make the expression type match the expected type"
 message = "`match` discriminates a closed set; pattern type '{pattern}' is not a member of '{scrutinee}'"
 help = "ask an integer width or range with an `is` test, and a length with `.length()` inside an `if`; `match` accepts only the members of a union, the variants of an enum, or variant types"
 
+[diagnostics.SEM010.issues.discerne_literal_arm_not_in_closed_set]
+message = "`{discerne}` discriminates a closed set; a literal arm tests a value of an open set"
+help = "test values with `{elige}`; `{discerne}` accepts only the members of a union, the variants of an enum, or the bool and absent literals"
+
+[diagnostics.SEM010.issues.discerne_subject_not_in_closed_set]
+message = "`{discerne}` over several subjects needs a closed set for each; subject {position} is not a union, an enum, or a bool"
+help = "test values with `{elige}`, or branch on the value first and match closed sets with `{discerne}`"
+
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "parameter default type mismatch"
 help = "make the expression type match the expected type"

@@ -144,10 +144,14 @@ impl HirVisitor for ExhaustiveChecker<'_> {
                 self.names,
                 &mut self.errors,
             );
+            let is_elige = self.elige_ids.contains(&expr.id);
+            if !is_elige {
+                check_multi_subject_closed_sets(scrutinees, self.types, &mut self.errors);
+            }
             check_coverage(
                 scrutinees,
                 arms,
-                self.elige_ids.contains(&expr.id),
+                is_elige,
                 self.types,
                 self.enum_variants,
                 self.names,
@@ -155,6 +159,70 @@ impl HirVisitor for ExhaustiveChecker<'_> {
             );
         }
         walk_expr(self, expr);
+    }
+}
+
+/// Every subject of a multi-subject `discerne` must be a closed set (enum,
+/// union, `bivalens`): the match is a product of closed sets, and a value
+/// subject (number, text, collection) belongs to `elige` (operator ruling
+/// 2026-10-02). A single-subject match keeps its pattern-level checks.
+fn check_multi_subject_closed_sets(
+    scrutinees: &[HirExpression],
+    types: &TypeTable,
+    errors: &mut Vec<SemanticError>,
+) {
+    if scrutinees.len() < 2 {
+        return;
+    }
+    for (position, subject) in scrutinees.iter().enumerate() {
+        if subject.ty.is_some_and(|ty| is_value_subject(ty, types)) {
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::TypeMismatch, subject.span)
+                    .with_arg("issue", "discerne_subject_not_in_closed_set")
+                    .with_arg("position", (position + 1).to_string()),
+            );
+        }
+    }
+}
+
+/// A value type (numeric, text, bytes, collection): an open set with no
+/// closed-set constructors. Generic, inferred, unknown, product (struct,
+/// tuple) and interface subjects are left to coverage.
+fn is_value_subject(ty: TypeId, types: &TypeTable) -> bool {
+    match types.get(ty) {
+        Type::Alias(_, inner) | Type::Ref(_, inner) => is_value_subject(*inner, types),
+        Type::Primitive(primitive) => matches!(
+            primitive,
+            Primitive::Ascii
+                | Primitive::Textus
+                | Primitive::Numerus
+                | Primitive::Fractus
+                | Primitive::Octeti
+                | Primitive::Regex
+                | Primitive::Json
+                | Primitive::Valor
+                | Primitive::Instans
+        ),
+        Type::SizedNumeric(..)
+        | Type::ModularWord(_)
+        | Type::SaturatingWord(_)
+        | Type::PolicyFloat(..)
+        | Type::SizedInstans(_)
+        | Type::BoundedTextus { .. }
+        | Type::BoundedAscii { .. }
+        | Type::BoundedOcteti { .. }
+        | Type::Array(_)
+        | Type::BoundedArray { .. }
+        | Type::Queue(_)
+        | Type::BoundedQueue { .. }
+        | Type::Stack(_)
+        | Type::BoundedStack { .. }
+        | Type::Map(..)
+        | Type::Set(_)
+        | Type::Tensor(..)
+        | Type::Vector(..)
+        | Type::Matrix(..) => true,
+        _ => false,
     }
 }
 

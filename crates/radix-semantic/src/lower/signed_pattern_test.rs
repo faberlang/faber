@@ -3,7 +3,7 @@
 //! Contract: a negated number literal is a legal pattern in `elige`, lowered
 //! to `HirPattern::NegatedLiteral` over the unsigned magnitude and typed like
 //! the literal it negates. `discerne` matches closed sets only (M2), so a
-//! negated literal there is refused as `discerne_pattern_not_in_closed_set`.
+//! negated literal there is refused as `discerne_literal_arm_not_in_closed_set`.
 //! A NaN pattern is rejected as SEM008 `nan_pattern` in `elige`; a named NaN
 //! constant cannot reach a pattern because `elige` accepts only literals and
 //! variants, and `discerne` treats a bare name as a binding.
@@ -45,7 +45,7 @@ fn elige_accepts_negated_decimal_and_infinity_patterns() {
 fn discerne_refuses_negated_integer_pattern() {
     assert_rejects_with_issue(
         "incipit {\n    fixum numerus n ← -1\n    discerne n {\n        casu -1 { tacet }\n        casu _ { tacet }\n    }\n}",
-        "discerne_pattern_not_in_closed_set",
+        "discerne_literal_arm_not_in_closed_set",
     );
 }
 
@@ -83,7 +83,7 @@ fn negated_pattern_against_textus_is_a_type_mismatch() {
 fn nan_pattern_is_rejected_in_discerne() {
     assert_rejects_with_issue(
         "incipit {\n    fixum fractus x ← nonnumerus\n    discerne x {\n        casu nonnumerus { tacet }\n        casu _ { tacet }\n    }\n}",
-        "discerne_pattern_not_in_closed_set",
+        "discerne_literal_arm_not_in_closed_set",
     );
 }
 

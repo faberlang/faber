@@ -44,14 +44,14 @@ fn assert_clean(source: &str) {
 }
 
 /// A literal arm in `discerne` is refused: `discerne` matches closed sets only.
-fn assert_not_closed_set(source: &str) {
+fn assert_literal_arm_refused(source: &str) {
     let result = analyze_source(source);
     assert!(
         result.diagnostics.iter().any(|diag| {
             diag.kind == SemanticErrorKind::TypeMismatch
-                && diag.issue() == Some("discerne_pattern_not_in_closed_set")
+                && diag.issue() == Some("discerne_literal_arm_not_in_closed_set")
         }),
-        "expected discerne_pattern_not_in_closed_set, got {:?}",
+        "expected discerne_literal_arm_not_in_closed_set, got {:?}",
         result
             .diagnostics
             .iter()
@@ -180,6 +180,39 @@ fn enum_by_bool_product_fully_covered_definitely_returns() {
 }
 
 #[test]
+fn two_enum_subjects_with_every_cell_covered_definitely_return() {
+    assert_clean(
+        "discretio Lumen { Rubeum, Viride }
+        discretio Forma { Circulus, Quadratum }
+        functio h(Lumen l, Forma f) → numerus {
+            discerne l et f {
+                casu Rubeum et Circulus { redde 1 }
+                casu Rubeum et Quadratum { redde 2 }
+                casu Viride et _ { redde 3 }
+            }
+        }",
+    );
+}
+
+#[test]
+fn two_enum_subjects_missing_one_cell_names_it() {
+    assert_missing(
+        "discretio Lumen { Rubeum, Viride }
+        discretio Forma { Circulus, Quadratum }
+        functio h(Lumen l, Forma f) → numerus {
+            discerne l et f {
+                casu Rubeum et Circulus { redde 1 }
+                casu Rubeum et Quadratum { redde 2 }
+                casu Viride et Circulus { redde 3 }
+            }
+            redde 0
+        }",
+        "missing_cases",
+        "(Viride, Quadratum)",
+    );
+}
+
+#[test]
 fn single_enum_missing_variant_names_it() {
     assert_missing(
         "discretio Lumen { Rubeum, Viride, Caeruleum }
@@ -197,7 +230,7 @@ fn single_enum_missing_variant_names_it() {
 
 #[test]
 fn literal_match_over_open_domain_without_catchall_is_rejected() {
-    assert_not_closed_set(
+    assert_literal_arm_refused(
         "functio k(numerus n) → numerus {
             discerne n {
                 casu 1 { redde 10 }
@@ -268,7 +301,7 @@ fn elige_over_bivalens_missing_falsum_is_rejected() {
 
 #[test]
 fn negated_literal_rows_are_open_space_values() {
-    assert_not_closed_set(
+    assert_literal_arm_refused(
         "functio s(numerus n) → numerus {
             discerne n {
                 casu -1 { redde 1 }
