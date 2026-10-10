@@ -191,9 +191,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     None => Ok(Value::Nil),
                 }
             }
-            MirIntrinsic::Provider(provider) => {
-                self.eval_provider(provider, &call.args, call.return_ty, span)
-            }
+            MirIntrinsic::Provider(provider) => self.eval_provider(provider, &call.args, span),
             MirIntrinsic::SermoOpen => self.eval_sermo_open(&call.args, span),
             MirIntrinsic::SermoSetOpener => self.eval_sermo_set_opener(&call.args, span),
             MirIntrinsic::Sermo(op) => self.eval_sermo_op(op, &call.args, call.return_ty, span),
@@ -364,9 +362,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     /// `cede <expr>` — yield inside a stream generator.
     ///
-    /// WHY: inside a generator frame (`Frame::is_generator`) the value is
-    /// appended to the active yield buffer and `cede` returns `Unit`, letting
-    /// the generator continue to the next yield.
+    /// WHY: inside a generator frame (`Frame::is_generator`) the value is stored
+    /// in `Runner::yielded` and `cede` returns `Unit`; the run loop parks the
+    /// frame once the statement completes and the cursor takes the item.
     pub(crate) fn eval_cede(
         &mut self,
         args: &[MirOperand],
@@ -2071,13 +2069,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Some(offset) = tensor_flat_offset(&borrow.shape, &index) else {
             return Err(RunnerError::internal(span, ERR_PONDE_INVALID_INDEX));
         };
-        // `set_value_at` refuses exactly the cells the old `value_at` probe
-        // refused: for affine layouts its `None` cases are the same bounds
-        // checks, and every edge tensor is refused outright — either way the
-        // probe's full cloning read could not change the outcome. A plain
-        // `offset < data.len()` test would NOT be equivalent: it would break
-        // writes through expanded views, whose physical offset is not the
-        // logical ordinal.
+        // `set_value_at` refuses out-of-bounds cells and every edge tensor
+        // outright. A plain `offset < data.len()` test would NOT be equivalent:
+        // it would break writes through expanded views, whose physical offset
+        // is not the logical ordinal.
         borrow
             .set_value_at(offset, value)
             .ok_or_else(|| RunnerError::internal(span, ERR_PONDE_INVALID_INDEX))?;
@@ -2473,18 +2468,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Option<Value>, RunnerError> {
         let snapshot = tensor.borrow().clone();
-        if !snapshot.edge_ops.iter().any(|operation| {
-            matches!(
-                operation,
-                TensorEdgeOp::Shift {
-                    descriptor: super::tensor_edge::TensorEdgeDescriptor {
-                        resolution: TensorEdgeResolution::Custom(_),
-                        ..
-                    },
-                    ..
-                }
-            )
-        }) {
+        if !tensor_has_custom_edge(&snapshot) {
             return match snapshot.value_at(logical_index) {
                 Some(value) => Ok(Some(value)),
                 None => snapshot.take_residency_error().map_or(Ok(None), Err),
@@ -2628,18 +2612,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Vec<Value>, RunnerError> {
         let borrow = tensor.borrow();
-        if !borrow.edge_ops.iter().any(|operation| {
-            matches!(
-                operation,
-                TensorEdgeOp::Shift {
-                    descriptor: super::tensor_edge::TensorEdgeDescriptor {
-                        resolution: TensorEdgeResolution::Custom(_),
-                        ..
-                    },
-                    ..
-                }
-            )
-        }) {
+        if !tensor_has_custom_edge(&borrow) {
             if borrow.has_contiguous_backing_mismatch() {
                 return Err(RunnerError::internal(
                     span,
@@ -2691,11 +2664,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         "unresolved shifted tensor cannot cross this boundary",
                     ));
                 }
-                if !tensor_has_custom_edge(&snapshot) {
-                    return Ok(Value::Tensor(tensor));
-                }
                 let data = self.tensor_logical_values(&tensor, span)?;
-                tensor_value_kind(data, tensor.borrow().data.kind(), snapshot.shape, span)
+                tensor_value_kind(data, tensor_kind(&tensor), snapshot.shape, span)
             }
             Value::Array(items) => {
                 let items = items.borrow().clone();
@@ -2962,7 +2932,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     return Err(RunnerError::internal_with_issue(
                         span,
                         format!("{label} length mismatch"),
-                        "runner_lista_elementwise_length_mismatch",
+                        RUNNER_LISTA_LENGTH_MISMATCH,
                     ));
                 }
                 let values = left
@@ -3071,8 +3041,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         RunnerError::internal(span, format!("{label} broadcast row overflow"))
                     })?;
                     // Stride over the lower-rank operand instead of cloning it
-                    // `rows` times (perf-A F1). Operand order is preserved
-                    // because Sub is not commutative.
+                    // `rows` times. Operand order is preserved because Sub is
+                    // not commutative.
                     if lower_data.is_empty() {
                         if !higher_data.is_empty() {
                             return Err(RunnerError::internal(
@@ -3105,7 +3075,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             }
                         })
                         .collect::<Result<Vec<_>, _>>()?;
-                    let data = self.store_elementwise_data(element, data, span)?;
+                    let data = self.store_computed_cells(element, data, span)?;
                     return tensor_value_typed(
                         self.types,
                         data,
@@ -3127,7 +3097,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .zip(right_data.iter())
                     .map(|(a, b)| op(a, b, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                let data = self.store_elementwise_data(element, data, span)?;
+                let data = self.store_computed_cells(element, data, span)?;
                 tensor_value_typed(self.types, data, element, left_shape, span)
             }
             (Value::Tensor(cell), scalar) => {
@@ -3138,7 +3108,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|elem| op(elem, scalar, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                let data = self.store_elementwise_data(element, data, span)?;
+                let data = self.store_computed_cells(element, data, span)?;
                 tensor_value_typed(self.types, data, element, shape, span)
             }
             (scalar, Value::Tensor(cell)) => {
@@ -3149,7 +3119,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|elem| op(scalar, elem, width, span))
                     .collect::<Result<Vec<_>, _>>()?;
-                let data = self.store_elementwise_data(element, data, span)?;
+                let data = self.store_computed_cells(element, data, span)?;
                 tensor_value_typed(self.types, data, element, shape, span)
             }
             _ => op(&left_val, &right_val, width, span),
@@ -3361,7 +3331,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     /// Softmax: `exp(x_i` - max(x)) / `sum(exp(x_j` - max(x))) with numerical
     /// stability. Operates over the last axis of any rank >= 1 tensor; every
-    /// leading axis is a batch. Uses inline `f64::exp()` from Rust stdlib.
+    /// leading axis is a batch.
     fn tensor_softmax(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "tensor softmax arity"));
@@ -3398,8 +3368,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     /// Categorical cross-entropy loss: `-sum(targets * log(softmax(logits) + ε)) / N`.
     /// Loss is normalized by N = last dimension (number of classes), not batch size.
-    /// Takes 2 args: logits (receiver) and targets. Returns scalar f32 loss.
-    /// Domain constraints: finite inputs, targets in [0,1], matching shapes, rank 1-2.
+    /// Takes 2 args: logits (receiver) and targets of the same shape, rank 1 or 2.
+    /// Returns the scalar loss as a `Value::Float`.
     fn tensor_crux_entropia(
         &mut self,
         args: &[MirOperand],
@@ -3613,7 +3583,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 )?);
             }
         }
-        let mut cells = self.store_matmul_cells(element, cells, span)?;
+        let mut cells = self.store_computed_cells(element, cells, span)?;
         // PRECISION (typed dense U2): a matmul over `tensor<f32>` keeps its
         // dot-product cells as unrounded f64 under inferred storage. The cell
         // is born `F32`, so each result rounds to f32 once, here, toward the
@@ -3630,22 +3600,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         tensor_value_typed(self.types, cells, element, output_shape, span)
     }
 
-    fn store_matmul_cells(
-        &self,
-        element: Option<TypeId>,
-        cells: Vec<Value>,
-        span: Span,
-    ) -> Result<Vec<Value>, RunnerError> {
-        match element {
-            Some(element) => self.store_tensor_elements(element, cells, span),
-            None => Ok(cells),
-        }
-    }
-
     /// Sum across a specified axis: `sum(x, axis)`.
     ///
     /// Backward-only `LayerNorm` VJP helper. Result rank is input rank - 1.
-    /// v1: rank-2 only with axis 0 (sum rows) or axis = last (sum columns).
+    /// Rank 1 sums to a scalar. Rank 2 with axis 0 sums down the rows to `[cols]`;
+    /// the last axis sums across the columns to `[rows]`.
     ///
     /// Args layout: `[input, axis_const]`.
     fn tensor_sum_axis(
@@ -3762,11 +3721,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             .collect()
     }
 
-    /// Slot-store a freshly computed elementwise buffer before it is wrapped
-    /// in a tensor, so the built result is never re-read out of its own
-    /// backing and cloned back. The op pass still completes before the first
-    /// store runs, matching the prior two-pass error precedence.
-    fn store_elementwise_data(
+    /// Slot-store a freshly computed buffer before it is wrapped in a tensor,
+    /// so the built result is never re-read out of its own backing and cloned
+    /// back. The op pass completes before the first store runs.
+    fn store_computed_cells(
         &self,
         element: Option<TypeId>,
         data: Vec<Value>,
@@ -4309,7 +4267,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 } else {
                     cell.borrow()
                         .keys()
-                        .map(Self::key_to_value)
+                        .map(MapKey::to_value)
                         .collect::<Vec<_>>()
                 };
                 // D19.2/D19.6: tabula order is unspecified; the test-only
@@ -4875,8 +4833,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .ok_or_else(|| RunnerError::internal(span, "numerus overflow"));
         }
         let numeric = match value {
-            Value::Int(v) => f(v as f64),
-            Value::UInt(v) => f(v as f64),
             Value::Float(v) => f(v),
             _ => {
                 return Err(RunnerError::internal(
@@ -5125,7 +5081,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 {
                     return Ok(Value::Bool(equal != negated));
                 }
-                let width = self.fuzzy_comparison_width(receiver, other, span);
+                let width = self.fuzzy_comparison_width(receiver, other);
                 let receiver = self.fuzzy_operand(receiver, span)?;
                 let other = self.fuzzy_operand(other, span)?;
                 let rel_tol = numeric_as_f64(&self.eval_operand(rel_tol, span)?, span)?;
@@ -5194,22 +5150,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if matches!(width, NumericWidth::F64) {
             value
         } else {
-            #[expect(clippy::cast_possible_truncation)]
-            {
-                f64::from(value as f32)
-            }
+            f64::from(value as f32)
         }
     }
 
-    fn fuzzy_comparison_width(
-        &self,
-        lhs: &MirOperand,
-        rhs: &MirOperand,
-        span: Span,
-    ) -> NumericWidth {
+    fn fuzzy_comparison_width(&self, lhs: &MirOperand, rhs: &MirOperand) -> NumericWidth {
         let mut saw_f32 = false;
         for operand in [lhs, rhs] {
-            let Some(ty) = self.operand_semantic_type(operand, span) else {
+            let Some(ty) = self.operand_semantic_type(operand) else {
                 continue;
             };
             match self.types.get(ty) {
@@ -5230,7 +5178,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn operand_semantic_type(&self, operand: &MirOperand, _span: Span) -> Option<TypeId> {
+    fn operand_semantic_type(&self, operand: &MirOperand) -> Option<TypeId> {
         let MirOperand::Place(place) = operand else {
             return None;
         };
@@ -5428,17 +5376,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn key_to_value(key: &MapKey) -> Value {
-        key.to_value()
-    }
-
     // PROVIDERS
 
     fn eval_provider(
         &mut self,
         provider: &MirProvider,
         args: &[MirOperand],
-        _return_ty: MirType,
         span: Span,
     ) -> Result<Value, RunnerError> {
         let identity = provider_identity(provider, self.interner);
