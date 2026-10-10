@@ -1623,6 +1623,10 @@ help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầ
 message = "initializer không khớp với annotation"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} có thể là none và không thể lưu vào ô có kiểu {expected}"
+help = "đưa giá trị mặc định bằng `coalesce`, thu hẹp kiểu trước bằng `if x is not none`, hoặc dùng phép đọc có thể thất bại `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"

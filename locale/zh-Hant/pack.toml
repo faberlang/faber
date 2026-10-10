@@ -1623,6 +1623,10 @@ help = "使運算式型別符合預期型別"
 message = "初始化式與註記不相符"
 help = "使運算式型別符合預期型別"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} 可能為 none，不能存入型別為 {expected} 的儲存格"
+help = "用 `coalesce` 給出預設值，先用 `if x is not none` 收窄，或使用可失敗讀取 `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "浮點常數無法精確表示"
 help = "寫成浮點字面量，或使用該浮點型別可精確表示的常數"

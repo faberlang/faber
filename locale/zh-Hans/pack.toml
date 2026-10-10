@@ -1623,6 +1623,10 @@ help = "使表达式类型与期望类型一致"
 message = "初始值与标注类型不匹配"
 help = "使初始值类型与声明类型一致"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} 可能为 none，不能存入类型为 {expected} 的单元"
+help = "用 `coalesce` 给出默认值，先用 `if x is not none` 收窄，或使用可失败读取 `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "浮点常量无法精确表示"
 help = "写成浮点字面量，或使用该浮点类型可精确表示的常量"

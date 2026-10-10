@@ -1635,6 +1635,10 @@ help = "अभिव्यक्ति का प्रकार अपेक्
 message = "इनिशियलाइज़र annotation से मेल नहीं खाता"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} none हो सकता है और इसे {expected} प्रकार के सेल में संग्रहीत नहीं किया जा सकता"
+help = "`coalesce` से डिफ़ॉल्ट दें, पहले `if x is not none` से संकुचित करें, या विफल हो सकने वाले पाठ `at` का उपयोग करें"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"

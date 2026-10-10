@@ -1281,6 +1281,9 @@ mod member_privacy_test;
 #[cfg(test)]
 #[path = "null_narrowing_test.rs"]
 mod null_narrowing_test;
+#[cfg(test)]
+#[path = "optional_into_plain_test.rs"]
+mod optional_into_plain_test;
 
 #[cfg(test)]
 #[path = "numeric_value_equality_test.rs"]

@@ -1022,6 +1022,17 @@ impl TypeChecker<'_> {
                 );
                 self.error_type
             }
+            // Need: an optional value stored into a declared cell
+            // that cannot hold `none` is a named error, not a silent unwrap.
+            (Some(expected), Some(site))
+                if matches!(
+                    site.kind,
+                    HirStoreKind::Declaration | HirStoreKind::Assignment
+                ) && self.reject_optional_into_plain_cell(ty, expected, expr.span) =>
+            {
+                // The named error stands alone: the node takes the slot's type.
+                expected
+            }
             (Some(expected), Some(site)) => self.coerce_store(expr, ty, expected, site),
             (Some(expected), None) => self.unify_expected(ty, expected, expr.span),
             (None, _) => ty,

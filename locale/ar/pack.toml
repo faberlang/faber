@@ -1623,6 +1623,10 @@ help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 message = "قيمة التهيئة لا تطابق النوع المعلن"
 help = "اجعل نوع قيمة التهيئة مطابقا للنوع المعلن"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "قد تكون القيمة {found} فارغة (none) ولا يمكن تخزينها في خلية من النوع {expected}"
+help = "قدّم قيمة افتراضية باستخدام `coalesce`، أو ضيّق النوع أولا باستخدام `if x is not none`، أو استخدم القراءة القابلة للفشل `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"

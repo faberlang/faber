@@ -1635,6 +1635,10 @@ help = "ทำให้ชนิดของนิพจน์ตรงกับ
 message = "ตัวเริ่มต้นไม่ตรงกับคำกำกับชนิด"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} อาจเป็น none และเก็บลงในเซลล์ชนิด {expected} ไม่ได้"
+help = "ระบุค่าเริ่มต้นด้วย `coalesce` จำกัดชนิดด้วย `if x is not none` ก่อน หรือใช้การอ่านที่อาจล้มเหลว `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"

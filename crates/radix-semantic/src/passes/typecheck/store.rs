@@ -32,6 +32,7 @@ use radix_hir::{HirStoreKind, HirStoreSite};
 use radix_types::numeric_range::IntRange;
 
 const STORE_CONSTANT_OUT_OF_RANGE: &str = "store_constant_out_of_range";
+const OPTIONAL_INTO_PLAIN_CELL: &str = "optional_into_plain_cell";
 
 /// One store position of the d11-6 table (ruling 21) as the checker sees it.
 #[derive(Clone, Copy)]
@@ -108,6 +109,49 @@ impl IntSlot {
 }
 
 impl TypeChecker<'_> {
+    /// Reject an optional value (`T ∪ none`) stored into a declared cell that
+    /// cannot hold `none`. The assignability relation unwraps
+    /// `Option(T)` into `T` silently; a store into a plain cell is where that
+    /// unwrap would trap far from the source of the optional, so it is a named
+    /// error here. Returns `true` when it reported, so the caller skips the
+    /// ordinary assignment unification. A flow-narrowed read, a `vel` result
+    /// and an `x!` unwrap already have the payload type and never reach this.
+    pub(super) fn reject_optional_into_plain_cell(
+        &mut self,
+        value_ty: TypeId,
+        slot_ty: TypeId,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let peel = |checker: &Self, ty: TypeId| {
+            let ty = checker.peel_nominal_aliases(ty);
+            let ty = checker.types.peel_access_marker(ty).1;
+            checker.peel_nominal_aliases(ty)
+        };
+        let value = peel(self, value_ty);
+        let slot = peel(self, slot_ty);
+        let Type::Option(inner) = self.types.get(value) else {
+            return false;
+        };
+        let inner = *inner;
+        let nihil = self.types.primitive(Primitive::Nihil);
+        if self.is_infer(slot)
+            || self.infer_union_var_of(slot).is_some()
+            || self.types.is_assignable(nihil, slot)
+            || !self.types.is_assignable(inner, slot)
+        {
+            return false;
+        }
+        let found = self.format_type_for_diagnostic(value_ty);
+        let expected = self.format_type_for_diagnostic(slot_ty);
+        self.error_issue_with_args(
+            SemanticErrorKind::TypeMismatch,
+            OPTIONAL_INTO_PLAIN_CELL,
+            span,
+            &[("found", found), ("expected", expected)],
+        );
+        true
+    }
+
     /// Check `expr` against a slot as a store: the slot's type is the expected
     /// type, and the value is narrowed, reduced or clamped at the slot under
     /// the slot's policy.

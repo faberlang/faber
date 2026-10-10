@@ -2102,6 +2102,10 @@ help = "name an {implendum} declaration after {implet}"
 message = "initializer does not match annotation"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} may be nihil and cannot be stored in a cell of type {expected}"
+help = "give a default with `vel`, narrow with `si x non est nihil` first, or use the failable read `apud`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"
