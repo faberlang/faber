@@ -3934,6 +3934,24 @@ fn tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
     }
 }
 
+#[test]
+fn tensor_gather_rejects_a_table_above_rank_two() {
+    // Rows are cut at the second extent, so a rank-3 table would silently
+    // lose its trailing extent instead of failing closed.
+    let table = tensor_value(vec![Value::Float(1.0); 8], vec![2, 2, 2]);
+    let ids = tensor_value(vec![Value::Int(1)], vec![1]);
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGather),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(TypeId(0)),
+    };
+    evaluate_collection_call(&call, vec![(MirValueId(0), table), (MirValueId(1), ids)])
+        .expect_err("a rank-3 gather table must fail closed");
+}
+
 // ---------------------------------------------------------------------------
 // Gradient-handle round trip (S5-U1): Create → Accumulate → Read → Zero
 // ---------------------------------------------------------------------------

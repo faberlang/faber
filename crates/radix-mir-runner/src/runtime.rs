@@ -4120,7 +4120,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let table = self.tensor_arg(table_arg, span)?;
         let shape = table.borrow().shape.clone();
-        if shape.len() < 2 {
+        if shape.len() != 2 {
             return Err(RunnerError::internal(
                 span,
                 "tensor gather requires a rank-2 table receiver",
