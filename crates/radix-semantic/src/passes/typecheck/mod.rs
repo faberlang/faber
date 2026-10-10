@@ -87,6 +87,9 @@ pub mod call;
 mod call_default_test;
 
 #[cfg(test)]
+#[path = "at_read_test.rs"]
+mod at_read_test;
+#[cfg(test)]
 #[path = "cfa_join_test.rs"]
 mod cfa_join_test;
 pub mod collect;
@@ -101,12 +104,6 @@ mod empty_dense;
 #[path = "enum_access_honesty_test.rs"]
 mod enum_access_honesty_test;
 pub mod expr;
-#[cfg(test)]
-#[path = "at_read_test.rs"]
-mod at_read_test;
-#[cfg(test)]
-#[path = "text_get_test.rs"]
-mod text_get_test;
 #[cfg(test)]
 #[path = "failable_intrinsic_typed_error_test.rs"]
 mod failable_intrinsic_typed_error_test;
@@ -141,6 +138,9 @@ mod shape_obligations_test;
 #[path = "slot_lift_test.rs"]
 mod slot_lift_test;
 mod tensor_edge_policy_generic;
+#[cfg(test)]
+#[path = "text_get_test.rs"]
+mod text_get_test;
 
 mod bits;
 mod closing;
