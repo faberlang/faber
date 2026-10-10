@@ -23,7 +23,7 @@
 //!   the renderer's own SGR color sequences preserved.
 
 use super::{Diagnostic, DiagnosticPhase, Severity};
-use crate::locale::{DiagnosticTemplateRenderError, LocalePack};
+use crate::locale::{DiagnosticTemplateRenderError, LocalePack, TemplateField};
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use std::fmt::Write;
 
@@ -50,7 +50,8 @@ pub fn render_diagnostics(diagnostics: &[Diagnostic], sources: &[(String, String
 /// # Errors
 ///
 /// Returns [`DiagnosticTemplateRenderError`] if a template contains unclosed
-/// placeholders, missing required placeholder values, or invalid format tokens.
+/// placeholders or invalid format tokens. A missing placeholder value falls
+/// back to the base message with a note naming it; it is not an error.
 pub fn render_diagnostics_with_pack(
     diagnostics: &[Diagnostic],
     sources: &[(String, String)],
@@ -136,7 +137,8 @@ pub fn render_plain(diag: &Diagnostic) -> String {
 /// # Errors
 ///
 /// Returns [`DiagnosticTemplateRenderError`] if the pack template contains
-/// malformed placeholders or a required placeholder value is missing.
+/// malformed placeholders. A missing placeholder value falls back to the base
+/// message with a note naming it; it is not an error.
 pub fn render_plain_with_pack(diag: &Diagnostic, pack: &LocalePack) -> Result<String, DiagnosticTemplateRenderError> {
     render_plain_text(diag, Some(pack))
 }
@@ -180,7 +182,8 @@ pub fn render_expanded(diag: &Diagnostic) -> String {
 /// # Errors
 ///
 /// Returns [`DiagnosticTemplateRenderError`] if the pack template contains
-/// malformed placeholders or a required placeholder value is missing.
+/// malformed placeholders. A missing placeholder value falls back to the base
+/// message with a note naming it; it is not an error.
 pub fn render_expanded_with_pack(
     diag: &Diagnostic,
     pack: &LocalePack,
@@ -229,7 +232,8 @@ pub fn render_expanded_diagnostics(diagnostics: &[Diagnostic]) -> String {
 /// # Errors
 ///
 /// Returns [`DiagnosticTemplateRenderError`] if any diagnostic template
-/// contains malformed placeholders or a required placeholder value is missing.
+/// contains malformed placeholders. A missing placeholder value falls back to
+/// the base message with a note naming it; it is not an error.
 pub fn render_expanded_diagnostics_with_pack(
     diagnostics: &[Diagnostic],
     pack: &LocalePack,
@@ -274,10 +278,30 @@ fn diagnostic_display_text(
     diag: &Diagnostic,
     pack: Option<&LocalePack>,
 ) -> Result<Option<DiagnosticDisplayText>, DiagnosticTemplateRenderError> {
-    if let Some(pack) = pack
-        && let Some(rendered) = pack.render_diagnostic_text(diag)?
-    {
-        return Ok(Some(DiagnosticDisplayText { message: rendered.message, help: rendered.help }));
+    if let Some(pack) = pack {
+        match pack.render_diagnostic_text(diag) {
+            Ok(Some(rendered)) => {
+                return Ok(Some(DiagnosticDisplayText { message: rendered.message, help: rendered.help }));
+            }
+            Ok(None) => {}
+            // A template placeholder the emit site did not supply must not
+            // abort the whole run: show the base message and
+            // name the missing placeholder so the pack defect stays visible.
+            Err(DiagnosticTemplateRenderError::MissingPlaceholder { code, field, placeholder }) => {
+                let field = match field {
+                    TemplateField::Message => "message",
+                    TemplateField::Help => "help",
+                };
+                return Ok(Some(DiagnosticDisplayText {
+                    message: format!(
+                        "{} [locale pack template missing placeholder: {code}.{field} {{{placeholder}}}]",
+                        diag.message
+                    ),
+                    help: diag.help.clone(),
+                }));
+            }
+            Err(err) => return Err(err),
+        }
     }
 
     if diag.code.is_none() || diag.phase == DiagnosticPhase::Codegen {

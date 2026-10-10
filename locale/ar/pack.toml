@@ -340,8 +340,8 @@ message = "خطأ في المحلل المعجمي أثناء التحليل"
 help = "أصلح خطأ المحلل المعجمي أولا؛ يستمر التحليل من الرموز النظيفة"
 
 [diagnostics.PARSE001]
-message = "مطلوب {expected}"
-help = "أضف {expected} في هذا الموضع"
+message = "مطلوب{?expected| |}"
+help = "أضف{?expected| |} في هذا الموضع"
 
 [diagnostics.PARSE001.issues.annotation_name]
 message = "مطلوب اسم تعليمة"

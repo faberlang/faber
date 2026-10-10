@@ -311,35 +311,48 @@ fn expanded_batch_render_with_pack_keeps_default_text_when_template_missing() {
     );
 }
 
-#[test]
-fn render_with_pack_propagates_template_errors() {
-    let pack = LocalePack::from_toml_str(
-        r#"
+const MISSING_PLACEHOLDER_PACK: &str = r#"
 [pack]
 id = "la-test"
 fallback = ["la"]
 
 [diagnostics.PARSE011]
 message = "expected {missing}"
+help = "add {missing} here"
 
 [llm]
 system_prompt_snippet = "emit Latin Faber"
 exemplars = ["./exemplars/salve-munde.fab"]
-"#,
-    )
-    .expect("pack should validate");
+"#;
+
+/// A template placeholder the emit site did not supply must not abort the run
+///: the base message renders with a note naming the placeholder.
+#[test]
+fn render_with_pack_falls_back_when_placeholder_is_missing() {
+    let pack = LocalePack::from_toml_str(MISSING_PLACEHOLDER_PACK).expect("pack should validate");
     let diagnostic = Diagnostic::error("expected function name")
         .with_code("PARSE011")
         .with_file("bad.fab");
 
-    assert_eq!(
-        render_plain_with_pack(&diagnostic, &pack).expect_err("missing placeholder should fail"),
-        DiagnosticTemplateRenderError::MissingPlaceholder {
-            code: "PARSE011".to_string(),
-            field: TemplateField::Message,
-            placeholder: "missing".to_string(),
-        }
+    let plain = render_plain_with_pack(&diagnostic, &pack).expect("missing placeholder falls back");
+    assert!(plain.contains("expected function name"), "base message kept: {plain}");
+    assert!(
+        plain.contains("[locale pack template missing placeholder: PARSE011.message {missing}]"),
+        "note names the placeholder: {plain}"
     );
+
+    let expanded =
+        render_expanded_with_pack(&diagnostic, &pack).expect("missing placeholder falls back in expanded mode");
+    assert!(
+        expanded.contains("[locale pack template missing placeholder: PARSE011.message {missing}]"),
+        "{expanded}"
+    );
+
+    // Batch rendering keeps going: the other diagnostic still renders.
+    let other = Diagnostic::error("other failure").with_file("bad.fab");
+    let batch =
+        render_expanded_diagnostics_with_pack(&[diagnostic, other], &pack).expect("batch render does not abort");
+    assert!(batch.contains("other failure"), "{batch}");
 }
 
 /// The issue row owns the prose; the base row is only for code-only diagnostics.
