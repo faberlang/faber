@@ -60,7 +60,16 @@ pub(super) fn cli_operand_record_fields(
             cli_operand_list_value(unit, operand, raw, diagnostics)?
         } else if let Some(value) = argumenta.get(index) {
             index += 1;
-            MirRuntimeRecordValue::Operand(cli_operand_value(unit, operand, value, diagnostics)?)
+            if matches!(operand.operand.ty, CliType::Octeti) {
+                cli_octeti_operand_value(unit, value)
+            } else {
+                MirRuntimeRecordValue::Operand(cli_operand_value(
+                    unit,
+                    operand,
+                    value,
+                    diagnostics,
+                )?)
+            }
         } else if let Some(default) = &operand.operand.default {
             MirRuntimeRecordValue::Operand(cli_default_operand_value(
                 unit,
@@ -126,10 +135,23 @@ pub(super) fn cli_operand_value(
                 return None;
             }
         }
-        CliType::Octeti => MirConstant::Octeti(value.as_bytes().to_vec()),
-        CliType::ListaTextus | CliType::ListaNumerus => return None,
+        CliType::Octeti | CliType::ListaTextus | CliType::ListaNumerus => return None,
     };
     Some(MirOperand::Constant(constant))
+}
+
+/// An `octeti` operand is a `lista<b8>`: the argument's UTF-8 bytes become a
+/// list of byte patterns typed by the record field.
+fn cli_octeti_operand_value(unit: &mut AnalyzedProgramNode, value: &str) -> MirRuntimeRecordValue {
+    let ty = unit.analysis.types.octeti_list();
+    let items = value
+        .bytes()
+        .map(|byte| MirOperand::Constant(MirConstant::UInt(u64::from(byte))))
+        .collect();
+    MirRuntimeRecordValue::Array {
+        ty: MirType::semantic(ty),
+        items,
+    }
 }
 
 pub(super) fn cli_operand_list_value(
@@ -517,7 +539,10 @@ pub(super) fn cli_record_type(
         CliType::Numerus => Primitive::Numerus,
         CliType::Fractus => Primitive::Fractus,
         CliType::Bivalens => Primitive::Bivalens,
-        CliType::Octeti => Primitive::Octeti,
+        CliType::Octeti => {
+            let bytes = types.octeti_list();
+            return Some(if rest { types.array(bytes) } else { bytes });
+        }
         CliType::ListaTextus => {
             let textus = types.primitive(Primitive::Textus);
             return Some(types.array(textus));

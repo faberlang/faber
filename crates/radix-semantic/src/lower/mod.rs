@@ -866,7 +866,7 @@ impl<'a> Lowerer<'a> {
             CliType::Numerus => self.types.primitive(Primitive::Numerus),
             CliType::Fractus => self.types.primitive(Primitive::Fractus),
             CliType::Bivalens => self.types.primitive(Primitive::Bivalens),
-            CliType::Octeti => self.types.primitive(Primitive::Octeti),
+            CliType::Octeti => self.types.octeti_list(),
             CliType::ListaTextus => {
                 let textus = self.types.primitive(Primitive::Textus);
                 self.types.array(textus)

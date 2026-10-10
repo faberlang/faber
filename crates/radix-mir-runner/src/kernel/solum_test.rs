@@ -1,6 +1,9 @@
-use super::{MAX_RANGE_READ_BYTES, read_byte_range};
+use super::{MAX_RANGE_READ_BYTES, octeti_bytes, read_byte_range};
+use crate::Value;
 use radix_lexer::Span;
+use std::cell::RefCell;
 use std::fs;
+use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn unique_path(suffix: &str) -> std::path::PathBuf {
@@ -106,4 +109,17 @@ fn range_read_refuses_negative_start_and_length() {
     );
 
     fs::remove_file(path).expect("remove negative fixture");
+}
+
+#[test]
+fn octeti_bytes_accepts_the_byte_value_and_a_b8_list() {
+    let list = |items: Vec<Value>| Value::Array(Rc::new(RefCell::new(items)));
+    assert_eq!(octeti_bytes(&Value::Octeti(vec![1, 2])), Some(vec![1, 2]));
+    assert_eq!(
+        octeti_bytes(&list(vec![Value::UInt(0x41), Value::UInt(255)])),
+        Some(vec![0x41, 255])
+    );
+    assert_eq!(octeti_bytes(&list(vec![Value::UInt(256)])), None);
+    assert_eq!(octeti_bytes(&list(vec![Value::Bool(true)])), None);
+    assert_eq!(octeti_bytes(&Value::Unit), None);
 }
