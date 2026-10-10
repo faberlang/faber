@@ -3262,9 +3262,23 @@ impl TypeChecker<'_> {
         let optional_slot_list_source = list_target
             && matches!(&source.kind, HirExpressionKind::Array(_))
             && self.list_slot_carries_optional(effective_target);
-        let source_expected =
-            (constructor_source || (empty_list_source && list_target) || optional_slot_list_source)
-                .then_some(effective_target);
+        // WHY: a JSON-object literal ascribed to a map, or listed inside an
+        // ascribed list whose slot is a map, is typed against that map exactly
+        // as a declaration cell types it, so `json_nested_value_requires_valor`
+        // and per-entry value checks apply to both spellings.
+        let json_literal_source = matches!(
+            &source.kind,
+            HirExpressionKind::Literal(HirLiteral::JsonValor(_))
+        ) && matches!(self.types.get(effective_target), Type::Map(..));
+        let map_slot_list_source = list_target
+            && matches!(&source.kind, HirExpressionKind::Array(_))
+            && self.list_slot_carries_map(effective_target);
+        let source_expected = (constructor_source
+            || (empty_list_source && list_target)
+            || optional_slot_list_source
+            || json_literal_source
+            || map_slot_list_source)
+            .then_some(effective_target);
         let source_ty = if matches!(
             self.types.get(effective_target),
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(_, _)
@@ -3511,6 +3525,22 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// True when `ty` is a list whose element slot is a map, directly or
+    /// through nested lists (`list<map<string, int>>`).
+    fn list_slot_carries_map(&self, ty: TypeId) -> bool {
+        match self.types.get(self.resolve_inferred_type(ty)) {
+            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                self.slot_carries_map(*elem)
+            }
+            _ => false,
+        }
+    }
+
+    fn slot_carries_map(&self, slot: TypeId) -> bool {
+        let slot = self.resolve_inferred_type(slot);
+        matches!(self.types.get(slot), Type::Map(..)) || self.list_slot_carries_map(slot)
+    }
+
     fn slot_carries_optional(&self, slot: TypeId) -> bool {
         let slot = self.resolve_inferred_type(slot);
         matches!(self.types.get(slot), Type::Option(_)) || self.list_slot_carries_optional(slot)
@@ -3522,12 +3552,13 @@ impl TypeChecker<'_> {
             return;
         };
 
-        let optional_slot = self.slot_carries_optional(elem_ty);
+        let optional_slot = self.slot_carries_optional(elem_ty) || self.slot_carries_map(elem_ty);
         for element in elements {
             match element {
                 HirArrayElement::Expr(expr) => {
-                    // WHY: an optional (or nested optional) slot types its
-                    // element literals against the slot, as a declaration does.
+                    // WHY: an optional (or nested optional) or map slot types
+                    // its element literals against the slot, as a declaration
+                    // does.
                     let element_ty = if optional_slot {
                         self.check_expr_with_expected(expr, Some(elem_ty))
                     } else {
