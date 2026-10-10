@@ -5136,7 +5136,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             };
             match self.types.get(ty) {
                 Type::Primitive(Primitive::Fractus) => return NumericWidth::F64,
-                Type::SizedNumeric(Primitive::Fractus, width) => {
+                Type::SizedNumeric(Primitive::Fractus, width) | Type::PolicyFloat(_, width) => {
                     if matches!(width, NumericWidth::F64) {
                         return NumericWidth::F64;
                     }

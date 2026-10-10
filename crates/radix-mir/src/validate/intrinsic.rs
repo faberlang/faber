@@ -1702,6 +1702,7 @@ impl Validator<'_, '_> {
                         self.type_kind(receiver_ty),
                         Type::Primitive(Primitive::Numerus | Primitive::Fractus)
                             | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+                            | Type::PolicyFloat(_, _)
                     ) {
                         self.error(span, "fuzzy comparison receiver is not numeric");
                     }
@@ -1713,6 +1714,7 @@ impl Validator<'_, '_> {
                         self.type_kind(receiver_ty),
                         Type::Primitive(Primitive::Fractus)
                             | Type::SizedNumeric(Primitive::Fractus, _)
+                            | Type::PolicyFloat(_, _)
                     ) {
                         self.error(span, "approximate comparison receiver is not fractus");
                         return;

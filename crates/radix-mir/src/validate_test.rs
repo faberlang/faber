@@ -3422,6 +3422,27 @@ fn approximate_plain_fractus_receiver_valid() {
 }
 
 #[test]
+fn approximate_policy_float_receiver_valid() {
+    // A `saturating`/`trapping` cell is the bare float of its width: width
+    // limits apply only at the store, so the comparison receiver is valid.
+    for policy in [
+        radix_types::FloatPolicy::Saturating,
+        radix_types::FloatPolicy::Trapping,
+    ] {
+        let mut types = TypeTable::new();
+        let receiver_ty = MirType::semantic(
+            types.intern(Type::PolicyFloat(policy, radix_types::NumericWidth::F32)),
+        );
+        let program = approximate_collection_program(&mut types, receiver_ty, receiver_ty);
+        let errors = validate(&program, &types);
+        assert!(
+            errors.is_empty(),
+            "expected a valid {policy:?} approximate receiver, got: {errors:?}"
+        );
+    }
+}
+
+#[test]
 fn approximate_rejects_numerus_receiver() {
     let mut types = TypeTable::new();
     let receiver_ty = numerus_mty(&mut types);

@@ -437,3 +437,88 @@ fn policy_float_arithmetic_overflow_is_infinity_not_a_trap() {
     .expect("an unstored product does not trap");
     assert_eq!(product, Value::Float(f64::INFINITY));
 }
+
+/// Run the five-argument fuzzy `≈` / `≉` over two cell-typed locals (so the
+/// comparison width is read from the slot type) and return its boolean.
+fn fuzzy(
+    policy: FloatPolicy,
+    width: NumericWidth,
+    left: f64,
+    right: f64,
+    negated: bool,
+) -> Result<Value, RunnerError> {
+    use radix_mir::{MirCollectionOp, MirIntrinsic, MirLocal, MirLocalId, MirPlace, MirPlaceBase};
+    use radix_mir::{MirRuntimeCall, MirType};
+
+    let mut types = TypeTable::new();
+    let ty = types.intern(cell(policy, width));
+    let bool_ty = types.primitive(Primitive::Bivalens);
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let mut program = MirProgram::new();
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: (0..2)
+            .map(|id| MirLocal {
+                id: MirLocalId(id),
+                ty: MirType::semantic(ty),
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            })
+            .collect(),
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    });
+    let mut host = crate::host::BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let frame = runner.frames.last_mut().expect("frame");
+    frame.locals[0] = Some(Value::Float(left));
+    frame.locals[1] = Some(Value::Float(right));
+    let place = |id| {
+        MirOperand::Place(MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(id)),
+            projections: vec![],
+        })
+    };
+    runner.eval_runtime_call(
+        &MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(MirCollectionOp::Approximate),
+            args: vec![
+                place(0),
+                place(1),
+                constant(1e-9),
+                constant(0.0),
+                MirOperand::Constant(MirConstant::Bool(negated)),
+            ],
+            return_ty: MirType::semantic(bool_ty),
+        },
+        Span::default(),
+    )
+}
+
+#[test]
+fn policy_float_fuzzy_comparison_runs_on_the_bare_float() {
+    // `q ≈ 7.0` over a saturating or trapping cell is the comparison of the
+    // bare float of its width; `≉` is its negation. No width limit applies.
+    for policy in [FloatPolicy::Saturating, FloatPolicy::Trapping] {
+        for width in [NumericWidth::F32, NumericWidth::F64] {
+            let same = fuzzy(policy, width, 7.0, 7.0, false).expect("≈ over a cell");
+            assert_eq!(same, Value::Bool(true), "{policy:?} {width:?} 7 ≈ 7");
+            let apart = fuzzy(policy, width, 7.0, 8.0, false).expect("≈ over a cell");
+            assert_eq!(apart, Value::Bool(false), "{policy:?} {width:?} 7 ≈ 8");
+            let negated = fuzzy(policy, width, 7.0, 8.0, true).expect("≉ over a cell");
+            assert_eq!(negated, Value::Bool(true), "{policy:?} {width:?} 7 ≉ 8");
+        }
+    }
+}
