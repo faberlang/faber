@@ -427,21 +427,21 @@ fn inf_into_a_float_never_fails() {
 #[test]
 fn a_float_into_inf_fails_only_at_nan_and_infinity() {
     assert_rejects(
-        &conversion("fractus a", "inf", "a ↦ inf"),
+        &conversion("fractus a", "inf", "a ↦ inf via Trunc"),
         "failable_conversio_requires_handler",
     );
-    test_support::assert_accepts(&conversion("fractus a", "inf", "a ↦ inf ⊥ 0"));
+    test_support::assert_accepts(&conversion("fractus a", "inf", "a ↦ inf via Trunc ⊥ 0"));
     // A finite constant is proven.
-    test_support::assert_accepts(&conversion("numerus a", "inf", "3.5 ↦ inf"));
+    test_support::assert_accepts(&conversion("numerus a", "inf", "3.5 ↦ inf via Trunc"));
     assert_rejects(
-        &conversion("numerus a", "inf", "∞ ↦ inf"),
+        &conversion("numerus a", "inf", "∞ ↦ inf via Trunc"),
         "failable_conversio_requires_handler",
     );
 }
 
 #[test]
 fn d64_into_inf_never_fails_and_inf_into_d64_is_checked() {
-    test_support::assert_accepts(&conversion("d64 a", "inf", "a ↦ inf"));
+    test_support::assert_accepts(&conversion("d64 a", "inf", "a ↦ inf via HalfEven"));
     assert_rejects(
         &conversion("inf a", "d64", "a ↦ d64"),
         "failable_conversio_requires_handler",

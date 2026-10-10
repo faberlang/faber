@@ -454,6 +454,9 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "octeti_to_tensor_length_mismatch" => {
             Some("size the byte window to product(shape) times the element width, or change the tensor shape".to_owned())
         }
+        "float_to_integer_requires_rounding" => {
+            Some("write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`, or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result".to_owned())
+        }
         "conversio_via_bits_retired" => {
             Some("write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`".to_owned())
         }
@@ -461,7 +464,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("Code reads a code point as littera ↦ u32 via Code or builds one as numerus ↦ littera via Code".to_owned())
         }
         "conversio_via_unknown_hint" => {
-            Some("use one of Hex, Bin, Oct, Be, Le, or Code after via".to_owned())
+            Some("use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer".to_owned())
         }
         "conversio_via_target_takes_no_hint" => {
             Some("drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint".to_owned())

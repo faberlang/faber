@@ -25,7 +25,8 @@ const TARGETS: [(&str, i128, i128); 9] = [
 ];
 
 fn check(target: &str, literal: &str, fits: bool) {
-    let source = format!("functio g() → {target} {{\n    redde {literal} ↦ {target}\n}}\n");
+    let source =
+        format!("functio g() → {target} {{\n    redde {literal} ↦ {target} via Trunc\n}}\n");
     if fits {
         assert_accepts(&source);
     } else {
@@ -98,5 +99,7 @@ fn truncation_toward_zero_decides_fit() {
 
 #[test]
 fn a_handler_still_covers_a_constant_that_does_not_fit() {
-    assert_accepts("functio g() → u64 {\n    redde 18446744073709551616.0 ↦ u64 ⊥ 0\n}\n");
+    assert_accepts(
+        "functio g() → u64 {\n    redde 18446744073709551616.0 ↦ u64 via Trunc ⊥ 0\n}\n",
+    );
 }

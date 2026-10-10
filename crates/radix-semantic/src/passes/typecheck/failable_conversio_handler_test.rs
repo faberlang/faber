@@ -48,8 +48,14 @@ fn every_failable_conversio_kind_is_rejected_without_a_handler() {
         ("u16", "u8"),
         ("d64", "i32"),
     ] {
+        // Need: a float or decimal source names its rounding.
+        let via = if matches!(param, "fractus" | "d64") {
+            " via Trunc"
+        } else {
+            ""
+        };
         assert_rejects_with_issue(
-            &format!("functio g({param} x) → {target} {{\n    redde x ↦ {target}\n}}\n"),
+            &format!("functio g({param} x) → {target} {{\n    redde x ↦ {target}{via}\n}}\n"),
             ISSUE,
         );
     }

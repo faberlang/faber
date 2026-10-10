@@ -1279,11 +1279,11 @@ mod namespace_shadow_test;
 mod conditional_narrowing_test;
 
 #[cfg(test)]
-#[path = "diverging_guard_narrowing_test.rs"]
-mod diverging_guard_narrowing_test;
-#[cfg(test)]
 #[path = "compound_guard_narrowing_test.rs"]
 mod compound_guard_narrowing_test;
+#[cfg(test)]
+#[path = "diverging_guard_narrowing_test.rs"]
+mod diverging_guard_narrowing_test;
 #[cfg(test)]
 #[path = "member_privacy_test.rs"]
 mod member_privacy_test;
@@ -1319,6 +1319,10 @@ mod bounded_string_conversio_test;
 #[cfg(test)]
 #[path = "bits_conversio_test.rs"]
 mod bits_conversio_test;
+
+#[cfg(test)]
+#[path = "rounding_conversio_test.rs"]
+mod rounding_conversio_test;
 
 #[cfg(test)]
 #[path = "bits_operator_test.rs"]
