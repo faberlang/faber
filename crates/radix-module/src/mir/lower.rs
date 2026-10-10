@@ -85,6 +85,9 @@ mod conversion_check_tests;
 #[path = "lower/display_tokens_test.rs"]
 mod display_tokens_tests;
 #[cfg(test)]
+#[path = "lower/bounded_textus_run_test.rs"]
+mod bounded_textus_run_tests;
+#[cfg(test)]
 #[path = "lower/empty_dense_test.rs"]
 mod empty_dense_tests;
 #[cfg(test)]

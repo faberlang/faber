@@ -1266,6 +1266,43 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// `textus ↦ textus<N>`: the store-time width check. The value stays a
+    /// text; a source of more than `N` Unicode scalars fails the conversion
+    /// with the Rust carrier's text (`TextusN::try_from_textus`), and `⊥`
+    /// recovery supplies the fallback.
+    pub(crate) fn convert_to_bounded_textus(
+        &mut self,
+        value: Value,
+        capacity: radix_types::IndexId,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let IndexExpr::Literal(capacity) = self.types.get_index(capacity) else {
+            return Err(RunnerError::internal(
+                span,
+                "bounded textus requires a literal capacity",
+            ));
+        };
+        let capacity = usize::try_from(*capacity).unwrap_or(usize::MAX);
+        match value {
+            Value::Str(text) => {
+                if text.chars().count() > capacity {
+                    self.recover_or_fail(
+                        recovery,
+                        span,
+                        "textus to bounded textus conversion failed",
+                    )
+                } else {
+                    Ok(Value::Str(text))
+                }
+            }
+            other => Err(RunnerError::internal(
+                span,
+                format!("bounded textus conversio requires a textus source, got {other:?}"),
+            )),
+        }
+    }
+
     pub(crate) fn convert_to_ascii(
         &mut self,
         value: Value,

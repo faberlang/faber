@@ -1485,7 +1485,6 @@ fn function_unsupported_bounded_carrier(
     types: &TypeTable,
 ) -> Option<&'static str> {
     let label = |ty: radix_mir::MirType| match types.get(ty.semantic_id()) {
-        Type::BoundedTextus { .. } => Some("bounded textus runner carrier"),
         Type::BoundedOcteti { .. } => Some("bounded octeti runner carrier"),
         _ => None,
     };
@@ -3848,6 +3847,10 @@ mod octeti_tensor_test;
 #[cfg(test)]
 #[path = "ascii_format_pack_test.rs"]
 mod ascii_format_pack_test;
+
+#[cfg(test)]
+#[path = "bounded_textus_test.rs"]
+mod bounded_textus_test;
 
 #[cfg(test)]
 #[path = "octeti_lista_test.rs"]
