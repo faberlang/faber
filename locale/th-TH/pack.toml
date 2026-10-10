@@ -98,6 +98,7 @@ ex = "ออก"
 in = "ใน"
 own = "เป็นเจ้าของ"
 copy = "สำเนา"
+axis = "แกน"
 lege = "อ่าน"
 lineam = "บรรทัด"
 omnia = "ทั้งหมด"
@@ -502,6 +503,10 @@ help = "ให้ schema เป็นส่วนหัวเชิงสัม�
 message = "schema ไม่สามารถประกาศ method ได้"
 help = "ประกาศ method บน genus แทน"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "ต้องมีชื่อฟังก์ชันหลัง '{functio}'"
 help = "เพิ่มชื่อฟังก์ชันหลัง '{functio}'"
@@ -626,6 +631,10 @@ help = "ใช้ expression ของกรณีที่ถูกต้อง
 message = "นิพจน์ไม่ถูกต้อง"
 help = "ตรวจไวยากรณ์นิพจน์"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "ตัวคั่น ceiling `⌈` และ `⌉` ปิด ceiling; `⌈x⌋` ไม่ใช่รูปแบบการปัดเศษ"
+help = "เขียน `⌊x⌉` เพื่อปัดเป็นจำนวนเต็มที่ใกล้ที่สุด เมื่อเสมอให้เลือกเพื่อนบ้านที่เป็นเลขคู่; เขียน `⌈x⌉` สำหรับ ceiling หรือ `⌊x⌋` สำหรับ floor"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` เป็นตัวดำเนินการที่เลิกใช้แล้ว; การปฏิเสธของ `≡` เขียนเป็น `{replacement}`"
 help = "เขียน `{replacement}` แทน `{glyph}`; สัญลักษณ์ปฏิเสธทุกตัวมีจำนวนเส้นเท่ากับสัญลักษณ์ที่มันปฏิเสธ (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -725,6 +734,10 @@ help = "เขียน `{bare}` แทน `{form}`; ตัวระบุคว
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "ใช้การสะกดชนิดที่ประกาศในภาษาของตัวอ่านนี้{?expected|: '|'}"
+
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` ทดสอบชนิด; '{value}' เป็นค่า"
+help = "เปรียบเทียบค่าด้วยกลุ่มตัวดำเนินการความเท่ากัน: `≡` (เข้มงวด), `≅` (ตรงเป๊ะหลังการเลื่อนชนิด), `≈` (คลุมเครือ); หากต้องการทดสอบชนิด null ให้เขียน `x est {type}`"
 
 [diagnostics.PARSE041]
 message = "คำอธิบายชนิดไม่ถูกต้อง"
@@ -1622,6 +1635,10 @@ help = "ทำให้ชนิดของนิพจน์ตรงกับ
 message = "ตัวเริ่มต้นไม่ตรงกับคำกำกับชนิด"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} อาจเป็น none และเก็บลงในเซลล์ชนิด {expected} ไม่ได้"
+help = "ระบุค่าเริ่มต้นด้วย `coalesce` จำกัดชนิดด้วย `if x is not none` ก่อน หรือใช้การอ่านที่อาจล้มเหลว `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"
@@ -1922,6 +1939,10 @@ help = "gradient selection (`∇`) เป็นเพียง parse-only ใน
 message = "ชนิดตัวถูกดำเนินการไม่ถูกต้อง"
 help = "ใช้ชนิดตัวถูกดำเนินการที่เข้ากันได้"
 
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "สัญลักษณ์การปัดเศษยังใช้กับค่า tensor ไม่ได้"
+help = "ปัดเศษแต่ละ element ด้วยลูปหรือเมธอดปัดเศษแบบ scalar; การยก per-element ยังไม่ได้สร้าง"
+
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "พารามิเตอร์ค่า {param} ใช้ตำแหน่ง extent ในลายเซ็นไม่ได้"
 help = "ประกาศพารามิเตอร์เจนเนอริก `<size {param}>` แล้วใช้ใน figura หรือเขียนการยก `size {param}` ในตำแหน่งที่ต้องการยกค่ารันไทม์"
@@ -1953,6 +1974,10 @@ help = "ใช้ ⊙ สำหรับการคูณสองลิสต�
 [diagnostics.SEM011.issues.lista_bits_whole_equality_only]
 message = "ไม่รองรับการเรียงลำดับลิสต์ของค่าบิต; ลิสต์บิตมีเพียงความเท่ากันของค่าทั้งก้อน"
 help = "เปรียบเทียบทั้งลิสต์ด้วย `≡`/`≢` หรือแปลงองค์ประกอบเป็นตัวเลขด้วย `↦` ก่อน; บิตไม่ใช่ตัวเลข จึงไม่ยก `≺ ≻ ≤ ≥` รายองค์ประกอบ"
+
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} เปรียบเทียบตัวเลข; {kind} ที่ไม่ใช่เทนเซอร์ตัวเลขเปรียบเทียบด้วยตัวดำเนินการนี้ไม่ได้"
+help = "เปรียบเทียบองค์ประกอบด้วยตัวดำเนินการตัวเลข หรือใช้ `≡`/`≢` เพื่อเปรียบเทียบค่าทั้งก้อน"
 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "ไม่รองรับ list `/` list; ใช้ ⊘ (รายองค์ประกอบ เหมือน `/`) หรือ ÷ (การหารจริงรายองค์ประกอบ)"
@@ -2722,6 +2747,10 @@ help = "ใช้ binding `varia` เพื่อให้กำหนดค่�
 message = "method ตัวดำเนินการ imperativus ต้องการ receiver แบบ varia"
 help = "ใช้ binding `varia` เพื่อให้กำหนดค่าใหม่ได้ หรือนำการกำหนดค่าเพิ่มเติมออก"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` เปลี่ยนสถานะที่เข้าถึงได้ผ่าน `{binding}` แต่ `{binding}` เป็น binding ที่เปลี่ยนแปลงไม่ได้ (`const` มีผลลึกถึงข้างใน)"
+help = "ประกาศ `{binding}` ด้วย `var` เพื่อให้เปลี่ยนค่าในตำแหน่งเดิมได้ หรือเรียก method ที่คืนค่าใหม่แทน"
+
 [diagnostics.SEM021]
 message = "เป้าหมายการกำหนดค่าไม่ถูกต้อง"
 help = "กำหนดค่าให้ lvalue ที่ถูกต้อง"
@@ -2933,6 +2962,14 @@ help = "use the same access marker at the call as in the signature"
 [diagnostics.SEM057.issues.call_marker_on_read_only]
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+
+[diagnostics.SEM057.issues.axis_marker_required]
+message = "this argument is an `axis` argument and must be written with the `axis` marker"
+help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+
+[diagnostics.SEM057.issues.axis_marker_unexpected]
+message = "the `axis` marker is written here but the parameter is not declared `axis`"
+help = "remove the `axis` marker, or declare the parameter `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"
@@ -3256,6 +3293,7 @@ exchange = "สลับ"
 load = "โหลด"
 store = "เก็บ"
 accipe = "ดึง"
+apud = "ที่"
 addita = "เพิ่มแล้ว"
 appende = "ต่อท้าย"
 argmaxima = "ดัชนีค่าสูงสุด"

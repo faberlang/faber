@@ -98,6 +98,7 @@ ex = "từ"
 in = "vào"
 own = "sở_hữu"
 copy = "sao_chép"
+axis = "trục"
 lege = "đọc"
 lineam = "dòng"
 omnia = "tất_cả"
@@ -502,6 +503,10 @@ help = "giữ schema là tiêu đề quan hệ đơn thuần"
 message = "schema không thể khai báo method"
 help = "khai báo method trên genus thay thế"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "cần tên hàm sau '{functio}'"
 help = "thêm tên hàm sau '{functio}'"
@@ -626,6 +631,10 @@ help = "dùng một biểu thức case hợp lệ"
 message = "biểu thức không hợp lệ"
 help = "kiểm tra cú pháp biểu thức"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "dấu phân cách trần `⌈` và `⌉` đóng một phép lấy trần; `⌈x⌋` không phải dạng làm tròn"
+help = "viết `⌊x⌉` để làm tròn tới số nguyên gần nhất, khi hòa chọn số chẵn lân cận; viết `⌈x⌉` cho trần hoặc `⌊x⌋` cho sàn"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` là toán tử đã bị loại bỏ; phủ định của `≡` được viết là `{replacement}`"
 help = "viết `{replacement}` thay cho `{glyph}`; mỗi ký hiệu phủ định có cùng số gạch ngang với ký hiệu mà nó phủ định (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -725,6 +734,10 @@ help = "viết `{bare}` thay vì `{form}`; dấu hiệu độ rộng tự nó l�
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "dùng chính tả kiểu được khai báo trong ngôn ngữ đọc này{?expected|: '|'}"
+
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` kiểm tra kiểu; '{value}' là một giá trị"
+help = "so sánh giá trị bằng họ toán tử bằng nhau: `≡` (chặt), `≅` (chính xác sau khi nâng kiểu), `≈` (mờ); để kiểm tra kiểu null, viết `x est {type}`"
 
 [diagnostics.PARSE041]
 message = "chú thích kiểu không hợp lệ"
@@ -1610,6 +1623,10 @@ help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầ
 message = "initializer không khớp với annotation"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} có thể là none và không thể lưu vào ô có kiểu {expected}"
+help = "đưa giá trị mặc định bằng `coalesce`, thu hẹp kiểu trước bằng `if x is not none`, hoặc dùng phép đọc có thể thất bại `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"
@@ -1910,6 +1927,10 @@ help = "gradient selection (`∇`) chỉ parse-only trong Phase 2A; các quy t�
 message = "kiểu toán hạng không hợp lệ"
 help = "dùng các kiểu toán hạng tương thích"
 
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "các ký hiệu làm tròn chưa áp dụng được cho giá trị tensor"
+help = "làm tròn từng phần tử bằng vòng lặp hoặc phương thức làm tròn vô hướng; phép nâng theo từng phần tử chưa được xây dựng"
+
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "tham số giá trị {param} không thể chiếm vị trí extent trong chữ ký"
 help = "khai báo tham số tổng quát `<size {param}>` và dùng nó trong figura, hoặc viết phép nâng `size {param}` nơi muốn nâng giá trị runtime"
@@ -1941,6 +1962,10 @@ help = "dùng ⊙ để nhân hai danh sách theo phần tử; `*` nhận một 
 [diagnostics.SEM011.issues.lista_bits_whole_equality_only]
 message = "không hỗ trợ sắp thứ tự danh sách giá trị bit; danh sách bit chỉ có so sánh bằng toàn giá trị"
 help = "so sánh cả danh sách bằng `≡`/`≢`, hoặc chuyển các phần tử sang số bằng `↦` trước; bit không phải số nên `≺ ≻ ≤ ≥` không áp theo từng phần tử"
+
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} so sánh các số; {kind} không phải tensor số thì không thể so sánh bằng nó"
+help = "so sánh các phần tử bằng toán tử số, hoặc dùng `≡`/`≢` để so sánh toàn giá trị"
 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "không hỗ trợ list `/` list; dùng ⊘ (theo phần tử, như `/`) hoặc ÷ (chia thực theo phần tử)"
@@ -2710,6 +2735,10 @@ help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa 
 message = "phương thức toán tử imperativus yêu cầu receiver varia"
 help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa phép gán bổ sung"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` thay đổi trạng thái truy cập được qua `{binding}`, nhưng `{binding}` là liên kết bất biến (`const` có hiệu lực sâu)"
+help = "khai báo `{binding}` bằng `var` để có thể thay đổi tại chỗ, hoặc gọi phương thức trả về giá trị mới"
+
 [diagnostics.SEM021]
 message = "đích gán không hợp lệ"
 help = "gán cho một lvalue hợp lệ"
@@ -2921,6 +2950,14 @@ help = "use the same access marker at the call as in the signature"
 [diagnostics.SEM057.issues.call_marker_on_read_only]
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+
+[diagnostics.SEM057.issues.axis_marker_required]
+message = "this argument is an `axis` argument and must be written with the `axis` marker"
+help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+
+[diagnostics.SEM057.issues.axis_marker_unexpected]
+message = "the `axis` marker is written here but the parameter is not declared `axis`"
+help = "remove the `axis` marker, or declare the parameter `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"
@@ -3244,6 +3281,7 @@ exchange = "đổi"
 load = "nạp"
 store = "lưu"
 accipe = "lấy"
+apud = "tại"
 addita = "đã_thêm"
 appende = "nối_đuôi"
 argmaxima = "argmax"

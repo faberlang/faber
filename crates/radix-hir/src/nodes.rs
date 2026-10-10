@@ -568,6 +568,10 @@ pub enum HirParamMode {
 
     /// `ex`: explicit move parameter.
     Ex,
+
+    /// `axis`: an owned number that names an axis. Passed by value like
+    /// `Owned`; the marker word is signature presentation, not a type.
+    Axis,
 }
 
 /// Product type declaration with fields, methods, and declared contracts.
@@ -1198,6 +1202,9 @@ pub enum HirArgMarker {
     Own,
     /// `copy`.
     Copy,
+    /// `axis`: the number names an axis. A second kind of marker (what a
+    /// number means, not how a value is passed).
+    Axis,
 }
 
 /// Recoverable error handler binding and body.
@@ -1390,6 +1397,15 @@ pub enum HirExpressionKind {
     },
 
     Assign(Box<HirExpression>, Box<HirExpression>),
+
+    /// Value-side `copy` marker on an assignment right side (`b ← copy c`):
+    /// the value is a deep duplicate of `expr`. Declaration initializers carry
+    /// the marker as the declared type's access mode instead, so this node
+    /// only ever appears as the source of an [`HirExpressionKind::Assign`].
+    Marked {
+        marker: HirArgMarker,
+        expr: Box<HirExpression>,
+    },
 
     /// Conversion-directed assignment (`↤`, U+21A4).
     ///

@@ -85,6 +85,7 @@ ex = "ex"
 in = "in"
 own = "penes"
 copy = "exemplum"
+axis = "axis"
 lege = "lege"
 lineam = "lineam"
 omnia = "omnia"
@@ -612,6 +613,10 @@ help = "scribe `{fixum} {size_param} <nomen> ← valorem`; vinculum numquam denu
 message = "forma statica `=` declarationis magnitudinis numerum litteralem naturalem postulat"
 help = "scribe litteralem post `=`, vel valorem temporis currentis cum `←` depone"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"
 help = "add a function name after '{functio}'"
@@ -788,6 +793,10 @@ help = "write `{glyph}` for `{operator}` (`≤` and `≥` for the non-strict for
 message = "nihil generis solum pro tensore, vectore et matrice est; genus collectionis ut lista non vindicatur"
 help = "scribe genus tensoris, vectoris vel matricis cum uncis vacuis, vel collectionem per litteram aedifica"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "fines tecti `⌈` et `⌉` tectum claudunt; `⌈x⌋` forma rotundandi non est"
+help = "scribe `⌊x⌉` ad proximum integrum rotundandum, paria ad vicinum parem; scribe `⌈x⌉` pro tecto vel `⌊x⌋` pro pavimento"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` signum retractum est; negatio `≡` scribitur `{replacement}`"
 help = "scribe `{replacement}` pro `{glyph}`; omne signum negationis easdem lineas habet quas signum negatum (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -935,6 +944,10 @@ help = "utere scriptura typi in hac lectoris lingua declarata{?expected|: '|'}"
 [diagnostics.PARSE040.issues.null_value_in_type_position]
 message = "'{value}' est valor nullus, non typus"
 help = "typus nullus est '{type}'; scribe '{type}' ubi typus requiritur"
+
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` typos probat; '{value}' est valor"
+help = "compara valores per familiam aequalitatis: `≡` (stricta), `≅` (promota-exacta), `≈` (fuzzy); ut typum nullum probes, scribe `x est {type}`"
 
 [diagnostics.PARSE041]
 message = "invalid type annotation"
@@ -2089,6 +2102,10 @@ help = "name an {implendum} declaration after {implet}"
 message = "initializer does not match annotation"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} may be nihil and cannot be stored in a cell of type {expected}"
+help = "give a default with `vel`, narrow with `si x non est nihil` first, or use the failable read `apud`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"
@@ -2477,6 +2494,10 @@ help = "write the copy as its own statement; to rebind a name to a tensor, use '
 message = "invalid operand types"
 help = "use compatible operand types"
 
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "signa rotundandi nondum ad valores tensoris pertinent"
+help = "rotunda quemque elementum per ambitum vel methodum rotundandi scalarem; elevatio per elementum nondum aedificata est"
+
 [diagnostics.SEM011.issues.generic_type_arg_bound]
 message = "type argument {rejected} does not satisfy {param} {implet} {contract}"
 help = "declare `{implet} {contract}` on the type, or call with a type that does"
@@ -2528,6 +2549,10 @@ help = "utere ⊙ ad multiplicationem duarum listarum per elementa; `*` scalare 
 [diagnostics.SEM011.issues.lista_bits_whole_equality_only]
 message = "ordinatio listae bituum non licet; lista bituum aequalitatem totius valoris tantum habet"
 help = "listas totas per `≡`/`≢` compara, vel elementa prius ad numeros per `↦` converte; bitus numeri non sunt, ergo `≺ ≻ ≤ ≥` super eos non elevantur"
+
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} numeros comparat; {kind} quae non est tensor numericus eo comparari non potest"
+help = "elementa per operatorem numericum compara, vel `≡`/`≢` ad totos valores comparandos adhibe"
 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "lista `/` lista non licet; utere ⊘ (elementwise, ut `/`) aut ÷ (divisio vera per elementa)"
@@ -3737,6 +3762,10 @@ help = "use a `varia` binding to allow reassignment, or remove the extra assignm
 message = "`{method}` mutat `{binding}` in loco, sed `{binding}` est ligatio immutabilis"
 help = "declara `{binding}` cum `varia` ut in loco mutari possit, aut utere methodo quae valorem novum reddit"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` mutat statum per `{binding}` attingibilem, sed `{binding}` est ligatio immutabilis (`fixum` est profundum)"
+help = "declara `{binding}` cum `varia` ut in loco mutari possit, aut utere methodo quae valorem novum reddit"
+
 [diagnostics.SEM020.issues.copy_into_target_immutable]
 message = "'⇇' needs writable tensor storage on its left"
 help = "write into a mutable local or a mut parameter; a constant, a fixum binding, or a non-mut parameter cannot be written"
@@ -3980,6 +4009,14 @@ help = "use the same access marker at the call as in the signature"
 [diagnostics.SEM057.issues.call_marker_on_read_only]
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+
+[diagnostics.SEM057.issues.axis_marker_required]
+message = "this argument is an `axis` argument and must be written with the `axis` marker"
+help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+
+[diagnostics.SEM057.issues.axis_marker_unexpected]
+message = "the `axis` marker is written here but the parameter is not declared `axis`"
+help = "remove the `axis` marker, or declare the parameter `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"

@@ -30,6 +30,9 @@ const ISSUE_LISTA_SCALAR_REQUIRED: &str = "lista_scalar_required";
 const ISSUE_LISTA_CAPACITY_MISMATCH: &str = "lista_capacity_mismatch";
 /// Bits are not numbers: a `lista<bN>` has whole-value equality only.
 const ISSUE_LISTA_BITS_WHOLE_EQUALITY_ONLY: &str = "lista_bits_whole_equality_only";
+/// `≈ ≉` compare numbers; a list, set, map or other aggregate that is not a
+/// numeric tensor is refused by name (`approx-aggregate-named-reject`).
+const ISSUE_APPROX_REQUIRES_NUMERIC_OPERANDS: &str = "approx_requires_numeric_operands";
 /// Decimal elements have no `÷` yet.
 const ISSUE_LISTA_DECIMAL_ELEMENT: &str = "lista_decimal_element_unsupported";
 
@@ -270,6 +273,130 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         Some(self.lista_result(shape.element, shape.capacity))
+    }
+
+    /// `non` over a `lista<bivalens>` negates each element (Q-C of the
+    /// 2026-10-04 comparisons ruling). `None` means the operand is not a list.
+    pub(in crate::passes::typecheck) fn check_lista_not(
+        &mut self,
+        operand: &HirExpression,
+        operand_ty: TypeId,
+    ) -> Option<TypeId> {
+        let shape = self.lista_arithmetic_shape(operand_ty)?;
+        if !self.lista_bool_element(shape.element, operand.span, BOOLEAN_OPERAND_REQUIRED) {
+            return Some(self.error_type);
+        }
+        let bivalens = self.bool_type();
+        Some(self.lista_result(bivalens, shape.capacity))
+    }
+
+    /// `et` / `aut` over `lista<bivalens>` pair per element, a list against a
+    /// scalar bool in either order broadcasts; both sides are always
+    /// evaluated. `None` means neither operand is a list.
+    pub(in crate::passes::typecheck) fn check_lista_logic(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+    ) -> Option<TypeId> {
+        let left = self.lista_arithmetic_shape(lhs_ty);
+        let right = self.lista_arithmetic_shape(rhs_ty);
+        if left.is_none() && right.is_none() {
+            return None;
+        }
+        let span = lhs.span;
+        let capacity = match (left, right) {
+            (Some(left), Some(right)) => {
+                let Some(capacity) = self.lista_pair_capacity(left, right, span, op) else {
+                    return Some(self.error_type);
+                };
+                capacity
+            }
+            (Some(list), None) | (None, Some(list)) => list.capacity,
+            (None, None) => return None,
+        };
+        let scalar_ty = match (left, right) {
+            (Some(_), None) => Some(rhs_ty),
+            (None, Some(_)) => Some(lhs_ty),
+            _ => None,
+        };
+        let mut admitted = true;
+        for shape in [left, right].into_iter().flatten() {
+            admitted &= self.lista_bool_element(shape.element, span, BOOLEAN_OPERANDS_REQUIRED);
+        }
+        if let Some(scalar_ty) = scalar_ty {
+            admitted &= self.lista_bool_element(scalar_ty, span, BOOLEAN_OPERANDS_REQUIRED);
+        }
+        if !admitted {
+            return Some(self.error_type);
+        }
+        let bivalens = self.bool_type();
+        Some(self.lista_result(bivalens, capacity))
+    }
+
+    /// Whether `ty` is a bool (an inferred slot is unified with bool); a
+    /// non-bool reports `issue` and gives `false`.
+    fn lista_bool_element(
+        &mut self,
+        ty: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> bool {
+        let resolved = self.resolve_inferred_type(ty);
+        if self.is_error(resolved) {
+            return false;
+        }
+        if self.is_infer(resolved) {
+            let bivalens = self.bool_type();
+            self.unify_assign_issue(ty, bivalens, span, issue);
+            return true;
+        }
+        if self.is_bool(ty) {
+            return true;
+        }
+        self.invalid_operand_types(issue, span);
+        false
+    }
+
+    /// `≈ ≉` over a list, set, map, queue, stack or ledger that reached here
+    /// is not a numeric tensor (numeric lists, tensors, registers and sparsa
+    /// answered earlier): the author gets a named error at check time, not
+    /// an `invalid MIR` failure at run time. `None` means no aggregate operand.
+    pub(in crate::passes::typecheck) fn check_approx_aggregate(
+        &mut self,
+        op: HirBinOp,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let kind = [lhs_ty, rhs_ty]
+            .into_iter()
+            .find_map(|ty| self.approx_aggregate_kind(ty))?;
+        self.invalid_operand_types_with_args(
+            ISSUE_APPROX_REQUIRES_NUMERIC_OPERANDS,
+            span,
+            &[
+                ("op", approx_glyph(op).to_owned()),
+                ("kind", kind.to_owned()),
+            ],
+        );
+        Some(self.error_type)
+    }
+
+    fn approx_aggregate_kind(&mut self, ty: TypeId) -> Option<&'static str> {
+        let resolved = self.value_carrier_type(ty);
+        let (_, payload) = self.types.peel_access_marker(resolved);
+        match self.types.get(payload).clone() {
+            Type::Array(_) | Type::BoundedArray { .. } => Some("list"),
+            Type::Queue(_) | Type::BoundedQueue { .. } => Some("queue"),
+            Type::Stack(_) | Type::BoundedStack { .. } => Some("stack"),
+            Type::Set(_) => Some("set"),
+            Type::Map(..) => Some("map"),
+            Type::Ledger(..) => Some("ledger"),
+            Type::Alias(_, target) => self.approx_aggregate_kind(target),
+            _ => None,
+        }
     }
 
     fn lista_arithmetic_shape(&mut self, ty: TypeId) -> Option<ListaArithmeticShape> {

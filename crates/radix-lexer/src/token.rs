@@ -224,6 +224,8 @@ pub enum TokenKind {
     In,
     Own,
     Copy,
+    /// `axis`: marks a number as an axis index at a call and in a signature.
+    Axis,
     Lege,
     Lineam,
     Omnia,
@@ -341,8 +343,12 @@ pub enum TokenKind {
     GtEq,            // ≥
 
     // === Postfix increment/decrement (statement-only) ===
-    PostInc, // ↑
-    PostDec, // ↓
+    PostInc,    // ↑
+    FloorOpen,  // ⌊ (U+230A)
+    FloorClose, // ⌋ (U+230B)
+    CeilOpen,   // ⌈ (U+2308)
+    CeilClose,  // ⌉ (U+2309)
+    PostDec,    // ↓
 
     // === Optional chaining ===
     QuestionDot,     // ?.

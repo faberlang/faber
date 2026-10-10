@@ -98,6 +98,7 @@ ex = "من"
 in = "في"
 own = "ملك"
 copy = "نسخة"
+axis = "محور"
 lege = "اقرأ"
 lineam = "سطرا"
 omnia = "الكل"
@@ -502,6 +503,10 @@ help = "أبقِ schema كترويسة علائقية بسيطة"
 message = "لا يمكن لـ schema أن يعلن method"
 help = "أعلن الـ method على genus بدلا من ذلك"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "مطلوب اسم دالة بعد {functio}"
 help = "أضف اسم الدالة بعد {functio}"
@@ -626,6 +631,10 @@ help = "استخدم تعبير case صالحا"
 message = "تعبير غير صالح"
 help = "تحقق من صياغة التعبير"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "حدّا السقف `⌈` و`⌉` يغلقان السقف؛ `⌈x⌋` ليس صيغة تقريب"
+help = "اكتب `⌊x⌉` للتقريب إلى أقرب عدد صحيح مع توجيه التعادل إلى الجار الزوجي؛ واكتب `⌈x⌉` للسقف أو `⌊x⌋` للأرضية"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` عامل ملغى؛ نفي `≡` يُكتب `{replacement}`"
 help = "اكتب `{replacement}` بدل `{glyph}`؛ لكل رمز نفي عدد الخطوط نفسه الذي في الرمز الذي ينفيه (`≡`/`≢`، `≅`/`≇`، `≈`/`≉`)"
@@ -725,6 +734,10 @@ help = "اكتب `{bare}` بدلا من `{form}`؛ علامة العرض هي ن
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "استخدم تهجئة النوع المعلنة في لغة القارئ هذه{?expected|: '|'}"
+
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` يختبر الأنواع؛ '{value}' قيمة"
+help = "قارن القيم بعائلة المساواة: `≡` (صارمة)، `≅` (دقيقة بعد الترقية)، `≈` (تقريبية)؛ لاختبار النوع الفارغ اكتب `x est {type}`"
 
 [diagnostics.PARSE041]
 message = "تعليمة نوع غير صالحة"
@@ -1610,6 +1623,10 @@ help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 message = "قيمة التهيئة لا تطابق النوع المعلن"
 help = "اجعل نوع قيمة التهيئة مطابقا للنوع المعلن"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "قد تكون القيمة {found} فارغة (none) ولا يمكن تخزينها في خلية من النوع {expected}"
+help = "قدّم قيمة افتراضية باستخدام `coalesce`، أو ضيّق النوع أولا باستخدام `if x is not none`، أو استخدم القراءة القابلة للفشل `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"
@@ -1910,6 +1927,10 @@ help = "gradient selection (`∇`) للتحليل فقط في Phase 2A؛ قوا�
 message = "أنواع operands غير صالحة"
 help = "استخدم أنواع operands متوافقة"
 
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "رموز التقريب لا تنطبق على قيم المصفوفات بعد"
+help = "قرّب كل عنصر بحلقة أو بطريقة تقريب عددية؛ الرفع لكل عنصر غير مبني"
+
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "معامل القيمة {param} لا يمكن أن يشغل موضع مدى في التوقيع"
 help = "عرّف معاملاً عاماً `<size {param}>` واستخدمه في المدى، أو اكتب الرفع `size {param}` حيث يُقصد رفع قيمة وقت التشغيل"
@@ -1941,6 +1962,10 @@ help = "استخدم ⊙ لضرب قائمتين عنصرًا بعنصر؛ يأ�
 [diagnostics.SEM011.issues.lista_bits_whole_equality_only]
 message = "ترتيب قائمة من قيم البتات غير مدعوم؛ قائمة البتات لها مساواة بالقيمة الكاملة فقط"
 help = "قارن القوائم كاملة بـ `≡`/`≢`، أو حوّل العناصر إلى أعداد بـ `↦` أولًا؛ البتات ليست أعدادًا، لذا لا ترفع `≺ ≻ ≤ ≥` عنصرًا بعنصر عليها"
+
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} يقارن الأعداد؛ لا يمكن مقارنة {kind} ليس موترًا عدديًا بهذا المعامل"
+help = "قارن العناصر بمعامل عددي، أو استخدم `≡`/`≢` لمقارنة القيم كاملة"
 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "list `/` list غير مدعوم؛ استخدم ⊘ (عنصرًا بعنصر مثل `/`) أو ÷ (قسمة حقيقية عنصرًا بعنصر)"
@@ -2710,6 +2735,10 @@ help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد �
 message = "imperativus operator method يتطلب {varia} receiver"
 help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد أو أزل الإسناد الإضافي"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` يغيّر حالة يمكن الوصول إليها عبر `{binding}`، لكن `{binding}` ربط غير قابل للتغيير (`const` عميق)"
+help = "صرّح عن `{binding}` بـ `var` ليمكن تغييره في مكانه، أو استدعِ دالة تُرجع قيمة جديدة"
+
 [diagnostics.SEM021]
 message = "هدف إسناد غير صالح"
 help = "أسند إلى lvalue صالح"
@@ -2921,6 +2950,14 @@ help = "use the same access marker at the call as in the signature"
 [diagnostics.SEM057.issues.call_marker_on_read_only]
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+
+[diagnostics.SEM057.issues.axis_marker_required]
+message = "this argument is an `axis` argument and must be written with the `axis` marker"
+help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+
+[diagnostics.SEM057.issues.axis_marker_unexpected]
+message = "the `axis` marker is written here but the parameter is not declared `axis`"
+help = "remove the `axis` marker, or declare the parameter `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"
@@ -3244,6 +3281,7 @@ exchange = "بدل"
 load = "حمل"
 store = "خزن"
 accipe = "اجلب"
+apud = "عند"
 addita = "مضاف"
 appende = "ألحق"
 argmaxima = "فهرس_الأكبر"

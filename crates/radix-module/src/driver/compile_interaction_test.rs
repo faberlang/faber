@@ -1523,6 +1523,32 @@ incipit {
 }
 
 #[test]
+fn est_value_literals_name_equality() {
+    // `est` tests types (DECISIONS D23.1); a null, number or string literal on
+    // the right is a value, so each gets the one named diagnostic whose help
+    // names the equality family.
+    let session = test_session(Target::HirRust);
+    for rhs in ["nulla", "1", "\"a\""] {
+        let source = format!(
+            "functio check(ignotum x) → vacuum {{\n  si x est {rhs} {{ nota \"t\" }}\n}}\n\nincipit {{\n  check(verum)\n}}"
+        );
+        let result = compile(&session, "test.fab", &source, ModuleCompileRequest::default());
+        let hits: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.issue() == Some("est_value_literal_names_equality"))
+            .collect();
+        assert_eq!(hits.len(), 1, "{rhs}: {:?}", result.diagnostics);
+        let help = radix_semantic::catalog_syntax::parse_help(radix_parser::ParseErrorKind::TypeInvalid, &hits[0].args)
+            .unwrap_or_default();
+        assert!(
+            help.contains('≡') && help.contains('≅') && help.contains('≈'),
+            "{rhs}: help must name the equality family: {help:?}"
+        );
+    }
+}
+
+#[test]
 fn externa_top_level_var_without_initializer_is_rejected() {
     let session = test_session(Target::HirRust);
     let source = r"@ externa

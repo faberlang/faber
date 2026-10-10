@@ -4,9 +4,9 @@
 //! `const T y ← x` compiles **outside** any null-check block because the
 //! source spelling `T ∪ null` lowers to `Type::Option(T)` (hir/lower/types.rs
 //! `lower_union_type`) and `TypeTable::is_assignable` permits `Option(T) → T`
-//! assignment generally (implicit unwrap; Rust codegen unwraps). The null
-//! check is therefore NOT the assignment mechanism — assignment is not
-//! block-sensitive.
+//! assignment generally (implicit unwrap; Rust codegen unwraps). Since need
+//! f1e76e37 a declaration or assignment store of an optional into a plain
+//! cell is `optional_into_plain_cell`; narrowing is the way to a plain `T`.
 //!
 //! What IS block-sensitive today is *use*: a method call or `+` concat on an
 //! `Option(T)` receiver/operand rejects (SEM004 / SEM011) even inside
@@ -26,17 +26,18 @@
 use crate::test_support;
 
 // ---------------------------------------------------------------------------
-// PROBE (recorded 2026-08-10): the assignment path is a general Option unwrap
+// Declaration and assignment stores do not unwrap an optional (f1e76e37)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn probe_assignment_unwraps_option_outside_null_check() {
-    // `fixum textus y ← x` compiles with `x : textus ∪ nihil` and NO null
-    // check anywhere: assignment is not a null-check-block typechecker
-    // behavior. The mechanism is `TypeTable::is_assignable`'s
-    // `(Type::Option(inner), _) => is_assignable(inner, to)` implicit unwrap.
-    test_support::assert_accepts(
+fn assignment_of_option_outside_null_check_is_rejected() {
+    // Recorded 2026-08-10 as accepted (`TypeTable::is_assignable` unwraps
+    // `Option(T)` into `T`); need closed that for declaration and
+    // assignment stores: `fixum textus y ← x` with `x : textus ∪ nihil` and no
+    // null check is `SEM010 optional_into_plain_cell`.
+    test_support::assert_rejects_with_issue(
         "functio f(textus ∪ nihil x) → textus {\n    fixum textus y ← x\n    redde y\n}",
+        "optional_into_plain_cell",
     );
 }
 

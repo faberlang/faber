@@ -98,6 +98,7 @@ ex = "取自"
 in = "传入"
 own = "拥有"
 copy = "拷贝"
+axis = "轴"
 lege = "读取"
 lineam = "行"
 omnia = "全部"
@@ -502,6 +503,10 @@ help = "保持 schema 为纯关系表头"
 message = "schema 不能声明 method"
 help = "请在 genus 上声明 method"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "在 {functio} 后需要函数名"
 help = "在 {functio} 后添加函数名"
@@ -626,6 +631,10 @@ help = "使用有效的 case 表达式"
 message = "无效表达式"
 help = "检查表达式语法"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "上取整的定界符是 `⌈` 和 `⌉`；`⌈x⌋` 不是取整形式"
+help = "用 `⌊x⌉` 取最近整数，平局取偶数邻值；用 `⌈x⌉` 上取整，或用 `⌊x⌋` 下取整"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` 是已废弃的运算符；`≡` 的否定写作 `{replacement}`"
 help = "用 `{replacement}` 代替 `{glyph}`；每个否定符号的横线数与其所否定的符号相同（`≡`/`≢`、`≅`/`≇`、`≈`/`≉`）"
@@ -725,6 +734,10 @@ help = "写 `{bare}`，不要写 `{form}`；宽度标记本身就是类型"
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "使用此读者语言中声明的类型拼写{?expected|：'|'}"
+
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` 用于测试类型；'{value}' 是一个值"
+help = "请用相等运算符家族比较值：`≡`（严格）、`≅`（提升后精确）、`≈`（模糊）；要测试 null 类型，请写 `x est {type}`"
 
 [diagnostics.PARSE041]
 message = "无效类型标注"
@@ -1610,6 +1623,10 @@ help = "使表达式类型与期望类型一致"
 message = "初始值与标注类型不匹配"
 help = "使初始值类型与声明类型一致"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} 可能为 none，不能存入类型为 {expected} 的单元"
+help = "用 `coalesce` 给出默认值，先用 `if x is not none` 收窄，或使用可失败读取 `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "浮点常量无法精确表示"
 help = "写成浮点字面量，或使用该浮点类型可精确表示的常量"
@@ -1910,6 +1927,10 @@ help = "Phase 2A 中 gradient selection（`∇`）仅为 parse-only；eligibilit
 message = "无效 operand 类型"
 help = "使用兼容的 operand 类型"
 
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "取整符号暂不适用于张量值"
+help = "用循环或标量取整方法逐元素取整；逐元素提升尚未实现"
+
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "值参数 {param} 不能占据签名的 extent 位置"
 help = "声明 `<size {param}>` 泛型参数并在 figura 中使用，或在需要运行时提升之处写出 `size {param}`"
@@ -1941,6 +1962,10 @@ help = "两个列表的逐元素乘法请用 ⊙；`*` 的一侧须为标量"
 [diagnostics.SEM011.issues.lista_bits_whole_equality_only]
 message = "不支持对位值列表排序；位列表只有整值相等"
 help = "请用 `≡`/`≢` 比较整个列表，或先用 `↦` 把元素转为数字；位不是数字，所以 `≺ ≻ ≤ ≥` 不会逐元素提升"
+
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} 比较数字；不是数值张量的 {kind} 不能用它比较"
+help = "请用数值运算符逐元素比较，或用 `≡`/`≢` 比较整个值"
 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "不支持 list `/` list；请用 ⊘（逐元素，同 `/`）或 ÷（逐元素真除法）"
@@ -2710,6 +2735,10 @@ help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
 message = "imperativus operator method 需要 varia receiver"
 help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` 会修改可通过 `{binding}` 访问的状态，但 `{binding}` 是不可变绑定（`const` 是深层的）"
+help = "用 `var` 声明 `{binding}` 以便就地修改，或改用返回新值的方法"
+
 [diagnostics.SEM021]
 message = "无效赋值目标"
 help = "赋值给有效的 lvalue"
@@ -2921,6 +2950,14 @@ help = "use the same access marker at the call as in the signature"
 [diagnostics.SEM057.issues.call_marker_on_read_only]
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+
+[diagnostics.SEM057.issues.axis_marker_required]
+message = "this argument is an `axis` argument and must be written with the `axis` marker"
+help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+
+[diagnostics.SEM057.issues.axis_marker_unexpected]
+message = "the `axis` marker is written here but the parameter is not declared `axis`"
+help = "remove the `axis` marker, or declare the parameter `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"
@@ -3244,6 +3281,7 @@ exchange = "交换"
 load = "加载"
 store = "存储"
 accipe = "获取"
+apud = "在"
 addita = "已添加"
 appende = "追加"
 argmaxima = "最大值索引"

@@ -990,7 +990,10 @@ insere_expr    := 'insere' STRING
 # `generis T X = e` declaration (en `static`) parses whole for recovery and is
 # reported as `PARSE010 static_decl_retired`, at the top level and in blocks
 # alike; `generis` survives only as the `genus` field modifier below.
-fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
+# The `copy`/`own` marker sits on the value (`value_marker`), never on the
+# declared type: the binding-side spelling `varia copy T b ← a` is retired and
+# reported as `PARSE010 binding_marker_moved_to_value` (FABER-2-SUNSET).
+fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' value_marker? expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 sit_decl      := 'sit' IDENTIFIER (('←' | '↢') expression)?
 array_destruct := ('fixum' | 'varia') array_pattern '←' expression
@@ -1026,7 +1029,7 @@ contract_ref := IDENTIFIER ('<' type_annotation (',' type_annotation)* '>')?
 generic_type_default := '=' type_annotation
 generic_size_default := '=' NATURAL
 call_type_args  := '<' type_annotation (',' type_annotation)* '>'
-parameter    := 'ceteri'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
+parameter    := 'ceteri'? 'axis'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
 func_modifier := 'argumenta' IDENTIFIER | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NATURAL) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
 callable_posture := 'fiet' | 'fiunt' | 'fient'
 return_clause := '→' type_annotation
@@ -1311,7 +1314,13 @@ expression := assignment
 # storage of `target`. Binds above assignment and below ternary; operands are
 # complete before the copy. One ⇇ per statement: a chain is `copy_into_chain`.
 transfer   := ternary ('⇇' ternary)?
-assignment := transfer ('←' assignment | '↤' assignment inline_default?)?
+# `value_marker` (operator ruling 2026-10-08): the `copy`/`own` marker sits on
+# the value at the place it is copied or given away. In a declaration it
+# duplicates or transfers the initializer (`var T b ← copy a`, `var T b ← own a`);
+# in an assignment only `copy` is written (`b ← copy c`). The word is a marker
+# only when an operand follows; otherwise it is an ordinary identifier.
+value_marker := 'own' | 'copy'
+assignment := transfer ('←' 'copy'? assignment | '↤' assignment inline_default?)?
 inc_dec_stmt := place ('↑' | '↓')
 place      := call_expr  (* semantic analysis requires an assignable target *)
 # `c ✓ a ✗ b` is the one value conditional (D4.5), one level only (D4.6): a
@@ -1363,7 +1372,12 @@ multiplicative_expr := vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' |
 vel_expr   := unary_expr ('vel' vel_rhs)*
 vel_rhs     := unary_expr vel_range_tail?
 vel_range_tail := ('‥' | '…' | 'ante' | 'usque') unary_expr ('per' unary_expr)?
-unary_expr      := ('-' | '¬' | 'non') unary_expr | finge_expr | cast_expr
+unary_expr      := ('-' | '¬' | 'non') unary_expr | rounding_expr | finge_expr | cast_expr
+# Paired rounding delimiters: `⌊x⌋` floor, `⌈x⌉` ceiling, `⌊x⌉` nearest with
+# ties to the even neighbour (`⌊2.5⌉` is 2). `⌈x⌋` parses as nearest and is the
+# named error `PARSE030 ceiling_floor_delimiters`; a tensor operand is the named
+# check error `SEM011 glyph_rounding_tensor_unsupported` until the lift is built.
+rounding_expr   := '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
 # `∇` is a structural POSTFIX gradient-selection operator, never a prefix unary
 # form. It binds in the expression postfix fold after calls have been formed,
 # and its optional selector bracket is consumed as part of the gradient suffix
@@ -1422,8 +1436,10 @@ optional_suffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')
 non_null_suffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
 argument_list  := (argument (',' argument)*)?
 # The optional call-site marker repeats the access marker its parameter declares
-# (see the prose rule "Call-site access markers").
-argument      := template_argument | call_marker? 'sparge'? expression
+# (see the prose rule "Call-site access markers"). `axis` is the one marker of
+# the second kind: it says what a number means, and a parameter declares it
+# before its type (`axis int a`) with the call echoing it (`t.mean(axis 1)`).
+argument      := template_argument | (call_marker | 'axis')? 'sparge'? expression
 call_marker   := 'de' | 'in' | 'own' | 'copy'
 template_argument := 'sparge'? IDENTIFIER ':' expression
 

@@ -1296,6 +1296,7 @@ fn collect_expr_defs(
         | HirExpressionKind::Vacua
         | HirExpressionKind::ReadLine(_)
         | HirExpressionKind::Error => {}
+        HirExpressionKind::Marked { expr, .. } => collect_expr_defs(expr, registry),
         HirExpressionKind::Reduction {
             source,
             coordinates,
@@ -1791,6 +1792,7 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                     radix_hir::HirOptionalChainKind::Member(_) => {}
                 }
             }
+            HirExpressionKind::Marked { expr, .. } => collect_expr(expr, registry),
             HirExpressionKind::NonNull(base, chain) => {
                 collect_expr(base, registry);
                 match chain {
@@ -2830,6 +2832,7 @@ pub(crate) fn validate_referential_integrity(
                     }
                 }
             }
+            HirExpressionKind::Marked { expr, .. } => validate_expr(expr, checks)?,
             HirExpressionKind::NonNull(base, chain) => {
                 validate_expr(base, checks)?;
                 match chain {

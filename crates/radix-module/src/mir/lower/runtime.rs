@@ -830,6 +830,27 @@ impl FunctionBuilder<'_> {
             };
             return self.lower_checked_tensor_access(op, lowered_args, &[receiver_ty, index_ty], expr_ty, expr.span);
         }
+        if op == MirCollectionOp::Index && method_name == "apud" && args.len() == 1 && self.device_role.is_none() {
+            // need: the `at` read reports an out-of-range index or a
+            // missing key on `⇥ textus` through a checked helper, the seam the
+            // checked tensor access above uses.
+            let (Some(index_ty), Some(receiver_ty)) =
+                (self.expr_ty(&args[0].expr), self.checked_tensor_receiver_ty(receiver))
+            else {
+                return None;
+            };
+            let keyed = matches!(self.types.get(receiver_ty.semantic_id()), Type::Map(..));
+            let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+            let helper = self.push_checked_at_helper(keyed, [receiver_ty, index_ty], expr_ty, textus, expr.span);
+            return self.lower_failable_call(
+                MirCallee::Function(helper),
+                lowered_args,
+                expr_ty,
+                textus,
+                None,
+                expr.span,
+            );
+        }
         if op == MirCollectionOp::Append
             && self.is_bounded_append_under_handler(receiver)
             && let (Some(item_ty), Some(receiver_ty)) =
@@ -1053,6 +1074,8 @@ impl FunctionBuilder<'_> {
             HirBinOp::GtEq => MirCollectionOp::ArrayGtEq,
             HirBinOp::ApproxEq => MirCollectionOp::ArrayValueEq,
             HirBinOp::ApproxNotEq => MirCollectionOp::ArrayValueNotEq,
+            HirBinOp::And => MirCollectionOp::ArrayAnd,
+            HirBinOp::Or => MirCollectionOp::ArrayOr,
             _ => {
                 self.errors.push(MirError::unsupported(
                     expr.span,
@@ -1072,10 +1095,11 @@ impl FunctionBuilder<'_> {
         ))
     }
 
-    /// Lower unary `-` over a `lista` to the elementwise negation op. `None`
-    /// means the operand is not a list.
+    /// Lower unary `-` (or `non` over a `lista<bivalens>`) to the elementwise
+    /// collection op. `None` means the operand is not a list.
     pub(super) fn lower_lista_negate(
         &mut self,
+        op: HirUnOp,
         operand: &HirExpression,
         expr: &HirExpression,
     ) -> Option<Option<MirOperand>> {
@@ -1088,7 +1112,11 @@ impl FunctionBuilder<'_> {
             let value = self.lower_expr_value(operand)?;
             let result_ty = self.expr_ty(expr)?;
             Some(self.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::ArrayNeg),
+                MirIntrinsic::Collection(if op == HirUnOp::Not {
+                    MirCollectionOp::ArrayNot
+                } else {
+                    MirCollectionOp::ArrayNeg
+                }),
                 vec![value],
                 result_ty,
                 expr.span,
@@ -1144,11 +1172,10 @@ impl FunctionBuilder<'_> {
             return None;
         }
 
-        // OQ2 pinned default: the column-side vector·matrix form stays
-        // fail-closed on the MIR lane (host-Rust 1C residual posture).
+        // Row-vector convention (ruling 2026-10-04): `v · m` with `v` of width K
+        // and `m` of shape [K, N] is a width-N vector, out[j] = sum_k v[k] * m[k, j].
         if op == HirBinOp::Dot && matches!((&lhs_ty, &rhs_ty), (Type::Vector(..), Type::Matrix(..))) {
-            self.glyph_fail_closed("vector·matrix dot product", expr.span);
-            return None;
+            return self.lower_vector_matrix_dot(lhs, rhs, expr);
         }
 
         let Some(method_name) = glyph_method_name(op, &lhs_ty, &rhs_ty) else {
@@ -1677,6 +1704,94 @@ impl FunctionBuilder<'_> {
             }
         }
         Some(self.construct_temp(MirAggregateKind::Matrix, MirAggregateFields::Ordered(fields), ty, expr.span))
+    }
+
+    /// Expand vector·matrix (row-vector convention) into lane×cell mul/add and
+    /// a vector construct: result lane `j` = sum over `k` of `v[k] * m[k, j]`.
+    fn lower_vector_matrix_dot(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let (lhs_ty_id, rhs_ty_id) = (lhs.ty?, rhs.ty?);
+        let Type::Vector(_, width) = self.normalized_type(lhs_ty_id).clone() else {
+            self.errors
+                .push(MirError::unsupported(expr.span, "vector·matrix requires a vector receiver"));
+            return None;
+        };
+        let Type::Matrix(element_ty, shape) = self.normalized_type(rhs_ty_id).clone() else {
+            self.errors
+                .push(MirError::unsupported(expr.span, "vector·matrix requires a matrix peer"));
+            return None;
+        };
+        let Some(lanes) = crate::semantic::literal_vector_width(width, self.types) else {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "vector·matrix vector width before MIR lowering",
+            ));
+            return None;
+        };
+        let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types) else {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "vector·matrix with non-literal matrix shape before MIR lowering",
+            ));
+            return None;
+        };
+        if rows > 4 || columns > 4 {
+            self.errors
+                .push(MirError::unsupported(expr.span, "vector·matrix exceeds 4x4 CPU subset"));
+            return None;
+        }
+        if lanes != rows {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "vector·matrix vector width must match matrix rows",
+            ));
+            return None;
+        }
+        let vector = self.lower_expr_value(lhs)?;
+        let vector = self.value_base_place(vector, MirType::semantic(lhs_ty_id), lhs.span)?;
+        let matrix = self.lower_expr_value(rhs)?;
+        let matrix = self.value_base_place(matrix, MirType::semantic(rhs_ty_id), rhs.span)?;
+        let elem_ty = MirType::semantic(element_ty);
+        let result_ty = self.expr_ty(expr)?;
+        let mut fields = Vec::with_capacity(usize::from(columns));
+        for column in 0..columns {
+            let mut acc = self.assign_temp(
+                MirValueKind::Binary {
+                    op: MirBinOp::Mul,
+                    lhs: vector_lane_operand(&vector, 0),
+                    rhs: matrix_cell_operand(&matrix, 0, column),
+                },
+                elem_ty,
+                expr.span,
+            );
+            for row in 1..rows {
+                let product = self.assign_temp(
+                    MirValueKind::Binary {
+                        op: MirBinOp::Mul,
+                        lhs: vector_lane_operand(&vector, row),
+                        rhs: matrix_cell_operand(&matrix, row, column),
+                    },
+                    elem_ty,
+                    expr.span,
+                );
+                acc = self.assign_temp(
+                    MirValueKind::Binary { op: MirBinOp::Add, lhs: acc, rhs: product },
+                    elem_ty,
+                    expr.span,
+                );
+            }
+            fields.push(MirAggregateItem::Operand(acc));
+        }
+        Some(self.construct_temp(
+            MirAggregateKind::Vector,
+            MirAggregateFields::Ordered(fields),
+            result_ty,
+            expr.span,
+        ))
     }
 
     /// Expand matrix×vector product into cell×lane mul/add and a vector construct.
@@ -4430,6 +4545,125 @@ impl FunctionBuilder<'_> {
         let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
         let helper = self.push_checked_tensor_helper(op, param_tys, ty, textus, span)?;
         self.lower_failable_call(MirCallee::Function(helper), lowered_args, ty, textus, None, span)
+    }
+
+    /// The `at` helper, for `(in receiver, index-or-key) ⇥ textus` (need
+    /// 20a8cc01): a list or text index outside `0‥length`, or a map key that is
+    /// not present, leaves the helper as the error textus; otherwise the strict
+    /// element `Index` read.
+    fn push_checked_at_helper(
+        &mut self,
+        keyed: bool,
+        param_tys: [MirType; 2],
+        return_ty: MirType,
+        error_ty: MirType,
+        span: Span,
+    ) -> MirFunctionId {
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            Some(error_ty),
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        let mut locals = Vec::with_capacity(2);
+        for (ty, mode) in param_tys
+            .into_iter()
+            .zip([MirParamMode::Ref, MirParamMode::Owned])
+        {
+            let local = nested.next_local_id();
+            nested
+                .params
+                .push(MirParam { local, name: None, ty, mode, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: local, name: None, ty, mutable: false, span });
+            locals.push(local);
+        }
+        let receiver = MirOperand::Place(MirPlace::local(locals[0]));
+        let index = MirOperand::Place(MirPlace::local(locals[1]));
+
+        let entry = nested.fresh_block(span);
+        let ok = nested.fresh_block(span);
+        let fail = nested.fresh_block(span);
+        nested.switch_to(entry);
+        if keyed {
+            let present = nested.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Contains),
+                vec![receiver.clone(), index.clone()],
+                bivalens,
+                span,
+            );
+            nested.terminate_current(
+                MirTerminatorKind::Branch { condition: present, then_block: ok, else_block: fail },
+                span,
+            );
+        } else {
+            let upper = nested.fresh_block(span);
+            let length = nested.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Length),
+                vec![receiver.clone()],
+                numerus,
+                span,
+            );
+            let negative = nested.binary_temp(
+                MirBinOp::Lt,
+                index.clone(),
+                MirOperand::Constant(MirConstant::Int(0)),
+                bivalens,
+                span,
+            );
+            nested.terminate_current(
+                MirTerminatorKind::Branch { condition: negative, then_block: fail, else_block: upper },
+                span,
+            );
+            nested.switch_to(upper);
+            let past_end = nested.binary_temp(MirBinOp::GtEq, index.clone(), length, bivalens, span);
+            nested.terminate_current(
+                MirTerminatorKind::Branch { condition: past_end, then_block: fail, else_block: ok },
+                span,
+            );
+        }
+
+        nested.switch_to(ok);
+        let element = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Index),
+            vec![receiver, index],
+            return_ty,
+            span,
+        );
+        nested.terminate_current(MirTerminatorKind::Return(Some(element)), span);
+
+        nested.switch_to(fail);
+        let message = MirOperand::Constant(MirConstant::String(nested.context.diagnostic_at_out_of_range));
+        nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
+
+        let blocks = nested.finish_blocks();
+        self.errors.extend(nested.errors);
+        self.synthetic_functions.push(MirFunction {
+            id,
+            source: None,
+            name: None,
+            params: nested.params,
+            locals: nested.locals,
+            temps: nested.temps,
+            blocks,
+            return_ty,
+            error_ty: Some(error_ty),
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        });
+        id
     }
 
     /// The helper body, for `(in receiver, index[, value]) ⇥ textus`:

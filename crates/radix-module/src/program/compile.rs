@@ -2131,7 +2131,7 @@ fn file_export_from_stmt(
 
 fn semantic_param_mode(mode: AstParamMode) -> SemanticParamMode {
     match mode {
-        AstParamMode::Owned => SemanticParamMode::Owned,
+        AstParamMode::Owned | AstParamMode::Axis => SemanticParamMode::Owned,
         AstParamMode::De => SemanticParamMode::Ref,
         AstParamMode::In => SemanticParamMode::MutRef,
         AstParamMode::Ex => SemanticParamMode::Move,

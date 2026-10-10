@@ -523,9 +523,10 @@ impl FunctionBuilder<'_> {
     ///
     /// Evaluation follows source order: the braced overrides first, then the
     /// source. Every instance field the braces omit is read from the source
-    /// place, so the copy is shallow — a collection field shares its value
-    /// with the source (D15.3). Field defaults never apply: the source
-    /// supplies every omitted field.
+    /// place. `from` takes VALUES (need, rule 5): an omitted
+    /// collection or object field is duplicated (`copy` on the field), so the
+    /// new value shares nothing with the source. Field defaults never apply:
+    /// the source supplies every omitted field.
     fn lower_struct_update_fields(
         &mut self,
         def_id: DefId,
@@ -539,11 +540,17 @@ impl FunctionBuilder<'_> {
             fields.push(MirNamedOperand { name: *name, value: self.lower_expr_value(value)? });
         }
         let base = self.lower_projectable_place(source)?;
-        let names: Vec<crate::lexer::Symbol> = if let Some(field_defs) = self.context.structs.get(&def_id) {
-            field_defs.iter().map(|field| field.name).collect()
+        let names: Vec<(crate::lexer::Symbol, TypeId)> = if let Some(field_defs) = self.context.structs.get(&def_id) {
+            field_defs
+                .iter()
+                .map(|field| (field.name, field.ty))
+                .collect()
         } else if let Some(field_types) = self.context.struct_field_types.get(&def_id) {
-            let mut names: Vec<_> = field_types.keys().copied().collect();
-            names.sort_by_key(|name| name.0);
+            let mut names: Vec<_> = field_types
+                .iter()
+                .map(|(name, ty)| (*name, ty.semantic_id()))
+                .collect();
+            names.sort_by_key(|(name, _)| name.0);
             names
         } else {
             self.errors.push(MirError::unsupported(
@@ -552,15 +559,34 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         };
-        for name in names {
+        for (name, ty) in names {
             if supplied.contains(&name) {
                 continue;
             }
             let mut place = base.clone();
             place.projections.push(MirProjection::Field(name));
-            fields.push(MirNamedOperand { name, value: MirOperand::Place(place) });
+            let mut value = MirOperand::Place(place);
+            if self.field_needs_value_copy(ty) {
+                value =
+                    self.runtime_call_value(MirIntrinsic::Duplicate, vec![value], MirType::semantic(ty), source.span);
+            }
+            fields.push(MirNamedOperand { name, value });
         }
         Some(fields)
+    }
+
+    /// Whether an inherited field is a referential value (collection, record,
+    /// tuple or genus instance, through aliases and options) that
+    /// copy-with-changes must duplicate rather than share.
+    fn field_needs_value_copy(&self, ty: TypeId) -> bool {
+        let mut ty = ty;
+        loop {
+            match self.types.get(ty) {
+                Type::Alias(_, inner) | Type::Option(inner) => ty = *inner,
+                Type::Struct(_) | Type::Record(_) | Type::Tuple(_) => return true,
+                _ => return self.types.is_aliasing_container(ty),
+            }
+        }
     }
 
     /// Merge explicit struct fields with static defaults and omitted `sponte` fields.

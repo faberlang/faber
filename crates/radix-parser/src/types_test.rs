@@ -132,7 +132,7 @@ fn invalid_type_tensor_sugar_angle_form_carries_sugar_discriminator() {
 #[test]
 fn parses_own_and_copy_type_position_markers() {
     let result = parse_ok(
-        "fixum own lista<numerus> owned ← vacua\nfixum copy lista<numerus> copied ← vacua",
+        "fixum lista<numerus> owned ← own vacua\nfixum lista<numerus> copied ← copy vacua",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(owned) = &program.statements[0].kind else {

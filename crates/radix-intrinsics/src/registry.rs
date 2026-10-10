@@ -91,6 +91,8 @@ pub enum IntrinsicReturnKind {
     Numerus,
     Textus,
     Inner,
+    /// The receiver's map value type `V` (`tabula.apud`: the checked read).
+    Value,
     NumericInner,
     /// Element type for floats; the 64-bit cap by the range rule for integers
     /// (d11-6 ruling 21), the same typing as the `summa` construct.
@@ -370,6 +372,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Lista, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], OptionInner, collection Index),
     intrinsic!(Lista, "addita", 1, &[IntrinsicParamKind::Inner], ArrayInner, collection AppendImmutable),
     intrinsic!(Lista, "appende", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
+    // need: the `at` read (la `apud`). `c[i]` dies, `c.get(i)` is
+    // `T ∪ none`, `c.at(i)` reports an out-of-range index / missing key on `⇥`
+    // (default form `⊥`). The error payload is the runtime failure text, the
+    // same `textus` the tensor `accipe` row declares (enum code: need).
+    MethodIntrinsic {
+        failable: true,
+        ..intrinsic!(Lista, "apud", 1, &[IntrinsicParamKind::NumerusIndex], Inner, collection Index)
+    },
     // LSR-W0-SEMANTIC: the argmax/argmin method twins beside the reduction
     // family. First-index tie law (also the parallel-combine law), empty →
     // nihil composing with `vel`/`coalesce`, NaN law pinned to `max from`'s
@@ -468,6 +478,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Lista, "vacua", 0, &[], Bool, collection IsEmpty),
     // tabula
     intrinsic!(Tabula, "accipe", 1, &[IntrinsicParamKind::Key], OptionValue, collection Index),
+    // need: the `at` read (la `apud`). `c[i]` dies, `c.get(i)` is
+    // `T ∪ none`, `c.at(i)` reports an out-of-range index / missing key on `⇥`
+    // (default form `⊥`). The error payload is the runtime failure text, the
+    // same `textus` the tensor `accipe` row declares (enum code: need).
+    MethodIntrinsic {
+        failable: true,
+        ..intrinsic!(Tabula, "apud", 1, &[IntrinsicParamKind::Key], Value, collection Index)
+    },
     intrinsic!(Tabula, "claves", 0, &[], ArrayKey, collection Keys),
     intrinsic!(Tabula, "dele", 1, &[IntrinsicParamKind::Key], Bool, collection Delete),
     intrinsic!(Tabula, "habet", 1, &[IntrinsicParamKind::Key], Bool, collection Contains),
@@ -513,7 +531,15 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // ascii
     intrinsic!(Ascii, "cursor", 0, &[], CursorLittera, collection CordCursor),
     // textus
-    intrinsic!(Textus, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], Textus, collection Index),
+    intrinsic!(Textus, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], OptionTextus, collection Index),
+    // need: the `at` read (la `apud`). `c[i]` dies, `c.get(i)` is
+    // `T ∪ none`, `c.at(i)` reports an out-of-range index / missing key on `⇥`
+    // (default form `⊥`). The error payload is the runtime failure text, the
+    // same `textus` the tensor `accipe` row declares (enum code: need).
+    MethodIntrinsic {
+        failable: true,
+        ..intrinsic!(Textus, "apud", 1, &[IntrinsicParamKind::NumerusIndex], Textus, collection Index)
+    },
     intrinsic!(Textus, "continet", 1, &[IntrinsicParamKind::Textus], Bool, collection Contains),
     intrinsic!(Textus, "cursor", 0, &[], CursorLittera, collection CordCursor),
     intrinsic!(Textus, "divide", 1, &[IntrinsicParamKind::Textus], TextusArray, collection Split),

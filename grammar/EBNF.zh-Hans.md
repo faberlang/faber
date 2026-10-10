@@ -37,7 +37,7 @@ const_init ::= insere_expr | expression
 # [013] insere_expr
 insere_expr ::= '嵌入' STRING
 # [014] fixum_decl
-fixum_decl ::= ('常量' | '变量') type_annotation IDENTIFIER (('←' expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
+fixum_decl ::= ('常量' | '变量') type_annotation IDENTIFIER (('←' value_marker? expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
 # [015] figendum_decl
 figendum_decl ::= ('等定' | '等变') type_annotation IDENTIFIER '←' expression
 # [016] sit_decl
@@ -71,7 +71,7 @@ generic_size_default ::= '=' NATURAL
 # [030] call_type_args
 call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
 # [031] parameter
-parameter ::= '其余'? type_annotation IDENTIFIER '可选'? ('作为' IDENTIFIER)? ('兜底' expression)?
+parameter ::= '其余'? '轴'? type_annotation IDENTIFIER '可选'? ('作为' IDENTIFIER)? ('兜底' expression)?
 # [032] func_modifier
 func_modifier ::= '参数' IDENTIFIER | '勘误' IDENTIFIER | '退出' (IDENTIFIER | NATURAL) | '不变' | '可抛' | '可选项' IDENTIFIER
 # [033] callable_posture
@@ -330,225 +330,229 @@ reice_stmt ::= '拒绝' expression '抛错' expression
 expression ::= assignment
 # [160] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [161] assignment
-assignment ::= transfer ('←' assignment | '↤' assignment inline_default?)?
-# [162] inc_dec_stmt
+# [161] value_marker
+value_marker ::= '拥有' | '拷贝'
+# [162] assignment
+assignment ::= transfer ('←' '拷贝'? assignment | '↤' assignment inline_default?)?
+# [163] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [163] place
+# [164] place
 place ::= call_expr
-# [164] ternary
+# [165] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [165] aut_expr
+# [166] aut_expr
 aut_expr ::= et_expr (('或') et_expr)*
-# [166] et_expr
+# [167] et_expr
 et_expr ::= equality (('且') equality)*
-# [167] equality
+# [168] equality
 equality ::= comparison equality_tail*
-# [168] equality_tail
+# [169] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('是' | '非' '是') type_annotation
-# [169] comparison
+# [170] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [170] format_expr
+# [171] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [171] bitwise_or_expr
+# [172] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [172] bitwise_xor_expr
+# [173] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [173] bitwise_and_expr
+# [174] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [174] shift_expr
+# [175] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [175] range_expr
+# [176] range_expr
 range_expr ::= additive_expr range_tail?
-# [176] range_tail
+# [177] range_tail
 range_tail ::= ('‥' | '…' | '迄' | '到') additive_expr ('步' additive_expr)?
-# [177] additive_expr
+# [178] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [178] multiplicative_expr
+# [179] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [179] vel_expr
+# [180] vel_expr
 vel_expr ::= unary_expr ('兜底' vel_rhs)*
-# [180] vel_rhs
+# [181] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [181] vel_range_tail
+# [182] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | '迄' | '到') unary_expr ('步' unary_expr)?
-# [182] unary_expr
-unary_expr ::= ('-' | '¬' | '非') unary_expr | finge_expr | cast_expr
-# [183] gradient_expr
+# [183] unary_expr
+unary_expr ::= ('-' | '¬' | '非') unary_expr | rounding_expr | finge_expr | cast_expr
+# [184] rounding_expr
+rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
+# [185] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [184] gradient_selection
+# [186] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [185] gradient_place
+# [187] gradient_place
 gradient_place ::= expression
-# [186] cast_expr
+# [188] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [187] conversio_expr
+# [189] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [188] interval_target
+# [190] interval_target
 interval_target ::= range_expr
-# [189] via_clause
+# [191] via_clause
 via_clause ::= '经由' IDENTIFIER
-# [190] inline_default
+# [192] inline_default
 inline_default ::= '⊥' unary_expr
-# [191] call_expr
+# [193] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [192] call_suffix
+# [194] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [193] member_suffix
+# [195] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [194] transpose_suffix
+# [196] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [195] optional_suffix
+# [197] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [196] non_null_suffix
+# [198] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [197] argument_list
+# [199] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [198] argument
-argument ::= template_argument | call_marker? '展开'? expression
-# [199] call_marker
+# [200] argument
+argument ::= template_argument | (call_marker | '轴')? '展开'? expression
+# [201] call_marker
 call_marker ::= '借自' | '传入' | '拥有' | '拷贝'
-# [200] template_argument
+# [202] template_argument
 template_argument ::= '展开'? IDENTIFIER ':' expression
-# [201] literal
+# [203] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '皆无' | '∞' | 'nan'
-# [202] primary
+# [204] primary
 primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
-# [203] ad_expr
+# [205] ad_expr
 ad_expr ::= '调用' ASCII_STRING ad_opener?
-# [204] ad_opener
+# [206] ad_opener
 ad_opener ::= '(' expression ')'
-# [205] array_literal
+# [207] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [206] array_element_list
+# [208] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [207] array_element
+# [209] array_element
 array_element ::= argument | '_'
-# [208] iuncta_expr
+# [210] iuncta_expr
 iuncta_expr ::= '元组' type_arguments '[' argument_list? ']'
-# [209] json_literal
+# [211] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [210] json_member
+# [212] json_member
 json_member ::= STRING ':' json_value
-# [211] typed_constructor
+# [213] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal
-# [212] field_list
+# [214] field_list
 field_list ::= field_init (',' field_init)*
-# [213] field_init
+# [215] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [214] field_key
+# [216] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [215] construction_source
+# [217] construction_source
 construction_source ::= '取自' call_expr
-# [216] json_value
+# [218] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [217] json_object
+# [219] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [218] json_array
+# [220] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [219] json_string
+# [221] json_string
 json_string ::= STRING
-# [220] json_number
+# [222] json_number
 json_number ::= NUMBER
-# [221] finge_expr
+# [223] finge_expr
 finge_expr ::= '构造' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [222] qualified_ident
+# [224] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [223] praefixum_expr
+# [225] praefixum_expr
 praefixum_expr ::= '前缀' block_stmt
-# [224] scriptum_expr
+# [226] scriptum_expr
 scriptum_expr ::= '格式化' '(' STRING (',' expression)* ')'
-# [225] lege_expr
+# [227] lege_expr
 lege_expr ::= '读取' '行'?
-# [226] first_match_expr
+# [228] first_match_expr
 first_match_expr ::= '首个匹配' '(' expression apud_clause? ',' '其中' IDENTIFIER block_stmt ')'
-# [227] reducta_expr
+# [229] reducta_expr
 reducta_expr ::= '归约' '经由' reducta_op '取自' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [228] reducta_op
+# [230] reducta_op
 reducta_op ::= '求和' | '求积' | '最大' | '最小' | '最大值索引' | '最小值索引' | '全部' | '任一' | '计数'
-# [229] reducta_group
+# [231] reducta_group
 reducta_group ::= '按' expression
-# [230] reducta_body
+# [232] reducta_body
 reducta_body ::= ('常量' | '变量') IDENTIFIER block_stmt
-# [231] reducta_identity
+# [233] reducta_identity
 reducta_identity ::= '兜底' expression
-# [232] sort_expr
+# [234] sort_expr
 sort_expr ::= '排序' '经由' sort_direction ('取自' | '借自') expression sort_body?
-# [233] sort_direction
+# [235] sort_direction
 sort_direction ::= '升序' | '降序'
-# [234] sort_body
+# [236] sort_body
 sort_body ::= ('常量' | '变量') IDENTIFIER block_stmt
-# [235] filum_clause
+# [237] filum_clause
 filum_clause ::= '线程' IDENTIFIER
-# [236] capta_expr
+# [238] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [237] object_pattern
+# [239] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [238] pattern_property
+# [240] pattern_property
 pattern_property ::= '其余'? IDENTIFIER ('作为' IDENTIFIER)?
-# [239] array_pattern
+# [241] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [240] array_pattern_element
+# [242] array_pattern_element
 array_pattern_element ::= '_' | '其余'? IDENTIFIER
-# [241] nota_stmt
+# [243] nota_stmt
 nota_stmt ::= ('显示' | '查看' | '警告' | '写入') expression (',' expression)*
-# [242] entry_header
+# [244] entry_header
 entry_header ::= ('参数' IDENTIFIER)? ('退出' expression)?
-# [243] incipit_stmt
+# [245] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [244] incipiet_stmt
+# [246] incipiet_stmt
 incipiet_stmt ::= '异步入口' entry_header block_stmt
-# [245] probandum_decl
+# [247] probandum_decl
 probandum_decl ::= '验题' STRING proba_modifier* '{' probandum_body '}'
-# [246] probandum_body
+# [248] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [247] proba_stmt
+# [249] proba_stmt
 proba_stmt ::= '测试' STRING proba_modifier* block_stmt
-# [248] proba_modifier
+# [250] proba_modifier
 proba_modifier ::= '预期失败' | '跳过' STRING | '预期' STRING | '仅' | '标签' STRING | '时限' NATURAL | '计量' | '重复' NATURAL | '易碎' NATURAL | '仅于' STRING
-# [249] praepara_block
+# [251] praepara_block
 praepara_block ::= ('备置' | '异步备置' | '收尾' | '异步收尾') '全部'? block_stmt
-# [250] fac_stmt
+# [252] fac_stmt
 fac_stmt ::= '执行' block_stmt cape_clause? ('当' expression)?
-# [251] IDENTIFIER
+# [253] IDENTIFIER
 IDENTIFIER ::=
-# [252] NUMBER
+# [254] NUMBER
 NUMBER ::=
-# [253] NATURAL
+# [255] NATURAL
 NATURAL ::=
-# [254] STRING
+# [256] STRING
 STRING ::=
-# [255] ASCII_STRING
+# [257] ASCII_STRING
 ASCII_STRING ::=
-# [256] BACKTICK_STRING
+# [258] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [257] OCTETI_STRING
+# [259] OCTETI_STRING
 OCTETI_STRING ::=
-# [258] NEWLINE
+# [260] NEWLINE
 NEWLINE ::=
-# [259] WIDTH_MARKER
+# [261] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [260] LISTA_WIDTH_SUGAR
+# [262] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [261] TENSOR_WIDTH_SUGAR
+# [263] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [262] SPARSA_WIDTH_SUGAR
+# [264] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [263] VECTOR_WIDTH_SUGAR
+# [265] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [264] MATRIX_WIDTH_SUGAR
+# [266] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [265] FRONTMATTER_DELIMITER
+# [267] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [266] TOML_LINES
+# [268] TOML_LINES
 TOML_LINES ::=
-# [267] ANNOTATION_NAME
+# [269] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [268] ANNOTATION_FIELD_NAME
+# [270] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [269] NON_NEWLINE_TOKEN
+# [271] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [270] NO_NEWLINE
+# [272] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -736,6 +740,7 @@ NO_NEWLINE ::=
 | [`reice_stmt`](#reice-stmt) | `#拒绝-stmt` | live |
 | [`expression`](#expression) | `#expression` | live |
 | [`transfer`](#transfer) | `#transfer` | live |
+| [`value_marker`](#value-marker) | `#value-marker` | live |
 | [`assignment`](#assignment) | `#assignment` | live |
 | [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live |
 | [`place`](#place) | `#place` | live |
@@ -758,6 +763,7 @@ NO_NEWLINE ::=
 | [`vel_rhs`](#vel-rhs) | `#兜底-rhs` | live |
 | [`vel_range_tail`](#vel-range-tail) | `#兜底-range-tail` | live |
 | [`unary_expr`](#unary-expr) | `#unary-expr` | live |
+| [`rounding_expr`](#rounding-expr) | `#rounding-expr` | live |
 | [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live |
 | [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live |
 | [`gradient_place`](#gradient-place) | `#gradient-place` | live |
@@ -872,6 +878,7 @@ productions. It is not a second keyword authority.
 | Params | `参数` | CLI arguments modifier |
 | Expression | `升序` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `或` | or |
+| Grammar | `轴` | keyword literal derived from the production |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `捕获` | local handler |
 | Error | `陷阱` | capture boundary (error channel reified as a value) |
@@ -1206,7 +1213,7 @@ The body joint keeps the existing closure law: `∴` followed by one expression,
 - Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `抛错` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `执行 { ... } 捕获 err { ... }` may catch `抛错` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `执行`/`捕获` wrapper, mirroring how bare `↦` conversio and `抛错` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
 - In a signature, `⇥` only ever names an error type (`→ T ⇥ E`). It never carries a value.
 - Parameter access markers live in the type position: `借自`/`ref` (read), `传入`/`mut` (mutate), `拥有` (consume), and `拷贝` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `取自`/`from` remains the import/iteration/extraction token identity.
-- Call-site access markers: an argument passed to a parameter declared `mut` / `拥有` / `拷贝` carries the same marker at the call (en `mut` `拥有` `拷贝`; la `传入` `拥有` `拷贝`), as in `bump(mut a)`, `eat(拥有 a)`, `dup(拷贝 a)`; the read marker `ref` (la `借自`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `拥有` and `拷贝` with the matching marker. Call-site `拷贝` is a plain echo of the parameter marker. Parameters take no `var`/`const`; the marker says what the callee may do. An unmarked or `ref` parameter is read-only, a `mut` parameter writes the caller's value, and an `拥有` or `拷贝` parameter is always writable by the callee (method call, field store, reassignment, element store; an `拥有` tensor parameter may be rebound whole). Only a whole local binding may be passed as `拥有`: a field or element, an unmarked parameter, a module constant, or an `遍历` binder is `SEM057 own_argument_not_local_binding` / `own_argument_unmarked_parameter` / `own_argument_module_constant` / `own_argument_loop_binder` (`拷贝 b.xs` is fine and does not kill `b`). After `eat(拥有 a)` the name `a` is dead: a later use is `SEM050 use_after_own`, blamed on the call argument (an unmarked source gets a copy suggestion); `moved_in_loop` and `moved_name_captured_by_closure` cover loops and closures; an exclusive (`拥有`/`拷贝`) source keeps `use_after_move` at the later read; a fresh value (`eat(拥有 make())`) is always fine.
+- Call-site access markers: an argument passed to a parameter declared `mut` / `拥有` / `拷贝` carries the same marker at the call (en `mut` `拥有` `拷贝`; la `传入` `拥有` `拷贝`), as in `bump(mut a)`, `eat(拥有 a)`, `dup(拷贝 a)`; the read marker `ref` (la `借自`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. `轴` is a second kind of marker beside those four: they say how a value is passed, this one says what a number means, and the kind is kept to this one word. A parameter declares it before its type (`轴 int a`), the call echoes it (`t.mean(轴 1)`), and inside the callee the parameter is an ordinary `int`; `轴 n` names the axis that is reduced over. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `拥有` and `拷贝` with the matching marker. Call-site `拷贝` is a plain echo of the parameter marker. Parameters take no `var`/`const`; the marker says what the callee may do. An unmarked or `ref` parameter is read-only, a `mut` parameter writes the caller's value, and an `拥有` or `拷贝` parameter is always writable by the callee (method call, field store, reassignment, element store; an `拥有` tensor parameter may be rebound whole). Only a whole local binding may be passed as `拥有`: a field or element, an unmarked parameter, a module constant, or an `遍历` binder is `SEM057 own_argument_not_local_binding` / `own_argument_unmarked_parameter` / `own_argument_module_constant` / `own_argument_loop_binder` (`拷贝 b.xs` is fine and does not kill `b`). After `eat(拥有 a)` the name `a` is dead: a later use is `SEM050 use_after_own`, blamed on the call argument (an unmarked source gets a copy suggestion); `moved_in_loop` and `moved_name_captured_by_closure` cover loops and closures; an exclusive (`拥有`/`拷贝`) source keeps `use_after_move` at the later read; a fresh value (`eat(拥有 make())`) is always fine.
 - Post-name marker: `可选` (voluntary/optional provision)
 - `其余` marks rest parameter
 - Ordinary `函数` declarations and genus methods require bodies. Signature-only methods belong in `契约`. The one exception is a top-level `函数` or a genus method marked `@ 不稳定`, which may omit its block (see `nondum_functio_decl`, `nondum_method_decl`).

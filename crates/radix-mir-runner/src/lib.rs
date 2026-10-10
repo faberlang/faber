@@ -3990,3 +3990,7 @@ mod sermo_frame_test;
 #[cfg(test)]
 #[path = "display_tokens_test.rs"]
 mod display_tokens_test;
+
+#[cfg(test)]
+#[path = "round_half_even_test.rs"]
+mod round_half_even_test;

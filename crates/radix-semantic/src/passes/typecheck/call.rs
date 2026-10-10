@@ -67,6 +67,11 @@ const ISSUE_UNION_MEMBER_DIFFERS: &str = "union_member_differs";
 const ISSUE_UNION_METHOD_SIGNATURE_SHADOWED: &str = "union_method_signature_shadowed";
 const ISSUE_VARIANT_CONSTRUCTOR_TYPE_ARGS: &str = "variant_constructor_type_args";
 
+/// The argument of an `axis` parameter was written without the `axis` word.
+pub(crate) const ISSUE_AXIS_MARKER_REQUIRED: &str = "axis_marker_required";
+/// `axis` was written before an argument whose parameter is not `axis`.
+pub(crate) const ISSUE_AXIS_MARKER_UNEXPECTED: &str = "axis_marker_unexpected";
+
 impl TypeChecker<'_> {
     /// Reject explicit type arguments on callee shapes that cannot carry generics.
     fn reject_explicit_type_args_on_dynamic_callee(
@@ -408,7 +413,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) {
-        self.check_call_args_lifting(sig, args, span, false, false);
+        self.check_call_args_lifting(sig, args, span, false, false, None);
     }
 
     /// [`Self::check_call_args`] for a call that may be a lifting attempt.
@@ -425,6 +430,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         user_function: bool,
         markers: bool,
+        axis: Option<&[bool]>,
     ) -> bool {
         let mut lifted = false;
         let required = sig.params.iter().filter(|param| !param.optional).count();
@@ -444,6 +450,10 @@ impl TypeChecker<'_> {
             let errors_before = self.errors.len();
             if markers {
                 self.check_call_marker(arg, param);
+            }
+            if let Some(axis) = axis {
+                let declared = axis.get(argument).copied().unwrap_or(false);
+                self.check_axis_marker(arg, declared);
             }
             let arg_ty = self.check_store_expr(&mut arg.expr, param.ty, site);
             if self
@@ -523,6 +533,7 @@ impl TypeChecker<'_> {
             Some(Written::Mut) => "mut",
             Some(Written::Own) => "own",
             Some(Written::Copy) => "copy",
+            Some(Written::Axis) => "axis",
             None => "none",
         };
         self.error_issue_with_args(
@@ -534,6 +545,23 @@ impl TypeChecker<'_> {
                 ("found", name(arg.marker).to_owned()),
             ],
         );
+    }
+
+    /// `axis` echo rule: a parameter declared `axis int a` is
+    /// called `axis <expr>`, and `axis <expr>` is refused for a plain
+    /// parameter. Inside the function the parameter is an ordinary int, so
+    /// passing it on writes the word again.
+    fn check_axis_marker(&mut self, arg: &HirCallArg, declared: bool) {
+        if arg.spread {
+            return;
+        }
+        let written = arg.marker == Some(radix_hir::HirArgMarker::Axis);
+        let issue = match (declared, written) {
+            (true, false) => ISSUE_AXIS_MARKER_REQUIRED,
+            (false, true) => ISSUE_AXIS_MARKER_UNEXPECTED,
+            _ => return,
+        };
+        self.error_issue(SemanticErrorKind::ModeMismatch, issue, arg.span);
     }
 
     /// A `mut` scalar parameter borrows the caller's cell: a store through it
@@ -723,7 +751,29 @@ impl TypeChecker<'_> {
         }
         self.canonicalize_sermo_view_method(receiver_ty, name);
         let method_name = self.method_display_name(*name);
-        let method_name = if method_name == super::tensor_index::GLYPH_TRANSPOSE_METHOD {
+        let method_name = if let Some(canonical) = method_name.strip_prefix("__faber_glyph_round:")
+        {
+            // Rounding glyphs lift per element over tensors in principle; the
+            // build is deferred, so a tensor-shaped operand is a named error.
+            let resolved = self.resolve_inferred_type(receiver_ty);
+            let (_, payload) = self.types.peel_access_marker(resolved);
+            if matches!(
+                self.types.get(payload),
+                Type::Tensor(..) | Type::Matrix(..) | Type::Vector(..)
+            ) {
+                self.invalid_operand_types("glyph_rounding_tensor_unsupported", receiver.span);
+                return self.error_type;
+            }
+            let surface = self
+                .locale_pack
+                .map_or(canonical, |pack| pack.intrinsic_surface(canonical));
+            if let Some(interner) = self.interner
+                && let Some(symbol) = interner.lookup(surface)
+            {
+                *name = symbol;
+            }
+            surface.to_owned()
+        } else if method_name == super::tensor_index::GLYPH_TRANSPOSE_METHOD {
             if !explicit_type_args.is_empty() || !args.is_empty() {
                 self.typecheck_call_arg_exprs(args);
                 self.invalid_operand_types(

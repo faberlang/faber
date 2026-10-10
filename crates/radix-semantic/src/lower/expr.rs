@@ -43,6 +43,7 @@ use rustc_hash::FxHashSet;
 /// The parser's private method name for the source-only `ᵀ` suffix (the same
 /// spelling typecheck rewrites to the transpose intrinsic).
 const GLYPH_TRANSPOSE_MARKER: &str = "__faber_glyph_transpose";
+const ROUNDING_GLYPH_MARKER: &str = "__faber_glyph_round:";
 
 /// Lower one AST expression into the HIR expression contract.
 ///
@@ -509,9 +510,35 @@ impl Lowerer<'_> {
             radix_syntax::UnOp::Neg => HirUnOp::Neg,
             radix_syntax::UnOp::Not => HirUnOp::Not,
             radix_syntax::UnOp::BitNot => HirUnOp::BitNot,
+            // The rounding delimiters are sugar for the canonical rounding
+            // method twins (`pavimentum`, `tectum`, `rotunda`). The private
+            // marker name lets typecheck reject a tensor operand by name and
+            // then rewrite to the active pack's intrinsic surface.
+            radix_syntax::UnOp::Floor => {
+                return self.lower_rounding_glyph("pavimentum", operand);
+            }
+            radix_syntax::UnOp::Ceil => return self.lower_rounding_glyph("tectum", operand),
+            radix_syntax::UnOp::Nearest => {
+                return self.lower_rounding_glyph("rotunda", operand);
+            }
         };
 
         HirExpressionKind::Unary(op, Box::new(operand))
+    }
+
+    /// Lower a rounding glyph to a marker `MethodCall` whose name carries the
+    /// canonical twin (`__faber_glyph_round:<canonical>`); typecheck rewrites it.
+    fn lower_rounding_glyph(
+        &mut self,
+        canonical: &str,
+        operand: HirExpression,
+    ) -> HirExpressionKind {
+        // Intern the pack surface so typecheck's lookup finds it.
+        let _ = self.intrinsic_surface_symbol(canonical);
+        let marker = self
+            .interner
+            .intern(&format!("{ROUNDING_GLYPH_MARKER}{canonical}"));
+        HirExpressionKind::MethodCall(Box::new(operand), marker, Vec::new(), Vec::new(), None)
     }
 
     fn lower_ternary(&mut self, ternary: &radix_syntax::TernaryExpr) -> HirExpressionKind {
@@ -896,12 +923,16 @@ impl Lowerer<'_> {
                 HirCallArg {
                     name: None,
                     spread: arg.is_spread,
-                    marker: arg.marker.map(|mode| match mode {
-                        radix_syntax::TypeMode::De => radix_hir::HirArgMarker::Ref,
-                        radix_syntax::TypeMode::In => radix_hir::HirArgMarker::Mut,
-                        radix_syntax::TypeMode::Own => radix_hir::HirArgMarker::Own,
-                        radix_syntax::TypeMode::Copy => radix_hir::HirArgMarker::Copy,
-                    }),
+                    marker: if arg.axis {
+                        Some(radix_hir::HirArgMarker::Axis)
+                    } else {
+                        arg.marker.map(|mode| match mode {
+                            radix_syntax::TypeMode::De => radix_hir::HirArgMarker::Ref,
+                            radix_syntax::TypeMode::In => radix_hir::HirArgMarker::Mut,
+                            radix_syntax::TypeMode::Own => radix_hir::HirArgMarker::Own,
+                            radix_syntax::TypeMode::Copy => radix_hir::HirArgMarker::Copy,
+                        })
+                    },
                     expr: lower_expr(self, &arg.value),
                     span: arg.span,
                 }
@@ -1371,10 +1402,24 @@ impl Lowerer<'_> {
 
     fn lower_assign(&mut self, assign: &radix_syntax::AssignExpr) -> HirExpressionKind {
         let target = lower_expr(self, &assign.target);
-        let source = lower_expr(self, &assign.value);
+        let mut source = lower_expr(self, &assign.value);
 
         match assign.op {
             radix_syntax::AssignOp::Assign => {
+                if assign.value_marker == Some(radix_syntax::TypeMode::Copy) {
+                    let span = source.span;
+                    let id = self.next_hir_id();
+                    let ty = None;
+                    source = radix_hir::HirExpression {
+                        id,
+                        kind: HirExpressionKind::Marked {
+                            marker: radix_hir::HirArgMarker::Copy,
+                            expr: Box::new(source),
+                        },
+                        ty,
+                        span,
+                    };
+                }
                 HirExpressionKind::Assign(Box::new(target), Box::new(source))
             }
             // `↤` (U+21A4) is conversion-directed assignment: the operator is

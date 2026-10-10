@@ -131,3 +131,65 @@ fn textus_index_declared_ascii1_keeps_the_compact_carrier() {
     });
     assert_eq!(value, Value::Ascii(b'b'));
 }
+
+/// `s[lo‥hi]` through the collection index op, exclusive range.
+fn text_range(text: &str, lo: i64, hi: i64) -> Result<Value, RunnerError> {
+    eval_collection(
+        MirCollectionOp::Index,
+        vec![
+            Value::Str(text.to_owned()),
+            Value::Tuple(vec![Value::Int(lo), Value::Int(hi), Value::Bool(false)]),
+        ],
+        textus,
+    )
+}
+
+#[test]
+fn text_range_past_the_end_dies_naming_the_range() {
+    let error = text_range("abcdef", 1, 99).expect_err("a range past the end must die");
+    assert_eq!(error.issue, "runner_text_range_out_of_bounds");
+    assert_eq!(error.message, "text range 1‥99 outside 0‥6");
+}
+
+#[test]
+fn text_range_wholly_outside_dies() {
+    let error = text_range("abcdef", 10, 12).expect_err("a range outside must die");
+    assert_eq!(error.message, "text range 10‥12 outside 0‥6");
+}
+
+#[test]
+fn text_range_reversed_dies() {
+    let error = text_range("abcdef", 4, 2).expect_err("a reversed range must die");
+    assert_eq!(error.message, "text range 4‥2 outside 0‥6");
+}
+
+#[test]
+fn text_range_inside_is_the_substring() {
+    assert_eq!(
+        text_range("abcdef", 0, 3).expect("in-range text window"),
+        Value::Str("abc".to_owned())
+    );
+}
+
+#[test]
+fn text_range_empty_at_the_end_is_the_empty_string() {
+    assert_eq!(
+        text_range("abcdef", 6, 6).expect("empty range at the end"),
+        Value::Str(String::new())
+    );
+}
+
+#[test]
+fn textus_get_non_ascii_is_the_ith_character_or_nil() {
+    assert_eq!(
+        index("Grüße", 2, optional_textus),
+        Value::Str("ü".to_owned())
+    );
+    assert_eq!(index("Grüße", 9, optional_textus), Value::Nil);
+}
+
+#[test]
+fn text_get_negative_index_is_nil() {
+    assert_eq!(index("hé", 1, optional_textus), Value::Str("é".to_owned()));
+    assert_eq!(index("hé", -1, optional_textus), Value::Nil);
+}

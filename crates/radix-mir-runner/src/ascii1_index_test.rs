@@ -43,3 +43,23 @@ fn one_byte_ascii_value_is_not_string() {
     assert_ne!(value, Value::Str("x".to_owned()));
     assert_eq!(value, Value::Ascii(b'x'));
 }
+
+#[test]
+fn non_ascii_scalar_index_is_the_ith_character() {
+    // "Grüße": s[2] is `ü`, s[3] is `ß`; indexing counts characters, not bytes.
+    let u = scalar_text_index("Grüße", 2, span()).expect("ü");
+    assert_eq!(u, Value::Str("ü".to_owned()));
+    let sz = scalar_text_index("Grüße", 3, span()).expect("ß");
+    assert_eq!(sz, Value::Str("ß".to_owned()));
+    // ASCII positions keep the compact carrier.
+    assert_eq!(
+        scalar_text_index("Grüße", 0, span()).expect("G"),
+        Value::Ascii(b'G')
+    );
+}
+
+#[test]
+fn scalar_index_past_last_character_of_non_ascii_text_dies() {
+    let err = scalar_text_index("Grüße", 5, span()).expect_err("past the end");
+    assert_eq!(err.issue, "runner_text_index_out_of_bounds");
+}

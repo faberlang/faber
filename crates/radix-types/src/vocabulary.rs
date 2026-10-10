@@ -189,6 +189,13 @@ pub enum MirCollectionOp {
     /// pairing and result as the orderings.
     ArrayValueEq,
     ArrayValueNotEq,
+    /// Elementwise `et` / `aut` over a `lista<bivalens>` (Q-C of the
+    /// 2026-10-04 comparisons ruling): two operands, a list pair or a list and
+    /// a scalar bool in either order; both sides are always evaluated.
+    ArrayAnd,
+    ArrayOr,
+    /// Elementwise `non` over a `lista<bivalens>`: one operand.
+    ArrayNot,
     Append,
     AppendImmutable,
     Put,

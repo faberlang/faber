@@ -196,6 +196,11 @@ impl Parser {
 
         self.advance();
         let is_conversio = matches!(op, AssignOp::ConversioAssign);
+        let value_marker = if matches!(op, AssignOp::Assign) {
+            self.parse_value_marker(Some(TypeMode::Copy))
+        } else {
+            None
+        };
         let parse_value: fn(&mut Self) -> Result<Expr, ParseError> = if is_conversio {
             Self::parse_assignment_open
         } else {
@@ -224,6 +229,7 @@ impl Parser {
                 op,
                 target: Box::new(target),
                 value,
+                value_marker,
                 recovery,
             }),
             span,
@@ -925,7 +931,59 @@ impl Parser {
             return self.parse_variant_expr();
         }
 
+        if matches!(self.peek().kind, TokenKind::FloorOpen | TokenKind::CeilOpen) {
+            return self.parse_rounding_glyph();
+        }
+
         self.parse_postfix_inner()
+    }
+
+    /// Parse the paired rounding delimiters.
+    ///
+    /// GRAMMAR:
+    ///   rounding := '⌊' expression '⌋'   floor
+    ///             | '⌈' expression '⌉'   ceiling
+    ///             | '⌊' expression '⌉'   nearest (ties to the even neighbour)
+    ///
+    /// `⌈x⌋` is a named error (`PARSE030 ceiling_floor_delimiters`) that
+    /// points at `⌊x⌉`; the parse continues as nearest so one file reports
+    /// every site.
+    fn parse_rounding_glyph(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        let open = self.peek().kind.clone();
+        self.advance();
+        let operand = Box::new(self.parse_expression()?);
+        let close_span = self.current_span();
+        let op = match (&open, &self.peek().kind) {
+            (TokenKind::FloorOpen, TokenKind::FloorClose) => UnOp::Floor,
+            (TokenKind::CeilOpen, TokenKind::CeilClose) => UnOp::Ceil,
+            (TokenKind::FloorOpen, TokenKind::CeilClose) => UnOp::Nearest,
+            (TokenKind::CeilOpen, TokenKind::FloorClose) => {
+                self.errors.push(
+                    ParseError::structured(
+                        ParseErrorKind::ExpressionInvalid,
+                        start.merge(close_span),
+                    )
+                    .with_arg("issue", "ceiling_floor_delimiters")
+                    .with_arg("replacement", "⌊x⌉"),
+                );
+                UnOp::Nearest
+            }
+            _ => {
+                return Err(ParseError::structured(
+                    ParseErrorKind::UnterminatedGroup,
+                    start,
+                ));
+            }
+        };
+        self.advance();
+        let span = start.merge(self.previous_span());
+        let id = self.next_id();
+        Ok(Expr {
+            id,
+            kind: ExprKind::Unary(UnaryExpr { op, operand }),
+            span,
+        })
     }
 
     fn can_start_expression(kind: &TokenKind) -> bool {
@@ -947,6 +1005,8 @@ impl Parser {
                 | TokenKind::Solum
                 | TokenKind::Minus
                 | TokenKind::BitwiseNot
+                | TokenKind::FloorOpen
+                | TokenKind::CeilOpen
                 | TokenKind::Nulla
                 | TokenKind::Cede
         )
@@ -3010,7 +3070,12 @@ impl Parser {
                 None
             };
 
-            let marker = self.parse_argument_marker();
+            let axis = self.parse_axis_marker();
+            let marker = if axis {
+                None
+            } else {
+                self.parse_argument_marker()
+            };
             let spread = self.eat_keyword_ident(TokenKind::Sparge);
             if let Some((_, label_span)) = labeled
                 && spread
@@ -3047,6 +3112,7 @@ impl Parser {
                 label: labeled.map(|(name, _)| name),
                 is_spread: spread,
                 marker,
+                axis,
                 value,
                 span,
             });
@@ -3079,7 +3145,55 @@ impl Parser {
         } else {
             return None;
         };
-        if !matches!(
+        if !self.marker_word_precedes_operand() {
+            return None;
+        }
+        self.advance();
+        Some(mode)
+    }
+
+    /// Parse an optional value-side marker (`copy x`, `own x`) at the start of
+    /// an initializer or assignment right side.
+    ///
+    /// The word is a marker only when an operand follows, exactly as at a call
+    /// argument (`copy` and `own` stay contextual: a binding named `copy` with
+    /// no operand after it is still an identifier). `allowed` restricts the
+    /// markers claimed here; `None` claims `copy` and `own` (declaration
+    /// initializers), `Some(mode)` claims only that mode (assignment).
+    pub(super) fn parse_value_marker(&mut self, allowed: Option<TypeMode>) -> Option<TypeMode> {
+        let mode = if self.check_keyword_ident(TokenKind::Copy) {
+            TypeMode::Copy
+        } else if self.check_keyword_ident(TokenKind::Own) {
+            TypeMode::Own
+        } else {
+            return None;
+        };
+        if allowed.is_some_and(|only| only != mode) || !self.marker_word_precedes_operand() {
+            return None;
+        }
+        self.advance();
+        Some(mode)
+    }
+
+    /// Parse the `axis` marker word before a call argument or a parameter
+    /// type (`t.mean(axis 1)`, `axis int a`).
+    ///
+    /// `axis` is a marker only when an operand follows and the pair is not a
+    /// compact closure head; otherwise it stays an ordinary identifier. In a
+    /// parameter list the operand is a type, so only the word's own position
+    /// is checked there.
+    pub(super) fn parse_axis_marker(&mut self) -> bool {
+        if !self.check_keyword_ident(TokenKind::Axis) || !self.marker_word_precedes_operand() {
+            return false;
+        }
+        self.advance();
+        true
+    }
+
+    /// Whether the marker word at the cursor is followed by an operand start
+    /// and is not the head of a compact closure (`in x ∴ body`).
+    fn marker_word_precedes_operand(&self) -> bool {
+        matches!(
             self.peek_at(1).kind,
             TokenKind::Ident(_)
                 | TokenKind::Tag
@@ -3088,14 +3202,10 @@ impl Parser {
                 | TokenKind::FloatText { .. }
                 | TokenKind::String(_)
                 | TokenKind::LBracket
-        ) || matches!(
+        ) && !matches!(
             self.peek_at(2).kind,
             TokenKind::Therefore | TokenKind::Arrow
-        ) {
-            return None;
-        }
-        self.advance();
-        Some(mode)
+        )
     }
 
     fn argument_label_start(&self) -> bool {

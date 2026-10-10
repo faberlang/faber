@@ -731,6 +731,7 @@ pub fn lower_analyzed_unit(
         map_changed_size: interner.intern("map changed size during iteration"),
         ponde_invalid_index: interner.intern(crate::runtime_contract::tensor::ERR_PONDE_INVALID_INDEX),
         accipe_invalid_index: interner.intern(crate::runtime_contract::tensor::ERR_ACCIPE_INVALID_INDEX),
+        at_out_of_range: interner.intern("at: index out of range or key missing"),
     };
     let kernel_lowering = options.kernel_lowering;
     let mut lowerer = MirLowerer {
@@ -1306,6 +1307,9 @@ struct DiagnosticSymbols {
     ponde_invalid_index: Symbol,
     /// The checked `accipe` read's out-of-range error textus (K11-b).
     accipe_invalid_index: Symbol,
+    /// The `at` read's (la `apud`) out-of-range index / missing key textus
+    ///.
+    at_out_of_range: Symbol,
 }
 
 struct MirLowerer<'a> {
@@ -2190,6 +2194,7 @@ struct FunctionBuilderContext<'a> {
     diagnostic_map_changed_size: Symbol,
     diagnostic_ponde_invalid_index: Symbol,
     diagnostic_accipe_invalid_index: Symbol,
+    diagnostic_at_out_of_range: Symbol,
     /// A `⇥` kernel exists in the unit: handled blocks emit the device
     /// fault-delivery markers (U9-5).
     fault_delivery: bool,
@@ -2288,6 +2293,7 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_map_changed_size: Symbol(0),
             diagnostic_ponde_invalid_index: Symbol(0),
             diagnostic_accipe_invalid_index: Symbol(0),
+            diagnostic_at_out_of_range: Symbol(0),
             fault_delivery: false,
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
@@ -2536,7 +2542,7 @@ impl<'a> FunctionBuilder<'a> {
         // `in` must remain `MirParamMode::MutRef` so call frames can preserve a
         // scalar mutable borrow instead of treating it as an owned value.
         let (mir_mode, mutable) = match mode {
-            HirParamMode::Owned => (MirParamMode::Owned, false),
+            HirParamMode::Owned | HirParamMode::Axis => (MirParamMode::Owned, false),
             HirParamMode::De => (MirParamMode::Ref, false),
             HirParamMode::In => (MirParamMode::MutRef, true),
             HirParamMode::Ex => (MirParamMode::Move, false),
@@ -3452,7 +3458,17 @@ impl<'a> FunctionBuilder<'a> {
                 }
             }
             HirLiteral::String(value) => Some(MirOperand::Constant(MirConstant::String(*value))),
-            HirLiteral::Ascii(value) => Some(MirOperand::Constant(MirConstant::Ascii(*value))),
+            HirLiteral::Ascii(value) => {
+                let operand = MirOperand::Constant(MirConstant::Ascii(*value));
+                // WHY: a MIR ascii constant is typed bare `ascii`, so as a
+                // bare aggregate item it cannot satisfy a bounded `ascii<N>`
+                // element type (need, item 11). A temp typed by the
+                // literal's own semantic type carries the bound.
+                match ty.filter(|ty| matches!(self.normalized_type(*ty), Type::BoundedAscii { .. })) {
+                    Some(ty) => Some(self.assign_temp(MirValueKind::Operand(operand), MirType::semantic(ty), span)),
+                    None => Some(operand),
+                }
+            }
             HirLiteral::Bool(value) => Some(MirOperand::Constant(MirConstant::Bool(*value))),
             HirLiteral::Nil => Some(MirOperand::Constant(MirConstant::Nil)),
             HirLiteral::Octeti(sym) => self.lower_octeti_literal(*sym, ty, span),
@@ -3581,8 +3597,8 @@ impl<'a> FunctionBuilder<'a> {
         {
             return lowered;
         }
-        if op == HirUnOp::Neg
-            && let Some(lowered) = self.lower_lista_negate(operand, expr)
+        if matches!(op, HirUnOp::Neg | HirUnOp::Not)
+            && let Some(lowered) = self.lower_lista_negate(op, operand, expr)
         {
             return lowered;
         }
@@ -3665,6 +3681,16 @@ impl<'a> FunctionBuilder<'a> {
             op,
             HirBinOp::Mod | HirBinOp::TrueDiv | HirBinOp::Hadamard | HirBinOp::HadamardDiv
         ) && self.is_lista_or_queue_stack_arithmetic_operand(lhs, rhs)
+        {
+            return self.lower_lista_elementwise(op, lhs, rhs, expr);
+        }
+        // `et` / `aut` over a `lista<bivalens>` lift per element (Q-C of the
+        // 2026-10-04 comparisons ruling); both sides are always evaluated, so
+        // it precedes the short-circuit.
+        if matches!(op, HirBinOp::And | HirBinOp::Or)
+            && expr
+                .ty
+                .is_some_and(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
         {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
@@ -4826,6 +4852,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Index(_, _) => "index access before aggregate place MIR lowering",
         HirExpressionKind::OptionalChain(_, _) => "optional chains before nullable control-flow MIR lowering",
         HirExpressionKind::NonNull(_, _) => "non-null assertions before nullable control-flow MIR lowering",
+        HirExpressionKind::Marked { .. } => "value-side markers before marked-value MIR lowering",
         HirExpressionKind::Gradient { .. } => {
             "gradient expressions before tensor-glyphs 2B backward-companion MIR lowering"
         }

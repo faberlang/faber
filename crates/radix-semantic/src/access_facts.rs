@@ -582,7 +582,9 @@ fn function_params(function: &HirFunction) -> Vec<radix_types::ParamType> {
         .map(|param| radix_types::ParamType {
             ty: param.ty,
             mode: match param.mode {
-                radix_hir::HirParamMode::Owned => radix_types::SemanticParamMode::Owned,
+                radix_hir::HirParamMode::Owned | radix_hir::HirParamMode::Axis => {
+                    radix_types::SemanticParamMode::Owned
+                }
                 radix_hir::HirParamMode::De => radix_types::SemanticParamMode::Ref,
                 radix_hir::HirParamMode::In => radix_types::SemanticParamMode::MutRef,
                 radix_hir::HirParamMode::Ex => radix_types::SemanticParamMode::Move,

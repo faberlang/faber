@@ -383,6 +383,7 @@ impl ReductionBodyState {
                 effect(checker, expr.span, "unapproved_effect");
                 self.walk_expr(checker, object);
             }
+            HirExpressionKind::Marked { expr: inner, .. } => self.walk_expr(checker, inner),
             HirExpressionKind::Block(block) => self.walk_block(checker, block),
             HirExpressionKind::Si {
                 cond,

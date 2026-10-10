@@ -4,20 +4,20 @@ kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "genus_decl", "genus_member", "field_decl", "expression", "assignment", "place", "literal", "typed_constructor", "field_list", "field_init", "expr_stmt", "call_expr", "member_suffix", "nota_stmt", "type_arguments", "type_argument", "array_literal"]
 category = "type"
 summary = "D-6: a copy bind deep-duplicates its source; list fields inside are not shared."
-syntax = "var copy V3 b ← a"
+syntax = "var V3 b ← copy a"
 related = ["genus", "lista"]
 locale = "en"
 +++
 # =============================================================================
 # mutabilitas — deep copy bind (D-6)
 # =============================================================================
-# `copy` says how a binding is INITIALIZED: `var copy Holder b ← a` duplicates
+# `copy` says how a binding is INITIALIZED: `var Holder b ← copy a` duplicates
 # `a`. It is not a property of `b` afterwards. A later `b ← c` of a class value
-# is always by reference, whether or not `b` was declared with `copy`: after
-# `var copy Point b ← a; b ← c; b.x ← 5`, `c.x` is 5 and `a.x` is untouched.
-# Each assignment site shows which one it is: a `var copy` declaration copies,
-# and a plain `←` never does. To copy again, write a new `var copy`
-# declaration. (Pinned by the radix-module test `copy_duplicate_test.rs`.)
+# is always by reference, whatever `b` was first initialized from: after
+# `var Point b ← copy a; b ← c; b.x ← 5`, `c.x` is 5 and `a.x` is untouched.
+# Each assignment site shows which one it is: `← copy a` copies, and a plain
+# `←` never does. To copy again, write `b ← copy c`. (Pinned by the
+# radix-module test `copy_duplicate_test.rs`.)
 
 class Holder {
     var f64 x = 0.0
@@ -26,7 +26,7 @@ class Holder {
 
 main {
     const Holder a ← Holder { x = 1.0 }
-    var copy Holder b ← a
+    var Holder b ← copy a
     b.x ← 5.0
     b.marks.append(1)
     print a.x

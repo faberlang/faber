@@ -83,6 +83,9 @@ fn lista_form(types: &TypeTable, expr: &HirExpression) -> Option<&'static str> {
         HirExpressionKind::Unary(HirUnOp::Neg, operand) => {
             lista_element(types, operand.ty).map(|_| "-")
         }
+        HirExpressionKind::Unary(HirUnOp::Not, operand) => {
+            lista_element(types, operand.ty).map(|_| "not")
+        }
         HirExpressionKind::Binary(op, lhs, rhs) => {
             let (left, right) = (lista_element(types, lhs.ty), lista_element(types, rhs.ty));
             if left.is_none() && right.is_none() {
@@ -93,6 +96,10 @@ fn lista_form(types: &TypeTable, expr: &HirExpression) -> Option<&'static str> {
                 HirBinOp::TrueDiv => "÷",
                 HirBinOp::Hadamard => "⊙",
                 HirBinOp::HadamardDiv => "⊘",
+                // `and` / `or` over a `lista<bivalens>` lift per element; the
+                // scalar form never has a list operand.
+                HirBinOp::And => "and",
+                HirBinOp::Or => "or",
                 // A numeric list compared per element types as a list of
                 // `bivalens`; a whole-value `≅` over other lists stays one
                 // `bivalens` and keeps its emitters.

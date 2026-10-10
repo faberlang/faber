@@ -74,6 +74,7 @@ fn lower_param_mode(mode: AstParamMode) -> HirParamMode {
         AstParamMode::De => HirParamMode::De,
         AstParamMode::In => HirParamMode::In,
         AstParamMode::Ex => HirParamMode::Ex,
+        AstParamMode::Axis => HirParamMode::Axis,
     }
 }
 
@@ -253,6 +254,7 @@ impl Lowerer<'_> {
         }
         self.signature_type_nesting -= 1;
         let mode = match param.ty.mode {
+            _ if param.mode == AstParamMode::Axis => HirParamMode::Axis,
             Some(type_mode) => super::type_mode_hir_param_mode(type_mode),
             None => lower_param_mode(param.mode),
         };

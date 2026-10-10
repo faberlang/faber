@@ -743,6 +743,7 @@ impl super::FaberCodegen<'_> {
             owner: HirOwnerRef::Def(local.def_id),
             slot: HirTypeSlot::Declared,
         };
+        let mut value_marker: Option<&str> = None;
         if let Some(ty) = local.ty {
             // The authored form at this site is the sole authority for
             // concrete versus hole spelling. An absent site falls back to
@@ -751,9 +752,25 @@ impl super::FaberCodegen<'_> {
             // binding with a later assignment type-checks, so materializing
             // the inferred type would change the authored surface and fail
             // output re-validation.
-            let rendered = self
+            let mut rendered = self
                 .type_to_faber_at(&site, ty, names, surface)
                 .unwrap_or_else(|error| self.record_type_emission_error(error));
+            // Value-side marker: an exclusive `copy`/`own` binding re-emits as
+            // `T b ← copy a` / `T b ← own a` (operator ruling 2026-10-08), so
+            // the mode word leaves the type and is written before the
+            // initializer.
+            if local
+                .init
+                .as_ref()
+                .is_some_and(|init| !matches!(init.kind, HirExpressionKind::ConversioAssign { .. }))
+                && let Some(marker) = self.exclusive_binding_marker(ty)
+            {
+                let word = surface.keyword(marker);
+                if let Some(rest) = rendered.strip_prefix(&format!("{word} ")) {
+                    rendered = rest.to_owned();
+                    value_marker = Some(word);
+                }
+            }
             writer.write(&rendered);
             writer.write(" ");
         } else if local.init.is_some() {
@@ -793,6 +810,10 @@ impl super::FaberCodegen<'_> {
                     " ← "
                 };
                 writer.write(glyph);
+                if let Some(word) = value_marker {
+                    writer.write(word);
+                    writer.write(" ");
+                }
                 self.write_expr(init, names, surface, writer);
             }
         }

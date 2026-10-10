@@ -856,6 +856,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorMin
             | MirCollectionOp::TensorNeg
             | MirCollectionOp::ArrayNeg
+            | MirCollectionOp::ArrayNot
             | MirCollectionOp::TensorMath(_)
             | MirCollectionOp::ScalarMath(_)
             | MirCollectionOp::TensorGelu
@@ -886,6 +887,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::ArrayGtEq
             | MirCollectionOp::ArrayValueEq
             | MirCollectionOp::ArrayValueNotEq
+            | MirCollectionOp::ArrayAnd
+            | MirCollectionOp::ArrayOr
             | MirCollectionOp::Append
             | MirCollectionOp::SortByKeys
             | MirCollectionOp::Compare
@@ -1850,7 +1853,7 @@ impl Validator<'_, '_> {
                     self.error(span, "tensor shift offsets are not an integer lista");
                 }
             }
-            MirCollectionOp::ArrayNeg => {
+            MirCollectionOp::ArrayNeg | MirCollectionOp::ArrayNot => {
                 let Some(operand_ty) = first_arg_ty else {
                     return;
                 };
@@ -1889,7 +1892,9 @@ impl Validator<'_, '_> {
             | MirCollectionOp::ArrayLtEq
             | MirCollectionOp::ArrayGtEq
             | MirCollectionOp::ArrayValueEq
-            | MirCollectionOp::ArrayValueNotEq => {
+            | MirCollectionOp::ArrayValueNotEq
+            | MirCollectionOp::ArrayAnd
+            | MirCollectionOp::ArrayOr => {
                 let Some(left_ty) = first_arg_ty else {
                     return;
                 };

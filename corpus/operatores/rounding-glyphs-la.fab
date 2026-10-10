@@ -1,0 +1,34 @@
++++
+term = "⌊x⌉"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "unary_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Signa rotundandi: pavimentum, tectum, proximum cum paribus ad parem."
+syntax = "⌊x⌋ pavimentum | ⌈x⌉ tectum | ⌊x⌉ proximum (paria ad parem)"
+related = ["⌊x⌋", "⌈x⌉", "⌊x⌉"]
+locale = "la"
++++
+# =============================================================================
+# ⌊x⌉ — Rounding glyphs in the Latin surface.
+# =============================================================================
+#
+# What this teaches:
+#   • The same three glyphs in every locale; nearest sends ties to even.
+#
+# See also: ⌊x⌋, ⌈x⌉
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   2, 3, 2, 4, -2, 2, 3
+
+incipit {
+    fixum fractus dimidium ← 2.5
+    nota ⌊dimidium⌋
+    nota ⌈dimidium⌉
+    nota ⌊dimidium⌉
+    nota ⌊3.5⌉
+    nota ⌊-2.5⌉
+    nota ⌊2.4⌉
+    nota ⌊2.6⌉
+}

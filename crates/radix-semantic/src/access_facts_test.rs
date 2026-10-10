@@ -105,8 +105,8 @@ fn own_transfer_records_dead_source_identity_and_spans() {
     let (hir, types, locals) = typed_local_rows(
         r"
 incipit {
-    fixum own lista<numerus> source ← [1, 2, 3]
-    fixum own lista<numerus> destination ← source
+    fixum lista<numerus> source ← own [1, 2, 3]
+    fixum lista<numerus> destination ← own source
 }
 ",
     );
@@ -134,7 +134,7 @@ fn provably_dead_unmarked_source_records_transfer_death() {
         r"
 incipit {
     fixum lista<numerus> source ← [1, 2, 3]
-    fixum own lista<numerus> destination ← source
+    fixum lista<numerus> destination ← own source
 }
 ",
     );
@@ -153,8 +153,8 @@ fn explicit_copy_keeps_the_exclusive_source_live() {
     let (hir, types, locals) = typed_local_rows(
         r"
 incipit {
-    fixum own lista<numerus> source ← [1, 2, 3]
-    fixum copy lista<numerus> copied ← source
+    fixum lista<numerus> source ← own [1, 2, 3]
+    fixum lista<numerus> copied ← copy source
     nota source.longitudo()
 }
 ",
@@ -174,7 +174,7 @@ fn scope_exit_records_an_unused_exclusive_source() {
     let (hir, types, locals) = typed_local_rows(
         r"
 incipit {
-    fixum own lista<numerus> scoped ← [1, 2, 3]
+    fixum lista<numerus> scoped ← own [1, 2, 3]
 }
 ",
     );
@@ -197,9 +197,9 @@ functio incertum() → bivalens {
     redde verum
 }
 incipit {
-    fixum own lista<numerus> source ← [1, 2, 3]
+    fixum lista<numerus> source ← own [1, 2, 3]
     si incertum() {
-        fixum own lista<numerus> destination ← source
+        fixum lista<numerus> destination ← own source
     }
 }
 ",

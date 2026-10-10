@@ -687,6 +687,7 @@ impl super::FaberCodegen<'_> {
                 radix_hir::HirParamMode::De => Some(TokenKind::De),
                 radix_hir::HirParamMode::In => Some(TokenKind::In),
                 radix_hir::HirParamMode::Ex => Some(TokenKind::Own),
+                radix_hir::HirParamMode::Axis => Some(TokenKind::Axis),
                 radix_hir::HirParamMode::Owned => None,
             };
             if let Some(marker) = marker {

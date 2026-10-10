@@ -259,6 +259,10 @@ mod mutability_baseline_test;
 mod mutability_markers_test;
 
 #[cfg(test)]
+#[path = "value_marker_test.rs"]
+mod value_marker_test;
+
+#[cfg(test)]
 #[path = "mutability_ref_test.rs"]
 mod mutability_ref_test;
 

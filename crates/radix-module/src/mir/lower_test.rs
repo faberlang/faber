@@ -7310,7 +7310,7 @@ functio asserted(vector<f32, 3> ∪ nihil v) → f32 {
     redde v![2]
 }
 functio write(vector<f32, 3> v) → vector<f32, 3> {
-    varia copy vector<f32, 3> u ← v
+    varia vector<f32, 3> u ← copy v
     u[0] ← 4.0
     redde u
 }

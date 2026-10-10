@@ -219,6 +219,29 @@ fn explicit_bounded_lista_literal_checks_capacity() {
     );
 }
 
+// Need item 12: an untyped `[]` takes the cell's type, as `vacua`
+// does, so a bounded cell keeps its capacity instead of being offered a
+// zero-length witness.
+#[test]
+fn empty_list_literal_takes_the_bounded_cell_capacity() {
+    let unit = analyze_ok(
+        r"incipit {
+    varia lista<fractus, 4> xs ← []
+    nota xs
+}",
+    );
+    let ty = entry_local_tys(&unit)[0];
+    assert!(
+        matches!(
+            unit.types.get(ty),
+            Type::BoundedArray { capacity, .. }
+                if matches!(unit.types.get_index(*capacity), IndexExpr::Literal(4))
+        ),
+        "`[]` against lista<fractus, 4> must keep capacity 4, got {:?}",
+        unit.types.get(ty)
+    );
+}
+
 #[test]
 fn unannotated_literal_pair_length_mismatch_rejects_at_typecheck() {
     assert_rejects_with_issue(

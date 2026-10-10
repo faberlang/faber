@@ -87,6 +87,9 @@ pub mod call;
 mod call_default_test;
 
 #[cfg(test)]
+#[path = "at_read_test.rs"]
+mod at_read_test;
+#[cfg(test)]
 #[path = "cfa_join_test.rs"]
 mod cfa_join_test;
 pub mod collect;
@@ -135,6 +138,9 @@ mod shape_obligations_test;
 #[path = "slot_lift_test.rs"]
 mod slot_lift_test;
 mod tensor_edge_policy_generic;
+#[cfg(test)]
+#[path = "text_get_test.rs"]
+mod text_get_test;
 
 mod bits;
 mod closing;
@@ -331,6 +337,11 @@ pub(crate) struct TypeChecker<'a> {
     /// Path that shadows an imported namespace must recover the name here.
     pub binding_names: FxHashMap<DefId, Symbol>,
 
+    /// Immutable (`const`/`fixum`) local bindings. `const` is deep: nothing
+    /// reachable through such a name may be modified, so a
+    /// mutating receiver rooted in one is rejected.
+    pub const_locals: FxHashSet<DefId>,
+
     /// Function signatures collected before body checking so calls can be
     /// checked regardless of declaration order.
     pub functions: FxHashMap<DefId, FuncSig>,
@@ -345,6 +356,9 @@ pub(crate) struct TypeChecker<'a> {
     /// reduction body may call them; the filum pass proves the callee body
     /// writes nothing.
     pub inlinable_kernels: FxHashSet<DefId>,
+    /// Per declared function or method, which parameters are `axis`
+    /// markers: the call must echo `axis` on exactly those.
+    pub axis_params: FxHashMap<DefId, Vec<bool>>,
 
     /// Method nucleum roles keyed by (struct-or-interface def, method name).
     pub method_nucleum_roles: FxHashMap<(DefId, Symbol), NucleumRole>,
@@ -805,9 +819,11 @@ impl<'a> TypeChecker<'a> {
             scopes: Vec::new(),
             binding_shadow: FxHashMap::default(),
             binding_names: FxHashMap::default(),
+            const_locals: FxHashSet::default(),
             functions: FxHashMap::default(),
             nucleum_roles: FxHashMap::default(),
             inlinable_kernels: FxHashSet::default(),
+            axis_params: FxHashMap::default(),
             method_nucleum_roles: FxHashMap::default(),
             method_defs: FxHashMap::default(),
             instance_method_defs: FxHashSet::default(),
@@ -1049,7 +1065,7 @@ impl<'a> TypeChecker<'a> {
 
 fn param_mode_from_hir(mode: HirParamMode) -> SemanticParamMode {
     match mode {
-        HirParamMode::Owned => SemanticParamMode::Owned,
+        HirParamMode::Owned | HirParamMode::Axis => SemanticParamMode::Owned,
         HirParamMode::De => SemanticParamMode::Ref,
         HirParamMode::In => SemanticParamMode::MutRef,
         HirParamMode::Ex => SemanticParamMode::Move,
@@ -1066,6 +1082,10 @@ pub mod test_support;
 #[cfg(test)]
 #[path = "access_operand_test.rs"]
 mod access_operand_test;
+
+#[cfg(test)]
+#[path = "axis_marker_test.rs"]
+mod axis_marker_test;
 
 #[cfg(test)]
 #[path = "ascii_cursor_test.rs"]
@@ -1261,6 +1281,9 @@ mod member_privacy_test;
 #[cfg(test)]
 #[path = "null_narrowing_test.rs"]
 mod null_narrowing_test;
+#[cfg(test)]
+#[path = "optional_into_plain_test.rs"]
+mod optional_into_plain_test;
 
 #[cfg(test)]
 #[path = "numeric_value_equality_test.rs"]

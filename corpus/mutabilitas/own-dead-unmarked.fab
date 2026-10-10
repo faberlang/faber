@@ -4,7 +4,7 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 summary = "MU-3: unmarked last-use into own is a provably-dead source."
-syntax = "const own list<int> b ← unmarked_a"
+syntax = "const list<int> b ← own unmarked_a"
 related = ["own"]
 locale = "en"
 +++
@@ -14,6 +14,6 @@ locale = "en"
 
 main {
     const list<int> a ← [1, 2, 3]
-    const own list<int> b ← a
+    const list<int> b ← own a
     print b.length()
 }

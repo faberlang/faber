@@ -325,6 +325,11 @@ impl<'a> Lexer<'a> {
             '↤' => TokenKind::ConversioAssign,
             '↢' => TokenKind::AwaitAssign,
             '↑' => TokenKind::PostInc,
+            // Rounding delimiters: `⌊x⌋` floor, `⌈x⌉` ceiling, `⌊x⌉` nearest.
+            '⌊' => TokenKind::FloorOpen,
+            '⌋' => TokenKind::FloorClose,
+            '⌈' => TokenKind::CeilOpen,
+            '⌉' => TokenKind::CeilClose,
             '↓' => TokenKind::PostDec,
             '∷' => TokenKind::Verte,
 

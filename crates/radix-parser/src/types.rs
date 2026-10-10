@@ -95,6 +95,9 @@ impl Parser {
     /// spelling, exactly as `nihil` is, so the diagnostic does not depend on
     /// the reader locale.
     pub(super) fn parse_est_type_rhs(&mut self) -> Result<TypeExpr, ParseError> {
+        if let Some(error) = self.est_value_literal_error() {
+            return Err(error);
+        }
         let literal = if self.check_keyword_ident(TokenKind::Verum) {
             Some("verum")
         } else if self.check_keyword_ident(TokenKind::Falsum) {
@@ -116,6 +119,35 @@ impl Parser {
             form: TypeFormLevel::LONG,
             iuncta_label: None,
         })
+    }
+
+    /// A null, number or string literal on the right of `est` / `non est`
+    /// (D23-V1): the literal is a value, so the diagnostic names the equality
+    /// family (`≡`, `≅`, `≈`) and, for the null value, the null type.
+    fn est_value_literal_error(&self) -> Option<ParseError> {
+        let (value, span) = if self.check_keyword_ident(TokenKind::Nihil) {
+            (self.current_ident_source(), self.current_span())
+        } else {
+            let sign = matches!(self.peek().kind, TokenKind::Minus);
+            let literal = if sign { self.peek_at(1) } else { self.peek() };
+            let text = match &literal.kind {
+                TokenKind::Integer(n) => n.to_string(),
+                TokenKind::Float(f) => f.to_string(),
+                TokenKind::FloatText { text, .. } | TokenKind::BigInteger(text) => {
+                    self.interner.resolve(*text).to_owned()
+                }
+                TokenKind::String(sym) => format!("\"{}\"", self.interner.resolve(*sym)),
+                _ => return None,
+            };
+            let value = if sign { format!("-{text}") } else { text };
+            (value, self.current_span())
+        };
+        Some(
+            ParseError::structured(ParseErrorKind::TypeInvalid, span)
+                .with_arg("issue", "est_value_literal_names_equality")
+                .with_arg("value", value)
+                .with_arg("type", self.null_type_surface()),
+        )
     }
 
     /// Type body beneath the depth budget; see [`Parser::parse_type`].

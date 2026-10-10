@@ -200,6 +200,7 @@ impl Parser {
     /// `sit`, and untyped destructuring have no concrete destination and are
     /// rejected with a structured diagnostic.
     fn parse_var_decl(&mut self) -> Result<StmtKind, ParseError> {
+        let keyword = self.current_word();
         let mutability = if self.eat_keyword_ident(TokenKind::Fixum) {
             AstMutability::Immutable
         } else if self.eat_keyword_ident(TokenKind::Varia) {
@@ -212,6 +213,8 @@ impl Parser {
             return self.parse_size_decl(mutability);
         }
 
+        let marker_span = self.current_span();
+        let marker = self.current_word();
         let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
             None
         } else {
@@ -219,9 +222,25 @@ impl Parser {
         };
 
         let binding = self.parse_binding_pattern()?;
+        if ty
+            .as_ref()
+            .is_some_and(|slot| matches!(slot.mode, Some(TypeMode::Copy | TypeMode::Own)))
+        {
+            self.record_binding_marker_retired(marker_span, keyword, marker, &binding);
+        }
 
         let mut compile_time = false;
+        let mut ty = ty;
         let (init, await_form) = if self.eat(&TokenKind::Assign) {
+            // Value-side marker (`var T b ← copy a`, `var T b ← own a`): the
+            // marker names what happens to the initializer, and the binding
+            // gets the exclusive-value type mode. The binding-side spelling
+            // (`var copy T b ← a`) is retired (PARSE010).
+            if let Some(slot) = ty.as_mut().filter(|slot| slot.mode.is_none())
+                && let Some(mode) = self.parse_value_marker(None)
+            {
+                slot.mode = Some(mode);
+            }
             (Some(Box::new(self.parse_expression()?)), None)
         } else if self.check(&TokenKind::Eq) {
             compile_time = true;
@@ -256,6 +275,44 @@ impl Parser {
             init,
             compile_time,
         }))
+    }
+
+    /// Spelling of the identifier word at the cursor (empty for any other
+    /// token), as written in the source.
+    fn current_word(&self) -> String {
+        match self.peek().kind {
+            TokenKind::Ident(sym) => self.interner.resolve(sym).to_owned(),
+            _ => String::new(),
+        }
+    }
+
+    /// Record the retired binding-side marker (`var copy T b ← a`,
+    /// `var own T b ← a`): `PARSE010 binding_marker_moved_to_value`, args
+    /// `keyword` (the declaration word as written), `marker` (the marker word
+    /// as written) and `name`.
+    ///
+    /// FABER-2-SUNSET: delete with the retired-word diagnostics; the marker
+    /// goes on the value (`var T b ← copy a`). The declaration is still
+    /// parsed whole so recovery resumes after it. Parameter markers
+    /// (`fn f(copy T p)`) are not affected: only the binding position.
+    fn record_binding_marker_retired(
+        &mut self,
+        span: Span,
+        keyword: String,
+        marker: String,
+        binding: &BindingPattern,
+    ) {
+        let name = match binding {
+            BindingPattern::Ident(ident) => self.interner.resolve(ident.name).to_owned(),
+            _ => "name".to_owned(),
+        };
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::DeclarationInvalid, span)
+                .with_arg("issue", "binding_marker_moved_to_value")
+                .with_arg("keyword", keyword)
+                .with_arg("marker", marker)
+                .with_arg("name", name),
+        );
     }
 
     /// Parse the `= expr` initializer of a local compile-time constant
@@ -390,8 +447,11 @@ impl Parser {
     /// and propagate a compatible alternate `E`. They reuse the ordinary
     /// `VarDecl` shape with `is_await = true` and the specified mutability.
     fn parse_await_var_decl(&mut self, mutability: AstMutability) -> Result<StmtKind, ParseError> {
+        let keyword = self.current_word();
         self.advance();
 
+        let marker_span = self.current_span();
+        let marker = self.current_word();
         let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
             None
         } else {
@@ -399,6 +459,12 @@ impl Parser {
         };
 
         let binding = self.parse_binding_pattern()?;
+        if ty
+            .as_ref()
+            .is_some_and(|slot| matches!(slot.mode, Some(TypeMode::Copy | TypeMode::Own)))
+        {
+            self.record_binding_marker_retired(marker_span, keyword, marker, &binding);
+        }
 
         // `figendum`/`variandum` retain `←`: combining implicit conversion and
         // await ordering needs a separate language decision, so `↤` here is a
@@ -808,6 +874,7 @@ impl Parser {
             let start = self.current_span();
 
             let rest = self.eat_keyword_ident(TokenKind::Ceteri);
+            let axis = self.parse_axis_marker();
             let ty = self.parse_type()?;
 
             let name = self.parse_param_name()?;
@@ -832,7 +899,11 @@ impl Parser {
             let span = start.merge(self.previous_span());
             params.push(Param {
                 sponte,
-                mode: AstParamMode::Owned,
+                mode: if axis {
+                    AstParamMode::Axis
+                } else {
+                    AstParamMode::Owned
+                },
                 is_rest: rest,
                 ty,
                 name,

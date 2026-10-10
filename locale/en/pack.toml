@@ -101,6 +101,7 @@ ex = "from"
 in = "mut"
 own = "own"
 copy = "copy"
+axis = "axis"
 lege = "read"
 lineam = "line"
 omnia = "all"
@@ -272,6 +273,7 @@ store = "store"
 
 # lista (27)
 accipe = "get"
+apud = "at"
 addita = "added"
 appende = "append"
 # LSR-W0 argmax/argmin method twins — index or nihil on empty, never −1.
@@ -834,6 +836,10 @@ help = "write `{fixum} {size_param} <name> ← value`; the binding never reassig
 message = "the static `=` form of a `{size_param}` declaration requires a natural-number literal"
 help = "write a literal after `=`, or store a runtime value with `←`"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"
 help = "add a function name after '{functio}'"
@@ -1010,6 +1016,10 @@ help = "write `{glyph}` for `{operator}` (`≤` and `≥` for the non-strict for
 message = "the typed zero exists only for tensor, vector and matrix types; a collection type such as list is not claimed"
 help = "write a tensor, vector or matrix type followed by empty braces, or build the collection with a literal"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "the ceiling delimiters `⌈` and `⌉` close a ceiling; `⌈x⌋` is not a rounding form"
+help = "write `⌊x⌉` to round to the nearest integer, ties to the even neighbour; write `⌈x⌉` for the ceiling or `⌊x⌋` for the floor"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` is a retired operator; the negation of `≡` is spelled `{replacement}`"
 help = "write `{replacement}` for `{glyph}`; every negation glyph has the same number of lines as the glyph it negates (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -1157,6 +1167,10 @@ help = "use the type spelling declared by this reader locale{?expected|: '|'}"
 [diagnostics.PARSE040.issues.null_value_in_type_position]
 message = "'{value}' is the null value, not a type"
 help = "the null type is '{type}'; write '{type}' where a type is required"
+
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`is` tests types; '{value}' is a value"
+help = "compare values with the equality family: `≡` (strict), `≅` (promoted-exact), `≈` (fuzzy); to test for the null type, write `x is {type}`"
 
 [diagnostics.PARSE041]
 message = "invalid type annotation"
@@ -2311,6 +2325,10 @@ help = "name an {implendum} declaration after {implet}"
 message = "initializer does not match annotation"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} may be none and cannot be stored in a cell of type {expected}"
+help = "give a default with `coalesce`, narrow with `if x is not none` first, or use the failable read `at`"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"
@@ -2699,6 +2717,10 @@ help = "write the copy as its own statement; to rebind a name to a tensor, use '
 message = "invalid operand types"
 help = "use compatible operand types"
 
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "the rounding glyphs do not apply to tensor values yet"
+help = "round each element with a loop or a scalar rounding method; the per-element lift is not built"
+
 [diagnostics.SEM011.issues.generic_type_arg_bound]
 message = "type argument {rejected} does not satisfy {param} {implet} {contract}"
 help = "declare `{implet} {contract}` on the type, or call with a type that does"
@@ -2750,6 +2772,10 @@ help = "use ⊙ for elementwise multiplication of two lists; `*` takes a scalar 
 [diagnostics.SEM011.issues.lista_bits_whole_equality_only]
 message = "ordering a list of bit values is unsupported; a bits list has whole-value equality only"
 help = "compare whole lists with `≡`/`≢`, or convert the elements to numbers with `↦` first; bits are not numbers, so `≺ ≻ ≤ ≥` do not lift over them"
+
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} compares numbers; a {kind} that is not a numeric tensor cannot be compared with it"
+help = "compare the elements with a numeric operator, or use `≡`/`≢` to compare whole values"
 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "list `/` list is unsupported; use ⊘ (elementwise, like `/`) or ÷ (elementwise true division)"
@@ -3959,6 +3985,10 @@ help = "use a `var` binding to allow reassignment, or remove the extra assignmen
 message = "`{method}` changes `{binding}` in place, but `{binding}` is an immutable binding"
 help = "declare `{binding}` with `var` so it can be changed in place, or call a method that returns a new value instead"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` changes state reachable through `{binding}`, but `{binding}` is an immutable binding (`const` is deep)"
+help = "declare `{binding}` with `var` so it can be changed in place, or call a method that returns a new value instead"
+
 [diagnostics.SEM020.issues.copy_into_target_immutable]
 message = "'⇇' needs writable tensor storage on its left"
 help = "write into a mutable local or a mut parameter; a constant, a fixum binding, or a non-mut parameter cannot be written"
@@ -4202,6 +4232,14 @@ help = "use the same access marker at the call as in the signature"
 [diagnostics.SEM057.issues.call_marker_on_read_only]
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+
+[diagnostics.SEM057.issues.axis_marker_required]
+message = "this argument is an `axis` argument and must be written with the `axis` marker"
+help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+
+[diagnostics.SEM057.issues.axis_marker_unexpected]
+message = "the `axis` marker is written here but the parameter is not declared `axis`"
+help = "remove the `axis` marker, or declare the parameter `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"

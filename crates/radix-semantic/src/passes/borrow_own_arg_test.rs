@@ -190,8 +190,8 @@ fn a_closure_called_before_the_move_is_fine() {
 #[test]
 fn bind_form_own_from_unmarked_behaves_as_before() {
     let dead =
-        "    const list<int> a ← [1, 2, 3]\n    const own list<int> b ← a\n    print b.length()";
+        "    const list<int> a ← [1, 2, 3]\n    const list<int> b ← own a\n    print b.length()";
     assert!(main_body(dead).is_empty());
-    let live = "    const list<int> a ← [1, 2, 3]\n    const own list<int> b ← a\n    print a.length()\n    print b.length()";
+    let live = "    const list<int> a ← [1, 2, 3]\n    const list<int> b ← own a\n    print a.length()\n    print b.length()";
     assert_eq!(main_body(live), ["unmarked_into_own"]);
 }

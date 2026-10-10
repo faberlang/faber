@@ -4,9 +4,10 @@
 //! receiver's contents in place. On a direct path to an immutable (`fixum`)
 //! binding it is rejected like a reassignment (SEM020,
 //! `imperativus_operator_method_requires_varia_receiver`); WARN013 agrees, so
-//! a `varia` that only feeds mutating intrinsics stays necessary. Non-path
-//! receivers keep the shallow mutability-engine D-1 behavior: a `fixum`
-//! field's list contents stay mutable through calls.
+//! a `varia` that only feeds mutating intrinsics stays necessary. A field or
+//! element reached through a `fixum` local is rejected too (`const` is deep,
+//! need: SEM020 `mutating_receiver_through_const`); a `varia`
+//! object's field contents stay mutable.
 //!
 //! Fixtures use latin spellings because the radix unit-test harness compiles
 //! bare source without the en-locale lex pack.
@@ -101,10 +102,57 @@ fn fixum_list_value_returning_twin_stays_accepted() {
 
 #[test]
 fn fixum_field_list_contents_stay_mutable() {
-    // Shallow D-1: the receiver is a field place, so the binding-modifier rule
-    // does not reach it.
+    // A `varia` object's field contents stay mutable. (A `fixum` object's do
+    // not: see `const_object_field_list_append_is_rejected`.)
     test_support::assert_accepts(
         "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
          incipit {\n    varia Punctum p ← Punctum { xs = [] }\n    p.xs.appende(3)\n    nota p.xs\n}",
+    );
+}
+
+const CONST_ISSUE: &str = "mutating_receiver_through_const";
+
+fn rejects_through_const(source: &str) {
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ImmutableAssignment)
+            && test_support::issue(err) == Some(CONST_ISSUE)),
+        "expected SEM020 {CONST_ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn const_object_field_list_append_is_rejected() {
+    // `const` is deep: a field of a const object is not
+    // reachable for in-place mutation.
+    rejects_through_const(
+        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
+         incipit {\n    fixum Punctum p ← Punctum { xs = [] }\n    p.xs.appende(3)\n}",
+    );
+}
+
+#[test]
+fn const_object_nested_field_list_append_is_rejected() {
+    rejects_through_const(
+        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
+         genus Cista {\n    fixum Punctum p\n}\n\n\
+         incipit {\n    fixum Cista c ← Cista { p = Punctum { xs = [] } }\n    c.p.xs.appende(3)\n}",
+    );
+}
+
+#[test]
+fn const_list_direct_append_keeps_its_own_issue() {
+    rejects_with_mutating_receiver_issue(
+        "incipit {\n    fixum lista<numerus> xs ← [3, 1, 2]\n    xs.appende(4)\n}",
+    );
+}
+
+#[test]
+fn const_object_field_list_read_stays_accepted() {
+    test_support::assert_accepts(
+        "genus Punctum {\n    fixum lista<numerus> xs\n}\n\n\
+         incipit {\n    fixum Punctum p ← Punctum { xs = [] }\n    nota p.xs.longitudo()\n}",
     );
 }

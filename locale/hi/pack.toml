@@ -98,6 +98,7 @@ ex = "सेवन"
 in = "में"
 own = "स्वामित्व"
 copy = "प्रतिलिपि"
+axis = "अक्ष"
 lege = "पढ़ो"
 lineam = "पंक्ति"
 omnia = "सभी"
@@ -502,6 +503,10 @@ help = "schema को साधारण संबंधपरक शीर्�
 message = "schema के अंदर method घोषित नहीं किया जा सकता"
 help = "method को genus पर घोषित करें"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "'{functio}' के बाद function नाम अपेक्षित है"
 help = "'{functio}' के बाद function नाम जोड़ें"
@@ -626,6 +631,10 @@ help = "मान्य case expression उपयोग करें"
 message = "अमान्य अभिव्यक्ति"
 help = "अभिव्यक्ति syntax जांचें"
 
+[diagnostics.PARSE030.issues.ceiling_floor_delimiters]
+message = "ceiling के delimiter `⌈` और `⌉` ceiling बंद करते हैं; `⌈x⌋` rounding का रूप नहीं है"
+help = "निकटतम पूर्णांक के लिए `⌊x⌉` लिखें, बराबरी पर सम पड़ोसी चुना जाता है; ceiling के लिए `⌈x⌉` या floor के लिए `⌊x⌋` लिखें"
+
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` एक retired operator है; `≡` का निषेध `{replacement}` लिखा जाता है"
 help = "`{glyph}` की जगह `{replacement}` लिखें; हर निषेध चिह्न में उतनी ही रेखाएँ होती हैं जितनी उस चिह्न में जिसे वह उलटता है (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
@@ -725,6 +734,10 @@ help = "`{form}` की जगह `{bare}` लिखें; width marker स्�
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' is not declared on this reader surface"
 help = "इस reader locale में घोषित टाइप वर्तनी का उपयोग करें{?expected|: '|'}"
+
+[diagnostics.PARSE040.issues.est_value_literal_names_equality]
+message = "`est` प्रकार जाँचता है; '{value}' एक मान है"
+help = "मानों की तुलना समानता परिवार से करें: `≡` (सख्त), `≅` (प्रोमोशन के बाद सटीक), `≈` (अस्पष्ट); null प्रकार जाँचने के लिए `x est {type}` लिखें"
 
 [diagnostics.PARSE041]
 message = "अमान्य प्रकार annotation"
@@ -1622,6 +1635,10 @@ help = "अभिव्यक्ति का प्रकार अपेक्
 message = "इनिशियलाइज़र annotation से मेल नहीं खाता"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
+[diagnostics.SEM010.issues.optional_into_plain_cell]
+message = "{found} none हो सकता है और इसे {expected} प्रकार के सेल में संग्रहीत नहीं किया जा सकता"
+help = "`coalesce` से डिफ़ॉल्ट दें, पहले `if x is not none` से संकुचित करें, या विफल हो सकने वाले पाठ `at` का उपयोग करें"
+
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
 help = "write a float literal, or a constant the float type holds exactly"
@@ -1922,6 +1939,10 @@ help = "Phase 2A में gradient selection (`∇`) केवल parse-only �
 message = "ऑपरेंड प्रकार अमान्य हैं"
 help = "संगत ऑपरेंड प्रकारों का उपयोग करें"
 
+[diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
+message = "rounding glyph अभी tensor मानों पर लागू नहीं होते"
+help = "हर element को लूप या scalar rounding method से round करें; per-element lift अभी बना नहीं है"
+
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "मान पैरामीटर {param} सिग्नेचर के extent स्थान पर नहीं रह सकता"
 help = "`<size {param}>` जेनेरिक पैरामीटर घोषित करें और उसे figura में उपयोग करें, या जहाँ runtime लिफ्ट अभीष्ट हो वहाँ `size {param}` लिखें"
@@ -1953,6 +1974,10 @@ help = "दो सूचियों के तत्ववार गुणन �
 [diagnostics.SEM011.issues.lista_bits_whole_equality_only]
 message = "बिट मानों की सूची का क्रम समर्थित नहीं है; बिट सूची में केवल पूर्ण-मान समानता होती है"
 help = "पूरी सूचियों की तुलना `≡`/`≢` से करें, या पहले `↦` से तत्वों को संख्याओं में बदलें; बिट संख्याएँ नहीं हैं, इसलिए `≺ ≻ ≤ ≥` उन पर तत्ववार लागू नहीं होते"
+
+[diagnostics.SEM011.issues.approx_requires_numeric_operands]
+message = "{op} संख्याओं की तुलना करता है; जो {kind} संख्यात्मक टेंसर नहीं है उसकी इससे तुलना नहीं हो सकती"
+help = "तत्वों की तुलना संख्यात्मक संचालक से करें, या पूर्ण मानों की तुलना के लिए `≡`/`≢` का उपयोग करें"
 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "list `/` list समर्थित नहीं है; ⊘ (तत्ववार, `/` की तरह) या ÷ (तत्ववार वास्तविक भाग) का उपयोग करें"
@@ -2722,6 +2747,10 @@ help = "reassignment की अनुमति के लिए `varia` binding 
 message = "imperativus operator method के लिए varia receiver आवश्यक है"
 help = "reassignment की अनुमति के लिए `varia` binding का उपयोग करें, या अतिरिक्त assignment हटाएँ"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` `{binding}` के ज़रिए पहुँचने योग्य स्थिति बदलता है, पर `{binding}` अपरिवर्तनीय binding है (`const` गहरा होता है)"
+help = "`{binding}` को `var` के साथ घोषित करें ताकि उसे वहीं बदला जा सके, या ऐसी method बुलाएँ जो नया मान लौटाती है"
+
 [diagnostics.SEM021]
 message = "अमान्य assignment target"
 help = "मान्य lvalue को assign करें"
@@ -2933,6 +2962,14 @@ help = "use the same access marker at the call as in the signature"
 [diagnostics.SEM057.issues.call_marker_on_read_only]
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
+
+[diagnostics.SEM057.issues.axis_marker_required]
+message = "this argument is an `axis` argument and must be written with the `axis` marker"
+help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
+
+[diagnostics.SEM057.issues.axis_marker_unexpected]
+message = "the `axis` marker is written here but the parameter is not declared `axis`"
+help = "remove the `axis` marker, or declare the parameter `axis int`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"
@@ -3256,6 +3293,7 @@ exchange = "अदलाबदली"
 load = "लोड"
 store = "संचय"
 accipe = "पाओ"
+apud = "पर"
 addita = "जोड़ा"
 appende = "पीछे_जोड़ो"
 argmaxima = "argmax"

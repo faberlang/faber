@@ -466,3 +466,123 @@ fn lista_bits_whole_equality_only_is_localized_in_en_and_la() {
         );
     }
 }
+
+// Need A5 (`approx-aggregate-named-reject`): `≈ ≉` over a list, set,
+// map or other aggregate that is not a numeric tensor is a named check error,
+// never an `invalid MIR` failure at run time.
+#[test]
+fn approx_over_non_numeric_lists_is_a_named_check_error() {
+    for (element, glyph) in [("textus", "≈"), ("bivalens", "≉"), ("lista<numerus>", "≈")] {
+        assert_rejects_with_issue(
+            &format!(
+                r"functio near(lista<{element}> a, lista<{element}> b) → bivalens {{
+    redde a {glyph} b
+}}"
+            ),
+            "approx_requires_numeric_operands",
+        );
+    }
+}
+
+#[test]
+fn approx_over_map_and_set_is_a_named_check_error() {
+    assert_rejects_with_issue(
+        r"functio near(tabula<textus, numerus> a, tabula<textus, numerus> b) → bivalens {
+    redde a ≈ b
+}",
+        "approx_requires_numeric_operands",
+    );
+    assert_rejects_with_issue(
+        r"functio near(copia<numerus> a, copia<numerus> b) → bivalens {
+    redde a ≈ b
+}",
+        "approx_requires_numeric_operands",
+    );
+}
+
+#[test]
+fn approx_over_numeric_lists_keeps_the_deferral_name() {
+    assert_rejects_with_issue(
+        r"functio near(lista<fractus> a, lista<fractus> b) → bivalens {
+    redde a ≈ b
+}",
+        "tensor_approx_comparison_deferred",
+    );
+}
+
+#[test]
+fn approx_over_scalars_still_checks() {
+    assert_accepts(
+        r"functio near(fractus a, fractus b) → bivalens {
+    redde a ≈ b
+}",
+    );
+}
+
+#[test]
+fn approx_requires_numeric_operands_is_localized_in_every_pack() {
+    let diagnostic = Diagnostic::error("SEM011")
+        .with_code("SEM011")
+        .with_arg("issue", "approx_requires_numeric_operands")
+        .with_arg("op", "≈")
+        .with_arg("kind", "list");
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let path = crate::locale::workspace_locale_pack_path(locale);
+        let pack = LocalePack::from_toml_path(path).expect("locale pack");
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .expect("diagnostic template")
+            .expect("SEM011 row");
+        assert!(
+            rendered.message.contains('≈') && !rendered.message.contains("{op}"),
+            "{locale}: {}",
+            rendered.message
+        );
+    }
+}
+
+// Q-C of the same ruling: `et` / `aut` / `non` lift per element over
+// `lista<bivalens>` and keep the list shape.
+#[test]
+fn bool_list_logic_lifts_per_element_and_keeps_the_list_type() {
+    assert_accepts(
+        r"functio both(lista<bivalens> a, lista<bivalens> b) → lista<bivalens> {
+    redde a et b
+}
+functio either(lista<bivalens> a, lista<bivalens> b) → lista<bivalens> {
+    redde a aut b
+}
+functio flip(lista<bivalens> a) → lista<bivalens> {
+    redde non a
+}
+functio mixed(lista<bivalens> a, bivalens flag) → lista<bivalens> {
+    redde flag et a
+}",
+    );
+}
+
+#[test]
+fn bool_list_logic_refuses_non_bool_elements_by_name() {
+    assert_rejects_with_issue(
+        r"functio both(lista<numerus> a, lista<bivalens> b) → lista<bivalens> {
+    redde a et b
+}",
+        "boolean_operands_required",
+    );
+    assert_rejects_with_issue(
+        r"functio flip(lista<numerus> a) → lista<bivalens> {
+    redde non a
+}",
+        "boolean_operand_required",
+    );
+}
+
+#[test]
+fn bool_list_logic_result_is_not_a_scalar_bool() {
+    assert_rejects_with_issue(
+        r"functio both(lista<bivalens> a, lista<bivalens> b) → bivalens {
+    redde a et b
+}",
+        "return_type_mismatch",
+    );
+}

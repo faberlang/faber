@@ -866,8 +866,8 @@ fn own_transfer_site_proves_move_and_dead_liveness() {
     let (queries, hir, _types) = source_queries(
         r"
 incipit {
-    fixum own lista<numerus> source ← [1, 2, 3]
-    fixum own lista<numerus> destination ← source
+    fixum lista<numerus> source ← own [1, 2, 3]
+    fixum lista<numerus> destination ← own source
 }
 ",
     );

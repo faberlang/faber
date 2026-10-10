@@ -762,6 +762,20 @@ impl super::FaberCodegen<'_> {
                     self.write_expr(step, names, surface, writer);
                 }
             }
+            HirExpressionKind::Marked {
+                marker,
+                expr: inner,
+            } => {
+                writer.write(surface.keyword(match marker {
+                    radix_hir::HirArgMarker::Ref => TokenKind::De,
+                    radix_hir::HirArgMarker::Mut => TokenKind::In,
+                    radix_hir::HirArgMarker::Own => TokenKind::Own,
+                    radix_hir::HirArgMarker::Copy => TokenKind::Copy,
+                    radix_hir::HirArgMarker::Axis => TokenKind::Axis,
+                }));
+                writer.write(" ");
+                self.write_expr_prec(inner, 12, names, surface, writer);
+            }
             HirExpressionKind::Assign(lhs, rhs) => {
                 self.write_expr_prec(lhs, 1, names, surface, writer);
                 writer.write(" ← ");
@@ -898,6 +912,18 @@ impl super::FaberCodegen<'_> {
                 for (idx, arg) in args.iter().enumerate() {
                     if idx > 0 {
                         writer.write(", ");
+                    }
+                    // A statement-head output keyword followed by `(` reads as
+                    // a user call, so a first argument whose receiver needs
+                    // parentheses cannot print as `(recv).method()`.
+                    if idx == 0
+                        && let Some((receiver, open, close)) =
+                            self.parenthesized_rounding_receiver(arg, surface)
+                    {
+                        writer.write(open);
+                        self.write_expr(receiver, names, surface, writer);
+                        writer.write(close);
+                        continue;
                     }
                     self.write_expr(arg, names, surface, writer);
                 }
@@ -1767,6 +1793,7 @@ impl super::FaberCodegen<'_> {
                     radix_hir::HirArgMarker::Mut => TokenKind::In,
                     radix_hir::HirArgMarker::Own => TokenKind::Own,
                     radix_hir::HirArgMarker::Copy => TokenKind::Copy,
+                    radix_hir::HirArgMarker::Axis => TokenKind::Axis,
                 }));
                 writer.write(" ");
             }
@@ -2008,6 +2035,42 @@ impl super::FaberCodegen<'_> {
             _ => return None,
         };
         Some((inline_place_temps(place, &temps), name, argument))
+    }
+
+    /// A rounding method call (`floor`, `ceil`, `round` twins) whose receiver
+    /// binds looser than the postfix chain, with its glyph delimiters. The
+    /// method form would print `(receiver).round()`, which cannot follow a
+    /// statement-head output keyword; the glyph form `⌊receiver⌉` is the same
+    /// operation and starts with its own delimiter.
+    fn parenthesized_rounding_receiver<'e>(
+        &self,
+        expr: &'e HirExpression,
+        surface: &impl KeywordSurface,
+    ) -> Option<(&'e HirExpression, &'static str, &'static str)> {
+        let HirExpressionKind::MethodCall(receiver, name, type_args, args, _) = &expr.kind else {
+            return None;
+        };
+        if !type_args.is_empty() || !args.is_empty() || self.glyph_transpose_ids.contains(&expr.id)
+        {
+            return None;
+        }
+        if self.expr_precedence(receiver) > 13 {
+            return None;
+        }
+        let spelling = self.symbol_to_string(*name);
+        let delimiters = [
+            ("pavimentum", "⌊", "⌋"),
+            ("tectum", "⌈", "⌉"),
+            ("rotunda", "⌊", "⌉"),
+        ];
+        delimiters.into_iter().find_map(|(canonical, open, close)| {
+            let localized = surface.intrinsic_surface(canonical);
+            (spelling == canonical || localized.as_deref() == Some(spelling.as_str())).then_some((
+                &**receiver,
+                open,
+                close,
+            ))
+        })
     }
 
     /// `receiver.method(argument)` for an authored numeric twin call, in the

@@ -1240,7 +1240,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     if start > end || end > items.len() {
                         return Err(RunnerError::internal_with_issue(
                             span,
-                            "list window out of bounds",
+                            format!("list range {start}‥{end} outside 0‥{}", items.len()),
                             "runner_list_window_out_of_bounds",
                         ));
                     }
@@ -1606,6 +1606,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.array_lift(args, span, MirLiftOp::TrueDiv, return_ty)
             }
             MirCollectionOp::ArrayNeg => self.array_lift(args, span, MirLiftOp::Neg, return_ty),
+            MirCollectionOp::ArrayAnd => self.array_lift(args, span, MirLiftOp::And, return_ty),
+            MirCollectionOp::ArrayOr => self.array_lift(args, span, MirLiftOp::Or, return_ty),
+            MirCollectionOp::ArrayNot => self.array_lift(args, span, MirLiftOp::Not, return_ty),
             MirCollectionOp::ArrayLt => self.array_lift(args, span, MirLiftOp::Lt, return_ty),
             MirCollectionOp::ArrayGt => self.array_lift(args, span, MirLiftOp::Gt, return_ty),
             MirCollectionOp::ArrayLtEq => self.array_lift(args, span, MirLiftOp::LtEq, return_ty),
@@ -1689,7 +1692,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 args,
                 span,
                 return_ty,
-                f64::round,
+                f64::round_ties_even,
                 std::convert::identity,
                 None,
             ),
@@ -3459,10 +3462,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             total_loss += row_loss;
         }
-        // Normalize by N = last_dim (class count), not by batch size.
-        // For rank-1 shape [C]: N = C, batch = 1.
-        // For rank-2 shape [B, C]: N = C, batch = B.
-        Ok(Value::Float(total_loss / last_dim as f64))
+        // Mean over the batch rows (ruling XENTDIV, 2026-10-08), not over classes.
+        // For rank-1 shape [C]: batch = 1.
+        // For rank-2 shape [B, C]: batch = B.
+        Ok(Value::Float(total_loss / batch as f64))
     }
 
     /// Matrix multiply / GEMV over runner `Value` tensors.
@@ -4357,17 +4360,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             Value::Str(text) => {
                 // A range index is a char-window read (`textus[lo‥hi]` stays a
-                // textus substring). Mirrors the octeti window above, but walks
-                // chars and truncates past the end like Rust codegen's
-                // `chars().skip(lo).take(hi - lo)` — no out-of-bounds trap.
+                // textus substring). Like a list window, it must lie fully
+                // inside the text or the program dies; an empty range at the
+                // end is allowed.
                 if let Some((start, end)) =
                     window_bounds(index, span, "textus index out of bounds")?
                 {
-                    let window: String = text
-                        .chars()
-                        .skip(start)
-                        .take(end.saturating_sub(start))
-                        .collect();
+                    let len = text.chars().count();
+                    if start > end || end > len {
+                        return Err(RunnerError::internal_with_issue(
+                            span,
+                            format!("text range {start}‥{end} outside 0‥{len}"),
+                            "runner_text_range_out_of_bounds",
+                        ));
+                    }
+                    let window: String = text.chars().skip(start).take(end - start).collect();
                     return Ok(Value::Str(window));
                 }
                 let idx = index.as_index(span)?;
@@ -6547,6 +6554,9 @@ fn lista_label(op: MirLiftOp) -> &'static str {
         MirLiftOp::GtEq => "lista gt-eq",
         MirLiftOp::Eq => "lista value-eq",
         MirLiftOp::NotEq => "lista value-not-eq",
+        MirLiftOp::And => "lista and",
+        MirLiftOp::Or => "lista or",
+        MirLiftOp::Not => "lista not",
         _ => "lista neg",
     }
 }

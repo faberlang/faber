@@ -52,6 +52,7 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Index(object, index) => self.visit_index_expr(object, index, expr),
             HirExpressionKind::OptionalChain(object, chain) => self.visit_optional_chain_expr(object, chain, expr),
             HirExpressionKind::NonNull(object, chain) => self.visit_non_null_expr(object, chain, expr),
+            HirExpressionKind::Marked { expr: inner, .. } => self.visit_marked_expr(inner, expr),
             HirExpressionKind::Vacua => self.visit_vacua_expr(expr),
             HirExpressionKind::Array(elements) => self.visit_array_expr(elements, expr),
             HirExpressionKind::Struct(def_id, fields) => self.visit_struct_expr(*def_id, fields, expr),
@@ -211,6 +212,7 @@ pub(super) trait HirExpressionLoweringVisitor {
         chain: &HirNonNullKind,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
+    fn visit_marked_expr(&mut self, inner: &HirExpression, expr: &HirExpression) -> Option<MirOperand>;
     fn visit_vacua_expr(&mut self, expr: &HirExpression) -> Option<MirOperand>;
     fn visit_array_expr(&mut self, elements: &[HirArrayElement], expr: &HirExpression) -> Option<MirOperand>;
     fn visit_struct_expr(
@@ -536,6 +538,14 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_non_null(object, chain, expr)
+    }
+
+    fn visit_marked_expr(&mut self, inner: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+        // Value-side `copy` (`b ← copy c`): deep-duplicate the operand, the
+        // same `Duplicate` a `copy` binding or `copy` argument stores.
+        let source = self.lower_expr_value(inner)?;
+        let ty = self.expr_ty(expr)?;
+        Some(self.runtime_call_value(MirIntrinsic::Duplicate, vec![source], ty, expr.span))
     }
 
     fn visit_vacua_expr(&mut self, expr: &HirExpression) -> Option<MirOperand> {

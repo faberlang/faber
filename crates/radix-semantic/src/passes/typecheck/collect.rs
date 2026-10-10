@@ -67,6 +67,18 @@ impl TypeChecker<'_> {
             .collect()
     }
 
+    /// Remember which parameters of `func` are declared `axis` (a marker, not
+    /// a type: the parameter's type stays an ordinary int).
+    fn record_axis_params(&mut self, def_id: radix_hir::DefId, func: &HirFunction) {
+        self.axis_params.insert(
+            def_id,
+            func.params
+                .iter()
+                .map(|param| param.mode == radix_hir::HirParamMode::Axis)
+                .collect(),
+        );
+    }
+
     /// Build the callable contract for a lowered function item or method.
     ///
     /// Missing return annotations are treated as `vacuum` at the signature
@@ -122,6 +134,7 @@ impl TypeChecker<'_> {
         let mut method_visibility = FxHashMap::default();
         for method in &struct_item.methods {
             let sig = self.function_signature(&method.func);
+            self.record_axis_params(method.def_id, &method.func);
             methods.insert(method.func.name, sig);
             self.method_defs
                 .insert((def_id, method.func.name), method.def_id);
@@ -398,6 +411,7 @@ impl TypeChecker<'_> {
             match &item.kind {
                 HirItemKind::Function(func) => {
                     let sig = self.function_signature(func);
+                    self.record_axis_params(item.def_id, func);
                     self.functions.insert(item.def_id, sig);
                     self.record_function_availability(item.def_id, &item.annotations);
                     if let Some(role) = func.nucleum_role() {

@@ -47,6 +47,7 @@ pub(super) const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str =
 const ISSUE_TENSOR_MEDIA_DECIMAL: &str = "tensor_media_decimal_rejected";
 const ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER: &str =
     "imperativus_operator_method_requires_varia_receiver";
+const ISSUE_MUTATING_RECEIVER_THROUGH_CONST: &str = "mutating_receiver_through_const";
 const ISSUE_INTRINSIC_METHOD_TYPE_ARGS: &str = "intrinsic_method_type_args";
 const ISSUE_TENSOR_FORMATA_ELEMENT_TYPE_MISMATCH: &str = "tensor_formata_element_type_mismatch";
 const ISSUE_TENSOR_TYPE_ARG_INCOMPLETE: &str = "tensor_type_arg_incomplete";
@@ -462,6 +463,28 @@ pub(super) fn check_intrinsic_method_call(
         return Some(checker.error_type);
     }
 
+    // `const` is deep: a mutating intrinsic on a field or
+    // element reached through a const local rewrites state reachable from that
+    // name, exactly what a `ref` view refuses.
+    if is_mutating_receiver(entry)
+        && !checker.expr_is_ref_view(place)
+        && let Some(root) = const_local_projection_root(checker, place)
+    {
+        let binding = checker
+            .binding_names
+            .get(&root)
+            .and_then(|symbol| checker.interner.map(|interner| interner.resolve(*symbol)))
+            .unwrap_or("value")
+            .to_owned();
+        checker.error_issue_with_args(
+            SemanticErrorKind::ImmutableAssignment,
+            ISSUE_MUTATING_RECEIVER_THROUGH_CONST,
+            span,
+            &[("binding", binding), ("method", method_name.clone())],
+        );
+        return Some(checker.error_type);
+    }
+
     if is_numeric_bitwise_operator(effective_name) && checker.is_fractus(receiver_ty) {
         checker.invalid_operand_types(ISSUE_BITWISE_METHOD_REQUIRES_NUMERUS_RECEIVER, span);
         return Some(checker.error_type);
@@ -648,6 +671,23 @@ pub(super) fn check_intrinsic_method_call(
                         }
                     }
                 }
+                checked
+            } else if entry.failable {
+                // need: the `at` read (la `apud`) on `lista`, `tabula`
+                // and `textus` is a failable call: an out-of-range index or a
+                // missing key is reported on `⇥ textus`, so the call needs a
+                // handler, a `⊥` default or an enclosing `⇥` (D17.8).
+                let checked = checker.check_known_method_args(args, params, ret, span);
+                let err = checker.textus_type();
+                let sig = FuncSig {
+                    type_params: Vec::new(),
+                    params: Vec::new(),
+                    ret: checked,
+                    err: Some(err),
+                    is_async: false,
+                    is_generator: false,
+                };
+                checker.reject_failable_call(&sig, span);
                 checked
             } else if bounded_appende {
                 // D6: bounded `appende` is a typed recoverable alternate exit.
@@ -989,6 +1029,7 @@ fn resolve_return_type(
             let numerus = checker.numerus_type();
             checker.types.option(numerus)
         }
+        IntrinsicReturnKind::Value => ctx.value.unwrap_or(checker.error_type),
         IntrinsicReturnKind::OptionValue => {
             let Some(value) = ctx.value else {
                 return checker.error_type;
@@ -1771,5 +1812,30 @@ fn check_integer_index_vector_arg(
     };
     if !crate::numeric_width::is_integer_index_vector(checker.types, arg_ty) {
         checker.invalid_operand_types(ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS, span);
+    }
+}
+
+/// The const local at the root of a field/index/deref projection chain, when
+/// `place` is such a projection (a bare path is the binding-level rule).
+fn const_local_projection_root(
+    checker: &TypeChecker<'_>,
+    place: &HirExpression,
+) -> Option<radix_hir::DefId> {
+    let mut current = match &place.kind {
+        HirExpressionKind::Field(object, _)
+        | HirExpressionKind::Index(object, _)
+        | HirExpressionKind::Deref(object) => object.as_ref(),
+        _ => return None,
+    };
+    loop {
+        match &current.kind {
+            HirExpressionKind::Field(object, _)
+            | HirExpressionKind::Index(object, _)
+            | HirExpressionKind::Deref(object) => current = object.as_ref(),
+            HirExpressionKind::Path(def_id) => {
+                return checker.const_locals.contains(def_id).then_some(*def_id);
+            }
+            _ => return None,
+        }
     }
 }

@@ -383,19 +383,69 @@ functio combine(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2
 // ===========================================================================
 
 #[test]
-fn rejects_glyph_vector_matrix_dot_with_explicit_diagnostic() {
-    let unit = analyze(
+fn lowers_glyph_vector_matrix_dot_to_lane_cell_mul_add() {
+    // Row-vector convention: out[j] = sum_k v[k] * m[k, j]; [3] · [3, 2] gives
+    // a width-2 vector, one 3-term sum per matrix column.
+    let dump = dump_source(
         r"
-functio vecmat(vector<f32, 2> v, matrix<f32, [2, 2]> m) → vector<f32, 2> {
+functio vecmat(vector<f32, 3> v, matrix<f32, [3, 2]> m) → vector<f32, 2> {
     redde v · m
 }
 ",
     );
-    let errors = lower_analyzed_unit(&unit, MirLoweringOptions::default())
-        .expect_err("vector·matrix must fail closed on the MIR lane");
-    assert_eq!(errors.len(), 1, "{errors:?}");
+
+    for column in 0..2 {
+        for row in 0..3 {
+            let term = format!("_0.lane{row} * _1.cell{row}_{column}");
+            assert!(dump.contains(&term), "missing `{term}`: {dump}");
+        }
+    }
+    assert!(dump.contains("construct vector"), "{dump}");
+    assert!(!dump.contains("is not supported on the MIR target"), "{dump}");
+    assert!(!dump.contains("glyph product binary operator"), "{dump}");
+}
+
+#[test]
+fn rejects_glyph_vector_matrix_dot_inner_dimension_mismatch_at_typecheck() {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let Err(errors) = crate::driver::analyze_source(
+        &session,
+        "test.fab",
+        r"
+functio vecmat(vector<f32, 4> v, matrix<f32, [3, 2]> m) → vector<f32, 2> {
+    redde v · m
+}
+",
+        AnalyzeRequest::default(),
+    ) else {
+        panic!("a [4] · [3, 2] product must be rejected");
+    };
+    assert!(
+        format!("{errors:?}").contains("glyph_inner_dim_mismatch"),
+        "expected a named inner-dimension diagnostic: {errors:?}"
+    );
+}
+
+#[test]
+fn rejects_glyph_vector_matrix_dot_width_mismatch_at_lowering() {
+    let mut types = TypeTable::new();
+    let elem = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let width = types.intern_index(IndexExpr::Literal(3));
+    let vector_ty = types.intern(Type::Vector(elem, width));
+    let matrix_ty = glyph_f32_matrix_ty(&mut types);
+    let lhs = glyph_operand(0, vector_ty);
+    let rhs = glyph_operand(1, matrix_ty);
+    let binop = glyph_binop(HirBinOp::Dot, &lhs, &rhs, vector_ty);
+    let mut builder = glyph_builder(&types, vector_ty, matrix_ty);
+
+    assert!(
+        builder
+            .lower_binary(HirBinOp::Dot, &lhs, &rhs, &binop)
+            .is_none()
+    );
+    assert_eq!(builder.errors.len(), 1, "{:?}", builder.errors);
     assert_eq!(
-        errors[0].issue,
-        "unsupported_mir_lowering_vector_matrix_dot_product_is_not_supported_on_the_mir_target"
+        builder.errors[0].issue,
+        "unsupported_mir_lowering_vector_matrix_vector_width_must_match_matrix_rows"
     );
 }

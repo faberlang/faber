@@ -54,7 +54,7 @@ class V3 {
 }
 main {
     var V3 a ← V3 { x = 1.0 }
-    var copy V3 b ← a
+    var V3 b ← copy a
     b.x ← 5.0
     b.ys.append(1)
     print a.x
@@ -110,7 +110,7 @@ class Point {
 main {
     const Point a ← Point { x = 1 }
     const Point c ← Point { x = 2 }
-    var copy Point b ← a
+    var Point b ← copy a
     b ← c
     b.x ← 5
     print a.x
@@ -186,7 +186,7 @@ locale = "en"
 +++
 main {
     var tf32[4] a ← tf32[4] {}.fill(1.5)
-    var copy tf32[4] w ← a
+    var tf32[4] w ← copy a
     w[0] ← 9.0
     const tf32[4] s ← w + a
     print s[0]
@@ -209,7 +209,7 @@ locale = "en"
 +++
 main {
     var tf32[2, 3] a ← tf32[2, 3] {}.fill(1.5)
-    var copy tf32[2, 3] w ← a
+    var tf32[2, 3] w ← copy a
     a[[1, 2]] ← 7.0
     w[[0, 1]] ← 4.0
     const u32 r ← 1
