@@ -1,9 +1,10 @@
 //! Runner proofs for copy-with-changes (DECISIONS D15.1–D15.3).
 //!
 //! `Genus { field = value } from source` overrides the braced fields and
-//! copies every other field from the source. The copy is shallow: a list field
-//! is shared with the source (D15.3). Overrides evaluate before the source, in
-//! source order, and the source evaluates once.
+//! copies every other field from the source as a VALUE (need, rule 5):
+//! a list or nested object field is duplicated, never shared with the source.
+//! Overrides evaluate before the source, in source order, and the source
+//! evaluates once.
 
 use crate::script::{BufferHost, interpret_source};
 
@@ -15,11 +16,18 @@ class Punctum {
 }
 ";
 
+const MUTABILE: &str = "
+class Mutabile {
+    var int n
+    var list<int> gradus
+}
+";
+
 fn run(body: &str) -> Vec<String> {
     let mut host = BufferHost::default();
     interpret_source(
         "construction_source.fab",
-        &format!("{PUNCTUM}{body}"),
+        &format!("{PUNCTUM}{MUTABILE}{body}"),
         &mut host,
     )
     .expect("copy-with-changes fixture runs");
@@ -42,16 +50,59 @@ main {
 }
 
 #[test]
-fn list_fields_are_shared_with_the_source() {
+fn list_fields_are_copied_from_the_source() {
+    let lines = run("
+main {
+    var Mutabile p ← Mutabile { n = 1, gradus = [4] }
+    var Mutabile q ← Mutabile { n = 9 } from p
+    q.gradus.append(5)
+    print p.gradus.length()
+    print q.gradus.length()
+}
+");
+    assert_eq!(lines, ["1", "2"]);
+}
+
+#[test]
+fn nested_object_fields_are_copied_from_the_source() {
+    let lines = run("
+class Intus {
+    var int n
+}
+
+class Cista {
+    var int k
+    var Intus intus
+    var list<int> gradus
+}
+
+main {
+    var Cista a ← Cista { k = 1, intus = Intus { n = 5 }, gradus = [1] }
+    var Cista b ← Cista { k = 9 } from a
+    b.intus.n ← 6
+    b.gradus.append(2)
+    print a.intus.n
+    print b.intus.n
+    print a.gradus.length()
+    print b.gradus.length()
+    print b.k
+}
+");
+    assert_eq!(lines, ["5", "6", "1", "2", "9"]);
+}
+
+#[test]
+fn an_explicit_field_is_not_replaced_by_the_source_copy() {
     let lines = run("
 main {
     const Punctum p ← Punctum { x = 1, y = 2, gradus = [4] }
-    const Punctum q ← Punctum { y = 9 } from p
-    q.gradus.append(5)
+    const Punctum q ← Punctum { gradus = [7, 8, 9] } from p
+    print q.gradus.length()
+    print q.gradus[0]
     print p.gradus.length()
 }
 ");
-    assert_eq!(lines, ["2"]);
+    assert_eq!(lines, ["3", "7", "1"]);
 }
 
 #[test]
