@@ -503,6 +503,10 @@ help = "schema को साधारण संबंधपरक शीर्�
 message = "schema के अंदर method घोषित नहीं किया जा सकता"
 help = "method को genus पर घोषित करें"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "'{functio}' के बाद function नाम अपेक्षित है"
 help = "'{functio}' के बाद function नाम जोड़ें"

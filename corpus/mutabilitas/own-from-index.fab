@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 summary = "MU-3 red: index projection into own rejects with copy suggestion."
-syntax = "const own list<int> b ← xs[0]"
+syntax = "const list<int> b ← own xs[0]"
 related = ["own", "copy"]
 locale = "en"
 no_expected = "rejects"
@@ -17,5 +17,5 @@ diagnostic = "SEM057:index_into_own"
 
 main {
     const list<list<int>> xs ← [[1], [2]]
-    const own list<int> b ← xs[0]
+    const list<int> b ← own xs[0]
 }

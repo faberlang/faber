@@ -503,6 +503,10 @@ help = "保持 schema 为纯关系表头"
 message = "schema 不能声明 method"
 help = "请在 genus 上声明 method"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "在 {functio} 后需要函数名"
 help = "在 {functio} 后添加函数名"

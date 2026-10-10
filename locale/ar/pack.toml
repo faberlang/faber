@@ -503,6 +503,10 @@ help = "أبقِ schema كترويسة علائقية بسيطة"
 message = "لا يمكن لـ schema أن يعلن method"
 help = "أعلن الـ method على genus بدلا من ذلك"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "مطلوب اسم دالة بعد {functio}"
 help = "أضف اسم الدالة بعد {functio}"

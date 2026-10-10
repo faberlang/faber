@@ -79,7 +79,7 @@ fn bytes_list(bytes src) → list<u8> {
 }
 
 fn extend(list<u8> dest, bytes src) → list<u8> {
-    var copy list<u8> out ← dest
+    var list<u8> out ← copy dest
     var int i ← 0
     while i ≺ src.length() {
         out.append(src.get(i) coalesce (0 ∷ u8))

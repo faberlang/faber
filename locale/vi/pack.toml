@@ -503,6 +503,10 @@ help = "giữ schema là tiêu đề quan hệ đơn thuần"
 message = "schema không thể khai báo method"
 help = "khai báo method trên genus thay thế"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "cần tên hàm sau '{functio}'"
 help = "thêm tên hàm sau '{functio}'"

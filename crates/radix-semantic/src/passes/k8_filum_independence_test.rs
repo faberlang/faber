@@ -179,7 +179,7 @@ fn explicit_copied_storage_accepted() {
     accepted(
         r"incipit {
     varia tensor<numerus, [4]> grid ← vacua
-    varia copy tensor<numerus, [4]> independent ← grid
+    varia tensor<numerus, [4]> independent ← copy grid
     itera ex grid apud [i] filum lane fixum value {
         grid[i] ← independent[0]
     }

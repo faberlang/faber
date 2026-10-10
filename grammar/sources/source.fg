@@ -990,6 +990,9 @@ insere_expr    := 'insere' STRING
 # `generis T X = e` declaration (en `static`) parses whole for recovery and is
 # reported as `PARSE010 static_decl_retired`, at the top level and in blocks
 # alike; `generis` survives only as the `genus` field modifier below.
+# The `copy`/`own` marker sits on the value (`value_marker`), never on the
+# declared type: the binding-side spelling `varia copy T b ← a` is retired and
+# reported as `PARSE010 binding_marker_moved_to_value` (FABER-2-SUNSET).
 fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' value_marker? expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 sit_decl      := 'sit' IDENTIFIER (('←' | '↢') expression)?

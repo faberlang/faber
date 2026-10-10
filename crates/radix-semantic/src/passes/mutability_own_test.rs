@@ -35,7 +35,7 @@ fn own_fresh_literal_is_legal() {
     let _ = analyze_ok(
         r"
 incipit {
-    fixum own lista<numerus> xs ← [1, 2, 3]
+    fixum lista<numerus> xs ← own [1, 2, 3]
     nota xs.longitudo()
 }
 ",
@@ -47,8 +47,8 @@ fn own_transfer_without_later_use_is_legal() {
     let _ = analyze_ok(
         r"
 incipit {
-    fixum own lista<numerus> a ← [1, 2, 3]
-    fixum own lista<numerus> b ← a
+    fixum lista<numerus> a ← own [1, 2, 3]
+    fixum lista<numerus> b ← own a
     nota b.longitudo()
 }
 ",
@@ -60,8 +60,8 @@ fn own_transfer_then_use_is_sem050() {
     assert_rejects_with_issue(
         r"
 incipit {
-    fixum own lista<numerus> a ← [1, 2, 3]
-    fixum own lista<numerus> b ← a
+    fixum lista<numerus> a ← own [1, 2, 3]
+    fixum lista<numerus> b ← own a
     nota a.longitudo()
     nota b.longitudo()
 }
@@ -78,7 +78,7 @@ functio take(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()
 }
 incipit {
-    fixum own lista<numerus> a ← [1, 2, 3]
+    fixum lista<numerus> a ← own [1, 2, 3]
     take(a)
     nota a.longitudo()
 }
@@ -93,7 +93,7 @@ fn unmarked_dead_into_own_is_legal() {
         r"
 incipit {
     fixum lista<numerus> a ← [1, 2, 3]
-    fixum own lista<numerus> b ← a
+    fixum lista<numerus> b ← own a
     nota b.longitudo()
 }
 ",
@@ -106,7 +106,7 @@ fn unmarked_live_into_own_rejects_with_copy_suggestion() {
         r"
 incipit {
     fixum lista<numerus> a ← [1, 2, 3]
-    fixum own lista<numerus> b ← a
+    fixum lista<numerus> b ← own a
     nota a.longitudo()
     nota b.longitudo()
 }
@@ -121,7 +121,7 @@ fn ref_into_own_rejects_with_copy_suggestion() {
         r"
 incipit {
     fixum de lista<numerus> a ← [1, 2, 3]
-    fixum own lista<numerus> b ← a
+    fixum lista<numerus> b ← own a
 }
 ",
         ISSUE_REF_INTO_OWN,
@@ -134,7 +134,7 @@ fn mut_into_own_rejects_with_copy_suggestion() {
         r"
 incipit {
     varia in lista<numerus> a ← [1, 2, 3]
-    fixum own lista<numerus> b ← a
+    fixum lista<numerus> b ← own a
 }
 ",
         ISSUE_MUT_INTO_OWN,
@@ -167,7 +167,7 @@ genus Persona {
 }
 incipit {
     fixum Persona p ← Persona { amici = [1, 2] }
-    fixum own lista<numerus> b ← p.amici
+    fixum lista<numerus> b ← own p.amici
 }
 ",
         ISSUE_FIELD_INTO_OWN,
@@ -180,7 +180,7 @@ fn index_into_own_rejects_with_copy_suggestion() {
         r"
 incipit {
     fixum lista<lista<numerus>> xs ← [[1], [2]]
-    fixum own lista<numerus> b ← xs[0]
+    fixum lista<numerus> b ← own xs[0]
 }
 ",
         ISSUE_INDEX_INTO_OWN,
@@ -194,7 +194,7 @@ fn shared_branch_into_own_rejects_with_copy_suggestion() {
 incipit {
     fixum lista<numerus> a ← [1]
     fixum lista<numerus> b ← [2]
-    fixum own lista<numerus> c ← verum ✓ a ✗ b
+    fixum lista<numerus> c ← own verum ✓ a ✗ b
 }
 ",
         ISSUE_SHARED_INTO_OWN,
@@ -206,8 +206,8 @@ fn copy_source_transfers_like_own() {
     let _ = analyze_ok(
         r"
 incipit {
-    fixum copy lista<numerus> a ← [1, 2, 3]
-    fixum own lista<numerus> b ← a
+    fixum lista<numerus> a ← copy [1, 2, 3]
+    fixum lista<numerus> b ← own a
     nota b.longitudo()
 }
 ",
@@ -219,8 +219,8 @@ fn copy_source_then_use_is_sem050() {
     assert_rejects_with_issue(
         r"
 incipit {
-    fixum copy lista<numerus> a ← [1, 2, 3]
-    fixum own lista<numerus> b ← a
+    fixum lista<numerus> a ← copy [1, 2, 3]
+    fixum lista<numerus> b ← own a
     nota a.longitudo()
 }
 ",

@@ -503,6 +503,10 @@ help = "ให้ schema เป็นส่วนหัวเชิงสัม�
 message = "schema ไม่สามารถประกาศ method ได้"
 help = "ประกาศ method บน genus แทน"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "ต้องมีชื่อฟังก์ชันหลัง '{functio}'"
 help = "เพิ่มชื่อฟังก์ชันหลัง '{functio}'"

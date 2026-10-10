@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
 category = "type"
 summary = "MU-3 red: field projection into own rejects with copy suggestion."
-syntax = "const own list<int> b ← p.friends"
+syntax = "const list<int> b ← own p.friends"
 related = ["own", "copy"]
 locale = "en"
 no_expected = "rejects"
@@ -21,5 +21,5 @@ class Person {
 
 main {
     const Person p ← Person { friends = [1, 2] }
-    const own list<int> b ← p.friends
+    const list<int> b ← own p.friends
 }

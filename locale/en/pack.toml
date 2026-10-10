@@ -836,6 +836,10 @@ help = "write `{fixum} {size_param} <name> ← value`; the binding never reassig
 message = "the static `=` form of a `{size_param}` declaration requires a natural-number literal"
 help = "write a literal after `=`, or store a runtime value with `←`"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"
 help = "add a function name after '{functio}'"

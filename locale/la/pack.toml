@@ -613,6 +613,10 @@ help = "scribe `{fixum} {size_param} <nomen> ← valorem`; vinculum numquam denu
 message = "forma statica `=` declarationis magnitudinis numerum litteralem naturalem postulat"
 help = "scribe litteralem post `=`, vel valorem temporis currentis cum `←` depone"
 
+[diagnostics.PARSE010.issues.binding_marker_moved_to_value]
+message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
+help = "write `{keyword} T {name} ← {marker} value`; a later `{name} ← {marker} value` marks the value the same way, and a parameter keeps `{marker}` before its type"
+
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"
 help = "add a function name after '{functio}'"

@@ -209,7 +209,7 @@ fn aliased_read_arguments_stay_legal() {
 #[test]
 fn copy_bind_does_not_alias() {
     for c in ALL {
-        let dup = format!("    var copy {} dup ← g\n", c.ty);
+        let dup = format!("    var {} dup ← copy g\n", c.ty);
         assert_accepts(c, &(dup.clone() + "    mut_read(mut g, dup)"));
         assert_accepts(c, &(dup.clone() + "    mut_read(mut dup, g)"));
         assert_accepts(c, &(dup + "    mut_mut(mut g, mut dup)"));
@@ -220,7 +220,7 @@ fn copy_bind_does_not_alias() {
 fn own_bind_does_not_alias() {
     for c in ALL {
         let body = format!(
-            "    const own {} taken ← g\n    mut_mut(mut g, mut taken)",
+            "    const {} taken ← own g\n    mut_mut(mut g, mut taken)",
             c.ty
         );
         let found = errors_of(&program(c, &body));

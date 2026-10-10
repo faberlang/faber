@@ -24,7 +24,7 @@ fn en(body: &str) -> String {
 #[test]
 fn copy_list_returns_as_bytes() {
     let source = en("fn mk(list<u8> table) → bytes {
-    var copy list<u8> b ← table
+    var list<u8> b ← copy table
     b.append(9)
     return b ↦ bytes
 }
@@ -40,7 +40,7 @@ main {
 fn copy_list_converts_to_bytes_with_arrow_down() {
     let source = en("main {
     const list<u8> t ← [1, 2, 3]
-    var copy list<u8> b ← t
+    var list<u8> b ← copy t
     const bytes o ↤ b
     print o.length()
 }
@@ -52,7 +52,7 @@ fn copy_list_converts_to_bytes_with_arrow_down() {
 fn copy_list_converts_to_wider_list() {
     let source = en("main {
     const list<i32> t ← [1, 2, 3]
-    var copy list<i32> b ← t
+    var list<i32> b ← copy t
     const list<i64> o ← b ↦ list<i64>
     print o
 }

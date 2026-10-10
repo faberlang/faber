@@ -22,7 +22,7 @@ fn bump(mut list<int> xs) → void {
 }
 
 fn eat(own list<int> xs) → void {
-    const own list<int> mine ← xs
+    const list<int> mine ← own xs
     print mine.length()
 }
 

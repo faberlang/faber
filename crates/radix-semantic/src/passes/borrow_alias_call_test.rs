@@ -191,14 +191,14 @@ fn aliased_ref_arguments_stay_legal() {
 
 #[test]
 fn copy_bind_does_not_alias() {
-    assert_accepts("    var copy tf32[2, 2] dup ← g\n    mut_read(mut g, dup)");
-    assert_accepts("    var copy tf32[2, 2] dup ← g\n    mut_read(mut dup, g)");
-    assert_accepts("    var copy tf32[2, 2] dup ← g\n    mut_mut(mut g, mut dup)");
+    assert_accepts("    var tf32[2, 2] dup ← copy g\n    mut_read(mut g, dup)");
+    assert_accepts("    var tf32[2, 2] dup ← copy g\n    mut_read(mut dup, g)");
+    assert_accepts("    var tf32[2, 2] dup ← copy g\n    mut_mut(mut g, mut dup)");
 }
 
 #[test]
 fn own_bind_does_not_alias() {
-    let found = errors("    const own tf32[2, 2] taken ← g\n    mut_mut(mut g, mut taken)");
+    let found = errors("    const tf32[2, 2] taken ← own g\n    mut_mut(mut g, mut taken)");
     assert!(
         !found.iter().any(|(_, issue)| matches!(
             issue.as_str(),
