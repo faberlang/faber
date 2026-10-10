@@ -2452,6 +2452,10 @@ help = "convert a bN only to an integer, float or bits type of the same width, s
 message = "a same-width bits conversion takes no via clause"
 help = "remove the via clause; a same-width bN conversion keeps the bit pattern and takes no hint"
 
+[diagnostics.SEM016.issues.bits_via_clause_required]
+message = "a bits list conversion that changes the bit width needs a via Le or via Be clause"
+help = "write the byte order with the conversion, such as lista<b8> ↦ lista<u16> via Le; a same-width conversion takes no clause"
+
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
 message = "從 octeti 轉換為 numerus 未指定（位元組寬度與位元組序）；請改用 `chorda` 或明確的位元組動詞"
 help = "使用 chorda 或明確的位元組轉換輔助工具"

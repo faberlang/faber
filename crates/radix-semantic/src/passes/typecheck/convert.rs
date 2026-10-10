@@ -621,7 +621,7 @@ impl TypeChecker<'_> {
         // Need unit 1.4a: same-width `bN ↔ uN` rows and the named
         // refusals for every other number pairing.
         if let Some(result_ty) =
-            self.check_bits_conversio(source_ty, target_resolved, !params.is_empty(), span)
+            self.check_bits_conversio(source_ty, target_resolved, params, span)
         {
             if !self.types.equals(result_ty, self.error_type)
                 && let Some(recovery) = recovery.as_deref_mut()
@@ -1695,7 +1695,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn conversio_has_endian_hint(&self, params: &[Symbol]) -> bool {
+    pub(super) fn conversio_has_endian_hint(&self, params: &[Symbol]) -> bool {
         let Some(interner) = self.interner else {
             return false;
         };

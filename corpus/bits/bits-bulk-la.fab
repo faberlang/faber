@@ -1,0 +1,47 @@
++++
+term = "bits"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "conversio"
+canonical = true
+summary = "A bits list converts to a wider list with a via Le or via Be clause, and a same-width list takes none."
+syntax = "list<b8> ↦ list<u16> via Le | list<b8> ↦ list<u8>"
+related = ["bits", "↦"]
+locale = "la"
++++
+# =============================================================================
+# bits — Bulk list conversions: a via clause exactly when the width changes
+# =============================================================================
+#
+# What this teaches:
+#   • lista<b8> ↦ lista<u8> keeps the width, so it takes no via clause
+#   • a width change names its byte order: ↦ lista<u16> via Le or via Be
+#   • the clause also encodes back: lista<u16> ↦ lista<b8> via Le
+#   • lista<b8> ↦ lista<b16> via Be reads byte pairs without reading them as numbers
+#
+# Common mistakes:
+#   • writing via on a same-width list — one spelling, no clause
+#   • leaving via off a width change — the byte order is not guessed
+#
+# See also: bits-literals, bits-operations
+# =============================================================================
+
+# bits — width-preserving round trip, Le and Be decode, encode, b8 to b16
+#
+# EXPECTED stdout: see bits-bulk-la.expected
+
+incipit {
+    fixum lista<b8> raw ← [0x01, 0x02, 0x03, 0x04]
+    fixum lista<u8> plain ← raw ↦ lista<u8>
+    fixum lista<b8> back ← plain ↦ lista<b8>
+    nota plain
+    nota back
+    fixum lista<u16> le ← raw ↦ lista<u16> via Le
+    fixum lista<u16> be ← raw ↦ lista<u16> via Be
+    nota le
+    nota be
+    fixum lista<b8> encoded ← le ↦ lista<b8> via Le
+    nota encoded
+    fixum lista<b16> wide ← raw ↦ lista<b16> via Be
+    nota wide
+}

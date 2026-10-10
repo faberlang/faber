@@ -744,6 +744,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "bits_via_clause_not_allowed" => Some(
             "remove the via clause; a same-width bN conversion keeps the bit pattern and takes no hint".to_owned(),
         ),
+        "bits_via_clause_required" => Some(
+            "write the byte order with the conversion, such as lista<b8> ↦ lista<u16> via Le; a same-width conversion takes no clause".to_owned(),
+        ),
         "bits_literal_out_of_range" => {
             Some("write a literal that fits in the bits width, such as 0xff for a b8".to_owned())
         }

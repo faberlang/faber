@@ -2326,8 +2326,16 @@ fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> 
             // the checker when the width stays the same.
             | crate::Type::Bits(_)
             | crate::Type::Error => return true,
+            // `lista<bN> ↔ lista<number>` takes `via Le|Be` exactly when the
+            // width changes (B5); the checker owns that rule, since only it
+            // sees the source type. Any other numeric list refuses there too.
             crate::Type::Array(elem) => {
-                return matches!(lowerer.types.get(*elem), crate::Type::Bits(_));
+                return matches!(
+                    lowerer.types.get(*elem),
+                    crate::Type::Bits(_)
+                        | crate::Type::SizedNumeric(..)
+                        | crate::Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                );
             }
             _ => return false,
         }

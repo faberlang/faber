@@ -2452,6 +2452,10 @@ help = "convert a bN only to an integer, float or bits type of the same width, s
 message = "a same-width bits conversion takes no via clause"
 help = "remove the via clause; a same-width bN conversion keeps the bit pattern and takes no hint"
 
+[diagnostics.SEM016.issues.bits_via_clause_required]
+message = "a bits list conversion that changes the bit width needs a via Le or via Be clause"
+help = "write the byte order with the conversion, such as lista<b8> ↦ lista<u16> via Le; a same-width conversion takes no clause"
+
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
 message = "chuyển đổi từ octeti sang numerus chưa được đặc tả (độ rộng byte và thứ tự byte); thay vào đó sử dụng `chorda` hoặc các động từ byte rõ ràng"
 help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"

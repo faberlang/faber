@@ -1,0 +1,35 @@
++++
+term = "bits"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A via clause on an 8-bit element is refused."
+syntax = "list<b8> ↦ list<u8> via Le — rejected"
+related = ["bits", "↦"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM016:bits_via_clause_not_allowed"
++++
+# =============================================================================
+# bits — A via clause on an 8-bit element is refused.
+# =============================================================================
+#
+# What this teaches:
+#   • a same-width list conversion takes no via clause, at any width
+#
+# Common mistakes:
+#   • writing via Le on list<b8> ↦ list<u8> — an 8-bit element has no byte order
+#
+# See also: bits-bulk
+# =============================================================================
+
+# bits reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    const list<b8> raw ← [0x01, 0x02]
+    const list<u8> plain ← raw ↦ list<u8> via Le
+    print plain
+}

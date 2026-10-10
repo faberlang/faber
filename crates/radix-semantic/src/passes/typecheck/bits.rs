@@ -19,6 +19,8 @@ pub(super) const BITS_LITERAL_OUT_OF_RANGE: &str = "bits_literal_out_of_range";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";
 const BITS_CONVERSION_WIDTH_MISMATCH: &str = "bits_conversion_width_mismatch";
 const BITS_VIA_CLAUSE_NOT_ALLOWED: &str = "bits_via_clause_not_allowed";
+const BITS_VIA_CLAUSE_REQUIRED: &str = "bits_via_clause_required";
+const CONVERSIO_VIA_TARGET_TAKES_NO_HINT: &str = "conversio_via_target_takes_no_hint";
 
 /// What the other side of a `bN` conversion is, for the same-width rows
 /// (need, unit 1.4a).
@@ -26,8 +28,11 @@ enum BitsConversioPeer {
     /// The same bit width, as `bN`, `uN`, `iN` or an IEEE float: the pattern
     /// is kept and read as the other type (rulings C2 and C3).
     SameWidth,
-    /// A bit width or number of a different (or no) width.
-    WidthMismatch,
+    /// A bit width or number of a different fixed width: a list conversion
+    /// takes a `via Le|Be` clause here (B5), a scalar one is refused.
+    OtherWidth,
+    /// A number with no fixed bit width (`numerus`, decimals, `inf`).
+    Unsized,
 }
 
 impl TypeChecker<'_> {
@@ -224,7 +229,7 @@ impl TypeChecker<'_> {
             if bits == width.bits() {
                 BitsConversioPeer::SameWidth
             } else {
-                BitsConversioPeer::WidthMismatch
+                BitsConversioPeer::OtherWidth
             }
         };
         match self.types.get(other) {
@@ -240,23 +245,26 @@ impl TypeChecker<'_> {
                 Some(same(64))
             }
             Type::SizedNumeric(_, W::D64 | W::Inf) | Type::Primitive(Primitive::Numerus) => {
-                Some(BitsConversioPeer::WidthMismatch)
+                Some(BitsConversioPeer::Unsized)
             }
             _ => None,
         }
     }
 
     /// `bN` conversions: scalar `bN ↔ uN | iN | fN` and the element-wise list
-    /// forms at the same N take no `via` clause and keep the pattern; every
-    /// other number pairing is a named refusal. `None` when no side is a `bN` (or the
-    /// other side is not a number or bits), so the ordinary rows run.
+    /// forms at the same N take no `via` clause and keep the pattern. A list
+    /// conversion that changes the bit width takes exactly a `via Le|Be`
+    /// clause (B5: a clause exactly when the width changes); every other
+    /// number pairing is a named refusal. `None` when no side is a `bN` (or
+    /// the other side is not a number or bits), so the ordinary rows run.
     pub(super) fn check_bits_conversio(
         &mut self,
         source_ty: TypeId,
         target: TypeId,
-        has_hint: bool,
+        params: &[Symbol],
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
+        let has_hint = !params.is_empty();
         let scalar = (self.bits_width_of(source_ty), self.bits_width_of(target));
         let listed = |this: &Self, ty: TypeId| match this.types.get(this.resolve_inferred_type(ty))
         {
@@ -276,6 +284,20 @@ impl TypeChecker<'_> {
         {
             true
         } else {
+            // A numeric list target takes a `via` clause only from a bits
+            // list (the lowering lets the clause through on any numeric list,
+            // since only the checker sees the source).
+            if has_hint
+                && let Type::Array(elem) = self.types.get(self.resolve_inferred_type(target))
+                && matches!(
+                    self.types.get(self.numeric_expected_type(*elem)),
+                    Type::SizedNumeric(..)
+                        | Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                )
+            {
+                self.invalid_conversion(CONVERSIO_VIA_TARGET_TAKES_NO_HINT, span);
+                return Some(self.error_type);
+            }
             return None;
         };
         let source_cell = self.bits_conversio_cell(source_ty, lists);
@@ -302,7 +324,13 @@ impl TypeChecker<'_> {
         let issue = match self.bits_conversio_peer(width, other)? {
             BitsConversioPeer::SameWidth if has_hint => BITS_VIA_CLAUSE_NOT_ALLOWED,
             BitsConversioPeer::SameWidth => return Some(self.resolve_inferred_type(target)),
-            BitsConversioPeer::WidthMismatch => BITS_CONVERSION_WIDTH_MISMATCH,
+            BitsConversioPeer::OtherWidth if lists && self.conversio_has_endian_hint(params) => {
+                return Some(self.resolve_inferred_type(target));
+            }
+            BitsConversioPeer::OtherWidth if lists => BITS_VIA_CLAUSE_REQUIRED,
+            BitsConversioPeer::OtherWidth | BitsConversioPeer::Unsized => {
+                BITS_CONVERSION_WIDTH_MISMATCH
+            }
         };
         self.invalid_conversion(issue, span);
         Some(self.error_type)

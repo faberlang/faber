@@ -28,7 +28,6 @@ fn width_change_is_a_named_refusal() {
         "functio f(u32 a) → b64 { redde a ↦ b64 }",
         "functio f(b8 a) → numerus { redde a ↦ numerus }",
         "functio f(b8 a) → b16 { redde a ↦ b16 }",
-        "functio f(lista<b8> a) → lista<b16> { redde a ↦ lista<b16> }",
         "functio f(lista<b8> a) → lista<numerus> { redde a ↦ lista<numerus> }",
     ] {
         test_support::assert_rejects_with_issue(source, "bits_conversion_width_mismatch");
@@ -78,7 +77,7 @@ fn signed_and_float_lists_convert_element_wise_at_the_same_width() {
     test_support::assert_accepts("functio f(lista<b32> a) → lista<f32> { redde a ↦ lista<f32> }");
     test_support::assert_rejects_with_issue(
         "functio f(lista<b8> a) → lista<f32> { redde a ↦ lista<f32> }",
-        "bits_conversion_width_mismatch",
+        "bits_via_clause_required",
     );
 }
 
@@ -113,5 +112,51 @@ fn via_clause_on_a_same_width_conversion_is_a_named_refusal() {
     test_support::assert_rejects_with_issue(
         "functio f(lista<u8> a) → lista<b8> { redde a ↦ lista<b8> via Le }",
         "bits_via_clause_not_allowed",
+    );
+}
+
+#[test]
+fn list_width_change_without_a_clause_is_a_named_refusal() {
+    for source in [
+        "functio f(lista<b8> a) → lista<b16> { redde a ↦ lista<b16> }",
+        "functio f(lista<b8> a) → lista<u16> { redde a ↦ lista<u16> }",
+        "functio f(lista<b16> a) → lista<b8> { redde a ↦ lista<b8> }",
+        "functio f(lista<u32> a) → lista<b8> { redde a ↦ lista<b8> }",
+    ] {
+        test_support::assert_rejects_with_issue(source, "bits_via_clause_required");
+    }
+}
+
+#[test]
+fn list_width_change_with_a_byte_order_clause_is_accepted() {
+    for source in [
+        "functio f(lista<b8> a) → lista<u16> { redde a ↦ lista<u16> via Le }",
+        "functio f(lista<b8> a) → lista<i32> { redde a ↦ lista<i32> via Be }",
+        "functio f(lista<b8> a) → lista<f32> { redde a ↦ lista<f32> via Le }",
+        "functio f(lista<b8> a) → lista<b16> { redde a ↦ lista<b16> via Be }",
+        "functio f(lista<b16> a) → lista<b8> { redde a ↦ lista<b8> via Le }",
+        "functio f(lista<u16> a) → lista<b8> { redde a ↦ lista<b8> via Le }",
+    ] {
+        test_support::assert_accepts(source);
+    }
+}
+
+#[test]
+fn list_clause_on_an_eight_bit_element_is_refused() {
+    for source in [
+        "functio f(lista<b8> a) → lista<u8> { redde a ↦ lista<u8> via Le }",
+        "functio f(lista<b8> a) → lista<i8> { redde a ↦ lista<i8> via Be }",
+        "functio f(lista<u8> a) → lista<b8> { redde a ↦ lista<b8> via Be }",
+        "functio f(lista<b16> a) → lista<u16> { redde a ↦ lista<u16> via Le }",
+    ] {
+        test_support::assert_rejects_with_issue(source, "bits_via_clause_not_allowed");
+    }
+}
+
+#[test]
+fn list_clause_without_a_bits_list_is_refused() {
+    test_support::assert_rejects_with_issue(
+        "functio f(lista<u8> a) → lista<u16> { redde a ↦ lista<u16> via Le }",
+        "conversio_via_target_takes_no_hint",
     );
 }

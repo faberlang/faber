@@ -25,6 +25,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 mod aggregate;
+mod bits_list;
 mod inf;
 mod littera;
 #[cfg(test)]
@@ -111,6 +112,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // pattern is kept and read as the other type.
         if let Some(reinterpreted) = self.reinterpret_bits(&value, source_ty, &target) {
             return Ok(reinterpreted);
+        }
+        // `lista<bN> ↔ lista<number | bits>` across a width change takes a
+        // `via Le|Be` clause (need, B5).
+        if let Some(converted) =
+            self.convert_bits_list_width(&value, source_ty, &target, params, recovery, span)
+        {
+            return converted;
         }
         match &target {
             Type::Primitive(Primitive::Textus) => {

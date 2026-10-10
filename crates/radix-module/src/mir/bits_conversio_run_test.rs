@@ -81,7 +81,7 @@ fn width_changing_conversions_are_refused_by_name() {
         ("fixum b8 a ← 1\nnota a ↦ u16", "bits_conversion_width_mismatch"),
         ("fixum b16 a ← 1\nnota a ↦ u8", "bits_conversion_width_mismatch"),
         ("fixum b8 a ← 1\nnota a ↦ numerus", "bits_conversion_width_mismatch"),
-        ("fixum lista<b8> a ← [1]\nnota a ↦ lista<b16>", "bits_conversion_width_mismatch"),
+        ("fixum lista<b8> a ← [1]\nnota a ↦ lista<b16>", "bits_via_clause_required"),
         ("fixum b8 a ← 1\nnota a ↦ i16", "bits_conversion_width_mismatch"),
         ("fixum b32 a ← 1\nnota a ↦ f64", "bits_conversion_width_mismatch"),
         ("fixum b8 a ← 1\nnota a ↦ u8 via Le", "bits_via_clause_not_allowed"),
@@ -91,4 +91,16 @@ fn width_changing_conversions_are_refused_by_name() {
         let message = refused(body);
         assert!(message.contains(issue), "{body}: {message}");
     }
+}
+
+#[test]
+fn bits_list_width_change_decodes_and_encodes_through_the_byte_order() {
+    let le = "fixum lista<b8> a ← [0x01, 0x02, 0x03, 0x04]\nnota a ↦ lista<u16> via Le";
+    assert_eq!(ok(le), ["[513, 1027]"]);
+    let be = "fixum lista<b8> a ← [0x01, 0x02, 0x03, 0x04]\nnota a ↦ lista<b16> via Be";
+    assert_eq!(ok(be), ["[0x0102, 0x0304]"]);
+    let encode = "fixum lista<u16> a ← [0x0102, 0x0304]\nnota a ↦ lista<b8> via Le";
+    assert_eq!(ok(encode), ["[0x02, 0x01, 0x04, 0x03]"]);
+    let same = "fixum lista<b8> a ← [0x01, 0xff]\nnota a ↦ lista<u8>";
+    assert_eq!(ok(same), ["[1, 255]"]);
 }
