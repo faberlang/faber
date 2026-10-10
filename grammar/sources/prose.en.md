@@ -1660,6 +1660,7 @@ expression statement whose callee is the identifier `nota` — a user function
 call, never the intrinsic.
 
 - `nota` = neutral diagnostic note, `vide` = debug/inspect, `mone` = warn
+- Output channel per level, the same on every target: `nota` (en `print`) and `scribe` (en `write`) write standard output; `vide` (en `debug`) and `mone` (en `warn`) write standard error, so standard output carries only the program's normal output
 - `scribe` is a diagnostic channel spelling; use current stdlib methods for real output
 
 ### Comments

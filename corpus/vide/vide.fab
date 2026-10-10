@@ -5,13 +5,13 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "output"
 canonical = true
-summary = "Writes a debug value to standard output."
+summary = "Writes a debug value to standard error."
 syntax = "vide <expression>"
 related = ["scribe", "mone"]
 locale = "en"
 +++
 # =============================================================================
-# vide — Writes a debug value to standard output.
+# vide — Writes a debug value to standard error.
 # =============================================================================
 #
 # What this teaches:

@@ -2665,6 +2665,7 @@ expression statement whose callee is the identifier `ghi_chú` — a user functi
 call, never the intrinsic.
 
 - `ghi_chú` = neutral diagnostic note, `xem` = debug/inspect, `cảnh_báo` = warn
+- Output channel per level, the same on every target: `ghi_chú` (en `print`) and `viết` (en `write`) write standard output; `xem` (en `debug`) and `cảnh_báo` (en `warn`) write standard error, so standard output carries only the program's normal output
 - `viết` is a diagnostic channel spelling; use current stdlib methods for real output
 
 ### Comments

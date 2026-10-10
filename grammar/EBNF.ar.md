@@ -2665,6 +2665,7 @@ expression statement whose callee is the identifier `اعرض` — a user functi
 call, never the intrinsic.
 
 - `اعرض` = neutral diagnostic note, `شاهد` = debug/inspect, `نبه` = warn
+- Output channel per level, the same on every target: `اعرض` (en `print`) and `اكتب` (en `write`) write standard output; `شاهد` (en `debug`) and `نبه` (en `warn`) write standard error, so standard output carries only the program's normal output
 - `اكتب` is a diagnostic channel spelling; use current stdlib methods for real output
 
 ### Comments

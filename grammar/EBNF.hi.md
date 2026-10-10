@@ -2665,6 +2665,7 @@ expression statement whose callee is the identifier `दिखाओ` — a user
 call, never the intrinsic.
 
 - `दिखाओ` = neutral diagnostic note, `देखो` = debug/inspect, `चेताओ` = warn
+- Output channel per level, the same on every target: `दिखाओ` (en `print`) and `लिखो` (en `write`) write standard output; `देखो` (en `debug`) and `चेताओ` (en `warn`) write standard error, so standard output carries only the program's normal output
 - `लिखो` is a diagnostic channel spelling; use current stdlib methods for real output
 
 ### Comments

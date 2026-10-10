@@ -2665,6 +2665,7 @@ expression statement whose callee is the identifier `บันทึก` — a u
 call, never the intrinsic.
 
 - `บันทึก` = neutral diagnostic note, `ดู` = debug/inspect, `เตือน` = warn
+- Output channel per level, the same on every target: `บันทึก` (en `print`) and `เขียน` (en `write`) write standard output; `ดู` (en `debug`) and `เตือน` (en `warn`) write standard error, so standard output carries only the program's normal output
 - `เขียน` is a diagnostic channel spelling; use current stdlib methods for real output
 
 ### Comments

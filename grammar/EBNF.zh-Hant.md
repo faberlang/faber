@@ -2665,6 +2665,7 @@ expression statement whose callee is the identifier `註記` — a user function
 call, never the intrinsic.
 
 - `註記` = neutral diagnostic note, `檢視` = debug/inspect, `警告` = warn
+- Output channel per level, the same on every target: `註記` (en `print`) and `寫出` (en `write`) write standard output; `檢視` (en `debug`) and `警告` (en `warn`) write standard error, so standard output carries only the program's normal output
 - `寫出` is a diagnostic channel spelling; use current stdlib methods for real output
 
 ### Comments

@@ -2665,6 +2665,7 @@ expression statement whose callee is the identifier `显示` — a user function
 call, never the intrinsic.
 
 - `显示` = neutral diagnostic note, `查看` = debug/inspect, `警告` = warn
+- Output channel per level, the same on every target: `显示` (en `print`) and `写入` (en `write`) write standard output; `查看` (en `debug`) and `警告` (en `warn`) write standard error, so standard output carries only the program's normal output
 - `写入` is a diagnostic channel spelling; use current stdlib methods for real output
 
 ### Comments
