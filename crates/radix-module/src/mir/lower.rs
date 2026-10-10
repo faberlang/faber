@@ -3455,7 +3455,17 @@ impl<'a> FunctionBuilder<'a> {
                 }
             }
             HirLiteral::String(value) => Some(MirOperand::Constant(MirConstant::String(*value))),
-            HirLiteral::Ascii(value) => Some(MirOperand::Constant(MirConstant::Ascii(*value))),
+            HirLiteral::Ascii(value) => {
+                let operand = MirOperand::Constant(MirConstant::Ascii(*value));
+                // WHY: a MIR ascii constant is typed bare `ascii`, so as a
+                // bare aggregate item it cannot satisfy a bounded `ascii<N>`
+                // element type (need, item 11). A temp typed by the
+                // literal's own semantic type carries the bound.
+                match ty.filter(|ty| matches!(self.normalized_type(*ty), Type::BoundedAscii { .. })) {
+                    Some(ty) => Some(self.assign_temp(MirValueKind::Operand(operand), MirType::semantic(ty), span)),
+                    None => Some(operand),
+                }
+            }
             HirLiteral::Bool(value) => Some(MirOperand::Constant(MirConstant::Bool(*value))),
             HirLiteral::Nil => Some(MirOperand::Constant(MirConstant::Nil)),
             HirLiteral::Octeti(sym) => self.lower_octeti_literal(*sym, ty, span),

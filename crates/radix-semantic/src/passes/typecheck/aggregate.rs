@@ -585,6 +585,11 @@ impl TypeChecker<'_> {
         });
         let result_capacity = match expected_capacity {
             Some(capacity) if self.is_unresolved_index_hole(capacity) => Some(capacity),
+            // WHY: an untyped `[]` takes the cell's type (ruling 2026-10-10:
+            // the double hole), exactly as `empty` does: an empty list in a
+            // bounded cell keeps that cell's capacity instead of becoming an
+            // exact zero-length witness that no capacity-N cell accepts.
+            Some(capacity) if elements.is_empty() => Some(capacity),
             Some(capacity) => literal_capacity.or(Some(capacity)),
             None => literal_capacity,
         };
