@@ -92,8 +92,8 @@ fn doctor_cli_exits_zero_with_structural_keys() {
     assert!(!kv(&stdout, "library_home").is_empty());
     let source = kv(&stdout, "library_home_source");
     assert!(
-        source == "env" || source == "in-tree",
-        "library_home_source must be env or in-tree, got {source}"
+        source == "env" || source == "embedded",
+        "library_home_source must be env or embedded, got {source}"
     );
     assert_eq!(kv(&stdout, "library.norma.identity"), "builtin");
     assert!(

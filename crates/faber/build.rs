@@ -8,7 +8,9 @@
 //! frontmatter declares `explains = [...]`, plus `legacy-redirects.toml`.
 //!
 //! It embeds the runtime support sources (`runtime/*`, `crates/radix-host-abi`)
-//! so an installed binary can materialize a path-dependency root.
+//! so an installed binary can materialize a path-dependency root, and the
+//! Norma library (`lib/norma` source, locale packs and manifests) so an
+//! installed binary resolves `norma:*` without a checkout.
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -45,7 +47,13 @@ const RUNTIME_ROOTS: &[&str] = &[
     "runtime/swift",
     "runtime/llvm",
     "crates/radix-host-abi",
+    "lib/norma/src",
+    "lib/norma/locale",
 ];
+
+/// Repository-relative single files the binary carries (Norma manifests the
+/// library resolver reads).
+const RUNTIME_FILES: &[&str] = &["lib/norma/faber.toml", "lib/norma/cista.toml"];
 
 /// Write `runtime_embedded.rs`: `EMBEDDED_RUNTIME` (sorted repo-relative path
 /// and `include_bytes!` of the file) and `EMBEDDED_RUNTIME_DIGEST` (FNV-1a 64
@@ -59,6 +67,12 @@ fn embed_runtime(repo_root: &Path, out_dir: &Path) {
         let dir = repo_root.join(root);
         println!("cargo:rerun-if-changed={}", dir.display());
         collect_runtime_files(&dir, &mut files);
+    }
+    for file in RUNTIME_FILES {
+        let path = repo_root.join(file);
+        println!("cargo:rerun-if-changed={}", path.display());
+        assert!(path.is_file(), "embedded file {} missing", path.display());
+        files.push(path);
     }
     files.sort();
 

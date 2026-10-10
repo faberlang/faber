@@ -33,6 +33,26 @@ fn embedded_root_materializes_once_and_matches_in_tree_sources() {
     );
     assert!(root.join("crates/radix-host-abi/Cargo.toml").is_file());
 
+    // Norma travels with the binary: a relocated root (a temp cache, no
+    // checkout) carries the source, locale packs and manifests the library
+    // resolver reads, byte-identical to the build tree.
+    assert!(root.starts_with(cache.path()));
+    for norma in [
+        "src/fs.fab",
+        "faber.toml",
+        "cista.toml",
+        "locale/en/pack.toml",
+    ] {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../lib/norma")
+            .join(norma);
+        assert_eq!(
+            fs::read(root.join("lib/norma").join(norma)).expect("extracted norma"),
+            fs::read(source).expect("in-tree norma"),
+            "lib/norma/{norma}"
+        );
+    }
+
     let marker = root.join(COMPLETE_MARKER);
     let before = fs::metadata(&marker)
         .and_then(|m| m.modified())

@@ -40,7 +40,7 @@ fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
 }
 
 #[test]
-fn in_tree_library_home_holds_norma_when_home_unset() {
+fn embedded_library_home_holds_norma_when_home_unset() {
     let _guard = env_guard();
     let _env = EnvRestore::capture();
     // SAFETY: serialized by ENV_LOCK; edition 2024 marks env mutation unsafe.
@@ -70,7 +70,7 @@ fn explicit_library_home_wins_over_workspace_probe() {
 }
 
 #[test]
-fn unset_home_records_in_tree_provenance() {
+fn unset_home_records_embedded_provenance() {
     let _guard = env_guard();
     let _env = EnvRestore::capture();
     // SAFETY: serialized by ENV_LOCK; edition 2024 marks env mutation unsafe.
@@ -78,8 +78,8 @@ fn unset_home_records_in_tree_provenance() {
         std::env::remove_var(FABER_LIBRARY_HOME_ENV);
     }
 
-    let resolved = resolved_library_home().expect("in-tree home");
-    assert_eq!(resolved.source, LibraryHomeSource::InTree);
+    let resolved = resolved_library_home().expect("embedded home");
+    assert_eq!(resolved.source, LibraryHomeSource::Embedded);
     assert!(resolved.path.join("norma/src/fs.fab").is_file());
 }
 
