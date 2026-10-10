@@ -23,7 +23,7 @@ const ISSUE: &str = "bits_type_unsupported_on_target";
 fn target_admits_bits(target: Target) -> bool {
     matches!(
         target,
-        Target::HirFaber | Target::MirStepper | Target::HirGo | Target::HirSwift
+        Target::HirFaber | Target::MirStepper | Target::HirGo | Target::HirSwift | Target::HirRust
     )
 }
 
