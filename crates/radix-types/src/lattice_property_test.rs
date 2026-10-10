@@ -11,6 +11,8 @@ use crate::index::IndexExpr;
 use crate::instans_precision::InstansPrecision;
 use crate::numeric_width::NumericWidth;
 use crate::{ParamType, Primitive, SemanticMutability, SemanticParamMode, Type, TypeId, TypeTable};
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use std::fmt::Write as _;
 
@@ -180,70 +182,120 @@ fn reflexivity_holds_for_all_types() {
     );
 }
 
-// ── Transitivity (randomized, pure lattice) ────────────────────────────────
-///
-/// Verifies transitivity for the core subtyping lattice, excluding known
-/// coercion edges (Option unboxing, Nihil → Option) that are not proper
-/// subtype relations.
+// ── Transitivity (pure lattice) ─────────────────────────────────────────────
+//
+// Subtype transitivity is checked over proper subtype edges only. Two edge
+// classes of `is_assignable` are deliberate non-subtype edges and are
+// classified explicitly (never skipped by a blanket filter):
+//
+// - `OctetiBridge`: `octeti` and exactly `lista<numerus<u8>>` are mutually
+//   assignable through D10.4 identity (`equals`), but the identity does not
+//   compose with element widening: `octeti` is NOT assignable to
+//   `lista<numerus>` (pinned by `octeti_u8_lista_bridge_is_outside_subtype_transitivity`).
+// - `OptionUnbox`: `Option(T)` -> `T` is a bare-assign unwrapping coercion.
+//   Combined with `nihil` -> `Option(T)` it would falsely imply `nihil` -> `T`
+//   (pinned by `option_unboxing_does_not_leak_nihil_into_concrete`).
+
+/// Replay seed for the sampled property. Override with `LATTICE_SEED=<u64>`
+/// to replay a reported failure.
+const DEFAULT_LATTICE_SEED: u64 = 0x7426_fc87_a11c_e5ed;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CoercionEdge {
+    OctetiBridge,
+    OptionUnbox,
+}
+
+/// Classify an assignable edge as a non-subtype coercion, or `None` when it
+/// is a proper subtype edge.
+fn coercion_edge(table: &TypeTable, from: TypeId, to: TypeId) -> Option<CoercionEdge> {
+    if is_octeti_u8_lista_bridge(table, from, to) {
+        return Some(CoercionEdge::OctetiBridge);
+    }
+    let unboxes = matches!(table.get(from), Type::Option(_))
+        && !matches!(
+            table.get(to),
+            Type::Option(_) | Type::Union(_) | Type::Primitive(Primitive::Ignotum)
+        );
+    unboxes.then_some(CoercionEdge::OptionUnbox)
+}
+
+/// Return every `(a, b, c)` with `a <: b`, `b <: c` over proper subtype edges
+/// but not `a <: c`.
+fn transitivity_violations(
+    table: &TypeTable,
+    triples: impl Iterator<Item = (TypeId, TypeId, TypeId)>,
+) -> Vec<(TypeId, TypeId, TypeId)> {
+    triples
+        .filter(|&(a, b, c)| {
+            table.is_assignable(a, b)
+                && table.is_assignable(b, c)
+                && coercion_edge(table, a, b).is_none()
+                && coercion_edge(table, b, c).is_none()
+                && !table.is_assignable(a, c)
+        })
+        .collect()
+}
+
+fn assert_no_violations(table: &TypeTable, violations: &[(TypeId, TypeId, TypeId)], context: &str) {
+    if violations.is_empty() {
+        return;
+    }
+    let mut msg = format!(
+        "transitivity violated for {} triple(s) where A <: B and B <: C but not A <: C ({context}):\n",
+        violations.len()
+    );
+    for (i, (a, b, c)) in violations.iter().enumerate().take(10) {
+        let _ = writeln!(
+            msg,
+            "  [{i}]  A={a:?} ({})  <:  B={b:?} ({})  <:  C={c:?} ({})",
+            table.get(*a).name(),
+            table.get(*b).name(),
+            table.get(*c).name(),
+        );
+    }
+    if violations.len() > 10 {
+        let _ = writeln!(msg, "  … and {} more", violations.len() - 10);
+    }
+    panic!("{msg}");
+}
 
 #[test]
 fn transitivity_holds_for_random_triples() {
+    let seed = std::env::var("LATTICE_SEED")
+        .ok()
+        .and_then(|raw| raw.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_LATTICE_SEED);
     let (table, ids) = build_comprehensive_table();
-    let mut rng = rand::thread_rng();
-    let sample_size = 10_000;
-    let mut violations = Vec::new();
+    let mut rng = StdRng::seed_from_u64(seed);
+    let triples: Vec<(TypeId, TypeId, TypeId)> = (0..10_000)
+        .map(|_| {
+            (
+                *ids.choose(&mut rng).unwrap(),
+                *ids.choose(&mut rng).unwrap(),
+                *ids.choose(&mut rng).unwrap(),
+            )
+        })
+        .collect();
 
-    for _ in 0..sample_size {
-        let a = ids.choose(&mut rng).copied().unwrap();
-        let b = ids.choose(&mut rng).copied().unwrap();
-        let c = ids.choose(&mut rng).copied().unwrap();
+    let violations = transitivity_violations(&table, triples.into_iter());
+    assert_no_violations(&table, &violations, &format!("seed={seed}"));
+}
 
-        let a_assign_b = table.is_assignable(a, b);
-        let b_assign_c = table.is_assignable(b, c);
-
-        if !a_assign_b || !b_assign_c {
-            continue;
-        }
-
-        // Octeti and exactly lista<numerus<u8>> are mutually assignable as a
-        // compatibility bridge, not as a proper subtype edge. Keep the
-        // randomized transitivity property over the actual lattice.
-        if is_octeti_u8_lista_bridge(&table, a, b) || is_octeti_u8_lista_bridge(&table, b, c) {
-            continue;
-        }
-
-        // ── Skip known coercion edges ────────────────────────────────────
-        //
-        // Option(T) → non-Option is an unwrapping coercion, not a subtype
-        // relation.  Combining it with Nihil → Option would falsely imply
-        // Nihil → T, which is semantically wrong.
-        if matches!(table.get(b), Type::Option(_)) && !matches!(table.get(c), Type::Option(_)) {
-            continue;
-        }
-
-        if !table.is_assignable(a, c) {
-            violations.push((a, b, c));
+#[test]
+fn transitivity_holds_exhaustively_over_comprehensive_table() {
+    let (table, ids) = build_comprehensive_table();
+    let mut triples = Vec::with_capacity(ids.len().pow(3));
+    for &a in &ids {
+        for &b in &ids {
+            for &c in &ids {
+                triples.push((a, b, c));
+            }
         }
     }
 
-    if !violations.is_empty() {
-        let mut msg = String::from(
-            "transitivity violated for triples where A <: B and B <: C but not A <: C:\n",
-        );
-        for (i, (a, b, c)) in violations.iter().enumerate().take(10) {
-            let _ = writeln!(
-                msg,
-                "  [{i}]  A={a:?} ({})  <:  B={b:?} ({})  <:  C={c:?} ({})",
-                table.get(*a).name(),
-                table.get(*b).name(),
-                table.get(*c).name(),
-            );
-        }
-        if violations.len() > 10 {
-            let _ = writeln!(msg, "  … and {} more", violations.len() - 10);
-        }
-        panic!("{msg}");
-    }
+    let violations = transitivity_violations(&table, triples.into_iter());
+    assert_no_violations(&table, &violations, "exhaustive");
 }
 
 fn is_octeti_u8_lista_bridge(table: &TypeTable, from: TypeId, to: TypeId) -> bool {
