@@ -557,3 +557,90 @@ incipit {
 }",
     );
 }
+
+// --- Size parameters of a generic class instantiate at the receiver ---
+
+#[test]
+fn applied_class_method_return_type_instantiates_size_param() {
+    // `Box<3>.mensura()` returns `vector<f32, 3>`: the class's `N` is the
+    // receiver's size argument, not a rigid parameter.
+    accepts(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+
+    functio mensura() → vector<f32, N> {
+        redde ego.minima
+    }
+}
+
+functio a(Capsa<3> b) → vector<f32, 3> {
+    redde b.mensura()
+}",
+    );
+}
+
+#[test]
+fn applied_class_method_parameter_type_instantiates_size_param() {
+    accepts(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+
+    functio muta(vector<f32, N> offset) → vector<f32, N> {
+        redde offset
+    }
+}
+
+functio a(Capsa<3> b, vector<f32, 3> o) → vector<f32, 3> {
+    redde b.muta(o)
+}",
+    );
+}
+
+#[test]
+fn applied_class_method_parameter_rejects_foreign_width() {
+    rejects_with_issue(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+
+    functio muta(vector<f32, N> offset) → vector<f32, N> {
+        redde offset
+    }
+}
+
+functio a(Capsa<3> b, vector<f32, 2> o) → vector<f32, 3> {
+    redde b.muta(o)
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn applied_class_method_return_rejects_foreign_width() {
+    rejects_with_issue(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+
+    functio mensura() → vector<f32, N> {
+        redde ego.minima
+    }
+}
+
+functio a(Capsa<3> b) → vector<f32, 2> {
+    redde b.mensura()
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn applied_class_field_type_instantiates_size_param() {
+    accepts(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+}
+
+functio a(Capsa<3> b) → vector<f32, 3> {
+    redde b.minima
+}",
+    );
+}
