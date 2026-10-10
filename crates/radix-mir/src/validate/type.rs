@@ -845,6 +845,15 @@ impl Validator<'_, '_> {
             Type::Primitive(Primitive::Numerus) => {
                 signed.is_some() || unsigned.is_some_and(|v| i64::try_from(v).is_ok())
             }
+            // A written integer stands for the raw-bits cell it lands in when
+            // its pattern fits N bits (need, B3).
+            Type::Bits(width) => match (signed, unsigned) {
+                (Some(v), _) => {
+                    u64::try_from(v).is_ok_and(|v| width.bits() == 64 || v >> width.bits() == 0)
+                }
+                (_, Some(v)) => width.bits() == 64 || v >> width.bits() == 0,
+                (None, None) => false,
+            },
             _ => false,
         }
     }

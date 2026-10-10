@@ -118,7 +118,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .field_order()
                     .with_dynamic(self.operand_is_dynamic(arg))
                     .with_char_text(self.operand_holds_littera(arg))
-                    .with_tuple(tuple.as_ref());
+                    .with_tuple(tuple.as_ref())
+                    .with_bits(self.operand_bits_width(arg));
                 let text = value.display_typed(self.interner, order, span, float_width)?;
                 self.host.scribe(*kind, &text)?;
                 Ok(Value::Unit)
@@ -151,12 +152,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .iter()
                     .map(|arg| self.operand_tuple_parts(arg))
                     .collect();
+                let bits: Vec<_> = call
+                    .args
+                    .iter()
+                    .map(|arg| self.operand_bits_width(arg))
+                    .collect();
                 Ok(Value::Str(format_template_shaped(
                     template_text,
                     &args,
                     &widths,
                     &char_text,
                     &tuples,
+                    &bits,
                     self.interner,
                     self.field_order(),
                     span,

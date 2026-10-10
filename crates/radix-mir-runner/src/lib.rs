@@ -617,6 +617,7 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Struct and variant fields holding a `littera`, so display quotes them
     /// as chars and every other ascii-carried text as text (pr4).
     field_char_set: value::FieldCharSet,
+    field_bits_widths: value::FieldBitsWidths,
     /// Struct and variant fields whose declared type holds a tuple, so display
     /// prints them as `iuncta [..]` at their element widths.
     field_tuple_parts: value::FieldTupleParts,
@@ -643,6 +644,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
         }
         let field_float_widths = index_field_float_widths(context, types);
         let field_char_set = index_field_char_set(context, types);
+        let field_bits_widths = index_field_bits_widths(context, types);
         let field_tuple_parts = index_field_tuple_parts(context, types);
         Self {
             function_index: program.function_index(),
@@ -677,6 +679,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             conversation_slots: Rc::default(),
             field_float_widths,
             field_char_set,
+            field_bits_widths,
             field_tuple_parts,
         }
     }
@@ -701,6 +704,8 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             char_fields: &self.field_char_set,
             tuple_fields: &self.field_tuple_parts,
             tuple: None,
+            bits_fields: &self.field_bits_widths,
+            bits: None,
             char_text: false,
             names: &self.context.display_names,
             tokens: self.display_tokens(),
@@ -751,6 +756,7 @@ fn tuple_parts(ty: TypeId, types: &TypeTable, depth: u8) -> Option<value::TupleP
                 .iter()
                 .map(|element| value::TuplePart {
                     width: element_display_width(*element, types, 0),
+                    bits: holds_bits(*element, types, 0),
                     tuple: tuple_parts(*element, types, depth + 1),
                 })
                 .collect(),
@@ -796,6 +802,37 @@ fn holds_littera(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
         | Type::BoundedArray { element: elem, .. } => holds_littera(*elem, types, depth + 1),
         _ => false,
     }
+}
+
+/// The raw-bits width of `ty` when it is (or holds, through collections and
+/// options) a `bN`: such a value prints as hexadecimal at its full width.
+fn holds_bits(ty: TypeId, types: &TypeTable, depth: u8) -> Option<radix_types::BitsWidth> {
+    if depth > 8 {
+        return None;
+    }
+    match types.get(ty) {
+        Type::Bits(width) => Some(*width),
+        _ => holds_bits(wrapped_element(ty, types)?, types, depth + 1),
+    }
+}
+
+fn index_field_bits_widths(
+    context: &MirValidationContext<'_>,
+    types: &TypeTable,
+) -> value::FieldBitsWidths {
+    let mut widths = FxHashMap::default();
+    let owners = context
+        .struct_fields
+        .iter()
+        .chain(context.variant_fields.iter());
+    for (def, fields) in owners {
+        for (name, ty) in fields {
+            if let Some(width) = holds_bits(ty.semantic_id(), types, 0) {
+                widths.insert((*def, *name), width);
+            }
+        }
+    }
+    widths
 }
 
 fn index_field_char_set(
@@ -2506,6 +2543,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .is_some_and(|ty| dynamic_display_type(ty, self.types, 0))
     }
 
+    /// Raw-bits width of a diagnostic operand whose static type is (or holds)
+    /// a `bN`, so it prints as hexadecimal at the full width.
+    fn operand_bits_width(&self, operand: &MirOperand) -> Option<radix_types::BitsWidth> {
+        holds_bits(self.operand_static_type(operand)?, self.types, 0)
+    }
+
     /// Whether a diagnostic operand's static type is (or holds) a `littera`,
     /// so its ascii-carried elements print as chars rather than text.
     fn operand_holds_littera(&self, operand: &MirOperand) -> bool {
@@ -3190,6 +3233,15 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         effective_width(self.types, ty.semantic_id()).unwrap_or(NumericWidth::I64)
     }
 
+    /// The raw-bits width (`b8 b16 b32 b64`) when `ty` is a bits type
+    ///; bit operations on it act at exactly that width.
+    fn bits_width(&self, ty: radix_mir::MirType) -> Option<radix_types::BitsWidth> {
+        match self.types.get(ty.semantic_id()) {
+            Type::Bits(width) => Some(*width),
+            _ => None,
+        }
+    }
+
     fn modular_word_width(&self, ty: radix_mir::MirType) -> Option<NumericWidth> {
         match self.types.get(ty.semantic_id()) {
             Type::ModularWord(width) => Some(*width),
@@ -3232,6 +3284,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 }
             }
             MirUnOp::Not => value.as_bool(span).map(|value| Value::Bool(!value)),
+            MirUnOp::BitNot if let Some(bits) = self.bits_width(result_ty) => {
+                value::bits_not(&value, bits, span)
+            }
             MirUnOp::BitNot => {
                 if let Some(width) = modular {
                     modular_word_bitnot(value, width, span)
@@ -3467,6 +3522,18 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         };
         if let Some(compared) = self.decimal_comparison(op, lhs, rhs, &left, &right) {
             return Ok(Value::Bool(compared));
+        }
+        if let Some(bits) = self.bits_width(result_ty)
+            && matches!(
+                op,
+                MirBinOp::BitAnd
+                    | MirBinOp::BitOr
+                    | MirBinOp::BitXor
+                    | MirBinOp::Shl
+                    | MirBinOp::Shr
+            )
+        {
+            return value::bits_binop(&left, &right, op, bits, span);
         }
         if let Some(modular) = self.modular_word_width(result_ty) {
             return match op {

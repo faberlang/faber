@@ -49,10 +49,12 @@ fn tuple_parts() -> TupleParts {
     TupleParts(vec![
         TuplePart {
             width: None,
+            bits: None,
             tuple: None,
         },
         TuplePart {
             width: None,
+            bits: None,
             tuple: None,
         },
     ])

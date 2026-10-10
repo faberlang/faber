@@ -3494,6 +3494,9 @@ impl<'a> FunctionBuilder<'a> {
                 Type::Alias(_, inner) => ty = *inner,
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64) => return true,
                 Type::ModularWord(NumericWidth::U64) | Type::SaturatingWord(NumericWidth::U64) => return true,
+                // A raw-bits cell always holds the zero-extended unsigned
+                // pattern.
+                Type::Bits(_) => return true,
                 _ => return false,
             }
         }

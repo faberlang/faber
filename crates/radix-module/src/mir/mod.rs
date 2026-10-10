@@ -285,6 +285,9 @@ mod abi_tests;
 #[path = "ai_workbench_stage5_test.rs"]
 mod ai_workbench_stage5_tests;
 #[cfg(test)]
+#[path = "bits_ops_test.rs"]
+mod bits_ops_tests;
+#[cfg(test)]
 #[path = "capability_test.rs"]
 mod capability_tests;
 #[cfg(test)]

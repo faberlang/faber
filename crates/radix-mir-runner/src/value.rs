@@ -74,11 +74,28 @@ pub struct TupleParts(pub Vec<TuplePart>);
 #[derive(Debug, Clone, PartialEq)]
 pub struct TuplePart {
     pub width: Option<NumericWidth>,
+    /// The element is a raw-bits `bN` (or holds one): it prints as hex.
+    pub bits: Option<radix_types::BitsWidth>,
     pub tuple: Option<TupleParts>,
 }
 
 /// Struct and variant fields whose declared type holds a tuple.
 pub type FieldTupleParts = FxHashMap<(DefId, Symbol), TupleParts>;
+
+/// Struct and variant fields whose declared type is (or holds, through
+/// collections and options) a raw-bits `bN`, keyed by `(def, field)`. A `bN`
+/// prints as hexadecimal at its full width (need, B12).
+pub type FieldBitsWidths = FxHashMap<(DefId, Symbol), radix_types::BitsWidth>;
+
+static NO_BITS_FIELDS: std::sync::LazyLock<FieldBitsWidths> =
+    std::sync::LazyLock::new(FxHashMap::default);
+
+/// Hexadecimal display of a raw-bits value: `0x` then lowercase digits at the
+/// type's full width (`0x7f` for a `b8`, `0x007f` for a `b16`).
+fn display_bits(pattern: u64, width: radix_types::BitsWidth) -> String {
+    let digits = usize::try_from(width.bits() / 4).unwrap_or(0);
+    format!("0x{pattern:0digits$x}")
+}
 
 static NO_TUPLE_FIELDS: std::sync::LazyLock<FieldTupleParts> =
     std::sync::LazyLock::new(FxHashMap::default);
@@ -121,6 +138,12 @@ pub struct FieldOrder<'a> {
     /// The value being shown is (or holds) a tuple per its static type: its
     /// shape. Reset per field and per element, where the declared type decides.
     pub tuple: Option<&'a TupleParts>,
+    /// Declared raw-bits fields (see [`FieldBitsWidths`]).
+    pub bits_fields: &'a FieldBitsWidths,
+    /// The value being shown is (or holds, through collections) a raw-bits
+    /// `bN` per its static type: it prints as hexadecimal at the full width.
+    /// Reset per field and per element, where the declared type decides.
+    pub bits: Option<radix_types::BitsWidth>,
 }
 
 impl<'a> FieldOrder<'a> {
@@ -139,6 +162,23 @@ impl<'a> FieldOrder<'a> {
             dynamic: false,
             tuple_fields: &NO_TUPLE_FIELDS,
             tuple: None,
+            bits_fields: &NO_BITS_FIELDS,
+            bits: None,
+        }
+    }
+
+    /// The same metadata for a value whose static type is (or holds) a `bN`.
+    #[must_use]
+    pub fn with_bits(self, bits: Option<radix_types::BitsWidth>) -> Self {
+        Self { bits, ..self }
+    }
+
+    /// The same metadata with the declared raw-bits fields attached.
+    #[must_use]
+    pub fn with_bits_fields(self, bits_fields: &'a FieldBitsWidths) -> Self {
+        Self {
+            bits_fields,
+            ..self
         }
     }
 
@@ -1338,7 +1378,9 @@ impl Value {
     ) -> Result<String, RunnerError> {
         Ok(match self {
             Value::Int(v) => display_int_at_width(*v, float_width),
-            Value::UInt(v) => v.to_string(),
+            Value::UInt(v) => order
+                .bits
+                .map_or_else(|| v.to_string(), |width| display_bits(*v, width)),
             Value::Magnus(v) => v.to_string(),
             Value::Dec(carrier, scale) => crate::decimal::format(*carrier, *scale),
             Value::Float(v) => display_float_at_width(*v, float_width),
@@ -1490,7 +1532,9 @@ fn display_tuple<'a>(
             display_element(
                 item,
                 interner,
-                order.with_tuple(part.and_then(|part| part.tuple.as_ref())),
+                order
+                    .with_tuple(part.and_then(|part| part.tuple.as_ref()))
+                    .with_bits(part.and_then(|part| part.bits)),
                 span,
                 part.and_then(|part| part.width),
             )
@@ -1549,7 +1593,9 @@ fn display_in_collection(
 ) -> Result<String, RunnerError> {
     Ok(match value {
         Value::Int(v) => display_int_at_width(*v, float_width),
-        Value::UInt(v) => v.to_string(),
+        Value::UInt(v) => order
+            .bits
+            .map_or_else(|| v.to_string(), |width| display_bits(*v, width)),
         Value::Magnus(v) => v.to_string(),
         Value::Array(items) => display_list(&items.borrow(), interner, order, span, float_width)?,
         Value::Map(entries) => {
@@ -1774,7 +1820,8 @@ fn display_construction(
         // inherited from the enclosing value.
         let field_order = order
             .with_char_text(order.char_fields.contains(&(def, *symbol)))
-            .with_tuple(order.tuple_fields.get(&(def, *symbol)));
+            .with_tuple(order.tuple_fields.get(&(def, *symbol)))
+            .with_bits(order.bits_fields.get(&(def, *symbol)).copied());
         let val_str = display_element(value, interner, field_order, span, width)?;
         parts.push(format!("{field} = {val_str}"));
     }
@@ -1867,6 +1914,97 @@ pub fn int_bitwise_binop(
             "bitwise operand requires numerus",
         )),
     }
+}
+
+const NEGATIVE_BITS_SHIFT: &str = "negative shift count";
+
+/// The stored pattern of a raw-bits value. A `bN` cell always holds its
+/// pattern zero-extended inside N bits; a value outside that
+/// range is a representation defect, never silently masked.
+fn bits_pattern(
+    value: &Value,
+    width: radix_types::BitsWidth,
+    span: Span,
+) -> Result<u64, RunnerError> {
+    let pattern = match value {
+        Value::UInt(pattern) => *pattern,
+        Value::Int(pattern) => u64::try_from(*pattern)
+            .map_err(|_| RunnerError::internal(span, "bits operand is not zero-extended"))?,
+        _ => return Err(RunnerError::internal(span, "bits operand requires bN")),
+    };
+    if width.bits() < 64 && pattern >> width.bits() != 0 {
+        return Err(RunnerError::internal(
+            span,
+            "bits operand exceeds its width",
+        ));
+    }
+    Ok(pattern)
+}
+
+/// Mask of the low N bits of a `bN`.
+fn bits_mask(width: radix_types::BitsWidth) -> u64 {
+    if width.bits() == 64 {
+        u64::MAX
+    } else {
+        (1u64 << width.bits()) - 1
+    }
+}
+
+/// `¬x` on a `bN`: flips exactly N bits.
+pub(crate) fn bits_not(
+    value: &Value,
+    width: radix_types::BitsWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    let pattern = bits_pattern(value, width, span)?;
+    Ok(Value::UInt(!pattern & bits_mask(width)))
+}
+
+/// `∧ ∨ ⊻ ⇐ ⇒` on a `bN`: every result stays inside N bits. A shift count of
+/// N or more gives all zeros (the count is not wrapped); a negative count is
+/// a run-time error; a right shift fills with zeros.
+pub(crate) fn bits_binop(
+    left: &Value,
+    right: &Value,
+    op: MirBinOp,
+    width: radix_types::BitsWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    let left = bits_pattern(left, width, span)?;
+    let pattern = match op {
+        MirBinOp::BitAnd | MirBinOp::BitOr | MirBinOp::BitXor => {
+            let right = bits_pattern(right, width, span)?;
+            match op {
+                MirBinOp::BitAnd => left & right,
+                MirBinOp::BitOr => left | right,
+                _ => left ^ right,
+            }
+        }
+        MirBinOp::Shl | MirBinOp::Shr => {
+            let count = match right {
+                Value::Int(count) => i128::from(*count),
+                Value::UInt(count) => i128::from(*count),
+                _ => return Err(RunnerError::internal(span, "shift count requires numerus")),
+            };
+            if count < 0 {
+                return Err(RunnerError::internal(span, NEGATIVE_BITS_SHIFT));
+            }
+            match u32::try_from(count) {
+                Ok(count) if count < width.bits() => {
+                    if op == MirBinOp::Shl {
+                        (left << count) & bits_mask(width)
+                    } else {
+                        left >> count
+                    }
+                }
+                _ => 0,
+            }
+        }
+        _ => {
+            return Err(RunnerError::internal(span, "invalid bits bitwise operator"));
+        }
+    };
+    Ok(Value::UInt(pattern))
 }
 
 /// Width authority for `wrapping<W>` execution (D11.8): the ring Z/2^W whose
@@ -2677,6 +2815,7 @@ pub fn format_template(
         widths,
         char_text,
         &[],
+        &[],
         interner,
         order,
         span,
@@ -2691,6 +2830,7 @@ pub fn format_template_shaped(
     widths: &[Option<NumericWidth>],
     char_text: &[bool],
     tuples: &[Option<TupleParts>],
+    bits: &[Option<radix_types::BitsWidth>],
     interner: &Interner,
     order: FieldOrder<'_>,
     span: Span,
@@ -2723,7 +2863,10 @@ pub fn format_template_shaped(
                 let width = widths.get(arg_index).copied().flatten();
                 let chars = char_text.get(arg_index).copied().unwrap_or(false);
                 let tuple = tuples.get(arg_index).and_then(Option::as_ref);
-                let order = order.with_char_text(chars).with_tuple(tuple);
+                let order = order
+                    .with_char_text(chars)
+                    .with_tuple(tuple)
+                    .with_bits(bits.get(arg_index).copied().flatten());
                 arg.display_typed(interner, order, span, width)
             })
             .transpose()?

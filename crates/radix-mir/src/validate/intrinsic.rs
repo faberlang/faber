@@ -3161,6 +3161,12 @@ impl Validator<'_, '_> {
         )
     }
 
+    /// Operand types of the bit operations: integers and the raw-bits
+    /// markers `b8 b16 b32 b64`.
+    pub(crate) fn is_bitwise_operand_type(&self, ty: MirType) -> bool {
+        self.is_numeric_integral_type(ty) || matches!(self.type_kind(ty), Type::Bits(_))
+    }
+
     pub(crate) fn is_float_type(&self, ty: MirType) -> bool {
         matches!(
             self.type_kind(ty),

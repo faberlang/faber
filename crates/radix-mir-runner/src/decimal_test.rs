@@ -352,10 +352,12 @@ fn tuple_prints_as_iuncta_at_every_depth_with_per_element_widths() {
     let wrapped_shape = value::TupleParts(vec![
         value::TuplePart {
             width: None,
+            bits: None,
             tuple: Some(shape.clone()),
         },
         value::TuplePart {
             width: None,
+            bits: None,
             tuple: None,
         },
     ]);

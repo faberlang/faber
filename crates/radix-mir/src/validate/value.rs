@@ -65,12 +65,18 @@ impl Validator<'_, '_> {
                     }
                     MirUnOp::BitNot => {
                         if let Some(operand_ty) = operand_ty
-                            && !self.is_numeric_integral_type(operand_ty)
+                            && !self.is_bitwise_operand_type(operand_ty)
                         {
-                            self.error(value.span, "bitwise not operand is not numeric integral");
+                            self.error(
+                                value.span,
+                                "bitwise not operand is not numeric integral or bits",
+                            );
                         }
-                        if !self.is_numeric_integral_type(value.ty) {
-                            self.error(value.span, "bitwise not result is not numeric integral");
+                        if !self.is_bitwise_operand_type(value.ty) {
+                            self.error(
+                                value.span,
+                                "bitwise not result is not numeric integral or bits",
+                            );
                         }
                     }
                     MirUnOp::Sqrt
@@ -172,14 +178,14 @@ impl Validator<'_, '_> {
                     | MirBinOp::Shl
                     | MirBinOp::Shr => {
                         if let Some(ty) = lhs_ty
-                            && !self.is_numeric_integral_type(ty)
+                            && !self.is_bitwise_operand_type(ty)
                         {
-                            self.error(value.span, "bitwise lhs is not numeric integral");
+                            self.error(value.span, "bitwise lhs is not numeric integral or bits");
                         }
                         if let Some(ty) = rhs_ty
-                            && !self.is_numeric_integral_type(ty)
+                            && !self.is_bitwise_operand_type(ty)
                         {
-                            self.error(value.span, "bitwise rhs is not numeric integral");
+                            self.error(value.span, "bitwise rhs is not numeric integral or bits");
                         }
                     }
                 }
