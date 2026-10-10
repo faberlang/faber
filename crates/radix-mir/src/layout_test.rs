@@ -145,6 +145,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
         }
         Type::Array(_)
         | Type::Map(_, _)
+        | Type::Ledger(_, _)
         | Type::Set(_)
         | Type::Option(_)
         | Type::Enum(_)
