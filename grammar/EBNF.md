@@ -1907,9 +1907,13 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   is failable (a handler is required except for a proven constant); into
   `wrapping<W>` / `saturating<W>` it reduces / clamps and cannot fail. `inf ↦`
   a float rounds to nearest-even and yields ±∞ beyond the float's finite range
-  (a constant beyond it is a compile error); a float `↦ inf` truncates toward
-  zero and fails only for NaN and ±∞. `inf ↦ d64` is range-checked and failable;
-  `d64 ↦ inf` truncates and cannot fail. `textus`/`ascii ↦ inf` accepts an
+  (a constant beyond it is a compile error); a float or `d64` `↦ inf` needs a
+  rounding choice, `via Floor|Ceil|HalfEven|Trunc` (toward −∞, toward +∞,
+  nearest with ties to the even neighbour, toward zero); the bare conversion is
+  `SEM016 float_to_integer_requires_rounding`. The conversion is failable and
+  reports on the error channel for NaN and ±∞ (a handler or `⊥ default` applies,
+  as for other failable numeric conversions). `inf ↦ d64` is range-checked and
+  failable. `textus`/`ascii ↦ inf` accepts an
   optional sign and digits of any length (failable on malformed input; `via
   Hex|Bin|Oct` as for other integers); `inf ↦ textus` writes the decimal digits.
   `inf ↔ octeti via Be|Le` is the minimal two's-complement encoding and its

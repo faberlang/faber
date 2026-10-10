@@ -34,8 +34,8 @@ locale = "en"
 #   • Going back down is a checked narrowing: `x ↦ u64 ⊥ 9` yields 9 when the
 #     value does not fit. `↦ float` rounds, and a value beyond the float
 #     range is `inf` or `-inf` (the printed spelling of float infinity; the
-#     integer type `inf` is unrelated to it). A float enters `inf` by
-#     truncation, a `d64` by half-even rounding; NaN and ∞ fail.
+#     integer type `inf` is unrelated to it). A float or `d64` enters `inf`
+#     only with a rounding choice (`via Trunc`, `via HalfEven`); NaN and ∞ fail.
 #   • `↦` and `¶` work on `inf` like any integer: parse and render at a
 #     radix with `via Hex`, pad with a format spec, print a field.
 #
@@ -134,20 +134,21 @@ main {
     const inf below ← 0 - huge
     print below ↦ float
 
-    # 9. Into inf: a float truncates toward zero, a d64 rounds half-even
-    #    (the `d64 ↦ i64` rule), and only a NaN or infinite float fails.
+    # 9. Into inf: a float or d64 converts only with a rounding choice
+    #    (`via Trunc` toward zero, `via HalfEven` ties to even); a NaN or
+    #    infinite float fails.
     const float frac ← 12.75
     const float negfrac ← -12.75
     const d64 half ← 12.5
     const d64 threequarters ← 12.75
     const float not_a_number ← 0.0 ÷ 0.0
     const float float_infinity ← ∞
-    print frac ↦ inf
-    print negfrac ↦ inf
-    print half ↦ inf
-    print threequarters ↦ inf
-    print not_a_number ↦ inf ⊥ 5
-    print float_infinity ↦ inf ⊥ 6
+    print frac ↦ inf via Trunc
+    print negfrac ↦ inf via Trunc
+    print half ↦ inf via HalfEven
+    print threequarters ↦ inf via HalfEven
+    print not_a_number ↦ inf via Trunc ⊥ 5
+    print float_infinity ↦ inf via Trunc ⊥ 6
     const inf trillions ← 100000000000000000000
     print trillions ↦ d64 ⊥ 0.5
 

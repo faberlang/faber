@@ -1,0 +1,60 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "A float or decimal converts to an integer only with a rounding choice: via Floor, Ceil, HalfEven or Trunc."
+syntax = "<float|d64> ↦ <integer> via Floor|Ceil|HalfEven|Trunc"
+related = ["↦", "via"]
+locale = "en"
++++
+# =============================================================================
+# float to integer — the four rounding choices
+# =============================================================================
+#
+# What this teaches:
+#   • A fractional number converts to an integer only with a rounding choice:
+#     `via Floor` (toward -inf), `via Ceil` (toward +inf), `via HalfEven`
+#     (nearest, ties to the even neighbour) or `via Trunc` (toward zero).
+#   • The bare conversion `x ↦ int` is a compile error (SEM016
+#     float_to_integer_requires_rounding); see float-to-int-reject.fab.
+#   • The same four words apply to a `d64` source.
+#
+# Common mistakes:
+#   • Assuming a default rounding — there is none; say which one is meant.
+# =============================================================================
+
+main {
+    const float a ← 2.5
+    const float b ← 3.5
+    const float c ← -2.5
+    const float d ← -0.5
+
+    print a ↦ int via Floor
+    print b ↦ int via Floor
+    print c ↦ int via Floor
+    print d ↦ int via Floor
+
+    print a ↦ int via Ceil
+    print b ↦ int via Ceil
+    print c ↦ int via Ceil
+    print d ↦ int via Ceil
+
+    print a ↦ int via HalfEven
+    print b ↦ int via HalfEven
+    print c ↦ int via HalfEven
+    print d ↦ int via HalfEven
+
+    print a ↦ int via Trunc
+    print b ↦ int via Trunc
+    print c ↦ int via Trunc
+    print d ↦ int via Trunc
+
+    const d64 p ← 2.5
+    const d64 q ← 3.5
+    print p ↦ i64 via HalfEven
+    print q ↦ i64 via HalfEven
+    print p ↦ i64 via Floor
+    print q ↦ i64 via Ceil
+}
