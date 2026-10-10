@@ -538,6 +538,11 @@ impl super::FaberCodegen<'_> {
                 Self::expect_no_form_args(form)?;
                 Ok(width.faber_marker().to_owned())
             }
+            // Bits markers (`b8`..`b64`) are bare, locale-neutral tokens.
+            Type::Bits(width) => {
+                Self::expect_no_form_args(form)?;
+                Ok(width.faber_marker().to_owned())
+            }
             Type::Array(_) => Ok(format!("l{}", self.fused_width_marker(form)?)),
             Type::Tensor(_, shape) => match form.args.as_slice() {
                 [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)]

@@ -126,6 +126,59 @@ fn short_width(ty: TypeId) -> HirTypeForm {
     semantic_form(TypeFormLevel::SHORT, ty, Vec::new())
 }
 
+/// Bits markers (`b8`..`b64`) round trip as bare, locale-neutral tokens at
+/// SHORT and LONG, bare and as a list child, in both locales.
+#[test]
+fn bits_markers_render_bare_at_short_and_long_in_both_locales() {
+    use radix_types::BitsWidth;
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    for (width, marker) in [
+        (BitsWidth::B8, "b8"),
+        (BitsWidth::B16, "b16"),
+        (BitsWidth::B32, "b32"),
+        (BitsWidth::B64, "b64"),
+    ] {
+        let bits_ty = types.bits(width);
+        let list_ty = types.array(bits_ty);
+        let list_form = semantic_form(
+            TypeFormLevel::LONG,
+            list_ty,
+            vec![type_arg(short_width(bits_ty))],
+        );
+        let forms = vec![
+            (declared_site(1), short_width(bits_ty)),
+            (
+                declared_site(2),
+                semantic_form(TypeFormLevel::LONG, bits_ty, Vec::new()),
+            ),
+            (declared_site(3), list_form),
+        ];
+        let mut codegen = FaberCodegen::new(&types, &interner);
+        codegen.authored_type_forms = forms.into_iter().collect();
+        assert_eq!(
+            render_at(&codegen, &declared_site(1), bits_ty, &LaSurface),
+            marker
+        );
+        assert_eq!(
+            render_at(&codegen, &declared_site(1), bits_ty, &EnSurface),
+            marker
+        );
+        assert_eq!(
+            render_at(&codegen, &declared_site(2), bits_ty, &LaSurface),
+            marker
+        );
+        assert_eq!(
+            render_at(&codegen, &declared_site(3), list_ty, &LaSurface),
+            format!("lista<{marker}>")
+        );
+        assert_eq!(
+            render_at(&codegen, &declared_site(3), list_ty, &EnSurface),
+            format!("list<{marker}>")
+        );
+    }
+}
+
 /// An authored `iuncta` element label rides the child form and re-emits as
 /// `label: type`; unlabeled slots keep the bare spelling.
 #[test]
