@@ -144,6 +144,29 @@ incipit {
 }
 
 #[test]
+fn template_literal_text_keeps_fullwidth_punctuation() {
+    let plain = literal_text(
+        r#"
+incipit {
+    fixum textus raw ← "a，b、c。é"
+    nota raw
+}
+"#,
+    );
+    assert_eq!(plain, "a，b、c。é");
+    let (template, args) = scriptum_application(
+        r#"
+incipit {
+    fixum textus out ← "a，§，b、c。é"("salve")
+    nota out
+}
+"#,
+    );
+    assert_eq!(template, "a，§，b、c。é");
+    assert_eq!(args, vec!["str:salve".to_owned()]);
+}
+
+#[test]
 fn positional_named_hole_application_erases_to_section_form() {
     let (template, args) = scriptum_application(
         r#"

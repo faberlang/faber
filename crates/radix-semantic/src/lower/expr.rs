@@ -971,7 +971,8 @@ impl Lowerer<'_> {
             return None;
         }
 
-        let erased = self.interner.intern(&analysis.erased);
+        // Template text is a string payload: keep source bytes (no NFKC).
+        let erased = self.interner.intern_raw(&analysis.erased);
         let positional = if has_labeled {
             self.reorder_labeled_actuals(&analysis, lowered)?
         } else {
