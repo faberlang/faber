@@ -126,6 +126,9 @@ mod non_null_mutating_receiver_test;
 #[path = "nondum_function_test.rs"]
 mod nondum_function_test;
 #[cfg(test)]
+#[path = "optional_element_get_test.rs"]
+mod optional_element_get_test;
+#[cfg(test)]
 #[path = "ponde_failable_test.rs"]
 mod ponde_failable_test;
 #[cfg(test)]
