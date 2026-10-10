@@ -1,7 +1,8 @@
 //! A2-LIFT G01: the built-in math functions as scalar float methods lower on
-//! the MIR runner and Rust. The TypeScript, Go, Python, Swift and Haskell
-//! leaves have no scalar math lowering and fail closed with a named
-//! diagnostic, never an emitted `x.radix()` method call on a number. Rust maps
+//! the MIR runner, Rust, TypeScript, Go, LLVM, S-expression and Swift. The
+//! Python and Haskell leaves have no scalar math lowering and fail closed with
+//! a named diagnostic, never an emitted `x.radix()` method call on a number.
+//! Swift maps each function onto Foundation's free function. Rust maps
 //! every function onto the std `f64` function (IEEE: NaN on a domain miss,
 //! infinity on overflow), computing `f32` through `f64` as the runner does.
 
@@ -32,30 +33,47 @@ fn has_args(diagnostics: &[crate::Diagnostic], expected: &[(&str, &str)]) -> boo
     })
 }
 
-#[cfg(all(feature = "hir-ts", feature = "hir-go", feature = "hir-swift"))]
+#[cfg(feature = "hir-python")]
 #[test]
-fn typescript_go_python_and_swift_fail_closed_for_every_function() {
+fn python_fails_closed_for_every_function() {
     for function in radix_types::MirMathFunction::SCALAR {
         let source = source(function.latin_name(), "f32");
-        for (target, label) in [
-            (Target::HirTypeScript, "TypeScript"),
-            (Target::HirGo, "Go"),
-            (Target::HirPython, "Python"),
-            (Target::HirSwift, "Swift"),
-        ] {
-            let diagnostics = failure_diagnostics(target, &source);
+        let diagnostics = failure_diagnostics(Target::HirPython, &source);
+        assert!(
+            has_args(
+                &diagnostics,
+                &[
+                    ("issue", "scalar_math_function_unsupported"),
+                    ("function", function.name()),
+                    ("target", "Python"),
+                ]
+            ),
+            "Python {}: {diagnostics:?}",
+            function.name()
+        );
+    }
+}
+
+#[cfg(feature = "hir-swift")]
+#[test]
+fn swift_lowers_every_function_to_the_foundation_free_function() {
+    for function in radix_types::MirMathFunction::SCALAR {
+        for ty in ["f32", "f64"] {
+            let result = compile(Target::HirSwift, &source(function.latin_name(), ty));
+            let Some(Output::Swift(out)) = result.output else {
+                panic!("swift output for {}: {:?}", function.name(), result.diagnostics);
+            };
+            let expected = match function {
+                radix_types::MirMathFunction::Ln => "log",
+                other => other.name(),
+            };
             assert!(
-                has_args(
-                    &diagnostics,
-                    &[
-                        ("issue", "scalar_math_function_unsupported"),
-                        ("function", function.name()),
-                        ("target", label),
-                    ]
-                ),
-                "{label} {}: {diagnostics:?}",
-                function.name()
+                out.code.contains(&format!("Foundation.{expected}(x)")),
+                "{} {ty}:\n{}",
+                function.name(),
+                out.code
             );
+            assert!(out.code.contains("import Foundation"), "{}", out.code);
         }
     }
 }
