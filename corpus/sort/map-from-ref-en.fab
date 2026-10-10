@@ -1,0 +1,22 @@
++++
+locale = "en"
+term = "sort-map-en"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+
+# `from` sorts a map's values; `ref` sorts a map's keys.
+main {
+    var map<string, int> m ← empty
+    m["gamma"] ← 30
+    m["alpha"] ← 20
+    m["beta"] ← 10
+    m["delta"] ← 20
+    print sort via asc from m
+    print sort via desc from m
+    print sort via asc ref m
+    print sort via desc ref m
+    print m.length()
+}

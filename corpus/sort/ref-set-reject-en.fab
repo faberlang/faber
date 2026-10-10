@@ -1,0 +1,18 @@
++++
+locale = "en"
+term = "sort-ref-set-reject-en"
+kind = "reject"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = false
+summary = "ref sorts map keys and is refused on a set."
+no_expected = "rejects"
+diagnostic = "SEM010:sort_ref_requires_map"
++++
+
+# This exemplum intentionally fails to compile: `ref` is admitted on a map only.
+main {
+    var set<int> s ← empty
+    s.add(1)
+    print sort via asc ref s
+}

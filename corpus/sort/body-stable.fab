@@ -1,0 +1,40 @@
++++
+locale = "la"
+term = "sort-body-stable"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+# A body returns the sort key. Ties keep source order in both directions:
+# descending is not the reverse of ascending.
+genus Person {
+    varia textus name
+    varia numerus age
+}
+
+functio names(lista<Person> ps) → textus {
+    varia textus out ← ""
+    itera ex ps fixum p {
+        si out ≡ "" {
+            out ← p.name
+        }
+        secus {
+            out ← out + " " + p.name
+        }
+    }
+    redde out
+}
+
+incipit {
+    fixum lista<Person> people ← [Person { name = "Livia", age = 30 }, Person { name = "Marcus", age = 30 }, Person { name = "Aulus", age = 25 }, Person { name = "Cornelia", age = 25 }, Person { name = "Titus", age = 40 }]
+    fixum lista<Person> young ← ordinata via ascendens ex people fixum p {
+        redde p.age
+    }
+    fixum lista<Person> old ← ordinata via descendens ex people fixum p {
+        redde p.age
+    }
+    nota names(young)
+    nota names(old)
+    nota names(people)
+}

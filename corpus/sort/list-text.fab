@@ -1,0 +1,15 @@
++++
+locale = "la"
+term = "sort-text"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+# Text sorts by code point: uppercase before lowercase, accents after ASCII.
+incipit {
+    fixum lista<textus> names ← ["marcus", "Livia", "aulus", "Cornelia", "émilia"]
+    nota ordinata via ascendens ex names
+    nota ordinata via descendens ex names
+    nota names
+}

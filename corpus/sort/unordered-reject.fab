@@ -1,0 +1,23 @@
++++
+locale = "la"
+term = "sort-unordered-reject"
+kind = "reject"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = false
+summary = "A source with no natural order needs a body that returns a key."
+no_expected = "rejects"
+diagnostic = "SEM010:sort_source_unordered"
++++
+
+# This exemplum intentionally fails to compile: Persona has no natural order
+# and the sort has no body.
+genus Persona {
+    varia textus nomen
+    varia numerus aetas
+}
+
+incipit {
+    fixum lista<Persona> personae ← [Persona { nomen = "Livia", aetas = 30 }]
+    nota ordinata via ascendens ex personae
+}

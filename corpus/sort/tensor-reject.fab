@@ -1,0 +1,18 @@
++++
+locale = "la"
+term = "sort-tensor-reject"
+kind = "reject"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = false
+summary = "A tensor cannot be the source of a sort expression."
+no_expected = "rejects"
+diagnostic = "SEM010:sort_tensor_unsupported"
++++
+
+# This exemplum intentionally fails to compile: a tensor source is refused.
+incipit {
+    fixum lista<f32> flat ← [3.0, 1.0, 2.0, 4.0]
+    fixum tf32[4] t ← flat ↦ tf32[4]
+    nota ordinata via ascendens ex t
+}

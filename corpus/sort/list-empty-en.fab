@@ -1,0 +1,18 @@
++++
+locale = "en"
+term = "sort-empty-en"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+
+# Sorting an empty list gives an empty list in both directions.
+main {
+    const list<int> xs ← empty
+    const list<int> up ← sort via asc from xs
+    const list<int> down ← sort via desc from xs
+    print up
+    print down
+    print up.length()
+}

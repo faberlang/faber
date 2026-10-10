@@ -1,0 +1,17 @@
++++
+locale = "la"
+term = "sort-ref-list-reject"
+kind = "reject"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = false
+summary = "ref sorts map keys and is refused on a list."
+no_expected = "rejects"
+diagnostic = "SEM010:sort_ref_requires_map"
++++
+
+# This exemplum intentionally fails to compile: `de` is admitted on a map only.
+incipit {
+    fixum lista<numerus> xs ← [3, 1, 2]
+    nota ordinata via ascendens de xs
+}

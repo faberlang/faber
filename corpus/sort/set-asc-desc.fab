@@ -1,0 +1,19 @@
++++
+locale = "la"
+term = "sort-set"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+# A set sorts into a list; the set itself is unchanged.
+incipit {
+    varia copia<numerus> s ← vacua
+    s.adde(7)
+    s.adde(3)
+    s.adde(5)
+    s.adde(1)
+    nota ordinata via ascendens ex s
+    nota ordinata via descendens ex s
+    nota s.longitudo()
+}

@@ -1,0 +1,20 @@
++++
+locale = "en"
+term = "sort-set-en"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+
+# A set sorts into a list; the set itself is unchanged.
+main {
+    var set<int> s ← empty
+    s.add(7)
+    s.add(3)
+    s.add(5)
+    s.add(1)
+    print sort via asc from s
+    print sort via desc from s
+    print s.length()
+}

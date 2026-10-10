@@ -1,0 +1,21 @@
++++
+locale = "la"
+term = "sort-map"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+# `from` sorts a map's values; `ref` sorts a map's keys.
+incipit {
+    varia tabula<textus, numerus> m ← vacua
+    m["gamma"] ← 30
+    m["alpha"] ← 20
+    m["beta"] ← 10
+    m["delta"] ← 20
+    nota ordinata via ascendens ex m
+    nota ordinata via descendens ex m
+    nota ordinata via ascendens de m
+    nota ordinata via descendens de m
+    nota m.longitudo()
+}
