@@ -93,16 +93,18 @@ def run_or_read(log_env: str, cargo_cmd: list[str]) -> str:
 # --- HIR/MIR matrix measurement parsing (same contract as the retired
 # --- generate-ebnf-matrix.py; measurement only) -----------------------------
 
+CORPUS_ROOT = (ROOT / "corpus").as_posix()
+
+
 def normalize_corpus_path(raw: str) -> str | None:
-    """Reduce any exemplum path to a stable `corpus/<rel>` form or return None."""
+    """Reduce any exemplum path to a stable `corpus/<rel>` form or return None.
+
+    Absolute paths are made relative to this script's own repository root, so
+    the result does not depend on what the checkout directory is called.
+    """
     raw = raw.replace("\\", "/").strip()
-    for marker in (
-        "/radix/corpus/",
-        "radix/corpus/",
-    ):
-        idx = raw.find(marker)
-        if idx >= 0:
-            return "corpus/" + raw[idx + len(marker):]
+    if raw.startswith(CORPUS_ROOT + "/"):
+        return "corpus/" + raw[len(CORPUS_ROOT) + 1:]
     if raw.endswith(".fab") and "/" in raw and not raw.startswith(("/", ".")):
         return f"corpus/{raw}"
     return None

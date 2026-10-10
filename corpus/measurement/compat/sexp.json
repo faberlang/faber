@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 319,
-    "analyzable": 401
+    "capable": 330,
+    "analyzable": 407
   },
   "terms": [
     {
@@ -156,7 +156,7 @@
     {
       "term": "clausura",
       "rule": "keyword",
-      "capable": 4,
+      "capable": 5,
       "analyzable": 5
     },
     {
@@ -348,7 +348,7 @@
     {
       "term": "functio",
       "rule": "keyword",
-      "capable": 14,
+      "capable": 15,
       "analyzable": 15
     },
     {
@@ -372,8 +372,8 @@
     {
       "term": "genus",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 8
+      "capable": 11,
+      "analyzable": 12
     },
     {
       "term": "iace",
@@ -570,8 +570,8 @@
     {
       "term": "nondum",
       "rule": "annotation",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "numerus",

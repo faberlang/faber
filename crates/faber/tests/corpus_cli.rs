@@ -106,7 +106,7 @@ fn corpus_runs_pilot_suite_across_source_package_and_rejection_cases() {
     assert_eq!(rejection["exit"], 1);
     assert!(
         rows.iter()
-            .any(|row| row["case"] == "packages/public-proba" && row["status"] == "pass")
+            .any(|row| row["case"] == "packages/proba-canary" && row["status"] == "pass")
     );
     assert!(
         rows.iter()

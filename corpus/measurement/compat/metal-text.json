@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 401
+    "analyzable": 407
   },
   "terms": [
     {
@@ -373,7 +373,7 @@
       "term": "genus",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 8
+      "analyzable": 12
     },
     {
       "term": "iace",
@@ -571,7 +571,7 @@
       "term": "nondum",
       "rule": "annotation",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 4
     },
     {
       "term": "numerus",
