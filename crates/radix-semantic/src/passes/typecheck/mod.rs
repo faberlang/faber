@@ -1285,6 +1285,10 @@ mod bits_conversio_test;
 mod bits_operator_test;
 
 #[cfg(test)]
+#[path = "bits_same_width_conversio_test.rs"]
+mod bits_same_width_conversio_test;
+
+#[cfg(test)]
 #[path = "ordo_conversio_test.rs"]
 mod ordo_conversio_test;
 

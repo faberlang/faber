@@ -2317,7 +2317,13 @@ fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> 
             | crate::Type::Tensor(..)
             | crate::Type::Param(_)
             | crate::Type::Alias(..)
+            // `bN` conversions: the hint is refused by name in
+            // the checker when the width stays the same.
+            | crate::Type::Bits(_)
             | crate::Type::Error => return true,
+            crate::Type::Array(elem) => {
+                return matches!(lowerer.types.get(*elem), crate::Type::Bits(_));
+            }
             _ => return false,
         }
     }

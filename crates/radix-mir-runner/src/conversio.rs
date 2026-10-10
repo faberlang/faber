@@ -150,6 +150,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::Primitive(Primitive::Octeti) => {
                 self.convert_to_octeti_from(value, source_ty, params, span)
             }
+            // `uN ↦ bN` and `bN ↦ bN` at one width keep the pattern (the
+            // checker admits no other source); bits live as unsigned cells.
+            Type::Bits(_) => match value {
+                Value::UInt(_) => Ok(value),
+                Value::Int(v) => Ok(Value::UInt(v as u64)),
+                other => Err(RunnerError::unsupported(
+                    span,
+                    &format!("runtime conversio to bits from {other:?}"),
+                )),
+            },
             Type::Primitive(Primitive::Ascii) => self.convert_to_ascii(value, recovery, span),
             Type::Primitive(Primitive::Littera) => {
                 self.convert_to_littera(value, params, recovery, span)

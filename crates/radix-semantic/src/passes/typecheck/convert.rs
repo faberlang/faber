@@ -619,6 +619,18 @@ impl TypeChecker<'_> {
             self.invalid_conversion(issue, span);
             return self.error_type;
         }
+        // Need unit 1.4a: same-width `bN ↔ uN` rows and the named
+        // refusals for every other number pairing.
+        if let Some(result_ty) =
+            self.check_bits_conversio(source_ty, target_resolved, !params.is_empty(), span)
+        {
+            if !self.types.equals(result_ty, self.error_type)
+                && let Some(recovery) = recovery.as_deref_mut()
+            {
+                self.note_conversio_recovery_checked(recovery, target_resolved);
+            }
+            return result_ty;
+        }
         // D10.6: `littera` text rows and the `Code` hint.
         if let Some(result_ty) = self.check_littera_conversio(
             source_ty,

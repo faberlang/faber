@@ -2416,6 +2416,22 @@ help = "跨越 boundary 前先通过 lista materialize cursor"
 message = "从 numerus、fractus 或 bivalens 到 octeti 的 conversion 未指定"
 help = "使用 chorda 或显式 byte conversion helpers"
 
+[diagnostics.SEM016.issues.bits_conversion_width_mismatch]
+message = "a bN converts only to the unsigned number or bits type of the same width"
+help = "convert a bN only to the unsigned number or bits type of the same width, such as b8 to u8"
+
+[diagnostics.SEM016.issues.bits_signed_conversion_unsettled]
+message = "conversion between bits and a signed integer is not settled"
+help = "convert to the unsigned type of the same width (u8 for b8); bN to signed iN is not settled yet"
+
+[diagnostics.SEM016.issues.bits_float_conversion_unsettled]
+message = "conversion between bits and a float is not settled"
+help = "convert to the unsigned type of the same width; bN to float is not settled yet"
+
+[diagnostics.SEM016.issues.bits_via_clause_not_allowed]
+message = "a same-width bits conversion takes no via clause"
+help = "remove the via clause; a same-width bN conversion keeps the bit pattern and takes no hint"
+
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
 message = "从 octeti 到 numerus 的 conversion 未指定"
 help = "使用 chorda 或显式 byte conversion helpers"

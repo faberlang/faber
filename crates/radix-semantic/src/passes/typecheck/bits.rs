@@ -17,6 +17,23 @@ const BITS_ARITHMETIC_REFUSED: &str = "bits_arithmetic_refused";
 const BITS_OPERAND_MISMATCH: &str = "bits_operand_mismatch";
 pub(super) const BITS_LITERAL_OUT_OF_RANGE: &str = "bits_literal_out_of_range";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";
+const BITS_CONVERSION_WIDTH_MISMATCH: &str = "bits_conversion_width_mismatch";
+const BITS_SIGNED_CONVERSION_UNSETTLED: &str = "bits_signed_conversion_unsettled";
+const BITS_FLOAT_CONVERSION_UNSETTLED: &str = "bits_float_conversion_unsettled";
+const BITS_VIA_CLAUSE_NOT_ALLOWED: &str = "bits_via_clause_not_allowed";
+
+/// What the other side of a `bN` conversion is, for the same-width rows
+/// (need, unit 1.4a).
+enum BitsConversioPeer {
+    /// The same bit width, as `bN` or `uN`: representation preserving.
+    SameWidth,
+    /// A bit width or number of a different (or no) width.
+    WidthMismatch,
+    /// A signed `iN` (ruling C2 pending).
+    Signed,
+    /// An IEEE float (ruling C3 pending).
+    Float,
+}
 
 impl TypeChecker<'_> {
     /// The `bN` width of `ty`, looking through aliases and resolved holes.
@@ -192,5 +209,107 @@ impl TypeChecker<'_> {
             }
             _ => None,
         }
+    }
+
+    /// The bits-side element/scalar type of a conversion side: the type itself
+    /// or, for a `lista<T>`, its element.
+    fn bits_conversio_cell(&self, ty: TypeId, listed: bool) -> TypeId {
+        let resolved = self.resolve_inferred_type(ty);
+        if listed && let Type::Array(elem) = self.types.get(resolved) {
+            return *elem;
+        }
+        resolved
+    }
+
+    fn bits_conversio_peer(&self, width: BitsWidth, other: TypeId) -> Option<BitsConversioPeer> {
+        use radix_types::NumericWidth as W;
+        let other = self.numeric_expected_type(self.resolve_inferred_type(other));
+        let same = |bits: u32| {
+            if bits == width.bits() {
+                BitsConversioPeer::SameWidth
+            } else {
+                BitsConversioPeer::WidthMismatch
+            }
+        };
+        match self.types.get(other) {
+            Type::Bits(peer) => Some(same(peer.bits())),
+            Type::SizedNumeric(_, W::U8) => Some(same(8)),
+            Type::SizedNumeric(_, W::U16) => Some(same(16)),
+            Type::SizedNumeric(_, W::U32) => Some(same(32)),
+            Type::SizedNumeric(_, W::U64) => Some(same(64)),
+            Type::SizedNumeric(_, W::I8 | W::I16 | W::I32 | W::I64) => {
+                Some(BitsConversioPeer::Signed)
+            }
+            Type::SizedNumeric(_, W::F16 | W::BF16 | W::F32 | W::F64)
+            | Type::Primitive(Primitive::Fractus) => Some(BitsConversioPeer::Float),
+            Type::SizedNumeric(_, W::D64 | W::Inf) | Type::Primitive(Primitive::Numerus) => {
+                Some(BitsConversioPeer::WidthMismatch)
+            }
+            _ => None,
+        }
+    }
+
+    /// `bN` conversions: scalar `bN ↔ uN` and `lista<bN> ↔ lista<uN>` at the
+    /// same N take no `via` clause and keep the pattern; every other number
+    /// pairing is a named refusal. `None` when no side is a `bN` (or the
+    /// other side is not a number or bits), so the ordinary rows run.
+    pub(super) fn check_bits_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target: TypeId,
+        has_hint: bool,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let scalar = (self.bits_width_of(source_ty), self.bits_width_of(target));
+        let listed = |this: &Self, ty: TypeId| match this.types.get(this.resolve_inferred_type(ty))
+        {
+            Type::Array(elem) => this.bits_width_of(*elem).is_some(),
+            _ => false,
+        };
+        let is_list = |this: &Self, ty: TypeId| {
+            matches!(
+                this.types.get(this.resolve_inferred_type(ty)),
+                Type::Array(_)
+            )
+        };
+        let lists = if scalar.0.is_some() || scalar.1.is_some() {
+            false
+        } else if (listed(self, source_ty) && is_list(self, target))
+            || (listed(self, target) && is_list(self, source_ty))
+        {
+            true
+        } else {
+            return None;
+        };
+        let source_cell = self.bits_conversio_cell(source_ty, lists);
+        let target_cell = self.bits_conversio_cell(target, lists);
+        let (width, other) = match (
+            self.bits_width_of(source_cell),
+            self.bits_width_of(target_cell),
+        ) {
+            (Some(width), _) => (width, target_cell),
+            (None, Some(width)) => (width, source_cell),
+            (None, None) => return None,
+        };
+        // A conversion between two bN of one width is the identity row.
+        if self.types.equals(
+            self.resolve_inferred_type(source_ty),
+            self.resolve_inferred_type(target),
+        ) {
+            if has_hint {
+                self.invalid_conversion(BITS_VIA_CLAUSE_NOT_ALLOWED, span);
+                return Some(self.error_type);
+            }
+            return None;
+        }
+        let issue = match self.bits_conversio_peer(width, other)? {
+            BitsConversioPeer::SameWidth if has_hint => BITS_VIA_CLAUSE_NOT_ALLOWED,
+            BitsConversioPeer::SameWidth => return Some(self.resolve_inferred_type(target)),
+            BitsConversioPeer::WidthMismatch => BITS_CONVERSION_WIDTH_MISMATCH,
+            BitsConversioPeer::Signed => BITS_SIGNED_CONVERSION_UNSETTLED,
+            BitsConversioPeer::Float => BITS_FLOAT_CONVERSION_UNSETTLED,
+        };
+        self.invalid_conversion(issue, span);
+        Some(self.error_type)
     }
 }
