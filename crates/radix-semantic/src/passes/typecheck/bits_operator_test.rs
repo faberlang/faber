@@ -180,6 +180,34 @@ fn literal_wider_than_the_bits_slot_is_refused() {
     );
 }
 
+/// The named refusal is the only error for the fault: the refused literal
+/// takes the cell's type, so no store mismatch follows it.
+#[test]
+fn refused_bits_literal_reports_once_without_cascade() {
+    for source in [
+        "incipit { fixum b8 x ← 0x1ff }",
+        "incipit { fixum b16 x ← 0x1ffff }",
+        "incipit { fixum b8 x ← -1 }",
+    ] {
+        let issues: Vec<String> = test_support::analyze_source(source)
+            .diagnostics
+            .iter()
+            .filter(|d| d.is_error())
+            .filter_map(|d| {
+                d.args
+                    .iter()
+                    .find(|arg| arg.name == "issue")
+                    .map(|arg| arg.value.clone())
+            })
+            .collect();
+        assert_eq!(
+            issues,
+            vec!["bits_literal_out_of_range".to_string()],
+            "{source:?}"
+        );
+    }
+}
+
 #[test]
 fn negative_literal_in_a_bits_slot_is_refused() {
     rejects("incipit { fixum b8 x ← -1 }", "bits_literal_out_of_range");

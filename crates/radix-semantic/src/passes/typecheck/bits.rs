@@ -98,8 +98,9 @@ impl TypeChecker<'_> {
                 BITS_LITERAL_OUT_OF_RANGE,
                 span,
             );
-            return self.error_type;
         }
+        // A refused literal still takes the cell's type, so the store checks
+        // that follow do not pile mismatches on the named refusal.
         self.bits_type_of(expected.expect("bits width came from an expected type"))
     }
 
@@ -121,7 +122,7 @@ impl TypeChecker<'_> {
                         BITS_LITERAL_OUT_OF_RANGE,
                         operand.span,
                     );
-                    return Some(self.error_type);
+                    return expected.map(|slot| self.bits_type_of(slot));
                 }
                 None
             }
