@@ -1681,8 +1681,10 @@ into `saturating` slots. This departs from Rust `Saturating<T>` deliberately.
 happens in the ether): `(a + b) / 2` with `wrapping<u8>` 200 and 100 is
 `300 / 2 = 150`, `a + b ≡ 44` is falsum and `print a + b` prints `300`. For
 `+ - * ⇐ ∧ ∨ ⊻ ¬` that feed a store directly, reducing once at the end equals
-reducing each step, so a backend may keep per-operation modular arithmetic
-there, where no one can observe the difference; the operand of `⇒`, `/`, `%`
+reducing each step, so, for number types, a backend may keep per-operation
+modular arithmetic there, where no one can observe the difference (raw bits
+`b8`..`b64` are not numbers and act at their width, `docs/design/numeric-model.md`
+section 8); the operand of `⇒`, `/`, `%`
 and a comparison is read, so it is exact. Ported hash and crypto code keeps its
 results by storing into a `wrapping<W>` slot before dividing, shifting right or
 comparing. Within one policy
@@ -1726,7 +1728,8 @@ from the destination. With `u8` operands `a + b` and `a * b` are `u16`, `a - b`,
 `u8`. Only trapping types grow. A `模数<W>` or `saturatus<W>`
 operand takes part by its declared width and gives the same range-rule type: the
 word reduces or clamps only where a value is stored into a slot, never
-mid-expression. Growth stops at the 64-bit containers: past them the
+mid-expression (number types only: raw bits `b8`..`b64` act at their width,
+`docs/design/numeric-model.md` section 8). Growth stops at the 64-bit containers: past them the
 type keeps the sign of the range (`i64` if it can be negative, else `u64`), so
 `u64 - u64` is `i64` (operator ruling 2026-09-30: it does not become `inf`;
 write `a ↦ inf - b` for the exact difference). `_` slots take the expression's
@@ -1812,8 +1815,9 @@ a `wrapping<W>` type it reduces the exact source value modulo 2^W, and into a
 (integer and `d64` sources). `fractus ↦` an integer width `W` saturates at the target
 width, NaN converting to `0` (the cross-tier Rust `as` status quo); integer
 `W` arithmetic traps on overflow while float→integer conversion
-clamps. Overflow policy lives in the type. There are no per-operation checked,
-wrapping, or saturating method families. To ask "does this fit?" of untrusted
+clamps. Overflow policy lives in the type. For number types there are no per-operation
+checked, wrapping, or saturating method families (raw bits `b8`..`b64` act at
+their width, `docs/design/numeric-model.md` section 8). To ask "does this fit?" of untrusted
 input, convert it to the narrow type with `↦` and handle the failure through the
 error channel. The `inf` rows are in The unbounded integer `inf`.
 
