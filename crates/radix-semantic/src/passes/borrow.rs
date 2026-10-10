@@ -213,6 +213,17 @@ fn run(
     }
 }
 
+/// How a binding's `bind_alias_roots` entry is written.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Rebind {
+    /// A new declaration: no earlier name or entry exists.
+    Fresh,
+    /// A rebind that runs whenever control reaches it.
+    Must,
+    /// A rebind that may not run, or whose effect may not stay local.
+    May,
+}
+
 /// Per-definition ownership state tracked at the root value level.
 ///
 /// The pass intentionally does not model partial moves or field-granular
@@ -303,6 +314,11 @@ struct BorrowChecker<'a> {
     /// either name reaches both. Closed transitively when the alias is
     /// recorded. Value types (scalars, text) copy and never enter this table.
     bind_alias_roots: FxHashMap<DefId, FxHashSet<DefId>>,
+    /// Nesting depth of the statement being checked: zero only for a
+    /// straight-line `name ← place` rebind written as its own statement in a
+    /// block that no branch, loop, closure or short-circuit guards. A rebind
+    /// at depth zero is a must-rebind; anywhere deeper it only may happen.
+    flow_depth: u32,
     /// Parameters declared `mut` (`in` mode or a `mut` access marker).
     mut_params: FxHashSet<DefId>,
     /// Tensor parameters written without any access marker (not `mut`, `own`,
@@ -384,6 +400,7 @@ impl<'a> BorrowChecker<'a> {
             de_aliases: FxHashSet::default(),
             tensor_view_roots: FxHashMap::default(),
             bind_alias_roots: FxHashMap::default(),
+            flow_depth: 0,
             mut_params: FxHashSet::default(),
             nonmut_tensor_params: FxHashSet::default(),
             nonmut_tensor_aliases: FxHashMap::default(),
@@ -524,6 +541,7 @@ impl<'a> BorrowChecker<'a> {
         self.de_aliases.clear();
         self.tensor_view_roots.clear();
         self.bind_alias_roots.clear();
+        self.flow_depth = 0;
         self.mut_params.clear();
         self.nonmut_tensor_params.clear();
         self.nonmut_tensor_aliases.clear();
@@ -547,6 +565,23 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn check_stmt(&mut self, stmt: &HirStatement) {
+        // A statement-level `name ← value` keeps the depth: it is the one
+        // statement shape whose rebind is a must-rebind. Any other statement
+        // may guard what it contains, so everything nested in it is deeper.
+        let straight = matches!(
+            &stmt.kind,
+            HirStatementKind::Expr(expr) if matches!(expr.kind, HirExpressionKind::Assign(..))
+        );
+        if !straight {
+            self.flow_depth += 1;
+        }
+        self.check_stmt_inner(stmt);
+        if !straight {
+            self.flow_depth -= 1;
+        }
+    }
+
+    fn check_stmt_inner(&mut self, stmt: &HirStatement) {
         self.stmt_node = self
             .regions
             .and_then(|facts| facts.cfg().node_for_hir_id(stmt.id));
@@ -660,7 +695,7 @@ impl<'a> BorrowChecker<'a> {
                         self.check_expr(init);
                     }
                     self.note_de_alias(local.def_id, local.ty, init);
-                    self.note_bind_alias(local.def_id, local.ty, init);
+                    self.note_bind_alias(local.def_id, local.ty, init, Rebind::Fresh);
                     if !local.mutable {
                         self.const_agg_aliases.insert(local.def_id);
                     }
@@ -1162,8 +1197,31 @@ impl<'a> BorrowChecker<'a> {
     /// value, so `c` and `a` overlap for the call-site borrow rule and the
     /// `⇇` alias rule. Exclusive (`own`/`copy`) bindings duplicate and do not
     /// alias, and value types copy.
-    fn note_bind_alias(&mut self, local: DefId, ty: Option<TypeId>, init: &HirExpression) {
-        self.bind_alias_roots.remove(&local);
+    ///
+    /// The table is flow-aware in two steps. A must-rebind (`Rebind::Must`)
+    /// replaces `local`'s entry and detaches `local` from every entry that
+    /// named it, since those entries keep the storage `local` used to name.
+    /// A may-rebind (`Rebind::May`: inside a branch, loop, closure or
+    /// short-circuit, or of a `mut` parameter) keeps the old entry and adds
+    /// the new roots, so both possible storages stay overlapping names.
+    fn note_bind_alias(
+        &mut self,
+        local: DefId,
+        ty: Option<TypeId>,
+        init: &HirExpression,
+        rebind: Rebind,
+    ) {
+        let must = match rebind {
+            Rebind::Fresh => true,
+            Rebind::Must => !self.mut_params.contains(&local),
+            Rebind::May => false,
+        };
+        if must {
+            self.bind_alias_roots.remove(&local);
+            if rebind == Rebind::Must {
+                self.detach_storage_name(local);
+            }
+        }
         self.nonmut_tensor_aliases.remove(&local);
         self.nonmut_agg_aliases.remove(&local);
         self.const_agg_aliases.remove(&local);
@@ -1180,6 +1238,9 @@ impl<'a> BorrowChecker<'a> {
             .cloned()
             .unwrap_or_default();
         roots.insert(source);
+        if let Some(prior) = self.bind_alias_roots.get(&local) {
+            roots.extend(prior.iter().copied());
+        }
         self.bind_alias_roots.insert(local, roots);
         if self.is_tensor_typed(init)
             && let Some(origin) = self.nonmut_tensor_origin(source)
@@ -1191,6 +1252,31 @@ impl<'a> BorrowChecker<'a> {
             && origin != local
         {
             self.nonmut_agg_aliases.insert(local, origin);
+        }
+    }
+
+    /// `name` was rebound to a new place: the entries that named `name` keep
+    /// naming its old storage, so one of them takes `name`'s place in the
+    /// others and `name` leaves every entry.
+    fn detach_storage_name(&mut self, name: DefId) {
+        let mut holders: Vec<DefId> = self
+            .bind_alias_roots
+            .iter()
+            .filter(|(holder, roots)| **holder != name && roots.contains(&name))
+            .map(|(holder, _)| *holder)
+            .collect();
+        let Some(&rep) = holders.iter().min_by_key(|holder| holder.0) else {
+            return;
+        };
+        holders.retain(|holder| *holder != rep);
+        for holder in holders {
+            if let Some(roots) = self.bind_alias_roots.get_mut(&holder) {
+                roots.remove(&name);
+                roots.insert(rep);
+            }
+        }
+        if let Some(roots) = self.bind_alias_roots.get_mut(&rep) {
+            roots.remove(&name);
         }
     }
 
@@ -2271,6 +2357,12 @@ impl HirVisitor for BorrowChecker<'_> {
                 self.finish_loop(&entry, block);
             }
             HirExpressionKind::Assign(target, value) => {
+                let rebind = if self.flow_depth == 0 {
+                    Rebind::Must
+                } else {
+                    Rebind::May
+                };
+                self.flow_depth += 1;
                 self.revive_on_assign(target);
                 self.check_lvalue(target);
                 if self.stores_tensor_view(value) {
@@ -2283,7 +2375,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     self.check_mut_tensor_param_rebind(target);
                 }
                 if let HirExpressionKind::Path(def_id) = &target.kind {
-                    self.note_bind_alias(*def_id, target.ty, value);
+                    self.note_bind_alias(*def_id, target.ty, value, rebind);
                 }
                 if target.ty.is_some_and(|ty| self.types.is_copy_view(ty))
                     || Self::root_def_id(target).is_some_and(|id| self.copy_roots.contains(&id))
@@ -2302,6 +2394,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 } else {
                     self.visit_expr(value);
                 }
+                self.flow_depth -= 1;
             }
             HirExpressionKind::CopyInto { target, value } => {
                 self.check_copy_into(target, value);

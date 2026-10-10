@@ -228,3 +228,43 @@ fn sequential_calls_release_call_scoped_borrows() {
         "    var tf32[2, 2] alias ← g\n    mut_read(mut g, fresh)\n    mut_read(mut alias, fresh)\n    mut_mut(mut fresh, mut g)\n    mut_read(mut fresh, alias)",
     );
 }
+
+// =============================================================================
+// Flow: an unconditional rebind detaches; a conditional rebind may-aliases
+// =============================================================================
+
+#[test]
+fn source_rebind_detaches_the_stale_alias() {
+    assert_accepts(
+        "    var tf32[2, 2] alias ← g\n    g ← fresh\n    mut_read(mut g, alias)\n    mut_mut(mut alias, mut g)",
+    );
+}
+
+#[test]
+fn source_rebind_keeps_the_other_aliases_of_the_old_storage() {
+    assert_rejects(
+        "    var tf32[2, 2] left ← g\n    var tf32[2, 2] right ← g\n    g ← fresh\n    mut_mut(mut left, mut right)",
+        "mutable_borrow_conflict",
+    );
+}
+
+#[test]
+fn conditional_alias_rebind_keeps_the_may_alias() {
+    assert_rejects(
+        "    var tf32[2, 2] alias ← g\n    if true {\n        alias ← fresh\n    }\n    mut_read(mut g, alias)",
+        "use_while_mutably_borrowed",
+    );
+}
+
+#[test]
+fn conditional_source_rebind_keeps_the_may_alias() {
+    assert_rejects(
+        "    var tf32[2, 2] alias ← g\n    if true {\n        g ← fresh\n    }\n    mut_read(mut g, alias)",
+        "use_while_mutably_borrowed",
+    );
+}
+
+#[test]
+fn unconditional_alias_rebind_clears_the_alias() {
+    assert_accepts("    var tf32[2, 2] alias ← g\n    alias ← fresh\n    mut_read(mut g, alias)");
+}
