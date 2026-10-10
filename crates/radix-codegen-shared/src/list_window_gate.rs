@@ -10,8 +10,9 @@
 //! runner (which executes it) implement the form. This gate rejects any module
 //! that takes one before an emitter runs, naming the target, until a target's
 //! own emission lands and adds itself to [`target_admits_list_window`]. The
-//! octeti endian window `buf[lo‥hi] ↦ W via Be` indexes an octeti receiver, not
-//! a list, and is untouched.
+//! octeti window, plain or under an endian conversion `buf[lo‥hi] ↦ W via Be`,
+//! indexes a byte receiver (`lista<b8>`, the word `octeti`), not a list, and is
+//! untouched.
 
 use crate::CodegenError;
 use radix_diagnostics::DiagnosticArg;
@@ -45,10 +46,17 @@ fn is_list_window(types: &TypeTable, expr: &HirExpression) -> bool {
     let (Some(object_ty), Some(index_ty)) = (object.ty, index.ty) else {
         return false;
     };
-    matches!(
-        resolved(types, object_ty),
-        Type::Array(_) | Type::BoundedArray { .. }
-    ) && matches!(resolved(types, index_ty), Type::Intervallum(_))
+    let is_list = match resolved(types, object_ty) {
+        // A byte list is the `octeti` word (`lista<b8>`, need): its
+        // window keeps the octeti slice emission the word always had.
+        Type::Array(element) => !matches!(
+            resolved(types, *element),
+            Type::Bits(radix_types::BitsWidth::B8)
+        ),
+        Type::BoundedArray { .. } => true,
+        _ => false,
+    };
+    is_list && matches!(resolved(types, index_ty), Type::Intervallum(_))
 }
 
 /// # Errors

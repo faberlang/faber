@@ -78,3 +78,16 @@ fn list_text_conversion_leaves_other_pairs_alone() {
     assert!(reject_list_text_conversion(&types, Some(bytes), text, "HirGo").is_ok());
     assert!(reject_list_text_conversion(&types, None, text, "HirGo").is_ok());
 }
+
+#[test]
+fn byte_text_conversion_is_the_eight_bit_pair_in_both_directions() {
+    let mut types = TypeTable::new();
+    let text = types.primitive(Primitive::Textus);
+    let (b8, b16) = (types.bits(BitsWidth::B8), types.bits(BitsWidth::B16));
+    let (bytes, units) = (list_of(&mut types, b8), list_of(&mut types, b16));
+    assert!(is_byte_text_conversion(&types, bytes, text));
+    assert!(is_byte_text_conversion(&types, text, bytes));
+    assert!(!is_byte_text_conversion(&types, units, text));
+    assert!(!is_byte_text_conversion(&types, text, units));
+    assert!(!is_byte_text_conversion(&types, bytes, bytes));
+}

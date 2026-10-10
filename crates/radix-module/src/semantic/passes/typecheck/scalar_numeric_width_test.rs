@@ -617,6 +617,9 @@ incipit {
 
 #[test]
 fn octeti_is_not_numeric_arithmetic() {
+    // `octeti` is `lista<b8>`: the list `+` is refused by the
+    // numeric-list operator law, and an element is a raw-bits `b8` that takes
+    // no arithmetic either (bits are not numbers).
     test_support::assert_rejects_with_issue(
         r"
 incipit {
@@ -625,7 +628,17 @@ incipit {
     fixum _ both ← left + right
 }
 ",
-        "numeric_operands_required",
+        "numeric_lista_operator_law",
+    );
+    test_support::assert_rejects_with_issue(
+        r"
+incipit {
+    fixum b8 left ← 1
+    fixum b8 right ← 2
+    fixum _ both ← left + right
+}
+",
+        "bits_arithmetic_refused",
     );
 }
 

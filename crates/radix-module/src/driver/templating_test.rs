@@ -258,23 +258,35 @@ fn octeti_literal_matches_in_elige_pattern() {
     assert!(result.success(), "expected octeti pattern match, got: {:?}", result.diagnostics);
 }
 
-// ── octetus builtin (D10.4: `octetus ≡ numerus<u8>`) ──
+// ── octetus builtin (retired: need, ruling B8) ──
+//
+// `octetus` (en `byte`) was `numerus<u8>`. The word is retired with the old
+// `octeti` primitive: the element of `octeti` is the raw-bits `b8`, a number
+// is spelled `u8`, and the two convert explicitly (`↦ u8`). The test keeps its
+// id; it now proves the u8 lowering of the number and the retirement of the
+// word.
 
 #[test]
 fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
     let session = test_session(Target::HirRust);
-    let source = "functio firstByte(octeti buf) → octetus {\n    fixum octetus b ← buf.accipe(0)\n    redde b\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    fixum octetus a ← firstByte(sig)\n    fixum u8 raw ← a\n    sig.appende(raw)\n    nota a\n}\n";
+    let source = "functio firstByte(octeti buf) → u8 {\n    fixum b8 b ← buf.accipe(0)\n    redde b ↦ u8\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    fixum u8 a ← firstByte(sig)\n    fixum b8 raw ← sig.accipe(1)\n    sig.appende(raw)\n    nota a\n}\n";
     let result = compile(&session, "octet_builtin.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
     assert!(
         code.contains("fn firstByte(buf: Vec<u8>) -> u8"),
-        "expected octetus param/ret to lower to u8, got:\n{code}"
+        "expected the u8 return and the byte-list param to lower to u8, got:\n{code}"
     );
     assert!(code.contains("buf.get(0"), "expected accipe to lower to buf.get, got:\n{code}");
     assert!(
         code.contains("sig.push(raw)"),
         "expected appende to lower to push, got:\n{code}"
+    );
+    assert_compile_fails_with_issue(
+        &session,
+        "octetus_retired.fab",
+        "functio firstByte(octeti buf) → octetus {\n    redde 0\n}\n",
+        "retired_byte_word",
     );
 }
 

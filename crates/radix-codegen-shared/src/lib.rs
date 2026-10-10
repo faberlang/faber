@@ -304,8 +304,8 @@ pub trait Codegen {
 }
 
 pub use bits_gate::{
-    list_text_conversion, list_width_change, reject_bits_type, reject_list_text_conversion,
-    reject_list_width_decode,
+    is_byte_text_conversion, list_text_conversion, list_width_change, reject_bits_type,
+    reject_list_text_conversion, reject_list_width_decode,
 };
 pub use device_ident::{MANGLE_PREFIX, is_device_reserved, mangle_device_ident};
 pub use ident::{

@@ -205,6 +205,29 @@ pub fn list_text_conversion(
     (from_list != to_list).then_some((from, to))
 }
 
+/// True for the 8-bit pair of [`list_text_conversion`]: `lista<b8> ↦ string`
+/// (the UTF-8 decode) and `string ↦ lista<b8>` (the UTF-8 encode). The word
+/// `octeti` (en `bytes`) is `lista<b8>` (need, ruling B9), so this is
+/// the pair its text conversions take; an emitter that implements it narrows
+/// its refusal to the 16- and 32-bit pairs.
+#[must_use]
+pub fn is_byte_text_conversion(types: &TypeTable, source: TypeId, target: TypeId) -> bool {
+    let bytes = |ty: TypeId| match types.get(types.peel_access_marker(ty).1) {
+        Type::Array(element) => matches!(
+            types.get(types.peel_access_marker(*element).1),
+            Type::Bits(width) if width.bits() == 8
+        ),
+        _ => false,
+    };
+    let text = |ty: TypeId| {
+        matches!(
+            types.get(types.peel_access_marker(ty).1),
+            Type::Primitive(Primitive::Textus)
+        )
+    };
+    (bytes(source) && text(target)) || (text(source) && bytes(target))
+}
+
 /// Refuse a `lista<bN>` to text or text to `lista<bN>` conversion, naming the
 /// conversion and the `backend` (the target's Debug name). Without this the
 /// emitters print a stringify, a cast or an opaque handle re-tag, which is a

@@ -13,8 +13,8 @@ use radix_hir::{DefId, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite
 use radix_lexer::{Interner, Symbol};
 use radix_syntax::TypeFormLevel;
 use radix_types::{
-    CollectionKind, IndexId, MarkerFamily, Primitive, SemanticMutability, SemanticParamMode,
-    TensorFamilyKind, Type, TypeId,
+    BitsWidth, CollectionKind, IndexId, MarkerFamily, Primitive, SemanticMutability,
+    SemanticParamMode, TensorFamilyKind, Type, TypeId,
 };
 use rustc_hash::FxHashMap;
 
@@ -682,6 +682,16 @@ impl super::FaberCodegen<'_> {
             Type::BoundedOcteti { capacity } => {
                 Self::expect_no_form_args(form)?;
                 Ok(self.bounded_primitive_head(Primitive::Octeti, *capacity, surface))
+            }
+            // The authored word `octeti` (en `bytes`) witnesses `lista<b8>`
+            // and carries no type argument (need, ruling B9).
+            Type::Array(element)
+                if form.args.is_empty()
+                    && matches!(self.types.get(*element), Type::Bits(BitsWidth::B8)) =>
+            {
+                Ok(surface
+                    .type_surface(TypeBindingKind::Primitive(Primitive::Octeti))
+                    .to_owned())
             }
             Type::Array(_) => Ok(format!(
                 "{}<{}>",
