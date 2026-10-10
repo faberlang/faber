@@ -280,7 +280,7 @@ fn numeric_lista_glyphs_reject_scalars_and_mixed_elements() {
         r"functio scalar(lista<numerus> xs) → lista<numerus> {
     redde xs ⊙ 2
 }",
-        "glyph_operands_unsupported",
+        "glyph_scalar_operand",
     );
     assert_rejects_with_issue(
         r"functio mixed(lista<i32> a, lista<i64> b) → lista<i32> {

@@ -1992,6 +1992,14 @@ help = "`≡` ต้องใช้ชนิดเดียวกัน; เป�
 message = "{kind} ของ bool ไม่ใช่ค่าความจริง"
 help = "ลดค่าก่อน: `{reducta} {via} {omnia} {ex} mask` หรือ `{reducta} {via} {quilibet} {ex} mask`"
 
+[diagnostics.SEM011.issues.glyph_scalar_operand]
+message = "{kind} {op} รับ aggregate สองค่า"
+help = "กับ scalar ให้เขียน `*` หรือ `/`"
+
+[diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
+message = "{op} บน {kind} ยังไม่รองรับ"
+help = "เปรียบเทียบด้วยการเรียงลำดับหรือการเปรียบเทียบแบบตรงทุกประการ หรือเปรียบเทียบองค์ประกอบในเครื่องมือ"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "ชนิดของอาร์กิวเมนต์ไม่ตรงกัน"
 help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"

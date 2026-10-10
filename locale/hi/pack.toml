@@ -1992,6 +1992,14 @@ help = "`≡` के लिए समान प्रकार आवश्य�
 message = "bool का {kind} सत्य-मान नहीं है"
 help = "पहले घटाएँ: `{reducta} {via} {omnia} {ex} mask` या `{reducta} {via} {quilibet} {ex} mask`"
 
+[diagnostics.SEM011.issues.glyph_scalar_operand]
+message = "{kind} {op} दो aggregate लेता है"
+help = "scalar के साथ `*` या `/` लिखें"
+
+[diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
+message = "{kind} पर {op} अभी स्वीकृत नहीं है"
+help = "क्रम या सटीक तुलना से तुलना करें, या tooling में तत्वों की तुलना करें"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "तर्क प्रकार असंगति"
 help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"

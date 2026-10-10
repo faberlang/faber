@@ -2909,6 +2909,10 @@ help = "shorten the {textus}<N> literal to fit its declared capacity, or use unb
 message = "operator {op} does not apply to these operand types"
 help = "use the pinned built-in families: · on vectors/matrices, × on 3-vectors, ⊗ on vectors, ⊙ on identical vector/matrix/tensor shapes"
 
+[diagnostics.SEM011.issues.glyph_scalar_operand]
+message = "a {kind} {op} takes two aggregates"
+help = "with a scalar write `*` or `/`"
+
 [diagnostics.SEM011.issues.glyph_static_shape_required]
 message = "operator {op} requires statically known shapes"
 help = "use literal vector widths or matrix/tensor shapes; shape-generic overload is deferred to Phase 2"
@@ -3214,7 +3218,7 @@ message = "tensor arithmetic requires numeric element type"
 help = "use numeric tensor or sparsa element types"
 
 [diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
-message = "{op} on tensors is not admitted yet"
+message = "{op} on a {kind} is not admitted yet"
 help = "compare with an ordering or exact comparison, or compare the elements in tooling"
 
 [diagnostics.SEM011.issues.tensor_lift_decimal_element_unsupported]

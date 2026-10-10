@@ -432,3 +432,113 @@ fn a_bool_aggregate_is_not_a_truth_value() {
         &[],
     );
 }
+
+// --- lists join the aggregate diagnostics (Q-E, 2026-10-04 comparisons ruling) --------
+
+#[test]
+fn list_equality_against_a_scalar_names_the_per_element_glyph() {
+    for ty in ["lista<f32>", "lista<f32, 4>", "lista<numerus>"] {
+        for op in ["≡", "≢"] {
+            rejects(
+                &function(&format!("{ty} a"), "bivalens", &format!("a {op} 2")),
+                SemanticErrorKind::OperandTypesInvalid,
+                "aggregate_equality_scalar_operand",
+                &[("kind", "list")],
+            );
+        }
+    }
+    // Two lists keep the whole-value rule.
+    accepts(&function(
+        "lista<numerus> a, lista<numerus> b",
+        "bivalens",
+        "a ≡ b",
+    ));
+}
+
+#[test]
+fn a_bool_list_is_not_a_truth_value() {
+    for ty in ["lista<bivalens>", "lista<bivalens, 3>"] {
+        rejects(
+            &format!("functio lifted({ty} m) {{\n    si m {{ nota \"yes\" }}\n}}"),
+            SemanticErrorKind::OperandTypesInvalid,
+            "aggregate_mask_not_truth_value",
+            &[("kind", "list")],
+        );
+    }
+}
+
+#[test]
+fn hadamard_glyphs_with_a_scalar_operand_name_the_scalar_forms() {
+    for (ty, kind) in [
+        (T, "tensor"),
+        (V, "vector"),
+        (M, "matrix"),
+        ("lista<f32>", "list"),
+        ("lista<f32, 3>", "list"),
+    ] {
+        for op in ["⊙", "⊘"] {
+            rejects(
+                &function(&format!("{ty} a"), ty, &format!("a {op} 2.0")),
+                SemanticErrorKind::OperandTypesInvalid,
+                "glyph_scalar_operand",
+                &[("kind", kind), ("op", op)],
+            );
+            rejects(
+                &function(&format!("{ty} a, f32 s"), ty, &format!("s {op} a")),
+                SemanticErrorKind::OperandTypesInvalid,
+                "glyph_scalar_operand",
+                &[("kind", kind), ("op", op)],
+            );
+        }
+    }
+}
+
+#[test]
+fn approximate_comparison_over_lists_fails_closed_at_check_time() {
+    for op in ["≈", "≉"] {
+        for body in [
+            format!("a {op} b"),
+            format!("a {op} 1.0"),
+            format!("1.0 {op} a"),
+        ] {
+            rejects(
+                &function("lista<f32> a, lista<f32> b", "bivalens", &body),
+                SemanticErrorKind::OperandTypesInvalid,
+                "tensor_approx_comparison_deferred",
+                &[("op", op), ("kind", "list")],
+            );
+        }
+        rejects(
+            &function(
+                "lista<f32, 4> a, lista<f32, 4> b",
+                "bivalens",
+                &format!("a {op} b"),
+            ),
+            SemanticErrorKind::OperandTypesInvalid,
+            "tensor_approx_comparison_deferred",
+            &[("op", op), ("kind", "list")],
+        );
+    }
+}
+
+#[test]
+fn approximate_comparison_deferral_names_its_aggregate_kind() {
+    rejects(
+        &function(&format!("{V} a, {V} b"), "bivalens", "a ≈ b"),
+        SemanticErrorKind::OperandTypesInvalid,
+        "tensor_approx_comparison_deferred",
+        &[("op", "≈"), ("kind", "vector")],
+    );
+    rejects(
+        &function(&format!("{M} a"), "bivalens", "a ≉ 1.0"),
+        SemanticErrorKind::OperandTypesInvalid,
+        "tensor_approx_comparison_deferred",
+        &[("op", "≉"), ("kind", "matrix")],
+    );
+    rejects(
+        &function(&format!("{T} a, {T} b"), "bivalens", "a ≈ b"),
+        SemanticErrorKind::OperandTypesInvalid,
+        "tensor_approx_comparison_deferred",
+        &[("op", "≈"), ("kind", "tensor")],
+    );
+}

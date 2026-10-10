@@ -355,6 +355,12 @@ impl TypeChecker<'_> {
         if self.is_aggregate_mask_type(cond_ty) {
             return Some(cond_ty);
         }
+        // A `lista<bivalens>` is a mask, never a truth value and never a
+        // select mask: name the reductions.
+        if self.is_bool_list_mask(cond_ty) {
+            self.report_mask_not_truth_value(cond_ty, cond.span);
+            return None;
+        }
         // Same report as the hinted check: an open hole binds to `bivalens`,
         // anything else is one expression mismatch (no follow-on error).
         let bivalens = self.bool_type();

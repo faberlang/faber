@@ -1980,6 +1980,14 @@ help = "`≡` 要求类型完全一致；请比较形状相同的聚合"
 message = "bool 的 {kind} 不是真值"
 help = "先归约：`{reducta} {via} {omnia} {ex} mask` 或 `{reducta} {via} {quilibet} {ex} mask`"
 
+[diagnostics.SEM011.issues.glyph_scalar_operand]
+message = "{kind} {op} 需要两个聚合值"
+help = "与标量请使用 `*` 或 `/`"
+
+[diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
+message = "尚不支持对 {kind} 使用 {op}"
+help = "请使用排序或精确比较，或在工具中逐元素比较"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "argument 类型不匹配"
 help = "使表达式类型与期望类型一致"

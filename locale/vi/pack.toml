@@ -1980,6 +1980,14 @@ help = "`≡` yêu cầu các kiểu giống hệt nhau; so sánh các tập h�
 message = "{kind} của bool không phải là giá trị chân lý"
 help = "hãy rút gọn trước: `{reducta} {via} {omnia} {ex} mask` hoặc `{reducta} {via} {quilibet} {ex} mask`"
 
+[diagnostics.SEM011.issues.glyph_scalar_operand]
+message = "{kind} {op} nhận hai aggregate"
+help = "với scalar hãy viết `*` hoặc `/`"
+
+[diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
+message = "{op} trên {kind} chưa được chấp nhận"
+help = "so sánh bằng thứ tự hoặc so sánh chính xác, hoặc so sánh các phần tử trong công cụ"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "không khớp kiểu đối số"
 help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"

@@ -40,6 +40,9 @@ enum AggregateKind {
     /// Compares as its mathematical tensor (a differing shape is `falsum`) and
     /// has no lifted operators yet, so only the scalar and `≈` rejections apply.
     Sparsa,
+    /// A `lista`, bounded or not: it compares as itself (`≡` is the scalar
+    /// rule), so only the scalar-operand, mask and `≈` rejections apply.
+    List,
 }
 
 impl AggregateKind {
@@ -49,6 +52,7 @@ impl AggregateKind {
             Self::Vector => "vector",
             Self::Matrix => "matrix",
             Self::Sparsa => "sparsa",
+            Self::List => "list",
         }
     }
 }
@@ -77,7 +81,9 @@ impl TypeChecker<'_> {
                 extent,
             });
         }
-        let register = self.register_operand(ty)?;
+        let Some(register) = self.register_operand(ty) else {
+            return self.list_operand(ty);
+        };
         Some(AggregateOperand {
             kind: match register.kind {
                 RegisterKind::Vector => AggregateKind::Vector,
@@ -86,6 +92,49 @@ impl TypeChecker<'_> {
             elem: register.elem,
             extent: register.extent,
         })
+    }
+
+    /// A `lista<T>` / `lista<T, N>` operand: its element and capacity (an
+    /// unbounded list has the unspecified shape).
+    fn list_operand(&mut self, ty: TypeId) -> Option<AggregateOperand> {
+        let elem = self.lista_element_type(ty)?;
+        let extent = self.lista_capacity(ty);
+        let extent = match extent {
+            Some(capacity) => capacity,
+            None => self.types.unspecified_shape(),
+        };
+        Some(AggregateOperand {
+            kind: AggregateKind::List,
+            elem,
+            extent,
+        })
+    }
+
+    /// The name of the aggregate kind (`tensor`, `vector`, `matrix`, `list`)
+    /// of `ty`; `None` for a scalar or a `sparsa`.
+    pub(super) fn glyph_aggregate_kind(&mut self, ty: TypeId) -> Option<&'static str> {
+        self.aggregate_operand(ty)
+            .filter(|aggregate| aggregate.kind != AggregateKind::Sparsa)
+            .map(|aggregate| aggregate.kind.name())
+    }
+
+    /// The kind name for a diagnostic that names the aggregate of an operand
+    /// pair (the first operand that is one).
+    pub(super) fn aggregate_kind_of_pair(
+        &mut self,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+    ) -> &'static str {
+        [lhs_ty, rhs_ty]
+            .into_iter()
+            .find_map(|ty| self.aggregate_operand(ty))
+            .map_or("tensor", |aggregate| aggregate.kind.name())
+    }
+
+    /// Whether `ty` is a `lista` of bool: a mask that is not a truth value.
+    pub(in crate::passes::typecheck) fn is_bool_list_mask(&mut self, ty: TypeId) -> bool {
+        self.list_operand(ty)
+            .is_some_and(|aggregate| self.is_bool(aggregate.elem))
     }
 
     fn sparsa_operand(&mut self, ty: TypeId) -> Option<(TypeId, IndexId)> {
@@ -148,7 +197,7 @@ impl TypeChecker<'_> {
         // shape known only at run time is a value question (`falsum`). A
         // sparsa compares as its mathematical tensor, so its shapes never
         // conflict statically.
-        if left.kind != AggregateKind::Sparsa
+        if !matches!(left.kind, AggregateKind::Sparsa | AggregateKind::List)
             && self.static_shape_conflict(left.extent, right.extent)
         {
             let args = [
@@ -376,8 +425,9 @@ impl TypeChecker<'_> {
 
     /// Whether a condition type is an aggregate that may be a select mask.
     pub(in crate::passes::typecheck) fn is_aggregate_mask_type(&mut self, ty: TypeId) -> bool {
-        self.aggregate_operand(ty)
-            .is_some_and(|aggregate| aggregate.kind != AggregateKind::Sparsa)
+        self.aggregate_operand(ty).is_some_and(|aggregate| {
+            !matches!(aggregate.kind, AggregateKind::Sparsa | AggregateKind::List)
+        })
     }
 
     /// Report a bool aggregate used where a truth value is required, naming the

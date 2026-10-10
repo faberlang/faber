@@ -1977,7 +1977,26 @@ impl TypeChecker<'_> {
                 {
                     return result;
                 }
-                self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
+                let kinds = (
+                    self.glyph_aggregate_kind(lhs_resolved),
+                    self.glyph_aggregate_kind(rhs_resolved),
+                );
+                let scalar_peer = match kinds {
+                    (Some(kind), None) if self.is_numeric_scalar(rhs_resolved) => Some(kind),
+                    (None, Some(kind)) if self.is_numeric_scalar(lhs_resolved) => Some(kind),
+                    _ => None,
+                };
+                match scalar_peer {
+                    Some(kind) => self.invalid_operand_types_with_args(
+                        GLYPH_SCALAR_OPERAND,
+                        lhs.span,
+                        &[
+                            ("op", op.glyph_spelling().unwrap_or("?").to_owned()),
+                            ("kind", kind.to_owned()),
+                        ],
+                    ),
+                    None => self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span),
+                }
                 self.error_type
             }
         }
@@ -2508,6 +2527,8 @@ fn family_mismatch_issue(lhs: Option<NumericShape>, rhs: Option<NumericShape>) -
 // TENSOR-GLYPHS-1B rank-rule diagnostics. Each carries `op` (the glyph
 // spelling) so renderers and tests identify the operator without prose.
 const GLYPH_OPERANDS_UNSUPPORTED: &str = "glyph_operands_unsupported";
+/// `⊙`/`⊘` with an aggregate on one side and a scalar on the other.
+const GLYPH_SCALAR_OPERAND: &str = "glyph_scalar_operand";
 const GLYPH_STATIC_SHAPE_REQUIRED: &str = "glyph_static_shape_required";
 const GLYPH_OP_NUMERIC_ELEMENT_REQUIRED: &str = "glyph_op_numeric_element_required";
 const GLYPH_ELEMENT_TYPE_MISMATCH: &str = "glyph_element_type_mismatch";

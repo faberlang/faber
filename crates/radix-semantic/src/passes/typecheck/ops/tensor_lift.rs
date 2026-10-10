@@ -58,7 +58,7 @@ pub(in crate::passes::typecheck) const ISSUE_ELEMENTWISE_REMAINDER_REQUIRES_SCAL
     "elementwise_remainder_requires_scalar";
 
 /// Spelling of the approximate-equality glyph in a deferral diagnostic.
-fn approx_glyph(op: HirBinOp) -> &'static str {
+pub(super) fn approx_glyph(op: HirBinOp) -> &'static str {
     if op == HirBinOp::FuzzyNotEq {
         "≉"
     } else {
@@ -629,10 +629,14 @@ impl TypeChecker<'_> {
                 || self.is_sparsa_operand(lhs_ty)
                 || self.is_sparsa_operand(rhs_ty))
         {
+            let kind = self.aggregate_kind_of_pair(lhs_ty, rhs_ty);
             self.invalid_operand_types_with_args(
                 ISSUE_TENSOR_APPROX_COMPARISON_DEFERRED,
                 span,
-                &[("op", approx_glyph(op).to_owned())],
+                &[
+                    ("op", approx_glyph(op).to_owned()),
+                    ("kind", kind.to_owned()),
+                ],
             );
             return Some(self.error_type);
         }
@@ -648,7 +652,10 @@ impl TypeChecker<'_> {
             self.invalid_operand_types_with_args(
                 ISSUE_TENSOR_APPROX_COMPARISON_DEFERRED,
                 span,
-                &[("op", approx_glyph(op).to_owned())],
+                &[
+                    ("op", approx_glyph(op).to_owned()),
+                    ("kind", "tensor".to_owned()),
+                ],
             );
             return Some(self.error_type);
         }

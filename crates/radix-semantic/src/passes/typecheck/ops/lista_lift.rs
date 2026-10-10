@@ -16,6 +16,7 @@
 //! time (a capacity never stands in for a length). Every other target either
 //! runs the form or fails closed (`lista_lift_gate`).
 
+use super::tensor_lift::{ISSUE_TENSOR_APPROX_COMPARISON_DEFERRED, approx_glyph};
 use super::*;
 use crate::passes::typecheck::integer_range::const_int_value;
 
@@ -187,6 +188,19 @@ impl TypeChecker<'_> {
         {
             return None;
         }
+        // `≈ ≉` over a numeric list wait for the tolerance ruling (L7), like
+        // a tensor: fail closed at check time.
+        if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
+            self.invalid_operand_types_with_args(
+                ISSUE_TENSOR_APPROX_COMPARISON_DEFERRED,
+                span,
+                &[
+                    ("op", approx_glyph(op).to_owned()),
+                    ("kind", "list".to_owned()),
+                ],
+            );
+            return Some(self.error_type);
+        }
         let (l_elem, r_elem, capacity) = match (left, right) {
             (Some(left), Some(right)) => {
                 let capacity = self.lista_pair_capacity(left, right, span, op)?;
@@ -272,6 +286,17 @@ impl TypeChecker<'_> {
             Type::Alias(_, target) => self.lista_arithmetic_shape(target),
             _ => None,
         }
+    }
+
+    /// The element type of a `lista` operand, `None` for any other type.
+    pub(super) fn lista_element_type(&mut self, ty: TypeId) -> Option<TypeId> {
+        self.lista_arithmetic_shape(ty).map(|shape| shape.element)
+    }
+
+    /// The literal-or-symbolic capacity of a bounded `lista` operand.
+    pub(super) fn lista_capacity(&mut self, ty: TypeId) -> Option<radix_types::IndexId> {
+        self.lista_arithmetic_shape(ty)
+            .and_then(|shape| shape.capacity)
     }
 
     fn is_numeric_lista_element(&self, ty: TypeId) -> bool {

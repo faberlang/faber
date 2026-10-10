@@ -1980,6 +1980,14 @@ help = "`≡` تتطلب أنواعًا متطابقة؛ قارن مجمّعات
 message = "{kind} من bool ليست قيمة صدق"
 help = "اختزلها أولًا: `{reducta} {via} {omnia} {ex} mask` أو `{reducta} {via} {quilibet} {ex} mask`"
 
+[diagnostics.SEM011.issues.glyph_scalar_operand]
+message = "{kind} {op} تأخذ تجميعتين"
+help = "مع scalar اكتب `*` أو `/`"
+
+[diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
+message = "{op} على {kind} غير مدعوم بعد"
+help = "قارن باستخدام ترتيب أو مقارنة دقيقة، أو قارن العناصر في الأدوات"
+
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "عدم تطابق في argument type"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
