@@ -19,7 +19,7 @@ use radix_diagnostics::DiagnosticArg;
 use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
 use radix_hir::{HirExpression, HirExpressionKind, HirModule};
 use radix_target::Target;
-use radix_types::{Type, TypeId, TypeTable};
+use radix_types::{BitsWidth, Type, TypeId, TypeTable};
 
 const ISSUE: &str = "list_window_unsupported_on_target";
 
@@ -27,6 +27,16 @@ const ISSUE: &str = "list_window_unsupported_on_target";
 /// authored index; the MIR runner executes it and does not reach codegen.
 fn target_admits_list_window(target: Target) -> bool {
     matches!(target, Target::HirFaber | Target::MirStepper)
+}
+
+/// Targets whose emitters carry the byte window `bytes[lo‥hi]` of a
+/// `lista<b8>` (the window the retired `octeti` word had; need): a
+/// fresh byte list copied from the range, in bounds or a failure.
+fn target_admits_byte_window(target: Target) -> bool {
+    matches!(
+        target,
+        Target::HirRust | Target::HirGo | Target::HirTypeScript | Target::HirSwift
+    )
 }
 
 /// The type behind aliases and access markers.
@@ -39,24 +49,24 @@ fn resolved<'a>(types: &'a TypeTable, ty: TypeId) -> &'a Type {
 }
 
 /// Whether `expr` is `list[range]`.
-fn is_list_window(types: &TypeTable, expr: &HirExpression) -> bool {
+fn is_list_window(types: &TypeTable, expr: &HirExpression, target: Target) -> bool {
     let HirExpressionKind::Index(object, index) = &expr.kind else {
         return false;
     };
     let (Some(object_ty), Some(index_ty)) = (object.ty, index.ty) else {
         return false;
     };
-    let is_list = match resolved(types, object_ty) {
-        // A byte list is the `octeti` word (`lista<b8>`, need): its
-        // window keeps the octeti slice emission the word always had.
-        Type::Array(element) => !matches!(
-            resolved(types, *element),
-            Type::Bits(radix_types::BitsWidth::B8)
-        ),
+    if !matches!(resolved(types, index_ty), Type::Intervallum(_)) {
+        return false;
+    }
+    match resolved(types, object_ty) {
+        Type::Array(element) => {
+            !(target_admits_byte_window(target)
+                && matches!(resolved(types, *element), Type::Bits(BitsWidth::B8)))
+        }
         Type::BoundedArray { .. } => true,
         _ => false,
-    };
-    is_list && matches!(resolved(types, index_ty), Type::Intervallum(_))
+    }
 }
 
 /// # Errors
@@ -70,6 +80,7 @@ pub fn reject_list_window(
 ) -> Result<(), CodegenError> {
     struct Gate<'a> {
         types: &'a TypeTable,
+        target: Target,
         found: bool,
     }
     impl HirVisitor for Gate<'_> {
@@ -77,7 +88,7 @@ pub fn reject_list_window(
             if self.found {
                 return;
             }
-            self.found = is_list_window(self.types, expr);
+            self.found = is_list_window(self.types, expr, self.target);
             if !self.found {
                 walk_expr(self, expr);
             }
@@ -88,6 +99,7 @@ pub fn reject_list_window(
     }
     let mut gate = Gate {
         types,
+        target,
         found: false,
     };
     walk_program(&mut gate, hir);

@@ -105,3 +105,24 @@ fn scalar_list_index_and_octeti_window_are_untouched() {
     reject_list_window(&index_module(octeti, range), &types, Target::HirRust)
         .expect("the octeti window is not a list window");
 }
+
+#[test]
+fn byte_list_window_is_admitted_where_the_emitter_carries_it() {
+    let mut types = TypeTable::new();
+    let int = types.primitive(Primitive::Numerus);
+    let range = types.intervallum(int);
+    let bytes = types.octeti_list();
+    let module = index_module(bytes, range);
+    for target in [
+        Target::HirRust,
+        Target::HirGo,
+        Target::HirTypeScript,
+        Target::HirSwift,
+    ] {
+        reject_list_window(&module, &types, target)
+            .unwrap_or_else(|error| panic!("{target:?} carries the byte window: {error:?}"));
+    }
+    let error = reject_list_window(&module, &types, Target::MirWasm)
+        .expect_err("a target without the byte window refuses it");
+    assert_eq!(issue_of(&error), Some("list_window_unsupported_on_target"));
+}
