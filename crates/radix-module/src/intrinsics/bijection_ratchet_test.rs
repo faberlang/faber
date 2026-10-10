@@ -418,6 +418,12 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
         // Gather's shape-transforming result cannot be inferred from the
         // `_` binding; pin the result shape like the corpus exemplar.
         format!("    fixum {sugar}[4, 3] ex ← {call}")
+    } else if row.failable {
+        // A failable read (`apud`, need; unit sb272) reports on `⇥`
+        // and needs a `⊥` default, a `fac`/`cape` handler or an enclosing `⇥`:
+        // the probe supplies a handler so it meets method admission, not
+        // SEM011 failable_call_requires_handler.
+        format!("    fac {{\n        fixum _ ex ← {call}\n    }} cape err {{\n    }}")
     } else {
         format!("    fixum _ ex ← {call}")
     };
