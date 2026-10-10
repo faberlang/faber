@@ -672,6 +672,23 @@ pub(super) fn check_intrinsic_method_call(
                     }
                 }
                 checked
+            } else if entry.failable {
+                // need: the `at` read (la `apud`) on `lista`, `tabula`
+                // and `textus` is a failable call: an out-of-range index or a
+                // missing key is reported on `⇥ textus`, so the call needs a
+                // handler, a `⊥` default or an enclosing `⇥` (D17.8).
+                let checked = checker.check_known_method_args(args, params, ret, span);
+                let err = checker.textus_type();
+                let sig = FuncSig {
+                    type_params: Vec::new(),
+                    params: Vec::new(),
+                    ret: checked,
+                    err: Some(err),
+                    is_async: false,
+                    is_generator: false,
+                };
+                checker.reject_failable_call(&sig, span);
+                checked
             } else if bounded_appende {
                 // D6: bounded `appende` is a typed recoverable alternate exit.
                 // Unbounded `lista<T>.appende` stays vacuum with no error channel.
@@ -1012,6 +1029,7 @@ fn resolve_return_type(
             let numerus = checker.numerus_type();
             checker.types.option(numerus)
         }
+        IntrinsicReturnKind::Value => ctx.value.unwrap_or(checker.error_type),
         IntrinsicReturnKind::OptionValue => {
             let Some(value) = ctx.value else {
                 return checker.error_type;

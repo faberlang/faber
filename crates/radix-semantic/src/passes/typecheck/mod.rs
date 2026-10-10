@@ -102,6 +102,9 @@ mod empty_dense;
 mod enum_access_honesty_test;
 pub mod expr;
 #[cfg(test)]
+#[path = "at_read_test.rs"]
+mod at_read_test;
+#[cfg(test)]
 #[path = "failable_intrinsic_typed_error_test.rs"]
 mod failable_intrinsic_typed_error_test;
 #[cfg(test)]

@@ -273,6 +273,7 @@ store = "store"
 
 # lista (27)
 accipe = "get"
+apud = "at"
 addita = "added"
 appende = "append"
 # LSR-W0 argmax/argmin method twins — index or nihil on empty, never −1.
