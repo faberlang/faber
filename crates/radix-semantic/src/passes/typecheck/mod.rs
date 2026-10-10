@@ -111,6 +111,9 @@ mod field_modifier_write_test;
 #[path = "fieldless_type_access_test.rs"]
 mod fieldless_type_access_test;
 #[cfg(test)]
+#[path = "loop_shape_test.rs"]
+mod loop_shape_test;
+#[cfg(test)]
 #[path = "mutating_intrinsic_test.rs"]
 mod mutating_intrinsic_test;
 #[cfg(test)]
@@ -156,6 +159,7 @@ pub mod json_genus;
 pub mod littera_conversio;
 pub mod lockstep;
 pub mod lookup;
+mod loop_shape;
 mod member_privacy;
 mod numeric_twin;
 mod sort_expr;
@@ -422,6 +426,9 @@ pub(crate) struct TypeChecker<'a> {
     pub(crate) air_lane_defs: FxHashSet<DefId>,
     /// Whether the function being checked is an AIR-lane function.
     pub(crate) current_air_function: bool,
+    /// Locals and parameters iterated by the loops enclosing the expression
+    /// being checked; the loop shape rule reads it (`loop_shape`).
+    loop_iterated: Vec<DefId>,
     /// Declaration currently owning the body being checked.
     pub(crate) current_function_def: Option<DefId>,
     /// HIR identity of the call currently checking its argument contracts.
@@ -823,6 +830,7 @@ impl<'a> TypeChecker<'a> {
             source_text: None,
             air_lane_defs: FxHashSet::default(),
             current_air_function: false,
+            loop_iterated: Vec::new(),
             current_function_def: None,
             current_shape_call: None,
             current_shape_return_expr: None,

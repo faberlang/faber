@@ -2084,6 +2084,10 @@ help = "أزل قائمة type argument الصريحة"
 message = "numeric {lista} elements مطلوبة"
 help = "استخدم numeric elements لـ {lista} intrinsic هذا"
 
+[diagnostics.SEM011.issues.loop_collection_shape_change]
+message = "هذه الحلقة تمر على `{binding}` فلا يمكن لـ `{method}` تغيير شكلها أو ترتيبها"
+help = "حدّث عنصرا بالقوس المربع، أو استخدم {queue} مع {dum} لقائمة عمل"
+
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
 message = "{octeti} literal يحتوي محرفا غير صالح '{character}'"
 help = "استخدم فقط hexadecimal digits في {octeti} literals"

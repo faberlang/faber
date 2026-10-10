@@ -415,6 +415,8 @@ pub(super) fn check_intrinsic_method_call(
     // same gates as the direct call on a plain binding.
     let place = TypeChecker::method_receiver_place(receiver);
 
+    checker.check_loop_shape_method(place, entry, &method_name, span);
+
     if checker.expr_is_ref_view(place) && is_mutating_receiver(entry) {
         checker.error_issue(
             SemanticErrorKind::AssignToImmutableBorrow,

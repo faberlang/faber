@@ -2084,6 +2084,10 @@ help = "移除显式 type argument 列表"
 message = "需要 numeric lista elements"
 help = "为此 lista intrinsic 使用 numeric elements"
 
+[diagnostics.SEM011.issues.loop_collection_shape_change]
+message = "此循环正在遍历 `{binding}`，因此 `{method}` 不能改变它的大小或顺序"
+help = "用方括号赋值来更新元素，或对工作列表使用 {queue} 加 {dum}"
+
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
 message = "octeti literal 包含无效字符 '{character}'"
 help = "在 octeti literals 中只使用十六进制数字"

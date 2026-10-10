@@ -2084,6 +2084,10 @@ help = "xóa danh sách đối số kiểu được chỉ rõ"
 message = "cần các phần tử số trong lista"
 help = "dùng các phần tử số cho intrinsic lista này"
 
+[diagnostics.SEM011.issues.loop_collection_shape_change]
+message = "vòng lặp này duyệt `{binding}`, nên `{method}` không được đổi kích thước hoặc thứ tự của nó"
+help = "dùng phép gán bằng ngoặc vuông để cập nhật phần tử, hoặc dùng {queue} với {dum} cho danh sách việc"
+
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
 message = "literal octeti chứa ký tự không hợp lệ '{character}'"
 help = "chỉ dùng chữ số thập lục phân trong các literal octeti"

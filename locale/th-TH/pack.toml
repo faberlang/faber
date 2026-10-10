@@ -2096,6 +2096,10 @@ help = "ลบรายการอาร์กิวเมนต์ชนิด
 message = "ต้องใช้องค์ประกอบ numeric ของ lista"
 help = "ใช้องค์ประกอบ numeric สำหรับ intrinsic ของ lista นี้"
 
+[diagnostics.SEM011.issues.loop_collection_shape_change]
+message = "ลูปนี้วนอยู่บน `{binding}` ดังนั้น `{method}` เปลี่ยนขนาดหรือลำดับของมันไม่ได้"
+help = "ใช้การเก็บค่าด้วยวงเล็บเหลี่ยมเพื่อแก้องค์ประกอบ หรือใช้ {queue} กับ {dum} สำหรับรายการงาน"
+
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
 message = "ลิเทอรัล octeti มีอักขระไม่ถูกต้อง '{character}'"
 help = "ใช้เฉพาะเลขฐานสิบหกในลิเทอรัล octeti"

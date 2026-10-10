@@ -2084,6 +2084,10 @@ help = "移除明確的型別引數清單"
 message = "需要數值 lista 元素"
 help = "此 lista 內建項目請使用數值元素"
 
+[diagnostics.SEM011.issues.loop_collection_shape_change]
+message = "此迴圈正在走訪 `{binding}`，因此 `{method}` 不能改變它的大小或順序"
+help = "用方括號賦值來更新元素，或對工作清單使用 {queue} 加 {dum}"
+
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
 message = "octeti 字面值包含無效字元 '{character}'"
 help = "octeti 字面值只能使用十六進位數字"

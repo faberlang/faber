@@ -2809,6 +2809,10 @@ help = "remove the explicit type argument list"
 message = "numeric {lista} elements required"
 help = "use numeric elements for this {lista} intrinsic"
 
+[diagnostics.SEM011.issues.loop_collection_shape_change]
+message = "this loop iterates `{binding}`, so `{method}` cannot change its shape or order"
+help = "update an element with a bracket store, or use a {queue} with {dum} for a worklist"
+
 [diagnostics.SEM011.issues.ordina_key_not_ordered]
 message = "clavis ordinis numerus aut {textus} esse debet"
 help = "redde numerum aut {textus} ex selectore clavis"

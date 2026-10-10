@@ -121,7 +121,7 @@ pub(super) fn check_lockstep_expr(
     for ((def_id, _), element) in bindings.iter().zip(element_tys.iter()) {
         checker.insert_binding(*def_id, *element);
     }
-    checker.check_loop_block(body);
+    checker.check_loop_block_over(sources.iter(), body);
     checker.pop_scope();
     checker.vacuum_type()
 }

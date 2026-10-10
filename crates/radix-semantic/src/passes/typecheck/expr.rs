@@ -667,7 +667,7 @@ impl TypeChecker<'_> {
                     );
                 }
                 self.insert_binding(*binding, elem_ty);
-                self.check_loop_block(block);
+                self.check_loop_block_over(std::iter::once(&**iter), block);
                 self.pop_scope();
                 self.vacuum_type()
             }
