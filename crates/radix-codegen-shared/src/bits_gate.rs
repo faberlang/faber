@@ -18,12 +18,7 @@ use radix_types::{Type, TypeId, TypeTable};
 const ISSUE: &str = "bits_type_unsupported_on_target";
 
 /// Targets that carry `bN` faithfully. The Faber re-emitter keeps the authored
-/// marker; the MIR runner executes the type and does not reach codegen; Swift
-/// carries it as the same-width unsigned integer with checked shifts.
-fn target_admits_bits(target: Target) -> bool {
-    matches!(
-        target,
-        Target::HirFaber | Target::MirStepper | Target::HirGo | Target::HirSwift | Target::HirRust
+        Target::HirFaber | Target::MirStepper | Target::HirGo | Target::HirSwift | Target::HirRust | Target::HirTypeScript
     )
 }
 

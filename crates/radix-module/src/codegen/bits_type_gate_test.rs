@@ -1,6 +1,6 @@
 //! Need: the raw-bits types `b8 b16 b32 b64` are implemented only by
-//! the Faber source emitter and the MIR runner. Every other emitter rejects a
-//! module that names one with the named `bits_type_unsupported_on_target`
+//! the Faber source emitter, the TypeScript emitter and the MIR runner. Every
+//! other emitter rejects a module that names one with the named `bits_type_unsupported_on_target`
 //! diagnostic before emission, instead of printing a placeholder identifier
 //! or a plain integer carrier.
 
@@ -58,8 +58,8 @@ fn go_emitter_keeps_bits() {
 
 #[cfg(feature = "hir-ts")]
 #[test]
-fn typescript_rejects_bits_before_emission() {
-    assert_rejected(Target::HirTypeScript, "HirTypeScript");
+fn typescript_keeps_bits() {
+    assert_eq!(diagnostics(Target::HirTypeScript), Vec::<(String, String)>::new());
 }
 
 #[cfg(feature = "hir-swift")]
