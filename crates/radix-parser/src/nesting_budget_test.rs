@@ -25,6 +25,18 @@ const OVER_BUDGET_OPERATORS: usize = MAX_PARSE_OPERATORS + 64;
 /// fired instead of the stack.
 const PROBE_STACK_BYTES: usize = 512 * 1024;
 
+/// Stack the walker-alignment probes run on: the 8 MiB production compile stack
+/// (`faber` main thread, package analysis) the budgets are sized for.
+///
+/// Those probes parse the deepest tree the budget admits, and an unoptimised
+/// parser spends tens of KB of stack per grammar level (measured: `parse_primary`
+/// 12 KB, `parse_postfix_inner` 11 KB, ~70 KB for one paren level), so the
+/// admitted depth no longer fits the 2 MiB test thread. The walker-alignment
+/// contract is about the tree, not about that thread, so these probes run on
+/// the stack the budget is documented against; the fail-closed probes above
+/// stay on [`PROBE_STACK_BYTES`].
+const PRODUCTION_STACK_BYTES: usize = 8 * 1024 * 1024;
+
 /// One nesting shape under test: a name and a source generator for a depth.
 type NestingShape = (&'static str, fn(usize) -> String);
 
@@ -131,6 +143,17 @@ fn parse_on_stack(source: &str, stack_bytes: usize) -> Vec<ParseError> {
         .expect("probe thread spawns")
         .join()
         .expect("probe must fail closed, not abort: the budget must fire before the stack does")
+}
+
+/// Run `probe` on a thread with the production stack, re-raising its panic.
+fn on_production_stack(probe: impl FnOnce() + Send + 'static) {
+    let handle = std::thread::Builder::new()
+        .stack_size(PRODUCTION_STACK_BYTES)
+        .spawn(probe)
+        .expect("probe thread spawns");
+    if let Err(panic) = handle.join() {
+        std::panic::resume_unwind(panic);
+    }
 }
 
 /// Walk a parsed program and return the depth the walker refused to enter.
@@ -324,6 +347,10 @@ fn nesting_and_folding_within_the_budgets_parse_clean() {
 /// every nesting shape is walked without reporting the depth limit.
 #[test]
 fn deepest_admitted_nesting_stays_inside_the_walker_budget() {
+    on_production_stack(deepest_admitted_nesting_inside_walker_budget);
+}
+
+fn deepest_admitted_nesting_inside_walker_budget() {
     let shapes: [NestingShape; 7] = [
         ("parens", nested_parens),
         ("assignment", assignment_chain),
@@ -390,6 +417,10 @@ fn spent_budget_reports_one_diagnostic_and_stops() {
 /// the walker budget.
 #[test]
 fn deep_nesting_with_a_long_fold_chain_stays_inside_the_walker_budget() {
+    on_production_stack(deep_nesting_with_a_long_fold_chain_inside_walker_budget);
+}
+
+fn deep_nesting_with_a_long_fold_chain_inside_walker_budget() {
     let depth = MAX_PARSE_DEPTH as usize - 2;
     let operators = MAX_PARSE_OPERATORS - 8;
     let chain = format!("1{}", " + 1".repeat(operators));
