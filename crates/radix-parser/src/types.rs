@@ -965,7 +965,10 @@ impl Parser {
             return Ok(LiftExtent::Literal(value));
         }
         if self.eat(&TokenKind::LParen) {
-            let term = self.parse_figura()?;
+            let span = self.current_span();
+            let term = self.nested(ParseErrorKind::TypeInvalid, span, |parser| {
+                parser.parse_figura()
+            })?;
             self.expect_issue(&TokenKind::RParen, "shape_parenthesis_end")?;
             return Ok(LiftExtent::Paren(Box::new(term)));
         }
@@ -974,7 +977,10 @@ impl Parser {
 
     fn parse_figura_atom(&mut self) -> Result<FiguraExpr, ParseError> {
         if self.eat(&TokenKind::LParen) {
-            let value = self.parse_figura()?;
+            let span = self.current_span();
+            let value = self.nested(ParseErrorKind::TypeInvalid, span, |parser| {
+                parser.parse_figura()
+            })?;
             self.expect_issue(&TokenKind::RParen, "shape_parenthesis_end")?;
             return Ok(value);
         }

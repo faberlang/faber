@@ -110,6 +110,26 @@ fn nested_figura(depth: usize) -> String {
     )
 }
 
+/// Parenthesized figura arithmetic: `(` recurses through the figura atom, a
+/// separate entry from the `[` tuple.
+fn nested_figura_parens(depth: usize) -> String {
+    format!(
+        "functio f(tensor<f32, {}1{}> value) → vacuum {{}}",
+        "(".repeat(depth),
+        ")".repeat(depth)
+    )
+}
+
+/// Spelled-lift parenthesis: `magnitudo ( magnitudo ( ...` recurses through the
+/// lift extent.
+fn nested_figura_lift_parens(depth: usize) -> String {
+    format!(
+        "functio f(tensor<f32, {}1{}> value) → vacuum {{}}",
+        "magnitudo (".repeat(depth),
+        ")".repeat(depth)
+    )
+}
+
 /// Two folded chains under one root expression.
 fn split_fold_chain(operators_per_side: usize) -> String {
     let side = format!("1{}", " + 1".repeat(operators_per_side));
@@ -296,6 +316,12 @@ fn nested_figura_past_the_budget_reports_a_nesting_diagnostic() {
         &nested_figura(OVER_BUDGET_DEPTH),
         ParseExpectation::Issue("nesting_too_deep"),
     );
+}
+
+#[test]
+fn nested_figura_parens_past_the_budget_fail_closed() {
+    assert_recursion_fails_closed("nested_figura_parens", nested_figura_parens);
+    assert_recursion_fails_closed("nested_figura_lift_parens", nested_figura_lift_parens);
 }
 
 #[test]
