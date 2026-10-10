@@ -42,10 +42,25 @@ const LIFTED: &[&str] = &[
     "fixum tensor<f32, [2]> r ← a ÷ b",
 ];
 
-/// The forms the TypeScript carrier lifts itself (`Tensor.lift`).
+/// The forms the TypeScript carrier lifts itself (`Tensor.lift`, `map`,
+/// `select`): every entry of `LIFTED` plus the remaining scalar, logic and
+/// `vel` forms.
 #[cfg(feature = "hir-ts")]
 const TS_LIFTED: &[&str] = &[
+    "fixum tensor<f32, [2]> r ← a * 0.5",
+    "fixum tensor<f32, [2]> r ← 10.0 - a",
+    "fixum tensor<f32, [2]> r ← a + 1.0",
+    "fixum tensor<f32, [2]> r ← a / 4.0",
+    "fixum tensor<f32, [2]> r ← a % 3.0",
+    "fixum tensor<f32, [2]> r ← -a",
     "fixum tensor<bivalens, [2]> r ← a ≻ b",
+    "fixum tensor<f32, [2]> r ← a ⤒ b",
+    "fixum tensor<f32, [2]> r ← a ⤓ b",
+    "fixum tensor<f32, [2]> r ← (a ≻ b) ✓ a ✗ b",
+    "fixum tensor<f32, [2]> r ← (a ≻ b) ✓ 1.0 ✗ 0.0",
+    "fixum tensor<bivalens, [2]> r ← non (a ≻ b)",
+    "fixum tensor<bivalens, [2]> r ← (a ≺ 2.0) aut (a ≻ 3.0)",
+    "fixum tensor<bivalens, [2]> r ← (a ≻ 1.0) et (a ≤ b)",
     "fixum tensor<f32, [2]> r ← a ÷ b",
     "fixum tensor<bivalens, [2]> r ← a ≅ b",
     "fixum tensor<bivalens, [2]> r ← a ≇ 2.0",
@@ -54,19 +69,8 @@ const TS_LIFTED: &[&str] = &[
 
 #[cfg(feature = "hir-ts")]
 #[test]
-fn typescript_rejects_the_lifted_forms() {
-    for body in LIFTED {
-        if TS_LIFTED.contains(body) {
-            continue;
-        }
-        assert_rejected(Target::HirTypeScript, body);
-    }
-}
-
-#[cfg(feature = "hir-ts")]
-#[test]
-fn typescript_admits_the_comparison_and_true_division_lift() {
-    for body in TS_LIFTED {
+fn typescript_admits_the_whole_tensor_lift() {
+    for body in LIFTED.iter().chain(TS_LIFTED) {
         let found = issues(Target::HirTypeScript, body);
         assert!(
             !found

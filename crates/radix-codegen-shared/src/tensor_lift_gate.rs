@@ -321,6 +321,51 @@ fn lifted_form(
             _,
             _,
         ) if matches!(target, Target::HirTypeScript) => None,
+        // The TypeScript carrier also lifts `+ - * / %` between a tensor and a
+        // scalar, `et`/`aut`, and `vel` over a tensor (`Tensor.lift`), so that
+        // target is exempt from exactly those forms; two tensors of `+ - * / %`
+        // keep their gate.
+        HirExpressionKind::Binary(
+            HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod,
+            lhs,
+            rhs,
+        ) if matches!(target, Target::HirTypeScript)
+            && tensor_element(types, lhs.ty).is_some()
+                != tensor_element(types, rhs.ty).is_some() =>
+        {
+            None
+        }
+        HirExpressionKind::Binary(HirBinOp::And | HirBinOp::Or, ..)
+            if matches!(target, Target::HirTypeScript) =>
+        {
+            None
+        }
+        // A shifted edge view (`t.disloco(..)`) is the Rust carrier's form and
+        // has no TypeScript method, so `vel` over it stays gated.
+        HirExpressionKind::Binary(HirBinOp::Coalesce, lhs, _)
+            if matches!(target, Target::HirTypeScript)
+                && tensor_element(types, lhs.ty).is_some()
+                && !matches!(
+                    &lhs.kind,
+                    HirExpressionKind::MethodCall(_, name, ..)
+                        if interner.resolve(*name) == "disloco"
+                ) =>
+        {
+            None
+        }
+        // Unary `-` and `non`, the `✓ ✗` select and `⤒ ⤓` are per-element
+        // carrier calls (`Tensor.map`, `select`, `lift`) on TypeScript.
+        HirExpressionKind::Unary(HirUnOp::Neg | HirUnOp::Not, _) | HirExpressionKind::Si { .. }
+            if matches!(target, Target::HirTypeScript) =>
+        {
+            None
+        }
+        HirExpressionKind::MethodCall(_, name, _, _, _)
+            if matches!(target, Target::HirTypeScript)
+                && matches!(interner.resolve(*name), "maximus" | "minimus") =>
+        {
+            None
+        }
         HirExpressionKind::Binary(op, lhs, rhs) => binary_label(
             types,
             *op,
