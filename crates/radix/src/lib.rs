@@ -26,8 +26,8 @@ pub mod module {
     };
     pub use radix_module::{
         abi, aspect, builtins, cli_descriptor, codegen, diagnostics, driver, file_interface, hir,
-        intrinsics, kernel, lexer, live_tuus_cursor, llvm_host, locale, parser, paths,
-        runtime_contract, semantic, syntax,
+        intrinsics, kernel, lexer, live_tuus_cursor, llvm_host, locale, parser, runtime_contract,
+        semantic, syntax,
     };
 }
 
