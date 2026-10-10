@@ -1317,16 +1317,19 @@ impl TypeChecker<'_> {
         target_resolved: TypeId,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
-        if !matches!(
+        if !(matches!(
             self.types.get(self.resolve_inferred_type(source_ty)),
             Type::Primitive(Primitive::Octeti)
-        ) {
+        ) || self.is_bytes_list(source_ty))
+        {
             return None;
         }
         let Type::Array(elem) = self.types.get(target_resolved).clone() else {
             return None;
         };
-        if self.is_numerus_u8(elem) {
+        // Bits elements are the bits rows' business (`lista<b8>` identity,
+        // width changes with `via Le|Be`), decided before this row.
+        if self.is_numerus_u8(elem) || self.bits_width_of(elem).is_some() {
             return Some(target_resolved);
         }
         self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
@@ -1344,10 +1347,11 @@ impl TypeChecker<'_> {
         params: &[Symbol],
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
-        if !matches!(
+        if !(matches!(
             self.types.get(self.resolve_inferred_type(target_resolved)),
             Type::Primitive(Primitive::Octeti)
-        ) {
+        ) || self.is_bytes_list(target_resolved))
+        {
             return None;
         }
         let Type::Tensor(elem, _) = self
@@ -1357,6 +1361,20 @@ impl TypeChecker<'_> {
         else {
             return None;
         };
+        // Ruling B6: an 8-bit element has no byte order, so it
+        // takes no `via` clause and a clause written on it is refused; every
+        // wider element still requires one.
+        let one_byte = matches!(
+            self.types.get(self.resolve_inferred_type(elem)),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I8 | NumericWidth::U8)
+        );
+        if one_byte {
+            if !params.is_empty() {
+                self.invalid_conversion(super::bits::BITS_VIA_CLAUSE_NOT_ALLOWED, span);
+                return Some(self.error_type);
+            }
+            return Some(target_resolved);
+        }
         if !self.conversio_has_endian_hint(params) {
             self.invalid_conversion(ISSUE_TENSOR_TO_OCTETI_UNSPECIFIED, span);
             return Some(self.error_type);
@@ -1434,15 +1452,34 @@ impl TypeChecker<'_> {
         Some(target_resolved)
     }
 
-    /// The byte-string sources of the bulk decode row: `lista<b8>` (`bytes`)
-    /// and the bounded `octeti<N>` form.
+    /// The byte-string forms of a conversion side: `lista<b8>` (`bytes`) and
+    /// the bounded `octeti<N>` form. One helper for every byte row (bulk
+    /// decode, endian windows, register targets, the tensor inverse).
     fn is_octeti_tensor_source(&self, source_ty: TypeId) -> bool {
         match self.types.get(self.resolve_inferred_type(source_ty)) {
             Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => true,
+            _ => self.is_bytes_list(source_ty),
+        }
+    }
+
+    /// `lista<b8>`: the unbounded raw-bits byte list `octeti`/`bytes` names.
+    fn is_bytes_list(&self, ty: TypeId) -> bool {
+        match self.types.get(self.resolve_inferred_type(ty)) {
             Type::Array(element) => {
                 self.bits_width_of(*element) == Some(radix_types::BitsWidth::B8)
             }
             _ => false,
+        }
+    }
+
+    /// The conversion family used by the refusing primitive rows: a byte list
+    /// is the `Octeti` family on either side, every other type keeps its
+    /// ordinary family.
+    fn bytes_conversio_family(&self, ty: TypeId) -> PrimitiveConversioFamily {
+        if self.is_bytes_list(ty) {
+            PrimitiveConversioFamily::Octeti
+        } else {
+            self.primitive_conversio_family(ty)
         }
     }
 
@@ -1473,10 +1510,12 @@ impl TypeChecker<'_> {
             self.types.get(target_resolved).clone(),
         ) {
             // Register-in: exact static octeti window into a vector register.
-            (
-                Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti),
-                Type::Vector(elem, width),
-            ) => {
+            (source_kind, Type::Vector(elem, width))
+                if matches!(
+                    source_kind,
+                    Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti)
+                ) || self.is_bytes_list(source_resolved) =>
+            {
                 if !self.conversio_has_endian_hint(params) {
                     self.invalid_conversion(ISSUE_OCTETI_TO_VECTOR_UNSPECIFIED, span);
                     return Some(self.error_type);
@@ -1647,8 +1686,8 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
         let issue = match (
-            self.primitive_conversio_family(source_ty),
-            self.primitive_conversio_family(target_resolved),
+            self.bytes_conversio_family(source_ty),
+            self.bytes_conversio_family(target_resolved),
         ) {
             (
                 PrimitiveConversioFamily::Numerus

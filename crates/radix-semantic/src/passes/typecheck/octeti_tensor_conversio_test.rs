@@ -243,9 +243,12 @@ fn tensor_target_takes_a_via_hint() {
 
 #[test]
 fn other_non_hint_targets_still_reject_a_via_hint() {
+    // The byte list is `lista<b8>`, so a numeric list target is the bits
+    // row's: an unsized numeric element has no width to match. Text is still
+    // refused by the lowering hint gate before typecheck sees the pair.
     assert_rejects_with_issue(
         "functio w(octeti b) → lista<numerus> { redde b ↦ lista<numerus> via Le }",
-        "conversio_via_target_takes_no_hint",
+        "bits_conversion_width_mismatch",
     );
     assert_rejects_with_issue(
         "functio w(octeti b) → textus { redde b ↦ textus via Le }",
@@ -263,6 +266,13 @@ fn tensor_to_octeti_is_accepted_for_every_element_and_order_and_is_infallible() 
     for element in [
         "u8", "i8", "i16", "u16", "i32", "u32", "i64", "u64", "f32", "f64",
     ] {
+        if matches!(element, "u8" | "i8") {
+            // An 8-bit element has no byte order and takes no clause (B6).
+            assert_accepts(&format!(
+                "functio w(tensor<{element}, [2, 2]> t) → octeti {{ redde t ↦ octeti }}"
+            ));
+            continue;
+        }
         for hint in ["Le", "Be"] {
             // No `⇥` and no handler: the row cannot fail.
             assert_accepts(&format!(
@@ -273,8 +283,25 @@ fn tensor_to_octeti_is_accepted_for_every_element_and_order_and_is_infallible() 
 }
 
 #[test]
+fn tensor_to_octeti_refuses_a_clause_on_one_byte_elements() {
+    for element in ["u8", "i8"] {
+        for hint in ["Le", "Be"] {
+            assert_rejects_with_issue(
+                &format!(
+                    "functio w(tensor<{element}, [2]> t) → octeti {{ redde t ↦ octeti via {hint} }}"
+                ),
+                "bits_via_clause_not_allowed",
+            );
+        }
+    }
+}
+
+#[test]
 fn tensor_to_octeti_without_a_hint_is_unspecified_even_for_one_byte_elements() {
-    for element in ["u8", "f32"] {
+    // B6: an 8-bit element takes no clause, so it is no longer unspecified
+    // without one; every wider element still is.
+    assert_accepts("functio w(tensor<u8, [2]> t) → octeti { redde t ↦ octeti }");
+    for element in ["i16", "u32", "f32", "f64"] {
         let err = error_with_issue(
             &format!("functio w(tensor<{element}, [2]> t) → octeti {{ redde t ↦ octeti }}"),
             TENSOR_UNSPECIFIED,

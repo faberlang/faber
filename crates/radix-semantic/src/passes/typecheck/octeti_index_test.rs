@@ -1,10 +1,18 @@
-//! Typecheck pins for unbounded `octeti[i]` and `octeti[lo‥hi]`.
+//! Typecheck pins for unbounded `octeti[i]` and `octeti[lo‥hi]`. A byte list is
+//! `lista<b8>`: `buf[i]` is one `b8` (bits are not numbers, ruling B1 of need
+//! 6a13d711), `buf[lo‥hi]` is a new byte list.
 
 use crate::test_support;
 
 #[test]
 fn octeti_scalar_index_accepts_as_numerus_u8() {
-    test_support::assert_accepts("functio at(octeti b, numerus i) → u8 { redde b[i] }");
+    // The element is a `b8`; a `u8` is reached only by `↦ u8`.
+    test_support::assert_accepts("functio at(octeti b, numerus i) → b8 { redde b[i] }");
+    test_support::assert_accepts("functio at(octeti b, numerus i) → u8 { redde b[i] ↦ u8 }");
+    test_support::assert_rejects_with_issue(
+        "functio at(octeti b, numerus i) → u8 { redde b[i] }",
+        "return_type_mismatch",
+    );
 }
 
 #[test]
@@ -15,8 +23,8 @@ fn octeti_range_index_accepts_as_octeti() {
 #[test]
 fn octeti_index_rejects_textus_key() {
     test_support::assert_rejects_with_issue(
-        r#"functio at(octeti b) → u8 { redde b["x"] }"#,
-        "octeti_index_must_be_numerus_or_range",
+        r#"functio at(octeti b) → b8 { redde b["x"] }"#,
+        "array_index_must_be_numerus",
     );
 }
 

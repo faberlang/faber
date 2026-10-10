@@ -27,9 +27,11 @@ fn octeti_to_lista_textus_rejects() {
 
 #[test]
 fn octeti_to_lista_unsized_numerus_rejects() {
+    // An unsized numerus element has no bit width to match: the bits row
+    // names it (`lista<b8>` converts to a sized same-width `lista<uN>` only).
     test_support::assert_rejects_with_issue(
         "incipit { fixum _ b ← |de ad| ↦ lista<numerus> }",
-        "unsupported_conversio",
+        "bits_conversion_width_mismatch",
     );
 }
 
