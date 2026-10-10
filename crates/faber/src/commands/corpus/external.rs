@@ -233,7 +233,34 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                     }
                 },
             };
+            let pinned_later = case
+                .target
+                .phase
+                .as_deref()
+                .filter(|phase| matches!(outcome, Judged::KnownFail) && *phase != "emit");
             match (outcome, failure) {
+                (Judged::KnownFail, Some(reason)) if pinned_later.is_some() => {
+                    failed += 1;
+                    (
+                        "fail",
+                        Some("emit"),
+                        Some(format!(
+                            "emit failed before expected {} phase: {reason}",
+                            pinned_later.unwrap_or("run")
+                        )),
+                    )
+                }
+                (Judged::KnownFail, None) if pinned_later.is_some() => {
+                    expected_failures += 1;
+                    (
+                        "expected-fail",
+                        Some("emit"),
+                        Some(format!(
+                            "known failure pinned at {} phase; roundtrip executes emit only",
+                            pinned_later.unwrap_or("run")
+                        )),
+                    )
+                }
                 (Judged::Pass, None) => {
                     passed += 1;
                     ("pass", Some("emit"), None)
@@ -517,7 +544,11 @@ fn run_case(
         (code, emit_ms, json!({"argv":emit_args,"cwd":case.dir}))
     };
     if !matches!(mode, "external" | "build") {
-        let mut row = result(case, target, "pass", "emit", None, None, started);
+        let (status, reason) = match judge_unexecuted_pin(case, "emit") {
+            Some((status, reason)) => (status, Some(reason)),
+            None => ("pass", None),
+        };
+        let mut row = result(case, target, status, "emit", reason, None, started);
         row["timing_ms"]["emit"] = json!(emit_ms);
         return row;
     }
@@ -530,6 +561,7 @@ fn run_case(
         return result(case, target, "fail", "setup", Some(error), None, started);
     }
     let mut row = result(case, target, "fail", "build", None, None, started);
+    let mut stale_build_pin = false;
     row["emit_command"] = emit_command;
     row["timing_ms"]["emit"] = json!(emit_ms);
     if !recipe.build.is_empty() {
@@ -546,7 +578,13 @@ fn run_case(
             }
         };
         row["build_command"] = json!({"argv":argv,"cwd":case_dir});
-        if case.target.phase.as_deref() == Some("build") || !output.status.success() {
+        stale_build_pin = mode != "build"
+            && output.status.success()
+            && matches!(case.target.outcome, Outcome::KnownFail)
+            && case.target.phase.as_deref() == Some("build");
+        if (case.target.phase.as_deref() == Some("build") && !stale_build_pin)
+            || !output.status.success()
+        {
             let (status, reason) = judge_phase(case, "build", &output);
             row["status"] = json!(status);
             row["reason"] = json!(reason);
@@ -558,9 +596,13 @@ fn run_case(
         return row;
     }
     if mode == "build" {
-        row["status"] = json!("pass");
+        let (status, reason) = match judge_unexecuted_pin(case, "build") {
+            Some((status, reason)) => (status, json!(reason)),
+            None => ("pass", Value::Null),
+        };
+        row["status"] = json!(status);
         row["phase"] = json!("build");
-        row["reason"] = Value::Null;
+        row["reason"] = reason;
         return row;
     }
     row["phase"] = json!("run");
@@ -586,7 +628,11 @@ fn run_case(
     row["command"] = json!({"argv":argv,"cwd":case_dir});
     row["exit"] = json!(output.status.code());
     let comparing = Instant::now();
-    let (status, reason) = judge_phase(case, "run", &output);
+    let (status, reason) = if stale_build_pin {
+        judge_stale_build_pin(case, &output)
+    } else {
+        judge_phase(case, "run", &output)
+    };
     row["status"] = json!(status);
     row["reason"] = json!(reason);
     row["timing_ms"]["compare"] = json!(ms(comparing));
@@ -786,6 +832,17 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
             ("fail", Some(format!("build failed: {diagnostics}")))
         };
     }
+    judge_run_output(case, output)
+}
+
+/// Compare a program run against the case's expected exit, goldens and fragments,
+/// whatever phase the case pins.
+fn judge_run_output(case: &Case, output: &Output) -> (&'static str, Option<String>) {
+    let diagnostics = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
     let expected = match case.expected() {
         Ok(expected) => expected,
         Err(reason) => return ("fail", Some(reason)),
@@ -843,6 +900,60 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
     }
     ("pass", None)
 }
+
+/// A known-fail pinned at a phase the target mode never executes cannot be judged
+/// there: the executed phases all succeeded, so report the pin as held (with the
+/// phase that went unchecked) instead of letting it read as a pass.
+fn judge_unexecuted_pin(case: &Case, executed: &str) -> Option<(&'static str, String)> {
+    let pinned = case.target.phase.as_deref()?;
+    let rank = |phase: &str| ["emit", "build", "run"].iter().position(|p| *p == phase);
+    if matches!(case.target.outcome, Outcome::KnownFail) && rank(pinned) > rank(executed) {
+        return Some((
+            "expected-fail",
+            format!(
+                "known failure pinned at {pinned} phase; this mode executes through {executed} only"
+            ),
+        ));
+    }
+    None
+}
+
+/// A known-fail pinned at `build` whose build now succeeds: the pin is stale. Judge
+/// the run that follows and report its own outcome rather than a bare unexpected pass.
+fn judge_stale_build_pin(case: &Case, run: &Output) -> (&'static str, Option<String>) {
+    let judged = if case.expect.is_some() {
+        judge_run_output(case, run)
+    } else if run.status.success() {
+        ("pass", None)
+    } else {
+        (
+            "fail",
+            Some(format!(
+                "exit {}: {}{}",
+                run.status,
+                String::from_utf8_lossy(&run.stderr),
+                String::from_utf8_lossy(&run.stdout)
+            )),
+        )
+    };
+    match judged {
+        ("pass", _) => (
+            "fail",
+            Some("unexpected pass; update target expectation".to_owned()),
+        ),
+        (_, reason) => (
+            "fail",
+            Some(format!(
+                "build pin is stale: build now succeeds; run phase failed: {}; re-pin at phase run",
+                reason.unwrap_or_default()
+            )),
+        ),
+    }
+}
+
+#[cfg(test)]
+#[path = "external_test.rs"]
+mod test;
 
 fn result(
     case: &Case,
