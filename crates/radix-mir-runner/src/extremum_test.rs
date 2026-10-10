@@ -4,6 +4,7 @@ use super::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use super::lib_test::evaluate_collection_call;
 use crate::host::BufferHost;
 use crate::value::TensorValue;
 use radix_lexer::Interner;
@@ -113,5 +114,65 @@ fn tensor_extrema_return_nihil_for_empty_runtime_tensors_without_identity() {
         eval_extremum(MirCollectionOp::TensorMin, Vec::new(), None)
             .expect("uncoalesced empty min returns nihil"),
         Value::Nil
+    );
+}
+
+fn eval_scalar_extremum(
+    op: MirCollectionOp,
+    left: Value,
+    right: Value,
+) -> Result<Value, RunnerError> {
+    evaluate_collection_call(
+        &MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(op),
+            args: vec![
+                MirOperand::Value(MirValueId(0)),
+                MirOperand::Value(MirValueId(1)),
+            ],
+            return_ty: MirType::semantic(radix_types::TypeId(0)),
+        },
+        vec![(MirValueId(0), left), (MirValueId(1), right)],
+    )
+}
+
+#[test]
+fn scalar_minimum_and_maximum_stay_exact_beyond_the_f64_integers() {
+    // 2^53 + 1 and 2^53 + 3 are not f64-representable; the pair must come back
+    // as one of the operands, not as a rounded neighbour.
+    let low = (1_i64 << 53) + 1;
+    let high = (1_i64 << 53) + 3;
+    assert_eq!(
+        eval_scalar_extremum(MirCollectionOp::Minimum, Value::Int(low), Value::Int(high))
+            .expect("scalar minimum"),
+        Value::Int(low)
+    );
+    assert_eq!(
+        eval_scalar_extremum(MirCollectionOp::Maximum, Value::Int(low), Value::Int(high))
+            .expect("scalar maximum"),
+        Value::Int(high)
+    );
+}
+
+#[test]
+fn scalar_minimum_and_maximum_accept_unsigned_pairs() {
+    let low = u64::MAX - 2;
+    let high = u64::MAX - 1;
+    assert_eq!(
+        eval_scalar_extremum(
+            MirCollectionOp::Minimum,
+            Value::UInt(low),
+            Value::UInt(high)
+        )
+        .expect("unsigned minimum"),
+        Value::UInt(low)
+    );
+    assert_eq!(
+        eval_scalar_extremum(
+            MirCollectionOp::Maximum,
+            Value::UInt(low),
+            Value::UInt(high)
+        )
+        .expect("unsigned maximum"),
+        Value::UInt(high)
     );
 }

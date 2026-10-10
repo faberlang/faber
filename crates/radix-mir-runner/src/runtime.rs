@@ -1560,22 +1560,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 i128::signum,
                 Some(|value| handroll::Magnus::from_i64(i64::from(value.signum()))),
             ),
-            MirCollectionOp::Minimum => self.numeric_extremum(
-                args,
-                span,
-                return_ty,
-                numeric_min,
-                super::value::ieee_minimum,
-                false,
-            ),
-            MirCollectionOp::Maximum => self.numeric_extremum(
-                args,
-                span,
-                return_ty,
-                numeric_max,
-                super::value::ieee_maximum,
-                true,
-            ),
+            MirCollectionOp::Minimum => {
+                self.numeric_extremum(args, span, return_ty, numeric_min, false)
+            }
+            MirCollectionOp::Maximum => {
+                self.numeric_extremum(args, span, return_ty, numeric_max, true)
+            }
             MirCollectionOp::Approximate => self.approximate_fractus(args, span),
             MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
             MirCollectionOp::ArgMax => self.arg_extremum_index(args, span, true),
@@ -4865,7 +4855,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
         return_ty: MirType,
         op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
-        scalar_op: fn(f64, f64) -> f64,
         take_greater: bool,
     ) -> Result<Value, RunnerError> {
         let is_array = matches!(
@@ -4880,11 +4869,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return self.tensor_elementwise_or_scalar(args, span, "tensor extremum", op, return_ty);
         }
         // `minimus`/`maximus` of two `inf` values is exact (ruling 37: an
-        // `inf` is totally ordered); the f64 path below would round.
+        // `inf` is totally ordered); `op` would round a `Magnus` through f64.
         if effective_width(self.types, return_ty.semantic_id()) == Some(NumericWidth::Inf) {
             return self.inf_extremum(args, span, take_greater);
         }
-        self.map_numeric_pair(args, span, scalar_op)
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, "numeric pair arity"));
+        };
+        let left = self.eval_operand(left, span)?;
+        let right = self.eval_operand(right, span)?;
+        op(&left, &right, NumericWidth::I64, span)
     }
 
     fn inf_extremum(
@@ -4905,26 +4899,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         } else {
             right
         })
-    }
-
-    fn map_numeric_pair(
-        &mut self,
-        args: &[MirOperand],
-        span: Span,
-        f: impl FnOnce(f64, f64) -> f64,
-    ) -> Result<Value, RunnerError> {
-        let [left, right] = args else {
-            return Err(RunnerError::internal(span, "numeric pair arity"));
-        };
-        let left = self.eval_operand(left, span)?;
-        let right = self.eval_operand(right, span)?;
-        match (left, right) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(f(a as f64, b as f64) as i64)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float(f(a as f64, b))),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(f(a, b as f64))),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(f(a, b))),
-            _ => Err(RunnerError::internal(span, "numeric pair type mismatch")),
-        }
     }
 
     fn sum_numeric_array(
