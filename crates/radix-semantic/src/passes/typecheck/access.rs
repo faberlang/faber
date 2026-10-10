@@ -734,15 +734,15 @@ impl TypeChecker<'_> {
         self.substitute_type_params(field_ty, &mut vars, Some(&mut shape_vars))
     }
 
-    /// Instantiate an applied generic nominal's `size` arguments into a method
+    /// Instantiate an applied generic nominal's arguments into a method
     /// signature.
     ///
-    /// A method of `class Box<size N>` declares its parameter and return
-    /// types over the class's `N`; on a `Box<3>` receiver those extents are
-    /// the receiver's size witness, exactly as `applied_field_type` projects
-    /// them for fields. Type parameters keep their declared form (identity),
-    /// as do the method's own generics; non-applied receivers and receivers
-    /// with no size arguments return the signature unchanged.
+    /// A method of `class Box<T, size N>` declares its parameter and return
+    /// types over the class's `T` and `N`; on a `Box<int, 3>` receiver those
+    /// are the receiver's type and size witnesses, exactly as
+    /// `applied_field_type` projects them for fields. The method's own
+    /// generics keep their declared form (identity); non-applied receivers
+    /// return the signature unchanged.
     pub(super) fn applied_method_signature(
         &mut self,
         receiver_ty: TypeId,
@@ -763,27 +763,24 @@ impl TypeChecker<'_> {
         let mut shape_vars = FxHashMap::default();
         for (param, arg) in params.iter().zip(args.iter()) {
             match arg {
-                radix_types::AppliedArg::Type(_) => {
-                    let identity = self.types.intern(Type::Param(*param));
-                    vars.insert(*param, identity);
+                radix_types::AppliedArg::Type(witness) => {
+                    vars.insert(*param, *witness);
                 }
                 radix_types::AppliedArg::Size(witness) => {
                     shape_vars.insert(*param, *witness);
                 }
             }
         }
-        if shape_vars.is_empty() {
+        if vars.is_empty() && shape_vars.is_empty() {
             return sig;
         }
+        // A method's own generic of the same name shadows the class's.
         for param in &sig.type_params {
+            shape_vars.remove(&param.name);
             let identity = self.types.intern(Type::Param(param.name));
-            vars.entry(param.name).or_insert(identity);
+            vars.insert(param.name, identity);
         }
-        let mut substituted = self.substitute_func_sig(&sig, &mut vars, Some(&mut shape_vars));
-        substituted
-            .type_params
-            .retain(|param| !shape_vars.contains_key(&param.name));
-        substituted
+        self.substitute_func_sig(&sig, &mut vars, Some(&mut shape_vars))
     }
 
     /// Field projections of a `ref` genus are `ref` views of referential fields.
