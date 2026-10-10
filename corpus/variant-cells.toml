@@ -558,7 +558,7 @@ family = "bounded-conversio"
 cell = "textus<N> ↦ textus"
 status = "direct"
 exemplum = "bounded/conversio-textus-to-textus.fab"
-expected = false
+expected = true
 note = "batch 1 (bc40c951): check-admitted; runner lacks bounded textus carrier (UnsupportedMir)"
 
 [[cells]]
@@ -567,7 +567,7 @@ family = "bounded-conversio"
 cell = "ascii<N> ↔ ascii<M> grow/shrink/identity (D7 resize)"
 status = "direct"
 exemplum = "bounded/conversio-ascii-resize.fab"
-expected = false
+expected = true
 note = "batch 1 (bc40c951): check-admitted; runner lacks runtime conversio to BoundedAscii (UnsupportedMir)"
 
 [[cells]]
@@ -673,7 +673,7 @@ family = "bounded-conversio"
 cell = "lista<T,N> ↦ lista<T,M>"
 status = "direct"
 exemplum = "bounded/conversio-lista-to-bounded-lista.fab"
-expected = false
+expected = true
 note = "batch 4: check-admitted shrink route; runner lacks runtime BoundedArray conversio (UnsupportedMir)"
 
 [[cells]]
