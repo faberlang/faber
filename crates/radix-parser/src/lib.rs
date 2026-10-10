@@ -1753,6 +1753,9 @@ mod claim_test;
 #[cfg(test)]
 #[path = "call_marker_test.rs"]
 mod call_marker_test;
+#[cfg(test)]
+#[path = "value_marker_test.rs"]
+mod value_marker_test;
 
 #[cfg(test)]
 #[path = "generic_call_test.rs"]

@@ -731,6 +731,30 @@ impl TypeChecker<'_> {
                 start, end, step, ..
             } => self.check_intervallum_expr(start, end, step, expr.span),
             HirExpressionKind::Assign(target, value) => self.check_assign(target, value),
+            HirExpressionKind::Marked {
+                marker,
+                expr: inner,
+            } => {
+                // Value-side `copy` (`b ← copy c`): the value has the type of
+                // its operand; a scalar carrier takes no access marker, the
+                // same refusal the binding-side form gets at the type.
+                let inner_span = inner.span;
+                let ty = self.check_expr_with_expected(inner, expected);
+                if matches!(marker, radix_hir::HirArgMarker::Copy)
+                    && ty != self.error_type
+                    && self
+                        .types
+                        .is_scalar_for_access_marker(self.resolve_inferred_type(ty))
+                {
+                    self.error_issue_with_args(
+                        SemanticErrorKind::LoweringError,
+                        crate::ISSUE_SCALAR_ACCESS_MARKER,
+                        inner_span,
+                        &[],
+                    );
+                }
+                ty
+            }
             HirExpressionKind::ConversioAssign {
                 target,
                 source,

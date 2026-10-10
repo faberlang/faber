@@ -4820,6 +4820,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Index(_, _) => "index access before aggregate place MIR lowering",
         HirExpressionKind::OptionalChain(_, _) => "optional chains before nullable control-flow MIR lowering",
         HirExpressionKind::NonNull(_, _) => "non-null assertions before nullable control-flow MIR lowering",
+        HirExpressionKind::Marked { .. } => "value-side markers before marked-value MIR lowering",
         HirExpressionKind::Gradient { .. } => {
             "gradient expressions before tensor-glyphs 2B backward-companion MIR lowering"
         }

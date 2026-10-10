@@ -221,7 +221,17 @@ impl Parser {
         let binding = self.parse_binding_pattern()?;
 
         let mut compile_time = false;
+        let mut ty = ty;
         let (init, await_form) = if self.eat(&TokenKind::Assign) {
+            // Value-side marker (`var T b ← copy a`, `var T b ← own a`): the
+            // marker names what happens to the initializer, and the binding
+            // gets the same exclusive-value type mode the binding-side
+            // spelling (`var copy T b ← a`) writes.
+            if let Some(slot) = ty.as_mut().filter(|slot| slot.mode.is_none())
+                && let Some(mode) = self.parse_value_marker(None)
+            {
+                slot.mode = Some(mode);
+            }
             (Some(Box::new(self.parse_expression()?)), None)
         } else if self.check(&TokenKind::Eq) {
             compile_time = true;

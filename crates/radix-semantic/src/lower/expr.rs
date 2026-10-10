@@ -1402,10 +1402,24 @@ impl Lowerer<'_> {
 
     fn lower_assign(&mut self, assign: &radix_syntax::AssignExpr) -> HirExpressionKind {
         let target = lower_expr(self, &assign.target);
-        let source = lower_expr(self, &assign.value);
+        let mut source = lower_expr(self, &assign.value);
 
         match assign.op {
             radix_syntax::AssignOp::Assign => {
+                if assign.value_marker == Some(radix_syntax::TypeMode::Copy) {
+                    let span = source.span;
+                    let id = self.next_hir_id();
+                    let ty = None;
+                    source = radix_hir::HirExpression {
+                        id,
+                        kind: HirExpressionKind::Marked {
+                            marker: radix_hir::HirArgMarker::Copy,
+                            expr: Box::new(source),
+                        },
+                        ty,
+                        span,
+                    };
+                }
                 HirExpressionKind::Assign(Box::new(target), Box::new(source))
             }
             // `↤` (U+21A4) is conversion-directed assignment: the operator is

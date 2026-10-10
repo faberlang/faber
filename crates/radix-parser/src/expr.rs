@@ -196,6 +196,11 @@ impl Parser {
 
         self.advance();
         let is_conversio = matches!(op, AssignOp::ConversioAssign);
+        let value_marker = if matches!(op, AssignOp::Assign) {
+            self.parse_value_marker(Some(TypeMode::Copy))
+        } else {
+            None
+        };
         let parse_value: fn(&mut Self) -> Result<Expr, ParseError> = if is_conversio {
             Self::parse_assignment_open
         } else {
@@ -224,6 +229,7 @@ impl Parser {
                 op,
                 target: Box::new(target),
                 value,
+                value_marker,
                 recovery,
             }),
             span,
@@ -3140,6 +3146,29 @@ impl Parser {
             return None;
         };
         if !self.marker_word_precedes_operand() {
+            return None;
+        }
+        self.advance();
+        Some(mode)
+    }
+
+    /// Parse an optional value-side marker (`copy x`, `own x`) at the start of
+    /// an initializer or assignment right side.
+    ///
+    /// The word is a marker only when an operand follows, exactly as at a call
+    /// argument (`copy` and `own` stay contextual: a binding named `copy` with
+    /// no operand after it is still an identifier). `allowed` restricts the
+    /// markers claimed here; `None` claims `copy` and `own` (declaration
+    /// initializers), `Some(mode)` claims only that mode (assignment).
+    pub(super) fn parse_value_marker(&mut self, allowed: Option<TypeMode>) -> Option<TypeMode> {
+        let mode = if self.check_keyword_ident(TokenKind::Copy) {
+            TypeMode::Copy
+        } else if self.check_keyword_ident(TokenKind::Own) {
+            TypeMode::Own
+        } else {
+            return None;
+        };
+        if allowed.is_some_and(|only| only != mode) || !self.marker_word_precedes_operand() {
             return None;
         }
         self.advance();

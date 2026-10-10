@@ -990,7 +990,7 @@ insere_expr    := 'insere' STRING
 # `generis T X = e` declaration (en `static`) parses whole for recovery and is
 # reported as `PARSE010 static_decl_retired`, at the top level and in blocks
 # alike; `generis` survives only as the `genus` field modifier below.
-fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
+fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' value_marker? expression) | ('=' const_init) | ('↤' assignment inline_default?) | ('↢' expression))?
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 sit_decl      := 'sit' IDENTIFIER (('←' | '↢') expression)?
 array_destruct := ('fixum' | 'varia') array_pattern '←' expression
@@ -1311,7 +1311,13 @@ expression := assignment
 # storage of `target`. Binds above assignment and below ternary; operands are
 # complete before the copy. One ⇇ per statement: a chain is `copy_into_chain`.
 transfer   := ternary ('⇇' ternary)?
-assignment := transfer ('←' assignment | '↤' assignment inline_default?)?
+# `value_marker` (operator ruling 2026-10-08): the `copy`/`own` marker sits on
+# the value at the place it is copied or given away. In a declaration it
+# duplicates or transfers the initializer (`var T b ← copy a`, `var T b ← own a`);
+# in an assignment only `copy` is written (`b ← copy c`). The word is a marker
+# only when an operand follows; otherwise it is an ordinary identifier.
+value_marker := 'own' | 'copy'
+assignment := transfer ('←' 'copy'? assignment | '↤' assignment inline_default?)?
 inc_dec_stmt := place ('↑' | '↓')
 place      := call_expr  (* semantic analysis requires an assignable target *)
 # `c ✓ a ✗ b` is the one value conditional (D4.5), one level only (D4.6): a

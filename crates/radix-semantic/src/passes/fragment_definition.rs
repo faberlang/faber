@@ -250,6 +250,7 @@ impl FragmentDefinitionChecker<'_> {
                 self.effect(expr.span, "unapproved_effect");
                 self.check_expr(object);
             }
+            HirExpressionKind::Marked { expr: inner, .. } => self.check_expr(inner),
             HirExpressionKind::Block(block) => self.check_block(block),
             HirExpressionKind::Si {
                 cond,

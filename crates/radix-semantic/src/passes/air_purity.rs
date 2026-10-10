@@ -264,6 +264,7 @@ impl AirPurityChecker<'_> {
                 self.reject(expr.span, "optional_null_chain");
                 self.check_expr(object);
             }
+            HirExpressionKind::Marked { expr: inner, .. } => self.check_expr(inner),
             HirExpressionKind::Block(block) => self.check_block(block),
             HirExpressionKind::Si {
                 cond,

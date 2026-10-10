@@ -1537,6 +1537,11 @@ pub struct AssignExpr {
     pub op: AssignOp,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
+    /// Value-side `copy` marker written before the right side
+    /// (`b ← copy c`): the stored value is a deep duplicate of `c`. Only
+    /// `TypeMode::Copy` is recorded here; a declaration initializer's marker
+    /// lands on the declared type's mode instead.
+    pub value_marker: Option<TypeMode>,
     /// `⊥ fallback` inline recovery, legal only on `↤` (conversion-directed
     /// assignment). The parser attaches the recovery to the nearest `↤` in a
     /// right-associated chain; the operator and recovery travel through the

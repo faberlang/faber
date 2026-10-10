@@ -1710,6 +1710,17 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
+        HirExpressionKind::Marked { expr: inner, .. } => {
+            rewrite_expr(
+                unit_path,
+                inner,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+        }
         HirExpressionKind::NonNull(object, chain) => {
             rewrite_expr(
                 unit_path,

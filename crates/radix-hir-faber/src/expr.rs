@@ -762,6 +762,20 @@ impl super::FaberCodegen<'_> {
                     self.write_expr(step, names, surface, writer);
                 }
             }
+            HirExpressionKind::Marked {
+                marker,
+                expr: inner,
+            } => {
+                writer.write(surface.keyword(match marker {
+                    radix_hir::HirArgMarker::Ref => TokenKind::De,
+                    radix_hir::HirArgMarker::Mut => TokenKind::In,
+                    radix_hir::HirArgMarker::Own => TokenKind::Own,
+                    radix_hir::HirArgMarker::Copy => TokenKind::Copy,
+                    radix_hir::HirArgMarker::Axis => TokenKind::Axis,
+                }));
+                writer.write(" ");
+                self.write_expr_prec(inner, 12, names, surface, writer);
+            }
             HirExpressionKind::Assign(lhs, rhs) => {
                 self.write_expr_prec(lhs, 1, names, surface, writer);
                 writer.write(" ← ");

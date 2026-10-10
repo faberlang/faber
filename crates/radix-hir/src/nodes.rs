@@ -1398,6 +1398,15 @@ pub enum HirExpressionKind {
 
     Assign(Box<HirExpression>, Box<HirExpression>),
 
+    /// Value-side `copy` marker on an assignment right side (`b ← copy c`):
+    /// the value is a deep duplicate of `expr`. Declaration initializers carry
+    /// the marker as the declared type's access mode instead, so this node
+    /// only ever appears as the source of an [`HirExpressionKind::Assign`].
+    Marked {
+        marker: HirArgMarker,
+        expr: Box<HirExpression>,
+    },
+
     /// Conversion-directed assignment (`↤`, U+21A4).
     ///
     /// `target ↤ source` evaluates `source`, converts it to the statically

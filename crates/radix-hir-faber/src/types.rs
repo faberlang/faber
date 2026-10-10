@@ -27,6 +27,16 @@ impl super::FaberCodegen<'_> {
         type_id
     }
 
+    /// Marker word an exclusive (`own`/`copy`) binding type writes on the
+    /// value side of its initializer (`T b ← copy a`).
+    pub(super) fn exclusive_binding_marker(&self, ty: TypeId) -> Option<radix_lexer::TokenKind> {
+        match self.types.get(ty) {
+            Type::Ref(SemanticMutability::Own, _) => Some(radix_lexer::TokenKind::Own),
+            Type::Ref(SemanticMutability::Copy, _) => Some(radix_lexer::TokenKind::Copy),
+            _ => None,
+        }
+    }
+
     pub(super) fn type_to_faber(
         &self,
         type_id: TypeId,
