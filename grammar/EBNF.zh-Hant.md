@@ -2669,6 +2669,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 
 The old `求和 取自`, `最大 取自`, and `最小 取自` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `歸約 經由 求和`, `歸約 經由 最大`, or `歸約 經由 最小`; the operator words remain ordinary identifiers outside the `經由` clause.
 
+The tensor method `.media()` (en `.mean()`) is not a reduction operator and has no `經由` form. It is sugar over the sum reduction: `t.media()` is `t.求和() / count`, where `count` is the element count of `t` (en `t.mean()` is `t.sum() / count`). The grouped form `t.media(軸 n)` is the grouped sum divided by the grouped count, elementwise. A mean is not a true reduction (two partial means do not combine; sums and counts do), so the reduction operator set stays the set of real reductions. An empty source is `0 / 0`, which follows the float rules and is not-a-number (NaN); it is not a no-value result and has no fallback.
+
 `排序 經由 <direction> (取自 | 從) source [(定值 | 變值) x { 傳回 key }]` is the sort expression (en `sort 經由 asc from xs`). `經由` is mandatory and selects `升序` or `降序` (en `asc`, `desc`). `取自` (en `from`) orders a list, a set, or a map's values; `從` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `排序`, `升序`, and `降序` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
 
 `格式文字` and `讀取`/`行` are builtin claims that resolve to a user binding

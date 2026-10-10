@@ -3172,9 +3172,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let tensor = self.tensor_arg(receiver, span)?;
         let values = self.tensor_logical_values(&tensor, span)?;
-        if values.is_empty() {
-            return Ok(Value::Float(0.0));
-        }
+        // The mean is sum / count: an empty source is 0.0 / 0.0, which is NaN.
         let mut sum = 0.0;
         for value in &values {
             sum += numeric_as_f64(value, span)?;
