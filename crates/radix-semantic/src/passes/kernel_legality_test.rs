@@ -537,6 +537,21 @@ functio k(tensor<f32, [8]> x, in tensor<f32, [8]> out) → vacuum {
 }
 
 #[test]
+fn a_conversion_default_in_a_kernel_selects_a_value_and_is_legal() {
+    // Operator ruling 2026-10-08 (KCONVDEF): `n ↦ i32 ⊥ 0` is compare plus
+    // select, never a handler.
+    assert_accepts(
+        r"
+@ nucleum
+@ publica
+functio k(i64 n) → i32 {
+    redde n ↦ i32 ⊥ 0
+}
+",
+    );
+}
+
+#[test]
 fn a_local_do_catch_is_still_a_recovery_next_to_a_call_default() {
     expect_kernel_error(
         r"

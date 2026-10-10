@@ -372,18 +372,10 @@ impl HirVisitor for KernelWalk<'_, '_> {
                 self.recovery(expr.span, "capta");
                 walk_expr(self, expr);
             }
-            // `call ⊥ default` selects a value and never unwinds (compare
-            // plus select on a device); it installs no handler.
+            // `call ⊥ default` and `n ↦ T ⊥ default` select a value and
+            // never unwind (compare plus select on a device); they install
+            // no handler (operator ruling 2026-10-08, KCONVDEF).
             HirExpressionKind::CallDefault { .. } => walk_expr(self, expr),
-            HirExpressionKind::ConversioAssign {
-                recovery: Some(_), ..
-            }
-            | HirExpressionKind::Conversio {
-                recovery: Some(_), ..
-            } => {
-                self.recovery(expr.span, "conversion_default");
-                walk_expr(self, expr);
-            }
             HirExpressionKind::Throw(_)
             | HirExpressionKind::Panic(_)
             | HirExpressionKind::Adfirma(..) => self.walk_quiet(expr),
