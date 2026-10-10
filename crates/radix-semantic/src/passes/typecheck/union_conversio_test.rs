@@ -265,10 +265,10 @@ fn orphan_ownership_rejects_both_ends_foreign() {
 
 #[test]
 fn builtin_rows_are_seeded_at_analysis_setup() {
-    let fixture = test_support::analyze_source("incipit { }");
+    let mut fixture = test_support::analyze_source("incipit { }");
     assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
     let textus = fixture.types.primitive(Primitive::Textus);
-    let octeti = fixture.types.primitive(Primitive::Octeti);
+    let octeti = fixture.types.octeti_list();
     for (source, destination) in [(textus, octeti), (octeti, textus)] {
         let row = fixture
             .resolver

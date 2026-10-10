@@ -21,13 +21,13 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
 
 /// Seed compiler-shipped conversion rows in the coherence registry (CTR-04).
 ///
-/// The pairs are the builtin `textus ↔ octeti` re-presentations the typecheck
+/// The pairs are the builtin `textus ↔ octeti` (`lista<b8>`) re-presentations the typecheck
 /// conversio checks already admit; seeding them as builtin rows makes the one
 /// registry the authority for their identity, so a user `@ conversio` row for
 /// the same ordered pair fails closed as a builtin shadow at enrollment.
 fn register_builtin_conversion_rows(resolver: &mut Resolver, types: &mut TypeTable) {
     let textus = types.primitive(Primitive::Textus);
-    let octeti = types.primitive(Primitive::Octeti);
+    let octeti = types.octeti_list();
     for (source, destination) in [(textus, octeti), (octeti, textus)] {
         let result = resolver.register_builtin_conversion(
             ConversionPair::new(source, destination),

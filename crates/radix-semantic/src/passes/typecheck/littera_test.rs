@@ -1,9 +1,9 @@
-//! D10.1–D10.5: `littera` (one Unicode scalar) and `octetus` (the byte).
+//! D10.1–D10.5: `littera` (one Unicode scalar) and the retired byte word.
 //!
 //! `ascii[i]`, text iteration, and text cursors bind `littera`; `textus[i]`
 //! keeps its `ascii<1>` row while operator fork F5 is held. `ascii<1> →
-//! littera → textus` widen implicitly, `octetus ≡ numerus<u8>`, and `octeti`
-//! is exactly `lista<octetus>`. Assertions are structured (issue identity),
+//! littera → textus` widen implicitly, the scalar `octetus` is retired
+//! (`retired_byte_word`), and `octeti` is exactly `lista<b8>`. Assertions are structured (issue identity),
 //! never rendered prose.
 
 use crate::test_support;
@@ -227,12 +227,12 @@ fn octeti_elements_are_b8() {
     );
 }
 
-/// D10.4: identity, not mutual assignability — exact equality accepts the
-/// pair because they are one type.
+/// Identity, not mutual assignability — exact equality accepts the pair
+/// because they are one type (`octeti` is exactly `lista<b8>`).
 #[test]
-fn octeti_is_exactly_lista_octetus() {
+fn octeti_is_exactly_lista_b8() {
     test_support::assert_accepts(
-        "functio f(octeti a, lista<octetus> b) → bivalens {
+        "functio f(octeti a, lista<b8> b) → bivalens {
     redde a ≡ b
 }",
     );

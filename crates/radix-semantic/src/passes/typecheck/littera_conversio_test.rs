@@ -48,10 +48,11 @@ fn numerus_to_littera_is_failable() {
     );
 }
 
-/// D10.4 `octetus ≡ numerus<u8>`: a byte converts by the digits rule.
+/// A `u8` number converts by the digits rule (the scalar byte word is
+/// retired; a raw byte is `b8`, a number is `u8`).
 #[test]
-fn octetus_to_littera_is_digits_rule() {
-    test_support::assert_accepts("functio f(octetus b) → littera { redde b ↦ littera ⊥ '?' }");
+fn u8_to_littera_is_digits_rule() {
+    test_support::assert_accepts("functio f(u8 b) → littera { redde b ↦ littera ⊥ '?' }");
 }
 
 #[test]

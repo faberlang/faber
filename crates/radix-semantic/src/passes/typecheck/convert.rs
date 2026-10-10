@@ -2585,6 +2585,12 @@ impl TypeChecker<'_> {
                 PrimitiveConversioFamily::Ascii
             }
             Type::Primitive(Primitive::Octeti) => PrimitiveConversioFamily::Octeti,
+            // `octeti` (en `bytes`) is `lista<b8>`: the byte-string family.
+            Type::Array(element)
+                if self.bits_width_of(*element) == Some(radix_types::BitsWidth::B8) =>
+            {
+                PrimitiveConversioFamily::Octeti
+            }
             Type::Primitive(Primitive::Regex) => PrimitiveConversioFamily::Regex,
             _ => PrimitiveConversioFamily::Other,
         }

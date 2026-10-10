@@ -114,7 +114,7 @@ fn itera_ex_octeti_binds_index_element_type() {
     test_support::assert_accepts(
         "functio f(octeti b) → vacuum {
     itera ex b fixum x {
-        fixum u8 y ← x
+        fixum b8 y ← x
         nota y
     }
 }",

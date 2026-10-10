@@ -117,16 +117,29 @@ incipit {
             expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
         EqualityCase {
-            // D10.4: `octeti` is exactly `lista<octetus>` — one type.
+            // `octeti` is exactly `lista<b8>` — one type.
             name: "octeti_lista_eq_accepts",
             source: r#"
 incipit {
     fixum octeti raw ← |41|
-    fixum lista<u8> bytes ← [0x41 ∷ u8]
+    fixum lista<b8> bytes ← |41|
     si raw ≡ bytes { nota "same" }
 }
 "#,
             expect: EqualityExpect::Accepts,
+        },
+        EqualityCase {
+            // Bits are not numbers (ruling B1): `lista<b8>` and `lista<u8>`
+            // are different types, so exact equality refuses the pair.
+            name: "octeti_lista_u8_eq_rejects",
+            source: r#"
+incipit {
+    fixum octeti raw ← |41|
+    fixum lista<u8> bytes ← [0x41 ∷ u8]
+    si raw ≡ bytes { nota "bad" }
+}
+"#,
+            expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
         EqualityCase {
             name: "ascii_index_numerus_eq_rejects",

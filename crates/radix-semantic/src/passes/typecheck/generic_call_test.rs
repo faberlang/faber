@@ -356,7 +356,7 @@ incipit {
             DiagnosticArg::new("issue", "generic_type_arg_domain"),
             DiagnosticArg::new("rejected", "numerus"),
             DiagnosticArg::new("param", "T"),
-            DiagnosticArg::new("accepted", "textus, octeti, lista<textus>"),
+            DiagnosticArg::new("accepted", "textus, lista<b8>, lista<textus>"),
         ],
     );
 }
@@ -562,7 +562,7 @@ incipit {
             DiagnosticArg::new("issue", "generic_type_arg_domain"),
             DiagnosticArg::new("rejected", "numerus"),
             DiagnosticArg::new("param", "T"),
-            DiagnosticArg::new("accepted", "textus, octeti, lista<textus>"),
+            DiagnosticArg::new("accepted", "textus, lista<b8>, lista<textus>"),
         ],
     );
 }
@@ -583,7 +583,7 @@ incipit {
             DiagnosticArg::new("issue", "generic_type_arg_domain"),
             DiagnosticArg::new("rejected", "numerus"),
             DiagnosticArg::new("param", "T"),
-            DiagnosticArg::new("accepted", "textus, octeti, lista<textus>"),
+            DiagnosticArg::new("accepted", "textus, lista<b8>, lista<textus>"),
         ],
     );
 }
