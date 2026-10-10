@@ -1,5 +1,6 @@
 //! Need: the raw-bits types `b8 b16 b32 b64` are implemented only by
-//! the Faber source emitter, the TypeScript emitter and the MIR runner. Every
+//! the Faber source emitter, the Rust, Go, TypeScript, Swift and sexp emitters
+//! and the MIR runner. Every
 //! other emitter rejects a module that names one with the named `bits_type_unsupported_on_target`
 //! diagnostic before emission, instead of printing a placeholder identifier
 //! or a plain integer carrier.
@@ -82,8 +83,8 @@ fn wasm_rejects_bits_before_emission() {
 
 #[cfg(feature = "mir-sexp")]
 #[test]
-fn sexp_rejects_bits_before_emission() {
-    assert_rejected(Target::MirSexp, "MirSexp");
+fn sexp_keeps_bits() {
+    assert_eq!(diagnostics(Target::MirSexp), Vec::<(String, String)>::new());
 }
 
 #[cfg(feature = "hir-faber")]
