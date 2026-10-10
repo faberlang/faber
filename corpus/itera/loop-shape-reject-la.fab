@@ -1,0 +1,21 @@
++++
+locale = "la"
+term = "itera-loop-shape-reject-la"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "expression", "call_expr"]
+canonical = false
+summary = "A method that changes a collection's shape inside a loop over that collection is refused at check time."
+no_expected = "rejects"
+diagnostic = "SEM011:loop_collection_shape_change"
++++
+
+# This exemplum intentionally fails to compile: `xs.appende(x)` changes the
+# shape of the lista that the loop is walking. Methods are checked; a bracket
+# store is the unchecked "developer knows best" form.
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    itera ex xs fixum x {
+        xs.appende(x)
+    }
+}

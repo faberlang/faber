@@ -1,0 +1,22 @@
++++
+locale = "en"
+term = "itera-loop-shape-reject"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "expression", "call_expr"]
+canonical = false
+summary = "A method that changes a collection's shape inside a loop over that collection is refused at check time."
+no_expected = "rejects"
+diagnostic = "SEM011:loop_collection_shape_change"
++++
+
+# This exemplum intentionally fails to compile: `xs.append(x)` changes the
+# shape of the list that the loop is walking. Methods are checked; a bracket
+# store is the unchecked "developer knows best" form. For a worklist, use a
+# queue with `while`.
+main {
+    var list<int> xs ← [1, 2, 3]
+    for from xs const x {
+        xs.append(x)
+    }
+}
