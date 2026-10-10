@@ -639,6 +639,10 @@ help = "viết `⌊x⌉` để làm tròn tới số nguyên gần nhất, khi h
 message = "`{glyph}` là toán tử đã bị loại bỏ; phủ định của `≡` được viết là `{replacement}`"
 help = "viết `{replacement}` thay cho `{glyph}`; mỗi ký hiệu phủ định có cùng số gạch ngang với ký hiệu mà nó phủ định (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "biểu thức sort hoặc reduce không thể là nguồn của vòng lặp"
+help = "hãy gán nó cho một tên trước, rồi lặp trên tên đó: `const list<int> ys ← sort via asc from xs`, sau đó `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "dùng ⊥ cho phục hồi conversio"
 help = "dùng ⊥; vel chỉ dùng cho phép hợp nhất nullish"

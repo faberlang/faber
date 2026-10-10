@@ -1,0 +1,20 @@
++++
+locale = "en"
+term = "itera-reduce-source-reject-en"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "reducta_expr"]
+canonical = false
+summary = "A bare reduce expression is refused as a loop source; bind it to a name first."
+no_expected = "rejects"
+diagnostic = "PARSE030:itera_source_sort_reduce_unbound"
++++
+
+# This exemplum intentionally fails to compile: a reduce expression is never
+# written in a loop header. Bind the reduced value to a name, then loop over it.
+main {
+    const list<int> xs ← [3, 1, 2]
+    for from reduce via sum from xs const x {
+        print x
+    }
+}

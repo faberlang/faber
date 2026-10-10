@@ -639,6 +639,10 @@ help = "用 `⌊x⌉` 取最近整数，平局取偶数邻值；用 `⌈x⌉` �
 message = "`{glyph}` 是已废弃的运算符；`≡` 的否定写作 `{replacement}`"
 help = "用 `{replacement}` 代替 `{glyph}`；每个否定符号的横线数与其所否定的符号相同（`≡`/`≢`、`≅`/`≇`、`≈`/`≉`）"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "sort 或 reduce 表达式不能直接作为循环来源"
+help = "先把它绑定到一个名称，再对该名称循环：`const list<int> ys ← sort via asc from xs`，然后 `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "使用 ⊥ 进行 conversio recovery"
 help = "使用 ⊥；vel 仅用于 nullish coalescing"

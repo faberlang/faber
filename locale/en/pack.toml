@@ -1024,6 +1024,10 @@ help = "write `⌊x⌉` to round to the nearest integer, ties to the even neighb
 message = "`{glyph}` is a retired operator; the negation of `≡` is spelled `{replacement}`"
 help = "write `{replacement}` for `{glyph}`; every negation glyph has the same number of lines as the glyph it negates (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "a sort or reduce expression cannot be a loop source"
+help = "bind it to a name first, then loop over the name: `const list<int> ys ← sort via asc from xs`, then `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
 help = "use ⊥; vel is nullish coalescing only"

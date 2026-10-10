@@ -1850,6 +1850,9 @@ impl Parser {
         };
         self.advance();
         self.expect_keyword_ident(TokenKind::Ex, "expected reduction source")?;
+        // Captured before the source parses (see `parse_sort_expr`): a loop
+        // head's `fixum name {` binder is not this expression's body.
+        let body_barred = self.sort_body_barred_at == Some(self.expression_contexts);
         let mut source = self.parse_expression()?;
         let apud = if self.eat_keyword_ident(TokenKind::Apud) {
             self.parse_apud_clause()?
@@ -1868,10 +1871,12 @@ impl Parser {
         } else {
             None
         };
-        let has_body = matches!(
-            self.keyword_ident_at(0),
-            Some(TokenKind::Fixum | TokenKind::Varia)
-        ) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+        let has_body = !body_barred
+            && matches!(
+                self.keyword_ident_at(0),
+                Some(TokenKind::Fixum | TokenKind::Varia)
+            )
+            && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
             && self.peek_at(2).kind == TokenKind::LBrace;
         let (mutability, binding, body) = if has_body {
             (

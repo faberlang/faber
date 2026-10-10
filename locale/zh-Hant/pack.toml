@@ -639,6 +639,10 @@ help = "用 `⌊x⌉` 取最近整數，平手取偶數鄰值；用 `⌈x⌉` �
 message = "`{glyph}` 是已廢棄的運算子；`≡` 的否定寫作 `{replacement}`"
 help = "用 `{replacement}` 取代 `{glyph}`；每個否定符號的橫線數與其所否定的符號相同（`≡`/`≢`、`≅`/`≇`、`≈`/`≉`）"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "sort 或 reduce 運算式不能直接作為迴圈來源"
+help = "先把它綁定到一個名稱，再對該名稱迴圈：`const list<int> ys ← sort via asc from xs`，然後 `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "使用 ⊥ 進行 conversio 復原"
 help = "使用 ⊥；vel 僅用於 nullish 合併"

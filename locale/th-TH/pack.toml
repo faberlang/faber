@@ -639,6 +639,10 @@ help = "เขียน `⌊x⌉` เพื่อปัดเป็นจำน�
 message = "`{glyph}` เป็นตัวดำเนินการที่เลิกใช้แล้ว; การปฏิเสธของ `≡` เขียนเป็น `{replacement}`"
 help = "เขียน `{replacement}` แทน `{glyph}`; สัญลักษณ์ปฏิเสธทุกตัวมีจำนวนเส้นเท่ากับสัญลักษณ์ที่มันปฏิเสธ (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "นิพจน์ sort หรือ reduce ไม่สามารถเป็นแหล่งของลูปได้"
+help = "ผูกไว้กับชื่อก่อน แล้วจึงวนลูปบนชื่อนั้น: `const list<int> ys ← sort via asc from xs` แล้วจึง `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "ใช้ ⊥ สำหรับการกู้คืน conversio"
 help = "ใช้ ⊥; vel ใช้สำหรับการรวมค่า nullish เท่านั้น"

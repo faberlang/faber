@@ -639,6 +639,10 @@ help = "निकटतम पूर्णांक के लिए `⌊x⌉` �
 message = "`{glyph}` एक retired operator है; `≡` का निषेध `{replacement}` लिखा जाता है"
 help = "`{glyph}` की जगह `{replacement}` लिखें; हर निषेध चिह्न में उतनी ही रेखाएँ होती हैं जितनी उस चिह्न में जिसे वह उलटता है (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "sort या reduce expression को loop का स्रोत नहीं बनाया जा सकता"
+help = "पहले उसे किसी नाम से बाँधें, फिर उसी नाम पर loop चलाएँ: `const list<int> ys ← sort via asc from xs`, फिर `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "conversio recovery के लिए ⊥ उपयोग करें"
 help = "⊥ उपयोग करें; vel केवल nullish coalescing के लिए है"

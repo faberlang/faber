@@ -193,6 +193,19 @@ impl Parser {
         let sources = self.parse_itera_sources(mode);
         self.sort_body_barred_at = previous_sort_bar;
         let sources = sources?;
+        // A bare sort or reduce expression is never a loop source: bind it
+        // to a name first (operator ruling 2026-10-10, need).
+        // Parenthesised expressions stay loop sources; only the direct
+        // expression kind is refused. The loop still parses so one file
+        // reports every site.
+        for source in &sources {
+            if matches!(source.kind, ExprKind::Sort(_) | ExprKind::Reducta(_)) {
+                self.errors.push(
+                    ParseError::structured(ParseErrorKind::ExpressionInvalid, source.span)
+                        .with_arg("issue", "itera_source_sort_reduce_unbound"),
+                );
+            }
+        }
         let apud = if self.eat_keyword_ident(TokenKind::Apud) {
             self.parse_apud_clause()?
         } else {

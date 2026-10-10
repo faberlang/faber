@@ -82,8 +82,17 @@ fn sort_head_requires_via_direction_and_source_word() {
 
 #[test]
 fn itera_binder_is_not_claimed_as_a_sort_body() {
-    let result = parse_ok(
+    // The bare sort source is refused (`itera_source_sort_reduce_unbound`,
+    // need); the loop still parses, and the binder stays the loop's.
+    let result = parse_program(
         "functio t(tabula<textus, numerus> m) → vacuum { itera ex ordinata via ascendens de m fixum k { scribe k } }",
+    );
+    assert_eq!(result.errors.len(), 1, "{:?}", result.errors);
+    assert!(
+        result.errors[0]
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "itera_source_sort_reduce_unbound")
     );
     let program = result.program.expect("program");
     let StmtKind::Func(function) = &program.statements[0].kind else {

@@ -639,6 +639,10 @@ help = "اكتب `⌊x⌉` للتقريب إلى أقرب عدد صحيح مع �
 message = "`{glyph}` عامل ملغى؛ نفي `≡` يُكتب `{replacement}`"
 help = "اكتب `{replacement}` بدل `{glyph}`؛ لكل رمز نفي عدد الخطوط نفسه الذي في الرمز الذي ينفيه (`≡`/`≢`، `≅`/`≇`، `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "لا يمكن أن يكون تعبير الفرز أو الاختزال مصدرًا لحلقة"
+help = "اربطه باسم أولًا ثم كرّر على ذلك الاسم: اكتب `const list<int> ys ← sort via asc from xs` ثم `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "استخدم ⊥ لاسترداد conversio"
 help = "استخدم ⊥؛ {vel} للـ nullish coalescing فقط"

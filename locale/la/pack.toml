@@ -801,6 +801,10 @@ help = "scribe `⌊x⌉` ad proximum integrum rotundandum, paria ad vicinum pare
 message = "`{glyph}` signum retractum est; negatio `≡` scribitur `{replacement}`"
 help = "scribe `{replacement}` pro `{glyph}`; omne signum negationis easdem lineas habet quas signum negatum (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "expressio ordinata vel reducta fons itera esse non potest"
+help = "liga eam prius ad nomen, deinde itera per nomen: `fixum lista<numerus> ys ← ordinata via ascendens ex xs`, deinde `itera ex ys fixum x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
 help = "use ⊥; vel is nullish coalescing only"

@@ -1005,6 +1005,9 @@ fn invalid_expression_message(args: &[DiagnosticArg]) -> Option<String> {
         }
         "format_chained" => Some("'¶' does not chain".to_owned()),
         "copy_into_chain" => Some("'⇇' does not chain".to_owned()),
+        "itera_source_sort_reduce_unbound" => {
+            Some("a sort or reduce expression cannot be a loop source".to_owned())
+        }
         "conditional_question_colon_removed" => {
             Some("'c ? a : b' was removed; write 'c ✓ a ✗ b'".to_owned())
         }
@@ -1058,6 +1061,10 @@ fn invalid_expression_help(args: &[DiagnosticArg]) -> Option<String> {
         "copy_into_chain" => {
             Some("write one 'target ⇇ value' per statement; '⇇' has no result to chain".to_owned())
         }
+        "itera_source_sort_reduce_unbound" => Some(
+            "bind it to a name first, then loop over the name: `const list<int> ys ← sort via asc from xs`, then `for from ys const x`"
+                .to_owned(),
+        ),
         "recovery_uses_exit_arrow" => {
             Some("write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a value".to_owned())
         }
