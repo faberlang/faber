@@ -161,10 +161,10 @@ fn ascii_octeti_conversio_emits_correct_lowering() {
 
 #[test]
 fn fractus_to_numerus_conversio_emits_checked_truncation() {
-    // D1.11: float → integer `↦` truncates toward zero and fails when the value is
+    // D1.11: float → integer `↦ via Trunc` truncates toward zero and fails when the value is
     // NaN, ±Inf, or out of the target range — never a saturating `as` cast.
     let session = test_session(Target::HirRust);
-    let source = "incipit { fixum _ n ← 3.7 ↦ numerus }";
+    let source = "incipit { fixum _ n ← 3.7 ↦ numerus via Trunc }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;

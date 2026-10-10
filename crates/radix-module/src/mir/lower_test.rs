@@ -3977,15 +3977,15 @@ functio legebatur(demo.Sample value) → numerus {
 fn lowers_cross_family_scalar_conversion_to_a_runtime_convert() {
     // Cross-family scalar changes (float -> integer, narrowing) are `↦`
     // conversions; `∷` no longer admits them (SEM016). The MIR has to carry
-    // the conversion (`1.9 ↦ numerus`, `300.0 ↦ numerus<i8>`); a pass-through
+    // the conversion (`1.9 ↦ numerus via Trunc`, `300.0 ↦ i8 via Trunc`); a pass-through
     // operand left the runner storing the raw float carrier in a numerus slot
     //. Same-family provable ascriptions stay pass-through and
     // keep no conversion.
     let dump = dump_source(
         r"
 functio ascriptiones() → numerus ⇥ textus {
-  fixum numerus truncatum ← 1.9 ↦ numerus
-  fixum i8 saturatum ← 300.0 ↦ i8
+  fixum numerus truncatum ← 1.9 ↦ numerus via Trunc
+  fixum i8 saturatum ← 300.0 ↦ i8 via Trunc
   fixum i32 idem ← 7 ∷ i32
   redde truncatum
 }",

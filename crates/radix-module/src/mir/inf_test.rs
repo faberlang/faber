@@ -291,12 +291,12 @@ fn conversions_to_floats_round_nearest_even_and_overflow_to_infinity() {
 fn conversions_from_floats_truncate_and_nan_and_infinity_fail() {
     // ruling 40.
     assert_eq!(
-        ok("fixum fractus x ← 1.0e25\nfixum fractus y ← -2.9\nnota x ↦ inf ⊥ 0\nnota y ↦ inf ⊥ 99"),
+        ok("fixum fractus x ← 1.0e25\nfixum fractus y ← -2.9\nnota x ↦ inf via Trunc ⊥ 0\nnota y ↦ inf via Trunc ⊥ 99"),
         ["10000000000000000905969664", "-2"]
     );
     assert_eq!(
         ok(
-            "fixum fractus nan ← 0.0 ÷ 0.0\nfixum fractus big ← ∞\nnota nan ↦ inf ⊥ 42\nnota big ↦ inf ⊥ 43\nnota -big ↦ inf ⊥ 44"
+            "fixum fractus nan ← 0.0 ÷ 0.0\nfixum fractus big ← ∞\nnota nan ↦ inf via Trunc ⊥ 42\nnota big ↦ inf via Trunc ⊥ 43\nnota -big ↦ inf via Trunc ⊥ 44"
         ),
         ["42", "43", "44"]
     );
@@ -304,10 +304,10 @@ fn conversions_from_floats_truncate_and_nan_and_infinity_fail() {
 
 #[test]
 fn conversions_with_d64_go_through_the_d64_rules() {
-    // ruling 40: `d64 → inf` is the integer reduction; `inf → d64` is range-checked.
+    // ruling 40 (amended by need): `d64 → inf` is the integer reduction and names its rounding (`via HalfEven`); `inf → d64` is range-checked.
     assert_eq!(
         ok(&format!(
-            "fixum d64 d ← 12.75\nfixum inf mid ← 200\nfixum inf big ← {TWO_64}\nnota d ↦ inf ⊥ 0\nnota mid ↦ d64 ⊥ 0.0\nnota big ↦ d64 ⊥ 1.5"
+            "fixum d64 d ← 12.75\nfixum inf mid ← 200\nfixum inf big ← {TWO_64}\nnota d ↦ inf via HalfEven ⊥ 0\nnota mid ↦ d64 ⊥ 0.0\nnota big ↦ d64 ⊥ 1.5"
         )),
         ["13", "200", "1.5"]
     );
