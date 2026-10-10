@@ -617,7 +617,7 @@ fn stat(path: &str, span: Span) -> Result<Value, RunnerError> {
 /// The bytes of an `octeti` argument: the byte value itself, or the
 /// `lista<b8>` array a bit-pattern list arrives as (every element one
 /// unsigned pattern below 256).
-fn octeti_bytes(value: &Value) -> Option<Vec<u8>> {
+pub(super) fn octeti_bytes(value: &Value) -> Option<Vec<u8>> {
     match value {
         Value::Octeti(bytes) => Some(bytes.clone()),
         Value::Array(items) => items

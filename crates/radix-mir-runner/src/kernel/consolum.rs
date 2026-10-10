@@ -6,6 +6,7 @@
 
 use super::super::{Host, RunnerError, Value};
 use super::args::expect_str;
+use super::solum::octeti_bytes;
 use radix_lexer::Span;
 use radix_mir::MirDiagnosticKind;
 
@@ -129,14 +130,11 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
     }
 }
 
+/// The bytes of an `octeti` argument: the byte value, or the `list<b8>`
+/// array the retired-word spelling lowers to.
 fn expect_octeti(value: &Value, span: Span, label: &str) -> Result<Vec<u8>, RunnerError> {
-    match value {
-        Value::Octeti(bytes) => Ok(bytes.clone()),
-        _ => Err(RunnerError::internal(
-            span,
-            format!("{label} expects octeti"),
-        )),
-    }
+    octeti_bytes(value)
+        .ok_or_else(|| RunnerError::internal(span, format!("{label} expects octeti")))
 }
 
 fn expect_int(value: &Value, span: Span, label: &str) -> Result<i64, RunnerError> {

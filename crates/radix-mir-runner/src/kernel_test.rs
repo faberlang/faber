@@ -845,6 +845,35 @@ fn consolum_write_bytes_writes_stdout_without_newline() {
 }
 
 #[test]
+fn consolum_write_bytes_accepts_a_b8_list_and_a_solum_read_bytes_result() {
+    let mut host = BufferHost::default();
+    let list = Value::Array(Rc::new(RefCell::new(vec![
+        Value::UInt(0x68),
+        Value::UInt(0x69),
+        Value::UInt(0x0a),
+    ])));
+    consolum(&mut host, "write_bytes", &[list]).expect("consolum.write_bytes list<b8>");
+    assert_eq!(host.pending_stdout, "hi\n");
+
+    let (_root, nested) = solum_fixture("consolum_read_bytes");
+    let path = nested.join("bytes.bin");
+    let text = path.to_string_lossy().into_owned();
+    std::fs::write(&path, b"abc").expect("write fixture");
+    let read = solum_dispatch(
+        &mut BufferHost::default(),
+        "read_bytes",
+        &[Value::Str(text)],
+    );
+    assert_eq!(read, Value::Octeti(b"abc".to_vec()));
+    consolum(&mut host, "write_bytes", &[read]).expect("consolum.write_bytes read_bytes result");
+    assert_eq!(host.pending_stdout, "hi\nabc");
+
+    let out_of_range = Value::Array(Rc::new(RefCell::new(vec![Value::UInt(256)])));
+    let err = consolum(&mut host, "write_bytes", &[out_of_range]).expect_err("range");
+    assert!(err.issue.contains("expects_octeti"));
+}
+
+#[test]
 fn consolum_debug_line_writes_stderr() {
     let mut host = BufferHost::default();
     consolum(&mut host, "debug_line", &[Value::Str("trace".to_owned())])
