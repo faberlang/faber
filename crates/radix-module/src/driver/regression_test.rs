@@ -1809,8 +1809,7 @@ fn rust_output_supports_unicode_textus_index_and_range_slice() {
     assert!(result.success());
     let output = super::rust_output(result);
     assert!(output.code.contains(".chars().nth("));
-    assert!(output.code.contains(".step_by("));
-    assert!(output.code.contains("collect::<String>()"));
+    assert!(output.code.contains("faber::textus::char_window("));
 }
 
 #[test]
