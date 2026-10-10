@@ -77,9 +77,10 @@ fn pack_key_set<'a>(keys: impl Iterator<Item = &'a String>) -> BTreeSet<String> 
 /// neither as a keyword. Completeness compares each installed pack with the
 /// scaffold after applying these settled per-locale exceptions; no pack row is
 /// synthesized here.
-const SEALED_KEYWORD_ROW_OMISSIONS: &[(&str, &str)] = &[("en", "conversion"), ("la", "conversion"), ("la", "nihil")];
+pub(super) const SEALED_KEYWORD_ROW_OMISSIONS: &[(&str, &str)] =
+    &[("en", "conversion"), ("la", "conversion"), ("la", "nihil")];
 
-fn is_sealed_keyword_row_omission(pack_id: &str, section: &str, key: &str) -> bool {
+pub(super) fn is_sealed_keyword_row_omission(pack_id: &str, section: &str, key: &str) -> bool {
     section == "keyword"
         && SEALED_KEYWORD_ROW_OMISSIONS
             .iter()

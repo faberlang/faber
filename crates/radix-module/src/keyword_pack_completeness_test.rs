@@ -15,10 +15,10 @@ const INSTALLED_LOCALES: &[&str] = &["en", "la", "ar", "hi", "th-TH", "vi", "zh-
 const CONTEXTUAL_SUMMA_KEYWORDS: &[&str] = &["summa", "filum"];
 
 // The registry retains `conversion` as an identity alias row
-// (`KeywordScope::Alias`) so tooling can name the family, but no installed
-// pack declares an alias as source syntax: every pack spells the annotation
-// through its `conversio` row. `nihil` is the same shape (D23.2): it is the
-// permanent `[types]` null-type word and the value literal is `nulla`.
+// (`KeywordScope::Alias`). The sealed English and Latin packs omit it, the six
+// other packs localize it; `nihil` is the permanent `[types]` null-type word,
+// so la omits it from `[keywords]` (D23.2). The sealed omissions are the one
+// list in `locale_test.rs` (`SEALED_KEYWORD_ROW_OMISSIONS`), shared below.
 
 /// Load a pack's **owned** rows from the raw file (no `inherits` merge).
 fn owned_installed_pack(locale: &str) -> LocalePack {
@@ -107,12 +107,20 @@ fn conversion_annotation_rows_follow_the_sealed_locale_surface() {
 }
 
 /// Per-section key-set drift between packs, naming both sets. `sections`
-/// pairs a locale with the keys its pack owns for one table.
+/// pairs a locale with the keys its pack owns for one table. A `[keywords]`
+/// key a sealed pack intentionally omits is not drift.
 fn key_set_drift(section: &str, sections: &[(&str, BTreeSet<String>)]) -> Vec<String> {
     let union: BTreeSet<&String> = sections.iter().flat_map(|(_, keys)| keys).collect();
     let mut drift = Vec::new();
     for (locale, keys) in sections {
-        let missing: Vec<&&String> = union.iter().filter(|key| !keys.contains(**key)).collect();
+        let missing: Vec<&&String> = union
+            .iter()
+            .filter(|key| !keys.contains(**key))
+            .filter(|key| {
+                !(section == "keywords"
+                    && super::tests::is_sealed_keyword_row_omission(locale, "keyword", key.as_str()))
+            })
+            .collect();
         if !missing.is_empty() {
             drift.push(format!(
                 "[{section}] {locale} lacks {missing:?} (carries {} of {} union keys)",
@@ -124,7 +132,8 @@ fn key_set_drift(section: &str, sections: &[(&str, BTreeSet<String>)]) -> Vec<St
     drift
 }
 
-/// The eight installed packs carry one key set per table, so the locale table
+/// The eight installed packs carry one key set per table (modulo the sealed
+/// keyword omissions), so the locale table
 /// can join them on the Latin key. `[keywords]` and `[types]` are compared
 /// across all eight; `[intrinsics]` across the seven non-la packs (la owns no
 /// section: identity-by-absence, asserted by the intrinsic completeness gate).
@@ -170,4 +179,23 @@ fn key_set_drift_names_the_pack_and_the_missing_keys() {
     let drift = key_set_drift("keywords", &[("en", full), ("ar", short)]);
     assert_eq!(drift.len(), 1, "{drift:?}");
     assert!(drift[0].contains("ar lacks") && drift[0].contains("\"b\""), "{drift:?}");
+
+    // Sealed omissions (en and la omit `conversion`) are not drift; a non-sealed
+    // pack missing the same key still is.
+    let with_conversion: BTreeSet<String> = ["a", "conversion"]
+        .iter()
+        .map(|key| (*key).to_owned())
+        .collect();
+    let without_conversion: BTreeSet<String> = ["a"].iter().map(|key| (*key).to_owned()).collect();
+    let sealed = key_set_drift(
+        "keywords",
+        &[
+            ("ar", with_conversion.clone()),
+            ("en", without_conversion.clone()),
+            ("la", without_conversion.clone()),
+        ],
+    );
+    assert!(sealed.is_empty(), "{sealed:?}");
+    let unsealed = key_set_drift("keywords", &[("ar", with_conversion), ("vi", without_conversion)]);
+    assert_eq!(unsealed.len(), 1, "{unsealed:?}");
 }
