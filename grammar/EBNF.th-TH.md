@@ -2124,6 +2124,31 @@ types and on cursors. A user type that should be iterable exposes an ordinary
 method that returns a cursor (`วน ออก arbor.nodi() คงที่ n`); nothing is
 called implicitly.
 
+**Changing the collection inside its own loop.** The rule is about the shape of
+the collection being walked (how many entries, in what order), not about what
+is inside an entry.
+
+- A method that changes the shape or order of the collection, called directly
+  on that collection inside its own loop, is rejected
+  (`SEM011 loop_collection_shape_change`). That covers `lista` `appende`,
+  `decapita`, `detrahe`, `inverte` and `ordina`, `copia` `adde` and `dele`, and
+  `tabula` `pone` (even when it would only update a value) and `dele`. A
+  worklist that must see its own additions uses a queue with `ขณะ`.
+- A bracket store is not checked at compile time. `xs[i] ← v` and `m[k] ← v`
+  are accepted inside the loop. A bracket store that adds a key to a `tabula`
+  or `tabulae` during a loop over it traps with `map changed size during
+  iteration`, the same on every target.
+- A change through another name for the same collection, through a method on
+  an object that holds the collection, or through a function the collection is
+  passed to is not guarded at compile time or at run time. Behaviour may differ
+  between targets: on an append, some targets cover the entries present when
+  the loop started and others also visit the new entries; on a removal, a
+  target may skip an element or trap. Do not file such a difference as a
+  defect; it is a known, accepted gap that may be closed later.
+- Updating the elements themselves is never covered by the rule. A loop over a
+  `lista` of objects that passes each object to a function as `mut` keeps
+  working.
+
 ### Switch/Match
 
 `แยก` is a statement, not an expression. A value chosen by a match comes
