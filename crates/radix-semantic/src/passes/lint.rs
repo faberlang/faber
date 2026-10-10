@@ -780,6 +780,7 @@ impl HirVisitor for LintContext<'_> {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 self.mark_place_mutated(target);
                 self.visit_expr(target);

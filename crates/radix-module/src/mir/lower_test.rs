@@ -3997,15 +3997,15 @@ functio legebatur(demo.Sample value) → numerus {
 fn lowers_cross_family_scalar_conversion_to_a_runtime_convert() {
     // Cross-family scalar changes (float -> integer, narrowing) are `↦`
     // conversions; `∷` no longer admits them (SEM016). The MIR has to carry
-    // the conversion (`1.9 ↦ numerus`, `300.0 ↦ numerus<i8>`); a pass-through
+    // the conversion (`1.9 ↦ numerus via Trunc`, `300.0 ↦ i8 via Trunc`); a pass-through
     // operand left the runner storing the raw float carrier in a numerus slot
     //. Same-family provable ascriptions stay pass-through and
     // keep no conversion.
     let dump = dump_source(
         r"
 functio ascriptiones() → numerus ⇥ textus {
-  fixum numerus truncatum ← 1.9 ↦ numerus
-  fixum i8 saturatum ← 300.0 ↦ i8
+  fixum numerus truncatum ← 1.9 ↦ numerus via Trunc
+  fixum i8 saturatum ← 300.0 ↦ i8 via Trunc
   fixum i32 idem ← 7 ∷ i32
   redde truncatum
 }",
@@ -7455,4 +7455,36 @@ main {
         2,
         "each ascribed JSON object literal must build the ascribed map: {dump}"
     );
+}
+
+#[test]
+fn missing_array_row_is_a_named_lowering_error_not_a_dropped_statement() {
+    // Loop and reduction lowering reach `lista<T>` rows through
+    // `require_array`; a bare `find_array(..)?` returned `None` with no
+    // diagnostic and the enclosing loop vanished from MIR. Lowering
+    // pre-interns the rows source programs need, so the missing row is pinned
+    // at the helper every loop site shares.
+    let types = TypeTable::new();
+    let fractus = types.primitive(Primitive::Fractus);
+    assert!(types.find_array(fractus).is_none(), "the fixture row must start absent");
+    let mut builder = FunctionBuilder::new(&types);
+    assert_eq!(
+        builder.require_array(fractus, Span::default(), "itera cursor element list"),
+        None
+    );
+    assert_eq!(builder.errors.len(), 1, "the miss must push exactly one error");
+    assert_eq!(
+        builder.errors[0].issue,
+        "missing_type_information_for_mir_lowering_itera_cursor_element_list"
+    );
+
+    let mut types = TypeTable::new();
+    let fractus = types.primitive(Primitive::Fractus);
+    let array = types.array(fractus);
+    let mut builder = FunctionBuilder::new(&types);
+    assert_eq!(
+        builder.require_array(fractus, Span::default(), "itera cursor element list"),
+        Some(array)
+    );
+    assert!(builder.errors.is_empty(), "the happy path pushes nothing");
 }

@@ -634,6 +634,17 @@ fn generate_go_from_analyzed(
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_library_registry(&analysis.libraries);
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
+    let mut statics = rustc_hash::FxHashMap::default();
+    for (def_id, fields, _, _) in analysis.resolver.imported_file_structs() {
+        for field in fields {
+            if field.modifier == Some(radix_syntax::FieldModifier::Generis)
+                && let Some(init) = field.init
+            {
+                statics.insert((def_id, field.name), init.clone());
+            }
+        }
+    }
+    r#gen.set_imported_static_fields(statics);
     let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
 }

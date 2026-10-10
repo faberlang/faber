@@ -1887,6 +1887,10 @@ mod reducta_test;
 mod sort_test;
 
 #[cfg(test)]
+#[path = "itera_source_sort_test.rs"]
+mod itera_source_sort_test;
+
+#[cfg(test)]
 #[path = "max_min_disambiguation_test.rs"]
 mod max_min_disambiguation_test;
 

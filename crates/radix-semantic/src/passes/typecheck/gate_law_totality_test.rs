@@ -256,7 +256,13 @@ fn probe(op: Op, family: Family) -> String {
             Family::P8DecimalInteger => ("d64", "numerus"),
             Family::P9DecimalFractus => ("d64", "fractus"),
         };
-        return format!("functio p({src} a) → {tgt} ⇥ textus {{ redde a ↦ {tgt} }}");
+        // Need: a decimal into an integer names its rounding.
+        let via = if matches!(family, Family::P8DecimalInteger) {
+            " via HalfEven"
+        } else {
+            ""
+        };
+        return format!("functio p({src} a) → {tgt} ⇥ textus {{ redde a ↦ {tgt}{via} }}");
     }
     let (lhs, rhs) = pair_types(family);
     if op == Op::Arith {

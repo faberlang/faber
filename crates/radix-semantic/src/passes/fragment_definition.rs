@@ -351,6 +351,7 @@ impl FragmentDefinitionChecker<'_> {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 if recovery.is_some() {
                     self.effect(expr.span, "alternate_exit");

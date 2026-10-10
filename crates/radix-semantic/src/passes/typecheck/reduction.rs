@@ -461,6 +461,7 @@ impl ReductionBodyState {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 if recovery.is_some() {
                     effect(checker, expr.span, "alternate_exit");

@@ -639,6 +639,10 @@ help = "viết `⌊x⌉` để làm tròn tới số nguyên gần nhất, khi h
 message = "`{glyph}` là toán tử đã bị loại bỏ; phủ định của `≡` được viết là `{replacement}`"
 help = "viết `{replacement}` thay cho `{glyph}`; mỗi ký hiệu phủ định có cùng số gạch ngang với ký hiệu mà nó phủ định (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "biểu thức sort hoặc reduce không thể là nguồn của vòng lặp"
+help = "hãy gán nó cho một tên trước, rồi lặp trên tên đó: `const list<int> ys ← sort via asc from xs`, sau đó `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "dùng ⊥ cho phục hồi conversio"
 help = "dùng ⊥; vel chỉ dùng cho phép hợp nhất nullish"
@@ -2517,11 +2521,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -3150,6 +3158,14 @@ help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu t
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" từ chối thân hàm này: `tacet` nằm ngoài tập con AIR v1"
 help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM065]
+message = "`{name}` sẽ chia sẻ `{binding}`, một giá trị chỉ đọc, dưới dạng tên có thể ghi (`{fixum}` là sâu)"
+help = "viết `{varia} {name} ← {copy} {binding}` để có giá trị độc lập, hoặc `{varia} {name} ← {own} {binding}` để tiếp quản nó"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` sẽ chia sẻ `{binding}`, một giá trị chỉ đọc, dưới dạng tên có thể ghi (`{fixum}` là sâu)"
+help = "viết `{varia} {name} ← {copy} {binding}` để có giá trị độc lập, hoặc `{varia} {name} ← {own} {binding}` để tiếp quản nó"
 
 [diagnostics.WARN001]
 message = "biến không được sử dụng"

@@ -639,6 +639,10 @@ help = "اكتب `⌊x⌉` للتقريب إلى أقرب عدد صحيح مع �
 message = "`{glyph}` عامل ملغى؛ نفي `≡` يُكتب `{replacement}`"
 help = "اكتب `{replacement}` بدل `{glyph}`؛ لكل رمز نفي عدد الخطوط نفسه الذي في الرمز الذي ينفيه (`≡`/`≢`، `≅`/`≇`، `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "لا يمكن أن يكون تعبير الفرز أو الاختزال مصدرًا لحلقة"
+help = "اربطه باسم أولًا ثم كرّر على ذلك الاسم: اكتب `const list<int> ys ← sort via asc from xs` ثم `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "استخدم ⊥ لاسترداد conversio"
 help = "استخدم ⊥؛ {vel} للـ nullish coalescing فقط"
@@ -2517,11 +2521,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -3150,6 +3158,14 @@ help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و A
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: `{tacet}` خارج v1 AIR subset"
 help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM065]
+message = "`{name}` سيشارك `{binding}`، وهو قيمة للقراءة فقط، كاسم قابل للكتابة (`{fixum}` عميق)"
+help = "اكتب `{varia} {name} ← {copy} {binding}` لقيمة مستقلة، أو `{varia} {name} ← {own} {binding}` لتولّي ملكيتها"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` سيشارك `{binding}`، وهو قيمة للقراءة فقط، كاسم قابل للكتابة (`{fixum}` عميق)"
+help = "اكتب `{varia} {name} ← {copy} {binding}` لقيمة مستقلة، أو `{varia} {name} ← {own} {binding}` لتولّي ملكيتها"
 
 [diagnostics.WARN001]
 message = "متغير غير مستخدم"

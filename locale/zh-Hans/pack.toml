@@ -639,6 +639,10 @@ help = "用 `⌊x⌉` 取最近整数，平局取偶数邻值；用 `⌈x⌉` �
 message = "`{glyph}` 是已废弃的运算符；`≡` 的否定写作 `{replacement}`"
 help = "用 `{replacement}` 代替 `{glyph}`；每个否定符号的横线数与其所否定的符号相同（`≡`/`≢`、`≅`/`≇`、`≈`/`≉`）"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "sort 或 reduce 表达式不能直接作为循环来源"
+help = "先把它绑定到一个名称，再对该名称循环：`const list<int> ys ← sort via asc from xs`，然后 `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "使用 ⊥ 进行 conversio recovery"
 help = "使用 ⊥；vel 仅用于 nullish coalescing"
@@ -2517,11 +2521,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -3150,6 +3158,14 @@ help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" 拒绝此函数体：`tacet` 不在 v1 AIR subset 之内"
 help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM065]
+message = "`{name}` 会把只读值 `{binding}` 共享为可写名称（`{fixum}` 是深层的）"
+help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{varia} {name} ← {own} {binding}` 接管它"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` 会把只读值 `{binding}` 共享为可写名称（`{fixum}` 是深层的）"
+help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{varia} {name} ← {own} {binding}` 接管它"
 
 [diagnostics.WARN001]
 message = "未使用变量"

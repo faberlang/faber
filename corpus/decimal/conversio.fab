@@ -14,8 +14,9 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • decimal → integer — `a ↦ i64` rounds half-even; it never
-#     truncates. 4.2 → 4, 2.5 → 2, 3.5 → 4.
+#   • decimal → integer — `a ↦ i64 via HalfEven` rounds half-even (ties to
+#     the even neighbour); a bare `a ↦ i64` is a compile error. 4.2 → 4,
+#     2.5 → 2, 3.5 → 4.
 #   • integer → decimal — `n ↦ d64` scales the integer to the
 #     carrier: 5 prints as `5`.
 #   • fractus → decimal — `g ↦ d64` uses the string round-trip,
@@ -41,7 +42,7 @@ locale = "en"
 
 main {
     const d64 a ← 4.2
-    const i64 i ← a ↦ i64
+    const i64 i ← a ↦ i64 via HalfEven
     print i
     const i64 n ← 5
     const d64 d ← n ↦ d64
@@ -52,7 +53,7 @@ main {
     const d64 h ← g ↦ d64
     print h
     const d64 p ← 2.5
-    print p ↦ i64
+    print p ↦ i64 via HalfEven
     const d64 r ← 3.5
-    print r ↦ i64
+    print r ↦ i64 via HalfEven
 }

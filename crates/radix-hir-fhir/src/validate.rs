@@ -1523,6 +1523,7 @@ fn collect_expr_defs(
             target,
             source,
             recovery,
+            ..
         } => {
             collect_expr_defs(target, registry);
             collect_expr_defs(source, registry);
@@ -1866,6 +1867,7 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 collect_expr(target, registry);
                 collect_expr(source, registry);
@@ -2966,6 +2968,7 @@ pub(crate) fn validate_referential_integrity(
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 validate_expr(target, checks)?;
                 validate_expr(source, checks)?;

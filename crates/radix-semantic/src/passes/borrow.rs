@@ -2407,6 +2407,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 self.check_lvalue(target);
                 if self.stores_tensor_view(source) {

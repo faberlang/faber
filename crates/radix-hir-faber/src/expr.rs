@@ -136,6 +136,24 @@ impl super::FaberCodegen<'_> {
         }
     }
 
+    /// Write the ` via HINT` clause of a `↤` conversion-directed assignment.
+    ///
+    /// The clause sits after the source and before the `⊥` default, the same
+    /// single-hint slot a `↦ T via HINT` conversion prints.
+    pub(super) fn write_conversio_assign_via(
+        &self,
+        params: &[Symbol],
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        if let Some(hint) = params.first() {
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Via));
+            writer.write(" ");
+            writer.write(&self.symbol_to_string(*hint));
+        }
+    }
+
     /// Write an expression with enough parentheses to survive a Faber reparse.
     ///
     /// The `parent_prec` contract is shared with `expr_precedence` in `ops.rs`.
@@ -798,6 +816,7 @@ impl super::FaberCodegen<'_> {
                 target,
                 source,
                 recovery,
+                params,
             } => {
                 // Conversion-directed assignment: re-emit the exact `↤`
                 // spelling (never `←` or `↦`). The `⊥` default is
@@ -807,6 +826,7 @@ impl super::FaberCodegen<'_> {
                 self.write_expr_prec(target, 1, names, surface, writer);
                 writer.write(" ↤ ");
                 self.write_expr_prec(source, 1, names, surface, writer);
+                self.write_conversio_assign_via(params, surface, writer);
                 if let Some(recovery) = recovery {
                     writer.write(" ⊥ ");
                     self.write_expr_prec(recovery, 12, names, surface, writer);

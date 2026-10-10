@@ -14,13 +14,13 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Numeric truncation — `fractus ↦ numerus` truncates toward zero; a NaN, an infinity, or a value outside the target range fails (`⊥ default` recovers).
+#   • Fractional to integer — `fractus ↦ numerus` is legal only with a rounding choice (`via Floor|Ceil|HalfEven|Trunc`); the bare conversion is a compile error (SEM016). A NaN, an infinity, or a value outside the target range fails (`⊥ default` recovers).
 #   • Truthiness from numbers — `fractus ↦ bivalens` and `numerus ↦ bivalens` use non-zero truthiness.
 #   • Bool-to-number — `bivalens ↦ numerus` yields 0/1; `bivalens ↦ fractus` yields 0.0/1.0.
 #   • Byte reinterpretation boundary — numerus/fractus/bivalens ↔ octeti is rejected at typecheck (use chorda instead).
 #
 # Common mistakes:
-#   • Expecting `fractus ↦ numerus` to round rather than truncate, or to saturate — it truncates toward zero and fails when out of range.
+#   • Writing a bare `fractus ↦ numerus` — a fractional number converts to an integer only with a rounding choice (`via Floor|Ceil|HalfEven|Trunc`), and it fails when out of range rather than saturating.
 #
 # See also: ↦, numerus, fractus, bivalens
 # =============================================================================
@@ -29,7 +29,7 @@ locale = "en"
 # conversio — numeric and bivalens primitive conversions
 #
 # WHY: `↦` owns the normal expectation for scalar numeric/bool conversions.
-# `fractus ↦ numerus` truncates toward zero; a NaN, an infinity, or a value outside the target range fails (`⊥ default` recovers). `fractus ↦
+# `fractus ↦ numerus` needs a rounding choice (`via Floor|Ceil|HalfEven|Trunc`; the bare conversion is a compile error); a NaN, an infinity, or a value outside the target range fails (`⊥ default` recovers). `fractus ↦
 # bivalens` and `numerus ↦ bivalens` use non-zero truthiness. `bivalens ↦
 # numerus` yields 0/1. `bivalens ↦ fractus` uses 1.0/0.0 because `bool as f64`
 # is invalid in Rust. `ascii ↦ bivalens` parallels `textus ↦ bivalens`.
@@ -38,7 +38,7 @@ locale = "en"
 
 main {
     const float pi ← 3.7
-    const int truncated ← pi ↦ int
+    const int truncated ← pi ↦ int via Trunc
     print truncated
     const bool fromFractus ← pi ↦ bool
     print fromFractus

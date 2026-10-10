@@ -53,6 +53,20 @@ fn run(
     shape: &[i64],
     input: Vec<Value>,
 ) -> Result<Value, RunnerError> {
+    run_op(
+        MirCollectionOp::TensorMath(function_under_test),
+        element,
+        shape,
+        input,
+    )
+}
+
+fn run_op(
+    op: MirCollectionOp,
+    element: Type,
+    shape: &[i64],
+    input: Vec<Value>,
+) -> Result<Value, RunnerError> {
     use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
@@ -78,7 +92,7 @@ fn run(
         .insert(MirValueId(0), tensor_value(input, shape.to_vec()));
     runner.eval_runtime_call(
         &MirRuntimeCall {
-            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMath(function_under_test)),
+            intrinsic: MirIntrinsic::Collection(op),
             args: vec![MirOperand::Value(MirValueId(0))],
             return_ty: MirType::semantic(tensor),
         },
@@ -310,4 +324,31 @@ fn integer_elements_are_rejected_by_float_only_functions() {
             format!("runner_tensor_{}_element_type_mismatch", function.name())
         );
     }
+}
+
+/// Need: the mean is sum / count, so an empty source is 0 / 0 = NaN
+/// (not a 0.0 fallback), and a non-empty source divides by the element count.
+#[test]
+fn mean_is_sum_over_count_and_empty_source_is_nan() {
+    let width = NumericWidth::F64;
+    let empty = run_op(
+        MirCollectionOp::TensorMean,
+        float_element(width),
+        &[0],
+        floats(&[]),
+    )
+    .expect("empty mean runs");
+    let Value::Float(number) = empty else {
+        panic!("expected float, got {empty:?}");
+    };
+    assert!(number.is_nan(), "empty mean is NaN, got {number}");
+
+    let full = run_op(
+        MirCollectionOp::TensorMean,
+        float_element(width),
+        &[4],
+        floats(&[3.0, 1.0, 3.0, 2.0]),
+    )
+    .expect("mean runs");
+    assert!(matches!(full, Value::Float(number) if number == 2.25));
 }

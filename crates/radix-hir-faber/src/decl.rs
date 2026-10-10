@@ -138,7 +138,10 @@ impl super::FaberCodegen<'_> {
                 }
                 writer.write(&self.symbol_to_string(c.name));
                 if let HirExpressionKind::ConversioAssign {
-                    source, recovery, ..
+                    source,
+                    recovery,
+                    params,
+                    ..
                 } = &c.value.kind
                 {
                     // Typed `↤` constant initializer: lowering stores the
@@ -146,6 +149,7 @@ impl super::FaberCodegen<'_> {
                     // `fixum T name ↤ source [⊥ default]`.
                     writer.write(" ↤ ");
                     self.write_expr_prec(source, 1, names, surface, writer);
+                    self.write_conversio_assign_via(params, surface, writer);
                     if let Some(recovery) = recovery {
                         writer.write(" ⊥ ");
                         self.write_expr_prec(recovery, 12, names, surface, writer);

@@ -639,6 +639,10 @@ help = "निकटतम पूर्णांक के लिए `⌊x⌉` �
 message = "`{glyph}` एक retired operator है; `≡` का निषेध `{replacement}` लिखा जाता है"
 help = "`{glyph}` की जगह `{replacement}` लिखें; हर निषेध चिह्न में उतनी ही रेखाएँ होती हैं जितनी उस चिह्न में जिसे वह उलटता है (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "sort या reduce expression को loop का स्रोत नहीं बनाया जा सकता"
+help = "पहले उसे किसी नाम से बाँधें, फिर उसी नाम पर loop चलाएँ: `const list<int> ys ← sort via asc from xs`, फिर `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "conversio recovery के लिए ⊥ उपयोग करें"
 help = "⊥ उपयोग करें; vel केवल nullish coalescing के लिए है"
@@ -2529,11 +2533,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -3162,6 +3170,14 @@ help = "v1 AIR subset को pure रखें: immutable locals, pure expressio
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `tacet` v1 AIR subset के बाहर है"
 help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM065]
+message = "`{name}` केवल-पठन मान `{binding}` को लिखने योग्य नाम के रूप में साझा करेगा (`{fixum}` गहरा है)"
+help = "स्वतंत्र मान के लिए `{varia} {name} ← {copy} {binding}` लिखें, या उसे अपने अधीन लेने के लिए `{varia} {name} ← {own} {binding}`"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` केवल-पठन मान `{binding}` को लिखने योग्य नाम के रूप में साझा करेगा (`{fixum}` गहरा है)"
+help = "स्वतंत्र मान के लिए `{varia} {name} ← {copy} {binding}` लिखें, या उसे अपने अधीन लेने के लिए `{varia} {name} ← {own} {binding}`"
 
 [diagnostics.WARN001]
 message = "अप्रयुक्त variable"

@@ -529,6 +529,7 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 self.check_expr(source);
                 if let Some(recovery) = recovery {

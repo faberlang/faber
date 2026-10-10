@@ -3047,7 +3047,7 @@ impl<'a> FunctionBuilder<'a> {
     /// same contract as ordinary assignment — no `↤`-specific exception.
     /// There is no codegen-only rewrite that duplicates any evaluation.
     fn lower_conversio_assign_expr(&mut self, expr: &HirExpression) -> Option<MirOperand> {
-        let HirExpressionKind::ConversioAssign { target, source, recovery } = &expr.kind else {
+        let HirExpressionKind::ConversioAssign { target, source, recovery, .. } = &expr.kind else {
             return self.lower_expr_value(expr);
         };
         let fallback_ty = self.expr_ty(source)?;
@@ -3071,7 +3071,13 @@ impl<'a> FunctionBuilder<'a> {
         span: Span,
         expr: &HirExpression,
     ) -> Option<()> {
-        let converted = self.lower_conversio(source, ty.semantic_id(), &[], recovery, None, expr)?;
+        // `a ↤ x via R`: `expr` is the `↤` node, so the `via` hint travels
+        // exactly as the explicit `x ↦ T via R` conversion's params.
+        let params: &[Symbol] = match &expr.kind {
+            HirExpressionKind::ConversioAssign { params, .. } => params,
+            _ => &[],
+        };
+        let converted = self.lower_conversio(source, ty.semantic_id(), params, recovery, None, expr)?;
         self.assign(destination, converted, ty, span);
         Some(())
     }

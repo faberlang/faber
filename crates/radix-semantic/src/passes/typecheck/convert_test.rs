@@ -287,7 +287,7 @@ fn primitive_conversio_matrix_cases() -> &'static [ConversioMatrixCase] {
         },
         ConversioMatrixCase {
             name: "fractus_to_numerus",
-            source: "incipit { fixum _ n ← 1.5 ↦ numerus }",
+            source: "incipit { fixum _ n ← 1.5 ↦ numerus via Trunc }",
             expect: MatrixExpect::Accepts,
         },
         ConversioMatrixCase {
@@ -2004,6 +2004,7 @@ fn conversio_assign_composes_declared_channel_through_conversion_seam() {
         &mut target,
         &mut source,
         None,
+        &[],
         crate::test_support::test_span(),
     );
     assert_eq!(result, numerus);
@@ -2044,6 +2045,7 @@ fn conversio_assign_channel_mismatch_keeps_sem010_shape() {
         &mut target,
         &mut source,
         None,
+        &[],
         crate::test_support::test_span(),
     );
     let err = checker
@@ -2206,8 +2208,8 @@ functio narrow(numerus x, d64 d) → modulus<u8> {
     fixum saturatus<u8> b ← x ↦ saturatus<u8>
     fixum modulus<u8> c ← b ↦ modulus<u8>
     fixum saturatus<i8> e ← a ↦ saturatus<i8>
-    fixum modulus<u8> f ← d ↦ modulus<u8>
-    fixum saturatus<u8> g ← d ↦ saturatus<u8>
+    fixum modulus<u8> f ← d ↦ modulus<u8> via HalfEven
+    fixum saturatus<u8> g ← d ↦ saturatus<u8> via HalfEven
     fixum modulus<u32> h ← 300 ↦ modulus<u32>
     redde a
 }
@@ -2227,16 +2229,26 @@ fn policy_word_conversio_rejects_recovery_slot() {
 
 #[test]
 fn policy_word_conversio_rejects_float_and_text_sources() {
-    for (source, target) in [
-        ("1.5", "modulus<u8>"),
-        ("1.5", "saturatus<u8>"),
-        ("\"7\"", "modulus<u8>"),
-        ("\"7\"", "saturatus<u8>"),
+    // Need: a float source names its rounding; text stays unsupported.
+    for (source, target, issue) in [
+        ("1.5", "modulus<u8>", "float_to_integer_requires_rounding"),
+        ("1.5", "saturatus<u8>", "float_to_integer_requires_rounding"),
+        ("\"7\"", "modulus<u8>", "unsupported_conversio"),
+        ("\"7\"", "saturatus<u8>", "unsupported_conversio"),
     ] {
         test_support::assert_rejects_with_issue(
             &format!("incipit {{ fixum _ b ← {source} ↦ {target} }}"),
-            "unsupported_conversio",
+            issue,
         );
+    }
+}
+
+#[test]
+fn policy_word_conversio_accepts_a_rounded_float_source() {
+    for target in ["modulus<u8>", "saturatus<u8>"] {
+        test_support::assert_accepts(&format!(
+            "incipit {{ fixum _ b ← 1.5 ↦ {target} via Floor }}"
+        ));
     }
 }
 
@@ -2257,7 +2269,7 @@ fn float_to_integer_conversio_requires_textus_alternate_exit() {
     test_support::assert_rejects_with_issue(
         r"
 functio trunc(fractus x) → numerus ⇥ numerus {
-    redde x ↦ numerus
+    redde x ↦ numerus via Trunc
 }
 ",
         "conversio_failure_channel_textus_required",

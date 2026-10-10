@@ -639,6 +639,10 @@ help = "เขียน `⌊x⌉` เพื่อปัดเป็นจำน�
 message = "`{glyph}` เป็นตัวดำเนินการที่เลิกใช้แล้ว; การปฏิเสธของ `≡` เขียนเป็น `{replacement}`"
 help = "เขียน `{replacement}` แทน `{glyph}`; สัญลักษณ์ปฏิเสธทุกตัวมีจำนวนเส้นเท่ากับสัญลักษณ์ที่มันปฏิเสธ (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "นิพจน์ sort หรือ reduce ไม่สามารถเป็นแหล่งของลูปได้"
+help = "ผูกไว้กับชื่อก่อน แล้วจึงวนลูปบนชื่อนั้น: `const list<int> ys ← sort via asc from xs` แล้วจึง `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "ใช้ ⊥ สำหรับการกู้คืน conversio"
 help = "ใช้ ⊥; vel ใช้สำหรับการรวมค่า nullish เท่านั้น"
@@ -2529,11 +2533,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -3162,6 +3170,14 @@ help = "รักษาเซตย่อย AIR v1 ให้บริสุท�
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: `tacet` อยู่นอกเซตย่อย AIR v1"
 help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM065]
+message = "`{name}` จะแชร์ `{binding}` ซึ่งเป็นค่าแบบอ่านอย่างเดียว เป็นชื่อที่เขียนได้ (`{fixum}` ลึก)"
+help = "เขียน `{varia} {name} ← {copy} {binding}` เพื่อได้ค่าอิสระ หรือ `{varia} {name} ← {own} {binding}` เพื่อรับช่วงต่อ"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` จะแชร์ `{binding}` ซึ่งเป็นค่าแบบอ่านอย่างเดียว เป็นชื่อที่เขียนได้ (`{fixum}` ลึก)"
+help = "เขียน `{varia} {name} ← {copy} {binding}` เพื่อได้ค่าอิสระ หรือ `{varia} {name} ← {own} {binding}` เพื่อรับช่วงต่อ"
 
 [diagnostics.WARN001]
 message = "ตัวแปรไม่ได้ใช้"

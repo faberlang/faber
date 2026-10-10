@@ -1907,9 +1907,13 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   is failable (a handler is required except for a proven constant); into
   `wrapping<W>` / `saturating<W>` it reduces / clamps and cannot fail. `inf ↦`
   a float rounds to nearest-even and yields ±∞ beyond the float's finite range
-  (a constant beyond it is a compile error); a float `↦ inf` truncates toward
-  zero and fails only for NaN and ±∞. `inf ↦ d64` is range-checked and failable;
-  `d64 ↦ inf` truncates and cannot fail. `textus`/`ascii ↦ inf` accepts an
+  (a constant beyond it is a compile error); a float or `d64` `↦ inf` needs a
+  rounding choice, `thông_qua Floor|Ceil|HalfEven|Trunc` (toward −∞, toward +∞,
+  nearest with ties to the even neighbour, toward zero); the bare conversion is
+  `SEM016 float_to_integer_requires_rounding`. The conversion is failable and
+  reports on the error channel for NaN and ±∞ (a handler or `⊥ default` applies,
+  as for other failable numeric conversions). `inf ↦ d64` is range-checked and
+  failable. `textus`/`ascii ↦ inf` accepts an
   optional sign and digits of any length (failable on malformed input; `thông_qua
   Hex|Bin|Oct` as for other integers); `inf ↦ textus` writes the decimal digits.
   `inf ↔ octeti thông_qua Be|Le` is the minimal two's-complement encoding and its
@@ -2664,6 +2668,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 `theo key` groups terms into a new result tensor; it does not mutate the source or key tensor. The key expression is evaluated per element with the coordinates in scope and must be integral. The bucket extent `K` comes from the expected result type, so a grouped result has shape `tensor<R, [K]>` for the operator's result type `R`. Out-of-range keys use the existing tensor-write failure. Grouped `tổng`, `tích`, `đếm`, `tất_cả`, and `bất_kỳ` have empty-bucket identities; grouped `lớn_nhất` and `nhỏ_nhất` require `hoặc_nếu_rỗng identity`. Grouped `argmax` and `argmin` are unsupported by name because their result is a coordinate, not a tensor element.
 
 The old `tổng từ`, `lớn_nhất từ`, and `nhỏ_nhất từ` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `rút_gọn thông_qua tổng`, `rút_gọn thông_qua lớn_nhất`, or `rút_gọn thông_qua nhỏ_nhất`; the operator words remain ordinary identifiers outside the `thông_qua` clause.
+
+The tensor method `.media()` (en `.mean()`) is not a reduction operator and has no `thông_qua` form. It is sugar over the sum reduction: `t.media()` is `t.tổng() / count`, where `count` is the element count of `t` (en `t.mean()` is `t.sum() / count`). The grouped form `t.media(trục n)` is the grouped sum divided by the grouped count, elementwise. A mean is not a true reduction (two partial means do not combine; sums and counts do), so the reduction operator set stays the set of real reductions. An empty source is `0 / 0`, which follows the float rules and is not-a-number (NaN); it is not a no-value result and has no fallback.
 
 `sắp_xếp thông_qua <direction> (từ | ra) source [(hằng | biến) x { trả key }]` is the sort expression (en `sort thông_qua asc from xs`). `thông_qua` is mandatory and selects `tăng_dần` or `giảm_dần` (en `asc`, `desc`). `từ` (en `from`) orders a list, a set, or a map's values; `ra` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `sắp_xếp`, `tăng_dần`, and `giảm_dần` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
 

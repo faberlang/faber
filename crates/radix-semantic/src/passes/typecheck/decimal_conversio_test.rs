@@ -39,12 +39,12 @@ fn cross_family_decimal_fractus_equality_rejects() {
 
 #[test]
 fn decimal_to_integer_arrow_accepts() {
-    test_support::assert_accepts("functio c(d64 a) → i64 { redde a ↦ i64 }");
+    test_support::assert_accepts("functio c(d64 a) → i64 { redde a ↦ i64 via HalfEven }");
 }
 
 #[test]
 fn decimal_to_unsigned_integer_arrow_accepts() {
-    test_support::assert_accepts("functio c(d64 a) → u32 ⇥ textus { redde a ↦ u32 }");
+    test_support::assert_accepts("functio c(d64 a) → u32 ⇥ textus { redde a ↦ u32 via HalfEven }");
 }
 
 #[test]

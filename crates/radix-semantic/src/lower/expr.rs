@@ -1439,10 +1439,38 @@ impl Lowerer<'_> {
                     .recovery
                     .as_ref()
                     .map(|fallback| Box::new(lower_expr(self, fallback)));
+                // The cell type is not known until typecheck, so only the
+                // hint's name is validated here; whether the pairing takes a
+                // hint is the checker's rule (`check_conversio`).
+                let mut params = Vec::new();
+                if let Some(via) = &assign.via {
+                    let hint = self.interner.resolve(via.name).to_owned();
+                    let issue = if hint == "Bits" {
+                        Some("conversio_via_bits_retired")
+                    } else if crate::numeric_width::is_float_rounding_hint(&hint)
+                        || crate::numeric_width::is_conversio_radix_hint(&hint)
+                    {
+                        None
+                    } else {
+                        Some("conversio_via_unknown_hint")
+                    };
+                    match issue {
+                        Some(issue) => self.push_error(
+                            SemanticErrorKind::ConversionInvalid,
+                            vec![
+                                DiagnosticArg::new("issue", issue),
+                                DiagnosticArg::new("hint", hint),
+                            ],
+                            via.span,
+                        ),
+                        None => params.push(via.name),
+                    }
+                }
                 HirExpressionKind::ConversioAssign {
                     target: Box::new(target),
                     source: Box::new(source),
                     recovery,
+                    params,
                 }
             }
         }
@@ -1889,6 +1917,10 @@ impl Lowerer<'_> {
         // a bit pattern is a `bN` value and `↦ bN` reads or writes it.
         let issue = if hint == "Bits" {
             Some("conversio_via_bits_retired")
+        } else if crate::numeric_width::is_float_rounding_hint(&hint) {
+            // Need: a rounding hint belongs to an integer-family
+            // target; the source (float or decimal) is the checker's rule.
+            (!via_target_takes_rounding_hint(self, target)).then_some("conversio_via_unknown_hint")
         } else if !crate::numeric_width::is_conversio_radix_hint(&hint) {
             Some("conversio_via_unknown_hint")
         } else if !via_target_takes_hint(self, target) {
@@ -2391,6 +2423,26 @@ fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> 
             }
             _ => return false,
         }
+    }
+}
+
+/// Whether a `↦` target can carry a rounding hint (`via Floor|Ceil|HalfEven|
+/// Trunc`, need): an integer-family target (`numerus`, sized
+/// integers, `inf`, `wrapping<W>`, `saturating<W>`). An alias or generic
+/// parameter is left to the checker, which sees the resolved pairing.
+fn via_target_takes_rounding_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> bool {
+    let HirConversioTarget::Type(ty) = target else {
+        return false;
+    };
+    match lowerer.types.get(*ty) {
+        crate::Type::Primitive(Primitive::Numerus)
+        | crate::Type::ModularWord(_)
+        | crate::Type::SaturatingWord(_)
+        | crate::Type::Alias(..)
+        | crate::Type::Param(_)
+        | crate::Type::Error => true,
+        crate::Type::SizedNumeric(Primitive::Numerus, width) => !width.is_decimal(),
+        _ => false,
     }
 }
 

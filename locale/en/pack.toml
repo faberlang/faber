@@ -1048,6 +1048,10 @@ help = "write `⌊x⌉` to round to the nearest integer, ties to the even neighb
 message = "`{glyph}` is a retired operator; the negation of `≡` is spelled `{replacement}`"
 help = "write `{replacement}` for `{glyph}`; every negation glyph has the same number of lines as the glyph it negates (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
 
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "a sort or reduce expression cannot be a loop source"
+help = "bind it to a name first, then loop over the name: `const list<int> ys ← sort via asc from xs`, then `for from ys const x`"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
 help = "use ⊥; vel is nullish coalescing only"
@@ -3719,11 +3723,15 @@ help = "use char ↦ u32 via Code or int ↦ char via Code; without Code a numbe
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, char, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -4828,6 +4836,14 @@ help = "use only constructs the build-time runner supports"
 [diagnostics.SEM064.issues.praefixum_import_unavailable]
 message = "`{praefixum}` initializer of `{name}` reaches `{callee}`, an import that build-time evaluation does not run in this analysis"
 help = "evaluation follows calls into other modules of a package: move the computation into this module, or analyze the package"
+
+[diagnostics.SEM065]
+message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
+help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
+help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
 
 [diagnostics.WARN001]
 message = "unused variable"
