@@ -881,6 +881,7 @@ impl TypeChecker<'_> {
             return ret;
         }
         if let Some(sig) = self.lookup_method_signature(receiver_ty, *name) {
+            let sig = self.applied_method_signature(receiver_ty, sig);
             self.check_method_visibility(receiver_ty, *name, receiver.span);
             if self.report_unavailable_method(receiver_ty, *name, receiver.span) {
                 self.typecheck_call_arg_exprs(args);

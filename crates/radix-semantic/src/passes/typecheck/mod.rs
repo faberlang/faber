@@ -450,6 +450,11 @@ pub(crate) struct TypeChecker<'a> {
     pub(crate) current_function_def: Option<DefId>,
     /// HIR identity of the call currently checking its argument contracts.
     pub(crate) current_shape_call: Option<HirId>,
+    /// Receiver the numeric-twin probe already checked. Checking is not
+    /// idempotent (an intrinsic call rewrites its method symbol to the
+    /// canonical spelling), so the next check of that expression adopts this
+    /// type instead of checking the receiver a second time.
+    pub(crate) twin_probed_receiver: Option<(HirId, TypeId)>,
     /// Returned expression whose runtime shape is checked against the result contract.
     pub(crate) current_shape_return_expr: Option<HirId>,
     /// Zero-based value-argument ordinal currently being checked.
@@ -852,6 +857,7 @@ impl<'a> TypeChecker<'a> {
             loop_iterated: Vec::new(),
             current_function_def: None,
             current_shape_call: None,
+            twin_probed_receiver: None,
             current_shape_return_expr: None,
             current_shape_argument: None,
             current_shape_fields: Vec::new(),
@@ -1147,6 +1153,10 @@ mod lista_operator_test;
 mod convert_test;
 
 #[cfg(test)]
+#[path = "ascription_optional_slot_test.rs"]
+mod ascription_optional_slot_test;
+
+#[cfg(test)]
 #[path = "element_relaxation_test.rs"]
 mod element_relaxation_test;
 
@@ -1355,6 +1365,10 @@ mod ordina_key_test;
 #[cfg(test)]
 #[path = "scalar_longitudo_test.rs"]
 mod scalar_longitudo_test;
+
+#[cfg(test)]
+#[path = "chained_intrinsic_receiver_test.rs"]
+mod chained_intrinsic_receiver_test;
 
 #[cfg(test)]
 #[path = "scalar_unknown_method_test.rs"]

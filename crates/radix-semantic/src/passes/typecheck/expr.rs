@@ -464,6 +464,16 @@ impl TypeChecker<'_> {
         expr: &mut HirExpression,
         expected: Option<TypeId>,
     ) -> TypeId {
+        // The numeric-twin probe below checked this receiver already. Checking
+        // is not idempotent (an intrinsic call writes its canonical method
+        // symbol back, which a second pass rejects as a wrong-locale spelling),
+        // so the probed type stands in for the second check.
+        if let Some((probed, ty)) = self.twin_probed_receiver
+            && probed == expr.id
+        {
+            self.twin_probed_receiver = None;
+            return ty;
+        }
         let saved_pending_conversion = self.pending_conversion.take();
         let store = self.pending_store.take();
         // ss1: a numeric method twin means its operator; rewrite it first.

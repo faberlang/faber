@@ -384,6 +384,9 @@ impl TypeChecker<'_> {
 
         let errors_before = self.errors.len();
         let receiver_ty = self.check_expr(receiver);
+        // The receiver is checked exactly once, whether the probe declines or
+        // the twin is rewritten (see `twin_probed_receiver`).
+        self.twin_probed_receiver = Some((receiver.id, receiver_ty));
         if self.errors.len() != errors_before {
             return None;
         }
