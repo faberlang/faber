@@ -159,7 +159,7 @@ fn pad32(bytes data) → list<u8> {
     const int bit_len ← data.length() * 8
     var list<u8> padded ← []
     for range 0‥data.length() const i {
-        padded.append(data.get(i) coalesce (0 ∷ u8))
+        padded.append((data.get(i) coalesce (0 ∷ b8)) ↦ u8)
     }
     padded.append(0x80 ∷ u8)
     while (padded.length() % 64) ≢ 56 {
@@ -188,7 +188,7 @@ fn sha256(bytes data) → bytes {
         state ← compress32(state, w, k)
     }
     const list<u8> out ← serialize32(state)
-    const bytes result ← out
+    const bytes result ← out ↦ list<b8>
     return result
 }
 
@@ -307,7 +307,7 @@ fn pad64(bytes data) → list<u8> {
     const int bit_len ← data.length() * 8
     var list<u8> padded ← []
     for range 0‥data.length() const i {
-        padded.append(data.get(i) coalesce (0 ∷ u8))
+        padded.append((data.get(i) coalesce (0 ∷ b8)) ↦ u8)
     }
     padded.append(0x80 ∷ u8)
     while (padded.length() % 128) ≢ 112 {
@@ -340,7 +340,7 @@ fn sha512_engine(bytes data, list<wrapping<u64>> iv, int n_words) → bytes {
         state ← compress64(state, w, k)
     }
     const list<u8> out ← serialize64(state, n_words)
-    const bytes result ← out
+    const bytes result ← out ↦ list<b8>
     return result
 }
 
