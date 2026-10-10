@@ -78,7 +78,7 @@ incipit {
     varia stack<numerus> b ← vacua
     b.appende(1)
     b.appende(3)
-    fixum stack<numerus> products ← a * b
+    fixum stack<numerus> products ← a ⊙ b
     itera ex products fixum item {
         nota item
     }

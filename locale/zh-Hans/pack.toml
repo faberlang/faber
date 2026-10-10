@@ -1928,6 +1928,14 @@ help = "请用 `≡`/`≢` 比较整个列表，或先用 `↦` 把元素转为�
 message = "不支持 list `/` list；请用 ⊘（逐元素，同 `/`）或 ÷（逐元素真除法）"
 help = "逐对相除（同 `/`）请用 ⊘，真除法请用 ÷"
 
+[diagnostics.SEM011.issues.queue_stack_multiply_requires_glyph]
+message = "不支持 {collection} `*` {collection}；逐元素乘法请用 ⊙"
+help = "两个 {collection} 的逐元素乘法请用 ⊙；`*` 的一侧须为标量"
+
+[diagnostics.SEM011.issues.queue_stack_divide_requires_glyph]
+message = "不支持 {collection} `/` {collection}；请用 ⊘（逐元素，同 `/`）"
+help = "逐对相除（同 `/`）请用 ⊘；`/` 的一侧须为标量"
+
 [diagnostics.SEM011.issues.lista_scalar_required]
 message = "不支持 list `{operator}` list；`{operator}` 的一侧须为标量"
 help = "请将列表与标量配对"

@@ -1940,6 +1940,14 @@ help = "पूरी सूचियों की तुलना `≡`/`≢` �
 message = "list `/` list समर्थित नहीं है; ⊘ (तत्ववार, `/` की तरह) या ÷ (तत्ववार वास्तविक भाग) का उपयोग करें"
 help = "हर जोड़ी को `/` की तरह भाग देने के लिए ⊘, या वास्तविक भाग के लिए ÷ का उपयोग करें"
 
+[diagnostics.SEM011.issues.queue_stack_multiply_requires_glyph]
+message = "{collection} `*` {collection} समर्थित नहीं है; तत्ववार गुणन के लिए ⊙ का उपयोग करें"
+help = "दो {collection} के तत्ववार गुणन के लिए ⊙ का उपयोग करें; `*` एक ओर अदिश लेता है"
+
+[diagnostics.SEM011.issues.queue_stack_divide_requires_glyph]
+message = "{collection} `/` {collection} समर्थित नहीं है; ⊘ (तत्ववार, `/` की तरह) का उपयोग करें"
+help = "हर जोड़ी को `/` की तरह भाग देने के लिए ⊘ का उपयोग करें; `/` एक ओर अदिश लेता है"
+
 [diagnostics.SEM011.issues.lista_scalar_required]
 message = "list `{operator}` list समर्थित नहीं है; `{operator}` एक ओर अदिश लेता है"
 help = "सूची को अदिश के साथ जोड़ें"

@@ -2495,7 +2495,7 @@ help = "applica +, - vel ÷ per elementa inter duas listas, ⊙ vel ⊘ ad produ
 
 [diagnostics.SEM011.issues.numeric_queue_stack_operator_law]
 message = "operator {collection} numerica {operator} per elementa agit; scalaria utrimque propagantur, {collection} parem longitudinem requirit; operanda queue/stack mixta invalida sunt; utere ↦ ad latitudinem convertendam"
-help = "applica +, -, *, vel / per elementa in queue vel stack; utere generibus congruentibus et ↦ ad latitudinem concordandam"
+help = "applica + vel - per elementa inter duas queue vel stack, ⊙ vel ⊘ ad producta et quotientes, aut quodlibet ex + - * / cum scalari; utere generibus congruentibus et ↦ ad latitudinem concordandam"
 
 [diagnostics.SEM011.issues.numeric_operands_required]
 message = "numeric operands required"
@@ -2512,6 +2512,14 @@ help = "listas totas per `≡`/`≢` compara, vel elementa prius ad numeros per 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "lista `/` lista non licet; utere ⊘ (elementwise, ut `/`) aut ÷ (divisio vera per elementa)"
 help = "utere ⊘ ad singula paria sicut `/` dividenda, aut ÷ ad divisionem veram"
+
+[diagnostics.SEM011.issues.queue_stack_multiply_requires_glyph]
+message = "{collection} `*` {collection} non licet; utere ⊙ (elementwise)"
+help = "utere ⊙ ad multiplicationem duarum {collection} per elementa; `*` scalare ex una parte requirit"
+
+[diagnostics.SEM011.issues.queue_stack_divide_requires_glyph]
+message = "{collection} `/` {collection} non licet; utere ⊘ (elementwise, ut `/`)"
+help = "utere ⊘ ad singula paria sicut `/` dividenda; `/` scalare ex una parte requirit"
 
 [diagnostics.SEM011.issues.lista_scalar_required]
 message = "lista `{operator}` lista non licet; `{operator}` scalare ex una parte requirit"

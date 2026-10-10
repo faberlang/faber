@@ -102,7 +102,7 @@ fn stack_sub(stack<int> left, stack<int> right) → stack<int> {
 }
 
 fn bounded_queue_min(queue<int, 8> left, queue<int, 3> right) → queue<int, 3> {
-    return left / right
+    return left ⊘ right
 }
 
 fn bounded_stack_min(stack<int, 5> left, stack<int, 2> right) → stack<int, 2> {

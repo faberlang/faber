@@ -127,14 +127,104 @@ functio queue_sub(queue<numerus> a, numerus scalar) → queue<numerus> {
     redde a - scalar
 }
 
-functio stack_mul(stack<numerus> a, stack<numerus> b) → stack<numerus> {
-    redde a * b
+functio queue_scale(queue<numerus> a, numerus scalar) → queue<numerus> {
+    redde a * scalar
 }
 
 functio stack_div(numerus scalar, stack<numerus> b) → stack<numerus> {
     redde scalar / b
+}
+
+functio stack_hadamard(stack<numerus> a, stack<numerus> b) → stack<numerus> {
+    redde a ⊙ b
+}
+
+functio queue_hadamard_div(queue<numerus> a, queue<numerus> b) → queue<numerus> {
+    redde a ⊘ b
 }",
     );
+}
+
+#[test]
+fn queue_stack_pair_multiply_and_divide_require_the_glyphs() {
+    for (source, issue) in [
+        (
+            "functio f(queue<numerus> a, queue<numerus> b) → queue<numerus> { redde a * b }",
+            "queue_stack_multiply_requires_glyph",
+        ),
+        (
+            "functio f(queue<numerus> a, queue<numerus> b) → queue<numerus> { redde a / b }",
+            "queue_stack_divide_requires_glyph",
+        ),
+        (
+            "functio f(stack<numerus> a, stack<numerus> b) → stack<numerus> { redde a * b }",
+            "queue_stack_multiply_requires_glyph",
+        ),
+        (
+            "functio f(stack<numerus> a, stack<numerus> b) → stack<numerus> { redde a / b }",
+            "queue_stack_divide_requires_glyph",
+        ),
+        (
+            "functio f(queue<numerus, 4> a, queue<numerus, 2> b) → queue<numerus, 2> { redde a * b }",
+            "queue_stack_multiply_requires_glyph",
+        ),
+        (
+            "functio f(stack<numerus, 4> a, stack<numerus, 4> b) → stack<numerus, 4> { redde a / b }",
+            "queue_stack_divide_requires_glyph",
+        ),
+    ] {
+        crate::test_support::assert_rejects_with_issue(source, issue);
+    }
+}
+
+#[test]
+fn queue_stack_hadamard_keeps_kind_and_minimizes_bounded_capacity() {
+    let unit = crate::test_support::analyze_ok(
+        r"functio queue_bounded(queue<numerus, 8> a, queue<numerus, 3> b) → queue<numerus, 3> {
+    redde a ⊙ b
+}
+
+functio stack_bounded(stack<numerus, 2> a, stack<numerus, 7> b) → stack<numerus, 2> {
+    redde a ⊘ b
+}",
+    );
+    let hir = unit.hir.as_ref().expect("HIR");
+    let bounded_queue = match &hir.items[0].kind {
+        radix_hir::HirItemKind::Function(function) => function.ret_ty.expect("queue return type"),
+        other => panic!("expected queue function, got {other:?}"),
+    };
+    let bounded_stack = match &hir.items[1].kind {
+        radix_hir::HirItemKind::Function(function) => function.ret_ty.expect("stack return type"),
+        other => panic!("expected stack function, got {other:?}"),
+    };
+    assert!(matches!(
+        unit.types.get(bounded_queue),
+        Type::BoundedQueue { .. }
+    ));
+    assert!(matches!(
+        unit.types.get(bounded_stack),
+        Type::BoundedStack { .. }
+    ));
+}
+
+#[test]
+fn queue_stack_hadamard_rejects_mixed_kinds_scalars_and_non_numeric_elements() {
+    for (source, issue) in [
+        (
+            "functio f(queue<numerus> q, stack<numerus> s) → queue<numerus> { redde q ⊙ s }",
+            "glyph_operands_unsupported",
+        ),
+        (
+            "functio f(queue<numerus> q) → queue<numerus> { redde q ⊙ 2 }",
+            "glyph_operands_unsupported",
+        ),
+        (
+            "functio f(queue<textus> q, queue<textus> r) → queue<textus> { redde q ⊙ r }",
+            "glyph_op_numeric_element_required",
+        ),
+    ] {
+        crate::test_support::assert_rejects_with_issue(source, issue);
+    }
 }
 
 #[test]
@@ -145,7 +235,7 @@ fn queue_stack_arithmetic_preserves_kind_and_minimizes_bounded_capacity() {
 }
 
 functio stack_bounded(stack<numerus, 2> a, stack<numerus, 7> b) → stack<numerus, 2> {
-    redde a * b
+    redde a ⊙ b
 }",
     );
     let hir = unit.hir.as_ref().expect("HIR");

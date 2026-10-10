@@ -27,6 +27,7 @@ use super::*;
 
 mod aggregate_compare;
 mod lista_lift;
+mod queue_stack_lift;
 mod tensor_lift;
 
 const INSTANS_ORDERING_OPERANDS_REQUIRED: &str = "instans_ordering_operands_required";
@@ -240,6 +241,23 @@ impl TypeChecker<'_> {
                 if lhs.kind != rhs.kind {
                     return Some(law_error(self, "queue/stack"));
                 }
+                let glyph_issue = match op {
+                    HirBinOp::Mul => {
+                        Some(queue_stack_lift::ISSUE_QUEUE_STACK_MULTIPLY_REQUIRES_GLYPH)
+                    }
+                    HirBinOp::Div => {
+                        Some(queue_stack_lift::ISSUE_QUEUE_STACK_DIVIDE_REQUIRES_GLYPH)
+                    }
+                    _ => None,
+                };
+                if let Some(issue) = glyph_issue {
+                    self.invalid_operand_types_with_args(
+                        issue,
+                        span,
+                        &[("collection", lhs.kind.spelling().to_owned())],
+                    );
+                    return Some(self.error_type);
+                }
                 if !self.is_numeric_queue_stack_element(lhs.element)
                     || !self.is_numeric_queue_stack_element(rhs.element)
                 {
@@ -277,16 +295,7 @@ impl TypeChecker<'_> {
             (None, None) => return None,
         };
 
-        Some(match (kind, capacity) {
-            (QueueStackArithmeticKind::Queue, Some(capacity)) => {
-                self.types.bounded_queue(element, capacity)
-            }
-            (QueueStackArithmeticKind::Queue, None) => self.types.queue(element),
-            (QueueStackArithmeticKind::Stack, Some(capacity)) => {
-                self.types.bounded_stack(element, capacity)
-            }
-            (QueueStackArithmeticKind::Stack, None) => self.types.stack(element),
-        })
+        Some(self.queue_stack_result(kind, element, capacity))
     }
 
     fn queue_stack_arithmetic_shape(&mut self, ty: TypeId) -> Option<QueueStackArithmeticShape> {
@@ -1963,6 +1972,11 @@ impl TypeChecker<'_> {
                 .check_lista_hadamard(op, lhs_resolved, rhs_resolved, lhs.span)
                 .unwrap_or(self.error_type),
             _ => {
+                if let Some(result) =
+                    self.check_queue_stack_hadamard(op, lhs_resolved, rhs_resolved, lhs.span)
+                {
+                    return result;
+                }
                 self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
                 self.error_type
             }

@@ -1928,6 +1928,14 @@ help = "so sánh cả danh sách bằng `≡`/`≢`, hoặc chuyển các phần
 message = "không hỗ trợ list `/` list; dùng ⊘ (theo phần tử, như `/`) hoặc ÷ (chia thực theo phần tử)"
 help = "dùng ⊘ để chia từng cặp như `/`, hoặc ÷ để chia thực"
 
+[diagnostics.SEM011.issues.queue_stack_multiply_requires_glyph]
+message = "không hỗ trợ {collection} `*` {collection}; dùng ⊙ (theo phần tử)"
+help = "dùng ⊙ để nhân hai {collection} theo phần tử; `*` nhận một số vô hướng ở một phía"
+
+[diagnostics.SEM011.issues.queue_stack_divide_requires_glyph]
+message = "không hỗ trợ {collection} `/` {collection}; dùng ⊘ (theo phần tử, như `/`)"
+help = "dùng ⊘ để chia từng cặp như `/`; `/` nhận một số vô hướng ở một phía"
+
 [diagnostics.SEM011.issues.lista_scalar_required]
 message = "không hỗ trợ list `{operator}` list; `{operator}` nhận một số vô hướng ở một phía"
 help = "ghép danh sách với một số vô hướng"

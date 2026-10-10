@@ -1940,6 +1940,14 @@ help = "เปรียบเทียบทั้งลิสต์ด้วย
 message = "ไม่รองรับ list `/` list; ใช้ ⊘ (รายองค์ประกอบ เหมือน `/`) หรือ ÷ (การหารจริงรายองค์ประกอบ)"
 help = "ใช้ ⊘ เพื่อหารทุกคู่เหมือน `/` หรือ ÷ สำหรับการหารจริง"
 
+[diagnostics.SEM011.issues.queue_stack_multiply_requires_glyph]
+message = "ไม่รองรับ {collection} `*` {collection}; ใช้ ⊙ (รายองค์ประกอบ)"
+help = "ใช้ ⊙ สำหรับการคูณสอง {collection} รายองค์ประกอบ; `*` รับสเกลาร์หนึ่งด้าน"
+
+[diagnostics.SEM011.issues.queue_stack_divide_requires_glyph]
+message = "ไม่รองรับ {collection} `/` {collection}; ใช้ ⊘ (รายองค์ประกอบ เหมือน `/`)"
+help = "ใช้ ⊘ เพื่อหารทุกคู่เหมือน `/`; `/` รับสเกลาร์หนึ่งด้าน"
+
 [diagnostics.SEM011.issues.lista_scalar_required]
 message = "ไม่รองรับ list `{operator}` list; `{operator}` รับสเกลาร์หนึ่งด้าน"
 help = "จับคู่ลิสต์กับสเกลาร์"
