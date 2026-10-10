@@ -337,14 +337,15 @@ impl HirVisitor for Reach<'_> {
 }
 
 /// Whether a callable is a kernel that rule 12.7 inlines: `@ nucleum`
-/// (fragment or entry, public or private), synchronous and infallible.
+/// (fragment or entry, public or private) and synchronous. A kernel may
+/// declare `⇥ text` (KTHROW, ruling 2026-10-08): its failure follows the
+/// lane body's own recovery rules, and kernel legality admits no handler.
 pub(crate) fn is_inlinable_kernel(function: &HirFunction) -> bool {
     function.nucleum_role().is_some()
         && !function.is_async
         && !function.posture.is_async()
         && !function.is_generator
         && !function.posture.is_stream()
-        && function.err_ty.is_none()
 }
 
 /// A bare tensor (through an access marker): the one field type with a

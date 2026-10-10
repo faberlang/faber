@@ -494,8 +494,10 @@ functio k(tensor<f32, [32]> xs) → f32 {{
 }
 
 #[test]
-fn reduction_term_calling_a_failable_kernel_is_rejected() {
-    assert_rejects_with_issue(
+fn reduction_term_calling_a_failable_kernel_is_accepted_when_the_caller_can_fail() {
+    // KTHROW (ruling 2026-10-08): a helper with `⇥ text` is inlinable; the
+    // caller propagates through its own `⇥ text`.
+    accepted(
         r"
 @ nucleum
 functio risky(f32 x) → f32 ⇥ textus { redde x }
@@ -504,7 +506,6 @@ functio k(tensor<f32, [32]> xs) → f32 ⇥ textus {
     redde reducta via summa ex xs apud [i] filum f fixum s { redde risky(s) }
 }
 ",
-        "reducta_body_context",
     );
 }
 
@@ -711,5 +712,57 @@ functio k(tensor<f32, [4]> out, tensor<f32, [4]> src) → vacuum {
 incipit {
 }",
         "assign_to_nonmut_tensor_param",
+    );
+}
+
+// =============================================================================
+// A helper with a `⇥ text` error channel (KTHROW, ruling 2026-10-08)
+// =============================================================================
+
+const FAILABLE: &str = r"
+@ nucleum
+functio h(f32 x) → f32 ⇥ textus {
+    si x ≺ 0.0 {
+        iace 'negative'
+    }
+    redde x
+}
+";
+
+/// A public kernel that can itself fail, so a failable helper call
+/// propagates through its own `⇥ text`.
+fn failable_kernel(helpers: &str, statement: &str) -> String {
+    kernel(helpers, statement).replace("→ vacuum {", "→ vacuum ⇥ textus {")
+}
+
+#[test]
+fn failable_helper_is_admitted_in_a_lane_body() {
+    accepted(&failable_kernel(FAILABLE, "out[i] ← h(value)"));
+}
+
+#[test]
+fn failable_helper_without_a_failing_caller_stays_a_named_error() {
+    // The failure has no handler in the lane body and the kernel cannot
+    // propagate it: it must not disappear.
+    assert_rejects_with_issue(
+        &kernel(FAILABLE, "out[i] ← h(value)"),
+        "failable_call_requires_handler",
+    );
+}
+
+#[test]
+fn failable_helper_is_still_held_to_the_independence_rules() {
+    let peek = r"
+@ nucleum
+functio peek(de tensor<f32, [4]> t, numerus at) → f32 ⇥ textus {
+    si at ≺ 0 {
+        iace 'negative'
+    }
+    redde t[at + 1]
+}
+";
+    rejected(
+        &failable_kernel(peek, "out[i] ← peek(out, i)"),
+        "written_storage_neighbor_read",
     );
 }
