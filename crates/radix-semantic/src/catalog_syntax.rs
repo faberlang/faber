@@ -307,6 +307,13 @@ pub fn lex_message(kind: LexErrorKind, args: &[DiagnosticArg]) -> Option<String>
     }
 }
 
+/// Quoted keyword spelling for a message: an explicit arg of that name when an
+/// emit site supplies one, else the Latin keyword. A pack renders the keyword
+/// from its own binding, so emit sites do not pass the literal.
+fn keyword_or_latin(args: &[DiagnosticArg], keyword: &str) -> String {
+    quote_arg(args, keyword).unwrap_or_else(|| format!("'{keyword}'"))
+}
+
 #[must_use]
 pub fn parse_message(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String> {
     match kind {
@@ -319,15 +326,22 @@ pub fn parse_message(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<Str
         ParseErrorKind::ModifierInvalid => Some("invalid modifier".to_owned()),
         ParseErrorKind::ModifierDuplicate => Some("duplicate modifier".to_owned()),
         ParseErrorKind::AnnotationInvalid => invalid_annotation_message(args),
-        ParseErrorKind::FunctionNameAbsent => quote_arg(args, "functio")
-            .map(|functio| format!("expected function name after {functio}")),
-        ParseErrorKind::FunctionBodyAbsent => quote_arg(args, "functio")
-            .map(|functio| format!("expected function body for {functio} declaration")),
-        ParseErrorKind::ClassNameAbsent => {
-            quote_arg(args, "genus").map(|genus| format!("expected class name after {genus}"))
-        }
-        ParseErrorKind::ClassBodyAbsent => quote_arg(args, "genus")
-            .map(|genus| format!("expected class body after {genus} declaration")),
+        ParseErrorKind::FunctionNameAbsent => Some(format!(
+            "expected function name after {}",
+            keyword_or_latin(args, "functio")
+        )),
+        ParseErrorKind::FunctionBodyAbsent => Some(format!(
+            "expected function body for {} declaration",
+            keyword_or_latin(args, "functio")
+        )),
+        ParseErrorKind::ClassNameAbsent => Some(format!(
+            "expected class name after {}",
+            keyword_or_latin(args, "genus")
+        )),
+        ParseErrorKind::ClassBodyAbsent => Some(format!(
+            "expected class body after {} declaration",
+            keyword_or_latin(args, "genus")
+        )),
         ParseErrorKind::ParameterInvalid => invalid_parameter_message(args),
         ParseErrorKind::TypeParameterInvalid => invalid_type_parameter_message(args),
         ParseErrorKind::BlockAbsent => quote_arg(args, "block").and_then(|block| {
@@ -371,7 +385,7 @@ pub fn parse_help(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String
         ParseErrorKind::Unexpected => unexpected_help(args),
         ParseErrorKind::AnnotationInvalid => invalid_annotation_help(args),
         ParseErrorKind::FunctionNameAbsent => {
-            let functio = quote_arg(args, "functio")?;
+            let functio = keyword_or_latin(args, "functio");
             Some(format!("add a function name after {functio}"))
         }
         ParseErrorKind::FunctionBodyAbsent => {
@@ -379,11 +393,11 @@ pub fn parse_help(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String
             Some(format!("add a {block} to the function declaration"))
         }
         ParseErrorKind::ClassNameAbsent => {
-            let genus = quote_arg(args, "genus")?;
+            let genus = keyword_or_latin(args, "genus");
             Some(format!("add a class name after {genus}"))
         }
         ParseErrorKind::ClassBodyAbsent => {
-            let genus = quote_arg(args, "genus")?;
+            let genus = keyword_or_latin(args, "genus");
             Some(format!("add a block after the {genus} declaration header"))
         }
         ParseErrorKind::ParameterInvalid => invalid_parameter_help(args),

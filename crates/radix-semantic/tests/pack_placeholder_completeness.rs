@@ -33,16 +33,18 @@ const SUPPLIED: &[(&str, &[&str])] = &[
     ("LOCALE002", &["pack", "spelling", "suggestion"]),
     // radix-module diagnostics/convert.rs: convert_from_mixed_script_advisory
     ("LOCALE004", &["identifier", "scripts"]),
+    // radix-module driver/mod.rs: resolve_frontmatter_locale_pack passes
+    // `locale_id` on every site that knows the id; the sites that do not
+    // (non-string key, unresolved session) use `issue` rows.
+    ("LOCALE003", &["locale_id"]),
 ];
 
-/// Known mismatches that are not fixable inside this unit's write scope.
-/// Each must remain a gap: when the emit site is fixed the entry must go.
+/// Known mismatches. Each must remain a gap: when the emit site is fixed the
+/// entry must go.
 const KNOWN_GAPS: &[(&str, &str)] = &[
-    // radix-module driver/mod.rs (resolve_frontmatter_locale_pack) and
-    // faber commands/format.rs emit LOCALE003 with no `locale_id` arg.
-    ("LOCALE003", "locale_id"),
     // The UNRES specs are registered in radix-diagnostics but no emit site
-    // supplies args for them yet.
+    // exists anywhere in the tree (need: grep finds only the spec
+    // definitions and the pack rows), so there is no site to supply args.
     ("UNRES001", "keyword"),
     ("UNRES002", "intrinsic"),
     ("UNRES003", "identity"),
@@ -154,6 +156,12 @@ fn supplied_codes_render_in_every_pack() {
         let pack = load_pack(locale);
         let codes = SUPPLIED.iter().map(|(code, _)| *code).chain(["PARSE012"]);
         for code in codes {
+            // Diagnostics stay `la`-scoped (radix-module locale_test.rs): the
+            // six non-`la`, non-`en` packs have no LOCALE003 row and fall
+            // back to the base message.
+            if code == "LOCALE003" && !pack.diagnostics.contains_key(code) {
+                continue;
+            }
             let diagnostic = Diagnostic::error(code).with_code(code).with_args(
                 supplied_args(code)
                     .into_iter()
@@ -164,5 +172,78 @@ fn supplied_codes_render_in_every_pack() {
                 .unwrap_or_else(|err| panic!("{locale}.{code}: {err}"))
                 .unwrap_or_else(|| panic!("{locale}.{code}: no pack row"));
         }
+    }
+}
+
+/// An `en` file's parse diagnostics print the file locale's own keyword, not
+/// the Latin literal: the emit sites pass no `functio` /
+/// `genus` arg, so the pack keyword binding supplies the spelling.
+#[test]
+fn declaration_parse_messages_use_the_pack_keyword() {
+    let cases = [
+        (
+            "functio () → textus {}\n",
+            radix_parser::ParseErrorKind::FunctionNameAbsent,
+            "functio",
+        ),
+        (
+            "functio parse(textus s) → textus\n",
+            radix_parser::ParseErrorKind::FunctionBodyAbsent,
+            "functio",
+        ),
+        (
+            "genus {}\n",
+            radix_parser::ParseErrorKind::ClassNameAbsent,
+            "genus",
+        ),
+        (
+            "genus Nomen\n",
+            radix_parser::ParseErrorKind::ClassBodyAbsent,
+            "genus",
+        ),
+    ];
+    let pack = load_pack("en");
+    let spelling = |key: &str| {
+        pack.keywords
+            .get(key)
+            .expect("keyword binding")
+            .canonical
+            .clone()
+    };
+    assert_ne!(
+        spelling("functio"),
+        "functio",
+        "en must spell functio differently"
+    );
+    for (source, kind, keyword) in cases {
+        let result = radix_parser::parse(radix_lexer::lex(source));
+        let error = result
+            .errors
+            .iter()
+            .find(|err| err.kind == kind)
+            .unwrap_or_else(|| panic!("{kind:?} not reported for {source:?}"));
+        assert!(
+            error.args.iter().all(|arg| arg.name != keyword),
+            "{kind:?} must not pass a literal `{keyword}` arg"
+        );
+        let code = radix_semantic::catalog_syntax::parse_spec(kind).code;
+        let diagnostic = Diagnostic::error("x")
+            .with_code(code)
+            .with_args(error.args.clone());
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .expect("renders")
+            .expect("pack row");
+        let want = format!("'{}'", spelling(keyword));
+        assert!(
+            rendered.message.contains(&want),
+            "{code}: {}",
+            rendered.message
+        );
+        assert!(
+            !rendered.message.contains(&format!("'{keyword}'")),
+            "{code}: {}",
+            rendered.message
+        );
     }
 }

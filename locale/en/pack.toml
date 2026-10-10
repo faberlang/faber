@@ -471,6 +471,30 @@ help = "use '{suggestion}' if you meant that keyword; '{spelling}' is a valid na
 message = "unknown or invalid reader locale '{locale_id}' in frontmatter"
 help = "check the locale id is a valid reader locale directory name under the standard library reader path"
 
+[diagnostics.LOCALE003.issues.invalid_id]
+message = "frontmatter locale '{locale_id}' is not a valid locale identifier; locale ids must be simple directory names"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.no_root]
+message = "frontmatter declares locale '{locale_id}' but no language-pack root is configured"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.outside_root]
+message = "frontmatter locale '{locale_id}' resolves outside the language-pack root"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.load_failed]
+message = "unknown reader locale '{locale_id}' in frontmatter: {detail}"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.not_a_string]
+message = "frontmatter 'locale' key must be a string"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.unresolved]
+message = "reader locale did not resolve for this source"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
 [diagnostics.LOCALE004]
 message = "identifier '{identifier}' mixes scripts: {scripts}"
 help = "check for look-alike characters from another alphabet; the name is accepted as written"

@@ -75,9 +75,9 @@ fn missing_function_name_emits_structured_parse_error() {
         .expect("missing function name diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args.len(), 1);
-    assert_eq!(err.args[0].name, "functio");
-    assert_eq!(err.args[0].value, "functio");
+    // The keyword spelling comes from the reader pack, not a literal arg
+    //: a literal arg would beat the pack binding.
+    assert!(err.args.is_empty());
 }
 
 #[test]
@@ -90,9 +90,9 @@ fn missing_class_name_emits_structured_parse_error() {
         .expect("missing class name diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args.len(), 1);
-    assert_eq!(err.args[0].name, "genus");
-    assert_eq!(err.args[0].value, "genus");
+    // The keyword spelling comes from the reader pack, not a literal arg
+    //: a literal arg would beat the pack binding.
+    assert!(err.args.is_empty());
 }
 
 #[test]
@@ -105,9 +105,9 @@ fn missing_class_body_emits_structured_parse_error() {
         .expect("missing class body diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args.len(), 1);
-    assert_eq!(err.args[0].name, "genus");
-    assert_eq!(err.args[0].value, "genus");
+    // The keyword spelling comes from the reader pack, not a literal arg
+    //: a literal arg would beat the pack binding.
+    assert!(err.args.is_empty());
 }
 
 #[test]

@@ -1632,19 +1632,17 @@ impl Parser {
 
     /// Parse the required name after `functio`.
     fn parse_function_name(&mut self) -> Result<Ident, ParseError> {
-        self.parse_decl_name_after_keyword(ParseErrorKind::FunctionNameAbsent, "functio", "functio")
+        self.parse_decl_name_after_keyword(ParseErrorKind::FunctionNameAbsent)
     }
 
     /// Parse the required name after `genus`.
     fn parse_class_name(&mut self) -> Result<Ident, ParseError> {
-        self.parse_decl_name_after_keyword(ParseErrorKind::ClassNameAbsent, "genus", "genus")
+        self.parse_decl_name_after_keyword(ParseErrorKind::ClassNameAbsent)
     }
 
     fn parse_decl_name_after_keyword(
         &mut self,
         missing_kind: ParseErrorKind,
-        keyword_arg: &'static str,
-        keyword: &'static str,
     ) -> Result<Ident, ParseError> {
         let token = self.advance();
         let span = token.span;
@@ -1655,7 +1653,7 @@ impl Parser {
                 if let Some(text) = keyword_allowed_as_ident(KeywordOwner::DeclarationName, kind) {
                     Ok(self.keyword_ident(text, span))
                 } else {
-                    Err(ParseError::structured(missing_kind, span).with_arg(keyword_arg, keyword))
+                    Err(ParseError::structured(missing_kind, span))
                 }
             }
         }
