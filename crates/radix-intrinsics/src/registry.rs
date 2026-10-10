@@ -531,7 +531,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // ascii
     intrinsic!(Ascii, "cursor", 0, &[], CursorLittera, collection CordCursor),
     // textus
-    intrinsic!(Textus, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], Textus, collection Index),
+    intrinsic!(Textus, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], OptionTextus, collection Index),
     // need: the `at` read (la `apud`). `c[i]` dies, `c.get(i)` is
     // `T ∪ none`, `c.at(i)` reports an out-of-range index / missing key on `⇥`
     // (default form `⊥`). The error payload is the runtime failure text, the

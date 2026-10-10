@@ -187,3 +187,9 @@ fn textus_get_non_ascii_is_the_ith_character_or_nil() {
     );
     assert_eq!(index("Grüße", 9, optional_textus), Value::Nil);
 }
+
+#[test]
+fn text_get_negative_index_is_nil() {
+    assert_eq!(index("hé", 1, optional_textus), Value::Str("é".to_owned()));
+    assert_eq!(index("hé", -1, optional_textus), Value::Nil);
+}
