@@ -160,3 +160,49 @@ fn list_clause_without_a_bits_list_is_refused() {
         "conversio_via_target_takes_no_hint",
     );
 }
+
+#[test]
+fn bits_list_to_textus_is_a_text_decode_at_widths_8_16_32() {
+    test_support::assert_accepts("functio f(lista<b8> a) → textus { redde a ↦ textus ⊥ \"?\" }");
+    test_support::assert_accepts("functio f(lista<b16> a) → textus { redde a ↦ textus ⊥ \"?\" }");
+    test_support::assert_accepts("functio f(lista<b32> a) → textus { redde a ↦ textus ⊥ \"?\" }");
+}
+
+#[test]
+fn textus_to_bits_list_is_an_infallible_encode() {
+    test_support::assert_accepts("functio f(textus a) → lista<b8> { redde a ↦ lista<b8> }");
+    test_support::assert_accepts("functio f(textus a) → lista<b16> { redde a ↦ lista<b16> }");
+    test_support::assert_accepts("functio f(textus a) → lista<b32> { redde a ↦ lista<b32> }");
+}
+
+#[test]
+fn unsigned_number_list_to_textus_stays_refused() {
+    test_support::assert_rejects_with_issue(
+        "functio f(lista<u8> a) → textus { redde a ↦ textus ⊥ \"?\" }",
+        "lista_to_textus_unsupported",
+    );
+    test_support::assert_rejects_with_issue(
+        "functio f(lista<u16> a) → textus { redde a ↦ textus ⊥ \"?\" }",
+        "lista_to_textus_unsupported",
+    );
+}
+
+#[test]
+fn b64_has_no_text_conversion() {
+    test_support::assert_rejects_with_issue(
+        "functio f(lista<b64> a) → textus { redde a ↦ textus ⊥ \"?\" }",
+        "bits_conversion_width_mismatch",
+    );
+    test_support::assert_rejects_with_issue(
+        "functio f(textus a) → lista<b64> { redde a ↦ lista<b64> }",
+        "bits_conversion_width_mismatch",
+    );
+}
+
+#[test]
+fn text_rows_take_no_via_clause() {
+    test_support::assert_rejects_with_issue(
+        "functio f(textus a) → lista<b16> { redde a ↦ lista<b16> via Le }",
+        "bits_via_clause_not_allowed",
+    );
+}

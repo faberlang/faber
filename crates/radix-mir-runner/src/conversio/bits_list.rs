@@ -162,6 +162,90 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 }
 
+impl<H: Host + ?Sized> Runner<'_, H> {
+    /// The `bN` width (8, 16 or 32) of a bits list's element, looking
+    /// through aliases. `None` for every other source.
+    pub(super) fn bits_text_width(&self, ty: TypeId) -> Option<u32> {
+        let mut ty = ty;
+        while let Type::Alias(_, inner) = self.types.get(ty) {
+            ty = *inner;
+        }
+        let Type::Array(elem) = self.types.get(ty) else {
+            return None;
+        };
+        self.bits_text_element_width(*elem)
+    }
+
+    /// The text width of a `bN` element type (8, 16 or 32).
+    pub(super) fn bits_text_element_width(&self, elem: TypeId) -> Option<u32> {
+        match self.bits_list_cell(elem)? {
+            Cell::Raw(bits @ (8 | 16 | 32)) => Some(bits),
+            _ => None,
+        }
+    }
+
+    /// `lista<bN> ↦ textus`: UTF-8 (N = 8), UTF-16 (16) or UTF-32 (32)
+    /// decode. The elements are the code units, so no byte order is
+    /// involved. An ill-formed sequence is the recoverable failure.
+    pub(super) fn convert_bits_list_to_textus(
+        &mut self,
+        value: &Value,
+        width: u32,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Value::Array(cell) = value else {
+            return Err(RunnerError::internal(
+                span,
+                "bits list to textus conversio met a value that is not a list",
+            ));
+        };
+        let mut units = Vec::with_capacity(cell.borrow().len());
+        for item in cell.borrow().iter() {
+            let Some(pattern) = bits_pattern(item) else {
+                return Err(RunnerError::internal(
+                    span,
+                    "bits list to textus conversio met an element that is not a bit pattern",
+                ));
+            };
+            units.push(pattern & mask(width));
+        }
+        let decoded = match width {
+            8 => String::from_utf8(units.iter().map(|unit| *unit as u8).collect()).ok(),
+            16 => {
+                String::from_utf16(&units.iter().map(|unit| *unit as u16).collect::<Vec<_>>()).ok()
+            }
+            _ => units
+                .iter()
+                .map(|unit| char::from_u32(*unit as u32))
+                .collect::<Option<String>>(),
+        };
+        match decoded {
+            Some(text) => Ok(Value::Str(text)),
+            None => self.recover_or_fail(recovery, span, "bits list to textus conversion failed"),
+        }
+    }
+
+    /// `textus ↦ lista<bN>`: the infallible UTF-8, UTF-16 or UTF-32 encode.
+    pub(super) fn convert_textus_to_bits_list(text: &str, width: u32) -> Value {
+        let items: Vec<Value> = match width {
+            8 => text
+                .bytes()
+                .map(|unit| Value::UInt(u64::from(unit)))
+                .collect(),
+            16 => text
+                .encode_utf16()
+                .map(|unit| Value::UInt(u64::from(unit)))
+                .collect(),
+            _ => text
+                .chars()
+                .map(|ch| Value::UInt(u64::from(u32::from(ch))))
+                .collect(),
+        };
+        Value::Array(Rc::new(RefCell::new(items)))
+    }
+}
+
 fn encode_pattern(value: &Value, cell: Cell) -> Option<u64> {
     match cell {
         Cell::Raw(bits) | Cell::Unsigned(bits) | Cell::Signed(bits) => {

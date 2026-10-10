@@ -120,6 +120,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         {
             return converted;
         }
+        // `lista<bN> ↦ textus` is a UTF-8/16/32 decode and `textus ↦
+        // lista<bN>` the encode (need, B4).
+        if matches!(target, Type::Primitive(Primitive::Textus))
+            && let Some(width) = self.bits_text_width(source_ty)
+        {
+            return self.convert_bits_list_to_textus(&value, width, recovery, span);
+        }
+        if let (Type::Array(elem), Value::Str(text)) = (&target, &value)
+            && let Some(width) = self.bits_text_element_width(*elem)
+        {
+            return Ok(Self::convert_textus_to_bits_list(text, width));
+        }
         match &target {
             Type::Primitive(Primitive::Textus) => {
                 self.convert_to_textus(value, source_ty, recovery, span)

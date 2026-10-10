@@ -1,0 +1,54 @@
++++
+term = "bits"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "conversio"
+canonical = true
+summary = "A lista<b8> converts to string as UTF-8, a lista<b16> as UTF-16 and a lista<b32> as UTF-32; the decode can fail and the encode cannot."
+syntax = "const string s ← bytes ↦ string ⊥ \"?\" | const list<b16> units ← s ↦ list<b16>"
+related = ["bits", "↦"]
+locale = "en"
++++
+# =============================================================================
+# bits — Text conversions at widths 8, 16 and 32
+# =============================================================================
+#
+# What this teaches:
+#   • list<b8> ↦ string is a UTF-8 decode, list<b16> UTF-16, list<b32> UTF-32
+#   • string ↦ list<bN> is the encode and cannot fail
+#   • a decode can fail on ill-formed input; recover with a ⊥ default
+#   • the elements are the code units, so no byte order is involved
+#
+# Common mistakes:
+#   • expecting a decode to succeed on any bits — ill-formed units fail
+#   • reaching for b64 — it has no text conversion
+#
+# See also: bits-bulk, bits-display
+# =============================================================================
+
+# bits — UTF-8, UTF-16 and UTF-32 round trips and a failing decode
+#
+# EXPECTED stdout: see bits-text.expected
+
+main {
+    # UTF-8: "é" is two bytes
+    const string word ← "héllo"
+    const list<b8> utf8 ← word ↦ list<b8>
+    print utf8
+    print utf8 ↦ string ⊥ "?"
+
+    # UTF-16: a character outside the basic plane is a surrogate pair
+    const string face ← "a😀"
+    const list<b16> utf16 ← face ↦ list<b16>
+    print utf16
+    print utf16 ↦ string ⊥ "?"
+
+    # UTF-32: one unit per character
+    const list<b32> utf32 ← face ↦ list<b32>
+    print utf32
+    print utf32 ↦ string ⊥ "?"
+
+    # a failing decode: 0xff is never valid in UTF-8
+    const list<b8> bad ← [0x68, 0xff]
+    print bad ↦ string ⊥ "?"
+}

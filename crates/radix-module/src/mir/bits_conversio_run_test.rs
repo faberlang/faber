@@ -104,3 +104,28 @@ fn bits_list_width_change_decodes_and_encodes_through_the_byte_order() {
     let same = "fixum lista<b8> a ← [0x01, 0xff]\nnota a ↦ lista<u8>";
     assert_eq!(ok(same), ["[1, 255]"]);
 }
+
+#[test]
+fn bits_lists_decode_and_encode_text_at_widths_8_16_32() {
+    // UTF-8: a multi-byte character, round trip.
+    assert_eq!(ok("fixum lista<b8> l ← [0x68, 0xc3, 0xa9]\nnota l ↦ textus ⊥ \"?\""), ["hé"]);
+    assert_eq!(ok("fixum textus s ← \"hé\"\nnota s ↦ lista<b8>"), ["[0x68, 0xc3, 0xa9]"]);
+    // An invalid UTF-8 byte string is the recoverable failure.
+    assert_eq!(ok("fixum lista<b8> l ← [0xff, 0x41]\nnota l ↦ textus ⊥ \"?\""), ["?"]);
+    // UTF-16: a character outside the basic plane is a surrogate pair.
+    assert_eq!(
+        ok("fixum lista<b16> l ← [0xd83d, 0xde00]\nnota l ↦ textus ⊥ \"?\""),
+        ["\u{1F600}"]
+    );
+    assert_eq!(
+        ok("fixum textus s ← \"a\u{1F600}\"\nnota s ↦ lista<b16>"),
+        ["[0x0061, 0xd83d, 0xde00]"]
+    );
+    assert_eq!(ok("fixum lista<b16> l ← [0xd800]\nnota l ↦ textus ⊥ \"?\""), ["?"]);
+    // UTF-32.
+    assert_eq!(
+        ok("fixum textus s ← \"a\u{1F600}\"\nnota s ↦ lista<b32>"),
+        ["[0x00000061, 0x0001f600]"]
+    );
+    assert_eq!(ok("fixum lista<b32> l ← [0x110000]\nnota l ↦ textus ⊥ \"?\""), ["?"]);
+}

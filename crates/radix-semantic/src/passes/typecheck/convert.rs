@@ -629,6 +629,17 @@ impl TypeChecker<'_> {
             }
             return result_ty;
         }
+        // Need B4: `lista<bN> ↦ textus` decodes UTF-8/16/32 and
+        // `textus ↦ lista<bN>` encodes; `b64` has no text conversion.
+        if let Some(result_ty) = self.check_bits_text_conversio(
+            source_ty,
+            target_resolved,
+            params,
+            recovery.as_deref_mut(),
+            span,
+        ) {
+            return result_ty;
+        }
         // D10.6: `littera` text rows and the `Code` hint.
         if let Some(result_ty) = self.check_littera_conversio(
             source_ty,

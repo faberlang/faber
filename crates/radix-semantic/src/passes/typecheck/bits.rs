@@ -251,6 +251,56 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// `lista<bN> ↦ textus` (UTF-8, UTF-16, UTF-32 decode; fallible) and
+    /// `textus ↦ lista<bN>` (encode; infallible) at widths 8, 16 and 32 (need
+    /// 6a13d711, B4). The rule is an explicit allowance for bits-list sources
+    /// only: `lista<uN> ↦ textus` and every other element type stay on the
+    /// ordinary refusal. `b64` has no text conversion and takes the named
+    /// bits width refusal. `None` when neither side is the bits-list/text
+    /// pair, so the ordinary rows run.
+    pub(super) fn check_bits_text_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target: TypeId,
+        params: &[Symbol],
+        recovery: Option<&mut HirExpression>,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let is_text = |this: &Self, ty: TypeId| {
+            matches!(
+                this.types.get(this.resolve_inferred_type(ty)),
+                Type::Primitive(Primitive::Textus)
+            )
+        };
+        let list_width =
+            |this: &Self, ty: TypeId| match this.types.get(this.resolve_inferred_type(ty)) {
+                Type::Array(elem) => this.bits_width_of(*elem),
+                _ => None,
+            };
+        let (width, decode) = if is_text(self, target) && !is_text(self, source_ty) {
+            (list_width(self, source_ty)?, true)
+        } else if is_text(self, source_ty) && !is_text(self, target) {
+            (list_width(self, target)?, false)
+        } else {
+            return None;
+        };
+        let result = self.resolve_inferred_type(target);
+        if matches!(width, BitsWidth::B64) {
+            self.invalid_conversion(BITS_CONVERSION_WIDTH_MISMATCH, span);
+            return Some(self.error_type);
+        }
+        if !params.is_empty() {
+            self.invalid_conversion(BITS_VIA_CLAUSE_NOT_ALLOWED, span);
+            return Some(self.error_type);
+        }
+        if let Some(recovery) = recovery {
+            self.note_conversio_recovery_checked(recovery, result);
+        } else if decode {
+            self.check_conversio_propagation_channel(source_ty, result, span);
+        }
+        Some(result)
+    }
+
     /// `bN` conversions: scalar `bN ↔ uN | iN | fN` and the element-wise list
     /// forms at the same N take no `via` clause and keep the pattern. A list
     /// conversion that changes the bit width takes exactly a `via Le|Be`
