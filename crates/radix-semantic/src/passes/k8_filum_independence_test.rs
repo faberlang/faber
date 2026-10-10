@@ -266,3 +266,19 @@ fn ordinary_non_filum_loop_unchanged() {
 }",
     );
 }
+
+#[test]
+fn failable_accipe_with_inline_default_accepted() {
+    // The `⊥` default makes the failure local: nothing escapes the lane.
+    accepted(&body("grid[i] ← grid.accipe([i]) ⊥ 0"));
+    accepted(&body("grid[i] ← grid.accipe([i]) ⊥ value"));
+}
+
+#[test]
+fn failable_accipe_with_default_keeps_neighbor_rule() {
+    // The default does not excuse a neighbor read of a written tensor.
+    rejected(
+        &body("grid[i] ← grid.accipe([i + 1]) ⊥ 0"),
+        "written_storage_neighbor_read",
+    );
+}
