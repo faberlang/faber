@@ -4,55 +4,62 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "expr_stmt", "redde_stmt", "cast_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "type"
 canonical = false
-summary = "octeti unifies with lista<u8> — every lista method works on octeti."
-syntax = "octeti"
-related = ["octeti", "lista", "numerus"]
+summary = "octeti is lista<b8> — every lista method works on it; lista<u8> converts to it with no clause, and an element needs ↦ u8 to become a number."
+syntax = "octeti = lista<b8>"
+related = ["octeti", "lista", "bits", "numerus"]
 locale = "en"
 +++
 
 # =============================================================================
-# octeti — octeti unifies with lista<u8> — every lista method works on octeti.
+# octeti — octeti is lista<b8>: every lista method works on it, and a number needs ↦ u8.
 # =============================================================================
 #
 # What this teaches:
-#   • Type unification — `octeti` and `lista<u8>` are representation-identical and bidirectionally assignable.
-#   • Method inheritance — Because of unification, every `lista` method is available on `octeti` receivers.
+#   • Identity — `octeti` is `lista<b8>`: a list of raw bits, not a list of numbers.
+#   • Method inheritance — every `lista` method is available on `octeti` receivers.
+#   • Conversion — `lista<u8> ↦ lista<b8>` keeps the width, so it takes no clause.
+#   • Elements — a `b8` has no arithmetic; `↦ u8` makes it a number, `↦ b8` makes a number raw bits.
 #
 # Common mistakes:
-#   • Forgetting that octeti carries the full lista API surface, not just byte operations.
+#   • Assuming `octeti` and `lista<u8>` are one type — they no longer unify; convert.
+#   • Appending a `u8` to an `octeti` without `↦ b8`.
 #
-# See also: octeti, lista, numerus
+# See also: octeti, lista, bits
 # =============================================================================
 
-# octeti — lista<u8> unification
+# octeti — lista<b8>
 #
-# WHY: `octeti` is semantic sugar for `lista<u8>`. The two are
-# representation-identical (Vec<u8>) and bidirectionally assignable, so octeti
-# carries every `lista` receiver method and either slot accepts the other.
+# WHY: `octeti` (en `bytes`) is `lista<b8>`. A `b8` is eight raw bits: equality,
+# ordering by bit pattern and the bit operations, but no arithmetic and no
+# mixing with `u8`. The list is a `lista`, so every `lista` receiver method
+# works on it. A `lista<u8>` is a different type: `↦ lista<b8>` converts it at
+# the same width (no via clause), and an element read becomes a number with
+# `↦ u8`.
 #
 # Cross-ref: octeti/octeti.fab (literal syntax), lista/lista.fab (lista methods),
-# typi/sized-numerus.fab (u8). See docs/factory/octeti-unify-lista/.
+# bits/ (b8), typi/sized-numerus.fab (u8).
 
 fn describe(bytes buf) → int {
     return buf.length()
 }
 
 fn firstByte(bytes buf) → u8 {
-    const u8 b ← buf.get(0) coalesce (0 ∷ u8)
-    return b
+    const b8 raw ← buf.get(0) coalesce (0 ∷ b8)
+    return raw ↦ u8
 }
 
-fn appendByte(mut bytes buf, u8 b) → bytes {
-    buf.append(b)
+fn appendByte(mut bytes buf, u8 value) → bytes {
+    buf.append(value ↦ b8)
     return buf
 }
 
-fn fromBytes() → bytes {
-    # WHY: lista<numerus<u8>> assigns into octeti bidirectionally.
-    var list<u8> bytes ← empty
-    bytes.append(0xde ∷ u8)
-    bytes.append(0xad ∷ u8)
-    const bytes asBytes ← bytes
+fn fromNumbers() → bytes {
+    # WHY: lista<u8> is a list of numbers; the same-width conversion makes
+    # it a byte list with no clause.
+    var list<u8> numbers ← empty
+    numbers.append(0xde ∷ u8)
+    numbers.append(0xad ∷ u8)
+    const bytes asBytes ← numbers ↦ list<b8>
     return asBytes
 }
 
@@ -66,10 +73,10 @@ main {
     const u8 first ← firstByte(sig)
     print first
 
-    # construction + cross-assignment
+    # a number appended as raw bits
     const u8 marker ← 0xff ∷ u8
     const bytes grown ← appendByte(mut sig, marker)
     print grown.length()
-    const bytes crossed ← fromBytes()
+    const bytes crossed ← fromNumbers()
     print crossed.length()
 }

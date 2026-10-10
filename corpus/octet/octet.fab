@@ -1,47 +1,35 @@
 +++
 term = "octet"
-kind = "existing-home"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "vel_expr", "vel_rhs", "cast_expr", "redde_stmt", "expr_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "nota_stmt", "expression", "literal"]
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "byte (octetus) is the byte scalar, an exact alias of u8 and the element type of bytes (octeti)."
-syntax = "byte"
-related = ["octeti", "numerus", "lista"]
+summary = "The word byte (octetus) is retired: write b8 for raw bits or u8 for a number."
+syntax = "byte — rejected"
+related = ["bits", "octeti", "numerus"]
 locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:retired_byte_word"
 +++
 # =============================================================================
-# byte — the byte scalar (Latin `octetus`), exactly u8, the element of bytes.
+# byte — The word byte (octetus) is retired: write b8 for raw bits or u8 for a number.
 # =============================================================================
 #
 # What this teaches:
-#   • Byte scalar type — `byte` is an exact alias of `u8`, the element type of `bytes`.
-#   • Identity — `bytes` is exactly `list<byte>`; a `byte` and an `u8` are one type.
+#   • `byte` (Latin `octetus`) no longer names a type; the diagnostic names both replacements
+#   • A raw byte is `b8`; a numeric byte is `u8`
 #
 # Common mistakes:
-#   • Confusing byte (one scalar) with bytes (the buffer) — bytes is list<byte>.
+#   • Writing `byte` for an element of `bytes` — the element is `b8`
 #
-# See also: octeti, numerus, lista
+# See also: bits, octeti, numerus
 # =============================================================================
 
-# byte - byte scalar (u8), D10.4
-
-fn describe(bytes buf) → int {
-    return buf.length()
-}
-
-fn firstByte(bytes buf) → byte {
-    const byte b ← buf.get(0) coalesce 0 ∷ u8
-    return b
-}
+# byte reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
 
 main {
-    var bytes sig ← |de ad be ef|
-    const u8 b ← 0x80 ∷ u8
-    sig.append(b)
-    print describe(sig)
-    const byte first ← firstByte(sig)
-    print first
-    const u8 raw ← b
-    const u8 back ← raw
-    print back
+    const byte b ← 0x80 ∷ u8
+    print b
 }

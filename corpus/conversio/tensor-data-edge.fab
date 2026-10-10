@@ -44,7 +44,7 @@ locale = "en"
 # (no bit-reinterpret primitive — same seam as gradus dequant `_f32le`).
 
 fn byteAt(bytes buf, int off) → int {
-    return buf.get(off) coalesce 0 ∷ u8 ↦ int
+    return buf.get(off) coalesce 0 ∷ b8 ↦ u8 ↦ int
 }
 
 fn leU32(bytes buf, int off) → int {

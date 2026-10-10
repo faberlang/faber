@@ -44,7 +44,7 @@ locale = "en"
 fn dump(bytes buf) → string {
     var string line ← ""
     for range 0‥buf.length() const i {
-        const u8 piece ← buf.get(i) coalesce 0 ∷ u8
+        const u8 piece ← buf.get(i) coalesce 0 ∷ b8 ↦ u8
         line ← "§§ "(line, piece ¶ "02x")
     }
     return line
