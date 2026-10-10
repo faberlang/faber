@@ -72,3 +72,33 @@ fn permutation_is_a_rearrangement_not_a_data_mutation() {
         "shuffle must permute elements, never add, drop, or alter them"
     );
 }
+
+#[test]
+fn seed_resolution_unset_is_random_zero_is_off_number_is_pinned() {
+    use super::shuffle::resolve_seed;
+    assert_eq!(resolve_seed(Some("0")), None, "0 turns the shuffle off");
+    assert_eq!(resolve_seed(Some("7")), Some(7));
+    assert!(resolve_seed(None).is_some(), "unset shuffles by default");
+    assert!(resolve_seed(Some("not a number")).is_some());
+}
+
+#[test]
+fn default_shuffle_permutes_a_sixteen_int_set_and_seed_zero_is_natural() {
+    use super::shuffle::{shuffle_unordered, with_seed};
+    let natural: Vec<i64> = (0..16).collect();
+    let run = |seed: Option<u64>| {
+        let mut items = natural.clone();
+        with_seed(seed, || shuffle_unordered(&mut items));
+        items
+    };
+    assert_eq!(run(None), natural, "seed 0 keeps the natural order");
+    let orders: Vec<Vec<i64>> = (1..=8).map(|seed| run(Some(seed))).collect();
+    assert!(
+        orders.iter().any(|order| *order != natural),
+        "a seeded run must permute the natural order"
+    );
+    assert!(
+        orders.iter().any(|order| *order != orders[0]),
+        "different seeds must give different orders"
+    );
+}

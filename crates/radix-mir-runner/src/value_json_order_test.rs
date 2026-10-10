@@ -1,10 +1,11 @@
 //! A `valor`/`json` object displays its keys sorted (byte order, the order a
 //! `BTreeMap<String, _>` gives), whatever the map's insertion order or the
-//! test-only iteration shuffle (`RADIX_RUNNER_SHUFFLE_SEED`); an ordinary
+//! iteration shuffle (`RADIX_RUNNER_SHUFFLE_SEED`); an ordinary
 //! `tabula` display stays unspecified-order.
 //!
-//! The shuffle seed is read once per process, so the seeds are covered by
-//! running this test binary under `RADIX_RUNNER_SHUFFLE_SEED=<n>`.
+//! The shuffle seed is read once per process and is random by default, so a
+//! specific seed is covered by running this test binary under
+//! `RADIX_RUNNER_SHUFFLE_SEED=<n>` (`0` turns the shuffle off).
 
 use crate::value::{FieldOrder, MapKey, StructFieldOrder, Value};
 use radix_lexer::{Interner, Span};
