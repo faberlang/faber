@@ -13,7 +13,7 @@
 use crate::CodegenError;
 use radix_diagnostics::DiagnosticArg;
 use radix_target::Target;
-use radix_types::{Type, TypeId, TypeTable};
+use radix_types::{Primitive, Type, TypeId, TypeTable};
 
 const ISSUE: &str = "bits_type_unsupported_on_target";
 
@@ -171,6 +171,64 @@ pub fn reject_list_width_decode(
     Err(CodegenError {
         message: format!(
             "the conversion `{from}` to `{to}` through a byte order (`via Le` or `via Be`) \
+             is not supported on the {backend} target yet"
+        ),
+        args: vec![
+            DiagnosticArg::new("issue", LIST_DECODE_ISSUE),
+            DiagnosticArg::new("from", from),
+            DiagnosticArg::new("to", to),
+            DiagnosticArg::new("target", backend),
+        ],
+    })
+}
+
+/// The `(from, to)` spellings of a conversion between a list of raw-bits
+/// `bN` elements and text (`string`), in either direction, or `None` for any
+/// other pair. `lista<b8> ↦ string` is a UTF-8 decode, `lista<b16>` UTF-16 and
+/// `lista<b32>` UTF-32 (each failable), and `string ↦ lista<bN>` is the encode
+///; no emitter other than the runner and the Faber re-emitter
+/// implements either direction.
+#[must_use]
+pub fn list_text_conversion(
+    types: &TypeTable,
+    source: TypeId,
+    target: TypeId,
+) -> Option<(String, String)> {
+    let side = |ty: TypeId| match types.get(types.peel_access_marker(ty).1) {
+        Type::Array(element) => element_bits(types, *element)
+            .0
+            .then(|| (true, format!("list<{}>", element_label(types, *element)))),
+        Type::Primitive(Primitive::Textus) => Some((false, "string".to_owned())),
+        _ => None,
+    };
+    let ((from_list, from), (to_list, to)) = (side(source)?, side(target)?);
+    (from_list != to_list).then_some((from, to))
+}
+
+/// Refuse a `lista<bN>` to text or text to `lista<bN>` conversion, naming the
+/// conversion and the `backend` (the target's Debug name). Without this the
+/// emitters print a stringify, a cast or an opaque handle re-tag, which is a
+/// wrong program, not a missing one.
+///
+/// # Errors
+///
+/// Returns a [`CodegenError`] (`bits_conversion_unsupported_on_target`) for a
+/// list-of-bits and text conversion.
+pub fn reject_list_text_conversion(
+    types: &TypeTable,
+    source: Option<TypeId>,
+    target: TypeId,
+    backend: &str,
+) -> Result<(), CodegenError> {
+    let Some(source) = source else {
+        return Ok(());
+    };
+    let Some((from, to)) = list_text_conversion(types, source, target) else {
+        return Ok(());
+    };
+    Err(CodegenError {
+        message: format!(
+            "the conversion `{from}` to `{to}` (UTF-8, UTF-16 or UTF-32 text) \
              is not supported on the {backend} target yet"
         ),
         args: vec![

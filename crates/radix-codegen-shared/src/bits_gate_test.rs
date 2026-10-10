@@ -39,3 +39,42 @@ fn same_width_list_conversion_is_not_matched() {
     assert!(list_width_change(&types, source, target).is_none());
     assert!(reject_list_width_decode(&types, Some(source), target, false, "HirRust").is_ok());
 }
+
+#[test]
+fn list_text_conversion_matches_both_directions_of_bits_and_text() {
+    let mut types = TypeTable::new();
+    let text = types.primitive(Primitive::Textus);
+    let b8 = types.bits(BitsWidth::B8);
+    let b32 = types.bits(BitsWidth::B32);
+    let (bytes, words) = (list_of(&mut types, b8), list_of(&mut types, b32));
+    assert_eq!(
+        list_text_conversion(&types, bytes, text),
+        Some(("list<b8>".to_owned(), "string".to_owned()))
+    );
+    assert_eq!(
+        list_text_conversion(&types, text, words),
+        Some(("string".to_owned(), "list<b32>".to_owned()))
+    );
+    let error = reject_list_text_conversion(&types, Some(bytes), text, "HirGo")
+        .expect_err("the text decode is refused");
+    assert_eq!(
+        error.message,
+        "the conversion `list<b8>` to `string` (UTF-8, UTF-16 or UTF-32 text) \
+         is not supported on the HirGo target yet"
+    );
+}
+
+#[test]
+fn list_text_conversion_leaves_other_pairs_alone() {
+    let mut types = TypeTable::new();
+    let text = types.primitive(Primitive::Textus);
+    let b8 = types.bits(BitsWidth::B8);
+    let u8_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
+    let (bits, bytes) = (list_of(&mut types, b8), list_of(&mut types, u8_ty));
+    assert!(list_text_conversion(&types, bytes, text).is_none());
+    assert!(list_text_conversion(&types, text, bytes).is_none());
+    assert!(list_text_conversion(&types, bits, bytes).is_none());
+    assert!(list_text_conversion(&types, text, text).is_none());
+    assert!(reject_list_text_conversion(&types, Some(bytes), text, "HirGo").is_ok());
+    assert!(reject_list_text_conversion(&types, None, text, "HirGo").is_ok());
+}
