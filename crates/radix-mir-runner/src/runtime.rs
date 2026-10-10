@@ -1237,7 +1237,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     if start > end || end > items.len() {
                         return Err(RunnerError::internal_with_issue(
                             span,
-                            "list window out of bounds",
+                            format!("list range {start}‥{end} outside 0‥{}", items.len()),
                             "runner_list_window_out_of_bounds",
                         ));
                     }
@@ -4354,17 +4354,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             Value::Str(text) => {
                 // A range index is a char-window read (`textus[lo‥hi]` stays a
-                // textus substring). Mirrors the octeti window above, but walks
-                // chars and truncates past the end like Rust codegen's
-                // `chars().skip(lo).take(hi - lo)` — no out-of-bounds trap.
+                // textus substring). Like a list window, it must lie fully
+                // inside the text or the program dies; an empty range at the
+                // end is allowed.
                 if let Some((start, end)) =
                     window_bounds(index, span, "textus index out of bounds")?
                 {
-                    let window: String = text
-                        .chars()
-                        .skip(start)
-                        .take(end.saturating_sub(start))
-                        .collect();
+                    let len = text.chars().count();
+                    if start > end || end > len {
+                        return Err(RunnerError::internal_with_issue(
+                            span,
+                            format!("text range {start}‥{end} outside 0‥{len}"),
+                            "runner_text_range_out_of_bounds",
+                        ));
+                    }
+                    let window: String = text.chars().skip(start).take(end - start).collect();
                     return Ok(Value::Str(window));
                 }
                 let idx = index.as_index(span)?;

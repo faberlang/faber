@@ -303,3 +303,12 @@ fn list_window_inclusive_range_keeps_the_end() {
         eval_list_window(receiver, inclusive, numerus_element).expect("inclusive list window");
     assert_eq!(result, list_of(vec![Value::Int(1), Value::Int(2)]));
 }
+
+#[test]
+fn list_window_far_past_the_end_dies_naming_the_range() {
+    let receiver = list_of((0..3).map(Value::Int).collect());
+    let error = eval_list_window(receiver, exclusive_range(1, 9), numerus_element)
+        .expect_err("a window past the end must die");
+    assert_eq!(error.issue, "runner_list_window_out_of_bounds");
+    assert_eq!(error.message, "list range 1‥9 outside 0‥3");
+}
