@@ -8,8 +8,7 @@ summary = "Route C: numeric list<T, N> ↦ tensor<T, [N]> pads spare slots with 
 syntax = "xs ↦ tensor<T, [N]> [⊥ fill]"
 related = ["lista", "tensor", "itera", "ex"]
 locale = "en"
-no_expected = "awaiting-ruling"
-ruling = "0b17133a"
+no_expected = "declaration-only"
 +++
 
 # =============================================================================
@@ -68,5 +67,5 @@ fn productMasked(list<float, 8> xs, tensor<float, [8]> lenMask) → float {
     for from t const x {
         total ← total * x
     }
-    return total * lenMask.product()
+    return total * lenMask.sum()
 }

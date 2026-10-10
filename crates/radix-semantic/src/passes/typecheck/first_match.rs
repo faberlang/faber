@@ -33,12 +33,14 @@ pub(super) fn check_first_match_expr(
         .peel_access_marker(checker.resolve_inferred_type(source_ty))
         .1;
 
-    // Base-lane iterable surface: array, tensor, and matrix sources. The
+    // Base-lane iterable surface: array (including exact-bound literals),
+    // tensor, and matrix sources. The
     // shared apud arity rule (coordinate count = rank) applies unchanged.
     let elem_ty = match checker.types.get(dispatch_ty) {
-        Type::Array(inner) | Type::Tensor(inner, _) | Type::Matrix(inner, _) => {
-            checker.resolve_inferred_type(*inner)
-        }
+        Type::Array(inner)
+        | Type::BoundedArray { element: inner, .. }
+        | Type::Tensor(inner, _)
+        | Type::Matrix(inner, _) => checker.resolve_inferred_type(*inner),
         _ => {
             checker.error_issue(
                 SemanticErrorKind::TypeMismatch,

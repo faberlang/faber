@@ -8,8 +8,7 @@ summary = "AIR-lane itera ex over full-literal bytes<N> / ascii<N> / string<N> u
 syntax = "@ radix lane \"air\"; itera ex bytes<N> | ascii<N> | string<N>"
 related = ["bytes", "ascii", "string", "ex", "itera", "radix"]
 locale = "en"
-no_expected = "awaiting-ruling"
-ruling = "0b17133a"
+no_expected = "rejects"
 +++
 
 # =============================================================================
@@ -35,8 +34,12 @@ ruling = "0b17133a"
 # See also: bytes, ascii, string, itera-ex-scalar-buffers
 # =============================================================================
 
-# Route A full-literal drivers — declaration-only; the semantic unit tests pin
-# the emitted lanes, the guard-free shape, and the element types.
+# Route A full-literal drivers. The itera loop itself is admitted (the
+# semantic unit tests in air_unroll_test.rs pin the emitted lanes, the
+# guard-free shape and the element types), but each bare `↦ bytes<8>` /
+# `↦ ascii<8>` / `↦ string<8>` conversion is a boundary throw that the AIR
+# lane declines with SEM059 runtime_conversion (air_purity.rs, ATH-3), so
+# `faber check` rejects this file: three runtime_conversion errors, one per driver.
 
 @ radix lane "air"
 fn full_bytes() → void {

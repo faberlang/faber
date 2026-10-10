@@ -104,6 +104,20 @@ functio t(tf32[0] a) → fractus ∪ nihil {
 }
 
 #[test]
+fn first_match_array_literal_source_checks_on_base_lane() {
+    // An exact-bound array literal interns as `BoundedArray`; the base lane
+    // admits it as a shaped iterable, same as a `lista<T>` source.
+    let errors = base_errors(
+        r"
+functio t() → fractus ∪ nihil {
+    redde primus_quem([1.0, -2.0, 3.0], ubi x { x ≻ 0.0 })
+}
+",
+    );
+    assert!(errors.is_empty(), "unexpected diagnostics: {errors:?}");
+}
+
+#[test]
 fn first_match_predicate_error_propagates_never_becomes_nihil() {
     // Contract row: a predicate ERROR rides the error channel; it is never
     // converted to a `nihil` result. The nullable result covers only
