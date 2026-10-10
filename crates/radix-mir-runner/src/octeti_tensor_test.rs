@@ -282,3 +282,104 @@ fn octeti_tensor_large_case_is_a_bulk_pass() {
     assert_eq!(first, expected_first);
     assert_eq!(last, expected_last);
 }
+
+/// Run `bytes ↦ tensor via hint` then `tensor ↦ octeti via hint` in one
+/// runner and return the round-tripped bytes.
+fn round_trip(
+    bytes: Vec<u8>,
+    element: (Primitive, NumericWidth),
+    dims: &[u64],
+    hint: &str,
+) -> Vec<u8> {
+    let mut types = TypeTable::new();
+    let element_ty = types.sized_numeric(element.0, element.1);
+    let dim_ids: Vec<_> = dims
+        .iter()
+        .map(|dim| types.intern_index(IndexExpr::Literal(*dim)))
+        .collect();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    let tensor_ty = types.tensor_with_shape(element_ty, shape);
+    let mut interner = Interner::new();
+    let hint_sym = interner.intern(hint);
+    let context = MirValidationContext::new(&types);
+    let mut program = MirProgram::new();
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(TypeId(0)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    });
+    let mut host = crate::host::BufferHost::default();
+    let mut runner = crate::Runner::new(&program, &context, &types, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    let decoded = runner
+        .convert_octeti_to_tensor(bytes, tensor_ty, &[hint_sym], None, Span::default())
+        .expect("octeti to tensor");
+    let tensor = tensor(decoded);
+    let encoded = runner
+        .convert_tensor_to_octeti(&tensor.borrow(), tensor_ty, &[hint_sym], Span::default())
+        .expect("tensor to octeti");
+    let Value::Octeti(bytes) = encoded else {
+        panic!("expected octeti, got {encoded:?}");
+    };
+    bytes
+}
+
+#[test]
+fn tensor_octeti_round_trips_bit_for_bit_for_every_element_and_order() {
+    // 2 x 2 grid of every element type; the byte pattern includes f32/f64
+    // NaN payload bytes, -0.0, and subnormal-shaped bit patterns.
+    let elements = [
+        (Primitive::Numerus, NumericWidth::U8, 1),
+        (Primitive::Numerus, NumericWidth::I8, 1),
+        (Primitive::Numerus, NumericWidth::I16, 2),
+        (Primitive::Numerus, NumericWidth::U16, 2),
+        (Primitive::Numerus, NumericWidth::I32, 4),
+        (Primitive::Numerus, NumericWidth::U32, 4),
+        (Primitive::Numerus, NumericWidth::I64, 8),
+        (Primitive::Numerus, NumericWidth::U64, 8),
+        (Primitive::Fractus, NumericWidth::F32, 4),
+        (Primitive::Fractus, NumericWidth::F64, 8),
+    ];
+    for (primitive, width, bytes_per) in elements {
+        for hint in ["Le", "Be"] {
+            let n = 4 * bytes_per;
+            let mut bytes: Vec<u8> = (0..n).map(|i| (i as u8).wrapping_mul(37) ^ 0x5a).collect();
+            if primitive == Primitive::Fractus {
+                // Quiet NaN with a payload, then -0.0, in the first two cells.
+                let (nan, neg_zero): (Vec<u8>, Vec<u8>) = match (width, hint) {
+                    (NumericWidth::F32, "Le") => (
+                        0x7fc0_1234_u32.to_le_bytes().to_vec(),
+                        0x8000_0000_u32.to_le_bytes().to_vec(),
+                    ),
+                    (NumericWidth::F32, _) => (
+                        0x7fc0_1234_u32.to_be_bytes().to_vec(),
+                        0x8000_0000_u32.to_be_bytes().to_vec(),
+                    ),
+                    (_, "Le") => (
+                        0x7ff8_0000_0000_1234_u64.to_le_bytes().to_vec(),
+                        0x8000_0000_0000_0000_u64.to_le_bytes().to_vec(),
+                    ),
+                    _ => (
+                        0x7ff8_0000_0000_1234_u64.to_be_bytes().to_vec(),
+                        0x8000_0000_0000_0000_u64.to_be_bytes().to_vec(),
+                    ),
+                };
+                bytes[..bytes_per].copy_from_slice(&nan);
+                bytes[bytes_per..2 * bytes_per].copy_from_slice(&neg_zero);
+            }
+            let back = round_trip(bytes.clone(), (primitive, width), &[2, 2], hint);
+            assert_eq!(back, bytes, "{primitive:?} {width:?} via {hint}");
+        }
+    }
+}

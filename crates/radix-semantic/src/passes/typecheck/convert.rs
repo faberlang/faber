@@ -64,6 +64,8 @@ const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified
 const ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED: &str = "octeti_to_tensor_unspecified";
 const ISSUE_OCTETI_TO_TENSOR_ELEMENT_UNSUPPORTED: &str = "octeti_to_tensor_element_unsupported";
 const ISSUE_OCTETI_TO_TENSOR_LENGTH_MISMATCH: &str = "octeti_to_tensor_length_mismatch";
+const ISSUE_TENSOR_TO_OCTETI_UNSPECIFIED: &str = "tensor_to_octeti_unspecified";
+const ISSUE_TENSOR_TO_OCTETI_ELEMENT_UNSUPPORTED: &str = "tensor_to_octeti_element_unsupported";
 const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
 // decimal-widths D2 (wildcard audit): the conversio `via` hints are
 // integer-family machinery. Radix text parse (Hex/Bin/Oct), endian unpack
@@ -802,6 +804,14 @@ impl TypeChecker<'_> {
             return result_ty;
         }
 
+        // `tensor<E, [shape]> ↦ octeti via Be|Le`: the infallible inverse of
+        // the row below (the byte length is product(shape) x width).
+        if let Some(result_ty) =
+            self.check_tensor_to_octeti_conversio(source_ty, target_resolved, params, span)
+        {
+            return result_ty;
+        }
+
         if let Some(result_ty) = self.check_octeti_to_tensor_conversio(
             source,
             source_ty,
@@ -1298,6 +1308,43 @@ impl TypeChecker<'_> {
         }
         self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
         Some(self.error_type)
+    }
+
+    /// `tensor<E, [d1, ..]> ↦ octeti via Be|Le` is the exact inverse of
+    /// `octeti ↦ tensor`: element `i` becomes bytes `[i*w, (i+1)*w)` in the
+    /// hinted order, no numeric conversion. The hint is required for every
+    /// width and the row cannot fail (the length is `product(shape) x w`).
+    fn check_tensor_to_octeti_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        params: &[Symbol],
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !matches!(
+            self.types.get(self.resolve_inferred_type(target_resolved)),
+            Type::Primitive(Primitive::Octeti)
+        ) {
+            return None;
+        }
+        let Type::Tensor(elem, _) = self
+            .types
+            .get(self.resolve_inferred_type(source_ty))
+            .clone()
+        else {
+            return None;
+        };
+        if !self.conversio_has_endian_hint(params) {
+            self.invalid_conversion(ISSUE_TENSOR_TO_OCTETI_UNSPECIFIED, span);
+            return Some(self.error_type);
+        }
+        if octeti_tensor_element_width_bytes(self.types.get(self.resolve_inferred_type(elem)))
+            .is_none()
+        {
+            self.invalid_conversion(ISSUE_TENSOR_TO_OCTETI_ELEMENT_UNSUPPORTED, span);
+            return Some(self.error_type);
+        }
+        Some(target_resolved)
     }
 
     /// `octeti ↦ tensor<E, [d1, ..]> via Be|Le` is a faithful bit

@@ -242,3 +242,42 @@ fn other_non_hint_targets_still_reject_a_via_hint() {
         "conversio_via_target_takes_no_hint",
     );
 }
+
+// --- inverse: tensor ↦ octeti via Be|Le -----------------------------------
+
+const TENSOR_UNSPECIFIED: &str = "tensor_to_octeti_unspecified";
+const TENSOR_ELEMENT: &str = "tensor_to_octeti_element_unsupported";
+
+#[test]
+fn tensor_to_octeti_is_accepted_for_every_element_and_order_and_is_infallible() {
+    for element in [
+        "u8", "i8", "i16", "u16", "i32", "u32", "i64", "u64", "f32", "f64",
+    ] {
+        for hint in ["Le", "Be"] {
+            // No `⇥` and no handler: the row cannot fail.
+            assert_accepts(&format!(
+                "functio w(tensor<{element}, [2, 2]> t) → octeti {{ redde t ↦ octeti via {hint} }}"
+            ));
+        }
+    }
+}
+
+#[test]
+fn tensor_to_octeti_without_a_hint_is_unspecified_even_for_one_byte_elements() {
+    for element in ["u8", "f32"] {
+        let err = error_with_issue(
+            &format!("functio w(tensor<{element}, [2]> t) → octeti {{ redde t ↦ octeti }}"),
+            TENSOR_UNSPECIFIED,
+        );
+        assert_eq!(err.kind, SemanticErrorKind::ConversionInvalid);
+    }
+}
+
+#[test]
+fn tensor_to_octeti_with_an_unsupported_element_is_declined_by_name() {
+    let err = error_with_issue(
+        "functio w(tensor<f16, [2]> t) → octeti { redde t ↦ octeti via Le }",
+        TENSOR_ELEMENT,
+    );
+    assert_eq!(err.kind, SemanticErrorKind::ConversionInvalid);
+}

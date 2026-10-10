@@ -1,4 +1,5 @@
-//! `octeti ↦ tensor<E, [shape]> via Le|Be`: faithful bulk reinterpretation.
+//! `octeti ↦ tensor<E, [shape]> via Le|Be`: faithful bulk reinterpretation,
+//! and its inverse `tensor<E, [shape]> ↦ octeti via Le|Be`.
 //!
 //! WHY: loading a weight tensor element by element through the interpreter
 //! costs microseconds per element. This row maps the byte string onto a typed
@@ -137,6 +138,74 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             RunnerError::internal(span, "tensor shape has unrepresentable strides")
         })?;
         Ok(Value::Tensor(Rc::new(RefCell::new(tensor))))
+    }
+
+    /// `tensor<E, [shape]> ↦ octeti via Le|Be`: row-major, element `i` at
+    /// bytes `[i*w, (i+1)*w)` in the hinted byte order, pure bit
+    /// reinterpretation. It cannot fail on length.
+    pub(crate) fn convert_tensor_to_octeti(
+        &self,
+        tensor: &TensorValue,
+        source_ty: TypeId,
+        params: &[Symbol],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let mut source_ty = source_ty;
+        while let Type::Alias(_, inner) = self.types.get(source_ty) {
+            source_ty = *inner;
+        }
+        let Type::Tensor(element_ty, _) = self.types.get(source_ty) else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor octeti conversio source is not a tensor",
+            ));
+        };
+        let Some(endian) = hints::endian_hint(params, |param| {
+            hints::classify(self.interner.resolve(*param))
+        }) else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor octeti conversio needs a Be or Le hint",
+            ));
+        };
+        let Some(element) = self.octeti_tensor_element(*element_ty) else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor octeti element unsupported",
+            ));
+        };
+        let width = element.width();
+        let float = match effective_width(self.types, *element_ty) {
+            Some(NumericWidth::F32) => Some(true),
+            Some(NumericWidth::F64) => Some(false),
+            _ => None,
+        };
+        let Some(values) = tensor.logical_values() else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor octeti conversio could not read the tensor elements",
+            ));
+        };
+        let mut bytes = Vec::with_capacity(values.len() * width);
+        for value in &values {
+            let bits: u64 = match (value, float) {
+                (Value::Float(v), Some(true)) => u64::from((*v as f32).to_bits()),
+                (Value::Float(v), Some(false)) => v.to_bits(),
+                (Value::Int(v), None) => *v as u64,
+                (Value::UInt(v), None) => *v,
+                _ => {
+                    return Err(RunnerError::internal(
+                        span,
+                        "tensor octeti conversio met a non-numeric element",
+                    ));
+                }
+            };
+            match endian {
+                EndianHint::Le => bytes.extend_from_slice(&bits.to_le_bytes()[..width]),
+                EndianHint::Be => bytes.extend_from_slice(&bits.to_be_bytes()[8 - width..]),
+            }
+        }
+        Ok(Value::Octeti(bytes))
     }
 
     fn octeti_tensor_element(&self, element_ty: TypeId) -> Option<Element> {

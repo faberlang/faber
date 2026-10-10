@@ -128,6 +128,11 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 EndianHint::Le => exact.to_bytes_le(),
             }));
         }
+        // `tensor<E, [shape]> ↦ octeti via Le|Be`: the infallible inverse of
+        // the bulk `octeti ↦ tensor` reinterpretation.
+        if let Value::Tensor(tensor) = &value {
+            return self.convert_tensor_to_octeti(&tensor.borrow(), source_ty, params, span);
+        }
         self.convert_to_octeti(value, span)
     }
 
