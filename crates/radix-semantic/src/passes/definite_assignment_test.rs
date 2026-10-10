@@ -166,11 +166,11 @@ fn rejects_read_after_partial_discerne_assignment() {
     // EDGE: only one discerne arm assigns the binding; the join must degrade.
     let result = crate::test_support::analyze_source(
         r"
-functio pick(numerus n) → numerus {
+functio pick(bivalens flag) → numerus {
     varia numerus value
-    discerne n {
-        casu 1 { value ← 10 }
-        casu 2 { tacet }
+    discerne flag {
+        casu verum { value ← 10 }
+        casu falsum { tacet }
     }
     redde value
 }
@@ -735,12 +735,12 @@ fn discerne_pattern_join_accepts_all_arms_initialized() {
     // variables that are initialized on every arm.
     let result = crate::test_support::analyze_source(
         r#"
-functio pick() → numerus {
+functio pick() → bivalens {
     sit value
-    value ← 1
+    value ← verum
     discerne value {
-        casu 1 { nota "a" }
-        casu 2 { nota "b" }
+        casu verum { nota "a" }
+        casu falsum { nota "b" }
         ceterum { nota "c" }
     }
     redde value

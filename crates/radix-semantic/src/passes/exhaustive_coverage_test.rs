@@ -43,6 +43,23 @@ fn assert_clean(source: &str) {
     );
 }
 
+/// A literal arm in `discerne` is refused: `discerne` matches closed sets only.
+fn assert_not_closed_set(source: &str) {
+    let result = analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|diag| {
+            diag.kind == SemanticErrorKind::TypeMismatch
+                && diag.issue() == Some("discerne_pattern_not_in_closed_set")
+        }),
+        "expected discerne_pattern_not_in_closed_set, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.kind, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+}
+
 fn assert_missing(source: &str, issue: &str, missing: &str) {
     let errors = non_exhaustive(source);
     assert!(
@@ -180,7 +197,7 @@ fn single_enum_missing_variant_names_it() {
 
 #[test]
 fn literal_match_over_open_domain_without_catchall_is_rejected() {
-    assert_missing(
+    assert_not_closed_set(
         "functio k(numerus n) → numerus {
             discerne n {
                 casu 1 { redde 10 }
@@ -188,17 +205,15 @@ fn literal_match_over_open_domain_without_catchall_is_rejected() {
             }
             redde 0
         }",
-        "missing_cases",
-        "_",
     );
 }
 
 #[test]
 fn multi_scrutinee_literal_rows_with_ceterum_definitely_return() {
     assert_clean(
-        "functio k(numerus n, bivalens b) → numerus {
-            discerne n et b {
-                casu 1 et verum { redde 10 }
+        "functio k(bivalens a, bivalens b) → numerus {
+            discerne a et b {
+                casu verum et verum { redde 10 }
                 ceterum { redde 0 }
             }
         }",
@@ -210,15 +225,15 @@ fn multi_scrutinee_missing_row_is_no_longer_silent() {
     // Before D4.8 a multi-scrutinee statement match was skipped outright.
     assert_missing(
         "incipit {
-            fixum numerus n ← 1
+            fixum bivalens a ← verum
             fixum bivalens b ← verum
-            discerne n et b {
-                casu 1 et verum { nota \"unum\" }
+            discerne a et b {
+                casu verum et verum { nota \"unum\" }
                 casu _ et falsum { nota \"falsum\" }
             }
         }",
         "missing_cases",
-        "(_, verum)",
+        "(falsum, verum)",
     );
 }
 
@@ -253,7 +268,7 @@ fn elige_over_bivalens_missing_falsum_is_rejected() {
 
 #[test]
 fn negated_literal_rows_are_open_space_values() {
-    assert_missing(
+    assert_not_closed_set(
         "functio s(numerus n) → numerus {
             discerne n {
                 casu -1 { redde 1 }
@@ -261,7 +276,5 @@ fn negated_literal_rows_are_open_space_values() {
             }
             redde 2
         }",
-        "missing_cases",
-        "_",
     );
 }

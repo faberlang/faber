@@ -1,9 +1,10 @@
 //! Signed and NaN literal patterns (DECISIONS D22.2, D22.3).
 //!
-//! Contract: a negated number literal is a legal pattern in both `discerne`
-//! and `elige`, lowered to `HirPattern::NegatedLiteral` over the unsigned
-//! magnitude and typed like the literal it negates. A NaN pattern is rejected
-//! as SEM008 `nan_pattern` on every path that can spell one; a named NaN
+//! Contract: a negated number literal is a legal pattern in `elige`, lowered
+//! to `HirPattern::NegatedLiteral` over the unsigned magnitude and typed like
+//! the literal it negates. `discerne` matches closed sets only (M2), so a
+//! negated literal there is refused as `discerne_pattern_not_in_closed_set`.
+//! A NaN pattern is rejected as SEM008 `nan_pattern` in `elige`; a named NaN
 //! constant cannot reach a pattern because `elige` accepts only literals and
 //! variants, and `discerne` treats a bare name as a binding.
 
@@ -26,9 +27,9 @@ fn entry_match_patterns(source: &str) -> Vec<HirPattern> {
 }
 
 #[test]
-fn discerne_accepts_negated_integer_decimal_and_infinity_patterns() {
+fn elige_accepts_negated_decimal_and_infinity_patterns() {
     let patterns = entry_match_patterns(
-        "incipit {\n    fixum fractus x ← -2.5\n    discerne x {\n        casu -1.0 { tacet }\n        casu -2.5 { tacet }\n        casu -∞ { tacet }\n        casu _ { tacet }\n    }\n}",
+        "incipit {\n    fixum fractus x ← -2.5\n    elige x {\n        casu -1.0 { tacet }\n        casu -2.5 { tacet }\n        casu -∞ { tacet }\n        ceterum { tacet }\n    }\n}",
     );
     assert!(matches!(
         patterns[0],
@@ -41,14 +42,11 @@ fn discerne_accepts_negated_integer_decimal_and_infinity_patterns() {
 }
 
 #[test]
-fn discerne_accepts_negated_integer_pattern() {
-    let patterns = entry_match_patterns(
+fn discerne_refuses_negated_integer_pattern() {
+    assert_rejects_with_issue(
         "incipit {\n    fixum numerus n ← -1\n    discerne n {\n        casu -1 { tacet }\n        casu _ { tacet }\n    }\n}",
+        "discerne_pattern_not_in_closed_set",
     );
-    assert!(matches!(
-        patterns[0],
-        HirPattern::NegatedLiteral(HirLiteral::Int(1))
-    ));
 }
 
 #[test]
@@ -76,7 +74,7 @@ fn elige_rejects_negation_over_a_non_number() {
 #[test]
 fn negated_pattern_against_textus_is_a_type_mismatch() {
     assert_rejects_with_issue(
-        "incipit {\n    fixum textus s ← \"a\"\n    discerne s {\n        casu -1 { tacet }\n        casu _ { tacet }\n    }\n}",
+        "incipit {\n    fixum textus s ← \"a\"\n    elige s {\n        casu -1 { tacet }\n        ceterum { tacet }\n    }\n}",
         "pattern_type_mismatch",
     );
 }
@@ -85,7 +83,7 @@ fn negated_pattern_against_textus_is_a_type_mismatch() {
 fn nan_pattern_is_rejected_in_discerne() {
     assert_rejects_with_issue(
         "incipit {\n    fixum fractus x ← nonnumerus\n    discerne x {\n        casu nonnumerus { tacet }\n        casu _ { tacet }\n    }\n}",
-        "nan_pattern",
+        "discerne_pattern_not_in_closed_set",
     );
 }
 

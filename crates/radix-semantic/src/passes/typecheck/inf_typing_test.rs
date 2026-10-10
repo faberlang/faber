@@ -622,8 +622,8 @@ fn a_big_literal_normalises_to_canonical_decimal_in_hir() {
 }
 
 #[test]
-fn a_big_literal_pattern_on_an_inf_subject_discerne_is_accepted() {
+fn a_big_literal_pattern_on_an_inf_subject_elige_is_accepted() {
     test_support::assert_accepts(&format!(
-        "functio f(inf x) → numerus {{\ndiscerne x {{\ncasu {TWO_TO_64} ergo redde 1\ncasu -{TWO_TO_64} ergo redde 2\ncasu _ ergo redde 0\n}}\n}}\n"
+        "functio f(inf x) → numerus {{\nelige x {{\ncasu {TWO_TO_64} ergo redde 1\ncasu -{TWO_TO_64} ergo redde 2\nceterum ergo redde 0\n}}\n}}\n"
     ));
 }
