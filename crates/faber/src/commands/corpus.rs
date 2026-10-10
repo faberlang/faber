@@ -4,6 +4,9 @@ mod canonical;
 mod external;
 #[cfg(feature = "mir-llvm")]
 mod gpu;
+#[cfg(test)]
+#[path = "corpus_runner_test.rs"]
+mod runner_test;
 mod rust;
 
 use crate::cli::CorpusArgs;
@@ -839,6 +842,25 @@ fn relative_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
     Ok(root.join(path))
 }
 
+/// Arguments after the `faber` executable for one runner-target case.
+///
+/// The runner target pins `--device cpu`: it verifies the MIR runner, so device
+/// selection must not depend on the host (`auto` routes kernel programs to Metal on a
+/// capable machine and fails closed elsewhere).
+fn runner_run_args(case: &Case) -> Vec<String> {
+    let mut args = vec![
+        "run".to_owned(),
+        case.input.display().to_string(),
+        "--device".to_owned(),
+        "cpu".to_owned(),
+    ];
+    if !case.args.is_empty() {
+        args.push("--".to_owned());
+        args.extend(case.args.iter().cloned());
+    }
+    args
+}
+
 fn run_case(case: &Case, faber: &Path) -> Value {
     let started = Instant::now();
     let Some(outcome) = case.target.outcome.judged() else {
@@ -880,20 +902,11 @@ fn run_case(case: &Case, faber: &Path) -> Value {
         }
     };
     let read_ms = ms(reading);
-    let mut argv = vec![
-        faber.display().to_string(),
-        "run".to_owned(),
-        case.input.display().to_string(),
-    ];
-    if !case.args.is_empty() {
-        argv.push("--".to_owned());
-        argv.extend(case.args.iter().cloned());
-    }
+    let run_args = runner_run_args(case);
+    let mut argv = vec![faber.display().to_string()];
+    argv.extend(run_args.iter().cloned());
     let mut command = Command::new(faber);
-    command.arg("run").arg(&case.input).current_dir(&case.dir);
-    if !case.args.is_empty() {
-        command.arg("--").args(&case.args);
-    }
+    command.args(&run_args).current_dir(&case.dir);
     let running = Instant::now();
     let output = match run_bounded(
         &mut command,
