@@ -2710,6 +2710,10 @@ help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد �
 message = "imperativus operator method يتطلب {varia} receiver"
 help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد أو أزل الإسناد الإضافي"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` يغيّر حالة يمكن الوصول إليها عبر `{binding}`، لكن `{binding}` ربط غير قابل للتغيير (`const` عميق)"
+help = "صرّح عن `{binding}` بـ `var` ليمكن تغييره في مكانه، أو استدعِ دالة تُرجع قيمة جديدة"
+
 [diagnostics.SEM021]
 message = "هدف إسناد غير صالح"
 help = "أسند إلى lvalue صالح"

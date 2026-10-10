@@ -2722,6 +2722,10 @@ help = "reassignment की अनुमति के लिए `varia` binding 
 message = "imperativus operator method के लिए varia receiver आवश्यक है"
 help = "reassignment की अनुमति के लिए `varia` binding का उपयोग करें, या अतिरिक्त assignment हटाएँ"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` `{binding}` के ज़रिए पहुँचने योग्य स्थिति बदलता है, पर `{binding}` अपरिवर्तनीय binding है (`const` गहरा होता है)"
+help = "`{binding}` को `var` के साथ घोषित करें ताकि उसे वहीं बदला जा सके, या ऐसी method बुलाएँ जो नया मान लौटाती है"
+
 [diagnostics.SEM021]
 message = "अमान्य assignment target"
 help = "मान्य lvalue को assign करें"

@@ -3737,6 +3737,10 @@ help = "use a `varia` binding to allow reassignment, or remove the extra assignm
 message = "`{method}` mutat `{binding}` in loco, sed `{binding}` est ligatio immutabilis"
 help = "declara `{binding}` cum `varia` ut in loco mutari possit, aut utere methodo quae valorem novum reddit"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` mutat statum per `{binding}` attingibilem, sed `{binding}` est ligatio immutabilis (`fixum` est profundum)"
+help = "declara `{binding}` cum `varia` ut in loco mutari possit, aut utere methodo quae valorem novum reddit"
+
 [diagnostics.SEM020.issues.copy_into_target_immutable]
 message = "'⇇' needs writable tensor storage on its left"
 help = "write into a mutable local or a mut parameter; a constant, a fixum binding, or a non-mut parameter cannot be written"

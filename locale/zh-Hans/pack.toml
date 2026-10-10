@@ -2710,6 +2710,10 @@ help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
 message = "imperativus operator method 需要 varia receiver"
 help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` 会修改可通过 `{binding}` 访问的状态，但 `{binding}` 是不可变绑定（`const` 是深层的）"
+help = "用 `var` 声明 `{binding}` 以便就地修改，或改用返回新值的方法"
+
 [diagnostics.SEM021]
 message = "无效赋值目标"
 help = "赋值给有效的 lvalue"

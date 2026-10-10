@@ -2722,6 +2722,10 @@ help = "ใช้ binding `varia` เพื่อให้กำหนดค่�
 message = "method ตัวดำเนินการ imperativus ต้องการ receiver แบบ varia"
 help = "ใช้ binding `varia` เพื่อให้กำหนดค่าใหม่ได้ หรือนำการกำหนดค่าเพิ่มเติมออก"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` เปลี่ยนสถานะที่เข้าถึงได้ผ่าน `{binding}` แต่ `{binding}` เป็น binding ที่เปลี่ยนแปลงไม่ได้ (`const` มีผลลึกถึงข้างใน)"
+help = "ประกาศ `{binding}` ด้วย `var` เพื่อให้เปลี่ยนค่าในตำแหน่งเดิมได้ หรือเรียก method ที่คืนค่าใหม่แทน"
+
 [diagnostics.SEM021]
 message = "เป้าหมายการกำหนดค่าไม่ถูกต้อง"
 help = "กำหนดค่าให้ lvalue ที่ถูกต้อง"

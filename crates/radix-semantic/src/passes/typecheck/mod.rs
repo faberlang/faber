@@ -331,6 +331,11 @@ pub(crate) struct TypeChecker<'a> {
     /// Path that shadows an imported namespace must recover the name here.
     pub binding_names: FxHashMap<DefId, Symbol>,
 
+    /// Immutable (`const`/`fixum`) local bindings. `const` is deep: nothing
+    /// reachable through such a name may be modified, so a
+    /// mutating receiver rooted in one is rejected.
+    pub const_locals: FxHashSet<DefId>,
+
     /// Function signatures collected before body checking so calls can be
     /// checked regardless of declaration order.
     pub functions: FxHashMap<DefId, FuncSig>,
@@ -805,6 +810,7 @@ impl<'a> TypeChecker<'a> {
             scopes: Vec::new(),
             binding_shadow: FxHashMap::default(),
             binding_names: FxHashMap::default(),
+            const_locals: FxHashSet::default(),
             functions: FxHashMap::default(),
             nucleum_roles: FxHashMap::default(),
             inlinable_kernels: FxHashSet::default(),

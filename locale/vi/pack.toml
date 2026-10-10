@@ -2710,6 +2710,10 @@ help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa 
 message = "phương thức toán tử imperativus yêu cầu receiver varia"
 help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa phép gán bổ sung"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` thay đổi trạng thái truy cập được qua `{binding}`, nhưng `{binding}` là liên kết bất biến (`const` có hiệu lực sâu)"
+help = "khai báo `{binding}` bằng `var` để có thể thay đổi tại chỗ, hoặc gọi phương thức trả về giá trị mới"
+
 [diagnostics.SEM021]
 message = "đích gán không hợp lệ"
 help = "gán cho một lvalue hợp lệ"

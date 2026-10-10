@@ -2710,6 +2710,10 @@ help = "使用 `varia` binding 以允許重新指派，或移除額外的指派"
 message = "imperativus operator method 需要 varia receiver"
 help = "使用 `varia` binding 以允許重新指派，或移除額外的指派"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` 會修改可透過 `{binding}` 存取的狀態，但 `{binding}` 是不可變綁定（`const` 是深層的）"
+help = "以 `var` 宣告 `{binding}` 以便就地修改，或改用回傳新值的方法"
+
 [diagnostics.SEM021]
 message = "無效指派目標"
 help = "指派至有效的 lvalue"

@@ -3959,6 +3959,10 @@ help = "use a `var` binding to allow reassignment, or remove the extra assignmen
 message = "`{method}` changes `{binding}` in place, but `{binding}` is an immutable binding"
 help = "declare `{binding}` with `var` so it can be changed in place, or call a method that returns a new value instead"
 
+[diagnostics.SEM020.issues.mutating_receiver_through_const]
+message = "`{method}` changes state reachable through `{binding}`, but `{binding}` is an immutable binding (`const` is deep)"
+help = "declare `{binding}` with `var` so it can be changed in place, or call a method that returns a new value instead"
+
 [diagnostics.SEM020.issues.copy_into_target_immutable]
 message = "'⇇' needs writable tensor storage on its left"
 help = "write into a mutable local or a mut parameter; a constant, a fixum binding, or a non-mut parameter cannot be written"
