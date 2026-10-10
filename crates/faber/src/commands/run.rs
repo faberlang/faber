@@ -288,20 +288,22 @@ fn interpret_path(
     // gpu-reset C2-U6c: a lone `.fab` file runs on the in-process device
     // session too (explicit GPU, or `auto` with kernels).
     #[cfg(feature = "device-runtime")]
-    let mut device_host = StdioHost::with_argumenta(program_args.to_vec());
-    if let Some(result) = try_device_session(
-        &config,
-        path,
-        selection,
-        &mut device_host,
-        stats,
-        stats_file,
-    ) {
-        if let Err(diagnostics) = result {
-            eprint_route_diagnostics(&diagnostics);
-            std::process::exit(1);
+    {
+        let mut device_host = StdioHost::with_argumenta(program_args.to_vec());
+        if let Some(result) = try_device_session(
+            &config,
+            path,
+            selection,
+            &mut device_host,
+            stats,
+            stats_file,
+        ) {
+            if let Err(diagnostics) = result {
+                eprint_route_diagnostics(&diagnostics);
+                std::process::exit(1);
+            }
+            return;
         }
-        return;
     }
     let config = match selection.kernel_lowering() {
         radix::module::mir::KernelLowering::Host => config.with_host_kernels(),

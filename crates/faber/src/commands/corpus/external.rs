@@ -1,7 +1,7 @@
 //! Suite-configured target toolchains and compiler inspection lanes.
 
 use super::{
-    Case, Judged, Outcome, SUITE_STEP_TIMEOUT, SuiteTarget, fail, ms, run_bounded, summary_status,
+    Case, Outcome, SUITE_STEP_TIMEOUT, SuiteTarget, fail, ms, run_bounded, summary_status,
 };
 use serde_json::{Value, json};
 use std::fs;
@@ -156,7 +156,16 @@ pub(super) fn execute(
     }
 }
 
+#[cfg(not(feature = "hir-faber"))]
+fn execute_roundtrip(_cases: &[Case], target: &str, _discover_ms: f64, _started: Instant) {
+    fail(&format!(
+        "[targets.{target}] roundtrip requires a faber build with feature `hir-faber`"
+    ));
+}
+
+#[cfg(feature = "hir-faber")]
 fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: Instant) {
+    use super::Judged;
     use radix::module::codegen::faber::reemit_faber;
     use radix::module::driver::{Config, Session};
     use radix::module::locale::latin_locale_pack;
