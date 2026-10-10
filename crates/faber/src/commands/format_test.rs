@@ -514,6 +514,83 @@ fn format_stdin_preserves_gradus_shaped_generic_tuple_labels() {
     );
 }
 
+/// Comments inside expression-owned blocks (closure, comptime, trap bodies)
+/// survive `faber format`. Closure and trap blocks are legal as an
+/// initializer, a call argument and an expression statement. A comptime block
+/// is legal only as a constant initializer (SEM064 elsewhere), so its three
+/// legal initializer sites are a module constant, a block-level constant and a
+/// class field default. Each source is canonical, so it must format to itself.
+#[test]
+fn format_stdin_preserves_comments_in_expression_owned_blocks() {
+    const FRONT: &str = "+++\nlocale = \"la\"\n+++\n";
+    const BODIES: [(&str, &str, &str); 3] = [
+        // (kind, block-opening head, body statement)
+        ("closure", "clausura → vacuum {", "tacet"),
+        ("trap", "capta {", "1"),
+        ("comptime", "praefixum {", "redde 1"),
+    ];
+    let mut cases: Vec<(String, String)> = Vec::new();
+    for (kind, head, stmt) in BODIES {
+        let block = |indent: &str| {
+            format!(
+                "{head}\n{indent}    # lead\n{indent}    {stmt}\n{indent}    # tail\n{indent}}}"
+            )
+        };
+        if kind == "comptime" {
+            cases.push((
+                format!("{kind} module constant"),
+                format!("{FRONT}fixum numerus x = {}\n", block("")),
+            ));
+            cases.push((
+                format!("{kind} block-level constant"),
+                format!(
+                    "{FRONT}functio f() → numerus {{\n    fixum numerus x = {}\n    redde x\n}}\n",
+                    block("    ")
+                ),
+            ));
+            cases.push((
+                format!("{kind} class field default"),
+                format!(
+                    "{FRONT}genus G {{\n    fixum numerus x = {}\n}}\n",
+                    block("    ")
+                ),
+            ));
+            continue;
+        }
+        cases.push((
+            format!("{kind} initializer"),
+            format!(
+                "{FRONT}functio f() → vacuum {{\n    fixum ∪ g ← {}\n}}\n",
+                block("    ")
+            ),
+        ));
+        cases.push((
+            format!("{kind} call argument"),
+            format!(
+                "{FRONT}functio h(∪ g) → vacuum {{\n    tacet\n}}\n\nfunctio f() → vacuum {{\n    h({})\n}}\n",
+                block("    ")
+            ),
+        ));
+        cases.push((
+            format!("{kind} expression statement"),
+            format!(
+                "{FRONT}functio f() → vacuum {{\n    {}\n}}\n",
+                block("    ")
+            ),
+        ));
+    }
+    assert_eq!(cases.len(), 9);
+    for (what, source) in &cases {
+        let formatted = assert_format_fixed_point(source, what);
+        for comment in ["# lead", "# tail"] {
+            assert!(
+                formatted.contains(comment),
+                "{what} must keep {comment:?}:\n{formatted}"
+            );
+        }
+    }
+}
+
 fn run_faber_format_stdin(source: &str) -> (String, String, bool) {
     let mut child = Command::new(faber_binary())
         .args(["format", "--stdin"])
