@@ -125,6 +125,9 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::FirstMatch { source, coordinates, binding, body } => {
                 self.visit_first_match_expr(source, coordinates, binding, body, expr)
             }
+            HirExpressionKind::Sort { direction, source_mode, source, binding, body, .. } => {
+                self.visit_sort_expr(*direction, *source_mode, source, binding.as_ref(), body.as_ref(), expr)
+            }
             HirExpressionKind::Handled { body, catch } => self.visit_handled_expr(body, catch, expr),
             HirExpressionKind::Trap(body) => self.visit_trap_expr(body, expr),
             HirExpressionKind::CallDefault { body, default, err_ty } => {
@@ -342,6 +345,15 @@ pub(super) trait HirExpressionLoweringVisitor {
         coordinates: &[(DefId, Symbol)],
         binding: &(DefId, Symbol),
         body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand>;
+    fn visit_sort_expr(
+        &mut self,
+        direction: radix_hir::HirSortDirection,
+        source_mode: radix_hir::HirSortSource,
+        source: &HirExpression,
+        binding: Option<&(DefId, Symbol)>,
+        body: Option<&HirBlock>,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_handled_expr(&mut self, body: &HirBlock, catch: &HirCape, expr: &HirExpression) -> Option<MirOperand>;
@@ -817,6 +829,18 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_first_match_expr(source, coordinates, binding, body, expr)
+    }
+
+    fn visit_sort_expr(
+        &mut self,
+        direction: radix_hir::HirSortDirection,
+        source_mode: radix_hir::HirSortSource,
+        source: &HirExpression,
+        binding: Option<&(DefId, Symbol)>,
+        body: Option<&HirBlock>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        self.lower_sort_expr(direction, source_mode, source, binding, body, expr)
     }
 
     fn visit_unsupported_expr(&mut self, kind: &HirExpressionKind, expr: &HirExpression) -> Option<MirOperand> {

@@ -158,6 +158,10 @@ pub mod lockstep;
 pub mod lookup;
 mod member_privacy;
 mod numeric_twin;
+mod sort_expr;
+#[cfg(test)]
+#[path = "sort_expr_test.rs"]
+mod sort_expr_test;
 pub(crate) use numeric_twin::intern_place_temporaries;
 pub use numeric_twin::{
     binary_twin_name, in_place_binary_twin_name, in_place_unary_twin_name, unary_twin_name,

@@ -118,10 +118,9 @@ fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
 
 /// `ordinata via Dir (ex | de) source [body]` re-emits at the source locale,
 /// the loop binder stays the loop's, the words stay plain identifiers
-/// elsewhere, and a non-HirFaber target refuses the node by name until the
-/// typecheck unit lands.
+/// elsewhere, and every target types the node.
 #[test]
-fn sort_expression_round_trips_in_latin_and_english_and_is_refused_by_typecheck() {
+fn sort_expression_round_trips_in_latin_and_english_and_typechecks() {
     let cases = [
         (
             "la",
@@ -170,7 +169,7 @@ fn sort_expression_round_trips_in_latin_and_english_and_is_refused_by_typecheck(
         }
         assert_eq!(emit(&first), first, "{locale} sort output is not idempotent");
 
-        // Typecheck refuses the node on every other target.
+        // Typecheck types the node on every target: no sort issue is raised.
         let mut check_session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
         check_session.config.target = Target::HirRust;
         let diagnostics = match analyze_source(&check_session, "sort-check.fab", &first, AnalyzeRequest::default()) {
@@ -178,10 +177,10 @@ fn sort_expression_round_trips_in_latin_and_english_and_is_refused_by_typecheck(
             Err(diagnostics) => diagnostics,
         };
         assert!(
-            diagnostics
-                .iter()
-                .any(|diagnostic| diagnostic.issue() == Some("sort_expression_not_typechecked")),
-            "{locale}: missing sort_expression_not_typechecked: {diagnostics:?}"
+            !diagnostics.iter().any(|diagnostic| diagnostic
+                .issue()
+                .is_some_and(|issue| issue.starts_with("sort_"))),
+            "{locale}: unexpected sort diagnostic: {diagnostics:?}"
         );
     }
 }

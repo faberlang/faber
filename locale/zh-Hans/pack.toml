@@ -1468,6 +1468,30 @@ help = "在 emit runnable CLI code 前修正 CLI annotation contract"
 message = "类型不匹配"
 help = "使表达式类型与期望类型一致"
 
+[diagnostics.SEM010.issues.sort_ref_requires_map]
+message = "`ref` sorts the keys of a map, so the source must be a map"
+help = "use `from` to sort the values of a list or a set, or sort a map with `ref`"
+
+[diagnostics.SEM010.issues.sort_tensor_unsupported]
+message = "a tensor cannot be the source of a sort expression"
+help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+
+[diagnostics.SEM010.issues.sort_source_unordered]
+message = "the elements have no natural order to sort by"
+help = "give the sort a body that returns an orderable key, such as a number, text or bool"
+
+[diagnostics.SEM010.issues.sort_key_unordered]
+message = "the sort key has no natural order"
+help = "return a number, text or bool from the sort body; a key is never a comparison"
+
+[diagnostics.SEM010.issues.sort_source_not_collection]
+message = "a sort expression needs a list, a set or a map as its source"
+help = "sort a list or a set with `from`, or a map with `from` (values) or `ref` (keys)"
+
+[diagnostics.SEM010.issues.sort_body_requires_redde]
+message = "a sort body must return its key"
+help = "end the sort body with `return <key>`"
+
 [diagnostics.SEM010.issues.argument_type_mismatch]
 message = "argument 类型不匹配"
 help = "使表达式类型与期望类型一致"

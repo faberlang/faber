@@ -541,6 +541,189 @@ impl FunctionBuilder<'_> {
         ))
     }
 
+    /// Lower the sort expression `sort via asc|desc from|ref source [body]`
+    ///.
+    ///
+    /// Always builds a new list. The source terms are a list place (a set is
+    /// converted, a map yields `Values` or `Keys`). A descending sort reverses
+    /// the terms, sorts ascending (stable), and reverses the result, so equal
+    /// keys keep source order in both directions. With a body the key list is
+    /// the body mapped over the terms; `SortByKeys` then reorders the terms.
+    pub(super) fn lower_sort_expr(
+        &mut self,
+        direction: radix_hir::HirSortDirection,
+        source_mode: radix_hir::HirSortSource,
+        source: &HirExpression,
+        binding: Option<&(DefId, Symbol)>,
+        body: Option<&HirBlock>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let Some(source_ty) = source.ty else {
+            self.errors
+                .push(MirError::missing_type(source.span, "sort expression source"));
+            return None;
+        };
+        let list_ty = self.expr_ty(expr)?;
+        let span = expr.span;
+        let mut payload = source_ty;
+        while let Type::Ref(_, inner) = self.normalized_type(payload) {
+            payload = *inner;
+        }
+        let (is_set, is_map) = match self.normalized_type(payload) {
+            Type::Array(_) | Type::BoundedArray { .. } => (false, false),
+            Type::Set(_) => (true, false),
+            Type::Map(_, _) => (false, true),
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    source.span,
+                    "sort expression source before collection MIR lowering",
+                ));
+                return None;
+            }
+        };
+        let source_value = self.lower_expr_value(source)?;
+        let source_mir_ty = MirType::semantic(payload);
+        let terms = if is_set {
+            let converted = self.runtime_call_value(
+                MirIntrinsic::Convert(MirConversion {
+                    store: None,
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty: source_mir_ty,
+                    target_ty: list_ty,
+                    params: Vec::new(),
+                    recovery: None,
+                    struct_defaults: Vec::new(),
+                }),
+                vec![source_value],
+                list_ty,
+                span,
+            );
+            self.materialize_operand_place(converted, list_ty, span)
+        } else if is_map {
+            let map = self.materialize_operand_place(source_value, source_mir_ty, span);
+            let op = match source_mode {
+                radix_hir::HirSortSource::Values => MirCollectionOp::Values,
+                radix_hir::HirSortSource::Keys => MirCollectionOp::Keys,
+            };
+            let snapshot =
+                self.runtime_call_value(MirIntrinsic::Collection(op), vec![MirOperand::Place(map)], list_ty, span);
+            self.materialize_operand_place(snapshot, list_ty, span)
+        } else {
+            self.materialize_operand_place(source_value, source_mir_ty, span)
+        };
+        if !self.current_is_open() {
+            return None;
+        }
+        let descending = matches!(direction, radix_hir::HirSortDirection::Descending);
+        let terms = if descending {
+            let reversed = self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Reverse),
+                vec![MirOperand::Place(terms)],
+                list_ty,
+                span,
+            );
+            self.materialize_operand_place(reversed, list_ty, span)
+        } else {
+            terms
+        };
+        let sorted = match (binding, body) {
+            (Some(binding), Some(body)) => {
+                struct KeyType(Option<TypeId>);
+                impl HirVisitor for KeyType {
+                    fn visit_stmt(&mut self, stmt: &HirStatement) {
+                        if let HirStatementKind::Redde(Some(value)) = &stmt.kind {
+                            self.0 = value.ty;
+                        }
+                        crate::hir::visit::walk_stmt(self, stmt);
+                    }
+                }
+                let mut key = KeyType(None);
+                key.visit_block(body);
+                let Some(key_ty) = key.0 else {
+                    self.errors
+                        .push(MirError::missing_type(body.span, "sort expression key"));
+                    return None;
+                };
+                let Type::Array(element) = self.normalized_type(list_ty.semantic_id()) else {
+                    self.errors
+                        .push(MirError::unsupported(span, "sort expression result before list MIR lowering"));
+                    return None;
+                };
+                let element = *element;
+                let Some(keys_ty) = self.types.find_array(key_ty) else {
+                    self.errors
+                        .push(MirError::missing_type(span, "sort expression key lista"));
+                    return None;
+                };
+                let keys_ty = MirType::semantic(keys_ty);
+                let selector = radix_types::FuncSig {
+                    type_params: Vec::new(),
+                    params: vec![radix_types::ParamType {
+                        ty: element,
+                        mode: radix_types::SemanticParamMode::Owned,
+                        optional: false,
+                    }],
+                    ret: key_ty,
+                    err: None,
+                    is_async: false,
+                    is_generator: false,
+                };
+                let closure = HirExpression {
+                    id: expr.id,
+                    kind: HirExpressionKind::Clausura(
+                        vec![crate::hir::HirParam {
+                            def_id: binding.0,
+                            name: binding.1,
+                            ty: element,
+                            mode: HirParamMode::Owned,
+                            optional: false,
+                            sponte: false,
+                            default: None,
+                            span: body.span,
+                        }],
+                        Some(key_ty),
+                        None,
+                        Box::new(HirExpression {
+                            id: expr.id,
+                            kind: HirExpressionKind::Block(body.clone()),
+                            ty: Some(key_ty),
+                            span: body.span,
+                        }),
+                    ),
+                    ty: self.types.find_equal(&Type::Func(selector)),
+                    span: body.span,
+                };
+                let key_fn = self.lower_closure_function(&closure, MirType::semantic(key_ty))?;
+                let keys = self.lower_transform_over(terms.clone(), key_fn, TransformKind::Map, keys_ty, span)?;
+                self.runtime_call_value(
+                    MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
+                    vec![MirOperand::Place(terms), keys],
+                    list_ty,
+                    span,
+                )
+            }
+            _ => self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Sort),
+                vec![MirOperand::Place(terms)],
+                list_ty,
+                span,
+            ),
+        };
+        if !self.current_is_open() {
+            return None;
+        }
+        if !descending {
+            return Some(sorted);
+        }
+        let sorted = self.materialize_operand_place(sorted, list_ty, span);
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Reverse),
+            vec![MirOperand::Place(sorted)],
+            list_ty,
+            span,
+        ))
+    }
+
     /// Lower the dedicated `primus_quem` first-match head (AFM-3 base lane).
     ///
     /// Total traversal with dataflow first-live selection over the same

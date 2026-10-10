@@ -377,6 +377,9 @@ mod record_literal_tests;
 #[cfg(test)]
 #[path = "saturating_word_test.rs"]
 mod saturating_word_tests;
+#[cfg(test)]
+#[path = "sort_expr_test.rs"]
+mod sort_expr_tests;
 
 #[cfg(test)]
 #[path = "tensor_lift_test.rs"]

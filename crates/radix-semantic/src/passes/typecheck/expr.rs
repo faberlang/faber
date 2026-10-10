@@ -58,7 +58,6 @@ const ISSUE_CEDE_REQUIRES_GENERATOR: &str = "cede_requires_generator";
 const ISSUE_REDDET_REQUIRES_ASYNC_FUNCTION: &str = "reddet_requires_async_function";
 const ISSUE_TACEBIT_REQUIRES_ASYNC_CONTEXT: &str = "tacebit_requires_async_context";
 const ISSUE_INVALID_LOWERED_EXPRESSION: &str = "invalid_lowered_expression";
-const ISSUE_SORT_EXPRESSION_NOT_TYPECHECKED: &str = "sort_expression_not_typechecked";
 /// Phase 2A fail-closed fact: the dedicated gradient node exists in HIR, but the
 /// operand-eligibility and selector rules land with tensor-glyphs 2B. No `∇`
 /// expression may pass typecheck untyped or silently.
@@ -950,23 +949,20 @@ impl TypeChecker<'_> {
             HirExpressionKind::Insere(path) => {
                 super::insere::check_insere(self, *path, expected, expr.span)
             }
-            // Front end only: the sort expression parses and lowers, and
-            // typecheck refuses it by name until its rules land. Source-faithful
-            // re-emission (`faber format`, the HirFaber target) keeps no types
-            // and still prints the construct back.
-            HirExpressionKind::Sort { source, .. } => {
-                if self.target == radix_target::Target::HirFaber {
-                    self.check_expr(source);
-                    expected.unwrap_or(self.error_type)
-                } else {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        ISSUE_SORT_EXPRESSION_NOT_TYPECHECKED,
-                        expr.span,
-                    );
-                    self.error_type
-                }
-            }
+            HirExpressionKind::Sort {
+                source_mode,
+                source,
+                binding,
+                body,
+                ..
+            } => super::sort_expr::check_sort_expr(
+                self,
+                *source_mode,
+                source,
+                *binding,
+                body.as_mut(),
+                expr.span,
+            ),
             HirExpressionKind::Error => {
                 if self.errored_exprs.insert(expr.id) {
                     self.error_issue(

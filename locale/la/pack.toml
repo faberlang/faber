@@ -1917,6 +1917,30 @@ help = "fix the CLI annotation contract before emitting runnable CLI code"
 message = "type mismatch"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.sort_ref_requires_map]
+message = "`de` ordinat claves tabulae, ergo fons tabula esse debet"
+help = "utere `ex` ad valores listae vel copiae ordinandos, aut ordina tabulam per `de`"
+
+[diagnostics.SEM010.issues.sort_tensor_unsupported]
+message = "tensor fons ordinationis esse non potest"
+help = "converte tensorem in listam primum"
+
+[diagnostics.SEM010.issues.sort_source_unordered]
+message = "elementa ordinem naturalem non habent"
+help = "da ordinationi corpus quod clavem ordinabilem reddat: numerum, textum aut bivalens"
+
+[diagnostics.SEM010.issues.sort_key_unordered]
+message = "clavis ordinationis ordinem naturalem non habet"
+help = "redde numerum, textum aut bivalens; clavis numquam comparatio est"
+
+[diagnostics.SEM010.issues.sort_source_not_collection]
+message = "ordinatio listam, copiam aut tabulam fontem requirit"
+help = "ordina listam vel copiam per `ex`, tabulam per `ex` (valores) aut `de` (claves)"
+
+[diagnostics.SEM010.issues.sort_body_requires_redde]
+message = "corpus ordinationis clavem reddere debet"
+help = "finire corpus per `redde <clavis>`"
+
 [diagnostics.SEM010.issues.argument_type_mismatch]
 message = "argument type mismatch"
 help = "make the expression type match the expected type"
