@@ -1049,6 +1049,14 @@ impl TypeTable {
         self.intern(Type::Bits(width))
     }
 
+    /// Allocate `lista<b8>`, the type the retired `octeti` word, the
+    /// `|de ad be ef|` literal and `insere` of a file produce (need,
+    /// ruling B9).
+    pub fn octeti_list(&mut self) -> TypeId {
+        let byte = self.bits(BitsWidth::B8);
+        self.array(byte)
+    }
+
     /// Allocate `instans<N>` with an explicit precision marker.
     pub fn sized_instans(&mut self, precision: InstansPrecision) -> TypeId {
         self.intern(Type::SizedInstans(precision))

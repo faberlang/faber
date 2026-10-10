@@ -79,6 +79,15 @@ impl Fold<'_> {
             match self.types.get(ty) {
                 Type::Alias(_, inner) => ty = *inner,
                 Type::Primitive(primitive) => return Some(*primitive),
+                // `lista<b8>` takes the raw bytes (ruling B9, need).
+                Type::Array(element)
+                    if matches!(
+                        self.types.get(*element),
+                        Type::Bits(radix_types::BitsWidth::B8)
+                    ) =>
+                {
+                    return Some(Primitive::Octeti);
+                }
                 _ => return None,
             }
         }

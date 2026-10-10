@@ -192,33 +192,35 @@ fn littera_converts_to_textus() {
     );
 }
 
+/// Need (ruling B8): the byte scalar word is retired; the issue
+/// names both replacements (`b8` raw bits, `u8` number) in every pack.
 #[test]
-fn octetus_is_numerus_u8() {
-    test_support::assert_accepts(
-        "functio f(octetus b) → u8 {
-    fixum u8 n ← b
-    fixum octetus back ← n
-    redde back
-}",
-    );
-}
-
-#[test]
-fn octetus_rejects_width_params() {
+fn octetus_is_retired_with_named_issue() {
     test_support::assert_rejects_with_issue(
-        "functio f(octetus<u16> b) → vacuum {
+        "functio f(octetus b) → vacuum {
     nota b
 }",
-        "octet_params",
+        "retired_byte_word",
+    );
+}
+
+/// Need (ruling B9): the `octeti` word resolves to `lista<b8>`.
+#[test]
+fn octeti_resolves_to_lista_b8() {
+    test_support::assert_accepts(
+        "functio f(octeti b) → vacuum {
+    fixum lista<b8> c ← b
+    nota c
+}",
     );
 }
 
 #[test]
-fn itera_ex_octeti_binds_octetus() {
+fn octeti_elements_are_b8() {
     test_support::assert_accepts(
         "functio f(octeti b) → vacuum {
     itera ex b fixum x {
-        fixum octetus y ← x
+        fixum b8 y ← x
         nota y
     }
 }",

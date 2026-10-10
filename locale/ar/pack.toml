@@ -1198,9 +1198,9 @@ help = "أصلح تركيب AST للتخفيض"
 message = "object destructuring يجب توسيعه قبل statement lowering"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.octet_params]
-message = "octet هو fixed-width ولا يقبل parameters"
-help = "أصلح تركيب AST للتخفيض"
+[diagnostics.SEM008.issues.retired_byte_word]
+message = "كلمة byte أُلغيت: اكتب b8 للبتات الخام أو u8 للعدد"
+help = "استخدم b8 للبايت الخام (lista<b8> لسلسلة بايتات) أو u8 للبايت العددي"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker يجب أن يكون كتابة عارية مثل ms أو us"

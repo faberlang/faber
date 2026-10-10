@@ -82,7 +82,7 @@ const ISSUE_MISSING_TYPE_ALIAS_SYMBOL: &str = "missing_type_alias_symbol";
 const ISSUE_MISSING_TYPE_SYMBOL_INFO: &str = "missing_type_symbol_info";
 const ISSUE_NAME_NOT_VARIANT: &str = "name_not_variant";
 const ISSUE_NAME_NOT_TYPE: &str = "name_not_type";
-const ISSUE_OCTET_PARAMS: &str = "octet_params";
+const ISSUE_RETIRED_BYTE_WORD: &str = "retired_byte_word";
 const ISSUE_PRECISION_MARKER_PARAMS: &str = "precision_marker_params";
 const ISSUE_PRECISION_MARKER_SHAPE: &str = "precision_marker_shape";
 const ISSUE_PRIMITIVE_PARAMS: &str = "primitive_params";
@@ -3581,6 +3581,7 @@ fn lower_bounded_primitive(
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
     match params {
+        [] if prim == Primitive::Octeti => Ok(types.octeti_list()),
         [] => Ok(types.primitive(prim)),
         [capacity]
             if prim == Primitive::Ascii && named_type_is_ascii_format_hint(capacity, interner) =>
@@ -3872,13 +3873,10 @@ fn lower_named_type(
         return Ok(types.primitive(prim));
     }
 
-    // D10.4: `octetus` (en `byte`) is exactly `numerus<u8>`, the element of
-    // `octeti` (`≡ lista<octetus>`). Fixed-width; rejects parameters.
+    // Need (ruling B8): `octetus` (en `byte`) is retired with
+    // `octeti`; the diagnostic names `b8` and `u8`.
     if name_str == "octetus" {
-        if !params.is_empty() {
-            return Err(TypeLowerError::Issue(ISSUE_OCTET_PARAMS));
-        }
-        return Ok(types.sized_numeric(Primitive::Numerus, crate::NumericWidth::U8));
+        return Err(TypeLowerError::Issue(ISSUE_RETIRED_BYTE_WORD));
     }
 
     if let Some(collection) = CollectionKind::from_name(name_str) {

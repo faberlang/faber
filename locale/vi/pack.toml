@@ -1198,9 +1198,9 @@ help = "sửa cấu trúc AST để hạ mức"
 message = "phải mở rộng phân rã đối tượng trước khi hạ mức câu lệnh"
 help = "sửa cấu trúc AST để hạ mức"
 
-[diagnostics.SEM008.issues.octet_params]
-message = "octet có độ rộng cố định và không thể nhận tham số"
-help = "sửa cấu trúc AST để hạ mức"
+[diagnostics.SEM008.issues.retired_byte_word]
+message = "từ byte đã bị loại bỏ: viết b8 cho bit thô hoặc u8 cho số"
+help = "dùng b8 cho byte thô (lista<b8> cho chuỗi byte) hoặc u8 cho byte dạng số"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "dấu độ chính xác phải là cách viết trần như ms hoặc us"

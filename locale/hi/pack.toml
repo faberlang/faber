@@ -1210,9 +1210,9 @@ help = "lowering के लिए AST construct ठीक करें"
 message = "statement lowering से पहले object destructuring को expand किया जाना चाहिए"
 help = "lowering के लिए AST construct ठीक करें"
 
-[diagnostics.SEM008.issues.octet_params]
-message = "octet fixed-width है और parameters स्वीकार नहीं कर सकता"
-help = "lowering के लिए AST construct ठीक करें"
+[diagnostics.SEM008.issues.retired_byte_word]
+message = "शब्द byte retire हो गया है: raw bits के लिए b8 या संख्या के लिए u8 लिखें"
+help = "raw byte के लिए b8 (byte string के लिए lista<b8>) या संख्यात्मक byte के लिए u8 उपयोग करें"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker ms या us जैसे bare spelling में होना चाहिए"

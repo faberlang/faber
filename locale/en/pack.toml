@@ -1786,9 +1786,9 @@ help = "fix the AST construct for lowering"
 message = "object destructuring should be expanded before statement lowering"
 help = "fix the AST construct for lowering"
 
-[diagnostics.SEM008.issues.octet_params]
-message = "byte is fixed-width (exactly u8) and cannot accept parameters"
-help = "fix the AST construct for lowering"
+[diagnostics.SEM008.issues.retired_byte_word]
+message = "the word byte is retired: write b8 for raw bits or u8 for a number"
+help = "use b8 for a raw byte (lista<b8> for a byte string) or u8 for a numeric byte"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker must be a bare spelling such as ms or us"

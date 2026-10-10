@@ -335,7 +335,7 @@ impl TypeChecker<'_> {
     }
 
     pub fn octeti_type(&mut self) -> TypeId {
-        self.types.primitive(Primitive::Octeti)
+        self.types.octeti_list()
     }
 
     pub fn json_type(&mut self) -> TypeId {

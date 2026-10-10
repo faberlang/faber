@@ -1210,9 +1210,9 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "ต้องขยายการแยกโครงสร้าง object ก่อนลดระดับคำสั่ง"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
-[diagnostics.SEM008.issues.octet_params]
-message = "octet มีความกว้างตายตัวและรับพารามิเตอร์ไม่ได้"
-help = "แก้โครงสร้าง AST สำหรับ lowering"
+[diagnostics.SEM008.issues.retired_byte_word]
+message = "คำว่า byte ถูกยกเลิกแล้ว: ใช้ b8 สำหรับบิตดิบ หรือ u8 สำหรับตัวเลข"
+help = "ใช้ b8 สำหรับไบต์ดิบ (lista<b8> สำหรับสายไบต์) หรือ u8 สำหรับไบต์ที่เป็นตัวเลข"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "ตัวระบุความละเอียดต้องเป็นการสะกดเปล่า เช่น ms หรือ us"

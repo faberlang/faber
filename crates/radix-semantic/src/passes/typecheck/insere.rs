@@ -26,6 +26,15 @@ pub(super) fn check_insere(
         None => (ISSUE_INSERE_TYPE_REQUIRED, checker.error_type),
         Some(ty) => match checker.types.get(ty) {
             Type::Primitive(Primitive::Textus | Primitive::Octeti) => return ty,
+            // `lista<b8>`: the bytes of a file (ruling B9).
+            Type::Array(element)
+                if matches!(
+                    checker.types.get(*element),
+                    Type::Bits(radix_types::BitsWidth::B8)
+                ) =>
+            {
+                return ty;
+            }
             // An erroring slot already reported its own fault.
             Type::Error => return checker.error_type,
             Type::Infer(_) => (ISSUE_INSERE_TYPE_REQUIRED, checker.error_type),

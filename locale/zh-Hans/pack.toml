@@ -1198,9 +1198,9 @@ help = "修正用于 lowering 的 AST construct"
 message = "object destructuring 应在 statement lowering 之前展开"
 help = "修正用于 lowering 的 AST construct"
 
-[diagnostics.SEM008.issues.octet_params]
-message = "octet 是 fixed-width 的，不能接受 parameters"
-help = "修正用于 lowering 的 AST construct"
+[diagnostics.SEM008.issues.retired_byte_word]
+message = "byte 一词已停用：原始位请写 b8，数值请写 u8"
+help = "原始字节使用 b8（字节串用 lista<b8>），数值字节使用 u8"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker 必须是裸写法，例如 ms 或 us"

@@ -1564,9 +1564,9 @@ help = "fix the AST construct for lowering"
 message = "object destructuring should be expanded before statement lowering"
 help = "fix the AST construct for lowering"
 
-[diagnostics.SEM008.issues.octet_params]
-message = "octetus is fixed-width (exactly u8) and cannot accept parameters"
-help = "fix the AST construct for lowering"
+[diagnostics.SEM008.issues.retired_byte_word]
+message = "verbum octetus abrogatum est: scribe b8 pro bitis crudis aut u8 pro numero"
+help = "utere b8 pro octeto crudo (lista<b8> pro serie octetorum) aut u8 pro octeto numerico"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker must be a bare spelling such as ms or us"

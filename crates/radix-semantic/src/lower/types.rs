@@ -706,7 +706,7 @@ impl Lowerer<'_> {
         }
 
         if name_str == "octetus" {
-            return self.lower_byte_word_type(params);
+            return self.lower_retired_byte_word_type();
         }
 
         if crate::numeric_width::is_standalone_width_name(name_str) {
@@ -991,7 +991,7 @@ impl Lowerer<'_> {
             crate::locale::TypeBindingKind::TrappingWord => {
                 Some(self.lower_trapping_word_type(params))
             }
-            crate::locale::TypeBindingKind::ByteWord => Some(self.lower_byte_word_type(params)),
+            crate::locale::TypeBindingKind::ByteWord => Some(self.lower_retired_byte_word_type()),
             crate::locale::TypeBindingKind::TensorEdgePolicy(policy) => {
                 Some(self.lower_tensor_edge_policy_type(policy, params))
             }
@@ -1007,16 +1007,11 @@ impl Lowerer<'_> {
         }
     }
 
-    /// D10.4: `octetus` (en `byte`) is exactly `numerus<u8>` — the byte
-    /// scalar and the element of `octeti` (`≡ lista<octetus>`). The width is
-    /// fixed by definition, so parameters are rejected.
-    fn lower_byte_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
-        if !params.is_empty() {
-            self.error("octet_params");
-            return self.types.intern(Type::Error);
-        }
-        self.types
-            .sized_numeric(Primitive::Numerus, crate::NumericWidth::U8)
+    /// Need (ruling B8): `octetus` (en `byte`) is retired with
+    /// `octeti`; the diagnostic names both replacements (`b8`, `u8`).
+    fn lower_retired_byte_word_type(&mut self) -> TypeId {
+        self.error("retired_byte_word");
+        self.types.intern(Type::Error)
     }
 
     fn lower_tensor_edge_policy_type(
@@ -1069,6 +1064,7 @@ impl Lowerer<'_> {
 
     fn lower_bounded_primitive(&mut self, prim: Primitive, params: &[GenericArgExpr]) -> TypeId {
         match params {
+            [] if prim == Primitive::Octeti => self.types.octeti_list(),
             [] => self.types.primitive(prim),
             [capacity]
                 if prim == Primitive::Ascii

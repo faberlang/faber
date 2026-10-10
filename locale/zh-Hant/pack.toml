@@ -1198,9 +1198,9 @@ help = "修正用於降階的 AST 結構"
 message = "物件解構應在陳述式降階前展開"
 help = "修正用於降階的 AST 結構"
 
-[diagnostics.SEM008.issues.octet_params]
-message = "octet 為固定寬度，不能接受參數"
-help = "修正用於降階的 AST 結構"
+[diagnostics.SEM008.issues.retired_byte_word]
+message = "byte 一詞已停用：原始位元請寫 b8，數值請寫 u8"
+help = "原始位元組使用 b8（位元組串用 lista<b8>），數值位元組使用 u8"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "精度標記必須是裸拼寫，例如 ms 或 us"
