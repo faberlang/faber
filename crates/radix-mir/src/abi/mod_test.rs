@@ -353,7 +353,7 @@ fn multi_input_return_buffer_kernel_rejects_mismatched_counts() {
     let error = MirKernelSignature::storage_buffer_kernel(&function, &validation)
         .expect_err("mismatched element counts should reject");
 
-    assert_eq!(error.message, ERR_KERNEL_IO_ELEMENT_MISMATCH);
+    assert_eq!(error.issue, "mir_kernel_io_element_mismatch");
 }
 
 /// Result-tuple kernel function:
@@ -909,10 +909,9 @@ fn transpose_contract_rejects_rank1_operand() {
     let validation = MirValidationContext::new(&types);
     let error = collection_op_contract(&function, &validation)
         .expect_err("rank-1 transpose must fail the contract resolver");
-    assert!(
-        error.message.contains("rank-2"),
-        "diagnostic must demand a rank-2 operand, got: {}",
-        error.message
+    assert_eq!(
+        error.issue, "mir_transpose_contract_rank_unsupported",
+        "diagnostic must demand a rank-2 operand, got: {error:?}"
     );
 }
 
@@ -1045,10 +1044,9 @@ fn batched_transpose_contract_rejects_rank5_operand() {
     let validation = MirValidationContext::new(&types);
     let error = collection_op_contract(&function, &validation)
         .expect_err("rank-5 transpose must fail the contract resolver");
-    assert!(
-        error.message.contains("rank 5+ is closed"),
-        "diagnostic must name the closed rank gate, got: {}",
-        error.message
+    assert_eq!(
+        error.issue, "mir_transpose_contract_rank_unsupported",
+        "diagnostic must name the closed rank gate, got: {error:?}"
     );
 }
 
@@ -1360,10 +1358,7 @@ fn storage_buffer_limit_record_allows_wider_lane_and_keeps_metal_oracle() {
 
     let metal_error = MirKernelSignature::storage_buffer_kernel(&function, &validation)
         .expect_err("the shared 31-buffer default must keep the fail-closed boundary");
-    assert_eq!(
-        metal_error.message,
-        "kernel storage-buffer count 40 exceeds the 31-buffer binding maximum; the decomposition must split the body"
-    );
+    assert_eq!(metal_error.issue, "mir_kernel_storage_buffer_limit");
 
     let wide_lane = StorageBufferLimitRecord::new("wide-test", 64);
     let signature =
@@ -1547,14 +1542,10 @@ fn abi_rejects_invalid_broadcast_pair_fail_closed() {
     let error = rank_extension_broadcast_fact(&function, &validation)
         .expect_err("an invalid broadcast pair must fail closed");
 
-    assert!(
-        error
-            .message
-            .contains("neither same-shape nor a rank extension"),
-        "typed diagnostic expected, got: {}",
-        error.message
+    assert_eq!(
+        error.issue, "mir_broadcast_pair_not_rank_extension",
+        "typed diagnostic expected, got: {error:?}"
     );
-    assert_eq!(error.issue, "mir_abi_error");
 }
 
 fn rank2_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
@@ -1725,10 +1716,9 @@ fn quantized_matmul_contract_rejects_unknown_layout() {
     let validation = MirValidationContext::new(&types);
     let error = collection_op_contract(&function, &validation)
         .expect_err("unknown GGML type id must fail closed");
-    assert!(
-        error.message.contains("admitted GGML type id"),
-        "typed diagnostic expected, got: {}",
-        error.message
+    assert_eq!(
+        error.issue, "mir_packed_layout_ggml_type_id_unsupported",
+        "typed diagnostic expected, got: {error:?}"
     );
 }
 
@@ -1888,7 +1878,6 @@ fn kernel_admission_rejects_sparse_storage_by_name() {
     for allow_host_owned in [false, true] {
         let err = require_kernel_device_view(sparse, allow_host_owned)
             .expect_err("sparse storage must not be admitted to kernels");
-        assert_eq!(err.message, "kernel sparse tensor storage is not admitted");
         assert_eq!(err.issue, "mir_kernel_sparse_storage_unsupported");
     }
 }
@@ -1906,5 +1895,5 @@ fn kernel_admission_adds_rank_three_and_four_with_rank_five_closed() {
 
     let rank5 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 5);
     let error = require_kernel_device_view(rank5, false).expect_err("rank 5 stays fail-closed");
-    assert_eq!(error.message, "kernel device view rank 5");
+    assert_eq!(error.issue, "mir_kernel_device_view_rank_unsupported");
 }

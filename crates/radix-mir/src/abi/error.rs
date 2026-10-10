@@ -175,6 +175,20 @@ fn abi_issue(message: &str) -> &'static str {
         "mir_graphics_pipeline_requires_color_targets"
     } else if message == ERR_GRAPHICS_PIPELINE_VARYING_MISMATCH {
         "mir_graphics_pipeline_varying_mismatch"
+    } else if message == ERR_KERNEL_IO_ELEMENT_MISMATCH {
+        "mir_kernel_io_element_mismatch"
+    } else if message.starts_with("kernel storage-buffer count ") {
+        "mir_kernel_storage_buffer_limit"
+    } else if message.starts_with("kernel device view rank ") {
+        "mir_kernel_device_view_rank_unsupported"
+    } else if message.starts_with("transpose dispatch contract requires a rank-2 tensor operand") {
+        "mir_transpose_contract_rank_unsupported"
+    } else if message.starts_with("packed kernel layout must be an admitted GGML type id") {
+        "mir_packed_layout_ggml_type_id_unsupported"
+    } else if message.starts_with("tensor-tensor add broadcast pair ")
+        && message.contains("neither same-shape nor a rank extension")
+    {
+        "mir_broadcast_pair_not_rank_extension"
     } else {
         "mir_abi_error"
     }
