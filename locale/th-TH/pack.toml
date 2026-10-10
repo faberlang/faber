@@ -2472,6 +2472,10 @@ help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u3
 message = "การแปลงจาก octeti เป็น bivalens ไม่มีความหมายเริ่มต้น; ถอดรหัสเป็น textus หรือเปรียบเทียบไบต์อย่างชัดเจน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
 
+[diagnostics.SEM016.issues.lista_to_textus_unsupported]
+message = "lista ไม่แปลงเป็น textus; ชนิดของ element ไม่ระบุการเข้ารหัสข้อความ"
+help = "แปลงเป็น lista<b8>, lista<b16> หรือ lista<b32> ก่อน แล้ว ↦ textus (ถอดรหัส UTF-8, UTF-16 หรือ UTF-32 อาจล้มเหลว); หรือแสดง lista ด้วยสตริงรูปแบบ \"§\"(xs)"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "การแปลงเป็น promissum ข้ามขอบเขต async/sync; ใช้ `@ futura` หรือ `.tum()` สำหรับการห่อแบบ async"
 help = "resolve หรือห่อค่า async อย่างชัดเจน"

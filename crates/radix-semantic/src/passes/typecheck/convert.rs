@@ -75,6 +75,7 @@ const ISSUE_DECIMAL_RADIX_HINT_REJECTED: &str = "decimal_radix_hint_rejected";
 const ISSUE_DECIMAL_ENDIAN_HINT_REJECTED: &str = "decimal_endianness_hint_rejected";
 const ISSUE_DECIMAL_BITS_HINT_REJECTED: &str = "decimal_bits_hint_rejected";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
+const ISSUE_LISTA_TO_TEXTUS_UNSUPPORTED: &str = "lista_to_textus_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
 const ISSUE_PROMISSUM_SOURCE_BOUNDARY: &str = "promissum_source_boundary";
 const ISSUE_SPARSA_COLLECTION_UNSUPPORTED: &str = "sparsa_collection_unsupported";
@@ -789,6 +790,12 @@ impl TypeChecker<'_> {
             Type::Primitive(Primitive::Regex)
         ) && let Some(error_ty) =
             self.check_regex_conversio(source, source_ty, recovery.is_some(), span)
+        {
+            return error_ty;
+        }
+
+        if let Some(error_ty) =
+            self.check_lista_to_textus_conversio(source_ty, target_resolved, target_carrier, span)
         {
             return error_ty;
         }
@@ -1561,6 +1568,50 @@ impl TypeChecker<'_> {
     }
 
     /// Reject primitive `↦` pairs with no single obvious meaning (byte reinterpretation, etc.).
+    /// Operator ruling 05ac0534: a list of anything but a
+    /// bits marker is not text. `lista<T> ↦ textus` and `lista<T, N> ↦
+    /// textus<M>` have no grammar row for any `T`; the byte buffer
+    /// (`octeti`) is a distinct type and keeps its row. A registered user
+    /// conversion row for the pair stays authoritative.
+    fn check_lista_to_textus_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        target_carrier: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !matches!(
+            self.types.get(target_carrier),
+            Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. }
+        ) {
+            return None;
+        }
+        let source = self.resolve_inferred_type(source_ty);
+        let element = match self.types.get(source) {
+            Type::Array(element) | Type::BoundedArray { element, .. } => *element,
+            _ => return None,
+        };
+        let element = self.resolve_inferred_type(element);
+        if matches!(
+            self.types.get(element),
+            Type::Bits(_)
+                | Type::Primitive(Primitive::Octeti | Primitive::Valor | Primitive::Ignotum)
+                | Type::Param(_)
+                | Type::Infer(_)
+        ) {
+            return None;
+        }
+        if self
+            .resolver
+            .conversion_row_for(source, target_resolved)
+            .is_some()
+        {
+            return None;
+        }
+        self.invalid_conversion(ISSUE_LISTA_TO_TEXTUS_UNSUPPORTED, span);
+        Some(self.error_type)
+    }
+
     fn check_rejected_primitive_conversio(
         &mut self,
         source: &HirExpression,

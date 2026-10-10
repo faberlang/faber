@@ -2460,6 +2460,10 @@ help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u3
 message = "conversion من {octeti} إلى {bivalens} بلا default meaning؛ فك إلى {textus} أو قارن bytes صراحة"
 help = "استخدم chorda أو explicit byte conversion helpers"
 
+[diagnostics.SEM016.issues.lista_to_textus_unsupported]
+message = "لا تتحول {lista} إلى {textus}؛ نوع العنصر لا يحدد ترميز النص"
+help = "حوّل إلى lista<b8> أو lista<b16> أو lista<b32> أولاً ثم ↦ textus (فك UTF-8 أو UTF-16 أو UTF-32، وقد يفشل)؛ أو اعرض القائمة بسلسلة التنسيق \"§\"(xs)"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "conversion إلى {promissum} يعبر async/sync boundary؛ استخدم `@ futura` أو `.tum()` للـ async wrapping"
 help = "resolve أو wrap async value صراحة"

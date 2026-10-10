@@ -2460,6 +2460,10 @@ help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u3
 message = "從 octeti 轉換為 bivalens 沒有預設意義；請解碼為 textus，或明確比較位元組"
 help = "使用 chorda 或明確的位元組轉換輔助工具"
 
+[diagnostics.SEM016.issues.lista_to_textus_unsupported]
+message = "lista 不能轉換為 textus；元素型別沒有指明文字編碼"
+help = "先轉換為 lista<b8>、lista<b16> 或 lista<b32>，再 ↦ textus（UTF-8、UTF-16 或 UTF-32 解碼，可能失敗）；或用格式字串 \"§\"(xs) 顯示 lista"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "轉換為 promissum 會跨越 async/sync 邊界；使用 `@ futura` 或 `.tum()` 進行非同步包裝"
 help = "明確解析或包裝 async 值"

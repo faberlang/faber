@@ -2472,6 +2472,10 @@ help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u3
 message = "octeti से bivalens में रूपांतरण का कोई default अर्थ नहीं है; textus में decode करें या bytes की स्पष्ट तुलना करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
 
+[diagnostics.SEM016.issues.lista_to_textus_unsupported]
+message = "lista से textus में रूपांतरण नहीं होता; element type से text encoding तय नहीं होती"
+help = "पहले lista<b8>, lista<b16> या lista<b32> में बदलें, फिर ↦ textus (UTF-8, UTF-16 या UTF-32 decode, विफल हो सकता है); या format string \"§\"(xs) से lista दिखाएँ"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "promissum में रूपांतरण async/sync boundary पार करता है; async wrapping के लिए `@ futura` या `.tum()` का उपयोग करें"
 help = "async value को स्पष्ट रूप से resolve या wrap करें"

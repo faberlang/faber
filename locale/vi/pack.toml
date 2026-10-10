@@ -2460,6 +2460,10 @@ help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u3
 message = "chuyển đổi từ octeti sang bivalens không có ý nghĩa mặc định; giải mã sang textus hoặc so sánh byte một cách rõ ràng"
 help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"
 
+[diagnostics.SEM016.issues.lista_to_textus_unsupported]
+message = "lista không chuyển đổi sang textus; kiểu phần tử không cho biết mã hóa văn bản"
+help = "chuyển sang lista<b8>, lista<b16> hoặc lista<b32> trước, rồi ↦ textus (giải mã UTF-8, UTF-16 hoặc UTF-32, có thể thất bại); hoặc hiển thị lista bằng chuỗi định dạng \"§\"(xs)"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "chuyển đổi sang promissum vượt qua ranh giới bất đồng bộ/đồng bộ; sử dụng `@ futura` hoặc `.tum()` để bọc bất đồng bộ"
 help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"

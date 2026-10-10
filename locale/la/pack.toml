@@ -3313,6 +3313,10 @@ help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u3
 message = "conversion from octeti to bivalens has no default meaning; decode to textus or compare bytes explicitly"
 help = "use chorda or explicit byte conversion helpers"
 
+[diagnostics.SEM016.issues.lista_to_textus_unsupported]
+message = "a lista does not convert to a textus; its element type does not say which text encoding it is"
+help = "convert to lista<b8>, lista<b16> or lista<b32> first, then ↦ textus (UTF-8, UTF-16 or UTF-32 decode, can fail); or show the lista with the format string \"§\"(xs)"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "conversion to promissum crosses the async/sync boundary; use `@ futura` or `.tum()` for async wrapping"
 help = "resolve or wrap the async value explicitly"

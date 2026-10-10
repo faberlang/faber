@@ -2460,6 +2460,10 @@ help = "convert to the matching IEEE width first: u16 pairs with bf16 or f16, u3
 message = "从 octeti 到 bivalens 的 conversion 没有 default meaning"
 help = "使用 chorda 或显式 byte conversion helpers"
 
+[diagnostics.SEM016.issues.lista_to_textus_unsupported]
+message = "lista 不能 conversion 为 textus；element type 没有指明 text encoding"
+help = "先转换为 lista<b8>、lista<b16> 或 lista<b32>，再 ↦ textus（UTF-8、UTF-16 或 UTF-32 decode，可能失败）；或用 format string \"§\"(xs) 显示 lista"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "conversion 到 promissum 跨越 async/sync boundary"
 help = "显式 resolve 或 wrap async value"

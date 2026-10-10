@@ -1,0 +1,33 @@
++++
+term = "↦"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Rejected route: a list of strings does not convert to a string."
+syntax = "list<string> ↦ string — rejected for every element type; convert to list<b8|b16|b32> first, or show with the format string"
+related = ["↦", "lista", "textus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM016:lista_to_textus_unsupported"
+ruling = "05ac0534"
++++
+# =============================================================================
+# lista to textus — rejected route
+# =============================================================================
+#
+# What this teaches:
+#   • No list converts to text, whatever its element type; the checker refuses
+#     `list<T> ↦ string` with one named diagnostic.
+#   • Say the meaning instead: list<b8|b16|b32> first, then ↦ string; or the
+#     format string "§"(xs).
+#
+# Common mistakes:
+#   • reading ↦ as "join the elements" — it is not a join.
+# =============================================================================
+
+main {
+    const list<string> a ← ["x", "y"]
+    const string s ← a ↦ string
+    print s
+}

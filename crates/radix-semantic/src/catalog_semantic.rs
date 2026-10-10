@@ -439,6 +439,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         | "octeti_to_numerus_unspecified"
         | "octeti_to_fractus_unspecified"
         | "octeti_to_bivalens_unsupported" => Some("use chorda or explicit byte conversion helpers".to_owned()),
+        "lista_to_textus_unsupported" => Some("convert to list<b8>, list<b16> or list<b32> first, then ↦ string; or show the list with the format string \"§\"(xs)".to_owned()),
         "octeti_endian_width_mismatch" => {
             Some("use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64".to_owned())
         }

@@ -191,6 +191,37 @@ fn octeti_to_textus_conversio_typechecks() {
 }
 
 #[test]
+fn lista_numerus_to_textus_conversio_rejects() {
+    test_support::assert_rejects_with_issue(
+        "incipit {\n  fixum lista<numerus> a ← [72, 105]\n  fixum _ s ← a ↦ textus\n}",
+        "lista_to_textus_unsupported",
+    );
+}
+
+#[test]
+fn lista_textus_to_textus_conversio_rejects() {
+    test_support::assert_rejects_with_issue(
+        "incipit {\n  fixum lista<textus> a ← [\"x\", \"y\"]\n  fixum _ s ← a ↦ textus\n}",
+        "lista_to_textus_unsupported",
+    );
+}
+
+#[test]
+fn bounded_lista_to_bounded_textus_conversio_rejects() {
+    test_support::assert_rejects_with_issue(
+        "incipit {\n  fixum lista<numerus> base ← [1, 2]\n  fixum lista<numerus, 8> raw ← base ↦ lista<numerus, 8>\n  fixum textus<8> out ← raw ↦ textus<8>\n}",
+        "lista_to_textus_unsupported",
+    );
+}
+
+#[test]
+fn octeti_variable_to_textus_conversio_stays_legal() {
+    test_support::assert_accepts(
+        "incipit {\n  fixum octeti b ← |68 69|\n  fixum _ s ← b ↦ textus\n}",
+    );
+}
+
+#[test]
 fn ascii_octeti_conversio_roundtrip_typechecks() {
     test_support::assert_accepts(
         "incipit {\n  fixum _ b ← 'hi' ↦ octeti\n  fixum _ a ← b ↦ ascii\n}",
