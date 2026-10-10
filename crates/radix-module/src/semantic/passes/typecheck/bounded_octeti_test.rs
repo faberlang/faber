@@ -131,7 +131,7 @@ fn bounded_octeti_rejects_non_rust_targets_fail_closed() {
 incipit {
     nota 0
 }";
-    for target in [Target::HirTypeScript, Target::HirGo] {
+    for target in [Target::HirTypeScript] {
         let result = compile_for_target_and_get_result(source, target);
         assert!(!result.success(), "target {target:?} must reject bounded octeti");
         assert!(
@@ -144,7 +144,6 @@ incipit {
         );
         let emitted = match &result.output {
             Some(crate::Output::TypeScript(output)) => output.code.as_str(),
-            Some(crate::Output::Go(output)) => output.code.as_str(),
             _ => "",
         };
         assert!(
@@ -152,4 +151,28 @@ incipit {
             "target {target:?} must not approximate octeti<N> as Uint8Array: {emitted}"
         );
     }
+}
+
+/// Go carries bounded octeti as a plain byte slice with the capacity erased at
+/// the type and checked at conversions (need, sb425): it no longer
+/// declines with `go_type_unsupported`.
+#[test]
+fn bounded_octeti_is_carried_on_go() {
+    let source = r"functio probe(octeti<8> xs) → u8 {
+    redde xs[0]
+}
+
+incipit {
+    nota 0
+}";
+    let result = compile_for_target_and_get_result(source, Target::HirGo);
+    assert!(result.success(), "Go must carry bounded octeti: {:?}", result.diagnostics);
+    let code = match &result.output {
+        Some(crate::Output::Go(output)) => output.code.as_str(),
+        _ => "",
+    };
+    assert!(
+        code.contains("func probe(xs []byte)"),
+        "bounded octeti must be a plain Go byte slice parameter, got: {code}"
+    );
 }
