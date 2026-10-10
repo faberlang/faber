@@ -257,6 +257,8 @@ abi_string_family! {
         SYMBOL_ARRAY_RANGE = "__faber_rt_v1_array_range",
         SYMBOL_ARRAY_OPTION = "__faber_rt_v1_array_option",
         SYMBOL_ARRAY_SORT = "__faber_rt_v1_array_sort",
+        SYMBOL_ARRAY_SORT_TEXT = "__faber_rt_v1_array_sort_text",
+        SYMBOL_ARRAY_SORT_BY_KEYS = "__faber_rt_v1_array_sort_by_keys",
         SYMBOL_ARRAY_SUM = "__faber_rt_v1_array_sum",
         // Process `argumenta`: captured argv excluding host argv[0], returned
         // as a `lista<textus>` handle for `incipit argumenta`.
