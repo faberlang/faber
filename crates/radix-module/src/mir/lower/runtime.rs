@@ -1165,11 +1165,10 @@ impl FunctionBuilder<'_> {
             return None;
         }
 
-        // OQ2 pinned default: the column-side vector·matrix form stays
-        // fail-closed on the MIR lane (host-Rust 1C residual posture).
+        // Row-vector convention (ruling 2026-10-04): `v · m` with `v` of width K
+        // and `m` of shape [K, N] is a width-N vector, out[j] = sum_k v[k] * m[k, j].
         if op == HirBinOp::Dot && matches!((&lhs_ty, &rhs_ty), (Type::Vector(..), Type::Matrix(..))) {
-            self.glyph_fail_closed("vector·matrix dot product", expr.span);
-            return None;
+            return self.lower_vector_matrix_dot(lhs, rhs, expr);
         }
 
         let Some(method_name) = glyph_method_name(op, &lhs_ty, &rhs_ty) else {
@@ -1698,6 +1697,94 @@ impl FunctionBuilder<'_> {
             }
         }
         Some(self.construct_temp(MirAggregateKind::Matrix, MirAggregateFields::Ordered(fields), ty, expr.span))
+    }
+
+    /// Expand vector·matrix (row-vector convention) into lane×cell mul/add and
+    /// a vector construct: result lane `j` = sum over `k` of `v[k] * m[k, j]`.
+    fn lower_vector_matrix_dot(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let (lhs_ty_id, rhs_ty_id) = (lhs.ty?, rhs.ty?);
+        let Type::Vector(_, width) = self.normalized_type(lhs_ty_id).clone() else {
+            self.errors
+                .push(MirError::unsupported(expr.span, "vector·matrix requires a vector receiver"));
+            return None;
+        };
+        let Type::Matrix(element_ty, shape) = self.normalized_type(rhs_ty_id).clone() else {
+            self.errors
+                .push(MirError::unsupported(expr.span, "vector·matrix requires a matrix peer"));
+            return None;
+        };
+        let Some(lanes) = crate::semantic::literal_vector_width(width, self.types) else {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "vector·matrix vector width before MIR lowering",
+            ));
+            return None;
+        };
+        let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types) else {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "vector·matrix with non-literal matrix shape before MIR lowering",
+            ));
+            return None;
+        };
+        if rows > 4 || columns > 4 {
+            self.errors
+                .push(MirError::unsupported(expr.span, "vector·matrix exceeds 4x4 CPU subset"));
+            return None;
+        }
+        if lanes != rows {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "vector·matrix vector width must match matrix rows",
+            ));
+            return None;
+        }
+        let vector = self.lower_expr_value(lhs)?;
+        let vector = self.value_base_place(vector, MirType::semantic(lhs_ty_id), lhs.span)?;
+        let matrix = self.lower_expr_value(rhs)?;
+        let matrix = self.value_base_place(matrix, MirType::semantic(rhs_ty_id), rhs.span)?;
+        let elem_ty = MirType::semantic(element_ty);
+        let result_ty = self.expr_ty(expr)?;
+        let mut fields = Vec::with_capacity(usize::from(columns));
+        for column in 0..columns {
+            let mut acc = self.assign_temp(
+                MirValueKind::Binary {
+                    op: MirBinOp::Mul,
+                    lhs: vector_lane_operand(&vector, 0),
+                    rhs: matrix_cell_operand(&matrix, 0, column),
+                },
+                elem_ty,
+                expr.span,
+            );
+            for row in 1..rows {
+                let product = self.assign_temp(
+                    MirValueKind::Binary {
+                        op: MirBinOp::Mul,
+                        lhs: vector_lane_operand(&vector, row),
+                        rhs: matrix_cell_operand(&matrix, row, column),
+                    },
+                    elem_ty,
+                    expr.span,
+                );
+                acc = self.assign_temp(
+                    MirValueKind::Binary { op: MirBinOp::Add, lhs: acc, rhs: product },
+                    elem_ty,
+                    expr.span,
+                );
+            }
+            fields.push(MirAggregateItem::Operand(acc));
+        }
+        Some(self.construct_temp(
+            MirAggregateKind::Vector,
+            MirAggregateFields::Ordered(fields),
+            result_ty,
+            expr.span,
+        ))
     }
 
     /// Expand matrix×vector product into cell×lane mul/add and a vector construct.

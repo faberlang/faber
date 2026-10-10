@@ -57,6 +57,10 @@ mod kernel_ban_tests;
 #[path = "lazy_cursor_test.rs"]
 mod lazy_cursor_tests;
 
+#[cfg(test)]
+#[path = "vector_matrix_test.rs"]
+mod vector_matrix_tests;
+
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Session};
 use crate::mir::{KernelLowering, lower_analyzed_unit};
