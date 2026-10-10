@@ -37,13 +37,15 @@ locale = "en"
 # targets, which the provider rejects (recorded residual). Generic
 # `charta.read_file<T>` across all three shapes is separate future provider work.
 #
-# Runtime check: files are prepared under /tmp so each read route can prove its
+# Runtime check: files are prepared under the temp dir, keyed by process id so
+# concurrent runs never share a path; each read route can prove its
 # accepted result shape independently of the harness working directory.
 
 import from "norma:fs" charta
+import from "norma:process" process
 
 main {
-    const string textPath ← "/tmp/faber-fs-lege-generic.txt"
+    const string textPath ← "§/faber-fs-lege-generic-§.txt"(charta.temp_dir(), process.pid())
     charta.write_file(textPath, "prima\nsecunda\n")
     const string body ← charta.read_file<string>(textPath)
     assert body ≡ "prima\nsecunda\n"
