@@ -286,18 +286,21 @@ impl FunctionBuilder<'_> {
         entries: Option<&Vec<HirObjectField>>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        // An explicitly parameterised constructor (`Cista<int> { … }`) carries
+        // the applied type as the cast target: construct the struct at that
+        // applied type, as the inferred form does.
+        let applied_struct = match self.types.get(target) {
+            Type::Applied(base, _) => match self.types.get(*base) {
+                Type::Struct(def_id) => Some(*def_id),
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(def_id) = applied_struct {
+            return self.lower_verte_struct(def_id, target, entries, expr);
+        }
         match self.types.get(target) {
             Type::Struct(def_id) => {
-                let def_id = *def_id;
-                self.lower_verte_struct(def_id, target, entries, expr)
-            }
-            // An explicitly parameterised constructor (`Cista<int> { … }`)
-            // carries the applied type as the cast target: construct the
-            // struct at that applied type, as the inferred form does.
-            Type::Applied(base, _) if matches!(self.types.get(*base), Type::Struct(_)) => {
-                let Type::Struct(def_id) = self.types.get(*base) else {
-                    unreachable!("guard proved a struct base")
-                };
                 let def_id = *def_id;
                 self.lower_verte_struct(def_id, target, entries, expr)
             }

@@ -52,9 +52,9 @@ fn bound_counts_scalars_not_bytes() {
 #[test]
 fn store_over_the_bound_fails_with_the_rust_text() {
     let err = eval_store(Value::Str("abcdef".to_owned()), 4).expect_err("6 > 4");
-    assert!(
-        err.message
-            .contains("textus to bounded textus conversion failed"),
+    assert_eq!(err.code, RUNNER_CODE_CONVERSION, "got: {err:?}");
+    assert_eq!(
+        err.issue, "runner_textus_to_bounded_textus_conversion_failed",
         "got: {err:?}"
     );
 }
