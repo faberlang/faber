@@ -455,7 +455,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("size the byte window to product(shape) times the element width, or change the tensor shape".to_owned())
         }
         "float_to_integer_requires_rounding" => {
-            Some("write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`, or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result".to_owned())
+            Some("write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result".to_owned())
         }
         "conversio_via_bits_retired" => {
             Some("write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`".to_owned())

@@ -3599,7 +3599,7 @@ help = "drop the via clause; only numeric, ascii, char, vector, and octeti<N> ta
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "a float or decimal does not convert to an integer without naming the rounding"
-help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`, or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"

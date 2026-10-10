@@ -187,6 +187,35 @@ fn literal_float_failability_follows_the_rounding_mode() {
 }
 
 #[test]
+fn convert_assign_takes_the_rounding_hint_of_the_explicit_form() {
+    // Need: `a ↤ x via R ⊥ d` is `a ← x ↦ T via R ⊥ d`.
+    for hint in ["Floor", "Ceil", "HalfEven", "Trunc"] {
+        test_support::assert_accepts(&format!(
+            "functio r(f64 x) → i32 {{ fixum i32 a ↤ x via {hint} ⊥ 0 redde a }}"
+        ));
+        test_support::assert_accepts(&format!(
+            "functio r(f64 x) → i32 ⇥ textus {{ varia i32 a ← 0 a ↤ x via {hint} redde a }}"
+        ));
+    }
+}
+
+#[test]
 fn failing_literal_float_conversion_accepts_a_default() {
     test_support::assert_accepts("functio r() → u8 { redde 255.5 ↦ u8 via HalfEven ⊥ 0 }");
+}
+
+#[test]
+fn convert_assign_without_a_hint_is_still_the_named_error() {
+    test_support::assert_rejects_with_issue(
+        "functio r(f64 x) → i32 { fixum i32 a ↤ x ⊥ 0 redde a }",
+        REQUIRES,
+    );
+}
+
+#[test]
+fn convert_assign_rounding_hint_is_refused_off_the_float_to_integer_pairing() {
+    test_support::assert_rejects_with_issue(
+        "functio r(i64 n) → i32 { fixum i32 a ↤ n via Floor ⊥ 0 redde a }",
+        UNKNOWN_HINT,
+    );
 }

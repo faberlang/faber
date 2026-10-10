@@ -1439,10 +1439,38 @@ impl Lowerer<'_> {
                     .recovery
                     .as_ref()
                     .map(|fallback| Box::new(lower_expr(self, fallback)));
+                // The cell type is not known until typecheck, so only the
+                // hint's name is validated here; whether the pairing takes a
+                // hint is the checker's rule (`check_conversio`).
+                let mut params = Vec::new();
+                if let Some(via) = &assign.via {
+                    let hint = self.interner.resolve(via.name).to_owned();
+                    let issue = if hint == "Bits" {
+                        Some("conversio_via_bits_retired")
+                    } else if crate::numeric_width::is_float_rounding_hint(&hint)
+                        || crate::numeric_width::is_conversio_radix_hint(&hint)
+                    {
+                        None
+                    } else {
+                        Some("conversio_via_unknown_hint")
+                    };
+                    match issue {
+                        Some(issue) => self.push_error(
+                            SemanticErrorKind::ConversionInvalid,
+                            vec![
+                                DiagnosticArg::new("issue", issue),
+                                DiagnosticArg::new("hint", hint),
+                            ],
+                            via.span,
+                        ),
+                        None => params.push(via.name),
+                    }
+                }
                 HirExpressionKind::ConversioAssign {
                     target: Box::new(target),
                     source: Box::new(source),
                     recovery,
+                    params,
                 }
             }
         }

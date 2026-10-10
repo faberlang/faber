@@ -917,6 +917,7 @@ impl TypeChecker<'_> {
         target: &mut HirExpression,
         source: &mut HirExpression,
         recovery: Option<&mut HirExpression>,
+        params: &[radix_lexer::Symbol],
         span: radix_lexer::Span,
     ) -> TypeId {
         self.invalidate_assignment_target(target);
@@ -947,7 +948,7 @@ impl TypeChecker<'_> {
         let result_ty = self.check_conversio(
             source,
             &mut conversion_target,
-            &[],
+            params,
             recovery,
             &mut route,
             span,

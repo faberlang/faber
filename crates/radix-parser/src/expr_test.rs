@@ -1332,6 +1332,38 @@ fn conversio_assign_typed_varia_initializer_parses_as_assignment() {
 }
 
 #[test]
+fn conversio_assign_via_hint_precedes_default_in_declaration() {
+    // Need: `a ↤ x via Trunc ⊥ 0` carries the hint on the assign
+    // node, before the default, exactly as `x ↦ T via Trunc ⊥ 0` does.
+    let result = parse_ok("fixum numerus a ↤ x via Trunc ⊥ 0");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let assign = assign_expr(var.init.as_deref().expect("initializer"));
+    assert!(matches!(assign.op, AssignOp::ConversioAssign));
+    assert!(assign.via.is_some(), "the via hint must be recorded");
+    assert!(assign.recovery.is_some(), "the ⊥ default must still attach");
+}
+
+#[test]
+fn conversio_assign_via_hint_without_default_in_statement() {
+    let result = parse_ok("a ↤ x via Floor");
+    let program = result.program.as_ref().expect("program");
+    let assign = assign_expr(&expr_stmt(program).expr);
+    assert!(matches!(assign.op, AssignOp::ConversioAssign));
+    assert!(assign.via.is_some());
+    assert!(assign.recovery.is_none());
+}
+
+#[test]
+fn plain_assign_has_no_via_hint() {
+    let result = parse_ok("a ← x");
+    let program = result.program.as_ref().expect("program");
+    assert!(assign_expr(&expr_stmt(program).expr).via.is_none());
+}
+
+#[test]
 fn conversio_assign_has_same_precedence_as_assign() {
     // `a ← b ↤ c` must bind as `a ← (b ↤ c)`: `↤` sits at the same
     // precedence level as `←`.

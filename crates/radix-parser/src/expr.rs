@@ -215,6 +215,14 @@ impl Parser {
         if self.check(&TokenKind::ExitArrow) {
             return Err(self.invalid_expression_error("recovery_uses_exit_arrow"));
         }
+        let via = if is_conversio {
+            self.parse_via_clause()?
+        } else {
+            None
+        };
+        if via.is_some() && self.check(&TokenKind::ExitArrow) {
+            return Err(self.invalid_expression_error("recovery_uses_exit_arrow"));
+        }
         let recovery = if is_conversio {
             self.parse_inline_default()?
         } else {
@@ -231,6 +239,7 @@ impl Parser {
                 value,
                 value_marker,
                 recovery,
+                via,
             }),
             span,
         })

@@ -2004,6 +2004,7 @@ fn conversio_assign_composes_declared_channel_through_conversion_seam() {
         &mut target,
         &mut source,
         None,
+        &[],
         crate::test_support::test_span(),
     );
     assert_eq!(result, numerus);
@@ -2044,6 +2045,7 @@ fn conversio_assign_channel_mismatch_keeps_sem010_shape() {
         &mut target,
         &mut source,
         None,
+        &[],
         crate::test_support::test_span(),
     );
     let err = checker

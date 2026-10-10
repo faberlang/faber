@@ -788,7 +788,10 @@ impl super::FaberCodegen<'_> {
         writer.write(&self.symbol_to_string(local.name));
         if let Some(init) = &local.init {
             if let HirExpressionKind::ConversioAssign {
-                source, recovery, ..
+                source,
+                recovery,
+                params,
+                ..
             } = &init.kind
             {
                 // Typed `↤` initializer: lowering stores the binding as the
@@ -797,6 +800,7 @@ impl super::FaberCodegen<'_> {
                 // ↤ source`.
                 writer.write(" ↤ ");
                 self.write_expr_prec(source, 1, names, surface, writer);
+                self.write_conversio_assign_via(params, surface, writer);
                 if let Some(recovery) = recovery {
                     writer.write(" ⊥ ");
                     self.write_expr_prec(recovery, 12, names, surface, writer);

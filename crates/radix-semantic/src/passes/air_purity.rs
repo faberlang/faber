@@ -222,6 +222,7 @@ impl AirPurityChecker<'_> {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 self.reject(expr.span, "assignment_mutation");
                 self.check_expr(target);

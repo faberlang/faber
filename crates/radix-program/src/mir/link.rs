@@ -1478,6 +1478,7 @@ pub(super) fn rewrite_expr(
             target,
             source,
             recovery,
+            ..
         } => {
             rewrite_expr(
                 unit_path,

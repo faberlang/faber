@@ -1421,6 +1421,11 @@ pub enum HirExpressionKind {
         target: Box<HirExpression>,
         source: Box<HirExpression>,
         recovery: Option<Box<HirExpression>>,
+        /// `via HINT` of `a ↤ x via HINT ⊥ d`: the same hint symbols a
+        /// `↦ T via HINT` [`HirExpressionKind::Conversio`] carries in `params`
+        /// (empty when no `via` is written).
+        #[serde(default)]
+        params: Vec<Symbol>,
     },
 
     Array(Vec<HirArrayElement>),
