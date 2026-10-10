@@ -621,8 +621,53 @@ fn generate_go_from_analyzed(
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_library_registry(&analysis.libraries);
+    r#gen.set_imported_constants(go_imported_constants(analysis, hir));
     let output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
+}
+
+/// Folded imported module constants read as `module.NAME` in `hir`.
+///
+/// Go output is one `main` package, so a provider module has no Go namespace:
+/// each such read prints the folded literal the file interface carries (the
+/// same value source as the MIR lowering's imported-constant map).
+#[cfg(feature = "hir-go")]
+fn go_imported_constants(
+    analysis: &crate::driver::AnalyzedModule,
+    hir: &HirModule,
+) -> rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), go::ImportedConst> {
+    use crate::file_interface::InterfaceConstValue;
+    use crate::hir::HirExpressionKind;
+    use crate::hir::visit::HirVisitor;
+    struct Reads<'u> {
+        analysis: &'u crate::driver::AnalyzedModule,
+        found: rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), go::ImportedConst>,
+    }
+    impl HirVisitor for Reads<'_> {
+        fn visit_expr(&mut self, expr: &crate::hir::HirExpression) {
+            if let HirExpressionKind::Field(object, member) = &expr.kind
+                && let HirExpressionKind::Path(module) = &object.kind
+                && let Some(namespace) = self.analysis.resolver.get_symbol(*module)
+                && namespace.kind == crate::semantic::SymbolKind::Module
+                && let Some(value) = self
+                    .analysis
+                    .resolver
+                    .namespace_file_const_value_canonical(namespace.name, *member)
+            {
+                let value = match value {
+                    InterfaceConstValue::Int(v) => go::ImportedConst::Int(*v),
+                    InterfaceConstValue::Float(v) => go::ImportedConst::Float(*v),
+                    InterfaceConstValue::Bool(v) => go::ImportedConst::Bool(*v),
+                    InterfaceConstValue::Text(v) => go::ImportedConst::Text(v.clone()),
+                };
+                self.found.insert((*module, *member), value);
+            }
+            crate::hir::visit::walk_expr(self, expr);
+        }
+    }
+    let mut reads = Reads { analysis, found: rustc_hash::FxHashMap::default() };
+    crate::hir::visit::walk_program(&mut reads, hir);
+    reads.found
 }
 
 #[cfg(not(feature = "hir-go"))]
