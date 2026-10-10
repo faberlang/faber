@@ -302,7 +302,7 @@ pub trait Codegen {
     ) -> Result<Self::Output, CodegenError>;
 }
 
-pub use bits_gate::reject_bits_type;
+pub use bits_gate::{list_width_change, reject_bits_type, reject_list_width_decode};
 pub use device_ident::{MANGLE_PREFIX, is_device_reserved, mangle_device_ident};
 pub use ident::{
     SCALAR_LOOP_CANDIDATES, SCALAR_LOOP_FALLBACK, VALUE_JOIN_CANDIDATES, VALUE_JOIN_FALLBACK,

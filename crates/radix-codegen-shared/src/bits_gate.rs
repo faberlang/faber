@@ -77,3 +77,111 @@ pub fn reject_bits_type(types: &TypeTable, target: Target) -> Result<(), Codegen
         ],
     })
 }
+
+const LIST_DECODE_ISSUE: &str = "bits_conversion_unsupported_on_target";
+
+/// The bit width a list element type carries, `None` for a number with no
+/// fixed width (`numerus`, `inf`) or a non-number.
+fn element_bits(types: &TypeTable, ty: TypeId) -> (bool, Option<u32>) {
+    use radix_types::NumericWidth as W;
+    let ty = types.peel_access_marker(ty).1;
+    match types.get(ty) {
+        Type::Bits(width) => (true, Some(width.bits())),
+        Type::SizedNumeric(_, width) => (
+            false,
+            match width {
+                W::I8 | W::U8 => Some(8),
+                W::I16 | W::U16 | W::F16 | W::BF16 => Some(16),
+                W::I32 | W::U32 | W::F32 => Some(32),
+                W::I64 | W::U64 | W::F64 | W::D64 => Some(64),
+                W::Inf => None,
+            },
+        ),
+        _ => (false, None),
+    }
+}
+
+fn element_label(types: &TypeTable, ty: TypeId) -> String {
+    let ty = types.peel_access_marker(ty).1;
+    match types.get(ty) {
+        Type::Bits(width) => width.faber_marker().to_owned(),
+        Type::SizedNumeric(_, width) => format!("{width:?}").to_lowercase(),
+        Type::Primitive(primitive) => format!("{primitive:?}").to_lowercase(),
+        other => format!("{other:?}"),
+    }
+}
+
+/// The `(from, to)` list spellings of a conversion between two lists whose
+/// element bit width differs and at least one of which is a raw-bits `bN`, or
+/// `None` for any other pair. Such a conversion carries a `via Le|Be` clause
+/// and decodes or encodes through the byte stream; the
+/// same-width list conversion has no clause and is not matched.
+#[must_use]
+pub fn list_width_change(
+    types: &TypeTable,
+    source: TypeId,
+    target: TypeId,
+) -> Option<(String, String)> {
+    let (Type::Array(from), Type::Array(to)) = (
+        types.get(types.peel_access_marker(source).1),
+        types.get(types.peel_access_marker(target).1),
+    ) else {
+        return None;
+    };
+    let ((from_bits, from_width), (to_bits, to_width)) =
+        (element_bits(types, *from), element_bits(types, *to));
+    if !(from_bits || to_bits) {
+        return None;
+    }
+    if matches!((from_width, to_width), (Some(a), Some(b)) if a == b) {
+        return None;
+    }
+    Some((
+        format!("list<{}>", element_label(types, *from)),
+        format!("list<{}>", element_label(types, *to)),
+    ))
+}
+
+/// Refuse a list conversion that carries an endian hint and changes the
+/// element bit width, naming the conversion and the `backend` (the target's
+/// Debug name). Emitters other than the runner and the Faber re-emitter have
+/// no byte-stream decode: they would print a per-element numeric cast, which
+/// is a wrong program, not a missing one.
+///
+/// # Errors
+///
+/// Returns a [`CodegenError`] (`bits_conversion_unsupported_on_target`) for a
+/// width-changing list conversion with an endian hint.
+pub fn reject_list_width_decode(
+    types: &TypeTable,
+    source: Option<TypeId>,
+    target: TypeId,
+    has_endian_hint: bool,
+    backend: &str,
+) -> Result<(), CodegenError> {
+    if !has_endian_hint {
+        return Ok(());
+    }
+    let Some(source) = source else {
+        return Ok(());
+    };
+    let Some((from, to)) = list_width_change(types, source, target) else {
+        return Ok(());
+    };
+    Err(CodegenError {
+        message: format!(
+            "the conversion `{from}` to `{to}` through a byte order (`via Le` or `via Be`) \
+             is not supported on the {backend} target yet"
+        ),
+        args: vec![
+            DiagnosticArg::new("issue", LIST_DECODE_ISSUE),
+            DiagnosticArg::new("from", from),
+            DiagnosticArg::new("to", to),
+            DiagnosticArg::new("target", backend),
+        ],
+    })
+}
+
+#[cfg(test)]
+#[path = "bits_gate_test.rs"]
+mod tests;
