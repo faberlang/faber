@@ -3950,7 +3950,7 @@ impl FunctionBuilder<'_> {
     /// to constants; otherwise each axis is read from the carrier's shape at
     /// run time, so a loop over a tensor never depends on the extent being a
     /// compile-time fact.
-    fn tensor_axis_bounds(
+    pub(super) fn tensor_axis_bounds(
         &mut self,
         tensor: &MirPlace,
         literal: Option<&[i64]>,

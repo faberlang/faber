@@ -754,16 +754,43 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(source.span, "primus_quem source"));
             return None;
         };
-        let elem_ty =
-            if let Type::Array(inner) | Type::BoundedArray { element: inner, .. } = self.normalized_type(source_ty) {
-                MirType::semantic(*inner)
-            } else {
+        // Source classification: lista and rank-1 tensors walk by flat
+        // index. A matrix source needs `apud [i, j]` coordinates at
+        // typecheck, which this lowering declines above (multi-axis).
+        let (elem_ty, shape) = match self.normalized_type(source_ty).clone() {
+            Type::Array(inner) | Type::BoundedArray { element: inner, .. } => {
+                (MirType::semantic(inner), FirstMatchSource::Array)
+            }
+            Type::Tensor(inner, dims) => {
+                let literal = radix_types::i64s_from_literal_index(dims, self.types);
+                let rank_one = match &literal {
+                    Some(literal) => literal.len() == 1,
+                    None => matches!(
+                        self.types.get_index(dims),
+                        radix_types::IndexExpr::Literal(_)
+                            | radix_types::IndexExpr::Runtime(_)
+                            | radix_types::IndexExpr::Affine { .. }
+                            | radix_types::IndexExpr::Divide { .. }
+                    ),
+                };
+                if !rank_one {
+                    self.errors.push(MirError::unsupported(
+                        source.span,
+                        "primus_quem tensor source before rank-1 first-match MIR lowering",
+                    ));
+                    return None;
+                }
+                let lanes = literal.and_then(|dims| dims.first().copied());
+                (MirType::semantic(inner), FirstMatchSource::Tensor(lanes))
+            }
+            _ => {
                 self.errors.push(MirError::unsupported(
                     source.span,
                     "primus_quem source before array first-match MIR lowering",
                 ));
                 return None;
-            };
+            }
+        };
         let result_ty = self.expr_ty(expr)?;
         let collection_ty = MirType::semantic(source_ty);
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
@@ -804,12 +831,22 @@ impl FunctionBuilder<'_> {
             expr.span,
         );
 
-        let length = self.runtime_call_value(
-            MirIntrinsic::Collection(MirCollectionOp::Length),
-            vec![MirOperand::Place(collection.clone())],
-            numerus,
-            expr.span,
-        );
+        let length = match shape {
+            FirstMatchSource::Array => self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Length),
+                vec![MirOperand::Place(collection.clone())],
+                numerus,
+                expr.span,
+            ),
+            // The literal lane count folds to a constant; otherwise the
+            // extent is read from the carrier's shape.
+            FirstMatchSource::Tensor(lanes) => {
+                let literal = lanes.map(|lanes| [lanes]);
+                self.tensor_axis_bounds(&collection, literal.as_ref().map(<[i64; 1]>::as_slice), 1, expr.span)?
+                    .into_iter()
+                    .next()?
+            }
+        };
         if !self.current_is_open() {
             return None;
         }
@@ -882,7 +919,18 @@ impl FunctionBuilder<'_> {
         );
 
         self.switch_to(take_id);
-        self.assign(MirPlace::local(result), MirOperand::Place(item_place), result_ty, expr.span);
+        // A `T ∪ nihil` slot stores the element as `some`, so typed targets
+        // see an option aggregate rather than a bare element.
+        let stored = if matches!(self.types.get(result_ty.semantic_id()), Type::Option(_)) {
+            self.assign_temp(
+                MirValueKind::Option(MirOptionOp::Some(MirOperand::Place(item_place))),
+                result_ty,
+                expr.span,
+            )
+        } else {
+            MirOperand::Place(item_place)
+        };
+        self.assign(MirPlace::local(result), stored, result_ty, expr.span);
         self.assign(
             MirPlace::local(matched),
             MirOperand::Constant(MirConstant::Bool(true)),
@@ -1149,4 +1197,13 @@ enum TransformKind {
     Any,
     Filter,
     Map,
+}
+
+/// Source shapes `primus_quem` lowers: the iteration is always row-major flat
+/// order over the carrier's cells.
+#[derive(Clone, Copy)]
+enum FirstMatchSource {
+    Array,
+    /// Rank-1 tensor; the literal lane count when the shape states one.
+    Tensor(Option<i64>),
 }

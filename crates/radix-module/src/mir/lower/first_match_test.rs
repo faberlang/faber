@@ -126,3 +126,38 @@ fn first_match_predicate_error_propagates_before_any_match() {
     );
     assert!(!errors.is_empty(), "predicate error must propagate, never become nihil");
 }
+
+#[test]
+fn first_match_over_tensor_source_returns_the_first_live_element() {
+    let lines = run_stdout(
+        "afm3_tensor.fab",
+        r"functio elige(tf32[4] x) → fractus ∪ nihil {
+    redde primus_quem(x, ubi v { v ≻ 0.0 })
+}
+incipit {
+    fixum lista<f32> flat ← [-1.0, 2.0, 3.0, -4.0]
+    fixum tf32[4] a ← flat ↦ tf32[4]
+    fixum fractus ∪ nihil r ← elige(a)
+    fixum fractus out ← r vel -9.0
+    nota out
+}",
+    );
+    assert_eq!(lines, vec!["2.0".to_owned()], "first positive lane of the tensor is 2.0");
+}
+
+#[test]
+fn first_match_over_zero_extent_tensor_yields_nihil() {
+    let lines = run_stdout(
+        "afm3_tensor_empty.fab",
+        r"functio elige_vacuum(tf32[0] x) → fractus ∪ nihil {
+    redde primus_quem(x, ubi v { v ≻ 0.0 })
+}
+incipit {
+    fixum tf32[0] a ← vacua
+    fixum fractus ∪ nihil r ← elige_vacuum(a)
+    fixum fractus out ← r vel -9.0
+    nota out
+}",
+    );
+    assert_eq!(lines, vec!["-9.0".to_owned()], "zero-extent tensor yields nihil");
+}
