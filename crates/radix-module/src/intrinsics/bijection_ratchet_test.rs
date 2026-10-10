@@ -574,6 +574,12 @@ const FAMILY_CONTROLS: &[(&str, &str)] = &[
     ("Match", "inventum/0"),
 ];
 
+/// Registry rows that stay only so the checker can answer a retired call with
+/// its named diagnostic instead of an arity error: `(row key, diagnostic)`.
+/// `.sorted(key)` (la `.ordinata(key)`) retired in favour of the sort
+/// expression (operator ruling O2, need; unit sb245).
+const RETIRED_ROWS: &[(&str, &str)] = &[("Lista.ordinata/1", "sorted_key_retired")];
+
 fn run_family_controls(session: &Session) {
     for (family, control) in FAMILY_CONTROLS {
         let (name, arity) = control.split_once('/').expect("control shape name/arity");
@@ -617,6 +623,17 @@ fn probe_registry_gaps(session: &Session) -> BTreeSet<String> {
                     ProbeOutcome::NotAdmitted => {}
                     ProbeOutcome::MethodFallthrough => {
                         any_fallthrough = true;
+                        break;
+                    }
+                    // A registry row kept only so the checker answers with a
+                    // named retirement diagnostic is owner-resolved by that
+                    // diagnostic: the probe meets the retirement, not a gap.
+                    ProbeOutcome::Unexpected(why)
+                        if RETIRED_ROWS
+                            .iter()
+                            .any(|(key, code)| *key == row_key(row) && why.contains(code)) =>
+                    {
+                        any_admitted = true;
                         break;
                     }
                     ProbeOutcome::Unexpected(why) => panic!(
