@@ -450,7 +450,7 @@ impl<'a> BorrowChecker<'a> {
             .map(|param| ParamType {
                 ty: param.ty,
                 mode: match param.mode {
-                    HirParamMode::Owned => SemanticParamMode::Owned,
+                    HirParamMode::Owned | HirParamMode::Axis => SemanticParamMode::Owned,
                     HirParamMode::De => SemanticParamMode::Ref,
                     HirParamMode::In => SemanticParamMode::MutRef,
                     HirParamMode::Ex => SemanticParamMode::Move,
@@ -490,17 +490,17 @@ impl<'a> BorrowChecker<'a> {
                 self.mut_params.insert(param.def_id);
             }
             let (marker, inner) = self.types.peel_access_marker(param.ty);
-            if matches!(param.mode, HirParamMode::Owned) && marker.is_none() {
+            if matches!(param.mode, HirParamMode::Owned | HirParamMode::Axis) && marker.is_none() {
                 self.unmarked_params.insert(param.def_id);
                 self.own.note_unmarked_param(param.def_id);
             }
-            if matches!(param.mode, HirParamMode::Owned)
+            if matches!(param.mode, HirParamMode::Owned | HirParamMode::Axis)
                 && marker.is_none()
                 && matches!(self.types.get(inner), Type::Tensor(_, _))
             {
                 self.nonmut_tensor_params.insert(param.def_id);
             }
-            if matches!(param.mode, HirParamMode::Owned)
+            if matches!(param.mode, HirParamMode::Owned | HirParamMode::Axis)
                 && marker.is_none()
                 && !matches!(self.types.get(inner), Type::Tensor(_, _))
                 && self.is_aliasing_type(inner)
@@ -2431,7 +2431,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 self.push_scope();
                 for param in params {
                     self.ensure_state(param.def_id);
-                    if matches!(param.mode, HirParamMode::Owned)
+                    if matches!(param.mode, HirParamMode::Owned | HirParamMode::Axis)
                         && self.types.peel_access_marker(param.ty).0.is_none()
                     {
                         self.own.note_unmarked_param(param.def_id);

@@ -1026,7 +1026,7 @@ contract_ref := IDENTIFIER ('<' type_annotation (',' type_annotation)* '>')?
 generic_type_default := '=' type_annotation
 generic_size_default := '=' NATURAL
 call_type_args  := '<' type_annotation (',' type_annotation)* '>'
-parameter    := 'ceteri'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
+parameter    := 'ceteri'? 'axis'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
 func_modifier := 'argumenta' IDENTIFIER | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NATURAL) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
 callable_posture := 'fiet' | 'fiunt' | 'fient'
 return_clause := '→' type_annotation
@@ -1427,8 +1427,10 @@ optional_suffix := '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')
 non_null_suffix := '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
 argument_list  := (argument (',' argument)*)?
 # The optional call-site marker repeats the access marker its parameter declares
-# (see the prose rule "Call-site access markers").
-argument      := template_argument | call_marker? 'sparge'? expression
+# (see the prose rule "Call-site access markers"). `axis` is the one marker of
+# the second kind: it says what a number means, and a parameter declares it
+# before its type (`axis int a`) with the call echoing it (`t.mean(axis 1)`).
+argument      := template_argument | (call_marker | 'axis')? 'sparge'? expression
 call_marker   := 'de' | 'in' | 'own' | 'copy'
 template_argument := 'sparge'? IDENTIFIER ':' expression
 

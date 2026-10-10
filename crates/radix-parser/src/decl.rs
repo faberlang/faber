@@ -808,6 +808,7 @@ impl Parser {
             let start = self.current_span();
 
             let rest = self.eat_keyword_ident(TokenKind::Ceteri);
+            let axis = self.parse_axis_marker();
             let ty = self.parse_type()?;
 
             let name = self.parse_param_name()?;
@@ -832,7 +833,11 @@ impl Parser {
             let span = start.merge(self.previous_span());
             params.push(Param {
                 sponte,
-                mode: AstParamMode::Owned,
+                mode: if axis {
+                    AstParamMode::Axis
+                } else {
+                    AstParamMode::Owned
+                },
                 is_rest: rest,
                 ty,
                 name,

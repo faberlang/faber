@@ -1106,6 +1106,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordKind::Misc,
     },
     KeywordSpec {
+        text: "axis",
+        token_kind: Some(TokenKind::Axis),
+        scope: KeywordScope::Contextual(PARAMETER_MODE),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
         text: "lege",
         token_kind: Some(TokenKind::Lege),
         scope: KeywordScope::Contextual(BUILTIN_CALL),

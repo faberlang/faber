@@ -3064,7 +3064,12 @@ impl Parser {
                 None
             };
 
-            let marker = self.parse_argument_marker();
+            let axis = self.parse_axis_marker();
+            let marker = if axis {
+                None
+            } else {
+                self.parse_argument_marker()
+            };
             let spread = self.eat_keyword_ident(TokenKind::Sparge);
             if let Some((_, label_span)) = labeled
                 && spread
@@ -3101,6 +3106,7 @@ impl Parser {
                 label: labeled.map(|(name, _)| name),
                 is_spread: spread,
                 marker,
+                axis,
                 value,
                 span,
             });
@@ -3133,7 +3139,32 @@ impl Parser {
         } else {
             return None;
         };
-        if !matches!(
+        if !self.marker_word_precedes_operand() {
+            return None;
+        }
+        self.advance();
+        Some(mode)
+    }
+
+    /// Parse the `axis` marker word before a call argument or a parameter
+    /// type (`t.mean(axis 1)`, `axis int a`).
+    ///
+    /// `axis` is a marker only when an operand follows and the pair is not a
+    /// compact closure head; otherwise it stays an ordinary identifier. In a
+    /// parameter list the operand is a type, so only the word's own position
+    /// is checked there.
+    pub(super) fn parse_axis_marker(&mut self) -> bool {
+        if !self.check_keyword_ident(TokenKind::Axis) || !self.marker_word_precedes_operand() {
+            return false;
+        }
+        self.advance();
+        true
+    }
+
+    /// Whether the marker word at the cursor is followed by an operand start
+    /// and is not the head of a compact closure (`in x ∴ body`).
+    fn marker_word_precedes_operand(&self) -> bool {
+        matches!(
             self.peek_at(1).kind,
             TokenKind::Ident(_)
                 | TokenKind::Tag
@@ -3142,14 +3173,10 @@ impl Parser {
                 | TokenKind::FloatText { .. }
                 | TokenKind::String(_)
                 | TokenKind::LBracket
-        ) || matches!(
+        ) && !matches!(
             self.peek_at(2).kind,
             TokenKind::Therefore | TokenKind::Arrow
-        ) {
-            return None;
-        }
-        self.advance();
-        Some(mode)
+        )
     }
 
     fn argument_label_start(&self) -> bool {

@@ -767,7 +767,7 @@ fn snapshot_const(
 
 fn param_mode(mode: HirParamMode) -> SemanticParamMode {
     match mode {
-        HirParamMode::Owned => SemanticParamMode::Owned,
+        HirParamMode::Owned | HirParamMode::Axis => SemanticParamMode::Owned,
         HirParamMode::De => SemanticParamMode::Ref,
         HirParamMode::In => SemanticParamMode::MutRef,
         HirParamMode::Ex => SemanticParamMode::Move,

@@ -288,7 +288,9 @@ fn collect_param_modes(params: &[HirParam]) -> FxHashMap<DefId, crate::SemanticP
         .iter()
         .map(|param| {
             let mode = match param.mode {
-                radix_hir::HirParamMode::Owned => crate::SemanticParamMode::Owned,
+                radix_hir::HirParamMode::Owned | radix_hir::HirParamMode::Axis => {
+                    crate::SemanticParamMode::Owned
+                }
                 radix_hir::HirParamMode::De => crate::SemanticParamMode::Ref,
                 radix_hir::HirParamMode::In => crate::SemanticParamMode::MutRef,
                 radix_hir::HirParamMode::Ex => crate::SemanticParamMode::Move,

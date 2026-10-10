@@ -523,6 +523,7 @@ impl TypeChecker<'_> {
             Some(Written::Mut) => "mut",
             Some(Written::Own) => "own",
             Some(Written::Copy) => "copy",
+            Some(Written::Axis) => "axis",
             None => "none",
         };
         self.error_issue_with_args(

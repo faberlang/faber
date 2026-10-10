@@ -923,12 +923,16 @@ impl Lowerer<'_> {
                 HirCallArg {
                     name: None,
                     spread: arg.is_spread,
-                    marker: arg.marker.map(|mode| match mode {
-                        radix_syntax::TypeMode::De => radix_hir::HirArgMarker::Ref,
-                        radix_syntax::TypeMode::In => radix_hir::HirArgMarker::Mut,
-                        radix_syntax::TypeMode::Own => radix_hir::HirArgMarker::Own,
-                        radix_syntax::TypeMode::Copy => radix_hir::HirArgMarker::Copy,
-                    }),
+                    marker: if arg.axis {
+                        Some(radix_hir::HirArgMarker::Axis)
+                    } else {
+                        arg.marker.map(|mode| match mode {
+                            radix_syntax::TypeMode::De => radix_hir::HirArgMarker::Ref,
+                            radix_syntax::TypeMode::In => radix_hir::HirArgMarker::Mut,
+                            radix_syntax::TypeMode::Own => radix_hir::HirArgMarker::Own,
+                            radix_syntax::TypeMode::Copy => radix_hir::HirArgMarker::Copy,
+                        })
+                    },
                     expr: lower_expr(self, &arg.value),
                     span: arg.span,
                 }

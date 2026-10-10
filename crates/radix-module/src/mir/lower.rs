@@ -2533,7 +2533,7 @@ impl<'a> FunctionBuilder<'a> {
         // `in` must remain `MirParamMode::MutRef` so call frames can preserve a
         // scalar mutable borrow instead of treating it as an owned value.
         let (mir_mode, mutable) = match mode {
-            HirParamMode::Owned => (MirParamMode::Owned, false),
+            HirParamMode::Owned | HirParamMode::Axis => (MirParamMode::Owned, false),
             HirParamMode::De => (MirParamMode::Ref, false),
             HirParamMode::In => (MirParamMode::MutRef, true),
             HirParamMode::Ex => (MirParamMode::Move, false),

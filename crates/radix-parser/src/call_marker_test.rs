@@ -66,3 +66,60 @@ fn marker_precedes_a_literal_or_list_argument() {
         ]
     );
 }
+
+fn call_axis_flags(source: &str) -> Vec<(bool, Option<TypeMode>)> {
+    let result = parse_ok(source);
+    let program = result.program.as_ref().expect("program");
+    let stmt = program.statements.last().expect("statement");
+    let StmtKind::Incipit(entry) = &stmt.kind else {
+        panic!("expected incipit");
+    };
+    let IfBody::Block(block) = &entry.body else {
+        panic!("expected block body");
+    };
+    let StmtKind::Expr(expr) = &block.statements[0].kind else {
+        panic!("expected expression statement");
+    };
+    let ExprKind::Call(call) = &expr.expr.kind else {
+        panic!("expected call, got {:?}", expr.expr.kind);
+    };
+    call.args.iter().map(|arg| (arg.axis, arg.marker)).collect()
+}
+
+#[test]
+fn axis_marker_parses_before_a_call_argument() {
+    let args = call_axis_flags("incipit {\n    f(a, axis 1, in b)\n}");
+    assert_eq!(
+        args,
+        vec![(false, None), (true, None), (false, Some(TypeMode::In))]
+    );
+}
+
+#[test]
+fn axis_marker_precedes_a_name_or_expression_argument() {
+    let args = call_axis_flags("incipit {\n    f(axis n, axis k)\n}");
+    assert!(args.iter().all(|(axis, mode)| *axis && mode.is_none()));
+}
+
+#[test]
+fn axis_word_stays_an_ordinary_identifier_without_a_following_operand() {
+    let args = call_axis_flags("incipit {\n    f(axis)\n}");
+    assert_eq!(args, vec![(false, None)]);
+}
+
+#[test]
+fn axis_marker_parses_before_a_parameter_type() {
+    let result = parse_ok("functio f(tensor<f32, [2, 3]> t, axis numerus a) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let modes: Vec<_> = func.params.iter().map(|param| param.mode).collect();
+    assert_eq!(
+        modes,
+        vec![
+            radix_syntax::AstParamMode::Owned,
+            radix_syntax::AstParamMode::Axis
+        ]
+    );
+}

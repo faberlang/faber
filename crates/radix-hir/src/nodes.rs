@@ -568,6 +568,10 @@ pub enum HirParamMode {
 
     /// `ex`: explicit move parameter.
     Ex,
+
+    /// `axis`: an owned number that names an axis. Passed by value like
+    /// `Owned`; the marker word is signature presentation, not a type.
+    Axis,
 }
 
 /// Product type declaration with fields, methods, and declared contracts.
@@ -1198,6 +1202,9 @@ pub enum HirArgMarker {
     Own,
     /// `copy`.
     Copy,
+    /// `axis`: the number names an axis. A second kind of marker (what a
+    /// number means, not how a value is passed).
+    Axis,
 }
 
 /// Recoverable error handler binding and body.

@@ -224,6 +224,8 @@ pub enum TokenKind {
     In,
     Own,
     Copy,
+    /// `axis`: marks a number as an axis index at a call and in a signature.
+    Axis,
     Lege,
     Lineam,
     Omnia,

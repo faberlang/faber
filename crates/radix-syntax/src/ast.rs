@@ -383,6 +383,10 @@ pub enum AstParamMode {
 
     /// `ex`: explicit move mode.
     Ex,
+
+    /// `axis`: the parameter is a number that names an axis. A marker word
+    /// before the type (`axis int a`), echoed at the call; not a type.
+    Axis,
 }
 
 /// Function modifiers parsed from declaration syntax.
@@ -1468,6 +1472,10 @@ pub struct Argument {
     /// Call-site access marker (`ref`/`mut`/`own`/`copy`; Latin `de`/`in`/
     /// `own`/`copy`) written before the argument expression, when present.
     pub marker: Option<TypeMode>,
+
+    /// `axis` marker word written before the argument: the number names an
+    /// axis. A second kind of marker beside `marker`; the two never combine.
+    pub axis: bool,
     pub value: Box<Expr>,
     pub span: Span,
 }

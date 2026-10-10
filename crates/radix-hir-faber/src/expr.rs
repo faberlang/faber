@@ -1767,6 +1767,7 @@ impl super::FaberCodegen<'_> {
                     radix_hir::HirArgMarker::Mut => TokenKind::In,
                     radix_hir::HirArgMarker::Own => TokenKind::Own,
                     radix_hir::HirArgMarker::Copy => TokenKind::Copy,
+                    radix_hir::HirArgMarker::Axis => TokenKind::Axis,
                 }));
                 writer.write(" ");
             }
