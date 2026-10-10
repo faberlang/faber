@@ -77,7 +77,7 @@ main {
 #[test]
 fn plain_list_converts_to_wider_list() {
     let source = en("main {
-    const list<i32> t ← [1, 2, 3]
+    var list<i32> t ← [1, 2, 3]
     var list<i32> b ← t
     const list<i64> o ← b ↦ list<i64>
     print o

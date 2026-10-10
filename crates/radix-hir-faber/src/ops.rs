@@ -44,6 +44,13 @@ impl super::FaberCodegen<'_> {
             | HirExpressionKind::CallDefault { .. }
             | HirExpressionKind::CopyInto { .. } => 2,
             HirExpressionKind::Binary(op, _, _) => self.binop_precedence(*op),
+            // `reducta via … ex <source>` and `ordinata via … ex <source>` end
+            // in an open tail (the source, then `vel <identity>`): a following
+            // operator or postfix member would be absorbed into that tail
+            // (`reduce via sum from a / 4.0` re-parses as a sum of `a / 4.0`).
+            // Parenthesize them as an operand of anything tighter than the
+            // ternary level.
+            HirExpressionKind::Reduction { .. } | HirExpressionKind::Sort { .. } => 2,
             // TypeCheck (`expr est <type>`) behaves like Is (precedence 4):
             // both are relational-style checks spelled with `est`.
             HirExpressionKind::TypeCheck { .. } => 4,
