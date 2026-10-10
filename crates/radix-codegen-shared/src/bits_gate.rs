@@ -33,6 +33,7 @@ fn target_admits_bits(target: Target) -> bool {
             | Target::HirGo
             | Target::HirSwift
             | Target::MirSexp
+            | Target::MirWasm
     )
 }
 
