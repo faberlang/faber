@@ -1375,6 +1375,10 @@ mod chained_intrinsic_receiver_test;
 mod scalar_unknown_method_test;
 
 #[cfg(test)]
+#[path = "builtin_unknown_method_test.rs"]
+mod builtin_unknown_method_test;
+
+#[cfg(test)]
 #[path = "scalar_order_test.rs"]
 mod scalar_order_test;
 

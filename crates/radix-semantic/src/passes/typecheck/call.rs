@@ -997,17 +997,6 @@ impl TypeChecker<'_> {
         let receiver_carrier = self.value_carrier_type(intrinsic_ty);
         let resolved_receiver = self.types.get(receiver_carrier);
         let receiver_is_atomic = matches!(resolved_receiver, Type::Atomic(_));
-        // Scalar numeric receivers join the closed set: the numeric registry
-        // owns their method surface, so a registry miss is `unknown_method`
-        // here rather than an inferred result that fails in a later phase.
-        let receiver_requires_known_method = matches!(
-            resolved_receiver,
-            Type::Tensor(_, _)
-                | Type::Vector(_, _)
-                | Type::Matrix(_, _)
-                | Type::Primitive(Primitive::Numerus | Primitive::Fractus)
-                | Type::SizedNumeric(_, _)
-        );
         let tensor_higher_order_method = matches!(resolved_receiver, Type::Tensor(_, _))
             && super::super::air_closure_lift::is_higher_order_method(&method_name);
         // N7e D3 (interim): a method of the bare float's registry surface on a
@@ -1019,6 +1008,10 @@ impl TypeChecker<'_> {
             self.invalid_operand_types(super::ops::POLICY_FLOAT_MATH_NOT_BUILT, receiver.span);
             return self.error_type;
         }
+        // Every receiver with an intrinsic family (scalar numerics, list, map,
+        // set, text, queue, stack, tensor family) is a closed, compiler-owned
+        // method surface: a registry miss is `unknown_method` here rather than
+        // an inferred result that every emitter prints as a verbatim call.
         if super::intrinsics::receiver_supports_intrinsics(resolved_receiver) {
             if let Some(result) = super::intrinsics::check_intrinsic_method_call(
                 self,
@@ -1046,10 +1039,7 @@ impl TypeChecker<'_> {
                 );
                 return self.error_type;
             }
-            if receiver_requires_known_method && !tensor_higher_order_method {
-                // Tensor, vector, matrix, and scalar numeric methods are closed
-                // compiler-owned surfaces. A registry miss must not manufacture an inferred
-                // result that survives check and fails only during lowering.
+            if !tensor_higher_order_method {
                 self.undefined_member("unknown_method", receiver.span);
                 return self.error_type;
             }

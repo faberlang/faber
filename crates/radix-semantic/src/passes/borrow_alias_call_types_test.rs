@@ -24,7 +24,7 @@ const LIST: Carrier = Carrier {
     decls: "",
     init: "[1, 2, 3]",
     fresh: "[4, 5]",
-    mut_body: "a.push(b.length())",
+    mut_body: "a.append(b.length())",
     read_body: "print a.length()\n    print b.length()",
 };
 
@@ -33,7 +33,7 @@ const MAP: Carrier = Carrier {
     decls: "",
     init: r#"{ "alpha": 10 }"#,
     fresh: r#"{ "beta": 20 }"#,
-    mut_body: r#"a.set("x", b.length())"#,
+    mut_body: r#"a.put("x", b.length())"#,
     read_body: "print a.length()\n    print b.length()",
 };
 
