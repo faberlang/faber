@@ -633,6 +633,9 @@ fn generate_output(
     // Raw-bits types (b8..b64) have a carrier only on the Faber source emitter
     // and the MIR runner; every other target fails closed, named, before emit.
     radix_codegen_shared::reject_bits_type(&analysis.types, target)?;
+    // A list window `xs[lo‥hi]` likewise has only those two executors; every
+    // other target refuses it by one named issue until its emission lands.
+    radix_codegen_shared::reject_list_window(&analysis.hir, &analysis.types, target)?;
     match target {
         Target::MirStepper => Err(codegen::CodegenError {
             message: "stepper is the core interpreter target; run through the MIR stepper, not codegen emit".to_owned(),

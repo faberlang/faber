@@ -45,6 +45,7 @@ pub mod frame;
 pub mod hints;
 pub mod hygiene;
 pub mod ident;
+pub mod list_window_gate;
 pub mod lista_lift_gate;
 pub mod names;
 pub mod runtime_api;
@@ -307,6 +308,7 @@ pub use ident::{
     SCALAR_LOOP_CANDIDATES, SCALAR_LOOP_FALLBACK, VALUE_JOIN_CANDIDATES, VALUE_JOIN_FALLBACK,
     output_resource_name, sanitize_ident, sanitize_rust_module_ident, unclaimed_name,
 };
+pub use list_window_gate::reject_list_window;
 pub use tensor_lift_gate::reject_tensor_lift;
 pub use unbounded_gate::{big_literal_unsupported, reject_unbounded_integer};
 pub use validation::{find_error_expr_in_program, reject_hir_errors};

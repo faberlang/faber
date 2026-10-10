@@ -88,6 +88,9 @@ mod copy_into_emit_test;
 #[path = "bits_type_gate_test.rs"]
 mod bits_type_gate_test;
 #[cfg(test)]
+#[path = "list_window_gate_test.rs"]
+mod list_window_gate_test;
+#[cfg(test)]
 #[path = "lista_lift_gate_test.rs"]
 mod lista_lift_gate_test;
 #[cfg(test)]

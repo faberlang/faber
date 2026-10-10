@@ -1,0 +1,103 @@
+//! Fail-closed gate for the list window `xs[lo‥hi]` (ruling B10 of need
+//! 6a13d711).
+//!
+//! A range index on a list is a window: a new list holding the range, fully in
+//! bounds or a failure. It lowers to no HIR kind and no MIR op of its own (it is
+//! `Index(list, interval)` in HIR and `Collection(Index)` with an interval
+//! argument in MIR), so no exhaustive match forces an emitter to refuse it, and
+//! a backend would print a scalar element read or fail with an unnamed error.
+//! Only the Faber source emitter (which prints the window back) and the MIR
+//! runner (which executes it) implement the form. This gate rejects any module
+//! that takes one before an emitter runs, naming the target, until a target's
+//! own emission lands and adds itself to [`target_admits_list_window`]. The
+//! octeti endian window `buf[lo‥hi] ↦ W via Be` indexes an octeti receiver, not
+//! a list, and is untouched.
+
+use crate::CodegenError;
+use radix_diagnostics::DiagnosticArg;
+use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
+use radix_hir::{HirExpression, HirExpressionKind, HirModule};
+use radix_target::Target;
+use radix_types::{Type, TypeId, TypeTable};
+
+const ISSUE: &str = "list_window_unsupported_on_target";
+
+/// Targets that carry a list window faithfully. The Faber re-emitter keeps the
+/// authored index; the MIR runner executes it and does not reach codegen.
+fn target_admits_list_window(target: Target) -> bool {
+    matches!(target, Target::HirFaber | Target::MirStepper)
+}
+
+/// The type behind aliases and access markers.
+fn resolved<'a>(types: &'a TypeTable, ty: TypeId) -> &'a Type {
+    let mut ty = types.peel_access_marker(ty).1;
+    while let Type::Alias(_, inner) = types.get(ty) {
+        ty = *inner;
+    }
+    types.get(ty)
+}
+
+/// Whether `expr` is `list[range]`.
+fn is_list_window(types: &TypeTable, expr: &HirExpression) -> bool {
+    let HirExpressionKind::Index(object, index) = &expr.kind else {
+        return false;
+    };
+    let (Some(object_ty), Some(index_ty)) = (object.ty, index.ty) else {
+        return false;
+    };
+    matches!(
+        resolved(types, object_ty),
+        Type::Array(_) | Type::BoundedArray { .. }
+    ) && matches!(resolved(types, index_ty), Type::Intervallum(_))
+}
+
+/// # Errors
+///
+/// Returns a [`CodegenError`] (`list_window_unsupported_on_target`) when the
+/// module takes a list window and `target` has no emission for it.
+pub fn reject_list_window(
+    hir: &HirModule,
+    types: &TypeTable,
+    target: Target,
+) -> Result<(), CodegenError> {
+    struct Gate<'a> {
+        types: &'a TypeTable,
+        found: bool,
+    }
+    impl HirVisitor for Gate<'_> {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if self.found {
+                return;
+            }
+            self.found = is_list_window(self.types, expr);
+            if !self.found {
+                walk_expr(self, expr);
+            }
+        }
+    }
+    if target_admits_list_window(target) {
+        return Ok(());
+    }
+    let mut gate = Gate {
+        types,
+        found: false,
+    };
+    walk_program(&mut gate, hir);
+    if !gate.found {
+        return Ok(());
+    }
+    Err(CodegenError {
+        message: format!(
+            "the list window `xs[lo‥hi]` is not supported on the {target:?} target: \
+             only the Faber source emitter and the MIR runner implement it"
+        ),
+        args: vec![
+            DiagnosticArg::new("issue", ISSUE),
+            DiagnosticArg::new("target", format!("{target:?}")),
+        ],
+    })
+}
+
+#[cfg(test)]
+#[path = "list_window_gate_test.rs"]
+mod tests;
