@@ -88,7 +88,7 @@ impl TypeChecker<'_> {
         &mut self,
         magnitude: Option<u64>,
         width: BitsWidth,
-        expected: Option<TypeId>,
+        slot: TypeId,
         span: radix_lexer::Span,
     ) -> TypeId {
         let fits = magnitude.is_some_and(|value| width.bits() == 64 || value >> width.bits() == 0);
@@ -101,7 +101,7 @@ impl TypeChecker<'_> {
         }
         // A refused literal still takes the cell's type, so the store checks
         // that follow do not pile mismatches on the named refusal.
-        self.bits_type_of(expected.expect("bits width came from an expected type"))
+        self.bits_type_of(slot)
     }
 
     /// Unary `-` over a `bN`. `None` when neither the slot nor the operand is
