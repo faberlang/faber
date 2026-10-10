@@ -70,6 +70,13 @@ fn every_element_width_is_accepted_with_a_matching_literal() {
         ("f32", 2),
         ("f64", 1),
     ] {
+        if matches!(element, "u8" | "i8") {
+            // An 8-bit element has no byte order and takes no clause (B6).
+            assert_accepts(&format!(
+                "incipit {{ fixum _ t ← |{eight}| ↦ tensor<{element}, [{count}]> }}"
+            ));
+            continue;
+        }
         for hint in ["Le", "Be"] {
             assert_accepts(&format!(
                 "incipit {{ fixum _ t ← |{eight}| ↦ tensor<{element}, [{count}]> via {hint} }}"
@@ -139,11 +146,14 @@ fn missing_hint_is_unspecified() {
 }
 
 #[test]
-fn missing_hint_is_unspecified_for_one_byte_elements_too() {
-    assert_rejects_with_issue(
-        "incipit { fixum _ t ← |00 01| ↦ tensor<u8, [2]> }",
-        UNSPECIFIED,
-    );
+fn one_byte_elements_take_no_hint_and_refuse_one() {
+    assert_accepts("incipit { fixum _ t ← |00 01| ↦ tensor<u8, [2]> }");
+    for hint in ["Le", "Be"] {
+        assert_rejects_with_issue(
+            &format!("incipit {{ fixum _ t ← |00 01| ↦ tensor<u8, [2]> via {hint} }}"),
+            "bits_via_clause_not_allowed",
+        );
+    }
 }
 
 #[test]

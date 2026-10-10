@@ -1372,7 +1372,8 @@ impl TypeChecker<'_> {
 
     /// `octeti ↦ tensor<E, [d1, ..]> via Be|Le` is a faithful bit
     /// reinterpretation of the bytes (row-major, byte order from the hint).
-    /// The hint is required for every width; `E` is one of u8 i8 i16 u16 i32
+    /// The hint is required for every element wider than 8 bits and forbidden
+    /// on 8-bit ones; `E` is one of u8 i8 i16 u16 i32
     /// u32 i64 u64 f32 f64. The byte length must equal `product(shape) x
     /// width` exactly: checked here only when the source length is static
     /// (an octeti literal or a constant window) and every extent is a
@@ -1386,16 +1387,25 @@ impl TypeChecker<'_> {
         params: &[Symbol],
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
-        if !matches!(
-            self.types.get(self.resolve_inferred_type(source_ty)),
-            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. }
-        ) {
+        if !self.is_octeti_tensor_source(source_ty) {
             return None;
         }
         let Type::Tensor(elem, shape) = self.types.get(target_carrier).clone() else {
             return None;
         };
-        if !self.conversio_has_endian_hint(params) {
+        // Ruling B6: an 8-bit element has no byte order, so
+        // it takes no `via` clause and a clause written on it is refused;
+        // every wider element still requires one.
+        let one_byte = matches!(
+            self.types.get(self.resolve_inferred_type(elem)),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::I8 | NumericWidth::U8)
+        );
+        if one_byte {
+            if !params.is_empty() {
+                self.invalid_conversion(super::bits::BITS_VIA_CLAUSE_NOT_ALLOWED, span);
+                return Some(self.error_type);
+            }
+        } else if !self.conversio_has_endian_hint(params) {
             self.invalid_conversion(ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED, span);
             return Some(self.error_type);
         }
@@ -1422,6 +1432,18 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         Some(target_resolved)
+    }
+
+    /// The byte-string sources of the bulk decode row: `lista<b8>` (`bytes`)
+    /// and the bounded `octeti<N>` form.
+    fn is_octeti_tensor_source(&self, source_ty: TypeId) -> bool {
+        match self.types.get(self.resolve_inferred_type(source_ty)) {
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => true,
+            Type::Array(element) => {
+                self.bits_width_of(*element) == Some(radix_types::BitsWidth::B8)
+            }
+            _ => false,
+        }
     }
 
     fn is_numerus_u8(&self, ty: TypeId) -> bool {

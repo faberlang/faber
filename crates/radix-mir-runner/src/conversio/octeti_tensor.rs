@@ -100,14 +100,6 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             ));
         };
         let element_ty = *element_ty;
-        let Some(endian) = hints::endian_hint(params, |param| {
-            hints::classify(self.interner.resolve(*param))
-        }) else {
-            return Err(RunnerError::internal(
-                span,
-                "octeti tensor conversio needs a Be or Le hint",
-            ));
-        };
         let Some(shape) = literal_tensor_dims(target_ty, self.types) else {
             return Err(RunnerError::internal_with_issue(
                 span,
@@ -119,6 +111,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(
                 span,
                 "octeti tensor element unsupported",
+            ));
+        };
+        // An 8-bit element has no byte order (ruling B6): the checker admits
+        // no clause on it, so the order is immaterial and `Le` stands in.
+        let endian = hints::endian_hint(params, |param| {
+            hints::classify(self.interner.resolve(*param))
+        });
+        let Some(endian) = endian.or((element.width() == 1).then_some(EndianHint::Le)) else {
+            return Err(RunnerError::internal(
+                span,
+                "octeti tensor conversio needs a Be or Le hint",
             ));
         };
         let expected = shape

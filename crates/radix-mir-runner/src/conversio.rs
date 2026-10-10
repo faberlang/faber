@@ -222,6 +222,24 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Value::Octeti(bytes) if matches!(target, Type::Tensor(_, _)) => {
                     self.convert_octeti_to_tensor(bytes, target_ty, params, recovery, span)
                 }
+                // The same row over a `lista<b8>` value held as a list of
+                // byte patterns (need: `octeti` is `lista<b8>`).
+                Value::Array(cell)
+                    if matches!(target, Type::Tensor(_, _))
+                        && self.is_bytes_list_type(source_ty) =>
+                {
+                    let mut bytes = Vec::with_capacity(cell.borrow().len());
+                    for item in cell.borrow().iter() {
+                        let Some(pattern) = bits_pattern(item) else {
+                            return Err(RunnerError::internal(
+                                span,
+                                "bytes tensor conversio met an element that is not a byte",
+                            ));
+                        };
+                        bytes.push(pattern as u8);
+                    }
+                    self.convert_octeti_to_tensor(bytes, target_ty, params, recovery, span)
+                }
                 value => self.convert_to_eager_sequence(value, target_ty, struct_defaults, span),
             },
             Type::Struct(def_id) => {
@@ -277,6 +295,17 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             _ => None,
         }
+    }
+
+    /// Whether `ty` is `lista<b8>` (aliases looked through).
+    fn is_bytes_list_type(&self, ty: TypeId) -> bool {
+        let Type::Array(element) = self.types.get(self.resolve_conversion_target(ty)) else {
+            return false;
+        };
+        matches!(
+            self.types.get(self.resolve_conversion_target(*element)),
+            Type::Bits(radix_types::BitsWidth::B8)
+        )
     }
 
     fn is_dynamic_source(&self, source_ty: TypeId) -> bool {

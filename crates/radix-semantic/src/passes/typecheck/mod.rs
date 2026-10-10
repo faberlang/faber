@@ -1297,6 +1297,10 @@ mod bits_operator_test;
 mod bits_same_width_conversio_test;
 
 #[cfg(test)]
+#[path = "octeti_tensor_bytes_list_test.rs"]
+mod octeti_tensor_bytes_list_test;
+
+#[cfg(test)]
 #[path = "ordo_conversio_test.rs"]
 mod ordo_conversio_test;
 

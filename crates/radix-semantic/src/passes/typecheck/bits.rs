@@ -18,7 +18,7 @@ const BITS_OPERAND_MISMATCH: &str = "bits_operand_mismatch";
 pub(super) const BITS_LITERAL_OUT_OF_RANGE: &str = "bits_literal_out_of_range";
 const INTEGER_OPERANDS_REQUIRED: &str = "integer_operands_required";
 const BITS_CONVERSION_WIDTH_MISMATCH: &str = "bits_conversion_width_mismatch";
-const BITS_VIA_CLAUSE_NOT_ALLOWED: &str = "bits_via_clause_not_allowed";
+pub(super) const BITS_VIA_CLAUSE_NOT_ALLOWED: &str = "bits_via_clause_not_allowed";
 const BITS_VIA_CLAUSE_REQUIRED: &str = "bits_via_clause_required";
 const CONVERSIO_VIA_TARGET_TAKES_NO_HINT: &str = "conversio_via_target_takes_no_hint";
 

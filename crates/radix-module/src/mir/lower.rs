@@ -101,6 +101,9 @@ pub(crate) mod lane_form;
 #[path = "lower/map_size_guard_test.rs"]
 mod map_size_guard_tests;
 mod monomorphize;
+#[cfg(test)]
+#[path = "lower/octeti_tensor_run_test.rs"]
+mod octeti_tensor_run_tests;
 mod package_instantiate;
 mod place;
 mod register_lift;
