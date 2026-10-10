@@ -144,7 +144,7 @@ fn wasm_bits_display_is_hex_at_full_width() {
 #[test]
 fn wasm_bits_equality_and_order_read_the_pattern_unsigned() {
     let text = wasm_text(
-        "fixum b8 a ← 0x80\nfixum b8 b ← 0x7f\nnota a ≻ b\nnota a ≺ b\nnota a ≥ b\nnota a ≤ b\nnota a ≡ b\nnota a ≠ b",
+        "fixum b8 a ← 0x80\nfixum b8 b ← 0x7f\nnota a ≻ b\nnota a ≺ b\nnota a ≥ b\nnota a ≤ b\nnota a ≡ b\nnota a ≢ b",
     );
     for opcode in ["i32.gt_u", "i32.lt_u", "i32.ge_u", "i32.le_u", "i32.eq", "i32.ne"] {
         assert!(

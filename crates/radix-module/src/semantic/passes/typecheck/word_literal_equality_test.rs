@@ -57,7 +57,7 @@ fn integer_policy_cells_compare_against_a_literal_under_exact_equality() {
         "saturating<i32>",
         "wrapping<i32>",
     ] {
-        for body in ["x ≡ 250", "250 ≡ x", "x ≠ 250", "250 ≠ x"] {
+        for body in ["x ≡ 250", "250 ≡ x", "x ≢ 250", "250 ≢ x"] {
             assert_accepts(&format!("fn probe({cell} x) → bool {{\n    return {body}\n}}\n"));
         }
     }
@@ -66,7 +66,7 @@ fn integer_policy_cells_compare_against_a_literal_under_exact_equality() {
 #[test]
 fn float_policy_cells_compare_against_a_literal_under_exact_equality() {
     for cell in ["f64", "saturating<f64>", "trapping<f64>", "trapping<f32>"] {
-        for body in ["x ≡ 2.5", "2.5 ≡ x", "x ≠ 2.5"] {
+        for body in ["x ≡ 2.5", "2.5 ≡ x", "x ≢ 2.5"] {
             assert_accepts(&format!("fn probe({cell} x) → bool {{\n    return {body}\n}}\n"));
         }
     }

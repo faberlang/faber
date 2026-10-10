@@ -18,7 +18,7 @@ locale = "en"
 #   • A scalar may stand on either side; an untyped literal adopts the matrix's element type
 #   • Logic — `and`, `or`, `not` act per cell on bool matrices and always evaluate both sides
 #   • Select — `mask ✓ m ✗ n` takes `m` where the mask is true and `n` elsewhere
-#   • Whole values — `≡` and `≠` still give one bool for the whole matrix
+#   • Whole values — `≡` and `≢` still give one bool for the whole matrix
 #
 # Common mistakes:
 #   • writing `m ≡ n` for a mask — it is one yes/no; write `m ≅ n`

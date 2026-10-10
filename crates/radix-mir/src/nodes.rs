@@ -1272,7 +1272,7 @@ impl MirVectorOp {
 ///
 /// Arity: `Neg` and `Not` take one operand, `Select` takes three (mask,
 /// then-value, else-value), everything else takes two. `WholeEq` and
-/// `WholeNotEq` (`≡`/`≠` over two tensors) are the exception to the lift: they
+/// `WholeNotEq` (`≡`/`≢` over two tensors) are the exception to the lift: they
 /// compare the two whole tensors and yield one scalar `bivalens`, not a tensor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirLiftOp {
@@ -1306,7 +1306,7 @@ pub enum MirLiftOp {
     /// shape and every element pair is `≡` (NaN is never `≡`); a shape
     /// difference is `false`, not an error.
     WholeEq,
-    /// `a ≠ b` over two tensors: `not (a ≡ b)`.
+    /// `a ≢ b` over two tensors: `not (a ≡ b)`.
     WholeNotEq,
 }
 

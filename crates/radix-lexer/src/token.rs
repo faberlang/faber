@@ -330,7 +330,8 @@ pub enum TokenKind {
     ApproxNotEq,     // ≇ promoted-exact negation
     FuzzyEq,         // ≈ tolerance compare
     FuzzyNotEq,      // ≉ tolerance compare negation
-    BangEq,          // ≠ / ≢
+    BangEq,          // ≢
+    BangEqRetired,   // ≠ (U+2260, retired; parser records neq_glyph_retired)
     BangEqEq,        // reserved; no source form
     Lt,              // ≺
     Gt,              // ≻

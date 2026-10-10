@@ -376,7 +376,11 @@ impl<'a> Lexer<'a> {
             '≻' => TokenKind::Gt,
             '←' => TokenKind::Assign,
             '≡' => TokenKind::EqEq,
-            '≢' | '≠' => TokenKind::BangEq,
+            '≢' => TokenKind::BangEq,
+            // FABER-2-SUNSET: U+2260 is retired (ruling 6b5c1c615); `≢` is the
+            // one negation of `≡`. It lexes to its own token so the parser can
+            // record `PARSE030 neq_glyph_retired` and keep parsing.
+            '≠' => TokenKind::BangEqRetired,
             '≅' => TokenKind::ApproxEq,
             '≇' => TokenKind::ApproxNotEq,
             '≈' => TokenKind::FuzzyEq,

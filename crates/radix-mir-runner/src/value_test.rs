@@ -261,7 +261,7 @@ fn ordering_and_arithmetic_accept_the_same_mixed_operand_mixes() {
 }
 
 /// IEEE 754 ordered comparison (operator ruling 2026-09-24): every ordered
-/// predicate against NaN is false and never traps; `≡` is false and `≠` true.
+/// predicate against NaN is false and never traps; `≡` is false and `≢` true.
 #[test]
 fn float_compare_with_nan_is_ieee_ordered_false() {
     let span = Span::default();

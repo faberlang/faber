@@ -824,12 +824,25 @@ fn lexes_postfix_inc_dec_operators() {
 
 #[test]
 fn lexes_equality_comparison_operators() {
-    let result = lex("≡ ≠");
+    let result = lex("≡ ≢");
     assert!(result.errors.is_empty());
     let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
     assert_eq!(
         kinds,
         vec![TokenKind::EqEq, TokenKind::BangEq, TokenKind::Eof,]
+    );
+}
+
+/// U+2260 is retired (ruling 6b5c1c615): it lexes to its own token, never to
+/// `BangEq`, so the parser can name `≢` in the diagnostic.
+#[test]
+fn retired_not_equal_glyph_lexes_to_its_own_token() {
+    let result = lex("≡ ≠");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![TokenKind::EqEq, TokenKind::BangEqRetired, TokenKind::Eof,]
     );
 }
 

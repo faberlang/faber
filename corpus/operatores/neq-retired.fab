@@ -1,0 +1,36 @@
++++
+term = "≢"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "comparison", "equality", "equality_tail", "et_expr", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "The glyph ≠ is retired; ≢ is the one negation of ≡."
+syntax = "a ≠ b — rejected; write a ≢ b"
+related = ["≢", "≡"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE030:neq_glyph_retired"
++++
+# =============================================================================
+# ≢ — The glyph ≠ is retired; ≢ is the one negation of ≡.
+# =============================================================================
+#
+# What this teaches:
+#   • every negation glyph has the same number of lines as the glyph it negates
+#     (≡/≢, ≅/≇, ≈/≉); there is no second spelling for inequality
+#
+# Common mistakes:
+#   • writing ≠ by habit — the diagnostic names ≢ as the replacement
+#
+# See also: comparatio
+# =============================================================================
+
+# retired-glyph reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    const int a ← 1
+    const int b ← 2
+    print a ≠ b
+}

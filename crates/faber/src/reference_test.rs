@@ -112,10 +112,10 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     assert!(bits.contains("retired"));
     assert!(bits.contains("b16"));
 
-    // finite teaches the bit-field read gate, never x ≠ x.
+    // finite teaches the bit-field read gate, never x ≢ x.
     let finite = render_plain(&registry.lookup("finite").expect("finite"));
     assert!(finite.contains("exponent"));
-    assert!(finite.contains("≠ x"));
+    assert!(finite.contains("≢ x"));
 
     // summa explains the grammar reduction, not the list `.summa()` method.
     let summa_lookup = registry.lookup("summa").expect("summa resolves");

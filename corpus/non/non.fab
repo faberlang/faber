@@ -37,7 +37,7 @@ test "non applied twice returns the original" {
 #   • the `non` keyword — unary boolean negation (equivalent to `!`)
 #
 # Common mistakes:
-#   • Confusing non (logical negation) with ≠ (inequality comparison) — non negates a boolean, ≠ compares two values.
+#   • Confusing non (logical negation) with ≢ (inequality comparison) — non negates a boolean, ≢ compares two values.
 #
 # See also: verum, falsum
 # =============================================================================

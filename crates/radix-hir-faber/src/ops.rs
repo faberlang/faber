@@ -147,7 +147,7 @@ impl super::FaberCodegen<'_> {
             HirBinOp::ApproxNotEq => "≇".to_owned(),
             HirBinOp::FuzzyEq => "≈".to_owned(),
             HirBinOp::FuzzyNotEq => "≉".to_owned(),
-            HirBinOp::NotEq | HirBinOp::StrictNotEq => "≠".to_owned(),
+            HirBinOp::NotEq | HirBinOp::StrictNotEq => "≢".to_owned(),
             HirBinOp::Lt => "≺".to_owned(),
             HirBinOp::Gt => "≻".to_owned(),
             HirBinOp::LtEq => "≤".to_owned(),

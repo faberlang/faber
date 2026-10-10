@@ -599,7 +599,7 @@ impl TypeChecker<'_> {
         Some(self.lift_bool_result(pair.shape))
     }
 
-    /// Comparisons over aggregates (advisor rulings 2026-10-04). `≡ ≠` compare
+    /// Comparisons over aggregates (advisor rulings 2026-10-04). `≡ ≢` compare
     /// whole values on every type and give one `bivalens` (see
     /// `check_aggregate_equality`); `< > ≤ ≥ ≅ ≇` lift per element like `+`, over
     /// a tensor or a register `vector`/`matrix` against a scalar or a same-shape

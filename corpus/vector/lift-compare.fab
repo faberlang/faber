@@ -18,7 +18,7 @@ locale = "en"
 #   • A scalar may stand on either side; an untyped literal adopts the vector's element type
 #   • Logic — `and`, `or`, `not` act per lane on bool vectors and always evaluate both sides
 #   • Select — `mask ✓ v ✗ w` takes `v` where the mask is true and `w` elsewhere
-#   • Whole values — `≡` and `≠` still give one bool for the whole vector
+#   • Whole values — `≡` and `≢` still give one bool for the whole vector
 #
 # Common mistakes:
 #   • writing `v ≡ w` for a mask — it is one yes/no; write `v ≅ w`

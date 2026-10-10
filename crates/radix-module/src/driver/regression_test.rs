@@ -518,7 +518,7 @@ fn compile_supports_extended_binary_operators() {
   fixum numerus ∪ nihil maybe ← nulla
 
   nota a ≡ b
-  nota a ≠ b
+  nota a ≢ b
   nota maybe est nihil
   nota a ∈ 0‥3
   nota a ∈ [1, 2, 3]
@@ -543,7 +543,7 @@ fn compile_supports_extended_unary_operators() {
   nota n ≺ 0
   nota n ≻ 0
   nota flag ≡ verum
-  nota flag ≠ verum
+  nota flag ≢ verum
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 

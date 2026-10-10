@@ -58,7 +58,7 @@ incipit {{
     nota maior(3, 9)
     nota maior(\"pirum\", \"malum\")
     fixum fractus top ← maior(1.5, nonnumerus)
-    nota top ≠ top
+    nota top ≢ top
     nota maior(2.5, -1.0)
 }}
 "

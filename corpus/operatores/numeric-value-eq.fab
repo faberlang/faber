@@ -6,7 +6,7 @@ category = "comparison"
 canonical = true
 summary = "Numeric value equality (≅) after promotion join — exact, not fuzzy float."
 syntax = "<expression> ≅ <expression> | <expression> ≇ <expression>"
-related = ["≡", "≠", "↦", "adfirma"]
+related = ["≡", "≢", "↦", "adfirma"]
 locale = "en"
 +++
 
@@ -23,7 +23,7 @@ locale = "en"
 #   • Expecting ≅ to be fuzzy or approximate — it is exact value equality after promotion.
 #   • Treating −1 as the unsigned maximum — the sign-boundary comparison is falsum, not a wrapped match.
 #
-# See also: ≡, ≠, ↦, adfirma
+# See also: ≡, ≢, ↦, adfirma
 # =============================================================================
 
 # operatores/numeric-value-eq — ≅ ≇

@@ -1,5 +1,5 @@
 //! Comparisons, logic and masks over aggregates (advisor rulings 2026-10-04,
-//! gpu-reset rule 15): `≡`/`≠` compare WHOLE values on every type, the numeric
+//! gpu-reset rule 15): `≡`/`≢` compare WHOLE values on every type, the numeric
 //! comparison glyphs `< > ≤ ≥ ≅ ≇` lift per element over a tensor, vector or
 //! matrix (against a scalar on either side or a same-shape peer), `et`/`aut`/
 //! `non` and the `✓ ✗` select lift over a bool aggregate, and a bool aggregate
@@ -58,11 +58,11 @@ fn function(params: &str, ret: &str, body: &str) -> String {
     format!("functio lifted({params}) → {ret} {{\n    redde {body}\n}}")
 }
 
-// --- `≡ ≠` compare whole values ------------------------------------------------
+// --- `≡ ≢` compare whole values ------------------------------------------------
 
 #[test]
 fn tensor_equality_is_one_bivalens() {
-    for op in ["≡", "≠"] {
+    for op in ["≡", "≢"] {
         accepts(&function(
             &format!("{T} a, {T} b"),
             "bivalens",
@@ -99,7 +99,7 @@ fn tensor_equality_needs_identical_element_types() {
 #[test]
 fn a_scalar_is_never_equal_to_an_aggregate() {
     for (ty, kind) in [(T, "tensor"), (V, "vector"), (M, "matrix")] {
-        for op in ["≡", "≠"] {
+        for op in ["≡", "≢"] {
             rejects(
                 &function(&format!("{ty} a"), "bivalens", &format!("a {op} 2.0")),
                 SemanticErrorKind::OperandTypesInvalid,
@@ -150,7 +150,7 @@ fn a_shape_that_is_part_of_the_type_must_agree() {
         &function(
             "tensor<f32, [2, 2]> a, tensor<f32, [4]> b",
             "bivalens",
-            "a ≠ b",
+            "a ≢ b",
         ),
         SemanticErrorKind::OperandTypesInvalid,
         "aggregate_equality_shape_mismatch",
@@ -212,7 +212,7 @@ fn a_shape_known_only_at_run_time_is_a_value_question() {
     );
     accepts(
         r"functio lifted<magnitudo N>(tensor<f32, [N]> a, tensor<f32, [3]> b) → bivalens {
-    redde a ≠ b
+    redde a ≢ b
 }",
     );
 }

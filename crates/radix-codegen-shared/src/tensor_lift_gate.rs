@@ -10,7 +10,7 @@
 //! them silently. Tensor `+ -` against a tensor of the same element type and
 //! the `⊙ ⊘` products keep their emitters.
 //!
-//! `≡ ≠` between two tensors compare whole values and are one `bivalens`, not a
+//! `≡ ≢` between two tensors compare whole values and are one `bivalens`, not a
 //! lift; they are gated under `tensor_equality_unsupported_on_target` because
 //! only the MIR runner executes them.
 //!
@@ -20,7 +20,7 @@
 //! comparisons `< > ≤ ≥ ≅ ≇` and `et`/`aut` between two registers or against a
 //! scalar, `⤒ ⤓` against a scalar or a register peer, and the `✓ ✗` select over
 //! a register mask. Their per-lane unrolling happens in MIR, so only the
-//! MIR-backed targets execute them; register with register `+ -`, `≡ ≠` and the
+//! MIR-backed targets execute them; register with register `+ -`, `≡ ≢` and the
 //! `⊙ ⊘` products keep their emitters.
 
 use crate::CodegenError;
@@ -51,7 +51,7 @@ enum Operands {
 #[derive(Clone, Copy)]
 enum Family {
     Tensor,
-    /// `≡ ≠` between two tensors: one whole-value verdict.
+    /// `≡ ≢` between two tensors: one whole-value verdict.
     TensorEquality,
     Vector,
     Matrix,
@@ -288,7 +288,7 @@ fn lifted_form(
         {
             None
         }
-        // `≡ ≠` between two tensors compare whole values: one verdict, gated
+        // `≡ ≢` between two tensors compare whole values: one verdict, gated
         // under its own issue. The TypeScript emitter compares shape then
         // elements itself, so that target is exempt from this family only.
         HirExpressionKind::Binary(
@@ -304,7 +304,7 @@ fn lifted_form(
             let spelling = if matches!(op, HirBinOp::Eq | HirBinOp::StrictEq) {
                 "≡"
             } else {
-                "≠"
+                "≢"
             };
             Some((Family::TensorEquality, spelling.to_owned()))
         }

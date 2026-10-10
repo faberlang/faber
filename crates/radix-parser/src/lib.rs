@@ -1835,6 +1835,10 @@ mod size_extent_test;
 mod comparison_ascii_retired_test;
 
 #[cfg(test)]
+#[path = "neq_glyph_retired_test.rs"]
+mod neq_glyph_retired_test;
+
+#[cfg(test)]
 #[path = "typed_zero_test.rs"]
 mod typed_zero_test;
 

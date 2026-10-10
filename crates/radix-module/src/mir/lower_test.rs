@@ -2880,7 +2880,7 @@ functio causa(FormaError e) → textus {
     }
 }
 functio mensura(lista<numerus> x, lista<numerus> w) → numerus ⇥ FormaError {
-    si x.longitudo() ≠ 2 {
+    si x.longitudo() ≢ 2 {
         iace finge FormaInvalida { causa = "matmul requires rank-2 operands" }
     }
     redde w.longitudo()
@@ -2895,10 +2895,10 @@ functio typo_par_tres(lista<numerus> a, lista<numerus> b, lista<numerus> c) → 
     fixum textus ta ← "f32"
     fixum textus tb ← "f32"
     fixum textus tc ← "f32"
-    si ta ≠ tb aut tb ≠ tc {
+    si ta ≢ tb aut tb ≢ tc {
         iace finge TypoMismatch { causa = "dtype mismatch" }
     }
-    si ta ≠ "f32" {
+    si ta ≢ "f32" {
         iace finge TypoMismatch { causa = "unsupported dtype for nn primitive" }
     }
     redde verum
@@ -2906,28 +2906,28 @@ functio typo_par_tres(lista<numerus> a, lista<numerus> b, lista<numerus> c) → 
 functio linear(lista<numerus> x, lista<numerus> w, lista<numerus> b) → numerus ⇥ NnError {
     fixum lista<numerus> fx ← x
     fixum lista<numerus> fw ← w
-    si fx.longitudo() ≠ 2 {
+    si fx.longitudo() ≢ 2 {
         iace finge GradusMismatch { causa = "linear requires rank-2 input" }
     }
-    si fw.longitudo() ≠ 2 {
+    si fw.longitudo() ≢ 2 {
         iace finge GradusMismatch { causa = "linear requires rank-2 weight" }
     }
     fixum numerus m ← fx.accipe(0) vel 1
     fixum numerus k ← fx.accipe(1) vel 1
     fixum numerus n ← fw.accipe(1) vel 1
-    si k ≠ (fw.accipe(0) vel 1) {
+    si k ≢ (fw.accipe(0) vel 1) {
         iace finge Incompatibilis { causa = "inner dimensions mismatch" }
     }
     fixum bivalens _ ← typo_par_tres(x, w, b)
     fixum lista<numerus> fb ← b
     si fb.longitudo() ≡ 1 {
-        si (fb.accipe(0) vel 1) ≠ n {
+        si (fb.accipe(0) vel 1) ≢ n {
             iace finge FormaMismatch { causa = "bias does not match output width" }
         }
     }
     secus {
         si fb.longitudo() ≡ 2 {
-            si (fb.accipe(0) vel 1) ≠ m aut (fb.accipe(1) vel 1) ≠ n {
+            si (fb.accipe(0) vel 1) ≢ m aut (fb.accipe(1) vel 1) ≢ n {
                 iace finge FormaMismatch { causa = "bias does not match output shape" }
             }
         }
@@ -3769,7 +3769,7 @@ fn lowers_adfirma_to_assert_runtime_intrinsics() {
         r#"
 functio check(textus name, numerus count) → vacuum {
     adfirma count ≻ 0
-    adfirma name ≠ "" mori "name must not be empty"
+    adfirma name ≢ "" mori "name must not be empty"
 }
 "#,
     );

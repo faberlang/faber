@@ -100,7 +100,7 @@ const OPS: [Op; 9] = [
 
 /// The 81-cell truth table, row = operator, column = carrier-pair family.
 const TABLE: [[Pin; 9]; 9] = [
-    // ≡ / ≠ — strict equality is fail-closed: identical types only.
+    // ≡ / ≢ — strict equality is fail-closed: identical types only.
     [
         join(),
         reject(EXACT_EQ),

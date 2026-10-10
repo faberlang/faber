@@ -4,8 +4,8 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "redde_stmt", "incipit_stmt", "fixum_decl", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "equality", "comparison", "expression", "literal", "nota_stmt"]
 category = "comparison"
 canonical = true
-summary = "≡ and ≠ compare whole tensors and give one yes/no; ≅ and ≇ give a per-element mask, and a mask reduces to one answer."
-syntax = "a ≡ b | a ≠ b | a ≅ b | reduce via all from mask"
+summary = "≡ and ≢ compare whole tensors and give one yes/no; ≅ and ≇ give a per-element mask, and a mask reduces to one answer."
+syntax = "a ≡ b | a ≢ b | a ≅ b | reduce via all from mask"
 related = ["tensor", "reducta", "bivalens"]
 locale = "en"
 +++
@@ -14,7 +14,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • ≡ and ≠ compare WHOLE tensors — the same shape and every element pair equal — and give one bool
+#   • ≡ and ≢ compare WHOLE tensors — the same shape and every element pair equal — and give one bool
 #   • ≅ and ≇ compare per element and give a bool tensor of the same shape (a mask)
 #   • A mask is never a condition — reduce it with `reduce via all` or `reduce via any`
 #   • NaN is not equal to anything, so a tensor holding one is not equal to itself
@@ -30,7 +30,7 @@ locale = "en"
 
 # tensor — ≡ is whole-value, ≅ is per element
 #
-# WHY: ≡ and ≠ mean the same on every type: are these the same value? A kernel's
+# WHY: ≡ and ≢ mean the same on every type: are these the same value? A kernel's
 # equality mask is `a ≅ b`, its ordering mask is `a > b`.
 #
 # EXPECTED stdout: see equality-whole.expected

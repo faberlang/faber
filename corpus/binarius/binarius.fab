@@ -22,7 +22,7 @@ fn carum() → bool {
 #
 # What this teaches:
 #   • Complete binary operator tour — arithmetic (`+ − * / %`), comparison
-#     (`≡ ≠ < >`), logic (`et aut`), nullish coalescing (`vel`), ternary
+#     (`≡ ≢ < >`), logic (`et aut`), nullish coalescing (`vel`), ternary
 #     (`sic/secus`), and bitwise (`∧ ∨ ⊻ ⇐ ⇒`)
 #   • Assignment patterns — explicit assignment (`←`) and postfix increment
 #     (`↑ ↓` statements)
@@ -37,7 +37,7 @@ fn carum() → bool {
 
 # binarius — binary operators and explicit assignment
 #
-# Covers arithmetic (+ − * / %), comparison (≡ ≠ < >), logic (et aut),
+# Covers arithmetic (+ − * / %), comparison (≡ ≢ < >), logic (et aut),
 # nullish coalescing (vel), ternary (sic/secus), bitwise (∧ ∨ ⊻ ⇐ ⇒),
 # explicit assignment (←), and postfix increment (↑ ↓ statements).
 #

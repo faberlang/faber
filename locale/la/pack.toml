@@ -784,6 +784,10 @@ help = "write `{glyph}` for `{operator}` (`≤` and `≥` for the non-strict for
 message = "nihil generis solum pro tensore, vectore et matrice est; genus collectionis ut lista non vindicatur"
 help = "scribe genus tensoris, vectoris vel matricis cum uncis vacuis, vel collectionem per litteram aedifica"
 
+[diagnostics.PARSE030.issues.neq_glyph_retired]
+message = "`{glyph}` signum retractum est; negatio `≡` scribitur `{replacement}`"
+help = "scribe `{replacement}` pro `{glyph}`; omne signum negationis easdem lineas habet quas signum negatum (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
 help = "use ⊥; vel is nullish coalescing only"
@@ -2471,7 +2475,7 @@ help = "keep caller and fragment lane bindings distinct"
 
 [diagnostics.SEM011.issues.est_value_rhs]
 message = "`est` genus probat; dextera pars valorem nominat"
-help = "ad valores comparandos utere aequalitatis signo: `≡`, vel `≠` pro `non est`"
+help = "ad valores comparandos utere aequalitatis signo: `≡`, vel `≢` pro `non est`"
 
 [diagnostics.SEM011.issues.range_step_must_be_numeric]
 message = "range step must be numeric"

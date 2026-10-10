@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "comparison"
 canonical = true
 summary = "bits values compare for equality and order by bit pattern read as unsigned."
-syntax = "a ≡ b | a ≠ b | a ≺ b | a ≻ b | a ≤ b | a ≥ b"
+syntax = "a ≡ b | a ≢ b | a ≺ b | a ≻ b | a ≤ b | a ≥ b"
 related = ["bits", "u8"]
 locale = "la"
 +++

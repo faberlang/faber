@@ -1,13 +1,13 @@
 +++
 term = "≡"
-explains = ["≠", "≡", "≥", "≤"]
+explains = ["≢", "≡", "≥", "≤"]
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "comparison", "equality", "equality_tail", "et_expr", "expression", "literal", "nota_stmt"]
 category = "comparison"
 canonical = true
 summary = "Equality and ordering comparisons returning bivalens."
-syntax = "<expression> ≡ <expression> | <expression> ≠ <expression> | <expression> ≤ <expression> | <expression> ≥ <expression>"
-related = ["≠", "≤", "≥", "est", "adfirma"]
+syntax = "<expression> ≡ <expression> | <expression> ≢ <expression> | <expression> ≤ <expression> | <expression> ≥ <expression>"
+related = ["≢", "≤", "≥", "est", "adfirma"]
 locale = "en"
 +++
 test "equal and not-equal comparisons" {
@@ -25,19 +25,19 @@ test "ordering and chained interval" {
 # =============================================================================
 #
 # What this teaches:
-#   • Comparison operators — `≡` (equal), `≠` (not equal), `≤` (less-or-equal), `≥` (greater-or-equal).
+#   • Comparison operators — `≡` (equal), `≢` (not equal), `≤` (less-or-equal), `≥` (greater-or-equal).
 #   • Chaining — Comparisons can be chained with `et` for interval tests like `0 < x et x < 10`.
 #
 # Common mistakes:
-#   • Using == instead of ≡ for equality, or != instead of ≠ for inequality — Faber uses Unicode operators.
+#   • Using == instead of ≡ for equality, or != instead of ≢ for inequality — Faber uses Unicode operators.
 #
-# See also: ≠, ≤, ≥, est, adfirma
+# See also: ≢, ≤, ≥, est, adfirma
 # =============================================================================
 
-# operatores/comparatio — ≡ ≠ ≤ ≥
+# operatores/comparatio — ≡ ≢ ≤ ≥
 #
 # GRAMMAR:
-#   cmpExpr :← expr ('≡' | '≠' | '≤' | '≥' | '<' | '>') expr
+#   cmpExpr :← expr ('≡' | '≢' | '≤' | '≥' | '<' | '>') expr
 #
 # EXPECTED OUTPUT:
 #   verum, verum, verum, verum, verum

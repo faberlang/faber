@@ -5,7 +5,7 @@
 //! against a scalar or a same-shape tensor. They lower to one
 //! `MirIntrinsic::TensorLift(op)` whose operands are all evaluated first, so
 //! nothing short-circuits (a documented deviation from the scalar meaning).
-//! `≡ ≠` over two tensors compare whole values and lower to the same call with
+//! `≡ ≢` over two tensors compare whole values and lower to the same call with
 //! `WholeEq`/`WholeNotEq`, which yields one `bivalens`. Tensor `+ -` against a
 //! tensor keeps its `addita`/`subtrahe` lowering and `⊙ ⊘` their glyph lowering.
 
@@ -42,7 +42,7 @@ impl FunctionBuilder<'_> {
             HirBinOp::Div if against_scalar => MirLiftOp::Div,
             HirBinOp::Mod if against_scalar => MirLiftOp::Mod,
             HirBinOp::TrueDiv => MirLiftOp::TrueDiv,
-            // `≡ ≠` compare whole tensors (one verdict); the typechecker rejects
+            // `≡ ≢` compare whole tensors (one verdict); the typechecker rejects
             // a scalar peer, so only a tensor pair reaches here.
             HirBinOp::Eq | HirBinOp::StrictEq if !against_scalar => MirLiftOp::WholeEq,
             HirBinOp::NotEq | HirBinOp::StrictNotEq if !against_scalar => MirLiftOp::WholeNotEq,

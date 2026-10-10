@@ -1108,7 +1108,7 @@
       "analyzable": 2
     },
     {
-      "term": "≠",
+      "term": "≢",
       "rule": "operator-group",
       "capable": 0,
       "analyzable": 1

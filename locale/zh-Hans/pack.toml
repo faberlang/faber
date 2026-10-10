@@ -624,6 +624,10 @@ help = "使用有效的 case 表达式"
 message = "无效表达式"
 help = "检查表达式语法"
 
+[diagnostics.PARSE030.issues.neq_glyph_retired]
+message = "`{glyph}` 是已废弃的运算符；`≡` 的否定写作 `{replacement}`"
+help = "用 `{replacement}` 代替 `{glyph}`；每个否定符号的横线数与其所否定的符号相同（`≡`/`≢`、`≅`/`≇`、`≈`/`≉`）"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "使用 ⊥ 进行 conversio recovery"
 help = "使用 ⊥；vel 仅用于 nullish coalescing"

@@ -2498,7 +2498,7 @@ targets = ["rust"]
         r#"
 @ public
 fn valida_nomen_tag(string nomen) → bool {
-    return nomen ≠ ""
+    return nomen ≢ ""
 }
 "#,
     )
@@ -2561,7 +2561,7 @@ targets = ["rust"]
         r#"
 @ public
 fn valida_nomen_tag(string nomen) → bool {
-    return nomen ≠ ""
+    return nomen ≢ ""
 }
 "#,
     )

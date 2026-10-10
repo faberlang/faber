@@ -471,7 +471,6 @@ fn equality_ladder_glyphs_pin_semantic_split() {
     assert_eq!(parsed_op("≉"), BinOp::FuzzyNotEq);
     assert_ne!(parsed_op("≅"), parsed_op("≈"));
     assert_ne!(parsed_op("≇"), parsed_op("≉"));
-    assert_eq!(parsed_op("≢"), parsed_op("≠"));
 }
 
 /// All five glyph spellings map to their pinned `BinOp` variants.

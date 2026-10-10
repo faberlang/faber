@@ -49,7 +49,7 @@ fn bits_shift_takes_an_integer_count_and_keeps_the_width() {
 #[test]
 fn bits_equality_and_ordering_give_bool() {
     accepts("functio f(b8 a, b8 b) → bivalens { redde a ≡ b }");
-    accepts("functio f(b8 a, b8 b) → bivalens { redde a ≠ b }");
+    accepts("functio f(b8 a, b8 b) → bivalens { redde a ≢ b }");
     accepts("functio f(b8 a, b8 b) → bivalens { redde a ≺ b }");
     accepts("functio f(b16 a, b16 b) → bivalens { redde a ≤ b }");
     accepts("functio f(b32 a, b32 b) → bivalens { redde a ≻ b }");

@@ -609,7 +609,7 @@ impl TypeChecker<'_> {
     /// then compare at the joined type in their respective lowerings.
     ///
     /// d11-6 ruling 22 (supersedes GT-2): `≅`/`≇`/`≈`/`≉` and ordering accept
-    /// every cross-family pair (integer, `d64`, float); `≡`/`≠` stay exact-type.
+    /// every cross-family pair (integer, `d64`, float); `≡`/`≢` stay exact-type.
     pub fn numeric_value_equality_types(
         &mut self,
         lhs: TypeId,
@@ -633,7 +633,7 @@ impl TypeChecker<'_> {
         self.numeric_bin(lhs, rhs, span);
     }
 
-    /// Enforce exact-type match for `≡`, `≠`, `est`, and `non est`.
+    /// Enforce exact-type match for `≡`, `≢`, `est`, and `non est`.
     ///
     /// WHY: assignability may widen across representations; equality must not
     /// erase deliberate annotations (`ascii`, sized numerics, precision-tagged

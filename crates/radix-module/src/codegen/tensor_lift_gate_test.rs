@@ -152,12 +152,12 @@ fn typescript_still_rejects_coalesce_over_a_shifted_view() {
     assert_rejected(Target::HirTypeScript, "fixum tensor<f32, [2]> r ← a.disloco([1]) vel 0.0");
 }
 
-/// `≡ ≠` between two tensors compare whole values; the runner and the
+/// `≡ ≢` between two tensors compare whole values; the runner and the
 /// TypeScript emitter are their only executors, so every other HIR-backed
 /// target names `tensor_equality_unsupported_on_target`.
 const WHOLE_EQUALITY: &[&str] = &[
     "fixum bivalens r ← a ≡ b",
-    "fixum bivalens r ← a ≠ b",
+    "fixum bivalens r ← a ≢ b",
     "fixum bivalens r ← a ≡ a",
 ];
 

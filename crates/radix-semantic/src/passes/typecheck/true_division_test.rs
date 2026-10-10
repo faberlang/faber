@@ -109,7 +109,7 @@ fn strict_equality_still_rejects_cross_family() {
         EXACT_EQ,
     );
     assert_rejects_with_issue(
-        "functio p(d64 a, f64 b) → bivalens { redde a ≠ b }",
+        "functio p(d64 a, f64 b) → bivalens { redde a ≢ b }",
         EXACT_EQ,
     );
 }

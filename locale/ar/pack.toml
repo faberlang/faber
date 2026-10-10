@@ -624,6 +624,10 @@ help = "استخدم تعبير case صالحا"
 message = "تعبير غير صالح"
 help = "تحقق من صياغة التعبير"
 
+[diagnostics.PARSE030.issues.neq_glyph_retired]
+message = "`{glyph}` عامل ملغى؛ نفي `≡` يُكتب `{replacement}`"
+help = "اكتب `{replacement}` بدل `{glyph}`؛ لكل رمز نفي عدد الخطوط نفسه الذي في الرمز الذي ينفيه (`≡`/`≢`، `≅`/`≇`، `≈`/`≉`)"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "استخدم ⊥ لاسترداد conversio"
 help = "استخدم ⊥؛ {vel} للـ nullish coalescing فقط"

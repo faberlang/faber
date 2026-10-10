@@ -243,7 +243,7 @@ functio i(tensor<u8, [2]> a, tensor<u16, [2]> b) → tensor<u16, [2]> { redde a 
 
 #[test]
 fn comparisons_produce_a_bivalens_tensor() {
-    // Numeric comparisons lift per element; `≡ ≠` compare whole values and are
+    // Numeric comparisons lift per element; `≡ ≢` compare whole values and are
     // pinned in `aggregate_compare_test`.
     for op in ["≺", "≻", "≤", "≥", "≅", "≇"] {
         accepts(&format!(

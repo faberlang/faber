@@ -15,7 +15,7 @@ locale = "en"
 #
 # What this teaches:
 #   • Comparisons — `< > ≤ ≥ ≅ ≇` on tensors give `tensor<bool, S>`, one verdict per element
-#   • Whole values — `≡` and `≠` compare the whole tensor and give one bool (see equality-whole)
+#   • Whole values — `≡` and `≢` compare the whole tensor and give one bool (see equality-whole)
 #   • Logic — `and`, `or`, `not` act per element on bool tensors and always evaluate both sides
 #   • Select — `mask ✓ a ✗ b` takes `a` where the mask is true and `b` elsewhere; both branches are evaluated
 #   • vel (spelled `coalesce` in English) — `t coalesce fallback` fills the `none` elements of a `T ∪ none` tensor

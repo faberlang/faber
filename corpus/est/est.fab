@@ -21,7 +21,7 @@ locale = "en"
 #   • Chaining — `est` composes with `et` and parenthesized expressions.
 #
 # Common mistakes:
-#   • Using `est` to compare values — its right-hand side is always a type; use `≡` (or `≠`) for value comparison: `<expr> ≡ verum`, `<expr> ≡ falsum`.
+#   • Using `est` to compare values — its right-hand side is always a type; use `≡` (or `≢`) for value comparison: `<expr> ≡ verum`, `<expr> ≡ falsum`.
 #
 # See also: non est, ≡
 # =============================================================================

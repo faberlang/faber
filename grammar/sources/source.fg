@@ -379,13 +379,6 @@ role = "equality"
 claiming_slots = ["equality_tail"]
 
 [[glyphs]]
-glyph = "≠"
-codepoint = "U+2260"
-unicode_name = "NOT EQUAL TO"
-role = "equality"
-claiming_slots = ["equality_tail"]
-
-[[glyphs]]
 glyph = "≡"
 codepoint = "U+2261"
 unicode_name = "IDENTICAL TO"
@@ -1324,7 +1317,7 @@ equality   := comparison equality_tail*
 # The equality tier carries two jobs that share a precedence level, not a
 # meaning (D23.1): a value comparison with a `comparison` on the right, and a
 # type test (`est` / `non est`) with a *type* on the right.
-equality_tail := ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison
+equality_tail := ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison
                | ('est' | 'non' 'est') type_annotation
 comparison := format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
 # Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;

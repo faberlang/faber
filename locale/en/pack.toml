@@ -1008,6 +1008,10 @@ help = "write `{glyph}` for `{operator}` (`≤` and `≥` for the non-strict for
 message = "the typed zero exists only for tensor, vector and matrix types; a collection type such as list is not claimed"
 help = "write a tensor, vector or matrix type followed by empty braces, or build the collection with a literal"
 
+[diagnostics.PARSE030.issues.neq_glyph_retired]
+message = "`{glyph}` is a retired operator; the negation of `≡` is spelled `{replacement}`"
+help = "write `{replacement}` for `{glyph}`; every negation glyph has the same number of lines as the glyph it negates (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
 help = "use ⊥; vel is nullish coalescing only"
@@ -2695,7 +2699,7 @@ help = "keep caller and fragment lane bindings distinct"
 
 [diagnostics.SEM011.issues.est_value_rhs]
 message = "`est` tests types; this right-hand side names a value"
-help = "compare values with the equality operator: `≡`, or `≠` for `non est`"
+help = "compare values with the equality operator: `≡`, or `≢` for `non est`"
 
 [diagnostics.SEM011.issues.range_step_must_be_numeric]
 message = "range step must be numeric"

@@ -624,6 +624,10 @@ help = "मान्य case expression उपयोग करें"
 message = "अमान्य अभिव्यक्ति"
 help = "अभिव्यक्ति syntax जांचें"
 
+[diagnostics.PARSE030.issues.neq_glyph_retired]
+message = "`{glyph}` एक retired operator है; `≡` का निषेध `{replacement}` लिखा जाता है"
+help = "`{glyph}` की जगह `{replacement}` लिखें; हर निषेध चिह्न में उतनी ही रेखाएँ होती हैं जितनी उस चिह्न में जिसे वह उलटता है (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "conversio recovery के लिए ⊥ उपयोग करें"
 help = "⊥ उपयोग करें; vel केवल nullish coalescing के लिए है"

@@ -624,6 +624,10 @@ help = "dùng một biểu thức case hợp lệ"
 message = "biểu thức không hợp lệ"
 help = "kiểm tra cú pháp biểu thức"
 
+[diagnostics.PARSE030.issues.neq_glyph_retired]
+message = "`{glyph}` là toán tử đã bị loại bỏ; phủ định của `≡` được viết là `{replacement}`"
+help = "viết `{replacement}` thay cho `{glyph}`; mỗi ký hiệu phủ định có cùng số gạch ngang với ký hiệu mà nó phủ định (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "dùng ⊥ cho phục hồi conversio"
 help = "dùng ⊥; vel chỉ dùng cho phép hợp nhất nullish"

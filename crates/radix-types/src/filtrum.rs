@@ -44,7 +44,7 @@ pub struct ColumnRef(pub LexSymbol);
 pub enum ComparisonOp {
     /// `eq` (`=`).
     Eq,
-    /// `ne` (`≠`).
+    /// `ne` (`≢`).
     Ne,
     /// `gt` (`>`).
     Gt,

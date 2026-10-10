@@ -624,6 +624,10 @@ help = "使用有效的 case 運算式"
 message = "無效運算式"
 help = "檢查運算式語法"
 
+[diagnostics.PARSE030.issues.neq_glyph_retired]
+message = "`{glyph}` 是已廢棄的運算子；`≡` 的否定寫作 `{replacement}`"
+help = "用 `{replacement}` 取代 `{glyph}`；每個否定符號的橫線數與其所否定的符號相同（`≡`/`≢`、`≅`/`≇`、`≈`/`≉`）"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "使用 ⊥ 進行 conversio 復原"
 help = "使用 ⊥；vel 僅用於 nullish 合併"

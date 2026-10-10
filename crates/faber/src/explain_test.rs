@@ -30,7 +30,7 @@ fn lookup_resolves_terms_aliases_and_legacy() {
         matches!(registry.lookup("==="), Some(Lookup::Legacy { canonical, .. }) if canonical.term == "≡")
     );
     assert!(
-        matches!(registry.lookup("!=="), Some(Lookup::Legacy { canonical, .. }) if canonical.term == "≠")
+        matches!(registry.lookup("!=="), Some(Lookup::Legacy { canonical, .. }) if canonical.term == "≢")
     );
 }
 

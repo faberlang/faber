@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "comparison"
 canonical = false
 summary = "Operator × carrier truth table: every comparison/equality/arithmetic/conversio gate cell is exactly one defined join or one named SEM rejection."
-syntax = "<expression> <operator> <expression> for ≡ ≠ ≅ ≇ ≈ ≉ < ≤ > ≥ + - * / % ↦ est"
+syntax = "<expression> <operator> <expression> for ≡ ≢ ≅ ≇ ≈ ≉ < ≤ > ≥ + - * / % ↦ est"
 related = ["≅", "≈", "≡", "↦", "mixed-ordering-join", "numeric-value-eq", "comparatio", "est"]
 locale = "en"
 +++
@@ -20,7 +20,7 @@ locale = "en"
 #     asserted by the radix-semantic coverage audit).
 #   • The gate arms: numeric_ordering_bin (< ≤ > ≥), numeric_arithmetic_bin
 #     (+ - * / %), numeric_value_equality_types (≅ ≇ ≈ ≉),
-#     exact_equality_types (≡ ≠), check_conversio (↦).
+#     exact_equality_types (≡ ≢), check_conversio (↦).
 #   • New carrier families (e.g. GEA4) must land a row here before their
 #     cells count as proven.
 #
@@ -45,7 +45,7 @@ locale = "en"
 # J = defined join (executed below, verdict pinned). R = named SEM rejection
 # (asserted by the coverage audit, never compiled).
 #
-#                     ≡/≠   ≅/≇   ≈/≉    <     ≤     >     ≥    arith   ↦
+#                     ≡/≢   ≅/≇   ≈/≉    <     ≤     >     ≥    arith   ↦
 # P1 int identical     J     J     J     J     J     J     J     J       J
 # P2 int cross-width   R-eq  J     J     J     J     J     J     J       J
 # P3 signed×unsigned   R-eq  J     J     J     J     J     J   R-u64³    J
@@ -116,7 +116,7 @@ main {
     # ----------------------------------------------------------- conversio
     const u64 five_u ← 5
 
-    # ----------------------------------------------------- ≡ / ≠ (P1 join)
+    # ----------------------------------------------------- ≡ / ≢ (P1 join)
     # Identical types join exactly (P1 ints, P7 decimals); every other family
     # pair is SEM010:equality_exact_types_required.
     print a ≡ b

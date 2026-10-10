@@ -1,4 +1,4 @@
-//! Typecheck probes for exact-type equality (`≡`, `≠`).
+//! Typecheck probes for exact-type equality (`≡`, `≢`).
 //!
 //! `est` / `non est` is a type test, not an equality operator (DECISIONS
 //! D23.1); its value-target rejection is pinned here too.
@@ -33,7 +33,7 @@ fn equality_exact_types_cases() -> Vec<EqualityCase> {
         },
         EqualityCase {
             name: "ascii_textus_neq_rejects",
-            source: "incipit { si 'a' ≠ \"a\" { nota \"bad\" } }",
+            source: "incipit { si 'a' ≢ \"a\" { nota \"bad\" } }",
             expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
         EqualityCase {
@@ -235,7 +235,7 @@ genus Euler {
 }
 
 functio same(de Euler value) → bivalens {
-    redde value.order ≠ "XYZ"
+    redde value.order ≢ "XYZ"
 }
 "#,
     );
@@ -255,7 +255,7 @@ genus Euler {
 }
 
 functio same(Euler value) → bivalens {
-    redde value.order ≠ 'X'
+    redde value.order ≢ 'X'
 }
 ",
     );
@@ -277,7 +277,7 @@ fn direct_ref_value_exact_equality_keeps_view_contract() {
     let result = compile(
         r#"
 functio same(de textus value) → bivalens {
-    redde value ≠ "XYZ"
+    redde value ≢ "XYZ"
 }
 "#,
     );

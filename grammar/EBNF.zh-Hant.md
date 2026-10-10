@@ -345,7 +345,7 @@ et_expr ::= equality (('且') equality)*
 # [167] equality
 equality ::= comparison equality_tail*
 # [168] equality_tail
-equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉') comparison | ('是' | '非' '是') type_annotation
+equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('是' | '非' '是') type_annotation
 # [169] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
 # [170] format_expr
@@ -1815,7 +1815,7 @@ any integer type.
 **Comparisons are exact across families.** `≺ ≻ ≤ ≥ ≅ ≇` accept operands from
 different number families with no `↦` and compare the true mathematical values
 (`i64 ≺ f64` is exact even above 2⁵³; NaN compares false). `≈`/`≉` compute in
-the float operand's width. `≡`/`≠` stay structural and exact-type, so
+the float operand's width. `≡`/`≢` stay structural and exact-type, so
 `1 ≡ 1.0` is rejected. A comparison stores nothing, so the family-crossing rule
 does not reach it.
 
@@ -1886,7 +1886,7 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   may (the MIR runner has a configurable bit-length ceiling).
 - **Comparison and keys.** `≺ ≻ ≤ ≥ ≅ ≇` compare exact mathematical values
   against any integer width, `d64` or float (±∞ order beyond every integer);
-  `≡ ≠` stay exact-type (`inf ≡ i64` is rejected). An `inf` value is hashable
+  `≡ ≢` stay exact-type (`inf ≡ i64` is rejected). An `inf` value is hashable
   and totally ordered, so it is a valid `tabula` key and `copia` element.
 - **Stores.** A store into an `inf` slot is total and emits no check. A store
   from an `inf` value into a bounded trapping slot is an implicit checked
@@ -2249,7 +2249,7 @@ on the right is rejected in the reader's own words (`SEM011:est_value_rhs`),
 pointing at the equality family. The null type is the one type spelling that also
 names a literal slot: `x 是 nihil` tests the null *type*, while the null *value*
 is `可空` (`null` in the English reader).
-Use `≡` / `≠` (or `≢`) for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
+Use `≡` / `≢` for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr ≡ 真`,
 `expr ≡ 假`, `expr ≡ 可空`, `expr 是 nihil` (the null *type* test),

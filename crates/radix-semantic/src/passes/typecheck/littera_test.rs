@@ -115,7 +115,7 @@ fn littera_equals_char_literal_either_side() {
     itera ex s fixum c {
         si c ≡ 'o' { n ← n + 1 }
         si 'a' ≡ c { n ← n + 1 }
-        si c ≠ 'z' { n ← n + 1 }
+        si c ≢ 'z' { n ← n + 1 }
     }
     redde n
 }",

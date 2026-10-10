@@ -624,6 +624,10 @@ help = "ใช้ expression ของกรณีที่ถูกต้อง
 message = "นิพจน์ไม่ถูกต้อง"
 help = "ตรวจไวยากรณ์นิพจน์"
 
+[diagnostics.PARSE030.issues.neq_glyph_retired]
+message = "`{glyph}` เป็นตัวดำเนินการที่เลิกใช้แล้ว; การปฏิเสธของ `≡` เขียนเป็น `{replacement}`"
+help = "เขียน `{replacement}` แทน `{glyph}`; สัญลักษณ์ปฏิเสธทุกตัวมีจำนวนเส้นเท่ากับสัญลักษณ์ที่มันปฏิเสธ (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "ใช้ ⊥ สำหรับการกู้คืน conversio"
 help = "ใช้ ⊥; vel ใช้สำหรับการรวมค่า nullish เท่านั้น"

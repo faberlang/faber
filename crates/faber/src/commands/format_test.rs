@@ -162,6 +162,80 @@ class Proba {
     assert_eq!(glyphs, vec!["≺".to_string(), "≻".to_string()]);
 }
 
+/// `≢` is the one negation of `≡` (ruling 6b5c1c615): it round-trips through
+/// the canonical format unchanged.
+#[test]
+fn canonical_format_prints_the_negation_glyph() {
+    let dir = std::env::temp_dir().join("faber-format-canonical-neq");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create scratch");
+    let path = dir.join("proba.fab");
+    let source = r#"+++
+locale = "en"
++++
+class Proba {
+    var float x
+    fn differs(float other) → bool {
+        return self.x ≢ other
+    }
+}
+"#;
+    fs::write(&path, source).expect("write");
+    let formatted = canonical_cli_pipeline(&path);
+    let _ = fs::remove_dir_all(&dir);
+    assert!(formatted.contains("self.x ≢ other"), "{formatted}");
+    assert!(!formatted.contains('≠'), "{formatted}");
+}
+
+/// The retired `≠` (U+2260) is refused with the named diagnostic and the
+/// canonical format does not migrate the source.
+#[test]
+fn canonical_format_refuses_retired_inequality_glyph() {
+    let dir = std::env::temp_dir().join("faber-format-canonical-neq-retired");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create scratch");
+    let path = dir.join("proba.fab");
+    let source = r#"+++
+locale = "en"
++++
+class Proba {
+    var float x
+    fn differs(float other) → bool {
+        return self.x ≠ other
+    }
+}
+"#;
+    fs::write(&path, source).expect("write");
+    let session = format_session(&path, None, source).expect("format session");
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("format emission locale pack"),
+        &path.display().to_string(),
+        source,
+    );
+    let _ = fs::remove_dir_all(&dir);
+    assert!(
+        !result.success(),
+        "retired inequality glyph must be refused"
+    );
+    let replacements: Vec<String> = result
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == Some("PARSE030"))
+        .filter_map(|d| {
+            d.args
+                .iter()
+                .find(|arg| arg.name == "replacement")
+                .map(|arg| arg.value.clone())
+        })
+        .collect();
+    assert_eq!(replacements, vec!["≢".to_string()]);
+}
+
 /// `<`/`>` remain ASCII generic application delimiters; en types stay English.
 #[test]
 fn canonical_format_keeps_ascii_angle_brackets_for_generics() {

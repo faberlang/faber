@@ -1,6 +1,6 @@
 //! Comparisons, logic and masks over aggregates (advisor rulings 2026-10-04).
 //!
-//! One rule for an author: `≡`/`≠` compare WHOLE values on every type, and the
+//! One rule for an author: `≡`/`≢` compare WHOLE values on every type, and the
 //! numeric comparison glyphs `< > ≤ ≥ ≅ ≇` lift PER ELEMENT on numeric
 //! aggregates like `+`.
 //!
@@ -151,7 +151,7 @@ impl TypeChecker<'_> {
         self.sparsa_operand(ty).is_some()
     }
 
-    /// `≡ ≠` where an operand is a tensor, vector, matrix or sparsa. `None` means the
+    /// `≡ ≢` where an operand is a tensor, vector, matrix or sparsa. `None` means the
     /// pair keeps the scalar equality rule: no aggregate, an aggregate of
     /// another kind, a vector or matrix pair that agrees, or a `nihil` test.
     pub(super) fn check_aggregate_equality(
@@ -261,7 +261,7 @@ impl TypeChecker<'_> {
         Some(dims)
     }
 
-    /// An aggregate against a numeric or bool scalar under `≡ ≠`: never the
+    /// An aggregate against a numeric or bool scalar under `≡ ≢`: never the
     /// same value; the help points at `≅`. Any other peer (`nihil`, an
     /// optional) keeps its own rule.
     fn reject_scalar_equality(

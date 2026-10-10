@@ -199,7 +199,7 @@ fn comparisons_produce_a_bivalens_tensor() {
     assert_eq!(mask_result("a ≅ 2.0"), ["[falsum, verum, falsum, falsum]"]);
 }
 
-/// `≡ ≠` compare whole tensors (advisor rulings 2026-10-04): one `bivalens`,
+/// `≡ ≢` compare whole tensors (advisor rulings 2026-10-04): one `bivalens`,
 /// where the numeric comparisons give a mask.
 fn whole_result(expr: &str) -> Vec<String> {
     ok(&format!(
@@ -218,8 +218,8 @@ fn equality_compares_whole_tensors_to_one_verdict() {
     assert_eq!(whole_result("a ≡ c"), ["verum"]);
     assert_eq!(whole_result("a ≡ a"), ["verum"]);
     assert_eq!(whole_result("a ≡ b"), ["falsum"]);
-    assert_eq!(whole_result("a ≠ b"), ["verum"]);
-    assert_eq!(whole_result("a ≠ c"), ["falsum"]);
+    assert_eq!(whole_result("a ≢ b"), ["verum"]);
+    assert_eq!(whole_result("a ≢ c"), ["falsum"]);
 }
 
 #[test]
@@ -233,7 +233,7 @@ fixum lista<f32> long_data ← [1.0, 2.0, 3.0]
 fixum tensor<f32, [magnitudo n]> short ← short_data ↦ tensor<f32, [magnitudo n]>
 fixum tensor<f32, [magnitudo m]> long ← long_data ↦ tensor<f32, [magnitudo m]>
 nota short ≡ long
-nota short ≠ long
+nota short ≢ long
 nota short ≡ short
 }";
     assert_eq!(ok(program), ["falsum", "verum", "verum"]);
@@ -248,7 +248,7 @@ fixum tensor<bivalens, [2]> lt ← n ≺ n
 fixum tensor<bivalens, [2]> eq ← n ≅ n
 fixum tensor<bivalens, [2]> ne ← n ≇ n
 fixum bivalens same ← n ≡ n
-fixum bivalens apart ← n ≠ n
+fixum bivalens apart ← n ≢ n
 nota n.planata()
 nota lt.planata()
 nota eq.planata()

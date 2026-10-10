@@ -93,7 +93,7 @@ fn bits_order_by_unsigned_pattern_and_equality_by_value() {
     assert_eq!(ok("fixum b8 a ← 0x80\nfixum b8 b ← 0x7f\nnota a ≺ b"), ["falsum"]);
     assert_eq!(ok("fixum b8 a ← 0x80\nnota a ≥ 0x80"), ["verum"]);
     assert_eq!(ok("fixum b8 a ← 0x80\nnota a ≡ 0x80"), ["verum"]);
-    assert_eq!(ok("fixum b8 a ← 0x80\nnota a ≠ 0x80"), ["falsum"]);
+    assert_eq!(ok("fixum b8 a ← 0x80\nnota a ≢ 0x80"), ["falsum"]);
     assert_eq!(
         ok("fixum b64 a ← 0x8000000000000000\nfixum b64 b ← 0x7fffffffffffffff\nnota a ≻ b"),
         ["verum"]

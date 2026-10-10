@@ -368,7 +368,11 @@ impl Parser {
                     TokenKind::ApproxNotEq => BinOp::ApproxNotEq, // ≇
                     TokenKind::FuzzyEq => BinOp::FuzzyEq,         // ≈
                     TokenKind::FuzzyNotEq => BinOp::FuzzyNotEq,   // ≉
-                    TokenKind::BangEq => BinOp::NotEq,            // ≠ / ≢
+                    TokenKind::BangEq => BinOp::NotEq,            // ≢
+                    TokenKind::BangEqRetired => {
+                        self.record_retired_neq_glyph();
+                        BinOp::NotEq
+                    }
                     _ if self.check_keyword_ident(TokenKind::Est) => BinOp::Is,
                     _ => break,
                 };
@@ -475,6 +479,34 @@ impl Parser {
                 .with_arg("issue", "comparison_ascii_retired")
                 .with_arg("operator", operator)
                 .with_arg("glyph", glyph),
+        );
+    }
+
+    /// Record the migration diagnostic for the retired inequality glyph `≠`
+    /// (U+2260) in equality position: `PARSE030 neq_glyph_retired`, args
+    /// `glyph` (as written) and `replacement` (`≢`, the one negation of `≡`).
+    ///
+    /// FABER-2-SUNSET: delete with the retired-word diagnostics.
+    ///
+    /// The caller still parses the operand as `NotEq`, so one file reports
+    /// every site.
+    fn record_retired_neq_glyph(&mut self) {
+        let span = self.current_span();
+        // A speculative sub-parse that is re-run must not report the same glyph twice.
+        if self.errors.iter().any(|err| {
+            err.span == span
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "neq_glyph_retired")
+        }) {
+            return;
+        }
+        self.errors.push(
+            ParseError::structured(ParseErrorKind::ExpressionInvalid, span)
+                .with_arg("issue", "neq_glyph_retired")
+                .with_arg("glyph", "≠")
+                .with_arg("replacement", "≢"),
         );
     }
 
