@@ -676,7 +676,20 @@ impl TypeChecker<'_> {
     ) {
         let lhs = self.equality_field_read_carrier(lhs_expr, lhs);
         let rhs = self.equality_field_read_carrier(rhs_expr, rhs);
+        let lhs = self.equality_value_marker_carrier(lhs);
+        let rhs = self.equality_value_marker_carrier(rhs);
         self.exact_equality_types(lhs, rhs, span);
+    }
+
+    /// A binding's `copy` / `own` value-side marker records how the value was
+    /// produced, not what it is: equality compares the carrier. `ref` and
+    /// `mut` views keep their wrapper (the view contract).
+    fn equality_value_marker_carrier(&mut self, ty: TypeId) -> TypeId {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.peel_access_marker(resolved) {
+            (Some(crate::AccessMarker::Copy | crate::AccessMarker::Own), carrier) => carrier,
+            _ => resolved,
+        }
     }
 
     fn equality_field_read_carrier(&mut self, expr: &HirExpression, ty: TypeId) -> TypeId {

@@ -1430,3 +1430,7 @@ fn semantic_union_guardrail_help(args: &[DiagnosticArg]) -> Option<String> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+#[path = "catalog_semantic_issue_rows_test.rs"]
+mod issue_rows_tests;
