@@ -211,13 +211,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             units.push(pattern & mask(width));
         }
         let decoded = match width {
-            8 => String::from_utf8(units.iter().map(|unit| *unit as u8).collect()).ok(),
-            16 => {
-                String::from_utf16(&units.iter().map(|unit| *unit as u16).collect::<Vec<_>>()).ok()
-            }
+            8 => units
+                .iter()
+                .map(|unit| u8::try_from(*unit).ok())
+                .collect::<Option<Vec<_>>>()
+                .and_then(|bytes| String::from_utf8(bytes).ok()),
+            16 => units
+                .iter()
+                .map(|unit| u16::try_from(*unit).ok())
+                .collect::<Option<Vec<_>>>()
+                .and_then(|words| String::from_utf16(&words).ok()),
             _ => units
                 .iter()
-                .map(|unit| char::from_u32(*unit as u32))
+                .map(|unit| u32::try_from(*unit).ok().and_then(char::from_u32))
                 .collect::<Option<String>>(),
         };
         match decoded {
@@ -261,10 +267,10 @@ fn encode_pattern(value: &Value, cell: Cell) -> Option<u64> {
 fn decode_pattern(pattern: u64, cell: Cell) -> Option<Value> {
     Some(match cell {
         Cell::Raw(_) | Cell::Unsigned(64) => Value::UInt(pattern),
-        Cell::Unsigned(_) => Value::Int(pattern as i64),
+        Cell::Unsigned(_) => Value::Int(i64::from_le_bytes(pattern.to_le_bytes())),
         Cell::Signed(bits) => {
             let shift = 64 - bits;
-            Value::Int(((pattern << shift) as i64) >> shift)
+            Value::Int(i64::from_le_bytes((pattern << shift).to_le_bytes()) >> shift)
         }
         Cell::Float(width, bits) => float_from_pattern(pattern, bits_width(bits)?, width)?,
     })

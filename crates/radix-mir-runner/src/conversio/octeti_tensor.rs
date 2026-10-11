@@ -194,7 +194,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             let bits: u64 = match (value, float) {
                 (Value::Float(v), Some(true)) => u64::from((*v as f32).to_bits()),
                 (Value::Float(v), Some(false)) => v.to_bits(),
-                (Value::Int(v), None) => *v as u64,
+                (Value::Int(v), None) => u64::from_le_bytes(v.to_le_bytes()),
                 (Value::UInt(v), None) => *v,
                 _ => {
                     return Err(RunnerError::internal(
