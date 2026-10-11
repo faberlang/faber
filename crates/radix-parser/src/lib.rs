@@ -537,8 +537,7 @@ impl Parser {
             kind if self.token_keyword_identity(kind) == Some(TokenKind::Ut) => true,
             kind if self.is_import_binding_name_kind(kind) => {
                 match tokens.get(index + 1).map(|token| &token.kind) {
-                    None => true,
-                    Some(TokenKind::Eof | TokenKind::Comma | TokenKind::Star) => true,
+                    None | Some(TokenKind::Eof | TokenKind::Comma | TokenKind::Star) => true,
                     Some(kind) if self.token_keyword_identity(kind) == Some(TokenKind::Ut) => true,
                     Some(TokenKind::Ident(_)) => tokens
                         .get(index + 1)
