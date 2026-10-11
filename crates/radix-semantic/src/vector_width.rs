@@ -91,11 +91,11 @@ pub fn is_vector_width_shape(index_id: IndexId, types: &TypeTable) -> bool {
     match types.get_index(index_id) {
         IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Infer(_) => true,
         IndexExpr::Affine { base, .. } => {
-            !radix_types::evaluate_index_dimension(index_id, types).is_err()
+            radix_types::evaluate_index_dimension(index_id, types).is_ok()
                 && is_static_width_term(*base, types)
         }
         IndexExpr::Divide { numerator, .. } => {
-            !radix_types::evaluate_index_dimension(index_id, types).is_err()
+            radix_types::evaluate_index_dimension(index_id, types).is_ok()
                 && is_static_width_term(*numerator, types)
         }
         IndexExpr::Tuple(dims) => dims.len() == 1,
@@ -107,11 +107,11 @@ fn is_static_width_term(index_id: IndexId, types: &TypeTable) -> bool {
     match types.get_index(index_id) {
         IndexExpr::Literal(_) | IndexExpr::Param(_) => true,
         IndexExpr::Affine { base, .. } => {
-            !radix_types::evaluate_index_dimension(index_id, types).is_err()
+            radix_types::evaluate_index_dimension(index_id, types).is_ok()
                 && is_static_width_term(*base, types)
         }
         IndexExpr::Divide { numerator, .. } => {
-            !radix_types::evaluate_index_dimension(index_id, types).is_err()
+            radix_types::evaluate_index_dimension(index_id, types).is_ok()
                 && is_static_width_term(*numerator, types)
         }
         IndexExpr::Tuple(_)

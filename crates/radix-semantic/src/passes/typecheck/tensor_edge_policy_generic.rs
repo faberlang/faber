@@ -5,7 +5,11 @@
 //! forwards requirements through callers, and validates concrete witnesses
 //! before codegen receives the provider catalog.
 
-use super::*;
+use super::{
+    DefId, FxHashMap, FxHashSet, GenericWitness, HirExpression, HirExpressionKind, HirFunction,
+    HirItem, HirItemKind, HirModule, ResolvedGenericBinding, Symbol, Type, TypeChecker, TypeId,
+    TypeTable,
+};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_function, walk_item, walk_method};
 use radix_hir::{TensorEdgePolicyProviderImpl, TensorEdgePolicyRequirement};
 
@@ -67,10 +71,10 @@ impl PolicyUsageCollector<'_> {
         let Some(policy) = self.policies.calls.get(&expression.id).copied() else {
             return;
         };
-        let type_args = match &expression.kind {
-            HirExpressionKind::Call(_, type_args, ..)
-            | HirExpressionKind::MethodCall(_, _, type_args, ..) => type_args,
-            _ => return,
+        let (HirExpressionKind::Call(_, type_args, ..)
+        | HirExpressionKind::MethodCall(_, _, type_args, ..)) = &expression.kind
+        else {
+            return;
         };
         let Some(&written_policy_type) = type_args.first() else {
             return;
@@ -265,13 +269,13 @@ impl TypeChecker<'_> {
             let mut forwarded = Vec::new();
             let mut runtime_forward_spans = Vec::new();
             for call in &calls {
-                let (Some(caller), Some(callee)) = (call.caller, call.callee) else {
+                let (Some(caller), Some(callee_def)) = (call.caller, call.callee) else {
                     continue;
                 };
                 let Some(caller_params) = function_type_params.get(&caller) else {
                     continue;
                 };
-                let Some(callee_requirements) = requirements.get(&callee) else {
+                let Some(callee_requirements) = requirements.get(&callee_def) else {
                     continue;
                 };
                 for requirement in callee_requirements {

@@ -61,28 +61,28 @@ impl HirVisitor for DecisionPointCounter {
             HirExpressionKind::Si { then_catch, .. } => {
                 self.0 += 1 + u32::from(then_catch.is_some());
             }
-            // Match/value dispatch: +1 per match, never per arm.
-            HirExpressionKind::Discerne { .. } => self.0 += 1,
-            HirExpressionKind::Loop(_)
+            // Match/value dispatch (+1 per match, never per arm), loops,
+            // short-circuit/coalesce operators, and error-handling forms: +1 each.
+            HirExpressionKind::Discerne { .. }
+            | HirExpressionKind::Loop(_)
             | HirExpressionKind::Dum(..)
             | HirExpressionKind::Itera { .. }
             | HirExpressionKind::IteraLockstep { .. }
-            | HirExpressionKind::IteraRange { .. } => self.0 += 1,
+            | HirExpressionKind::IteraRange { .. }
+            | HirExpressionKind::Handled { .. }
+            | HirExpressionKind::Trap(_)
+            | HirExpressionKind::CallDefault { .. }
+            | HirExpressionKind::FirstMatch { .. } => self.0 += 1,
             HirExpressionKind::Binary(HirBinOp::And | HirBinOp::Or | HirBinOp::Coalesce, _, _) => {
-                self.0 += 1
+                self.0 += 1;
             }
-            HirExpressionKind::Handled { .. } => self.0 += 1,
-            HirExpressionKind::Trap(_) | HirExpressionKind::CallDefault { .. } => self.0 += 1,
             // Body-carrying folds/selections: +1 each.
             HirExpressionKind::Reduction { body, identity, .. } => {
-                self.0 += u32::from(body.is_some()) + u32::from(identity.is_some())
+                self.0 += u32::from(body.is_some()) + u32::from(identity.is_some());
             }
-            HirExpressionKind::FirstMatch { .. } => self.0 += 1,
             // Conversion recovery tails: +1 only when the `⊥` fallback is present.
-            HirExpressionKind::ConversioAssign { recovery, .. } => {
-                self.0 += u32::from(recovery.is_some());
-            }
-            HirExpressionKind::Conversio { recovery, .. } => {
+            HirExpressionKind::ConversioAssign { recovery, .. }
+            | HirExpressionKind::Conversio { recovery, .. } => {
                 self.0 += u32::from(recovery.is_some());
             }
             _ => {}
