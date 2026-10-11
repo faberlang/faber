@@ -3260,111 +3260,9 @@ pub(crate) fn validate_referential_integrity(
         for binding in &presentation.function_modifier_bindings {
             checks.check_def(binding.local)?;
         }
-        // Every attachment anchor must name a registered owner, each owner
-        // may carry at most one attachment, and comment Symbols must resolve
-        // in the interner table.
-        let mut attached_anchors: FxHashSet<u32> = FxHashSet::default();
-        for attachment in &presentation.attachments {
-            if !owner_ids.contains(&attachment.anchor.0) {
-                return Err(HirArtifactError::DanglingIndex {
-                    kind: "HirSourceAnchorId",
-                    index: attachment.anchor.0,
-                    arena_size: owner_ids.len(),
-                });
-            }
-            if !attached_anchors.insert(attachment.anchor.0) {
-                return Err(HirArtifactError::InvalidPresentation {
-                    issue: "duplicate_attachment_owner",
-                    anchor: attachment.anchor.0,
-                });
-            }
-            for trivia in &attachment.leading {
-                if let radix_hir::HirTrivia::CommentLine { text, .. } = trivia {
-                    checks.check_symbol(*text)?;
-                }
-            }
-        }
+        validate_presentation_attachments(presentation, &owner_ids, checks)?;
 
-        // The entry-start anchor, when present, must name a registered owner.
-        if let Some(anchor) = presentation.entry_start_anchor.as_ref()
-            && !owner_ids.contains(&anchor.0)
-        {
-            return Err(HirArtifactError::DanglingIndex {
-                kind: "HirSourceAnchorId",
-                index: anchor.0,
-                arena_size: owner_ids.len(),
-            });
-        }
-
-        // The `regio` declaration (D7.7): interned name and doc lines, and an
-        // anchor that names a registered owner.
-        if let Some(region) = presentation.region.as_ref() {
-            checks.check_symbol(region.name)?;
-            for line in &region.doc {
-                checks.check_symbol(*line)?;
-            }
-            if let Some(anchor) = region.anchor.as_ref()
-                && !owner_ids.contains(&anchor.0)
-            {
-                return Err(HirArtifactError::DanglingIndex {
-                    kind: "HirSourceAnchorId",
-                    index: anchor.0,
-                    arena_size: owner_ids.len(),
-                });
-            }
-        }
-
-        // Structural ends (block ends + program end) must be anchor-consistent
-        // with the owners registry. Lowering allocates every anchor from one
-        // arena, so end ids are unique and never shared with a non-end owner;
-        // an end that carries trivia is registered under its own kind, and an
-        // owner claiming a structural-end kind must be backed by the matching
-        // end record. Trivia-free ends legitimately have no owner record
-        // (owners are registered only when trivia exists), so an end id absent
-        // from the registry is legal.
-        let mut end_ids: FxHashSet<u32> = FxHashSet::default();
-        for end in &presentation.block_ends {
-            if !end_ids.insert(end.id.0) {
-                return Err(HirArtifactError::InvalidPresentation {
-                    issue: "duplicate_block_end_anchor",
-                    anchor: end.id.0,
-                });
-            }
-        }
-        if !end_ids.insert(presentation.program_end.id.0) {
-            return Err(HirArtifactError::InvalidPresentation {
-                issue: "program_end_collides_with_block_end",
-                anchor: presentation.program_end.id.0,
-            });
-        }
-        for owner in &presentation.owners {
-            match owner.kind {
-                radix_hir::HirTriviaOwnerKind::BlockEnd => {
-                    if !end_ids.contains(&owner.id.0) {
-                        return Err(HirArtifactError::InvalidPresentation {
-                            issue: "block_end_owner_without_end",
-                            anchor: owner.id.0,
-                        });
-                    }
-                }
-                radix_hir::HirTriviaOwnerKind::ProgramEnd => {
-                    if owner.id != presentation.program_end.id {
-                        return Err(HirArtifactError::InvalidPresentation {
-                            issue: "program_end_owner_mismatch",
-                            anchor: owner.id.0,
-                        });
-                    }
-                }
-                _ => {
-                    if end_ids.contains(&owner.id.0) {
-                        return Err(HirArtifactError::InvalidPresentation {
-                            issue: "end_anchor_reused_as_owner",
-                            anchor: owner.id.0,
-                        });
-                    }
-                }
-            }
-        }
+        validate_presentation_structural_ends(presentation)?;
 
         let check_symbol = |sym| checks.check_symbol(sym);
         let check_hir = |hir_id| checks.check_hir(hir_id);
@@ -4116,6 +4014,126 @@ pub(crate) fn validate_referential_integrity(
         if let Some(backward) = entry.backward {
             checks.check_symbol(backward.companion_name)?;
             checks.check_def(backward.companion_def_id)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_presentation_attachments(
+    presentation: &radix_hir::HirPresentation,
+    owner_ids: &FxHashSet<u32>,
+    checks: &IntegrityChecks<'_>,
+) -> Result<(), HirArtifactError> {
+    // Every attachment anchor must name a registered owner, each owner
+    // may carry at most one attachment, and comment Symbols must resolve
+    // in the interner table.
+    let mut attached_anchors: FxHashSet<u32> = FxHashSet::default();
+    for attachment in &presentation.attachments {
+        if !owner_ids.contains(&attachment.anchor.0) {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "HirSourceAnchorId",
+                index: attachment.anchor.0,
+                arena_size: owner_ids.len(),
+            });
+        }
+        if !attached_anchors.insert(attachment.anchor.0) {
+            return Err(HirArtifactError::InvalidPresentation {
+                issue: "duplicate_attachment_owner",
+                anchor: attachment.anchor.0,
+            });
+        }
+        for trivia in &attachment.leading {
+            if let radix_hir::HirTrivia::CommentLine { text, .. } = trivia {
+                checks.check_symbol(*text)?;
+            }
+        }
+    }
+
+    // The entry-start anchor, when present, must name a registered owner.
+    if let Some(anchor) = presentation.entry_start_anchor.as_ref()
+        && !owner_ids.contains(&anchor.0)
+    {
+        return Err(HirArtifactError::DanglingIndex {
+            kind: "HirSourceAnchorId",
+            index: anchor.0,
+            arena_size: owner_ids.len(),
+        });
+    }
+
+    // The `regio` declaration (D7.7): interned name and doc lines, and an
+    // anchor that names a registered owner.
+    if let Some(region) = presentation.region.as_ref() {
+        checks.check_symbol(region.name)?;
+        for line in &region.doc {
+            checks.check_symbol(*line)?;
+        }
+        if let Some(anchor) = region.anchor.as_ref()
+            && !owner_ids.contains(&anchor.0)
+        {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "HirSourceAnchorId",
+                index: anchor.0,
+                arena_size: owner_ids.len(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_presentation_structural_ends(
+    presentation: &radix_hir::HirPresentation,
+) -> Result<(), HirArtifactError> {
+    // Structural ends (block ends + program end) must be anchor-consistent
+    // with the owners registry. Lowering allocates every anchor from one
+    // arena, so end ids are unique and never shared with a non-end owner;
+    // an end that carries trivia is registered under its own kind, and an
+    // owner claiming a structural-end kind must be backed by the matching
+    // end record. Trivia-free ends legitimately have no owner record
+    // (owners are registered only when trivia exists), so an end id absent
+    // from the registry is legal.
+    let mut end_ids: FxHashSet<u32> = FxHashSet::default();
+    for end in &presentation.block_ends {
+        if !end_ids.insert(end.id.0) {
+            return Err(HirArtifactError::InvalidPresentation {
+                issue: "duplicate_block_end_anchor",
+                anchor: end.id.0,
+            });
+        }
+    }
+    if !end_ids.insert(presentation.program_end.id.0) {
+        return Err(HirArtifactError::InvalidPresentation {
+            issue: "program_end_collides_with_block_end",
+            anchor: presentation.program_end.id.0,
+        });
+    }
+    for owner in &presentation.owners {
+        match owner.kind {
+            radix_hir::HirTriviaOwnerKind::BlockEnd => {
+                if !end_ids.contains(&owner.id.0) {
+                    return Err(HirArtifactError::InvalidPresentation {
+                        issue: "block_end_owner_without_end",
+                        anchor: owner.id.0,
+                    });
+                }
+            }
+            radix_hir::HirTriviaOwnerKind::ProgramEnd => {
+                if owner.id != presentation.program_end.id {
+                    return Err(HirArtifactError::InvalidPresentation {
+                        issue: "program_end_owner_mismatch",
+                        anchor: owner.id.0,
+                    });
+                }
+            }
+            _ => {
+                if end_ids.contains(&owner.id.0) {
+                    return Err(HirArtifactError::InvalidPresentation {
+                        issue: "end_anchor_reused_as_owner",
+                        anchor: owner.id.0,
+                    });
+                }
+            }
         }
     }
 
