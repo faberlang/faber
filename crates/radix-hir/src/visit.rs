@@ -358,7 +358,9 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             visitor.visit_expr(object);
             walk_non_null(visitor, chain);
         }
-        HirExpressionKind::Marked { expr, .. } => visitor.visit_expr(expr),
+        HirExpressionKind::Marked { expr, .. } | HirExpressionKind::TypeCheck { expr, .. } => {
+            visitor.visit_expr(expr)
+        }
         HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
             visitor.visit_block(block);
         }
@@ -584,7 +586,6 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
                 visitor.visit_expr(opener);
             }
         }
-        HirExpressionKind::TypeCheck { expr, .. } => visitor.visit_expr(expr),
     }
 }
 
@@ -971,7 +972,9 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             visitor.visit_expr_mut(object);
             walk_non_null_mut(visitor, chain);
         }
-        HirExpressionKind::Marked { expr, .. } => visitor.visit_expr_mut(expr),
+        HirExpressionKind::Marked { expr, .. } | HirExpressionKind::TypeCheck { expr, .. } => {
+            visitor.visit_expr_mut(expr)
+        }
         HirExpressionKind::Gradient {
             call,
             selected_arguments,
@@ -1206,7 +1209,6 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
                 visitor.visit_expr_mut(opener);
             }
         }
-        HirExpressionKind::TypeCheck { expr, .. } => visitor.visit_expr_mut(expr),
     }
 }
 
