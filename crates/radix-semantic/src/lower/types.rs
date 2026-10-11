@@ -230,19 +230,7 @@ impl Lowerer<'_> {
 
         let base_ty = ty_id;
         if let Some(mode) = ty.mode {
-            let marker = crate::access_marker_from_type_mode(mode);
-            if self.types.is_scalar_for_access_marker(ty_id)
-                && !(allow_scalar_ref_mut
-                    && matches!(
-                        mode,
-                        radix_syntax::TypeMode::De | radix_syntax::TypeMode::In
-                    ))
-            {
-                self.error(crate::ISSUE_SCALAR_ACCESS_MARKER);
-                ty_id = self.types.intern(Type::Error);
-            } else {
-                ty_id = self.types.access_marker(marker, ty_id);
-            }
+            ty_id = self.apply_access_marker(ty_id, mode, allow_scalar_ref_mut);
         }
 
         let marked_ty = ty_id;
@@ -251,38 +239,73 @@ impl Lowerer<'_> {
         }
 
         if capturing_form {
-            // The frame was pushed above; an empty stack means lowering
-            // already bailed out, so leave the type without a form.
-            let Some(frame) = self.form_frames.pop() else {
-                return ty_id;
-            };
-            let mut form = Self::complete_type_form(ty, base_ty, frame);
-            // Access and nullable modifiers wrap the authored carrier. Keep
-            // its name and generic children beneath each semantic wrapper.
-            for wrapper_ty in [marked_ty, ty_id] {
-                if wrapper_ty != form.ty {
-                    form = radix_hir::HirTypeForm {
-                        ty: wrapper_ty,
-                        head: radix_hir::HirTypeFormHead::Semantic(
-                            radix_syntax::TypeFormLevel::LONG,
-                        ),
-                        args: vec![radix_hir::HirTypeFormArg::Type(Box::new(form))],
-                        label: None,
-                    };
-                }
-            }
-            // The label belongs to this node's position in its parent (the
-            // `gx` of `iuncta<gx: int, …>`), so it rides the outermost form.
-            form.label = ty.iuncta_label.as_ref().map(|ident| ident.name);
-            // A parent frame always exists during capture: the marker frame
-            // pushed by `lower_authored_type` sits at the bottom of the stack.
-            if let Some(parent) = self.form_frames.last_mut() {
-                parent
-                    .args
-                    .push(radix_hir::HirTypeFormArg::Type(Box::new(form)));
-            }
+            ty_id = self.capture_authored_form(ty, base_ty, marked_ty, ty_id);
         }
 
+        ty_id
+    }
+
+    /// Apply an access marker, rejecting one that cannot modify a scalar.
+    fn apply_access_marker(
+        &mut self,
+        ty_id: TypeId,
+        mode: radix_syntax::TypeMode,
+        allow_scalar_ref_mut: bool,
+    ) -> TypeId {
+        let marker = crate::access_marker_from_type_mode(mode);
+        if self.types.is_scalar_for_access_marker(ty_id)
+            && !(allow_scalar_ref_mut
+                && matches!(
+                    mode,
+                    radix_syntax::TypeMode::De | radix_syntax::TypeMode::In
+                ))
+        {
+            self.error(crate::ISSUE_SCALAR_ACCESS_MARKER);
+            self.types.intern(Type::Error)
+        } else {
+            self.types.access_marker(marker, ty_id)
+        }
+    }
+
+    /// Attach the authored form captured for one type node to its parent frame.
+    ///
+    /// Returns the type unchanged when lowering already bailed out and left no
+    /// frame on the stack.
+    fn capture_authored_form(
+        &mut self,
+        ty: &TypeExpr,
+        base_ty: TypeId,
+        marked_ty: TypeId,
+        ty_id: TypeId,
+    ) -> TypeId {
+        // The frame was pushed by the caller; an empty stack means lowering
+        // already bailed out, so leave the type without a form.
+        let Some(frame) = self.form_frames.pop() else {
+            return ty_id;
+        };
+        let mut form = Self::complete_type_form(ty, base_ty, frame);
+        // Access and nullable modifiers wrap the authored carrier. Keep
+        // its name and generic children beneath each semantic wrapper.
+        for wrapper_ty in [marked_ty, ty_id] {
+            if wrapper_ty != form.ty {
+                form = radix_hir::HirTypeForm {
+                    ty: wrapper_ty,
+                    head: radix_hir::HirTypeFormHead::Semantic(radix_syntax::TypeFormLevel::LONG),
+                    args: vec![radix_hir::HirTypeFormArg::Type(Box::new(form))],
+                    label: None,
+                };
+            }
+        }
+        // The label belongs to this node's position in its parent (the
+        // `gx` of `iuncta<gx: int, …>`), so it rides the outermost form.
+        form.label = ty.iuncta_label.as_ref().map(|ident| ident.name);
+        // A parent frame always exists during capture: the marker frame
+        // pushed by `lower_authored_type` sits at the bottom of the stack.
+        if let Some(parent) = self.form_frames.last_mut() {
+            parent
+                .args
+                .push(radix_hir::HirTypeFormArg::Type(Box::new(form)));
+        }
         ty_id
     }
 
@@ -461,19 +484,18 @@ impl Lowerer<'_> {
                 self.error("generic_type_argument_in_size_position");
                 None
             }
-            None => match self
-                .resolver
-                .lookup(ident.name)
-                .and_then(|def_id| self.resolver.get_symbol(def_id).map(|symbol| symbol.kind))
-            {
-                Some(crate::SymbolKind::IndexParam) => {
+            None => {
+                if let Some(crate::SymbolKind::IndexParam) = self
+                    .resolver
+                    .lookup(ident.name)
+                    .and_then(|def_id| self.resolver.get_symbol(def_id).map(|symbol| symbol.kind))
+                {
                     Some(self.types.intern_index(IndexExpr::Param(ident.name)))
-                }
-                _ => {
+                } else {
                     self.error("generic_type_argument_in_size_position");
                     None
                 }
-            },
+            }
         }
     }
 
@@ -678,185 +700,12 @@ impl Lowerer<'_> {
         let name_text = self.interner.resolve(name.name).to_owned();
         let name_str = name_text.as_str();
 
-        if let Some(ty) = self.lower_locale_pack_type(name_str, params) {
+        if let Some(ty) = self.lower_primitive_named_type(name_str, params) {
             return ty;
         }
 
-        // The parser canonicalizes localized policy markers to their Latin
-        // identities before HIR lowering. Resolve those identities directly
-        // into the tagged marker type, even when the source surface was
-        // localized (for example English `clamp` → canonical `clampa`).
-        if let Some(policy) = BuiltinTensorEdgePolicy::from_latin(name_str) {
-            return self.lower_tensor_edge_policy_type(policy, params);
-        }
-
-        if let Some(prim) = Primitive::from_name(name_str) {
-            return self.lower_primitive_type(prim, params);
-        }
-
-        if name_str == "modulus" {
-            return self.lower_modular_word_type(params);
-        }
-
-        if name_str == "saturatus" {
-            return self.lower_saturating_word_type(params);
-        }
-
-        if name_str == "exactus" {
-            return self.lower_trapping_word_type(params);
-        }
-
-        if name_str == "octetus" {
-            return self.lower_retired_byte_word_type();
-        }
-
-        if crate::numeric_width::is_standalone_width_name(name_str) {
-            let Some(type_params) = generic_type_exprs(params) else {
-                self.error("generic_size_argument_in_type_position");
-                return self.types.intern(Type::Error);
-            };
-            let mut issues = Vec::new();
-            let Some(ty) = crate::numeric_width::lower_standalone_width_type(
-                name_str,
-                &type_params,
-                self.types,
-                &mut |issue| issues.push(issue),
-            ) else {
-                self.error("standalone_width_internal");
-                return self.types.intern(Type::Error);
-            };
-            if let Some(issue) = issues.first() {
-                self.error(issue.issue());
-            }
+        if let Some(ty) = self.lower_frame_named_type(name_str, params) {
             return ty;
-        }
-
-        // SQL row: dynamic column map (faber::Valor per column).
-        if name_str == "series" {
-            if !params.is_empty() {
-                self.error("series_params");
-                return self.types.intern(Type::Error);
-            }
-            let textus = self.types.primitive(Primitive::Textus);
-            let valor = self.types.primitive(Primitive::Valor);
-            return self.types.map(textus, valor);
-        }
-
-        if name_str == "intervallum" {
-            if params.len() != 1 {
-                self.error("intervallum_arity");
-                return self.types.intern(Type::Error);
-            }
-            let bound = self.lower_generic_type_arg(&params[0]);
-            if !crate::is_intervallum_bound_type(self.types, bound) {
-                self.error("intervallum_bound");
-                return self.types.intern(Type::Error);
-            }
-            return self.types.intervallum(bound);
-        }
-
-        if name_str == "sermo" && !params.is_empty() {
-            // `sermo<O, R>` (D6.11); bare `sermo` is `sermo<valor, valor>`
-            // and resolves through the ordinary builtin symbol.
-            let Some(def_id) = crate::builtins::frame_types::sermo_def_id(self.resolver) else {
-                self.error("sermo_missing_builtin");
-                return self.types.intern(Type::Error);
-            };
-            let [opener, reply] = params else {
-                self.error("sermo_arity");
-                return self.types.intern(Type::Error);
-            };
-            let opener = self.lower_generic_type_arg(opener);
-            let reply = self.lower_generic_type_arg(reply);
-            return crate::builtins::frame_types::sermo_typed_type_id(
-                self.types, def_id, opener, reply,
-            );
-        }
-
-        if name_str == "scrinium" {
-            let Some(def_id) = crate::builtins::frame_types::scrinium_def_id(self.resolver) else {
-                self.error("scrinium_missing_builtin");
-                return self.types.intern(Type::Error);
-            };
-            let payload_ty = match params {
-                [] => self.types.primitive(Primitive::Valor),
-                [payload] => self.lower_generic_type_arg(payload),
-                _ => {
-                    self.error("scrinium_arity");
-                    return self.types.intern(Type::Error);
-                }
-            };
-            return crate::builtins::frame_types::scrinium_payload_type_id(
-                self.types, def_id, payload_ty,
-            );
-        }
-
-        if name_str == "atomic" {
-            if params.len() == 1 {
-                self.error("atomic_compiler_owned_syntax");
-            } else {
-                self.error("atomic_arity");
-            }
-            return self.types.intern(Type::Error);
-        }
-
-        if name_str == "tensor" {
-            if params.is_empty() {
-                self.error("tensor_incomplete");
-            } else {
-                self.error("tensor_missing_figura");
-            }
-            return self.types.intern(Type::Error);
-        }
-
-        if name_str == "sparsa" {
-            if params.is_empty() {
-                self.error("sparsa_incomplete");
-            } else {
-                self.error("sparsa_missing_figura");
-            }
-            return self.types.intern(Type::Error);
-        }
-
-        if name_str == "matrix" {
-            if params.is_empty() {
-                self.error("matrix_incomplete");
-            } else {
-                self.error("matrix_missing_figura");
-            }
-            return self.types.intern(Type::Error);
-        }
-
-        if name_str == "iuncta" {
-            let elements: Vec<TypeId> = params
-                .iter()
-                .map(|param| {
-                    let GenericArgExpr::Type(param) = param else {
-                        self.error("iuncta_type_arg_shape");
-                        return self.types.intern(Type::Error);
-                    };
-                    if matches!(param.kind, TypeExprKind::UnionHole) {
-                        // A standalone ∪ is a heterogeneous accumulation hole for
-                        // collection elements, not a valid monomorphic tuple
-                        // position. Reject it here so the issue points at the
-                        // offending iuncta element instead of leaking WARN017.
-                        self.current_span = param.span;
-                        self.error("iuncta_union_type_arg_unsupported");
-                        self.types.intern(Type::Error)
-                    } else {
-                        self.lower_nested_type(param)
-                    }
-                })
-                .collect();
-            return self.types.tuple(elements);
-        }
-
-        if name_str == "ratio" {
-            return self.lower_ratio_type(params);
-        }
-
-        if let Some(collection) = CollectionKind::from_name(name_str) {
-            return self.lower_collection_type(collection, params);
         }
 
         if self.is_lexical_type_param(name.name) {
@@ -937,6 +786,215 @@ impl Lowerer<'_> {
             return base;
         }
         self.types.intern(Type::Applied(base, args))
+    }
+
+    /// Lower the builtin primitive, word-policy, width, and SQL-row names.
+    ///
+    /// Returns `None` when `name_str` is not one of these builtins, so the
+    /// caller can continue with the frame, shape, and user-type paths.
+    fn lower_primitive_named_type(
+        &mut self,
+        name_str: &str,
+        params: &[GenericArgExpr],
+    ) -> Option<TypeId> {
+        if let Some(ty) = self.lower_locale_pack_type(name_str, params) {
+            return Some(ty);
+        }
+
+        // The parser canonicalizes localized policy markers to their Latin
+        // identities before HIR lowering. Resolve those identities directly
+        // into the tagged marker type, even when the source surface was
+        // localized (for example English `clamp` → canonical `clampa`).
+        if let Some(policy) = BuiltinTensorEdgePolicy::from_latin(name_str) {
+            return Some(self.lower_tensor_edge_policy_type(policy, params));
+        }
+
+        if let Some(prim) = Primitive::from_name(name_str) {
+            return Some(self.lower_primitive_type(prim, params));
+        }
+
+        if name_str == "modulus" {
+            return Some(self.lower_modular_word_type(params));
+        }
+
+        if name_str == "saturatus" {
+            return Some(self.lower_saturating_word_type(params));
+        }
+
+        if name_str == "exactus" {
+            return Some(self.lower_trapping_word_type(params));
+        }
+
+        if name_str == "octetus" {
+            return Some(self.lower_retired_byte_word_type());
+        }
+
+        if crate::numeric_width::is_standalone_width_name(name_str) {
+            let Some(type_params) = generic_type_exprs(params) else {
+                self.error("generic_size_argument_in_type_position");
+                return Some(self.types.intern(Type::Error));
+            };
+            let mut issues = Vec::new();
+            let Some(ty) = crate::numeric_width::lower_standalone_width_type(
+                name_str,
+                &type_params,
+                self.types,
+                &mut |issue| issues.push(issue),
+            ) else {
+                self.error("standalone_width_internal");
+                return Some(self.types.intern(Type::Error));
+            };
+            if let Some(issue) = issues.first() {
+                self.error(issue.issue());
+            }
+            return Some(ty);
+        }
+
+        // SQL row: dynamic column map (faber::Valor per column).
+        if name_str == "series" {
+            if !params.is_empty() {
+                self.error("series_params");
+                return Some(self.types.intern(Type::Error));
+            }
+            let textus = self.types.primitive(Primitive::Textus);
+            let valor = self.types.primitive(Primitive::Valor);
+            return Some(self.types.map(textus, valor));
+        }
+
+        if name_str == "intervallum" {
+            if params.len() != 1 {
+                self.error("intervallum_arity");
+                return Some(self.types.intern(Type::Error));
+            }
+            let bound = self.lower_generic_type_arg(&params[0]);
+            if !crate::is_intervallum_bound_type(self.types, bound) {
+                self.error("intervallum_bound");
+                return Some(self.types.intern(Type::Error));
+            }
+            return Some(self.types.intervallum(bound));
+        }
+
+        None
+    }
+
+    /// Lower the builtin frame, shape, tuple, ratio, and collection names.
+    ///
+    /// Returns `None` when `name_str` is not one of these builtins.
+    fn lower_frame_named_type(
+        &mut self,
+        name_str: &str,
+        params: &[GenericArgExpr],
+    ) -> Option<TypeId> {
+        if name_str == "sermo" && !params.is_empty() {
+            // `sermo<O, R>` (D6.11); bare `sermo` is `sermo<valor, valor>`
+            // and resolves through the ordinary builtin symbol.
+            let Some(def_id) = crate::builtins::frame_types::sermo_def_id(self.resolver) else {
+                self.error("sermo_missing_builtin");
+                return Some(self.types.intern(Type::Error));
+            };
+            let [opener, reply] = params else {
+                self.error("sermo_arity");
+                return Some(self.types.intern(Type::Error));
+            };
+            let opener = self.lower_generic_type_arg(opener);
+            let reply = self.lower_generic_type_arg(reply);
+            return Some(crate::builtins::frame_types::sermo_typed_type_id(
+                self.types, def_id, opener, reply,
+            ));
+        }
+
+        if name_str == "scrinium" {
+            let Some(def_id) = crate::builtins::frame_types::scrinium_def_id(self.resolver) else {
+                self.error("scrinium_missing_builtin");
+                return Some(self.types.intern(Type::Error));
+            };
+            let payload_ty = match params {
+                [] => self.types.primitive(Primitive::Valor),
+                [payload] => self.lower_generic_type_arg(payload),
+                _ => {
+                    self.error("scrinium_arity");
+                    return Some(self.types.intern(Type::Error));
+                }
+            };
+            return Some(crate::builtins::frame_types::scrinium_payload_type_id(
+                self.types, def_id, payload_ty,
+            ));
+        }
+
+        if name_str == "atomic" {
+            if params.len() == 1 {
+                self.error("atomic_compiler_owned_syntax");
+            } else {
+                self.error("atomic_arity");
+            }
+            return Some(self.types.intern(Type::Error));
+        }
+
+        if name_str == "tensor" {
+            if params.is_empty() {
+                self.error("tensor_incomplete");
+            } else {
+                self.error("tensor_missing_figura");
+            }
+            return Some(self.types.intern(Type::Error));
+        }
+
+        if name_str == "sparsa" {
+            if params.is_empty() {
+                self.error("sparsa_incomplete");
+            } else {
+                self.error("sparsa_missing_figura");
+            }
+            return Some(self.types.intern(Type::Error));
+        }
+
+        if name_str == "matrix" {
+            if params.is_empty() {
+                self.error("matrix_incomplete");
+            } else {
+                self.error("matrix_missing_figura");
+            }
+            return Some(self.types.intern(Type::Error));
+        }
+
+        if name_str == "iuncta" {
+            return Some(self.lower_iuncta_type(params));
+        }
+
+        if name_str == "ratio" {
+            return Some(self.lower_ratio_type(params));
+        }
+
+        if let Some(collection) = CollectionKind::from_name(name_str) {
+            return Some(self.lower_collection_type(collection, params));
+        }
+
+        None
+    }
+
+    /// Lower `iuncta<...>` into a monomorphic tuple of element types.
+    fn lower_iuncta_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
+        let elements: Vec<TypeId> = params
+            .iter()
+            .map(|param| {
+                let GenericArgExpr::Type(param) = param else {
+                    self.error("iuncta_type_arg_shape");
+                    return self.types.intern(Type::Error);
+                };
+                if matches!(param.kind, TypeExprKind::UnionHole) {
+                    // A standalone ∪ is a heterogeneous accumulation hole for
+                    // collection elements, not a valid monomorphic tuple
+                    // position. Reject it here so the issue points at the
+                    // offending iuncta element instead of leaking WARN017.
+                    self.current_span = param.span;
+                    self.error("iuncta_union_type_arg_unsupported");
+                    self.types.intern(Type::Error)
+                } else {
+                    self.lower_nested_type(param)
+                }
+            })
+            .collect();
+        self.types.tuple(elements)
     }
 
     /// Lower `ratio<label: T, …>` into interned `Type::Record`.

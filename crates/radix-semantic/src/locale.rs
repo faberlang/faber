@@ -34,6 +34,7 @@ use radix_lexer::{
 };
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
@@ -583,7 +584,7 @@ impl LocalePack {
             &diagnostic.args,
         )?;
         if let Some(issue) = missing_issue {
-            message.push_str(&format!(" [locale pack missing row: {code}.{issue}]"));
+            write!(message, " [locale pack missing row: {code}.{issue}]").ok();
         }
         let help = template
             .help
@@ -1300,6 +1301,46 @@ pub fn latin_locale_pack() -> LocalePack {
         })
         .collect();
 
+    let mut types = latin_spec_type_bindings();
+    insert_latin_extra_types(&mut types);
+
+    let mut pack = LocalePack {
+        metadata: LocalePackMetadata {
+            id: "la".to_string(),
+            schema_version: LOCALE_PACK_SCHEMA_VERSION,
+            inherits: None,
+            fallback: Vec::new(),
+        },
+        keywords,
+        types,
+        library_members: BTreeMap::new(),
+        library_member_surfaces: BTreeMap::new(),
+        intrinsics: BTreeMap::new(),
+        diagnostics: latin_diagnostic_templates(),
+        llm: LlmArtifacts {
+            system_prompt_snippet:
+                "Emit canonical Latin Faber source using the registered Latin keywords and glyphs."
+                    .to_string(),
+            exemplars: vec!["corpus/incipit/salve-munde.fab".to_string()],
+        },
+        keyword_surfaces: HashMap::new(),
+        type_surfaces: HashMap::new(),
+        keyword_fallbacks: Vec::new(),
+        type_fallbacks: Vec::new(),
+        keyword_folded_spellings: Vec::new(),
+        suggestion_input_len_min: 0,
+        suggestion_input_len_max: 0,
+        suggestion_memo: SuggestionMemoHandle::default(),
+        keyword_latin_key_by_spelling: HashMap::new(),
+        type_binding_by_spelling: HashMap::new(),
+        intrinsic_surfaces: HashMap::new(),
+        intrinsic_canonical_by_surface: HashMap::new(),
+    };
+    pack.rebuild_surfaces();
+    pack
+}
+
+fn latin_spec_type_bindings() -> BTreeMap<String, TypeBinding> {
     let mut types = BTreeMap::new();
     for spec in primitive_type_specs() {
         // Disambiguate type spellings that collide with keyword spellings.
@@ -1349,6 +1390,10 @@ pub fn latin_locale_pack() -> LocalePack {
         };
         types.insert(spec.text.to_string(), entry);
     }
+    types
+}
+
+fn insert_latin_extra_types(types: &mut BTreeMap<String, TypeBinding>) {
     types.insert(
         "modulus".to_owned(),
         TypeBinding {
@@ -1429,41 +1474,6 @@ pub fn latin_locale_pack() -> LocalePack {
             },
         );
     }
-
-    let mut pack = LocalePack {
-        metadata: LocalePackMetadata {
-            id: "la".to_string(),
-            schema_version: LOCALE_PACK_SCHEMA_VERSION,
-            inherits: None,
-            fallback: Vec::new(),
-        },
-        keywords,
-        types,
-        library_members: BTreeMap::new(),
-        library_member_surfaces: BTreeMap::new(),
-        intrinsics: BTreeMap::new(),
-        diagnostics: latin_diagnostic_templates(),
-        llm: LlmArtifacts {
-            system_prompt_snippet:
-                "Emit canonical Latin Faber source using the registered Latin keywords and glyphs."
-                    .to_string(),
-            exemplars: vec!["corpus/incipit/salve-munde.fab".to_string()],
-        },
-        keyword_surfaces: HashMap::new(),
-        type_surfaces: HashMap::new(),
-        keyword_fallbacks: Vec::new(),
-        type_fallbacks: Vec::new(),
-        keyword_folded_spellings: Vec::new(),
-        suggestion_input_len_min: 0,
-        suggestion_input_len_max: 0,
-        suggestion_memo: SuggestionMemoHandle::default(),
-        keyword_latin_key_by_spelling: HashMap::new(),
-        type_binding_by_spelling: HashMap::new(),
-        intrinsic_surfaces: HashMap::new(),
-        intrinsic_canonical_by_surface: HashMap::new(),
-    };
-    pack.rebuild_surfaces();
-    pack
 }
 
 /// Validate a pack against live compiler registries and schema invariants.
@@ -2231,7 +2241,7 @@ impl TemplatePlaceholderIssue<'_> {
                     code: code.to_string(),
                     field,
                     placeholder: placeholder.to_string(),
-                })
+                });
             }
         }
     }
@@ -2385,48 +2395,8 @@ impl ReaderPackToml {
             })
             .collect();
 
-        let mut library_members: BTreeMap<
-            InterfaceLibraryIdentity,
-            BTreeMap<LibraryMemberKey, String>,
-        > = BTreeMap::new();
-        let mut library_member_surfaces: BTreeMap<
-            InterfaceLibraryIdentity,
-            BTreeMap<LibraryMemberKey, Vec<String>>,
-        > = BTreeMap::new();
-        for member in self.library_members {
-            let identity = InterfaceLibraryIdentity {
-                provider: member.provider,
-                package: member.package,
-                module_path: member.module_path,
-            };
-            let key = LibraryMemberKey {
-                owner: member.owner,
-                kind: member.kind,
-                canonical: member.canonical,
-            };
-            let primary = library_members.entry(identity.clone()).or_default();
-            // Keep a translated surface as the primary projection when a pack
-            // also declares an identity row for the same canonical member.
-            // This makes both spellings explicit without changing the
-            // consumer-locale emission surface.
-            match primary.get(&key) {
-                None => {
-                    primary.insert(key.clone(), member.surface.clone());
-                }
-                Some(existing) if existing == &key.canonical && member.surface != key.canonical => {
-                    primary.insert(key.clone(), member.surface.clone());
-                }
-                Some(_) => {}
-            }
-            let surfaces = library_member_surfaces
-                .entry(identity)
-                .or_default()
-                .entry(key)
-                .or_default();
-            if !surfaces.iter().any(|surface| surface == &member.surface) {
-                surfaces.push(member.surface);
-            }
-        }
+        let (library_members, library_member_surfaces) =
+            project_library_members(self.library_members);
 
         let intrinsics = self
             .intrinsics
@@ -2478,6 +2448,57 @@ impl ReaderPackToml {
         pack.rebuild_surfaces();
         pack
     }
+}
+
+fn project_library_members(
+    members: Vec<LibraryMemberToml>,
+) -> (
+    BTreeMap<InterfaceLibraryIdentity, BTreeMap<LibraryMemberKey, String>>,
+    BTreeMap<InterfaceLibraryIdentity, BTreeMap<LibraryMemberKey, Vec<String>>>,
+) {
+    let mut library_members: BTreeMap<
+        InterfaceLibraryIdentity,
+        BTreeMap<LibraryMemberKey, String>,
+    > = BTreeMap::new();
+    let mut library_member_surfaces: BTreeMap<
+        InterfaceLibraryIdentity,
+        BTreeMap<LibraryMemberKey, Vec<String>>,
+    > = BTreeMap::new();
+    for member in members {
+        let identity = InterfaceLibraryIdentity {
+            provider: member.provider,
+            package: member.package,
+            module_path: member.module_path,
+        };
+        let key = LibraryMemberKey {
+            owner: member.owner,
+            kind: member.kind,
+            canonical: member.canonical,
+        };
+        let primary = library_members.entry(identity.clone()).or_default();
+        // Keep a translated surface as the primary projection when a pack
+        // also declares an identity row for the same canonical member.
+        // This makes both spellings explicit without changing the
+        // consumer-locale emission surface.
+        match primary.get(&key) {
+            None => {
+                primary.insert(key.clone(), member.surface.clone());
+            }
+            Some(existing) if existing == &key.canonical && member.surface != key.canonical => {
+                primary.insert(key.clone(), member.surface.clone());
+            }
+            Some(_) => {}
+        }
+        let surfaces = library_member_surfaces
+            .entry(identity)
+            .or_default()
+            .entry(key)
+            .or_default();
+        if !surfaces.iter().any(|surface| surface == &member.surface) {
+            surfaces.push(member.surface);
+        }
+    }
+    (library_members, library_member_surfaces)
 }
 
 fn surface_keys<'a>(
