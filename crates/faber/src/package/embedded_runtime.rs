@@ -52,10 +52,10 @@ fn cache_dir() -> PathBuf {
 /// Write the table into a sibling temp dir, then rename it onto `root`. A lost
 /// rename race (the winner's directory already exists) is success.
 fn materialize(parent: &Path, root: &Path) -> io::Result<()> {
-    fs::create_dir_all(parent)?;
     // Unique per call: concurrent callers in one process (parallel tests,
     // threads) must not share, write into, or discard each other's staging.
     static STAGING_SEQ: AtomicU64 = AtomicU64::new(0);
+    fs::create_dir_all(parent)?;
     let staging = parent.join(format!(
         ".faber-runtime-{EMBEDDED_RUNTIME_DIGEST}.{}.{}.tmp",
         std::process::id(),

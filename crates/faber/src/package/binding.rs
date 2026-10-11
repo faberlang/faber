@@ -44,6 +44,11 @@ enum BindingProbeMode {
     Cargo,
 }
 
+/// Verify the library bindings declared for `target`.
+///
+/// # Errors
+///
+/// Returns the manifest, member-path or binding-verification diagnostics.
 pub fn verify_library_bindings(
     package_root: &Path,
     target: &str,
@@ -98,6 +103,11 @@ pub fn load_target_bindings(
     })
 }
 
+/// Verify the shape of the library bindings declared for `target`.
+///
+/// # Errors
+///
+/// Returns the manifest, target-binding or binding-shape diagnostics.
 #[cfg(feature = "hir-rust")]
 pub fn verify_library_binding_shapes(
     package_root: &Path,

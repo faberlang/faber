@@ -131,18 +131,17 @@ fn write_artifact_contents(path: &Path, contents: impl AsRef<[u8]>) {
 pub fn format_generated_code(target: Target, code: &str) -> Result<String, String> {
     match target {
         Target::HirRust => run_formatter("rustfmt", &["--edition", "2021"], code),
-        Target::HirFaber => Ok(code.to_string()),
         Target::HirGo => run_formatter("gofmt", &[], code),
-        Target::HirSwift => Ok(code.to_string()),
-        Target::HirPython => Ok(code.to_string()),
-        Target::HirHaskell => Ok(code.to_string()),
-        Target::HirPascal => Ok(code.to_string()),
-        Target::HirCobol => Ok(code.to_string()),
-        Target::HirFortran => Ok(code.to_string()),
-        Target::HirOdin => Ok(code.to_string()),
-        Target::HirTypeScript => format_typescript_code(code),
-        Target::HirFhir => Ok(code.to_string()),
-        Target::MirStepper
+        Target::HirFaber
+        | Target::HirSwift
+        | Target::HirPython
+        | Target::HirHaskell
+        | Target::HirPascal
+        | Target::HirCobol
+        | Target::HirFortran
+        | Target::HirOdin
+        | Target::HirFhir
+        | Target::MirStepper
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
@@ -155,6 +154,7 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         | Target::MirFmirBinary
         | Target::MirFmirBundle
         | Target::MirAmd => Ok(code.to_string()),
+        Target::HirTypeScript => format_typescript_code(code),
     }
 }
 
@@ -176,9 +176,8 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::HirCobol
         | Target::HirFortran
         | Target::HirOdin
-        | Target::HirFhir => Ok(code.to_string()),
-        Target::HirTypeScript => lint_typescript_code(code),
-        Target::MirStepper
+        | Target::HirFhir
+        | Target::MirStepper
         | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
@@ -191,6 +190,7 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::MirFmirBinary
         | Target::MirFmirBundle
         | Target::MirAmd => Ok(code.to_string()),
+        Target::HirTypeScript => lint_typescript_code(code),
     }
 }
 

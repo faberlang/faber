@@ -74,6 +74,11 @@ pub fn is_diagnostic_query(query: &str) -> bool {
 }
 
 /// Resolve a diagnostic explanation from an embedded reader pack.
+///
+/// # Errors
+///
+/// Returns [`ExplainError`] if the reader locale is empty or its embedded pack
+/// cannot be loaded.
 pub fn lookup_embedded_diagnostic(
     query: &str,
     locale: Option<&str>,
@@ -146,6 +151,10 @@ pub fn render_plain(explanation: &DiagnosticExplanation) -> String {
 }
 
 /// Render one diagnostic explanation as JSON.
+///
+/// # Errors
+///
+/// Returns [`ExplainError`] if the explanation cannot be serialized as JSON.
 pub fn render_json(explanation: &DiagnosticExplanation) -> Result<String, ExplainError> {
     serde_json::to_string_pretty(explanation)
         .map_err(|err| ExplainError::new(format!("failed to render diagnostic JSON: {err}")))
