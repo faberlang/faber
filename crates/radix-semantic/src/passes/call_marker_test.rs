@@ -7,7 +7,7 @@
 
 use crate::test_support::{analyze_ok, analyze_source, assert_rejects_with_issue, issue};
 
-const DEFS: &str = "functio bump(in lista<numerus> xs) → vacuum { xs.adde(1) }\n\
+const DEFS: &str = "functio bump(in lista<numerus> xs) → vacuum { xs.appende(1) }\n\
 functio eat(own lista<numerus> xs) → vacuum { nota xs.longitudo() }\n\
 functio dup(copy lista<numerus> xs) → vacuum { nota xs.longitudo() }\n\
 functio peek(lista<numerus> xs) → vacuum { nota xs.longitudo() }\n\
@@ -90,7 +90,7 @@ fn temporary_with_matching_own_or_copy_marker_is_accepted() {
 }
 
 const GENUS: &str = "genus Box {\n    varia numerus n\n    \
-functio fill(in lista<numerus> ys) → vacuum { ys.adde(1) }\n    \
+functio fill(in lista<numerus> ys) → vacuum { ys.appende(1) }\n    \
 functio take(own lista<numerus> ys) → vacuum { nota ys.longitudo() }\n    \
 functio look(lista<numerus> ys) → vacuum { nota ys.longitudo() }\n}\n";
 
@@ -114,7 +114,7 @@ fn method_arguments_follow_the_signature_modes() {
 
 #[test]
 fn method_receiver_carries_no_marker_and_intrinsics_are_exempt() {
-    let _ = analyze_ok(&method("a.adde(9)"));
+    let _ = analyze_ok(&method("a.appende(9)"));
     let _ = analyze_ok(&method("nota a.longitudo()"));
 }
 
@@ -147,9 +147,9 @@ fn function_value_calls_use_the_function_type_modes() {
 
 #[test]
 fn closure_values_use_their_declared_parameter_modes() {
-    let ok = "incipit {\n    varia lista<numerus> a ← [1]\n    fixum _ g ← (in lista<numerus> ys) ∴ ys.adde(2)\n    g(in a)\n}";
+    let ok = "incipit {\n    varia lista<numerus> a ← [1]\n    fixum _ g ← (in lista<numerus> ys) ∴ ys.appende(2)\n    g(in a)\n}";
     let _ = analyze_ok(ok);
-    let missing = "incipit {\n    varia lista<numerus> a ← [1]\n    fixum _ g ← (in lista<numerus> ys) ∴ ys.adde(2)\n    g(a)\n}";
+    let missing = "incipit {\n    varia lista<numerus> a ← [1]\n    fixum _ g ← (in lista<numerus> ys) ∴ ys.appende(2)\n    g(a)\n}";
     assert_rejects_with_issue(missing, "call_marker_missing");
 }
 

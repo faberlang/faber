@@ -1,0 +1,38 @@
++++
+term = "textus"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "register"
+canonical = false
+summary = "s[i] on a string is the i-th Unicode character, not the i-th byte; it dies only when i is out of range."
+syntax = "<string>[<index>]"
+related = ["textus", "textus-quaestiones"]
+locale = "en"
++++
+# =============================================================================
+# textus — s[i] is the i-th Unicode character
+# =============================================================================
+#
+# What this teaches:
+#   • `s[i]` on a string counts characters, not bytes: in "Grüße" the
+#     characters at 0, 2 and 3 are G, ü and ß.
+#   • A multi-byte character is one character, so indexing past it lands on
+#     the next one, never inside it.
+#
+# Common mistakes:
+#   • expecting a byte offset — to index per byte, use the ascii type
+#   • indexing past the last character — that dies; it does not wrap or trim
+#
+# See also: textus, textus-quaestiones
+#
+# EXPECTED OUTPUT:
+#   index-unicode.expected
+# =============================================================================
+
+main {
+    const string s ← "Grüße"
+    print s[0]
+    print s[2]
+    print s[3]
+    print s[4]
+}

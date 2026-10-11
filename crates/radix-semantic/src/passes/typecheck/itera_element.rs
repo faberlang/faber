@@ -70,7 +70,6 @@ impl TypeChecker<'_> {
             | Type::BoundedQueue { element: inner, .. }
             | Type::Stack(inner)
             | Type::BoundedStack { element: inner, .. }
-            | Type::Set(inner)
             | Type::BoundedArray { element: inner, .. }
             | Type::Tensor(inner, _)
             | Type::Matrix(inner, _)
@@ -78,6 +77,12 @@ impl TypeChecker<'_> {
             | Type::Sparsa(inner, _)
                 if ex =>
             {
+                inner
+            }
+            // MIR walks a `copia` through a `lista<T>` snapshot; intern the row
+            // for that lowering.
+            Type::Set(inner) if ex => {
+                self.types.array(inner);
                 inner
             }
             Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } if ex => {

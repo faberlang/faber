@@ -219,18 +219,6 @@ scrinium = "帧"
 meus = "发送"
 tuus = "接收"
 
-[diagnostics.UNRES001]
-message = "关键字 '{keyword}' 未在读者语言包 '{pack}' 中声明"
-help = "在此语法位置使用读者语言包中声明的关键字拼写"
-
-[diagnostics.UNRES002]
-message = "内建函数 '{intrinsic}' 未在读者语言包 '{pack}' 中为接收者族 '{receiver}' 声明"
-help = "为此接收者族使用读者语言包中声明的内建函数拼写"
-
-[diagnostics.UNRES003]
-message = "库成员 '{member}' 未在读者语言包 '{pack}' 中为标识 '{identity}' 声明"
-help = "为此库标识使用读者语言包中声明的成员拼写"
-
 [diagnostics.LOCALE002]
 message = "读者语言包 {pack} 发现类似关键字的写法 {spelling}"
 help = "若本意是关键字请使用 {suggestion}；{spelling} 按原样是合法名称"
@@ -638,6 +626,10 @@ help = "用 `⌊x⌉` 取最近整数，平局取偶数邻值；用 `⌈x⌉` �
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` 是已废弃的运算符；`≡` 的否定写作 `{replacement}`"
 help = "用 `{replacement}` 代替 `{glyph}`；每个否定符号的横线数与其所否定的符号相同（`≡`/`≢`、`≅`/`≇`、`≈`/`≉`）"
+
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "sort 或 reduce 表达式不能直接作为循环来源"
+help = "先把它绑定到一个名称，再对该名称循环：`const list<int> ys ← sort via asc from xs`，然后 `for from ys const x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "使用 ⊥ 进行 conversio recovery"
@@ -2517,11 +2509,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -2951,6 +2947,26 @@ help = "use the same access marker at the call as in the signature"
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
 
+[diagnostics.SEM010.issues.axis_reduction_extent_unknown]
+message = "the mean needs a compile-time extent on the axis it removes"
+help = "give the axis a literal extent, or write the grouped reduction and divide by the run-time count"
+
+[diagnostics.SEM010.issues.axis_reduction_mean_requires_float]
+message = "the mean along an axis needs a floating-point element"
+help = "convert the tensor to a floating-point element type first, or use sum"
+
+[diagnostics.SEM010.issues.axis_reduction_not_constant]
+message = "the axis of a reduction must be a compile-time constant"
+help = "write a literal axis such as `axis 1`; the result shape depends on it"
+
+[diagnostics.SEM010.issues.axis_reduction_out_of_range]
+message = "the axis is outside the rank of the tensor"
+help = "use an axis from 0 up to one less than the rank"
+
+[diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
+message = "an axis reduction is built for rank-2 tensors only"
+help = "reduce a rank-2 tensor, or write the explicit reduction with `pro`"
+
 [diagnostics.SEM057.issues.axis_marker_required]
 message = "this argument is an `axis` argument and must be written with the `axis` marker"
 help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
@@ -3150,6 +3166,14 @@ help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" 拒绝此函数体：`tacet` 不在 v1 AIR subset 之内"
 help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM065]
+message = "`{name}` 会把只读值 `{binding}` 共享为可写名称（`{fixum}` 是深层的）"
+help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{varia} {name} ← {own} {binding}` 接管它"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` 会把只读值 `{binding}` 共享为可写名称（`{fixum}` 是深层的）"
+help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{varia} {name} ← {own} {binding}` 接管它"
 
 [diagnostics.WARN001]
 message = "未使用变量"

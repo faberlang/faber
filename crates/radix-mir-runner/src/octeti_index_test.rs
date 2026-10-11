@@ -130,6 +130,8 @@ fn bounded_lista_dynamic_oob_is_a_hard_runner_error() {
     )
     .expect_err("bounded lista dynamic OOB must fail hard");
     assert_eq!(error.issue, "runner_array_index_out_of_bounds");
+    assert_eq!(error.arg("index"), Some("8"));
+    assert_eq!(error.arg("len"), Some("2"));
 }
 
 #[test]
@@ -167,6 +169,9 @@ fn octeti_index_range_out_of_bounds_fails() {
         err.issue, "runner_octeti_index_out_of_bounds",
         "expected live octeti OOB fail, got: {err:?}"
     );
+    assert_eq!(err.arg("start"), Some("0"));
+    assert_eq!(err.arg("end"), Some("5"));
+    assert_eq!(err.arg("len"), Some("4"));
 }
 
 #[test]
@@ -285,6 +290,9 @@ fn list_window_past_the_end_fails_not_short() {
     let error = eval_list_window(receiver, exclusive_range(1, 4), numerus_element)
         .expect_err("a window past the end must fail");
     assert_eq!(error.issue, "runner_list_window_out_of_bounds");
+    assert_eq!(error.arg("start"), Some("1"));
+    assert_eq!(error.arg("end"), Some("4"));
+    assert_eq!(error.arg("len"), Some("3"));
 }
 
 #[test]
@@ -310,4 +318,7 @@ fn list_window_far_past_the_end_dies() {
     let error = eval_list_window(receiver, exclusive_range(1, 9), numerus_element)
         .expect_err("a window past the end must die");
     assert_eq!(error.issue, "runner_list_window_out_of_bounds");
+    assert_eq!(error.arg("start"), Some("1"));
+    assert_eq!(error.arg("end"), Some("9"));
+    assert_eq!(error.arg("len"), Some("3"));
 }

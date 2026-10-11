@@ -310,6 +310,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             target,
             source,
             recovery,
+            ..
         } => {
             visitor.visit_expr(target);
             visitor.visit_expr(source);
@@ -931,6 +932,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             target,
             source,
             recovery,
+            ..
         } => {
             visitor.visit_expr_mut(target);
             visitor.visit_expr_mut(source);

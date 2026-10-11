@@ -228,24 +228,36 @@ scrinium = "scrinium"
 meus = "meus"
 tuus = "tuus"
 
-[diagnostics.UNRES001]
-message = "keyword '{keyword}' is not declared for reader locale '{pack}'"
-help = "use a keyword spelling declared in the reader pack for this grammar position"
-
-[diagnostics.UNRES002]
-message = "intrinsic '{intrinsic}' is not declared for reader locale '{pack}' on receiver family '{receiver}'"
-help = "use an intrinsic spelling declared in the reader pack for this receiver family"
-
-[diagnostics.UNRES003]
-message = "library member '{member}' is not declared for reader locale '{pack}' for identity '{identity}'"
-help = "use a member spelling declared in the reader pack for this library identity"
-
 [diagnostics.LOCALE002]
 message = "reader locale '{pack}' saw keyword-like spelling '{spelling}'"
 help = "use '{suggestion}' if you meant that keyword; '{spelling}' is a valid name as written"
 
 [diagnostics.LOCALE003]
 message = "unknown or invalid reader locale '{locale_id}' in frontmatter"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.invalid_id]
+message = "frontmatter locale '{locale_id}' is not a valid locale identifier; locale ids must be simple directory names"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.no_root]
+message = "frontmatter declares locale '{locale_id}' but no language-pack root is configured"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.outside_root]
+message = "frontmatter locale '{locale_id}' resolves outside the language-pack root"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.load_failed]
+message = "unknown reader locale '{locale_id}' in frontmatter: {detail}"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.not_a_string]
+message = "frontmatter 'locale' key must be a string"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LOCALE003.issues.unresolved]
+message = "reader locale did not resolve for this source"
 help = "check the locale id is a valid reader locale directory name under the standard library reader path"
 
 [diagnostics.LOCALE004]
@@ -800,6 +812,10 @@ help = "scribe `⌊x⌉` ad proximum integrum rotundandum, paria ad vicinum pare
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` signum retractum est; negatio `≡` scribitur `{replacement}`"
 help = "scribe `{replacement}` pro `{glyph}`; omne signum negationis easdem lineas habet quas signum negatum (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "expressio ordinata vel reducta fons itera esse non potest"
+help = "liga eam prius ad nomen, deinde itera per nomen: `fixum lista<numerus> ys ← ordinata via ascendens ex xs`, deinde `itera ex ys fixum x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
@@ -3368,11 +3384,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -4010,6 +4030,26 @@ help = "use the same access marker at the call as in the signature"
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
 
+[diagnostics.SEM010.issues.axis_reduction_extent_unknown]
+message = "the mean needs a compile-time extent on the axis it removes"
+help = "give the axis a literal extent, or write the grouped reduction and divide by the run-time count"
+
+[diagnostics.SEM010.issues.axis_reduction_mean_requires_float]
+message = "the mean along an axis needs a floating-point element"
+help = "convert the tensor to a floating-point element type first, or use sum"
+
+[diagnostics.SEM010.issues.axis_reduction_not_constant]
+message = "the axis of a reduction must be a compile-time constant"
+help = "write a literal axis such as `axis 1`; the result shape depends on it"
+
+[diagnostics.SEM010.issues.axis_reduction_out_of_range]
+message = "the axis is outside the rank of the tensor"
+help = "use an axis from 0 up to one less than the rank"
+
+[diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
+message = "an axis reduction is built for rank-2 tensors only"
+help = "reduce a rank-2 tensor, or write the explicit reduction with `pro`"
+
 [diagnostics.SEM057.issues.axis_marker_required]
 message = "this argument is an `axis` argument and must be written with the `axis` marker"
 help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
@@ -4381,6 +4421,14 @@ help = "use only constructs the build-time runner supports"
 [diagnostics.SEM064.issues.praefixum_import_unavailable]
 message = "`{praefixum}` initializer of `{name}` reaches `{callee}`, an import that build-time evaluation does not run in this analysis"
 help = "evaluation follows calls into other modules of a package: move the computation into this module, or analyze the package"
+
+[diagnostics.SEM065]
+message = "`{name}` communicaret `{binding}`, valorem legendi tantum, ut nomen scribile (`{fixum}` est profundum)"
+help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, aut `{varia} {name} ← {own} {binding}` ut eum suscipias"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` communicaret `{binding}`, valorem legendi tantum, ut nomen scribile (`{fixum}` est profundum)"
+help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, aut `{varia} {name} ← {own} {binding}` ut eum suscipias"
 
 [diagnostics.WARN001]
 message = "unused variable"

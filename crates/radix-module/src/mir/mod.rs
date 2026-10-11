@@ -330,6 +330,9 @@ mod device_tests;
 #[path = "exact_integer_test.rs"]
 mod exact_integer_tests;
 #[cfg(test)]
+#[path = "generic_receiver_call_test.rs"]
+mod generic_receiver_call_tests;
+#[cfg(test)]
 #[path = "implicit_store_test.rs"]
 mod implicit_store_tests;
 #[cfg(test)]

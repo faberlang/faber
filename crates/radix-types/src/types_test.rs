@@ -1290,6 +1290,7 @@ fn f004_func_sig_equals_includes_type_params() {
             ty: numerus,
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         ret: vacuum,
         err: None,
@@ -1302,6 +1303,7 @@ fn f004_func_sig_equals_includes_type_params() {
             ty: numerus,
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         ret: vacuum,
         err: None,
@@ -1335,6 +1337,7 @@ fn f004_func_sig_equal_when_type_params_match() {
             ty: numerus,
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         ret: vacuum,
         err: None,
@@ -1347,6 +1350,7 @@ fn f004_func_sig_equal_when_type_params_match() {
             ty: numerus,
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         ret: vacuum,
         err: None,
@@ -1470,6 +1474,7 @@ fn gpd2_func_sig_equals_includes_sort_and_default() {
             ty: numerus,
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         ret: vacuum,
         err: None,
@@ -2219,4 +2224,31 @@ fn ledger_is_a_distinct_two_argument_collection_from_map() {
     assert!(!types.equals(map, ledger));
     assert!(!types.is_assignable(map, ledger));
     assert!(!types.is_assignable(ledger, map));
+}
+
+#[test]
+fn func_sig_params_differing_only_in_sponte_are_not_equal() {
+    // Need: a `sponte` slot and a merely defaulted slot are distinct
+    // parameter contracts; their function types must not unify.
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let sig_of = |sponte: bool| FuncSig {
+        type_params: Vec::new(),
+        params: vec![ParamType {
+            ty: numerus,
+            mode: SemanticParamMode::Owned,
+            optional: true,
+            sponte,
+        }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+    let sponte_fn = types.function(sig_of(true));
+    let defaulted_fn = types.function(sig_of(false));
+    assert!(!types.equals(sponte_fn, defaulted_fn));
+    let sponte_again = types.function(sig_of(true));
+    assert!(types.equals(sponte_fn, sponte_again));
 }

@@ -1421,6 +1421,11 @@ pub enum HirExpressionKind {
         target: Box<HirExpression>,
         source: Box<HirExpression>,
         recovery: Option<Box<HirExpression>>,
+        /// `via HINT` of `a ↤ x via HINT ⊥ d`: the same hint symbols a
+        /// `↦ T via HINT` [`HirExpressionKind::Conversio`] carries in `params`
+        /// (empty when no `via` is written).
+        #[serde(default)]
+        params: Vec<Symbol>,
     },
 
     Array(Vec<HirArrayElement>),
@@ -2267,12 +2272,15 @@ pub struct HirPresentation {
     #[serde(default)]
     pub elige_expr_ids: Vec<HirId>,
 
-    /// Ids of `MethodCall` expressions lowered from the source-only `ᵀ`
-    /// transpose suffix. Typecheck rewrites the glyph marker to the canonical
-    /// transpose intrinsic and keeps the node id; Faber re-emission prints the
-    /// glyph form (`xᵀ`) for exactly these ids instead of `.transpose()`.
+    /// Ids of `MethodCall` expressions lowered from a source-only glyph form:
+    /// the `ᵀ` transpose suffix and the rounding delimiters (`⌊x⌋`, `⌈x⌉`,
+    /// `⌊x⌉`). Typecheck rewrites the glyph marker to the canonical intrinsic
+    /// and keeps the node id; Faber re-emission prints the glyph form for
+    /// exactly these ids instead of the method call (`.transpose()`, `.floor()`).
+    /// The id only marks a glyph-authored method twin: emission picks `ᵀ` or the
+    /// rounding delimiters from the rewritten twin's name.
     #[serde(default)]
-    pub glyph_transpose_ids: Vec<HirId>,
+    pub glyph_ids: Vec<HirId>,
 
     /// Ids of the expressions typecheck produced by desugaring a numeric
     /// twin method (`a.add(2)` means `a ← a + 2`, `x.added(y)` is `x + y`;

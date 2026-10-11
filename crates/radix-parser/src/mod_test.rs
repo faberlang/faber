@@ -75,9 +75,9 @@ fn missing_function_name_emits_structured_parse_error() {
         .expect("missing function name diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args.len(), 1);
-    assert_eq!(err.args[0].name, "functio");
-    assert_eq!(err.args[0].value, "functio");
+    // The keyword spelling comes from the reader pack, not a literal arg
+    //: a literal arg would beat the pack binding.
+    assert!(err.args.is_empty());
 }
 
 #[test]
@@ -90,9 +90,9 @@ fn missing_class_name_emits_structured_parse_error() {
         .expect("missing class name diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args.len(), 1);
-    assert_eq!(err.args[0].name, "genus");
-    assert_eq!(err.args[0].value, "genus");
+    // The keyword spelling comes from the reader pack, not a literal arg
+    //: a literal arg would beat the pack binding.
+    assert!(err.args.is_empty());
 }
 
 #[test]
@@ -105,9 +105,9 @@ fn missing_class_body_emits_structured_parse_error() {
         .expect("missing class body diagnostic");
 
     assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args.len(), 1);
-    assert_eq!(err.args[0].name, "genus");
-    assert_eq!(err.args[0].value, "genus");
+    // The keyword spelling comes from the reader pack, not a literal arg
+    //: a literal arg would beat the pack binding.
+    assert!(err.args.is_empty());
 }
 
 #[test]
@@ -2241,8 +2241,12 @@ fn genus_colon_ctor_rejected() {
 }
 
 #[test]
-fn bare_brace_equals_form_rejected() {
-    assert_parse_error_issue(r"fixum _ point ← { x = 10 }", "json_quoted_key");
+fn bare_brace_equals_form_is_the_inferred_constructor() {
+    // Operator ruling 2026-10-10: a bare `{ field = value }`
+    // is sugar for `_ { field = value }`; the retired anonymous-record form
+    // is gone, and the cell supplies the type (no cell is a checker error).
+    let result = parse_ok(r"fixum _ point ← { x = 10 }");
+    assert!(result.errors.is_empty());
 }
 
 #[test]
@@ -5294,6 +5298,28 @@ fn inferred_constructor_entries_parse_as_hole_verte_over_json_object() {
 #[test]
 fn inferred_constructor_empty_braces_parse_as_hole_verte_over_empty_object() {
     with_inferred_constructor_init("_ { }", |kind| {
+        let ExprKind::Verte(verte) = kind else {
+            panic!("expected Verte");
+        };
+        assert!(matches!(verte.ty.kind, TypeExprKind::Infer));
+        assert!(matches!(verte.expr.kind, ExprKind::Object(_)));
+    });
+}
+
+#[test]
+fn inferred_constructor_brackets_parse_as_hole_verte_over_array() {
+    with_inferred_constructor_init("_ [1, 2]", |kind| {
+        let ExprKind::Verte(verte) = kind else {
+            panic!("expected Verte");
+        };
+        assert!(matches!(verte.ty.kind, TypeExprKind::Infer));
+        assert!(matches!(verte.expr.kind, ExprKind::Array(_)));
+    });
+}
+
+#[test]
+fn bare_field_literal_parses_as_hole_verte_over_object() {
+    with_inferred_constructor_init("{ x = 1, y = 2 }", |kind| {
         let ExprKind::Verte(verte) = kind else {
             panic!("expected Verte");
         };

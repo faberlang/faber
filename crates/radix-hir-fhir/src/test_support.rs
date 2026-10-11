@@ -61,7 +61,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),

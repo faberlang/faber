@@ -158,3 +158,77 @@ functio grouped_max(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tens
         "reducta_group_op_unsupported",
     );
 }
+
+// Need: `t.summa(axis n)` / `t.media(axis n)` on a rank-2 tensor
+// expand to the grouped reduction and drop the named axis from the shape.
+
+#[test]
+fn axis_reduction_drops_the_named_axis_from_a_rank_two_shape() {
+    assert_accepts(
+        r"
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis 1) }
+functio columns(tensor<f32, [2, 3]> g) → tensor<f32, [3]> { redde g.summa(axis 0) }
+functio means(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.media(axis 1) }
+",
+    );
+}
+
+#[test]
+fn axis_reduction_result_shape_must_match_the_kept_axis() {
+    assert_rejects_with_issue(
+        r"
+functio rows(tensor<f32, [2, 3]> g) → tensor<f32, [3]> { redde g.summa(axis 1) }
+",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn axis_reduction_out_of_range_axis_is_named() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis 2) }
+",
+        "axis_reduction_out_of_range",
+    );
+}
+
+#[test]
+fn axis_reduction_negative_axis_is_out_of_range() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3]> g) → tensor<f32, [2]> { redde g.summa(axis 0 - 1) }
+",
+        "axis_reduction_out_of_range",
+    );
+}
+
+#[test]
+fn axis_reduction_run_time_axis_is_named() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3]> g, numerus a) → tensor<f32, [2]> { redde g.summa(axis a) }
+",
+        "axis_reduction_not_constant",
+    );
+}
+
+#[test]
+fn axis_reduction_above_rank_two_is_a_named_refusal() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3, 4]> g) → tensor<f32, [3, 4]> { redde g.summa(axis 0) }
+",
+        "axis_reduction_rank_unsupported",
+    );
+}
+
+#[test]
+fn axis_reduction_mean_needs_a_float_element() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<i32, [2, 3]> g) → tensor<f32, [2]> { redde g.media(axis 1) }
+",
+        "axis_reduction_mean_requires_float",
+    );
+}

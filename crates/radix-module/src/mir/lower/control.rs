@@ -199,6 +199,9 @@ pub(super) enum CollectionIteraKind {
     Stack(TypeId),
     MapKeys(TypeId),
     MapValues(TypeId),
+    /// `itera ex s` over a `copia`: walk a snapshot of the elements.
+    /// Order is unspecified (D19.2).
+    SetElements(TypeId),
     /// `itera ex m apud [k] fixum v` (D3.1): walk a key snapshot and read
     /// each value back by key; an `iuncta` key binds one name per part
     /// (D3.3). Order is unspecified (D19.2).
@@ -1424,9 +1427,10 @@ impl FunctionBuilder<'_> {
         extent: usize,
         span: Span,
     ) -> Option<MirOperand> {
-        let flat_ty = MirType::semantic(self.types.find_array(element_ty.semantic_id())?);
+        let flat_ty =
+            MirType::semantic(self.require_array(element_ty.semantic_id(), span, "reduction tensor element list")?);
         let integer = self.types.primitive(Primitive::Numerus);
-        let dimensions_ty = MirType::semantic(self.types.find_array(integer)?);
+        let dimensions_ty = MirType::semantic(self.require_array(integer, span, "reduction tensor dimension list")?);
         let flat = self.construct_temp(
             MirAggregateKind::Array,
             MirAggregateFields::Ordered(
@@ -1624,9 +1628,20 @@ impl FunctionBuilder<'_> {
         Some(())
     }
 
+    /// The interned `lista<element>` row, or a named lowering error. A bare
+    /// `?` on `find_array` returns `None` with no diagnostic and the
+    /// enclosing statement silently vanishes from MIR.
+    pub(super) fn require_array(&mut self, element: TypeId, span: Span, what: &str) -> Option<TypeId> {
+        let found = self.types.find_array(element);
+        if found.is_none() {
+            self.errors.push(MirError::missing_type(span, what));
+        }
+        found
+    }
+
     fn reduction_indices(&mut self, indices: Vec<MirOperand>, span: Span) -> Option<MirOperand> {
         let integer = self.types.primitive(Primitive::Numerus);
-        let ty = MirType::semantic(self.types.find_array(integer)?);
+        let ty = MirType::semantic(self.require_array(integer, span, "reduction index list")?);
         Some(self.construct_temp(
             MirAggregateKind::Array,
             MirAggregateFields::Ordered(indices.into_iter().map(MirAggregateItem::Operand).collect()),
@@ -3958,6 +3973,7 @@ impl FunctionBuilder<'_> {
             Type::Map(key, value) if matches!(mode, HirIteraMode::Ex) && has_coordinates => {
                 CollectionIteraKind::MapEntries { key: *key, value: *value }
             }
+            Type::Set(element) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::SetElements(*element),
             Type::Map(key, _) if matches!(mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
             Type::Map(_, value) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
             // Borrowed receiver (`de`/`mut` param, or a field read through
@@ -4075,16 +4091,18 @@ impl FunctionBuilder<'_> {
         // so a suspending backend resumes the producer once per step.
         let stepped = self.mark_stepped_cursor_stream(&collection, &collection_kind, iter.mode);
         let (collection, collection_ty) = match &collection_kind {
-            CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) if stepped => {
-                (collection, MirType::semantic(self.types.find_array(*element)?))
-            }
+            CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) if stepped => (
+                collection,
+                MirType::semantic(self.require_array(*element, iter.iter.span, "itera cursor element list")?),
+            ),
             CollectionIteraKind::Text(element) => {
                 let snapshot = self.text_scalar_snapshot(collection, *element, iter.iter.span)?;
-                let array_ty = MirType::semantic(self.types.find_array(*element)?);
+                let array_ty =
+                    MirType::semantic(self.require_array(*element, iter.iter.span, "itera text scalar list")?);
                 (MirOperand::Place(snapshot), array_ty)
             }
             CollectionIteraKind::Cursor(element) | CollectionIteraKind::AsyncCursor(element) => {
-                let array = self.types.find_array(*element)?;
+                let array = self.require_array(*element, iter.iter.span, "itera cursor snapshot list")?;
                 let array_ty = MirType::semantic(array);
                 let snapshot = self.runtime_call_value(
                     MirIntrinsic::Sermo(crate::mir::MirSermoOp::DrainCursor),
@@ -4135,6 +4153,11 @@ impl FunctionBuilder<'_> {
             CollectionIteraKind::MapKeys(key) => {
                 let (snapshot_place, binding_ty) =
                     self.lower_map_itera_snapshot(collection, *key, MirCollectionOp::Keys, iter.iter.span)?;
+                (snapshot_place, binding_ty, false)
+            }
+            CollectionIteraKind::SetElements(element) => {
+                let (snapshot_place, binding_ty) =
+                    self.lower_set_itera_snapshot(collection, collection_semantic, *element, iter.iter.span)?;
                 (snapshot_place, binding_ty, false)
             }
             CollectionIteraKind::MapValues(value) => {
@@ -4848,8 +4871,13 @@ impl FunctionBuilder<'_> {
     /// checker interned `cursor<littera>` / `lista<littera>` for the loop
     /// (`itera_element`).
     fn text_scalar_snapshot(&mut self, text: MirOperand, element: TypeId, span: Span) -> Option<MirPlace> {
-        let cursor_ty = MirType::semantic(self.types.find_equal(&Type::Cursor(element))?);
-        let array_ty = MirType::semantic(self.types.find_array(element)?);
+        let Some(cursor) = self.types.find_equal(&Type::Cursor(element)) else {
+            self.errors
+                .push(MirError::missing_type(span, "itera text scalar cursor"));
+            return None;
+        };
+        let cursor_ty = MirType::semantic(cursor);
+        let array_ty = MirType::semantic(self.require_array(element, span, "itera text scalar list")?);
         let cursor = self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::CordCursor),
             vec![text],
@@ -5015,6 +5043,44 @@ impl FunctionBuilder<'_> {
         MirOperand::Place(value_read)
     }
 
+    /// A `copia` walk reads a `copia ↦ lista<T>` snapshot of the elements, the
+    /// same conversion a written `↦ lista<T>` lowers to, so the loop shares
+    /// the array lane and the runner's unordered element order (D19.2).
+    fn lower_set_itera_snapshot(
+        &mut self,
+        collection: MirPlace,
+        set_ty: TypeId,
+        element: TypeId,
+        span: Span,
+    ) -> Option<(MirPlace, MirType)> {
+        let element_ty = MirType::semantic(element);
+        let Some(array) = self.types.find_array(element) else {
+            self.errors
+                .push(MirError::missing_type(span, "copia element list snapshot"));
+            return None;
+        };
+        let array_ty = MirType::semantic(array);
+        let snapshot = self.runtime_call_value(
+            MirIntrinsic::Convert(MirConversion {
+                store: None,
+                flavor: MirConversionFlavor::Runtime,
+                source_ty: MirType::semantic(set_ty),
+                target_ty: array_ty,
+                params: Vec::new(),
+                recovery: None,
+                struct_defaults: Vec::new(),
+            }),
+            vec![MirOperand::Place(collection)],
+            array_ty,
+            span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+        let snapshot_place = self.materialize_operand_place(snapshot, array_ty, span);
+        Some((snapshot_place, element_ty))
+    }
+
     fn lower_map_itera_snapshot(
         &mut self,
         collection: MirPlace,
@@ -5024,7 +5090,7 @@ impl FunctionBuilder<'_> {
     ) -> Option<(MirPlace, MirType)> {
         debug_assert!(matches!(op, MirCollectionOp::Keys | MirCollectionOp::Values));
         let element_ty = MirType::semantic(element);
-        let array_id = self.types.find_array(element)?;
+        let array_id = self.require_array(element, span, "itera map snapshot list")?;
         let array_ty = MirType::semantic(array_id);
         let snapshot = self.runtime_call_value(
             MirIntrinsic::Collection(op),

@@ -590,6 +590,7 @@ fn function_params(function: &HirFunction) -> Vec<radix_types::ParamType> {
                 radix_hir::HirParamMode::Ex => radix_types::SemanticParamMode::Move,
             },
             optional: param.optional,
+            sponte: param.sponte,
         })
         .collect()
 }

@@ -13,7 +13,7 @@ locale = "en"
 # =============================================================================
 
 main {
-    const list<int> a ← [1, 2, 3]
+    var list<int> a ← [1, 2, 3]
     var list<int> b ← a
     b.append(4)
     print a.length()

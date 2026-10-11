@@ -738,8 +738,30 @@ impl FunctionBuilder<'_> {
             return None;
         };
 
-        let lowered_receiver = self.lower_expr_value(receiver)?;
+        let mut lowered_receiver = self.lower_expr_value(receiver)?;
         let expr_ty = self.expr_ty(expr)?;
+        // A bounded textus slices as its initialized prefix: widen it to the
+        // unbounded carrier first (D7), the same copy `↦ textus` performs.
+        if op == MirCollectionOp::Slice
+            && let Some(source_ty) = self.expr_ty(receiver)
+            && matches!(self.normalized_type(source_ty.semantic_id()), Type::BoundedTextus { .. })
+        {
+            let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+            lowered_receiver = self.runtime_call_value(
+                MirIntrinsic::Convert(MirConversion {
+                    store: None,
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty,
+                    target_ty: textus,
+                    params: Vec::new(),
+                    recovery: None,
+                    struct_defaults: Vec::new(),
+                }),
+                vec![lowered_receiver],
+                textus,
+                expr.span,
+            );
+        }
         if matches!(op, MirCollectionOp::TensorGet | MirCollectionOp::TensorSet)
             && let Some(lowered) = self.lower_kernel_checked_tensor_access(
                 op,

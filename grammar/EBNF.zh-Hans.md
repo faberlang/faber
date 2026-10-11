@@ -1907,9 +1907,13 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   is failable (a handler is required except for a proven constant); into
   `wrapping<W>` / `saturating<W>` it reduces / clamps and cannot fail. `inf ↦`
   a float rounds to nearest-even and yields ±∞ beyond the float's finite range
-  (a constant beyond it is a compile error); a float `↦ inf` truncates toward
-  zero and fails only for NaN and ±∞. `inf ↦ d64` is range-checked and failable;
-  `d64 ↦ inf` truncates and cannot fail. `textus`/`ascii ↦ inf` accepts an
+  (a constant beyond it is a compile error); a float or `d64` `↦ inf` needs a
+  rounding choice, `经由 Floor|Ceil|HalfEven|Trunc` (toward −∞, toward +∞,
+  nearest with ties to the even neighbour, toward zero); the bare conversion is
+  `SEM016 float_to_integer_requires_rounding`. The conversion is failable and
+  reports on the error channel for NaN and ±∞ (a handler or `⊥ default` applies,
+  as for other failable numeric conversions). `inf ↦ d64` is range-checked and
+  failable. `textus`/`ascii ↦ inf` accepts an
   optional sign and digits of any length (failable on malformed input; `经由
   Hex|Bin|Oct` as for other integers); `inf ↦ textus` writes the decimal digits.
   `inf ↔ octeti 经由 Be|Le` is the minimal two's-complement encoding and its
@@ -2119,6 +2123,31 @@ There is no iteration interface. `遍历 取自` works on the built-in iterable
 types and on cursors. A user type that should be iterable exposes an ordinary
 method that returns a cursor (`遍历 取自 arbor.nodi() 常量 n`); nothing is
 called implicitly.
+
+**Changing the collection inside its own loop.** The rule is about the shape of
+the collection being walked (how many entries, in what order), not about what
+is inside an entry.
+
+- A method that changes the shape or order of the collection, called directly
+  on that collection inside its own loop, is rejected
+  (`SEM011 loop_collection_shape_change`). That covers `lista` `appende`,
+  `decapita`, `detrahe`, `inverte` and `ordina`, `copia` `adde` and `dele`, and
+  `tabula` `pone` (even when it would only update a value) and `dele`. A
+  worklist that must see its own additions uses a queue with `当`.
+- A bracket store is not checked at compile time. `xs[i] ← v` and `m[k] ← v`
+  are accepted inside the loop. A bracket store that adds a key to a `tabula`
+  or `tabulae` during a loop over it traps with `map changed size during
+  iteration`, the same on every target.
+- A change through another name for the same collection, through a method on
+  an object that holds the collection, or through a function the collection is
+  passed to is not guarded at compile time or at run time. Behaviour may differ
+  between targets: on an append, some targets cover the entries present when
+  the loop started and others also visit the new entries; on a removal, a
+  target may skip an element or trap. Do not file such a difference as a
+  defect; it is a known, accepted gap that may be closed later.
+- Updating the elements themselves is never covered by the rule. A loop over a
+  `lista` of objects that passes each object to a function as `mut` keeps
+  working.
 
 ### Switch/Match
 
@@ -2664,6 +2693,8 @@ For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN nev
 `按 key` groups terms into a new result tensor; it does not mutate the source or key tensor. The key expression is evaluated per element with the coordinates in scope and must be integral. The bucket extent `K` comes from the expected result type, so a grouped result has shape `tensor<R, [K]>` for the operator's result type `R`. Out-of-range keys use the existing tensor-write failure. Grouped `求和`, `求积`, `计数`, `全部`, and `任一` have empty-bucket identities; grouped `最大` and `最小` require `兜底 identity`. Grouped `最大值索引` and `最小值索引` are unsupported by name because their result is a coordinate, not a tensor element.
 
 The old `求和 取自`, `最大 取自`, and `最小 取自` forms (English `sum from`, `max from`, and `min from`) are retired. The parser reports `PARSE010` for them. Use `归约 经由 求和`, `归约 经由 最大`, or `归约 经由 最小`; the operator words remain ordinary identifiers outside the `经由` clause.
+
+The tensor method `.media()` (en `.mean()`) is not a reduction operator and has no `经由` form. It is sugar over the sum reduction: `t.media()` is `t.求和() / count`, where `count` is the element count of `t` (en `t.mean()` is `t.sum() / count`). The grouped form `t.media(轴 n)` is the grouped sum divided by the grouped count, elementwise. A mean is not a true reduction (two partial means do not combine; sums and counts do), so the reduction operator set stays the set of real reductions. An empty source is `0 / 0`, which follows the float rules and is not-a-number (NaN); it is not a no-value result and has no fallback.
 
 `排序 经由 <direction> (取自 | 借自) source [(常量 | 变量) x { 返回 key }]` is the sort expression (en `sort 经由 asc from xs`). `经由` is mandatory and selects `升序` or `降序` (en `asc`, `desc`). `取自` (en `from`) orders a list, a set, or a map's values; `借自` (en `ref`) orders a map's keys. The optional body is the reduce body form and returns the sort key; without a body the source elements are the keys. The result is always a new list and the source is not changed. The sort is stable. `排序`, `升序`, and `降序` are claimed only in their slots and remain ordinary identifiers elsewhere; the list method `.ordina()` (en `.sort()`) is unchanged. Typecheck is not yet wired: the checker refuses the expression with `SEM010:sort_expression_not_typechecked`.
 

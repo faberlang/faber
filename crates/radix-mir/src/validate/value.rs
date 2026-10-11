@@ -528,6 +528,9 @@ impl Validator<'_, '_> {
                 ) {
                     continue;
                 }
+                if index == 0 && self.receiver_is_instance_of_self(expected.ty, arg_ty) {
+                    continue;
+                }
                 self.bind_generic_type_witness(
                     expected.ty,
                     arg_ty,
@@ -561,6 +564,27 @@ impl Validator<'_, '_> {
                 }
             }
         }
+    }
+
+    /// A method's `self` parameter is the bare class (`Struct(def)`) while the
+    /// receiver of an instantiated generic class is `Applied(base, args)`
+    /// whose base is that same class: the receiver is an instance of the
+    /// method's `self` class.
+    fn receiver_is_instance_of_self(&self, expected: MirType, actual: MirType) -> bool {
+        let types = self.context.types.as_table();
+        let peel = |mut ty: TypeId| loop {
+            match types.get(ty) {
+                Type::Alias(_, inner) | Type::Ref(_, inner) => ty = *inner,
+                _ => return ty,
+            }
+        };
+        let Type::Struct(expected_def) = types.get(peel(expected.semantic_id())) else {
+            return false;
+        };
+        let Type::Applied(base, _) = types.get(peel(actual.semantic_id())) else {
+            return false;
+        };
+        matches!(types.get(peel(*base)), Type::Struct(def) if def == expected_def)
     }
 
     /// A `_` extent in a parameter type falls through to the parameter's own

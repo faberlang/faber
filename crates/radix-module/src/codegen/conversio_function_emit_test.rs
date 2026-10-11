@@ -69,7 +69,7 @@ fn rust_calls_the_conversio_function() {
 #[test]
 fn go_calls_the_conversio_function() {
     let code = emit(Target::HirGo, &format!("{DECLS}{USES}"));
-    assert!(code.contains("f := adFahrenheit(Celsius{"), "{code}");
+    assert!(code.contains("f := adFahrenheit(&Celsius{"), "{code}");
     assert!(code.contains("faberConversio, faberConversioErr := adMensuram("), "{code}");
     let result = compile(Target::HirGo, &format!("{DECLS}{PROPAGATES}"));
     assert!(!result.success());

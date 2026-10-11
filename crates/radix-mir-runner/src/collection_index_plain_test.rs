@@ -78,6 +78,16 @@ fn assert_same_error(actual: &RunnerError, expected: &RunnerError) {
     assert_eq!(actual.args, expected.args);
 }
 
+/// The expected error: `error` plus the structured out-of-bounds facts.
+fn with_facts(mut error: RunnerError, facts: &[(&str, usize)]) -> RunnerError {
+    error.args.extend(
+        facts
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), value.to_string())),
+    );
+    error
+}
+
 fn errors_built() -> usize {
     crate::INTERNAL_ERRORS_BUILT.with(std::cell::Cell::get)
 }
@@ -122,18 +132,26 @@ fn out_of_range_plain_index_keeps_its_error_text_and_code() {
     let error = eval_index(list(&[1]), Value::Int(5)).unwrap_err();
     assert_same_error(
         &error,
-        &RunnerError::internal(span, "array index out of bounds"),
+        &with_facts(
+            RunnerError::internal(span, "array index out of bounds"),
+            &[("index", 5), ("len", 1)],
+        ),
     );
     assert_eq!(error.code, "runner_internal");
 
     let error = eval_index(Value::Octeti(vec![1]), Value::Int(5)).unwrap_err();
     assert_same_error(
         &error,
-        &RunnerError::internal(span, "octeti index out of bounds"),
+        &with_facts(
+            RunnerError::internal(span, "octeti index out of bounds"),
+            &[("index", 5), ("len", 1)],
+        ),
     );
 
     let error = eval_index(Value::Str("a".into()), Value::Int(5)).unwrap_err();
     assert_eq!(error.issue, "runner_text_index_out_of_bounds");
+    assert_eq!(error.arg("index"), Some("5"));
+    assert_eq!(error.arg("len"), Some("1"));
     assert_eq!(error.code, "runner_internal");
 
     let error = eval_index(tensor(&[1]), Value::Int(5)).unwrap_err();
@@ -178,7 +196,10 @@ fn interval_index_still_slices() {
     let error = eval_index(Value::Octeti(vec![1, 2]), range(1, 9, false)).unwrap_err();
     assert_same_error(
         &error,
-        &RunnerError::internal(Span::default(), "octeti index out of bounds"),
+        &with_facts(
+            RunnerError::internal(Span::default(), "octeti index out of bounds"),
+            &[("start", 1), ("end", 9), ("len", 2)],
+        ),
     );
 }
 

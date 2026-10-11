@@ -1,0 +1,20 @@
++++
+locale = "la"
+term = "itera-sort-source-reject"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "sort_expr"]
+canonical = false
+summary = "A bare sort expression is refused as a loop source; bind it to a name first."
+no_expected = "rejects"
+diagnostic = "PARSE030:itera_source_sort_reduce_unbound"
++++
+
+# This exemplum intentionally fails to compile: a sort expression is never
+# written in a loop header. Bind the sorted value to a name, then loop over it.
+incipit {
+    fixum lista<numerus> xs ← [3, 1, 2]
+    itera ex ordinata via ascendens ex xs fixum x {
+        nota x
+    }
+}

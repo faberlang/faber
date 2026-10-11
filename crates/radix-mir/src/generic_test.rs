@@ -1307,6 +1307,7 @@ fn func_sig(param: TypeId, ret: TypeId, is_async: bool, is_generator: bool) -> F
             ty: param,
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         ret,
         err: None,

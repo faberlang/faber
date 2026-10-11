@@ -1,0 +1,30 @@
++++
+term = "tensor"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "An axis outside the receiver rank is a named error."
+syntax = "tensor.sum(axis n) | tensor.mean(axis n)"
+related = ["tensor", "fractus", "lista"]
+locale = "en"
+diagnostic = "SEM010:axis_reduction_out_of_range"
++++
+
+# axis out of range: a rank-2 tensor has axes 0 and 1, so `axis 2` is refused.
+
+main {
+    const list<f32> flat ← [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0
+    ]
+    const tf32[2, 3] grid ← flat ↦ tf32[2, 3]
+
+    const tf32[3] bad ← grid.sum(axis 2)
+
+    print bad[0]
+}

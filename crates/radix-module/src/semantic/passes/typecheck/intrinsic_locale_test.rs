@@ -65,6 +65,17 @@ fn diagnostic_summary(diagnostics: &[Diagnostic]) -> Vec<String> {
         .collect()
 }
 
+/// True when the diagnostics carry the named `unknown_method` miss
+/// (need: a method absent from a builtin receiver's registry is a
+/// check error, not an accepted verbatim call).
+fn reports_unknown_method(diagnostics: &[Diagnostic]) -> bool {
+    diagnostics.iter().any(|diag| {
+        diag.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "unknown_method")
+    })
+}
+
 /// Collect the method-call spellings present in a program's function bodies.
 fn method_call_spellings(program: &HirModule, interner: &crate::lexer::Interner) -> Vec<String> {
     let mut spellings = Vec::new();
@@ -228,16 +239,16 @@ fn la_and_no_pack_keep_latin_identity() {
     }
 }
 
-/// done_when 2: without a pack, surface-only behavior is byte-identical to
-/// today — the en spelling keeps its miss path, is not rewritten, and the
-/// diagnostic set is unchanged.
+/// done_when 2: without a pack, surface-only behavior is unchanged — the en
+/// spelling is not resolved through any pack row, so it keeps its miss path.
+/// Since need that miss is the named `unknown_method` check error on
+/// a builtin textus receiver, not an accepted verbatim call.
 #[test]
 fn without_pack_surface_spelling_is_unchanged() {
-    let unit = analyze(NO_PACK_SURFACE, None).expect("no-pack `contains` keeps today's accept path");
-    assert_eq!(
-        method_call_spellings(&unit.hir, &unit.interner),
-        vec!["contains".to_owned()],
-        "without a pack the surface spelling is never rewritten"
+    let diagnostics = analyze(NO_PACK_SURFACE, None).unwrap_err_or_diagnostics();
+    assert!(
+        reports_unknown_method(&diagnostics),
+        "without a pack the surface spelling is never resolved: {diagnostics:?}"
     );
 }
 
@@ -292,18 +303,22 @@ fn lint_and_mir_accept_en_spelling_call() {
 
 /// Family scoping: `append` is the en surface of the lista `appende` row; on a
 /// textus receiver it must NOT resolve (the en pack has no Textus row for it),
-/// so the HIR keeps the surface spelling and the miss path is unchanged.
+/// so the call keeps its miss path: the named `unknown_method` check error
+///, identical to the no-pack Latin-equivalent call.
 #[test]
 fn en_surface_is_family_scoped() {
-    let unit = analyze(FAMILY_MISS, Some(en_pack())).expect("family-scoped surface keeps today's accept path");
-    assert_eq!(
-        method_call_spellings(&unit.hir, &unit.interner),
-        vec!["append".to_owned()],
-        "a surface mapped for another receiver family must not resolve on textus"
+    let diagnostics = analyze(FAMILY_MISS, Some(en_pack())).unwrap_err_or_diagnostics();
+    assert!(
+        reports_unknown_method(&diagnostics),
+        "family-scoped miss must be the named unknown_method error: {diagnostics:?}"
     );
     // The Latin-equivalent call behaves identically without any pack.
     let latin = "functio probe(textus t) → textus {\n    redde t.append(\"a\")\n}\n";
-    assert!(analyze(latin, None).is_ok(), "la/no-pack append must keep today's miss path");
+    let latin_diagnostics = analyze(latin, None).unwrap_err_or_diagnostics();
+    assert!(
+        reports_unknown_method(&latin_diagnostics),
+        "la/no-pack append must be the named unknown_method error: {latin_diagnostics:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------

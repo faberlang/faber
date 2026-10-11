@@ -111,23 +111,26 @@ functio combine(fractus x, fractus y) → fractus {
 }
 
 #[test]
-fn rejects_tensor_intrinsic_method_names_on_non_tensor_receivers() {
-    // The AIR pass still owns "a tensor method name needs a tensor receiver"
-    // for receivers typecheck leaves open (collections, text).
-    let errors = air_errors(
-        r#"
+fn tensor_intrinsic_method_names_on_collection_receivers_fail_in_typecheck() {
+    // need: a list receiver is a closed method surface, so
+    // `x.gelu()` is `unknown_method` at check time and never reaches the AIR
+    // purity pass (same posture as the scalar receivers below).
+    let source = r#"
 @ radix lane "air"
 functio combine(lista<fractus> x) → lista<fractus> {
     redde x.gelu()
 }
-"#,
-    );
-
-    let err = expect_air_issue(&errors, "tensor_method_receiver");
-    assert!(
+"#;
+    let errors = analyze(source);
+    assert!(errors.iter().any(|err| {
         err.args
             .iter()
-            .any(|arg| arg.name == "method" && arg.value == "gelu")
+            .any(|arg| arg.name == "issue" && arg.value == "unknown_method")
+    }));
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::AirPurityViolation)
     );
 }
 
@@ -1129,7 +1132,7 @@ functio g() → numerus {
     let optional = air_errors(
         r#"
 @ radix lane "air"
-functio h() → numerus {
+functio h() → numerus ∪ nihil {
     fixum lista<numerus> xs ← [1, 2, 3]
     redde xs?[0]
 }

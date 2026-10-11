@@ -357,7 +357,7 @@ targets = ["rust"]
     .expect("green unit");
     fs::write(
         root.join("src/bad.proba"),
-        "fn unsupported() → int {\n    return [1, 2].foo()\n}\n\ntest \"blocked\" {\n    assert 1 ≡ 1\n}\n",
+        "fn unsupported(matrix<f32, [2, 3]> m) → any {\n    return m.invert()\n}\n\ntest \"blocked\" {\n    assert 1 ≡ 1\n}\n",
     )
     .expect("unsupported unit");
 

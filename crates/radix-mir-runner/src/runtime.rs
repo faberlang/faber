@@ -683,12 +683,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 tensor_value_typed(self.types, vec![zero; count], Some(*element), shape, span)
             }
             MirAggregateKind::Interval { inclusive } => {
-                let [start, end] = self
-                    .eval_ordered_fields(&aggregate.fields, span)?
-                    .try_into()
-                    .map_err(|_| {
-                        RunnerError::internal(span, "interval construct requires two bounds")
-                    })?;
+                let mut bounds = self.eval_ordered_fields(&aggregate.fields, span)?;
+                let step = if bounds.len() == 3 {
+                    bounds.pop()
+                } else {
+                    None
+                };
+                let [start, end] = bounds.try_into().map_err(|_| {
+                    RunnerError::internal(span, "interval construct requires two bounds")
+                })?;
                 // F-082: reject reversed bounds (start > end) — an interval must
                 // be monotonic so every materialized element is reachable.
                 let reversed = match (&start, &end) {
@@ -709,7 +712,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         "interval bounds must be monotonic (start ≤ end)",
                     ));
                 }
-                Ok(interval_value(start, end, inclusive))
+                let mut interval = interval_value(start, end, inclusive);
+                if let (Value::Tuple(parts), Some(step)) = (&mut interval, step) {
+                    parts.push(step);
+                }
+                Ok(interval)
             }
             MirAggregateKind::Vector => {
                 let Type::Vector(_, width) = self.types.get(aggregate.ty.semantic_id()) else {
@@ -1238,13 +1245,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 {
                     let items = cell.borrow();
                     if start > end || end > items.len() {
-                        return Err(RunnerError::internal_with_issue(
-                            span,
-                            format!("list range {start}‥{end} outside 0‥{}", items.len()),
-                            "runner_list_window_out_of_bounds",
+                        return Err(window_failure(
+                            RunnerError::internal_with_issue(
+                                span,
+                                format!("list range {start}‥{end} outside 0‥{}", items.len()),
+                                "runner_list_window_out_of_bounds",
+                            ),
+                            start,
+                            end,
+                            items.len(),
                         ));
                     }
-                    return Ok(array_value(items[start..end].to_vec()));
+                    let step = window_step(&index, span)?;
+                    return Ok(array_value(
+                        items[start..end].iter().step_by(step).cloned().collect(),
+                    ));
                 }
                 let item = if matches!(self.types.get(return_ty.semantic_id()), Type::Option(_)) {
                     Self::optional_collection_index(receiver, &index, span)?
@@ -3160,9 +3175,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let tensor = self.tensor_arg(receiver, span)?;
         let values = self.tensor_logical_values(&tensor, span)?;
-        if values.is_empty() {
-            return Ok(Value::Float(0.0));
-        }
+        // The mean is sum / count: an empty source is 0.0 / 0.0, which is NaN.
         let mut sum = 0.0;
         for value in &values {
             sum += numeric_as_f64(value, span)?;
@@ -4331,32 +4344,50 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         .map(|item| byte_from_value(item, span))
                         .collect::<Result<Vec<_>, _>>()?;
                     if start > end || end > bytes.len() {
-                        return Err(RunnerError::internal(span, "octeti index out of bounds"));
+                        return Err(window_failure(
+                            RunnerError::internal(span, "octeti index out of bounds"),
+                            start,
+                            end,
+                            bytes.len(),
+                        ));
                     }
-                    return Ok(Value::Octeti(bytes[start..end].to_vec()));
+                    let step = window_step(index, span)?;
+                    return Ok(Value::Octeti(
+                        bytes[start..end].iter().step_by(step).copied().collect(),
+                    ));
                 }
                 let idx = index.as_index(span)?;
-                cell.borrow()
-                    .get(idx)
-                    .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "array index out of bounds"))
+                let items = cell.borrow();
+                items.get(idx).cloned().ok_or_else(|| {
+                    index_failure(
+                        RunnerError::internal(span, "array index out of bounds"),
+                        idx,
+                        items.len(),
+                    )
+                })
             }
             // A run-time lane select: the checked-index law (the failure is the
             // out-of-range `lista` index failure, text included).
             Value::Vector(lanes) => {
                 let idx = index.as_index(span)?;
-                lanes
-                    .borrow()
-                    .get(idx)
-                    .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "array index out of bounds"))
+                let lanes = lanes.borrow();
+                lanes.get(idx).cloned().ok_or_else(|| {
+                    index_failure(
+                        RunnerError::internal(span, "array index out of bounds"),
+                        idx,
+                        lanes.len(),
+                    )
+                })
             }
             Value::Tuple(elems) => {
                 let idx = index.as_index(span)?;
-                elems
-                    .get(idx)
-                    .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "tuple index out of bounds"))
+                elems.get(idx).cloned().ok_or_else(|| {
+                    index_failure(
+                        RunnerError::internal(span, "tuple index out of bounds"),
+                        idx,
+                        elems.len(),
+                    )
+                })
             }
             Value::Str(text) => {
                 // A range index is a char-window read (`textus[lo‥hi]` stays a
@@ -4368,24 +4399,40 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 {
                     let len = text.chars().count();
                     if start > end || end > len {
-                        return Err(RunnerError::internal_with_issue(
-                            span,
-                            format!("text range {start}‥{end} outside 0‥{len}"),
-                            "runner_text_range_out_of_bounds",
+                        return Err(window_failure(
+                            RunnerError::internal_with_issue(
+                                span,
+                                format!("text range {start}‥{end} outside 0‥{len}"),
+                                "runner_text_range_out_of_bounds",
+                            ),
+                            start,
+                            end,
+                            len,
                         ));
                     }
-                    let window: String = text.chars().skip(start).take(end - start).collect();
+                    let step = window_step(index, span)?;
+                    let window: String = text
+                        .chars()
+                        .skip(start)
+                        .take(end - start)
+                        .step_by(step)
+                        .collect();
                     return Ok(Value::Str(window));
                 }
                 let idx = index.as_index(span)?;
                 crate::value::scalar_text_index(&text, idx, span)
+                    .map_err(|error| index_failure(error, idx, text.chars().count()))
             }
             Value::Ascii(byte) => {
                 let idx = index.as_index(span)?;
                 if idx == 0 {
                     Ok(Value::Ascii(byte))
                 } else {
-                    Err(RunnerError::internal(span, "text index out of bounds"))
+                    Err(index_failure(
+                        RunnerError::internal(span, "text index out of bounds"),
+                        idx,
+                        1,
+                    ))
                 }
             }
             Value::Octeti(bytes) => {
@@ -4393,15 +4440,29 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     window_bounds(index, span, "octeti index out of bounds")?
                 {
                     if start > end || end > bytes.len() {
-                        return Err(RunnerError::internal(span, "octeti index out of bounds"));
+                        return Err(window_failure(
+                            RunnerError::internal(span, "octeti index out of bounds"),
+                            start,
+                            end,
+                            bytes.len(),
+                        ));
                     }
-                    return Ok(Value::Octeti(bytes[start..end].to_vec()));
+                    let step = window_step(index, span)?;
+                    return Ok(Value::Octeti(
+                        bytes[start..end].iter().step_by(step).copied().collect(),
+                    ));
                 }
                 let idx = index.as_index(span)?;
                 bytes
                     .get(idx)
                     .map(|byte| Value::Int(i64::from(*byte)))
-                    .ok_or_else(|| RunnerError::internal(span, "octeti index out of bounds"))
+                    .ok_or_else(|| {
+                        index_failure(
+                            RunnerError::internal(span, "octeti index out of bounds"),
+                            idx,
+                            bytes.len(),
+                        )
+                    })
             }
             Value::Map(cell) => {
                 let key = index.to_key(span)?;
@@ -5617,14 +5678,61 @@ fn window_interval(value: &Value) -> Option<(Value, Value, bool)> {
     let Value::Tuple(parts) = value else {
         return None;
     };
-    let [start, end, Value::Bool(inclusive)] = parts.as_slice() else {
+    // A stepped window carries its step as a fourth part (`window_step`).
+    let ([start, end, Value::Bool(inclusive)] | [start, end, Value::Bool(inclusive), _]) =
+        parts.as_slice()
+    else {
         return None;
     };
     Some((start.clone(), end.clone(), *inclusive))
 }
 
+/// The positive stride of a range index: `1` for an unstepped window, the
+/// `per` step of `s[a‥b per n]` otherwise. A zero or negative step dies.
+fn window_step(index: &Value, span: Span) -> Result<usize, RunnerError> {
+    let Value::Tuple(parts) = index else {
+        return Ok(1);
+    };
+    let Some(step) = parts.get(3) else {
+        return Ok(1);
+    };
+    let positive = match step {
+        Value::Int(step) => usize::try_from(*step).ok().filter(|step| *step > 0),
+        Value::UInt(step) => usize::try_from(*step).ok().filter(|step| *step > 0),
+        _ => None,
+    };
+    positive.ok_or_else(|| {
+        RunnerError::internal_with_issue(
+            span,
+            "range step must be positive",
+            "runner_range_step_not_positive",
+        )
+    })
+}
+
 /// The `[start, end)` window a range index selects, or `None` when `index`
 /// is not a range. An inclusive range ending at `usize::MAX` reports `overflow`.
+/// Attach the structured facts of an out-of-bounds window read (`start`, `end`,
+/// `len`) so a caller keys on the numbers, never on the rendered message.
+fn window_failure(mut error: RunnerError, start: usize, end: usize, len: usize) -> RunnerError {
+    error.args.extend([
+        ("start".to_owned(), start.to_string()),
+        ("end".to_owned(), end.to_string()),
+        ("len".to_owned(), len.to_string()),
+    ]);
+    error
+}
+
+/// Attach the structured facts of an out-of-bounds scalar index read (`index`,
+/// `len`).
+fn index_failure(mut error: RunnerError, index: usize, len: usize) -> RunnerError {
+    error.args.extend([
+        ("index".to_owned(), index.to_string()),
+        ("len".to_owned(), len.to_string()),
+    ]);
+    error
+}
+
 fn window_bounds(
     index: &Value,
     span: Span,

@@ -926,6 +926,7 @@ impl HirVisitor for BodyProof<'_> {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 self.write(target);
                 self.visit_expr(source);

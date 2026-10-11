@@ -219,18 +219,6 @@ scrinium = "khung"
 meus = "gửi"
 tuus = "nhận"
 
-[diagnostics.UNRES001]
-message = "từ khóa '{keyword}' không được khai báo cho gói đọc '{pack}'"
-help = "dùng chính tả từ khóa được khai báo trong gói đọc cho vị trí ngữ pháp này"
-
-[diagnostics.UNRES002]
-message = "hàm nội tại '{intrinsic}' không được khai báo cho gói đọc '{pack}' trên họ bộ nhận '{receiver}'"
-help = "dùng chính tả hàm nội tại được khai báo trong gói đọc cho họ bộ nhận này"
-
-[diagnostics.UNRES003]
-message = "thành viên '{member}' không được khai báo cho gói đọc '{pack}' cho định danh '{identity}'"
-help = "dùng chính tả thành viên được khai báo trong gói đọc cho định danh thư viện này"
-
 [diagnostics.LOCALE002]
 message = "gói đọc '{pack}' thấy cách viết giống từ khóa '{spelling}'"
 help = "dùng '{suggestion}' nếu bạn muốn từ khóa đó; '{spelling}' vẫn là tên hợp lệ như đã viết"
@@ -638,6 +626,10 @@ help = "viết `⌊x⌉` để làm tròn tới số nguyên gần nhất, khi h
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` là toán tử đã bị loại bỏ; phủ định của `≡` được viết là `{replacement}`"
 help = "viết `{replacement}` thay cho `{glyph}`; mỗi ký hiệu phủ định có cùng số gạch ngang với ký hiệu mà nó phủ định (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "biểu thức sort hoặc reduce không thể là nguồn của vòng lặp"
+help = "hãy gán nó cho một tên trước, rồi lặp trên tên đó: `const list<int> ys ← sort via asc from xs`, sau đó `for from ys const x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "dùng ⊥ cho phục hồi conversio"
@@ -2517,11 +2509,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -2951,6 +2947,26 @@ help = "use the same access marker at the call as in the signature"
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
 
+[diagnostics.SEM010.issues.axis_reduction_extent_unknown]
+message = "the mean needs a compile-time extent on the axis it removes"
+help = "give the axis a literal extent, or write the grouped reduction and divide by the run-time count"
+
+[diagnostics.SEM010.issues.axis_reduction_mean_requires_float]
+message = "the mean along an axis needs a floating-point element"
+help = "convert the tensor to a floating-point element type first, or use sum"
+
+[diagnostics.SEM010.issues.axis_reduction_not_constant]
+message = "the axis of a reduction must be a compile-time constant"
+help = "write a literal axis such as `axis 1`; the result shape depends on it"
+
+[diagnostics.SEM010.issues.axis_reduction_out_of_range]
+message = "the axis is outside the rank of the tensor"
+help = "use an axis from 0 up to one less than the rank"
+
+[diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
+message = "an axis reduction is built for rank-2 tensors only"
+help = "reduce a rank-2 tensor, or write the explicit reduction with `pro`"
+
 [diagnostics.SEM057.issues.axis_marker_required]
 message = "this argument is an `axis` argument and must be written with the `axis` marker"
 help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
@@ -3150,6 +3166,14 @@ help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu t
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" từ chối thân hàm này: `tacet` nằm ngoài tập con AIR v1"
 help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM065]
+message = "`{name}` sẽ chia sẻ `{binding}`, một giá trị chỉ đọc, dưới dạng tên có thể ghi (`{fixum}` là sâu)"
+help = "viết `{varia} {name} ← {copy} {binding}` để có giá trị độc lập, hoặc `{varia} {name} ← {own} {binding}` để tiếp quản nó"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` sẽ chia sẻ `{binding}`, một giá trị chỉ đọc, dưới dạng tên có thể ghi (`{fixum}` là sâu)"
+help = "viết `{varia} {name} ← {copy} {binding}` để có giá trị độc lập, hoặc `{varia} {name} ← {own} {binding}` để tiếp quản nó"
 
 [diagnostics.WARN001]
 message = "biến không được sử dụng"

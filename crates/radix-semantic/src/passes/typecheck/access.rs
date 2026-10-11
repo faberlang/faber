@@ -734,6 +734,55 @@ impl TypeChecker<'_> {
         self.substitute_type_params(field_ty, &mut vars, Some(&mut shape_vars))
     }
 
+    /// Instantiate an applied generic nominal's arguments into a method
+    /// signature.
+    ///
+    /// A method of `class Box<T, size N>` declares its parameter and return
+    /// types over the class's `T` and `N`; on a `Box<int, 3>` receiver those
+    /// are the receiver's type and size witnesses, exactly as
+    /// `applied_field_type` projects them for fields. The method's own
+    /// generics keep their declared form (identity); non-applied receivers
+    /// return the signature unchanged.
+    pub(super) fn applied_method_signature(
+        &mut self,
+        receiver_ty: TypeId,
+        sig: FuncSig,
+    ) -> FuncSig {
+        let resolved = self.resolve_inferred_type(receiver_ty);
+        let (_, resolved) = self.types.peel_access_marker(resolved);
+        let Type::Applied(_, args) = self.types.get(resolved).clone() else {
+            return sig;
+        };
+        let Some(struct_def) = self.struct_def_from_type(receiver_ty) else {
+            return sig;
+        };
+        let Some(params) = self.type_params_by_def.get(&struct_def).cloned() else {
+            return sig;
+        };
+        let mut vars = FxHashMap::default();
+        let mut shape_vars = FxHashMap::default();
+        for (param, arg) in params.iter().zip(args.iter()) {
+            match arg {
+                radix_types::AppliedArg::Type(witness) => {
+                    vars.insert(*param, *witness);
+                }
+                radix_types::AppliedArg::Size(witness) => {
+                    shape_vars.insert(*param, *witness);
+                }
+            }
+        }
+        if vars.is_empty() && shape_vars.is_empty() {
+            return sig;
+        }
+        // A method's own generic of the same name shadows the class's.
+        for param in &sig.type_params {
+            shape_vars.remove(&param.name);
+            let identity = self.types.intern(Type::Param(param.name));
+            vars.insert(param.name, identity);
+        }
+        self.substitute_func_sig(&sig, &mut vars, Some(&mut shape_vars))
+    }
+
     /// Field projections of a `ref` genus are `ref` views of referential fields.
     fn project_ref_view(&mut self, object_ty: TypeId, field_ty: TypeId) -> TypeId {
         if !self.types.is_ref_view(object_ty) {

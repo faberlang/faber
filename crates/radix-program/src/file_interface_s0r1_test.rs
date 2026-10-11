@@ -268,6 +268,7 @@ fn exported_signature_materializes_solved_union_param() {
             ]),
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         "the solved union must materialize as InterfaceTypeSnapshot::Union, never fail unrepresentable"
     );
@@ -346,6 +347,7 @@ fn export_probe_fixture_materializes_solved_union_param() {
             ]),
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         }],
         "the match-solved param hole must materialize as InterfaceTypeSnapshot::Union"
     );

@@ -344,6 +344,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
                 "format session did not resolve a source locale pack",
             )
             .with_code("LOCALE003")
+            .with_arg("issue", "unresolved")
             .with_file(name)],
             radix::services::DiagnosticMode::Normal,
             None,
@@ -399,6 +400,7 @@ pub(super) fn format_session(
                 )
                 .with_phase(radix::module::diagnostics::DiagnosticPhase::Lex)
                 .with_code("LOCALE003")
+                .with_arg("issue", "not_a_string")
                 .with_file(name),
             ));
         }
@@ -418,6 +420,7 @@ pub(super) fn format_session(
         Box::new(
             radix::module::diagnostics::Diagnostic::error("reader locale did not resolve")
                 .with_code("LOCALE003")
+                .with_arg("issue", "unresolved")
                 .with_file(name),
         )
     })?;

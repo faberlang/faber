@@ -228,13 +228,13 @@ main {
     # recovery supplies the target-typed fallback.
     print signed ↦ u32 ⊥ 0 ∷ u32
     print a ↦ f32
-    print single ↦ int
+    print single ↦ int via Trunc
     print a ↦ float
-    print four_two ↦ int
+    print four_two ↦ int via Trunc
     print single ↦ f64
     print double ↦ f32
     print d64v ↦ d64
-    print d64v ↦ int
+    print d64v ↦ int via HalfEven
     print five ↦ d64
     print d64v ↦ float
     print four_two ↦ d64

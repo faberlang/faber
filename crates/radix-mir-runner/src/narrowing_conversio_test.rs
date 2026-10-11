@@ -236,6 +236,104 @@ fn decimal_source_rounds_like_numerus_narrowing_then_applies_the_policy() {
     assert_eq!(clamped, Value::Int(0));
 }
 
+fn fractus() -> Type {
+    Type::Primitive(Primitive::Fractus)
+}
+
+/// Exact expected residues of a float's truncated integer value in `u8`/`i8`.
+///
+/// Small inputs reduce by plain integer math (300 mod 256 = 44; -5 mod 256 =
+/// 251, signed -5; 255 signed is -1). A double with magnitude >= 2^60 has an
+/// ulp of at least 2^8, so it is an exact multiple of 2^8 and both residues are
+/// 0: that covers 1e25, 1e300 and -1e300. 1e19 is 2^19 * 5^19 with 5^19 < 2^53,
+/// so it is exactly representable and a multiple of 2^8 too.
+fn wrapping_float_expectations() -> Vec<(f64, i64, i64)> {
+    vec![
+        // (input, wrapping<u8>, wrapping<i8>); fractional inputs truncate first.
+        (3.7, 3, 3),
+        (300.7, 44, 44),
+        (-5.5, 251, -5),
+        (255.0, 255, -1),
+        (1e19, 0, 0),
+        (1e25, 0, 0),
+        (1e300, 0, 0),
+        (-1e300, 0, 0),
+    ]
+}
+
+#[test]
+fn float_into_wrapping_reduces_exactly_for_any_finite_magnitude() {
+    for (input, unsigned, signed) in wrapping_float_expectations() {
+        let u8_result = run_conversion(
+            fractus(),
+            wrapping(NumericWidth::U8),
+            Value::Float(input),
+            None,
+        )
+        .expect("a finite float cannot fail");
+        assert_eq!(u8_result, Value::Int(unsigned), "wrapping<u8> of {input}");
+        let i8_result = run_conversion(
+            fractus(),
+            wrapping(NumericWidth::I8),
+            Value::Float(input),
+            None,
+        )
+        .expect("a finite float cannot fail");
+        assert_eq!(i8_result, Value::Int(signed), "wrapping<i8> of {input}");
+    }
+}
+
+#[test]
+fn float_into_saturating_clamps_for_any_finite_magnitude() {
+    // (input, saturating<u8>, saturating<i8>)
+    let cases: [(f64, i64, i64); 8] = [
+        (3.7, 3, 3),
+        (300.7, 255, 127),
+        (-5.5, 0, -5),
+        (255.0, 255, 127),
+        (1e19, 255, 127),
+        (1e25, 255, 127),
+        (1e300, 255, 127),
+        (-1e300, 0, -128),
+    ];
+    for (input, unsigned, signed) in cases {
+        let u8_result = run_conversion(
+            fractus(),
+            saturating(NumericWidth::U8),
+            Value::Float(input),
+            None,
+        )
+        .expect("a finite float cannot fail");
+        assert_eq!(u8_result, Value::Int(unsigned), "saturating<u8> of {input}");
+        let i8_result = run_conversion(
+            fractus(),
+            saturating(NumericWidth::I8),
+            Value::Float(input),
+            None,
+        )
+        .expect("a finite float cannot fail");
+        assert_eq!(i8_result, Value::Int(signed), "saturating<i8> of {input}");
+    }
+}
+
+#[test]
+fn float_into_wrapping_keeps_nan_and_infinity_on_the_error_channel() {
+    for input in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let error = run_conversion(
+            fractus(),
+            wrapping(NumericWidth::U8),
+            Value::Float(input),
+            None,
+        )
+        .expect_err("a non-finite float has no integer");
+        assert!(
+            error.issue.contains("fractus_to_numerus"),
+            "{}",
+            error.issue
+        );
+    }
+}
+
 /// A value at the top of `i128` (far past every width) clamps at the store
 /// instead of overflowing; only the store clamps (d11-6 ruling 3).
 #[test]

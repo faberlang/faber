@@ -27,11 +27,11 @@ class Outer {
 }
 
 main {
-    const V3 a ← V3 { x = 1.0 }
+    var V3 a ← V3 { x = 1.0 }
     var V3 b ← a
     b.x ← 5.0
     print a.x
-    const Outer o ← Outer {}
+    var Outer o ← Outer {}
     var Inner i ← o.inner
     i.n ← 3
     print o.inner.n

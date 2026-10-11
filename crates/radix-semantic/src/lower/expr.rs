@@ -77,7 +77,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         }
         ExprKind::Ident(ident) => lowerer.lower_nomen(ident),
         ExprKind::Binary(bin) => lowerer.lower_binarius(bin),
-        ExprKind::Unary(unary) => lowerer.lower_unarius(unary),
+        ExprKind::Unary(unary) => lowerer.lower_unarius(unary, id),
         ExprKind::Ternary(ternary) => lowerer.lower_ternary(ternary),
         ExprKind::Call(call) => lowerer.lower_vocare(call, id),
         ExprKind::Member(member) => lowerer.lower_membrum(member, id),
@@ -503,7 +503,7 @@ impl Lowerer<'_> {
     }
 
     /// Lower unary expression (unarius)
-    fn lower_unarius(&mut self, unary: &UnaryExpr) -> HirExpressionKind {
+    fn lower_unarius(&mut self, unary: &UnaryExpr, id: HirId) -> HirExpressionKind {
         let operand = lower_expr(self, &unary.operand);
 
         let op = match unary.op {
@@ -514,11 +514,18 @@ impl Lowerer<'_> {
             // method twins (`pavimentum`, `tectum`, `rotunda`). The private
             // marker name lets typecheck reject a tensor operand by name and
             // then rewrite to the active pack's intrinsic surface.
+            // The node id is recorded with the glyph ids so Faber re-emission
+            // prints the authored delimiters instead of the method twin.
             radix_syntax::UnOp::Floor => {
+                self.presentation.glyph_ids.push(id);
                 return self.lower_rounding_glyph("pavimentum", operand);
             }
-            radix_syntax::UnOp::Ceil => return self.lower_rounding_glyph("tectum", operand),
+            radix_syntax::UnOp::Ceil => {
+                self.presentation.glyph_ids.push(id);
+                return self.lower_rounding_glyph("tectum", operand);
+            }
             radix_syntax::UnOp::Nearest => {
+                self.presentation.glyph_ids.push(id);
                 return self.lower_rounding_glyph("rotunda", operand);
             }
         };
@@ -622,7 +629,7 @@ impl Lowerer<'_> {
                 let (recv, name) = self.flatten_dotted_method_callee(member);
                 let name = self.canonicalize_namespace_member(&recv, name);
                 if self.interner.resolve(name) == GLYPH_TRANSPOSE_MARKER {
-                    self.presentation.glyph_transpose_ids.push(id);
+                    self.presentation.glyph_ids.push(id);
                 }
                 let args = self.lower_call_args(&call.args);
                 HirExpressionKind::MethodCall(Box::new(recv), name, type_args, args, None)
@@ -1432,10 +1439,38 @@ impl Lowerer<'_> {
                     .recovery
                     .as_ref()
                     .map(|fallback| Box::new(lower_expr(self, fallback)));
+                // The cell type is not known until typecheck, so only the
+                // hint's name is validated here; whether the pairing takes a
+                // hint is the checker's rule (`check_conversio`).
+                let mut params = Vec::new();
+                if let Some(via) = &assign.via {
+                    let hint = self.interner.resolve(via.name).to_owned();
+                    let issue = if hint == "Bits" {
+                        Some("conversio_via_bits_retired")
+                    } else if crate::numeric_width::is_float_rounding_hint(&hint)
+                        || crate::numeric_width::is_conversio_radix_hint(&hint)
+                    {
+                        None
+                    } else {
+                        Some("conversio_via_unknown_hint")
+                    };
+                    match issue {
+                        Some(issue) => self.push_error(
+                            SemanticErrorKind::ConversionInvalid,
+                            vec![
+                                DiagnosticArg::new("issue", issue),
+                                DiagnosticArg::new("hint", hint),
+                            ],
+                            via.span,
+                        ),
+                        None => params.push(via.name),
+                    }
+                }
                 HirExpressionKind::ConversioAssign {
                     target: Box::new(target),
                     source: Box::new(source),
                     recovery,
+                    params,
                 }
             }
         }
@@ -1882,6 +1917,10 @@ impl Lowerer<'_> {
         // a bit pattern is a `bN` value and `↦ bN` reads or writes it.
         let issue = if hint == "Bits" {
             Some("conversio_via_bits_retired")
+        } else if crate::numeric_width::is_float_rounding_hint(&hint) {
+            // Need: a rounding hint belongs to an integer-family
+            // target; the source (float or decimal) is the checker's rule.
+            (!via_target_takes_rounding_hint(self, target)).then_some("conversio_via_unknown_hint")
         } else if !crate::numeric_width::is_conversio_radix_hint(&hint) {
             Some("conversio_via_unknown_hint")
         } else if !via_target_takes_hint(self, target) {
@@ -2384,6 +2423,26 @@ fn via_target_takes_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> 
             }
             _ => return false,
         }
+    }
+}
+
+/// Whether a `↦` target can carry a rounding hint (`via Floor|Ceil|HalfEven|
+/// Trunc`, need): an integer-family target (`numerus`, sized
+/// integers, `inf`, `wrapping<W>`, `saturating<W>`). An alias or generic
+/// parameter is left to the checker, which sees the resolved pairing.
+fn via_target_takes_rounding_hint(lowerer: &Lowerer<'_>, target: &HirConversioTarget) -> bool {
+    let HirConversioTarget::Type(ty) = target else {
+        return false;
+    };
+    match lowerer.types.get(*ty) {
+        crate::Type::Primitive(Primitive::Numerus)
+        | crate::Type::ModularWord(_)
+        | crate::Type::SaturatingWord(_)
+        | crate::Type::Alias(..)
+        | crate::Type::Param(_)
+        | crate::Type::Error => true,
+        crate::Type::SizedNumeric(Primitive::Numerus, width) => !width.is_decimal(),
+        _ => false,
     }
 }
 

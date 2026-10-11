@@ -1335,6 +1335,7 @@ impl TypeTable {
                         .all(|(a_param, b_param)| {
                             a_param.mode == b_param.mode
                                 && a_param.optional == b_param.optional
+                                && a_param.sponte == b_param.sponte
                                 && self.equals(a_param.ty, b_param.ty)
                         })
                     && self.equals(a_sig.ret, b_sig.ret)
@@ -2831,7 +2832,11 @@ pub struct ResolvedGenericCall {
 pub struct ParamType {
     pub ty: TypeId,
     pub mode: SemanticParamMode,
+    /// Whether callers may omit this argument (a `sponte` marker or a default).
     pub optional: bool,
+    /// Whether the parameter is a source `sponte` slot: an optional value may be
+    /// stored into it. A merely defaulted parameter is omittable but not sponte.
+    pub sponte: bool,
 }
 
 /// Parameter ownership/borrowing mode as seen by semantic analysis.

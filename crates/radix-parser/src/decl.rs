@@ -813,7 +813,7 @@ impl Parser {
                 ParseErrorKind::FunctionBodyAbsent,
                 self.current_span(),
             )
-            .with_arg("functio", "functio"));
+            .with_arg("block", "{ ... }"));
         };
 
         Ok(StmtKind::Func(FuncDecl {
@@ -1022,8 +1022,7 @@ impl Parser {
             return Err(ParseError::structured(
                 ParseErrorKind::ClassBodyAbsent,
                 self.current_span(),
-            )
-            .with_arg("genus", "genus"));
+            ));
         }
         self.advance();
 

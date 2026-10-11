@@ -777,6 +777,7 @@ impl TypeChecker<'_> {
                 ty: param_ty,
                 mode: param_a.mode,
                 optional: param_a.optional,
+                sponte: param_a.sponte,
             });
         }
         let ret = self.unify_with_policy(sig_a.ret, sig_b.ret, span, issue, policy);

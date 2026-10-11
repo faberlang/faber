@@ -104,6 +104,7 @@ pub fn attach_signatures(
                 ty: p.ty,
                 mode: SemanticParamMode::Owned,
                 optional: false,
+                sponte: false,
             })
             .collect();
 
@@ -112,6 +113,7 @@ pub fn attach_signatures(
             ty: residual_ty,
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         });
 
         // Upstream: primal return type, owned.
@@ -119,6 +121,7 @@ pub fn attach_signatures(
             ty: upstream_ty,
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         });
 
         let sig = FuncSig {

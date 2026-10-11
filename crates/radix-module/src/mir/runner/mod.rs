@@ -61,6 +61,10 @@ mod lazy_cursor_tests;
 #[path = "vector_matrix_test.rs"]
 mod vector_matrix_tests;
 
+#[cfg(test)]
+#[path = "rounding_conversio_run_test.rs"]
+mod rounding_conversio_run_tests;
+
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Session};
 use crate::mir::{KernelLowering, lower_analyzed_unit};

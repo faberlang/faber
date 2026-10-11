@@ -802,11 +802,13 @@ fn type_positions_pin_fixed_and_item_shape_separators() {
                 ty: textus,
                 mode: SemanticParamMode::Owned,
                 optional: false,
+                sponte: false,
             },
             ParamType {
                 ty: numerus,
                 mode: SemanticParamMode::Owned,
                 optional: false,
+                sponte: false,
             },
         ],
         ret: i32_ty,

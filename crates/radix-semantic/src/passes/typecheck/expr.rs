@@ -276,7 +276,7 @@ impl TypeChecker<'_> {
                     &source.kind,
                     HirExpressionKind::Literal(HirLiteral::JsonValor(
                         radix_syntax::JsonValue::Object(_)
-                    ))
+                    )) | HirExpressionKind::Array(_)
                 ))
     }
 
@@ -450,6 +450,70 @@ impl TypeChecker<'_> {
         None
     }
 
+    /// `_ [ … ]` and a bare `[ … ]` against a tuple cell. The hole form
+    /// (`Verte` with an `Infer` target over an array) builds the expected
+    /// bracket type: a tuple cell makes the tuple, any other cell gets the
+    /// plain array literal (and its ordinary checking), and no expected type
+    /// is a named error. A bare array literal takes a tuple cell's type too
+    /// (the literal is a hole with a default; no cell leaves it a list).
+    /// Returns `Some(type)` when the node is settled here.
+    fn desugar_bracket_literal_shape(
+        &mut self,
+        expr: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> Option<TypeId> {
+        let hole = match &expr.kind {
+            HirExpressionKind::Verte {
+                source,
+                target,
+                entries: None,
+            } => {
+                matches!(source.kind, HirExpressionKind::Array(_))
+                    && self.is_infer(self.resolve_inferred_type(*target))
+            }
+            _ => false,
+        };
+        let bare = matches!(expr.kind, HirExpressionKind::Array(_));
+        if !hole && !bare {
+            return None;
+        }
+        let concrete = expected
+            .map(|ty| self.resolve_inferred_type(ty))
+            .filter(|ty| !self.is_infer(*ty));
+        if hole && concrete.is_none() {
+            self.invalid_conversion(
+                super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                expr.span,
+            );
+            return Some(self.error_type);
+        }
+        let is_tuple = concrete.is_some_and(|ty| matches!(self.types.get(ty), Type::Tuple(_)));
+        if hole {
+            let placeholder = HirExpressionKind::Tuple(Vec::new(), None);
+            if let HirExpressionKind::Verte { source, .. } =
+                std::mem::replace(&mut expr.kind, placeholder)
+            {
+                expr.kind = source.kind;
+            }
+        }
+        if is_tuple
+            && let HirExpressionKind::Array(elements) = &mut expr.kind
+            && elements
+                .iter()
+                .all(|element| matches!(element, HirArrayElement::Expr(_)))
+        {
+            let items = std::mem::take(elements)
+                .into_iter()
+                .filter_map(|element| match element {
+                    HirArrayElement::Expr(item) => Some(item),
+                    _ => None,
+                })
+                .collect();
+            expr.kind = HirExpressionKind::Tuple(items, None);
+        }
+        None
+    }
+
     /// Synthesizes an expression type, optionally using an expected type as
     /// context for shape-sensitive expressions.
     ///
@@ -464,8 +528,24 @@ impl TypeChecker<'_> {
         expr: &mut HirExpression,
         expected: Option<TypeId>,
     ) -> TypeId {
+        // The numeric-twin probe below checked this receiver already. Checking
+        // is not idempotent (an intrinsic call writes its canonical method
+        // symbol back, which a second pass rejects as a wrong-locale spelling),
+        // so the probed type stands in for the second check.
+        if let Some((probed, ty)) = self.twin_probed_receiver
+            && probed == expr.id
+        {
+            self.twin_probed_receiver = None;
+            return ty;
+        }
         let saved_pending_conversion = self.pending_conversion.take();
         let store = self.pending_store.take();
+        // Need: `t.sum(axis n)` / `t.mean(axis n)` expand to the
+        // grouped reduction before the call is checked.
+        if let super::reduction::AxisReduction::Refused = self.desugar_axis_reduction(expr) {
+            self.pending_conversion = saved_pending_conversion;
+            return self.error_type;
+        }
         // ss1: a numeric method twin means its operator; rewrite it first.
         let in_place_twin = self.desugar_numeric_twin(expr);
         // Ruling 2026-10-08: `empty` at a dense tensor, vector, or matrix slot
@@ -484,6 +564,9 @@ impl TypeChecker<'_> {
             Err(slot) => return slot,
         };
         if let Some(settled) = self.desugar_inferred_constructor_shape(expr, expected) {
+            return settled;
+        }
+        if let Some(settled) = self.desugar_bracket_literal_shape(expr, expected) {
             return settled;
         }
         let ty = match &mut expr.kind {
@@ -701,19 +784,23 @@ impl TypeChecker<'_> {
                 body,
                 identity,
                 ..
-            } => super::reduction::check_reduction_expr(
-                self,
-                *op,
-                source,
-                coordinates,
-                group.as_mut(),
-                *filum,
-                *binding,
-                body.as_mut(),
-                identity.as_mut(),
-                expected,
-                expr.span,
-            ),
+            } => {
+                // An axis expansion supplies its own bucket shape.
+                let expected = self.axis_reduction_results.remove(&expr.id).or(expected);
+                super::reduction::check_reduction_expr(
+                    self,
+                    *op,
+                    source,
+                    coordinates,
+                    group.as_mut(),
+                    *filum,
+                    *binding,
+                    body.as_mut(),
+                    identity.as_mut(),
+                    expected,
+                    expr.span,
+                )
+            }
             HirExpressionKind::FirstMatch {
                 source,
                 coordinates,
@@ -759,7 +846,14 @@ impl TypeChecker<'_> {
                 target,
                 source,
                 recovery,
-            } => self.check_conversio_assign(target, source, recovery.as_deref_mut(), expr.span),
+                params,
+            } => self.check_conversio_assign(
+                target,
+                source,
+                recovery.as_deref_mut(),
+                params,
+                expr.span,
+            ),
             HirExpressionKind::Array(elements) => self.check_array(elements, expr.span, expected),
             HirExpressionKind::Struct(def_id, fields) => self.check_struct_literal(*def_id, fields),
             HirExpressionKind::Verte {
@@ -1027,8 +1121,17 @@ impl TypeChecker<'_> {
             (Some(expected), Some(site))
                 if matches!(
                     site.kind,
-                    HirStoreKind::Declaration | HirStoreKind::Assignment
-                ) && self.reject_optional_into_plain_cell(ty, expected, expr.span) =>
+                    HirStoreKind::Declaration
+                        | HirStoreKind::Assignment
+                        | HirStoreKind::Argument
+                        | HirStoreKind::Return
+                        | HirStoreKind::Yield
+                        | HirStoreKind::Throw
+                        | HirStoreKind::Field
+                        | HirStoreKind::Element
+                        | HirStoreKind::TuplePosition
+                ) && !site.optional_slot
+                    && self.reject_optional_into_plain_cell(ty, expected, expr.span) =>
             {
                 // The named error stands alone: the node takes the slot's type.
                 expected

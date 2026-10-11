@@ -875,6 +875,7 @@ fn simple_sig(params: Vec<TypeId>, ret: TypeId) -> FuncSig {
                 ty,
                 mode: SemanticParamMode::Owned,
                 optional: false,
+                sponte: false,
             })
             .collect(),
         ret,
@@ -896,6 +897,7 @@ fn resolve_param_types(
             ty: resolve_param_kind(checker, *kind, ctx),
             mode: SemanticParamMode::Owned,
             optional: false,
+            sponte: false,
         })
         .collect()
 }
@@ -983,6 +985,32 @@ fn resolve_param_kind(
     }
 }
 
+/// `T ∪ nihil` for an optional read of an element or value of type `inner`.
+///
+/// WHY: an optional of an optional is the same optional. A read over an
+/// element that already carries `nihil` (`lista<numerus ∪ nihil>.accipe`)
+/// stays `numerus ∪ nihil`, so a plain optional cell takes it with one
+/// unwrap and flow narrowing applies; wrapping it again would force two.
+fn optional_of(checker: &mut TypeChecker<'_>, inner: TypeId) -> TypeId {
+    let mut peeled = inner;
+    while let Type::Alias(_, target) = checker.types.get(peeled) {
+        peeled = *target;
+    }
+    let nihil = checker.types.primitive(Primitive::Nihil);
+    let already_optional = match checker.types.get(peeled) {
+        Type::Option(_) => true,
+        Type::Union(members) => members
+            .iter()
+            .any(|member| checker.types.equals(*member, nihil)),
+        _ => false,
+    };
+    if already_optional {
+        inner
+    } else {
+        checker.types.option(inner)
+    }
+}
+
 fn resolve_return_type(
     checker: &mut TypeChecker<'_>,
     entry: &MethodIntrinsic,
@@ -1011,7 +1039,7 @@ fn resolve_return_type(
             let Some(inner) = ctx.inner else {
                 return checker.error_type;
             };
-            checker.types.option(inner)
+            optional_of(checker, inner)
         }
         IntrinsicReturnKind::OptionNumerus => {
             // LSR-W0: the argmax/argmin index-or-nihil shape. The index is
@@ -1034,7 +1062,7 @@ fn resolve_return_type(
             let Some(value) = ctx.value else {
                 return checker.error_type;
             };
-            checker.types.option(value)
+            optional_of(checker, value)
         }
         IntrinsicReturnKind::ArrayInner => {
             if matches!(

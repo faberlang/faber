@@ -44,6 +44,9 @@ pub(super) struct StoreSite {
     pub(super) inferred_from: Option<radix_lexer::Span>,
     /// An `=` position states a compile-time fact: a constant must fit.
     pub(super) compile_time: bool,
+    /// The receiving slot is a `sponte` parameter or field: it is an optional
+    /// target, so an optional value stored into it is not an unwrap.
+    pub(super) optional_slot: bool,
 }
 
 impl StoreSite {
@@ -53,11 +56,18 @@ impl StoreSite {
             slot: None,
             inferred_from: None,
             compile_time: false,
+            optional_slot: false,
         }
     }
 
     pub(super) fn named(mut self, slot: Symbol) -> Self {
         self.slot = Some(slot);
+        self
+    }
+
+    /// Mark a `sponte` parameter or field slot, which holds an absent value.
+    pub(super) fn optional_slot(mut self, optional: bool) -> Self {
+        self.optional_slot = optional;
         self
     }
 
@@ -215,6 +225,11 @@ impl TypeChecker<'_> {
                 return ty;
             }
             let ty = self.check_expr(expr);
+            // Need: a thrown, yielded or element-stored optional
+            // does not unwrap silently into a plain slot.
+            if self.reject_optional_into_plain_cell(ty, slot_ty, expr.span) {
+                return slot_ty;
+            }
             if let Some(widened) = self.widen_into_inf(expr, ty, slot_ty) {
                 return widened;
             }

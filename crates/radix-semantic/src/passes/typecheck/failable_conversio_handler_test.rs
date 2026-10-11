@@ -48,8 +48,14 @@ fn every_failable_conversio_kind_is_rejected_without_a_handler() {
         ("u16", "u8"),
         ("d64", "i32"),
     ] {
+        // Need: a float or decimal source names its rounding.
+        let via = if matches!(param, "fractus" | "d64") {
+            " via Trunc"
+        } else {
+            ""
+        };
         assert_rejects_with_issue(
-            &format!("functio g({param} x) → {target} {{\n    redde x ↦ {target}\n}}\n"),
+            &format!("functio g({param} x) → {target} {{\n    redde x ↦ {target}{via}\n}}\n"),
             ISSUE,
         );
     }
@@ -213,4 +219,34 @@ fn infallible_text_rows_are_exempt() {
 #[test]
 fn bn_reinterpretation_is_exempt() {
     assert_accepts("functio bits(f32 x) → b32 {\n    redde x ↦ b32\n}\n");
+}
+
+// --- float into a policy word -----------------------------
+
+/// A float into a `wrapping`/`saturating` word fails at NaN and ±∞, so a
+/// direct `fac/cape` types its catch binding `textus` (not the `ignotum`
+/// escape): the text payload is usable as text and is not a number.
+#[test]
+fn float_into_policy_word_types_the_catch_binding_as_textus() {
+    for word in ["modulus<u8>", "saturatus<u8>"] {
+        let program = |binding: &str| {
+            format!(
+                "functio g(fractus x) → vacuum {{\n    fac {{\n        fixum {word} w ← x ↦ {word} via Trunc\n        nota w\n    }} cape err {{\n        {binding}\n    }}\n}}\n"
+            )
+        };
+        assert_accepts(&program("fixum textus s ← err\n        nota s"));
+        let rejected = analyze_source(&program("fixum numerus n ← err\n        nota n"));
+        assert!(
+            rejected.diagnostics.iter().any(|err| err.is_error()),
+            "{word}: catch binding must be textus, got {:?}",
+            rejected.diagnostics
+        );
+    }
+}
+
+/// An integer source into a policy word still cannot fail: no channel is
+/// consulted and nothing needs a handler.
+#[test]
+fn integer_into_policy_word_needs_no_handler() {
+    assert_accepts("functio g(numerus x) → modulus<u8> {\n    redde x ↦ modulus<u8>\n}\n");
 }

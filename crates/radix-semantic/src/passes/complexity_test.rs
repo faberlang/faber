@@ -376,6 +376,7 @@ fn row_conversio_assign_recovery_counts_when_present() {
             target: target(),
             source: source(),
             recovery: None,
+            params: Vec::new(),
         })]),
         1,
         "no ⊥ fallback: 0"
@@ -385,6 +386,7 @@ fn row_conversio_assign_recovery_counts_when_present() {
             target: target(),
             source: source(),
             recovery: Some(source()),
+            params: Vec::new(),
         })]),
         2,
         "⊥ fallback present: +1"

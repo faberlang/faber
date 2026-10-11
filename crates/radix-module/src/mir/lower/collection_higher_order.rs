@@ -651,6 +651,7 @@ impl FunctionBuilder<'_> {
                         ty: element,
                         mode: radix_types::SemanticParamMode::Owned,
                         optional: false,
+                        sponte: false,
                     }],
                     ret: key_ty,
                     err: None,

@@ -3614,7 +3614,9 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
         return Err(Box::new(
             Diagnostic::error("frontmatter declares an empty locale")
                 .with_phase(DiagnosticPhase::Lex)
-                .with_code(locale_unknown_spec().code),
+                .with_code(locale_unknown_spec().code)
+                .with_arg("locale_id", locale_id)
+                .with_arg("issue", "invalid_id"),
         ));
     }
 
@@ -3637,7 +3639,9 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
                 "frontmatter locale '{locale_id}' is not a valid locale identifier; locale ids must be simple directory names"
             ))
             .with_phase(DiagnosticPhase::Lex)
-            .with_code(locale_unknown_spec().code),
+            .with_code(locale_unknown_spec().code)
+            .with_arg("locale_id", locale_id)
+            .with_arg("issue", "invalid_id"),
         ));
     }
 
@@ -3647,7 +3651,9 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
                 "frontmatter declares locale '{locale_id}' but no language-pack root is configured"
             ))
             .with_phase(DiagnosticPhase::Lex)
-            .with_code(locale_unknown_spec().code),
+            .with_code(locale_unknown_spec().code)
+            .with_arg("locale_id", locale_id)
+            .with_arg("issue", "no_root"),
         )
     })?;
 
@@ -3666,7 +3672,9 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
                 "frontmatter locale '{locale_id}' resolves outside the language-pack root"
             ))
             .with_phase(DiagnosticPhase::Lex)
-            .with_code(locale_unknown_spec().code),
+            .with_code(locale_unknown_spec().code)
+            .with_arg("locale_id", locale_id)
+            .with_arg("issue", "outside_root"),
         ));
     }
 
@@ -3674,7 +3682,10 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
         Box::new(
             Diagnostic::error(format!("unknown reader locale '{locale_id}' in frontmatter: {err}"))
                 .with_phase(DiagnosticPhase::Lex)
-                .with_code(locale_unknown_spec().code),
+                .with_code(locale_unknown_spec().code)
+                .with_arg("locale_id", locale_id)
+                .with_arg("issue", "load_failed")
+                .with_arg("detail", err.to_string()),
         )
     })
 }
@@ -3715,7 +3726,8 @@ pub(crate) fn resolve_peeled_lex_pack(
             diagnostics.push(
                 Diagnostic::error("frontmatter 'locale' key must be a string")
                     .with_phase(DiagnosticPhase::Lex)
-                    .with_code(locale_unknown_spec().code),
+                    .with_code(locale_unknown_spec().code)
+                    .with_arg("issue", "not_a_string"),
             );
             Err(())
         }
@@ -4330,7 +4342,7 @@ fn empty_presentation() -> HirPresentation {
         entry_explicit: false,
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
-        glyph_transpose_ids: Vec::new(),
+        glyph_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),

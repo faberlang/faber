@@ -124,7 +124,7 @@ fn sort_expression_round_trips_in_latin_and_english_and_typechecks() {
     let cases = [
         (
             "la",
-            "functio f(lista<numerus> xs, tabula<textus, numerus> m) → vacuum {\n    fixum lista<numerus> a ← ordinata via ascendens ex xs\n    fixum lista<textus> k ← ordinata via descendens de m\n    fixum lista<numerus> b ← ordinata via ascendens ex xs fixum p {\n        redde p\n    }\n    itera ex ordinata via ascendens de m fixum n {\n        scribe n\n    }\n    varia numerus ordinata ← 1\n    varia numerus ascendens ← 2\n    varia lista<numerus> ys ← [3, 1]\n    ys.ordina()\n}\n",
+            "functio f(lista<numerus> xs, tabula<textus, numerus> m) → vacuum {\n    fixum lista<numerus> a ← ordinata via ascendens ex xs\n    fixum lista<textus> k ← ordinata via descendens de m\n    fixum lista<numerus> b ← ordinata via ascendens ex xs fixum p {\n        redde p\n    }\n    fixum lista<textus> s ← ordinata via ascendens de m\n    itera ex s fixum n {\n        scribe n\n    }\n    varia numerus ordinata ← 1\n    varia numerus ascendens ← 2\n    varia lista<numerus> ys ← [3, 1]\n    ys.ordina()\n}\n",
             [
                 "ordinata via ascendens ex xs",
                 "ordinata via descendens de m",
@@ -133,7 +133,7 @@ fn sort_expression_round_trips_in_latin_and_english_and_typechecks() {
         ),
         (
             "en",
-            "fn f(list<int> xs, map<string, int> m) → none {\n    const list<int> a ← sort via asc from xs\n    const list<string> k ← sort via desc ref m\n    const list<int> b ← sort via asc from xs const p {\n        return p\n    }\n    for from sort via asc ref m const n {\n        print n\n    }\n    var int sort ← 1\n    var int asc ← 2\n    var list<int> ys ← [3, 1]\n    ys.sort()\n}\n",
+            "fn f(list<int> xs, map<string, int> m) → none {\n    const list<int> a ← sort via asc from xs\n    const list<string> k ← sort via desc ref m\n    const list<int> b ← sort via asc from xs const p {\n        return p\n    }\n    const list<string> s ← sort via asc ref m\n    for from s const n {\n        print n\n    }\n    var int sort ← 1\n    var int asc ← 2\n    var list<int> ys ← [3, 1]\n    ys.sort()\n}\n",
             [
                 "sort via asc from xs",
                 "sort via desc ref m",
@@ -697,6 +697,18 @@ fn reduction_max_coalesce_parenthesizes_binary_source() {
     assert!(
         code.contains("reducta via maxima ex (row ⊙ scale) vel 0.0"),
         "extremum source must stay grouped before the vel tail:\n{code}"
+    );
+}
+
+#[test]
+fn reduction_as_a_binary_operand_stays_grouped() {
+    // `reducta via summa ex row / 4.0` re-parses as a sum of `row / 4.0`.
+    let code = assert_idempotent(
+        "functio mean(tensor<f32, [4]> row) → f32 {\n    redde (reducta via summa ex row) / 4.0\n}\n",
+    );
+    assert!(
+        code.contains("(reducta via summa ex row) / 4.0"),
+        "reduction operand must stay grouped before the operator:\n{code}"
     );
 }
 

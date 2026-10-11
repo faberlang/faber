@@ -69,8 +69,8 @@ fn other_field_on_textus_is_unknown_field() {
 
 #[test]
 fn length_method_call_is_accepted() {
-    test_support::assert_accepts("functio f(textus s) → numerus { redde s.length() }");
-    test_support::assert_accepts("functio f(lista<numerus> xs) → numerus { redde xs.length() }");
+    test_support::assert_accepts("functio f(textus s) → numerus { redde s.longitudo() }");
+    test_support::assert_accepts("functio f(lista<numerus> xs) → numerus { redde xs.longitudo() }");
 }
 
 /// PINNED EXCEPTION: `.nuntius` on `textus` is the caught-error message

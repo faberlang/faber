@@ -219,18 +219,6 @@ scrinium = "เฟรม"
 meus = "ส่ง"
 tuus = "รับ"
 
-[diagnostics.UNRES001]
-message = "คีย์เวิร์ด '{keyword}' ไม่ได้ประกาศไว้สำหรับชุดภาษา '{pack}'"
-help = "ใช้การสะกดคีย์เวิร์ดที่ประกาศในชุดภาษาสำหรับตำแหน่งไวยากรณ์นี้"
-
-[diagnostics.UNRES002]
-message = "อินทรินซิก '{intrinsic}' ไม่ได้ประกาศไว้สำหรับชุดภาษา '{pack}' บนตระกูลตัวรับ '{receiver}'"
-help = "ใช้การสะกดอินทรินซิกที่ประกาศในชุดภาษาสำหรับตระกูลตัวรับนี้"
-
-[diagnostics.UNRES003]
-message = "สมาชิก '{member}' ไม่ได้ประกาศไว้สำหรับชุดภาษา '{pack}' สำหรับเอกลักษณ์ '{identity}'"
-help = "ใช้การสะกดสมาชิกที่ประกาศในชุดภาษาสำหรับเอกลักษณ์ไลบรารีนี้"
-
 [diagnostics.LOCALE002]
 message = "ชุดภาษา '{pack}' พบการสะกดที่คล้ายคำสำคัญ '{spelling}'"
 help = "ใช้ '{suggestion}' หากตั้งใจหมายถึงคำสำคัญ; '{spelling}' เป็นชื่อที่ใช้ได้ตามที่เขียน"
@@ -638,6 +626,10 @@ help = "เขียน `⌊x⌉` เพื่อปัดเป็นจำน�
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` เป็นตัวดำเนินการที่เลิกใช้แล้ว; การปฏิเสธของ `≡` เขียนเป็น `{replacement}`"
 help = "เขียน `{replacement}` แทน `{glyph}`; สัญลักษณ์ปฏิเสธทุกตัวมีจำนวนเส้นเท่ากับสัญลักษณ์ที่มันปฏิเสธ (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "นิพจน์ sort หรือ reduce ไม่สามารถเป็นแหล่งของลูปได้"
+help = "ผูกไว้กับชื่อก่อน แล้วจึงวนลูปบนชื่อนั้น: `const list<int> ys ← sort via asc from xs` แล้วจึง `for from ys const x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "ใช้ ⊥ สำหรับการกู้คืน conversio"
@@ -2529,11 +2521,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -2963,6 +2959,26 @@ help = "use the same access marker at the call as in the signature"
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
 
+[diagnostics.SEM010.issues.axis_reduction_extent_unknown]
+message = "the mean needs a compile-time extent on the axis it removes"
+help = "give the axis a literal extent, or write the grouped reduction and divide by the run-time count"
+
+[diagnostics.SEM010.issues.axis_reduction_mean_requires_float]
+message = "the mean along an axis needs a floating-point element"
+help = "convert the tensor to a floating-point element type first, or use sum"
+
+[diagnostics.SEM010.issues.axis_reduction_not_constant]
+message = "the axis of a reduction must be a compile-time constant"
+help = "write a literal axis such as `axis 1`; the result shape depends on it"
+
+[diagnostics.SEM010.issues.axis_reduction_out_of_range]
+message = "the axis is outside the rank of the tensor"
+help = "use an axis from 0 up to one less than the rank"
+
+[diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
+message = "an axis reduction is built for rank-2 tensors only"
+help = "reduce a rank-2 tensor, or write the explicit reduction with `pro`"
+
 [diagnostics.SEM057.issues.axis_marker_required]
 message = "this argument is an `axis` argument and must be written with the `axis` marker"
 help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
@@ -3162,6 +3178,14 @@ help = "รักษาเซตย่อย AIR v1 ให้บริสุท�
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: `tacet` อยู่นอกเซตย่อย AIR v1"
 help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM065]
+message = "`{name}` จะแชร์ `{binding}` ซึ่งเป็นค่าแบบอ่านอย่างเดียว เป็นชื่อที่เขียนได้ (`{fixum}` ลึก)"
+help = "เขียน `{varia} {name} ← {copy} {binding}` เพื่อได้ค่าอิสระ หรือ `{varia} {name} ← {own} {binding}` เพื่อรับช่วงต่อ"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` จะแชร์ `{binding}` ซึ่งเป็นค่าแบบอ่านอย่างเดียว เป็นชื่อที่เขียนได้ (`{fixum}` ลึก)"
+help = "เขียน `{varia} {name} ← {copy} {binding}` เพื่อได้ค่าอิสระ หรือ `{varia} {name} ← {own} {binding}` เพื่อรับช่วงต่อ"
 
 [diagnostics.WARN001]
 message = "ตัวแปรไม่ได้ใช้"

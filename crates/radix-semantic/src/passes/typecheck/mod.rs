@@ -93,6 +93,9 @@ mod at_read_test;
 #[path = "cfa_join_test.rs"]
 mod cfa_join_test;
 pub mod collect;
+#[cfg(test)]
+#[path = "const_share_into_var_test.rs"]
+mod const_share_into_var_test;
 mod contract_bound;
 #[cfg(test)]
 #[path = "contract_bound_test.rs"]
@@ -125,6 +128,9 @@ mod non_null_mutating_receiver_test;
 #[cfg(test)]
 #[path = "nondum_function_test.rs"]
 mod nondum_function_test;
+#[cfg(test)]
+#[path = "optional_element_get_test.rs"]
+mod optional_element_get_test;
 #[cfg(test)]
 #[path = "ponde_failable_test.rs"]
 mod ponde_failable_test;
@@ -447,6 +453,11 @@ pub(crate) struct TypeChecker<'a> {
     pub(crate) current_function_def: Option<DefId>,
     /// HIR identity of the call currently checking its argument contracts.
     pub(crate) current_shape_call: Option<HirId>,
+    /// Receiver the numeric-twin probe already checked. Checking is not
+    /// idempotent (an intrinsic call rewrites its method symbol to the
+    /// canonical spelling), so the next check of that expression adopts this
+    /// type instead of checking the receiver a second time.
+    pub(crate) twin_probed_receiver: Option<(HirId, TypeId)>,
     /// Returned expression whose runtime shape is checked against the result contract.
     pub(crate) current_shape_return_expr: Option<HirId>,
     /// Zero-based value-argument ordinal currently being checked.
@@ -484,6 +495,9 @@ pub(crate) struct TypeChecker<'a> {
     /// assignment, or effect-hoisted block), handed to the presentation
     /// sidecar when the check finishes.
     numeric_twin_ids: Vec<HirId>,
+    /// Result type of each `t.sum(axis n)` expansion, read as the expected
+    /// bucket shape when the synthesized reduction node is checked.
+    axis_reduction_results: FxHashMap<HirId, TypeId>,
     /// Node ids of `empty` literals rewritten into the typed zero, handed to
     /// the presentation sidecar when the check finishes.
     pub(super) empty_dense_ids: Vec<HirId>,
@@ -849,6 +863,7 @@ impl<'a> TypeChecker<'a> {
             loop_iterated: Vec::new(),
             current_function_def: None,
             current_shape_call: None,
+            twin_probed_receiver: None,
             current_shape_return_expr: None,
             current_shape_argument: None,
             current_shape_fields: Vec::new(),
@@ -862,6 +877,7 @@ impl<'a> TypeChecker<'a> {
             compile_time_locals: FxHashSet::default(),
             static_size_values: FxHashMap::default(),
             numeric_twin_ids: Vec::new(),
+            axis_reduction_results: FxHashMap::default(),
             empty_dense_ids: Vec::new(),
             inferred_constructor_ids: Vec::new(),
             alias_type_params: FxHashMap::default(),
@@ -1144,6 +1160,10 @@ mod lista_operator_test;
 mod convert_test;
 
 #[cfg(test)]
+#[path = "ascription_optional_slot_test.rs"]
+mod ascription_optional_slot_test;
+
+#[cfg(test)]
 #[path = "element_relaxation_test.rs"]
 mod element_relaxation_test;
 
@@ -1276,6 +1296,12 @@ mod namespace_shadow_test;
 mod conditional_narrowing_test;
 
 #[cfg(test)]
+#[path = "compound_guard_narrowing_test.rs"]
+mod compound_guard_narrowing_test;
+#[cfg(test)]
+#[path = "diverging_guard_narrowing_test.rs"]
+mod diverging_guard_narrowing_test;
+#[cfg(test)]
 #[path = "member_privacy_test.rs"]
 mod member_privacy_test;
 #[cfg(test)]
@@ -1310,6 +1336,10 @@ mod bounded_string_conversio_test;
 #[cfg(test)]
 #[path = "bits_conversio_test.rs"]
 mod bits_conversio_test;
+
+#[cfg(test)]
+#[path = "rounding_conversio_test.rs"]
+mod rounding_conversio_test;
 
 #[cfg(test)]
 #[path = "bits_operator_test.rs"]
@@ -1352,8 +1382,16 @@ mod ordina_key_test;
 mod scalar_longitudo_test;
 
 #[cfg(test)]
+#[path = "chained_intrinsic_receiver_test.rs"]
+mod chained_intrinsic_receiver_test;
+
+#[cfg(test)]
 #[path = "scalar_unknown_method_test.rs"]
 mod scalar_unknown_method_test;
+
+#[cfg(test)]
+#[path = "builtin_unknown_method_test.rs"]
+mod builtin_unknown_method_test;
 
 #[cfg(test)]
 #[path = "scalar_order_test.rs"]

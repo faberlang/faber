@@ -1,0 +1,32 @@
++++
+term = "↦"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Rejected route: a bare float or decimal to integer conversion has no rounding choice."
+syntax = "<float|d64> ↦ <integer> — rejected without via Floor|Ceil|HalfEven|Trunc"
+related = ["↦", "via"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM016:float_to_integer_requires_rounding"
+ruling = "ea7cfde1"
++++
+# =============================================================================
+# float to integer — rejected without a rounding choice
+# =============================================================================
+#
+# What this teaches:
+#   • A bare `float ↦ int` is a compile error: the checker refuses it with one
+#     named diagnostic (SEM016 float_to_integer_requires_rounding, need).
+#   • Say the rounding: `via Floor`, `via Ceil`, `via HalfEven` or `via Trunc`.
+#
+# Common mistakes:
+#   • expecting `↦` to truncate — there is no default rounding.
+# =============================================================================
+
+main {
+    const float a ← 2.5
+    const int n ← a ↦ int
+    print n
+}

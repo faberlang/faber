@@ -2235,6 +2235,7 @@ fn eot_selective_test_interface() -> crate::file_interface::FileInterface {
             ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
             mode: SemanticParamMode::Ref,
             optional: false,
+            sponte: false,
         }],
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
         err: None,
@@ -2310,6 +2311,68 @@ incipit { tacet }"#,
         "selective type import must bind the type: {:?}",
         result.diagnostics
     );
+}
+
+/// Need: the imported snapshot carries `sponte` apart from `optional`.
+fn imported_omittable_param_interface(sponte: bool) -> crate::file_interface::FileInterface {
+    use crate::file_interface::{
+        FileExport, FileExportKind, InterfaceCallable, InterfaceParam, InterfaceTypeSnapshot,
+    };
+    use crate::{Primitive, SemanticParamMode};
+
+    let mut interface = crate::file_interface::FileInterface::new();
+    interface.insert(FileExport {
+        name: "prende".to_owned(),
+        kind: FileExportKind::Function(InterfaceCallable {
+            type_params: Vec::new(),
+            params: vec![InterfaceParam {
+                ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                mode: SemanticParamMode::Owned,
+                optional: true,
+                sponte,
+            }],
+            ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
+            err: None,
+            is_async: false,
+            is_generator: false,
+            tensor_edge_policy_requirements: Vec::new(),
+            device: None,
+        }),
+    });
+    interface
+}
+
+fn analyze_optional_argument_into_imported_param(sponte: bool) -> test_support::AnalyzedFixture {
+    test_support::analyze_source_with_import_contract(
+        r#"importa ex "norma:consolum" fixum prende
+functio g(numerus ∪ nihil x) { prende(x) }
+incipit { tacet }"#,
+        std::collections::BTreeMap::new(),
+        std::collections::BTreeMap::from([(
+            "norma:consolum".to_owned(),
+            imported_omittable_param_interface(sponte),
+        )]),
+    )
+}
+
+#[test]
+fn optional_argument_into_imported_defaulted_non_sponte_param_is_sem010() {
+    let result = analyze_optional_argument_into_imported_param(false);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|err| err.is_error()
+                && test_support::issue(err) == Some("optional_into_plain_cell")),
+        "expected optional_into_plain_cell, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn optional_argument_into_imported_sponte_param_is_accepted() {
+    let result = analyze_optional_argument_into_imported_param(true);
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
 #[test]
@@ -2591,6 +2654,55 @@ fn inferred_constructor_against_union_of_several_types_is_named_error() {
     test_support::assert_rejects_with_issue(
         "genus P { varia numerus x = 0 } incipit { fixum P ∪ textus p ← _ { x = 1 } }",
         "inferred_constructor_ambiguous_union",
+    );
+}
+
+#[test]
+fn inferred_bracket_literal_builds_expected_tuple_in_binding_return_and_argument() {
+    test_support::assert_accepts(
+        "
+functio f() → iuncta<numerus, textus> { redde _ [1, \"a\"] }
+functio g(iuncta<numerus, textus> t) → numerus { redde t[0] }
+incipit {
+    fixum iuncta<numerus, textus> t ← _ [1, \"a\"]
+    fixum iuncta<numerus, numerus> v ← [5, 6]
+    fixum lista<numerus> xs ← _ [1, 2]
+    nota g(_ [3, \"c\"])
+    nota g([4, \"d\"])
+}
+",
+    );
+}
+
+#[test]
+fn inferred_bracket_literal_without_expected_type_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "incipit { nota _ [1, 2] }",
+        "inferred_constructor_no_expected_type",
+    );
+}
+
+#[test]
+fn inferred_bracket_literal_with_wrong_tuple_arity_is_named_error() {
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum iuncta<numerus, numerus> t ← _ [1, 2, 3] }",
+        "iuncta_construction_arity_mismatch",
+    );
+}
+
+#[test]
+fn bare_field_literal_takes_the_class_cell_type() {
+    test_support::assert_accepts(
+        "
+genus P { varia numerus x = 0 varia numerus y = 0 }
+functio f() → P { redde { x = 1, y = 2 } }
+functio g(P p) → numerus { redde p.x }
+incipit {
+    fixum P p ← { x = 1 }
+    nota g({ x = 2, y = 3 })
+    nota f().y
+}
+",
     );
 }
 

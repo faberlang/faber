@@ -557,3 +557,260 @@ incipit {
 }",
     );
 }
+
+// --- Size parameters of a generic class instantiate at the receiver ---
+
+#[test]
+fn applied_class_method_return_type_instantiates_size_param() {
+    // `Box<3>.mensura()` returns `vector<f32, 3>`: the class's `N` is the
+    // receiver's size argument, not a rigid parameter.
+    accepts(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+
+    functio mensura() → vector<f32, N> {
+        redde ego.minima
+    }
+}
+
+functio a(Capsa<3> b) → vector<f32, 3> {
+    redde b.mensura()
+}",
+    );
+}
+
+#[test]
+fn applied_class_method_parameter_type_instantiates_size_param() {
+    accepts(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+
+    functio muta(vector<f32, N> offset) → vector<f32, N> {
+        redde offset
+    }
+}
+
+functio a(Capsa<3> b, vector<f32, 3> o) → vector<f32, 3> {
+    redde b.muta(o)
+}",
+    );
+}
+
+#[test]
+fn applied_class_method_parameter_rejects_foreign_width() {
+    rejects_with_issue(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+
+    functio muta(vector<f32, N> offset) → vector<f32, N> {
+        redde offset
+    }
+}
+
+functio a(Capsa<3> b, vector<f32, 2> o) → vector<f32, 3> {
+    redde b.muta(o)
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn applied_class_method_return_rejects_foreign_width() {
+    rejects_with_issue(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+
+    functio mensura() → vector<f32, N> {
+        redde ego.minima
+    }
+}
+
+functio a(Capsa<3> b) → vector<f32, 2> {
+    redde b.mensura()
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn applied_class_field_type_instantiates_size_param() {
+    accepts(
+        r"genus Capsa<magnitudo N> {
+    varia vector<f32, N> minima
+}
+
+functio a(Capsa<3> b) → vector<f32, 3> {
+    redde b.minima
+}",
+    );
+}
+
+// --- Type parameters of a generic class instantiate at the receiver ---
+
+#[test]
+fn applied_class_method_return_type_instantiates_type_param() {
+    accepts(
+        r"genus Cista<T> {
+    varia T res
+
+    functio accipe() → T {
+        redde ego.res
+    }
+}
+
+functio a(Cista<numerus> b) → numerus {
+    redde b.accipe()
+}",
+    );
+}
+
+#[test]
+fn applied_class_method_return_rejects_foreign_type() {
+    rejects_with_issue(
+        r"genus Cista<T> {
+    varia T res
+
+    functio accipe() → T {
+        redde ego.res
+    }
+}
+
+functio a(Cista<numerus> b) → textus {
+    redde b.accipe()
+}",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn applied_class_method_argument_type_is_checked() {
+    rejects_with_issue(
+        r#"genus Cista<T> {
+    varia T res
+
+    functio idem(T v) → T {
+        redde v
+    }
+}
+
+functio a(Cista<numerus> b) → textus {
+    redde b.idem("x")
+}"#,
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn applied_class_method_argument_of_the_instantiated_type_checks() {
+    accepts(
+        r"genus Cista<T> {
+    varia T res
+
+    functio idem(T v) → T {
+        redde v
+    }
+}
+
+functio a(Cista<numerus> b) → numerus {
+    redde b.idem(1)
+}",
+    );
+}
+
+#[test]
+fn applied_nested_generic_class_method_instantiates() {
+    accepts(
+        r"genus Cista<T> {
+    varia T res
+
+    functio accipe() → T {
+        redde ego.res
+    }
+}
+
+functio a(Cista<Cista<numerus>> b) → Cista<numerus> {
+    redde b.accipe()
+}",
+    );
+    rejects_with_issue(
+        r"genus Cista<T> {
+    varia T res
+
+    functio accipe() → T {
+        redde ego.res
+    }
+}
+
+functio a(Cista<Cista<numerus>> b) → numerus {
+    redde b.accipe()
+}",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn applied_two_parameter_class_method_instantiates_each() {
+    accepts(
+        r"genus Par<K, V> {
+    varia K clavis
+    varia V valor
+
+    functio accipeValor() → V {
+        redde ego.valor
+    }
+}
+
+functio a(Par<textus, numerus> p) → numerus {
+    redde p.accipeValor()
+}",
+    );
+    rejects_with_issue(
+        r"genus Par<K, V> {
+    varia K clavis
+    varia V valor
+
+    functio accipeValor() → V {
+        redde ego.valor
+    }
+}
+
+functio a(Par<textus, numerus> p) → textus {
+    redde p.accipeValor()
+}",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn applied_class_method_without_type_param_is_unchanged() {
+    accepts(
+        r"genus Cista<T> {
+    varia T res
+
+    functio numerare() → numerus {
+        redde 1
+    }
+}
+
+functio a(Cista<textus> b) → numerus {
+    redde b.numerare()
+}",
+    );
+}
+
+#[test]
+fn applied_class_method_call_through_ego_checks() {
+    accepts(
+        r"genus Cista<T> {
+    varia T res
+
+    functio accipe() → T {
+        redde ego.res
+    }
+
+    functio itera() → T {
+        redde ego.accipe()
+    }
+}",
+    );
+}

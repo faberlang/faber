@@ -1,0 +1,19 @@
++++
+locale = "en"
+term = "mean-sugar"
+kind = "concept"
+category = "collection"
+grammar = ["reducta_expr"]
+canonical = true
++++
+
+main {
+    const list<f32> flat ← [3.0, 1.0, 3.0, 2.0]
+    const tf32[4] a ← flat ↦ tf32[4]
+    const f32 viaSum ← (reduce via sum from a) / 4.0
+    print a.mean()
+    print viaSum
+    const list<f32> emptyData ← []
+    const tf32[0] e ← emptyData ↦ tf32[0]
+    print e.mean()
+}

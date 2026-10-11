@@ -232,6 +232,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 if self.is_live_local_path(target) {
                     self.error(ISSUE_REASSIGN, expr.span);

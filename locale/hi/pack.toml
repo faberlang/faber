@@ -219,18 +219,6 @@ scrinium = "फ़्रेम"
 meus = "भेजना"
 tuus = "पाना"
 
-[diagnostics.UNRES001]
-message = "कीवर्ड '{keyword}' reader locale '{pack}' के लिए घोषित नहीं है"
-help = "इस व्याकरण स्थिति के लिए reader pack में घोषित कीवर्ड वर्तनी का उपयोग करें"
-
-[diagnostics.UNRES002]
-message = "इंट्रिंसिक '{intrinsic}' reader locale '{pack}' के लिए receiver family '{receiver}' पर घोषित नहीं है"
-help = "इस receiver family के लिए reader pack में घोषित इंट्रिंसिक वर्तनी का उपयोग करें"
-
-[diagnostics.UNRES003]
-message = "लाइब्रेरी सदस्य '{member}' identity '{identity}' के लिए reader locale '{pack}' में घोषित नहीं है"
-help = "इस लाइब्रेरी identity के लिए reader pack में घोषित सदस्य वर्तनी का उपयोग करें"
-
 [diagnostics.LOCALE002]
 message = "रीडर locale '{pack}' को keyword जैसी spelling '{spelling}' मिली"
 help = "यदि आप उस कीवर्ड का मतलब रखते हैं तो '{suggestion}' का उपयोग करें; '{spelling}' वैसा ही एक वैध नाम है"
@@ -638,6 +626,10 @@ help = "निकटतम पूर्णांक के लिए `⌊x⌉` �
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` एक retired operator है; `≡` का निषेध `{replacement}` लिखा जाता है"
 help = "`{glyph}` की जगह `{replacement}` लिखें; हर निषेध चिह्न में उतनी ही रेखाएँ होती हैं जितनी उस चिह्न में जिसे वह उलटता है (`≡`/`≢`, `≅`/`≇`, `≈`/`≉`)"
+
+[diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
+message = "sort या reduce expression को loop का स्रोत नहीं बनाया जा सकता"
+help = "पहले उसे किसी नाम से बाँधें, फिर उसी नाम पर loop चलाएँ: `const list<int> ys ← sort via asc from xs`, फिर `for from ys const x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "conversio recovery के लिए ⊥ उपयोग करें"
@@ -2529,11 +2521,15 @@ help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Co
 
 [diagnostics.SEM016.issues.conversio_via_unknown_hint]
 message = "`{hint}` is not a convert hint"
-help = "use one of Hex, Bin, Oct, Be, Le, or Code after via"
+help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEven and Trunc belong only to a float or decimal converted to an integer"
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
 help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+
+[diagnostics.SEM016.issues.float_to_integer_requires_rounding]
+message = "a float or decimal does not convert to an integer without naming the rounding"
+help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
@@ -2963,6 +2959,26 @@ help = "use the same access marker at the call as in the signature"
 message = "a read-only parameter takes no `{found}` marker"
 help = "remove the marker, or write `ref`, which is the explicit spelling of the default"
 
+[diagnostics.SEM010.issues.axis_reduction_extent_unknown]
+message = "the mean needs a compile-time extent on the axis it removes"
+help = "give the axis a literal extent, or write the grouped reduction and divide by the run-time count"
+
+[diagnostics.SEM010.issues.axis_reduction_mean_requires_float]
+message = "the mean along an axis needs a floating-point element"
+help = "convert the tensor to a floating-point element type first, or use sum"
+
+[diagnostics.SEM010.issues.axis_reduction_not_constant]
+message = "the axis of a reduction must be a compile-time constant"
+help = "write a literal axis such as `axis 1`; the result shape depends on it"
+
+[diagnostics.SEM010.issues.axis_reduction_out_of_range]
+message = "the axis is outside the rank of the tensor"
+help = "use an axis from 0 up to one less than the rank"
+
+[diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
+message = "an axis reduction is built for rank-2 tensors only"
+help = "reduce a rank-2 tensor, or write the explicit reduction with `pro`"
+
 [diagnostics.SEM057.issues.axis_marker_required]
 message = "this argument is an `axis` argument and must be written with the `axis` marker"
 help = "write the marker at the call as the signature declares it, for example `f(axis 1)`"
@@ -3162,6 +3178,14 @@ help = "v1 AIR subset को pure रखें: immutable locals, pure expressio
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `tacet` v1 AIR subset के बाहर है"
 help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM065]
+message = "`{name}` केवल-पठन मान `{binding}` को लिखने योग्य नाम के रूप में साझा करेगा (`{fixum}` गहरा है)"
+help = "स्वतंत्र मान के लिए `{varia} {name} ← {copy} {binding}` लिखें, या उसे अपने अधीन लेने के लिए `{varia} {name} ← {own} {binding}`"
+
+[diagnostics.SEM065.issues.const_shared_into_var]
+message = "`{name}` केवल-पठन मान `{binding}` को लिखने योग्य नाम के रूप में साझा करेगा (`{fixum}` गहरा है)"
+help = "स्वतंत्र मान के लिए `{varia} {name} ← {copy} {binding}` लिखें, या उसे अपने अधीन लेने के लिए `{varia} {name} ← {own} {binding}`"
 
 [diagnostics.WARN001]
 message = "अप्रयुक्त variable"

@@ -36,17 +36,16 @@ impl FunctionBuilder<'_> {
         kind: HirRangeKind,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        if step.is_some() {
-            self.errors.push(MirError::unsupported(
-                expr.span,
-                "stepped interval value before interval MIR lowering",
-            ));
-            return None;
-        }
-        let fields = vec![
+        // A step is a positive stride over a window (`xs[a‥b per n]`): it rides
+        // as an optional third operand, checked positive where the window is
+        // read.
+        let mut fields = vec![
             MirAggregateItem::Operand(self.lower_expr_value(start)?),
             MirAggregateItem::Operand(self.lower_expr_value(end)?),
         ];
+        if let Some(step) = step {
+            fields.push(MirAggregateItem::Operand(self.lower_expr_value(step)?));
+        }
         let ty = self.expr_ty(expr)?;
         Some(self.construct_temp(
             MirAggregateKind::Interval { inclusive: matches!(kind, HirRangeKind::Inclusive) },
@@ -287,39 +286,23 @@ impl FunctionBuilder<'_> {
         entries: Option<&Vec<HirObjectField>>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        // An explicitly parameterised constructor (`Cista<int> { … }`) carries
+        // the applied type as the cast target: construct the struct at that
+        // applied type, as the inferred form does.
+        let applied_struct = match self.types.get(target) {
+            Type::Applied(base, _) => match self.types.get(*base) {
+                Type::Struct(def_id) => Some(*def_id),
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(def_id) = applied_struct {
+            return self.lower_verte_struct(def_id, target, entries, expr);
+        }
         match self.types.get(target) {
             Type::Struct(def_id) => {
-                let Some(entries) = entries else {
-                    self.errors.push(MirError::unsupported(
-                        expr.span,
-                        "struct construction without object entries before aggregate MIR lowering",
-                    ));
-                    return None;
-                };
-                let fields = self.lower_struct_object_fields(*def_id, entries, expr.span)?;
-                // A generic struct written bare (`Box { … }`) carries the
-                // written raw head in `target`; the checker's contextual
-                // instantiation records the applied type (`Box<N>`) on the
-                // expression. Construct at the applied type so generic-
-                // template instantiation can specialize the temp.
-                let ty = self
-                    .expr_ty(expr)
-                    .filter(|ty| match self.types.get(ty.semantic_id()) {
-                        Type::Applied(base, _) => matches!(
-                            self.types.get(*base),
-                            Type::Struct(expr_def) if expr_def == def_id
-                        ),
-                        _ => false,
-                    })
-                    .unwrap_or(MirType::semantic(target));
-                let constructed = self.construct_temp(
-                    MirAggregateKind::Struct(*def_id),
-                    MirAggregateFields::Named(fields),
-                    ty,
-                    expr.span,
-                );
-                self.call_creo_hook(*def_id, &constructed, expr.span);
-                Some(constructed)
+                let def_id = *def_id;
+                self.lower_verte_struct(def_id, target, entries, expr)
             }
             Type::Record(_) => {
                 let Some(entries) = entries else {
@@ -334,14 +317,24 @@ impl FunctionBuilder<'_> {
                 Some(self.construct_temp(MirAggregateKind::Record, MirAggregateFields::Named(fields), ty, expr.span))
             }
             Type::Map(_, _) => {
-                let Some(entries) = entries else {
-                    self.errors.push(MirError::unsupported(
-                        expr.span,
-                        "map construction without object entries before aggregate MIR lowering",
-                    ));
-                    return None;
+                // A bare `{ "k": v }` literal ascribed with `∷` stays a JSON
+                // valor literal source (it has no object entries); its members
+                // are the key/value pairs of the ascribed map type, exactly as
+                // the declaration form lowers them.
+                let fields = match (entries, &source.kind) {
+                    (Some(entries), _) => self.lower_map_object_fields(entries, expr.span)?,
+                    (
+                        None,
+                        HirExpressionKind::Literal(HirLiteral::JsonValor(crate::syntax::JsonValue::Object(members))),
+                    ) => self.lower_json_map_members(members, expr.span)?,
+                    (None, _) => {
+                        self.errors.push(MirError::unsupported(
+                            expr.span,
+                            "map construction without object entries before aggregate MIR lowering",
+                        ));
+                        return None;
+                    }
                 };
-                let fields = self.lower_map_object_fields(entries, expr.span)?;
                 let ty = MirType::semantic(target);
                 Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(fields), ty, expr.span))
             }
@@ -434,6 +427,48 @@ impl FunctionBuilder<'_> {
                 Some(self.assign_temp(MirValueKind::Operand(operand), ty, expr.span))
             }
         }
+    }
+
+    /// Lower a struct construction whose cast target is the struct (or the
+    /// struct applied to type/size arguments) to a struct aggregate.
+    fn lower_verte_struct(
+        &mut self,
+        def_id: DefId,
+        target: TypeId,
+        entries: Option<&Vec<HirObjectField>>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let Some(entries) = entries else {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "struct construction without object entries before aggregate MIR lowering",
+            ));
+            return None;
+        };
+        let fields = self.lower_struct_object_fields(def_id, entries, expr.span)?;
+        // A generic struct written bare (`Box { … }`) carries the
+        // written raw head in `target`; the checker's contextual
+        // instantiation records the applied type (`Box<N>`) on the
+        // expression. Construct at the applied type so generic-
+        // template instantiation can specialize the temp.
+        let ty = self
+            .expr_ty(expr)
+            .filter(|ty| match self.types.get(ty.semantic_id()) {
+                Type::Applied(base, _) => matches!(
+                    self.types.get(*base),
+                    Type::Struct(expr_def) if *expr_def == def_id
+                ),
+                _ => false,
+            })
+            .unwrap_or(MirType::semantic(target));
+        let constructed = self.construct_temp(
+            MirAggregateKind::Struct(def_id),
+            MirAggregateFields::Named(fields),
+            ty,
+            expr.span,
+        );
+        self.call_creo_hook(def_id, &constructed, expr.span);
+        Some(constructed)
     }
 
     /// The `∷` ascription cast for a `bivalens` source into a `numerus`

@@ -136,6 +136,24 @@ impl super::FaberCodegen<'_> {
         }
     }
 
+    /// Write the ` via HINT` clause of a `↤` conversion-directed assignment.
+    ///
+    /// The clause sits after the source and before the `⊥` default, the same
+    /// single-hint slot a `↦ T via HINT` conversion prints.
+    pub(super) fn write_conversio_assign_via(
+        &self,
+        params: &[Symbol],
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        if let Some(hint) = params.first() {
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Via));
+            writer.write(" ");
+            writer.write(&self.symbol_to_string(*hint));
+        }
+    }
+
     /// Write an expression with enough parentheses to survive a Faber reparse.
     ///
     /// The `parent_prec` contract is shared with `expr_precedence` in `ops.rs`.
@@ -270,10 +288,23 @@ impl super::FaberCodegen<'_> {
                     writer.write(")");
                 }
             }
-            HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
+            HirExpressionKind::MethodCall(receiver, name, type_args, args, _)
                 if type_args.is_empty()
                     && args.is_empty()
-                    && self.glyph_transpose_ids.contains(&expr.id) =>
+                    && self.glyph_ids.contains(&expr.id)
+                    && self.rounding_delimiters(*name, surface).is_some() =>
+            {
+                // Authored `⌊x⌋` / `⌈x⌉` / `⌊x⌉`: lowering recorded the node
+                // id, typecheck rewrote the marker to the rounding twin and
+                // kept the id; the delimiters are the authored surface.
+                if let Some((open, close)) = self.rounding_delimiters(*name, surface) {
+                    writer.write(open);
+                    self.write_expr(receiver, names, surface, writer);
+                    writer.write(close);
+                }
+            }
+            HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
+                if type_args.is_empty() && args.is_empty() && self.glyph_ids.contains(&expr.id) =>
             {
                 // Authored `xᵀ`: typecheck rewrote the glyph marker to the
                 // transpose intrinsic and kept the node id; a compound
@@ -785,6 +816,7 @@ impl super::FaberCodegen<'_> {
                 target,
                 source,
                 recovery,
+                params,
             } => {
                 // Conversion-directed assignment: re-emit the exact `↤`
                 // spelling (never `←` or `↦`). The `⊥` default is
@@ -794,6 +826,7 @@ impl super::FaberCodegen<'_> {
                 self.write_expr_prec(target, 1, names, surface, writer);
                 writer.write(" ↤ ");
                 self.write_expr_prec(source, 1, names, surface, writer);
+                self.write_conversio_assign_via(params, surface, writer);
                 if let Some(recovery) = recovery {
                     writer.write(" ⊥ ");
                     self.write_expr_prec(recovery, 12, names, surface, writer);
@@ -2050,14 +2083,24 @@ impl super::FaberCodegen<'_> {
         let HirExpressionKind::MethodCall(receiver, name, type_args, args, _) = &expr.kind else {
             return None;
         };
-        if !type_args.is_empty() || !args.is_empty() || self.glyph_transpose_ids.contains(&expr.id)
-        {
+        if !type_args.is_empty() || !args.is_empty() || self.glyph_ids.contains(&expr.id) {
             return None;
         }
         if self.expr_precedence(receiver) > 13 {
             return None;
         }
-        let spelling = self.symbol_to_string(*name);
+        let (open, close) = self.rounding_delimiters(*name, surface)?;
+        Some((&**receiver, open, close))
+    }
+
+    /// The glyph delimiters of a rounding twin (`pavimentum` floor, `tectum`
+    /// ceiling, `rotunda` nearest), matched by canonical or localized name.
+    fn rounding_delimiters(
+        &self,
+        name: Symbol,
+        surface: &impl KeywordSurface,
+    ) -> Option<(&'static str, &'static str)> {
+        let spelling = self.symbol_to_string(name);
         let delimiters = [
             ("pavimentum", "⌊", "⌋"),
             ("tectum", "⌈", "⌉"),
@@ -2065,11 +2108,8 @@ impl super::FaberCodegen<'_> {
         ];
         delimiters.into_iter().find_map(|(canonical, open, close)| {
             let localized = surface.intrinsic_surface(canonical);
-            (spelling == canonical || localized.as_deref() == Some(spelling.as_str())).then_some((
-                &**receiver,
-                open,
-                close,
-            ))
+            (spelling == canonical || localized.as_deref() == Some(spelling.as_str()))
+                .then_some((open, close))
         })
     }
 

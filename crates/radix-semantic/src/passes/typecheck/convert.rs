@@ -72,6 +72,10 @@ const ISSUE_TENSOR_TO_OCTETI_ELEMENT_UNSUPPORTED: &str = "tensor_to_octeti_eleme
 // instead of a generic mismatch.
 const ISSUE_DECIMAL_RADIX_HINT_REJECTED: &str = "decimal_radix_hint_rejected";
 const ISSUE_DECIMAL_ENDIAN_HINT_REJECTED: &str = "decimal_endianness_hint_rejected";
+// Need: a float or decimal does not become an integer bare; the
+// rounding is named (`via Floor|Ceil|HalfEven|Trunc`).
+const ISSUE_FLOAT_TO_INTEGER_REQUIRES_ROUNDING: &str = "float_to_integer_requires_rounding";
+const ISSUE_CONVERSIO_VIA_UNKNOWN_HINT: &str = "conversio_via_unknown_hint";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_LISTA_TO_TEXTUS_UNSUPPORTED: &str = "lista_to_textus_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
@@ -448,13 +452,21 @@ fn integer_width_range(width: NumericWidth) -> Option<(i128, i128)> {
     }
 }
 
-/// Whether a float's truncation toward zero lies in `lo..=hi`, decided in the
-/// exact `i128` domain: `hi as f64` rounds up for the 64-bit widths (2^63,
+/// Whether a float rounded by the `via` mode lies in `lo..=hi`, decided in
+/// the exact `i128` domain: `hi as f64` rounds up for the 64-bit widths (2^63,
 /// 2^64), so comparing in float space would accept the first float past them.
 /// NaN and infinities never fit. `f64 -> i128` saturates beyond 2^127, far
 /// outside every integer width, so a huge magnitude still compares correctly.
-fn float_truncation_fits(value: f64, (lo, hi): (i128, i128)) -> bool {
-    value.is_finite() && (lo..=hi).contains(&(value.trunc() as i128))
+/// `mode` is the named rounding (`Floor`, `Ceil`, `HalfEven`, `Trunc`); no
+/// hint rounds toward zero, as the runner does.
+fn float_rounding_fits(value: f64, mode: Option<&str>, (lo, hi): (i128, i128)) -> bool {
+    let rounded = match mode {
+        Some("Floor") => value.floor(),
+        Some("Ceil") => value.ceil(),
+        Some("HalfEven") => value.round_ties_even(),
+        _ => value.trunc(),
+    };
+    rounded.is_finite() && (lo..=hi).contains(&(rounded as i128))
 }
 
 /// Whether a float width can hold the value after rounding. `f16`/`bf16` have
@@ -611,6 +623,15 @@ impl TypeChecker<'_> {
         if !self.check_float_conversion_constant(source, target_resolved, span) {
             return self.error_type;
         }
+        // Need: float/decimal into an integer family names its
+        // rounding; a rounding hint on any other pairing is an unknown hint.
+        let rounded = match self.check_rounding_conversio(source_ty, target_resolved, params, span)
+        {
+            Ok(rounded) => rounded,
+            // The refusal is reported; the declared target keeps the
+            // surrounding expression typed instead of cascading mismatches.
+            Err(()) => return target_resolved,
+        };
         // decimal-widths D2 (wildcard audit): any conversio `via` hint aimed
         // at a decimal numerus target rejects here — radix text parse, endian
         // and unpack are integer-family only.
@@ -663,12 +684,20 @@ impl TypeChecker<'_> {
         // target's policy (reduce mod 2^W / clamp) and cannot fail: no `⊥`
         // recovery, no failure channel.
         if self.is_policy_word(target_resolved) {
-            if !self.is_policy_word_conversio_source(source_ty) {
+            if !rounded && !self.is_policy_word_conversio_source(source_ty) {
                 self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
                 return self.error_type;
             }
             if recovery.is_some() {
                 self.invalid_conversion(ISSUE_WORD_CONVERSIO_RECOVERY_UNSUPPORTED, span);
+            } else if self.float_word_conversio_can_fail(source, source_ty)
+                && self.current_error.is_some()
+            {
+                // A float into a word fails only at NaN and ±∞ (need
+                // e97acf45): an active channel carries the text payload like
+                // any other failable numeric `↦`, so a direct `fac`/`cape`
+                // infers `textus` instead of the `ignotum` escape.
+                self.check_text_failure_channel(source_ty, target_resolved, span);
             }
             return target_resolved;
         }
@@ -999,7 +1028,7 @@ impl TypeChecker<'_> {
             self.note_conversio_recovery_checked(recovery, target_resolved);
         } else {
             self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            if self.numeric_conversio_can_fail(source, source_ty, target_resolved) {
+            if self.numeric_conversio_can_fail(source, source_ty, target_resolved, params) {
                 self.check_text_failure_channel(source_ty, target_resolved, span);
             }
         }
@@ -1773,6 +1802,54 @@ impl TypeChecker<'_> {
         params
             .iter()
             .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
+    }
+
+    /// Need: the rounding rule of `↦`. A float or decimal source into
+    /// an integer-family target (`numerus`, sized integers, `inf`, `wrapping`
+    /// and `saturating` words) needs a `via Floor|Ceil|HalfEven|Trunc` hint;
+    /// the bare conversion is the named `float_to_integer_requires_rounding`
+    /// error. A rounding hint on any other pairing is the unknown-hint error.
+    /// `Ok(true)` means a rounding hint was accepted; the conversion then
+    /// continues down the ordinary (failable) numeric rows.
+    fn check_rounding_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        params: &[Symbol],
+        span: radix_lexer::Span,
+    ) -> Result<bool, ()> {
+        let hint = self.interner.and_then(|interner| {
+            params
+                .iter()
+                .find_map(|param| match interner.resolve(*param) {
+                    "Floor" => Some("Floor"),
+                    "Ceil" => Some("Ceil"),
+                    "HalfEven" => Some("HalfEven"),
+                    "Trunc" => Some("Trunc"),
+                    _ => None,
+                })
+        });
+        let source = self.peel_alias_chain(self.resolve_inferred_type(source_ty));
+        let from_real = matches!(
+            numeric_fact(self.types.get(source)).map(|fact| fact.family),
+            Some(NumericFactFamily::Float { .. } | NumericFactFamily::Decimal)
+        );
+        let to_integer = self.is_integer_conversio_operand(target_resolved);
+        match (from_real && to_integer, hint) {
+            (true, None) => {
+                self.invalid_conversion(ISSUE_FLOAT_TO_INTEGER_REQUIRES_ROUNDING, span);
+                Err(())
+            }
+            (false, Some(hint)) => {
+                self.invalid_conversion_with_args(
+                    ISSUE_CONVERSIO_VIA_UNKNOWN_HINT,
+                    span,
+                    &[("hint", hint)],
+                );
+                Err(())
+            }
+            (rounds, _) => Ok(rounds),
+        }
     }
 
     /// decimal-widths D2 (wildcard audit): named reject for conversio `via`
@@ -2740,6 +2817,16 @@ impl TypeChecker<'_> {
         )
     }
 
+    /// A float source into a policy word can fail at run time (NaN, ±∞)
+    /// unless the source is a finite literal.
+    fn float_word_conversio_can_fail(&self, source: &HirExpression, source_ty: TypeId) -> bool {
+        let source_ty = self.peel_alias_chain(self.resolve_inferred_type(source_ty));
+        matches!(
+            self.types.get(source_ty),
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+        ) && static_float_magnitude(source).is_none_or(|value| !value.is_finite())
+    }
+
     /// Sources of a `wrapping`/`saturating` conversion (ruling 24): integers of
     /// any policy family, and `d64`. Float and other sources are not admitted.
     fn is_policy_word_conversio_source(&self, ty: TypeId) -> bool {
@@ -2944,6 +3031,7 @@ impl TypeChecker<'_> {
         source: &HirExpression,
         source_ty: TypeId,
         target_resolved: TypeId,
+        params: &[Symbol],
     ) -> bool {
         let source_ty = self.peel_alias_chain(self.resolve_inferred_type(source_ty));
         let target_ty = self.peel_alias_chain(target_resolved);
@@ -2981,7 +3069,13 @@ impl TypeChecker<'_> {
                 let Some(value) = static_float_magnitude(source) else {
                     return true;
                 };
-                !target_range.is_some_and(|range| float_truncation_fits(value, range))
+                let mode = self.interner.and_then(|interner| {
+                    params.iter().find_map(|param| {
+                        let name = interner.resolve(*param);
+                        matches!(name, "Floor" | "Ceil" | "HalfEven" | "Trunc").then_some(name)
+                    })
+                });
+                !target_range.is_some_and(|range| float_rounding_fits(value, mode, range))
             }
             NumericFactFamily::Decimal => {
                 // d64 integer parts fit i64.
@@ -3322,8 +3416,30 @@ impl TypeChecker<'_> {
             self.types.get(effective_target),
             Type::Array(_) | Type::BoundedArray { .. }
         );
-        let source_expected =
-            (constructor_source || (empty_list_source && list_target)).then_some(effective_target);
+        // WHY: a list literal ascribed to a list whose slot is optional
+        // (`[null, 1] ∷ list<int ∪ none>`) must be typed against that slot
+        // exactly as a declaration cell types it; without the expected type
+        // the bare literal joins `none` with `int` and fails SEM010.
+        let optional_slot_list_source = list_target
+            && matches!(&source.kind, HirExpressionKind::Array(_))
+            && self.list_slot_carries_optional(effective_target);
+        // WHY: a JSON-object literal ascribed to a map, or listed inside an
+        // ascribed list whose slot is a map, is typed against that map exactly
+        // as a declaration cell types it, so `json_nested_value_requires_valor`
+        // and per-entry value checks apply to both spellings.
+        let json_literal_source = matches!(
+            &source.kind,
+            HirExpressionKind::Literal(HirLiteral::JsonValor(_))
+        ) && matches!(self.types.get(effective_target), Type::Map(..));
+        let map_slot_list_source = list_target
+            && matches!(&source.kind, HirExpressionKind::Array(_))
+            && self.list_slot_carries_map(effective_target);
+        let source_expected = (constructor_source
+            || (empty_list_source && list_target)
+            || optional_slot_list_source
+            || json_literal_source
+            || map_slot_list_source)
+            .then_some(effective_target);
         let source_ty = if matches!(
             self.types.get(effective_target),
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(_, _)
@@ -3559,16 +3675,56 @@ impl TypeChecker<'_> {
         self.types.intern(Type::Applied(base_ty, witnesses))
     }
 
+    /// True when `ty` is a list whose element slot is optional, directly or
+    /// through nested lists (`list<int ∪ none>`, `list<list<int ∪ none>>`).
+    fn list_slot_carries_optional(&self, ty: TypeId) -> bool {
+        match self.types.get(self.resolve_inferred_type(ty)) {
+            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                self.slot_carries_optional(*elem)
+            }
+            _ => false,
+        }
+    }
+
+    /// True when `ty` is a list whose element slot is a map, directly or
+    /// through nested lists (`list<map<string, int>>`).
+    fn list_slot_carries_map(&self, ty: TypeId) -> bool {
+        match self.types.get(self.resolve_inferred_type(ty)) {
+            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                self.slot_carries_map(*elem)
+            }
+            _ => false,
+        }
+    }
+
+    fn slot_carries_map(&self, slot: TypeId) -> bool {
+        let slot = self.resolve_inferred_type(slot);
+        matches!(self.types.get(slot), Type::Map(..)) || self.list_slot_carries_map(slot)
+    }
+
+    fn slot_carries_optional(&self, slot: TypeId) -> bool {
+        let slot = self.resolve_inferred_type(slot);
+        matches!(self.types.get(slot), Type::Option(_)) || self.list_slot_carries_optional(slot)
+    }
+
     fn check_verte_array_target(&mut self, source: &mut HirExpression, elem_ty: TypeId) {
         let HirExpressionKind::Array(elements) = &mut source.kind else {
             self.check_expr(source);
             return;
         };
 
+        let optional_slot = self.slot_carries_optional(elem_ty) || self.slot_carries_map(elem_ty);
         for element in elements {
             match element {
                 HirArrayElement::Expr(expr) => {
-                    let element_ty = self.check_expr(expr);
+                    // WHY: an optional (or nested optional) or map slot types
+                    // its element literals against the slot, as a declaration
+                    // does.
+                    let element_ty = if optional_slot {
+                        self.check_expr_with_expected(expr, Some(elem_ty))
+                    } else {
+                        self.check_expr(expr)
+                    };
                     self.unify_join(
                         element_ty,
                         elem_ty,

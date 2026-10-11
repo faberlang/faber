@@ -1547,6 +1547,10 @@ pub struct AssignExpr {
     /// right-associated chain; the operator and recovery travel through the
     /// syntax tree so no erasure happens before the destination type is known.
     pub recovery: Option<Box<Expr>>,
+    /// `via HINT` rounding/codegen hint, legal only on `↤` and written before
+    /// the `⊥` default (`a ↤ x via Trunc ⊥ 0`). It is the same hint a
+    /// `↦ T via HINT` conversion carries, with `T` the assigned cell's type.
+    pub via: Option<Ident>,
 }
 
 #[derive(Debug, Clone, Copy)]

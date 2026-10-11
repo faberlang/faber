@@ -108,7 +108,9 @@ impl TypeChecker<'_> {
                         self.undefined_member("struct_field_requires_value", span);
                         continue;
                     };
-                    let site = StoreSite::new(HirStoreKind::Field).named(*name);
+                    let site = StoreSite::new(HirStoreKind::Field)
+                        .named(*name)
+                        .optional_slot(field_info.optional);
                     let value_ty = self.check_store_expr(value, field_info.ty, site);
                     self.unify_carrier_assign(
                         value_ty,
@@ -302,6 +304,7 @@ impl TypeChecker<'_> {
                     ty: param.ty,
                     mode: param_mode_from_hir(param.mode),
                     optional: param.optional,
+                    sponte: param.sponte,
                 })
                 .collect(),
             ret: ret_ty,
@@ -421,7 +424,9 @@ impl TypeChecker<'_> {
                 continue;
             };
             supplied.insert(*name);
-            let site = StoreSite::new(HirStoreKind::Field).named(*name);
+            let site = StoreSite::new(HirStoreKind::Field)
+                .named(*name)
+                .optional_slot(field_info.optional);
             let value_ty = self.check_store_expr(value, field_info.ty, site);
             self.unify_assign_issue(
                 value_ty,

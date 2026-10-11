@@ -456,6 +456,7 @@ impl<'a> BorrowChecker<'a> {
                     HirParamMode::Ex => SemanticParamMode::Move,
                 },
                 optional: param.optional,
+                sponte: param.sponte,
             })
             .collect();
         self.func_params.insert(def_id, params);
@@ -2406,6 +2407,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 target,
                 source,
                 recovery,
+                ..
             } => {
                 self.check_lvalue(target);
                 if self.stores_tensor_view(source) {

@@ -226,28 +226,33 @@ fn first_block_body(dump: &str) -> String {
 }
 
 fn unsupported_range_expr(numerus: crate::semantic::TypeId, span: crate::lexer::Span, first_id: u32) -> HirExpression {
+    // An interval clamp with a recovery value is the interval form MIR lowering
+    // still declines (stepped interval values lower since sb314).
+    let literal = |offset: u32, value: u64| HirExpression {
+        id: HirId(first_id + offset),
+        kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
+        ty: Some(numerus),
+        span,
+    };
     HirExpression {
         id: HirId(first_id),
-        kind: HirExpressionKind::Intervallum {
-            start: Box::new(HirExpression {
-                id: HirId(first_id + 1),
-                kind: HirExpressionKind::Literal(HirLiteral::Int(0)),
-                ty: Some(numerus),
-                span,
-            }),
-            end: Box::new(HirExpression {
+        kind: HirExpressionKind::Conversio {
+            source: Box::new(literal(1, 5)),
+            target: crate::hir::HirConversioTarget::Intervallum(Box::new(HirExpression {
                 id: HirId(first_id + 2),
-                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
-                ty: Some(numerus),
-                span,
-            }),
-            step: Some(Box::new(HirExpression {
-                id: HirId(first_id + 3),
-                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+                kind: HirExpressionKind::Intervallum {
+                    start: Box::new(literal(3, 0)),
+                    end: Box::new(literal(4, 1)),
+                    step: None,
+                    kind: HirRangeKind::Exclusive,
+                },
                 ty: Some(numerus),
                 span,
             })),
-            kind: HirRangeKind::Exclusive,
+            params: Vec::new(),
+            recovery: Some(Box::new(literal(5, 0))),
+            route: None,
+            implicit: None,
         },
         ty: Some(numerus),
         span,
@@ -1352,7 +1357,7 @@ fn failed_local_initializer_does_not_bind_local() {
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
         builder.errors[0].issue,
-        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+        "unsupported_mir_lowering_interval_clamp_recovery_before_interval_mir_lowering"
     );
 
     let deferred = HirLocal {
@@ -1401,7 +1406,7 @@ fn failed_top_level_const_initializer_does_not_bind_const() {
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
         builder.errors[0].issue,
-        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+        "unsupported_mir_lowering_interval_clamp_recovery_before_interval_mir_lowering"
     );
 }
 
@@ -1846,7 +1851,7 @@ fn range_itera_stops_when_bounds_fail_to_lower() {
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
         builder.errors[0].issue,
-        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+        "unsupported_mir_lowering_interval_clamp_recovery_before_interval_mir_lowering"
     );
 }
 
@@ -2314,6 +2319,26 @@ functio summaCrateris(MODUS Crater c) → numerus {
         erase_type_ids(&keys_by_value),
         "de tabula key iteration must match by-value twin"
     );
+}
+
+/// Need: iterating a `copia` lowers through a `copia ↦ lista<T>`
+/// snapshot instead of failing closed.
+#[test]
+fn itera_ex_over_copia_lowers_through_a_list_snapshot() {
+    let dump = dump_source(
+        r"functio summa(copia<numerus> elementa) → numerus {
+  varia numerus total ← 0
+  itera ex elementa fixum x {
+    total ← total + x
+  }
+  redde total
+}",
+    );
+    assert!(
+        !dump.contains("itera collection before iterator MIR lowering"),
+        "itera ex over a copia must lower: {dump}"
+    );
+    assert!(dump.contains("convert"), "copia walk reads a list snapshot: {dump}");
 }
 
 /// Erase opaque `ty#N` ids from a dump so twin comparisons ignore the
@@ -3072,6 +3097,7 @@ functio mensura(lista<numerus> f) → numerus ⇥ FormaError {
                 ty: param.ty,
                 mode: crate::semantic::SemanticParamMode::Owned,
                 optional: param.optional,
+                sponte: param.sponte,
             })
             .collect(),
         ret: mensura_function.ret_ty.expect("mensura return type"),
@@ -3897,14 +3923,25 @@ incipit {
 
 #[test]
 fn rejects_unsupported_runtime_method_shapes() {
-    let unit = analyze(r"functio malum(lista<numerus> xs) → numerus { redde xs.praepone(1) }");
-    let errors =
-        lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect_err("unsupported method remains fail-closed");
+    // Need: a method absent from a builtin receiver's registry is
+    // refused at the checker as `unknown_method`, so the call never reaches
+    // MIR lowering. The fail-closed boundary moved from lowering to analysis.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let diagnostics = crate::driver::analyze_source(
+        &session,
+        "test.fab",
+        r"functio malum(lista<numerus> xs) → numerus { redde xs.praepone(1) }",
+        AnalyzeRequest::default(),
+    )
+    .map(|_| ())
+    .expect_err("unsupported method remains fail-closed at analysis");
 
     assert!(
-        errors
+        diagnostics.iter().any(|diag| diag
+            .args
             .iter()
-            .any(|err| err.issue == "unsupported_mir_lowering_method_call_before_runtime_provider_mir_lowering")
+            .any(|arg| arg.name == "issue" && arg.value == "unknown_method")),
+        "expected the named unknown_method error: {diagnostics:?}"
     );
 }
 
@@ -3971,15 +4008,15 @@ functio legebatur(demo.Sample value) → numerus {
 fn lowers_cross_family_scalar_conversion_to_a_runtime_convert() {
     // Cross-family scalar changes (float -> integer, narrowing) are `↦`
     // conversions; `∷` no longer admits them (SEM016). The MIR has to carry
-    // the conversion (`1.9 ↦ numerus`, `300.0 ↦ numerus<i8>`); a pass-through
+    // the conversion (`1.9 ↦ numerus via Trunc`, `300.0 ↦ i8 via Trunc`); a pass-through
     // operand left the runner storing the raw float carrier in a numerus slot
     //. Same-family provable ascriptions stay pass-through and
     // keep no conversion.
     let dump = dump_source(
         r"
 functio ascriptiones() → numerus ⇥ textus {
-  fixum numerus truncatum ← 1.9 ↦ numerus
-  fixum i8 saturatum ← 300.0 ↦ i8
+  fixum numerus truncatum ← 1.9 ↦ numerus via Trunc
+  fixum i8 saturatum ← 300.0 ↦ i8 via Trunc
   fixum i32 idem ← 7 ∷ i32
   redde truncatum
 }",
@@ -4694,7 +4731,7 @@ fn collection_callback_errors_do_not_publish_synthetic_functions() {
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
         builder.errors[0].issue,
-        "unsupported_mir_lowering_stepped_interval_value_before_interval_mir_lowering"
+        "unsupported_mir_lowering_interval_clamp_recovery_before_interval_mir_lowering"
     );
 }
 
@@ -7408,4 +7445,57 @@ functio exemplo() → vacuum {
         dump.contains("function f1 -> ty#") && dump.contains("append"),
         "the synthesized helper performs the append: {dump}"
     );
+}
+
+#[test]
+fn ascribed_json_object_literal_constructs_the_typed_map() {
+    let dump = dump_source(
+        r#"+++
+locale = "en"
++++
+main {
+    const _ a ← {"a": 1} ∷ map<string, int>
+    const _ b ← {"a": null} ∷ map<string, int ∪ none>
+    print a
+    print b
+}
+"#,
+    );
+    assert_eq!(
+        dump.matches("construct map:").count(),
+        2,
+        "each ascribed JSON object literal must build the ascribed map: {dump}"
+    );
+}
+
+#[test]
+fn missing_array_row_is_a_named_lowering_error_not_a_dropped_statement() {
+    // Loop and reduction lowering reach `lista<T>` rows through
+    // `require_array`; a bare `find_array(..)?` returned `None` with no
+    // diagnostic and the enclosing loop vanished from MIR. Lowering
+    // pre-interns the rows source programs need, so the missing row is pinned
+    // at the helper every loop site shares.
+    let types = TypeTable::new();
+    let fractus = types.primitive(Primitive::Fractus);
+    assert!(types.find_array(fractus).is_none(), "the fixture row must start absent");
+    let mut builder = FunctionBuilder::new(&types);
+    assert_eq!(
+        builder.require_array(fractus, Span::default(), "itera cursor element list"),
+        None
+    );
+    assert_eq!(builder.errors.len(), 1, "the miss must push exactly one error");
+    assert_eq!(
+        builder.errors[0].issue,
+        "missing_type_information_for_mir_lowering_itera_cursor_element_list"
+    );
+
+    let mut types = TypeTable::new();
+    let fractus = types.primitive(Primitive::Fractus);
+    let array = types.array(fractus);
+    let mut builder = FunctionBuilder::new(&types);
+    assert_eq!(
+        builder.require_array(fractus, Span::default(), "itera cursor element list"),
+        Some(array)
+    );
+    assert!(builder.errors.is_empty(), "the happy path pushes nothing");
 }

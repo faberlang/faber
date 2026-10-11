@@ -521,6 +521,17 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // in default `faber check` output; the machine identity is asserted via
         // issue() in the same test.
         || rel == "crates/radix-program/src/bounded_param_pkg001_test.rs"
+        // Renderer contract (locale-pack surface): these tests render
+        // diagnostics through an installed pack via `render_diagnostic_text`
+        // and pin the resolved prose (keyword binding substituted for the
+        // Latin spelling, placeholder completeness); the machine identity is
+        // asserted via code/args in the same tests.
+        || rel == "crates/radix-semantic/tests/pack_placeholder_completeness.rs"
+        || rel == "crates/radix-module/src/driver/frontmatter_locale_test.rs"
+        // Renderer contract (CLI output mode): pins the terse plain-mode
+        // line (code header, no message prose) against the `--diagnostics`
+        // expanded rendering of the same diagnostic.
+        || rel == "crates/faber/src/commands/check_test.rs"
         // Renderer contract: `faber explain` / reference-pack resolution pins
         // the template and help text it returns.
         || rel == "crates/faber/src/diagnostic_explain_test.rs"

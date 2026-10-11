@@ -329,3 +329,61 @@ incipit {
         .expect("s[i] ≡ 97 must produce a SEM010 TypeMismatch diagnostic");
     assert_eq!(diag.issue(), Some(EXACT_EQ_ISSUE));
 }
+
+/// A `copy` / `own` binding marker is a binding fact, not part of the value's
+/// type: `≡` / `≢` compare the carrier.
+#[test]
+fn value_marker_bindings_keep_exact_equality_accepting() {
+    let cases: [(&str, &str); 6] = [
+        (
+            "copy_eq",
+            "genus Point { varia numerus x }\nfunctio f(Point a) → bivalens { varia Point d ← copy a\nredde a ≡ d }",
+        ),
+        (
+            "copy_neq_reversed",
+            "genus Point { varia numerus x }\nfunctio f(Point a) → bivalens { varia Point d ← copy a\nredde d ≢ a }",
+        ),
+        (
+            "own_eq",
+            "genus Point { varia numerus x }\nfunctio f(Point a, Point b) → bivalens { varia Point d ← own b\nredde a ≡ d }",
+        ),
+        (
+            "own_neq_reversed",
+            "genus Point { varia numerus x }\nfunctio f(Point a, Point b) → bivalens { varia Point d ← own b\nredde d ≢ a }",
+        ),
+        (
+            "copy_both_sides",
+            "genus Point { varia numerus x }\nfunctio f(Point a) → bivalens { varia Point d ← copy a\nvaria Point e ← copy a\nredde d ≡ e }",
+        ),
+        (
+            "optional_copy_binding",
+            "genus Point { varia numerus x }\nfunctio f(Point ∪ nihil a) → bivalens { varia Point ∪ nihil d ← copy a\nredde a ≡ d }",
+        ),
+    ];
+    for (name, source) in cases {
+        let result = compile(source);
+        assert!(
+            result.is_ok(),
+            "case {name}: marker binding must not reject ≡/≢: {:?}",
+            result.diagnostics
+        );
+    }
+}
+
+#[test]
+fn value_marker_binding_keeps_distinct_type_rejection() {
+    let result = compile(
+        "genus Point { varia numerus x }\ngenus Rect { varia numerus w }\nfunctio f(Point a, Rect r) → bivalens { varia Point d ← copy a\nredde d ≡ r }",
+    );
+    assert!(
+        result.diagnostics.iter().any(|diag| {
+            diag.kind == SemanticErrorKind::TypeMismatch
+                && diag
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == EXACT_EQ_ISSUE)
+        }),
+        "Point ≡ Rect must still reject: {:?}",
+        result.diagnostics
+    );
+}

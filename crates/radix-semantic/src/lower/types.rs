@@ -209,6 +209,7 @@ impl Lowerer<'_> {
                                 None => SemanticParamMode::Owned,
                             },
                             optional: false,
+                            sponte: false,
                         }
                     })
                     .collect();

@@ -27,7 +27,7 @@ fn narrow(int n) → u8 ⇥ string {
 }
 
 fn truncate(float x) → int ⇥ string {
-    return x ↦ int
+    return x ↦ int via Trunc
 }
 
 main {
@@ -51,7 +51,7 @@ main {
         print "caught propagated narrowing"
     }
     do {
-        const int c ← huge ↦ int
+        const int c ← huge ↦ int via Trunc
         print c
     }
     catch err {

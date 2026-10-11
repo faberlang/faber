@@ -75,6 +75,9 @@ mod async_surface;
 mod callable;
 mod collection_higher_order;
 
+#[cfg(test)]
+#[path = "lower/bounded_textus_run_test.rs"]
+mod bounded_textus_run_tests;
 mod context;
 mod control;
 mod conversio_route;
@@ -90,6 +93,9 @@ mod empty_dense_tests;
 #[cfg(test)]
 #[path = "lower/entry_args_test.rs"]
 mod entry_args_tests;
+#[cfg(test)]
+#[path = "lower/explicit_generic_constructor_test.rs"]
+mod explicit_generic_constructor_tests;
 mod expr;
 #[cfg(test)]
 #[path = "lower/first_match_test.rs"]
@@ -3087,7 +3093,7 @@ impl<'a> FunctionBuilder<'a> {
     /// same contract as ordinary assignment — no `↤`-specific exception.
     /// There is no codegen-only rewrite that duplicates any evaluation.
     fn lower_conversio_assign_expr(&mut self, expr: &HirExpression) -> Option<MirOperand> {
-        let HirExpressionKind::ConversioAssign { target, source, recovery } = &expr.kind else {
+        let HirExpressionKind::ConversioAssign { target, source, recovery, .. } = &expr.kind else {
             return self.lower_expr_value(expr);
         };
         let fallback_ty = self.expr_ty(source)?;
@@ -3111,7 +3117,13 @@ impl<'a> FunctionBuilder<'a> {
         span: Span,
         expr: &HirExpression,
     ) -> Option<()> {
-        let converted = self.lower_conversio(source, ty.semantic_id(), &[], recovery, None, expr)?;
+        // `a ↤ x via R`: `expr` is the `↤` node, so the `via` hint travels
+        // exactly as the explicit `x ↦ T via R` conversion's params.
+        let params: &[Symbol] = match &expr.kind {
+            HirExpressionKind::ConversioAssign { params, .. } => params,
+            _ => &[],
+        };
+        let converted = self.lower_conversio(source, ty.semantic_id(), params, recovery, None, expr)?;
         self.assign(destination, converted, ty, span);
         Some(())
     }

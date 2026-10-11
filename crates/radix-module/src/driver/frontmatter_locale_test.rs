@@ -96,6 +96,30 @@ fn compile_rejects_unknown_frontmatter_locale() {
 }
 
 #[test]
+fn locale_unknown_diagnostic_carries_the_locale_id_it_names() {
+    // LOCALE003's pack message is `unknown or invalid reader locale
+    // '{locale_id}'`: every emit site supplies the arg.
+    let config = Config::default().with_target(Target::HirRust);
+    let session = crate::driver::Session::new(config);
+    let source = "+++\nlocale = \"xx\"\n+++\n\nfunctio salve() { }";
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
+
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|d| d.code == Some("LOCALE003"))
+        .expect("LOCALE003 for an unknown frontmatter locale");
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "locale_id")
+            .map(|arg| arg.value.as_str()),
+        Some("xx")
+    );
+}
+
+#[test]
 fn compile_frontmatter_without_locale_falls_back_to_session() {
     let config = Config::default()
         .with_target(Target::HirRust)
@@ -213,4 +237,50 @@ fn compile_rejects_non_string_frontmatter_locale() {
             .iter()
             .any(|d| d.code == Some("LOCALE003"))
     );
+}
+
+/// LOCALE003 emit sites supply `locale_id` where the id is known and an
+/// `issue` row where it is not, so the `en` pack renders every variant
+/// without a missing-placeholder fallback.
+#[test]
+fn locale_unknown_diagnostics_render_through_the_en_pack() {
+    let pack = crate::locale::LocalePack::from_toml_path(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../locale/en/pack.toml"),
+    )
+    .expect("en pack");
+    for (id, issue, expect) in [
+        (
+            "../../etc/passwd",
+            "invalid_id",
+            "'../../etc/passwd' is not a valid locale identifier",
+        ),
+        ("", "invalid_id", "is not a valid locale identifier"),
+        ("zz-nope", "no_root", "'zz-nope' but no language-pack root"),
+    ] {
+        let source = format!("+++\nlocale = \"{id}\"\n+++\n\nfn salve() {{ }}");
+        let mut config = Config::default().with_target(Target::HirRust);
+        if issue == "no_root" {
+            config.locale_root = None;
+        }
+        let session = crate::driver::Session::new(config);
+        let result = compile(&session, "locale.fab", &source, ModuleCompileRequest::default());
+        let diagnostic = result
+            .diagnostics
+            .iter()
+            .find(|d| d.code == Some("LOCALE003"))
+            .unwrap_or_else(|| panic!("no LOCALE003 for {id:?}: {:?}", result.diagnostics));
+        assert!(
+            diagnostic
+                .args
+                .iter()
+                .any(|a| a.name == "locale_id" && a.value == id),
+            "locale_id arg for {id:?}: {:?}",
+            diagnostic.args
+        );
+        let rendered = pack
+            .render_diagnostic_text(diagnostic)
+            .expect("renders without a missing placeholder")
+            .expect("pack row");
+        assert!(rendered.message.contains(expect), "{issue}: {}", rendered.message);
+    }
 }

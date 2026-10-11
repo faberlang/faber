@@ -1174,6 +1174,9 @@ pub enum MapKey {
     Magnus(Magnus),
     Bool(bool),
     Str(String),
+    /// The `none` element of a `set<T ∪ none>` or key of a
+    /// `map<K ∪ none, V>` (reads back as [`Value::Nil`]); a `unit` value keys
+    /// to the same slot, since no collection type holds both.
     Unit,
     /// Composite `iuncta` key (D3.2): hashable when every part is.
     Tuple(Vec<MapKey>),
@@ -1189,7 +1192,7 @@ impl MapKey {
             MapKey::Magnus(v) => Value::Magnus(Rc::new(v.clone())),
             MapKey::Bool(v) => Value::Bool(*v),
             MapKey::Str(v) => Value::Str(v.clone()),
-            MapKey::Unit => Value::Unit,
+            MapKey::Unit => Value::Nil,
             MapKey::Tuple(parts) => Value::Tuple(parts.iter().map(MapKey::to_value).collect()),
         }
     }
@@ -1487,7 +1490,7 @@ impl Value {
             Value::Str(v) => Ok(MapKey::Str(v.clone())),
             Value::Ascii(b) => Ok(MapKey::Str(char::from(*b).to_string())),
             Value::Char(ch) => Ok(MapKey::Str(ch.to_string())),
-            Value::Unit => Ok(MapKey::Unit),
+            Value::Nil | Value::Unit => Ok(MapKey::Unit),
             Value::Tuple(items) => items
                 .iter()
                 .map(|item| item.to_key(span))
@@ -2027,7 +2030,25 @@ fn modular_word_bits(width: NumericWidth) -> u32 {
 /// Reduce an exact integer into the representatives of `width`.
 pub(crate) fn modular_word_reduce(value: i128, width: NumericWidth) -> i128 {
     let (lo, hi) = modular_word_range(width);
-    lo + (value - lo).rem_euclid(hi - lo + 1)
+    let modulus = hi - lo + 1;
+    // Reduce into `0..modulus` first, then shift to the signed window: the
+    // representative never needs `value - lo`, which overflows near `i128::MIN`
+    // and `i128::MAX` for a signed word.
+    let residue = value.rem_euclid(modulus);
+    if residue > hi {
+        residue - modulus
+    } else {
+        residue
+    }
+}
+
+/// Reduce an integer-valued float into the ring of `width` exactly. Every
+/// finite double is an exact integer here, so `% 2^W` (an exact `fmod`) gives
+/// the residue without first narrowing the magnitude through `i128`.
+pub(crate) fn modular_word_float_result(value: f64, width: NumericWidth) -> Value {
+    let modulus = 2f64.powi(i32::try_from(modular_word_bits(width)).unwrap_or(64));
+    // `|residue| < 2^W <= 2^64`, so the cast is exact.
+    modular_word_result((value % modulus) as i128, width)
 }
 
 /// Reduce `value` into the ring and surface it in the width's carrier.
@@ -2280,19 +2301,6 @@ pub fn float_to_numerus_width(value: f64, width: NumericWidth) -> Value {
 // tests keep their `crate::value` import paths.
 pub(crate) use radix_codegen_shared::decimal::decimal_scale_factor;
 pub(crate) use radix_codegen_shared::decimal::round_half_even_quotient;
-
-/// Checked round-half-even division with the runner's standard arithmetic
-/// diagnostics. Decimal parsing uses the pure quotient helper so it can
-/// distinguish malformed text from a carrier overflow.
-pub(crate) fn round_half_even_division(
-    numerator: i128,
-    denominator: i128,
-    span: Span,
-    error: &'static str,
-) -> Result<i128, RunnerError> {
-    round_half_even_quotient(numerator, denominator)
-        .ok_or_else(|| RunnerError::internal(span, error))
-}
 
 /// Execute one decimal arithmetic operation over exact decimal values.
 pub(crate) fn decimal_numeric_binop(

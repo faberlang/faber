@@ -819,6 +819,7 @@ impl TypeChecker<'_> {
                     ty: freshen(self, param.ty),
                     mode: param.mode,
                     optional: param.optional,
+                    sponte: param.sponte,
                 })
                 .collect(),
             ret: sig.ret,
@@ -1013,6 +1014,7 @@ impl TypeChecker<'_> {
                     ty: self.substitute_type_params(param.ty, vars, shape_vars.as_deref_mut()),
                     mode: param.mode,
                     optional: param.optional,
+                    sponte: param.sponte,
                 })
                 .collect(),
             ret: self.substitute_type_params(sig.ret, vars, shape_vars.as_deref_mut()),
