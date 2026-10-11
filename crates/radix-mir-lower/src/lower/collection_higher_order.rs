@@ -63,7 +63,7 @@ impl FunctionBuilder<'_> {
         self.lower_collection_predicate(receiver, predicate, TransformKind::Any, expr)
     }
 
-    pub(super) fn lower_mappata(
+    pub fn lower_mappata(
         &mut self,
         receiver: &HirExpression,
         closure: &HirExpression,
@@ -625,7 +625,7 @@ impl FunctionBuilder<'_> {
                         if let HirStatementKind::Redde(Some(value)) = &stmt.kind {
                             self.0 = value.ty;
                         }
-                        crate::hir::visit::walk_stmt(self, stmt);
+                        radix_hir::visit::walk_stmt(self, stmt);
                     }
                 }
                 let mut key = KeyType(None);
@@ -663,7 +663,7 @@ impl FunctionBuilder<'_> {
                 let closure = HirExpression {
                     id: expr.id,
                     kind: HirExpressionKind::Clausura(
-                        vec![crate::hir::HirParam {
+                        vec![radix_hir::HirParam {
                             def_id: binding.0,
                             name: binding.1,
                             ty: element,
@@ -1174,7 +1174,7 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    pub(super) fn take_synthetic_functions(&mut self) -> Vec<MirFunction> {
+    pub fn take_synthetic_functions(&mut self) -> Vec<MirFunction> {
         std::mem::take(&mut self.synthetic_functions)
     }
 

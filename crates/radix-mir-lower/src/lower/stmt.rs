@@ -17,7 +17,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::visit::HirVisitor;
+use radix_hir::visit::HirVisitor;
 
 impl HirVisitor for FunctionBuilder<'_> {
     /// Lower a HIR block in source order until a MIR terminator seals the

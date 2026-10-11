@@ -16,14 +16,14 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::visit::{HirVisitor, walk_expr};
+use radix_hir::visit::{HirVisitor, walk_expr};
 
 const FAILABLE_CALLBACK_MESSAGE: &str = "failable collection callbacks before failable-callable MIR lowering";
 
 impl FunctionBuilder<'_> {
     pub(super) fn lower_clausura_expr(
         &mut self,
-        params: &[crate::hir::HirParam],
+        params: &[radix_hir::HirParam],
         ret_ty: Option<&TypeId>,
         err_ty: Option<&TypeId>,
         body: &HirExpression,
@@ -266,7 +266,7 @@ impl FunctionBuilder<'_> {
 
     fn lower_closure_from_parts(
         &mut self,
-        params: &[crate::hir::HirParam],
+        params: &[radix_hir::HirParam],
         ret_ty: Option<TypeId>,
         err_ty: Option<TypeId>,
         body: &HirExpression,
@@ -480,11 +480,7 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    fn collect_closure_captures(
-        &self,
-        params: &[crate::hir::HirParam],
-        body: &HirExpression,
-    ) -> Vec<MirClosureCapture> {
+    fn collect_closure_captures(&self, params: &[radix_hir::HirParam], body: &HirExpression) -> Vec<MirClosureCapture> {
         let params = params.iter().map(|param| param.def_id).collect();
         let mut collector =
             ClosureCaptureCollector { parent: self, params, seen: FxHashSet::default(), captures: Vec::new() };
@@ -498,7 +494,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn collect_block_captures(
         &self,
         excluded: FxHashSet<DefId>,
-        body: &crate::hir::HirBlock,
+        body: &radix_hir::HirBlock,
     ) -> Vec<MirClosureCapture> {
         let mut collector = ClosureCaptureCollector {
             parent: self,

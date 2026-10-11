@@ -26,20 +26,20 @@ use super::package_instantiate::ImportedDeviceRoute;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering context
 use super::*;
-use crate::file_interface::InterfaceConstValue;
-use crate::hir::visit::HirVisitor;
-use crate::hir::{
+use radix_hir::visit::HirVisitor;
+use radix_hir::{
     HirAnnotation, HirAnnotationValue, HirConst, HirEnum, HirExpression, HirExpressionKind, HirFunction, HirImport,
     HirItemKind, HirMethod, HirStruct, LibraryItem, LibraryItemKind, LibraryProvider,
 };
-use crate::kernel::{
+use radix_mir::MirExternalFunctionIdentity;
+use radix_mir::MirProviderKind;
+use radix_mir::{MirFunctionSignature, MirLayoutTable, MirParamSignature};
+use radix_semantic::SymbolKind;
+use radix_semantic::analyzed_application::AnalyzedModuleApplicationView;
+use radix_semantic::file_interface::InterfaceConstValue;
+use radix_semantic::kernel::{
     is_kernel_glob_import_path, is_kernel_import_path, resolve_kernel_module, resolve_kernel_module_name,
 };
-use crate::mir::MirExternalFunctionIdentity;
-use crate::mir::MirProviderKind;
-use crate::mir::{MirFunctionSignature, MirLayoutTable, MirParamSignature};
-use crate::semantic::SymbolKind;
-use crate::semantic::analyzed_application::AnalyzedModuleApplicationView;
 use std::sync::Arc;
 
 /// Callable parameter metadata preserved for MIR call lowering.
@@ -92,7 +92,7 @@ struct FrozenMaps<'a> {
 /// The lowering-only maps feed [`FunctionBuilderContext`]. The validation map is
 /// carried beside them because it is built from the same HIR walk but consumed
 /// only after a complete [`MirProgram`] exists.
-pub(super) struct LoweringContextMaps<'a> {
+pub struct LoweringContextMaps<'a> {
     interner: &'a Interner,
     fault_delivery: bool,
     function_errors: FxHashMap<DefId, MirType>,
@@ -146,7 +146,7 @@ pub(super) struct LoweringContextMaps<'a> {
     /// declaration order. A method call through a contract-typed value lowers
     /// to a type-test chain over exactly these members.
     interface_implementors: FxHashMap<DefId, Vec<(DefId, TypeId)>>,
-    gpu_builtins: Vec<(DefId, crate::mir::MirKernelBuiltin)>,
+    gpu_builtins: Vec<(DefId, radix_mir::MirKernelBuiltin)>,
     /// Frozen Arc-wrapped maps populated after the HIR visitor phase.
     frozen: FrozenMaps<'a>,
     pub(super) validation: MirValidationContext<'a>,
@@ -327,12 +327,12 @@ impl<'a> LoweringContextMaps<'a> {
     pub(super) fn builder_context(
         &self,
         interner: &'a Interner,
-        empty_textus: crate::lexer::Symbol,
+        empty_textus: radix_lexer::Symbol,
         diagnostics: DiagnosticSymbols,
         structs: Arc<FxHashMap<DefId, Vec<&'a HirField>>>,
-        struct_field_types: Arc<FxHashMap<DefId, FxHashMap<crate::lexer::Symbol, MirType>>>,
+        struct_field_types: Arc<FxHashMap<DefId, FxHashMap<radix_lexer::Symbol, MirType>>>,
         function_params: Arc<FxHashMap<DefId, Vec<CallableParamMeta<'a>>>>,
-        cli_record_fields_by_local: Arc<FxHashMap<crate::lexer::Symbol, Vec<MirRuntimeRecordField>>>,
+        cli_record_fields_by_local: Arc<FxHashMap<radix_lexer::Symbol, Vec<MirRuntimeRecordField>>>,
         cli_record_fields_by_type: Arc<FxHashMap<radix_types::TypeId, Vec<MirRuntimeRecordField>>>,
         cli_adapter_active: bool,
     ) -> FunctionBuilderContext<'a> {
@@ -727,11 +727,11 @@ impl<'a> LoweringContextMaps<'a> {
                 {
                     self.found.insert((*module, *member), value.clone());
                 }
-                crate::hir::visit::walk_expr(self, expr);
+                radix_hir::visit::walk_expr(self, expr);
             }
         }
         let mut reads = Reads { unit, found: FxHashMap::default() };
-        crate::hir::visit::walk_program(&mut reads, unit.hir);
+        radix_hir::visit::walk_program(&mut reads, unit.hir);
         self.imported_constants = reads.found;
     }
 
@@ -1002,7 +1002,7 @@ fn json_annotation_nomen(annotations: &[HirAnnotation], interner: &Interner) -> 
     match &field.value {
         HirAnnotationValue::String(symbol) => Some(*symbol),
         HirAnnotationValue::Expr(expr) => match &expr.kind {
-            HirExpressionKind::Literal(crate::hir::HirLiteral::String(symbol)) => Some(*symbol),
+            HirExpressionKind::Literal(radix_hir::HirLiteral::String(symbol)) => Some(*symbol),
             _ => None,
         },
         _ => None,

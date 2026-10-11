@@ -1,11 +1,15 @@
 //! Middle IR model for execution-shaped compiler analysis.
 //!
 //! Core MIR lives in foundation leaf `radix-mir`. This package module re-exports
-//! that leaf and owns residual HIR→MIR lowering plus emit backends until those
-//! peel into their own crates.
+//! that leaf and owns residual MIR emit backends until those peel into their own
+//! crates. HIR→MIR lowering moved to `radix-mir-lower` (goal `radix-crate-dag`,
+//! C-M1); the `lower`/fragment modules below are shims over it.
 
-// Residual: HIR→MIR lowering (needs AnalyzedModule / driver).
+// Shims over `radix-mir-lower` (production moved; the fragments keep their test
+// hosts here, so they are test-only modules).
+#[cfg(test)]
 pub(crate) mod fragment_composition;
+#[cfg(test)]
 pub(crate) mod fragment_instantiation;
 mod lower;
 #[cfg(feature = "device")]
@@ -184,6 +188,7 @@ pub use radix_mir::{
 // KCM-05: the synthetic-kernel metadata carrier rides the same device module.
 #[cfg(feature = "mir-basic")]
 pub use basic_text::{MirBasicError, emit_basic_text};
+pub(crate) use radix_mir::MirGenericBindings;
 pub use radix_mir::device::{
     MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirImportedEntryError, MirImportedEntryFact,
     merge_imported_entry_roles,
@@ -219,7 +224,6 @@ pub use radix_mir::{
     MirLayoutTable, MirPackedBitOrder, MirPackedNumericFormat, MirPackedNumericLayout, MirScalarLayout,
     MirTensorLocusLayout, MirTensorStorageLayout, MirTensorStrideLayout, MirTensorViewLayout,
 };
-pub(crate) use radix_mir::{MirGenericBindings, instantiate_existing_generic_type, type_contains_param};
 pub use radix_mir::{
     MirTypeError, MirTypeLookup, constant_ty, index_projection_result_ty, option_chain_base_ty, option_payload_ty,
     place_base_ty,
@@ -246,6 +250,8 @@ pub use radix_mir::{
     TensorSystemsTarget, TensorSystemsTargetLayout, TensorSystemsTargetRank, TensorSystemsTargetRow,
     TensorSystemsTargetStatus, selected_tensor_systems_family, tensor_systems_target_rows,
 };
+#[cfg(test)]
+pub(crate) use radix_mir::{instantiate_existing_generic_type, type_contains_param};
 #[cfg(feature = "runner")]
 pub use runner::{
     BufferHost, Host, RUNNER_KERNEL_REFUSED_ISSUE, RunSourceError, RunnerDispatchStatus, RunnerError,

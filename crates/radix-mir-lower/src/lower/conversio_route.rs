@@ -23,7 +23,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::{HirConversioRoute, HirOrdoRouteMember, HirOrdoRow};
+use radix_hir::{HirConversioRoute, HirOrdoRouteMember, HirOrdoRow};
 
 impl FunctionBuilder<'_> {
     pub(super) fn lower_conversio_route(

@@ -40,6 +40,7 @@ radix-semantic = { path = "../radix-semantic" }
 # Novelty Odin leaf: default-off, NOT in full-targets.
 radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }
+radix-mir-lower = { path = "../radix-mir-lower", optional = true }
 radix-host-abi = { path = "../radix-host-abi" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
@@ -77,7 +78,7 @@ full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
 hir-faber = ["dep:radix-hir-faber", "radix-target/hir-faber"]
 hir-fhir = ["mir-core", "dep:radix-hir-fhir", "radix-target/hir-fhir", "radix-semantic/hir-fhir"]
 mir-fmir = ["mir-core"]
-mir-core = ["dep:radix-mir"]
+mir-core = ["dep:radix-mir", "dep:radix-mir-lower"]
 runner = ["mir-core", "dep:radix-mir-runner"]
 test-support = ["dep:tempfile"]
 

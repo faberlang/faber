@@ -15,7 +15,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::HirCallArg;
+use radix_hir::HirCallArg;
 
 /// One union member the dispatch chain can narrow to.
 #[derive(Clone, Copy)]

@@ -1,0 +1,45 @@
+[package]
+name = "radix-mir-lower"
+version = "0.84.0"
+edition = "2024"
+description = "HIR→MIR lowering for Faber: the analyzed-application lowering pass and its fragment composition"
+license = "MIT"
+publish = false
+
+[lints.clippy]
+# Group first at lower priority so per-lint allows below win package-wide.
+pedantic = { level = "deny", priority = -1 }
+# Carried from radix-module (whose lowering code was written under this exact
+# posture); per-lint fixes land incrementally.
+too_many_lines = "allow"
+match_same_arms = "allow"
+struct_excessive_bools = "allow"
+fn_params_excessive_bools = "allow"
+struct_field_names = "allow"
+needless_pass_by_value = "allow"
+similar_names = "allow"
+unnecessary_wraps = "allow"
+unused_self = "allow"
+items_after_statements = "allow"
+used_underscore_items = "allow"
+implicit_hasher = "allow"
+too_many_arguments = "allow"
+doc_markdown = "allow"
+missing_panics_doc = "allow"
+
+[dependencies]
+handroll = { path = "../handroll" }
+radix-codegen-shared = { path = "../radix-codegen-shared" }
+radix-diagnostics = { path = "../radix-diagnostics" }
+radix-hir = { path = "../radix-hir" }
+radix-intrinsics = { path = "../radix-intrinsics" }
+radix-lexer = { path = "../radix-lexer" }
+radix-mir = { path = "../radix-mir" }
+radix-runtime-contract = { path = "../radix-runtime-contract" }
+radix-semantic = { path = "../radix-semantic" }
+radix-syntax = { path = "../radix-syntax" }
+radix-types = { path = "../radix-types" }
+rustc-hash = "2"
+
+[dev-dependencies]
+hygiene-ratchet = { path = "../hygiene-ratchet" }

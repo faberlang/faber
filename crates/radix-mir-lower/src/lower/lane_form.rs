@@ -36,14 +36,14 @@ use super::{
 };
 
 /// Issue name: a second top-level `thread lane` loop in one kernel.
-pub(crate) const LANE_FORM_SECOND_REGION_ISSUE: &str = "lane_form_second_region";
+pub const LANE_FORM_SECOND_REGION_ISSUE: &str = "lane_form_second_region";
 /// Issue name: a statement after the top-level `thread lane` loop.
-pub(crate) const LANE_FORM_POST_LOOP_ISSUE: &str = "lane_form_post_loop_statement";
+pub const LANE_FORM_POST_LOOP_ISSUE: &str = "lane_form_post_loop_statement";
 /// Issue name: a kernel `⊥` whose call is not the checked tensor read (the
 /// device lowering of other failable calls is pending).
 pub(crate) const KERNEL_CALL_DEFAULT_PENDING_ISSUE: &str = "kernel_call_default_pending";
 /// Issue name: a `thread lane` reduce inside a lane region (C4-8 nested).
-pub(crate) const LANE_FORM_NESTED_REDUCE_ISSUE: &str = "lane_form_nested_reduce";
+pub const LANE_FORM_NESTED_REDUCE_ISSUE: &str = "lane_form_nested_reduce";
 
 /// Intern the device word (`u32`) the lane-form arithmetic runs in. Lowering
 /// holds the type table immutably, so the arena gets it before function

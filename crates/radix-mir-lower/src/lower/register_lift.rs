@@ -324,7 +324,7 @@ impl FunctionBuilder<'_> {
         let Type::Matrix(element, shape) = self.normalized_type(payload).clone() else {
             return None;
         };
-        let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types) else {
+        let Some((rows, columns)) = radix_semantic::literal_matrix_shape(shape, self.types) else {
             self.errors.push(MirError::unsupported(
                 span,
                 "matrix lift with non-literal shape before MIR lowering",

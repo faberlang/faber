@@ -25,7 +25,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::visit::HirVisitor;
+use radix_hir::visit::HirVisitor;
 use radix_mir::kernel_plan::GRID_REDUCE_WORKGROUP;
 use radix_types::i64s_from_literal_index;
 
@@ -37,7 +37,7 @@ fn filum_term_type(body: &HirBlock) -> Option<MirType> {
             if let HirStatementKind::Redde(Some(value)) = &stmt.kind {
                 self.0 = value.ty;
             }
-            crate::hir::visit::walk_stmt(self, stmt);
+            radix_hir::visit::walk_stmt(self, stmt);
         }
     }
     let mut term = TermType(None);
@@ -76,7 +76,7 @@ fn body_bracket_stores_into(body: &HirBlock, def: DefId) -> bool {
                 }
                 _ => {}
             }
-            crate::hir::visit::walk_expr(self, expr);
+            radix_hir::visit::walk_expr(self, expr);
         }
     }
     let mut stores = Stores { def, found: false };
@@ -631,7 +631,7 @@ impl FunctionBuilder<'_> {
         lowered_receiver: &MirOperand,
         receiver: &HirExpression,
         method_name: &str,
-        args: &[crate::hir::HirCallArg],
+        args: &[radix_hir::HirCallArg],
         expr_ty: MirType,
         span: Span,
     ) -> Option<Option<MirOperand>> {
@@ -684,7 +684,7 @@ impl FunctionBuilder<'_> {
         is_set: bool,
         lowered_receiver: &MirOperand,
         receiver_ty: MirType,
-        args: &[crate::hir::HirCallArg],
+        args: &[radix_hir::HirCallArg],
         coordinates: &[&HirExpression],
         literal: Option<&[i64]>,
         expr_ty: MirType,
@@ -798,7 +798,7 @@ impl FunctionBuilder<'_> {
         let payload = self
             .types
             .get(self.method_receiver_payload_id(receiver.ty?));
-        let entry = crate::intrinsics::lookup_method_for_type(payload, method_name, args.len())?;
+        let entry = radix_intrinsics::lookup_method_for_type(payload, method_name, args.len())?;
         if !entry.failable || args.len() != 1 || !matches!(payload, Type::Tensor(..)) {
             return None;
         }
@@ -820,7 +820,7 @@ impl FunctionBuilder<'_> {
     /// This is the join-point contract for expression-valued blocks and `si`:
     /// complex control forms assign their eventual value into `destination`,
     /// while ordinary expressions lower to an operand and are assigned once.
-    pub(super) fn lower_expr_to_destination(
+    pub fn lower_expr_to_destination(
         &mut self,
         expr: &HirExpression,
         destination: MirPlace,
@@ -1007,7 +1007,7 @@ impl FunctionBuilder<'_> {
     /// Numeric ranges and array-backed collection loops can use ordinary locals,
     /// branches, gotos, runtime length calls, and index projections. Map, set,
     /// text, and cursor iteration still need iterator/runtime ABI policy.
-    pub(super) fn lower_itera_expr(
+    pub fn lower_itera_expr(
         &mut self,
         mode: HirIteraMode,
         coordinates: &[(DefId, Symbol)],
@@ -1197,7 +1197,7 @@ impl FunctionBuilder<'_> {
                     if let HirStatementKind::Redde(Some(value)) = &stmt.kind {
                         self.0 = value.ty;
                     }
-                    crate::hir::visit::walk_stmt(self, stmt);
+                    radix_hir::visit::walk_stmt(self, stmt);
                 }
             }
             let mut term = TermType(None);
@@ -1642,7 +1642,7 @@ impl FunctionBuilder<'_> {
     /// The interned `lista<element>` row, or a named lowering error. A bare
     /// `?` on `find_array` returns `None` with no diagnostic and the
     /// enclosing statement silently vanishes from MIR.
-    pub(super) fn require_array(&mut self, element: TypeId, span: Span, what: &str) -> Option<TypeId> {
+    pub fn require_array(&mut self, element: TypeId, span: Span, what: &str) -> Option<TypeId> {
         let found = self.types.find_array(element);
         if found.is_none() {
             self.errors.push(MirError::missing_type(span, what));
@@ -4139,7 +4139,7 @@ impl FunctionBuilder<'_> {
                 let array = self.require_array(*element, iter.iter.span, "itera cursor snapshot list")?;
                 let array_ty = MirType::semantic(array);
                 let snapshot = self.runtime_call_value(
-                    MirIntrinsic::Sermo(crate::mir::MirSermoOp::DrainCursor),
+                    MirIntrinsic::Sermo(radix_mir::MirSermoOp::DrainCursor),
                     vec![collection],
                     array_ty,
                     iter.iter.span,
@@ -4919,7 +4919,7 @@ impl FunctionBuilder<'_> {
             span,
         );
         let snapshot = self.runtime_call_value(
-            MirIntrinsic::Sermo(crate::mir::MirSermoOp::DrainCursor),
+            MirIntrinsic::Sermo(radix_mir::MirSermoOp::DrainCursor),
             vec![cursor],
             array_ty,
             span,

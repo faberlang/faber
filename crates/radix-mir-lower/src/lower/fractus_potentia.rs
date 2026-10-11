@@ -23,7 +23,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::HirCallArg;
+use radix_hir::HirCallArg;
 
 /// Largest integral `|y|` the exact repeated-squaring path accepts. Squaring
 /// error grows with the exponent; beyond this the `exp · ln` path is as good.

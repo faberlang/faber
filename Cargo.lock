@@ -876,6 +876,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "radix-mir-lower"
+version = "0.84.0"
+dependencies = [
+ "handroll",
+ "hygiene-ratchet",
+ "radix-codegen-shared",
+ "radix-diagnostics",
+ "radix-hir",
+ "radix-intrinsics",
+ "radix-lexer",
+ "radix-mir",
+ "radix-runtime-contract",
+ "radix-semantic",
+ "radix-syntax",
+ "radix-types",
+ "rustc-hash",
+]
+
+[[package]]
 name = "radix-mir-runner"
 version = "0.84.0"
 dependencies = [
@@ -915,6 +934,7 @@ dependencies = [
  "radix-intrinsics",
  "radix-lexer",
  "radix-mir",
+ "radix-mir-lower",
  "radix-mir-runner",
  "radix-parser",
  "radix-runtime-contract",

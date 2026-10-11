@@ -24,11 +24,11 @@ const BUDGETS: Budgets = Budgets {
     todo: 0,
     unimplemented: 0,
     // WHY: the four `substitute_tensor_from_flat_shape_size_constants` /
-    // `substitute_shape_size_constants` calls in mir/lower/monomorphize.rs and
-    // mir/lower/package_instantiate.rs return `#[must_use]` bools whose `false`
-    // (a term that cannot fold yet) is deliberately left to the post-finalize
-    // survivor net, which reports one stable diagnostic.
-    let_underscore: 4,
+    // `substitute_shape_size_constants` calls that left these `#[must_use]`
+    // bools unread moved with `mir/lower/{monomorphize,package_instantiate}.rs`
+    // into `radix-mir-lower` (goal `radix-crate-dag`, C-M1), so the ratchet
+    // drops to zero here and the budget is minted in the new crate.
+    let_underscore: 0,
     // D03-MODULE-PI extracted package_instantiate.rs `mod tests` (path-wired);
     // D03-MODULE-LH moved the `library_home_test_support` helper into the
     // import_resolve.rs companion (pub(crate) re-export preserves its path).

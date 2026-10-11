@@ -240,7 +240,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn lower_struct_literal(
         &mut self,
         def_id: DefId,
-        fields: &[(crate::lexer::Symbol, HirExpression)],
+        fields: &[(radix_lexer::Symbol, HirExpression)],
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         let explicit: Vec<_> = fields.iter().map(|(name, value)| (*name, value)).collect();
@@ -279,7 +279,7 @@ impl FunctionBuilder<'_> {
     /// that can be represented as aggregate construction: object entries for
     /// structs/maps, array syntax for arrays/sets, and direct variant calls for
     /// enum payloads.
-    pub(super) fn lower_verte(
+    pub fn lower_verte(
         &mut self,
         source: &HirExpression,
         target: TypeId,
@@ -325,7 +325,7 @@ impl FunctionBuilder<'_> {
                     (Some(entries), _) => self.lower_map_object_fields(entries, expr.span)?,
                     (
                         None,
-                        HirExpressionKind::Literal(HirLiteral::JsonValor(crate::syntax::JsonValue::Object(members))),
+                        HirExpressionKind::Literal(HirLiteral::JsonValor(radix_syntax::JsonValue::Object(members))),
                     ) => self.lower_json_map_members(members, expr.span)?,
                     (None, _) => {
                         self.errors.push(MirError::unsupported(
@@ -565,7 +565,7 @@ impl FunctionBuilder<'_> {
     fn lower_struct_update_fields(
         &mut self,
         def_id: DefId,
-        explicit: &[(crate::lexer::Symbol, &HirExpression)],
+        explicit: &[(radix_lexer::Symbol, &HirExpression)],
         source: &HirExpression,
     ) -> Option<Vec<MirNamedOperand>> {
         let mut supplied = FxHashSet::default();
@@ -575,7 +575,7 @@ impl FunctionBuilder<'_> {
             fields.push(MirNamedOperand { name: *name, value: self.lower_expr_value(value)? });
         }
         let base = self.lower_projectable_place(source)?;
-        let names: Vec<(crate::lexer::Symbol, TypeId)> = if let Some(field_defs) = self.context.structs.get(&def_id) {
+        let names: Vec<(radix_lexer::Symbol, TypeId)> = if let Some(field_defs) = self.context.structs.get(&def_id) {
             field_defs
                 .iter()
                 .map(|field| (field.name, field.ty))
@@ -628,7 +628,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn materialize_struct_fields(
         &mut self,
         def_id: DefId,
-        explicit: &[(crate::lexer::Symbol, &HirExpression)],
+        explicit: &[(radix_lexer::Symbol, &HirExpression)],
         fill: StructFieldFill,
         span: Span,
     ) -> Option<Vec<MirNamedOperand>> {
@@ -712,7 +712,7 @@ impl FunctionBuilder<'_> {
     /// semantic typing already fixed the target collection shape.
     pub(super) fn lower_json_valor_literal(
         &mut self,
-        value: &crate::syntax::JsonValue,
+        value: &radix_syntax::JsonValue,
         ty: Option<TypeId>,
         span: Span,
     ) -> Option<MirOperand> {
@@ -724,7 +724,7 @@ impl FunctionBuilder<'_> {
         let mir_ty = MirType::semantic(type_id);
         match self.types.get(type_id) {
             Type::Map(_, _) => {
-                let crate::syntax::JsonValue::Object(members) = value else {
+                let radix_syntax::JsonValue::Object(members) = value else {
                     self.errors.push(MirError::unsupported(
                         span,
                         "JSON valor map literal without object shape before aggregate MIR lowering",
@@ -735,7 +735,7 @@ impl FunctionBuilder<'_> {
                 Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(fields), mir_ty, span))
             }
             Type::Array(_) => {
-                let crate::syntax::JsonValue::Array(items) = value else {
+                let radix_syntax::JsonValue::Array(items) = value else {
                     self.errors.push(MirError::unsupported(
                         span,
                         "JSON valor array literal without array shape before aggregate MIR lowering",
@@ -746,11 +746,11 @@ impl FunctionBuilder<'_> {
                 Some(self.construct_temp(MirAggregateKind::Array, MirAggregateFields::Ordered(fields), mir_ty, span))
             }
             Type::Primitive(Primitive::Valor) => match value {
-                crate::syntax::JsonValue::Object(members) => {
+                radix_syntax::JsonValue::Object(members) => {
                     let fields = self.lower_json_map_members(members, span)?;
                     Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(fields), mir_ty, span))
                 }
-                crate::syntax::JsonValue::Array(items) => {
+                radix_syntax::JsonValue::Array(items) => {
                     let fields = self.lower_json_array_items(items, span)?;
                     Some(self.construct_temp(
                         MirAggregateKind::Array,
@@ -762,7 +762,7 @@ impl FunctionBuilder<'_> {
                 scalar => self.lower_json_value(scalar, span),
             },
             Type::Primitive(Primitive::Json) => {
-                if let crate::syntax::JsonValue::Object(members) = value {
+                if let radix_syntax::JsonValue::Object(members) = value {
                     let fields = self.lower_json_map_members(members, span)?;
                     Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(fields), mir_ty, span))
                 } else {
@@ -785,7 +785,7 @@ impl FunctionBuilder<'_> {
 
     fn lower_json_map_members(
         &mut self,
-        members: &[crate::syntax::JsonMember],
+        members: &[radix_syntax::JsonMember],
         span: Span,
     ) -> Option<Vec<MirKeyValueOperand>> {
         let mut fields = Vec::with_capacity(members.len());
@@ -799,7 +799,7 @@ impl FunctionBuilder<'_> {
 
     fn lower_json_array_items(
         &mut self,
-        items: &[crate::syntax::JsonValue],
+        items: &[radix_syntax::JsonValue],
         span: Span,
     ) -> Option<Vec<MirAggregateItem>> {
         let mut fields = Vec::with_capacity(items.len());
@@ -809,19 +809,19 @@ impl FunctionBuilder<'_> {
         Some(fields)
     }
 
-    fn lower_json_value(&mut self, value: &crate::syntax::JsonValue, span: Span) -> Option<MirOperand> {
+    fn lower_json_value(&mut self, value: &radix_syntax::JsonValue, span: Span) -> Option<MirOperand> {
         match value {
-            crate::syntax::JsonValue::String(sym) => Some(MirOperand::Constant(MirConstant::String(*sym))),
-            crate::syntax::JsonValue::Numerus(value) => Some(MirOperand::Constant(MirConstant::Int(*value))),
-            crate::syntax::JsonValue::Fractus(value) => Some(MirOperand::Constant(MirConstant::Float(*value))),
-            crate::syntax::JsonValue::Bool(value) => Some(MirOperand::Constant(MirConstant::Bool(*value))),
-            crate::syntax::JsonValue::Null => Some(MirOperand::Constant(MirConstant::Nil)),
-            crate::syntax::JsonValue::Object(members) => {
+            radix_syntax::JsonValue::String(sym) => Some(MirOperand::Constant(MirConstant::String(*sym))),
+            radix_syntax::JsonValue::Numerus(value) => Some(MirOperand::Constant(MirConstant::Int(*value))),
+            radix_syntax::JsonValue::Fractus(value) => Some(MirOperand::Constant(MirConstant::Float(*value))),
+            radix_syntax::JsonValue::Bool(value) => Some(MirOperand::Constant(MirConstant::Bool(*value))),
+            radix_syntax::JsonValue::Null => Some(MirOperand::Constant(MirConstant::Nil)),
+            radix_syntax::JsonValue::Object(members) => {
                 let fields = self.lower_json_map_members(members, span)?;
                 let ty = MirType::semantic(self.types.primitive(Primitive::Valor));
                 Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(fields), ty, span))
             }
-            crate::syntax::JsonValue::Array(items) => {
+            radix_syntax::JsonValue::Array(items) => {
                 let fields = self.lower_json_array_items(items, span)?;
                 let ty = MirType::semantic(self.types.primitive(Primitive::Valor));
                 Some(self.construct_temp(MirAggregateKind::Array, MirAggregateFields::Ordered(fields), ty, span))

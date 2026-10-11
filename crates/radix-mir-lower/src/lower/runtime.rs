@@ -20,15 +20,15 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::HirCallArg;
-use crate::hir::visit::{HirVisitor, walk_expr};
-use crate::semantic::IndexExpr;
-use crate::semantic::lista_tensor_conversio::{
+use radix_hir::HirCallArg;
+use radix_hir::visit::{HirVisitor, walk_expr};
+use radix_semantic::IndexExpr;
+use radix_semantic::lista_tensor_conversio::{
     ListaToTensorShape, analyze_rectangular_lista_literal, lista_numerus_type, resolve_bounded_lista_padded_shape,
     resolve_lista_to_tensor_shape, validate_lista_to_tensor_source,
 };
 
-pub(super) fn shape_relation_applies_to_return(types: &TypeTable, relation: &ShapeRelation, expression: u32) -> bool {
+pub fn shape_relation_applies_to_return(types: &TypeTable, relation: &ShapeRelation, expression: u32) -> bool {
     fn mentions_expression(types: &TypeTable, index: IndexId, expression: u32) -> bool {
         match types.get_index(index) {
             IndexExpr::Runtime(
@@ -100,7 +100,7 @@ struct HandledConversio<'a> {
 impl FunctionBuilder<'_> {
     pub(super) fn emit_call_shape_check(
         &mut self,
-        site: crate::hir::HirId,
+        site: radix_hir::HirId,
         arguments: &[MirOperand],
         callee_parameter_offset: u32,
         span: Span,
@@ -144,7 +144,7 @@ impl FunctionBuilder<'_> {
 
     pub(super) fn emit_store_shape_check(
         &mut self,
-        expression: crate::hir::HirId,
+        expression: radix_hir::HirId,
         value: MirOperand,
         span: Span,
     ) -> Option<()> {
@@ -559,7 +559,7 @@ impl FunctionBuilder<'_> {
             return false;
         };
         let payload = self.types.get(self.method_receiver_payload_id(ty));
-        crate::intrinsics::lookup_method_for_type(payload, name, arg_count)
+        radix_intrinsics::lookup_method_for_type(payload, name, arg_count)
             .is_some_and(radix_intrinsics::is_mutating_receiver)
     }
 
@@ -647,8 +647,8 @@ impl FunctionBuilder<'_> {
         let method_name = self.resolve_method_name(method)?.to_owned();
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
-            if crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
-                .is_some_and(|entry| matches!(entry.mir_kind, crate::intrinsics::IntrinsicMirKind::TensorLimes))
+            if radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                .is_some_and(|entry| matches!(entry.mir_kind, radix_intrinsics::IntrinsicMirKind::TensorLimes))
             {
                 return self.lower_tensor_limes(receiver, args, expr);
             }
@@ -692,8 +692,8 @@ impl FunctionBuilder<'_> {
             && let Some(receiver_ty) = receiver.ty
         {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
-            if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
-                && matches!(entry.receiver, crate::intrinsics::IntrinsicReceiver::Tensor)
+            if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                && matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor)
             {
                 return self.lower_tensor_silu(receiver, expr);
             }
@@ -701,28 +701,28 @@ impl FunctionBuilder<'_> {
 
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
-            if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
-                && crate::intrinsics::mir_is_higher_order_lista(entry)
+            if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                && radix_intrinsics::mir_is_higher_order_lista(entry)
             {
                 let closure = &args[0].expr;
                 return match entry.mir_kind {
-                    crate::intrinsics::IntrinsicMirKind::HigherOrderAll => self.lower_omnia(receiver, closure, expr),
-                    crate::intrinsics::IntrinsicMirKind::HigherOrderAny => self.lower_quilibet(receiver, closure, expr),
-                    crate::intrinsics::IntrinsicMirKind::HigherOrderFiltrata => {
+                    radix_intrinsics::IntrinsicMirKind::HigherOrderAll => self.lower_omnia(receiver, closure, expr),
+                    radix_intrinsics::IntrinsicMirKind::HigherOrderAny => self.lower_quilibet(receiver, closure, expr),
+                    radix_intrinsics::IntrinsicMirKind::HigherOrderFiltrata => {
                         self.lower_filtrata(receiver, closure, expr)
                     }
-                    crate::intrinsics::IntrinsicMirKind::HigherOrderMap => self.lower_mappata(receiver, closure, expr),
-                    crate::intrinsics::IntrinsicMirKind::HigherOrderReduce => {
+                    radix_intrinsics::IntrinsicMirKind::HigherOrderMap => self.lower_mappata(receiver, closure, expr),
+                    radix_intrinsics::IntrinsicMirKind::HigherOrderReduce => {
                         let initial = &args[1].expr;
                         self.lower_reducta(receiver, closure, initial, expr)
                     }
-                    crate::intrinsics::IntrinsicMirKind::HigherOrderCumulata => {
+                    radix_intrinsics::IntrinsicMirKind::HigherOrderCumulata => {
                         let initial = &args[1].expr;
                         self.lower_cumulata(receiver, closure, initial, expr)
                     }
                     // The keyed `ordinata(key)` is retired; only the
                     // in-place `ordina(key)` reaches lowering.
-                    crate::intrinsics::IntrinsicMirKind::HigherOrderSortBy => {
+                    radix_intrinsics::IntrinsicMirKind::HigherOrderSortBy => {
                         self.lower_sort_by_key(receiver, closure, expr)
                     }
                     _ => None,
@@ -732,10 +732,10 @@ impl FunctionBuilder<'_> {
 
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
-            if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+            if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
                 && entry
                     .params
-                    .contains(&crate::intrinsics::IntrinsicParamKind::TextusOrReplacer)
+                    .contains(&radix_intrinsics::IntrinsicParamKind::TextusOrReplacer)
                 && matches!(args[1].expr.kind, HirExpressionKind::Clausura(..))
             {
                 return self.lower_regex_replace_closure(receiver, &args[0].expr, &args[1].expr, expr);
@@ -1261,8 +1261,8 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let receiver_ty = self.normalized_type(self.method_receiver_payload_id(receiver_ty));
-        let entry = crate::intrinsics::lookup_method_for_type(receiver_ty, method_name, 1)?;
-        let op = crate::intrinsics::mir_collection_op(entry)?;
+        let entry = radix_intrinsics::lookup_method_for_type(receiver_ty, method_name, 1)?;
+        let op = radix_intrinsics::mir_collection_op(entry)?;
         let lowered_args = vec![self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?];
         let ty = self.expr_ty(expr)?;
         Some(self.runtime_call_value(MirIntrinsic::Collection(op), lowered_args, ty, expr.span))
@@ -1284,14 +1284,14 @@ impl FunctionBuilder<'_> {
                 .push(MirError::unsupported(expr.span, "outer product requires vector operands"));
             return None;
         };
-        let Some(rows) = crate::semantic::literal_vector_width(lhs_width, self.types) else {
+        let Some(rows) = radix_semantic::literal_vector_width(lhs_width, self.types) else {
             self.errors.push(MirError::unsupported(
                 expr.span,
                 "outer product with non-literal width before MIR lowering",
             ));
             return None;
         };
-        let Some(columns) = crate::semantic::literal_vector_width(rhs_width, self.types) else {
+        let Some(columns) = radix_semantic::literal_vector_width(rhs_width, self.types) else {
             self.errors.push(MirError::unsupported(
                 expr.span,
                 "outer product with non-literal width before MIR lowering",
@@ -1348,22 +1348,22 @@ impl FunctionBuilder<'_> {
         }?;
         let op = if Some(receiver_def) == self.context.sermo_def {
             match method_name {
-                "meus" => crate::mir::MirSermoOp::ViewMeus,
-                "tuus" => crate::mir::MirSermoOp::ViewTuus,
+                "meus" => radix_mir::MirSermoOp::ViewMeus,
+                "tuus" => radix_mir::MirSermoOp::ViewTuus,
                 "close" if args.is_empty() => return self.lower_sermo_close(receiver, expr),
                 _ => return None,
             }
         } else if Some(receiver_def) == self.context.meus_def {
             match method_name {
-                "da" => crate::mir::MirSermoOp::Send,
-                "fini" => crate::mir::MirSermoOp::Finish,
+                "da" => radix_mir::MirSermoOp::Send,
+                "fini" => radix_mir::MirSermoOp::Finish,
                 _ => return None,
             }
         } else if Some(receiver_def) == self.context.tuus_def {
             match method_name {
-                "accipe" => crate::mir::MirSermoOp::Receive { frame: self.context.scrinium_def? },
-                "cursor" => crate::mir::MirSermoOp::Cursor { frame: self.context.scrinium_def? },
-                "fini" => crate::mir::MirSermoOp::Finish,
+                "accipe" => radix_mir::MirSermoOp::Receive { frame: self.context.scrinium_def? },
+                "cursor" => radix_mir::MirSermoOp::Cursor { frame: self.context.scrinium_def? },
+                "fini" => radix_mir::MirSermoOp::Finish,
                 _ => return None,
             }
         } else {
@@ -1385,13 +1385,9 @@ impl FunctionBuilder<'_> {
         let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
         let sermo_op = |op| MirIntrinsic::Sermo(op);
         let closed =
-            self.runtime_call_value(sermo_op(crate::mir::MirSermoOp::Close), vec![sermo.clone()], bool_ty, span);
-        let failed = self.runtime_call_value(
-            sermo_op(crate::mir::MirSermoOp::CloseFailed),
-            vec![sermo.clone()],
-            bool_ty,
-            span,
-        );
+            self.runtime_call_value(sermo_op(radix_mir::MirSermoOp::Close), vec![sermo.clone()], bool_ty, span);
+        let failed =
+            self.runtime_call_value(sermo_op(radix_mir::MirSermoOp::CloseFailed), vec![sermo.clone()], bool_ty, span);
         let fail_id = self.fresh_block(span);
         let ok_id = self.fresh_block(span);
         self.terminate_current(
@@ -1399,7 +1395,7 @@ impl FunctionBuilder<'_> {
             span,
         );
         self.switch_to(fail_id);
-        let message = self.runtime_call_value(sermo_op(crate::mir::MirSermoOp::CloseError), vec![sermo], textus, span);
+        let message = self.runtime_call_value(sermo_op(radix_mir::MirSermoOp::CloseError), vec![sermo], textus, span);
         self.fail_with_textus(message, span);
         self.switch_to(ok_id);
         Some(closed)
@@ -1419,8 +1415,8 @@ impl FunctionBuilder<'_> {
             return None;
         }
         let entry =
-            crate::intrinsics::lookup_method_for_type(self.normalized_type(payload_ty), method_name, args.len())?;
-        let op = crate::intrinsics::mir_atomic_op(entry)?;
+            radix_intrinsics::lookup_method_for_type(self.normalized_type(payload_ty), method_name, args.len())?;
+        let op = radix_intrinsics::mir_atomic_op(entry)?;
         let mut lowered_args = Vec::with_capacity(args.len() + 1);
         lowered_args.push(self.lower_expr_value(receiver)?);
         lowered_args.extend(self.lower_hir_call_args(args)?);
@@ -1575,7 +1571,7 @@ impl FunctionBuilder<'_> {
         let Type::Matrix(element_ty, shape) = self.normalized_type(receiver_ty).clone() else {
             return None;
         };
-        let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types) else {
+        let Some((rows, columns)) = radix_semantic::literal_matrix_shape(shape, self.types) else {
             self.errors.push(MirError::unsupported(
                 expr.span,
                 "matrix method with non-literal shape before MIR lowering",
@@ -1634,7 +1630,7 @@ impl FunctionBuilder<'_> {
                 ));
                 return None;
             };
-            let Some((rhs_rows, rhs_columns)) = crate::semantic::literal_matrix_shape(peer_shape, self.types) else {
+            let Some((rhs_rows, rhs_columns)) = radix_semantic::literal_matrix_shape(peer_shape, self.types) else {
                 self.errors.push(MirError::unsupported(
                     expr.span,
                     "matrix matmul peer with non-literal shape before MIR lowering",
@@ -1759,14 +1755,14 @@ impl FunctionBuilder<'_> {
                 .push(MirError::unsupported(expr.span, "vector·matrix requires a matrix peer"));
             return None;
         };
-        let Some(lanes) = crate::semantic::literal_vector_width(width, self.types) else {
+        let Some(lanes) = radix_semantic::literal_vector_width(width, self.types) else {
             self.errors.push(MirError::unsupported(
                 expr.span,
                 "vector·matrix vector width before MIR lowering",
             ));
             return None;
         };
-        let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types) else {
+        let Some((rows, columns)) = radix_semantic::literal_matrix_shape(shape, self.types) else {
             self.errors.push(MirError::unsupported(
                 expr.span,
                 "vector·matrix with non-literal matrix shape before MIR lowering",
@@ -2035,17 +2031,17 @@ impl FunctionBuilder<'_> {
         let neg_eps = MirOperand::Constant(MirConstant::Float(-0.000_001));
         let gt = self.assign_temp(
             MirValueKind::Binary { op: MirBinOp::Gt, lhs: det.clone(), rhs: eps },
-            MirType::semantic(self.types.primitive(crate::semantic::Primitive::Bivalens)),
+            MirType::semantic(self.types.primitive(radix_semantic::Primitive::Bivalens)),
             expr.span,
         );
         let lt = self.assign_temp(
             MirValueKind::Binary { op: MirBinOp::Lt, lhs: det.clone(), rhs: neg_eps },
-            MirType::semantic(self.types.primitive(crate::semantic::Primitive::Bivalens)),
+            MirType::semantic(self.types.primitive(radix_semantic::Primitive::Bivalens)),
             expr.span,
         );
         let invertible = self.assign_temp(
             MirValueKind::Binary { op: MirBinOp::Or, lhs: gt, rhs: lt },
-            MirType::semantic(self.types.primitive(crate::semantic::Primitive::Bivalens)),
+            MirType::semantic(self.types.primitive(radix_semantic::Primitive::Bivalens)),
             expr.span,
         );
 
@@ -2220,7 +2216,7 @@ impl FunctionBuilder<'_> {
         c: &MirOperand,
         d: &MirOperand,
         elem_ty: MirType,
-        span: crate::lexer::Span,
+        span: radix_lexer::Span,
     ) -> MirOperand {
         let ab = self.assign_temp(
             MirValueKind::Binary { op: MirBinOp::Mul, lhs: a.clone(), rhs: b.clone() },
@@ -2243,7 +2239,7 @@ impl FunctionBuilder<'_> {
         d: &MirOperand,
         scale: &MirOperand,
         elem_ty: MirType,
-        span: crate::lexer::Span,
+        span: radix_lexer::Span,
     ) -> MirOperand {
         let raw = self.mul_sub_mul(a, b, c, d, elem_ty, span);
         self.assign_temp(
@@ -2262,7 +2258,7 @@ impl FunctionBuilder<'_> {
         y: &MirOperand,
         z: &MirOperand,
         elem_ty: MirType,
-        span: crate::lexer::Span,
+        span: radix_lexer::Span,
     ) -> MirOperand {
         let p0 = self.assign_temp(
             MirValueKind::Binary { op: MirBinOp::Mul, lhs: r0.clone(), rhs: x.clone() },
@@ -2323,7 +2319,7 @@ impl FunctionBuilder<'_> {
         // contraction, which the MIR lane fails closed on rather than
         // truncating or stretching the grid.
         let declared = match self.types.get(result_ty.semantic_id()) {
-            Type::Matrix(_, shape) => crate::semantic::literal_matrix_shape(*shape, self.types),
+            Type::Matrix(_, shape) => radix_semantic::literal_matrix_shape(*shape, self.types),
             _ => None,
         };
         if !matches!(declared, Some((r, c)) if r == rows && c == rhs_columns) {
@@ -2472,8 +2468,8 @@ impl FunctionBuilder<'_> {
         }
         let receiver_ty = receiver.ty?;
         let normalized = self.normalized_type(receiver_ty);
-        let entry = crate::intrinsics::lookup_method_for_type(normalized, method_name, args.len())?;
-        if !matches!(entry.receiver, crate::intrinsics::IntrinsicReceiver::Numeric) {
+        let entry = radix_intrinsics::lookup_method_for_type(normalized, method_name, args.len())?;
+        if !matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Numeric) {
             return None;
         }
         self.lower_potentia(receiver, receiver_ty, args, expr)
@@ -2771,7 +2767,7 @@ impl FunctionBuilder<'_> {
             )]
             let index_operand = MirOperand::Constant(MirConstant::Int(index as i64));
             args.push(MirOperand::Place(MirPlace {
-                base: crate::mir::MirPlaceBase::Temp(temp),
+                base: radix_mir::MirPlaceBase::Temp(temp),
                 projections: vec![MirProjection::Index(index_operand)],
             }));
         }
@@ -3021,7 +3017,7 @@ impl FunctionBuilder<'_> {
             .unwrap_or(false)
         {
             return Some(self.runtime_call_value(
-                MirIntrinsic::CursorStream(crate::mir::MirCursorStream { callee: def_id, stepped: false }),
+                MirIntrinsic::CursorStream(radix_mir::MirCursorStream { callee: def_id, stepped: false }),
                 lowered_args,
                 ty,
                 expr.span,
@@ -3331,8 +3327,8 @@ impl FunctionBuilder<'_> {
             return Some(MirCollectionOp::TensorCreate);
         }
         let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
-        let entry = crate::intrinsics::lookup_method_for_type(payload, method_name, args.len())?;
-        crate::intrinsics::mir_collection_op(entry)
+        let entry = radix_intrinsics::lookup_method_for_type(payload, method_name, args.len())?;
+        radix_intrinsics::mir_collection_op(entry)
     }
 
     pub(super) fn resolve_method_name(&self, method: Symbol) -> Option<&str> {
@@ -3349,8 +3345,8 @@ impl FunctionBuilder<'_> {
         self.append_stmt(MirStatement {
             kind: MirStatementKind::RuntimeCall {
                 destination: None,
-                call: crate::mir::MirRuntimeCall {
-                    intrinsic: crate::mir::MirIntrinsic::Panic,
+                call: radix_mir::MirRuntimeCall {
+                    intrinsic: radix_mir::MirIntrinsic::Panic,
                     args: vec![value],
                     return_ty: numquam,
                 },
@@ -3700,7 +3696,7 @@ impl FunctionBuilder<'_> {
         }
         if recovery.is_none()
             && let Type::Matrix(_, shape) = self.normalized_type(target).clone()
-            && let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types)
+            && let Some((rows, columns)) = radix_semantic::literal_matrix_shape(shape, self.types)
             && let HirExpressionKind::Array(elements) = &source.kind
         {
             return self.lower_matrix_from_nested_lista(elements, rows, columns, ty, expr);
@@ -3847,7 +3843,7 @@ impl FunctionBuilder<'_> {
     /// reduced or clamped here, at compile time, instead of by a runtime
     /// conversion that would range-check.
     fn fold_word_store_constant(&self, source: &HirExpression, target: TypeId) -> Option<MirOperand> {
-        let value = crate::semantic::passes::const_int_value(source)?;
+        let value = radix_semantic::passes::const_int_value(source)?;
         let (width, saturating) = match self.normalized_type(target) {
             Type::ModularWord(width) => (*width, false),
             Type::SaturatingWord(width) => (*width, true),
@@ -4542,7 +4538,7 @@ impl FunctionBuilder<'_> {
         };
         let payload_id = self.method_receiver_payload_id(receiver_ty);
         let payload = self.types.get(payload_id);
-        let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, method_name, args.len()) else {
+        let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, method_name, args.len()) else {
             return false;
         };
         if !entry.failable {
@@ -4579,9 +4575,9 @@ impl FunctionBuilder<'_> {
         };
         let literal = |expr: &HirExpression| -> Option<i128> {
             match &expr.kind {
-                HirExpressionKind::Literal(crate::hir::HirLiteral::Int(value)) => Some(i128::from(*value)),
-                HirExpressionKind::Unary(crate::hir::HirUnOp::Neg, inner) => match &inner.kind {
-                    HirExpressionKind::Literal(crate::hir::HirLiteral::Int(value)) => i128::from(*value).checked_neg(),
+                HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => Some(i128::from(*value)),
+                HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => match &inner.kind {
+                    HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => i128::from(*value).checked_neg(),
                     _ => None,
                 },
                 _ => None,
@@ -4591,7 +4587,7 @@ impl FunctionBuilder<'_> {
             HirExpressionKind::Array(elements) => elements
                 .iter()
                 .map(|element| match element {
-                    crate::hir::HirArrayElement::Expr(inner) => literal(inner),
+                    radix_hir::HirArrayElement::Expr(inner) => literal(inner),
                     _ => None,
                 })
                 .collect(),

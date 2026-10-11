@@ -16,7 +16,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::visit::HirVisitor;
+use radix_hir::visit::HirVisitor;
 
 /// Visitor that lowers the MIR-producing subset of HIR items.
 ///
@@ -64,7 +64,7 @@ impl HirVisitor for ItemLoweringPass<'_, '_, '_> {
                 // template through the ordinary MIR route would either
                 // reject an AIR-only body or bypass the pre-AIR contract.
                 if !function.type_params.is_empty()
-                    && self.lowerer.unit.radix_lanes.lane_for(item.def_id) == Some(crate::semantic::RadixLane::Air)
+                    && self.lowerer.unit.radix_lanes.lane_for(item.def_id) == Some(radix_semantic::RadixLane::Air)
                 {
                     return;
                 }
