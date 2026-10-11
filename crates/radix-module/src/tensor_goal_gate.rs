@@ -11,6 +11,12 @@ use crate::diagnostics::DiagnosticArg;
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::semantic::{NumericWidth, Primitive, Type, TypeTable};
 
+/// Run the type-system gates for sized numerics and tensor construction.
+///
+/// # Panics
+///
+/// Panics if any gate assertion fails: width assignability, the `i32` type
+/// spelling, tensor interning, or the tensor-declaration typecheck.
 pub fn run_types_gate() {
     let mut types = TypeTable::new();
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
@@ -40,6 +46,13 @@ pub fn run_types_gate() {
     assert!(result.is_ok(), "tensor decl should typecheck: {:?}", result.err());
 }
 
+/// Run the conversio gates for sized numerics and the retired wrapper spelling.
+///
+/// # Panics
+///
+/// Panics if a sized conversio unexpectedly fails to typecheck, or if the
+/// retired `numerus<f32>` spelling is not rejected with the expected wrapper
+/// diagnostic.
 pub fn run_convert_gate() {
     let session = Session::new(Config::default());
 

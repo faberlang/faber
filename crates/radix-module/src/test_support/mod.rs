@@ -140,6 +140,11 @@ pub fn cargo_managed_temp_root() -> PathBuf {
 /// process per prefix. Recovers dirs orphaned by crashed/killed test runs;
 /// `cargo clean` is the primary sweep and this is the safety net for abnormal
 /// termination (entries older than 24h).
+///
+/// # Panics
+///
+/// Panics if the sweep mutex is poisoned, or if the managed temp root cannot
+/// be resolved by [`cargo_managed_temp_root`].
 pub fn sweep_managed_temp(prefix: &str) {
     static SWEPT: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
     let mut swept = SWEPT.lock().expect("sweep lock");

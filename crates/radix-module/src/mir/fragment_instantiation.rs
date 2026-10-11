@@ -221,15 +221,15 @@ impl<'a> InstantiationChecker<'a> {
         &mut self,
         caller: RoleKind,
         caller_fn: &'a MirFunction,
-        callee: &MirCallee,
+        target: &MirCallee,
         args: &[MirOperand],
         destination: Option<&MirPlace>,
         failable: bool,
         span: Span,
     ) {
-        let Some((callee_id, callee_role, definition_span)) = self.resolve_callee(callee) else {
+        let Some((callee_id, callee_role, definition_span)) = self.resolve_callee(target) else {
             if matches!(caller, RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel)
-                && matches!(callee, MirCallee::Closure(_) | MirCallee::Value(_))
+                && matches!(target, MirCallee::Closure(_) | MirCallee::Value(_))
             {
                 self.context(caller, "host_callable", span, None);
             }
@@ -244,26 +244,20 @@ impl<'a> InstantiationChecker<'a> {
             // callers — a kernel caller or fragment composes it, it composes
             // entries/helpers itself, and a host caller's direct call is the
             // launch boundary (unmatched, so legal).
-            (RoleKind::Entry, RoleKind::Entry) => {
-                self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
-            }
-            (RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel, RoleKind::Fragment) => {
-                self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
+            (RoleKind::Entry, RoleKind::Entry)
+            | (RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel, RoleKind::Fragment)
+            | (RoleKind::Entry | RoleKind::Fragment, RoleKind::SyntheticKernel)
+            | (RoleKind::SyntheticKernel, RoleKind::Entry | RoleKind::SyntheticKernel) => {
+                self.check_instantiation(caller, caller_fn, target, callee_id, args, destination, failable, span);
             }
             (RoleKind::Fragment, RoleKind::Entry) => {
                 self.context(caller, "entry_callee", span, Some(definition_span));
             }
-            (RoleKind::Entry | RoleKind::Fragment, RoleKind::SyntheticKernel)
-            | (RoleKind::SyntheticKernel, RoleKind::Entry | RoleKind::SyntheticKernel) => {
-                self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
-            }
             (RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel, RoleKind::Graphics) => {
                 self.context(caller, "graphics_stage", span, Some(definition_span));
             }
-            (RoleKind::Ordinary | RoleKind::Graphics, RoleKind::Fragment) => {
-                self.context(caller, "host_callable", span, Some(definition_span));
-            }
-            (RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel, RoleKind::Ordinary) => {
+            (RoleKind::Ordinary | RoleKind::Graphics, RoleKind::Fragment)
+            | (RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel, RoleKind::Ordinary) => {
                 self.context(caller, "host_callable", span, Some(definition_span));
             }
             _ => {}
@@ -274,7 +268,7 @@ impl<'a> InstantiationChecker<'a> {
         &mut self,
         caller: RoleKind,
         caller_fn: &'a MirFunction,
-        callee: &MirCallee,
+        target: &MirCallee,
         callee_id: MirFunctionId,
         args: &[MirOperand],
         destination: Option<&MirPlace>,
@@ -285,7 +279,7 @@ impl<'a> InstantiationChecker<'a> {
             return;
         };
         let definition_span = Some(sig.span);
-        if !self.bindings_solved(callee, sig) {
+        if !self.bindings_solved(target, sig) {
             self.ty(caller, "bindings", span, definition_span, None, None);
             return;
         }
@@ -676,13 +670,10 @@ fn resolve_ty(types: &TypeTable, ty: TypeId) -> TypeId {
 
 fn is_device_safe_type(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(resolve_ty(types, ty)) {
-        Type::Primitive(Primitive::Textus | Primitive::Ascii | Primitive::Octeti | Primitive::Ignotum) => false,
-        Type::Primitive(_) | Type::SizedNumeric(_, _) | Type::ModularWord(_) | Type::SizedInstans(_) => true,
-        Type::Tensor(_, _) | Type::Vector(_, _) | Type::Matrix(_, _) | Type::Sparsa(_, _) | Type::Atomic(_) => true,
-        Type::Struct(_) => true,
-        Type::Applied(inner, _) => is_device_safe_type(types, *inner),
-        Type::Param(_) | Type::Infer(_) => false,
-        Type::Array(_)
+        Type::Primitive(Primitive::Textus | Primitive::Ascii | Primitive::Octeti | Primitive::Ignotum)
+        | Type::Param(_)
+        | Type::Infer(_)
+        | Type::Array(_)
         | Type::Map(_, _)
         | Type::Set(_)
         | Type::Record(_)
@@ -696,6 +687,17 @@ fn is_device_safe_type(types: &TypeTable, ty: TypeId) -> bool {
         | Type::Intervallum(_)
         | Type::Enum(_)
         | Type::Interface(_) => false,
+        Type::Primitive(_)
+        | Type::SizedNumeric(_, _)
+        | Type::ModularWord(_)
+        | Type::SizedInstans(_)
+        | Type::Tensor(_, _)
+        | Type::Vector(_, _)
+        | Type::Matrix(_, _)
+        | Type::Sparsa(_, _)
+        | Type::Atomic(_)
+        | Type::Struct(_) => true,
+        Type::Applied(inner, _) => is_device_safe_type(types, *inner),
         _ => false,
     }
 }

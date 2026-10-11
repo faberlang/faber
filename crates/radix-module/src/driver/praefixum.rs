@@ -90,10 +90,9 @@ mod evaluation {
         body: &str,
         defer_imported: bool,
     ) -> Result<(), Vec<Diagnostic>> {
-        let order = match semantic::passes::praefixum::evaluation_order(&unit.hir, &unit.types) {
-            Ok(order) => order,
+        let Ok(order) = semantic::passes::praefixum::evaluation_order(&unit.hir, &unit.types) else {
             // Analysis already reported the cycle.
-            Err(_) => return Ok(()),
+            return Ok(());
         };
         if order.is_empty() {
             return Ok(());
@@ -148,10 +147,9 @@ mod evaluation {
         imports: &mut dyn ImportedEffects,
         run: &mut dyn FnMut(AnalyzedModule, DefId, Span) -> Result<Value, SemanticError>,
     ) -> Result<(), Vec<Diagnostic>> {
-        let order = match semantic::passes::praefixum::evaluation_order(&unit.hir, &unit.types) {
-            Ok(order) => order,
+        let Ok(order) = semantic::passes::praefixum::evaluation_order(&unit.hir, &unit.types) else {
             // Analysis already reported the cycle.
-            Err(_) => return Ok(()),
+            return Ok(());
         };
         let mut errors = Vec::new();
         for site in &order {
