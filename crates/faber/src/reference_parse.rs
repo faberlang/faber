@@ -22,6 +22,13 @@ struct ExemplaFrontmatter {
 }
 
 /// Parse one exempla file into an explain registry entry.
+///
+/// # Errors
+///
+/// Returns an error when the frontmatter is missing or cannot be split, when it
+/// does not parse as TOML, when it lacks the `kind`, `category`, `summary` or
+/// `syntax` field, when `kind` is unknown, or when the assembled entry fails
+/// validation.
 pub fn entry_from_exempla(
     path_label: &str,
     source: &str,
@@ -84,6 +91,11 @@ pub fn entry_from_exempla(
 }
 
 /// Build a legacy explain entry from a redirect row and its canonical target.
+///
+/// # Errors
+///
+/// Returns an error if the constructed entry fails validation: empty syntax or
+/// summary, an empty body, or a body without a fab code example.
 pub fn legacy_entry_from_redirect(
     redirect_term: &str,
     canonical: &str,

@@ -187,6 +187,11 @@ impl std::error::Error for ExplainError {}
 
 impl Registry {
     /// Build the explain registry from the reference embedded in this binary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded reference pack cannot be read or the
+    /// registry cannot be built from it.
     pub fn load() -> Result<Self, ExplainError> {
         crate::reference::ReferencePack::embedded()?.build_registry()
     }
@@ -430,6 +435,10 @@ pub fn render_search(query: &str, hits: &[SearchHit<'_>]) -> String {
 }
 
 /// Render one lookup result as JSON while preserving resolution provenance.
+///
+/// # Errors
+///
+/// Returns an error if the lookup cannot be serialized to JSON.
 pub fn render_json(lookup: &Lookup<'_>) -> Result<String, ExplainError> {
     match lookup {
         Lookup::Exact(entry) => serde_json::to_string_pretty(entry),
@@ -509,6 +518,10 @@ pub fn render_list(registry: &Registry) -> String {
 /// Records carry `term`, `kind`, `category`, and `summary` in the same order as
 /// [`render_list`] (kind groups, then registry order), so a consumer gets the
 /// plain list without parsing fixed-width text. Legacy entries are omitted.
+///
+/// # Errors
+///
+/// Returns an error if the rows cannot be serialized to JSON.
 pub fn render_list_json(registry: &Registry) -> Result<String, ExplainError> {
     let rows = LIST_KIND_ORDER
         .iter()

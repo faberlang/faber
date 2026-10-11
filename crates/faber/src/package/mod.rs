@@ -304,6 +304,13 @@ pub fn absolutize_path(path: &Path) -> std::path::PathBuf {
     radix::program::paths::normalize_path(&path)
 }
 
+/// Discover the package containing `input`, reading and validating its manifest
+/// when it is manifest-backed.
+///
+/// # Errors
+///
+/// Returns the discovery diagnostic when the package cannot be located, or the
+/// manifest diagnostic when a present manifest cannot be read or validated.
 pub fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
     let path = absolutize_path(input);
     let spec = radix::program::discovery::discover_package_with_base(&path, &resolution_base())?;
@@ -362,6 +369,11 @@ pub fn test_input_route(path: &Path, no_package: bool) -> TestInputRoute {
     }
 }
 
+/// Discover the build layout for `input`.
+///
+/// # Errors
+///
+/// Returns the discovery diagnostic when the layout cannot be determined.
 pub fn discover_build_layout(
     input: &Path,
 ) -> Result<radix::program::discovery::BuildLayout, Box<Diagnostic>> {
@@ -419,6 +431,11 @@ const PLATFORM_DEFAULT_PROVIDERS: &[&str] = &["norma"];
 
 /// Build a library resolver for a package root, attaching `faber.toml`
 /// dependencies and `faber.lock` interface roots when present.
+///
+/// # Errors
+///
+/// Returns the diagnostics when the manifest or lockfile cannot be read, when
+/// the lock fails dependency validation, or when the lock index cannot be built.
 pub fn library_resolver_for_package(
     config: &radix::module::driver::Config,
     package_root: &std::path::Path,

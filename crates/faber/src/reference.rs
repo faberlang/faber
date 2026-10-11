@@ -98,6 +98,11 @@ struct LegacyRedirectRow {
 
 impl ReferencePack {
     /// The reference compiled into this binary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded exempla or legacy-redirect sources fail
+    /// to parse (see [`Self::from_sources`]).
     pub fn embedded() -> Result<Self, ReferenceError> {
         Self::from_sources(EMBEDDED_EXEMPLA, EMBEDDED_LEGACY_REDIRECTS)
     }
@@ -107,6 +112,13 @@ impl ReferencePack {
     /// A file contributes the terms its frontmatter lists under `explains`;
     /// files without that key are ignored. Terms are ordered by term string so
     /// the registry does not depend on file order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a source's frontmatter cannot be split or parsed as
+    /// TOML, when one term is explained by more than one file, when the legacy
+    /// redirects do not parse, when a legacy redirect is duplicated, or when it
+    /// points at a term no file explains.
     pub fn from_sources(files: &[(&str, &str)], legacy_toml: &str) -> Result<Self, ReferenceError> {
         let mut terms = Vec::new();
         let mut sources = BTreeMap::new();
@@ -199,6 +211,11 @@ impl ReferencePack {
     }
 
     /// Parse exempla entries and build an explain [`Registry`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an exempla entry or a legacy redirect entry fails to
+    /// build, or if the assembled registry fails validation.
     pub fn build_registry(&self) -> Result<Registry, ExplainError> {
         let mut entries = Vec::new();
 
