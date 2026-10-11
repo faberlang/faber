@@ -4800,7 +4800,6 @@ impl FunctionBuilder<'_> {
             .push(MirLocalDecl { id: axis, name: None, ty: numerus, mutable: true, span });
         let receiver = MirOperand::Place(MirPlace::local(locals[0]));
         let index = MirOperand::Place(MirPlace::local(locals[1]));
-        let value = MirOperand::Place(MirPlace::local(locals[2]));
         let axis_place = MirPlace::local(axis);
 
         let entry = nested.fresh_block(span);
@@ -4840,7 +4839,7 @@ impl FunctionBuilder<'_> {
             fail,
             span,
         );
-        emit_checked_tensor_helper_result(&mut nested, op, receiver, index, value, return_ty, ok, fail, span);
+        emit_checked_tensor_helper_result(&mut nested, op, receiver, index, &locals, return_ty, ok, fail, span);
 
         Some(Self::finish_synthetic_function(
             &mut self.errors,
@@ -5046,12 +5045,18 @@ fn emit_checked_tensor_helper_loop(
 /// Emit the terminal blocks of a checked tensor helper: `ok` performs the
 /// `TensorSet` store (returning unit) or the `TensorGet` read, and `fail`
 /// returns the `ponde`/`accipe` invalid-index error.
+/// # Panics
+///
+/// A `TensorSet` helper body is `(in receiver, index, value)`, so its third
+/// parameter local is present whenever this path is taken; the index at
+/// `locals[2]` sits inside the `TensorSet` arm deliberately, because the
+/// two-parameter form (`accipe`) never reaches it.
 fn emit_checked_tensor_helper_result(
     nested: &mut FunctionBuilder<'_>,
     op: MirCollectionOp,
     receiver: MirOperand,
     index: MirOperand,
-    value: MirOperand,
+    locals: &[MirLocalId],
     return_ty: MirType,
     ok: MirBlockId,
     fail: MirBlockId,
@@ -5059,6 +5064,7 @@ fn emit_checked_tensor_helper_result(
 ) {
     nested.switch_to(ok);
     if op == MirCollectionOp::TensorSet {
+        let value = MirOperand::Place(MirPlace::local(locals[2]));
         nested.runtime_call_to_place(
             None,
             MirIntrinsic::Collection(MirCollectionOp::TensorSet),
