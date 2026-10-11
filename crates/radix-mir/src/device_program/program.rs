@@ -92,41 +92,7 @@ impl DeviceProgram {
             return Err(DeviceProgramError::EmptyLaunches);
         }
 
-        for (kernel_index, kernel) in self.kernels.iter().enumerate() {
-            if kernel.entry.trim().is_empty() {
-                return Err(DeviceProgramError::EmptyEntryName {
-                    kernel: kernel_index,
-                });
-            }
-            kernel
-                .plan
-                .validate()
-                .map_err(|error| DeviceProgramError::Plan { error })?;
-            let mut seen_bindings: Vec<Binding> = Vec::new();
-            for resource in &kernel.resources {
-                if resource.version.version == 0 {
-                    return Err(DeviceProgramError::ZeroVersion {
-                        buffer: resource.buffer.id,
-                        version: resource.version.version,
-                    });
-                }
-                if seen_bindings.contains(&resource.binding) {
-                    return Err(DeviceProgramError::RepeatedBinding {
-                        kernel: kernel_index,
-                        group: resource.binding.group,
-                        binding: resource.binding.binding,
-                    });
-                }
-                seen_bindings.push(resource.binding);
-                if !role_permits_access(resource.buffer.role, resource.access) {
-                    return Err(DeviceProgramError::RoleAccessMismatch {
-                        buffer: resource.buffer.id,
-                        role: resource.buffer.role,
-                        access: resource.access,
-                    });
-                }
-            }
-        }
+        validate_kernel_resources(&self.kernels)?;
 
         let mut seen_launches: Vec<LaunchId> = Vec::new();
         for launch in &self.launches {
@@ -211,26 +177,7 @@ impl DeviceProgram {
             }
         }
 
-        let mut first_identities: Vec<BufferIdentity> = Vec::new();
-        let mut first_shapes: Vec<super::helpers::ShapeRecord> = Vec::new();
-        for kernel in &self.kernels {
-            for resource in &kernel.resources {
-                record_identity(&mut first_identities, &resource.buffer)?;
-                record_shape(&mut first_shapes, resource.buffer.id, &resource.version)?;
-            }
-        }
-        for (result_index, result) in self.results.iter().enumerate() {
-            record_identity(&mut first_identities, &result.buffer)?;
-            record_shape(&mut first_shapes, result.buffer.id, &result.version)?;
-            if !result_is_produced(self, result) {
-                return Err(DeviceProgramError::ResultNotProduced {
-                    result: result_index,
-                    produced_by: result.produced_by,
-                    buffer: result.buffer.id,
-                    version: result.version.version,
-                });
-            }
-        }
+        validate_recorded_identities(self)?;
 
         Ok(())
     }
@@ -504,4 +451,75 @@ impl DeviceProgram {
         }
         Ok(())
     }
+}
+
+/// Per-kernel consistency rules: a non-empty entry name, a valid plan,
+/// unique `(group, binding)` slots, version numbers ≥ 1, and role/access
+/// agreement.
+fn validate_kernel_resources(
+    kernels: &[super::types::KernelUnit],
+) -> Result<(), DeviceProgramError> {
+    for (kernel_index, kernel) in kernels.iter().enumerate() {
+        if kernel.entry.trim().is_empty() {
+            return Err(DeviceProgramError::EmptyEntryName {
+                kernel: kernel_index,
+            });
+        }
+        kernel
+            .plan
+            .validate()
+            .map_err(|error| DeviceProgramError::Plan { error })?;
+        let mut seen_bindings: Vec<Binding> = Vec::new();
+        for resource in &kernel.resources {
+            if resource.version.version == 0 {
+                return Err(DeviceProgramError::ZeroVersion {
+                    buffer: resource.buffer.id,
+                    version: resource.version.version,
+                });
+            }
+            if seen_bindings.contains(&resource.binding) {
+                return Err(DeviceProgramError::RepeatedBinding {
+                    kernel: kernel_index,
+                    group: resource.binding.group,
+                    binding: resource.binding.binding,
+                });
+            }
+            seen_bindings.push(resource.binding);
+            if !role_permits_access(resource.buffer.role, resource.access) {
+                return Err(DeviceProgramError::RoleAccessMismatch {
+                    buffer: resource.buffer.id,
+                    role: resource.buffer.role,
+                    access: resource.access,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Cross-reference consistency: every reference to the same [`BufferId`]
+/// carries the same identity facts and the same shape for a given version,
+/// and every result is actually produced by its named launch.
+fn validate_recorded_identities(program: &DeviceProgram) -> Result<(), DeviceProgramError> {
+    let mut first_identities: Vec<BufferIdentity> = Vec::new();
+    let mut first_shapes: Vec<super::helpers::ShapeRecord> = Vec::new();
+    for kernel in &program.kernels {
+        for resource in &kernel.resources {
+            record_identity(&mut first_identities, &resource.buffer)?;
+            record_shape(&mut first_shapes, resource.buffer.id, &resource.version)?;
+        }
+    }
+    for (result_index, result) in program.results.iter().enumerate() {
+        record_identity(&mut first_identities, &result.buffer)?;
+        record_shape(&mut first_shapes, result.buffer.id, &result.version)?;
+        if !result_is_produced(program, result) {
+            return Err(DeviceProgramError::ResultNotProduced {
+                result: result_index,
+                produced_by: result.produced_by,
+                buffer: result.buffer.id,
+                version: result.version.version,
+            });
+        }
+    }
+    Ok(())
 }

@@ -837,109 +837,18 @@ fn validate_host_calls(
 
                     // ── Per-argument boundary checks (type + shape) ─────────
                     let arg_locals = args.iter().map(operand_base_local).collect::<Vec<_>>();
-                    for (position, argument) in args.iter().enumerate() {
-                        // Constant literals carry their plain primitive in MIR
-                        // and the general validator already gated them against
-                        // the declared param type at the call site — the
-                        // boundary's exact-type check applies to carried
-                        // *values*, not literals.
-                        if matches!(argument, MirOperand::Constant(_)) {
-                            continue;
-                        }
-                        let Some(argument_ty) = operand_ty(&scope, &values, argument) else {
-                            continue;
-                        };
-                        let declared = &kernel.params[position];
+                    check_call_argument_boundary(args, kernel, host, validation, &values, &scope)?;
 
-                        // Wrong type: the crossing value's element type must
-                        // exactly equal the kernel's declared boundary element
-                        // type.
-                        let argument_element = element_type_of(argument_ty, validation);
-                        let declared_element = element_type_of(declared.ty, validation);
-                        if let (Some(found), Some(expected)) = (argument_element, declared_element)
-                            && !validation
-                                .types
-                                .equals(found.semantic_id(), expected.semantic_id())
-                        {
-                            return Err(BoundaryAbiError::Type {
-                                host: host.id,
-                                kernel: kernel.id,
-                                position,
-                                expected,
-                                found,
-                            });
-                        }
+                    check_call_observation(
+                        args,
+                        host,
+                        kernel,
+                        &pending_outputs,
+                        &local_holds_output,
+                        &arg_locals,
+                    )?;
 
-                        // Wrong shape: the crossing value's element count must
-                        // equal the kernel's declared boundary element count.
-                        // An aggregate or unresolvable count is a shape
-                        // violation — the boundary is static-typed.
-                        let argument_count = element_count_of(argument_ty, validation);
-                        let declared_count = element_count_of(declared.ty, validation);
-                        if let Some(expected_count) = declared_count
-                            && argument_count != Some(expected_count)
-                        {
-                            return Err(BoundaryAbiError::Shape {
-                                host: host.id,
-                                kernel: kernel.id,
-                                position,
-                                expected_count,
-                                found_count: argument_count,
-                            });
-                        }
-                    }
-
-                    // ── Observation: no input may hold this kernel's own
-                    //    earlier output (the region result observed before
-                    //    its launch ran). ──────────────────────────────────
-                    for arg_local in arg_locals.iter().flatten() {
-                        if local_holds_output.contains(arg_local) {
-                            return Err(BoundaryAbiError::Observation {
-                                host: host.id,
-                                kernel: kernel.id,
-                                local: *arg_local,
-                            });
-                        }
-                    }
-                    // A direct temp argument that is still an un-assigned call
-                    // output (`scale_kernel(scale_kernel(x))` shape) observes
-                    // the producing launch's result as an input.
-                    for argument in args {
-                        if let MirOperand::Temp(temp) = argument
-                            && pending_outputs.contains_key(temp)
-                        {
-                            return Err(BoundaryAbiError::Observation {
-                                host: host.id,
-                                kernel: kernel.id,
-                                local: MirLocalId(temp.0),
-                            });
-                        }
-                    }
-
-                    // ── Lifetime: the output must not land in a host
-                    //    parameter (direct local destination). ─────────────
-                    if let Some(local) = destination_local
-                        && scope.parameter_local(local)
-                    {
-                        return Err(BoundaryAbiError::Lifetime {
-                            host: host.id,
-                            kernel: kernel.id,
-                            parameter: local,
-                        });
-                    }
-
-                    // ── Mutation: the output must not be routed into the
-                    //    storage of a read-only input value (direct aliasing
-                    //    or the value-flow `_1 = %t` pattern). ─────────────
-                    if let Some(local) = destination_local
-                        && arg_locals.contains(&Some(local))
-                    {
-                        return Err(BoundaryAbiError::Mutation {
-                            host: host.id,
-                            kernel: kernel.id,
-                            local,
-                        });
-                    }
+                    check_call_destination(destination_local, &arg_locals, &scope, host, kernel)?;
 
                     // Record the call's pending output for the value-flow
                     // checks (the temp destination, or the direct local).
@@ -999,6 +908,142 @@ fn validate_host_calls(
                 _ => {}
             }
         }
+    }
+    Ok(())
+}
+
+/// Per-argument boundary checks: each carried (non-literal) argument's element
+/// type and element count must match the kernel's declared boundary param.
+fn check_call_argument_boundary(
+    args: &[MirOperand],
+    kernel: &MirFunction,
+    host: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    values: &FxHashMap<MirValueId, MirType>,
+    scope: &HostFunctionScope<'_>,
+) -> Result<(), BoundaryAbiError> {
+    for (position, argument) in args.iter().enumerate() {
+        // Constant literals carry their plain primitive in MIR
+        // and the general validator already gated them against
+        // the declared param type at the call site — the
+        // boundary's exact-type check applies to carried
+        // *values*, not literals.
+        if matches!(argument, MirOperand::Constant(_)) {
+            continue;
+        }
+        let Some(argument_ty) = operand_ty(scope, values, argument) else {
+            continue;
+        };
+        let declared = &kernel.params[position];
+
+        // Wrong type: the crossing value's element type must
+        // exactly equal the kernel's declared boundary element
+        // type.
+        let argument_element = element_type_of(argument_ty, validation);
+        let declared_element = element_type_of(declared.ty, validation);
+        if let (Some(found), Some(expected)) = (argument_element, declared_element)
+            && !validation
+                .types
+                .equals(found.semantic_id(), expected.semantic_id())
+        {
+            return Err(BoundaryAbiError::Type {
+                host: host.id,
+                kernel: kernel.id,
+                position,
+                expected,
+                found,
+            });
+        }
+
+        // Wrong shape: the crossing value's element count must
+        // equal the kernel's declared boundary element count.
+        // An aggregate or unresolvable count is a shape
+        // violation — the boundary is static-typed.
+        let argument_count = element_count_of(argument_ty, validation);
+        let declared_count = element_count_of(declared.ty, validation);
+        if let Some(expected_count) = declared_count
+            && argument_count != Some(expected_count)
+        {
+            return Err(BoundaryAbiError::Shape {
+                host: host.id,
+                kernel: kernel.id,
+                position,
+                expected_count,
+                found_count: argument_count,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Observation checks: no call input may hold this kernel's own earlier output
+/// (the region result observed before its launch ran).
+fn check_call_observation(
+    args: &[MirOperand],
+    host: &MirFunction,
+    kernel: &MirFunction,
+    pending_outputs: &FxHashMap<MirTempId, Vec<MirLocalId>>,
+    local_holds_output: &[MirLocalId],
+    arg_locals: &[Option<MirLocalId>],
+) -> Result<(), BoundaryAbiError> {
+    for arg_local in arg_locals.iter().flatten() {
+        if local_holds_output.contains(arg_local) {
+            return Err(BoundaryAbiError::Observation {
+                host: host.id,
+                kernel: kernel.id,
+                local: *arg_local,
+            });
+        }
+    }
+    // A direct temp argument that is still an un-assigned call
+    // output (`scale_kernel(scale_kernel(x))` shape) observes
+    // the producing launch's result as an input.
+    for argument in args {
+        if let MirOperand::Temp(temp) = argument
+            && pending_outputs.contains_key(temp)
+        {
+            return Err(BoundaryAbiError::Observation {
+                host: host.id,
+                kernel: kernel.id,
+                local: MirLocalId(temp.0),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Destination checks: the call's output must not land in a host parameter
+/// (a lifetime escape) nor be routed into the storage of a read-only input.
+fn check_call_destination(
+    destination_local: Option<MirLocalId>,
+    arg_locals: &[Option<MirLocalId>],
+    scope: &HostFunctionScope<'_>,
+    host: &MirFunction,
+    kernel: &MirFunction,
+) -> Result<(), BoundaryAbiError> {
+    // ── Lifetime: the output must not land in a host
+    //    parameter (direct local destination). ─────────────
+    if let Some(local) = destination_local
+        && scope.parameter_local(local)
+    {
+        return Err(BoundaryAbiError::Lifetime {
+            host: host.id,
+            kernel: kernel.id,
+            parameter: local,
+        });
+    }
+
+    // ── Mutation: the output must not be routed into the
+    //    storage of a read-only input value (direct aliasing
+    //    or the value-flow `_1 = %t` pattern). ─────────────
+    if let Some(local) = destination_local
+        && arg_locals.contains(&Some(local))
+    {
+        return Err(BoundaryAbiError::Mutation {
+            host: host.id,
+            kernel: kernel.id,
+            local,
+        });
     }
     Ok(())
 }
