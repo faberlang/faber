@@ -206,6 +206,30 @@ impl TypeChecker<'_> {
             return Some(Err(()));
         }
 
+        let unified_dims =
+            match self.unify_shape_dimensions(boundary, span, actual_dims, expected_dims) {
+                Some(Ok(dims)) => dims,
+                Some(Err(())) => return Some(Err(())),
+                None => return None,
+            };
+        let unified = if matches!(self.types.get_index(actual_shape), IndexExpr::Tuple(_)) {
+            self.types.intern_index(IndexExpr::Tuple(unified_dims))
+        } else {
+            unified_dims.first().copied().unwrap_or(actual_shape)
+        };
+        Some(Ok(unified))
+    }
+
+    /// Unify a boundary call's or return's shape one axis at a time, retaining
+    /// recoverable runtime relations and rejecting concrete contradictions.
+    /// `None` means no runtime boundary was active for an axis read.
+    fn unify_shape_dimensions(
+        &mut self,
+        boundary: ShapeRelationBoundary,
+        span: Span,
+        actual_dims: Vec<IndexId>,
+        expected_dims: Vec<IndexId>,
+    ) -> Option<Result<Vec<IndexId>, ()>> {
         let mut unified_dims = Vec::with_capacity(actual_dims.len());
         for (axis, (actual, expected)) in actual_dims.into_iter().zip(expected_dims).enumerate() {
             let mut actual = self.resolve_index(actual);
@@ -259,22 +283,37 @@ impl TypeChecker<'_> {
                 let mut unifier = self.index_infer.unifier(self.types);
                 unifier.unify(actual, expected)
             };
-            match unified {
-                Ok(index) => unified_dims.push(index),
-                Err(_) => {
-                    // The unifier can have already bound this dimension's
-                    // original inference hole while checking an earlier
-                    // argument. Resolve that binding before retaining a
-                    // recoverable relation; otherwise the backend receives
-                    // an Infer node instead of the first argument's witness.
-                    let expected = self.canonicalize_index(expected);
-                    // A concrete arithmetic failure is a contradiction, not
-                    // an unknown runtime relation. In particular, after an
-                    // earlier argument binds D=5, `D / 2` cannot match a
-                    // tensor of width 2: exactness must reject at this call.
-                    if radix_types::evaluate_index_dimension(actual, self.types).is_err()
-                        || radix_types::evaluate_index_dimension(expected, self.types).is_err()
-                    {
+            if let Ok(index) = unified {
+                unified_dims.push(index);
+            } else {
+                // The unifier can have already bound this dimension's
+                // original inference hole while checking an earlier
+                // argument. Resolve that binding before retaining a
+                // recoverable relation; otherwise the backend receives
+                // an Infer node instead of the first argument's witness.
+                let expected = self.canonicalize_index(expected);
+                // A concrete arithmetic failure is a contradiction, not
+                // an unknown runtime relation. In particular, after an
+                // earlier argument binds D=5, `D / 2` cannot match a
+                // tensor of width 2: exactness must reject at this call.
+                if radix_types::evaluate_index_dimension(actual, self.types).is_err()
+                    || radix_types::evaluate_index_dimension(expected, self.types).is_err()
+                {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+                        span,
+                    );
+                    return Some(Err(()));
+                }
+                let actual_static = radix_types::evaluate_index_dimension(actual, self.types)
+                    .ok()
+                    .flatten();
+                let expected_static = radix_types::evaluate_index_dimension(expected, self.types)
+                    .ok()
+                    .flatten();
+                if let (Some(left), Some(right)) = (actual_static, expected_static) {
+                    if left != right {
                         self.error_issue(
                             SemanticErrorKind::TypeMismatch,
                             ISSUE_INCOMPATIBLE_TENSOR_INDEX,
@@ -282,44 +321,22 @@ impl TypeChecker<'_> {
                         );
                         return Some(Err(()));
                     }
-                    let actual_static = radix_types::evaluate_index_dimension(actual, self.types)
-                        .ok()
-                        .flatten();
-                    let expected_static =
-                        radix_types::evaluate_index_dimension(expected, self.types)
-                            .ok()
-                            .flatten();
-                    if let (Some(left), Some(right)) = (actual_static, expected_static) {
-                        if left != right {
-                            self.error_issue(
-                                SemanticErrorKind::TypeMismatch,
-                                ISSUE_INCOMPATIBLE_TENSOR_INDEX,
-                                span,
-                            );
-                            return Some(Err(()));
-                        }
-                        unified_dims.push(self.types.intern_index(IndexExpr::Literal(left)));
-                        continue;
-                    }
-
-                    let (runtime_actual, _) = self.runtime_boundary_axis(axis as u32)?;
-                    // A value-shape extent (a whole-figura `list<int>` value
-                    // name) has no scalar read: the producing conversion's
-                    // runtime count check owns the fact, so no axis equation
-                    // is retained against it.
-                    if !self.extent_binding_is_value_shape(expected) {
-                        self.record_shape_relation(runtime_actual, expected, span, boundary);
-                    }
-                    unified_dims.push(runtime_actual);
+                    unified_dims.push(self.types.intern_index(IndexExpr::Literal(left)));
+                    continue;
                 }
+
+                let (runtime_actual, _) = self.runtime_boundary_axis(axis as u32)?;
+                // A value-shape extent (a whole-figura `list<int>` value
+                // name) has no scalar read: the producing conversion's
+                // runtime count check owns the fact, so no axis equation
+                // is retained against it.
+                if !self.extent_binding_is_value_shape(expected) {
+                    self.record_shape_relation(runtime_actual, expected, span, boundary);
+                }
+                unified_dims.push(runtime_actual);
             }
         }
-        let unified = if matches!(self.types.get_index(actual_shape), IndexExpr::Tuple(_)) {
-            self.types.intern_index(IndexExpr::Tuple(unified_dims))
-        } else {
-            unified_dims.first().copied().unwrap_or(actual_shape)
-        };
-        Some(Ok(unified))
+        Some(Ok(unified_dims))
     }
 
     fn shape_dimensions(shape: IndexId, types: &TypeTable) -> Option<Vec<IndexId>> {
@@ -423,7 +440,55 @@ impl TypeChecker<'_> {
         // A direct dimension `N` is a usable witness for the generic symbol N.
         // Derived dimensions such as `N - 1` constrain an axis but cannot by
         // themselves recover N.
-        for (parameter, fields, shape, span) in &shapes {
+        self.install_shape_symbol_witnesses(type_params, params, &shapes);
+
+        for (parameter, fields, shape, span) in shapes {
+            let Some(dims) = Self::shape_dimensions(shape, self.types) else {
+                continue;
+            };
+            for (axis, dim) in dims.into_iter().enumerate() {
+                let expected = self.runtime_substitute_shape_params(dim);
+                let actual = self
+                    .types
+                    .intern_index(IndexExpr::Runtime(runtime_formal_axis(
+                        parameter,
+                        &fields,
+                        axis as u32,
+                    )));
+                // A statically known extent is a compile-time fact, and a
+                // non-scalar term (a rank tuple passed as a size argument,
+                // `Pondo<[D]>`) has no per-axis equation to check at runtime.
+                // The same holds for a value-shape extent: a whole-figura
+                // `list<int>` value name is read by the producing
+                // conversion's runtime count check, never per axis.
+                let no_entry_equation = matches!(
+                    radix_types::evaluate_index_dimension(expected, self.types),
+                    Ok(Some(_)) | Err(radix_types::IndexArithmeticError::NotScalar)
+                ) || self.extent_binding_is_value_shape(expected);
+                if !self.current_device_function
+                    && !no_entry_equation
+                    && !self.types.index_equals(actual, expected)
+                {
+                    self.record_shape_relation(
+                        actual,
+                        expected,
+                        span,
+                        ShapeRelationBoundary::FunctionEntry,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Install the generic-size witnesses a signature's formal tensor axes
+    /// carry, so each call records its own relation against the callee's axis.
+    fn install_shape_symbol_witnesses(
+        &mut self,
+        type_params: &[radix_hir::HirTypeParam],
+        params: &[HirParam],
+        shapes: &[(u32, Vec<Symbol>, IndexId, Span)],
+    ) {
+        for (parameter, fields, shape, span) in shapes {
             let Some(dims) = Self::shape_dimensions(*shape, self.types) else {
                 continue;
             };
@@ -498,43 +563,6 @@ impl TypeChecker<'_> {
                     witness,
                     *span,
                 );
-            }
-        }
-
-        for (parameter, fields, shape, span) in shapes {
-            let Some(dims) = Self::shape_dimensions(shape, self.types) else {
-                continue;
-            };
-            for (axis, dim) in dims.into_iter().enumerate() {
-                let expected = self.runtime_substitute_shape_params(dim);
-                let actual = self
-                    .types
-                    .intern_index(IndexExpr::Runtime(runtime_formal_axis(
-                        parameter,
-                        &fields,
-                        axis as u32,
-                    )));
-                // A statically known extent is a compile-time fact, and a
-                // non-scalar term (a rank tuple passed as a size argument,
-                // `Pondo<[D]>`) has no per-axis equation to check at runtime.
-                // The same holds for a value-shape extent: a whole-figura
-                // `list<int>` value name is read by the producing
-                // conversion's runtime count check, never per axis.
-                let no_entry_equation = matches!(
-                    radix_types::evaluate_index_dimension(expected, self.types),
-                    Ok(Some(_)) | Err(radix_types::IndexArithmeticError::NotScalar)
-                ) || self.extent_binding_is_value_shape(expected);
-                if !self.current_device_function
-                    && !no_entry_equation
-                    && !self.types.index_equals(actual, expected)
-                {
-                    self.record_shape_relation(
-                        actual,
-                        expected,
-                        span,
-                        ShapeRelationBoundary::FunctionEntry,
-                    );
-                }
             }
         }
     }
