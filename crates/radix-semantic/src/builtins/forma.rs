@@ -73,13 +73,6 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
         DepthExceeded, ExprKind, IfBody, Literal, Program, StmtKind, Visitor, walk_expr, walk_stmt,
     };
 
-    let Some(def_id) = def_id(resolver) else {
-        return false;
-    };
-    let Some(symbol) = resolver.get_symbol(def_id) else {
-        return false;
-    };
-
     struct FormaUsageVisitor {
         forma_name: Symbol,
         found: bool,
@@ -163,6 +156,13 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
             }
         }
     }
+
+    let Some(def_id) = def_id(resolver) else {
+        return false;
+    };
+    let Some(symbol) = resolver.get_symbol(def_id) else {
+        return false;
+    };
 
     let mut visitor = FormaUsageVisitor {
         forma_name: symbol.name,

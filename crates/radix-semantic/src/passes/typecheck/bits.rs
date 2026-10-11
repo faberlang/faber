@@ -234,13 +234,10 @@ impl TypeChecker<'_> {
         };
         match self.types.get(other) {
             Type::Bits(peer) => Some(same(peer.bits())),
-            Type::SizedNumeric(_, W::U8) => Some(same(8)),
-            Type::SizedNumeric(_, W::U16) => Some(same(16)),
-            Type::SizedNumeric(_, W::U32) => Some(same(32)),
+            Type::SizedNumeric(_, W::U8 | W::I8) => Some(same(8)),
+            Type::SizedNumeric(_, W::U16 | W::I16 | W::F16 | W::BF16) => Some(same(16)),
+            Type::SizedNumeric(_, W::U32 | W::I32 | W::F32) => Some(same(32)),
             Type::SizedNumeric(_, W::U64) => Some(same(64)),
-            Type::SizedNumeric(_, W::I8) => Some(same(8)),
-            Type::SizedNumeric(_, W::I16 | W::F16 | W::BF16) => Some(same(16)),
-            Type::SizedNumeric(_, W::I32 | W::F32) => Some(same(32)),
             Type::SizedNumeric(_, W::I64 | W::F64) | Type::Primitive(Primitive::Fractus) => {
                 Some(same(64))
             }

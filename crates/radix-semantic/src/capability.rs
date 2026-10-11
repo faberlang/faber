@@ -654,12 +654,6 @@ impl<'a> DerivedCapabilityQueries<'a> {
                     TypeLaw::Transfer | TypeLaw::ExplicitDuplicate,
                     AccessMarker::Own | AccessMarker::Copy,
                 ) => self.type_law(*inner, law, visiting),
-                // Borrow and acquisition views that cannot transfer still
-                // propagate classification failures from the pointee.
-                (TypeLaw::Transfer | TypeLaw::ExplicitDuplicate, _) => {
-                    self.classify_only(*inner, visiting)?;
-                    Ok(false)
-                }
                 // Duplicating a shared borrow copies the view itself; the
                 // pointee's own duplication law is not consulted, but its
                 // classification failures still propagate.
@@ -667,7 +661,10 @@ impl<'a> DerivedCapabilityQueries<'a> {
                     self.classify_only(*inner, visiting)?;
                     Ok(true)
                 }
-                (TypeLaw::TrivialDuplicate, _) => {
+                // Transfers and acquisitions that cannot take ownership, and
+                // duplications of any view other than a shared borrow, still
+                // propagate classification failures from the pointee.
+                (TypeLaw::Transfer | TypeLaw::ExplicitDuplicate | TypeLaw::TrivialDuplicate, _) => {
                     self.classify_only(*inner, visiting)?;
                     Ok(false)
                 }
@@ -798,20 +795,16 @@ impl<'a> DerivedCapabilityQueries<'a> {
         identity: &mut SolvedIndexedIdentity,
     ) -> Result<(), CapabilityReason> {
         self.index_solved(shape)?;
-        match self.types.get_index(shape) {
-            IndexExpr::Tuple(dims) => {
-                for dim in dims {
-                    self.index_solved(*dim)?;
-                    identity.dimensions.push(*dim);
-                    identity.tuple_order.push(*dim);
-                }
-                Ok(())
+        if let IndexExpr::Tuple(dims) = self.types.get_index(shape) {
+            for dim in dims {
+                self.index_solved(*dim)?;
+                identity.dimensions.push(*dim);
+                identity.tuple_order.push(*dim);
             }
-            _ => {
-                identity.dimensions.push(shape);
-                Ok(())
-            }
+        } else {
+            identity.dimensions.push(shape);
         }
+        Ok(())
     }
 
     fn solved_identity(
@@ -861,7 +854,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
                             identity.size_arguments.push(*size);
                         }
                         AppliedArg::Type(inner) => {
-                            self.solved_identity(*inner, visiting, identity)?
+                            self.solved_identity(*inner, visiting, identity)?;
                         }
                     }
                 }

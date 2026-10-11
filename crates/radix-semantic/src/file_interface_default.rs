@@ -164,7 +164,7 @@ fn rewrite_default(
 fn rewrite_literal(literal: &mut HirLiteral, text: &mut impl FnMut(&mut Symbol)) {
     match literal {
         HirLiteral::String(value) | HirLiteral::Ascii(value) | HirLiteral::Octeti(value) => {
-            text(value)
+            text(value);
         }
         HirLiteral::FloatText { text: value, .. } => text(value),
         HirLiteral::Regex(pattern, flags) => {
