@@ -195,6 +195,17 @@ impl super::FaberCodegen<'_> {
                     return;
                 }
                 HirExpressionKind::Literal(HirLiteral::JsonValor(_)) => writer.write("_ "),
+                // `_ [ … ]` the checker rewrote to an array or tuple: the
+                // hole's type form still sits under the node id. A bare
+                // `[ … ]` into a tuple cell has no such form and prints bare.
+                HirExpressionKind::Array(_) | HirExpressionKind::Tuple(..)
+                    if self.authored_type_forms.contains_key(&HirTypeSite {
+                        owner: HirOwnerRef::Hir(expr.id),
+                        slot: HirTypeSlot::AscriptionTarget,
+                    }) =>
+                {
+                    writer.write("_ ");
+                }
                 _ => {}
             }
         }
@@ -892,6 +903,9 @@ impl super::FaberCodegen<'_> {
                 // derive the prefix from it so re-emit typechecks.
                 let prefix_tys: Vec<_> = match type_args {
                     Some(args) => args.clone(),
+                    // A checker-built tuple (`_ [ … ]` or a bare `[ … ]` at a
+                    // tuple cell) re-emits as authored, with no type prefix.
+                    None if self.inferred_constructor_ids.contains(&expr.id) => Vec::new(),
                     None => match expr.ty.map(|ty| self.types.get(ty)) {
                         Some(radix_types::Type::Tuple(elems)) => elems.clone(),
                         _ => Vec::new(),

@@ -58,6 +58,9 @@ mod itera_range_emit_test;
 mod receiver_paren_test;
 
 #[cfg(test)]
+mod inferred_bracket_emit_test;
+
+#[cfg(test)]
 mod trivia_test;
 
 pub use module::{FaberCodegen, FaberOutput, empty_presentation};

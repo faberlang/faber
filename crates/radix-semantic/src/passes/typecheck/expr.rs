@@ -488,6 +488,13 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         let is_tuple = concrete.is_some_and(|ty| matches!(self.types.get(ty), Type::Tuple(_)));
+        if hole || is_tuple {
+            // The node is rewritten to an `Array` or `Tuple` and loses its
+            // authored shape; re-emission keys on this id to print `_ [ … ]`
+            // (the hole's type form survives under the node id) or the bare
+            // `[ … ]` the author wrote into a tuple cell.
+            self.inferred_constructor_ids.push(expr.id);
+        }
         if hole {
             let placeholder = HirExpressionKind::Tuple(Vec::new(), None);
             if let HirExpressionKind::Verte { source, .. } =
