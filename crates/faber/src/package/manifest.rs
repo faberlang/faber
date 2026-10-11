@@ -303,6 +303,10 @@ fn input_manifest(
 /// names an unreadable or unsupported target is always an error: the declared
 /// target is never silently ignored in favor of a default. A manifest naming
 /// no target resolves to the implicit portable default.
+///
+/// # Errors
+/// Fails when a discoverable manifest exists but cannot be read, or when it
+/// names an unsupported build target.
 pub fn manifest_package_build_target(input: &Path) -> Result<Option<Target>, Box<Diagnostic>> {
     let Some((manifest, path)) = input_manifest(input)? else {
         return Ok(None);
@@ -334,6 +338,10 @@ pub(crate) fn manifest_check_section(input: &Path) -> Option<ManifestCheck> {
 /// when the key is absent — the caller applies the portable default `auto`.
 /// An unsupported spelling fails closed with a structured diagnostic (never
 /// silently ignored).
+///
+/// # Errors
+/// Fails when the manifest names a device spelling outside the supported set
+/// (`auto`, `reference`, `cpu`, `metal`, `cuda`).
 #[cfg(feature = "runner")]
 pub fn manifest_device_choice(
     device: Option<&str>,
@@ -361,6 +369,10 @@ pub fn manifest_device_choice(
 /// route that takes `--device` (`faber run`, `faber test`). An invalid
 /// manifest value fails closed with a structured diagnostic (never silently
 /// ignored).
+///
+/// # Errors
+/// Fails when the discovered manifest cannot be read, or when its `[device]
+/// device` value is unsupported.
 #[cfg(feature = "runner")]
 pub fn resolve_device_selection(
     cli: Option<DeviceChoice>,
@@ -404,6 +416,10 @@ pub(crate) fn manifest_device_inputs(
 ///
 /// Unknown manifest fields are rejected by the manifest structs so spelling
 /// mistakes become diagnostics rather than silently ignored configuration.
+///
+/// # Errors
+/// Fails when the file cannot be read, when the TOML does not parse as a
+/// manifest, or when it uses the retired `[device] backend` key.
 pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
     let source =
         fs::read_to_string(path).map_err(|err| Box::new(Diagnostic::io_error(path, &err)))?;
@@ -461,84 +477,7 @@ pub(crate) fn validate_manifest(
     manifest: &FaberManifest,
     path: &Path,
 ) -> Result<(), Box<Diagnostic>> {
-    if manifest.package.name.trim().is_empty() {
-        return Err(Box::new(
-            crate::package_diagnostic_error("faber.toml package.name must not be empty")
-                .with_file(path.display().to_string()),
-        ));
-    }
-    if !is_valid_provider_segment(&manifest.package.name) {
-        return Err(Box::new(
-            crate::package_diagnostic_error(
-                "faber.toml package.name must contain only ASCII letters, numbers, underscore, or hyphen",
-            )
-            .with_file(path.display().to_string())
-            .with_arg("issue", "invalid_package_name"),
-        ));
-    }
-
-    if manifest.package.version.trim().is_empty() {
-        return Err(Box::new(
-            crate::package_diagnostic_error("faber.toml package.version must not be empty")
-                .with_file(path.display().to_string()),
-        ));
-    }
-
-    if manifest.package.edition.trim().is_empty() {
-        return Err(Box::new(
-            crate::package_diagnostic_error("faber.toml package.edition must not be empty")
-                .with_file(path.display().to_string()),
-        ));
-    }
-
-    if manifest.paths.source.trim().is_empty() {
-        return Err(Box::new(
-            crate::package_diagnostic_error("faber.toml paths.source must not be empty")
-                .with_file(path.display().to_string()),
-        ));
-    }
-
-    // FBR-P1-001: the supported source-root set is exactly `src` (default) and
-    // `.` (package root). Everything else — nested roots like
-    // `components/faber` or depth-1 customs like `lib` — is rejected loudly
-    // until a usage contract for custom source roots is decided. The
-    // `manifest_path_for_spec` probes are only provably complete for this set.
-    match manifest.paths.source.trim() {
-        "src" | "." => {}
-        unsupported => {
-            return Err(Box::new(
-                crate::package_diagnostic_error(format!(
-                    "faber.toml paths.source '{unsupported}' is not supported: only \"src\" (the default) and \".\" (the package root) are allowed until a usage contract for custom source roots is decided"
-                ))
-                .with_file(path.display().to_string())
-                .with_arg("issue", "package_member_unsupported_source_root")
-                .with_arg("source", unsupported.to_owned())
-                .with_arg("supported_source_roots", "src,.")
-                .with_arg("reason", "custom_source_root_usage_contract_pending"),
-            ));
-        }
-    }
-
-    if let Some(entry) = manifest.paths.entry.as_deref()
-        && entry.trim().is_empty()
-    {
-        return Err(Box::new(
-            crate::package_diagnostic_error("faber.toml paths.entry must not be empty")
-                .with_file(path.display().to_string()),
-        ));
-    }
-
-    if let Some(library) = &manifest.library
-        && !is_valid_provider_segment(&library.provider)
-    {
-        return Err(Box::new(
-                crate::package_diagnostic_error(
-                    "faber.toml library.provider must contain only ASCII letters, numbers, underscore, or hyphen",
-                )
-                .with_file(path.display().to_string())
-                .with_arg("issue", "invalid_library_provider"),
-            ));
-    }
+    validate_package_identity(manifest, path)?;
 
     match manifest.build.kind.as_str() {
         "bin" => validate_binary_build(manifest, path)?,
@@ -610,6 +549,15 @@ pub(crate) fn validate_manifest(
         }
     }
 
+    validate_dependencies_and_dispatch(manifest, path)?;
+
+    Ok(())
+}
+
+fn validate_dependencies_and_dispatch(
+    manifest: &FaberManifest,
+    path: &Path,
+) -> Result<(), Box<Diagnostic>> {
     for (name, version) in &manifest.dependencies {
         if name.trim().is_empty() {
             return Err(Box::new(
@@ -690,7 +638,88 @@ pub(crate) fn validate_manifest(
             }
         }
     }
+    Ok(())
+}
 
+fn validate_package_identity(manifest: &FaberManifest, path: &Path) -> Result<(), Box<Diagnostic>> {
+    if manifest.package.name.trim().is_empty() {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml package.name must not be empty")
+                .with_file(path.display().to_string()),
+        ));
+    }
+    if !is_valid_provider_segment(&manifest.package.name) {
+        return Err(Box::new(
+            crate::package_diagnostic_error(
+                "faber.toml package.name must contain only ASCII letters, numbers, underscore, or hyphen",
+            )
+            .with_file(path.display().to_string())
+            .with_arg("issue", "invalid_package_name"),
+        ));
+    }
+
+    if manifest.package.version.trim().is_empty() {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml package.version must not be empty")
+                .with_file(path.display().to_string()),
+        ));
+    }
+
+    if manifest.package.edition.trim().is_empty() {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml package.edition must not be empty")
+                .with_file(path.display().to_string()),
+        ));
+    }
+
+    if manifest.paths.source.trim().is_empty() {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml paths.source must not be empty")
+                .with_file(path.display().to_string()),
+        ));
+    }
+
+    // FBR-P1-001: the supported source-root set is exactly `src` (default) and
+    // `.` (package root). Everything else — nested roots like
+    // `components/faber` or depth-1 customs like `lib` — is rejected loudly
+    // until a usage contract for custom source roots is decided. The
+    // `manifest_path_for_spec` probes are only provably complete for this set.
+    match manifest.paths.source.trim() {
+        "src" | "." => {}
+        unsupported => {
+            return Err(Box::new(
+                crate::package_diagnostic_error(format!(
+                    "faber.toml paths.source '{unsupported}' is not supported: only \"src\" (the default) and \".\" (the package root) are allowed until a usage contract for custom source roots is decided"
+                ))
+                .with_file(path.display().to_string())
+                .with_arg("issue", "package_member_unsupported_source_root")
+                .with_arg("source", unsupported.to_owned())
+                .with_arg("supported_source_roots", "src,.")
+                .with_arg("reason", "custom_source_root_usage_contract_pending"),
+            ));
+        }
+    }
+
+    if let Some(entry) = manifest.paths.entry.as_deref()
+        && entry.trim().is_empty()
+    {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml paths.entry must not be empty")
+                .with_file(path.display().to_string()),
+        ));
+    }
+
+    if let Some(library) = &manifest.library
+        && !is_valid_provider_segment(&library.provider)
+    {
+        return Err(Box::new(
+                crate::package_diagnostic_error(
+                    "faber.toml library.provider must contain only ASCII letters, numbers, underscore, or hyphen",
+                )
+                .with_file(path.display().to_string())
+                .with_arg("issue", "invalid_library_provider"),
+            ));
+    }
     Ok(())
 }
 
