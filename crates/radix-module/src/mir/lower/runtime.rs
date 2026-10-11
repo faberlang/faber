@@ -363,15 +363,6 @@ impl FunctionBuilder<'_> {
         boundary: ShapeRelationBoundary,
         callee_parameter_offset: u32,
     ) -> Result<MirShapeExpr, String> {
-        let append = |arguments: &mut Vec<MirOperand>, operand: MirOperand| -> Result<u32, String> {
-            if let Some(position) = arguments.iter().position(|existing| existing == &operand) {
-                return u32::try_from(position).map_err(|_| "runtime shape check has too many operands".to_owned());
-            }
-            let argument =
-                u32::try_from(arguments.len()).map_err(|_| "runtime shape check has too many operands".to_owned())?;
-            arguments.push(operand);
-            Ok(argument)
-        };
         let formal_operand = |this: &Self, parameter: u32| -> Result<MirOperand, String> {
             let ordinal = parameter
                 .checked_add(this.formal_parameter_offset)
@@ -406,20 +397,11 @@ impl FunctionBuilder<'_> {
                     None => MirShapeExpr::ScalarArgument { argument },
                 });
             }
-            let argument = append(arguments, formal_operand(this, parameter)?)?;
+            let argument = append_runtime_shape_argument(arguments, formal_operand(this, parameter)?)?;
             Ok(match axis {
                 Some((fields, axis)) => MirShapeExpr::TensorFieldAxis { argument, fields, axis },
                 None => MirShapeExpr::ScalarArgument { argument },
             })
-        };
-        let binding_operand = |this: &Self, binding: DefId| {
-            if let Some(place) = this.captured_bindings.get(&binding) {
-                Some(MirOperand::Place(place.clone()))
-            } else {
-                this.bindings
-                    .get(&binding)
-                    .map(|binding| MirOperand::Place(MirPlace::local(binding.local)))
-            }
         };
         match source {
             RuntimeExtentId::CallArgumentAxis { argument, axis } => {
@@ -454,29 +436,46 @@ impl FunctionBuilder<'_> {
                     let argument = call_operand(arguments, parameter)?;
                     Ok(MirShapeExpr::TensorAxis { argument, axis })
                 } else {
-                    let argument = append(arguments, formal_operand(self, parameter)?)?;
+                    let argument = append_runtime_shape_argument(arguments, formal_operand(self, parameter)?)?;
                     Ok(MirShapeExpr::TensorAxis { argument, axis })
                 }
             }
             RuntimeExtentId::FunctionParameterFieldAxis { parameter, fields, axis } => {
                 parameter_shape(self, arguments, parameter, Some((fields, axis)))
             }
+            other => self.lower_runtime_shape_leaf_source(other, arguments, expression_value),
+        }
+    }
+
+    /// Resolve a shape extent source in the binding/expression families into a
+    /// `MirShapeExpr`, appending its operand to `arguments`. The parameter and
+    /// call-argument families are handled by the caller's `parameter_shape`.
+    fn lower_runtime_shape_leaf_source(
+        &self,
+        source: RuntimeExtentId,
+        arguments: &mut Vec<MirOperand>,
+        expression_value: Option<&(u32, MirOperand)>,
+    ) -> Result<MirShapeExpr, String> {
+        match source {
             RuntimeExtentId::ScalarBinding(binding) => {
-                let operand = binding_operand(self, binding)
+                let operand = self
+                    .runtime_shape_binding_operand(binding)
                     .ok_or_else(|| "runtime scalar extent binding is unavailable in MIR".to_owned())?;
-                let argument = append(arguments, operand)?;
+                let argument = append_runtime_shape_argument(arguments, operand)?;
                 Ok(MirShapeExpr::ScalarArgument { argument })
             }
             RuntimeExtentId::TensorBindingAxis { binding, axis } => {
-                let operand = binding_operand(self, binding)
+                let operand = self
+                    .runtime_shape_binding_operand(binding)
                     .ok_or_else(|| "runtime tensor extent binding is unavailable in MIR".to_owned())?;
-                let argument = append(arguments, operand)?;
+                let argument = append_runtime_shape_argument(arguments, operand)?;
                 Ok(MirShapeExpr::TensorAxis { argument, axis })
             }
             RuntimeExtentId::TensorFieldAxis { binding, fields, axis } => {
-                let operand = binding_operand(self, binding)
+                let operand = self
+                    .runtime_shape_binding_operand(binding)
                     .ok_or_else(|| "runtime tensor-field extent binding is unavailable in MIR".to_owned())?;
-                let argument = append(arguments, operand)?;
+                let argument = append_runtime_shape_argument(arguments, operand)?;
                 Ok(MirShapeExpr::TensorFieldAxis { argument, fields, axis })
             }
             RuntimeExtentId::ScalarExpression { expression } => {
@@ -484,7 +483,7 @@ impl FunctionBuilder<'_> {
                     .filter(|(available, _)| *available == expression)
                     .map(|(_, operand)| operand.clone())
                     .ok_or_else(|| "runtime scalar expression source is unavailable at this boundary".to_owned())?;
-                let argument = append(arguments, operand)?;
+                let argument = append_runtime_shape_argument(arguments, operand)?;
                 Ok(MirShapeExpr::ScalarArgument { argument })
             }
             RuntimeExtentId::ExpressionAxis { expression, axis } => {
@@ -492,7 +491,7 @@ impl FunctionBuilder<'_> {
                     .filter(|(available, _)| *available == expression)
                     .map(|(_, operand)| operand.clone())
                     .ok_or_else(|| "runtime shape expression source is unavailable at this boundary".to_owned())?;
-                let argument = append(arguments, operand)?;
+                let argument = append_runtime_shape_argument(arguments, operand)?;
                 Ok(MirShapeExpr::TensorAxis { argument, axis })
             }
             RuntimeExtentId::ExpressionFieldAxis { expression, fields, axis } => {
@@ -502,9 +501,22 @@ impl FunctionBuilder<'_> {
                     .ok_or_else(|| {
                         "runtime tensor-field expression source is unavailable at this boundary".to_owned()
                     })?;
-                let argument = append(arguments, operand)?;
+                let argument = append_runtime_shape_argument(arguments, operand)?;
                 Ok(MirShapeExpr::TensorFieldAxis { argument, fields, axis })
             }
+            _ => Err("runtime shape relation reached an unexpected extent source".to_owned()),
+        }
+    }
+
+    /// Resolve a captured or lexical binding to the MIR operand its shape
+    /// extent names.
+    fn runtime_shape_binding_operand(&self, binding: DefId) -> Option<MirOperand> {
+        if let Some(place) = self.captured_bindings.get(&binding) {
+            Some(MirOperand::Place(place.clone()))
+        } else {
+            self.bindings
+                .get(&binding)
+                .map(|binding| MirOperand::Place(MirPlace::local(binding.local)))
         }
     }
 
@@ -2106,7 +2118,7 @@ impl FunctionBuilder<'_> {
             expr.span,
         );
         let neg_c = self.assign_temp(MirValueKind::Unary { op: MirUnOp::Neg, operand: c }, elem_ty, expr.span);
-        let neg_c_s = self.assign_temp(
+        let neg_c_scaled = self.assign_temp(
             MirValueKind::Binary { op: MirBinOp::Mul, lhs: neg_c, rhs: inv_det.clone() },
             elem_ty,
             expr.span,
@@ -2121,7 +2133,7 @@ impl FunctionBuilder<'_> {
             MirAggregateFields::Ordered(vec![
                 MirAggregateItem::Operand(d_s),
                 MirAggregateItem::Operand(neg_b_s),
-                MirAggregateItem::Operand(neg_c_s),
+                MirAggregateItem::Operand(neg_c_scaled),
                 MirAggregateItem::Operand(a_s),
             ]),
             matrix_ty,
@@ -2412,11 +2424,11 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    /// Lower the GI3-1 SiLU activation as existing tensor elementwise MIR.
+    /// Lower the `GI3-1` `SiLU` activation as existing tensor elementwise MIR.
     ///
-    /// `silu(x) = x / (1 + exp(-x))`: TensorNeg, tensor Exp, TensorAdd, and
-    /// TensorDiv are the complete composition. Keeping this expansion here
-    /// means the registry admits the method without inventing TensorSilu.
+    /// `silu(x) = x / (1 + exp(-x))`: `TensorNeg`, tensor Exp, `TensorAdd`, and
+    /// `TensorDiv` are the complete composition. Keeping this expansion here
+    /// means the registry admits the method without inventing `TensorSilu`.
     fn lower_tensor_silu(&mut self, receiver: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
         let tensor_ty = self.expr_ty(expr)?;
         let x = self.lower_expr_value(receiver)?;
@@ -2536,14 +2548,35 @@ impl FunctionBuilder<'_> {
         self.assign(base_place.clone(), base, ty, expr.span);
         self.assign(exponent_place.clone(), exponent, exponent_ty, expr.span);
 
+        let done =
+            self.emit_potentia_loop(&accumulator_place, &base_place, &exponent_place, exponent_ty, ty, expr.span);
+        self.switch_to(done);
+        self.assign(MirPlace::temp(destination), MirOperand::Place(accumulator_place), ty, expr.span);
+        Some(MirOperand::Temp(destination))
+    }
+
+    /// Emit the exponentiation-by-squaring loop for integer `potentia`. The
+    /// accumulator, base and exponent locals already hold their start values;
+    /// the loop multiplies the accumulator on an odd exponent, halves the
+    /// exponent, and squares the base only when another iteration remains.
+    /// Returns the `done` block the caller joins after the loop.
+    fn emit_potentia_loop(
+        &mut self,
+        accumulator_place: &MirPlace,
+        base_place: &MirPlace,
+        exponent_place: &MirPlace,
+        exponent_ty: MirType,
+        ty: MirType,
+        span: Span,
+    ) -> MirBlockId {
         let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
-        let loop_check = self.fresh_block(expr.span);
-        let body = self.fresh_block(expr.span);
-        let multiply = self.fresh_block(expr.span);
-        let shift = self.fresh_block(expr.span);
-        let square = self.fresh_block(expr.span);
-        let done = self.fresh_block(expr.span);
-        self.trap_negative_potentia_exponent(&exponent_place, loop_check, expr.span);
+        let loop_check = self.fresh_block(span);
+        let body = self.fresh_block(span);
+        let multiply = self.fresh_block(span);
+        let shift = self.fresh_block(span);
+        let square = self.fresh_block(span);
+        let done = self.fresh_block(span);
+        self.trap_negative_potentia_exponent(exponent_place, loop_check, span);
 
         self.switch_to(loop_check);
         let has_exponent = self.binary_temp(
@@ -2551,11 +2584,11 @@ impl FunctionBuilder<'_> {
             MirOperand::Place(exponent_place.clone()),
             MirOperand::Constant(MirConstant::Int(0)),
             bool_ty,
-            expr.span,
+            span,
         );
         self.terminate_current(
             MirTerminatorKind::Branch { condition: has_exponent, then_block: body, else_block: done },
-            expr.span,
+            span,
         );
 
         self.switch_to(body);
@@ -2564,18 +2597,18 @@ impl FunctionBuilder<'_> {
             MirOperand::Place(exponent_place.clone()),
             MirOperand::Constant(MirConstant::Int(2)),
             exponent_ty,
-            expr.span,
+            span,
         );
         let is_odd = self.binary_temp(
             MirBinOp::NotEq,
             odd_part,
             MirOperand::Constant(MirConstant::Int(0)),
             bool_ty,
-            expr.span,
+            span,
         );
         self.terminate_current(
             MirTerminatorKind::Branch { condition: is_odd, then_block: multiply, else_block: shift },
-            expr.span,
+            span,
         );
 
         self.switch_to(multiply);
@@ -2584,10 +2617,10 @@ impl FunctionBuilder<'_> {
             MirOperand::Place(accumulator_place.clone()),
             MirOperand::Place(base_place.clone()),
             ty,
-            expr.span,
+            span,
         );
-        self.assign(accumulator_place.clone(), product, ty, expr.span);
-        self.terminate_current(MirTerminatorKind::Goto(shift), expr.span);
+        self.assign(accumulator_place.clone(), product, ty, span);
+        self.terminate_current(MirTerminatorKind::Goto(shift), span);
 
         self.switch_to(shift);
         let half = self.binary_temp(
@@ -2595,19 +2628,19 @@ impl FunctionBuilder<'_> {
             MirOperand::Place(exponent_place.clone()),
             MirOperand::Constant(MirConstant::Int(2)),
             exponent_ty,
-            expr.span,
+            span,
         );
-        self.assign(exponent_place.clone(), half, exponent_ty, expr.span);
+        self.assign(exponent_place.clone(), half, exponent_ty, span);
         let has_more = self.binary_temp(
             MirBinOp::Gt,
             MirOperand::Place(exponent_place.clone()),
             MirOperand::Constant(MirConstant::Int(0)),
             bool_ty,
-            expr.span,
+            span,
         );
         self.terminate_current(
             MirTerminatorKind::Branch { condition: has_more, then_block: square, else_block: loop_check },
-            expr.span,
+            span,
         );
 
         self.switch_to(square);
@@ -2616,14 +2649,11 @@ impl FunctionBuilder<'_> {
             MirOperand::Place(base_place.clone()),
             MirOperand::Place(base_place.clone()),
             ty,
-            expr.span,
+            span,
         );
-        self.assign(base_place, squared, ty, expr.span);
-        self.terminate_current(MirTerminatorKind::Goto(loop_check), expr.span);
-
-        self.switch_to(done);
-        self.assign(MirPlace::temp(destination), MirOperand::Place(accumulator_place), ty, expr.span);
-        Some(MirOperand::Temp(destination))
+        self.assign(base_place.clone(), squared, ty, span);
+        self.terminate_current(MirTerminatorKind::Goto(loop_check), span);
+        done
     }
 
     /// Ruling 28: a negative integer exponent is an arithmetic trap (the class
@@ -3120,6 +3150,21 @@ impl FunctionBuilder<'_> {
             return Some(MirOperand::Temp(destination));
         }
 
+        self.lower_failable_call_declared(callee, lowered_args, ty, err_ty, conversion, span)
+    }
+
+    /// Lower a failable call that reaches the declared `⇥` error channel (no
+    /// active trap or `cape` handler): the failure propagates through
+    /// `ReturnError`, or panics when the unit declares no error channel.
+    fn lower_failable_call_declared(
+        &mut self,
+        callee: MirCallee,
+        lowered_args: Vec<MirOperand>,
+        ty: MirType,
+        err_ty: MirType,
+        conversion: Option<DefId>,
+        span: Span,
+    ) -> Option<MirOperand> {
         let Some(destination_ty) = self.error_ty else {
             return self.lower_unhandled_call_panic(callee, lowered_args, ty, err_ty, span);
         };
@@ -3729,11 +3774,26 @@ impl FunctionBuilder<'_> {
         // A deferred recovery region stores the fallback into the conversion's
         // destination and both arms flow into one join, so every consumer
         // after the conversion reads a single joined temp.
-        if let Some((recovery_value, Some(tail_block))) = &lowered_recovery {
+        self.wire_conversio_recovery_tail(lowered_recovery.as_ref(), conversion_block, &result, ty, expr.span);
+        Some(result)
+    }
+
+    /// Wire a deferred conversio recovery region (if any) into the CFG after the
+    /// conversion statement. A sealed-block destination is reported and the
+    /// result is left unwired.
+    fn wire_conversio_recovery_tail(
+        &mut self,
+        lowered_recovery: Option<&(MirOperand, Option<MirBlockId>)>,
+        conversion_block: Option<MirBlockId>,
+        result: &MirOperand,
+        ty: MirType,
+        span: Span,
+    ) {
+        if let Some((recovery_value, Some(tail_block))) = lowered_recovery {
             let Some(conversion_block) = conversion_block else {
                 self.errors
-                    .push(MirError::unsupported(expr.span, "conversio recovery after a sealed MIR block"));
-                return Some(result);
+                    .push(MirError::unsupported(span, "conversio recovery after a sealed MIR block"));
+                return;
             };
             self.wire_conversio_recovery_block(
                 conversion_block,
@@ -3741,10 +3801,9 @@ impl FunctionBuilder<'_> {
                 recovery_value.clone(),
                 result.clone(),
                 ty,
-                expr.span,
+                span,
             );
         }
-        Some(result)
     }
 
     /// An await-binding whose awaited value narrows into the declared slot
@@ -4668,24 +4727,15 @@ impl FunctionBuilder<'_> {
         let message = MirOperand::Constant(MirConstant::String(nested.context.diagnostic_at_out_of_range));
         nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
 
-        let blocks = nested.finish_blocks();
-        self.errors.extend(nested.errors);
-        self.synthetic_functions.push(MirFunction {
+        Self::finish_synthetic_function(
+            &mut self.errors,
+            &mut self.synthetic_functions,
             id,
-            source: None,
-            name: None,
-            params: nested.params,
-            locals: nested.locals,
-            temps: nested.temps,
-            blocks,
+            nested,
             return_ty,
-            error_ty: Some(error_ty),
-            is_async: false,
-            is_generator: false,
-            shader_stage: None,
+            error_ty,
             span,
-        });
-        id
+        )
     }
 
     /// The helper body, for `(in receiver, index[, value]) ⇥ textus`:
@@ -4754,7 +4804,8 @@ impl FunctionBuilder<'_> {
             .push(MirLocalDecl { id: axis, name: None, ty: numerus, mutable: true, span });
         let receiver = MirOperand::Place(MirPlace::local(locals[0]));
         let index = MirOperand::Place(MirPlace::local(locals[1]));
-        let axis_operand = MirOperand::Place(MirPlace::local(axis));
+        let value = MirOperand::Place(MirPlace::local(locals[2]));
+        let axis_place = MirPlace::local(axis);
 
         let entry = nested.fresh_block(span);
         let cond = nested.fresh_block(span);
@@ -4764,115 +4815,67 @@ impl FunctionBuilder<'_> {
         let ok = nested.fresh_block(span);
         let fail = nested.fresh_block(span);
 
-        nested.switch_to(entry);
-        let shape = nested.runtime_call_value(
-            MirIntrinsic::Collection(MirCollectionOp::TensorShape),
-            vec![receiver.clone()],
+        let (shape, rank) = emit_checked_tensor_helper_entry(
+            &mut nested,
+            &receiver,
+            &index,
+            axis_place.clone(),
             array_ty,
-            span,
-        );
-        let rank = nested.runtime_call_value(
-            MirIntrinsic::Collection(MirCollectionOp::Length),
-            vec![shape.clone()],
             numerus,
-            span,
-        );
-        let index_len = nested.runtime_call_value(
-            MirIntrinsic::Collection(MirCollectionOp::Length),
-            vec![index.clone()],
-            numerus,
-            span,
-        );
-        nested.assign(MirPlace::local(axis), MirOperand::Constant(MirConstant::Int(0)), numerus, span);
-        let same_rank = nested.binary_temp(MirBinOp::Eq, index_len, rank.clone(), bivalens, span);
-        nested.terminate_current(
-            MirTerminatorKind::Branch { condition: same_rank, then_block: cond, else_block: fail },
-            span,
-        );
-
-        nested.switch_to(cond);
-        let more = nested.binary_temp(MirBinOp::Lt, axis_operand.clone(), rank, bivalens, span);
-        nested.terminate_current(
-            MirTerminatorKind::Branch { condition: more, then_block: body, else_block: ok },
-            span,
-        );
-
-        nested.switch_to(body);
-        // Both lists are in range by construction (axis < rank == both lengths),
-        // so the strict-element `Index` read cannot fault.
-        let extent_at = |nested: &mut FunctionBuilder<'_>, list: MirOperand| {
-            nested.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::Index),
-                vec![list, axis_operand.clone()],
-                numerus,
-                span,
-            )
-        };
-        let coordinate = extent_at(&mut nested, index.clone());
-        let extent = extent_at(&mut nested, shape);
-        let negative = nested.binary_temp(
-            MirBinOp::Lt,
-            coordinate.clone(),
-            MirOperand::Constant(MirConstant::Int(0)),
             bivalens,
+            entry,
+            cond,
+            fail,
             span,
         );
-        nested.terminate_current(
-            MirTerminatorKind::Branch { condition: negative, then_block: fail, else_block: upper },
-            span,
-        );
-
-        nested.switch_to(upper);
-        let past_end = nested.binary_temp(MirBinOp::GtEq, coordinate, extent, bivalens, span);
-        nested.terminate_current(
-            MirTerminatorKind::Branch { condition: past_end, then_block: fail, else_block: step },
-            span,
-        );
-
-        nested.switch_to(step);
-        let next = nested.binary_temp(
-            MirBinOp::Add,
-            axis_operand,
-            MirOperand::Constant(MirConstant::Int(1)),
+        emit_checked_tensor_helper_loop(
+            &mut nested,
+            &index,
+            shape,
+            rank,
+            axis_place,
             numerus,
+            bivalens,
+            cond,
+            body,
+            upper,
+            step,
+            ok,
+            fail,
             span,
         );
-        nested.assign(MirPlace::local(axis), next, numerus, span);
-        nested.terminate_current(MirTerminatorKind::Goto(cond), span);
+        emit_checked_tensor_helper_result(&mut nested, op, receiver, index, value, return_ty, ok, fail, span);
 
-        nested.switch_to(ok);
-        if op == MirCollectionOp::TensorSet {
-            let value = MirOperand::Place(MirPlace::local(locals[2]));
-            nested.runtime_call_to_place(
-                None,
-                MirIntrinsic::Collection(MirCollectionOp::TensorSet),
-                vec![receiver, index, value],
-                return_ty,
-                span,
-            );
-            nested.terminate_current(MirTerminatorKind::Return(None), span);
-        } else {
-            let element = nested.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::TensorGet),
-                vec![receiver, index],
-                return_ty,
-                span,
-            );
-            nested.terminate_current(MirTerminatorKind::Return(Some(element)), span);
-        }
+        Some(Self::finish_synthetic_function(
+            &mut self.errors,
+            &mut self.synthetic_functions,
+            id,
+            nested,
+            return_ty,
+            error_ty,
+            span,
+        ))
+    }
 
-        nested.switch_to(fail);
-        let invalid_index = if op == MirCollectionOp::TensorSet {
-            nested.context.diagnostic_ponde_invalid_index
-        } else {
-            nested.context.diagnostic_accipe_invalid_index
-        };
-        let message = MirOperand::Constant(MirConstant::String(invalid_index));
-        nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
-
+    /// Record a completed synthetic MIR function into the lowering's function
+    /// arena, returning its id. Shared by the checked tensor and checked `at`
+    /// helper builders.
+    ///
+    /// Takes the two arenas rather than `&mut self`: `nested` borrows
+    /// `self.context`, so a receiver for the whole of `self` cannot be borrowed
+    /// while it is live. Disjoint field borrows stay legal.
+    fn finish_synthetic_function(
+        errors: &mut Vec<MirError>,
+        synthetic_functions: &mut Vec<MirFunction>,
+        id: MirFunctionId,
+        mut nested: FunctionBuilder<'_>,
+        return_ty: MirType,
+        error_ty: MirType,
+        span: Span,
+    ) -> MirFunctionId {
         let blocks = nested.finish_blocks();
-        self.errors.extend(nested.errors);
-        self.synthetic_functions.push(MirFunction {
+        errors.extend(nested.errors);
+        synthetic_functions.push(MirFunction {
             id,
             source: None,
             name: None,
@@ -4887,7 +4890,7 @@ impl FunctionBuilder<'_> {
             shader_stage: None,
             span,
         });
-        Some(id)
+        id
     }
 
     /// Emit a runtime call and return the operand shape promised by its return
@@ -4926,6 +4929,179 @@ impl FunctionBuilder<'_> {
             span,
         });
     }
+}
+
+/// Emit the entry block of a checked tensor helper: bind the shape list and its
+/// rank, require the index list to match the rank, seed the axis at zero, and
+/// branch into the per-axis check loop or the failure block. Returns the
+/// `(shape, rank)` operands the loop needs.
+fn emit_checked_tensor_helper_entry(
+    nested: &mut FunctionBuilder<'_>,
+    receiver: &MirOperand,
+    index: &MirOperand,
+    axis: MirPlace,
+    array_ty: MirType,
+    numerus: MirType,
+    bivalens: MirType,
+    entry: MirBlockId,
+    cond: MirBlockId,
+    fail: MirBlockId,
+    span: Span,
+) -> (MirOperand, MirOperand) {
+    nested.switch_to(entry);
+    let shape = nested.runtime_call_value(
+        MirIntrinsic::Collection(MirCollectionOp::TensorShape),
+        vec![receiver.clone()],
+        array_ty,
+        span,
+    );
+    let rank = nested.runtime_call_value(
+        MirIntrinsic::Collection(MirCollectionOp::Length),
+        vec![shape.clone()],
+        numerus,
+        span,
+    );
+    let index_len = nested.runtime_call_value(
+        MirIntrinsic::Collection(MirCollectionOp::Length),
+        vec![index.clone()],
+        numerus,
+        span,
+    );
+    nested.assign(axis, MirOperand::Constant(MirConstant::Int(0)), numerus, span);
+    let same_rank = nested.binary_temp(MirBinOp::Eq, index_len, rank.clone(), bivalens, span);
+    nested.terminate_current(
+        MirTerminatorKind::Branch { condition: same_rank, then_block: cond, else_block: fail },
+        span,
+    );
+    (shape, rank)
+}
+
+/// Emit the per-axis bounds loop of a checked tensor helper: walk every axis,
+/// reading the index coordinate and the shape extent, and branch to `fail` on
+/// the first out-of-range coordinate or to `ok` when every axis is in range.
+fn emit_checked_tensor_helper_loop(
+    nested: &mut FunctionBuilder<'_>,
+    index: &MirOperand,
+    shape: MirOperand,
+    rank: MirOperand,
+    axis: MirPlace,
+    numerus: MirType,
+    bivalens: MirType,
+    cond: MirBlockId,
+    body: MirBlockId,
+    upper: MirBlockId,
+    step: MirBlockId,
+    ok: MirBlockId,
+    fail: MirBlockId,
+    span: Span,
+) {
+    let axis_operand = MirOperand::Place(axis.clone());
+    nested.switch_to(cond);
+    let more = nested.binary_temp(MirBinOp::Lt, axis_operand.clone(), rank, bivalens, span);
+    nested.terminate_current(
+        MirTerminatorKind::Branch { condition: more, then_block: body, else_block: ok },
+        span,
+    );
+
+    nested.switch_to(body);
+    // Both lists are in range by construction (axis < rank == both lengths),
+    // so the strict-element `Index` read cannot fault.
+    let extent_at = |nested: &mut FunctionBuilder<'_>, list: MirOperand| {
+        nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Index),
+            vec![list, axis_operand.clone()],
+            numerus,
+            span,
+        )
+    };
+    let coordinate = extent_at(nested, index.clone());
+    let extent = extent_at(nested, shape);
+    let negative = nested.binary_temp(
+        MirBinOp::Lt,
+        coordinate.clone(),
+        MirOperand::Constant(MirConstant::Int(0)),
+        bivalens,
+        span,
+    );
+    nested.terminate_current(
+        MirTerminatorKind::Branch { condition: negative, then_block: fail, else_block: upper },
+        span,
+    );
+
+    nested.switch_to(upper);
+    let past_end = nested.binary_temp(MirBinOp::GtEq, coordinate, extent, bivalens, span);
+    nested.terminate_current(
+        MirTerminatorKind::Branch { condition: past_end, then_block: fail, else_block: step },
+        span,
+    );
+
+    nested.switch_to(step);
+    let next = nested.binary_temp(
+        MirBinOp::Add,
+        axis_operand,
+        MirOperand::Constant(MirConstant::Int(1)),
+        numerus,
+        span,
+    );
+    nested.assign(axis, next, numerus, span);
+    nested.terminate_current(MirTerminatorKind::Goto(cond), span);
+}
+
+/// Emit the terminal blocks of a checked tensor helper: `ok` performs the
+/// `TensorSet` store (returning unit) or the `TensorGet` read, and `fail`
+/// returns the `ponde`/`accipe` invalid-index error.
+fn emit_checked_tensor_helper_result(
+    nested: &mut FunctionBuilder<'_>,
+    op: MirCollectionOp,
+    receiver: MirOperand,
+    index: MirOperand,
+    value: MirOperand,
+    return_ty: MirType,
+    ok: MirBlockId,
+    fail: MirBlockId,
+    span: Span,
+) {
+    nested.switch_to(ok);
+    if op == MirCollectionOp::TensorSet {
+        nested.runtime_call_to_place(
+            None,
+            MirIntrinsic::Collection(MirCollectionOp::TensorSet),
+            vec![receiver, index, value],
+            return_ty,
+            span,
+        );
+        nested.terminate_current(MirTerminatorKind::Return(None), span);
+    } else {
+        let element = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorGet),
+            vec![receiver, index],
+            return_ty,
+            span,
+        );
+        nested.terminate_current(MirTerminatorKind::Return(Some(element)), span);
+    }
+
+    nested.switch_to(fail);
+    let invalid_index = if op == MirCollectionOp::TensorSet {
+        nested.context.diagnostic_ponde_invalid_index
+    } else {
+        nested.context.diagnostic_accipe_invalid_index
+    };
+    let message = MirOperand::Constant(MirConstant::String(invalid_index));
+    nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
+}
+
+/// Append a shape operand to `arguments`, deduplicating an existing equal
+/// entry, and return its index. Errors when the operand list is not
+/// addressable as a `u32`.
+fn append_runtime_shape_argument(arguments: &mut Vec<MirOperand>, operand: MirOperand) -> Result<u32, String> {
+    if let Some(position) = arguments.iter().position(|existing| existing == &operand) {
+        return u32::try_from(position).map_err(|_| "runtime shape check has too many operands".to_owned());
+    }
+    let argument =
+        u32::try_from(arguments.len()).map_err(|_| "runtime shape check has too many operands".to_owned())?;
+    arguments.push(operand);
+    Ok(argument)
 }
 
 fn mir_diagnostic_kind(kind: HirScribeKind) -> MirDiagnosticKind {
@@ -4983,22 +5159,23 @@ fn matrix_method_kind(method_name: &str) -> Option<MirLaneOp> {
 fn glyph_method_name(op: HirBinOp, lhs_ty: &Type, rhs_ty: &Type) -> Option<&'static str> {
     match (op, lhs_ty, rhs_ty) {
         (HirBinOp::Dot, Type::Vector(..), Type::Vector(..)) => Some("productum"),
-        (HirBinOp::Dot, Type::Matrix(..), Type::Matrix(..)) => Some("matmul"),
+        (HirBinOp::Dot, Type::Matrix(..), Type::Matrix(..)) | (HirBinOp::Dot, Type::Tensor(..), Type::Tensor(..)) => {
+            Some("matmul")
+        }
         (HirBinOp::Dot, Type::Matrix(..), Type::Vector(..)) => Some("applica"),
-        (HirBinOp::Dot, Type::Tensor(..), Type::Tensor(..)) => Some("matmul"),
         (HirBinOp::Cross, Type::Vector(..), Type::Vector(..)) => Some("transversum"),
-        (HirBinOp::Hadamard, Type::Vector(..), Type::Vector(..)) => Some("multiplica"),
-        (HirBinOp::Hadamard, Type::Matrix(..), Type::Matrix(..)) => Some("multiplica"),
-        (HirBinOp::Hadamard, Type::Tensor(..), Type::Tensor(..)) => Some("multiplica"),
-        (HirBinOp::HadamardDiv, Type::Vector(..), Type::Vector(..)) => Some("divida"),
-        (HirBinOp::HadamardDiv, Type::Matrix(..), Type::Matrix(..)) => Some("divida"),
+        (HirBinOp::Hadamard, Type::Vector(..), Type::Vector(..))
+        | (HirBinOp::Hadamard, Type::Matrix(..), Type::Matrix(..))
+        | (HirBinOp::Hadamard, Type::Tensor(..), Type::Tensor(..)) => Some("multiplica"),
+        (HirBinOp::HadamardDiv, Type::Vector(..), Type::Vector(..))
+        | (HirBinOp::HadamardDiv, Type::Matrix(..), Type::Matrix(..)) => Some("divida"),
         (HirBinOp::HadamardDiv, Type::Tensor(..), Type::Tensor(..)) => Some("divisio"),
-        (HirBinOp::Add, Type::Vector(..), Type::Vector(..)) => Some("addita"),
-        (HirBinOp::Add, Type::Matrix(..), Type::Matrix(..)) => Some("addita"),
-        (HirBinOp::Add, Type::Tensor(..), Type::Tensor(..)) => Some("addita"),
-        (HirBinOp::Sub, Type::Vector(..), Type::Vector(..)) => Some("subtrahe"),
-        (HirBinOp::Sub, Type::Matrix(..), Type::Matrix(..)) => Some("subtrahe"),
-        (HirBinOp::Sub, Type::Tensor(..), Type::Tensor(..)) => Some("subtrahe"),
+        (HirBinOp::Add, Type::Vector(..), Type::Vector(..))
+        | (HirBinOp::Add, Type::Matrix(..), Type::Matrix(..))
+        | (HirBinOp::Add, Type::Tensor(..), Type::Tensor(..)) => Some("addita"),
+        (HirBinOp::Sub, Type::Vector(..), Type::Vector(..))
+        | (HirBinOp::Sub, Type::Matrix(..), Type::Matrix(..))
+        | (HirBinOp::Sub, Type::Tensor(..), Type::Tensor(..)) => Some("subtrahe"),
         _ => None,
     }
 }
