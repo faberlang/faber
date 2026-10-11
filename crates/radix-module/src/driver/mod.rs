@@ -1139,121 +1139,7 @@ fn generate_wgsl_text_output(
         let has_fragment = !graphics_source.fragment_entries.is_empty();
 
         if has_vertex || has_fragment {
-            // Run MIR lowering for the graphics path so lowered MirFunctions
-            // are available for body emission. If the source has a non-empty
-            // vertex or fragment body, a lowering failure is a structured
-            // diagnostic — never a silent fallback to reflection defaults.
-            // Truly empty bodies may still select reflection-generated bodies.
-            prepare_mir_lowering_interner(analysis);
-            let has_non_empty_vertex = graphics_source
-                .vertex_entries
-                .iter()
-                .any(|e| e.body_shape == GraphicsVertexBodyShape::Unsupported);
-            let has_non_empty_fragment = graphics_source
-                .fragment_entries
-                .iter()
-                .any(|e| e.body_shape == GraphicsVertexBodyShape::Unsupported);
-            let bound_types = target_bindings::wgsl_bound_type_table(
-                target_bindings,
-                &analysis.hir,
-                &analysis.resolver,
-                &analysis.interner,
-            );
-            let mir_result = lower_graphics_mir_with_context_for_target(analysis);
-            let bound_calls = mir_result.as_ref().map_or_else(
-                |_| crate::mir::WgslBoundCallTable::new(),
-                |mir| target_bindings::wgsl_bound_call_table(target_bindings, mir.validated.program(), &mir.interner),
-            );
-            let (vertex_mir, fragment_mir, mir_validation, mir_interner) = match &mir_result {
-                Ok(mir) => {
-                    let v = mir
-                        .validated
-                        .program()
-                        .functions
-                        .iter()
-                        .find(|f| f.shader_stage == Some(crate::mir::MirKernelShaderStage::Vertex));
-                    let f = mir
-                        .validated
-                        .program()
-                        .functions
-                        .iter()
-                        .find(|f| f.shader_stage == Some(crate::mir::MirKernelShaderStage::Fragment));
-                    (v, f, Some(&mir.validated), Some(&mir.interner))
-                }
-                Err(error) if has_non_empty_vertex || has_non_empty_fragment => {
-                    return Err(SpannedCodegenError {
-                        message: error.message.clone(),
-                        args: error.args.clone(),
-                        span: error.span,
-                    });
-                }
-                Err(_) => (None, None, None, None),
-            };
-
-            if has_non_empty_vertex && vertex_mir.is_none() {
-                return Err(mir_errors_to_spanned(vec![crate::mir::MirError {
-                    message: "MIR lowering produced no vertex function for a non-empty graphics shader body".to_owned(),
-                    issue: "mir_lower_graphics_body_missing".to_owned(),
-                    span: crate::lexer::Span::default(),
-                    definition_span: None,
-                }]));
-            }
-            if has_non_empty_fragment && fragment_mir.is_none() {
-                return Err(mir_errors_to_spanned(vec![crate::mir::MirError {
-                    message: "MIR lowering produced no fragment function for a non-empty graphics shader body"
-                        .to_owned(),
-                    issue: "mir_lower_graphics_body_missing".to_owned(),
-                    span: crate::lexer::Span::default(),
-                    definition_span: None,
-                }]));
-            }
-
-            if has_vertex && has_fragment {
-                let output = emit_wgsl_graphics_pipeline_output(
-                    &graphics_source,
-                    vertex_mir,
-                    fragment_mir,
-                    mir_validation,
-                    mir_interner,
-                    &bound_calls,
-                    &bound_types,
-                )
-                .map_err(wgsl_text_codegen_error)?;
-                return Ok(crate::Output::WgslText(crate::WgslTextOutput {
-                    code: output.source,
-                    reflection: Some(output.reflection),
-                }));
-            }
-            if has_vertex {
-                let output = emit_wgsl_vertex_source_output(
-                    &graphics_source,
-                    vertex_mir,
-                    mir_validation,
-                    mir_interner,
-                    &bound_calls,
-                    &bound_types,
-                )
-                .map_err(wgsl_text_codegen_error)?;
-                return Ok(crate::Output::WgslText(crate::WgslTextOutput {
-                    code: output.source,
-                    reflection: Some(output.reflection),
-                }));
-            }
-            if has_fragment {
-                let output = emit_wgsl_fragment_source_output(
-                    &graphics_source,
-                    fragment_mir,
-                    mir_validation,
-                    mir_interner,
-                    &bound_calls,
-                    &bound_types,
-                )
-                .map_err(wgsl_text_codegen_error)?;
-                return Ok(crate::Output::WgslText(crate::WgslTextOutput {
-                    code: output.source,
-                    reflection: Some(output.reflection),
-                }));
-            }
+            return emit_wgsl_graphics_output(analysis, graphics_source, has_vertex, has_fragment, target_bindings);
         }
 
         prepare_mir_lowering_interner(analysis);
@@ -1278,6 +1164,124 @@ fn generate_wgsl_text_output(
             code: output.source,
             reflection: Some(output.reflection),
         }))
+    }
+}
+
+#[cfg(feature = "mir-wgsl")]
+fn emit_wgsl_graphics_output(
+    analysis: &mut AnalyzedModule,
+    graphics_source: GraphicsSourceFacts,
+    has_vertex: bool,
+    has_fragment: bool,
+    target_bindings: &TargetBindings,
+) -> Result<crate::Output, SpannedCodegenError> {
+    // Run MIR lowering for the graphics path so lowered MirFunctions
+    // are available for body emission. If the source has a non-empty
+    // vertex or fragment body, a lowering failure is a structured
+    // diagnostic — never a silent fallback to reflection defaults.
+    // Truly empty bodies may still select reflection-generated bodies.
+    prepare_mir_lowering_interner(analysis);
+    let has_non_empty_vertex = graphics_source
+        .vertex_entries
+        .iter()
+        .any(|e| e.body_shape == GraphicsVertexBodyShape::Unsupported);
+    let has_non_empty_fragment = graphics_source
+        .fragment_entries
+        .iter()
+        .any(|e| e.body_shape == GraphicsVertexBodyShape::Unsupported);
+    let bound_types =
+        target_bindings::wgsl_bound_type_table(target_bindings, &analysis.hir, &analysis.resolver, &analysis.interner);
+    let mir_result = lower_graphics_mir_with_context_for_target(analysis);
+    let bound_calls = mir_result.as_ref().map_or_else(
+        |_| crate::mir::WgslBoundCallTable::new(),
+        |mir| target_bindings::wgsl_bound_call_table(target_bindings, mir.validated.program(), &mir.interner),
+    );
+    let (vertex_mir, fragment_mir, mir_validation, mir_interner) = match &mir_result {
+        Ok(mir) => {
+            let v = mir
+                .validated
+                .program()
+                .functions
+                .iter()
+                .find(|f| f.shader_stage == Some(crate::mir::MirKernelShaderStage::Vertex));
+            let f = mir
+                .validated
+                .program()
+                .functions
+                .iter()
+                .find(|f| f.shader_stage == Some(crate::mir::MirKernelShaderStage::Fragment));
+            (v, f, Some(&mir.validated), Some(&mir.interner))
+        }
+        Err(error) if has_non_empty_vertex || has_non_empty_fragment => {
+            return Err(SpannedCodegenError {
+                message: error.message.clone(),
+                args: error.args.clone(),
+                span: error.span,
+            });
+        }
+        Err(_) => (None, None, None, None),
+    };
+
+    if has_non_empty_vertex && vertex_mir.is_none() {
+        return Err(mir_errors_to_spanned(vec![crate::mir::MirError {
+            message: "MIR lowering produced no vertex function for a non-empty graphics shader body".to_owned(),
+            issue: "mir_lower_graphics_body_missing".to_owned(),
+            span: crate::lexer::Span::default(),
+            definition_span: None,
+        }]));
+    }
+    if has_non_empty_fragment && fragment_mir.is_none() {
+        return Err(mir_errors_to_spanned(vec![crate::mir::MirError {
+            message: "MIR lowering produced no fragment function for a non-empty graphics shader body".to_owned(),
+            issue: "mir_lower_graphics_body_missing".to_owned(),
+            span: crate::lexer::Span::default(),
+            definition_span: None,
+        }]));
+    }
+
+    if has_vertex && has_fragment {
+        let output = emit_wgsl_graphics_pipeline_output(
+            &graphics_source,
+            vertex_mir,
+            fragment_mir,
+            mir_validation,
+            mir_interner,
+            &bound_calls,
+            &bound_types,
+        )
+        .map_err(wgsl_text_codegen_error)?;
+        return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+            code: output.source,
+            reflection: Some(output.reflection),
+        }));
+    } else if has_vertex {
+        let output = emit_wgsl_vertex_source_output(
+            &graphics_source,
+            vertex_mir,
+            mir_validation,
+            mir_interner,
+            &bound_calls,
+            &bound_types,
+        )
+        .map_err(wgsl_text_codegen_error)?;
+        return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+            code: output.source,
+            reflection: Some(output.reflection),
+        }));
+    } else {
+        let output = emit_wgsl_fragment_source_output(
+            &graphics_source,
+            fragment_mir,
+            mir_validation,
+            mir_interner,
+            &bound_calls,
+            &bound_types,
+        )
+        .map_err(wgsl_text_codegen_error)?;
+        return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+            code: output.source,
+            reflection: Some(output.reflection),
+        }));
     }
 }
 
@@ -1689,7 +1693,7 @@ fn prepare_mir_lowering_interner(analysis: &mut AnalyzedModule) {
 pub struct AirBackwardBundle {
     pub air_mir: crate::mir::MirProgram,
     pub air_program: crate::air::AirProgram,
-    /// Global `(operand_ty → transposed_ty)` map for MatMul VJP operand
+    /// Global `(operand_ty → transposed_ty)` map for `MatMul` VJP operand
     /// types, merged from every AIR function (annotated primals + unannotated
     /// callees). The reverse-AD transform resolves the transposed type in
     /// O(1) via this map instead of scanning the whole `TypeTable`
@@ -1706,7 +1710,7 @@ struct AirBackwardPrimal {
     companion_def_id: crate::hir::DefId,
     /// Types of selected differentiable inputs, in parameter declaration order.
     selected_input_types: Vec<crate::semantic::TypeId>,
-    /// DefIds of selected differentiable input parameters, in declaration order.
+    /// `DefIds` of selected differentiable input parameters, in declaration order.
     selected_param_sources: Vec<crate::hir::DefId>,
     ret_ty: crate::semantic::TypeId,
     /// Annotated companion name from @ radix backward "name".
@@ -2009,12 +2013,23 @@ pub fn apply_air_backward_bundle<'a>(
             })?;
     }
 
+    lowered = install_unannotated_companions(lowered, &generated.unannotated_companions, &mut fresh_ids)?;
+
+    finalize_air_backward_shapes(lowered)
+}
+
+#[cfg(feature = "device")]
+fn install_unannotated_companions<'a>(
+    mut lowered: crate::mir::LoweredMirUnit<'a>,
+    companions: &[crate::air::AirFunction],
+    fresh_ids: &mut FreshMirFunctionIds,
+) -> Result<crate::mir::LoweredMirUnit<'a>, SpannedCodegenError> {
     // Emit unannotated callee companions into the MIR program.  These are
     // companions for functions that are called but not themselves annotated
     // with @ radix backward.  They must be lowered to MIR so the backward
     // sub-companion Call targets are available at link time.
     let mut unannotated_functions = Vec::new();
-    for companion in &generated.unannotated_companions {
+    for companion in companions {
         let companion_program = crate::air::AirProgram { functions: vec![companion.clone()] };
         crate::air::validate_program(&companion_program).map_err(|errors| {
             let messages: Vec<String> = errors.iter().map(|e| format!("{e:?}")).collect();
@@ -2069,8 +2084,7 @@ pub fn apply_air_backward_bundle<'a>(
                 }
             }
         })?;
-
-    finalize_air_backward_shapes(lowered)
+    Ok(lowered)
 }
 
 /// Apply concrete shape bindings from existing call-site monomorphizations to
@@ -2720,6 +2734,7 @@ fn generate_air_lane_backward_with_companion<'a>(
     fresh_ids: &mut FreshMirFunctionIds,
     no_fuse: bool,
 ) -> Result<(crate::mir::LoweredMirUnit<'a>, crate::mir::device::LosslessMirCompanionEntry), codegen::CodegenError> {
+    use crate::air::fusion::{FusionTable, fuse_companion};
     use crate::air::{
         AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef, AirCompanionRelation,
         AirCompanionSelectedInput, AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
@@ -2730,7 +2745,6 @@ fn generate_air_lane_backward_with_companion<'a>(
     let types_ref = lowered.validated.validation().types.as_table();
 
     // Run fusion pass on the companion body (unless disabled).
-    use crate::air::fusion::{FusionTable, fuse_companion};
     let (fused_body, fusion_table) = if no_fuse {
         (companion.body, FusionTable::default())
     } else {
@@ -2839,6 +2853,17 @@ fn generate_air_lane_backward_with_companion<'a>(
     // without reconstructing the relation from names, shapes, or positions.
     // The selected-input positions reuse the checked conversions already
     // performed for the AIR relation (no new `expect` sites).
+    let (lowered, entry) = build_lossless_companion_entry(primal, selected_inputs, backward_functions, lowered)?;
+    Ok((lowered, entry))
+}
+
+#[cfg(feature = "device")]
+fn build_lossless_companion_entry<'a>(
+    primal: &AirBackwardPrimal,
+    selected_inputs: &'static [crate::air::AirCompanionSelectedInput],
+    backward_functions: Vec<crate::mir::MirFunction>,
+    lowered: crate::mir::LoweredMirUnit<'a>,
+) -> Result<(crate::mir::LoweredMirUnit<'a>, crate::mir::device::LosslessMirCompanionEntry), codegen::CodegenError> {
     use crate::mir::device::{
         LosslessMirCompanionEntry, MirCompanionDerivativeKind, MirCompanionSelectedInput, MirCompanionSelectedOutput,
     };
