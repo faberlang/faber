@@ -979,6 +979,7 @@ dependencies = [
  "radix-intrinsics",
  "radix-lexer",
  "radix-parser",
+ "radix-runtime-contract",
  "radix-syntax",
  "radix-target",
  "radix-types",
