@@ -113,12 +113,36 @@ fn device_section_builder(
         .with_file(diagnostic_path.display().to_string())
         .with_arg("issue", "package_device_steps_not_repeating")]);
     }
-    // Fail closed when a declared input is missing for an input buffer.
-    // The TWO exemptions (S3-A5 + S5-U1): the companion's reverse-AD
-    // upstream seed — a synthetic 1-element input whose source param
-    // carries no source name — is provisioned with 1.0; and a DECOMPOSED
-    // kernel's data-flow input that another kernel produces (a forward
-    // intermediate) needs no external value.
+    let device_inputs = resolve_device_inputs(prepared, lowered, &program, diagnostic_path)?;
+    let selection = prepared.device_selection.unwrap_or(DeviceSelection::Auto);
+    let section = super::device::device_section_for_program(
+        &program,
+        &semantics,
+        &lowered.validated,
+        &lowered.interner,
+        super::device::DeviceSectionBuild {
+            selection,
+            inputs: &device_inputs,
+            ptx_target: super::device::ptx_target_for(None),
+            repeating_steps: step_count,
+        },
+    )?;
+    Ok(Some(section))
+}
+
+/// Resolve the `[device] inputs` map for `program`: fail closed on a declared
+/// input buffer with no value. The TWO exemptions (S3-A5 + S5-U1): the
+/// companion's reverse-AD upstream seed — a synthetic 1-element input whose
+/// source param carries no source name — is provisioned with 1.0; and a
+/// DECOMPOSED kernel's data-flow input that another kernel produces (a forward
+/// intermediate) needs no external value.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn resolve_device_inputs(
+    prepared: &radix::program::mir::PreparedPackageMir<'_>,
+    lowered: &radix::module::mir::LoweredMirUnit<'_>,
+    program: &radix_mir::device_program::DeviceProgram,
+    diagnostic_path: &Path,
+) -> Result<std::collections::BTreeMap<String, Vec<f32>>, Vec<Diagnostic>> {
     let mut device_inputs = prepared.device_inputs.clone();
     let mut upstream_seeds: Vec<(String, Vec<f32>)> = Vec::new();
     let produced: std::collections::BTreeSet<String> = program
@@ -192,20 +216,7 @@ fn device_section_builder(
     for (name, values) in upstream_seeds {
         device_inputs.insert(name, values);
     }
-    let selection = prepared.device_selection.unwrap_or(DeviceSelection::Auto);
-    let section = super::device::device_section_for_program(
-        &program,
-        &semantics,
-        &lowered.validated,
-        &lowered.interner,
-        super::device::DeviceSectionBuild {
-            selection,
-            inputs: &device_inputs,
-            ptx_target: super::device::ptx_target_for(None),
-            repeating_steps: step_count,
-        },
-    )?;
-    Ok(Some(section))
+    Ok(device_inputs)
 }
 
 /// Without `device-runtime` (DDPP1-U2, C2 feature isolation) no package
@@ -221,6 +232,9 @@ fn device_section_builder(
 
 /// Public package-MIR callback for external backend harnesses: forward to the
 /// moved compiler driver with the faber seams.
+///
+/// # Errors
+/// Diagnostics when the input or persisted artifact is invalid.
 #[cfg(feature = "runner")]
 pub fn with_lowered_package_mir<R>(
     config: &Config,
@@ -247,6 +261,9 @@ pub(crate) fn with_interpreted_lowered_package_mir<R>(
 
 /// Link an already-analyzed package test scope once, then lend its validated
 /// MIR and original test-function identity map to the runner consumer.
+///
+/// # Errors
+/// Diagnostics when the input or persisted artifact is invalid.
 #[cfg(feature = "runner")]
 pub fn with_linked_test_package_mir<R>(
     package: radix::program::analyze::AnalyzedProgram,
@@ -268,6 +285,9 @@ pub fn with_linked_test_package_mir<R>(
 
 /// Generated fmir-bin runner crates consume this public API (the stdio
 /// entry). Forward to the moved route with the faber seams.
+///
+/// # Errors
+/// Diagnostics when the image bytes or the persisted artifact is invalid.
 #[cfg(feature = "runner")]
 pub fn run_fmir_image_bytes_with_stdio(
     image_bytes: &[u8],
