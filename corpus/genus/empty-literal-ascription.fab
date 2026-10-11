@@ -1,0 +1,33 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "return_clause", "type_annotation", "owned_type", "base_type", "incipit_stmt", "fixum_decl", "typed_constructor", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "verte_expr", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "An empty bare `{}` ascribed with `∷` to a class builds that class, like `Class {}`."
+syntax = "<type> <name> ← {} ∷ <Class>"
+related = ["genus"]
+locale = "en"
++++
+# =============================================================================
+# genus — empty literal ascription
+# =============================================================================
+#
+# What this teaches:
+#   • `{} ∷ Class` is the same value as `Class {}`: every field takes its default.
+#
+# See also: genus
+# =============================================================================
+
+class Calc {
+    var int value = 0
+    fn set(int n) → void {
+        self.value ← n
+    }
+}
+
+main {
+    var Calc c ← {} ∷ Calc
+    c.set(5)
+    print c.value
+}

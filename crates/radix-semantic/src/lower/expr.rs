@@ -1511,7 +1511,29 @@ impl Lowerer<'_> {
             false,
         );
         self.allow_bare_generic_construction = previous_bare_generic_construction;
-        if let radix_syntax::ExprKind::Object(object) = &verte.expr.kind {
+        // WHY: `{} ∷ Genus` is the same value as `Genus {}` (constructor =
+        // type + shape; the bare literal takes the ascribed cell type), so the
+        // empty bare JSON object literal ascribed to a genus lowers as a
+        // construction with zero entries rather than a JSON source.
+        let empty_json_object_for_genus = matches!(
+            &verte.expr.kind,
+            radix_syntax::ExprKind::Literal(radix_syntax::Literal::JsonValor(
+                radix_syntax::JsonValue::Object(members)
+            )) if members.is_empty()
+        ) && self.ascription_target_is_genus(target);
+        if empty_json_object_for_genus {
+            let placeholder = HirExpression {
+                id: self.next_hir_id(),
+                kind: HirExpressionKind::Tuple(Vec::new(), None),
+                ty: None,
+                span: self.current_span,
+            };
+            HirExpressionKind::Verte {
+                source: Box::new(placeholder),
+                target,
+                entries: Some(Vec::new()),
+            }
+        } else if let radix_syntax::ExprKind::Object(object) = &verte.expr.kind {
             let mut entries = Vec::new();
             for field in &object.fields {
                 entries.push(self.lower_object_field(field));
@@ -1535,6 +1557,17 @@ impl Lowerer<'_> {
                 target,
                 entries: None,
             }
+        }
+    }
+
+    /// Whether an ascription target resolved to a genus (bare or applied).
+    fn ascription_target_is_genus(&self, target: TypeId) -> bool {
+        match self.types.get(target) {
+            crate::Type::Struct(_) => true,
+            crate::Type::Applied(base, _) => {
+                matches!(self.types.get(*base), crate::Type::Struct(_))
+            }
+            _ => false,
         }
     }
 
