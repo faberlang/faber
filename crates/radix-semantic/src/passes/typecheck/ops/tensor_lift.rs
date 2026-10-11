@@ -28,7 +28,13 @@
 //! share both). `≈ ≉` on a register wait for L7 like the tensor form. Registers
 //! lift no comparison, logic or select yet.
 
-use super::*;
+use super::{
+    ARGUMENT_TYPE_MISMATCH, BOOLEAN_OPERAND_REQUIRED, BOOLEAN_OPERANDS_REQUIRED,
+    COALESCE_FALLBACK_TYPE_MISMATCH, COMMON_TYPE_MISMATCH, HirBinOp, HirBlock, HirExpression,
+    MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, NUMERIC_OPERANDS_REQUIRED, Primitive,
+    SemanticErrorKind, TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, TENSOR_MULTIPLY_REQUIRES_GLYPH,
+    Type, TypeChecker, TypeId, is_numeric_literal,
+};
 use crate::IndexId;
 use crate::passes::typecheck::integer_range::const_int_value;
 use radix_hir::HirCallArg;
@@ -712,20 +718,12 @@ impl TypeChecker<'_> {
             }
             return self.register_result(register, joined);
         }
-        match self.lift_side(arg_ty) {
-            LiftSide::Scalar(_) => {
-                self.unify_assign_issue(
-                    arg_ty,
-                    register.elem,
-                    arg.expr.span,
-                    ARGUMENT_TYPE_MISMATCH,
-                );
-                receiver_ty
-            }
-            _ => {
-                self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
-                self.error_type
-            }
+        if let LiftSide::Scalar(_) = self.lift_side(arg_ty) {
+            self.unify_assign_issue(arg_ty, register.elem, arg.expr.span, ARGUMENT_TYPE_MISMATCH);
+            receiver_ty
+        } else {
+            self.invalid_operand_types(ARGUMENT_TYPE_MISMATCH, span);
+            self.error_type
         }
     }
 

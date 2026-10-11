@@ -2,8 +2,8 @@
 //!
 //! COMPILER PHASE: Semantic typecheck
 //! INPUT: Tensor namespace method calls (creata, structa, formata) and tensor
-//! receiver methods (crea, strue, forma) with resolved DefIds and explicit type arguments
-//! OUTPUT: Checked call sites with finalized TypeIds on tensor values; structured
+//! receiver methods (crea, strue, forma) with resolved `DefIds` and explicit type arguments
+//! OUTPUT: Checked call sites with finalized `TypeIds` on tensor values; structured
 //! diagnostics for stale API shapes (structa, creata type args, retired crea/strue)
 
 use super::TypeChecker;

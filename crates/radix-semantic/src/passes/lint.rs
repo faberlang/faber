@@ -750,14 +750,11 @@ impl HirVisitor for LintContext<'_> {
                 }
                 walk_expr(self, expr);
             }
-            HirExpressionKind::Assign(target, value) => {
-                self.mark_place_mutated(target);
-                self.visit_expr(target);
-                self.visit_expr(value);
-            }
-            // `⇇` writes the existing storage its target names: for the
-            // `var` lint that is a mutation of the target place.
-            HirExpressionKind::CopyInto { target, value } => {
+            // `⇇` writes the existing storage its target names exactly like
+            // ordinary assignment: for the `var` lint that is a mutation of
+            // the target place.
+            HirExpressionKind::Assign(target, value)
+            | HirExpressionKind::CopyInto { target, value } => {
                 self.mark_place_mutated(target);
                 self.visit_expr(target);
                 self.visit_expr(value);
@@ -844,13 +841,11 @@ impl HirVisitor for PergeFinder {
 fn root_place_def_id(expr: &HirExpression) -> Option<radix_hir::DefId> {
     match &expr.kind {
         HirExpressionKind::Path(def_id) => Some(*def_id),
-        HirExpressionKind::Field(base, _) | HirExpressionKind::Deref(base) => {
-            root_place_def_id(base)
-        }
-        HirExpressionKind::Index(base, _) => root_place_def_id(base),
-        HirExpressionKind::OptionalChain(base, _) | HirExpressionKind::NonNull(base, _) => {
-            root_place_def_id(base)
-        }
+        HirExpressionKind::Field(base, _)
+        | HirExpressionKind::Deref(base)
+        | HirExpressionKind::Index(base, _)
+        | HirExpressionKind::OptionalChain(base, _)
+        | HirExpressionKind::NonNull(base, _) => root_place_def_id(base),
         _ => None,
     }
 }

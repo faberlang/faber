@@ -427,16 +427,16 @@ impl TypeChecker<'_> {
                     // with interface-supplied types, not namespace receivers;
                     // keeping them out of `import_receivers` lets their real
                     // function/const types govern call and use sites.
-                    if !import.selective {
+                    if import.selective {
+                        self.record_ordering_contract_bindings(import);
+                    } else {
                         for import_item in &import.items {
                             self.import_receivers.insert(import_item.def_id);
                         }
-                    } else {
-                        self.record_ordering_contract_bindings(import);
                     }
                 }
                 HirItemKind::Struct(struct_item) => {
-                    self.collect_struct(item.def_id, &item.annotations, struct_item, item.span)
+                    self.collect_struct(item.def_id, &item.annotations, struct_item, item.span);
                 }
                 HirItemKind::Interface(interface_item) => {
                     self.collect_interface(item.def_id, interface_item);
