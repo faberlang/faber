@@ -228,91 +228,10 @@ impl Validator<'_, '_> {
                     );
                 }
             }
-            MirTerminatorKind::TryCall {
-                destination,
-                callee,
-                args,
-                error_place,
-                ..
-            } => {
-                let sig = self.validate_callee(scope, callee, terminator.span);
-                let mut generic_bindings = GenericTypeBindings::default();
-                let mut shape_bindings = MirShapeBindings::default();
-                self.validate_call_args(
-                    scope,
-                    sig.as_ref(),
-                    args,
-                    preceding_tensor_shape_check(previous, args),
-                    terminator.span,
-                    &mut generic_bindings,
-                    &mut shape_bindings,
-                );
-                if !self.call_destination_matches_shape_check(
-                    scope,
-                    destination.as_ref(),
-                    sig.as_ref().map(|sig| sig.return_ty),
-                    args,
-                    preceding_tensor_shape_check(previous, args),
-                ) {
-                    self.validate_optional_destination_with_shapes(
-                        scope,
-                        destination.as_ref(),
-                        sig.as_ref().map(|sig| sig.return_ty),
-                        terminator.span,
-                        &mut generic_bindings,
-                        &mut shape_bindings,
-                    );
-                }
-                let error_place_ty = self.validate_place(scope, error_place, terminator.span);
-                // The failable contract is enforced whenever the callee
-                // signature is resolvable HERE. Package-MIR synthetic callees
-                // (`MirCallee::Definition { source }` allocated by the faber
-                // linker after analysis) resolve only in the merged
-                // whole-program validation, where the linked library function
-                // carries the synthetic source; deferring their check to that
-                // stage matches the plain-`Call` treatment of cross-unit
-                // definitions. A never-resolvable def is caught downstream the
-                // same way a plain `Call` to one is: by the runner/emitter.
-                if sig.is_none() {
-                    match &callee {
-                        MirCallee::Definition { .. } => {}
-                        _ => self.error(
-                            terminator.span,
-                            "try_call callee does not have a known failable signature",
-                        ),
-                    }
-                }
-                match (sig.as_ref().and_then(|sig| sig.error_ty), error_place_ty) {
-                    (Some(error_ty), Some(place_ty)) => {
-                        self.bind_generic_type_witness(
-                            error_ty,
-                            place_ty,
-                            &mut generic_bindings,
-                            &mut shape_bindings,
-                            terminator.span,
-                            "try_call error place type mismatch",
-                        );
-                        if let Some(error_ty) = self.instantiate_generic_type(
-                            error_ty,
-                            &generic_bindings,
-                            &shape_bindings,
-                            terminator.span,
-                        ) {
-                            self.require_assignable(
-                                error_ty,
-                                place_ty,
-                                terminator.span,
-                                "try_call error place type mismatch",
-                            );
-                        }
-                    }
-                    (None, _) if sig.is_some() => {
-                        self.error(terminator.span, "try_call callee is not known failable");
-                    }
-                    _ => {}
-                }
+            MirTerminatorKind::TryCall { .. } => {
+                self.validate_try_call(scope, previous, terminator);
             }
-            MirTerminatorKind::Goto(_) => {}
+            MirTerminatorKind::Goto(_) | MirTerminatorKind::Unreachable => {}
             MirTerminatorKind::Branch { condition, .. } => {
                 if let Some(condition_ty) = self.validate_operand(scope, condition, terminator.span)
                 {
@@ -335,7 +254,100 @@ impl Validator<'_, '_> {
                     }
                 }
             }
-            MirTerminatorKind::Unreachable => {}
+        }
+    }
+
+    fn validate_try_call(
+        &mut self,
+        scope: &mut FunctionScope<'_, '_>,
+        previous: Option<&MirStatement>,
+        terminator: &MirTerminator,
+    ) {
+        let MirTerminatorKind::TryCall {
+            destination,
+            callee,
+            args,
+            error_place,
+            ..
+        } = &terminator.kind
+        else {
+            return;
+        };
+        let sig = self.validate_callee(scope, callee, terminator.span);
+        let mut generic_bindings = GenericTypeBindings::default();
+        let mut shape_bindings = MirShapeBindings::default();
+        self.validate_call_args(
+            scope,
+            sig.as_ref(),
+            args,
+            preceding_tensor_shape_check(previous, args),
+            terminator.span,
+            &mut generic_bindings,
+            &mut shape_bindings,
+        );
+        if !self.call_destination_matches_shape_check(
+            scope,
+            destination.as_ref(),
+            sig.as_ref().map(|sig| sig.return_ty),
+            args,
+            preceding_tensor_shape_check(previous, args),
+        ) {
+            self.validate_optional_destination_with_shapes(
+                scope,
+                destination.as_ref(),
+                sig.as_ref().map(|sig| sig.return_ty),
+                terminator.span,
+                &mut generic_bindings,
+                &mut shape_bindings,
+            );
+        }
+        let error_place_ty = self.validate_place(scope, error_place, terminator.span);
+        // The failable contract is enforced whenever the callee
+        // signature is resolvable HERE. Package-MIR synthetic callees
+        // (`MirCallee::Definition { source }` allocated by the faber
+        // linker after analysis) resolve only in the merged
+        // whole-program validation, where the linked library function
+        // carries the synthetic source; deferring their check to that
+        // stage matches the plain-`Call` treatment of cross-unit
+        // definitions. A never-resolvable def is caught downstream the
+        // same way a plain `Call` to one is: by the runner/emitter.
+        if sig.is_none() {
+            match &callee {
+                MirCallee::Definition { .. } => {}
+                _ => self.error(
+                    terminator.span,
+                    "try_call callee does not have a known failable signature",
+                ),
+            }
+        }
+        match (sig.as_ref().and_then(|sig| sig.error_ty), error_place_ty) {
+            (Some(error_ty), Some(place_ty)) => {
+                self.bind_generic_type_witness(
+                    error_ty,
+                    place_ty,
+                    &mut generic_bindings,
+                    &mut shape_bindings,
+                    terminator.span,
+                    "try_call error place type mismatch",
+                );
+                if let Some(error_ty) = self.instantiate_generic_type(
+                    error_ty,
+                    &generic_bindings,
+                    &shape_bindings,
+                    terminator.span,
+                ) {
+                    self.require_assignable(
+                        error_ty,
+                        place_ty,
+                        terminator.span,
+                        "try_call error place type mismatch",
+                    );
+                }
+            }
+            (None, _) if sig.is_some() => {
+                self.error(terminator.span, "try_call callee is not known failable");
+            }
+            _ => {}
         }
     }
 
@@ -454,40 +466,8 @@ impl Validator<'_, '_> {
             }
         }
 
-        let mut recovery_region = FxHashSet::default();
-        let mut recovery_stack = Vec::new();
-        for block in &function.blocks {
-            // The region tail either stores the recovery temp itself or, when
-            // the fallback has its own branches, copies the finished recovery
-            // value into the conversion destination.
-            let stores_recovery = block.statements.iter().any(|statement| match &statement.kind {
-                MirStatementKind::Assign { place, value } => {
-                    matches!(&place.base, MirPlaceBase::Temp(temp) if recovery_temps.contains(temp))
-                        || matches!(
-                            &value.kind,
-                            crate::MirValueKind::Operand(MirOperand::Temp(temp))
-                                if recovery_temps.contains(temp)
-                        )
-                }
-                _ => false,
-            });
-            let joins_reachable = terminator_successors(&block.terminator.kind)
-                .into_iter()
-                .any(|successor| reachable.contains(&successor));
-            if stores_recovery && !reachable.contains(&block.id) && joins_reachable {
-                recovery_region.insert(block.id);
-                recovery_stack.push(block.id);
-            }
-        }
-        while let Some(current) = recovery_stack.pop() {
-            if let Some(preds) = predecessors.get(&current) {
-                for pred in preds {
-                    if !reachable.contains(pred) && recovery_region.insert(*pred) {
-                        recovery_stack.push(*pred);
-                    }
-                }
-            }
-        }
+        let recovery_region =
+            conversion_recovery_region(function, &recovery_temps, &reachable, &predecessors);
 
         for block in &function.blocks {
             // Only flag blocks that are referenced as successor targets but are
@@ -512,31 +492,9 @@ impl Validator<'_, '_> {
         //    accepts loops (the exit reaches Return) while rejecting pure
         //    Goto cycles (no path to any seed).
 
-        // Identify seeds: blocks whose terminator is Return/ReturnError/Unreachable.
-        let mut reaches_terminator = FxHashSet::default();
-        let mut stack: Vec<MirBlockId> = Vec::new();
-        for block in &function.blocks {
-            match &block.terminator.kind {
-                MirTerminatorKind::Return(_)
-                | MirTerminatorKind::ReturnError(_)
-                | MirTerminatorKind::Unreachable => {
-                    reaches_terminator.insert(block.id);
-                    stack.push(block.id);
-                }
-                _ => {}
-            }
-        }
-
-        // Reverse-BFS: follow predecessor edges backward from seeds.
-        while let Some(current) = stack.pop() {
-            if let Some(preds) = predecessors.get(&current) {
-                for pred in preds {
-                    if reaches_terminator.insert(*pred) {
-                        stack.push(*pred);
-                    }
-                }
-            }
-        }
+        // Identify seeds (blocks whose terminator is Return/ReturnError/
+        // Unreachable) and reverse-BFS: follow predecessor edges backward.
+        let reaches_terminator = blocks_reaching_terminator(function, &predecessors);
 
         for block in &function.blocks {
             if reachable.contains(&block.id) && !reaches_terminator.contains(&block.id) {
@@ -551,6 +509,81 @@ impl Validator<'_, '_> {
             }
         }
     }
+}
+
+fn conversion_recovery_region(
+    function: &MirFunction,
+    recovery_temps: &FxHashSet<crate::MirTempId>,
+    reachable: &FxHashSet<MirBlockId>,
+    predecessors: &FxHashMap<MirBlockId, Vec<MirBlockId>>,
+) -> FxHashSet<MirBlockId> {
+    let mut recovery_region = FxHashSet::default();
+    let mut recovery_stack = Vec::new();
+    for block in &function.blocks {
+        // The region tail either stores the recovery temp itself or, when
+        // the fallback has its own branches, copies the finished recovery
+        // value into the conversion destination.
+        let stores_recovery = block
+            .statements
+            .iter()
+            .any(|statement| match &statement.kind {
+                MirStatementKind::Assign { place, value } => {
+                    matches!(&place.base, MirPlaceBase::Temp(temp) if recovery_temps.contains(temp))
+                        || matches!(
+                            &value.kind,
+                            crate::MirValueKind::Operand(MirOperand::Temp(temp))
+                                if recovery_temps.contains(temp)
+                        )
+                }
+                _ => false,
+            });
+        let joins_reachable = terminator_successors(&block.terminator.kind)
+            .into_iter()
+            .any(|successor| reachable.contains(&successor));
+        if stores_recovery && !reachable.contains(&block.id) && joins_reachable {
+            recovery_region.insert(block.id);
+            recovery_stack.push(block.id);
+        }
+    }
+    while let Some(current) = recovery_stack.pop() {
+        if let Some(preds) = predecessors.get(&current) {
+            for pred in preds {
+                if !reachable.contains(pred) && recovery_region.insert(*pred) {
+                    recovery_stack.push(*pred);
+                }
+            }
+        }
+    }
+    recovery_region
+}
+
+fn blocks_reaching_terminator(
+    function: &MirFunction,
+    predecessors: &FxHashMap<MirBlockId, Vec<MirBlockId>>,
+) -> FxHashSet<MirBlockId> {
+    let mut reaches_terminator = FxHashSet::default();
+    let mut stack: Vec<MirBlockId> = Vec::new();
+    for block in &function.blocks {
+        match &block.terminator.kind {
+            MirTerminatorKind::Return(_)
+            | MirTerminatorKind::ReturnError(_)
+            | MirTerminatorKind::Unreachable => {
+                reaches_terminator.insert(block.id);
+                stack.push(block.id);
+            }
+            _ => {}
+        }
+    }
+    while let Some(current) = stack.pop() {
+        if let Some(preds) = predecessors.get(&current) {
+            for pred in preds {
+                if reaches_terminator.insert(*pred) {
+                    stack.push(*pred);
+                }
+            }
+        }
+    }
+    reaches_terminator
 }
 
 fn preceding_tensor_shape_check<'a>(

@@ -621,17 +621,7 @@ impl PlanCompiler {
     pub fn compile(&self, graph: &TypedModelGraph) -> Result<CompiledDevicePlan, GraphError> {
         graph.validate()?;
         let candidates = Self::find_candidates(graph)?;
-        let mut claimed = BTreeSet::new();
-        for candidate in &candidates {
-            for node in &candidate.source_nodes {
-                if !claimed.insert(*node) {
-                    return Err(GraphError::PatternMismatch {
-                        layer: candidate.layer,
-                        detail: format!("node {} belongs to multiple fusions", node.0),
-                    });
-                }
-            }
-        }
+        let claimed = claim_fusion_nodes(&candidates)?;
 
         let mut all_candidates = candidates;
         for node in &graph.nodes {
@@ -711,34 +701,7 @@ impl PlanCompiler {
             });
         }
 
-        let mut layers = Vec::new();
-        let mut layer_ids = graph
-            .nodes
-            .iter()
-            .map(|node| node.layer)
-            .collect::<Vec<_>>();
-        layer_ids.sort_unstable();
-        layer_ids.dedup();
-        for layer in layer_ids {
-            let recognized = schedule
-                .iter()
-                .filter(|call| call.layer == layer && call.operation != LibraryOperation::Generated)
-                .map(|call| DecompositionRow {
-                    operation: call.operation,
-                    source_nodes: call.source_nodes.clone(),
-                })
-                .collect();
-            layers.push(LayerDecomposition {
-                layer,
-                before_kernel_count: graph
-                    .nodes
-                    .iter()
-                    .filter(|node| node.layer == layer)
-                    .count(),
-                after_kernel_count: schedule.iter().filter(|call| call.layer == layer).count(),
-                recognized,
-            });
-        }
+        let layers = layer_decompositions(graph, &schedule);
 
         let executor_plan = ExecutorPlanExtension {
             abi_version: EXECUTOR_PLAN_BIND_ABI_VERSION,
@@ -883,43 +846,7 @@ impl PlanCompiler {
                     detail: "attention scores are missing their typed K projection".to_owned(),
                 });
             };
-            let facts = [context, softmax, scale, scores, query, key, value]
-                .into_iter()
-                .map(|node| node.attention)
-                .collect::<Option<Vec<_>>>();
-            let Some(facts) = facts else {
-                return Err(GraphError::PatternMismatch {
-                    layer: context.layer,
-                    detail: "attention chain is missing typed GQA facts".to_owned(),
-                });
-            };
-            if facts.iter().any(|fact| *fact != facts[0]) {
-                return Err(GraphError::PatternMismatch {
-                    layer: context.layer,
-                    detail: "attention chain has inconsistent GQA facts".to_owned(),
-                });
-            }
-            if [softmax, scale, scores, query, key, value]
-                .into_iter()
-                .any(|node| node.layer != context.layer)
-            {
-                return Err(GraphError::PatternMismatch {
-                    layer: context.layer,
-                    detail: "attention chain crosses transformer layers".to_owned(),
-                });
-            }
-            let facts = facts[0];
-            if query.shape.dims != facts.q_dims()
-                || key.shape.dims != facts.kv_dims()
-                || value.shape.dims != facts.kv_dims()
-                || scores.shape.dims != vec![facts.kv_heads, facts.q_per_kv, facts.seq, facts.seq]
-                || context.shape.dims != vec![facts.seq, facts.hidden]
-            {
-                return Err(GraphError::PatternMismatch {
-                    layer: context.layer,
-                    detail: "attention chain shapes do not match its GQA facts".to_owned(),
-                });
-            }
+            Self::attention_chain_facts(context, softmax, scale, scores, query, key, value)?;
             candidates.push(Candidate {
                 layer: context.layer,
                 operation: LibraryOperation::CausalAttention,
@@ -927,6 +854,55 @@ impl PlanCompiler {
             });
         }
         Ok(candidates)
+    }
+
+    fn attention_chain_facts(
+        context: &TypedOpNode,
+        softmax: &TypedOpNode,
+        scale: &TypedOpNode,
+        scores: &TypedOpNode,
+        query: &TypedOpNode,
+        key: &TypedOpNode,
+        value: &TypedOpNode,
+    ) -> Result<(), GraphError> {
+        let facts = [context, softmax, scale, scores, query, key, value]
+            .into_iter()
+            .map(|node| node.attention)
+            .collect::<Option<Vec<_>>>();
+        let Some(facts) = facts else {
+            return Err(GraphError::PatternMismatch {
+                layer: context.layer,
+                detail: "attention chain is missing typed GQA facts".to_owned(),
+            });
+        };
+        if facts.iter().any(|fact| *fact != facts[0]) {
+            return Err(GraphError::PatternMismatch {
+                layer: context.layer,
+                detail: "attention chain has inconsistent GQA facts".to_owned(),
+            });
+        }
+        if [softmax, scale, scores, query, key, value]
+            .into_iter()
+            .any(|node| node.layer != context.layer)
+        {
+            return Err(GraphError::PatternMismatch {
+                layer: context.layer,
+                detail: "attention chain crosses transformer layers".to_owned(),
+            });
+        }
+        let facts = facts[0];
+        if query.shape.dims != facts.q_dims()
+            || key.shape.dims != facts.kv_dims()
+            || value.shape.dims != facts.kv_dims()
+            || scores.shape.dims != vec![facts.kv_heads, facts.q_per_kv, facts.seq, facts.seq]
+            || context.shape.dims != vec![facts.seq, facts.hidden]
+        {
+            return Err(GraphError::PatternMismatch {
+                layer: context.layer,
+                detail: "attention chain shapes do not match its GQA facts".to_owned(),
+            });
+        }
+        Ok(())
     }
 
     fn find_residual_rms(graph: &TypedModelGraph) -> Vec<Candidate> {
@@ -1362,80 +1338,17 @@ impl PlanCompiler {
             None
         };
         if let Some(facts) = causal_facts {
-            let views = [
-                ("q", facts.q_dims(), facts.q_strides()),
-                ("k", facts.kv_dims(), facts.kv_strides()),
-                ("v", facts.kv_dims(), facts.kv_strides()),
-                (
-                    "output",
-                    facts.q_dims(),
-                    facts.sequence_major_output_strides(),
-                ),
-            ];
-            for (binding, (name, dims, strides)) in views.into_iter().enumerate() {
-                binds.push(LibraryBind {
-                    name: name.to_owned(),
-                    binding: Binding {
-                        group: 0,
-                        binding: u32::try_from(binding).unwrap_or(u32::MAX),
-                    },
-                    dims,
-                    strides: strides.clone(),
-                    offset_elements: 0,
-                });
-                offsets.push(OffsetBinding {
-                    name: name.to_owned(),
-                    offset_elements: 0,
-                    strides,
-                });
-            }
+            push_causal_attention_binds(facts, &mut binds, &mut offsets);
         } else {
-            for (binding, name) in logical_signature.inputs.iter().enumerate() {
-                let binding = Binding {
-                    group: 0,
-                    binding: u32::try_from(binding).unwrap_or(u32::MAX),
-                };
-                let (dims, strides) =
-                    if operation == LibraryOperation::SsmConv1d && name == "kernel" {
-                        let Some(SsmFacts::Conv1d { kernel_width, .. }) = ssm_facts else {
-                            return Err(missing_facts(candidate, "SSM conv"));
-                        };
-                        (vec![kernel_width], vec![1])
-                    } else {
-                        (bind.dims.clone(), bind.strides.clone())
-                    };
-                binds.push(LibraryBind {
-                    name: name.clone(),
-                    binding,
-                    dims,
-                    strides: strides.clone(),
-                    offset_elements: 0,
-                });
-                offsets.push(OffsetBinding {
-                    name: name.clone(),
-                    offset_elements: 0,
-                    strides,
-                });
-            }
-            for (offset, name) in logical_signature.outputs.iter().enumerate() {
-                let binding = Binding {
-                    group: 0,
-                    binding: u32::try_from(logical_signature.inputs.len() + offset)
-                        .unwrap_or(u32::MAX),
-                };
-                binds.push(LibraryBind {
-                    name: name.clone(),
-                    binding,
-                    dims: bind.dims.clone(),
-                    strides: bind.strides.clone(),
-                    offset_elements: 0,
-                });
-                offsets.push(OffsetBinding {
-                    name: name.clone(),
-                    offset_elements: 0,
-                    strides: bind.strides.clone(),
-                });
-            }
+            push_signature_binds(
+                operation,
+                &logical_signature,
+                &bind,
+                ssm_facts,
+                candidate,
+                &mut binds,
+                &mut offsets,
+            )?;
         }
         let (mut uniforms, workspace, requirements) = if let Some(facts) = causal_facts {
             (
@@ -1459,66 +1372,14 @@ impl PlanCompiler {
         // MoE selections carry their declared expert policy and a
         // metal-scoped body admission requirement; dispatch lands in M8-U1b.
         let mut requirements = requirements;
-        match operation {
-            LibraryOperation::RouterSelection => {
-                let facts = moe_facts.ok_or_else(|| missing_facts(candidate, "router"))?;
-                uniforms.push(UniformBinding {
-                    name: "expert_count".to_owned(),
-                    ty: crate::device_program_plans::UniformType::U32,
-                    bits: u32::try_from(facts.experts).unwrap_or(u32::MAX),
-                });
-                uniforms.push(UniformBinding {
-                    name: "active_experts".to_owned(),
-                    ty: crate::device_program_plans::UniformType::U32,
-                    bits: u32::try_from(facts.active).unwrap_or(u32::MAX),
-                });
-                requirements.push(BackendRequirement {
-                    backend: "metal".to_owned(),
-                    feature: "RouterSelection".to_owned(),
-                });
-            }
-            LibraryOperation::GroupedExpertGemm => {
-                let facts = moe_facts.ok_or_else(|| missing_facts(candidate, "expert"))?;
-                uniforms.push(UniformBinding {
-                    name: "expert_count".to_owned(),
-                    ty: crate::device_program_plans::UniformType::U32,
-                    bits: u32::try_from(facts.experts).unwrap_or(u32::MAX),
-                });
-                requirements.push(BackendRequirement {
-                    backend: "metal".to_owned(),
-                    feature: "GroupedExpertGemm".to_owned(),
-                });
-            }
-            LibraryOperation::SsmConv1d => {
-                let Some(SsmFacts::Conv1d { kernel_width, .. }) = ssm_facts else {
-                    return Err(missing_facts(candidate, "SSM conv"));
-                };
-                uniforms.push(UniformBinding {
-                    name: "kernel_width".to_owned(),
-                    ty: crate::device_program_plans::UniformType::U32,
-                    bits: u32::try_from(kernel_width).unwrap_or(u32::MAX),
-                });
-                requirements.push(BackendRequirement {
-                    backend: "metal".to_owned(),
-                    feature: "SsmConv1d".to_owned(),
-                });
-            }
-            LibraryOperation::SsmScan => {
-                let Some(SsmFacts::Scan { state_dim, .. }) = ssm_facts else {
-                    return Err(missing_facts(candidate, "SSM scan"));
-                };
-                uniforms.push(UniformBinding {
-                    name: "state_dim".to_owned(),
-                    ty: crate::device_program_plans::UniformType::U32,
-                    bits: u32::try_from(state_dim).unwrap_or(u32::MAX),
-                });
-                requirements.push(BackendRequirement {
-                    backend: "metal".to_owned(),
-                    feature: "SsmScan".to_owned(),
-                });
-            }
-            _ => {}
-        }
+        push_operation_uniforms(
+            operation,
+            moe_facts,
+            ssm_facts,
+            candidate,
+            &mut uniforms,
+            &mut requirements,
+        )?;
         if matches!(
             operation,
             LibraryOperation::QkvProjection | LibraryOperation::SwiGlu
@@ -1546,6 +1407,217 @@ impl PlanCompiler {
             },
         })
     }
+}
+
+fn claim_fusion_nodes(candidates: &[Candidate]) -> Result<BTreeSet<GraphNodeId>, GraphError> {
+    let mut claimed = BTreeSet::new();
+    for candidate in candidates {
+        for node in &candidate.source_nodes {
+            if !claimed.insert(*node) {
+                return Err(GraphError::PatternMismatch {
+                    layer: candidate.layer,
+                    detail: format!("node {} belongs to multiple fusions", node.0),
+                });
+            }
+        }
+    }
+    Ok(claimed)
+}
+
+fn layer_decompositions(
+    graph: &TypedModelGraph,
+    schedule: &[ScheduledCall],
+) -> Vec<LayerDecomposition> {
+    let mut layers = Vec::new();
+    let mut layer_ids = graph
+        .nodes
+        .iter()
+        .map(|node| node.layer)
+        .collect::<Vec<_>>();
+    layer_ids.sort_unstable();
+    layer_ids.dedup();
+    for layer in layer_ids {
+        let recognized = schedule
+            .iter()
+            .filter(|call| call.layer == layer && call.operation != LibraryOperation::Generated)
+            .map(|call| DecompositionRow {
+                operation: call.operation,
+                source_nodes: call.source_nodes.clone(),
+            })
+            .collect();
+        layers.push(LayerDecomposition {
+            layer,
+            before_kernel_count: graph
+                .nodes
+                .iter()
+                .filter(|node| node.layer == layer)
+                .count(),
+            after_kernel_count: schedule.iter().filter(|call| call.layer == layer).count(),
+            recognized,
+        });
+    }
+    layers
+}
+
+fn push_causal_attention_binds(
+    facts: AttentionFacts,
+    binds: &mut Vec<LibraryBind>,
+    offsets: &mut Vec<OffsetBinding>,
+) {
+    let views = [
+        ("q", facts.q_dims(), facts.q_strides()),
+        ("k", facts.kv_dims(), facts.kv_strides()),
+        ("v", facts.kv_dims(), facts.kv_strides()),
+        (
+            "output",
+            facts.q_dims(),
+            facts.sequence_major_output_strides(),
+        ),
+    ];
+    for (binding, (name, dims, strides)) in views.into_iter().enumerate() {
+        binds.push(LibraryBind {
+            name: name.to_owned(),
+            binding: Binding {
+                group: 0,
+                binding: u32::try_from(binding).unwrap_or(u32::MAX),
+            },
+            dims,
+            strides: strides.clone(),
+            offset_elements: 0,
+        });
+        offsets.push(OffsetBinding {
+            name: name.to_owned(),
+            offset_elements: 0,
+            strides,
+        });
+    }
+}
+
+fn push_signature_binds(
+    operation: LibraryOperation,
+    logical_signature: &LogicalSignature,
+    bind: &BindDescriptor,
+    ssm_facts: Option<SsmFacts>,
+    candidate: &Candidate,
+    binds: &mut Vec<LibraryBind>,
+    offsets: &mut Vec<OffsetBinding>,
+) -> Result<(), GraphError> {
+    for (binding, name) in logical_signature.inputs.iter().enumerate() {
+        let binding = Binding {
+            group: 0,
+            binding: u32::try_from(binding).unwrap_or(u32::MAX),
+        };
+        let (dims, strides) = if operation == LibraryOperation::SsmConv1d && name == "kernel" {
+            let Some(SsmFacts::Conv1d { kernel_width, .. }) = ssm_facts else {
+                return Err(missing_facts(candidate, "SSM conv"));
+            };
+            (vec![kernel_width], vec![1])
+        } else {
+            (bind.dims.clone(), bind.strides.clone())
+        };
+        binds.push(LibraryBind {
+            name: name.clone(),
+            binding,
+            dims,
+            strides: strides.clone(),
+            offset_elements: 0,
+        });
+        offsets.push(OffsetBinding {
+            name: name.clone(),
+            offset_elements: 0,
+            strides,
+        });
+    }
+    for (offset, name) in logical_signature.outputs.iter().enumerate() {
+        let binding = Binding {
+            group: 0,
+            binding: u32::try_from(logical_signature.inputs.len() + offset).unwrap_or(u32::MAX),
+        };
+        binds.push(LibraryBind {
+            name: name.clone(),
+            binding,
+            dims: bind.dims.clone(),
+            strides: bind.strides.clone(),
+            offset_elements: 0,
+        });
+        offsets.push(OffsetBinding {
+            name: name.clone(),
+            offset_elements: 0,
+            strides: bind.strides.clone(),
+        });
+    }
+    Ok(())
+}
+
+fn push_operation_uniforms(
+    operation: LibraryOperation,
+    moe_facts: Option<MoEFacts>,
+    ssm_facts: Option<SsmFacts>,
+    candidate: &Candidate,
+    uniforms: &mut Vec<UniformBinding>,
+    requirements: &mut Vec<BackendRequirement>,
+) -> Result<(), GraphError> {
+    match operation {
+        LibraryOperation::RouterSelection => {
+            let facts = moe_facts.ok_or_else(|| missing_facts(candidate, "router"))?;
+            uniforms.push(UniformBinding {
+                name: "expert_count".to_owned(),
+                ty: crate::device_program_plans::UniformType::U32,
+                bits: u32::try_from(facts.experts).unwrap_or(u32::MAX),
+            });
+            uniforms.push(UniformBinding {
+                name: "active_experts".to_owned(),
+                ty: crate::device_program_plans::UniformType::U32,
+                bits: u32::try_from(facts.active).unwrap_or(u32::MAX),
+            });
+            requirements.push(BackendRequirement {
+                backend: "metal".to_owned(),
+                feature: "RouterSelection".to_owned(),
+            });
+        }
+        LibraryOperation::GroupedExpertGemm => {
+            let facts = moe_facts.ok_or_else(|| missing_facts(candidate, "expert"))?;
+            uniforms.push(UniformBinding {
+                name: "expert_count".to_owned(),
+                ty: crate::device_program_plans::UniformType::U32,
+                bits: u32::try_from(facts.experts).unwrap_or(u32::MAX),
+            });
+            requirements.push(BackendRequirement {
+                backend: "metal".to_owned(),
+                feature: "GroupedExpertGemm".to_owned(),
+            });
+        }
+        LibraryOperation::SsmConv1d => {
+            let Some(SsmFacts::Conv1d { kernel_width, .. }) = ssm_facts else {
+                return Err(missing_facts(candidate, "SSM conv"));
+            };
+            uniforms.push(UniformBinding {
+                name: "kernel_width".to_owned(),
+                ty: crate::device_program_plans::UniformType::U32,
+                bits: u32::try_from(kernel_width).unwrap_or(u32::MAX),
+            });
+            requirements.push(BackendRequirement {
+                backend: "metal".to_owned(),
+                feature: "SsmConv1d".to_owned(),
+            });
+        }
+        LibraryOperation::SsmScan => {
+            let Some(SsmFacts::Scan { state_dim, .. }) = ssm_facts else {
+                return Err(missing_facts(candidate, "SSM scan"));
+            };
+            uniforms.push(UniformBinding {
+                name: "state_dim".to_owned(),
+                ty: crate::device_program_plans::UniformType::U32,
+                bits: u32::try_from(state_dim).unwrap_or(u32::MAX),
+            });
+            requirements.push(BackendRequirement {
+                backend: "metal".to_owned(),
+                feature: "SsmScan".to_owned(),
+            });
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 /// A candidate reached selection without the typed facts its operation needs.

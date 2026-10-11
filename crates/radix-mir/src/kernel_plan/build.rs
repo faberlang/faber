@@ -570,61 +570,9 @@ impl CollectionKernelPlan {
                 };
                 Some(plan)
             }
-            MirCollectionOp::TensorRmsNorm => {
-                // GI3-1: the RMSNorm recipe resolves the typed facts like the
-                // S6-P1 transformer recipes — dims from the operand tensor,
-                // axis from the trailing const operand (must be the last
-                // axis for the v1 row-wise recipe), epsilon from the const
-                // operand, and the affine gamma peer width cross-checked.
-                let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
-                let count = dims_product(&dims)?;
-                if !signature_matches_transformer_counts(signature, count, count) {
-                    return None;
-                }
-                let (epsilon_bits, width, gamma_local) =
-                    rms_norm_const_facts(function, validation, &dims, axis)?;
-                // Gamma is data, but it must still be present in the typed
-                // kernel resource signature. This keeps plan admission tied
-                // to the source ABI without adding gamma to the wire plan.
-                let gamma_resource = signature.extra_inputs.iter().find(|resource| {
-                    resource.source_local == Some(gamma_local) && resource.element_count == width
-                })?;
-                if gamma_resource.role != MirKernelResourceRole::Input
-                    || gamma_resource.access != MirKernelResourceAccess::Read
-                {
-                    return None;
-                }
-                Some(CollectionKernelPlan::RmsNormalization(
-                    RmsNormalizationPlan {
-                        axis,
-                        epsilon_bits,
-                        width,
-                    },
-                ))
-            }
+            MirCollectionOp::TensorRmsNorm => rms_norm_plan(signature, function, validation, op),
             MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf => {
-                // GI3-1: the RoPE recipe resolves pos/dim from the trailing
-                // const operands and the row width from the operand dims.
-                // The caller-provided interleaved `[rows, dim/2, 3]` table
-                // is the explicit fourth MIR operand; no unrelated kernel
-                // parameter is eligible as a table. `TensorRopeHalf` selects
-                // Qwen/NeoX rotate_half pairing; `TensorRope` stays llama
-                // consecutive-pair.
-                let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
-                let count = dims_product(&dims)?;
-                if !signature_matches_transformer_counts(signature, count, count) {
-                    return None;
-                }
-                let (pos, dim, width, per_row, rows) =
-                    rope_plan_facts(function, validation, op, &dims, axis)?;
-                Some(CollectionKernelPlan::Rope(RopePlan {
-                    pos,
-                    dim,
-                    width,
-                    per_row,
-                    rows,
-                    rotate_half: matches!(op, MirCollectionOp::TensorRopeHalf),
-                }))
+                rope_plan(signature, function, validation, op)
             }
             MirCollectionOp::TensorGather => {
                 // GI3-1: the row-gather recipe resolves the rank-2 `[V, D]`
@@ -755,6 +703,73 @@ impl CollectionKernelPlan {
             }
         }
     }
+}
+
+fn rope_plan(
+    signature: &MirKernelSignature,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    op: MirCollectionOp,
+) -> Option<CollectionKernelPlan> {
+    // GI3-1: the RoPE recipe resolves pos/dim from the trailing
+    // const operands and the row width from the operand dims.
+    // The caller-provided interleaved `[rows, dim/2, 3]` table
+    // is the explicit fourth MIR operand; no unrelated kernel
+    // parameter is eligible as a table. `TensorRopeHalf` selects
+    // Qwen/NeoX rotate_half pairing; `TensorRope` stays llama
+    // consecutive-pair.
+    let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
+    let count = dims_product(&dims)?;
+    if !signature_matches_transformer_counts(signature, count, count) {
+        return None;
+    }
+    let (pos, dim, width, per_row, rows) = rope_plan_facts(function, validation, op, &dims, axis)?;
+    Some(CollectionKernelPlan::Rope(RopePlan {
+        pos,
+        dim,
+        width,
+        per_row,
+        rows,
+        rotate_half: matches!(op, MirCollectionOp::TensorRopeHalf),
+    }))
+}
+
+fn rms_norm_plan(
+    signature: &MirKernelSignature,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    op: MirCollectionOp,
+) -> Option<CollectionKernelPlan> {
+    // GI3-1: the RMSNorm recipe resolves the typed facts like the
+    // S6-P1 transformer recipes — dims from the operand tensor,
+    // axis from the trailing const operand (must be the last
+    // axis for the v1 row-wise recipe), epsilon from the const
+    // operand, and the affine gamma peer width cross-checked.
+    let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
+    let count = dims_product(&dims)?;
+    if !signature_matches_transformer_counts(signature, count, count) {
+        return None;
+    }
+    let (epsilon_bits, width, gamma_local) =
+        rms_norm_const_facts(function, validation, &dims, axis)?;
+    // Gamma is data, but it must still be present in the typed
+    // kernel resource signature. This keeps plan admission tied
+    // to the source ABI without adding gamma to the wire plan.
+    let gamma_resource = signature.extra_inputs.iter().find(|resource| {
+        resource.source_local == Some(gamma_local) && resource.element_count == width
+    })?;
+    if gamma_resource.role != MirKernelResourceRole::Input
+        || gamma_resource.access != MirKernelResourceAccess::Read
+    {
+        return None;
+    }
+    Some(CollectionKernelPlan::RmsNormalization(
+        RmsNormalizationPlan {
+            axis,
+            epsilon_bits,
+            width,
+        },
+    ))
 }
 
 /// Barrier schedule for the tree-reduction recipe: one post-load barrier
@@ -909,7 +924,7 @@ fn signature_matches_matmul_runtime(signature: &MirKernelSignature) -> bool {
         || signature
             .extra_inputs
             .first()
-            .is_some_and(|resource| resource.is_runtime_shaped());
+            .is_some_and(crate::abi::MirKernelResource::is_runtime_shaped);
     signature.workgroup.x == MATMUL_TILE
         && signature.workgroup.y == MATMUL_TILE
         && signature.workgroup.z == 1
