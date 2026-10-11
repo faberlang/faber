@@ -246,10 +246,14 @@ fn source_nominal_defs(source: &radix_module::mir::MirValidationContext<'_>) -> 
 
 fn program_nominal_defs_from_types(types: &TypeTable) -> Vec<DefId> {
     (0..types.type_count())
-        .filter_map(|index| match types.get(TypeId(index as u32)) {
-            Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => Some(*def_id),
-            _ => None,
-        })
+        .filter_map(
+            |index| match types.get(TypeId(u32::try_from(index).unwrap_or(u32::MAX))) {
+                Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => {
+                    Some(*def_id)
+                }
+                _ => None,
+            },
+        )
         .collect()
 }
 
@@ -357,11 +361,12 @@ fn collect_terminator_aggregate_defs(terminator: &MirTerminator, variants: &mut 
 
 fn collect_value_variant_defs(value: &MirValue, variants: &mut Vec<DefId>) {
     match &value.kind {
-        MirValueKind::Operand(operand) => collect_operand_variant_defs(operand, variants),
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            collect_operand_variant_defs(operand, variants);
+        }
         MirValueKind::Closure(closure) => {
             collect_operand_variant_defs(&closure.environment, variants);
         }
-        MirValueKind::Unary { operand, .. } => collect_operand_variant_defs(operand, variants),
         MirValueKind::TensorExtent { tensor, .. } => collect_operand_variant_defs(tensor, variants),
         MirValueKind::Binary { lhs, rhs, .. } => {
             collect_operand_variant_defs(lhs, variants);
@@ -543,6 +548,46 @@ fn collect_remapped_validation(
             .unwrap_or_else(|| remap_nominal_def(def))
     };
     let mut out = RemappedValidation::default();
+    remap_struct_and_variant_defs(
+        source,
+        source_interner,
+        entry_interner,
+        type_rewrites,
+        remap_nominal_def,
+        remap_variant_def,
+        &mut out,
+    );
+    for (def, sig) in &source.functions {
+        let mut sig = sig.clone();
+        rewrite_type_id(&mut sig.return_ty, type_rewrites);
+        if let Some(error_ty) = &mut sig.error_ty {
+            rewrite_type_id(error_ty, type_rewrites);
+        }
+        for param in &mut sig.params {
+            rewrite_type_id(&mut param.ty, type_rewrites);
+        }
+        out.functions.entry(remap_function_def(*def)).or_insert(sig);
+    }
+    for def in &source.method_defs {
+        out.method_defs.insert(remap_function_def(*def));
+    }
+    for (route, def) in &source.ad_routes {
+        out.ad_routes
+            .entry(route.clone())
+            .or_insert_with(|| remap_function_def(*def));
+    }
+    out
+}
+
+fn remap_struct_and_variant_defs(
+    source: &radix_module::mir::MirValidationContext<'_>,
+    source_interner: &Interner,
+    entry_interner: &mut Interner,
+    type_rewrites: &[(TypeId, TypeId)],
+    remap_nominal_def: impl Fn(DefId) -> DefId + Copy,
+    remap_variant_def: impl Fn(DefId) -> DefId + Copy,
+    out: &mut RemappedValidation,
+) {
     for (def, fields) in &source.struct_fields {
         let dest = remap_nominal_def(*def);
         let slot = out.struct_fields.entry(dest).or_default();
@@ -628,26 +673,6 @@ fn collect_remapped_validation(
             );
         }
     }
-    for (def, sig) in &source.functions {
-        let mut sig = sig.clone();
-        rewrite_type_id(&mut sig.return_ty, type_rewrites);
-        if let Some(error_ty) = &mut sig.error_ty {
-            rewrite_type_id(error_ty, type_rewrites);
-        }
-        for param in &mut sig.params {
-            rewrite_type_id(&mut param.ty, type_rewrites);
-        }
-        out.functions.entry(remap_function_def(*def)).or_insert(sig);
-    }
-    for def in &source.method_defs {
-        out.method_defs.insert(remap_function_def(*def));
-    }
-    for (route, def) in &source.ad_routes {
-        out.ad_routes
-            .entry(route.clone())
-            .or_insert_with(|| remap_function_def(*def));
-    }
-    out
 }
 
 #[cfg(test)]
@@ -2196,7 +2221,7 @@ pub(super) fn import_lowered_semantic_types(
     let mut imported = HashMap::new();
     let mut rewrites = Vec::new();
     for index in 0..source.type_count() {
-        let source_ty = TypeId(index as u32);
+        let source_ty = TypeId(u32::try_from(index).unwrap_or(u32::MAX));
         let target_ty =
             import_semantic_type_with_nominal(source, target, source_ty, &mut imported, nominal);
         push_type_rewrite(&mut rewrites, source_ty, target_ty);
@@ -2271,10 +2296,10 @@ fn rewrite_validation_type_ids(
         .collect();
 }
 
-/// Move validation-context DefId keys through the same variant/nominal remap
+/// Move validation-context `DefId` keys through the same variant/nominal remap
 /// as the program's `EnumVariant` aggregates.
 ///
-/// Each unit allocates user DefIds from `USER_DEF_ID_BASE`. After the program
+/// Each unit allocates user `DefId`s from `USER_DEF_ID_BASE`. After the program
 /// rewrite, a source-local `DTypeError.UnknownName` can still occupy the same
 /// numeric id as the consumer's remapped `DType.I32`. `remapped.apply` then
 /// `or_insert`s commune fields onto that slot, so a unit-variant construction
@@ -2568,8 +2593,14 @@ fn remap_lowered_program_text_symbols<'a>(
     // the hazard `selected_cli_dispatch_function` documents for command
     // symbols). The snapshot rebuild keeps every `TypeId` slot-in-place, so
     // the program's still-source type ids resolve unchanged.
-    let has_records = (0..context.types.type_count())
-        .any(|index| matches!(context.types.get(TypeId(index as u32)), Type::Record(_)));
+    let has_records = (0..context.types.type_count()).any(|index| {
+        matches!(
+            context
+                .types
+                .get(TypeId(u32::try_from(index).unwrap_or(u32::MAX))),
+            Type::Record(_)
+        )
+    });
     if has_records {
         let mut snapshot = context.types.snapshot();
         snapshot.remap_record_field_symbols(|symbol| remap_symbol(symbol, source, target));
@@ -2729,7 +2760,7 @@ fn rewrite_tensor_edge_type_identity(
         | MirTensorEdgeTypeIdentity::Vector(inner, _)
         | MirTensorEdgeTypeIdentity::Matrix(inner, _)
         | MirTensorEdgeTypeIdentity::Sparsa(inner, _) => {
-            rewrite_tensor_edge_type_identity(inner, rewrites)
+            rewrite_tensor_edge_type_identity(inner, rewrites);
         }
         MirTensorEdgeTypeIdentity::Tuple(items)
         | MirTensorEdgeTypeIdentity::Union(items)
