@@ -15,8 +15,8 @@
 use crate::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{Span, TokenKind};
 use radix_syntax::{
-    BlockStmt, CapeClause, ClassMemberKind, FuncDecl, IfBody, ProbandumDecl, Program, SecusClause,
-    Stmt, StmtKind, Trivia,
+    BlockStmt, CapeClause, ClassDecl, ClassMemberKind, FuncDecl, IfBody, ProbandumDecl, Program,
+    SecusClause, Stmt, StmtKind, Trivia,
 };
 use radix_syntax::{Visitor, walk_stmt};
 use std::collections::HashSet;
@@ -103,15 +103,7 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
     claim_trivia(&stmt.leading_trivia, claimed);
     match &stmt.kind {
         StmtKind::Func(func) => claim_func_decl(func, claimed),
-        StmtKind::Class(class) => {
-            claim_trivia(&class.end_trivia, claimed);
-            for member in &class.members {
-                claim_trivia(&member.leading_trivia, claimed);
-                if let ClassMemberKind::Method(func) = &member.kind {
-                    claim_func_decl(func, claimed);
-                }
-            }
-        }
+        StmtKind::Class(class) => claim_class_members(class, claimed),
         StmtKind::Interface(interface) => {
             for method in &interface.methods {
                 claim_trivia(&method.leading_trivia, claimed);
@@ -200,6 +192,16 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
             claim_catch(fac.catch.as_ref(), claimed);
         }
         StmtKind::Incipit(incipit) => claim_if_body(&incipit.body, claimed),
+    }
+}
+
+fn claim_class_members(class: &ClassDecl, claimed: &mut HashSet<u32>) {
+    claim_trivia(&class.end_trivia, claimed);
+    for member in &class.members {
+        claim_trivia(&member.leading_trivia, claimed);
+        if let ClassMemberKind::Method(func) = &member.kind {
+            claim_func_decl(func, claimed);
+        }
     }
 }
 

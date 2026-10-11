@@ -151,21 +151,7 @@ impl Parser {
                 _ => self.parse_expr_stmt()?,
             },
 
-            TokenKind::At => {
-                let annotations = self.parse_annotations()?;
-                self.nondum_function_pending = self.check_keyword_ident(TokenKind::Functio)
-                    && annotations
-                        .iter()
-                        .any(|annotation| self.is_nondum_annotation(annotation));
-                let parsed = self.parse_stmt();
-                self.nondum_function_pending = false;
-                let mut stmt = parsed?;
-                let mut combined = leading_trivia;
-                combined.append(&mut stmt.leading_trivia);
-                stmt.leading_trivia = combined;
-                stmt.annotations = annotations;
-                return Ok(stmt);
-            }
+            TokenKind::At => return self.parse_annotated_stmt(leading_trivia),
 
             _ => self.parse_expr_stmt()?,
         };
@@ -178,6 +164,22 @@ impl Parser {
             annotations: Vec::new(),
             leading_trivia,
         })
+    }
+
+    fn parse_annotated_stmt(&mut self, leading_trivia: Vec<Trivia>) -> Result<Stmt, ParseError> {
+        let annotations = self.parse_annotations()?;
+        self.nondum_function_pending = self.check_keyword_ident(TokenKind::Functio)
+            && annotations
+                .iter()
+                .any(|annotation| self.is_nondum_annotation(annotation));
+        let parsed = self.parse_stmt();
+        self.nondum_function_pending = false;
+        let mut stmt = parsed?;
+        let mut combined = leading_trivia;
+        combined.append(&mut stmt.leading_trivia);
+        stmt.leading_trivia = combined;
+        stmt.annotations = annotations;
+        Ok(stmt)
     }
 
     // VARIABLE DECLARATIONS
