@@ -233,7 +233,7 @@ impl Validator<'_, '_> {
                     "panic runtime call does not return numquam",
                 );
             }
-            MirIntrinsic::Provider(_) => {}
+            MirIntrinsic::Provider(_) | MirIntrinsic::SermoOpen | MirIntrinsic::SermoSetOpener => {}
             MirIntrinsic::DeviceBlock(op) => {
                 let expected = usize::from(matches!(op, MirDeviceBlockOp::Enter { .. }));
                 self.require_arg_count(call.args.len(), expected, span, "device block marker");
@@ -243,7 +243,6 @@ impl Validator<'_, '_> {
                     self.error(span, "device block marker handler block is missing");
                 }
             }
-            MirIntrinsic::SermoOpen | MirIntrinsic::SermoSetOpener => {}
             MirIntrinsic::Sermo(op) => self.validate_sermo_call(scope, op, call, span),
             MirIntrinsic::Cede => {
                 self.require_arg_count(call.args.len(), 1, span, "cede runtime call");
@@ -952,8 +951,9 @@ impl Validator<'_, '_> {
             // trailing fill operand after [seed, flat, shape]; the flat path
             // keeps its exact-count 3-argument contract.
             MirCollectionOp::TensorFromFlat => 3,
-            MirCollectionOp::TensorRmsNorm => 4,
-            MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf => 4,
+            MirCollectionOp::TensorRmsNorm
+            | MirCollectionOp::TensorRope
+            | MirCollectionOp::TensorRopeHalf => 4,
             MirCollectionOp::TensorLayerNorm => 0,
             MirCollectionOp::TensorGather => 0,
             // Compiler-owned M3 lowering carries tensor peers followed by a
@@ -1986,7 +1986,7 @@ impl Validator<'_, '_> {
                         );
                     }
                     // `(None, None)` already returned above.
-                    (Some(_), None) | (None, Some(_)) | (None, None) => {}
+                    (Some(_), None) | (None, _) => {}
                 }
                 if flows {
                     self.require_assignable(
