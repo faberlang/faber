@@ -789,11 +789,9 @@ impl std::hash::Hash for MirConstant {
             Self::Int(v) => v.hash(state),
             Self::UInt(v) => v.hash(state),
             Self::Float(v) => v.to_bits().hash(state),
-            Self::String(v) => v.hash(state),
-            Self::Ascii(v) => v.hash(state),
+            Self::String(v) | Self::Ascii(v) => v.hash(state),
             Self::Bool(v) => v.hash(state),
-            Self::Nil => {}
-            Self::Unit => {}
+            Self::Nil | Self::Unit => {}
             Self::Octeti(v) => v.hash(state),
             Self::Regex { pattern, flags } => {
                 pattern.hash(state);

@@ -460,10 +460,8 @@ impl MirLayoutKind {
     fn size_bits(self) -> Option<u16> {
         match self {
             // `Magnus` is an unsized heap carrier: no fixed bit size.
-            Self::Scalar(MirScalarLayout::Magnus) => None,
-            Self::Scalar(scalar) => Some(scalar.size_bits()),
-            Self::Atomic(atomic) => Some(atomic.element.size_bits()),
-            Self::Aggregate(_)
+            Self::Scalar(MirScalarLayout::Magnus)
+            | Self::Aggregate(_)
             | Self::DeviceView(_)
             | Self::DeviceVector(_)
             | Self::DeviceMatrix(_)
@@ -471,15 +469,15 @@ impl MirLayoutKind {
             | Self::PackedNumeric(_)
             | Self::Void
             | Self::Never => None,
+            Self::Scalar(scalar) => Some(scalar.size_bits()),
+            Self::Atomic(atomic) => Some(atomic.element.size_bits()),
         }
     }
 
     fn align_bits(self) -> Option<u16> {
         match self {
-            Self::Scalar(MirScalarLayout::Magnus) => None,
-            Self::Scalar(scalar) => Some(scalar.align_bits()),
-            Self::Atomic(atomic) => Some(atomic.element.align_bits()),
-            Self::Aggregate(_)
+            Self::Scalar(MirScalarLayout::Magnus)
+            | Self::Aggregate(_)
             | Self::DeviceView(_)
             | Self::DeviceVector(_)
             | Self::DeviceMatrix(_)
@@ -487,6 +485,8 @@ impl MirLayoutKind {
             | Self::PackedNumeric(_)
             | Self::Void
             | Self::Never => None,
+            Self::Scalar(scalar) => Some(scalar.align_bits()),
+            Self::Atomic(atomic) => Some(atomic.element.align_bits()),
         }
     }
 }

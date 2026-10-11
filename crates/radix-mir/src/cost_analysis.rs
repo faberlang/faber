@@ -75,8 +75,7 @@ impl CostTag {
     pub fn amplify(self, element_count: u64) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.amplify(element_count)),
-            Self::F => self,
-            Self::U => self,
+            Self::F | Self::U => self,
         }
     }
 }

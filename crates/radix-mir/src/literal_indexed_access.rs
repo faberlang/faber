@@ -96,20 +96,17 @@ impl LiteralIndexedAccessPlan {
                 };
                 access_count += 1;
                 let offset = literal_call_offset(function, call, types, &aliases, &indices)?;
-                match op {
-                    MirCollectionOp::TensorGet => {
-                        let destination = MirSlot::from_place(destination.as_ref()?)?;
-                        get_results.insert(resolve_slot(destination, &aliases)?);
-                    }
+                if let MirCollectionOp::TensorGet = op {
+                    let destination = MirSlot::from_place(destination.as_ref()?)?;
+                    get_results.insert(resolve_slot(destination, &aliases)?);
+                } else {
                     // `TensorSet`: the let-else above admits only Get and Set.
-                    _ => {
-                        let receiver =
-                            resolve_slot(MirSlot::from_operand(call.args.first()?)?, &aliases)?;
-                        if receiver != returned_output || offset >= output_elements {
-                            return None;
-                        }
-                        set_offsets.insert(offset);
+                    let receiver =
+                        resolve_slot(MirSlot::from_operand(call.args.first()?)?, &aliases)?;
+                    if receiver != returned_output || offset >= output_elements {
+                        return None;
                     }
+                    set_offsets.insert(offset);
                 }
             }
         }
@@ -433,12 +430,14 @@ fn terminator_reads_set(
     slots: &FxHashSet<MirSlot>,
 ) -> bool {
     match terminator {
-        MirTerminatorKind::Return(Some(operand)) => operand_resolves_into(operand, aliases, slots),
-        MirTerminatorKind::ReturnError(operand) => operand_resolves_into(operand, aliases, slots),
-        MirTerminatorKind::Branch { condition, .. } => {
-            operand_resolves_into(condition, aliases, slots)
+        MirTerminatorKind::Return(Some(operand))
+        | MirTerminatorKind::ReturnError(operand)
+        | MirTerminatorKind::Branch {
+            condition: operand, ..
         }
-        MirTerminatorKind::Switch { value, .. } => operand_resolves_into(value, aliases, slots),
+        | MirTerminatorKind::Switch { value: operand, .. } => {
+            operand_resolves_into(operand, aliases, slots)
+        }
         MirTerminatorKind::TryCall { args, .. } => args
             .iter()
             .any(|operand| operand_resolves_into(operand, aliases, slots)),

@@ -96,7 +96,6 @@ pub fn option_payload_ty(ty: MirType, types: &TypeTable) -> Result<MirType, MirT
                 .map(|member| MirType::semantic(*member))
                 .ok_or_else(|| MirTypeError::unsupported("nullable union payload type"))
         }
-        Type::Primitive(Primitive::Nihil) => Ok(ty),
         Type::Alias(_, target) => option_payload_ty(MirType::semantic(*target), types),
         Type::Primitive(_) => Ok(ty),
         other => Err(MirTypeError::unsupported(format!("option type {other:?}"))),
@@ -157,7 +156,6 @@ pub fn constant_ty_with_index(
                     MirType::semantic,
                 ));
         }
-        MirConstant::Float(_) => Primitive::Fractus,
         MirConstant::Bool(_) => Primitive::Bivalens,
         MirConstant::Unit => Primitive::Vacuum,
         MirConstant::String(_) => Primitive::Textus,
@@ -173,7 +171,7 @@ pub fn constant_ty_with_index(
         }
         // A shape-size scalar is a float-sized compile-time value (the
         // symbolic companion divides by it at runtime).
-        MirConstant::ShapeSize { .. } => Primitive::Fractus,
+        MirConstant::Float(_) | MirConstant::ShapeSize { .. } => Primitive::Fractus,
         // An exact bignum constant is the unbounded integer; the sized type
         // is interned whenever an `inf` is declared.
         MirConstant::Magnus(_) => {
