@@ -1615,19 +1615,7 @@ impl BodyDecline<'_> {
 
     fn scan_expr(&mut self, expr: &HirExpression, as_statement: bool) {
         match &expr.kind {
-            HirExpressionKind::Assign(lhs, rhs) => {
-                match &lhs.kind {
-                    HirExpressionKind::Path(def) => {
-                        if *def == self.index_def || !self.same_block_locals.contains(def) {
-                            self.reject(CAUSA_IMPURE);
-                        } else if !self.at_loop_body_root {
-                            self.reject(CAUSA_UNSUPPORTED_CONTROL);
-                        }
-                    }
-                    _ => self.reject(CAUSA_IMPURE),
-                }
-                self.scan_expr(rhs, false);
-            }
+            HirExpressionKind::Assign(lhs, rhs) => self.scan_assign(lhs, rhs),
             HirExpressionKind::Si {
                 cond,
                 then_block,
@@ -1726,6 +1714,20 @@ impl BodyDecline<'_> {
             _ => walk_expr(self, expr),
         }
     }
+
+    fn scan_assign(&mut self, lhs: &HirExpression, rhs: &HirExpression) {
+        match &lhs.kind {
+            HirExpressionKind::Path(def) => {
+                if *def == self.index_def || !self.same_block_locals.contains(def) {
+                    self.reject(CAUSA_IMPURE);
+                } else if !self.at_loop_body_root {
+                    self.reject(CAUSA_UNSUPPORTED_CONTROL);
+                }
+            }
+            _ => self.reject(CAUSA_IMPURE),
+        }
+        self.scan_expr(rhs, false);
+    }
 }
 
 impl HirVisitor for BodyDecline<'_> {
@@ -1756,36 +1758,8 @@ fn emit_unrolled_lanes(
         .collect();
     let mut out = Vec::new();
     for (lane_index, value) in ready.lanes.iter().enumerate() {
-        let mut coordinate_bindings = FxHashMap::default();
-        if !ready.coordinate_defs.is_empty() {
-            let tuple = &ready.lane_coordinates[lane_index];
-            for (def, coord) in ready.coordinate_defs.iter().zip(tuple) {
-                let binding_def = ids.next_def();
-                let binding = HirLocal {
-                    def_id: binding_def,
-                    name: interner.intern(&format!("__unroll_{}", binding_def.0)),
-                    ty: None,
-                    init: Some(HirExpression {
-                        id: ids.next_hir(),
-                        kind: int_literal(*coord, ids),
-                        ty: None,
-                        span: ready.body.span,
-                    }),
-                    mutable: false,
-                    is_await: false,
-                    runtime_provided: false,
-                    await_store: None,
-                    size_decl: false,
-                    size_static: false,
-                };
-                out.push(HirStatement {
-                    id: ids.next_hir(),
-                    kind: HirStatementKind::Local(binding),
-                    span: ready.body.span,
-                });
-                coordinate_bindings.insert(*def, binding_def);
-            }
-        }
+        let coordinate_bindings =
+            emit_coordinate_bindings(ready, lane_index, interner, ids, &mut out);
         let mut remap = Remap {
             index_def: ready.index_def,
             index_value: *value,
@@ -1859,6 +1833,46 @@ fn emit_unrolled_lanes(
         out.extend(stmts);
     }
     (out, acc_current)
+}
+
+fn emit_coordinate_bindings(
+    ready: &ReadyUnroll,
+    lane_index: usize,
+    interner: &mut Interner,
+    ids: &mut IdGen,
+    out: &mut Vec<HirStatement>,
+) -> FxHashMap<DefId, DefId> {
+    let mut coordinate_bindings = FxHashMap::default();
+    if !ready.coordinate_defs.is_empty() {
+        let tuple = &ready.lane_coordinates[lane_index];
+        for (def, coord) in ready.coordinate_defs.iter().zip(tuple) {
+            let binding_def = ids.next_def();
+            let binding = HirLocal {
+                def_id: binding_def,
+                name: interner.intern(&format!("__unroll_{}", binding_def.0)),
+                ty: None,
+                init: Some(HirExpression {
+                    id: ids.next_hir(),
+                    kind: int_literal(*coord, ids),
+                    ty: None,
+                    span: ready.body.span,
+                }),
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+                await_store: None,
+                size_decl: false,
+                size_static: false,
+            };
+            out.push(HirStatement {
+                id: ids.next_hir(),
+                kind: HirStatementKind::Local(binding),
+                span: ready.body.span,
+            });
+            coordinate_bindings.insert(*def, binding_def);
+        }
+    }
+    coordinate_bindings
 }
 
 fn emit_iteration(
@@ -2252,7 +2266,7 @@ impl MaskCollector<'_> {
                 }
             }
             HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
-                self.scan_expr(expr)
+                self.scan_expr(expr);
             }
             HirStatementKind::Custodi(custodi) => {
                 for clause in &custodi.clauses {
@@ -2305,31 +2319,7 @@ impl MaskCollector<'_> {
                     }
                 }
             }
-            HirExpressionKind::Binary(op, lhs, rhs) => {
-                self.scan_expr(lhs);
-                self.scan_expr(rhs);
-                if matches!(
-                    *op,
-                    HirBinOp::Mul | HirBinOp::Hadamard | HirBinOp::HadamardDiv
-                ) {
-                    if self.is_fill_built(lhs)
-                        || self.is_fill_built(rhs)
-                        || is_comparison(lhs)
-                        || is_comparison(rhs)
-                    {
-                        self.in_region_mask = true;
-                    }
-                } else if *op == HirBinOp::Div {
-                    if !is_nonzero_literal(rhs) {
-                        self.nan_unsafe = true;
-                    }
-                    self.note_data(lhs);
-                    self.note_data(rhs);
-                } else if !is_cmp(*op) {
-                    self.note_data(lhs);
-                    self.note_data(rhs);
-                }
-            }
+            HirExpressionKind::Binary(op, lhs, rhs) => self.scan_binary(*op, lhs, rhs),
             HirExpressionKind::Assign(lhs, rhs) => {
                 self.scan_expr(rhs);
                 self.note_data(lhs);
@@ -2348,7 +2338,7 @@ impl MaskCollector<'_> {
             }
             HirExpressionKind::Block(block) => self.scan_block(block),
             HirExpressionKind::Loop(block) | HirExpressionKind::Itera { body: block, .. } => {
-                self.scan_block(block)
+                self.scan_block(block);
             }
             HirExpressionKind::Dum(cond, block) => {
                 self.scan_expr(cond);
@@ -2366,6 +2356,32 @@ impl MaskCollector<'_> {
             | HirExpressionKind::Index(operand, _)
             | HirExpressionKind::Praefixum(operand) => self.scan_expr(operand),
             _ => {}
+        }
+    }
+
+    fn scan_binary(&mut self, op: HirBinOp, lhs: &HirExpression, rhs: &HirExpression) {
+        self.scan_expr(lhs);
+        self.scan_expr(rhs);
+        if matches!(
+            op,
+            HirBinOp::Mul | HirBinOp::Hadamard | HirBinOp::HadamardDiv
+        ) {
+            if self.is_fill_built(lhs)
+                || self.is_fill_built(rhs)
+                || is_comparison(lhs)
+                || is_comparison(rhs)
+            {
+                self.in_region_mask = true;
+            }
+        } else if op == HirBinOp::Div {
+            if !is_nonzero_literal(rhs) {
+                self.nan_unsafe = true;
+            }
+            self.note_data(lhs);
+            self.note_data(rhs);
+        } else if !is_cmp(op) {
+            self.note_data(lhs);
+            self.note_data(rhs);
         }
     }
 }
@@ -2513,7 +2529,7 @@ impl RuntimeLenGuard {
                 }
             }
             HirExpressionKind::Unary(_, operand) | HirExpressionKind::Field(operand, _) => {
-                self.scan_expr(operand)
+                self.scan_expr(operand);
             }
             _ => {}
         }
