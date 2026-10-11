@@ -481,7 +481,6 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 }
             }
         }
-        StmtKind::Interface(_) => {}
         StmtKind::Probandum(test) => {
             for setup in &test.body.setup {
                 scan_rust_block(&setup.body, file, diagnostics);
@@ -600,7 +599,8 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 scan_rust_expr(init, file, diagnostics);
             }
         }
-        StmtKind::Import(_)
+        StmtKind::Interface(_)
+        | StmtKind::Import(_)
         | StmtKind::TypeAlias(_)
         | StmtKind::Enum(_)
         | StmtKind::Union(_)

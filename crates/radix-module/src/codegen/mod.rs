@@ -387,89 +387,7 @@ pub fn generate_from_analyzed_with_options(
         .without_unavailable_declarations(&analysis.interner);
     let hir = &*emit_hir;
     match target {
-        Target::HirRust => {
-            #[cfg(feature = "hir-rust")]
-            {
-                reject_rust_unsupported_types(&analysis.types)?;
-
-                let mut namespace_info = rust::build_file_import_namespaces(
-                    hir,
-                    &analysis.interner,
-                    &rust::ResolverImportsBridge(&analysis.resolver),
-                );
-                let callback_identities =
-                    imported_tensor_edge_policy_callback_identities(&analysis.resolver, &analysis.interner);
-                let mut emitted_tensor_policy_providers = rustc_hash::FxHashSet::default();
-                let mut policy_identity_codegen =
-                    rust::RustCodegen::new_with_types(hir, &analysis.interner, &analysis.types);
-                policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
-                for provider in &analysis.tensor_edge_policies.provider_impls {
-                    if let Some(key) =
-                        policy_identity_codegen.tensor_edge_policy_provider_key(provider, &analysis.types, None)?
-                    {
-                        emitted_tensor_policy_providers.insert(key);
-                    }
-                }
-                let provider_modules = emit_provider_modules(analysis, &mut emitted_tensor_policy_providers)?;
-                let gpu_builtins = rust::rust_gpu_builtins(&analysis.gpu_builtins);
-                let function_facts = rust::rust_function_facts(&analysis.function_facts);
-                let used_imports = rust::used_import_defs(&analysis.resolved_uses);
-
-                // Provider-emitted signatures decide importer call-site
-                // unwrapping: an `ad`-verb provider function emits `Result`
-                // even without a declared `⇥` channel, so widen the imported
-                // namespace effects for those members.
-                let mut provider_failable_exports = rustc_hash::FxHashMap::default();
-                for (name, _, failable_exports) in &provider_modules {
-                    provider_failable_exports
-                        .entry(name.as_str())
-                        .or_insert(failable_exports);
-                }
-                for ((def_id, member), effects) in &mut namespace_info.function_effects {
-                    let Some(modules) = namespace_info.modules.get(def_id) else {
-                        continue;
-                    };
-                    if let Some(failable_exports) = modules
-                        .iter()
-                        .find_map(|segment| provider_failable_exports.get(segment.as_str()))
-                        && failable_exports.contains(member)
-                    {
-                        effects.is_failable = true;
-                    }
-                }
-                let mut r#gen = rust::RustCodegen::new_with_types(hir, &analysis.interner, &analysis.types);
-                r#gen.set_display_tokens(display_tokens_for_module(analysis));
-                r#gen.set_shape_obligations(rust::rust_shape_obligations(&analysis.shape_obligations));
-                r#gen.set_tensor_edge_policy_table(Some(&analysis.tensor_edge_policies));
-                r#gen.set_tensor_edge_policy_callback_identities(callback_identities.iter().cloned());
-                r#gen.set_gpu_builtins(&gpu_builtins);
-                r#gen.set_function_facts(&function_facts);
-                r#gen.set_used_import_defs(&used_imports);
-                r#gen.set_imported_namespace_info(namespace_info);
-                let mut output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
-
-                if !provider_modules.is_empty() {
-                    let mut module_block = String::new();
-                    for (module_name, module_code, _failable) in &provider_modules {
-                        module_block.push_str("pub mod ");
-                        module_block.push_str(module_name);
-                        module_block.push_str(" {\n");
-                        module_block.push_str(module_code);
-                        if !module_code.ends_with('\n') {
-                            module_block.push('\n');
-                        }
-                        module_block.push_str("}\n\n");
-                    }
-                    output.code = insert_modules_after_leading_crate_attributes(&output.code, &module_block);
-                }
-
-                Ok(crate::Output::Rust(crate::RustOutput { code: output.code }))
-            }
-            #[cfg(not(feature = "hir-rust"))]
-            {
-                Err(unavailable_target_error(Target::HirRust))
-            }
-        }
+        Target::HirRust => generate_rust_from_analyzed(analysis, hir),
         Target::HirTypeScript => {
             #[cfg(feature = "hir-ts")]
             {
@@ -543,6 +461,88 @@ pub fn generate_from_analyzed_with_options(
     }
 }
 
+#[cfg(feature = "hir-rust")]
+fn generate_rust_from_analyzed(
+    analysis: &crate::driver::AnalyzedModule,
+    hir: &HirModule,
+) -> Result<crate::Output, CodegenError> {
+    reject_rust_unsupported_types(&analysis.types)?;
+
+    let mut namespace_info =
+        rust::build_file_import_namespaces(hir, &analysis.interner, &rust::ResolverImportsBridge(&analysis.resolver));
+    let callback_identities = imported_tensor_edge_policy_callback_identities(&analysis.resolver, &analysis.interner);
+    let mut emitted_tensor_policy_providers = rustc_hash::FxHashSet::default();
+    let mut policy_identity_codegen = rust::RustCodegen::new_with_types(hir, &analysis.interner, &analysis.types);
+    policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
+    for provider in &analysis.tensor_edge_policies.provider_impls {
+        if let Some(key) = policy_identity_codegen.tensor_edge_policy_provider_key(provider, &analysis.types, None)? {
+            emitted_tensor_policy_providers.insert(key);
+        }
+    }
+    let provider_modules = emit_provider_modules(analysis, &mut emitted_tensor_policy_providers)?;
+    let gpu_builtins = rust::rust_gpu_builtins(&analysis.gpu_builtins);
+    let function_facts = rust::rust_function_facts(&analysis.function_facts);
+    let used_imports = rust::used_import_defs(&analysis.resolved_uses);
+
+    // Provider-emitted signatures decide importer call-site
+    // unwrapping: an `ad`-verb provider function emits `Result`
+    // even without a declared `⇥` channel, so widen the imported
+    // namespace effects for those members.
+    let mut provider_failable_exports = rustc_hash::FxHashMap::default();
+    for (name, _, failable_exports) in &provider_modules {
+        provider_failable_exports
+            .entry(name.as_str())
+            .or_insert(failable_exports);
+    }
+    for ((def_id, member), effects) in &mut namespace_info.function_effects {
+        let Some(modules) = namespace_info.modules.get(def_id) else {
+            continue;
+        };
+        if let Some(failable_exports) = modules
+            .iter()
+            .find_map(|segment| provider_failable_exports.get(segment.as_str()))
+            && failable_exports.contains(member)
+        {
+            effects.is_failable = true;
+        }
+    }
+    let mut r#gen = rust::RustCodegen::new_with_types(hir, &analysis.interner, &analysis.types);
+    r#gen.set_display_tokens(display_tokens_for_module(analysis));
+    r#gen.set_shape_obligations(rust::rust_shape_obligations(&analysis.shape_obligations));
+    r#gen.set_tensor_edge_policy_table(Some(&analysis.tensor_edge_policies));
+    r#gen.set_tensor_edge_policy_callback_identities(callback_identities.iter().cloned());
+    r#gen.set_gpu_builtins(&gpu_builtins);
+    r#gen.set_function_facts(&function_facts);
+    r#gen.set_used_import_defs(&used_imports);
+    r#gen.set_imported_namespace_info(namespace_info);
+    let mut output = r#gen.generate(hir, &analysis.types, &analysis.interner)?;
+
+    if !provider_modules.is_empty() {
+        let mut module_block = String::new();
+        for (module_name, module_code, _failable) in &provider_modules {
+            module_block.push_str("pub mod ");
+            module_block.push_str(module_name);
+            module_block.push_str(" {\n");
+            module_block.push_str(module_code);
+            if !module_code.ends_with('\n') {
+                module_block.push('\n');
+            }
+            module_block.push_str("}\n\n");
+        }
+        output.code = insert_modules_after_leading_crate_attributes(&output.code, &module_block);
+    }
+
+    Ok(crate::Output::Rust(crate::RustOutput { code: output.code }))
+}
+
+#[cfg(not(feature = "hir-rust"))]
+fn generate_rust_from_analyzed(
+    _analysis: &crate::driver::AnalyzedModule,
+    _hir: &HirModule,
+) -> Result<crate::Output, CodegenError> {
+    Err(unavailable_target_error(Target::HirRust))
+}
+
 /// The output tokens the module behind `analysis` prints through.
 ///
 /// Plumbing only: every module fills Latin until the final
@@ -573,12 +573,12 @@ pub(crate) fn display_tokens_for_module(
 #[path = "display_tokens_test.rs"]
 mod display_tokens_test;
 
-/// Register cross-file DefIds from sibling module imports into the TS codegen.
+/// Register cross-file `DefIds` from sibling module imports into the TS codegen.
 ///
 /// When a package file imports another local file (`importa ex "./bridge"`),
-/// the type checker assigns DefIds for the exported types via the file
+/// the type checker assigns `DefIds` for the exported types via the file
 /// interface system. The TS `NameCatalog` only collects local HIR declarations,
-/// so those cross-file DefIds would be unresolvable during code generation.
+/// so those cross-file `DefIds` would be unresolvable during code generation.
 /// This mirrors the Rust backend's `build_file_import_namespaces` by reading
 /// the resolver's file interface exports and registering them as external defs.
 ///
@@ -966,65 +966,75 @@ fn map_provider_modules(
                 emitted_tensor_policy_providers,
                 modules,
             )?;
-            let namespace_info = rust::build_file_import_namespaces(
-                &provider.hir,
-                &provider.interner,
-                &rust::ResolverImportsBridge(&provider.resolver),
-            );
-            let callback_identities =
-                imported_tensor_edge_policy_callback_identities(&provider.resolver, &provider.interner);
-            let mut policy_identity_codegen =
-                rust::RustCodegen::new_with_types(&provider.hir, &provider.interner, &provider.types);
-            policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
-            let mut provider_emit_rows = Vec::new();
-            for provider_impl in &provider.tensor_edge_policies.provider_impls {
-                let Some(key) = policy_identity_codegen.tensor_edge_policy_provider_key(
-                    provider_impl,
-                    &provider.types,
-                    Some(&module_name),
-                )?
-                else {
-                    continue;
-                };
-                if emitted_tensor_policy_providers.insert(key) {
-                    provider_emit_rows.push(*provider_impl);
-                }
-            }
-            let shape_obligations = rust::rust_shape_obligations(&provider.shape_obligations);
-            // Declaration-only `@ nondum` provider functions have nothing to emit.
-            let provider_hir = provider
-                .hir
-                .without_unavailable_declarations(&provider.interner);
-            let module_out = radix_hir_rust::generate_with_library_registry_test_selection_and_imports(
-                radix_hir_rust::ModuleGenerationRequest {
-                    hir: &provider_hir,
-                    types: &provider.types,
-                    interner: &provider.interner,
-                    libraries: &radix_hir::LibraryRegistry::default(),
-                    test_selection: None,
-                    function_facts: None,
-                    shape_obligations: Some(&shape_obligations),
-                    tensor_edge_policies: Some(&provider.tensor_edge_policies),
-                    tensor_edge_policy_provider_impls_to_emit: Some(&provider_emit_rows),
-                    tensor_edge_policy_callback_identities: &callback_identities,
-                    module_mode: true,
-                    cli_program: None,
-                    imported_function_params: None,
-                    imported_namespace_info: Some(namespace_info),
-                    gpu_builtins: &[],
-                    field_name_policy: radix_hir_rust::RustFieldNamePolicy::default(),
-                    static_route_table: None,
-                    display_tokens: None,
-                },
-            )?;
-            // The provider's emitted signatures (not its Faber declarations)
-            // decide importer call-site unwrapping: `ad`-verb functions emit
-            // `Result` even without a declared `⇥` channel.
-            let failable_exports = radix_hir_rust::provider_failable_export_names(&provider.hir, &provider.interner);
-            modules.insert(module_name, (module_out.code, failable_exports));
+            emit_provider_module_code(&provider, &module_name, emitted_tensor_policy_providers, modules)?;
         }
     }
 
+    Ok(())
+}
+
+#[cfg(feature = "hir-rust")]
+fn emit_provider_module_code<'a>(
+    provider: &crate::driver::ProviderUnitGuard<'a>,
+    module_name: &str,
+    emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
+    modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
+) -> Result<(), CodegenError> {
+    let namespace_info = rust::build_file_import_namespaces(
+        &provider.hir,
+        &provider.interner,
+        &rust::ResolverImportsBridge(&provider.resolver),
+    );
+    let callback_identities = imported_tensor_edge_policy_callback_identities(&provider.resolver, &provider.interner);
+    let mut policy_identity_codegen =
+        rust::RustCodegen::new_with_types(&provider.hir, &provider.interner, &provider.types);
+    policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
+    let mut provider_emit_rows = Vec::new();
+    for provider_impl in &provider.tensor_edge_policies.provider_impls {
+        let Some(key) = policy_identity_codegen.tensor_edge_policy_provider_key(
+            provider_impl,
+            &provider.types,
+            Some(module_name),
+        )?
+        else {
+            continue;
+        };
+        if emitted_tensor_policy_providers.insert(key) {
+            provider_emit_rows.push(*provider_impl);
+        }
+    }
+    let shape_obligations = rust::rust_shape_obligations(&provider.shape_obligations);
+    // Declaration-only `@ nondum` provider functions have nothing to emit.
+    let provider_hir = provider
+        .hir
+        .without_unavailable_declarations(&provider.interner);
+    let module_out = radix_hir_rust::generate_with_library_registry_test_selection_and_imports(
+        radix_hir_rust::ModuleGenerationRequest {
+            hir: &provider_hir,
+            types: &provider.types,
+            interner: &provider.interner,
+            libraries: &radix_hir::LibraryRegistry::default(),
+            test_selection: None,
+            function_facts: None,
+            shape_obligations: Some(&shape_obligations),
+            tensor_edge_policies: Some(&provider.tensor_edge_policies),
+            tensor_edge_policy_provider_impls_to_emit: Some(&provider_emit_rows),
+            tensor_edge_policy_callback_identities: &callback_identities,
+            module_mode: true,
+            cli_program: None,
+            imported_function_params: None,
+            imported_namespace_info: Some(namespace_info),
+            gpu_builtins: &[],
+            field_name_policy: radix_hir_rust::RustFieldNamePolicy::default(),
+            static_route_table: None,
+            display_tokens: None,
+        },
+    )?;
+    // The provider's emitted signatures (not its Faber declarations)
+    // decide importer call-site unwrapping: `ad`-verb functions emit
+    // `Result` even without a declared `⇥` channel.
+    let failable_exports = radix_hir_rust::provider_failable_export_names(&provider.hir, &provider.interner);
+    modules.insert(module_name.to_owned(), (module_out.code, failable_exports));
     Ok(())
 }
 
