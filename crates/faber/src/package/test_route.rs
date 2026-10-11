@@ -51,6 +51,12 @@ pub fn test_source_filter_for_input(
 }
 
 /// Analyze a package for `faber test` with auto-filter and a wall-clock budget.
+///
+/// # Errors
+///
+/// Returns the package analysis diagnostics when the package cannot be
+/// analyzed, or a single budget diagnostic when the wall-clock budget elapses
+/// before analysis completes.
 pub fn analyze_package_for_tests(
     config: &Config,
     input: &Path,
