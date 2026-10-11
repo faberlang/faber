@@ -107,11 +107,6 @@ fn collect_runtime_shape_conflicts(
         }
         ty
     }
-    let (Type::Tensor(_, expected), Type::Tensor(_, actual)) =
-        (types.get(payload(types, expected)), types.get(payload(types, actual)))
-    else {
-        return;
-    };
     fn visit(
         types: &TypeTable,
         expected: IndexId,
@@ -138,6 +133,11 @@ fn collect_runtime_shape_conflicts(
             _ => {}
         }
     }
+    let (Type::Tensor(_, expected), Type::Tensor(_, actual)) =
+        (types.get(payload(types, expected)), types.get(payload(types, actual)))
+    else {
+        return;
+    };
     visit(types, *expected, *actual, 0, bindings, conflicts);
 }
 
@@ -636,18 +636,8 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         parent_shape_bindings: &MirShapeBindings,
     ) -> Option<MirMonomorphizationKey> {
         let CallWitness { caller_source, args, destination, error_place, span, scope, shape_check } = witness;
-        let mut bindings = MirGenericBindings::default();
-        let mut shape_bindings = MirShapeBindings::default();
-        let source = template.source?;
-        let params = self.generic_param_order.get(&source)?.clone();
-        self.bind_explicit_type_args(
-            caller_source,
-            source,
-            explicit_type_args,
-            &mut bindings,
-            &mut shape_bindings,
-            span,
-        )?;
+        let (source, params, mut bindings, mut shape_bindings) =
+            self.prepare_call_bindings(template, explicit_type_args, caller_source, span)?;
         for (index, arg) in args.iter().enumerate() {
             let Some(expected) = template.params.get(index) else {
                 continue;
@@ -721,78 +711,134 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
         }
 
-        if let Some(destination) = destination {
-            let actual = self.place_ty(destination, scope, span)?;
-            // The destination type of a call is the callee's return type with the
-            // call's own extents substituted. Extents already bound from the
-            // arguments are authoritative: a run-time axis of the destination
-            // (the call expression's own result axis) is the same value read back,
-            // not a second witness, so it never conflicts with them.
-            let mut trial_bindings = bindings.clone();
-            let mut trial_shapes = shape_bindings.clone();
-            if bind_generic_type_witness_with_shapes(
-                self.types(),
-                template.return_ty,
-                actual,
-                &mut trial_bindings,
-                &mut trial_shapes,
-            ) {
-                bindings = trial_bindings;
-                shape_bindings = trial_shapes;
-            } else {
-                let mut conflicts = Vec::new();
-                collect_runtime_shape_conflicts(
-                    self.types(),
-                    template.return_ty.semantic_id(),
-                    actual.semantic_id(),
-                    &shape_bindings,
-                    &mut conflicts,
-                );
-                let mut retry_bindings = bindings.clone();
-                let mut retry_shapes = shape_bindings.clone();
-                for (parameter, _) in &conflicts {
-                    retry_shapes.remove(parameter);
-                }
-                if conflicts.is_empty()
-                    || !bind_generic_type_witness_with_shapes(
-                        self.types(),
-                        template.return_ty,
-                        actual,
-                        &mut retry_bindings,
-                        &mut retry_shapes,
-                    )
-                {
-                    self.lowerer
-                        .errors
-                        .push(MirError::validation(span, "destination type mismatch"));
-                    return None;
-                }
-                bindings = retry_bindings;
-                for (parameter, witness) in retry_shapes {
-                    shape_bindings.entry(parameter).or_insert(witness);
-                }
-            }
-        }
+        self.bind_call_destination(template.return_ty, destination, scope, span, &mut bindings, &mut shape_bindings)?;
 
         if let (Some(expected), Some(error_place)) = (template.error_ty, error_place) {
-            let actual = self.place_ty(error_place, scope, span)?;
-            if !bind_generic_type_witness_with_shapes(
-                self.types(),
-                expected,
-                actual,
-                &mut bindings,
-                &mut shape_bindings,
-            ) {
-                self.lowerer
-                    .errors
-                    .push(MirError::validation(span, "error destination type mismatch"));
-                return None;
-            }
+            self.bind_call_error_place(expected, error_place, scope, span, &mut bindings, &mut shape_bindings)?;
         }
 
+        let (type_args, shape_args) =
+            self.build_call_type_args(&params, &bindings, &shape_bindings, parent_shape_bindings, span)?;
+        Some(MirMonomorphizationKey { source, type_args, shape_args })
+    }
+
+    fn prepare_call_bindings(
+        &mut self,
+        template: &MirFunction,
+        explicit_type_args: &[MirType],
+        caller_source: Option<DefId>,
+        span: Span,
+    ) -> Option<(DefId, Vec<OrderedParam>, MirGenericBindings, MirShapeBindings)> {
+        let source = template.source?;
+        let params = self.generic_param_order.get(&source)?.clone();
+        let mut bindings = MirGenericBindings::default();
+        let mut shape_bindings = MirShapeBindings::default();
+        self.bind_explicit_type_args(
+            caller_source,
+            source,
+            explicit_type_args,
+            &mut bindings,
+            &mut shape_bindings,
+            span,
+        )?;
+        Some((source, params, bindings, shape_bindings))
+    }
+
+    fn bind_call_destination(
+        &mut self,
+        return_ty: MirType,
+        destination: Option<&MirPlace>,
+        scope: &FunctionTypeScope,
+        span: Span,
+        bindings: &mut MirGenericBindings,
+        shape_bindings: &mut MirShapeBindings,
+    ) -> Option<()> {
+        let Some(destination) = destination else {
+            return Some(());
+        };
+        let actual = self.place_ty(destination, scope, span)?;
+        // The destination type of a call is the callee's return type with the
+        // call's own extents substituted. Extents already bound from the
+        // arguments are authoritative: a run-time axis of the destination
+        // (the call expression's own result axis) is the same value read back,
+        // not a second witness, so it never conflicts with them.
+        let mut trial_bindings = bindings.clone();
+        let mut trial_shapes = shape_bindings.clone();
+        if bind_generic_type_witness_with_shapes(
+            self.types(),
+            return_ty,
+            actual,
+            &mut trial_bindings,
+            &mut trial_shapes,
+        ) {
+            *bindings = trial_bindings;
+            *shape_bindings = trial_shapes;
+        } else {
+            let mut conflicts = Vec::new();
+            collect_runtime_shape_conflicts(
+                self.types(),
+                return_ty.semantic_id(),
+                actual.semantic_id(),
+                shape_bindings,
+                &mut conflicts,
+            );
+            let mut retry_bindings = bindings.clone();
+            let mut retry_shapes = shape_bindings.clone();
+            for (parameter, _) in &conflicts {
+                retry_shapes.remove(parameter);
+            }
+            if conflicts.is_empty()
+                || !bind_generic_type_witness_with_shapes(
+                    self.types(),
+                    return_ty,
+                    actual,
+                    &mut retry_bindings,
+                    &mut retry_shapes,
+                )
+            {
+                self.lowerer
+                    .errors
+                    .push(MirError::validation(span, "destination type mismatch"));
+                return None;
+            }
+            *bindings = retry_bindings;
+            for (parameter, witness) in retry_shapes {
+                shape_bindings.entry(parameter).or_insert(witness);
+            }
+        }
+        Some(())
+    }
+
+    fn bind_call_error_place(
+        &mut self,
+        error_ty: MirType,
+        error_place: &MirPlace,
+        scope: &FunctionTypeScope,
+        span: Span,
+        bindings: &mut MirGenericBindings,
+        shape_bindings: &mut MirShapeBindings,
+    ) -> Option<()> {
+        let actual = self.place_ty(error_place, scope, span)?;
+        if !bind_generic_type_witness_with_shapes(self.types(), error_ty, actual, bindings, shape_bindings) {
+            self.lowerer
+                .errors
+                .push(MirError::validation(span, "error destination type mismatch"));
+            return None;
+        }
+        Some(())
+    }
+
+    fn build_call_type_args(
+        &mut self,
+        params: &[OrderedParam],
+        bindings: &MirGenericBindings,
+        shape_bindings: &MirShapeBindings,
+        parent_shape_bindings: &MirShapeBindings,
+        span: Span,
+    ) -> Option<(Vec<MirType>, Vec<IndexId>)> {
         let mut type_args = Vec::with_capacity(params.len());
         let mut shape_args = Vec::with_capacity(params.len());
-        for param in &params {
+        for param in params {
             match param.kind {
                 ParamKind::Typus => {
                     let Some(bound) = bindings.get(&param.name).copied() else {
@@ -837,7 +883,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 }
             }
         }
-        Some(MirMonomorphizationKey { source, type_args, shape_args })
+        Some((type_args, shape_args))
     }
 
     fn bind_explicit_type_args(
@@ -937,20 +983,6 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         concrete: MirType,
         span: Span,
     ) -> Option<IndexId> {
-        let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
-            return None;
-        };
-        let sym = *sym;
-        if let Some(value) = self.magnitudo_literal_of(concrete) {
-            let index = find_literal_index(self.types(), value);
-            if index.is_none() {
-                self.lowerer.errors.push(MirError::validation(
-                    span,
-                    "generic call signature has unresolved type parameter",
-                ));
-            }
-            return index;
-        }
         struct LocalFinder {
             name: Symbol,
             found: Option<DefId>,
@@ -967,6 +999,20 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 }
                 crate::hir::visit::walk_local(self, local);
             }
+        }
+        let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
+            return None;
+        };
+        let sym = *sym;
+        if let Some(value) = self.magnitudo_literal_of(concrete) {
+            let index = find_literal_index(self.types(), value);
+            if index.is_none() {
+                self.lowerer.errors.push(MirError::validation(
+                    span,
+                    "generic call signature has unresolved type parameter",
+                ));
+            }
+            return index;
         }
         let mut finder = LocalFinder { name: sym, found: None };
         finder.visit_program(&self.lowerer.unit.hir);
@@ -1130,94 +1176,9 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 return false;
             };
 
-            let call_return_ty = function
-                .blocks
-                .iter()
-                .flat_map(|block| &block.statements)
-                .find_map(|statement| match &statement.kind {
-                    MirStatementKind::RuntimeCall { destination: Some(place), call }
-                        if place.base == MirPlaceBase::Temp(pending.destination)
-                            && place.projections.is_empty()
-                            && matches!(
-                                &call.intrinsic,
-                                MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp))
-                            ) =>
-                    {
-                        Some(call.return_ty)
-                    }
-                    _ => None,
-                });
-            let Some(call_return_ty) = call_return_ty else {
-                self.lowerer.errors.push(MirError::unsupported(
-                    pending.span,
-                    "deferred tensor limes placeholder is missing from its concrete instance",
-                ));
+            let Some(dispatch) = self.resolve_deferred_limes_dispatch(function, &pending, actual_policy, &callback_ids)
+            else {
                 return false;
-            };
-            let Some((element_type, rank)) = tensor_element_and_rank(self.types(), call_return_ty.semantic_id()) else {
-                self.lowerer.errors.push(MirError::unsupported(
-                    pending.span,
-                    "deferred tensor limes result is not a ranked tensor",
-                ));
-                return false;
-            };
-            let providers = self
-                .lowerer
-                .unit
-                .tensor_edge_policies
-                .provider_impls
-                .iter()
-                .copied()
-                .filter(|provider| {
-                    same_type_identity(self.types(), provider.policy_type, actual_policy)
-                        && same_type_identity(self.types(), provider.element_type, element_type)
-                        && provider.rank == rank
-                })
-                .collect::<Vec<_>>();
-            let [provider] = providers.as_slice() else {
-                self.lowerer.errors.push(MirError::unsupported(
-                    pending.span,
-                    "generic tensor limes specialization has no unique checked policy provider",
-                ));
-                return false;
-            };
-            let dispatch = match provider.policy {
-                radix_hir::ResolvedTensorEdgePolicy::Builtin(policy) => MirEdgePolicy::Builtin(match policy {
-                    radix_types::BuiltinTensorEdgePolicy::Clamp => MirBuiltinEdgePolicy::Clamp,
-                    radix_types::BuiltinTensorEdgePolicy::Reflect => MirBuiltinEdgePolicy::Reflect,
-                    radix_types::BuiltinTensorEdgePolicy::Wrap => MirBuiltinEdgePolicy::Wrap,
-                }),
-                radix_hir::ResolvedTensorEdgePolicy::Custom { policy_def, remap, transform } => {
-                    let Some(remap) = callback_ids.get(&remap).copied() else {
-                        self.lowerer.errors.push(MirError::unsupported(
-                            pending.span,
-                            "generic tensor limes remap callback has no lowered function",
-                        ));
-                        return false;
-                    };
-                    let transform = match transform {
-                        Some(def_id) => {
-                            if let Some(function) = callback_ids.get(&def_id).copied() {
-                                Some(function)
-                            } else {
-                                self.lowerer.errors.push(MirError::unsupported(
-                                    pending.span,
-                                    "generic tensor limes transform callback has no lowered function",
-                                ));
-                                return false;
-                            }
-                        }
-                        None => None,
-                    };
-                    MirEdgePolicy::Custom { policy_def, remap, transform }
-                }
-                radix_hir::ResolvedTensorEdgePolicy::Deferred { .. } => {
-                    self.lowerer.errors.push(MirError::unsupported(
-                        pending.span,
-                        "generic tensor limes provider remained deferred after specialization",
-                    ));
-                    return false;
-                }
             };
             let Some(statement) = function.blocks.iter_mut().flat_map(|block| &mut block.statements).find(|statement| {
                 matches!(
@@ -1241,6 +1202,105 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
         }
         true
+    }
+
+    fn resolve_deferred_limes_dispatch(
+        &mut self,
+        function: &MirFunction,
+        pending: &PendingTensorLimes,
+        actual_policy: TypeId,
+        callback_ids: &FxHashMap<DefId, MirFunctionId>,
+    ) -> Option<MirEdgePolicy> {
+        let call_return_ty = function
+            .blocks
+            .iter()
+            .flat_map(|block| &block.statements)
+            .find_map(|statement| match &statement.kind {
+                MirStatementKind::RuntimeCall { destination: Some(place), call }
+                    if place.base == MirPlaceBase::Temp(pending.destination)
+                        && place.projections.is_empty()
+                        && matches!(
+                            &call.intrinsic,
+                            MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp))
+                        ) =>
+                {
+                    Some(call.return_ty)
+                }
+                _ => None,
+            });
+        let Some(call_return_ty) = call_return_ty else {
+            self.lowerer.errors.push(MirError::unsupported(
+                pending.span,
+                "deferred tensor limes placeholder is missing from its concrete instance",
+            ));
+            return None;
+        };
+        let Some((element_type, rank)) = tensor_element_and_rank(self.types(), call_return_ty.semantic_id()) else {
+            self.lowerer.errors.push(MirError::unsupported(
+                pending.span,
+                "deferred tensor limes result is not a ranked tensor",
+            ));
+            return None;
+        };
+        let providers = self
+            .lowerer
+            .unit
+            .tensor_edge_policies
+            .provider_impls
+            .iter()
+            .copied()
+            .filter(|provider| {
+                same_type_identity(self.types(), provider.policy_type, actual_policy)
+                    && same_type_identity(self.types(), provider.element_type, element_type)
+                    && provider.rank == rank
+            })
+            .collect::<Vec<_>>();
+        let [provider] = providers.as_slice() else {
+            self.lowerer.errors.push(MirError::unsupported(
+                pending.span,
+                "generic tensor limes specialization has no unique checked policy provider",
+            ));
+            return None;
+        };
+        let dispatch = match provider.policy {
+            radix_hir::ResolvedTensorEdgePolicy::Builtin(policy) => MirEdgePolicy::Builtin(match policy {
+                radix_types::BuiltinTensorEdgePolicy::Clamp => MirBuiltinEdgePolicy::Clamp,
+                radix_types::BuiltinTensorEdgePolicy::Reflect => MirBuiltinEdgePolicy::Reflect,
+                radix_types::BuiltinTensorEdgePolicy::Wrap => MirBuiltinEdgePolicy::Wrap,
+            }),
+            radix_hir::ResolvedTensorEdgePolicy::Custom { policy_def, remap, transform } => {
+                let Some(remap) = callback_ids.get(&remap).copied() else {
+                    self.lowerer.errors.push(MirError::unsupported(
+                        pending.span,
+                        "generic tensor limes remap callback has no lowered function",
+                    ));
+                    return None;
+                };
+                let transform = match transform {
+                    Some(def_id) => {
+                        if let Some(function) = callback_ids.get(&def_id).copied() {
+                            Some(function)
+                        } else {
+                            self.lowerer.errors.push(MirError::unsupported(
+                                pending.span,
+                                "generic tensor limes transform callback has no lowered function",
+                            ));
+                            return None;
+                        }
+                    }
+                    None => None,
+                };
+                MirEdgePolicy::Custom { policy_def, remap, transform }
+            }
+            radix_hir::ResolvedTensorEdgePolicy::Deferred { .. } => {
+                self.lowerer.errors.push(MirError::unsupported(
+                    pending.span,
+                    "generic tensor limes provider remained deferred after specialization",
+                ));
+                return None;
+            }
+        };
+        Some(dispatch)
     }
 
     fn substitute_function(&mut self, function: &mut MirFunction, bindings: &MirGenericBindings, span: Span) -> bool {
@@ -1641,7 +1701,6 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                         .unwrap_or_else(|| self.lowerer.types.primitive(Primitive::Numerus)),
                 ));
             }
-            MirConstant::Float(_) => Primitive::Fractus,
             MirConstant::Bool(_) => Primitive::Bivalens,
             MirConstant::Unit => Primitive::Vacuum,
             MirConstant::String(_) => Primitive::Textus,
@@ -1662,7 +1721,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                     });
             }
             // A shape-size scalar is a float-sized compile-time value.
-            MirConstant::ShapeSize { .. } => Primitive::Fractus,
+            MirConstant::Float(_) | MirConstant::ShapeSize { .. } => Primitive::Fractus,
         };
         Some(MirType::semantic(self.lowerer.types.primitive(primitive)))
     }
@@ -1794,13 +1853,12 @@ pub(super) fn resolve_parent_shape_binding(
     parent_shape_bindings: &MirShapeBindings,
 ) -> Option<IndexId> {
     match types.get_index(shape) {
-        IndexExpr::Literal(_) => Some(shape),
+        IndexExpr::Literal(_) | IndexExpr::Runtime(_) => Some(shape),
         IndexExpr::Param(name) => parent_shape_bindings.get(name).copied().and_then(|bound| {
             (bound != shape)
                 .then(|| resolve_parent_shape_binding(types, bound, parent_shape_bindings))
                 .flatten()
         }),
-        IndexExpr::Runtime(_) => Some(shape),
         IndexExpr::Affine { base, offset } => {
             let resolved_base = resolve_parent_shape_binding(types, *base, parent_shape_bindings)?;
             if resolved_base == *base {
