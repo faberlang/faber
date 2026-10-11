@@ -290,83 +290,7 @@ fn plan_linked_library_instances(
         library_resolver,
         library_cache,
         |analysis, _| {
-            let mut requests = Vec::with_capacity(calls.len());
-            let mut planned_calls = Vec::with_capacity(calls.len());
-            for call in &calls {
-                let Some(bindings) = request_for_target(call, &mut analysis.types) else {
-                    semantic_errors.push(missing_instance_diagnostic(
-                        target_path,
-                        "generic_air_library_instance_type_rehome_failed",
-                    ));
-                    continue;
-                };
-                let template = call.companion_primal.unwrap_or(call.target_def);
-                planned_calls.push((
-                    radix_module::semantic::passes::air_specialize::AirInstanceKey {
-                        template,
-                        witnesses: bindings.iter().map(|binding| binding.witness).collect(),
-                    },
-                    call.clone(),
-                ));
-                requests.push(
-                    radix_module::semantic::passes::air_specialize::AirSpecializationRequest {
-                        template,
-                        bindings,
-                    },
-                );
-            }
-            if !semantic_errors.is_empty() || requests.is_empty() {
-                return Ok(LibraryInstancePlan {
-                    instance_by_key: HashMap::new(),
-                    companions: HashMap::new(),
-                    planned_calls,
-                });
-            }
-
-            let report = radix_module::semantic::passes::air_specialize::specialize_requested(
-                &mut analysis.hir,
-                &mut analysis.radix_lanes,
-                &mut analysis.types,
-                &mut analysis.interner,
-                &requests,
-            );
-
-            // The library's ordinary semantic pipeline has already run; the
-            // newly materialized clones must pass the same concrete-only gates
-            // before the package lowers the library unit to AIR/MIR.
-            if let Err(instance_errors) = radix_module::semantic::passes::air_unroll::unroll(
-                &mut analysis.hir,
-                &mut analysis.presentation,
-                &analysis.radix_lanes,
-                &mut analysis.interner,
-                &analysis.types,
-            ) {
-                semantic_errors.extend(instance_errors.into_iter().map(|error| {
-                    Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
-                }));
-            }
-            if let Err(instance_errors) = radix_module::semantic::passes::air_purity::check(
-                &mut analysis.hir,
-                &mut analysis.radix_lanes,
-                &mut analysis.interner,
-                &analysis.types,
-            ) {
-                semantic_errors.extend(instance_errors.into_iter().map(|error| {
-                    Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
-                }));
-            }
-
-            let mut companions = HashMap::new();
-            for (_, instance) in &report.instance_defs {
-                if let Some(backward) = analysis.radix_lanes.backward_for(*instance) {
-                    companions.insert(*instance, backward.companion_def_id);
-                }
-            }
-            Ok(LibraryInstancePlan {
-                instance_by_key: report.instance_defs.iter().cloned().collect(),
-                companions,
-                planned_calls,
-            })
+            plan_instances_in_library_analysis(target_path, &calls, analysis, &mut semantic_errors)
         },
     );
 
@@ -451,6 +375,93 @@ fn plan_linked_library_instances(
             target,
         );
     }
+}
+
+/// Materialize the requested concrete instances inside a linked library's
+/// cached analysis and collect any concrete-only gate errors.
+fn plan_instances_in_library_analysis(
+    target_path: &Path,
+    calls: &[NamespaceGenericCall],
+    analysis: &mut radix_module::driver::AnalyzedModule,
+    semantic_errors: &mut Vec<Diagnostic>,
+) -> Result<LibraryInstancePlan, radix_module::codegen::CodegenError> {
+    let mut requests = Vec::with_capacity(calls.len());
+    let mut planned_calls = Vec::with_capacity(calls.len());
+    for call in calls {
+        let Some(bindings) = request_for_target(call, &mut analysis.types) else {
+            semantic_errors.push(missing_instance_diagnostic(
+                target_path,
+                "generic_air_library_instance_type_rehome_failed",
+            ));
+            continue;
+        };
+        let template = call.companion_primal.unwrap_or(call.target_def);
+        planned_calls.push((
+            radix_module::semantic::passes::air_specialize::AirInstanceKey {
+                template,
+                witnesses: bindings.iter().map(|binding| binding.witness).collect(),
+            },
+            call.clone(),
+        ));
+        requests.push(
+            radix_module::semantic::passes::air_specialize::AirSpecializationRequest {
+                template,
+                bindings,
+            },
+        );
+    }
+    if !semantic_errors.is_empty() || requests.is_empty() {
+        return Ok(LibraryInstancePlan {
+            instance_by_key: HashMap::new(),
+            companions: HashMap::new(),
+            planned_calls,
+        });
+    }
+
+    let report = radix_module::semantic::passes::air_specialize::specialize_requested(
+        &mut analysis.hir,
+        &mut analysis.radix_lanes,
+        &mut analysis.types,
+        &mut analysis.interner,
+        &requests,
+    );
+
+    // The library's ordinary semantic pipeline has already run; the newly
+    // materialized clones must pass the same concrete-only gates before the
+    // package lowers the library unit to AIR/MIR.
+    if let Err(instance_errors) = radix_module::semantic::passes::air_unroll::unroll(
+        &mut analysis.hir,
+        &mut analysis.presentation,
+        &analysis.radix_lanes,
+        &mut analysis.interner,
+        &analysis.types,
+    ) {
+        semantic_errors.extend(instance_errors.into_iter().map(|error| {
+            Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
+        }));
+    }
+    if let Err(instance_errors) = radix_module::semantic::passes::air_purity::check(
+        &mut analysis.hir,
+        &mut analysis.radix_lanes,
+        &mut analysis.interner,
+        &analysis.types,
+    ) {
+        semantic_errors.extend(instance_errors.into_iter().map(|error| {
+            Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
+        }));
+    }
+
+    let mut companions = HashMap::new();
+    for (_, instance) in &report.instance_defs {
+        if let Some(backward) = analysis.radix_lanes.backward_for(*instance) {
+            companions.insert(*instance, backward.companion_def_id);
+        }
+    }
+    Ok(LibraryInstancePlan {
+        instance_by_key: report.instance_defs.iter().cloned().collect(),
+        companions,
+        planned_calls,
+    })
 }
 
 fn discover_calls(
@@ -754,7 +765,7 @@ fn canonicalize_index(target: &mut TypeTable, index: IndexId) -> IndexId {
 
 fn intern_index_canonical(target: &mut TypeTable, expr: IndexExpr) -> IndexId {
     (0..target.index_count())
-        .map(|raw| IndexId(raw as u32))
+        .filter_map(|raw| u32::try_from(raw).ok().map(IndexId))
         .find(|id| target.get_index(*id) == &expr)
         .unwrap_or_else(|| target.intern_index(expr))
 }
