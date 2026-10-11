@@ -3424,9 +3424,9 @@ fn merge_shifted_device_function_metadata(
     Ok(())
 }
 
-fn append_shifted_program<'merged, 'incoming>(
+fn append_shifted_program<'merged>(
     mut merged: LoweredMirUnit<'merged>,
-    incoming: LoweredMirUnit<'incoming>,
+    incoming: LoweredMirUnit<'_>,
     diagnostic_path: &Path,
     extra: &RemappedValidation,
     prior_templates: &[MirFunction],
@@ -3905,9 +3905,10 @@ pub(super) fn shift_terminator_ids(terminator: &mut MirTerminator, offset: u32) 
 
 pub(super) fn shift_value_ids(value: &mut MirValue, offset: u32) {
     match &mut value.kind {
-        MirValueKind::Operand(operand) => shift_operand_ids(operand, offset),
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            shift_operand_ids(operand, offset);
+        }
         MirValueKind::Closure(closure) => shift_closure_value_ids(closure, offset),
-        MirValueKind::Unary { operand, .. } => shift_operand_ids(operand, offset),
         MirValueKind::Binary { lhs, rhs, .. } => {
             shift_operand_ids(lhs, offset);
             shift_operand_ids(rhs, offset);
@@ -4357,9 +4358,10 @@ fn remap_operand_function_ids(
 
 fn remap_value_function_ids(value: &mut MirValue, remap: &HashMap<MirFunctionId, MirFunctionId>) {
     match &mut value.kind {
-        MirValueKind::Operand(operand) => remap_operand_function_ids(operand, remap),
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            remap_operand_function_ids(operand, remap);
+        }
         MirValueKind::Closure(closure) => remap_function_id(&mut closure.function, remap),
-        MirValueKind::Unary { operand, .. } => remap_operand_function_ids(operand, remap),
         MirValueKind::Binary { lhs, rhs, .. } => {
             remap_operand_function_ids(lhs, remap);
             remap_operand_function_ids(rhs, remap);
@@ -4643,13 +4645,14 @@ fn scan_terminator_references(terminator: &MirTerminator, scan: &mut MirReferenc
 
 fn scan_value_references(value: &MirValue, scan: &mut MirReferenceScan) {
     match &value.kind {
-        MirValueKind::Operand(operand) => scan_operand_references(operand, scan),
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            scan_operand_references(operand, scan);
+        }
         MirValueKind::Closure(closure) => {
             scan.functions.push(closure.function);
             scan.environments.push(closure.environment_id);
             scan_operand_references(&closure.environment, scan);
         }
-        MirValueKind::Unary { operand, .. } => scan_operand_references(operand, scan),
         MirValueKind::Binary { lhs, rhs, .. } => {
             scan_operand_references(lhs, scan);
             scan_operand_references(rhs, scan);
