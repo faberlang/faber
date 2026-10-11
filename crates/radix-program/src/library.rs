@@ -271,33 +271,7 @@ impl LibraryResolver {
             return Ok(None);
         };
 
-        if provider.is_empty() {
-            return Err(LibraryResolveError::ProviderSpecifierInvalid {
-                specifier: specifier.to_owned(),
-                reason: "provider segment must not be empty".to_owned(),
-            });
-        }
-
-        if !is_valid_provider_segment(provider) {
-            return Err(LibraryResolveError::ProviderSpecifierInvalid {
-                specifier: specifier.to_owned(),
-                reason: "provider segment must contain only ASCII letters, numbers, underscore, or hyphen".to_owned(),
-            });
-        }
-
-        if module_path.is_empty() {
-            return Err(LibraryResolveError::ProviderSpecifierInvalid {
-                specifier: specifier.to_owned(),
-                reason: "module path segment must not be empty".to_owned(),
-            });
-        }
-
-        if module_path.contains(':') {
-            return Err(LibraryResolveError::ProviderSpecifierInvalid {
-                specifier: specifier.to_owned(),
-                reason: "library specifier must contain exactly one provider separator".to_owned(),
-            });
-        }
+        validate_library_specifier(specifier, provider, module_path)?;
 
         let segments = module_path.split('/').collect::<Vec<_>>();
         if !segments
@@ -396,6 +370,44 @@ impl LibraryResolver {
             }
         })
     }
+}
+
+fn validate_library_specifier(
+    specifier: &str,
+    provider: &str,
+    module_path: &str,
+) -> Result<(), LibraryResolveError> {
+    if provider.is_empty() {
+        return Err(LibraryResolveError::ProviderSpecifierInvalid {
+            specifier: specifier.to_owned(),
+            reason: "provider segment must not be empty".to_owned(),
+        });
+    }
+
+    if !is_valid_provider_segment(provider) {
+        return Err(LibraryResolveError::ProviderSpecifierInvalid {
+            specifier: specifier.to_owned(),
+            reason:
+                "provider segment must contain only ASCII letters, numbers, underscore, or hyphen"
+                    .to_owned(),
+        });
+    }
+
+    if module_path.is_empty() {
+        return Err(LibraryResolveError::ProviderSpecifierInvalid {
+            specifier: specifier.to_owned(),
+            reason: "module path segment must not be empty".to_owned(),
+        });
+    }
+
+    if module_path.contains(':') {
+        return Err(LibraryResolveError::ProviderSpecifierInvalid {
+            specifier: specifier.to_owned(),
+            reason: "library specifier must contain exactly one provider separator".to_owned(),
+        });
+    }
+
+    Ok(())
 }
 
 /// In-tree library home: `<repo>/lib`, located from this crate's manifest
@@ -559,7 +571,7 @@ use radix_module::hir::{
     DefId, HirItemKind, LibraryBinding, LibraryIdentity, LibraryItem, LibraryItemKind,
     LibraryProvider,
 };
-use radix_module::lexer::Interner;
+use radix_module::lexer::{Interner, Symbol};
 use radix_module::parser;
 use radix_module::program::program_export_surface;
 use radix_module::semantic::passes::visibility_annotation::{
@@ -639,6 +651,7 @@ impl LibraryInterfaceCache {
     }
 
     /// Attach the caller's reader-locale-pack loader (faber product seam).
+    #[must_use]
     pub fn with_locale_loader(mut self, loader: LocaleLoader) -> Self {
         self.locale_loader = Some(loader);
         self
@@ -1276,85 +1289,21 @@ fn analyze_cached_library_interface_body(
         return Err(error);
     }
 
-    let mut namespace_exports = BTreeMap::new();
-    for dependency in &direct_imports {
-        namespace_exports.insert(
-            dependency.binding.clone(),
-            library_namespace_member_export_surface(dependency, library_resolver, library_cache)?,
-        );
-    }
-    let mut file_interfaces = BTreeMap::new();
-    for dependency in &direct_imports {
-        file_interfaces.insert(
-            dependency.binding.clone(),
-            library_cached_file_interface(dependency, library_resolver, library_cache)?,
-        );
-    }
-    // Transitive library leaves install under their producer-side bindings,
-    // mirroring the file-mode and package-unit paths (B10): a direct
-    // import's public surface can name a nominal from a module this unit
-    // does not import (`tensor.TensorError.ShapeFailure { shape.ShapeError
-    // inner }`), and without that module's nominal registrations the payload
-    // fails remap, so the variant loses its own fields and drops out of
-    // coverage. A direct binding for the same name always wins; the extra
-    // namespaces stay inert (no HIR import binding).
-    for dependency in &expanded {
-        let dependency_key = library_identity_key(&library_identity(&dependency.module));
-        if &dependency_key == key || file_interfaces.contains_key(&dependency.binding) {
-            continue;
-        }
-        file_interfaces.insert(
-            dependency.binding.clone(),
-            library_cached_file_interface(dependency, library_resolver, library_cache)?,
-        );
-    }
+    let (namespace_exports, file_interfaces) = library_import_interface_maps(
+        &expanded,
+        &direct_imports,
+        key,
+        library_resolver,
+        library_cache,
+    )?;
 
     let analysis_source = {
         let cached = load_cached_library_interface(&import.module, library_cache)?;
         cached.peeled_body.clone()
     };
 
-    // Library interface analysis follows the package target. Browser products
-    // must not inherit Rust-only borrow qualification from Config::default().
-    // The module's own reader locale (resolved at parse time) overrides any
-    // consuming-package locale: a Latin consumer must analyze an en library
-    // under the en pack, and vice versa.
-    let mut analysis_config = library_cache.analysis_config.clone();
-    if let Some(pack) = load_cached_library_interface(&import.module, library_cache)?
-        .locale_pack
-        .as_ref()
-    {
-        analysis_config = analysis_config.with_locale_pack(pack.clone());
-    } else {
-        analysis_config.locale_pack = None;
-    }
-    let session = Session::new(analysis_config);
-    let mut namespace_seams = BTreeMap::new();
-    let mut namespace_declarations = BTreeMap::new();
-    for dependency in &direct_imports {
-        namespace_seams.insert(
-            dependency.binding.clone(),
-            dependency.module.package == import.module.package,
-        );
-        namespace_declarations.insert(
-            dependency.binding.clone(),
-            library_interface_declaration_surface(dependency, library_resolver, library_cache)?,
-        );
-    }
-    // PKG-ADM (library seam): a library unit's own export surface is its
-    // kernel-template admission fact, mirroring the package path
-    // (analyze.rs): an exported `@ publica` size-generic `@ kernel` template
-    // is demand-admissible because consumers instantiate it from their own
-    // units. Without this, every linked-library kernel API with no same-unit
-    // caller orphans (ADM001) the moment a consumer analyzes the library.
-    // `@ interna`/`@ privata` and unexported templates stay fail-closed.
-    let kernel_template_admissions = {
-        let cached = load_cached_library_interface(&import.module, library_cache)?;
-        PackageKernelTemplateAdmissions::from_export_surface(&program_export_surface(
-            &cached.program,
-            &cached.interner,
-        ))
-    };
+    let (session, namespace_seams, namespace_declarations, kernel_template_admissions) =
+        library_analysis_session(import, &direct_imports, library_resolver, library_cache)?;
     let mut analysis = match analyze_source_with_kernel_template_admissions(
         &session,
         &import.module.interface_path.display().to_string(),
@@ -1390,6 +1339,24 @@ fn analyze_cached_library_interface_body(
         library_resolver,
         library_cache,
     )?;
+    install_library_file_interface(
+        import,
+        key,
+        analysis,
+        expanded,
+        library_resolver,
+        library_cache,
+    )
+}
+
+fn install_library_file_interface(
+    import: &LibraryImportBinding,
+    key: &LibraryIdentityKey,
+    analysis: AnalyzedModule,
+    expanded: Vec<LibraryImportBinding>,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<(), Diagnostic> {
     let export_names = {
         let cached = load_cached_library_interface(&import.module, library_cache)?;
         program_export_surface(&cached.program, &cached.interner)
@@ -1429,6 +1396,115 @@ fn analyze_cached_library_interface_body(
     cached.file_interface = Some(file_interface);
     cached.expanded_imports = expanded;
     Ok(())
+}
+
+type LibraryImportInterfaceMaps = (
+    BTreeMap<String, BTreeMap<String, VisibilityTier>>,
+    BTreeMap<String, FileInterface>,
+);
+
+fn library_import_interface_maps(
+    expanded: &[LibraryImportBinding],
+    direct_imports: &[LibraryImportBinding],
+    key: &LibraryIdentityKey,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<LibraryImportInterfaceMaps, Diagnostic> {
+    let mut namespace_exports = BTreeMap::new();
+    for dependency in direct_imports {
+        namespace_exports.insert(
+            dependency.binding.clone(),
+            library_namespace_member_export_surface(dependency, library_resolver, library_cache)?,
+        );
+    }
+    let mut file_interfaces = BTreeMap::new();
+    for dependency in direct_imports {
+        file_interfaces.insert(
+            dependency.binding.clone(),
+            library_cached_file_interface(dependency, library_resolver, library_cache)?,
+        );
+    }
+    // Transitive library leaves install under their producer-side bindings,
+    // mirroring the file-mode and package-unit paths (B10): a direct
+    // import's public surface can name a nominal from a module this unit
+    // does not import (`tensor.TensorError.ShapeFailure { shape.ShapeError
+    // inner }`), and without that module's nominal registrations the payload
+    // fails remap, so the variant loses its own fields and drops out of
+    // coverage. A direct binding for the same name always wins; the extra
+    // namespaces stay inert (no HIR import binding).
+    for dependency in expanded {
+        let dependency_key = library_identity_key(&library_identity(&dependency.module));
+        if &dependency_key == key || file_interfaces.contains_key(&dependency.binding) {
+            continue;
+        }
+        file_interfaces.insert(
+            dependency.binding.clone(),
+            library_cached_file_interface(dependency, library_resolver, library_cache)?,
+        );
+    }
+    Ok((namespace_exports, file_interfaces))
+}
+
+type LibraryAnalysisSession = (
+    Session,
+    BTreeMap<String, bool>,
+    BTreeMap<String, BTreeMap<String, VisibilityTier>>,
+    PackageKernelTemplateAdmissions,
+);
+
+fn library_analysis_session(
+    import: &LibraryImportBinding,
+    direct_imports: &[LibraryImportBinding],
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<LibraryAnalysisSession, Diagnostic> {
+    // Library interface analysis follows the package target. Browser products
+    // must not inherit Rust-only borrow qualification from Config::default().
+    // The module's own reader locale (resolved at parse time) overrides any
+    // consuming-package locale: a Latin consumer must analyze an en library
+    // under the en pack, and vice versa.
+    let mut analysis_config = library_cache.analysis_config.clone();
+    if let Some(pack) = load_cached_library_interface(&import.module, library_cache)?
+        .locale_pack
+        .as_ref()
+    {
+        analysis_config = analysis_config.with_locale_pack(pack.clone());
+    } else {
+        analysis_config.locale_pack = None;
+    }
+    let session = Session::new(analysis_config);
+    let mut namespace_seams = BTreeMap::new();
+    let mut namespace_declarations = BTreeMap::new();
+    for dependency in direct_imports {
+        namespace_seams.insert(
+            dependency.binding.clone(),
+            dependency.module.package == import.module.package,
+        );
+        namespace_declarations.insert(
+            dependency.binding.clone(),
+            library_interface_declaration_surface(dependency, library_resolver, library_cache)?,
+        );
+    }
+    // PKG-ADM (library seam): a library unit's own export surface is its
+    // kernel-template admission fact, mirroring the package path
+    // (analyze.rs): an exported `@ publica` size-generic `@ kernel` template
+    // is demand-admissible because consumers instantiate it from their own
+    // units. Without this, every linked-library kernel API with no same-unit
+    // caller orphans (ADM001) the moment a consumer analyzes the library.
+    // `@ interna`/`@ privata` and unexported templates stay fail-closed.
+    let kernel_template_admissions = {
+        let cached = load_cached_library_interface(&import.module, library_cache)?;
+        PackageKernelTemplateAdmissions::from_export_surface(&program_export_surface(
+            &cached.program,
+            &cached.interner,
+        ))
+    };
+    Ok((
+        session,
+        namespace_seams,
+        namespace_declarations,
+        kernel_template_admissions,
+    ))
 }
 
 /// A library module's own import bindings, with default names bound (D7.7).
@@ -1557,34 +1633,7 @@ pub fn attach_library_provenance_with_links(
         return Ok(());
     }
 
-    let hir_items = analysis
-        .hir
-        .items
-        .iter()
-        .filter_map(|item| {
-            hir_item_name_and_kind(item, &analysis.interner)
-                .map(|(name, kind)| (name, kind, item.def_id))
-        })
-        .collect::<Vec<_>>();
-    let hir_import_bindings = analysis
-        .hir
-        .items
-        .iter()
-        .filter_map(|item| match &item.kind {
-            HirItemKind::Import(import) => Some(import),
-            _ => None,
-        })
-        .flat_map(|import| {
-            import.items.iter().map(|item| {
-                let binding = item.alias.unwrap_or(item.name);
-                (
-                    analysis.interner.resolve(binding).to_owned(),
-                    binding,
-                    item.def_id,
-                )
-            })
-        })
-        .collect::<Vec<_>>();
+    let (hir_items, hir_import_bindings) = library_hir_name_index(analysis);
     for import in imports {
         let identity = library_identity(&import.module);
         let linked_crate = linked_library_crates.and_then(|map| map.get(&import.module.package));
@@ -1595,33 +1644,8 @@ pub fn attach_library_provenance_with_links(
             library_namespace_member_export_surface(import, library_resolver, library_cache)?;
         let has_namespace_binding = library_interface_has_module(import, library_cache)?;
 
-        let binding_def_id = hir_import_bindings
-            .iter()
-            .find(|(name, _, _)| name.as_str() == import.binding)
-            .map(|(_, _, def_id)| *def_id)
-            .or_else(|| {
-                hir_items
-                    .iter()
-                    .find(|(name, _, _)| name.as_str() == import.binding)
-                    .map(|(_, _, def_id)| *def_id)
-            });
-        let imported_type_def_ids = hir_import_bindings
-            .iter()
-            .find(|(name, _, _)| name.as_str() == import.binding)
-            .map(|(_, binding, _)| {
-                analysis
-                    .resolver
-                    .imported_file_type_exports(*binding)
-                    .into_iter()
-                    .map(|export| {
-                        (
-                            analysis.interner.resolve(export.member).to_owned(),
-                            export.def_id,
-                        )
-                    })
-                    .collect::<BTreeMap<_, _>>()
-            })
-            .unwrap_or_default();
+        let (binding_def_id, imported_type_def_ids) =
+            library_import_binding_def_ids(analysis, import, &hir_items, &hir_import_bindings);
 
         if let Some(binding_def_id) = binding_def_id {
             analysis.libraries.bindings.insert(
@@ -1653,18 +1677,7 @@ pub fn attach_library_provenance_with_links(
             ))
             .with_span(import.import_span));
         } else if !exported_members.is_empty() {
-            for exported_member in exported_members.keys() {
-                if interface_items
-                    .iter()
-                    .all(|item| item.exported_name != *exported_member)
-                {
-                    return Err(crate::package_diagnostic_error(format!(
-                        "library import `{}` did not produce binding `{}` in analyzed HIR",
-                        import.module.package, import.binding
-                    ))
-                    .with_span(import.import_span));
-                }
-            }
+            ensure_library_members_have_bindings(import, &exported_members, &interface_items)?;
         }
 
         for interface_item in interface_items {
@@ -1708,6 +1721,99 @@ pub fn attach_library_provenance_with_links(
     }
 
     Ok(())
+}
+
+fn library_import_binding_def_ids(
+    analysis: &radix_module::driver::AnalyzedModule,
+    import: &LibraryImportBinding,
+    hir_items: &[(String, LibraryItemKind, DefId)],
+    hir_import_bindings: &[(String, Symbol, DefId)],
+) -> (Option<DefId>, BTreeMap<String, DefId>) {
+    let binding_def_id = hir_import_bindings
+        .iter()
+        .find(|(name, _, _)| name.as_str() == import.binding)
+        .map(|(_, _, def_id)| *def_id)
+        .or_else(|| {
+            hir_items
+                .iter()
+                .find(|(name, _, _)| name.as_str() == import.binding)
+                .map(|(_, _, def_id)| *def_id)
+        });
+    let imported_type_def_ids = hir_import_bindings
+        .iter()
+        .find(|(name, _, _)| name.as_str() == import.binding)
+        .map(|(_, binding, _)| {
+            analysis
+                .resolver
+                .imported_file_type_exports(*binding)
+                .into_iter()
+                .map(|export| {
+                    (
+                        analysis.interner.resolve(export.member).to_owned(),
+                        export.def_id,
+                    )
+                })
+                .collect::<BTreeMap<_, _>>()
+        })
+        .unwrap_or_default();
+    (binding_def_id, imported_type_def_ids)
+}
+
+fn ensure_library_members_have_bindings(
+    import: &LibraryImportBinding,
+    exported_members: &BTreeMap<String, VisibilityTier>,
+    interface_items: &[LibraryInterfaceItem],
+) -> Result<(), Diagnostic> {
+    for exported_member in exported_members.keys() {
+        if interface_items
+            .iter()
+            .all(|item| item.exported_name != *exported_member)
+        {
+            return Err(crate::package_diagnostic_error(format!(
+                "library import `{}` did not produce binding `{}` in analyzed HIR",
+                import.module.package, import.binding
+            ))
+            .with_span(import.import_span));
+        }
+    }
+    Ok(())
+}
+
+fn library_hir_name_index(
+    analysis: &radix_module::driver::AnalyzedModule,
+) -> (
+    Vec<(String, LibraryItemKind, DefId)>,
+    Vec<(String, Symbol, DefId)>,
+) {
+    let hir_items = analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            hir_item_name_and_kind(item, &analysis.interner)
+                .map(|(name, kind)| (name, kind, item.def_id))
+        })
+        .collect::<Vec<_>>();
+    let hir_import_bindings = analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            HirItemKind::Import(import) => Some(import),
+            _ => None,
+        })
+        .flat_map(|import| {
+            import.items.iter().map(|item| {
+                let binding = item.alias.unwrap_or(item.name);
+                (
+                    analysis.interner.resolve(binding).to_owned(),
+                    binding,
+                    item.def_id,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    (hir_items, hir_import_bindings)
 }
 
 fn library_namespace_member_export_surface(
@@ -1935,8 +2041,7 @@ fn hir_item_name_and_kind(
             interner.resolve(konst.name).to_owned(),
             LibraryItemKind::Const,
         )),
-        HirItemKind::Schema(_) => None,
-        HirItemKind::Import(_) => None,
+        HirItemKind::Schema(_) | HirItemKind::Import(_) => None,
     }
 }
 
