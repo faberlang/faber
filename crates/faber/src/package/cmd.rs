@@ -23,10 +23,44 @@ use super::manifest_build_target_for_input;
 #[cfg(feature = "mir-llvm")]
 use super::{LlvmHostProfile, build_host_program};
 use super::{
-    MANIFEST_FILE, config_with_locale, discover_build_layout, package_host_selection_diagnostic,
-    read_manifest,
+    MANIFEST_FILE, config_with_locale, discover_build_layout as discover_package_layout,
+    package_host_selection_diagnostic, read_manifest,
 };
 use radix::program::discovery::BuildLayout;
+
+/// Layout for a package-mode build of `input`.
+///
+/// A manifest-backed package owns its `target/` tree. A single `.fab` file
+/// with no `faber.toml` above it has no package of its own: its generated
+/// project and `target/` go under `out_dir`, never into the source directory.
+/// The layout's `package_root` and `manifest_path` still name the source side.
+fn discover_build_layout(
+    input: &Path,
+    out_dir: &Path,
+) -> Result<BuildLayout, Box<radix::module::Diagnostic>> {
+    let layout = discover_package_layout(input)?;
+    if !is_manifestless_single_file(input) {
+        return Ok(layout);
+    }
+    let relocated =
+        BuildLayout::from_package_root(super::absolutize_path(out_dir), layout.binary_name());
+    Ok(BuildLayout {
+        package_root: layout.package_root,
+        manifest_path: layout.manifest_path,
+        ..relocated
+    })
+}
+
+/// True for a regular source file that is not a manifest and has no
+/// `faber.toml` in any ancestor directory.
+fn is_manifestless_single_file(input: &Path) -> bool {
+    input.is_file()
+        && input.file_name().and_then(|name| name.to_str()) != Some(MANIFEST_FILE)
+        && !input
+            .ancestors()
+            .skip(1)
+            .any(|dir| dir.join(MANIFEST_FILE).exists())
+}
 
 /// Print `message` and terminate.
 fn fail(message: &str) -> ! {
@@ -292,12 +326,8 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         exit_target_feature_unavailable("wasm", "mir-wasm");
         #[cfg(feature = "mir-wasm")]
         {
-            let output_dir = match discover_build_layout(&input_path) {
-                Ok(layout) => layout
-                    .package_root
-                    .join("target")
-                    .join("faber")
-                    .join("wasm"),
+            let output_dir = match discover_build_layout(&input_path, &command.out_dir) {
+                Ok(layout) => layout.cargo_target_dir.join("faber").join("wasm"),
                 Err(d) => fail_with_diagnostic(&d),
             };
             let options = radix::program::wasm::PackageWasmOptions::new(output_dir);
@@ -350,7 +380,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     }
 
     if is_package && target == Target::HirTypeScript {
-        let layout = match discover_build_layout(&input_path) {
+        let layout = match discover_build_layout(&input_path, &command.out_dir) {
             Ok(l) => l,
             Err(d) => fail_with_diagnostic(&d),
         };
@@ -396,7 +426,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
             let Some(output) = go_result.compile_result.output else {
                 fail("compilation failed");
             };
-            let layout = match discover_build_layout(&input_path) {
+            let layout = match discover_build_layout(&input_path, &command.out_dir) {
                 Ok(l) => l,
                 Err(d) => fail_with_diagnostic(&d),
             };
@@ -441,7 +471,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     // Package Rust builds own a generated crate under target/faber/ and let
     // Cargo place artifacts in sibling debug/release directories.
     if is_package && target == Target::HirRust {
-        let layout = match discover_build_layout(&input_path) {
+        let layout = match discover_build_layout(&input_path, &command.out_dir) {
             Ok(l) => l,
             Err(d) => fail_with_diagnostic(&d),
         };
@@ -1079,3 +1109,7 @@ fn is_permissive_check_code(code: Option<&'static str>) -> bool {
         Some("SEM001" | "SEM002" | "SEM003" | "SEM004" | "SEM006")
     )
 }
+
+#[cfg(test)]
+#[path = "cmd_test.rs"]
+mod tests;
