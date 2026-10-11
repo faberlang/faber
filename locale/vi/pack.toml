@@ -2964,8 +2964,16 @@ message = "the axis is outside the rank of the tensor"
 help = "use an axis from 0 up to one less than the rank"
 
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
-message = "an axis reduction is built for rank-2 tensors only"
-help = "reduce a rank-2 tensor, or write the explicit reduction with `pro`"
+message = "an axis reduction is built for tensors of rank 2 to 8 only"
+help = "reduce a tensor of rank 2 to 8 with literal dimensions, or write the explicit reduction with `reducta ... per [...]`"
+
+[diagnostics.SEM010.issues.reducta_group_keys_not_literal]
+message = "the grouping keys of a multi-key grouped reduction must be a bracketed list of key expressions written in place"
+help = "write `per [i, j]` with the keys spelled out; a list held in a variable or a spread cannot name the result axes"
+
+[diagnostics.SEM010.issues.reducta_group_rank_mismatch]
+message = "a grouped reduction with N keys produces a result tensor of rank N"
+help = "make the expected result tensor's rank equal the number of keys, or drop a key"
 
 [diagnostics.SEM057.issues.axis_marker_required]
 message = "this argument is an `axis` argument and must be written with the `axis` marker"
