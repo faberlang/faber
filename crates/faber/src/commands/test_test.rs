@@ -312,7 +312,8 @@ targets = ["rust"]
         None,
         false,
         false,
-    );
+    )
+    .expect("package analysis succeeds");
 
     assert!(!unmatched_include);
     assert_eq!(
@@ -324,6 +325,52 @@ targets = ["rust"]
     assert_eq!(report.failed(), 0, "plain unit must not run: {report:?}");
     assert_eq!(report.blocked(), 0, "plain unit must not link: {report:?}");
     assert_eq!(report.results[0].name, "focused");
+}
+
+#[test]
+fn package_analysis_failure_returns_err_instead_of_exiting() {
+    let root = scratch_dir().join("sb442-analysis-failure");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("src")).expect("fixture src");
+    fs::write(
+        root.join("faber.toml"),
+        r#"[package]
+name = "sb442_analysis_failure"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "sb442_analysis_failure"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("fixture manifest");
+    fs::write(
+        root.join("src/broken.proba"),
+        "test \"broken\" {\n    assert undefined_name ≡ 1\n}\n",
+    )
+    .expect("analysis-failing unit");
+
+    let result = super::run_package_with_options(
+        &Config::default(),
+        &root,
+        &super::TestRunOptions::default(),
+        None,
+        false,
+        false,
+    );
+
+    let message = result.expect_err("analysis failure must be an Err, not a process exit");
+    assert!(
+        message.ends_with("error: package analysis failed"),
+        "summary line closes the message: {message}"
+    );
 }
 
 #[test]
@@ -368,7 +415,8 @@ targets = ["rust"]
         None,
         false,
         false,
-    );
+    )
+    .expect("package analysis succeeds");
 
     assert!(!unmatched_include);
     assert_eq!(

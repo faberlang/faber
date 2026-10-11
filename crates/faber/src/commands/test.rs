@@ -186,14 +186,20 @@ pub(super) fn cmd_test(args: &TestArgs) {
                 );
                 (report, false, metadata)
             }
-            package::TestInputRoute::Package => run_package_with_options(
+            package::TestInputRoute::Package => match run_package_with_options(
                 &config,
                 &input_path,
                 &options,
                 proba_filter.as_ref(),
                 args.include_ignored,
                 args.focused,
-            ),
+            ) {
+                Ok(run) => run,
+                Err(failure) => {
+                    eprintln!("{failure}");
+                    std::process::exit(1);
+                }
+            },
             package::TestInputRoute::ManifestLessDirectory => {
                 eprintln!("error: {}", package::MANIFEST_LESS_TEST_MESSAGE);
                 std::process::exit(1);
@@ -419,17 +425,17 @@ fn run_package_with_options(
     proba_filter: Option<&TestSourceFilter>,
     include_ignored: bool,
     focused: bool,
-) -> (ProbaReport, bool, RunMetadata) {
+) -> Result<(ProbaReport, bool, RunMetadata), String> {
     let package = match package::analyze_package_for_tests(config, input, proba_filter) {
         Ok(package) => package,
-        Err(diagnostics) => fail_package_analysis(&diagnostics),
+        Err(diagnostics) => return Err(package_analysis_failure(&diagnostics)),
     };
     if package
         .diagnostics
         .iter()
         .any(radix::module::diagnostics::Diagnostic::is_error)
     {
-        fail_package_analysis(&package.diagnostics);
+        return Err(package_analysis_failure(&package.diagnostics));
     }
 
     let unmatched_include = proba_filter.is_some_and(|filter| {
@@ -439,7 +445,7 @@ fn run_package_with_options(
         )
     });
     if unmatched_include {
-        return (ProbaReport::default(), true, RunMetadata::default());
+        return Ok((ProbaReport::default(), true, RunMetadata::default()));
     }
 
     let mut test_units = Vec::new();
@@ -468,7 +474,7 @@ fn run_package_with_options(
                 .results
                 .extend(list_report(&unit_path, &selected).results);
         }
-        return (report, false, metadata);
+        return Ok((report, false, metadata));
     }
 
     let mut metadata = metadata;
@@ -512,7 +518,7 @@ fn run_package_with_options(
             }
         }
     }
-    (combined, false, metadata)
+    Ok((combined, false, metadata))
 }
 
 /// Analyze, isolate, link, and run one test unit.
@@ -981,13 +987,16 @@ fn replay_output(result: &CaseResult) {
     }
 }
 
-fn fail_package_analysis(diagnostics: &[radix::module::diagnostics::Diagnostic]) -> ! {
+/// The stderr text for a package analysis failure: rendered diagnostics (when
+/// any) followed by the summary line. Returned, not printed, so library code
+/// never exits the process; the CLI entry prints it and exits 1.
+fn package_analysis_failure(diagnostics: &[radix::module::diagnostics::Diagnostic]) -> String {
     let rendered = render_package_analysis_diagnostics(diagnostics);
-    if !rendered.is_empty() {
-        eprintln!("{rendered}");
+    if rendered.is_empty() {
+        "error: package analysis failed".to_owned()
+    } else {
+        format!("{rendered}\nerror: package analysis failed")
     }
-    eprintln!("error: package analysis failed");
-    std::process::exit(1);
 }
 
 /// Package-route analysis diagnostics: errors use the same plain renderer as
