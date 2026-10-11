@@ -240,7 +240,11 @@ pub(super) fn rewrite_place_sources(
             // variant remap (`rewrite_lowered_variant_defs`), never the
             // function-source rewrite — a colliding source id in the rewrite
             // map would corrupt the variant identity with a synthetic id.
-            MirProjection::VariantField { .. } => {}
+            MirProjection::VariantField { .. }
+            | MirProjection::Field(_)
+            | MirProjection::VectorLane(_)
+            | MirProjection::MatrixCell { .. }
+            | MirProjection::SharedCell => {}
             MirProjection::ClosureCapture { source, .. } => {
                 if let Some(rewritten) = rewritten_source(unit_path, *source, source_rewrites) {
                     *source = rewritten;
@@ -249,10 +253,6 @@ pub(super) fn rewrite_place_sources(
             MirProjection::Index(operand) => {
                 rewrite_operand_sources(operand, unit_path, source_rewrites);
             }
-            MirProjection::Field(_)
-            | MirProjection::VectorLane(_)
-            | MirProjection::MatrixCell { .. }
-            | MirProjection::SharedCell => {}
         }
     }
 }
