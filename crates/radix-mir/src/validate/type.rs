@@ -316,14 +316,7 @@ impl Validator<'_, '_> {
                 window.map(MirType::semantic)
             }
             Type::Array(inner) => {
-                if let Some((_, index_ty)) = index {
-                    self.require_assignable(
-                        index_ty,
-                        self.primitive(Primitive::Numerus),
-                        span,
-                        "array index is not numerus",
-                    );
-                }
+                self.require_numerus_index(index, span, "array index is not numerus");
                 Some(MirType::semantic(inner))
             }
             // Queue/stack iteration reads the array-backed runtime carrier
@@ -333,27 +326,13 @@ impl Validator<'_, '_> {
             | Type::BoundedQueue { element: inner, .. }
             | Type::Stack(inner)
             | Type::BoundedStack { element: inner, .. } => {
-                if let Some((_, index_ty)) = index {
-                    self.require_assignable(
-                        index_ty,
-                        self.primitive(Primitive::Numerus),
-                        span,
-                        "queue or stack index is not numerus",
-                    );
-                }
+                self.require_numerus_index(index, span, "queue or stack index is not numerus");
                 Some(MirType::semantic(inner))
             }
             // Route B (AEU-4): bounded lista element gathers index the live
             // prefix lanes only (the lowerer emits constants below len).
             Type::BoundedArray { element, .. } => {
-                if let Some((_, index_ty)) = index {
-                    self.require_assignable(
-                        index_ty,
-                        self.primitive(Primitive::Numerus),
-                        span,
-                        "bounded array index is not numerus",
-                    );
-                }
+                self.require_numerus_index(index, span, "bounded array index is not numerus");
                 Some(MirType::semantic(element))
             }
             // Route B (AEU-7): scalar bounded buffer element gathers — the
@@ -362,14 +341,7 @@ impl Validator<'_, '_> {
             // arm, the lowerer emits only constant lanes below len, so the
             // non-ASCII trap row can never fire from a dead slot.
             Type::BoundedOcteti { .. } | Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
-                if let Some((_, index_ty)) = index {
-                    self.require_assignable(
-                        index_ty,
-                        self.primitive(Primitive::Numerus),
-                        span,
-                        "bounded buffer index is not numerus",
-                    );
-                }
+                self.require_numerus_index(index, span, "bounded buffer index is not numerus");
                 match crate::ty::index_projection_result_ty(base_ty, self.context.types.as_table())
                 {
                     Ok(ty) => Some(ty),
@@ -383,14 +355,7 @@ impl Validator<'_, '_> {
             // `0 <= i < N`, the checked-index failure otherwise (the constant
             // lane is `VectorLane`).
             Type::Vector(element, _) => {
-                if let Some((_, index_ty)) = index {
-                    self.require_assignable(
-                        index_ty,
-                        self.primitive(Primitive::Numerus),
-                        span,
-                        "vector lane index is not numerus",
-                    );
-                }
+                self.require_numerus_index(index, span, "vector lane index is not numerus");
                 Some(MirType::semantic(element))
             }
             Type::Tensor(inner, _) => {
@@ -411,105 +376,139 @@ impl Validator<'_, '_> {
                 }
                 Some(MirType::semantic(value))
             }
-            Type::Primitive(Primitive::Textus) => {
-                if let Some((_, index_ty)) = index {
-                    // A range index is a window read, not a scalar numerus key
-                    // (mirrors the octeti arm above): bounds must still be
-                    // integer-valued, and the window stays a textus substring.
-                    let range_bound = match self.type_kind(index_ty) {
-                        Type::Intervallum(bound) => Some(*bound),
-                        _ => None,
-                    };
-                    if let Some(range_bound) = range_bound {
-                        self.require_assignable(
-                            MirType::semantic(range_bound),
-                            self.primitive(Primitive::Numerus),
-                            span,
-                            "textus index range bounds are not numerus",
-                        );
-                        return Some(self.primitive(Primitive::Textus));
-                    }
-                    self.require_assignable(
-                        index_ty,
-                        self.primitive(Primitive::Numerus),
-                        span,
-                        "textus index is not numerus",
-                    );
-                }
-                Some(self.primitive(Primitive::Textus))
-            }
-            Type::Primitive(Primitive::Octeti) => {
-                if let Some((_, index_ty)) = index {
-                    // A range index is a window read, not a scalar numerus key.
-                    // Its bounds must still be integer-valued, and the window
-                    // preserves the octeti carrier for a following conversion.
-                    let range_bound = match self.type_kind(index_ty) {
-                        Type::Intervallum(bound) => Some(*bound),
-                        _ => None,
-                    };
-                    if let Some(range_bound) = range_bound {
-                        self.require_assignable(
-                            MirType::semantic(range_bound),
-                            self.primitive(Primitive::Numerus),
-                            span,
-                            "octeti index range bounds are not numerus",
-                        );
-                        return Some(self.primitive(Primitive::Octeti));
-                    }
-                    self.require_assignable(
-                        index_ty,
-                        self.primitive(Primitive::Numerus),
-                        span,
-                        "octeti index is not numerus",
-                    );
-                }
-                match crate::ty::index_projection_result_ty(base_ty, self.context.types.as_table())
-                {
-                    Ok(ty) => Some(ty),
-                    Err(error) => {
-                        self.error(span, error.message);
-                        None
-                    }
-                }
-            }
-            Type::Tuple(elements) => match index {
-                Some((MirOperand::Constant(MirConstant::Int(n)), _)) => {
-                    // Negative or non-fitting indices are out of bounds; usize::MAX is the
-                    // out-of-range sentinel (matches the old `as` wrap for negatives on 64-bit).
-                    let idx = usize::try_from(*n).unwrap_or(usize::MAX);
-                    if idx >= elements.len() {
-                        self.error(
-                            span,
-                            format!("tuple index {n} out of bounds for arity {}", elements.len()),
-                        );
-                        None
-                    } else {
-                        Some(MirType::semantic(elements[idx]))
-                    }
-                }
-                Some((MirOperand::Constant(MirConstant::UInt(n)), _)) => {
-                    // Non-fitting indices are out of bounds; usize::MAX is the out-of-range sentinel.
-                    let idx = usize::try_from(*n).unwrap_or(usize::MAX);
-                    if idx >= elements.len() {
-                        self.error(
-                            span,
-                            format!("tuple index {n} out of bounds for arity {}", elements.len()),
-                        );
-                        None
-                    } else {
-                        Some(MirType::semantic(elements[idx]))
-                    }
-                }
-                Some(_) => {
-                    self.error(span, "tuple subscript requires compile-time constant index");
-                    None
-                }
-                None => None,
-            },
+            Type::Primitive(Primitive::Textus) => self.project_textus_index(index, span),
+            Type::Primitive(Primitive::Octeti) => self.project_octeti_index(base_ty, index, span),
+            Type::Tuple(elements) => self.project_index_tuple(&elements, index, span),
             _ => {
                 self.error(span, "index projection base is not indexable");
                 None
             }
+        }
+    }
+
+    /// Range-bound check shared by the scalar collection index arms that read
+    /// the live prefix lanes (lista, bounded lista, queue/stack, vector).
+    fn require_numerus_index(
+        &mut self,
+        index: Option<(&MirOperand, MirType)>,
+        span: Span,
+        message: &str,
+    ) {
+        if let Some((_, index_ty)) = index {
+            self.require_assignable(index_ty, self.primitive(Primitive::Numerus), span, message);
+        }
+    }
+
+    fn project_textus_index(
+        &mut self,
+        index: Option<(&MirOperand, MirType)>,
+        span: Span,
+    ) -> Option<MirType> {
+        if let Some((_, index_ty)) = index {
+            // A range index is a window read, not a scalar numerus key
+            // (mirrors the octeti arm above): bounds must still be
+            // integer-valued, and the window stays a textus substring.
+            let range_bound = match self.type_kind(index_ty) {
+                Type::Intervallum(bound) => Some(*bound),
+                _ => None,
+            };
+            if let Some(range_bound) = range_bound {
+                self.require_assignable(
+                    MirType::semantic(range_bound),
+                    self.primitive(Primitive::Numerus),
+                    span,
+                    "textus index range bounds are not numerus",
+                );
+                return Some(self.primitive(Primitive::Textus));
+            }
+            self.require_assignable(
+                index_ty,
+                self.primitive(Primitive::Numerus),
+                span,
+                "textus index is not numerus",
+            );
+        }
+        Some(self.primitive(Primitive::Textus))
+    }
+
+    fn project_octeti_index(
+        &mut self,
+        base_ty: MirType,
+        index: Option<(&MirOperand, MirType)>,
+        span: Span,
+    ) -> Option<MirType> {
+        if let Some((_, index_ty)) = index {
+            // A range index is a window read, not a scalar numerus key.
+            // Its bounds must still be integer-valued, and the window
+            // preserves the octeti carrier for a following conversion.
+            let range_bound = match self.type_kind(index_ty) {
+                Type::Intervallum(bound) => Some(*bound),
+                _ => None,
+            };
+            if let Some(range_bound) = range_bound {
+                self.require_assignable(
+                    MirType::semantic(range_bound),
+                    self.primitive(Primitive::Numerus),
+                    span,
+                    "octeti index range bounds are not numerus",
+                );
+                return Some(self.primitive(Primitive::Octeti));
+            }
+            self.require_assignable(
+                index_ty,
+                self.primitive(Primitive::Numerus),
+                span,
+                "octeti index is not numerus",
+            );
+        }
+        match crate::ty::index_projection_result_ty(base_ty, self.context.types.as_table()) {
+            Ok(ty) => Some(ty),
+            Err(error) => {
+                self.error(span, error.message);
+                None
+            }
+        }
+    }
+
+    fn project_index_tuple(
+        &mut self,
+        elements: &[TypeId],
+        index: Option<(&MirOperand, MirType)>,
+        span: Span,
+    ) -> Option<MirType> {
+        match index {
+            Some((MirOperand::Constant(MirConstant::Int(n)), _)) => {
+                // Negative or non-fitting indices are out of bounds; usize::MAX is the
+                // out-of-range sentinel (matches the old `as` wrap for negatives on 64-bit).
+                let idx = usize::try_from(*n).unwrap_or(usize::MAX);
+                if idx >= elements.len() {
+                    self.error(
+                        span,
+                        format!("tuple index {n} out of bounds for arity {}", elements.len()),
+                    );
+                    None
+                } else {
+                    Some(MirType::semantic(elements[idx]))
+                }
+            }
+            Some((MirOperand::Constant(MirConstant::UInt(n)), _)) => {
+                // Non-fitting indices are out of bounds; usize::MAX is the out-of-range sentinel.
+                let idx = usize::try_from(*n).unwrap_or(usize::MAX);
+                if idx >= elements.len() {
+                    self.error(
+                        span,
+                        format!("tuple index {n} out of bounds for arity {}", elements.len()),
+                    );
+                    None
+                } else {
+                    Some(MirType::semantic(elements[idx]))
+                }
+            }
+            Some(_) => {
+                self.error(span, "tuple subscript requires compile-time constant index");
+                None
+            }
+            None => None,
         }
     }
 
@@ -598,35 +597,7 @@ impl Validator<'_, '_> {
                 }
             }
             MirLayoutKind::DeviceVector(vector) => {
-                if !matches!(
-                    projection,
-                    MirProjection::Field(_)
-                        | MirProjection::VectorLane(_)
-                        | MirProjection::Index(_)
-                ) {
-                    self.error(
-                        span,
-                        "device vector projection must be a swizzle field, lane, or lane select",
-                    );
-                }
-                let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
-                    self.error(span, "device vector projection result has no layout");
-                    return;
-                };
-                if let MirLayoutKind::DeviceVector(result_vector) = result_layout.kind {
-                    if result_vector.element != vector.element {
-                        self.error(span, "device vector swizzle element layout mismatch");
-                    }
-                } else if let MirLayoutKind::Scalar(result_scalar) = result_layout.kind {
-                    if result_scalar != vector.element {
-                        self.error(span, "device vector lane element layout mismatch");
-                    }
-                } else {
-                    self.error(
-                        span,
-                        "device vector projection result must be a vector or element scalar",
-                    );
-                }
+                self.validate_device_vector_projection(vector.element, result_ty, projection, span);
             }
             MirLayoutKind::DeviceMatrix(matrix) => {
                 if !matches!(projection, MirProjection::MatrixCell { .. }) {
@@ -649,6 +620,42 @@ impl Validator<'_, '_> {
             | MirLayoutKind::OpaqueHandle
             | MirLayoutKind::Void
             | MirLayoutKind::Never => {}
+        }
+    }
+
+    fn validate_device_vector_projection(
+        &mut self,
+        element: MirScalarLayout,
+        result_ty: MirType,
+        projection: &MirProjection,
+        span: Span,
+    ) {
+        if !matches!(
+            projection,
+            MirProjection::Field(_) | MirProjection::VectorLane(_) | MirProjection::Index(_)
+        ) {
+            self.error(
+                span,
+                "device vector projection must be a swizzle field, lane, or lane select",
+            );
+        }
+        let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
+            self.error(span, "device vector projection result has no layout");
+            return;
+        };
+        if let MirLayoutKind::DeviceVector(result_vector) = result_layout.kind {
+            if result_vector.element != element {
+                self.error(span, "device vector swizzle element layout mismatch");
+            }
+        } else if let MirLayoutKind::Scalar(result_scalar) = result_layout.kind {
+            if result_scalar != element {
+                self.error(span, "device vector lane element layout mismatch");
+            }
+        } else {
+            self.error(
+                span,
+                "device vector projection result must be a vector or element scalar",
+            );
         }
     }
 
@@ -686,8 +693,9 @@ impl Validator<'_, '_> {
         }
 
         match self.context.types.get(ty).clone() {
-            Type::Infer(_) => self.error(span, "MIR type is unresolved inference variable"),
-            Type::InferUnion(_) => self.error(span, "MIR type is unresolved inference variable"),
+            Type::Infer(_) | Type::InferUnion(_) => {
+                self.error(span, "MIR type is unresolved inference variable")
+            }
             Type::MarkerHole { .. } => self.error(span, "MIR type is unresolved marker-width hole"),
             Type::Error => self.error(span, "MIR type is semantic error recovery type"),
             Type::TensorEdgePolicy(_) => {
@@ -710,8 +718,6 @@ impl Validator<'_, '_> {
             | Type::BoundedArray { element: inner, .. }
             | Type::BoundedQueue { element: inner, .. }
             | Type::BoundedStack { element: inner, .. } => self.validate_type_id(inner, span, seen),
-            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {
-            }
             Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
                 self.validate_type_id(success, span, seen);
                 self.validate_type_id(alternate, span, seen);
@@ -759,7 +765,10 @@ impl Validator<'_, '_> {
             | Type::Struct(_)
             | Type::Enum(_)
             | Type::Interface(_)
-            | Type::Param(_) => {}
+            | Type::Param(_)
+            | Type::BoundedTextus { .. }
+            | Type::BoundedAscii { .. }
+            | Type::BoundedOcteti { .. } => {}
         }
     }
 
@@ -905,7 +914,11 @@ impl Validator<'_, '_> {
                 .types
                 .find_sized_numeric(Primitive::Numerus, NumericWidth::U64)
                 .map_or_else(|| self.primitive(Primitive::Numerus), MirType::semantic),
-            MirConstant::Float(_) => self.primitive(Primitive::Fractus),
+            // A shape-size scalar is a float-sized compile-time value (the
+            // symbolic companion divides by it at runtime).
+            MirConstant::Float(_) | MirConstant::ShapeSize { .. } => {
+                self.primitive(Primitive::Fractus)
+            }
             MirConstant::String(_) => self.primitive(Primitive::Textus),
             MirConstant::Ascii(_) => self.primitive(Primitive::Ascii),
             MirConstant::Bool(_) => self.primitive(Primitive::Bivalens),
@@ -914,9 +927,6 @@ impl Validator<'_, '_> {
             MirConstant::Octeti(_) => self.primitive(Primitive::Octeti),
             MirConstant::Regex { .. } => self.primitive(Primitive::Regex),
             MirConstant::Function(_) => self.primitive(Primitive::Ignotum),
-            // A shape-size scalar is a float-sized compile-time value (the
-            // symbolic companion divides by it at runtime).
-            MirConstant::ShapeSize { .. } => self.primitive(Primitive::Fractus),
             // An exact bignum constant is the unbounded integer; the sized
             // type is interned whenever an `inf` is declared, and the
             // fallback keeps hand-built programs typing as a plain integer.
@@ -972,8 +982,9 @@ impl Validator<'_, '_> {
         match self.type_kind(ty) {
             Type::Enum(def_id) => Some(*def_id),
             Type::Applied(base, _) => self.enum_def_from_type(MirType::semantic(*base)),
-            Type::Alias(_, inner) => self.enum_def_from_type(MirType::semantic(*inner)),
-            Type::Ref(_, inner) => self.enum_def_from_type(MirType::semantic(*inner)),
+            Type::Alias(_, inner) | Type::Ref(_, inner) => {
+                self.enum_def_from_type(MirType::semantic(*inner))
+            }
             _ => None,
         }
     }
@@ -1003,16 +1014,18 @@ fn numerus_width_range(width: NumericWidth) -> (i128, i128) {
         NumericWidth::I8 => (i128::from(i8::MIN), i128::from(i8::MAX)),
         NumericWidth::I16 => (i128::from(i16::MIN), i128::from(i16::MAX)),
         NumericWidth::I32 => (i128::from(i32::MIN), i128::from(i32::MAX)),
-        NumericWidth::I64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
         NumericWidth::U8 => (0, i128::from(u8::MAX)),
         NumericWidth::U16 => (0, i128::from(u16::MAX)),
         NumericWidth::U32 => (0, i128::from(u32::MAX)),
         NumericWidth::U64 => (0, i128::from(u64::MAX)),
-        NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64 => {
-            (i128::from(i64::MIN), i128::from(i64::MAX))
-        }
-        // decimal-widths D1: scaled-integer carriers fit the i64 domain.
-        NumericWidth::D64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
+        // `i64`, the float widths, and the decimal-widths D1 scaled-integer
+        // carriers all fit the i64 domain.
+        NumericWidth::I64
+        | NumericWidth::F16
+        | NumericWidth::BF16
+        | NumericWidth::F32
+        | NumericWidth::F64
+        | NumericWidth::D64 => (i128::from(i64::MIN), i128::from(i64::MAX)),
         // `inf` has no bound: every `Int`/`UInt` constant range-checks (a
         // `MirConstant::Magnus` is admitted by `integer_constant_fits`
         // directly, never through this i128 window).
