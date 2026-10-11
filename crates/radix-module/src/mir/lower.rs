@@ -272,7 +272,7 @@ pub struct LoweredMirUnit<'a> {
     /// constructor consumes it to lower generated companions into kernels.
     pub companions: radix_mir::device::MirCompanionMap,
     /// Imported-device routes transferred from this unit's lowering context
-    /// (KPC-WIRE done_when (c)), keyed by import-item `DefId`: the v2 device
+    /// (KPC-WIRE `done_when` (c)), keyed by import-item `DefId`: the v2 device
     /// role, launch visibility, provider-route identity, and explicit body
     /// channel collected at the import items. Package linking joins each
     /// route to the merged synthetic template `DefId` and instantiates
@@ -280,7 +280,7 @@ pub struct LoweredMirUnit<'a> {
     /// untouched.
     pub imported_device_routes: FxHashMap<DefId, Vec<ImportedDeviceRoute>>,
     /// Concrete imported-device instances registered for this unit by
-    /// package-link instantiation (KPC-WIRE done_when (d)): one entry per
+    /// package-link instantiation (KPC-WIRE `done_when` (d)): one entry per
     /// [`MirMonomorphizationKey`], each proving the instance was admitted
     /// under its route's role + body channel rather than a role bit alone.
     /// Empty until package linking runs the device-aware instantiation.
@@ -577,19 +577,7 @@ fn portable_tensor_edge_type_identity(
                 .map(|item| portable_tensor_edge_type_identity(types, interner, *item))
                 .collect::<Option<Vec<_>>>()?,
         ),
-        Type::Record(fields) => {
-            let mut fields = fields
-                .iter()
-                .map(|(name, field_ty)| {
-                    Some((
-                        interner.resolve(*name).to_owned(),
-                        portable_tensor_edge_type_identity(types, interner, *field_ty)?,
-                    ))
-                })
-                .collect::<Option<Vec<_>>>()?;
-            fields.sort_by(|left, right| left.0.cmp(&right.0));
-            MirTensorEdgeTypeIdentity::Record(fields)
-        }
+        Type::Record(fields) => portable_tensor_edge_record_identity(types, interner, fields)?,
         Type::BoundedArray { .. }
         | Type::Queue(_)
         | Type::BoundedQueue { .. }
@@ -617,6 +605,24 @@ fn portable_tensor_edge_type_identity(
         | Type::Error => return None,
     };
     Some(identity)
+}
+
+fn portable_tensor_edge_record_identity(
+    types: &TypeTable,
+    interner: &Interner,
+    fields: &FxHashMap<Symbol, TypeId>,
+) -> Option<MirTensorEdgeTypeIdentity> {
+    let mut fields = fields
+        .iter()
+        .map(|(name, field_ty)| {
+            Some((
+                interner.resolve(*name).to_owned(),
+                portable_tensor_edge_type_identity(types, interner, *field_ty)?,
+            ))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    fields.sort_by(|left, right| left.0.cmp(&right.0));
+    Some(MirTensorEdgeTypeIdentity::Record(fields))
 }
 
 fn portable_tensor_edge_shape_identity(types: &TypeTable, shape: IndexId) -> Option<MirTensorEdgeShapeIdentity> {
@@ -706,14 +712,7 @@ pub fn lower_analyzed_unit(
     // Lowering-owned extension arena: one clone of the analyzed table per
     // call; every synthesized shape below interns into this table, never
     // into the unit's.
-    let mut types = TypeTable::from_snapshot(unit.types.snapshot()).map_err(|message| {
-        vec![MirError {
-            message: format!("MIR lowering could not clone the type arena: {message}"),
-            issue: "mir_type_arena_clone_failed".to_owned(),
-            span: Span::default(),
-            definition_span: None,
-        }]
-    })?;
+    let mut types = clone_lowering_type_table(unit)?;
     // Same law for the interner: lowering-added runtime and diagnostic
     // symbols intern into this clone, so the analyzed unit's interner keeps
     // exactly the symbols upstream phases produced.
@@ -790,116 +789,25 @@ pub fn lower_analyzed_unit(
         // Shape substitution interns the concrete shapes/types each instance
         // carries into the lowering-owned arena before layouts and validation
         // read them back.
-        let finalize_errors = monomorphize::finalize_monomorphized_shapes(
-            &unit.hir,
-            &mut types,
-            &mut program.functions,
-            &monomorphizations,
-        );
-        if !finalize_errors.is_empty() {
-            return Err(finalize_errors);
-        }
-        // Full (un-gated) device roles: composition checks classify every
-        // `@ nucleum` function, including private helpers that produce no
-        // entry row. Entry gating happens on the driver's emit/dispatch path
-        // via `device_entry_roles_from_hir`.
-        let roles = crate::mir::device_roles_from_hir(&unit.hir);
-        // `⇇` on a device function lowers as the output-buffer store the
-        // recipes already write; the host keeps the storage-preserving copy.
-        // Host kernel lowering keeps the host copy for every function.
+        finalize_lowered_shapes(unit, &mut types, &mut program, &monomorphizations)?;
+        // Device-form post-processing: output-buffer copies, fragment
+        // instantiation, and composition all run only when lowering a device
+        // kernel; host lowering keeps the storage-preserving copy and skips
+        // the fragment machinery.
         if kernel_lowering == KernelLowering::Device {
-            for function in &mut program.functions {
-                if function
-                    .source
-                    .is_some_and(|source| roles.contains_key(&source))
-                {
-                    radix_mir::device_copy_into::lower_device_copy_into(function);
-                }
-            }
-        }
-        // Device fragment checking and composition are device-form machinery.
-        // Host kernel lowering skips both: a kernel is an ordinary function,
-        // and a call to a helper kernel stays a plain call.
-        if kernel_lowering == KernelLowering::Device {
-            // DFV2-4: launch entries are the public `@ nucleum` sources — the
-            // only device functions that stay program symbols when device
-            // code also calls them; composed private helpers are pruned.
-            let launch_entries = crate::mir::device_entry_roles_from_hir(&unit.hir, &interner)
-                .into_iter()
-                .filter(|(_, role)| *role == crate::mir::MirDeviceRole::Kernel)
-                .map(|(source, _)| source)
-                .collect::<FxHashSet<_>>();
-            let layouts = MirLayoutTable::from_types(&types);
-            let summaries =
-                crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, &types, &interner)
-                    .summaries;
-            let instantiation_errors = super::fragment_instantiation::check_with_metadata(
-                &program.functions,
-                &monomorphizations,
-                &layouts,
+            apply_device_form_lowering(
+                unit,
                 &types,
-                &roles,
-                Some(&summaries),
-                &device_function_metadata,
-            );
-            if !instantiation_errors.is_empty() {
-                return Err(instantiation_errors
-                    .into_iter()
-                    .map(MirError::from)
-                    .collect());
-            }
-            let composition_errors = super::fragment_composition::compose_keeping_template_callees(
-                &mut program.functions,
+                &interner,
+                &mut program,
                 &monomorphizations,
-                &roles,
                 &device_function_metadata,
-                super::fragment_composition::active_budget(),
-                Some(&interner),
-                &launch_entries,
                 &generic_templates,
-            );
-            if !composition_errors.is_empty() {
-                return Err(composition_errors
-                    .into_iter()
-                    .map(|error| MirError {
-                        message: error.message(),
-                        issue: error.issue.to_owned(),
-                        span: error.span,
-                        definition_span: error.definition_span,
-                    })
-                    .collect());
-            }
+            )?;
         }
-        let mut maps = LoweringContextMaps::collect(unit);
-        // KPC-WIRE done_when (c): the module-owned route map is transferred
-        // exactly once instead of being dropped with the rest of the walk.
-        let imported_device_routes = maps.take_imported_device_routes();
-        let mut validation = maps.validation;
-        align_function_signatures_with_mir_params(&mut validation, &program.functions);
         let display_tokens = display_tokens_for_file(unit);
-        record_function_display_tokens(&mut validation, &program, &types, &interner, &display_tokens);
-        validation.layouts = MirLayoutTable::from_types(&types);
-        validation.closure_environments = closure_environments
-            .iter()
-            .map(|environment| (environment.id, environment.clone()))
-            .collect();
-        // The escaping context resolves MIR symbols through the lowering-owned
-        // interner clone — it carries the runtime/diagnostic symbols this
-        // lowering interned (format templates, the lockstep panic text), which
-        // the analyzed unit's interner no longer gains by mutation.
-        validation.interner = radix_mir::MirInterner::Owned(std::sync::Arc::new(interner.clone()));
-        // Ownership hand-off: the validation token takes the lowering-owned
-        // arena, so the returned unit carries its own table and borrows
-        // nothing from the lowering call itself.
-        let tensor_edge_policy_providers =
-            portable_tensor_edge_policy_providers(&unit.tensor_edge_policies, &types, &interner);
-        let validation = validation.with_owned_types(types);
-        let validated = ValidatedMir::new(program, validation).map_err(|errors| {
-            errors
-                .into_iter()
-                .map(|error| MirError::validation(error.span, error.message))
-                .collect::<Vec<_>>()
-        })?;
+        let (validated, imported_device_routes, tensor_edge_policy_providers) =
+            build_lowering_validation(unit, program, types, &interner, &display_tokens, &closure_environments)?;
         Ok(LoweredMirUnit {
             interner: lowering_interner,
             monomorphizations,
@@ -920,6 +828,156 @@ pub fn lower_analyzed_unit(
     } else {
         Err(lowering_errors)
     }
+}
+
+fn clone_lowering_type_table(unit: &AnalyzedModule) -> Result<TypeTable, Vec<MirError>> {
+    TypeTable::from_snapshot(unit.types.snapshot()).map_err(|message| {
+        vec![MirError {
+            message: format!("MIR lowering could not clone the type arena: {message}"),
+            issue: "mir_type_arena_clone_failed".to_owned(),
+            span: Span::default(),
+            definition_span: None,
+        }]
+    })
+}
+
+fn finalize_lowered_shapes(
+    unit: &AnalyzedModule,
+    types: &mut TypeTable,
+    program: &mut MirProgram,
+    monomorphizations: &[MirMonomorphization],
+) -> Result<(), Vec<MirError>> {
+    let errors =
+        monomorphize::finalize_monomorphized_shapes(&unit.hir, types, &mut program.functions, monomorphizations);
+    if errors.is_empty() {
+        return Ok(());
+    }
+    Err(errors)
+}
+
+fn apply_device_form_lowering(
+    unit: &AnalyzedModule,
+    types: &TypeTable,
+    interner: &Interner,
+    program: &mut MirProgram,
+    monomorphizations: &[MirMonomorphization],
+    device_function_metadata: &MirDeviceFunctionMetadataMap,
+    generic_templates: &[MirFunction],
+) -> Result<(), Vec<MirError>> {
+    // Full (un-gated) device roles: composition checks classify every
+    // `@ nucleum` function, including private helpers that produce no
+    // entry row. Entry gating happens on the driver's emit/dispatch path
+    // via `device_entry_roles_from_hir`.
+    let roles = crate::mir::device_roles_from_hir(&unit.hir);
+    // `⇇` on a device function lowers as the output-buffer store the
+    // recipes already write; the host keeps the storage-preserving copy.
+    // Host kernel lowering keeps the host copy for every function.
+    for function in &mut program.functions {
+        if function
+            .source
+            .is_some_and(|source| roles.contains_key(&source))
+        {
+            radix_mir::device_copy_into::lower_device_copy_into(function);
+        }
+    }
+    // Device fragment checking and composition are device-form machinery.
+    // Host kernel lowering skips both: a kernel is an ordinary function,
+    // and a call to a helper kernel stays a plain call.
+    // DFV2-4: launch entries are the public `@ nucleum` sources — the
+    // only device functions that stay program symbols when device
+    // code also calls them; composed private helpers are pruned.
+    let launch_entries = crate::mir::device_entry_roles_from_hir(&unit.hir, interner)
+        .into_iter()
+        .filter(|(_, role)| *role == crate::mir::MirDeviceRole::Kernel)
+        .map(|(source, _)| source)
+        .collect::<FxHashSet<_>>();
+    let layouts = MirLayoutTable::from_types(types);
+    let summaries =
+        crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, types, interner).summaries;
+    let instantiation_errors = super::fragment_instantiation::check_with_metadata(
+        &program.functions,
+        monomorphizations,
+        &layouts,
+        types,
+        &roles,
+        Some(&summaries),
+        device_function_metadata,
+    );
+    if !instantiation_errors.is_empty() {
+        return Err(instantiation_errors
+            .into_iter()
+            .map(MirError::from)
+            .collect());
+    }
+    let composition_errors = super::fragment_composition::compose_keeping_template_callees(
+        &mut program.functions,
+        monomorphizations,
+        &roles,
+        device_function_metadata,
+        super::fragment_composition::active_budget(),
+        Some(interner),
+        &launch_entries,
+        generic_templates,
+    );
+    if !composition_errors.is_empty() {
+        return Err(composition_errors
+            .into_iter()
+            .map(|error| MirError {
+                message: error.message(),
+                issue: error.issue.to_owned(),
+                span: error.span,
+                definition_span: error.definition_span,
+            })
+            .collect());
+    }
+    Ok(())
+}
+
+fn build_lowering_validation<'a>(
+    unit: &'a AnalyzedModule,
+    program: MirProgram,
+    types: TypeTable,
+    interner: &Interner,
+    display_tokens: &radix_runtime_contract::display_tokens::DisplayTokens,
+    closure_environments: &[MirClosureEnvironment],
+) -> Result<
+    (
+        ValidatedMir<'a>,
+        FxHashMap<DefId, Vec<ImportedDeviceRoute>>,
+        Vec<MirTensorEdgePolicyProvider>,
+    ),
+    Vec<MirError>,
+> {
+    let mut maps = LoweringContextMaps::collect(unit);
+    // KPC-WIRE done_when (c): the module-owned route map is transferred
+    // exactly once instead of being dropped with the rest of the walk.
+    let imported_device_routes = maps.take_imported_device_routes();
+    let mut validation = maps.validation;
+    align_function_signatures_with_mir_params(&mut validation, &program.functions);
+    record_function_display_tokens(&mut validation, &program, &types, interner, display_tokens);
+    validation.layouts = MirLayoutTable::from_types(&types);
+    validation.closure_environments = closure_environments
+        .iter()
+        .map(|environment| (environment.id, environment.clone()))
+        .collect();
+    // The escaping context resolves MIR symbols through the lowering-owned
+    // interner clone — it carries the runtime/diagnostic symbols this
+    // lowering interned (format templates, the lockstep panic text), which
+    // the analyzed unit's interner no longer gains by mutation.
+    validation.interner = radix_mir::MirInterner::Owned(std::sync::Arc::new(interner.clone()));
+    // Ownership hand-off: the validation token takes the lowering-owned
+    // arena, so the returned unit carries its own table and borrows
+    // nothing from the lowering call itself.
+    let tensor_edge_policy_providers =
+        portable_tensor_edge_policy_providers(&unit.tensor_edge_policies, &types, interner);
+    let validation = validation.with_owned_types(types);
+    let validated = ValidatedMir::new(program, validation).map_err(|errors| {
+        errors
+            .into_iter()
+            .map(|error| MirError::validation(error.span, error.message))
+            .collect::<Vec<_>>()
+    })?;
+    Ok((validated, imported_device_routes, tensor_edge_policy_providers))
 }
 
 /// The display tokens the file holding `unit` prints through: its own locale
@@ -1141,13 +1199,11 @@ fn cli_descriptor_record_fields<'a>(
 /// base (mirroring `cli_value_type` in the HIR lowerer).
 fn cli_record_base_type(types: &mut TypeTable, ty: &CliType) -> TypeId {
     match ty {
-        CliType::Textus | CliType::Ignotum => types.primitive(Primitive::Textus),
-        CliType::Numerus => types.primitive(Primitive::Numerus),
+        CliType::Textus | CliType::Ignotum | CliType::ListaTextus => types.primitive(Primitive::Textus),
+        CliType::Numerus | CliType::ListaNumerus => types.primitive(Primitive::Numerus),
         CliType::Fractus => types.primitive(Primitive::Fractus),
         CliType::Bivalens => types.primitive(Primitive::Bivalens),
         CliType::Octeti => types.octeti_list(),
-        CliType::ListaTextus => types.primitive(Primitive::Textus),
-        CliType::ListaNumerus => types.primitive(Primitive::Numerus),
     }
 }
 
@@ -1205,10 +1261,7 @@ fn ensure_map_iteration_array_types(types: &mut TypeTable) {
                 elements.insert(*key);
                 elements.insert(*value);
             }
-            Type::Cursor(element) => {
-                elements.insert(*element);
-            }
-            Type::AsyncCursor(element, _) => {
+            Type::Cursor(element) | Type::AsyncCursor(element, _) => {
                 elements.insert(*element);
             }
             _ => {}
@@ -2243,7 +2296,7 @@ struct FunctionBuilderContext<'a> {
     structs: Arc<FxHashMap<DefId, Vec<&'a HirField>>>,
     /// Producer-side defaults for imported class fields.
     imported_struct_defaults: Arc<FxHashMap<DefId, Vec<(Symbol, HirExpression)>>>,
-    /// Field-name → MirType metadata for EVERY struct the analysis knows
+    /// Field-name → `MirType` metadata for EVERY struct the analysis knows
     /// (local + imported file-interface structs). Local structs are also in
     /// [`Self::structs`]; imported structs exist only here. Aggregate
     /// materialization falls back to this map for zero-init of imported
@@ -3578,11 +3631,12 @@ impl<'a> FunctionBuilder<'a> {
         loop {
             match self.types.get(ty) {
                 Type::Alias(_, inner) => ty = *inner,
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64) => return true,
-                Type::ModularWord(NumericWidth::U64) | Type::SaturatingWord(NumericWidth::U64) => return true,
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
+                | Type::ModularWord(NumericWidth::U64)
+                | Type::SaturatingWord(NumericWidth::U64)
                 // A raw-bits cell always holds the zero-extended unsigned
                 // pattern.
-                Type::Bits(_) => return true,
+                | Type::Bits(_) => return true,
                 _ => return false,
             }
         }
@@ -3761,20 +3815,7 @@ impl<'a> FunctionBuilder<'a> {
             return Some(predicate);
         }
         if matches!(op, HirBinOp::Between | HirBinOp::NotBetween) {
-            let collection = self.lower_expr_value(rhs)?;
-            let value = self.lower_expr_value(lhs)?;
-            let ty = self.expr_ty(expr)?;
-            let contained = self.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::Contains),
-                vec![collection, value],
-                ty,
-                expr.span,
-            );
-            if op == HirBinOp::Between {
-                return Some(contained);
-            }
-            // `∉` is the existing boolean negation of the same `Contains` call.
-            return Some(self.assign_temp(MirValueKind::Unary { op: MirUnOp::Not, operand: contained }, ty, expr.span));
+            return self.lower_between_comparison(op, lhs, rhs, expr);
         }
         if matches!(op, HirBinOp::InRange | HirBinOp::NotInRange) {
             return self.lower_range_membership(op == HirBinOp::NotInRange, lhs, rhs, expr);
@@ -3793,23 +3834,7 @@ impl<'a> FunctionBuilder<'a> {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
         if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
-            // GT-1: fuzzy equality joins decimal operands at the d64 scale
-            // like every other comparison tier; raw scaled carriers would
-            // compare a d64 carrier against a peer at another scale.
-            let (lhs, rhs) = self.lower_decimal_join_operands(lhs, rhs)?;
-            let ty = self.expr_ty(expr)?;
-            return Some(self.runtime_call_value(
-                MirIntrinsic::Collection(MirCollectionOp::Approximate),
-                vec![
-                    lhs,
-                    rhs,
-                    MirOperand::Constant(MirConstant::Float(1e-9)),
-                    MirOperand::Constant(MirConstant::Float(0.0)),
-                    MirOperand::Constant(MirConstant::Bool(matches!(op, HirBinOp::FuzzyNotEq))),
-                ],
-                ty,
-                expr.span,
-            ));
+            return self.lower_fuzzy_comparison(op, lhs, rhs, expr);
         }
         // A1/C5 numeric collection laws have a dedicated MIR collection-op
         // seam: every pair reaches the runner, which pairs the live lengths
@@ -3866,6 +3891,55 @@ impl<'a> FunctionBuilder<'a> {
         let ty = self.expr_ty(expr)?;
 
         Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
+    }
+
+    fn lower_between_comparison(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let collection = self.lower_expr_value(rhs)?;
+        let value = self.lower_expr_value(lhs)?;
+        let ty = self.expr_ty(expr)?;
+        let contained = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Contains),
+            vec![collection, value],
+            ty,
+            expr.span,
+        );
+        if op == HirBinOp::Between {
+            return Some(contained);
+        }
+        // `∉` is the existing boolean negation of the same `Contains` call.
+        Some(self.assign_temp(MirValueKind::Unary { op: MirUnOp::Not, operand: contained }, ty, expr.span))
+    }
+
+    fn lower_fuzzy_comparison(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        // GT-1: fuzzy equality joins decimal operands at the d64 scale
+        // like every other comparison tier; raw scaled carriers would
+        // compare a d64 carrier against a peer at another scale.
+        let (lhs, rhs) = self.lower_decimal_join_operands(lhs, rhs)?;
+        let ty = self.expr_ty(expr)?;
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Approximate),
+            vec![
+                lhs,
+                rhs,
+                MirOperand::Constant(MirConstant::Float(1e-9)),
+                MirOperand::Constant(MirConstant::Float(0.0)),
+                MirOperand::Constant(MirConstant::Bool(matches!(op, HirBinOp::FuzzyNotEq))),
+            ],
+            ty,
+            expr.span,
+        ))
     }
 
     /// `x ∈ r` / `x ∉ r` over an interval (`InRange` / `NotInRange`).
