@@ -965,6 +965,35 @@ impl<'a> KernelBuilder<'a> {
         // so the D-6 fill can resolve the companion's FULL result-tuple field
         // producers after all subchains are emitted.
         let mut subchain_output_buffer_ids: BTreeMap<(usize, u32), BufferId> = BTreeMap::new();
+        self.emit_decomposition_subchains(
+            function,
+            &decomposition,
+            subchain_validation,
+            base_entry,
+            &return_tuple_locals,
+            &mut subchain_output_buffer_ids,
+        )?;
+
+        self.record_subchain_gradient_buffers(
+            function,
+            &decomposition,
+            &subchain_output_buffer_ids,
+        );
+        Ok(())
+    }
+
+    /// Emit one kernel per decomposition subchain (the S5-U1/U5 decomposition
+    /// path): resolve each synthetic subchain's emission signature and hand it
+    /// to the shared emission seam.
+    fn emit_decomposition_subchains(
+        &mut self,
+        function: &MirFunction,
+        decomposition: &crate::kernel_decomposition::KernelDecomposition,
+        subchain_validation: crate::MirValidationContext<'_>,
+        base_entry: String,
+        return_tuple_locals: &[MirLocalId],
+        subchain_output_buffer_ids: &mut BTreeMap<(usize, u32), BufferId>,
+    ) -> Result<(), DeviceProgramBuildError> {
         for (subchain_index, subchain) in decomposition.subchains.iter().enumerate() {
             let synthetic = decomposition.subchain_function(
                 function,
@@ -1061,12 +1090,20 @@ impl<'a> KernelBuilder<'a> {
                 decomposition.subchains.len() == 1,
             )?;
         }
+        Ok(())
+    }
 
-        // D-6 gradient-slot → buffer mapping: the companion's gradient slots
-        // index the FULL result-tuple, which the LAST subchain's return-tuple
-        // Construct binds to locals. The train_step gradient reads alias the
-        // producing subchains' gradient buffers (the backward → train_step
-        // device-to-device edge).
+    /// D-6 gradient-slot → buffer mapping: the companion's gradient slots
+    /// index the FULL result-tuple, which the LAST subchain's return-tuple
+    /// Construct binds to locals. The train_step gradient reads alias the
+    /// producing subchains' gradient buffers (the backward → train_step
+    /// device-to-device edge).
+    fn record_subchain_gradient_buffers(
+        &mut self,
+        function: &MirFunction,
+        decomposition: &crate::kernel_decomposition::KernelDecomposition,
+        subchain_output_buffer_ids: &BTreeMap<(usize, u32), BufferId>,
+    ) {
         if let Some(source) = function.source
             && self.companion_gradient_slots.contains_key(&source.0)
             && let Some(fields) = decomposition.return_tuple_fields(function)
@@ -1093,7 +1130,6 @@ impl<'a> KernelBuilder<'a> {
                 self.gradient_buffers.insert((source.0, slot), buffer_id);
             }
         }
-        Ok(())
     }
 
     /// Emit one kernel (a whole function or one decomposition subchain): the

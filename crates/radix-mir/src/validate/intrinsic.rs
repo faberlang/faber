@@ -934,7 +934,9 @@ impl Validator<'_, '_> {
             | MirCollectionOp::IntervalUnion
             | MirCollectionOp::IntervalContains
             | MirCollectionOp::IntervalClamp => 2,
-            MirCollectionOp::Approximate => 0,
+            // Route C (AEU-5): the padded bounded-lista snapshot appends a
+            // trailing fill operand after [seed, flat, shape]; the flat path
+            // keeps its exact-count 3-argument contract.
             MirCollectionOp::Put
             | MirCollectionOp::Slice
             | MirCollectionOp::Replace
@@ -946,21 +948,19 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorQuantizedMatMul
             | MirCollectionOp::TensorGroupedMatMul
             | MirCollectionOp::TensorSsmConv1d
-            | MirCollectionOp::SparseSet => 3,
-            // Route C (AEU-5): the padded bounded-lista snapshot appends a
-            // trailing fill operand after [seed, flat, shape]; the flat path
-            // keeps its exact-count 3-argument contract.
-            MirCollectionOp::TensorFromFlat => 3,
+            | MirCollectionOp::SparseSet
+            | MirCollectionOp::TensorFromFlat => 3,
             MirCollectionOp::TensorRmsNorm
             | MirCollectionOp::TensorRope
             | MirCollectionOp::TensorRopeHalf => 4,
-            MirCollectionOp::TensorLayerNorm => 0,
-            MirCollectionOp::TensorGather => 0,
             // Compiler-owned M3 lowering carries tensor peers followed by a
             // variable const contract: projections may carry fused rope and
             // bias peers, while scores/context/softmax carry their normal
             // tensor inputs.
-            MirCollectionOp::TensorBatchedAttention => 0,
+            MirCollectionOp::Approximate
+            | MirCollectionOp::TensorLayerNorm
+            | MirCollectionOp::TensorGather
+            | MirCollectionOp::TensorBatchedAttention => 0,
         };
         if matches!(op, MirCollectionOp::Approximate) {
             if !matches!(call.args.len(), 3 | 5) {
