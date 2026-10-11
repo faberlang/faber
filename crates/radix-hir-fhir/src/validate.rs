@@ -1354,21 +1354,20 @@ fn collect_expr_defs(
             registry.insert(binding.0);
             collect_block_defs(body, registry);
         }
-        HirExpressionKind::Praefixum(inner) | HirExpressionKind::Format { value: inner, .. } => {
+        HirExpressionKind::Praefixum(inner)
+        | HirExpressionKind::Format { value: inner, .. }
+        | HirExpressionKind::Unary(_, inner)
+        | HirExpressionKind::Ref(_, inner)
+        | HirExpressionKind::Deref(inner) => {
             collect_expr_defs(inner, registry);
         }
         HirExpressionKind::CopyInto { target, value } => {
             collect_expr_defs(target, registry);
             collect_expr_defs(value, registry);
         }
-        HirExpressionKind::Binary(_, lhs, rhs) => {
+        HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
             collect_expr_defs(lhs, registry);
             collect_expr_defs(rhs, registry);
-        }
-        HirExpressionKind::Unary(_, inner)
-        | HirExpressionKind::Ref(_, inner)
-        | HirExpressionKind::Deref(inner) => {
-            collect_expr_defs(inner, registry);
         }
         HirExpressionKind::Call(callee, _, args, _) => {
             collect_expr_defs(callee, registry);
@@ -1515,10 +1514,6 @@ fn collect_expr_defs(
                 collect_expr_defs(s, registry);
             }
         }
-        HirExpressionKind::Assign(lhs, rhs) => {
-            collect_expr_defs(lhs, registry);
-            collect_expr_defs(rhs, registry);
-        }
         HirExpressionKind::ConversioAssign {
             target,
             source,
@@ -1551,12 +1546,7 @@ fn collect_expr_defs(
                 collect_expr_defs(e, registry);
             }
         }
-        HirExpressionKind::Scribe(_, args) => {
-            for a in args {
-                collect_expr_defs(a, registry);
-            }
-        }
-        HirExpressionKind::Scriptum(_, args) => {
+        HirExpressionKind::Scribe(_, args) | HirExpressionKind::Scriptum(_, args) => {
             for a in args {
                 collect_expr_defs(a, registry);
             }
@@ -1567,7 +1557,9 @@ fn collect_expr_defs(
                 collect_expr_defs(m, registry);
             }
         }
-        HirExpressionKind::Panic(expr) | HirExpressionKind::Throw(expr) => {
+        HirExpressionKind::Panic(expr)
+        | HirExpressionKind::Throw(expr)
+        | HirExpressionKind::TypeCheck { expr, .. } => {
             collect_expr_defs(expr, registry);
         }
         HirExpressionKind::Handled { body, catch } => {
@@ -1629,9 +1621,6 @@ fn collect_expr_defs(
                 collect_expr_defs(o, registry);
             }
         }
-        HirExpressionKind::TypeCheck { expr, .. } => {
-            collect_expr_defs(expr, registry);
-        }
     }
 }
 
@@ -1676,8 +1665,6 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
 
 fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_hir::HirId> {
     use radix_hir::{HirExpressionKind, HirStatementKind};
-
-    let mut registry = FxHashSet::default();
 
     fn collect_block(block: &radix_hir::HirBlock, registry: &mut FxHashSet<radix_hir::HirId>) {
         for stmt in &block.statements {
@@ -1740,13 +1727,15 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 collect_expr(source, registry);
                 collect_block(body, registry);
             }
-            HirExpressionKind::Binary(_, lhs, rhs) => {
+            HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
                 collect_expr(lhs, registry);
                 collect_expr(rhs, registry);
             }
             HirExpressionKind::Unary(_, inner)
             | HirExpressionKind::Ref(_, inner)
-            | HirExpressionKind::Deref(inner) => {
+            | HirExpressionKind::Deref(inner)
+            | HirExpressionKind::Praefixum(inner)
+            | HirExpressionKind::Format { value: inner, .. } => {
                 collect_expr(inner, registry);
             }
             HirExpressionKind::Call(callee, _, args, _) => {
@@ -1793,7 +1782,16 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                     radix_hir::HirOptionalChainKind::Member(_) => {}
                 }
             }
-            HirExpressionKind::Marked { expr, .. } => collect_expr(expr, registry),
+            HirExpressionKind::Marked { expr, .. }
+            | HirExpressionKind::TypeCheck { expr, .. }
+            | HirExpressionKind::Panic(expr)
+            | HirExpressionKind::Throw(expr)
+            | HirExpressionKind::Cede(expr)
+            | HirExpressionKind::Reddet(expr)
+            | HirExpressionKind::Tacebit(expr)
+            | HirExpressionKind::Yield(expr) => {
+                collect_expr(expr, registry);
+            }
             HirExpressionKind::NonNull(base, chain) => {
                 collect_expr(base, registry);
                 match chain {
@@ -1859,10 +1857,6 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 }
                 collect_block(body, registry);
             }
-            HirExpressionKind::Assign(lhs, rhs) => {
-                collect_expr(lhs, registry);
-                collect_expr(rhs, registry);
-            }
             HirExpressionKind::ConversioAssign {
                 target,
                 source,
@@ -1906,14 +1900,6 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 if let Some(m) = msg {
                     collect_expr(m, registry);
                 }
-            }
-            HirExpressionKind::Panic(expr)
-            | HirExpressionKind::Throw(expr)
-            | HirExpressionKind::Cede(expr)
-            | HirExpressionKind::Reddet(expr)
-            | HirExpressionKind::Tacebit(expr)
-            | HirExpressionKind::Yield(expr) => {
-                collect_expr(expr, registry);
             }
             HirExpressionKind::Handled { body, catch } => {
                 collect_block(body, registry);
@@ -1971,11 +1957,6 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                     collect_expr(o, registry);
                 }
             }
-            HirExpressionKind::TypeCheck { expr, .. } => collect_expr(expr, registry),
-            HirExpressionKind::Praefixum(inner)
-            | HirExpressionKind::Format { value: inner, .. } => {
-                collect_expr(inner, registry);
-            }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => {
@@ -2004,6 +1985,8 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
             }
         }
     }
+
+    let mut registry = FxHashSet::default();
 
     // Collect from all items and entry.
     for item in &hir.items {
@@ -2325,25 +2308,6 @@ pub(crate) fn validate_referential_integrity(
     type_count: usize,
     interner_len: usize,
 ) -> Result<(), HirArtifactError> {
-    // ――― DefId registry (S2: collect every definition-site DefId) ―――――――
-    let def_registry = collect_def_registry(artifact);
-
-    // HirId registry: collect every HirId-bearing node in the tree (items +
-    // statements + expressions) into a membership-test set. HirIds are
-    // allocated by a monotonic counter in the lowerer, but error recovery
-    // discards partially-constructed nodes, leaving gaps in the ID space.
-    // A count-based bound would false-positive on those gaps; only a
-    // membership test is correct.
-    let hir_registry = collect_hir_registry(artifact);
-
-    let checks = IntegrityChecks {
-        def_registry: &def_registry,
-        hir_registry: &hir_registry,
-        type_count,
-        interner_len,
-        index_count: artifact.types.indices().len(),
-    };
-
     use radix_hir::{HirExpressionKind, HirItemKind, HirStatementKind};
 
     // A `Typus` default names a concrete type arena slot; `Magnitudo` defaults
@@ -2653,10 +2617,7 @@ pub(crate) fn validate_referential_integrity(
                         validate_expr(init, checks)?;
                     }
                 }
-                HirStatementKind::Expr(expr) => {
-                    validate_expr(expr, checks)?;
-                }
-                HirStatementKind::Redde(Some(expr)) => {
+                HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
                     validate_expr(expr, checks)?;
                 }
                 HirStatementKind::IncDec(inc) => {
@@ -2756,19 +2717,26 @@ pub(crate) fn validate_referential_integrity(
             HirExpressionKind::Literal(lit) => match lit {
                 radix_hir::HirLiteral::String(s)
                 | radix_hir::HirLiteral::Ascii(s)
-                | radix_hir::HirLiteral::Octeti(s) => checks.check_symbol(*s)?,
+                | radix_hir::HirLiteral::Octeti(s)
+                | radix_hir::HirLiteral::Regex(s, None) => checks.check_symbol(*s)?,
                 radix_hir::HirLiteral::Regex(s, Some(f)) => {
                     checks.check_symbol(*s)?;
                     checks.check_symbol(*f)?;
                 }
-                radix_hir::HirLiteral::Regex(s, None) => checks.check_symbol(*s)?,
                 _ => {}
             },
-            HirExpressionKind::Binary(_, lhs, rhs) => {
+            HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
                 validate_expr(lhs, checks)?;
                 validate_expr(rhs, checks)?;
             }
-            HirExpressionKind::Unary(_, inner) => {
+            HirExpressionKind::Unary(_, inner)
+            | HirExpressionKind::Cede(inner)
+            | HirExpressionKind::Reddet(inner)
+            | HirExpressionKind::Tacebit(inner)
+            | HirExpressionKind::Yield(inner)
+            | HirExpressionKind::Ref(_, inner)
+            | HirExpressionKind::Deref(inner)
+            | HirExpressionKind::Praefixum(inner) => {
                 validate_expr(inner, checks)?;
             }
             HirExpressionKind::Call(callee, type_args, args, _) => {
@@ -2960,10 +2928,6 @@ pub(crate) fn validate_referential_integrity(
                     validate_expr(s, checks)?;
                 }
             }
-            HirExpressionKind::Assign(lhs, rhs) => {
-                validate_expr(lhs, checks)?;
-                validate_expr(rhs, checks)?;
-            }
             HirExpressionKind::ConversioAssign {
                 target,
                 source,
@@ -3064,12 +3028,6 @@ pub(crate) fn validate_referential_integrity(
                 }
                 validate_expr(body, checks)?;
             }
-            HirExpressionKind::Cede(inner)
-            | HirExpressionKind::Reddet(inner)
-            | HirExpressionKind::Tacebit(inner)
-            | HirExpressionKind::Yield(inner) => {
-                validate_expr(inner, checks)?;
-            }
             HirExpressionKind::Verte {
                 source,
                 target,
@@ -3126,15 +3084,9 @@ pub(crate) fn validate_referential_integrity(
                     validate_expr(o, checks)?;
                 }
             }
-            HirExpressionKind::Ref(_, inner) | HirExpressionKind::Deref(inner) => {
-                validate_expr(inner, checks)?;
-            }
             HirExpressionKind::TypeCheck { expr, ty, .. } => {
                 validate_expr(expr, checks)?;
                 checks.check_type(*ty)?;
-            }
-            HirExpressionKind::Praefixum(inner) => {
-                validate_expr(inner, checks)?;
             }
             HirExpressionKind::Format { value, spec } => {
                 checks.check_symbol(*spec)?;
@@ -3174,12 +3126,12 @@ pub(crate) fn validate_referential_integrity(
                 match lit {
                     radix_hir::HirLiteral::String(s)
                     | radix_hir::HirLiteral::Ascii(s)
-                    | radix_hir::HirLiteral::Octeti(s) => checks.check_symbol(*s)?,
+                    | radix_hir::HirLiteral::Octeti(s)
+                    | radix_hir::HirLiteral::Regex(s, None) => checks.check_symbol(*s)?,
                     radix_hir::HirLiteral::Regex(s, Some(f)) => {
                         checks.check_symbol(*s)?;
                         checks.check_symbol(*f)?;
                     }
-                    radix_hir::HirLiteral::Regex(s, None) => checks.check_symbol(*s)?,
                     _ => {}
                 }
             }
@@ -3446,14 +3398,11 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::Stack(t)
             | radix_types::Type::Atomic(t)
             | radix_types::Type::Intervallum(t)
-            | radix_types::Type::Option(t) => {
+            | radix_types::Type::Option(t)
+            | radix_types::Type::Ref(_, t) => {
                 checks.check_type(*t)?;
             }
-            radix_types::Type::PromissumFailable(t, e) => {
-                checks.check_type(*t)?;
-                checks.check_type(*e)?;
-            }
-            radix_types::Type::AsyncCursor(t, e) => {
+            radix_types::Type::PromissumFailable(t, e) | radix_types::Type::AsyncCursor(t, e) => {
                 checks.check_type(*t)?;
                 checks.check_type(*e)?;
             }
@@ -3490,9 +3439,6 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::BoundedAscii { capacity }
             | radix_types::Type::BoundedOcteti { capacity } => {
                 checks.check_index(*capacity)?;
-            }
-            radix_types::Type::Ref(_, t) => {
-                checks.check_type(*t)?;
             }
             radix_types::Type::Struct(d)
             | radix_types::Type::Enum(d)
@@ -3661,6 +3607,25 @@ pub(crate) fn validate_referential_integrity(
         }
         Ok(())
     }
+
+    // ――― DefId registry (S2: collect every definition-site DefId) ―――――――
+    let def_registry = collect_def_registry(artifact);
+
+    // HirId registry: collect every HirId-bearing node in the tree (items +
+    // statements + expressions) into a membership-test set. HirIds are
+    // allocated by a monotonic counter in the lowerer, but error recovery
+    // discards partially-constructed nodes, leaving gaps in the ID space.
+    // A count-based bound would false-positive on those gaps; only a
+    // membership test is correct.
+    let hir_registry = collect_hir_registry(artifact);
+
+    let checks = IntegrityChecks {
+        def_registry: &def_registry,
+        hir_registry: &hir_registry,
+        type_count,
+        interner_len,
+        index_count: artifact.types.indices().len(),
+    };
 
     // ── Top-level validation ───────────────────────────────────────────
 
