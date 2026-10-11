@@ -671,8 +671,8 @@ pub fn unique_kernel_entry_name(
 /// and the boundary-ABI validation gate.
 pub(crate) fn callee_function_ids(callee: &MirCallee, program: &MirProgram) -> Vec<MirFunctionId> {
     match callee {
-        MirCallee::Function(id) => vec![*id],
-        MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => vec![*id],
+        MirCallee::Function(id)
+        | MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => vec![*id],
         MirCallee::Closure(closure) => vec![closure.function],
         MirCallee::Definition { source, .. } => program
             .functions

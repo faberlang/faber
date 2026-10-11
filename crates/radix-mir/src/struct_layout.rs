@@ -202,10 +202,9 @@ fn field_spec(
         Type::Set(_) => return Err(StructLayoutRefusal::Set),
         Type::Tensor(_, _) | Type::Sparsa(_, _) => return Err(StructLayoutRefusal::Tensor),
         Type::Option(_) => return Err(StructLayoutRefusal::Nullable),
-        Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => {
-            return Err(StructLayoutRefusal::Text);
-        }
-        Type::Primitive(Primitive::Textus | Primitive::Littera | Primitive::Ascii) => {
+        Type::BoundedTextus { .. }
+        | Type::BoundedAscii { .. }
+        | Type::Primitive(Primitive::Textus | Primitive::Littera | Primitive::Ascii) => {
             return Err(StructLayoutRefusal::Text);
         }
         _ => {}

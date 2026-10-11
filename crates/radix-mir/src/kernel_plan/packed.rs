@@ -294,8 +294,7 @@ pub(crate) fn trailing_layout_operand(
             };
             // Quantized matmul: [left, right, layout]. Gather: [table, ids, layout?].
             let index = match op {
-                MirCollectionOp::TensorQuantizedMatMul => 2,
-                MirCollectionOp::TensorGather => 2,
+                MirCollectionOp::TensorQuantizedMatMul | MirCollectionOp::TensorGather => 2,
                 _ => return None,
             };
             return args.get(index);

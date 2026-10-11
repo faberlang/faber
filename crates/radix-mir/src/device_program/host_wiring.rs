@@ -293,7 +293,7 @@ impl MirVisitor for Collector<'_> {
                 }
             }
             MirCallee::Closure(closure) => self.mark_opaque(closure.function),
-            _ => {}
+            MirCallee::Value(_) => {}
         }
         walk_callee(self, callee);
     }
