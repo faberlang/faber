@@ -1309,7 +1309,10 @@ fn count_nodes(function: &MirFunction) -> u32 {
         .iter()
         .map(|block| u32::try_from(block.statements.len()).unwrap_or(u32::MAX) + 1)
         .sum::<u32>();
-    stmts + function.locals.len() as u32 + function.temps.len() as u32 + function.blocks.len() as u32
+    stmts
+        + u32::try_from(function.locals.len()).unwrap_or(u32::MAX)
+        + u32::try_from(function.temps.len()).unwrap_or(u32::MAX)
+        + u32::try_from(function.blocks.len()).unwrap_or(u32::MAX)
 }
 
 fn place_ty(function: &MirFunction, place: &MirPlace) -> Option<MirType> {
@@ -1777,7 +1780,9 @@ fn visit_successors(kind: &MirTerminatorKind, mut visit: impl FnMut(MirBlockId))
             visit(*else_block);
         }
         MirTerminatorKind::Switch { cases, default, .. } => {
-            cases.iter().for_each(|case| visit(case.target));
+            for case in cases {
+                visit(case.target);
+            }
             visit(*default);
         }
         MirTerminatorKind::TryCall { ok_block, error_block, .. } => {

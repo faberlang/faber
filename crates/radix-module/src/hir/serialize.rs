@@ -503,7 +503,7 @@ fn remap_struct_field_sites(hir: &radix_hir::HirModule, presentation: &mut radix
         for (ordinal, field) in strukt.fields.iter().enumerate() {
             let old_site = radix_hir::HirTypeSite {
                 owner: radix_hir::HirOwnerRef::Def(field.def_id),
-                slot: radix_hir::HirTypeSlot::Field(ordinal as u32),
+                slot: radix_hir::HirTypeSlot::Field(u32::try_from(ordinal).unwrap_or(u32::MAX)),
             };
             if let Some(authored) = authored_by_site.get_mut(&old_site) {
                 authored.site.owner = radix_hir::HirOwnerRef::Def(item.def_id);
@@ -556,7 +556,7 @@ fn register_function_sites(
         register_site(
             sites,
             radix_hir::HirOwnerRef::Def(param.def_id),
-            radix_hir::HirTypeSlot::Parameter(ordinal as u32),
+            radix_hir::HirTypeSlot::Parameter(u32::try_from(ordinal).unwrap_or(u32::MAX)),
             param.ty,
         );
     }
@@ -564,7 +564,7 @@ fn register_function_sites(
         register_site(
             sites,
             radix_hir::HirOwnerRef::Def(param.def_id),
-            radix_hir::HirTypeSlot::Parameter(function.params.len() as u32),
+            radix_hir::HirTypeSlot::Parameter(u32::try_from(function.params.len()).unwrap_or(u32::MAX)),
             param.ty,
         );
     }
@@ -588,7 +588,10 @@ fn register_annotation_sites(
                 register_site(
                     sites,
                     owner.clone(),
-                    radix_hir::HirTypeSlot::AnnotationField { annotation: annotation as u32, field },
+                    radix_hir::HirTypeSlot::AnnotationField {
+                        annotation: u32::try_from(annotation).unwrap_or(u32::MAX),
+                        field,
+                    },
                     ty,
                 );
                 field += 1;
@@ -610,7 +613,7 @@ impl HirVisitor for TypeSiteRegistry {
                     register_site(
                         &mut self.sites,
                         owner.clone(),
-                        radix_hir::HirTypeSlot::Field(ordinal as u32),
+                        radix_hir::HirTypeSlot::Field(u32::try_from(ordinal).unwrap_or(u32::MAX)),
                         field.ty,
                     );
                     register_site(
@@ -631,7 +634,7 @@ impl HirVisitor for TypeSiteRegistry {
                     register_site(
                         &mut self.sites,
                         owner.clone(),
-                        radix_hir::HirTypeSlot::Field(ordinal as u32),
+                        radix_hir::HirTypeSlot::Field(u32::try_from(ordinal).unwrap_or(u32::MAX)),
                         field.ty,
                     );
                 }
@@ -640,7 +643,7 @@ impl HirVisitor for TypeSiteRegistry {
                         register_site(
                             &mut self.sites,
                             radix_hir::HirOwnerRef::Def(variant.def_id),
-                            radix_hir::HirTypeSlot::Field(ordinal as u32),
+                            radix_hir::HirTypeSlot::Field(u32::try_from(ordinal).unwrap_or(u32::MAX)),
                             field.ty,
                         );
                     }
@@ -652,7 +655,7 @@ impl HirVisitor for TypeSiteRegistry {
                         register_site(
                             &mut self.sites,
                             radix_hir::HirOwnerRef::Def(param.def_id),
-                            radix_hir::HirTypeSlot::Parameter(ordinal as u32),
+                            radix_hir::HirTypeSlot::Parameter(u32::try_from(ordinal).unwrap_or(u32::MAX)),
                             param.ty,
                         );
                     }
@@ -666,7 +669,7 @@ impl HirVisitor for TypeSiteRegistry {
                     register_site(
                         &mut self.sites,
                         owner.clone(),
-                        radix_hir::HirTypeSlot::Field(ordinal as u32),
+                        radix_hir::HirTypeSlot::Field(u32::try_from(ordinal).unwrap_or(u32::MAX)),
                         column.ty,
                     );
                 }
@@ -741,7 +744,7 @@ impl HirVisitor for TypeSiteRegistry {
                     register_site(
                         &mut self.sites,
                         radix_hir::HirOwnerRef::Hir(expr.id),
-                        radix_hir::HirTypeSlot::TupleTypeArgument(ordinal as u32),
+                        radix_hir::HirTypeSlot::TupleTypeArgument(u32::try_from(ordinal).unwrap_or(u32::MAX)),
                         *ty,
                     );
                 }
@@ -751,7 +754,7 @@ impl HirVisitor for TypeSiteRegistry {
                     register_site(
                         &mut self.sites,
                         radix_hir::HirOwnerRef::Def(param.def_id),
-                        radix_hir::HirTypeSlot::ClosureParameter(ordinal as u32),
+                        radix_hir::HirTypeSlot::ClosureParameter(u32::try_from(ordinal).unwrap_or(u32::MAX)),
                         param.ty,
                     );
                 }
