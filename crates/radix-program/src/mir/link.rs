@@ -286,175 +286,15 @@ pub(super) fn local_namespace_call_targets(
     library_cache: &mut LibraryInterfaceCache,
     loaded_links: Option<&BTreeMap<PathBuf, BTreeMap<String, PathBuf>>>,
 ) -> Result<PackageMirLinks, Vec<Diagnostic>> {
-    let units_by_path = package
-        .nodes
-        .values()
-        .map(|unit| (unit.path.clone(), unit))
-        .collect::<BTreeMap<_, _>>();
     let mut links = PackageMirLinkAccumulator::default();
-    // Sibling-route product identity: the package root directory name, the
-    // same derivation the package-identity computation applies.
-    let sibling_product = package
-        .spec
-        .package_root
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-
-    for unit in package.nodes.values() {
-        for item in &unit.analysis.hir.items {
-            let HirItemKind::Import(import) = &item.kind else {
-                continue;
-            };
-            if let Some(loaded_links) = loaded_links {
-                // Loaded-package path: local imports resolve from the explicit
-                // link table (import binding → target module path) instead of
-                // the filesystem. Library imports are not linked here — the
-                // store owns library closure (Stage 5 of the package delivery).
-                let Some(unit_links) = loaded_links.get(&unit.path) else {
-                    continue;
-                };
-                for import_item in &import.items {
-                    let binding = unit
-                        .analysis
-                        .interner
-                        .resolve(import_item.alias.unwrap_or(import_item.name));
-                    let Some(target_path) = unit_links.get(binding) else {
-                        continue;
-                    };
-                    let Some(sibling) = units_by_path.get(target_path).copied() else {
-                        continue;
-                    };
-                    let exports = unit
-                        .namespace_exports
-                        .get(binding)
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_keys()
-                        .collect::<BTreeSet<_>>();
-                    links
-                        .namespaces
-                        .insert((unit.path.clone(), import_item.def_id), exports.clone());
-                    // D5.1: allocate every function source; module-private
-                    // helpers are reached from exported functions of the
-                    // same module. Only exports become call targets.
-                    for function in top_level_functions(sibling) {
-                        let synthetic = *links
-                            .source_rewrites
-                            .entry((sibling.path.clone(), function.def_id))
-                            .or_insert_with(|| {
-                                let def_id = DefId(links.next_synthetic);
-                                links.next_synthetic += 1;
-                                def_id
-                            });
-                        if exports.contains(&function.name) {
-                            links.targets.insert(
-                                (unit.path.clone(), import_item.def_id, function.name),
-                                synthetic,
-                            );
-                        }
-                    }
-                    for member in top_level_consts(sibling) {
-                        let exported = exports.contains(&member.name);
-                        link_const_member(
-                            &mut links,
-                            &unit.path,
-                            import_item.def_id,
-                            &sibling.path,
-                            &member,
-                            exported,
-                        );
-                    }
-                }
-                continue;
-            }
-            let import_path = unit.analysis.interner.resolve(import.path);
-            let resolution =
-                resolve_import(&package.spec, library_resolver, &unit.path, import_path);
-            match resolution {
-                ImportResolution::Local(target_path) => {
-                    let Some(sibling) = units_by_path.get(&target_path).copied() else {
-                        continue;
-                    };
-                    for import_item in &import.items {
-                        link_import_item_to_sibling(
-                            &mut links,
-                            unit,
-                            import_item,
-                            sibling,
-                            &sibling_product,
-                        );
-                    }
-                }
-                ImportResolution::Library(module) => {
-                    // A `provider:module` specifier that resolves to a file
-                    // already in this package is a self-import, not an
-                    // external library. Keep the sibling-unit link so package
-                    // tests execute the in-tree bodies instead of leaving
-                    // members as package providers.
-                    if let Some(sibling) = units_by_path
-                        .get(&crate::paths::normalize_path(&module.interface_path))
-                        .copied()
-                    {
-                        for import_item in &import.items {
-                            link_import_item_to_sibling(
-                                &mut links,
-                                unit,
-                                import_item,
-                                sibling,
-                                &sibling_product,
-                            );
-                        }
-                        continue;
-                    }
-                    // Kernel-manifest `norma:*` modules stay on the
-                    // runner-kernel bridge (`bridge_norma_providers_to_kernel`);
-                    // they are not linked into the program.
-                    if is_bridged_norma_import_path(import_path) {
-                        continue;
-                    }
-                    // Only the interpreted run path links library imports.
-                    // External-target builds keep the previous behavior:
-                    // library calls stay provider-backed and emit as-is.
-                    if consumer != PackageMirConsumer::Interpreted {
-                        continue;
-                    }
-                    let site = LibraryImportSite {
-                        caller_path: unit.path.clone(),
-                        import_path: import_path.to_owned(),
-                        visibility: import.visibility,
-                        items: import
-                            .items
-                            .iter()
-                            .map(|item| LibraryImportSiteItem {
-                                def_id: item.def_id,
-                                binding: unit
-                                    .analysis
-                                    .interner
-                                    .resolve(item.alias.unwrap_or(item.name))
-                                    .to_owned(),
-                            })
-                            .collect(),
-                    };
-                    link_library_import_site(
-                        &mut links,
-                        &site,
-                        &module,
-                        library_resolver,
-                        library_cache,
-                    );
-                }
-                ImportResolution::Error(diag) => {
-                    // External-target builds keep the previous silent-skip;
-                    // only the interpreted run path fails closed here.
-                    if consumer == PackageMirConsumer::Interpreted {
-                        links.diagnostics.push(diag);
-                    }
-                }
-                ImportResolution::Unsupported => continue,
-            }
-        }
-    }
+    link_package_unit_imports(
+        &mut links,
+        package,
+        consumer,
+        library_resolver,
+        library_cache,
+        loaded_links,
+    );
 
     if consumer == PackageMirConsumer::Interpreted {
         link_nested_library_imports(&mut links, library_resolver, library_cache);
@@ -484,6 +324,204 @@ pub(super) fn local_namespace_call_targets(
         method_targets: links.method_targets,
         imported_device_routes: links.imported_device_routes,
     })
+}
+
+fn link_package_unit_imports(
+    links: &mut PackageMirLinkAccumulator,
+    package: &AnalyzedProgram,
+    consumer: PackageMirConsumer,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    loaded_links: Option<&BTreeMap<PathBuf, BTreeMap<String, PathBuf>>>,
+) {
+    let units_by_path = package
+        .nodes
+        .values()
+        .map(|unit| (unit.path.clone(), unit))
+        .collect::<BTreeMap<_, _>>();
+    // Sibling-route product identity: the package root directory name, the
+    // same derivation the package-identity computation applies.
+    let sibling_product = package
+        .spec
+        .package_root
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+
+    for unit in package.nodes.values() {
+        for item in &unit.analysis.hir.items {
+            let HirItemKind::Import(import) = &item.kind else {
+                continue;
+            };
+            if let Some(loaded_links) = loaded_links {
+                // Loaded-package path: local imports resolve from the explicit
+                // link table (import binding → target module path) instead of
+                // the filesystem. Library imports are not linked here — the
+                // store owns library closure (Stage 5 of the package delivery).
+                link_loaded_import_items(links, unit, import, loaded_links, &units_by_path);
+                continue;
+            }
+            let import_path = unit.analysis.interner.resolve(import.path);
+            let resolution =
+                resolve_import(&package.spec, library_resolver, &unit.path, import_path);
+            match resolution {
+                ImportResolution::Local(target_path) => {
+                    let Some(sibling) = units_by_path.get(&target_path).copied() else {
+                        continue;
+                    };
+                    link_sibling_import_items(links, unit, import, sibling, &sibling_product);
+                }
+                ImportResolution::Library(module) => {
+                    // A `provider:module` specifier that resolves to a file
+                    // already in this package is a self-import, not an
+                    // external library. Keep the sibling-unit link so package
+                    // tests execute the in-tree bodies instead of leaving
+                    // members as package providers.
+                    if let Some(sibling) = units_by_path
+                        .get(&crate::paths::normalize_path(&module.interface_path))
+                        .copied()
+                    {
+                        link_sibling_import_items(links, unit, import, sibling, &sibling_product);
+                        continue;
+                    }
+                    // Kernel-manifest `norma:*` modules stay on the
+                    // runner-kernel bridge (`bridge_norma_providers_to_kernel`);
+                    // they are not linked into the program.
+                    if is_bridged_norma_import_path(import_path) {
+                        continue;
+                    }
+                    // Only the interpreted run path links library imports.
+                    // External-target builds keep the previous behavior:
+                    // library calls stay provider-backed and emit as-is.
+                    if consumer != PackageMirConsumer::Interpreted {
+                        continue;
+                    }
+                    link_library_import_module(
+                        links,
+                        unit,
+                        import,
+                        import_path,
+                        &module,
+                        library_resolver,
+                        library_cache,
+                    );
+                }
+                ImportResolution::Error(diag) => {
+                    // External-target builds keep the previous silent-skip;
+                    // only the interpreted run path fails closed here.
+                    if consumer == PackageMirConsumer::Interpreted {
+                        links.diagnostics.push(diag);
+                    }
+                }
+                ImportResolution::Unsupported => {}
+            }
+        }
+    }
+}
+
+fn link_loaded_import_items(
+    links: &mut PackageMirLinkAccumulator,
+    unit: &AnalyzedProgramNode,
+    import: &radix_module::hir::HirImport,
+    loaded_links: &BTreeMap<PathBuf, BTreeMap<String, PathBuf>>,
+    units_by_path: &BTreeMap<PathBuf, &AnalyzedProgramNode>,
+) {
+    let Some(unit_links) = loaded_links.get(&unit.path) else {
+        return;
+    };
+    for import_item in &import.items {
+        let binding = unit
+            .analysis
+            .interner
+            .resolve(import_item.alias.unwrap_or(import_item.name));
+        let Some(target_path) = unit_links.get(binding) else {
+            continue;
+        };
+        let Some(sibling) = units_by_path.get(target_path).copied() else {
+            continue;
+        };
+        let exports = unit
+            .namespace_exports
+            .get(binding)
+            .cloned()
+            .unwrap_or_default()
+            .into_keys()
+            .collect::<BTreeSet<_>>();
+        links
+            .namespaces
+            .insert((unit.path.clone(), import_item.def_id), exports.clone());
+        // D5.1: allocate every function source; module-private
+        // helpers are reached from exported functions of the
+        // same module. Only exports become call targets.
+        for function in top_level_functions(sibling) {
+            let synthetic = *links
+                .source_rewrites
+                .entry((sibling.path.clone(), function.def_id))
+                .or_insert_with(|| {
+                    let def_id = DefId(links.next_synthetic);
+                    links.next_synthetic += 1;
+                    def_id
+                });
+            if exports.contains(&function.name) {
+                links.targets.insert(
+                    (unit.path.clone(), import_item.def_id, function.name),
+                    synthetic,
+                );
+            }
+        }
+        for member in top_level_consts(sibling) {
+            let exported = exports.contains(&member.name);
+            link_const_member(
+                links,
+                &unit.path,
+                import_item.def_id,
+                &sibling.path,
+                &member,
+                exported,
+            );
+        }
+    }
+}
+
+fn link_library_import_module(
+    links: &mut PackageMirLinkAccumulator,
+    unit: &AnalyzedProgramNode,
+    import: &radix_module::hir::HirImport,
+    import_path: &str,
+    module: &crate::library::ResolvedLibraryModule,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) {
+    let site = LibraryImportSite {
+        caller_path: unit.path.clone(),
+        import_path: import_path.to_owned(),
+        visibility: import.visibility,
+        items: import
+            .items
+            .iter()
+            .map(|item| LibraryImportSiteItem {
+                def_id: item.def_id,
+                binding: unit
+                    .analysis
+                    .interner
+                    .resolve(item.alias.unwrap_or(item.name))
+                    .to_owned(),
+            })
+            .collect(),
+    };
+    link_library_import_site(links, &site, module, library_resolver, library_cache);
+}
+
+fn link_sibling_import_items(
+    links: &mut PackageMirLinkAccumulator,
+    unit: &AnalyzedProgramNode,
+    import: &radix_module::hir::HirImport,
+    sibling: &AnalyzedProgramNode,
+    product: &str,
+) {
+    for import_item in &import.items {
+        link_import_item_to_sibling(links, unit, import_item, sibling, product);
+    }
 }
 
 /// Link one import item of a package-owned sibling: derive the caller's
@@ -625,61 +663,8 @@ fn link_library_import_site(
         );
         return;
     };
-    let mut functions = analysis
-        .hir
-        .items
-        .iter()
-        .filter_map(|item| {
-            let HirItemKind::Function(function) = &item.kind else {
-                return None;
-            };
-            Some(TopLevelFunction {
-                name: analysis.interner.resolve(function.name).to_owned(),
-                def_id: item.def_id,
-            })
-        })
-        .collect::<Vec<_>>();
-    // Compiler-generated companions have no HIR item, but their source
-    // DefId is the identity carried by their generated MIR function.
-    // A declared companion with no resolvable symbol fails closed
-    // here (stable `package_mir_companion_unresolved` identity)
-    // instead of silently vanishing from the link and surfacing later
-    // as an unstable runner-internal error.
-    for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
-        let name = analysis
-            .interner
-            .resolve(backward.companion_name)
-            .to_owned();
-        if !companion_resolves(analysis, primal_def_id, backward) {
-            push_companion_unresolved(
-                &mut links.diagnostics,
-                &site.caller_path,
-                &site.import_path,
-                &name,
-                PackageMirConsumer::Interpreted,
-            );
-            continue;
-        }
-        functions.push(TopLevelFunction {
-            name,
-            def_id: backward.companion_def_id,
-        });
-    }
-    let consts = analysis
-        .hir
-        .items
-        .iter()
-        .filter_map(|item| {
-            let HirItemKind::Constant(konst) = &item.kind else {
-                return None;
-            };
-            Some(TopLevelConst {
-                name: analysis.interner.resolve(konst.name).to_owned(),
-                def_id: item.def_id,
-                konst: konst.clone(),
-            })
-        })
-        .collect::<Vec<_>>();
+    let functions = collect_library_functions(links, site, analysis);
+    let consts = collect_library_consts(analysis);
     let exports = interface.exports.keys().cloned().collect::<BTreeSet<_>>();
     let library_path = module.interface_path.clone();
 
@@ -760,6 +745,72 @@ fn link_library_import_site(
             import,
         });
     }
+}
+
+fn collect_library_functions(
+    links: &mut PackageMirLinkAccumulator,
+    site: &LibraryImportSite,
+    analysis: &radix_module::driver::AnalyzedModule,
+) -> Vec<TopLevelFunction> {
+    let mut functions = analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            let HirItemKind::Function(function) = &item.kind else {
+                return None;
+            };
+            Some(TopLevelFunction {
+                name: analysis.interner.resolve(function.name).to_owned(),
+                def_id: item.def_id,
+            })
+        })
+        .collect::<Vec<_>>();
+    // Compiler-generated companions have no HIR item, but their source
+    // DefId is the identity carried by their generated MIR function.
+    // A declared companion with no resolvable symbol fails closed
+    // here (stable `package_mir_companion_unresolved` identity)
+    // instead of silently vanishing from the link and surfacing later
+    // as an unstable runner-internal error.
+    for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
+        let name = analysis
+            .interner
+            .resolve(backward.companion_name)
+            .to_owned();
+        if !companion_resolves(analysis, primal_def_id, backward) {
+            push_companion_unresolved(
+                &mut links.diagnostics,
+                &site.caller_path,
+                &site.import_path,
+                &name,
+                PackageMirConsumer::Interpreted,
+            );
+            continue;
+        }
+        functions.push(TopLevelFunction {
+            name,
+            def_id: backward.companion_def_id,
+        });
+    }
+    functions
+}
+
+fn collect_library_consts(analysis: &radix_module::driver::AnalyzedModule) -> Vec<TopLevelConst> {
+    analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            let HirItemKind::Constant(konst) = &item.kind else {
+                return None;
+            };
+            Some(TopLevelConst {
+                name: analysis.interner.resolve(konst.name).to_owned(),
+                def_id: item.def_id,
+                konst: konst.clone(),
+            })
+        })
+        .collect::<Vec<_>>()
 }
 
 /// Whether a declared `@ radix backward` companion can be linked by the
@@ -1518,7 +1569,8 @@ pub(super) fn rewrite_expr(
         | HirExpressionKind::Panic(inner)
         | HirExpressionKind::Throw(inner)
         | HirExpressionKind::Praefixum(inner)
-        | HirExpressionKind::Format { value: inner, .. } => rewrite_expr(
+        | HirExpressionKind::Format { value: inner, .. }
+        | HirExpressionKind::Marked { expr: inner, .. } => rewrite_expr(
             unit_path,
             inner,
             interner,
@@ -1704,17 +1756,6 @@ pub(super) fn rewrite_expr(
             rewrite_optional_chain(
                 unit_path,
                 chain,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            );
-        }
-        HirExpressionKind::Marked { expr: inner, .. } => {
-            rewrite_expr(
-                unit_path,
-                inner,
                 interner,
                 targets,
                 data_member_targets,
@@ -2856,13 +2897,13 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
                 }
             }
             HirExpressionKind::Call(callee, type_args, args, _) => {
-                let (receiver, method) = match &callee.kind {
-                    HirExpressionKind::Field(receiver, method) => (receiver, *method),
-                    _ => {
+                let (receiver, method) =
+                    if let HirExpressionKind::Field(receiver, method) = &callee.kind {
+                        (receiver, *method)
+                    } else {
                         walk_expr_mut(self, expr);
                         return;
-                    }
-                };
+                    };
                 if let Some((new_callee, type_args, args)) =
                     self.synthetic_call_parts(receiver, method, type_args, args)
                 {
