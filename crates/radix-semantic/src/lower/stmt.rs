@@ -48,8 +48,8 @@ fn error_expr(lowerer: &mut Lowerer, span: Span) -> HirExpression {
 fn binding_pattern_span(pattern: &radix_syntax::BindingPattern) -> Span {
     match pattern {
         radix_syntax::BindingPattern::Ident(ident) => ident.span,
-        radix_syntax::BindingPattern::Wildcard(span) => *span,
-        radix_syntax::BindingPattern::Array { span, .. }
+        radix_syntax::BindingPattern::Wildcard(span)
+        | radix_syntax::BindingPattern::Array { span, .. }
         | radix_syntax::BindingPattern::Object { span, .. } => *span,
     }
 }
@@ -513,18 +513,15 @@ impl Lowerer<'_> {
             let def_id = self.next_def_id();
             self.bind_local(name, def_id);
             let init_expr = if let Some(labels) = tuple_labels.as_ref() {
-                match crate::tuple_labels::position_of(labels, field.name.name) {
-                    Some(position) => {
-                        if let Some(bound) = bound_positions.as_mut() {
-                            bound[position] = true;
-                        }
-                        self.lower_tuple_destructure_index(subject, position, field.name.span)
+                if let Some(position) = crate::tuple_labels::position_of(labels, field.name.name) {
+                    if let Some(bound) = bound_positions.as_mut() {
+                        bound[position] = true;
                     }
-                    None => {
-                        self.current_span = field.name.span;
-                        self.error("unknown_tuple_element_label");
-                        error_expr(self, field.name.span)
-                    }
+                    self.lower_tuple_destructure_index(subject, position, field.name.span)
+                } else {
+                    self.current_span = field.name.span;
+                    self.error("unknown_tuple_element_label");
+                    error_expr(self, field.name.span)
                 }
             } else {
                 HirExpression {
@@ -931,49 +928,14 @@ impl Lowerer<'_> {
             span: binding_span,
         };
 
-        self.push_scope();
-        let coordinate_bindings = iter_stmt
-            .apud
-            .iter()
-            .map(|ident| {
-                let def_id = self.next_def_id();
-                self.bind_local(ident.name, def_id);
-                (def_id, ident.name)
-            })
-            .collect();
-        // The lane binder is declared alongside the loop bindings (same
-        // shape as `summa`'s filum binder); the runner lowers the plain
-        // loop, so the binder never becomes a runtime local.
-        let filum_binding = iter_stmt.filum.as_ref().map(|ident| {
-            let def_id = self.next_def_id();
-            self.bind_local(ident.name, def_id);
-            (def_id, ident.name)
-        });
-        self.bind_local(binding_name, binding);
-        if matches!(first_binding, radix_syntax::BindingPattern::Object { .. }) {
-            self.record_itera_element_labels(&iter_stmt.sources[0], binding);
-        }
-        let pattern_locals = match first_binding {
-            radix_syntax::BindingPattern::Array { .. } => self.lower_array_destructure_pattern(
-                first_binding,
-                &binding_expr,
-                iter_stmt.mutability,
-                false,
-            ),
-            radix_syntax::BindingPattern::Object { .. } => self.lower_object_destructure_pattern(
-                first_binding,
-                &binding_expr,
-                iter_stmt.mutability,
-                false,
-            ),
-            // Wildcard binders returned above, so only identifiers reach here.
-            radix_syntax::BindingPattern::Ident(_) | radix_syntax::BindingPattern::Wildcard(_) => {
-                Vec::new()
-            }
-        };
-        let mut body = self.lower_ergo_body(&iter_stmt.body);
-        body.statements.splice(0..0, pattern_locals);
-        self.pop_scope();
+        let (coordinate_bindings, filum_binding, body) = enter_itera_scope(
+            self,
+            iter_stmt,
+            first_binding,
+            binding_name,
+            binding,
+            &binding_expr,
+        );
         let expr = HirExpression {
             id: self.next_hir_id(),
             kind: HirExpressionKind::Itera {
@@ -1791,6 +1753,64 @@ impl Lowerer<'_> {
             expr
         }
     }
+}
+
+fn enter_itera_scope(
+    lowerer: &mut Lowerer,
+    iter_stmt: &radix_syntax::IteraStmt,
+    first_binding: &radix_syntax::BindingPattern,
+    binding_name: radix_lexer::Symbol,
+    binding: radix_hir::DefId,
+    binding_expr: &radix_syntax::Expr,
+) -> (
+    Vec<(radix_hir::DefId, radix_lexer::Symbol)>,
+    Option<(radix_hir::DefId, radix_lexer::Symbol)>,
+    HirBlock,
+) {
+    lowerer.push_scope();
+    let coordinate_bindings = iter_stmt
+        .apud
+        .iter()
+        .map(|ident| {
+            let def_id = lowerer.next_def_id();
+            lowerer.bind_local(ident.name, def_id);
+            (def_id, ident.name)
+        })
+        .collect();
+    // The lane binder is declared alongside the loop bindings (same
+    // shape as `summa`'s filum binder); the runner lowers the plain
+    // loop, so the binder never becomes a runtime local.
+    let filum_binding = iter_stmt.filum.as_ref().map(|ident| {
+        let def_id = lowerer.next_def_id();
+        lowerer.bind_local(ident.name, def_id);
+        (def_id, ident.name)
+    });
+    lowerer.bind_local(binding_name, binding);
+    if matches!(first_binding, radix_syntax::BindingPattern::Object { .. }) {
+        lowerer.record_itera_element_labels(&iter_stmt.sources[0], binding);
+    }
+    let pattern_locals = match first_binding {
+        radix_syntax::BindingPattern::Array { .. } => lowerer.lower_array_destructure_pattern(
+            first_binding,
+            binding_expr,
+            iter_stmt.mutability,
+            false,
+        ),
+        radix_syntax::BindingPattern::Object { .. } => lowerer.lower_object_destructure_pattern(
+            first_binding,
+            binding_expr,
+            iter_stmt.mutability,
+            false,
+        ),
+        // Wildcard binders returned above, so only identifiers reach here.
+        radix_syntax::BindingPattern::Ident(_) | radix_syntax::BindingPattern::Wildcard(_) => {
+            Vec::new()
+        }
+    };
+    let mut body = lowerer.lower_ergo_body(&iter_stmt.body);
+    body.statements.splice(0..0, pattern_locals);
+    lowerer.pop_scope();
+    (coordinate_bindings, filum_binding, body)
 }
 
 /// Whether a destructuring subject is a side-effect-free place that each

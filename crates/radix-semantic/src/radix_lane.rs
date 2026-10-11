@@ -52,7 +52,7 @@ pub struct RadixBackward {
 pub struct RadixLaneMetadata {
     lanes: FxHashMap<DefId, RadixLane>,
     backward: FxHashMap<DefId, RadixBackward>,
-    /// Monotonic source for companion DefId allocation.
+    /// Monotonic source for companion `DefId` allocation.
     next_companion_id: u32,
 }
 
@@ -108,7 +108,7 @@ impl RadixLaneMetadata {
         self.backward.insert(def_id, backward);
     }
 
-    /// Allocate a fresh DefId for a companion function.
+    /// Allocate a fresh `DefId` for a companion function.
     fn allocate_companion_def_id(&mut self) -> DefId {
         let id = DefId(self.next_companion_id | 0x8000_0000);
         self.next_companion_id = self.next_companion_id.wrapping_add(1);
@@ -220,52 +220,7 @@ pub fn collect(
                 }
             }
             StmtKind::Class(decl) => {
-                crate::radix_contract::validate_declaration(
-                    &stmt.annotations,
-                    false,
-                    interner,
-                    &mut errors,
-                );
-                reject_unsupported_radix_annotations(
-                    &stmt.annotations,
-                    interner,
-                    "genus declaration",
-                    &mut errors,
-                );
-                reject_unsupported_radix_backward_annotations(
-                    &stmt.annotations,
-                    interner,
-                    "genus declaration",
-                    &mut errors,
-                );
-                for member in &decl.members {
-                    reject_unsupported_radix_annotations(
-                        &member.annotations,
-                        interner,
-                        "genus member",
-                        &mut errors,
-                    );
-                    reject_unsupported_radix_backward_annotations(
-                        &member.annotations,
-                        interner,
-                        "genus member",
-                        &mut errors,
-                    );
-                    if let ClassMemberKind::Method(method) = &member.kind {
-                        reject_unsupported_radix_annotations(
-                            &method.annotations,
-                            interner,
-                            "genus method",
-                            &mut errors,
-                        );
-                        reject_unsupported_radix_backward_annotations(
-                            &method.annotations,
-                            interner,
-                            "genus method",
-                            &mut errors,
-                        );
-                    }
-                }
+                collect_class_annotations(stmt, decl, interner, &mut errors);
             }
             _ => {
                 crate::radix_contract::validate_declaration(
@@ -294,6 +249,45 @@ pub fn collect(
         Ok(metadata)
     } else {
         Err(errors)
+    }
+}
+
+fn collect_class_annotations(
+    stmt: &radix_syntax::Stmt,
+    decl: &radix_syntax::ClassDecl,
+    interner: &Interner,
+    errors: &mut Vec<SemanticError>,
+) {
+    crate::radix_contract::validate_declaration(&stmt.annotations, false, interner, errors);
+    reject_unsupported_radix_annotations(&stmt.annotations, interner, "genus declaration", errors);
+    reject_unsupported_radix_backward_annotations(
+        &stmt.annotations,
+        interner,
+        "genus declaration",
+        errors,
+    );
+    for member in &decl.members {
+        reject_unsupported_radix_annotations(&member.annotations, interner, "genus member", errors);
+        reject_unsupported_radix_backward_annotations(
+            &member.annotations,
+            interner,
+            "genus member",
+            errors,
+        );
+        if let ClassMemberKind::Method(method) = &member.kind {
+            reject_unsupported_radix_annotations(
+                &method.annotations,
+                interner,
+                "genus method",
+                errors,
+            );
+            reject_unsupported_radix_backward_annotations(
+                &method.annotations,
+                interner,
+                "genus method",
+                errors,
+            );
+        }
     }
 }
 

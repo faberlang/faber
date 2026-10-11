@@ -670,112 +670,123 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
 
 fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
     if let Some(issue) = arg_value(args, "issue") {
-        match issue {
-            "secus_si_else_if" => return Some("replace secus si with sin".to_owned()),
-            "requirit_iace" => return Some("write requirit cond iace err".to_owned()),
-            "requirit_else_rejected" => {
-                return Some("use 'iace' for the recoverable payload".to_owned());
-            }
-            "reice_iace" => return Some("write reice cond iace err".to_owned()),
-            "reice_else_rejected" => {
-                return Some("use 'iace' for the recoverable payload".to_owned());
-            }
-            "adfirma_else_rejected" => {
-                return Some("use 'mori' for the optional panic message".to_owned());
-            }
-            "adfirma_message_particle" => {
-                return Some("write adfirma cond mori message".to_owned());
-            }
-            "itera_mode" => {
-                return Some("choose one iteration mode before the iterable expression".to_owned());
-            }
-            "allocator_kind" => {
-                return Some("use \"arena\" or \"page\" as the allocator kind".to_owned());
-            }
-            "annotation_name" => return Some("add an annotation name after @".to_owned()),
-            "duplicate_rest_pattern" => {
-                let keyword = quote_arg(args, "keyword")?;
-                return Some(format!("keep only one {keyword} rest binding"));
-            }
-            "mutability_marker" => {
-                return Some("add fixum or varia before the binding name".to_owned());
-            }
-            "sit_identifier_binding" => {
-                let keyword = quote_arg(args, "keyword")?;
-                return Some(format!(
-                    "write {keyword} name ← expr or use fixum for typed/destructured bindings"
-                ));
-            }
-            "sit_no_destructuring" => {
-                return Some("use fixum with a destructuring pattern".to_owned());
-            }
-            "test_case_or_setup" => {
-                let proba = quote_arg(args, "proba")?;
-                let probandum = quote_arg(args, "probandum")?;
-                let setup = quote_arg(args, "setup")?;
-                return Some(format!(
-                    "start the body item with {proba}, {probandum}, or {setup}"
-                ));
-            }
-            "test_modifier_integer" => {
-                let modifier = quote_arg(args, "modifier")?;
-                return Some(format!("put an integer literal after {modifier}"));
-            }
-            "tensor_figura_after_element" => {
-                return Some("add a comma and Figura shape, such as tensor<T, []>".to_owned());
-            }
-            "sparsa_figura_after_element" => {
-                return Some("add a comma and Figura shape, such as sparsa<T, []>".to_owned());
-            }
-            "vector_width_after_element" => {
-                return Some("add a comma and vector width, such as vector<T, [4]>".to_owned());
-            }
-            "matrix_figura_after_element" => {
-                return Some("add a comma and shape, such as matrix<T, [4, 4]>".to_owned());
-            }
-            "atomic_single_element" => {
-                return Some("remove the extra type parameter; use atomic<T>".to_owned());
-            }
-            "retired_prefix_predicate" => {
-                let replacement = arg_value(args, "replacement")?;
-                return Some(format!("rewrite with {replacement}"));
-            }
-            "equality_non_missing_est" => {
-                return Some("write identity negation as non est".to_owned());
-            }
-            "membership_keyword_retired" => {
-                let glyph = quote_arg(args, "glyph")?;
-                return Some(format!(
-                    "write {glyph} (or ∉ to negate) between the element and the collection or range"
-                ));
-            }
-            "est_non_spelling" => return Some("use non est for identity negation".to_owned()),
-            "closure_body_start" => {
-                return Some("add : for an expression body or { ... } for a block body".to_owned());
-            }
-            "ad_ascii_route" => {
-                return Some("write the route as an ASCII literal after ad".to_owned());
-            }
-            "json_quoted_key" => return Some("quote JSON object keys".to_owned()),
-            "json_string_key" => {
-                return Some("start the JSON key with a string literal".to_owned());
-            }
-            "field_value_separator" => {
-                return Some("use = between field name and value".to_owned());
-            }
-            "call_type_args_start" => {
-                return Some("start call-site type arguments with <".to_owned());
-            }
-            "gradient_empty_selector_list" => {
-                return Some(
-                    "name the primal call arguments whose adjoints you want, e.g. loss(x, y) ∇ [x]"
-                        .to_owned(),
-                );
-            }
-            _ => {}
-        }
+        return expected_help_issue(issue, args);
     }
+    expected_help_fallback(args)
+}
 
+fn expected_help_issue(issue: &str, args: &[DiagnosticArg]) -> Option<String> {
+    match issue {
+        "secus_si_else_if" => return Some("replace secus si with sin".to_owned()),
+        "requirit_iace" => return Some("write requirit cond iace err".to_owned()),
+        "requirit_else_rejected" | "reice_else_rejected" => {
+            return Some("use 'iace' for the recoverable payload".to_owned());
+        }
+        "reice_iace" => return Some("write reice cond iace err".to_owned()),
+        "adfirma_else_rejected" => {
+            return Some("use 'mori' for the optional panic message".to_owned());
+        }
+        "adfirma_message_particle" => {
+            return Some("write adfirma cond mori message".to_owned());
+        }
+        "itera_mode" => {
+            return Some("choose one iteration mode before the iterable expression".to_owned());
+        }
+        "allocator_kind" => {
+            return Some("use \"arena\" or \"page\" as the allocator kind".to_owned());
+        }
+        "annotation_name" => return Some("add an annotation name after @".to_owned()),
+        other => expected_help_issue_late(other, args),
+    }
+}
+
+fn expected_help_issue_late(issue: &str, args: &[DiagnosticArg]) -> Option<String> {
+    match issue {
+        "duplicate_rest_pattern" => {
+            let keyword = quote_arg(args, "keyword")?;
+            return Some(format!("keep only one {keyword} rest binding"));
+        }
+        "mutability_marker" => {
+            return Some("add fixum or varia before the binding name".to_owned());
+        }
+        "sit_identifier_binding" => {
+            let keyword = quote_arg(args, "keyword")?;
+            return Some(format!(
+                "write {keyword} name ← expr or use fixum for typed/destructured bindings"
+            ));
+        }
+        "sit_no_destructuring" => {
+            return Some("use fixum with a destructuring pattern".to_owned());
+        }
+        "test_case_or_setup" => {
+            let proba = quote_arg(args, "proba")?;
+            let probandum = quote_arg(args, "probandum")?;
+            let setup = quote_arg(args, "setup")?;
+            return Some(format!(
+                "start the body item with {proba}, {probandum}, or {setup}"
+            ));
+        }
+        "test_modifier_integer" => {
+            let modifier = quote_arg(args, "modifier")?;
+            return Some(format!("put an integer literal after {modifier}"));
+        }
+        "tensor_figura_after_element" => {
+            return Some("add a comma and Figura shape, such as tensor<T, []>".to_owned());
+        }
+        "sparsa_figura_after_element" => {
+            return Some("add a comma and Figura shape, such as sparsa<T, []>".to_owned());
+        }
+        "vector_width_after_element" => {
+            return Some("add a comma and vector width, such as vector<T, [4]>".to_owned());
+        }
+        "matrix_figura_after_element" => {
+            return Some("add a comma and shape, such as matrix<T, [4, 4]>".to_owned());
+        }
+        "atomic_single_element" => {
+            return Some("remove the extra type parameter; use atomic<T>".to_owned());
+        }
+        "retired_prefix_predicate" => {
+            let replacement = arg_value(args, "replacement")?;
+            return Some(format!("rewrite with {replacement}"));
+        }
+        "equality_non_missing_est" => {
+            return Some("write identity negation as non est".to_owned());
+        }
+        "membership_keyword_retired" => {
+            let glyph = quote_arg(args, "glyph")?;
+            return Some(format!(
+                "write {glyph} (or ∉ to negate) between the element and the collection or range"
+            ));
+        }
+        "est_non_spelling" => return Some("use non est for identity negation".to_owned()),
+        "closure_body_start" => {
+            return Some("add : for an expression body or { ... } for a block body".to_owned());
+        }
+        "ad_ascii_route" => {
+            return Some("write the route as an ASCII literal after ad".to_owned());
+        }
+        "json_quoted_key" => return Some("quote JSON object keys".to_owned()),
+        "json_string_key" => {
+            return Some("start the JSON key with a string literal".to_owned());
+        }
+        "field_value_separator" => {
+            return Some("use = between field name and value".to_owned());
+        }
+        "call_type_args_start" => {
+            return Some("start call-site type arguments with <".to_owned());
+        }
+        "gradient_empty_selector_list" => {
+            return Some(
+                "name the primal call arguments whose adjoints you want, e.g. loss(x, y) ∇ [x]"
+                    .to_owned(),
+            );
+        }
+        _ => {}
+    }
+    expected_help_fallback(args)
+}
+
+fn expected_help_fallback(args: &[DiagnosticArg]) -> Option<String> {
     let expected = arg_value(args, "expected")?;
     Some(format!("provide {expected} in this grammar position"))
 }
