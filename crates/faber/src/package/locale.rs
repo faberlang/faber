@@ -14,6 +14,11 @@ pub const DEFAULT_CODE_LOCALE: &str = "en";
 
 /// Load a conversion target from the embedded pack set. Conversion targets
 /// are command-wide and must not vary with the first input package.
+///
+/// # Errors
+///
+/// Returns an error when no embedded pack exists for `locale`; the diagnostic
+/// names the embedded reader-locale ids.
 pub fn embedded_conversion_locale_pack(locale: &str) -> Result<LocalePack, Box<Diagnostic>> {
     load_embedded_locale_pack(locale).map_err(|err| Box::new(embedded_load_diagnostic(locale, err)))
 }
@@ -33,6 +38,10 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
 }
 
 /// Build the product-default code config for inputs without package context.
+///
+/// # Errors
+///
+/// Returns an error if the embedded product-default `en` pack cannot be loaded.
 pub fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnostic>> {
     let pack = load_embedded_locale_pack(DEFAULT_CODE_LOCALE)
         .map_err(|err| Box::new(embedded_load_diagnostic(DEFAULT_CODE_LOCALE, err)))?;
@@ -46,6 +55,11 @@ pub fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnost
 /// message templates only. When diagnostics locale is omitted, the code pack is
 /// reused for rendering. When no code locale is selected explicitly, the
 /// product default is the English `en` code pack.
+///
+/// # Errors
+///
+/// Returns an error when package discovery, reader-locale selection, or
+/// diagnostic-locale resolution fails.
 pub fn config_with_locale(
     target: Target,
     input: &Path,
@@ -91,6 +105,12 @@ pub(crate) fn resolve_diagnostics_locale_pack(
 }
 
 /// Load the reader pack selected by CLI locale or package manifest.
+///
+/// # Errors
+///
+/// Returns an error when package discovery or manifest loading fails, when the
+/// `--locale` value is empty, or when the selected pack is missing or its id
+/// does not match the selected locale.
 pub fn load_locale_pack_for_input(
     input: &Path,
     cli_locale: Option<&str>,
@@ -228,6 +248,12 @@ fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) 
 /// package-local pack, else the embedded pack); stdin uses the embedded pack
 /// directly, since there is no package context to consult. An omitted locale
 /// selects the product-default `en` pack.
+///
+/// # Errors
+///
+/// Returns an error when `--locale` is empty, when a file input fails package
+/// or locale-pack resolution (a missing package path is reported specifically),
+/// or when the embedded pack for the locale cannot be loaded for stdin.
 pub fn locale_pack_for_emit_with_diagnostic(
     input: &[String],
     cli_locale: Option<&str>,
@@ -261,6 +287,11 @@ pub fn locale_pack_for_emit_with_diagnostic(
 /// Compatibility wrapper for library callers that only need the normalized
 /// message. The CLI uses [`locale_pack_for_emit_with_diagnostic`] so it can
 /// preserve structured package-path failures.
+///
+/// # Errors
+///
+/// Returns the diagnostic message when [`locale_pack_for_emit_with_diagnostic`]
+/// fails.
 pub fn locale_pack_for_emit(
     input: &[String],
     cli_locale: Option<&str>,
