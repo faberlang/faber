@@ -193,7 +193,9 @@ fn degraded_seed() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_nanos());
     // Fold the 128-bit count into 64 bits: low half ⊕ high half.
-    let nanos_lo = nanos as u64;
+    let bytes = nanos.to_le_bytes();
+    let (halves, _) = bytes.as_chunks::<8>();
+    let nanos_lo = u64::from_le_bytes(halves[0]);
     let nanos_hi = (nanos >> 64) as u64;
     let local = 0_u64;
     let stack = std::ptr::addr_of!(local) as usize as u64;
