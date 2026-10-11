@@ -198,225 +198,7 @@ impl Parser {
 
         // Standalone `∪` is a union hole. A second cup is a parse error; the
         // hole consumes the whole type expression.
-        // Authored compression capture: sugar roots and bare width markers
-        // carry SHORT; every other spelling is LONG. Child levels come from
-        // each branch's own parse (width children are always bare widths).
-        let mut form = TypeFormLevel::LONG;
-        // Authored spelling of the head word, kept for the retired-wrapper
-        // diagnostic (canonicalization below rewrites it to its latin identity).
-        let mut authored_word = String::new();
-        let kind = if matches!(self.peek().kind, TokenKind::Underscore(_)) {
-            self.advance();
-            TypeExprKind::Infer
-        } else if self.check(&TokenKind::Cup) {
-            let cup_span = self.peek().span;
-            self.advance();
-            if self.check(&TokenKind::Cup) {
-                return Err(
-                    ParseError::structured(ParseErrorKind::TypeInvalid, cup_span)
-                        .with_arg("issue", "unexpected_cup_after_union_hole"),
-                );
-            }
-            TypeExprKind::UnionHole
-        } else {
-            let name = if self.check_keyword_ident(TokenKind::Nihil) {
-                // The null *type* is `nihil` (D23.2) and reaches the type
-                // grammar as an ordinary type word. The null *value* literal
-                // (`null` / `nulla`) is the only word claiming the `Nihil`
-                // identity, so seeing it where a type is required is an error
-                // (D23.1/D23.2).
-                let span = self.peek().span;
-                let source = self.current_ident_source();
-                self.advance();
-                let type_surface = self.null_type_surface();
-                return Err(ParseError::structured(ParseErrorKind::TypeInvalid, span)
-                    .with_arg("issue", "null_value_in_type_position")
-                    .with_arg("value", source)
-                    .with_arg("type", type_surface));
-            } else if self.check_keyword_ident(TokenKind::Modulus) {
-                let span = self.peek().span;
-                let source = self.current_ident_source();
-                self.advance();
-                if source == "modulus" {
-                    self.reject_latin_type_word("modulus", span);
-                }
-                self.keyword_ident("modulus", span)
-            } else if self.check_keyword_ident(TokenKind::Iuncta) {
-                let span = self.peek().span;
-                let source = self.current_ident_source();
-                self.advance();
-                if source == "iuncta" {
-                    self.reject_latin_type_word("iuncta", span);
-                }
-                self.keyword_ident("iuncta", span)
-            } else {
-                let ident = self.parse_ident()?;
-                authored_word = self.interner.resolve(ident.name).to_owned();
-                // Canonicalize a type spelling to its latin identity only for
-                // a single-part type. A qualified prefix is an import binding
-                // (namespace) and must keep its authored spelling — a binding
-                // may coincide with a localized type spelling (e.g. `object`).
-                if self.check(&TokenKind::Dot) {
-                    ident
-                } else {
-                    self.canonical_type_ident(ident)
-                }
-            };
-
-            let mut path = vec![name];
-            while self.eat(&TokenKind::Dot) {
-                path.push(self.parse_ident()?);
-            }
-
-            let Some(last) = path.last() else {
-                return Err(self.invalid_type_error("expected_type_name"));
-            };
-            let name = Ident {
-                name: last.name,
-                span: last.span,
-            };
-            let name_str = self.interner.resolve(name.name).to_owned();
-
-            if let Some(width) = radix_types::numeric_width::lista_sugar_width_marker(&name_str) {
-                form = TypeFormLevel::SHORT;
-                self.parse_lista_width_sugar(name, width)?
-            } else if let Some(width) =
-                radix_types::numeric_width::tensor_sugar_width_marker(&name_str)
-            {
-                form = TypeFormLevel::SHORT;
-                self.parse_tensor_width_sugar(name, width)?
-            } else if let Some(width) =
-                radix_types::numeric_width::vector_sugar_width_marker(&name_str)
-            {
-                form = TypeFormLevel::SHORT;
-                self.parse_vector_width_sugar(name, width)?
-            } else if let Some(width) =
-                radix_types::numeric_width::matrix_sugar_width_marker(&name_str)
-            {
-                form = TypeFormLevel::SHORT;
-                self.parse_matrix_width_sugar(name, width)?
-            } else if let Some(width) =
-                radix_types::numeric_width::sparsa_sugar_width_marker(&name_str)
-            {
-                form = TypeFormLevel::SHORT;
-                self.parse_sparsa_width_sugar(name, width)?
-            } else if path.len() == 1
-                && matches!(name_str.as_str(), "numerus" | "fractus")
-                && self.check(&TokenKind::LtAscii)
-            {
-                let (kind, level) = self.parse_retired_numeric_wrapper(name, &authored_word)?;
-                form = level;
-                kind
-            } else if self.eat(&TokenKind::LtAscii) {
-                if name_str == "atomic" {
-                    let elem = Box::new(self.parse_type()?);
-                    if self.eat(&TokenKind::Comma) {
-                        return Err(ParseError::structured(
-                            ParseErrorKind::Expected,
-                            self.current_span(),
-                        )
-                        .with_arg("issue", "atomic_single_element"));
-                    }
-                    self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
-                    TypeExprKind::Atomic(elem)
-                } else if name_str == "promissum" {
-                    let success = Box::new(self.parse_type()?);
-
-                    if self.eat(&TokenKind::ExitArrow) {
-                        let alternate = Box::new(self.parse_type()?);
-                        self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
-                        TypeExprKind::PromissumFailable(success, alternate)
-                    } else {
-                        if self.eat(&TokenKind::Comma) {
-                            return Err(ParseError::structured(
-                                ParseErrorKind::TypeInvalid,
-                                self.current_span(),
-                            )
-                            .with_arg("issue", "promissum_alternate_uses_exit_arrow"));
-                        }
-                        self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
-                        TypeExprKind::Named(name, vec![GenericArgExpr::Type(*success)])
-                    }
-                } else if name_str == "tensor"
-                    || name_str == "sparsa"
-                    || name_str == "vector"
-                    || name_str == "matrix"
-                {
-                    let elem = Box::new(self.parse_type()?);
-                    let issue = if name_str == "tensor" {
-                        "tensor_figura_after_element"
-                    } else if name_str == "sparsa" {
-                        "sparsa_figura_after_element"
-                    } else if name_str == "matrix" {
-                        "matrix_figura_after_element"
-                    } else {
-                        "vector_width_after_element"
-                    };
-                    if !self.eat(&TokenKind::Comma) {
-                        return Err(ParseError::structured(
-                            ParseErrorKind::Expected,
-                            self.current_span(),
-                        )
-                        .with_arg("issue", issue));
-                    }
-                    let shape = self.parse_figura()?;
-                    self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
-                    if name_str == "tensor" {
-                        TypeExprKind::Tensor(elem, shape)
-                    } else if name_str == "sparsa" {
-                        TypeExprKind::Sparsa(elem, shape)
-                    } else if name_str == "matrix" {
-                        TypeExprKind::Matrix(elem, shape)
-                    } else {
-                        TypeExprKind::Vector(elem, shape)
-                    }
-                } else {
-                    let mut params = Vec::new();
-                    let mut labels = HashSet::new();
-                    loop {
-                        let param = if name_str == "iuncta" {
-                            GenericArgExpr::Type(self.parse_iuncta_type_argument(&mut labels)?)
-                        } else if path.len() == 1 && name_str == "ratio" {
-                            GenericArgExpr::Type(self.parse_ratio_type_argument(&mut labels)?)
-                        } else if path.len() == 1 && is_bounded_capacity_head(&name_str) {
-                            // lista/textus/ascii/octeti spell their capacity in
-                            // the type surface itself, so their arguments keep
-                            // the explicit `Type` shape (NATURAL interns as a
-                            // named type) rather than the kinded split.
-                            self.parse_explicit_type_argument()?
-                        } else {
-                            self.parse_type_argument()?
-                        };
-                        params.push(param);
-                        if !self.consume_item_separator(&TokenKind::GtAscii, "type_parameters")? {
-                            break;
-                        }
-                    }
-                    self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
-                    if name_str == "iuncta" && params.len() > 16 {
-                        return Err(
-                            ParseError::structured(ParseErrorKind::TypeInvalid, name.span)
-                                .with_arg("issue", "iuncta_arity_exceeded")
-                                .with_arg("arity", params.len().to_string()),
-                        );
-                    }
-                    if path.len() == 1 {
-                        TypeExprKind::Named(name, params)
-                    } else {
-                        TypeExprKind::Qualified(path, params)
-                    }
-                }
-            } else {
-                if path.len() == 1 {
-                    if radix_types::numeric_width::is_standalone_width_name(&name_str) {
-                        form = TypeFormLevel::SHORT;
-                    }
-                    TypeExprKind::Named(name, Vec::new())
-                } else {
-                    TypeExprKind::Qualified(path, Vec::new())
-                }
-            }
-        };
+        let (kind, mut form) = self.parse_type_atom_kind()?;
 
         // `exactus<W>` (en `trapping<W>`) is the policy word spelled out; keep
         // that authored spelling apart from the bare marker for the formatter.
@@ -448,6 +230,258 @@ impl Parser {
             iuncta_label: None,
         };
         Ok(core)
+    }
+
+    /// Parse the kind of one tail-free, mode-stripped type core.
+    ///
+    /// Authored compression capture: sugar roots and bare width markers carry
+    /// SHORT; every other spelling is LONG. Child levels come from each branch's
+    /// own parse (width children are always bare widths). The head word's
+    /// authored spelling is kept for the retired-wrapper diagnostic.
+    fn parse_type_atom_kind(&mut self) -> Result<(TypeExprKind, TypeFormLevel), ParseError> {
+        let mut form = TypeFormLevel::LONG;
+        let kind = if matches!(self.peek().kind, TokenKind::Underscore(_)) {
+            self.advance();
+            TypeExprKind::Infer
+        } else if self.check(&TokenKind::Cup) {
+            let cup_span = self.peek().span;
+            self.advance();
+            if self.check(&TokenKind::Cup) {
+                return Err(
+                    ParseError::structured(ParseErrorKind::TypeInvalid, cup_span)
+                        .with_arg("issue", "unexpected_cup_after_union_hole"),
+                );
+            }
+            TypeExprKind::UnionHole
+        } else {
+            let (name, path, name_str, authored_word) = self.parse_type_head()?;
+            if let Some(width) = radix_types::numeric_width::lista_sugar_width_marker(&name_str) {
+                form = TypeFormLevel::SHORT;
+                self.parse_lista_width_sugar(name, width)?
+            } else if let Some(width) =
+                radix_types::numeric_width::tensor_sugar_width_marker(&name_str)
+            {
+                form = TypeFormLevel::SHORT;
+                self.parse_tensor_width_sugar(name, width)?
+            } else if let Some(width) =
+                radix_types::numeric_width::vector_sugar_width_marker(&name_str)
+            {
+                form = TypeFormLevel::SHORT;
+                self.parse_vector_width_sugar(name, width)?
+            } else if let Some(width) =
+                radix_types::numeric_width::matrix_sugar_width_marker(&name_str)
+            {
+                form = TypeFormLevel::SHORT;
+                self.parse_matrix_width_sugar(name, width)?
+            } else if let Some(width) =
+                radix_types::numeric_width::sparsa_sugar_width_marker(&name_str)
+            {
+                form = TypeFormLevel::SHORT;
+                self.parse_sparsa_width_sugar(name, width)?
+            } else if path.len() == 1
+                && matches!(name_str.as_str(), "numerus" | "fractus")
+                && self.check(&TokenKind::LtAscii)
+            {
+                let (kind, level) = self.parse_retired_numeric_wrapper(name, &authored_word)?;
+                form = level;
+                kind
+            } else if self.eat(&TokenKind::LtAscii) {
+                self.parse_angle_type_args(name, path, &name_str)?
+            } else if path.len() == 1 {
+                if radix_types::numeric_width::is_standalone_width_name(&name_str) {
+                    form = TypeFormLevel::SHORT;
+                }
+                TypeExprKind::Named(name, Vec::new())
+            } else {
+                TypeExprKind::Qualified(path, Vec::new())
+            }
+        };
+        Ok((kind, form))
+    }
+
+    /// Parse a type head word and its dotted path.
+    ///
+    /// Returns the final path segment as the head [`Ident`], the full path, the
+    /// head's resolved spelling, and the head's authored spelling (kept for the
+    /// retired-wrapper diagnostic; canonicalization rewrites it to its latin
+    /// identity).
+    fn parse_type_head(&mut self) -> Result<(Ident, Vec<Ident>, String, String), ParseError> {
+        let mut authored_word = String::new();
+        let name = if self.check_keyword_ident(TokenKind::Nihil) {
+            // The null *type* is `nihil` (D23.2) and reaches the type
+            // grammar as an ordinary type word. The null *value* literal
+            // (`null` / `nulla`) is the only word claiming the `Nihil`
+            // identity, so seeing it where a type is required is an error
+            // (D23.1/D23.2).
+            let span = self.peek().span;
+            let source = self.current_ident_source();
+            self.advance();
+            let type_surface = self.null_type_surface();
+            return Err(ParseError::structured(ParseErrorKind::TypeInvalid, span)
+                .with_arg("issue", "null_value_in_type_position")
+                .with_arg("value", source)
+                .with_arg("type", type_surface));
+        } else if self.check_keyword_ident(TokenKind::Modulus) {
+            let span = self.peek().span;
+            let source = self.current_ident_source();
+            self.advance();
+            if source == "modulus" {
+                self.reject_latin_type_word("modulus", span);
+            }
+            self.keyword_ident("modulus", span)
+        } else if self.check_keyword_ident(TokenKind::Iuncta) {
+            let span = self.peek().span;
+            let source = self.current_ident_source();
+            self.advance();
+            if source == "iuncta" {
+                self.reject_latin_type_word("iuncta", span);
+            }
+            self.keyword_ident("iuncta", span)
+        } else {
+            let ident = self.parse_ident()?;
+            authored_word = self.interner.resolve(ident.name).to_owned();
+            // Canonicalize a type spelling to its latin identity only for
+            // a single-part type. A qualified prefix is an import binding
+            // (namespace) and must keep its authored spelling — a binding
+            // may coincide with a localized type spelling (e.g. `object`).
+            if self.check(&TokenKind::Dot) {
+                ident
+            } else {
+                self.canonical_type_ident(ident)
+            }
+        };
+
+        let mut path = vec![name];
+        while self.eat(&TokenKind::Dot) {
+            path.push(self.parse_ident()?);
+        }
+
+        let Some(last) = path.last() else {
+            return Err(self.invalid_type_error("expected_type_name"));
+        };
+        let name = Ident {
+            name: last.name,
+            span: last.span,
+        };
+        let name_str = self.interner.resolve(name.name).to_owned();
+        Ok((name, path, name_str, authored_word))
+    }
+
+    /// Parse the angle-bracketed arguments of an already-consumed type head.
+    fn parse_angle_type_args(
+        &mut self,
+        name: Ident,
+        path: Vec<Ident>,
+        name_str: &str,
+    ) -> Result<TypeExprKind, ParseError> {
+        if name_str == "atomic" {
+            let elem = Box::new(self.parse_type()?);
+            if self.eat(&TokenKind::Comma) {
+                return Err(
+                    ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                        .with_arg("issue", "atomic_single_element"),
+                );
+            }
+            self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
+            Ok(TypeExprKind::Atomic(elem))
+        } else if name_str == "promissum" {
+            let success = Box::new(self.parse_type()?);
+            if self.eat(&TokenKind::ExitArrow) {
+                let alternate = Box::new(self.parse_type()?);
+                self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
+                Ok(TypeExprKind::PromissumFailable(success, alternate))
+            } else {
+                if self.eat(&TokenKind::Comma) {
+                    return Err(ParseError::structured(
+                        ParseErrorKind::TypeInvalid,
+                        self.current_span(),
+                    )
+                    .with_arg("issue", "promissum_alternate_uses_exit_arrow"));
+                }
+                self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
+                Ok(TypeExprKind::Named(
+                    name,
+                    vec![GenericArgExpr::Type(*success)],
+                ))
+            }
+        } else if name_str == "tensor"
+            || name_str == "sparsa"
+            || name_str == "vector"
+            || name_str == "matrix"
+        {
+            let elem = Box::new(self.parse_type()?);
+            let issue = if name_str == "tensor" {
+                "tensor_figura_after_element"
+            } else if name_str == "sparsa" {
+                "sparsa_figura_after_element"
+            } else if name_str == "matrix" {
+                "matrix_figura_after_element"
+            } else {
+                "vector_width_after_element"
+            };
+            if !self.eat(&TokenKind::Comma) {
+                return Err(
+                    ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                        .with_arg("issue", issue),
+                );
+            }
+            let shape = self.parse_figura()?;
+            self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
+            if name_str == "tensor" {
+                Ok(TypeExprKind::Tensor(elem, shape))
+            } else if name_str == "sparsa" {
+                Ok(TypeExprKind::Sparsa(elem, shape))
+            } else if name_str == "matrix" {
+                Ok(TypeExprKind::Matrix(elem, shape))
+            } else {
+                Ok(TypeExprKind::Vector(elem, shape))
+            }
+        } else {
+            self.parse_named_type_params(name, path, name_str)
+        }
+    }
+
+    /// Parse the generic argument list of a named or qualified type.
+    fn parse_named_type_params(
+        &mut self,
+        name: Ident,
+        path: Vec<Ident>,
+        name_str: &str,
+    ) -> Result<TypeExprKind, ParseError> {
+        let mut params = Vec::new();
+        let mut labels = HashSet::new();
+        loop {
+            let param = if name_str == "iuncta" {
+                GenericArgExpr::Type(self.parse_iuncta_type_argument(&mut labels)?)
+            } else if path.len() == 1 && name_str == "ratio" {
+                GenericArgExpr::Type(self.parse_ratio_type_argument(&mut labels)?)
+            } else if path.len() == 1 && is_bounded_capacity_head(name_str) {
+                // lista/textus/ascii/octeti spell their capacity in
+                // the type surface itself, so their arguments keep
+                // the explicit `Type` shape (NATURAL interns as a
+                // named type) rather than the kinded split.
+                self.parse_explicit_type_argument()?
+            } else {
+                self.parse_type_argument()?
+            };
+            params.push(param);
+            if !self.consume_item_separator(&TokenKind::GtAscii, "type_parameters")? {
+                break;
+            }
+        }
+        self.expect_issue(&TokenKind::GtAscii, "type_arguments_end")?;
+        if name_str == "iuncta" && params.len() > 16 {
+            return Err(
+                ParseError::structured(ParseErrorKind::TypeInvalid, name.span)
+                    .with_arg("issue", "iuncta_arity_exceeded")
+                    .with_arg("arity", params.len().to_string()),
+            );
+        }
+        if path.len() == 1 {
+            Ok(TypeExprKind::Named(name, params))
+        } else {
+            Ok(TypeExprKind::Qualified(path, params))
+        }
     }
 
     /// Consume a trailing intersection chain after a core type.
