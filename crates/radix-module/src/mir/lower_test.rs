@@ -4628,6 +4628,40 @@ incipit {
 }
 
 #[test]
+fn axis_reduction_on_a_rank_three_tensor_sums_and_means_each_axis() {
+    // v[i, j, k] = 1 + 12 i + 4 j + k over [2, 3, 4].
+    let source = r"functio over_first(tensor<f64, [2, 3, 4]> g) → tensor<f64, [3, 4]> { redde g.summa(axis 0) }
+functio over_second(tensor<f64, [2, 3, 4]> g) → tensor<f64, [2, 4]> { redde g.summa(axis 1) }
+functio over_third(tensor<f64, [2, 3, 4]> g) → tensor<f64, [2, 3]> { redde g.summa(axis 2) }
+functio mean_second(tensor<f64, [2, 3, 4]> g) → tensor<f64, [2, 4]> { redde g.media(axis 1) }
+incipit {
+  fixum lista<f64> data ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
+  fixum tensor<f64, [2, 3, 4]> g ← data ↦ tensor<f64, [2, 3, 4]>
+  nota over_first(g)
+  nota over_second(g)
+  nota over_third(g)
+  nota mean_second(g)
+}";
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "axis-reduction-rank-three.fab",
+        source,
+        &mut host,
+    )
+    .expect("rank-three axis reductions should execute");
+    assert_eq!(
+        host.stdout_lines,
+        [
+            "[14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0, 36.0]",
+            "[15.0, 18.0, 21.0, 24.0, 51.0, 54.0, 57.0, 60.0]",
+            "[10.0, 26.0, 42.0, 58.0, 74.0, 90.0]",
+            "[5.0, 6.0, 7.0, 8.0, 17.0, 18.0, 19.0, 20.0]",
+        ]
+    );
+}
+
+#[test]
 fn reducta_grouping_preserves_source_and_key_tensors() {
     let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
   redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }

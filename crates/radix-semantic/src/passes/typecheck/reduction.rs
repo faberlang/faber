@@ -23,8 +23,15 @@ const ISSUE_REDUCTA_BODY_CONTEXT: &str = "reducta_body_context";
 const ISSUE_REDUCTA_GROUP_KEYS_NOT_LITERAL: &str = "reducta_group_keys_not_literal";
 const ISSUE_REDUCTA_GROUP_RANK_MISMATCH: &str = "reducta_group_rank_mismatch";
 
-/// Coordinate names the axis expansion binds; interned before typecheck.
-pub(crate) const AXIS_REDUCTION_COORDINATES: [&str; 2] = ["__axis0", "__axis1"];
+/// Coordinate names the axis expansion binds; interned before typecheck. A
+/// rank-N source binds the first N names, so `MAX_AXIS_REDUCTION_RANK` is the
+/// length of this list.
+pub(crate) const AXIS_REDUCTION_COORDINATES: [&str; MAX_AXIS_REDUCTION_RANK] = [
+    "__axis0", "__axis1", "__axis2", "__axis3", "__axis4", "__axis5", "__axis6", "__axis7",
+];
+
+/// Highest source rank the axis sugar expands (need, P6).
+const MAX_AXIS_REDUCTION_RANK: usize = 8;
 
 const ISSUE_AXIS_REDUCTION_RANK_UNSUPPORTED: &str = "axis_reduction_rank_unsupported";
 const ISSUE_AXIS_REDUCTION_NOT_CONSTANT: &str = "axis_reduction_not_constant";
@@ -43,11 +50,12 @@ pub(super) enum AxisReduction {
 }
 
 impl TypeChecker<'_> {
-    /// Need: on a rank-2 tensor `t.sum(axis n)` is
-    /// `reduce via sum from t at [i, j] per k` with `k` the kept coordinate,
-    /// and `t.mean(axis n)` is that grouped sum divided by the extent of the
-    /// removed axis. The axis is a compile-time constant in `0..rank`; the
-    /// result is the receiver shape with that axis removed.
+    /// Needs: on a rank-N tensor (2 to 8) `t.sum(axis n)`
+    /// is `reduce via sum from t at [c0, .., cN-1] per [kept coordinates]`,
+    /// the coordinates other than `n` in order, and `t.mean(axis n)` is that
+    /// grouped sum divided by the extent of the removed axis. The axis is a
+    /// compile-time constant in `0..rank`; the result is the receiver shape
+    /// with that axis removed.
     pub(super) fn desugar_axis_reduction(&mut self, expr: &mut HirExpression) -> AxisReduction {
         let HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) =
             &mut expr.kind
@@ -98,7 +106,9 @@ impl TypeChecker<'_> {
         };
         let element = self.resolve_inferred_type(element);
         let dims = match self.types.get_index(shape) {
-            IndexExpr::Tuple(dims) if dims.len() == 2 => dims.clone(),
+            IndexExpr::Tuple(dims) if (2..=MAX_AXIS_REDUCTION_RANK).contains(&dims.len()) => {
+                dims.clone()
+            }
             _ => {
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,
@@ -117,7 +127,7 @@ impl TypeChecker<'_> {
             );
             return AxisReduction::Refused;
         };
-        if !(0..2).contains(&axis) {
+        if !(0..dims.len() as i128).contains(&axis) {
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,
                 ISSUE_AXIS_REDUCTION_OUT_OF_RANGE,
@@ -126,7 +136,7 @@ impl TypeChecker<'_> {
             return AxisReduction::Refused;
         }
         let axis = axis as usize;
-        let kept = 1 - axis;
+        let rank = dims.len();
         let mut divisor = None;
         if mean {
             if !self.is_fractus(element) {
@@ -149,12 +159,35 @@ impl TypeChecker<'_> {
                 }
             }
         }
-        let result = self.types.tensor_with_shape(element, dims[kept]);
-        let row = DefId(self.next_synthetic_def);
-        let column = DefId(self.next_synthetic_def + 1);
-        self.next_synthetic_def += 2;
-        let key = if kept == 0 { row } else { column };
-        let group = self.synthesized(HirExpressionKind::Path(key), span);
+        let kept: Vec<usize> = (0..rank).filter(|&index| index != axis).collect();
+        let result_shape = if let [only] = kept[..] {
+            dims[only]
+        } else {
+            let kept_dims = kept.iter().map(|&index| dims[index]).collect();
+            self.types.intern_index(IndexExpr::Tuple(kept_dims))
+        };
+        let result = self.types.tensor_with_shape(element, result_shape);
+        let coordinate_ids: Vec<DefId> = (0..rank)
+            .map(|offset| DefId(self.next_synthetic_def + offset as u32))
+            .collect();
+        self.next_synthetic_def += rank as u32;
+        let key_paths: Vec<HirExpression> = kept
+            .iter()
+            .map(|&index| self.synthesized(HirExpressionKind::Path(coordinate_ids[index]), span))
+            .collect();
+        let group = if key_paths.len() == 1 {
+            key_paths.into_iter().next().expect("one kept coordinate")
+        } else {
+            self.synthesized(
+                HirExpressionKind::Array(
+                    key_paths
+                        .into_iter()
+                        .map(radix_hir::HirArrayElement::Expr)
+                        .collect(),
+                ),
+                span,
+            )
+        };
         let kind = std::mem::replace(&mut expr.kind, HirExpressionKind::Vacua);
         let HirExpressionKind::MethodCall(receiver, ..) = kind else {
             return AxisReduction::NotApplicable;
@@ -162,7 +195,11 @@ impl TypeChecker<'_> {
         let reduction = HirExpressionKind::Reduction {
             op: HirReductionOp::Sum,
             source: receiver,
-            coordinates: vec![(row, coordinate_names[0]), (column, coordinate_names[1])],
+            coordinates: coordinate_ids
+                .iter()
+                .zip(&coordinate_names)
+                .map(|(id, name)| (*id, *name))
+                .collect(),
             group: Some(Box::new(group)),
             filum: None,
             binding: None,

@@ -310,10 +310,57 @@ functio bad(tensor<f32, [2, 3]> g, numerus a) → tensor<f32, [2]> { redde g.sum
 }
 
 #[test]
-fn axis_reduction_above_rank_two_is_a_named_refusal() {
+fn axis_reduction_drops_the_named_axis_from_a_rank_three_shape() {
+    assert_accepts(
+        r"
+functio first(tensor<f32, [2, 3, 4]> g) → tensor<f32, [3, 4]> { redde g.summa(axis 0) }
+functio second(tensor<f32, [2, 3, 4]> g) → tensor<f32, [2, 4]> { redde g.summa(axis 1) }
+functio third(tensor<f32, [2, 3, 4]> g) → tensor<f32, [2, 3]> { redde g.summa(axis 2) }
+functio mean(tensor<f32, [2, 3, 4]> g) → tensor<f32, [2, 4]> { redde g.media(axis 1) }
+",
+    );
+}
+
+#[test]
+fn axis_reduction_rank_three_result_shape_must_match_the_kept_axes() {
     assert_rejects_with_issue(
         r"
-functio bad(tensor<f32, [2, 3, 4]> g) → tensor<f32, [3, 4]> { redde g.summa(axis 0) }
+functio bad(tensor<f32, [2, 3, 4]> g) → tensor<f32, [2, 3]> { redde g.summa(axis 1) }
+",
+        "return_type_mismatch",
+    );
+}
+
+#[test]
+fn axis_reduction_rank_three_out_of_range_axis_is_named() {
+    assert_accepts(
+        r"
+functio last(tensor<f32, [2, 3, 4]> g) → tensor<f32, [2, 3]> { redde g.summa(axis 2) }
+",
+    );
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [2, 3, 4]> g) → tensor<f32, [2, 3]> { redde g.summa(axis 3) }
+",
+        "axis_reduction_out_of_range",
+    );
+}
+
+#[test]
+fn axis_reduction_above_rank_eight_is_a_named_refusal() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [1, 1, 1, 1, 1, 1, 1, 1, 2]> g) → tensor<f32, [1, 1, 1, 1, 1, 1, 1, 1]> { redde g.summa(axis 8) }
+",
+        "axis_reduction_rank_unsupported",
+    );
+}
+
+#[test]
+fn axis_reduction_on_a_rank_one_tensor_is_a_named_refusal() {
+    assert_rejects_with_issue(
+        r"
+functio bad(tensor<f32, [4]> g) → f32 { redde g.summa(axis 0) }
 ",
         "axis_reduction_rank_unsupported",
     );
