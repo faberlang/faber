@@ -11,8 +11,8 @@
 use crate::{AccessMarker, Type, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
-    DefId, HirArrayElement, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId,
-    HirItemKind, HirLocal, HirModule, HirStatement, HirStatementKind,
+    DefId, HirArrayElement, HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirFunction,
+    HirId, HirItemKind, HirLocal, HirModule, HirStatement, HirStatementKind,
 };
 use radix_lexer::Span;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -229,8 +229,9 @@ fn classify_initializer(expr: &HirExpression) -> AccessFact {
         {
             AccessFact::Fresh
         }
-        HirExpressionKind::Struct(_, _) | HirExpressionKind::Tuple(_, _) => AccessFact::Fresh,
-        HirExpressionKind::Verte {
+        HirExpressionKind::Struct(_, _)
+        | HirExpressionKind::Tuple(_, _)
+        | HirExpressionKind::Verte {
             entries: Some(_), ..
         } => AccessFact::Fresh,
         _ => AccessFact::Unknown,
@@ -698,49 +699,7 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
             } => self.visit_if(cond, then_block, then_catch.as_deref(), else_block.as_ref()),
             HirExpressionKind::Discerne {
                 scrutinees, arms, ..
-            } => {
-                for scrutinee in scrutinees {
-                    self.visit_expr(scrutinee);
-                }
-                let baseline = self.states.clone();
-                let bindings = self.bindings.clone();
-                let used = self.used.clone();
-                let mut branch_states = Vec::new();
-                let mut branch_used = Vec::new();
-                for arm in arms {
-                    self.states = baseline.clone();
-                    self.bindings = bindings.clone();
-                    self.used = used.clone();
-                    self.branch_depth += 1;
-                    self.visit_expr(&arm.body);
-                    self.branch_depth = self.branch_depth.saturating_sub(1);
-                    branch_states.push(self.states.clone());
-                    branch_used.push(self.used.clone());
-                }
-                if let Some(first) = branch_states.first() {
-                    let mut joined = baseline.clone();
-                    for (&def_id, &before) in &baseline {
-                        let mut state = first.get(&def_id).copied().unwrap_or(before);
-                        for states in branch_states.iter().skip(1) {
-                            let next = states.get(&def_id).copied().unwrap_or(before);
-                            state = match (state, next) {
-                                (Liveness::Dead, Liveness::Dead) => Liveness::Dead,
-                                (Liveness::Live, Liveness::Live) => Liveness::Live,
-                                _ => Liveness::MaybeDead,
-                            };
-                        }
-                        joined.insert(def_id, state);
-                    }
-                    self.states = joined;
-                } else {
-                    self.states = baseline;
-                }
-                self.bindings = bindings;
-                self.used = used;
-                for branch in branch_used {
-                    self.used.extend(branch);
-                }
-            }
+            } => self.visit_discerne(scrutinees, arms),
             HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
                 if matches!(expr.kind, HirExpressionKind::Loop(_)) {
                     self.with_unknown_branch(|this| this.visit_block(block), |_| {});
@@ -780,6 +739,52 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
                 self.used.extend(closure_used);
             }
             _ => walk_expr(self, expr),
+        }
+    }
+}
+
+impl DeadSourceAnalyzer<'_> {
+    fn visit_discerne(&mut self, scrutinees: &[HirExpression], arms: &[HirCasuArm]) {
+        for scrutinee in scrutinees {
+            self.visit_expr(scrutinee);
+        }
+        let baseline = self.states.clone();
+        let bindings = self.bindings.clone();
+        let used = self.used.clone();
+        let mut branch_states = Vec::new();
+        let mut branch_used = Vec::new();
+        for arm in arms {
+            self.states = baseline.clone();
+            self.bindings = bindings.clone();
+            self.used = used.clone();
+            self.branch_depth += 1;
+            self.visit_expr(&arm.body);
+            self.branch_depth = self.branch_depth.saturating_sub(1);
+            branch_states.push(self.states.clone());
+            branch_used.push(self.used.clone());
+        }
+        if let Some(first) = branch_states.first() {
+            let mut joined = baseline.clone();
+            for (&def_id, &before) in &baseline {
+                let mut state = first.get(&def_id).copied().unwrap_or(before);
+                for states in branch_states.iter().skip(1) {
+                    let next = states.get(&def_id).copied().unwrap_or(before);
+                    state = match (state, next) {
+                        (Liveness::Dead, Liveness::Dead) => Liveness::Dead,
+                        (Liveness::Live, Liveness::Live) => Liveness::Live,
+                        _ => Liveness::MaybeDead,
+                    };
+                }
+                joined.insert(def_id, state);
+            }
+            self.states = joined;
+        } else {
+            self.states = baseline;
+        }
+        self.bindings = bindings;
+        self.used = used;
+        for branch in branch_used {
+            self.used.extend(branch);
         }
     }
 }

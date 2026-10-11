@@ -80,15 +80,15 @@ use crate::{
 };
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
-    HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd, HirOwnerRef,
-    HirParamMode, HirPresentation, HirRegion, HirSourceAnchorId, HirStatement, HirStatementKind,
-    HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner,
-    HirTriviaOwnerKind, HirTypeFormArg, HirVariantPath,
+    HirAnnotation, HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd,
+    HirOwnerRef, HirParamMode, HirPresentation, HirRegion, HirSourceAnchorId, HirStatement,
+    HirStatementKind, HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment,
+    HirTriviaOwner, HirTriviaOwnerKind, HirTypeFormArg, HirVariantPath,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
-    BlockStmt, GenericParamKind, PraeparaBlock, PraeparaKind, ProbaCase, ProbaModifier,
-    ProbandumDecl, Program, Stmt, StmtKind, Trivia, TypeMode,
+    BlockStmt, GenericParamKind, IncipitStmt, PraeparaBlock, PraeparaKind, ProbaCase,
+    ProbaModifier, ProbandumDecl, Program, Stmt, StmtKind, Trivia, TypeMode,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -421,56 +421,11 @@ impl<'a> Lowerer<'a> {
             self.current_span = stmt.span;
 
             if let StmtKind::Incipit(entry_stmt) = &stmt.kind {
-                // Explicit entry (`incipit`) leading trivia renders at the
-                // entry-start owner; the entry block itself has no semantic
-                // node id, so the owner carries no back-reference.
-                let entry_trivia = self.hir_trivia(&stmt.leading_trivia);
-                if let Some(anchor) =
-                    self.register_attachment(HirTriviaOwnerKind::Entry, None, entry_trivia)
-                {
-                    self.presentation.entry_start_anchor = Some(anchor);
-                }
-                self.presentation.entry_explicit = true;
-                entry_annotations = self.lower_annotations(&stmt.annotations);
-                entry_args_name = entry_stmt.args.as_ref().map(|ident| ident.name);
-                entry_is_async = entry_stmt.is_async;
-                // `incipit` introduces an entry-local scope and may synthesize
-                // a CLI args local before the user-authored body statements.
-                self.push_scope();
-                let mut args_binding = None;
-                if let Some(args) = &entry_stmt.args {
-                    let def_id = self.next_def_id();
-                    self.bind_local(args.name, def_id);
-                    args_binding = Some((args.name, args.span, def_id));
-                }
-                let mut block = self.lower_ergo_body(&entry_stmt.body);
-                if let Some((name, span, def_id)) = args_binding {
-                    block.statements.insert(
-                        0,
-                        HirStatement {
-                            id: self.next_hir_id(),
-                            kind: HirStatementKind::Local(radix_hir::HirLocal {
-                                def_id,
-                                name,
-                                ty: Some(self.incipit_args_type()),
-                                init: None,
-                                mutable: false,
-                                is_await: false,
-                                runtime_provided: true,
-                                await_store: None,
-                                size_decl: false,
-                                size_static: false,
-                            }),
-                            span,
-                        },
-                    );
-                }
-                // Preserve exitus as the tail expression of the entry block.
-                if let Some(exitus) = &entry_stmt.exitus {
-                    let exitus_expr = self.lower_expr(exitus);
-                    block.expr = Some(Box::new(exitus_expr));
-                }
-                self.pop_scope();
+                let (block, annotations, args_name, is_async) =
+                    self.lower_incipit_entry(stmt, entry_stmt);
+                entry_annotations = annotations;
+                entry_args_name = args_name;
+                entry_is_async = is_async;
                 entry = Some(block);
             } else {
                 let lowered_items = self.lower_stmt_items(stmt);
@@ -531,20 +486,7 @@ impl<'a> Lowerer<'a> {
             entry = Some(HirBlock::simple(implicit_entry_stmts, None, span));
         }
 
-        // Program-end boundary: trivia before EOF (including a comment-only
-        // file) attaches to the single program-end owner.
-        let program_end_id = self.next_anchor();
-        self.presentation.program_end = HirModuleEnd {
-            id: program_end_id.clone(),
-            span: program.span,
-        };
-        let end_trivia = self.hir_trivia(&program.end_trivia);
-        self.register_attachment_at(
-            program_end_id,
-            HirTriviaOwnerKind::ProgramEnd,
-            None,
-            end_trivia,
-        );
+        self.attach_program_end(program);
 
         crate::builtins::inject_hir_items(
             &mut items,
@@ -562,6 +504,83 @@ impl<'a> Lowerer<'a> {
             entry_args_name,
             entry_is_async,
         }
+    }
+
+    /// Lower one explicit `incipit` entry into its block and entry metadata.
+    ///
+    /// Explicit entry (`incipit`) leading trivia renders at the entry-start
+    /// owner; the entry block itself has no semantic node id, so the owner
+    /// carries no back-reference.
+    fn lower_incipit_entry(
+        &mut self,
+        stmt: &Stmt,
+        entry_stmt: &IncipitStmt,
+    ) -> (HirBlock, Vec<HirAnnotation>, Option<Symbol>, bool) {
+        let entry_trivia = self.hir_trivia(&stmt.leading_trivia);
+        if let Some(anchor) =
+            self.register_attachment(HirTriviaOwnerKind::Entry, None, entry_trivia)
+        {
+            self.presentation.entry_start_anchor = Some(anchor);
+        }
+        self.presentation.entry_explicit = true;
+        let entry_annotations = self.lower_annotations(&stmt.annotations);
+        let entry_args_name = entry_stmt.args.as_ref().map(|ident| ident.name);
+        let entry_is_async = entry_stmt.is_async;
+        // `incipit` introduces an entry-local scope and may synthesize a CLI
+        // args local before the user-authored body statements.
+        self.push_scope();
+        let mut args_binding = None;
+        if let Some(args) = &entry_stmt.args {
+            let def_id = self.next_def_id();
+            self.bind_local(args.name, def_id);
+            args_binding = Some((args.name, args.span, def_id));
+        }
+        let mut block = self.lower_ergo_body(&entry_stmt.body);
+        if let Some((name, span, def_id)) = args_binding {
+            block.statements.insert(
+                0,
+                HirStatement {
+                    id: self.next_hir_id(),
+                    kind: HirStatementKind::Local(radix_hir::HirLocal {
+                        def_id,
+                        name,
+                        ty: Some(self.incipit_args_type()),
+                        init: None,
+                        mutable: false,
+                        is_await: false,
+                        runtime_provided: true,
+                        await_store: None,
+                        size_decl: false,
+                        size_static: false,
+                    }),
+                    span,
+                },
+            );
+        }
+        // Preserve exitus as the tail expression of the entry block.
+        if let Some(exitus) = &entry_stmt.exitus {
+            let exitus_expr = self.lower_expr(exitus);
+            block.expr = Some(Box::new(exitus_expr));
+        }
+        self.pop_scope();
+        (block, entry_annotations, entry_args_name, entry_is_async)
+    }
+
+    /// Attach the program-end trivia owner (trivia before EOF, including a
+    /// comment-only file) and record it in the presentation.
+    fn attach_program_end(&mut self, program: &Program) {
+        let program_end_id = self.next_anchor();
+        self.presentation.program_end = HirModuleEnd {
+            id: program_end_id.clone(),
+            span: program.span,
+        };
+        let end_trivia = self.hir_trivia(&program.end_trivia);
+        self.register_attachment_at(
+            program_end_id,
+            HirTriviaOwnerKind::ProgramEnd,
+            None,
+            end_trivia,
+        );
     }
 
     /// Drain diagnostics accumulated during the lowering run.
@@ -1227,8 +1246,8 @@ fn prune_mixed_local_variant_paths(
 
         fn visit_pattern(&mut self, pattern: &HirPattern) {
             match pattern {
-                HirPattern::Variant(def_id, _) => self.count(*def_id),
-                HirPattern::TypeTest {
+                HirPattern::Variant(def_id, _)
+                | HirPattern::TypeTest {
                     candidate: Some(def_id),
                     ..
                 } => self.count(*def_id),

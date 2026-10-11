@@ -1140,16 +1140,17 @@ fn register_locale_pack_type_spellings(
                 // Collections and the tensor family are parameterized shapes
                 // (no bare `TypeId`); their spellings register as name-only
                 // aliases and lower through dedicated type syntax.
-                TypeBindingKind::Collection(_) => None,
-                TypeBindingKind::TensorFamily(_) => None,
-                TypeBindingKind::ModularWord
-                | TypeBindingKind::SaturatingWord
-                | TypeBindingKind::TrappingWord
-                | TypeBindingKind::ByteWord => None,
                 // Census relational names are reader-surface rows only in S2;
                 // no bare `TypeId` until the S3/S4 type surface lands.
-                TypeBindingKind::Relational(_) => None,
-                TypeBindingKind::Ratio | TypeBindingKind::Frame(_) => None,
+                TypeBindingKind::Collection(_)
+                | TypeBindingKind::TensorFamily(_)
+                | TypeBindingKind::ModularWord
+                | TypeBindingKind::SaturatingWord
+                | TypeBindingKind::TrappingWord
+                | TypeBindingKind::ByteWord
+                | TypeBindingKind::Relational(_)
+                | TypeBindingKind::Ratio
+                | TypeBindingKind::Frame(_) => None,
             };
             let symbol = scope::Symbol {
                 def_id: resolver.fresh_builtin_def_id(),
@@ -1160,7 +1161,7 @@ fn register_locale_pack_type_spellings(
                 span: radix_lexer::Span::default(),
             };
             if let Ok(def_id) = resolver.define(symbol) {
-                resolver.record_locale_pack_type_alias(def_id, name)
+                resolver.record_locale_pack_type_alias(def_id, name);
             }
         }
     }

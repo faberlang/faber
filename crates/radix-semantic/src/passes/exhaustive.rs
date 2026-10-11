@@ -234,55 +234,8 @@ fn check_match(
     names: Option<&CoverageNames<'_>>,
     errors: &mut Vec<SemanticError>,
 ) {
-    // `omnia` enforcement: the keyword is only valid over a single enum
-    // scrutinee where every variant can be named explicitly. For any other
-    // shape (multi-scrutinee, non-enum, untyped) the contract is ill-defined —
-    // there is no finite variant set to enumerate (e.g. matching every
-    // character of a `textus` is meaningless). These are hard errors, not
-    // warnings, because `omnia` is an explicit author promise.
-    if exhaustive {
-        if scrutinees.len() != 1 {
-            errors.push(
-                SemanticError::structured(SemanticErrorKind::OmniaRequiresEnum, scrutinees[0].span)
-                    .with_arg("issue", "single_enum_scrutinee")
-                    .with_arg("keyword", "omnia"),
-            );
-            return;
-        }
-        if scrutinees[0]
-            .ty
-            .and_then(|ty| enum_def_from_type(ty, types))
-            .is_none()
-        {
-            // If the scrutinee is untyped, upstream typecheck owns the
-            // diagnostic; otherwise the type exists but is not an enum.
-            if scrutinees[0].ty.is_some() {
-                errors.push(
-                    SemanticError::structured(
-                        SemanticErrorKind::OmniaRequiresEnum,
-                        scrutinees[0].span,
-                    )
-                    .with_arg("issue", "enum_scrutinee")
-                    .with_arg("keyword", "omnia"),
-                );
-            }
-            return;
-        }
-        // Every arm must name explicit variants only — no `casu _`, no bare
-        // binding, no `ceterum` (which lowers to a wildcard arm), and no mixed
-        // arm like `casu A, _` whose wildcard silently absorbs the remaining
-        // variants. `any` (not `all`) catches a catchall hiding alongside named
-        // variants in the same arm; `all` would let `casu A, _` slip through and
-        // defeat the omnia invariant.
-        for arm in arms {
-            if !arm.patterns.is_empty() && arm.patterns.iter().any(is_catchall_pattern) {
-                errors.push(
-                    SemanticError::structured(SemanticErrorKind::OmniaForbidsCatchall, arm.span)
-                        .with_arg("issue", "catchall_arm")
-                        .with_arg("keyword", "omnia"),
-                );
-            }
-        }
+    if exhaustive && check_omnia_contract(scrutinees, arms, types, errors) {
+        return;
     }
 
     if scrutinees.len() != 1 {
@@ -374,6 +327,62 @@ fn check_match(
             .with_arg("casu", "casu"),
         );
     }
+}
+
+// `omnia` enforcement: the keyword is only valid over a single enum
+// scrutinee where every variant can be named explicitly. For any other
+// shape (multi-scrutinee, non-enum, untyped) the contract is ill-defined —
+// there is no finite variant set to enumerate (e.g. matching every
+// character of a `textus` is meaningless). These are hard errors, not
+// warnings, because `omnia` is an explicit author promise.
+//
+// Returns `true` when the match was rejected and the caller must stop.
+fn check_omnia_contract(
+    scrutinees: &[HirExpression],
+    arms: &[HirCasuArm],
+    types: &TypeTable,
+    errors: &mut Vec<SemanticError>,
+) -> bool {
+    if scrutinees.len() != 1 {
+        errors.push(
+            SemanticError::structured(SemanticErrorKind::OmniaRequiresEnum, scrutinees[0].span)
+                .with_arg("issue", "single_enum_scrutinee")
+                .with_arg("keyword", "omnia"),
+        );
+        return true;
+    }
+    if scrutinees[0]
+        .ty
+        .and_then(|ty| enum_def_from_type(ty, types))
+        .is_none()
+    {
+        // If the scrutinee is untyped, upstream typecheck owns the
+        // diagnostic; otherwise the type exists but is not an enum.
+        if scrutinees[0].ty.is_some() {
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::OmniaRequiresEnum, scrutinees[0].span)
+                    .with_arg("issue", "enum_scrutinee")
+                    .with_arg("keyword", "omnia"),
+            );
+        }
+        return true;
+    }
+    // Every arm must name explicit variants only — no `casu _`, no bare
+    // binding, no `ceterum` (which lowers to a wildcard arm), and no mixed
+    // arm like `casu A, _` whose wildcard silently absorbs the remaining
+    // variants. `any` (not `all`) catches a catchall hiding alongside named
+    // variants in the same arm; `all` would let `casu A, _` slip through and
+    // defeat the omnia invariant.
+    for arm in arms {
+        if !arm.patterns.is_empty() && arm.patterns.iter().any(is_catchall_pattern) {
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::OmniaForbidsCatchall, arm.span)
+                    .with_arg("issue", "catchall_arm")
+                    .with_arg("keyword", "omnia"),
+            );
+        }
+    }
+    false
 }
 
 pub(crate) fn union_members_from_type(ty: TypeId, types: &TypeTable) -> Option<Vec<TypeId>> {
@@ -549,8 +558,8 @@ fn render_ctor(ctor: Option<Ctor>, types: &TypeTable, names: Option<&CoverageNam
 #[must_use]
 pub fn pattern_variant_id(pattern: &HirPattern) -> Option<DefId> {
     match pattern {
-        HirPattern::Variant(def_id, _) => Some(*def_id),
-        HirPattern::TypeTest {
+        HirPattern::Variant(def_id, _)
+        | HirPattern::TypeTest {
             candidate: Some(def_id),
             ..
         } => Some(*def_id),
