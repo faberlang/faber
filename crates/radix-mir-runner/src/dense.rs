@@ -168,7 +168,7 @@ fn reads_back_exactly(kind: DenseKind, value: &Value) -> bool {
     match (kind, value) {
         (DenseKind::F32, Value::Float(v)) => {
             let rounded = f64::from(*v as f32);
-            *v == rounded || (v.is_nan() && rounded.is_nan())
+            v.to_bits() == rounded.to_bits() || (v.is_nan() && rounded.is_nan())
         }
         (DenseKind::F64, Value::Float(_)) | (DenseKind::I64, Value::Int(_)) => true,
         (DenseKind::I32, Value::Int(v)) => i32::try_from(*v).is_ok(),
