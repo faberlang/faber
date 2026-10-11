@@ -830,15 +830,15 @@ fn normalize_type_form(form: &mut radix_hir::HirTypeForm, expected: TypeId, type
         | Type::Intervallum(inner)
         | Type::BoundedArray { element: inner, .. }
         | Type::BoundedQueue { element: inner, .. }
-        | Type::BoundedStack { element: inner, .. } => {
+        | Type::BoundedStack { element: inner, .. }
+        | Type::Vector(inner, _)
+        | Type::Matrix(inner, _)
+        | Type::Sparsa(inner, _) => {
             normalize_first_type_arg(form, *inner, types);
         }
         Type::Tensor(inner, shape) => {
             normalize_first_type_arg(form, *inner, types);
             normalize_size_arg(form, *shape);
-        }
-        Type::Vector(inner, _) | Type::Matrix(inner, _) | Type::Sparsa(inner, _) => {
-            normalize_first_type_arg(form, *inner, types);
         }
         Type::Map(key, value) | Type::PromissumFailable(key, value) | Type::AsyncCursor(key, value) => {
             normalize_type_args(form, &[*key, *value], types);
