@@ -362,7 +362,8 @@ proba "ok" {
     )
     .expect("analyze");
     let cases = inventory_cases(&analysis.hir, &analysis.interner);
-    let lowered = super::lower_analyzed_unit(&mut analysis, Default::default()).expect("lower");
+    let lowered =
+        super::lower_analyzed_unit(analysis.application_view(), Default::default()).expect("lower");
     let mut ghost = cases[0].clone();
     ghost.def_id = super::DefId(u32::MAX);
     ghost.name = "ghost".to_owned();

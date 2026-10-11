@@ -21,7 +21,8 @@ fn session() -> Session {
 fn initializer_shape(source: &str, function_name: &str, names: &[&str]) -> Vec<String> {
     let unit = analyze_source(&session(), "itera-destructure.fab", source, AnalyzeRequest::default())
         .expect("fixture analyzes");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("fixture lowers to MIR");
+    let lowered =
+        lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("fixture lowers to MIR");
     let function = lowered
         .validated
         .program()
@@ -110,7 +111,8 @@ fn place_shape(place: &MirPlace, interner: &crate::lexer::Interner) -> String {
 fn assert_lowered_and_valid(source: &str) {
     let unit = analyze_source(&session(), "itera-destructure.fab", source, AnalyzeRequest::default())
         .expect("fixture analyzes");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("fixture lowers to MIR");
+    let lowered =
+        lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("fixture lowers to MIR");
     validate_program(lowered.validated.program(), lowered.validated.validation()).expect("fixture MIR validates");
 }
 

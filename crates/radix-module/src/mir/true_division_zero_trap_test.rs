@@ -10,7 +10,8 @@ fn dump(body: &str) -> String {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let unit = analyze_source(&session, "true-div.fab", &source, AnalyzeRequest::default())
         .unwrap_or_else(|diagnostics| panic!("analysis succeeds: {diagnostics:?}"));
-    crate::mir::dump_analyzed_unit(&unit).unwrap_or_else(|errors| panic!("MIR lowering succeeds: {errors:?}"))
+    crate::mir::dump_analyzed_unit(unit.application_view())
+        .unwrap_or_else(|errors| panic!("MIR lowering succeeds: {errors:?}"))
 }
 
 fn has_trap_probe(dump: &str) -> bool {

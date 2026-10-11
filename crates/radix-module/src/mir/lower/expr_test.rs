@@ -106,7 +106,7 @@ fn static_field_read_through_an_imported_genus_inlines_the_interface_initializer
         },
     )
     .expect("imported static read analyzes");
-    let dump = crate::mir::dump_analyzed_unit(&unit).expect("imported static read lowers");
+    let dump = crate::mir::dump_analyzed_unit(unit.application_view()).expect("imported static read lowers");
     assert!(dump.contains("4242"), "expected the inlined initializer, got:\n{dump}");
 }
 
@@ -146,7 +146,8 @@ fn imported_module_constant_read_and_index_lower_to_the_interface_value() {
         AnalyzeRequest { cli_program: None, contract },
     )
     .expect("imported constant index analyzes");
-    let dump = crate::mir::dump_analyzed_unit(&unit).expect("imported constant index lowers in single-file MIR");
+    let dump = crate::mir::dump_analyzed_unit(unit.application_view())
+        .expect("imported constant index lowers in single-file MIR");
     assert!(dump.contains("5"), "expected the inlined constant, got:\n{dump}");
 }
 
@@ -190,7 +191,8 @@ fn imported_list_constant_index_lowers_to_the_interface_list() {
         AnalyzeRequest { cli_program: None, contract },
     )
     .expect("imported list constant index analyzes");
-    let dump = crate::mir::dump_analyzed_unit(&unit).expect("imported list constant index lowers in single-file MIR");
+    let dump = crate::mir::dump_analyzed_unit(unit.application_view())
+        .expect("imported list constant index lowers in single-file MIR");
     for value in ["1111", "2222", "3333"] {
         assert!(dump.contains(value), "expected the inlined list element {value}, got:\n{dump}");
     }

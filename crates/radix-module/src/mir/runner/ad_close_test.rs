@@ -19,7 +19,7 @@ fn run(name: &str, source: &str) -> (Vec<String>, ConversationLedger) {
     let session = Session::new(Config::default().with_target(Target::HirRust));
     let analysis = analyze_prepared_program_name(&session, name, source)
         .unwrap_or_else(|errors| panic!("{name} should analyze: {errors:?}"));
-    let lowered = lower_analyzed_unit(&analysis, crate::mir::MirLoweringOptions::default())
+    let lowered = lower_analyzed_unit(analysis.application_view(), crate::mir::MirLoweringOptions::default())
         .unwrap_or_else(|errors| panic!("{name} should lower: {errors:?}"));
     let mut host = BufferHost::default();
     let outcome = radix_mir_runner::run_entry_with_stats(&lowered.validated, &mut host)

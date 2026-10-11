@@ -18,7 +18,7 @@ main {
 }
 ";
     let unit = analyze_source(&session, "tokens.fab", source, AnalyzeRequest::default()).expect("analyzes");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("lowers");
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("lowers");
     let validation = lowered.validated.validation();
     assert_eq!(
         validation.display_tokens.tokens,
@@ -61,7 +61,7 @@ main {
 }
 ";
     let unit = analyze_source(&session, "tokens.fab", source, AnalyzeRequest::default()).expect("analyzes");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("lowers");
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("lowers");
     let validation = lowered.validated.validation();
     let program = lowered.validated.program();
     let names = radix_mir::MirNames::new(

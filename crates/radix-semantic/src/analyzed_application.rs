@@ -10,7 +10,62 @@ use crate::qualified_identity::{QualifiedIdentityTable, build_qualified_identiti
 use crate::resolved_use::{ResolvedUseIndex, analyze_resolved_uses};
 use crate::{AnnotationContractMetadata, RadixLaneMetadata, Resolver, SemanticError, TypeTable};
 use radix_hir::{HirModule, LibraryRegistry};
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Package-local import identity facts for user-code cross-module calls.
+///
+/// Supplied by package-aware callers (the CLI compile path, package harnesses)
+/// so MIR lowering can resolve user-code provider imports to their canonical
+/// `(product, module_path, item)` identities (campaign D-PA1). `None` keeps
+/// the legacy provider routing: raw import spelling + interner indices, which
+/// are meaningless across the module boundary.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PackageImportIdentities {
+    /// Package identity: manifest `package.name`, or package-root-derived
+    /// fallback (the package root directory name).
+    pub product: String,
+    /// This file's canonical module segments (frontmatter `group`, else
+    /// source-root-relative path with `.fab`/`main.fab`/`mod.fab`
+    /// normalization) — mirror of `module_segments_for_file`.
+    pub module_segments: Vec<String>,
+    /// Resolved target module segments per import binding (`binding →
+    /// target file's canonical module segments`) for local sibling imports —
+    /// mirror of `resolve_import` + `module_segments_for_file`.
+    pub imports: BTreeMap<String, Vec<String>>,
+    /// Body-bearing file interface per import binding, for imports whose
+    /// target exports at least one device function (DFV2-3). Recorded by the
+    /// same package-identity pass that fills `imports` and read by the MIR
+    /// provider-route seam. Per-unit by construction: the map rides this
+    /// value through `ModuleCompileRequest` into its analyzed application and
+    /// dies with it, so an interface resolved for one unit can never serve
+    /// another package's or module's unit (S01-7).
+    pub device_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
+}
+
+/// Borrowed view of the HIR v1 analyzed-application contract consumed by MIR lowering.
+#[derive(Clone, Copy)]
+pub struct AnalyzedModuleApplicationView<'a> {
+    pub stamp: AnalysisStamp,
+    pub hir: &'a HirModule,
+    pub types: &'a TypeTable,
+    pub shape_obligations: &'a crate::shape_obligations::ShapeObligationTable,
+    pub kernel_requirements: &'a crate::passes::kernel_requirements::KernelRequirementsReport,
+    pub tensor_edge_policies: &'a radix_hir::TensorEdgePolicyTable,
+    pub resolver: &'a Resolver,
+    pub annotation_contracts: &'a AnnotationContractMetadata,
+    pub libraries: &'a LibraryRegistry,
+    pub function_facts: &'a FunctionFactTable,
+    pub resolved_uses: &'a ResolvedUseIndex,
+    pub qualified_identities: &'a QualifiedIdentityTable,
+    pub package_import_identities: Option<&'a PackageImportIdentities>,
+    pub provenance: &'a crate::capability::FunctionProvenanceTable,
+    pub radix_lanes: &'a RadixLaneMetadata,
+    pub gpu_builtins: &'a [(radix_hir::DefId, radix_types::MirKernelBuiltin)],
+    pub cli_program: Option<&'a crate::cli::CliProgram>,
+    pub display_tokens: &'a radix_runtime_contract::display_tokens::DisplayTokens,
+    pub interner: &'a radix_lexer::Interner,
+}
 
 /// Monotonic stamp proving fields of an [`AnalyzedApplication`] share one run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

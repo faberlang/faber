@@ -21,6 +21,7 @@ fn stub_function(id: u32) -> MirFunction {
 // ── Phase-4 producer fact: instance shape-size substitution ──────────────
 
 use crate::codegen::Target;
+use crate::driver::AnalyzedModule;
 use crate::driver::{AnalyzeRequest, Config, Session};
 use crate::semantic::IndexId;
 
@@ -492,5 +493,5 @@ main args args {
 }
 "#,
     );
-    crate::mir::dump_analyzed_unit(&unit).expect("the return-form generic-size call lowers");
+    crate::mir::dump_analyzed_unit(unit.application_view()).expect("the return-form generic-size call lowers");
 }

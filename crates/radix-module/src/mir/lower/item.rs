@@ -53,7 +53,7 @@ impl HirVisitor for ItemLoweringPass<'_, '_, '_> {
     fn visit_item(&mut self, item: &HirItem) {
         // A declaration-only `@ nondum` function has no body to lower; every
         // use was refused by semantic analysis.
-        if item.is_unavailable_declaration(&self.lowerer.unit.interner) {
+        if item.is_unavailable_declaration(self.lowerer.unit.interner) {
             return;
         }
         match &item.kind {
@@ -73,7 +73,7 @@ impl HirVisitor for ItemLoweringPass<'_, '_, '_> {
             HirItemKind::Struct(strukt) => {
                 for method in &strukt.methods {
                     // A declaration-only `@ nondum` method has no body to lower.
-                    if method.is_unavailable_declaration(&self.lowerer.unit.interner) {
+                    if method.is_unavailable_declaration(self.lowerer.unit.interner) {
                         continue;
                     }
                     self.lowerer

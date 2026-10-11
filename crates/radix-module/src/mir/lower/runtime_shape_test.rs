@@ -98,7 +98,8 @@ fn caller_size_witness_keeps_its_binding_not_the_callee_argument_ordinal() {
         IndexExpr::Runtime(RuntimeExtentId::TensorBindingAxis { binding, axis: 0 }) if *binding == real),
         "the witness node addresses the caller binding, not callee argument 1"
     );
-    dump_analyzed_unit(&unit).expect("one-argument zero_bias call should lower with the caller witness");
+    dump_analyzed_unit(unit.application_view())
+        .expect("one-argument zero_bias call should lower with the caller witness");
 }
 
 #[test]
@@ -118,7 +119,8 @@ fn return_only_runtime_size_still_requires_a_formal_carrier_witness() {
     );
     let unit = analyze_source(&session(), "return_only_size.fab", &source, AnalyzeRequest::default())
         .expect("the return-only size template should analyze");
-    let errors = dump_analyzed_unit(&unit).expect_err("runtime specialization needs a formal carrier witness");
+    let errors =
+        dump_analyzed_unit(unit.application_view()).expect_err("runtime specialization needs a formal carrier witness");
     assert!(
         errors
             .iter()
@@ -142,7 +144,7 @@ fn callee_argument_out_of_range_remains_rejected() {
         .next()
         .expect("call witness")[0]
         .witness = invalid;
-    let errors = dump_analyzed_unit(&unit).expect_err("zero_bias has only callee argument 0");
+    let errors = dump_analyzed_unit(unit.application_view()).expect_err("zero_bias has only callee argument 0");
     assert!(
         errors
             .iter()

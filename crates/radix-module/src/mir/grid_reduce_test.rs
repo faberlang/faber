@@ -23,7 +23,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 fn lower(source: &str, kernel_lowering: KernelLowering) -> Result<(String, Vec<MirParamMode>), Vec<MirError>> {
     let unit = analyze(source);
     let options = MirLoweringOptions { kernel_lowering, ..Default::default() };
-    lower_analyzed_unit(&unit, options).map(|lowered| {
+    lower_analyzed_unit(unit.application_view(), options).map(|lowered| {
         let program = lowered.validated.program();
         let modes = program.functions[0]
             .params
@@ -195,7 +195,8 @@ main {}
 
 fn device_program(source: &str) -> (radix_mir::device_program::DeviceProgram, radix_mir::MirKernelSignature) {
     let unit = analyze(source);
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("device lowering validates");
+    let lowered =
+        lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("device lowering validates");
     let (program, _semantics, _steps) = radix_mir::device_program::build_device_program(
         &lowered.validated,
         &lowered.interner,

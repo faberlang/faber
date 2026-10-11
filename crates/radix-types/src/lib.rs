@@ -46,8 +46,8 @@ pub use filtrum::{
     OrderRow, Predicate, PredicateValue, SortDirection, SourceIdentity, Window, WindowError,
 };
 pub use vocabulary::{
-    CapabilityGap, KernelModule, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis,
-    MirKernelBuiltin, MirMathFunction,
+    CapabilityGap, KernelLowering, KernelModule, Lowerability, MirAtomicOp, MirCollectionOp,
+    MirKernelAxis, MirKernelBuiltin, MirMathFunction,
 };
 
 /// [`DefId`] partition threshold: [`DefId`]s below this value are compiler-injected

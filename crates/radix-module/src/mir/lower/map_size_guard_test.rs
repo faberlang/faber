@@ -23,7 +23,7 @@ fn program(body: &str) -> String {
 fn panic_calls(name: &str, source: &str) -> usize {
     let unit = crate::driver::analyze_source(&session(), name, source, AnalyzeRequest::default())
         .unwrap_or_else(|error| panic!("{name} should analyze: {error:?}"));
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .unwrap_or_else(|error| panic!("{name} should lower: {error:?}"));
     lowered
         .validated

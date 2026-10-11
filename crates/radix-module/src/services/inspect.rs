@@ -350,7 +350,7 @@ pub fn mir_output_for_source(name: &str, raw_source: &str) -> Result<String, Vec
         Err(diagnostics) => return Err(format_mir_frontend_diagnostics(&source_file, diagnostics)),
     };
 
-    match crate::mir::dump_analyzed_unit(&analysis) {
+    match crate::mir::dump_analyzed_unit(analysis.application_view()) {
         Ok(output) => Ok(output),
         Err(errors) => Err(format_mir_errors(&source_file, errors)),
     }

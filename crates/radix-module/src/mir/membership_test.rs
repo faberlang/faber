@@ -15,7 +15,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 }
 
 fn dump(source: &str) -> String {
-    dump_analyzed_unit(&analyze(source)).expect("MIR lowering succeeds")
+    dump_analyzed_unit(analyze(source).application_view()).expect("MIR lowering succeeds")
 }
 
 /// The dump with interned-symbol ids blanked: the `non (…)` spelling interns one
@@ -240,7 +240,7 @@ fn range_membership_lowers_in_device_kernel_form_without_interval_ops() {
         &format!("+++\nlocale = \"en\"\n+++\n{KERNEL}"),
     )
     .expect("analyzes");
-    let lowered = crate::mir::lower_analyzed_unit(&unit, crate::mir::MirLoweringOptions::default())
+    let lowered = crate::mir::lower_analyzed_unit(unit.application_view(), crate::mir::MirLoweringOptions::default())
         .expect("device kernel form lowers");
     let text = radix_mir::dump::dump_program(lowered.validated.program());
     assert!(!text.contains("interval"), "{text}");

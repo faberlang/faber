@@ -38,11 +38,13 @@ pub(crate) mod source_inventory;
 mod target_bindings;
 mod target_policy;
 
+pub use crate::semantic::{AnalyzedModuleApplicationView, PackageImportIdentities};
 pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
 pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
 #[cfg(feature = "runner")]
 pub use praefixum::{evaluate_deferred, run_linked_function};
-pub use session::{Config, KernelLowering, Session, SessionMemos, WarnPolicy};
+pub use radix_types::KernelLowering;
+pub use session::{Config, Session, SessionMemos, WarnPolicy};
 pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, source_load_diagnostic};
 pub use target_bindings::TargetBindings;
 
@@ -2603,7 +2605,8 @@ fn lower_graphics_mir_with_context_for_target(
     // that continues to compute lowering (F-107). The full HIR lowers safely
     // to target-neutral MIR; graphics-specific filtering is a selection on
     // the output, not a precondition on the input.
-    crate::mir::lower_analyzed_unit(analysis, crate::mir::MirLoweringOptions::default()).map_err(mir_errors_to_spanned)
+    crate::mir::lower_analyzed_unit(analysis.application_view(), crate::mir::MirLoweringOptions::default())
+        .map_err(mir_errors_to_spanned)
 }
 
 #[cfg_attr(not(feature = "device"), allow(unused_variables))]
@@ -2615,8 +2618,9 @@ fn lower_mir_with_context_for_target(
     #[cfg(feature = "device")]
     let bundle = prepare_air_backward_bundle(analysis)?;
     #[cfg_attr(not(feature = "device"), allow(unused_mut))]
-    let mut lowered = crate::mir::lower_analyzed_unit(analysis, crate::mir::MirLoweringOptions::default())
-        .map_err(mir_errors_to_spanned)?;
+    let mut lowered =
+        crate::mir::lower_analyzed_unit(analysis.application_view(), crate::mir::MirLoweringOptions::default())
+            .map_err(mir_errors_to_spanned)?;
     #[cfg(feature = "device")]
     if let Some(bundle) = bundle {
         lowered = apply_air_backward_bundle(lowered, bundle, analysis, no_fuse)?;
@@ -3023,36 +3027,6 @@ fn is_cli_scalar_type(ty: &crate::cli::CliType) -> bool {
     )
 }
 
-/// Package-local import identity facts for user-code cross-module calls.
-///
-/// Supplied by package-aware callers (the CLI compile path, package harnesses)
-/// so MIR lowering can resolve user-code provider imports to their canonical
-/// `(product, module_path, item)` identities (campaign D-PA1). `None` keeps
-/// the legacy provider routing: raw import spelling + interner indices, which
-/// are meaningless across the module boundary.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct PackageImportIdentities {
-    /// Package identity: manifest `package.name`, or package-root-derived
-    /// fallback (the package root directory name).
-    pub product: String,
-    /// This file's canonical module segments (frontmatter `group`, else
-    /// source-root-relative path with `.fab`/`main.fab`/`mod.fab`
-    /// normalization) — mirror of `module_segments_for_file`.
-    pub module_segments: Vec<String>,
-    /// Resolved target module segments per import binding (`binding →
-    /// target file's canonical module segments`) for local sibling imports —
-    /// mirror of `resolve_import` + `module_segments_for_file`.
-    pub imports: BTreeMap<String, Vec<String>>,
-    /// Body-bearing file interface per import binding, for imports whose
-    /// target exports at least one device function (DFV2-3). Recorded by the
-    /// same package-identity pass that fills `imports` and read by the MIR
-    /// provider-route seam. Per-unit by construction: the map rides this
-    /// value through `ModuleCompileRequest` into `AnalyzedModule` and dies
-    /// with it, so an interface resolved for one unit can never serve
-    /// another package's or module's unit (S01-7).
-    pub device_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
-}
-
 /// One coherent module analysis shared by codegen and package-level tooling.
 ///
 /// This is the driver-facing carrier for a single source module: HIR, types,
@@ -3276,10 +3250,12 @@ impl AnalyzedModule {
             function_facts: &self.function_facts,
             resolved_uses: &self.resolved_uses,
             qualified_identities: &self.qualified_identities,
+            package_import_identities: self.package_import_identities.as_ref(),
             provenance: &self.provenance,
             radix_lanes: &self.radix_lanes,
             gpu_builtins: &self.gpu_builtins,
             cli_program: self.cli_program.as_ref(),
+            display_tokens: &self.display_tokens,
             interner: &self.interner,
         }
     }
@@ -3341,27 +3317,6 @@ pub struct GraphicsFragmentEntry {
     pub returns_vacuum: bool,
     pub has_error_type: bool,
     pub body_shape: GraphicsVertexBodyShape,
-}
-
-/// Borrowed view of the HIR v1 analyzed application contract on an [`AnalyzedModule`].
-pub struct AnalyzedModuleApplicationView<'a> {
-    pub stamp: semantic::AnalysisStamp,
-    pub hir: &'a HirModule,
-    pub types: &'a semantic::TypeTable,
-    pub shape_obligations: &'a semantic::ShapeObligationTable,
-    pub kernel_requirements: &'a semantic::passes::kernel_requirements::KernelRequirementsReport,
-    pub tensor_edge_policies: &'a radix_hir::TensorEdgePolicyTable,
-    pub resolver: &'a Resolver,
-    pub annotation_contracts: &'a semantic::AnnotationContractMetadata,
-    pub libraries: &'a LibraryRegistry,
-    pub function_facts: &'a semantic::FunctionFactTable,
-    pub resolved_uses: &'a semantic::ResolvedUseIndex,
-    pub qualified_identities: &'a semantic::QualifiedIdentityTable,
-    pub provenance: &'a semantic::FunctionProvenanceTable,
-    pub radix_lanes: &'a RadixLaneMetadata,
-    pub gpu_builtins: &'a [(crate::hir::DefId, radix_types::MirKernelBuiltin)],
-    pub cli_program: Option<&'a crate::cli::CliProgram>,
-    pub interner: &'a Interner,
 }
 
 /// Caller-supplied inputs for the single [`analyze_source`] entry.

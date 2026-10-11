@@ -5,6 +5,7 @@
 
 use super::*;
 use crate::codegen::Target;
+use crate::driver::AnalyzedModule;
 use crate::driver::{AnalyzeRequest, Config, Session};
 use crate::hir::HirId;
 
@@ -15,7 +16,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 
 fn dump_source(source: &str) -> String {
     let unit = analyze(source);
-    dump_analyzed_unit(&unit).expect("MIR lowering succeeds")
+    dump_analyzed_unit(unit.application_view()).expect("MIR lowering succeeds")
 }
 
 // ===========================================================================

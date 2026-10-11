@@ -31,7 +31,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 fn dump(source: &str, kernel_lowering: KernelLowering) -> String {
     let unit = analyze(source);
     let options = MirLoweringOptions { kernel_lowering, ..Default::default() };
-    let lowered = lower_analyzed_unit(&unit, options)
+    let lowered = lower_analyzed_unit(unit.application_view(), options)
         .unwrap_or_else(|errors| panic!("{kernel_lowering:?} lowering must succeed: {errors:?}"));
     dump_program(lowered.validated.program())
 }

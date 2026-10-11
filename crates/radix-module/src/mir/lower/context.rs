@@ -26,7 +26,6 @@ use super::package_instantiate::ImportedDeviceRoute;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering context
 use super::*;
-use crate::driver::AnalyzedModule;
 use crate::file_interface::InterfaceConstValue;
 use crate::hir::visit::HirVisitor;
 use crate::hir::{
@@ -40,6 +39,7 @@ use crate::mir::MirExternalFunctionIdentity;
 use crate::mir::MirProviderKind;
 use crate::mir::{MirFunctionSignature, MirLayoutTable, MirParamSignature};
 use crate::semantic::SymbolKind;
+use crate::semantic::analyzed_application::AnalyzedModuleApplicationView;
 use std::sync::Arc;
 
 /// Callable parameter metadata preserved for MIR call lowering.
@@ -168,9 +168,9 @@ impl<'a> LoweringContextMaps<'a> {
     /// declarations that never lower into executable MIR, such as structs,
     /// enums, and imports, still define facts required by function-body lowering
     /// and validation.
-    pub(super) fn collect(unit: &'a AnalyzedModule) -> Self {
+    pub(super) fn collect(unit: AnalyzedModuleApplicationView<'a>) -> Self {
         let mut maps = Self {
-            interner: &unit.interner,
+            interner: unit.interner,
             fault_delivery: false,
             function_errors: FxHashMap::default(),
             function_async: FxHashMap::default(),
@@ -200,7 +200,7 @@ impl<'a> LoweringContextMaps<'a> {
             method_targets: FxHashMap::default(),
             creo_hooks: FxHashMap::default(),
             interface_implementors: FxHashMap::default(),
-            gpu_builtins: unit.gpu_builtins.clone(),
+            gpu_builtins: unit.gpu_builtins.to_vec(),
             frozen: FrozenMaps {
                 fault_delivery: false,
                 function_errors: Arc::new(FxHashMap::default()),
@@ -231,12 +231,12 @@ impl<'a> LoweringContextMaps<'a> {
                 // table (via `with_owned_types`) before the context escapes.
                 // Walk-time reads here (primitives, declared structs) resolve
                 // identically in both tables.
-                types: radix_mir::MirTypeTable::Borrowed(&unit.types),
+                types: radix_mir::MirTypeTable::Borrowed(unit.types),
                 // Placeholder: body lowering never reads `.layouts`; the real
                 // table is built once at the lowering entry point and moved
                 // into the escaping context via `validation_context`.
                 layouts: MirLayoutTable::default(),
-                interner: radix_mir::MirInterner::Borrowed(&unit.interner),
+                interner: radix_mir::MirInterner::Borrowed(unit.interner),
                 functions: FxHashMap::default(),
                 method_defs: FxHashSet::default(),
                 external_function_identities: FxHashMap::default(),
@@ -263,7 +263,7 @@ impl<'a> LoweringContextMaps<'a> {
             },
         };
         maps.record_package_import_identities(unit);
-        maps.visit_program(&unit.hir);
+        maps.visit_program(unit.hir);
         maps.record_conversion_rows(unit);
         for item in unit.libraries.items.values() {
             maps.record_library_item_identity(item);
@@ -553,7 +553,7 @@ impl<'a> LoweringContextMaps<'a> {
         }
     }
 
-    fn record_imported_enum_items(&mut self, unit: &AnalyzedModule) {
+    fn record_imported_enum_items(&mut self, unit: AnalyzedModuleApplicationView<'_>) {
         let nominal_names = unit.resolver.imported_file_nominal_names();
         for (def, name) in &nominal_names {
             self.validation
@@ -612,7 +612,7 @@ impl<'a> LoweringContextMaps<'a> {
         }
     }
 
-    fn record_imported_struct_items(&mut self, unit: &AnalyzedModule) {
+    fn record_imported_struct_items(&mut self, unit: AnalyzedModuleApplicationView<'_>) {
         for (def_id, imported_fields, _, type_params) in unit.resolver.imported_file_structs() {
             let mut fields = FxHashMap::default();
             let mut optional_fields = FxHashSet::default();
@@ -685,7 +685,7 @@ impl<'a> LoweringContextMaps<'a> {
 
     /// Record imported nominal members so a qualified type test can recover its
     /// target even when the parser preserved `namespace.Type` as a value field.
-    fn record_imported_type_members(&mut self, unit: &AnalyzedModule) {
+    fn record_imported_type_members(&mut self, unit: AnalyzedModuleApplicationView<'_>) {
         for item in &unit.hir.items {
             let HirItemKind::Import(import) = &item.kind else {
                 continue;
@@ -709,9 +709,9 @@ impl<'a> LoweringContextMaps<'a> {
     /// inlines the value the file interface carries (the same value the
     /// module-constant fold uses). Package-aware callers rewrite these reads
     /// to linked definitions before lowering, so they never reach this map.
-    fn record_imported_constants(&mut self, unit: &AnalyzedModule) {
+    fn record_imported_constants(&mut self, unit: AnalyzedModuleApplicationView<'_>) {
         struct Reads<'u> {
-            unit: &'u AnalyzedModule,
+            unit: AnalyzedModuleApplicationView<'u>,
             found: FxHashMap<(DefId, Symbol), InterfaceConstValue>,
         }
         impl HirVisitor for Reads<'_> {
@@ -731,7 +731,7 @@ impl<'a> LoweringContextMaps<'a> {
             }
         }
         let mut reads = Reads { unit, found: FxHashMap::default() };
-        crate::hir::visit::walk_program(&mut reads, &unit.hir);
+        crate::hir::visit::walk_program(&mut reads, unit.hir);
         self.imported_constants = reads.found;
     }
 
@@ -771,7 +771,7 @@ impl<'a> LoweringContextMaps<'a> {
     /// conversion shape. Builtin rows carry no callable and are skipped;
     /// first enrollment wins a pair, matching the registry's
     /// duplicate-rejecting insertion order.
-    fn record_conversion_rows(&mut self, unit: &AnalyzedModule) {
+    fn record_conversion_rows(&mut self, unit: AnalyzedModuleApplicationView<'_>) {
         for row in unit.resolver.conversion_rows() {
             if let Some(fn_def_id) = row.fn_def_id {
                 self.conversion_rows.entry(row.pair).or_insert(fn_def_id);
@@ -881,8 +881,8 @@ impl<'a> LoweringContextMaps<'a> {
     /// call lowers to `MirCallee::Definition { source: <verb id> }`, and the
     /// sibling unit's own compile records the SAME identity for its function
     /// definition, so both emitters agree on one symbol.
-    fn record_package_import_identities(&mut self, unit: &'a AnalyzedModule) {
-        let Some(package_identities) = &unit.package_import_identities else {
+    fn record_package_import_identities(&mut self, unit: AnalyzedModuleApplicationView<'a>) {
+        let Some(package_identities) = unit.package_import_identities else {
             return;
         };
         self.package_product = Some(package_identities.product.clone());
@@ -1029,7 +1029,9 @@ fn function_signature(
 }
 
 /// Collect callable parameter metadata for MIR call lowering.
-pub(super) fn function_param_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<CallableParamMeta<'_>>> {
+pub(super) fn function_param_map(
+    unit: AnalyzedModuleApplicationView<'_>,
+) -> FxHashMap<DefId, Vec<CallableParamMeta<'_>>> {
     let mut params = FxHashMap::default();
     for item in &unit.hir.items {
         match &item.kind {
@@ -1070,7 +1072,7 @@ pub(super) fn function_param_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<
 /// Unlike validation's type-only field table, aggregate lowering needs borrowed
 /// HIR field nodes so default initializers and field ordering remain available
 /// when a constructor is lowered.
-pub(super) fn struct_field_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<&HirField>> {
+pub(super) fn struct_field_map(unit: AnalyzedModuleApplicationView<'_>) -> FxHashMap<DefId, Vec<&HirField>> {
     // WHY: this map intentionally keeps borrowed field nodes for default
     // initializer lowering. `HirVisitor::visit_item` cannot store those
     // borrows with the unit lifetime, so this remains an explicit unit scan.

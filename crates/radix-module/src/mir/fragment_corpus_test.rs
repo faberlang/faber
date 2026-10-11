@@ -46,7 +46,7 @@ fn analyze(source: &str) -> Result<crate::driver::AnalyzedModule, Vec<Diagnostic
 
 fn lower(source: &str) -> Result<(crate::driver::AnalyzedModule, MirProgram), Vec<crate::mir::MirError>> {
     let analysis = analyze(source).unwrap_or_else(|errors| panic!("analyze must succeed: {errors:?}"));
-    let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())?;
+    let lowered = crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())?;
     let program = lowered.validated.program().clone();
     drop(lowered);
     Ok((analysis, program))
@@ -189,7 +189,7 @@ functio host(f32 x) → f32 {
 }
 ";
     let analysis = analyze(source).unwrap_or_else(|errors| panic!("host→fragment analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
+    let errors = crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
         .expect_err("host→fragment must fail at instantiation");
     let err = expect_lower_issue(&errors, ISSUE_CONTEXT);
     assert_eq!(
@@ -527,8 +527,8 @@ functio k(f32 x) → f32 {
 }
 ";
     let analysis = analyze(source).unwrap_or_else(|errors| panic!("cycle analyzes: {errors:?}"));
-    let errors =
-        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect_err("cycle must fail closed");
+    let errors = crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
+        .expect_err("cycle must fail closed");
     let err = expect_lower_issue(&errors, ISSUE_CYCLE);
     assert!(span_in(err.span, source, "pong(x)") || span_in(err.span, source, "ping(x)"));
 }
@@ -549,7 +549,7 @@ functio k(f32 x) → f32 {
     let budget = ExpansionBudget { max_concrete_instances: 0, ..ExpansionBudget::DOCUMENTED_DEFAULTS };
     with_budget_override(budget, || {
         let analysis = analyze(source).unwrap_or_else(|errors| panic!("budget fixture analyzes: {errors:?}"));
-        let errors = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
+        let errors = crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
             .expect_err("budget override must fail closed");
         let err = expect_lower_issue(&errors, ISSUE_EXPANSION);
         assert!(

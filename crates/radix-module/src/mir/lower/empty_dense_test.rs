@@ -28,7 +28,7 @@ fn stdout(source: &str) -> Vec<String> {
 /// spellings of one program compare by structure.
 fn entry_mir(source: &str) -> String {
     let unit = analyze_source(&session(), "empty-dense.fab", source, AnalyzeRequest::default()).expect("analyzes");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("lowers");
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("lowers");
     let entry = lowered
         .validated
         .program()

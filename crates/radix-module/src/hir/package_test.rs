@@ -612,7 +612,8 @@ fn signature_only_device_import_fails_closed() {
 /// Lower the unit and attach canonical MIR bodies to `metadata`.
 #[cfg(feature = "mir-core")]
 fn attach_bodies(metadata: &mut NucleumProgramMetadata, unit: &mut AnalyzedModule) {
-    let lowered = crate::mir::lower_analyzed_unit(unit, MirLoweringOptions::default()).expect("lower device unit");
+    let lowered = crate::mir::lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
+        .expect("lower device unit");
     metadata.attach_canonical_mir(lowered.validated.program(), "device.fab");
 }
 

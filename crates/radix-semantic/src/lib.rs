@@ -140,7 +140,8 @@ pub use access_facts::{
 };
 pub use analyzed_application::{
     AnalysisStamp, AnalyzedApplication, AnalyzedApplicationDriverFields, AnalyzedApplicationError,
-    AnalyzedApplicationParts, QualificationStatus, TargetQualification, qualify_for_target,
+    AnalyzedApplicationParts, AnalyzedModuleApplicationView, PackageImportIdentities,
+    QualificationStatus, TargetQualification, qualify_for_target,
 };
 pub use annotation_contract::{
     AnnotationAttachmentTarget, AnnotationContract, AnnotationContractField,

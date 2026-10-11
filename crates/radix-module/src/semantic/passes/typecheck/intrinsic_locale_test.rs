@@ -171,7 +171,7 @@ fn en_surface_resolves_to_same_intrinsic_as_canonical() {
         vec!["continet".to_owned()],
         "the en surface spelling must be rewritten to the canonical registry name on the HIR"
     );
-    let mir = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let mir = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("en `contains` call must lower to MIR");
     assert!(
@@ -232,7 +232,7 @@ fn la_and_no_pack_keep_latin_identity() {
             vec!["continet".to_owned()],
             "{label}: the canonical Latin spelling must be kept as-is"
         );
-        let mir = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+        let mir = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
             .map(|lowered| lowered.validated.into_parts().0)
             .expect("{label}: `continet` call must lower to MIR");
         assert!(mir_has_contains(&mir), "{label}: `continet` must lower to Contains");
@@ -258,7 +258,7 @@ fn without_pack_surface_spelling_is_unchanged() {
 fn la_pack_keeps_canonical_spelling_and_identity() {
     let unit = analyze(LA_SOURCE, Some(la_pack())).expect("la canonical `continet` should typecheck");
     assert_eq!(method_call_spellings(&unit.hir, &unit.interner), vec!["continet".to_owned()]);
-    let mir = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let mir = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("la `continet` call must lower to MIR");
     assert!(mir_has_contains(&mir), "la `continet` must lower to Contains");
@@ -295,7 +295,7 @@ fn unknown_method_diagnostics_are_pack_agnostic() {
 #[test]
 fn lint_and_mir_accept_en_spelling_call() {
     let unit = analyze(EN_SOURCE, Some(en_pack())).expect("en `contains` passes typecheck + lint with the en pack");
-    let mir = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let mir = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("en `contains` call lowers to MIR");
     assert!(mir_has_contains(&mir));
@@ -365,7 +365,7 @@ fn en_proof_ascii_alnum_chars_contains() {
 
     // The en surface lowers to the same `Contains` runtime call (identical
     // runtime semantics; the canonical name flowed into MIR lowering unchanged).
-    let en_mir = lower_analyzed_unit(&en, MirLoweringOptions::default())
+    let en_mir = lower_analyzed_unit(en.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("en proof `.contains(c)` must lower to MIR");
     assert!(mir_has_contains(&en_mir), "en `.contains(c)` must lower to the Contains op");
@@ -382,7 +382,7 @@ fn la_proof_ascii_alnum_chars_continet() {
         vec!["continet".to_owned()],
         "la `.continet(c)` must keep the canonical spelling"
     );
-    let mir = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let mir = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("la proof `.continet(c)` must lower to MIR");
     assert!(mir_has_contains(&mir), "la `.continet(c)` must lower to the Contains op");

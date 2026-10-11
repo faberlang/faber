@@ -66,8 +66,8 @@ main {{
 fn build(source: &str) -> (DeviceProgram, DeviceSemantics, String) {
     let unit = analyze(source);
     let options = MirLoweringOptions { kernel_lowering: KernelLowering::Device, ..Default::default() };
-    let lowered =
-        lower_analyzed_unit(&unit, options).unwrap_or_else(|errors| panic!("device lowering must succeed: {errors:?}"));
+    let lowered = lower_analyzed_unit(unit.application_view(), options)
+        .unwrap_or_else(|errors| panic!("device lowering must succeed: {errors:?}"));
     let dump = dump_program(lowered.validated.program());
     let (program, semantics, _steps) = build_device_program(
         &lowered.validated,

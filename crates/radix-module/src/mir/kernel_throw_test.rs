@@ -49,7 +49,8 @@ main args args {
 /// The device-form kernel function, its signature and reflection.
 fn lowered_kernel(source: &str) -> (radix_mir::MirFunction, MirKernelSignature, MirKernelReflection) {
     let unit = analyze(source);
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("device lowering validates");
+    let lowered =
+        lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("device lowering validates");
     let function = lowered
         .validated
         .program()

@@ -134,7 +134,7 @@ fn evaluation_function(
 }
 
 fn lower_and_run(unit: &AnalyzedModule, span: Span) -> Result<Value, SemanticError> {
-    let lowered = lower_analyzed_unit(unit, MirLoweringOptions::default()).map_err(|errors| {
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).map_err(|errors| {
         let detail = errors
             .first()
             .map_or_else(|| "MIR lowering failed".to_owned(), |error| error.message.clone());

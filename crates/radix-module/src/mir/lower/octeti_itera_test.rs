@@ -20,7 +20,7 @@ fn octeti_itera_ex_validates_byte_binding_and_runtime_bound() {
 }";
     let unit = crate::driver::analyze_source(&session(), "byte-list.fab", source, AnalyzeRequest::default())
         .expect("D10.4/D19.4 admit bytes iteration with a u8 binding");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .expect("byte iteration must lower through the existing byte index row");
     crate::mir::validate_program(lowered.validated.program(), lowered.validated.validation())
         .expect("the byte carrier and binding types must pass MIR validation");
@@ -84,7 +84,7 @@ fn octeti_itera_de_keeps_existing_fail_closed_admission() {
     // Need: `octeti` is `lista<b8>`, an ordinary list, so `itera de`
     // is the ordinary list index iteration. MIR no longer declines it (the
     // retired opaque carrier only offered value iteration).
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .expect("index iteration over lista<b8> lowers like every list");
     crate::mir::validate_program(lowered.validated.program(), lowered.validated.validation())
         .expect("the index iteration of a byte list must pass MIR validation");

@@ -25,7 +25,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 fn lower(source: &str, kernel_lowering: KernelLowering) -> Result<(String, Vec<MirParamMode>), Vec<MirError>> {
     let unit = analyze(source);
     let options = MirLoweringOptions { kernel_lowering, ..Default::default() };
-    lower_analyzed_unit(&unit, options).map(|lowered| {
+    lower_analyzed_unit(unit.application_view(), options).map(|lowered| {
         let program = lowered.validated.program();
         let modes = program.functions[0]
             .params
@@ -218,7 +218,7 @@ fn lane_id_and_grid_arithmetic_are_u32_while_binders_stay_int() {
     use radix_types::{NumericWidth, Primitive, Type};
     let unit = analyze(COPY);
     let options = MirLoweringOptions { kernel_lowering: KernelLowering::Device, ..Default::default() };
-    let lowered = lower_analyzed_unit(&unit, options).expect("device lowering validates");
+    let lowered = lower_analyzed_unit(unit.application_view(), options).expect("device lowering validates");
     let types = &lowered.validated.validation().types;
     let function = &lowered.validated.program().functions[0];
     let u32_ty = types

@@ -28,7 +28,8 @@ fn session() -> Session {
 fn raw_entry_args_are_initialized_once_before_the_body() {
     let unit = analyze_source(&session(), "raw-entry-args.fab", SOURCE, AnalyzeRequest::default())
         .expect("raw entry args analyze as runtime-provided");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("raw entry args lower");
+    let lowered =
+        lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("raw entry args lower");
     let entry = lowered
         .validated
         .program()
@@ -76,7 +77,8 @@ fn raw_entry_args_are_initialized_once_before_the_body() {
 fn raw_entry_args_execute_populated_and_empty_host_vectors() {
     let unit = analyze_source(&session(), "raw-entry-args.fab", SOURCE, AnalyzeRequest::default())
         .expect("raw entry args analyze");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("raw entry args lower");
+    let lowered =
+        lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("raw entry args lower");
     for (args, expected) in [
         (
             vec!["inferentia", "serve", "--prompt", "X"],

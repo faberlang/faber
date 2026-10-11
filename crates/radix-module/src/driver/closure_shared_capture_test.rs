@@ -97,7 +97,7 @@ fn dump_en(body: &str) -> String {
             Ok(unit) => unit,
             Err(diagnostics) => panic!("analysis failed: {diagnostics:?}"),
         };
-    match crate::mir::dump_analyzed_unit(&unit) {
+    match crate::mir::dump_analyzed_unit(unit.application_view()) {
         Ok(dump) => dump,
         Err(errors) => panic!("MIR lowering failed: {errors:?}"),
     }

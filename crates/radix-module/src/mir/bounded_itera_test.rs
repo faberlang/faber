@@ -23,7 +23,7 @@ fn bounded_lista_ex_lowers_to_len_static_split() {
 }";
     let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
         .expect("bounded lista itera source analyzes");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .expect("runtime-len bounded lista itera ex lowers in the base MIR lane");
     validate_program(lowered.validated.program(), lowered.validated.validation())
         .expect("the len static split MIR must validate");
@@ -64,7 +64,8 @@ fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
 }";
     let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
         .expect("bounded lista itera source analyzes");
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("the split lowers");
+    let lowered =
+        lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("the split lowers");
     validate_program(lowered.validated.program(), lowered.validated.validation())
         .expect("the len static split MIR must validate");
     let dump = dump_program(lowered.validated.program());
@@ -97,7 +98,7 @@ fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
         AnalyzeRequest::default(),
     )
     .expect("source analyzes; the decline is MIR's");
-    let errors = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let errors = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .expect_err("N > 10 exceeds the Route B code-size cap and must fail closed");
     assert_eq!(errors.len(), 1, "exactly the itera decline fires: {errors:?}");
     assert!(
@@ -150,7 +151,7 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
     for (name, source) in cases {
         let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
             .unwrap_or_else(|error| panic!("{name} source analyzes: {error:?}"));
-        let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+        let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
             .unwrap_or_else(|error| panic!("{name} itera ex lowers in the base MIR lane: {error:?}"));
         validate_program(lowered.validated.program(), lowered.validated.validation())
             .unwrap_or_else(|error| panic!("{name} live-prefix split MIR must validate: {error:?}"));
@@ -196,7 +197,7 @@ fn scalar_bounded_buffers_capacity_above_ten_stay_unsupported() {
         AnalyzeRequest::default(),
     )
     .expect("source analyzes; the decline is MIR's");
-    let errors = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let errors = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .expect_err("N > 10 exceeds the Route B code-size cap and must fail closed");
     assert_eq!(errors.len(), 1, "exactly the itera decline fires: {errors:?}");
     assert!(

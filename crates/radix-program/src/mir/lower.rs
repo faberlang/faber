@@ -1140,7 +1140,7 @@ pub(super) fn lower_package_units<'a>(
                     }
                 };
                 let mut lowered = match lower_analyzed_unit(
-                    analysis,
+                    analysis.application_view(),
                     radix_module::mir::MirLoweringOptions {
                         kernel_lowering,
                         ..Default::default()
@@ -3391,7 +3391,7 @@ pub(super) fn lower_unit<'a>(
             .cloned()
             .unwrap_or_default();
         lower_analyzed_unit(
-            &unit.analysis,
+            unit.analysis.application_view(),
             radix_module::mir::MirLoweringOptions {
                 cli_record_fields_by_local: std::sync::Arc::new(fields.into_iter().collect()),
                 kernel_lowering,
@@ -3400,7 +3400,7 @@ pub(super) fn lower_unit<'a>(
         )
     } else {
         lower_analyzed_unit(
-            &unit.analysis,
+            unit.analysis.application_view(),
             radix_module::mir::MirLoweringOptions {
                 kernel_lowering,
                 ..Default::default()

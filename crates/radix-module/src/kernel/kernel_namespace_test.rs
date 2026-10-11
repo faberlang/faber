@@ -138,7 +138,7 @@ incipit {
 }
 "#;
     let unit = analyze_source(&session, "kernel-import.fab", source, AnalyzeRequest::default()).expect("analysis");
-    let program = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let program = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");
 
@@ -172,7 +172,7 @@ incipit {
 }
 "#;
     let unit = analyze_source(&session, "kernel-toml-import.fab", source, AnalyzeRequest::default()).expect("analysis");
-    let program = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let program = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");
 
@@ -207,7 +207,7 @@ incipit {
 }
 "#;
     let unit = analyze_source(&session, "kernel-glob-import.fab", source, AnalyzeRequest::default()).expect("analysis");
-    let program = lower_analyzed_unit(&unit, MirLoweringOptions::default())
+    let program = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
         .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");
 

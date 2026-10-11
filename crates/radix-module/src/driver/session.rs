@@ -26,31 +26,11 @@ use super::target_bindings::TargetBindings;
 use crate::codegen::{OutputMode, Target};
 use crate::diagnostics::Severity;
 use crate::locale::LocalePack;
+use radix_types::KernelLowering;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-
-/// How `@ kernel` (and nucleum fragment) functions lower.
-///
-/// `Device` is the form the device translators consume: device views for
-/// tensors, device-checked arithmetic, `⇇` as the output-buffer store,
-/// kernel-to-kernel calls composed (inlined) into their callers, and the
-/// `filum` reduction recipe. `Host` lowers every kernel exactly as an
-/// ordinary function: tensor brackets are `TensorGet`/`TensorSet`, integer
-/// and vector-lane stores keep the host store checks, `⇇` keeps its
-/// storage-preserving host copy, a call to a helper kernel stays a plain
-/// call, and a `thread` reduction is the sequential fold. The CPU route
-/// (`faber run --device cpu`) selects `Host`; the selection is a property of
-/// the route, never of a source name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum KernelLowering {
-    /// Device-translatable form (the default).
-    #[default]
-    Device,
-    /// Ordinary host-function form, run by the MIR runner on the CPU.
-    Host,
-}
 
 /// Policy for promoting warning diagnostics to errors at the compilation boundary.
 ///

@@ -23,7 +23,8 @@ fn analyze(source: &str) -> AnalyzedModule {
 /// The device-form signature and reflection of the program's first function.
 fn kernel(source: &str) -> (MirKernelSignature, MirKernelReflection) {
     let unit = analyze(source);
-    let lowered = lower_analyzed_unit(&unit, MirLoweringOptions::default()).expect("device lowering validates");
+    let lowered =
+        lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()).expect("device lowering validates");
     let signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
         lowered
             .validated

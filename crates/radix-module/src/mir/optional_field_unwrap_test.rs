@@ -8,6 +8,7 @@
 
 use super::*;
 use crate::codegen::Target;
+use crate::driver::AnalyzedModule;
 use crate::driver::{AnalyzeRequest, Config, Session};
 
 fn analyze(source: &str) -> AnalyzedModule {
@@ -27,7 +28,7 @@ fn analyze(source: &str) -> AnalyzedModule {
 
 fn lower_errors(source: &str) -> Vec<String> {
     let unit = analyze(source);
-    match lower_analyzed_unit(&unit, MirLoweringOptions::default()) {
+    match lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()) {
         Ok(_) => Vec::new(),
         Err(errors) => errors.into_iter().map(|error| error.message).collect(),
     }
@@ -35,7 +36,7 @@ fn lower_errors(source: &str) -> Vec<String> {
 
 fn dump_source(source: &str) -> String {
     let unit = analyze(source);
-    dump_analyzed_unit(&unit).unwrap_or_else(|errors| {
+    dump_analyzed_unit(unit.application_view()).unwrap_or_else(|errors| {
         panic!(
             "MIR lowering succeeds: {:?}",
             errors

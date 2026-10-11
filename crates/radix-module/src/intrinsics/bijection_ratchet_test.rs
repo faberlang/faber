@@ -497,7 +497,7 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
         }
     };
 
-    match crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()) {
+    match crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default()) {
         Ok(_) => ProbeOutcome::Lowered,
         Err(errors) => {
             let issues = errors.iter().map(|e| e.issue.as_str()).collect::<Vec<_>>();

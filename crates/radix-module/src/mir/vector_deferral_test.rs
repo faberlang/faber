@@ -15,7 +15,7 @@ fn session() -> Session {
 fn dump(source: &str) -> String {
     let analyzed = crate::driver::analyze_source(&session(), "test.fab", source, AnalyzeRequest::default())
         .expect("analysis succeeds");
-    dump_analyzed_unit(&analyzed).expect("MIR lowering succeeds")
+    dump_analyzed_unit(analyzed.application_view()).expect("MIR lowering succeeds")
 }
 
 fn run(source: &str) -> Vec<String> {

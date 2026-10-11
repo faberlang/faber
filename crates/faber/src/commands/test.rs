@@ -368,7 +368,7 @@ fn run_source_with_options(
     }
 
     let lowered = radix::module::mir::lower_analyzed_unit(
-        &analysis,
+        analysis.application_view(),
         radix::module::mir::MirLoweringOptions {
             kernel_lowering: session.config.kernel_lowering,
             ..Default::default()

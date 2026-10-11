@@ -101,7 +101,7 @@ fn mir_lowering_skips_a_bodiless_nondum_function() {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let unit = crate::driver::analyze_source(&session, "nondum.fab", SOURCE, AnalyzeRequest::default())
         .expect("analysis succeeds");
-    let dump = crate::mir::dump_analyzed_unit(&unit).expect("MIR lowering succeeds");
+    let dump = crate::mir::dump_analyzed_unit(unit.application_view()).expect("MIR lowering succeeds");
     // Two MIR functions: `nunc` and the entry block. The two declarations
     // lower to nothing.
     assert_eq!(
@@ -198,7 +198,7 @@ fn mir_lowering_skips_a_bodiless_nondum_method() {
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
     let unit = crate::driver::analyze_source(&session, "nondum.fab", GENUS_SOURCE, AnalyzeRequest::default())
         .expect("analysis succeeds");
-    let dump = crate::mir::dump_analyzed_unit(&unit).expect("MIR lowering succeeds");
+    let dump = crate::mir::dump_analyzed_unit(unit.application_view()).expect("MIR lowering succeeds");
     // Two MIR functions: `lege` and the entry block. The declaration lowers
     // to nothing.
     assert_eq!(

@@ -553,7 +553,7 @@ fn run_proba_on_analyzed_with_unit_path(
 ) -> Result<ProbaReport, RunSourceError> {
     let cases = inventory_cases(&unit.hir, &unit.interner);
     let lowered = lower_analyzed_unit(
-        unit,
+        unit.application_view(),
         MirLoweringOptions {
             kernel_lowering,
             ..Default::default()

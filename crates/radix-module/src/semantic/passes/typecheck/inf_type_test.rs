@@ -162,7 +162,8 @@ fn inf_operations_lower_to_mir_with_no_gate() {
         let session = crate::driver::Session::new(Config::default().with_target(ConfigTarget::MirSexp));
         let unit = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default())
             .unwrap_or_else(|diagnostics| panic!("analysis of {source}: {diagnostics:?}"));
-        crate::mir::dump_analyzed_unit(&unit).unwrap_or_else(|errors| panic!("MIR lowering of {source}: {errors:?}"));
+        crate::mir::dump_analyzed_unit(unit.application_view())
+            .unwrap_or_else(|errors| panic!("MIR lowering of {source}: {errors:?}"));
     }
 }
 

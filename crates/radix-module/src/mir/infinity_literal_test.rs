@@ -22,7 +22,7 @@ const SOURCE: &str = r"incipit {
 #[test]
 fn non_finite_literals_lower_to_float_constants_and_neg_instruction() {
     let unit = analyze(SOURCE);
-    let dump = dump_analyzed_unit(&unit).expect("MIR lowering succeeds");
+    let dump = dump_analyzed_unit(unit.application_view()).expect("MIR lowering succeeds");
     assert!(dump.contains("const float inf"), "infinity constant missing: {dump}");
     assert!(dump.contains("const float NaN"), "NaN constant missing: {dump}");
     assert!(dump.contains("neg %"), "negative infinity must use MIR negation: {dump}");

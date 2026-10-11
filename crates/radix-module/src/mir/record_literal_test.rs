@@ -44,7 +44,7 @@ fn labelled_record_literal_lowers_to_one_record_aggregate() {
         ),
     )
     .expect("analyzes");
-    let dump = dump_analyzed_unit(&unit).expect("MIR lowering succeeds");
+    let dump = dump_analyzed_unit(unit.application_view()).expect("MIR lowering succeeds");
     assert_eq!(dump.matches("construct record").count(), 1, "{dump}");
 }
 

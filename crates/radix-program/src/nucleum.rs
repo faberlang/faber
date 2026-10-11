@@ -93,7 +93,7 @@ pub fn attach_canonical_mir(
             continue;
         }
         let lowered = radix_module::mir::lower_analyzed_unit(
-            &node.analysis,
+            node.analysis.application_view(),
             radix_module::mir::MirLoweringOptions::default(),
         )
         .map_err(|errors| {

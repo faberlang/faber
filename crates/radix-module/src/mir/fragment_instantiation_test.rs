@@ -778,8 +778,8 @@ functio outer(f32 x) → f32 {
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered =
-        crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).expect("Entry→Entry must compose");
+    let lowered = crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
+        .expect("Entry→Entry must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
             &lowered.validated.program().functions,
@@ -810,7 +810,7 @@ functio k(f32 x) → f32 {
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default())
+    let lowered = crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
         .expect("legal Entry→Fragment must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
@@ -1005,7 +1005,7 @@ fn lower_source(source: &str) -> Result<(), Vec<crate::mir::MirError>> {
             )
         },
     );
-    crate::mir::lower_analyzed_unit(&analysis, MirLoweringOptions::default()).map(|_| ())
+    crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default()).map(|_| ())
 }
 
 #[test]

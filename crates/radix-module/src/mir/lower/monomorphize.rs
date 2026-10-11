@@ -257,7 +257,7 @@ struct MonomorphizationState<'lowerer, 'unit> {
 
 impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     fn new(lowerer: &'lowerer mut MirLowerer<'unit>) -> Self {
-        let mut generic_param_order = generic_param_order(&lowerer.unit.hir);
+        let mut generic_param_order = generic_param_order(lowerer.unit.hir);
         for (source, params) in &mut generic_param_order {
             let Some(bindings) = lowerer
                 .unit
@@ -308,7 +308,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             MirFunctionId(u32::MAX)
         };
         let function_index = MirFunctionIndex::for_functions(&lowerer.functions);
-        let (mut contract_methods, genus_methods) = contract_dispatch_tables(&lowerer.unit.hir);
+        let (mut contract_methods, genus_methods) = contract_dispatch_tables(lowerer.unit.hir);
         // D1.4: ordering-bound calls name the contract itself (it may be
         // imported); a genus witness resolves to its own `compare`.
         if let (Some(contract), Some(compare)) = (
@@ -1015,7 +1015,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             return index;
         }
         let mut finder = LocalFinder { name: sym, found: None };
-        finder.visit_program(&self.lowerer.unit.hir);
+        finder.visit_program(self.lowerer.unit.hir);
         let value_binding = finder.found.or_else(|| {
             caller_source.and_then(|source| {
                 self.lowerer

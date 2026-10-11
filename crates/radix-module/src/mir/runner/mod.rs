@@ -127,7 +127,7 @@ pub fn run_analyzed_with_kernel_lowering<H: Host + ?Sized>(
     host: &mut H,
 ) -> Result<(), Vec<RunnerError>> {
     let options = crate::mir::MirLoweringOptions { kernel_lowering, ..Default::default() };
-    let lowered = lower_analyzed_unit(unit, options).map_err(|errors| {
+    let lowered = lower_analyzed_unit(unit.application_view(), options).map_err(|errors| {
         errors
             .into_iter()
             .map(|error| RunnerError::internal(error.span, error.message))

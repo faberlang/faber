@@ -2,7 +2,7 @@
 //!
 //! This module is the boundary between a fully analyzed HIR unit and the
 //! execution-shaped MIR model used by MIR dumps, validation, and temporary MIR
-//! probes. It deliberately depends on [`AnalyzedModule`] rather than raw HIR so
+//! probes. It deliberately depends on [`AnalyzedModuleApplicationView`] rather than raw HIR so
 //! lowering can preserve semantic identity, resolved definitions, inferred
 //! types, entry metadata, and the interner without rebuilding semantic context.
 //!
@@ -32,8 +32,6 @@
 //!   support without inheriting silent behavior.
 
 use crate::cli::{CliDefault, CliOperand, CliOption, CliType};
-use crate::driver::AnalyzedModule;
-pub use crate::driver::KernelLowering;
 use crate::file_interface::InterfaceConstValue;
 use crate::hir::visit::{HirVisitor, walk_expr, walk_program};
 use crate::hir::{
@@ -57,6 +55,7 @@ use crate::mir::{
     MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
     MirVectorOp, ValidatedMir, dump_program, instantiate_existing_generic_type, type_contains_param,
 };
+use crate::semantic::analyzed_application::AnalyzedModuleApplicationView;
 use crate::semantic::{
     ConversionPair, IndexExpr, IndexId, NumericWidth, Primitive, RuntimeExtentId, RuntimeSizeBinding, ShapeRelation,
     ShapeRelationBoundary, Type, TypeId, TypeTable,
@@ -267,7 +266,8 @@ pub struct LoweredMirUnit<'a> {
     pub validated: ValidatedMir<'a>,
     /// Owned companion-relation carrier (S3-A2): primal → companion device
     /// materialization facts, populated by the driver's
-    /// [`apply_air_backward_bundle`](crate::driver::apply_air_backward_bundle)
+    /// `apply_air_backward_bundle` (driver-side today; part of the AIR
+    /// backward bundle the driver applies around the lowering)
     /// instead of being discarded after validation. The faber device-program
     /// constructor consumes it to lower generated companions into kernels.
     pub companions: radix_mir::device::MirCompanionMap,
@@ -643,6 +643,8 @@ fn portable_tensor_edge_shape_identity(types: &TypeTable, shape: IndexId) -> Opt
     }
 }
 
+pub use radix_types::KernelLowering;
+
 #[derive(Default)]
 pub struct MirLoweringOptions {
     /// How `@ kernel` functions lower; see [`KernelLowering`].
@@ -706,7 +708,7 @@ pub enum MirRuntimeRecordValue {
 /// types, sealed-block misuse, a corrupt type arena, and post-lowering
 /// validation failures.
 pub fn lower_analyzed_unit(
-    unit: &AnalyzedModule,
+    unit: AnalyzedModuleApplicationView<'_>,
     options: MirLoweringOptions,
 ) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
     // Lowering-owned extension arena: one clone of the analyzed table per
@@ -721,8 +723,8 @@ pub fn lower_analyzed_unit(
     // rides along for monomorphization's bound dispatch.
     types.ordering_contract = unit.types.ordering_contract;
     ensure_map_iteration_array_types(&mut types);
-    ensure_itera_coordinate_array_types(&unit.hir, &mut types);
-    ensure_tensor_bracket_index_array_types(&unit.hir, &mut types);
+    ensure_itera_coordinate_array_types(unit.hir, &mut types);
+    ensure_tensor_bracket_index_array_types(unit.hir, &mut types);
     if options.kernel_lowering == KernelLowering::Device {
         lane_form::ensure_lane_word_type(&mut types);
     }
@@ -830,7 +832,7 @@ pub fn lower_analyzed_unit(
     }
 }
 
-fn clone_lowering_type_table(unit: &AnalyzedModule) -> Result<TypeTable, Vec<MirError>> {
+fn clone_lowering_type_table(unit: AnalyzedModuleApplicationView<'_>) -> Result<TypeTable, Vec<MirError>> {
     TypeTable::from_snapshot(unit.types.snapshot()).map_err(|message| {
         vec![MirError {
             message: format!("MIR lowering could not clone the type arena: {message}"),
@@ -842,13 +844,13 @@ fn clone_lowering_type_table(unit: &AnalyzedModule) -> Result<TypeTable, Vec<Mir
 }
 
 fn finalize_lowered_shapes(
-    unit: &AnalyzedModule,
+    unit: AnalyzedModuleApplicationView<'_>,
     types: &mut TypeTable,
     program: &mut MirProgram,
     monomorphizations: &[MirMonomorphization],
 ) -> Result<(), Vec<MirError>> {
     let errors =
-        monomorphize::finalize_monomorphized_shapes(&unit.hir, types, &mut program.functions, monomorphizations);
+        monomorphize::finalize_monomorphized_shapes(unit.hir, types, &mut program.functions, monomorphizations);
     if errors.is_empty() {
         return Ok(());
     }
@@ -856,7 +858,7 @@ fn finalize_lowered_shapes(
 }
 
 fn apply_device_form_lowering(
-    unit: &AnalyzedModule,
+    unit: AnalyzedModuleApplicationView<'_>,
     types: &TypeTable,
     interner: &Interner,
     program: &mut MirProgram,
@@ -868,7 +870,7 @@ fn apply_device_form_lowering(
     // `@ nucleum` function, including private helpers that produce no
     // entry row. Entry gating happens on the driver's emit/dispatch path
     // via `device_entry_roles_from_hir`.
-    let roles = crate::mir::device_roles_from_hir(&unit.hir);
+    let roles = crate::mir::device_roles_from_hir(unit.hir);
     // `⇇` on a device function lowers as the output-buffer store the
     // recipes already write; the host keeps the storage-preserving copy.
     // Host kernel lowering keeps the host copy for every function.
@@ -886,14 +888,14 @@ fn apply_device_form_lowering(
     // DFV2-4: launch entries are the public `@ nucleum` sources — the
     // only device functions that stay program symbols when device
     // code also calls them; composed private helpers are pruned.
-    let launch_entries = crate::mir::device_entry_roles_from_hir(&unit.hir, interner)
+    let launch_entries = crate::mir::device_entry_roles_from_hir(unit.hir, interner)
         .into_iter()
         .filter(|(_, role)| *role == crate::mir::MirDeviceRole::Kernel)
         .map(|(source, _)| source)
         .collect::<FxHashSet<_>>();
     let layouts = MirLayoutTable::from_types(types);
     let summaries =
-        crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, types, interner).summaries;
+        crate::semantic::passes::fragment_definition::check(unit.hir, unit.resolver, types, interner).summaries;
     let instantiation_errors = super::fragment_instantiation::check_with_metadata(
         &program.functions,
         monomorphizations,
@@ -941,7 +943,7 @@ type LoweringValidation<'a> = (
 );
 
 fn build_lowering_validation<'a>(
-    unit: &'a AnalyzedModule,
+    unit: AnalyzedModuleApplicationView<'a>,
     program: MirProgram,
     types: TypeTable,
     interner: &Interner,
@@ -969,7 +971,7 @@ fn build_lowering_validation<'a>(
     // arena, so the returned unit carries its own table and borrows
     // nothing from the lowering call itself.
     let tensor_edge_policy_providers =
-        portable_tensor_edge_policy_providers(&unit.tensor_edge_policies, &types, interner);
+        portable_tensor_edge_policy_providers(unit.tensor_edge_policies, &types, interner);
     let validation = validation.with_owned_types(types);
     let validated = ValidatedMir::new(program, validation).map_err(|errors| {
         errors
@@ -982,7 +984,9 @@ fn build_lowering_validation<'a>(
 
 /// The display tokens the file holding `unit` prints through: its own locale
 /// pack's words.
-fn display_tokens_for_file(unit: &AnalyzedModule) -> radix_runtime_contract::display_tokens::DisplayTokens {
+fn display_tokens_for_file(
+    unit: AnalyzedModuleApplicationView<'_>,
+) -> radix_runtime_contract::display_tokens::DisplayTokens {
     unit.display_tokens.clone()
 }
 
@@ -1067,11 +1071,11 @@ pub fn prepare_mir_lowering_interner(interner: &mut Interner) {
 /// command surfaces that share a binding name (e.g. `cli/cli.fab` entry and
 /// `greet` both bind `args`) from colliding.
 fn cli_descriptor_record_fields_by_type(
-    unit: &AnalyzedModule,
+    unit: AnalyzedModuleApplicationView<'_>,
     interner: &mut Interner,
     types: &mut TypeTable,
 ) -> Arc<FxHashMap<TypeId, Vec<MirRuntimeRecordField>>> {
-    let Some(cli) = unit.cli_program.as_ref() else {
+    let Some(cli) = unit.cli_program else {
         return Arc::new(FxHashMap::default());
     };
     let mut fields_by_type = FxHashMap::default();
@@ -1104,7 +1108,7 @@ fn cli_descriptor_record_fields_by_type(
 
 /// Record type of the root `incipit argumenta` local, read from the HIR entry
 /// block's runtime-provided args local.
-fn cli_entry_args_type(unit: &AnalyzedModule) -> Option<TypeId> {
+fn cli_entry_args_type(unit: AnalyzedModuleApplicationView<'_>) -> Option<TypeId> {
     let name = unit.hir.entry_args_name?;
     let entry = unit.hir.entry.as_ref()?;
     entry.statements.iter().find_map(|statement| {
@@ -1119,7 +1123,7 @@ fn cli_entry_args_type(unit: &AnalyzedModule) -> Option<TypeId> {
 
 /// Record type of a mounted command's `argumenta` param, read from the HIR
 /// command function's CLI-args parameter.
-fn cli_command_record_type(unit: &AnalyzedModule, function_symbol: Symbol) -> Option<TypeId> {
+fn cli_command_record_type(unit: AnalyzedModuleApplicationView<'_>, function_symbol: Symbol) -> Option<TypeId> {
     unit.hir.items.iter().find_map(|item| {
         let HirItemKind::Function(function) = &item.kind else {
             return None;
@@ -1245,7 +1249,7 @@ fn cli_type_zero_operand(interner: &mut Interner, ty: &CliType) -> MirOperand {
 /// # Errors
 /// Returns `MirError` values for unsupported HIR surfaces, missing semantic
 /// types, sealed-block misuse, and post-lowering validation failures.
-pub fn dump_analyzed_unit(unit: &AnalyzedModule) -> Result<String, Vec<MirError>> {
+pub fn dump_analyzed_unit(unit: AnalyzedModuleApplicationView<'_>) -> Result<String, Vec<MirError>> {
     lower_analyzed_unit(unit, MirLoweringOptions::default()).map(|lowered| dump_program(lowered.validated.program()))
 }
 
@@ -1396,7 +1400,7 @@ struct DiagnosticSymbols {
 }
 
 struct MirLowerer<'a> {
-    unit: &'a AnalyzedModule,
+    unit: AnalyzedModuleApplicationView<'a>,
     /// Lowering-owned extension arena (a per-call clone of `unit.types` that
     /// this lowering alone extends). Every type read during the walk goes
     /// through this table so synthesized shapes resolve like analyzed ones.
@@ -1848,7 +1852,7 @@ impl<'a> MirLowerer<'a> {
                     builder.prepare_lane_region(body);
                 }
                 if function.nucleum_fragment {
-                    for (def_id, name, ty, span) in inherited_lane_binding_locals(function, &self.unit.resolver) {
+                    for (def_id, name, ty, span) in inherited_lane_binding_locals(function, self.unit.resolver) {
                         builder.add_inherited_lane_param(def_id, name, ty, span);
                     }
                 }
