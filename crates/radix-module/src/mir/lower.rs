@@ -2132,6 +2132,7 @@ struct ReductionFoldContext {
     buckets: Vec<ReductionBucket>,
     coordinates: Vec<MirLocalId>,
     group: Option<HirExpression>,
+    group_dims: Vec<usize>,
     error_tensor: Option<MirOperand>,
 }
 

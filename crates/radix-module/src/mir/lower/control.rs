@@ -1225,11 +1225,19 @@ impl FunctionBuilder<'_> {
             Some(identity) => Some(self.lower_expr_value(identity)?),
             None => None,
         };
-        let bucket_count = if group.is_some() {
+        let group_dims: Vec<usize> = if group.is_some() {
             let Type::Tensor(_, shape) = self.normalized_type(expr.ty?) else {
                 return None;
             };
-            usize::try_from(*i64s_from_literal_index(*shape, self.types)?.first()?).ok()?
+            i64s_from_literal_index(*shape, self.types)?
+                .into_iter()
+                .map(|dim| usize::try_from(dim).ok())
+                .collect::<Option<_>>()?
+        } else {
+            Vec::new()
+        };
+        let bucket_count = if group.is_some() {
+            group_dims.iter().product()
         } else {
             1
         };
@@ -1287,7 +1295,7 @@ impl FunctionBuilder<'_> {
             buckets.push(ReductionBucket { accumulator, score, seen, coordinates: winner });
         }
         let error_tensor = if group.is_some() {
-            Some(self.reduction_tensor(&buckets, result_ty, accumulator_ty, bucket_count, expr.span)?)
+            Some(self.reduction_tensor(&buckets, result_ty, accumulator_ty, &group_dims, expr.span)?)
         } else {
             None
         };
@@ -1328,6 +1336,7 @@ impl FunctionBuilder<'_> {
             buckets: buckets.clone(),
             coordinates: coordinate_locals.clone(),
             group: group.cloned(),
+            group_dims: group_dims.clone(),
             error_tensor,
         };
         let previous = self.reduction_fold.replace(fold);
@@ -1354,7 +1363,7 @@ impl FunctionBuilder<'_> {
                     self.reduction_empty_identity(bucket, identity.clone()?, accumulator_ty, expr.span);
                 }
             }
-            return self.reduction_tensor(&buckets, result_ty, accumulator_ty, bucket_count, expr.span);
+            return self.reduction_tensor(&buckets, result_ty, accumulator_ty, &group_dims, expr.span);
         }
         let bucket = &buckets[0];
         let result = if matches!(op, Op::ArgMax | Op::ArgMin) {
@@ -1424,7 +1433,7 @@ impl FunctionBuilder<'_> {
         buckets: &[ReductionBucket],
         result_ty: MirType,
         element_ty: MirType,
-        extent: usize,
+        dims: &[usize],
         span: Span,
     ) -> Option<MirOperand> {
         let flat_ty =
@@ -1444,9 +1453,11 @@ impl FunctionBuilder<'_> {
         );
         let dimensions = self.construct_temp(
             MirAggregateKind::Array,
-            MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(
-                extent as i64,
-            )))]),
+            MirAggregateFields::Ordered(
+                dims.iter()
+                    .map(|dim| MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(*dim as i64))))
+                    .collect(),
+            ),
             dimensions_ty,
             span,
         );
@@ -1655,21 +1666,43 @@ impl FunctionBuilder<'_> {
             return;
         };
         if let Some(group) = &fold.group {
-            let Some(key) = self.lower_expr_value(group) else {
-                return;
-            };
+            // A group is one key (`pro k`) or a coordinate list (`pro [k0, k1, ..]`);
+            // each key is evaluated once. A bucket is selected when every key equals
+            // its row-major coordinate, so an out-of-range key never aliases another
+            // bucket and falls through to the tensor write failure below.
+            let mut keys = Vec::new();
+            for key_expr in radix_hir::reduction_group_keys(group) {
+                let Some(key) = self.lower_expr_value(key_expr) else {
+                    return;
+                };
+                keys.push(key);
+            }
             let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
             let join = self.fresh_block(span);
             for (index, bucket) in fold.buckets.iter().enumerate() {
                 let selected = self.fresh_block(span);
                 let next = self.fresh_block(span);
-                let condition = self.binary_temp(
-                    MirBinOp::Eq,
-                    key.clone(),
-                    MirOperand::Constant(MirConstant::Int(index as i64)),
-                    boolean,
-                    span,
-                );
+                let mut remainder = index;
+                let mut coordinates = vec![0usize; keys.len()];
+                for (axis, key_dim) in fold.group_dims.iter().enumerate().take(keys.len()).rev() {
+                    coordinates[axis] = remainder % (*key_dim).max(1);
+                    remainder /= (*key_dim).max(1);
+                }
+                let mut condition: Option<MirOperand> = None;
+                for (key, coordinate) in keys.iter().zip(coordinates) {
+                    let matches = self.binary_temp(
+                        MirBinOp::Eq,
+                        key.clone(),
+                        MirOperand::Constant(MirConstant::Int(coordinate as i64)),
+                        boolean,
+                        span,
+                    );
+                    condition = Some(match condition {
+                        Some(previous) => self.binary_temp(MirBinOp::And, previous, matches, boolean, span),
+                        None => matches,
+                    });
+                }
+                let condition = condition.expect("a reduction group has at least one key");
                 self.terminate_current(
                     MirTerminatorKind::Branch { condition, then_block: selected, else_block: next },
                     span,
@@ -1679,8 +1712,7 @@ impl FunctionBuilder<'_> {
                 self.terminate_open_current(MirTerminatorKind::Goto(join), span);
                 self.switch_to(next);
             }
-            if let (Some(tensor), Some(indices)) = (fold.error_tensor.clone(), self.reduction_indices(vec![key], span))
-            {
+            if let (Some(tensor), Some(indices)) = (fold.error_tensor.clone(), self.reduction_indices(keys, span)) {
                 // Preserve the existing write failure, never reinterpret a bad key.
                 self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::TensorSet),

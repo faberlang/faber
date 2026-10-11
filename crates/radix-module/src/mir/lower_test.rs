@@ -4597,6 +4597,37 @@ incipit {
 }
 
 #[test]
+fn reducta_two_key_group_sums_into_a_rank_two_bucket_tensor() {
+    let source = r"functio buckets(tensor<f64, [5]> xs, tensor<numerus, [5]> rows, tensor<numerus, [5]> cols) → tensor<f64, [2, 3]> {
+  redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]] fixum v { redde v }
+}
+functio counts(tensor<f64, [5]> xs, tensor<numerus, [5]> rows, tensor<numerus, [5]> cols) → tensor<numerus, [2, 3]> {
+  redde reducta via numeratio ex xs apud [i] pro [rows[i], cols[i]] fixum v { redde v ≻ 0.0 }
+}
+incipit {
+  fixum lista<f64> xs_data ← [1.0, 2.0, 4.0, 8.0, 16.0]
+  fixum tensor<f64, [5]> xs ← xs_data ↦ tensor<f64, [5]>
+  fixum lista<numerus> rows_data ← [0, 1, 0, 1, 1]
+  fixum tensor<numerus, [5]> rows ← rows_data ↦ tensor<numerus, [5]>
+  fixum lista<numerus> cols_data ← [2, 0, 2, 1, 0]
+  fixum tensor<numerus, [5]> cols ← cols_data ↦ tensor<numerus, [5]>
+  fixum tensor<f64, [2, 3]> grid ← buckets(xs, rows, cols)
+  nota grid
+  fixum tensor<numerus, [2, 3]> tally ← counts(xs, rows, cols)
+  nota tally
+}";
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "reducta-two-key-group.fab",
+        source,
+        &mut host,
+    )
+    .expect("two-key grouped reduction should execute");
+    assert_eq!(host.stdout_lines, ["[0.0, 0.0, 5.0, 18.0, 8.0, 0.0]", "[0, 0, 2, 2, 1, 0]"]);
+}
+
+#[test]
 fn reducta_grouping_preserves_source_and_key_tensors() {
     let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
   redde reducta via numeratio ex values apud [i] pro keys[i] fixum value { redde value }
@@ -4641,6 +4672,37 @@ incipit {
         &mut host,
     )
     .expect_err("an out-of-range bucket must use the existing tensor write failure");
+    let crate::mir::RunSourceError::Stepper(errors) = errors else {
+        panic!("out-of-range grouped key should reach the runner: {errors:?}");
+    };
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0].issue, "runner_tensor_ponde_invalid_index");
+}
+
+#[test]
+fn reducta_two_key_group_out_of_range_key_never_aliases_a_bucket() {
+    // Column 3 of row 0 would be flat bucket 3 (row 1, column 0) under a bare
+    // flat-index compare; each key is checked against its own coordinate.
+    let source = r"functio buckets(tensor<f64, [2]> xs, tensor<numerus, [2]> rows, tensor<numerus, [2]> cols) → tensor<f64, [2, 3]> {
+  redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]] fixum v { redde v }
+}
+incipit {
+  fixum lista<f64> xs_data ← [1.0, 2.0]
+  fixum tensor<f64, [2]> xs ← xs_data ↦ tensor<f64, [2]>
+  fixum lista<numerus> rows_data ← [0, 1]
+  fixum tensor<numerus, [2]> rows ← rows_data ↦ tensor<numerus, [2]>
+  fixum lista<numerus> cols_data ← [3, 0]
+  fixum tensor<numerus, [2]> cols ← cols_data ↦ tensor<numerus, [2]>
+  nota buckets(xs, rows, cols)
+}";
+    let mut host = crate::mir::BufferHost::default();
+    let errors = crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "reducta-two-key-out-of-range.fab",
+        source,
+        &mut host,
+    )
+    .expect_err("an out-of-range coordinate must use the existing tensor write failure");
     let crate::mir::RunSourceError::Stepper(errors) = errors else {
         panic!("out-of-range grouped key should reach the runner: {errors:?}");
     };
