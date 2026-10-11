@@ -374,62 +374,103 @@ pub(crate) fn apply_collection_op_contract(
     signature: &mut MirKernelSignature,
     validation: &MirValidationContext<'_>,
 ) -> Result<(), MirAbiError> {
+    if apply_filum_declaration_launch(function, validation, signature)? {
+        return Ok(());
+    }
+    let Some(contract) = collection_op_contract(function, validation)? else {
+        return Ok(());
+    };
+    apply_launch_contract(contract, signature);
+    Ok(())
+}
+
+/// Apply the `FilumSum` declaration's launch shape when the body declares one.
+///
+/// Returns `true` when the declaration supplied the whole contract, so the
+/// collection-op scan must be skipped.
+fn apply_filum_declaration_launch(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    signature: &mut MirKernelSignature,
+) -> Result<bool, MirAbiError> {
     // SFR-6: a `FilumSum` declaration is the author-stated recipe — it has
     // no collection-op contract, so the collection scan below never sees
     // it. The native collective arm needs the declaration's launch shape
     // (workgroup = lane width W, dispatch = source length, one partial
     // slot per workgroup) from the same facts the plan pass resolves
     // (`kernel_plan_for_function`'s declared-recipe scan).
-    if let Some((lane_width, length)) = filum_declaration_launch_facts(function, validation)? {
-        let partials = if lane_width == 0 {
-            return Err(MirAbiError::new("filum summa lane width must be non-zero"));
-        } else {
-            length.div_ceil(u64::from(lane_width))
-        };
-        signature.workgroup = MirWorkgroupSize {
-            x: lane_width,
-            y: 1,
-            z: 1,
-        };
-        signature.dispatch_size = MirKernelDispatchSize {
-            x: length,
-            y: 1,
-            z: 1,
-        };
-        signature.output.element_count = partials;
-        return Ok(());
-    }
-    let Some(contract) = collection_op_contract(function, validation)? else {
-        return Ok(());
+    let Some((lane_width, length)) = filum_declaration_launch_facts(function, validation)? else {
+        return Ok(false);
     };
+    let partials = if lane_width == 0 {
+        return Err(MirAbiError::new("filum summa lane width must be non-zero"));
+    } else {
+        length.div_ceil(u64::from(lane_width))
+    };
+    signature.workgroup = MirWorkgroupSize {
+        x: lane_width,
+        y: 1,
+        z: 1,
+    };
+    signature.dispatch_size = MirKernelDispatchSize {
+        x: length,
+        y: 1,
+        z: 1,
+    };
+    signature.output.element_count = partials;
+    Ok(true)
+}
+
+/// Assign a flat 1D workgroup and dispatch pair.
+fn set_flat_launch(signature: &mut MirKernelSignature, workgroup_x: u32, dispatch: u64) {
+    signature.workgroup = MirWorkgroupSize {
+        x: workgroup_x,
+        y: 1,
+        z: 1,
+    };
+    signature.dispatch_size = MirKernelDispatchSize {
+        x: dispatch,
+        y: 1,
+        z: 1,
+    };
+}
+
+/// Assign the square 8x8 matmul workgroup and the given dispatch grid.
+fn set_matmul_launch(signature: &mut MirKernelSignature, dispatch_x: u64, dispatch_y: u64) {
+    signature.workgroup = MirWorkgroupSize { x: 8, y: 8, z: 1 };
+    signature.dispatch_size = MirKernelDispatchSize {
+        x: dispatch_x,
+        y: dispatch_y,
+        z: 1,
+    };
+}
+
+/// Translate one resolved collection-op contract into launch geometry.
+fn apply_launch_contract(contract: CollectionOpContract, signature: &mut MirKernelSignature) {
     match contract {
         CollectionOpContract::Reduction {
             length,
             workgroup_x,
             partials,
         } => {
-            signature.workgroup = MirWorkgroupSize {
-                x: workgroup_x,
-                y: 1,
-                z: 1,
-            };
-            signature.dispatch_size = MirKernelDispatchSize {
-                x: length,
-                y: 1,
-                z: 1,
-            };
+            set_flat_launch(signature, workgroup_x, length);
             signature.output.element_count = partials;
         }
         CollectionOpContract::MatMul {
             dispatch_x,
             dispatch_y,
+        }
+        | CollectionOpContract::QuantizedMatMul {
+            dispatch_x,
+            dispatch_y,
+            ..
+        }
+        | CollectionOpContract::GroupedMatMul {
+            dispatch_x,
+            dispatch_y,
+            ..
         } => {
-            signature.workgroup = MirWorkgroupSize { x: 8, y: 8, z: 1 };
-            signature.dispatch_size = MirKernelDispatchSize {
-                x: dispatch_x,
-                y: dispatch_y,
-                z: 1,
-            };
+            set_matmul_launch(signature, dispatch_x, dispatch_y);
         }
         CollectionOpContract::MatMulRuntime => {
             // Same 8x8 workgroup; the grid comes from the call-site shapes
@@ -443,109 +484,60 @@ pub(crate) fn apply_collection_op_contract(
             // with additional outputs or accumulation buffers keeps the 1D
             // contract (a rows grid would under-cover the extra writes).
             if signature.extra_outputs.is_empty() && signature.accumulation_buffers.is_empty() {
-                let lanes = u64::from(crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X);
-                signature.workgroup = MirWorkgroupSize {
-                    x: crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X,
-                    y: 1,
-                    z: 1,
-                };
                 // The 1D dispatch law counts THREADS (the reduction
                 // contract's law): rows workgroups × 32 lanes, so the
                 // derived `ceil(dispatch / workgroup)` grid is exactly the
                 // row count.
-                signature.dispatch_size = MirKernelDispatchSize {
-                    x: rows.saturating_mul(lanes),
-                    y: 1,
-                    z: 1,
-                };
+                set_flat_launch(
+                    signature,
+                    crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X,
+                    rows.saturating_mul(u64::from(crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X)),
+                );
             }
         }
         CollectionOpContract::Transpose { m, n } => {
             // Elementwise-style 1D contract: one thread per output element
             // of the rank-2 remap (S5-U1).
-            signature.workgroup = MirWorkgroupSize {
-                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
-                y: 1,
-                z: 1,
-            };
-            signature.dispatch_size = MirKernelDispatchSize {
-                x: m.saturating_mul(n),
-                y: 1,
-                z: 1,
-            };
+            set_flat_launch(
+                signature,
+                crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                m.saturating_mul(n),
+            );
         }
         // U3 head-axis: the batch folds into the same elementwise-style 1D
         // contract — one thread per output element of the whole batched
         // `[batch, N, M]` output (`batch · M · N` threads).
         CollectionOpContract::BatchedTranspose { batch, m, n } => {
-            signature.workgroup = MirWorkgroupSize {
-                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
-                y: 1,
-                z: 1,
-            };
-            signature.dispatch_size = MirKernelDispatchSize {
-                x: batch.saturating_mul(m).saturating_mul(n),
-                y: 1,
-                z: 1,
-            };
-        }
-        CollectionOpContract::QuantizedMatMul {
-            dispatch_x,
-            dispatch_y,
-            ..
-        }
-        | CollectionOpContract::GroupedMatMul {
-            dispatch_x,
-            dispatch_y,
-            ..
-        } => {
-            signature.workgroup = MirWorkgroupSize { x: 8, y: 8, z: 1 };
-            signature.dispatch_size = MirKernelDispatchSize {
-                x: dispatch_x,
-                y: dispatch_y,
-                z: 1,
-            };
+            set_flat_launch(
+                signature,
+                crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                batch.saturating_mul(m).saturating_mul(n),
+            );
         }
         CollectionOpContract::BatchedAttention {
             output_elements, ..
         } => {
-            signature.workgroup = MirWorkgroupSize { x: 64, y: 1, z: 1 };
-            signature.dispatch_size = MirKernelDispatchSize {
-                x: output_elements,
-                y: 1,
-                z: 1,
-            };
+            set_flat_launch(signature, 64, output_elements);
         }
         CollectionOpContract::SsmConv1d {
             length, channels, ..
         } => {
-            signature.workgroup = MirWorkgroupSize {
-                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
-                y: 1,
-                z: 1,
-            };
-            signature.dispatch_size = MirKernelDispatchSize {
-                x: length.saturating_mul(channels),
-                y: 1,
-                z: 1,
-            };
+            set_flat_launch(
+                signature,
+                crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                length.saturating_mul(channels),
+            );
         }
         CollectionOpContract::SsmScan {
             length, state_dim, ..
         } => {
-            signature.workgroup = MirWorkgroupSize {
-                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
-                y: 1,
-                z: 1,
-            };
-            signature.dispatch_size = MirKernelDispatchSize {
-                x: length.saturating_mul(state_dim),
-                y: 1,
-                z: 1,
-            };
+            set_flat_launch(
+                signature,
+                crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                length.saturating_mul(state_dim),
+            );
         }
     }
-    Ok(())
 }
 
 /// The launch facts of the kernel body's `FilumSum` declaration (SFR-6):
@@ -628,204 +620,24 @@ pub fn collection_op_contract(
                 | MirCollectionOp::TensorMean
                 | MirCollectionOp::TensorMax
                 | MirCollectionOp::TensorMin => {
-                    // PGC-R5: skip the DEAD stability-max idiom — a
-                    // `TensorMax`/`TensorMin` whose temp destination only
-                    // copies into scalar locals nothing ever reads (the
-                    // `_stability_max` coalesce const of the causal-softmax
-                    // idiom is the standing example). Narrow by
-                    // construction: Sum/Mean reductions and any
-                    // tensor-typed copy stay live (a later subchain may
-                    // read them — the S3-A5 cross-subchain blind spot),
-                    // and the emitters' dead skips are the precedent.
-                    if matches!(op, MirCollectionOp::TensorMax | MirCollectionOp::TensorMin)
-                        && destination
-                            .as_ref()
-                            .is_some_and(|dest| reduction_destination_is_dead(function, dest))
+                    if let Some(contract) =
+                        reduction_contract(op, function, args, destination, validation)?
                     {
-                        continue;
+                        return Ok(Some(contract));
                     }
-                    let Some(operand_ty) = args
-                        .first()
-                        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
-                    else {
-                        continue;
-                    };
-                    let length = device_view_element_count(operand_ty, validation)?;
-                    if length == 0 {
-                        return Err(MirAbiError::new("reduction tensor length must be non-zero"));
-                    }
-                    let workgroup_x = reduction_workgroup_x(length);
-                    let partials = length.div_ceil(u64::from(workgroup_x));
-                    return Ok(Some(CollectionOpContract::Reduction {
-                        length,
-                        workgroup_x,
-                        partials,
-                    }));
                 }
                 MirCollectionOp::TensorMatMul => {
-                    let Some(left_ty) = args
-                        .first()
-                        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
-                    else {
-                        continue;
-                    };
-                    let Some(right_ty) = args
-                        .get(1)
-                        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
-                    else {
-                        continue;
-                    };
-                    let left_all = crate::tensor_type::tensor_dims(left_ty, validation)
-                        .map_err(MirAbiError::new)?;
-                    let right_all = crate::tensor_type::tensor_dims(right_ty, validation)
-                        .map_err(MirAbiError::new)?;
-                    let runtime = left_all
-                        .iter()
-                        .chain(&right_all)
-                        .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime));
-                    if runtime {
-                        // Only the rank-2 contraction takes run-time extents;
-                        // batched stays literal-only (named refusal).
-                        if left_all.len() != 2 || !(1..=2).contains(&right_all.len()) {
-                            return Err(MirAbiError::new(
-                                "matmul with run-time extents requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
-                            ));
-                        }
-                        if let (
-                            crate::tensor_type::Dim::Literal(left_k),
-                            crate::tensor_type::Dim::Literal(right_k),
-                        ) = (left_all[1], right_all[0])
-                            && left_k != right_k
-                        {
-                            return Err(MirAbiError::new("matmul inner dimensions must match"));
-                        }
-                        return Ok(Some(CollectionOpContract::MatMulRuntime));
+                    if let Some(contract) = matmul_contract(function, args, validation)? {
+                        return Ok(Some(contract));
                     }
-                    let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
-                        .map_err(MirAbiError::new)?;
-                    let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
-                        .map_err(MirAbiError::new)?;
-                    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
-                    // U1 head-axis: a rank-3/4 receiver with a rank-2+ right
-                    // operand carrying leading batch axes is the batched
-                    // contraction (decode `[5,3,1,64]·[5,64,76]` and prefill
-                    // `[5,3,36,64]·[5,64,36]`). The argument's batch dims
-                    // must be a PREFIX of the receiver's (the GQA share:
-                    // K/V per kv-head broadcast over q-per-kv heads). The
-                    // batch folds into `dispatch_y` — one padded row-block
-                    // per batch — so the workgroup/tile grid laws are
-                    // unchanged and the rank-2 arm stays byte-identical.
-                    let batched_rank = left_dims.len() >= 3
-                        && left_dims.len() <= 4
-                        && right_dims.len() >= 2
-                        && right_dims.len() <= left_dims.len();
-                    if batched_rank {
-                        let batch_axis_count = right_dims.len() - 2;
-                        for axis in 0..batch_axis_count {
-                            if left_dims[axis] != right_dims[axis] {
-                                return Err(MirAbiError::new(
-                                    "batched matmul requires the right operand's leading batch dims to be a prefix of the left operand's batch dims",
-                                ));
-                            }
-                        }
-                        if left_dims[left_dims.len() - 1] != right_dims[right_dims.len() - 2] {
-                            return Err(MirAbiError::new("matmul inner dimensions must match"));
-                        }
-                        let m = left_dims[left_dims.len() - 2];
-                        let n = right_dims[right_dims.len() - 1];
-                        let batch = left_dims[..left_dims.len() - 2].iter().product::<u64>();
-                        return Ok(Some(CollectionOpContract::MatMul {
-                            dispatch_x: n.div_ceil(tile),
-                            dispatch_y: batch * m.div_ceil(tile),
-                        }));
-                    }
-                    if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
-                        return Err(MirAbiError::new(
-                            "matmul dispatch contract requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
-                        ));
-                    }
-                    if left_dims[1] != right_dims[0] {
-                        return Err(MirAbiError::new("matmul inner dimensions must match"));
-                    }
-                    let right_columns = right_dims.get(1).copied().unwrap_or(1);
-                    return Ok(Some(CollectionOpContract::MatMul {
-                        dispatch_x: right_columns.div_ceil(tile),
-                        dispatch_y: left_dims[0].div_ceil(tile),
-                    }));
                 }
                 MirCollectionOp::TensorTranspose => {
-                    let Some(operand_ty) = args
-                        .first()
-                        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
-                    else {
-                        continue;
-                    };
-                    let dims = crate::tensor_type::tensor_literal_dims(operand_ty, validation)
-                        .map_err(MirAbiError::new)?;
-                    if dims.len() == 3 || dims.len() == 4 {
-                        // U3 head-axis: a rank-3/4 operand is the batched
-                        // transpose — leading batch (head) axes fold into
-                        // the batch count, the trailing `[M, N]` pair swaps.
-                        // Rank 5+ stays closed at this typed gate (the
-                        // device-view family admits at most rank 4).
-                        let m = dims[dims.len() - 2];
-                        let n = dims[dims.len() - 1];
-                        let batch = dims[..dims.len() - 2]
-                            .iter()
-                            .copied()
-                            .try_fold(1_u64, u64::checked_mul)
-                            .ok_or_else(|| {
-                                MirAbiError::new("batched transpose batch count overflows u64")
-                            })?;
-                        if m == 0 || n == 0 || batch == 0 {
-                            return Err(MirAbiError::new(
-                                "transpose dispatch contract requires non-zero dimensions",
-                            ));
-                        }
-                        return Ok(Some(CollectionOpContract::BatchedTranspose { batch, m, n }));
+                    if let Some(contract) = transpose_contract(function, args, validation)? {
+                        return Ok(Some(contract));
                     }
-                    if dims.len() != 2 {
-                        return Err(MirAbiError::new(
-                            "transpose dispatch contract requires a rank-2 tensor operand, or rank-3/4 for the batched transpose (rank 5+ is closed)",
-                        ));
-                    }
-                    if dims[0] == 0 || dims[1] == 0 {
-                        return Err(MirAbiError::new(
-                            "transpose dispatch contract requires non-zero dimensions",
-                        ));
-                    }
-                    return Ok(Some(CollectionOpContract::Transpose {
-                        m: dims[0],
-                        n: dims[1],
-                    }));
                 }
                 MirCollectionOp::TensorQuantizedMatMul => {
-                    let (left_dims, right_dims, layout) =
-                        packed_rank2_matmul_operands(function, args, validation)?;
-                    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
-                    let m = left_dims[0];
-                    let n = right_dims[1];
-                    // M=1 quantized dispatch exists as a shared, lane-neutral
-                    // contract: a single flat grid row (same `ceil(N/8)`
-                    // workgroups along x). Whether a device lane carries a
-                    // dedicated GEMV body — and its thread geometry — is a
-                    // per-lane recipe fact (Metal: `radix-mir-metal`
-                    // quantized_matmul emit); the ELP-02 lane admission map
-                    // is the handoff for stating it per lane. Prefill keeps
-                    // the tiled GEMM grid.
-                    let (dispatch_x, dispatch_y) = if m == 1 {
-                        (n.div_ceil(tile), 1)
-                    } else {
-                        (n.div_ceil(tile), m.div_ceil(tile))
-                    };
-                    return Ok(Some(CollectionOpContract::QuantizedMatMul {
-                        dispatch_x,
-                        dispatch_y,
-                        m,
-                        k: left_dims[1],
-                        n,
-                        layout,
-                    }));
+                    return Ok(Some(quantized_matmul_contract(function, args, validation)?));
                 }
                 MirCollectionOp::TensorGroupedMatMul => {
                     return Ok(Some(grouped_matmul_contract(function, args, validation)?));
@@ -894,6 +706,229 @@ pub fn collection_op_contract(
         }
     }
     Ok(None)
+}
+
+/// Matmul contract for the current `TensorMatMul`: the run-time-extent
+/// rank-2 contraction, the rank-2 literal grid, or the batched fold.
+fn matmul_contract(
+    function: &MirFunction,
+    args: &[MirOperand],
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<CollectionOpContract>, MirAbiError> {
+    let Some(left_ty) = args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
+    else {
+        return Ok(None);
+    };
+    let Some(right_ty) = args
+        .get(1)
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
+    else {
+        return Ok(None);
+    };
+    let left_all =
+        crate::tensor_type::tensor_dims(left_ty, validation).map_err(MirAbiError::new)?;
+    let right_all =
+        crate::tensor_type::tensor_dims(right_ty, validation).map_err(MirAbiError::new)?;
+    let runtime = left_all
+        .iter()
+        .chain(&right_all)
+        .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime));
+    if runtime {
+        // Only the rank-2 contraction takes run-time extents;
+        // batched stays literal-only (named refusal).
+        if left_all.len() != 2 || !(1..=2).contains(&right_all.len()) {
+            return Err(MirAbiError::new(
+                "matmul with run-time extents requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
+            ));
+        }
+        if let (crate::tensor_type::Dim::Literal(left_k), crate::tensor_type::Dim::Literal(right_k)) =
+            (left_all[1], right_all[0])
+            && left_k != right_k
+        {
+            return Err(MirAbiError::new("matmul inner dimensions must match"));
+        }
+        return Ok(Some(CollectionOpContract::MatMulRuntime));
+    }
+    let left_dims =
+        crate::tensor_type::tensor_literal_dims(left_ty, validation).map_err(MirAbiError::new)?;
+    let right_dims =
+        crate::tensor_type::tensor_literal_dims(right_ty, validation).map_err(MirAbiError::new)?;
+    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
+    // U1 head-axis: a rank-3/4 receiver with a rank-2+ right
+    // operand carrying leading batch axes is the batched
+    // contraction (decode `[5,3,1,64]·[5,64,76]` and prefill
+    // `[5,3,36,64]·[5,64,36]`). The argument's batch dims
+    // must be a PREFIX of the receiver's (the GQA share:
+    // K/V per kv-head broadcast over q-per-kv heads). The
+    // batch folds into `dispatch_y` — one padded row-block
+    // per batch — so the workgroup/tile grid laws are
+    // unchanged and the rank-2 arm stays byte-identical.
+    let batched_rank = left_dims.len() >= 3
+        && left_dims.len() <= 4
+        && right_dims.len() >= 2
+        && right_dims.len() <= left_dims.len();
+    if batched_rank {
+        let batch_axis_count = right_dims.len() - 2;
+        for axis in 0..batch_axis_count {
+            if left_dims[axis] != right_dims[axis] {
+                return Err(MirAbiError::new(
+                    "batched matmul requires the right operand's leading batch dims to be a prefix of the left operand's batch dims",
+                ));
+            }
+        }
+        if left_dims[left_dims.len() - 1] != right_dims[right_dims.len() - 2] {
+            return Err(MirAbiError::new("matmul inner dimensions must match"));
+        }
+        let m = left_dims[left_dims.len() - 2];
+        let n = right_dims[right_dims.len() - 1];
+        let batch = left_dims[..left_dims.len() - 2].iter().product::<u64>();
+        return Ok(Some(CollectionOpContract::MatMul {
+            dispatch_x: n.div_ceil(tile),
+            dispatch_y: batch * m.div_ceil(tile),
+        }));
+    }
+    if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
+        return Err(MirAbiError::new(
+            "matmul dispatch contract requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
+        ));
+    }
+    if left_dims[1] != right_dims[0] {
+        return Err(MirAbiError::new("matmul inner dimensions must match"));
+    }
+    let right_columns = right_dims.get(1).copied().unwrap_or(1);
+    Ok(Some(CollectionOpContract::MatMul {
+        dispatch_x: right_columns.div_ceil(tile),
+        dispatch_y: left_dims[0].div_ceil(tile),
+    }))
+}
+
+/// Transpose contract for the current `TensorTranspose`: the rank-2 remap or
+/// the rank-3/4 batched fold.
+fn transpose_contract(
+    function: &MirFunction,
+    args: &[MirOperand],
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<CollectionOpContract>, MirAbiError> {
+    let Some(operand_ty) = args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
+    else {
+        return Ok(None);
+    };
+    let dims = crate::tensor_type::tensor_literal_dims(operand_ty, validation)
+        .map_err(MirAbiError::new)?;
+    if dims.len() == 3 || dims.len() == 4 {
+        // U3 head-axis: a rank-3/4 operand is the batched
+        // transpose — leading batch (head) axes fold into
+        // the batch count, the trailing `[M, N]` pair swaps.
+        // Rank 5+ stays closed at this typed gate (the
+        // device-view family admits at most rank 4).
+        let m = dims[dims.len() - 2];
+        let n = dims[dims.len() - 1];
+        let batch = dims[..dims.len() - 2]
+            .iter()
+            .copied()
+            .try_fold(1_u64, u64::checked_mul)
+            .ok_or_else(|| MirAbiError::new("batched transpose batch count overflows u64"))?;
+        if m == 0 || n == 0 || batch == 0 {
+            return Err(MirAbiError::new(
+                "transpose dispatch contract requires non-zero dimensions",
+            ));
+        }
+        return Ok(Some(CollectionOpContract::BatchedTranspose { batch, m, n }));
+    }
+    if dims.len() != 2 {
+        return Err(MirAbiError::new(
+            "transpose dispatch contract requires a rank-2 tensor operand, or rank-3/4 for the batched transpose (rank 5+ is closed)",
+        ));
+    }
+    if dims[0] == 0 || dims[1] == 0 {
+        return Err(MirAbiError::new(
+            "transpose dispatch contract requires non-zero dimensions",
+        ));
+    }
+    Ok(Some(CollectionOpContract::Transpose {
+        m: dims[0],
+        n: dims[1],
+    }))
+}
+
+/// Quantized-matmul contract for the current `TensorQuantizedMatMul`.
+fn quantized_matmul_contract(
+    function: &MirFunction,
+    args: &[MirOperand],
+    validation: &MirValidationContext<'_>,
+) -> Result<CollectionOpContract, MirAbiError> {
+    let (left_dims, right_dims, layout) = packed_rank2_matmul_operands(function, args, validation)?;
+    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
+    let m = left_dims[0];
+    let n = right_dims[1];
+    // M=1 quantized dispatch exists as a shared, lane-neutral
+    // contract: a single flat grid row (same `ceil(N/8)`
+    // workgroups along x). Whether a device lane carries a
+    // dedicated GEMV body — and its thread geometry — is a
+    // per-lane recipe fact (Metal: `radix-mir-metal`
+    // quantized_matmul emit); the ELP-02 lane admission map
+    // is the handoff for stating it per lane. Prefill keeps
+    // the tiled GEMM grid.
+    let (dispatch_x, dispatch_y) = if m == 1 {
+        (n.div_ceil(tile), 1)
+    } else {
+        (n.div_ceil(tile), m.div_ceil(tile))
+    };
+    Ok(CollectionOpContract::QuantizedMatMul {
+        dispatch_x,
+        dispatch_y,
+        m,
+        k: left_dims[1],
+        n,
+        layout,
+    })
+}
+
+/// Reduction-family contract for the current `Sum`/`Mean`/`Max`/`Min` op.
+fn reduction_contract(
+    op: MirCollectionOp,
+    function: &MirFunction,
+    args: &[MirOperand],
+    destination: &Option<MirPlace>,
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<CollectionOpContract>, MirAbiError> {
+    // PGC-R5: skip the DEAD stability-max idiom — a
+    // `TensorMax`/`TensorMin` whose temp destination only
+    // copies into scalar locals nothing ever reads (the
+    // `_stability_max` coalesce const of the causal-softmax
+    // idiom is the standing example). Narrow by
+    // construction: Sum/Mean reductions and any
+    // tensor-typed copy stay live (a later subchain may
+    // read them — the S3-A5 cross-subchain blind spot),
+    // and the emitters' dead skips are the precedent.
+    if matches!(op, MirCollectionOp::TensorMax | MirCollectionOp::TensorMin)
+        && destination
+            .as_ref()
+            .is_some_and(|dest| reduction_destination_is_dead(function, dest))
+    {
+        return Ok(None);
+    }
+    let Some(operand_ty) = args
+        .first()
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
+    else {
+        return Ok(None);
+    };
+    let length = device_view_element_count(operand_ty, validation)?;
+    if length == 0 {
+        return Err(MirAbiError::new("reduction tensor length must be non-zero"));
+    }
+    let workgroup_x = reduction_workgroup_x(length);
+    let partials = length.div_ceil(u64::from(workgroup_x));
+    Ok(Some(CollectionOpContract::Reduction {
+        length,
+        workgroup_x,
+        partials,
+    }))
 }
 
 /// PGC-R5: resolve the `RowReduction` contract for a row-reduction-family
@@ -1230,26 +1265,7 @@ fn batched_attention_contract(
     let axes_base = args.len() - 5;
     let kind_index = axes_base - 1;
     let kind_value = const_nonnegative_u64(args, kind_index, "attention kind")?;
-    let (kind, rotate_half) = match kind_value {
-        0 => (crate::kernel_plan::BatchedAttentionKind::ProjectionQ, false),
-        1 => (crate::kernel_plan::BatchedAttentionKind::ProjectionK, false),
-        2 => (crate::kernel_plan::BatchedAttentionKind::ProjectionV, false),
-        // 6/7 are the same Q/K projection contracts with the explicit
-        // Qwen/NeoX rotate-half mapping carried as a plan fact.
-        6 => (crate::kernel_plan::BatchedAttentionKind::ProjectionQ, true),
-        7 => (crate::kernel_plan::BatchedAttentionKind::ProjectionK, true),
-        3 => (crate::kernel_plan::BatchedAttentionKind::Scores, false),
-        4 => (crate::kernel_plan::BatchedAttentionKind::Softmax, false),
-        5 => (
-            crate::kernel_plan::BatchedAttentionKind::ContextSequenceMajor,
-            false,
-        ),
-        other => {
-            return Err(MirAbiError::new(format!(
-                "batched attention kind {other} is not admitted"
-            )));
-        }
-    };
+    let (kind, rotate_half) = batched_attention_kind(kind_value)?;
     let kv_heads = const_u64(args, axes_base, "kv_heads")?;
     let q_per_kv = const_u64(args, axes_base + 1, "q_per_kv")?;
     let seq = const_u64(args, axes_base + 2, "sequence")?;
@@ -1354,6 +1370,32 @@ fn batched_attention_contract(
         rotate_half,
         scale_bits,
         output_elements,
+    })
+}
+
+/// Decode the batched-attention operation kind and its rotate-half flag.
+fn batched_attention_kind(
+    kind_value: u64,
+) -> Result<(crate::kernel_plan::BatchedAttentionKind, bool), MirAbiError> {
+    Ok(match kind_value {
+        0 => (crate::kernel_plan::BatchedAttentionKind::ProjectionQ, false),
+        1 => (crate::kernel_plan::BatchedAttentionKind::ProjectionK, false),
+        2 => (crate::kernel_plan::BatchedAttentionKind::ProjectionV, false),
+        // 6/7 are the same Q/K projection contracts with the explicit
+        // Qwen/NeoX rotate-half mapping carried as a plan fact.
+        6 => (crate::kernel_plan::BatchedAttentionKind::ProjectionQ, true),
+        7 => (crate::kernel_plan::BatchedAttentionKind::ProjectionK, true),
+        3 => (crate::kernel_plan::BatchedAttentionKind::Scores, false),
+        4 => (crate::kernel_plan::BatchedAttentionKind::Softmax, false),
+        5 => (
+            crate::kernel_plan::BatchedAttentionKind::ContextSequenceMajor,
+            false,
+        ),
+        other => {
+            return Err(MirAbiError::new(format!(
+                "batched attention kind {other} is not admitted"
+            )));
+        }
     })
 }
 

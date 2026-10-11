@@ -209,7 +209,7 @@ struct KernelBuild {
 #[derive(Debug, Clone)]
 struct ProgramBuffer {
     id: BufferId,
-    /// The kernel source function that minted this buffer; a SingleRun
+    /// The kernel source function that minted this buffer; a `SingleRun`
     /// program joins same-named slots only within one function.
     function: MirFunctionId,
     name: String,
@@ -335,8 +335,8 @@ pub struct DeviceGradientLink {
 /// policy itself.
 fn direct_callee_function_id(callee: &MirCallee) -> Option<MirFunctionId> {
     match callee {
-        MirCallee::Function(id) => Some(*id),
-        MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => Some(*id),
+        MirCallee::Function(id)
+        | MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => Some(*id),
         MirCallee::Value(_) | MirCallee::Closure(_) | MirCallee::Definition { .. } => None,
     }
 }
@@ -793,7 +793,7 @@ struct KernelBuilder<'a> {
     builds: Vec<KernelBuild>,
     /// Whether same-named parameter slots of DIFFERENT kernels join one
     /// buffer. Training and device-resident programs wire kernels through
-    /// shared names; a SingleRun program keys residency on host backings, so
+    /// shared names; a `SingleRun` program keys residency on host backings, so
     /// each kernel owns its slots and a name coincidence is not a join.
     ///
     /// KNOWN VIOLATION of the value-identity rule (register V-01 training
