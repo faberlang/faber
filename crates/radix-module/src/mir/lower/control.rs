@@ -1702,7 +1702,9 @@ impl FunctionBuilder<'_> {
                         None => matches,
                     });
                 }
-                let condition = condition.expect("a reduction group has at least one key");
+                let Some(condition) = condition else {
+                    return;
+                };
                 self.terminate_current(
                     MirTerminatorKind::Branch { condition, then_block: selected, else_block: next },
                     span,
