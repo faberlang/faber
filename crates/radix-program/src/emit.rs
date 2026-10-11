@@ -171,7 +171,7 @@ pub fn package_rust_runtime_plan<R>(
 fn compile_package_internal(
     config: &Config,
     input: &Path,
-    _test_selection: Option<&RustTestSelection>,
+    test_selection: Option<&RustTestSelection>,
     include_proba: bool,
     proba_filter: Option<&TestSourceFilter>,
     seams: &EmissionSeams,
@@ -214,31 +214,7 @@ fn compile_package_internal(
     };
 
     if config.target == Target::HirGo {
-        #[cfg(not(feature = "hir-go"))]
-        return compile_failure(vec![
-            crate::package_diagnostic_error(
-                "target `go` is not available in this faber build; rebuild with feature `hir-go`",
-            )
-            .with_file(input.display().to_string())
-            .with_arg("issue", "package_target_unavailable")
-            .with_arg("target", "go"),
-        ]);
-
-        #[cfg(feature = "hir-go")]
-        {
-            let plan = plan_package(&package, Target::HirGo);
-            if !plan.supported {
-                return compile_failure(vec![
-                    crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
-                        "package compilation does not support this target".to_owned()
-                    }))
-                    .with_file(input.display().to_string())
-                    .with_arg("issue", "package_target_unsupported")
-                    .with_arg("target", plan.target),
-                ]);
-            }
-            return (seams.emit_go)(&package, input);
-        }
+        return compile_package_go(&package, input, seams);
     }
 
     // U6-D: the package-aware Wasm path accepts Target::MirWasm (the text
@@ -246,57 +222,7 @@ fn compile_package_internal(
     // through the package-to-Wasm builder (entry + sibling units, canonical
     // `faber_external` symbol linking).
     if config.target == Target::MirWasm {
-        #[cfg(not(feature = "mir-wasm"))]
-        return compile_failure(vec![crate::package_diagnostic_error(
-            "target `wasm` is not available in this faber build; rebuild with feature `mir-wasm`",
-        )
-        .with_file(input.display().to_string())
-        .with_arg("issue", "package_target_unavailable")
-        .with_arg("target", "wasm")]);
-
-        #[cfg(feature = "mir-wasm")]
-        {
-            let plan = plan_package(&package, Target::MirWasm);
-            if !plan.supported {
-                return compile_failure(vec![
-                    crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
-                        "package compilation does not support this target".to_owned()
-                    }))
-                    .with_file(input.display().to_string())
-                    .with_arg("issue", "package_target_unsupported")
-                    .with_arg("target", plan.target),
-                ]);
-            }
-            let mut package = package;
-            let options = crate::wasm::PackageWasmOptions::new(
-                package
-                    .spec
-                    .package_root
-                    .join("target")
-                    .join("faber")
-                    .join("wasm"),
-            );
-            let build = match crate::wasm::build_package_wasm_from_graph(&mut package, &options) {
-                Ok(build) => build,
-                Err(diagnostics) => return compile_failure(diagnostics),
-            };
-            let entry_wat = build
-                .modules
-                .iter()
-                .find(|module| module.is_entry)
-                .map(|module| module.wat.clone())
-                .unwrap_or_default();
-            return PackageCompileResult {
-                compile_result: CompileResult {
-                    output: Some(radix_module::Output::WasmText(
-                        radix_module::WasmTextOutput { code: entry_wat },
-                    )),
-                    diagnostics: package.diagnostics.clone(),
-                },
-                #[cfg(feature = "hir-go")]
-                go_modules: Vec::new(),
-            };
-        }
+        return compile_package_wasm(package, input);
     }
 
     if config.target != Target::HirRust {
@@ -336,9 +262,97 @@ fn compile_package_internal(
         crate::rust_target::compile_package_rust(
             package,
             &library_resolver,
-            _test_selection,
+            test_selection,
             seams.analysis.locale_loader,
         )
+    }
+}
+
+fn compile_package_go(
+    package: &AnalyzedProgram,
+    input: &Path,
+    seams: &EmissionSeams,
+) -> PackageCompileResult {
+    #[cfg(not(feature = "hir-go"))]
+    return compile_failure(vec![
+        crate::package_diagnostic_error(
+            "target `go` is not available in this faber build; rebuild with feature `hir-go`",
+        )
+        .with_file(input.display().to_string())
+        .with_arg("issue", "package_target_unavailable")
+        .with_arg("target", "go"),
+    ]);
+
+    #[cfg(feature = "hir-go")]
+    {
+        let plan = plan_package(package, Target::HirGo);
+        if !plan.supported {
+            return compile_failure(vec![
+                crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
+                    "package compilation does not support this target".to_owned()
+                }))
+                .with_file(input.display().to_string())
+                .with_arg("issue", "package_target_unsupported")
+                .with_arg("target", plan.target),
+            ]);
+        }
+        (seams.emit_go)(package, input)
+    }
+}
+
+fn compile_package_wasm(package: AnalyzedProgram, input: &Path) -> PackageCompileResult {
+    #[cfg(not(feature = "mir-wasm"))]
+    return compile_failure(vec![
+        crate::package_diagnostic_error(
+            "target `wasm` is not available in this faber build; rebuild with feature `mir-wasm`",
+        )
+        .with_file(input.display().to_string())
+        .with_arg("issue", "package_target_unavailable")
+        .with_arg("target", "wasm"),
+    ]);
+
+    #[cfg(feature = "mir-wasm")]
+    {
+        let plan = plan_package(&package, Target::MirWasm);
+        if !plan.supported {
+            return compile_failure(vec![
+                crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
+                    "package compilation does not support this target".to_owned()
+                }))
+                .with_file(input.display().to_string())
+                .with_arg("issue", "package_target_unsupported")
+                .with_arg("target", plan.target),
+            ]);
+        }
+        let mut package = package;
+        let options = crate::wasm::PackageWasmOptions::new(
+            package
+                .spec
+                .package_root
+                .join("target")
+                .join("faber")
+                .join("wasm"),
+        );
+        let build = match crate::wasm::build_package_wasm_from_graph(&mut package, &options) {
+            Ok(build) => build,
+            Err(diagnostics) => return compile_failure(diagnostics),
+        };
+        let entry_wat = build
+            .modules
+            .iter()
+            .find(|module| module.is_entry)
+            .map(|module| module.wat.clone())
+            .unwrap_or_default();
+        PackageCompileResult {
+            compile_result: CompileResult {
+                output: Some(radix_module::Output::WasmText(
+                    radix_module::WasmTextOutput { code: entry_wat },
+                )),
+                diagnostics: package.diagnostics.clone(),
+            },
+            #[cfg(feature = "hir-go")]
+            go_modules: Vec::new(),
+        }
     }
 }
 

@@ -564,17 +564,7 @@ fn plan_rust_artifacts(
         });
     }
 
-    push_unique_node(
-        nodes,
-        seen,
-        ArtifactNode {
-            id: "rust:runtime:faber".to_owned(),
-            kind: ArtifactKind::RuntimeDependency,
-            target: Some("rust"),
-            path: PathBuf::from("faber"),
-            depends_on: Vec::new(),
-        },
-    );
+    push_rust_runtime_node(nodes, seen);
 
     // Tokio is selected from HIR async facts (same rule as RustRuntimePlan), not
     // from scanning generated text for `tokio::` or the `block_on` spelling.
@@ -627,6 +617,20 @@ fn plan_rust_artifacts(
             kind: DependencyKind::PackageDependency,
         });
     }
+}
+
+fn push_rust_runtime_node(nodes: &mut Vec<ArtifactNode>, seen: &mut BTreeSet<String>) {
+    push_unique_node(
+        nodes,
+        seen,
+        ArtifactNode {
+            id: "rust:runtime:faber".to_owned(),
+            kind: ArtifactKind::RuntimeDependency,
+            target: Some("rust"),
+            path: PathBuf::from("faber"),
+            depends_on: Vec::new(),
+        },
+    );
 }
 
 fn plan_go_artifacts(

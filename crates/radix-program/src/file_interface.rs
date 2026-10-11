@@ -108,6 +108,71 @@ pub fn extract_file_interface_with_identity(
         });
     }
 
+    insert_file_export_items(
+        analysis,
+        &public_exports,
+        export_identity,
+        file_label,
+        &mut interface,
+    )?;
+
+    // `@ radix backward` companions are compiler-generated synthetic functions
+    // with no HIR item, so they never appear in the loop above. Their typed
+    // signature is attached to the companion resolver symbol by radix's
+    // companion-signature pass; snapshot it into the interface so consumers
+    // can call the companion across the import boundary (SEM004).
+    for (_, backward) in analysis.radix_lanes.iter_backward() {
+        let name = analysis
+            .interner
+            .resolve(backward.companion_name)
+            .to_owned();
+        if !public_exports.contains(&name) {
+            continue;
+        }
+        let Some(symbol) = analysis.resolver.get_symbol(backward.companion_def_id) else {
+            continue;
+        };
+        let Some(ty) = symbol.ty else {
+            continue;
+        };
+        let Type::Func(sig) = analysis.types.get(ty) else {
+            continue;
+        };
+        let callable = snapshot_interface_callable_with_identity(
+            sig,
+            &analysis.types,
+            &analysis.interner,
+            &analysis.resolver,
+            export_identity.map(identity_for).as_ref(),
+        )
+        .map_err(|err| interface_error(file_label, &name, err))?;
+        interface.insert(FileExport {
+            name,
+            kind: FileExportKind::Function(callable),
+        });
+    }
+
+    // `@ ad` routes are program-wide facts, not export-filtered: a private
+    // handler still serves its route (D6.10).
+    interface.routes = radix_module::semantic::passes::ad_routes::route_exports(
+        &analysis.hir,
+        &analysis.types,
+        &analysis.interner,
+        &analysis.resolver,
+        export_identity.map(identity_for).as_ref(),
+    )
+    .map_err(|err| interface_error(file_label, "@ ad route", err))?;
+
+    Ok(interface)
+}
+
+fn insert_file_export_items(
+    analysis: &AnalyzedModule,
+    public_exports: &BTreeSet<&String>,
+    export_identity: Option<&ExportIdentityContext>,
+    file_label: &str,
+    interface: &mut FileInterface,
+) -> Result<(), Diagnostic> {
     for item in &analysis.hir.items {
         let Some(name) = hir_item_name(&item.kind, analysis) else {
             continue;
@@ -175,8 +240,7 @@ pub fn extract_file_interface_with_identity(
                 );
                 FileExportKind::Const(ty, value)
             }
-            HirItemKind::Schema(_) => continue,
-            HirItemKind::Import(_) => continue,
+            HirItemKind::Schema(_) | HirItemKind::Import(_) => continue,
         };
 
         // An `@ nondum` free function stays in the interface so importers can
@@ -201,55 +265,7 @@ pub fn extract_file_interface_with_identity(
         }
         interface.insert(FileExport { name, kind });
     }
-
-    // `@ radix backward` companions are compiler-generated synthetic functions
-    // with no HIR item, so they never appear in the loop above. Their typed
-    // signature is attached to the companion resolver symbol by radix's
-    // companion-signature pass; snapshot it into the interface so consumers
-    // can call the companion across the import boundary (SEM004).
-    for (_, backward) in analysis.radix_lanes.iter_backward() {
-        let name = analysis
-            .interner
-            .resolve(backward.companion_name)
-            .to_owned();
-        if !public_exports.contains(&name) {
-            continue;
-        }
-        let Some(symbol) = analysis.resolver.get_symbol(backward.companion_def_id) else {
-            continue;
-        };
-        let Some(ty) = symbol.ty else {
-            continue;
-        };
-        let Type::Func(sig) = analysis.types.get(ty) else {
-            continue;
-        };
-        let callable = snapshot_interface_callable_with_identity(
-            sig,
-            &analysis.types,
-            &analysis.interner,
-            &analysis.resolver,
-            export_identity.map(identity_for).as_ref(),
-        )
-        .map_err(|err| interface_error(file_label, &name, err))?;
-        interface.insert(FileExport {
-            name,
-            kind: FileExportKind::Function(callable),
-        });
-    }
-
-    // `@ ad` routes are program-wide facts, not export-filtered: a private
-    // handler still serves its route (D6.10).
-    interface.routes = radix_module::semantic::passes::ad_routes::route_exports(
-        &analysis.hir,
-        &analysis.types,
-        &analysis.interner,
-        &analysis.resolver,
-        export_identity.map(identity_for).as_ref(),
-    )
-    .map_err(|err| interface_error(file_label, "@ ad route", err))?;
-
-    Ok(interface)
+    Ok(())
 }
 
 fn snapshot_alias(
@@ -784,9 +800,8 @@ fn hir_item_name(item: &HirItemKind, analysis: &AnalyzedModule) -> Option<String
         HirItemKind::Enum(enm) => analysis.interner.resolve(enm.name),
         HirItemKind::Interface(interface) => analysis.interner.resolve(interface.name),
         HirItemKind::TypeAlias(alias) => analysis.interner.resolve(alias.name),
-        HirItemKind::Schema(_) => return None,
+        HirItemKind::Schema(_) | HirItemKind::Import(_) => return None,
         HirItemKind::Constant(konst) => analysis.interner.resolve(konst.name),
-        HirItemKind::Import(_) => return None,
     };
     Some(name.to_owned())
 }

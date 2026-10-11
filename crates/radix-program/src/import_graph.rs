@@ -75,42 +75,13 @@ pub fn build_mount_plan(
         .collect::<Vec<_>>();
 
     for mount in mounts {
-        if imports.named_aliases.contains(&mount.alias) {
-            diagnostics.push(
-                crate::package_diagnostic_error(format!(
-                    "@ imperia target '{}' must be a wildcard import alias, not a named import",
-                    mount.alias
-                ))
-                .with_file(entry_file.path.display().to_string())
-                .with_arg("issue", "mount_requires_wildcard_alias")
-                .with_arg("alias", mount.alias.clone())
-                .with_span(mount.span),
-            );
-            continue;
-        }
-
-        let Some(module_path) = imports.wildcard_aliases.get(&mount.alias) else {
-            diagnostics.push(
-                crate::package_diagnostic_error(format!(
-                    "@ imperia target '{}' does not name a package-local wildcard import alias",
-                    mount.alias
-                ))
-                .with_file(entry_file.path.display().to_string())
-                .with_arg("issue", "mount_unknown_wildcard_alias")
-                .with_arg("alias", mount.alias.clone())
-                .with_span(mount.span),
-            );
-            continue;
-        };
-        let Some(module_file) = files_by_path.get(module_path) else {
-            diagnostics.push(
-                crate::package_diagnostic_error(format!(
-                    "@ imperia target '{}' resolved to a module that was not loaded",
-                    mount.alias
-                ))
-                .with_file(entry_file.path.display().to_string())
-                .with_span(mount.span),
-            );
+        let Some(module_file) = resolve_mount_module(
+            &mount,
+            &imports,
+            &files_by_path,
+            &entry_file.path,
+            &mut diagnostics,
+        ) else {
             continue;
         };
 
@@ -162,6 +133,54 @@ pub fn build_mount_plan(
             module_cli,
         })
     }
+}
+
+fn resolve_mount_module<'a>(
+    mount: &MountSpec,
+    imports: &ImportAliases,
+    files_by_path: &'a BTreeMap<PathBuf, &'a PackageFile>,
+    entry_path: &Path,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<&'a PackageFile> {
+    if imports.named_aliases.contains(&mount.alias) {
+        diagnostics.push(
+            crate::package_diagnostic_error(format!(
+                "@ imperia target '{}' must be a wildcard import alias, not a named import",
+                mount.alias
+            ))
+            .with_file(entry_path.display().to_string())
+            .with_arg("issue", "mount_requires_wildcard_alias")
+            .with_arg("alias", mount.alias.clone())
+            .with_span(mount.span),
+        );
+        return None;
+    }
+
+    let Some(module_path) = imports.wildcard_aliases.get(&mount.alias) else {
+        diagnostics.push(
+            crate::package_diagnostic_error(format!(
+                "@ imperia target '{}' does not name a package-local wildcard import alias",
+                mount.alias
+            ))
+            .with_file(entry_path.display().to_string())
+            .with_arg("issue", "mount_unknown_wildcard_alias")
+            .with_arg("alias", mount.alias.clone())
+            .with_span(mount.span),
+        );
+        return None;
+    };
+    let Some(module_file) = files_by_path.get(module_path) else {
+        diagnostics.push(
+            crate::package_diagnostic_error(format!(
+                "@ imperia target '{}' resolved to a module that was not loaded",
+                mount.alias
+            ))
+            .with_file(entry_path.display().to_string())
+            .with_span(mount.span),
+        );
+        return None;
+    };
+    Some(*module_file)
 }
 
 #[derive(Default)]
@@ -765,21 +784,14 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
             manifest_path,
             reason,
             cause_issue,
-        } => {
-            let diagnostic = crate::package_diagnostic_error(format!(
-                "installed library provider `{provider}` for import `{specifier}` has an invalid manifest at {}: {reason}",
-                manifest_path.display()
-            ))
-            .with_file(file.display().to_string())
-            .with_arg("issue", "invalid_installed_library_manifest")
-            .with_arg("specifier", specifier)
-            .with_arg("provider", provider)
-            .with_arg("manifest_path", manifest_path.display().to_string());
-            match cause_issue {
-                Some(cause) => diagnostic.with_arg("cause_issue", cause.into_string()),
-                None => diagnostic,
-            }
-        }
+        } => installed_manifest_invalid_diagnostic(
+            file,
+            specifier,
+            provider,
+            manifest_path,
+            reason,
+            cause_issue,
+        ),
         LibraryResolveError::InstalledSourceRootMissing {
             specifier,
             provider,
@@ -853,6 +865,29 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         .with_arg("issue", "undeclared_library_provider")
         .with_arg("specifier", specifier)
         .with_arg("provider", provider),
+    }
+}
+
+fn installed_manifest_invalid_diagnostic(
+    file: &Path,
+    specifier: String,
+    provider: String,
+    manifest_path: PathBuf,
+    reason: String,
+    cause_issue: Option<Box<str>>,
+) -> Diagnostic {
+    let diagnostic = crate::package_diagnostic_error(format!(
+        "installed library provider `{provider}` for import `{specifier}` has an invalid manifest at {}: {reason}",
+        manifest_path.display()
+    ))
+    .with_file(file.display().to_string())
+    .with_arg("issue", "invalid_installed_library_manifest")
+    .with_arg("specifier", specifier)
+    .with_arg("provider", provider)
+    .with_arg("manifest_path", manifest_path.display().to_string());
+    match cause_issue {
+        Some(cause) => diagnostic.with_arg("cause_issue", cause.into_string()),
+        None => diagnostic,
     }
 }
 
