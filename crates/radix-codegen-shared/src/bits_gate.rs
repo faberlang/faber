@@ -13,7 +13,7 @@
 use crate::CodegenError;
 use radix_diagnostics::DiagnosticArg;
 use radix_target::Target;
-use radix_types::{Primitive, Type, TypeId, TypeTable};
+use radix_types::{BitsWidth, Primitive, Type, TypeId, TypeTable};
 
 const ISSUE: &str = "bits_type_unsupported_on_target";
 
@@ -42,9 +42,7 @@ fn target_admits_bits(target: Target) -> bool {
 /// The first raw-bits marker (`b8`) a module wrote, if any. The `lista<b8>`
 /// the `octeti` word names is not one: it is seeded unmarked.
 fn first_bits_marker(types: &TypeTable) -> Option<&'static str> {
-    types
-        .first_authored_bits()
-        .map(|width| width.faber_marker())
+    types.first_authored_bits().map(BitsWidth::faber_marker)
 }
 
 /// # Errors

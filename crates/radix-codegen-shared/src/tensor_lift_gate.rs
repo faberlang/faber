@@ -277,7 +277,6 @@ fn lifted_form(
     target: Target,
     expr: &HirExpression,
 ) -> Option<(Family, String)> {
-    let tensor = |label: String| Some((Family::Tensor, label));
     match &expr.kind {
         // The Rust runtime carries `vel` over a nullable-element tensor (a
         // shifted edge view) with a scalar fallback as `Tensor::coalesce`.
@@ -336,11 +335,6 @@ fn lifted_form(
         {
             None
         }
-        HirExpressionKind::Binary(HirBinOp::And | HirBinOp::Or, ..)
-            if matches!(target, Target::HirTypeScript) =>
-        {
-            None
-        }
         // A shifted edge view (`t.disloco(..)`) is the Rust carrier's form and
         // has no TypeScript method, so `vel` over it stays gated.
         HirExpressionKind::Binary(HirBinOp::Coalesce, lhs, _)
@@ -354,9 +348,12 @@ fn lifted_form(
         {
             None
         }
-        // Unary `-` and `non`, the `✓ ✗` select and `⤒ ⤓` are per-element
-        // carrier calls (`Tensor.map`, `select`, `lift`) on TypeScript.
-        HirExpressionKind::Unary(HirUnOp::Neg | HirUnOp::Not, _) | HirExpressionKind::Si { .. }
+        // `and`/`or`, unary `-` and `non`, the `✓ ✗` select and `⤒ ⤓` are
+        // per-element carrier calls (`Tensor.map`, `select`, `lift`) on
+        // TypeScript.
+        HirExpressionKind::Binary(HirBinOp::And | HirBinOp::Or, ..)
+        | HirExpressionKind::Unary(HirUnOp::Neg | HirUnOp::Not, _)
+        | HirExpressionKind::Si { .. }
             if matches!(target, Target::HirTypeScript) =>
         {
             None
@@ -367,6 +364,18 @@ fn lifted_form(
         {
             None
         }
+        _ => plain_lift_label(types, interner, expr),
+    }
+}
+
+/// The label of a lift whose TypeScript exemption does not apply.
+fn plain_lift_label(
+    types: &TypeTable,
+    interner: &Interner,
+    expr: &HirExpression,
+) -> Option<(Family, String)> {
+    let tensor = |label: String| Some((Family::Tensor, label));
+    match &expr.kind {
         HirExpressionKind::Binary(op, lhs, rhs) => binary_label(
             types,
             *op,

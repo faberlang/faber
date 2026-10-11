@@ -212,15 +212,12 @@ pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
         Type::BoundedAscii { .. } => &[IntrinsicReceiver::Ascii, IntrinsicReceiver::Textus],
         Type::Primitive(Primitive::Regex) => &[IntrinsicReceiver::Regex],
         Type::Primitive(Primitive::Match) => &[IntrinsicReceiver::Match],
-        Type::Primitive(Primitive::Numerus) => &[IntrinsicReceiver::Numeric],
-        Type::Primitive(Primitive::Fractus) => {
+        Type::Primitive(Primitive::Numerus)
+        | Type::SizedNumeric(Primitive::Numerus, _)
+        | Type::ModularWord(_) => &[IntrinsicReceiver::Numeric],
+        Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
             &[IntrinsicReceiver::Fractus, IntrinsicReceiver::Numeric]
         }
-        Type::SizedNumeric(Primitive::Fractus, _) => {
-            &[IntrinsicReceiver::Fractus, IntrinsicReceiver::Numeric]
-        }
-        Type::SizedNumeric(Primitive::Numerus, _) => &[IntrinsicReceiver::Numeric],
-        Type::ModularWord(_) => &[IntrinsicReceiver::Numeric],
         Type::Tensor(_, _) => &[IntrinsicReceiver::Tensor],
         Type::Matrix(_, _) => &[IntrinsicReceiver::Matrix],
         Type::Vector(_, _) => &[IntrinsicReceiver::Vector],
@@ -346,8 +343,8 @@ fn is_modular_word_method(method: &str) -> bool {
 pub fn mir_collection_op(entry: &MethodIntrinsic) -> Option<MirCollectionOp> {
     match entry.mir_kind {
         IntrinsicMirKind::Collection(op) => Some(op),
-        IntrinsicMirKind::Atomic(_) => None,
-        IntrinsicMirKind::HigherOrderAll
+        IntrinsicMirKind::Atomic(_)
+        | IntrinsicMirKind::HigherOrderAll
         | IntrinsicMirKind::HigherOrderAny
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
