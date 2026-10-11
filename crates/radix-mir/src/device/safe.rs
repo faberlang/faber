@@ -300,8 +300,14 @@ impl<'a> DeviceSafeClassifier<'a> {
         let semantic = self.types.get(ty.semantic_id()).clone();
         match semantic {
             Type::Primitive(Primitive::Bivalens | Primitive::Vacuum | Primitive::Numquam)
-            | Type::SizedNumeric(Primitive::Fractus, _) => self.check_device_layout(ty),
-            Type::Alias(_, _) => self.check_device_layout(ty),
+            | Type::SizedNumeric(Primitive::Fractus, _)
+            | Type::Alias(_, _)
+            | Type::ModularWord(_)
+            | Type::Bits(_)
+            | Type::Atomic(_)
+            | Type::Tensor(_, _)
+            | Type::Vector(_, _)
+            | Type::Matrix(_, _) => self.check_device_layout(ty),
             Type::Param(_)
             | Type::Infer(_)
             | Type::InferUnion(_)
@@ -312,6 +318,13 @@ impl<'a> DeviceSafeClassifier<'a> {
             Type::TensorEdgePolicy(_) => {
                 self.record_policy("tensor edge-policy marker is not a runtime value type");
             }
+            Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+            | Type::SizedNumeric(Primitive::Numerus, _) => {
+                self.check_device_layout(ty);
+            }
+            // D11.1: no device clamp lowering yet — fail closed.
+            // N7E-1: the policy-float cell has no device lowering; D6 splits
+            // `trapping` (a language rule) from `saturating` (temporary) in N7E-2.
             Type::Primitive(
                 Primitive::Textus
                 | Primitive::Ascii
@@ -324,21 +337,10 @@ impl<'a> DeviceSafeClassifier<'a> {
                 | Primitive::Ignotum
                 | Primitive::Instans,
             )
-            | Type::SizedInstans(_) => {
-                self.record_policy(format!("device host value type {semantic:?}"));
-            }
-            Type::Primitive(Primitive::Numerus | Primitive::Fractus)
-            | Type::SizedNumeric(Primitive::Numerus, _) => {
-                self.check_device_layout(ty);
-            }
-            Type::ModularWord(_) | Type::Bits(_) => self.check_device_layout(ty),
-            // D11.1: no device clamp lowering yet — fail closed.
-            // N7E-1: the policy-float cell has no device lowering; D6 splits
-            // `trapping` (a language rule) from `saturating` (temporary) in N7E-2.
-            Type::SaturatingWord(_) | Type::PolicyFloat(_, _) => {
-                self.record_policy(format!("device host value type {semantic:?}"));
-            }
-            Type::SizedNumeric(_, _) => {
+            | Type::SizedInstans(_)
+            | Type::SaturatingWord(_)
+            | Type::PolicyFloat(_, _)
+            | Type::SizedNumeric(_, _) => {
                 self.record_policy(format!("device host value type {semantic:?}"));
             }
             Type::Array(inner) if self.is_vector_surrogate_element(inner) => {
@@ -375,10 +377,6 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::BoundedOcteti { .. } => {
                 self.record_policy(format!("device aggregate value type {semantic:?}"));
             }
-            Type::Atomic(_) => self.check_device_layout(ty),
-            Type::Tensor(_, _) => self.check_device_layout(ty),
-            Type::Vector(_, _) => self.check_device_layout(ty),
-            Type::Matrix(_, _) => self.check_device_layout(ty),
             Type::Primitive(Primitive::Nihil) => self.record_policy(SHAPE_DEVICE_NIHIL_VALUE),
         }
     }
@@ -404,52 +402,7 @@ impl<'a> DeviceSafeClassifier<'a> {
                 MirLayoutKind::Aggregate(_) => {
                     self.record_layout(SHAPE_KERNEL_AGGREGATE_LAYOUT);
                 }
-                MirLayoutKind::DeviceView(view) => {
-                    // MLC-4: sparse storage is rejected by name, fail-closed,
-                    // before the host-owned entry and generic storage rows.
-                    if view.storage == MirTensorStorageLayout::Sparse {
-                        self.record_policy(SHAPE_KERNEL_SPARSE_STORAGE);
-                        return;
-                    }
-                    let host_owned_entry = self.allow_host_owned_tensor_entry
-                        && view.storage == MirTensorStorageLayout::HostOwned
-                        && view.locus == MirTensorLocusLayout::Host;
-                    if host_owned_entry {
-                        return;
-                    }
-                    if view.storage != MirTensorStorageLayout::DeviceHandle
-                        || view.locus != MirTensorLocusLayout::Device
-                    {
-                        self.record_policy(SHAPE_KERNEL_HOST_TENSOR_STORAGE);
-                    } else if !view.row_major || !view.contiguous || view.offset_elements != 0 {
-                        self.record_layout("kernel dense tensor view layout");
-                    } else if view.rank != 1 {
-                        self.record_layout(format!("kernel device view rank {}", view.rank));
-                    } else if let Some(element) = view.element.scalar() {
-                        if !matches!(
-                            element,
-                            MirScalarLayout::Bf16
-                                | MirScalarLayout::F32
-                                | MirScalarLayout::I32
-                                | MirScalarLayout::U32
-                                | MirScalarLayout::U8
-                        ) {
-                            self.record_layout(format!(
-                                "kernel device view element {}",
-                                element.spelling()
-                            ));
-                        }
-                    } else if let MirDeviceViewElement::Vector(vector) = view.element
-                        && (!is_device_view_vector(vector.width)
-                            || !is_device_vector_element(vector.element))
-                    {
-                        self.record_layout(format!(
-                            "kernel vector-element device view width {} element {}",
-                            vector.width,
-                            vector.element.spelling()
-                        ));
-                    }
-                }
+                MirLayoutKind::DeviceView(view) => self.check_device_view(view),
                 MirLayoutKind::DeviceVector(vector) => {
                     if vector.width < DEVICE_VECTOR_MIN_WIDTH
                         || vector.width > DEVICE_VECTOR_MAX_WIDTH
@@ -493,6 +446,49 @@ impl<'a> DeviceSafeClassifier<'a> {
                 }
             },
             Err(error) => self.record_layout(error.message),
+        }
+    }
+
+    fn check_device_view(&mut self, view: crate::MirDeviceViewLayout) {
+        // MLC-4: sparse storage is rejected by name, fail-closed,
+        // before the host-owned entry and generic storage rows.
+        if view.storage == MirTensorStorageLayout::Sparse {
+            self.record_policy(SHAPE_KERNEL_SPARSE_STORAGE);
+            return;
+        }
+        let host_owned_entry = self.allow_host_owned_tensor_entry
+            && view.storage == MirTensorStorageLayout::HostOwned
+            && view.locus == MirTensorLocusLayout::Host;
+        if host_owned_entry {
+            return;
+        }
+        if view.storage != MirTensorStorageLayout::DeviceHandle
+            || view.locus != MirTensorLocusLayout::Device
+        {
+            self.record_policy(SHAPE_KERNEL_HOST_TENSOR_STORAGE);
+        } else if !view.row_major || !view.contiguous || view.offset_elements != 0 {
+            self.record_layout("kernel dense tensor view layout");
+        } else if view.rank != 1 {
+            self.record_layout(format!("kernel device view rank {}", view.rank));
+        } else if let Some(element) = view.element.scalar() {
+            if !matches!(
+                element,
+                MirScalarLayout::Bf16
+                    | MirScalarLayout::F32
+                    | MirScalarLayout::I32
+                    | MirScalarLayout::U32
+                    | MirScalarLayout::U8
+            ) {
+                self.record_layout(format!("kernel device view element {}", element.spelling()));
+            }
+        } else if let MirDeviceViewElement::Vector(vector) = view.element
+            && (!is_device_view_vector(vector.width) || !is_device_vector_element(vector.element))
+        {
+            self.record_layout(format!(
+                "kernel vector-element device view width {} element {}",
+                vector.width,
+                vector.element.spelling()
+            ));
         }
     }
 
@@ -986,55 +982,12 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                     },
                 ..
             } => self.record_policy(SHAPE_KERNEL_TENSOR_VIEW_OP),
-            MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic:
-                            MirIntrinsic::Collection(
-                                MirCollectionOp::Sum
-                                    | MirCollectionOp::TensorMean
-                                    | MirCollectionOp::TensorMax
-                                    | MirCollectionOp::TensorMin,
-                            ),
-                        ..
-                    },
-                ..
-            } => {
-                crate::visit::walk_stmt(self, stmt);
-            }
-            MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic:
-                            MirIntrinsic::Collection(
-                                MirCollectionOp::TensorMatMul
-                                | MirCollectionOp::TensorQuantizedMatMul
-                                // EXEC02-PS3: `TensorSsmConv1d` is a recipe
-                                // op (`CollectionKernelPlan::SsmConv1d`) with
-                                // an NVVM body emitter; other targets keep
-                                // their own per-op fail-closed emit gates.
-                                | MirCollectionOp::TensorSsmConv1d
-                                // EXEC02-PC1: `TensorSsmScan` and
-                                // `TensorGroupedMatMul` follow the same
-                                // recipe admission (`nvvm/ssm_scan.rs` /
-                                // `nvvm/grouped_matmul.rs` body emitters);
-                                // other targets keep their own per-op
-                                // fail-closed emit gates. Ops with no NVVM
-                                // body (e.g. a malformed attention shape)
-                                // stay fail-closed in their NVVM emitter.
-                                | MirCollectionOp::TensorSsmScan
-                                | MirCollectionOp::TensorGroupedMatMul
-                                // EXEC02-PC1 split: batched attention now has
-                                // a real NVVM body (`nvvm/batched_attention.rs`)
-                                // and follows the same target-local admission.
-                                | MirCollectionOp::TensorBatchedAttention,
-                            ),
-                        ..
-                    },
-                ..
-            } => {
-                crate::visit::walk_stmt(self, stmt);
-            }
+            // S3-A5: the elementwise tensor set is device-safe — the
+            // Metal emitter lowers each op to a per-element tensor
+            // expression (the companion's missing mul/div/fill arms, plus
+            // the pointwise family; TensorAdd/TensorRelu predate S3-A5).
+            // The WGSL emitter keeps its per-op fail-closed emit gate.
+            //
             // S5-U2: rank-2 `TensorTranspose` is a recipe op — the plan pass
             // admits it (`CollectionKernelPlan::Transpose`, kernel_plan.rs),
             // the ABI resolves its dispatch contract (workgroup 64, dispatch
@@ -1042,16 +995,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // body. The device-safe gate admits the statement the same way
             // it admits the other recipe ops (the operand layouts are still
             // walked and checked).
-            MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorTranspose),
-                        ..
-                    },
-                ..
-            } => {
-                crate::visit::walk_stmt(self, stmt);
-            }
+            //
             // S6-P2: the transformer recipe ops (`TensorSumAxis` /
             // `TensorSoftmax` / `TensorLayerNorm`) are device-materialization
             // admissions — the S6-P1 plan surface resolves each to a single
@@ -1069,52 +1013,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // GI3-3 Metal emitter arms lower the recipe bodies. The gate
             // admits the statements the same way it admits the other
             // recipe ops; the operand layouts are still walked and checked.
-            MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic:
-                            MirIntrinsic::Collection(
-                                MirCollectionOp::TensorSumAxis
-                                | MirCollectionOp::TensorSoftmax
-                                | MirCollectionOp::TensorLayerNorm
-                                | MirCollectionOp::TensorRmsNorm
-                                | MirCollectionOp::TensorRope
-                                | MirCollectionOp::TensorRopeHalf
-                                | MirCollectionOp::TensorGather
-                                | MirCollectionOp::TensorCausalMaskedSoftmax,
-                            ),
-                        ..
-                    },
-                ..
-            } => {
-                crate::visit::walk_stmt(self, stmt);
-            }
-            MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic:
-                            MirIntrinsic::Collection(
-                                MirCollectionOp::TensorAdd
-                                | MirCollectionOp::TensorSub
-                                | MirCollectionOp::TensorMul
-                                | MirCollectionOp::TensorDiv
-                                | MirCollectionOp::TensorNeg
-                                | MirCollectionOp::TensorFill
-                                | MirCollectionOp::TensorExpand
-                                | MirCollectionOp::TensorRelu
-                                | MirCollectionOp::TensorGelu,
-                            ),
-                        ..
-                    },
-                ..
-            } => {
-                // S3-A5: the elementwise tensor set is device-safe — the
-                // Metal emitter lowers each op to a per-element tensor
-                // expression (the companion's missing mul/div/fill arms, plus
-                // the pointwise family; TensorAdd/TensorRelu predate S3-A5).
-                // The WGSL emitter keeps its per-op fail-closed emit gate.
-                crate::visit::walk_stmt(self, stmt);
-            }
+            //
             // SFR-7: a `FilumSum` declaration is the author-stated recipe
             // (SFR-5 plan entry) — the emitters lower it in place (the
             // Metal native simdgroup arm, the NVVM warp collective). The
@@ -1123,7 +1022,53 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             MirStatementKind::RuntimeCall {
                 call:
                     MirRuntimeCall {
-                        intrinsic: MirIntrinsic::FilumReduce(_),
+                        intrinsic:
+                            MirIntrinsic::Collection(
+                                MirCollectionOp::Sum
+                                    | MirCollectionOp::TensorMean
+                                    | MirCollectionOp::TensorMax
+                                    | MirCollectionOp::TensorMin
+                                    | MirCollectionOp::TensorMatMul
+                                    | MirCollectionOp::TensorQuantizedMatMul
+                                    // EXEC02-PS3: `TensorSsmConv1d` is a recipe
+                                    // op (`CollectionKernelPlan::SsmConv1d`) with
+                                    // an NVVM body emitter; other targets keep
+                                    // their own per-op fail-closed emit gates.
+                                    | MirCollectionOp::TensorSsmConv1d
+                                    // EXEC02-PC1: `TensorSsmScan` and
+                                    // `TensorGroupedMatMul` follow the same
+                                    // recipe admission (`nvvm/ssm_scan.rs` /
+                                    // `nvvm/grouped_matmul.rs` body emitters);
+                                    // other targets keep their own per-op
+                                    // fail-closed emit gates. Ops with no NVVM
+                                    // body (e.g. a malformed attention shape)
+                                    // stay fail-closed in their NVVM emitter.
+                                    | MirCollectionOp::TensorSsmScan
+                                    | MirCollectionOp::TensorGroupedMatMul
+                                    // EXEC02-PC1 split: batched attention now has
+                                    // a real NVVM body (`nvvm/batched_attention.rs`)
+                                    // and follows the same target-local admission.
+                                    | MirCollectionOp::TensorBatchedAttention
+                                    | MirCollectionOp::TensorTranspose
+                                    | MirCollectionOp::TensorSumAxis
+                                    | MirCollectionOp::TensorSoftmax
+                                    | MirCollectionOp::TensorLayerNorm
+                                    | MirCollectionOp::TensorRmsNorm
+                                    | MirCollectionOp::TensorRope
+                                    | MirCollectionOp::TensorRopeHalf
+                                    | MirCollectionOp::TensorGather
+                                    | MirCollectionOp::TensorCausalMaskedSoftmax
+                                    | MirCollectionOp::TensorAdd
+                                    | MirCollectionOp::TensorSub
+                                    | MirCollectionOp::TensorMul
+                                    | MirCollectionOp::TensorDiv
+                                    | MirCollectionOp::TensorNeg
+                                    | MirCollectionOp::TensorFill
+                                    | MirCollectionOp::TensorExpand
+                                    | MirCollectionOp::TensorRelu
+                                    | MirCollectionOp::TensorGelu,
+                            )
+                            | MirIntrinsic::FilumReduce(_),
                         ..
                     },
                 ..
@@ -1224,13 +1169,14 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             {
                 crate::visit::walk_terminator(self, terminator);
             }
-            MirTerminatorKind::Switch { .. } if self.allows_structured_scalar_switch => {
+            MirTerminatorKind::Switch { .. } | MirTerminatorKind::Unreachable
+                if self.allows_structured_scalar_switch =>
+            {
                 crate::visit::walk_terminator(self, terminator);
             }
-            MirTerminatorKind::Switch { .. } if self.allows_structured_indexed_write_switch => {
-                crate::visit::walk_terminator(self, terminator);
-            }
-            MirTerminatorKind::Goto(_) if self.allows_structured_indexed_write_switch => {
+            MirTerminatorKind::Switch { .. } | MirTerminatorKind::Goto(_)
+                if self.allows_structured_indexed_write_switch =>
+            {
                 crate::visit::walk_terminator(self, terminator);
             }
             MirTerminatorKind::Goto(_) if self.allows_structured_scalar_switch => {
@@ -1257,9 +1203,6 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             MirTerminatorKind::ReturnError(_) if self.throw_slots.is_some() => {}
             MirTerminatorKind::ReturnError(_) => {
                 self.record_abi(SHAPE_RETURN_ERROR_DEVICE_TERMINATOR);
-            }
-            MirTerminatorKind::Unreachable if self.allows_structured_scalar_switch => {
-                crate::visit::walk_terminator(self, terminator);
             }
             MirTerminatorKind::Goto(_)
             | MirTerminatorKind::Branch { .. }
