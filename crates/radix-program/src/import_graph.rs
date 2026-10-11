@@ -810,17 +810,7 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
             package,
             expected_path,
             known_modules,
-        } => crate::package_diagnostic_error(format!(
-            "unknown library module `{specifier}` for provider `{package}`; expected {}; known modules: {}",
-            expected_path.display(),
-            known_modules.join(", ")
-        ))
-        .with_file(file.display().to_string())
-        .with_arg("issue", "unknown_library_module")
-        .with_arg("specifier", specifier)
-        .with_arg("provider", package)
-        .with_arg("expected_path", expected_path.display().to_string())
-        .with_arg("known_modules", known_modules.join(",")),
+        } => unknown_module_diagnostic(file, specifier, package, expected_path, known_modules),
         // Uncoded on purpose: the standing renderer contract prints prose
         // for coded non-Codegen diagnostics only through locale-pack
         // templates, and no pack carries a PKG001 template — coding this arm
@@ -842,19 +832,7 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
             specifier,
             provider,
             version,
-        } => {
-            let version_hint = version
-                .as_deref()
-                .map(|v| format!(" (`{provider} = \"{v}\"`)"))
-                .unwrap_or_default();
-            crate::package_diagnostic_error(format!(
-                "library import `{specifier}` is declared in faber.toml{version_hint} but missing from faber.lock; install the package with the package manager"
-            ))
-            .with_file(file.display().to_string())
-            .with_arg("issue", "missing_locked_package")
-            .with_arg("specifier", specifier)
-            .with_arg("provider", provider)
-        }
+        } => locked_package_missing_diagnostic(file, specifier, provider, version),
         LibraryResolveError::ProviderUndeclared {
             specifier,
             provider,
@@ -866,6 +844,45 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         .with_arg("specifier", specifier)
         .with_arg("provider", provider),
     }
+}
+
+fn unknown_module_diagnostic(
+    file: &Path,
+    specifier: String,
+    package: String,
+    expected_path: PathBuf,
+    known_modules: Vec<String>,
+) -> Diagnostic {
+    crate::package_diagnostic_error(format!(
+        "unknown library module `{specifier}` for provider `{package}`; expected {}; known modules: {}",
+        expected_path.display(),
+        known_modules.join(", ")
+    ))
+    .with_file(file.display().to_string())
+    .with_arg("issue", "unknown_library_module")
+    .with_arg("specifier", specifier)
+    .with_arg("provider", package)
+    .with_arg("expected_path", expected_path.display().to_string())
+    .with_arg("known_modules", known_modules.join(","))
+}
+
+fn locked_package_missing_diagnostic(
+    file: &Path,
+    specifier: String,
+    provider: String,
+    version: Option<String>,
+) -> Diagnostic {
+    let version_hint = version
+        .as_deref()
+        .map(|v| format!(" (`{provider} = \"{v}\"`)"))
+        .unwrap_or_default();
+    crate::package_diagnostic_error(format!(
+        "library import `{specifier}` is declared in faber.toml{version_hint} but missing from faber.lock; install the package with the package manager"
+    ))
+    .with_file(file.display().to_string())
+    .with_arg("issue", "missing_locked_package")
+    .with_arg("specifier", specifier)
+    .with_arg("provider", provider)
 }
 
 fn installed_manifest_invalid_diagnostic(

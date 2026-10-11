@@ -91,119 +91,141 @@ pub(super) fn plan_package_instances(
             );
             continue;
         }
-        let Some((_, target)) = package.node_by_path_mut(&target_path) else {
-            continue;
-        };
-        let mut requests = Vec::with_capacity(calls.len());
-        let mut keys = Vec::with_capacity(calls.len());
-        for call in &calls {
-            let Some(bindings) = request_for_target(call, &mut target.analysis.types) else {
-                errors.push(missing_instance_diagnostic(
-                    &call.target_path,
-                    "generic_air_instance_type_rehome_failed",
-                ));
-                continue;
-            };
-            keys.push(
-                radix_module::semantic::passes::air_specialize::AirInstanceKey {
-                    template: call.target_def,
-                    witnesses: bindings.iter().map(|binding| binding.witness).collect(),
-                },
-            );
-            requests.push(
-                radix_module::semantic::passes::air_specialize::AirSpecializationRequest {
-                    template: call.target_def,
-                    bindings,
-                },
-            );
-        }
-        if !errors.is_empty() {
-            continue;
-        }
-        if requests.is_empty() {
-            continue;
-        }
-
-        let report = radix_module::semantic::passes::air_specialize::specialize_requested(
-            &mut target.analysis.hir,
-            &mut target.analysis.radix_lanes,
-            &mut target.analysis.types,
-            &mut target.analysis.interner,
-            &requests,
-        );
-        let instance_by_key = report
-            .instance_defs
-            .iter()
-            .cloned()
-            .collect::<HashMap<_, _>>();
-        for key in &keys {
-            if !instance_by_key.contains_key(key) {
-                errors.push(missing_instance_diagnostic(
-                    &target_path,
-                    "generic_air_instance_materialization_failed",
-                ));
-            }
-        }
-        if !errors.is_empty() {
-            continue;
-        }
-
-        // The ordinary semantic pipeline has already run for this module.
-        // Newly requested clones must pass the same concrete-only gates before
-        // the package lowers any unit to AIR/MIR.
-        if let Err(instance_errors) = radix_module::semantic::passes::air_unroll::unroll(
-            &mut target.analysis.hir,
-            &mut target.analysis.presentation,
-            &target.analysis.radix_lanes,
-            &mut target.analysis.interner,
-            &target.analysis.types,
-        ) {
-            errors.extend(instance_errors.into_iter().map(|error| {
-                Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
-            }));
-        }
-        if let Err(instance_errors) = radix_module::semantic::passes::air_purity::check(
-            &mut target.analysis.hir,
-            &mut target.analysis.radix_lanes,
-            &mut target.analysis.interner,
-            &target.analysis.types,
-        ) {
-            errors.extend(instance_errors.into_iter().map(|error| {
-                Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
-            }));
-        }
-
-        for (_, instance) in report.instance_defs {
-            let synthetic = DefId(links.next_synthetic);
-            links.next_synthetic = links.next_synthetic.saturating_add(1);
-            links
-                .sources
-                .insert((target_path.clone(), instance), synthetic);
-        }
-        for (call, key) in calls.iter().zip(keys) {
-            let Some(instance) = instance_by_key.get(&key).copied() else {
-                continue;
-            };
-            let Some(synthetic) = links.sources.get(&(target_path.clone(), instance)).copied()
-            else {
-                continue;
-            };
-            links.air_calls.insert(
-                (
-                    call.caller_path.clone(),
-                    call.call_span.start,
-                    call.call_span.end,
-                    call.old_target,
-                ),
-                synthetic,
-            );
-        }
+        plan_sibling_target_instances(&target_path, &calls, package, links, &mut errors);
     }
 
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors)
+    }
+}
+
+/// Materialize concrete provider-owned instances for one in-package sibling
+/// target and register every instance under a package synthetic source identity.
+fn plan_sibling_target_instances(
+    target_path: &Path,
+    calls: &[NamespaceGenericCall],
+    package: &mut AnalyzedProgram,
+    links: &mut PackageMirLinks,
+    errors: &mut Vec<Diagnostic>,
+) {
+    let Some((_, target)) = package.node_by_path_mut(target_path) else {
+        return;
+    };
+    let mut requests = Vec::with_capacity(calls.len());
+    let mut keys = Vec::with_capacity(calls.len());
+    for call in calls {
+        let Some(bindings) = request_for_target(call, &mut target.analysis.types) else {
+            errors.push(missing_instance_diagnostic(
+                &call.target_path,
+                "generic_air_instance_type_rehome_failed",
+            ));
+            continue;
+        };
+        keys.push(
+            radix_module::semantic::passes::air_specialize::AirInstanceKey {
+                template: call.target_def,
+                witnesses: bindings.iter().map(|binding| binding.witness).collect(),
+            },
+        );
+        requests.push(
+            radix_module::semantic::passes::air_specialize::AirSpecializationRequest {
+                template: call.target_def,
+                bindings,
+            },
+        );
+    }
+    if !errors.is_empty() {
+        return;
+    }
+    if requests.is_empty() {
+        return;
+    }
+
+    let report = radix_module::semantic::passes::air_specialize::specialize_requested(
+        &mut target.analysis.hir,
+        &mut target.analysis.radix_lanes,
+        &mut target.analysis.types,
+        &mut target.analysis.interner,
+        &requests,
+    );
+    let instance_by_key = report
+        .instance_defs
+        .iter()
+        .cloned()
+        .collect::<HashMap<_, _>>();
+    for key in &keys {
+        if !instance_by_key.contains_key(key) {
+            errors.push(missing_instance_diagnostic(
+                target_path,
+                "generic_air_instance_materialization_failed",
+            ));
+        }
+    }
+    if !errors.is_empty() {
+        return;
+    }
+
+    run_sibling_concrete_gates(target_path, target, errors);
+
+    for (_, instance) in report.instance_defs {
+        let synthetic = DefId(links.next_synthetic);
+        links.next_synthetic = links.next_synthetic.saturating_add(1);
+        links
+            .sources
+            .insert((target_path.to_path_buf(), instance), synthetic);
+    }
+    for (call, key) in calls.iter().zip(keys) {
+        let Some(instance) = instance_by_key.get(&key).copied() else {
+            continue;
+        };
+        let Some(synthetic) = links
+            .sources
+            .get(&(target_path.to_path_buf(), instance))
+            .copied()
+        else {
+            continue;
+        };
+        links.air_calls.insert(
+            (
+                call.caller_path.clone(),
+                call.call_span.start,
+                call.call_span.end,
+                call.old_target,
+            ),
+            synthetic,
+        );
+    }
+}
+
+/// Run the concrete-only unroll and AIR-purity gates over a target whose
+/// ordinary semantic pipeline has already completed.
+fn run_sibling_concrete_gates(
+    target_path: &Path,
+    target: &mut crate::analyze::AnalyzedProgramNode,
+    errors: &mut Vec<Diagnostic>,
+) {
+    if let Err(instance_errors) = radix_module::semantic::passes::air_unroll::unroll(
+        &mut target.analysis.hir,
+        &mut target.analysis.presentation,
+        &target.analysis.radix_lanes,
+        &mut target.analysis.interner,
+        &target.analysis.types,
+    ) {
+        errors.extend(instance_errors.into_iter().map(|error| {
+            Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
+        }));
+    }
+    if let Err(instance_errors) = radix_module::semantic::passes::air_purity::check(
+        &mut target.analysis.hir,
+        &mut target.analysis.radix_lanes,
+        &mut target.analysis.interner,
+        &target.analysis.types,
+    ) {
+        errors.extend(instance_errors.into_iter().map(|error| {
+            Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
+        }));
     }
 }
 
@@ -483,27 +505,26 @@ fn discover_calls(
                 else {
                     continue;
                 };
-                let params =
-                    match generic_air_params(&analysis.hir, &analysis.radix_lanes, target_def) {
-                        Some(params) => params,
-                        None => {
-                            // Not a template call: a declared `@ radix
-                            // backward` companion of a generic AIR template
-                            // plans through its primal's instance.
-                            let Some(primal) =
-                                declared_companion_primal(&analysis.radix_lanes, target_def)
-                            else {
-                                continue;
-                            };
-                            let Some(params) =
-                                generic_air_params(&analysis.hir, &analysis.radix_lanes, primal)
-                            else {
-                                continue;
-                            };
-                            companion_primal = Some(primal);
-                            params
-                        }
+                let params = if let Some(params) =
+                    generic_air_params(&analysis.hir, &analysis.radix_lanes, target_def)
+                {
+                    params
+                } else {
+                    // Not a template call: a declared `@ radix
+                    // backward` companion of a generic AIR template
+                    // plans through its primal's instance.
+                    let Some(primal) = declared_companion_primal(&analysis.radix_lanes, target_def)
+                    else {
+                        continue;
                     };
+                    let Some(params) =
+                        generic_air_params(&analysis.hir, &analysis.radix_lanes, primal)
+                    else {
+                        continue;
+                    };
+                    companion_primal = Some(primal);
+                    params
+                };
                 library = Some(target);
                 params
             };
@@ -535,7 +556,7 @@ fn discover_calls(
 }
 
 /// The generic AIR primal owning a declared backward companion def, when the
-/// companion's own DefId names a `@ radix backward` row.
+/// companion's own `DefId` names a `@ radix backward` row.
 fn declared_companion_primal(
     lanes: &radix_module::semantic::RadixLaneMetadata,
     companion_def: DefId,

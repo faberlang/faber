@@ -93,7 +93,7 @@ impl ModuleGraph {
 
     /// Local import targets from `from`, in recorded order.
     pub fn local_edges(&self, from: &ModuleId) -> &[(String, ModuleId)] {
-        self.local.get(from).map(Vec::as_slice).unwrap_or(&[])
+        self.local.get(from).map_or(&[], Vec::as_slice)
     }
 
     /// Local successors of `from`.
