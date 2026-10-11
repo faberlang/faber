@@ -215,56 +215,7 @@ pub fn fold_static_shapes(
     // Pass 1: resolve every shape op's literal shape and trace
     // `magnitudines()` results to their shape-source tensor. Any unfoldable
     // shape stops the fold with a typed diagnostic.
-    let mut shape_sources: BTreeMap<MirLocalId, ShapeSource> = BTreeMap::new();
-    for block in &function.blocks {
-        for statement in &block.statements {
-            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
-                continue;
-            };
-            let MirStatementKind::RuntimeCall { destination, call } = &statement.kind else {
-                continue;
-            };
-            let Some(local) = destination_local_traced(destination.as_ref(), &temp_to_local) else {
-                continue;
-            };
-            match op {
-                MirCollectionOp::TensorShape => {
-                    let dims = shape_receiver_dims(call, function, validation)?;
-                    shape_sources.insert(
-                        local,
-                        ShapeSource {
-                            dims,
-                            source_receiver: call
-                                .args
-                                .first()
-                                .and_then(crate::read_analysis::operand_local),
-                        },
-                    );
-                }
-                MirCollectionOp::TensorCreate | MirCollectionOp::TensorFromFlat => {
-                    let dims =
-                        tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
-                            ShapeFoldError::new(
-                                ShapeFoldKind::NonStaticShapeDestination,
-                                format!(
-                                    "shape-construction destination local {} has no literal \
-                                 tensor shape (dynamic shape is not device-expressible)",
-                                    local.0
-                                ),
-                            )
-                        })?;
-                    shape_sources.insert(
-                        local,
-                        ShapeSource {
-                            dims,
-                            source_receiver: None,
-                        },
-                    );
-                }
-                _ => {}
-            }
-        }
-    }
+    let shape_sources = resolve_shape_sources(function, validation, &temp_to_local)?;
 
     // Pass 2: rewrite the statements, collecting the folded shape facts.
     let mut facts: Vec<FoldedShapeFact> = Vec::new();
@@ -315,6 +266,66 @@ pub fn fold_static_shapes(
         function: folded,
         report: ShapeFoldReport { facts },
     })
+}
+
+/// Resolve every shape op's literal shape and trace `magnitudines()` results
+/// to their shape-source tensor. Any unfoldable shape is a typed diagnostic.
+fn resolve_shape_sources(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    temp_to_local: &BTreeMap<MirTempId, MirLocalId>,
+) -> Result<BTreeMap<MirLocalId, ShapeSource>, ShapeFoldError> {
+    let mut shape_sources: BTreeMap<MirLocalId, ShapeSource> = BTreeMap::new();
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
+                continue;
+            };
+            let MirStatementKind::RuntimeCall { destination, call } = &statement.kind else {
+                continue;
+            };
+            let Some(local) = destination_local_traced(destination.as_ref(), temp_to_local) else {
+                continue;
+            };
+            match op {
+                MirCollectionOp::TensorShape => {
+                    let dims = shape_receiver_dims(call, function, validation)?;
+                    shape_sources.insert(
+                        local,
+                        ShapeSource {
+                            dims,
+                            source_receiver: call
+                                .args
+                                .first()
+                                .and_then(crate::read_analysis::operand_local),
+                        },
+                    );
+                }
+                MirCollectionOp::TensorCreate | MirCollectionOp::TensorFromFlat => {
+                    let dims =
+                        tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
+                            ShapeFoldError::new(
+                                ShapeFoldKind::NonStaticShapeDestination,
+                                format!(
+                                    "shape-construction destination local {} has no literal \
+                                 tensor shape (dynamic shape is not device-expressible)",
+                                    local.0
+                                ),
+                            )
+                        })?;
+                    shape_sources.insert(
+                        local,
+                        ShapeSource {
+                            dims,
+                            source_receiver: None,
+                        },
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(shape_sources)
 }
 
 /// Fold every selected device-resident function in one validated MIR program.
@@ -494,34 +505,52 @@ fn fold_statement(
                 span: statement.span,
             })
         }
-        MirCollectionOp::TensorFromFlat => {
-            let Some(local) = destination_local_traced(destination.as_ref(), temp_to_local) else {
-                return Err(ShapeFoldError::new(
-                    ShapeFoldKind::NonStaticShapeDestination,
-                    "tensor_from_flat destination is not a local; cannot fold its shape",
-                ));
-            };
-            let dims = tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
-                ShapeFoldError::new(
-                    ShapeFoldKind::NonStaticShapeDestination,
-                    format!(
-                        "tensor_from_flat destination local {} has no literal tensor shape \
-                         (dynamic shape is not device-expressible)",
-                        local.0
-                    ),
-                )
-            })?;
-            facts.push(FoldedShapeFact {
-                local,
-                dims: dims.clone(),
-                element_ty: tensor_element_ty(call.return_ty, validation)?,
-                element_count: element_count_for_dims(&dims)?,
-                source: ShapeFactSource::FromFlat,
-            });
-            Ok(statement.clone())
-        }
+        MirCollectionOp::TensorFromFlat => fold_tensor_from_flat(
+            statement,
+            destination,
+            call,
+            temp_to_local,
+            validation,
+            facts,
+        ),
         _ => Ok(statement.clone()),
     }
+}
+
+/// Fold a `TensorFromFlat` statement: keep its data movement and record the
+/// folded shape fact for the destination local.
+fn fold_tensor_from_flat(
+    statement: &MirStatement,
+    destination: &Option<MirPlace>,
+    call: &MirRuntimeCall,
+    temp_to_local: &BTreeMap<MirTempId, MirLocalId>,
+    validation: &MirValidationContext<'_>,
+    facts: &mut Vec<FoldedShapeFact>,
+) -> Result<MirStatement, ShapeFoldError> {
+    let Some(local) = destination_local_traced(destination.as_ref(), temp_to_local) else {
+        return Err(ShapeFoldError::new(
+            ShapeFoldKind::NonStaticShapeDestination,
+            "tensor_from_flat destination is not a local; cannot fold its shape",
+        ));
+    };
+    let dims = tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
+        ShapeFoldError::new(
+            ShapeFoldKind::NonStaticShapeDestination,
+            format!(
+                "tensor_from_flat destination local {} has no literal tensor shape \
+                 (dynamic shape is not device-expressible)",
+                local.0
+            ),
+        )
+    })?;
+    facts.push(FoldedShapeFact {
+        local,
+        dims: dims.clone(),
+        element_ty: tensor_element_ty(call.return_ty, validation)?,
+        element_count: element_count_for_dims(&dims)?,
+        source: ShapeFactSource::FromFlat,
+    });
+    Ok(statement.clone())
 }
 
 /// The MIR tensor type of a `magnitudines()` receiver, or a typed
