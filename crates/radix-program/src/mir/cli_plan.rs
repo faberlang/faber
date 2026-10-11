@@ -266,15 +266,12 @@ pub(super) fn fmir_text_cli_placeholder_value(
     ty: &FmirTextCliValueType,
 ) -> MirOperand {
     let constant = match ty {
-        FmirTextCliValueType::Textus => {
+        FmirTextCliValueType::Textus | FmirTextCliValueType::ListaTextus => {
             MirConstant::String(unit.analysis.interner.intern("__fmir_runtime_arg__"))
         }
         FmirTextCliValueType::Numerus => MirConstant::Int(0),
         FmirTextCliValueType::Fractus => MirConstant::Float(0.0),
         FmirTextCliValueType::Bivalens => MirConstant::Bool(false),
-        FmirTextCliValueType::ListaTextus => {
-            MirConstant::String(unit.analysis.interner.intern("__fmir_runtime_arg__"))
-        }
     };
     MirOperand::Constant(constant)
 }
@@ -597,59 +594,7 @@ pub(super) fn plan_cli_subcommand(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<CliDispatchPlan> {
     let entry_path = package.spec.entry.clone();
-    let diagnostic_count = diagnostics.len();
-    if cli_program
-        .global_options
-        .iter()
-        .any(|option| !is_package_mir_supported_option(option))
-    {
-        diagnostics.push(unsupported_cli_diagnostic(
-            &entry_path,
-            "CLI global options beyond boolean flags and scalar values",
-        ));
-    }
-    if !cli_program.options.is_empty() {
-        diagnostics.push(unsupported_cli_diagnostic(
-            &entry_path,
-            "root-local CLI options in subcommand mode",
-        ));
-    }
-    if cli_program.commands.iter().any(|command| {
-        has_unsupported_package_mir_operands(
-            cli_program
-                .global_operands
-                .iter()
-                .chain(command.operands.iter()),
-        )
-    }) {
-        diagnostics.push(unsupported_cli_diagnostic(
-            &entry_path,
-            "CLI command operands beyond supported positional values",
-        ));
-    }
-    if !cli_program.operands.is_empty() {
-        diagnostics.push(unsupported_cli_diagnostic(
-            &entry_path,
-            "root-local CLI operands in subcommand mode",
-        ));
-    }
-    if cli_program.exit.is_some() {
-        diagnostics.push(unsupported_cli_diagnostic(
-            &entry_path,
-            "CLI exit expressions",
-        ));
-    }
-    if cli_program
-        .commands
-        .iter()
-        .any(command_has_unsupported_options)
-    {
-        diagnostics.push(unsupported_cli_diagnostic(
-            &entry_path,
-            "CLI command options beyond boolean flags and scalar values",
-        ));
-    }
-    if diagnostics.len() != diagnostic_count {
+    if !subcommand_cli_surface_supported(cli_program, &entry_path, diagnostics) {
         return None;
     }
 
@@ -750,6 +695,69 @@ pub(super) fn plan_cli_subcommand(
         function: target_command.function_symbol,
         record_type_rewrite,
     })
+}
+
+/// Validate the subcommand CLI surface this planner can dispatch, pushing one
+/// unsupported-surface diagnostic for each part it cannot. Returns `false`
+/// when any diagnostic was pushed.
+fn subcommand_cli_surface_supported(
+    cli_program: &CliProgram,
+    entry_path: &std::path::Path,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> bool {
+    let diagnostic_count = diagnostics.len();
+    if cli_program
+        .global_options
+        .iter()
+        .any(|option| !is_package_mir_supported_option(option))
+    {
+        diagnostics.push(unsupported_cli_diagnostic(
+            entry_path,
+            "CLI global options beyond boolean flags and scalar values",
+        ));
+    }
+    if !cli_program.options.is_empty() {
+        diagnostics.push(unsupported_cli_diagnostic(
+            entry_path,
+            "root-local CLI options in subcommand mode",
+        ));
+    }
+    if cli_program.commands.iter().any(|command| {
+        has_unsupported_package_mir_operands(
+            cli_program
+                .global_operands
+                .iter()
+                .chain(command.operands.iter()),
+        )
+    }) {
+        diagnostics.push(unsupported_cli_diagnostic(
+            entry_path,
+            "CLI command operands beyond supported positional values",
+        ));
+    }
+    if !cli_program.operands.is_empty() {
+        diagnostics.push(unsupported_cli_diagnostic(
+            entry_path,
+            "root-local CLI operands in subcommand mode",
+        ));
+    }
+    if cli_program.exit.is_some() {
+        diagnostics.push(unsupported_cli_diagnostic(
+            entry_path,
+            "CLI exit expressions",
+        ));
+    }
+    if cli_program
+        .commands
+        .iter()
+        .any(command_has_unsupported_options)
+    {
+        diagnostics.push(unsupported_cli_diagnostic(
+            entry_path,
+            "CLI command options beyond boolean flags and scalar values",
+        ));
+    }
+    diagnostics.len() == diagnostic_count
 }
 
 pub(super) fn cli_operand_consumed_len(
@@ -958,7 +966,8 @@ pub(super) fn intern_param_symbols(
     let mut intern_by_name =
         |symbol: Symbol| -> Symbol { target_interner.intern(source_interner.resolve(symbol)) };
     for index in 0..source_types.type_count() {
-        if let Type::Param(symbol) = source_types.get(TypeId(index as u32)) {
+        let type_index = u32::try_from(index).unwrap_or(u32::MAX);
+        if let Type::Param(symbol) = source_types.get(TypeId(type_index)) {
             let remapped = intern_by_name(*symbol);
             map.insert(*symbol, remapped);
         }
@@ -966,8 +975,9 @@ pub(super) fn intern_param_symbols(
     // Shape dims (`tensor<f32, [D, Q]>`) are index params, a separate symbol
     // population from type params; remap both by name.
     for index in 0..source_types.index_count() {
+        let index_id = u32::try_from(index).unwrap_or(u32::MAX);
         if let IndexExpr::Param(symbol) =
-            source_types.get_index(radix_module::semantic::IndexId(index as u32))
+            source_types.get_index(radix_module::semantic::IndexId(index_id))
         {
             let remapped = intern_by_name(*symbol);
             map.insert(*symbol, remapped);
@@ -987,7 +997,8 @@ pub(super) fn intern_record_field_symbols(
 ) -> HashMap<Symbol, Symbol> {
     let mut map = HashMap::new();
     for index in 0..source_types.type_count() {
-        let Type::Record(fields) = source_types.get(TypeId(index as u32)) else {
+        let type_index = u32::try_from(index).unwrap_or(u32::MAX);
+        let Type::Record(fields) = source_types.get(TypeId(type_index)) else {
             continue;
         };
         for name in fields.keys() {
@@ -1025,7 +1036,8 @@ pub(super) fn build_nominal_remap(
     let mut map = HashMap::new();
     let mut target_interner = entry.interner.clone();
     for index in 0..source_types.type_count() {
-        let kind = match source_types.get(TypeId(index as u32)) {
+        let type_index = u32::try_from(index).unwrap_or(u32::MAX);
+        let kind = match source_types.get(TypeId(type_index)) {
             Type::Struct(def_id) => Some((*def_id, InterfaceNominalKind::Struct)),
             Type::Enum(def_id) => Some((*def_id, InterfaceNominalKind::Enum)),
             Type::Interface(def_id) => Some((*def_id, InterfaceNominalKind::Interface)),
@@ -1189,7 +1201,7 @@ fn fallback_entry_nominal_type(
     };
     let mut found = None;
     for index in 0..entry.types.type_count() {
-        let ty = TypeId(index as u32);
+        let ty = TypeId(u32::try_from(index).unwrap_or(u32::MAX));
         let def_id = match (kind, entry.types.get(ty)) {
             (InterfaceNominalKind::Struct, Type::Struct(def_id))
             | (InterfaceNominalKind::Enum, Type::Enum(def_id))
@@ -1224,7 +1236,7 @@ pub(super) fn record_shared_nominals(
     shared: &mut HashMap<(InterfaceNominalKind, String), TypeId>,
 ) {
     for index in 0..source_types.type_count() {
-        let source_ty = TypeId(index as u32);
+        let source_ty = TypeId(u32::try_from(index).unwrap_or(u32::MAX));
         let def_id = match source_types.get(source_ty) {
             Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => *def_id,
             _ => continue,
@@ -1246,7 +1258,7 @@ pub(super) fn source_nominal_names(
 ) -> HashMap<DefId, (InterfaceNominalKind, String)> {
     let mut names = HashMap::new();
     for index in 0..source_types.type_count() {
-        let ty = TypeId(index as u32);
+        let ty = TypeId(u32::try_from(index).unwrap_or(u32::MAX));
         let (kind, def_id) = match source_types.get(ty) {
             Type::Struct(def_id) => (InterfaceNominalKind::Struct, *def_id),
             Type::Enum(def_id) => (InterfaceNominalKind::Enum, *def_id),
