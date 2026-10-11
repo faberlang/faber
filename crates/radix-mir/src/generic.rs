@@ -1601,14 +1601,14 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         (Type::Primitive(a), Type::Primitive(b)) => a == b,
         (Type::SizedNumeric(ap, aw), Type::SizedNumeric(bp, bw)) => ap == bp && aw == bw,
         (Type::SizedInstans(a), Type::SizedInstans(b)) => a == b,
-        (Type::Array(a), Type::Array(b)) => types.equals(*a, *b),
         (Type::Map(ak, av), Type::Map(bk, bv)) => types.equals(*ak, *bk) && types.equals(*av, *bv),
         (Type::Record(a), Type::Record(b)) => {
             a.len() == b.len()
                 && a.iter()
                     .all(|(name, a_ty)| b.get(name).is_some_and(|b_ty| types.equals(*a_ty, *b_ty)))
         }
-        (Type::Set(a), Type::Set(b))
+        (Type::Array(a), Type::Array(b))
+        | (Type::Set(a), Type::Set(b))
         | (Type::Promissum(a), Type::Promissum(b))
         | (Type::Cursor(a), Type::Cursor(b))
         | (Type::Queue(a), Type::Queue(b))
@@ -1675,27 +1675,9 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         }
         (Type::Func(a), Type::Func(b)) => function_signature_matches(types, a, b),
         (Type::Applied(a_base, a_args), Type::Applied(b_base, b_args)) => {
-            a_args.len() == b_args.len()
-                && types.equals(*a_base, *b_base)
-                && a_args
-                    .iter()
-                    .zip(b_args.iter())
-                    .all(|(a_arg, b_arg)| match (a_arg, b_arg) {
-                        (radix_types::AppliedArg::Type(a), radix_types::AppliedArg::Type(b)) => {
-                            types.equals(*a, *b)
-                        }
-                        (radix_types::AppliedArg::Size(a), radix_types::AppliedArg::Size(b)) => {
-                            types.index_equals(*a, *b)
-                        }
-                        _ => false,
-                    })
+            applied_type_args_match(types, *a_base, *b_base, a_args, b_args)
         }
-        (Type::Union(a), Type::Union(b)) => {
-            a.len() == b.len()
-                && a.iter()
-                    .all(|a_ty| b.iter().any(|b_ty| types.equals(*a_ty, *b_ty)))
-        }
-        (Type::Intersection(a), Type::Intersection(b)) => {
+        (Type::Union(a), Type::Union(b)) | (Type::Intersection(a), Type::Intersection(b)) => {
             a.len() == b.len()
                 && a.iter()
                     .all(|a_ty| b.iter().any(|b_ty| types.equals(*a_ty, *b_ty)))
@@ -1712,6 +1694,29 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         (Type::Error, Type::Error) => true,
         _ => false,
     }
+}
+
+fn applied_type_args_match(
+    types: &TypeTable,
+    a_base: TypeId,
+    b_base: TypeId,
+    a_args: &[radix_types::AppliedArg],
+    b_args: &[radix_types::AppliedArg],
+) -> bool {
+    types.equals(a_base, b_base)
+        && a_args.len() == b_args.len()
+        && a_args
+            .iter()
+            .zip(b_args.iter())
+            .all(|(a_arg, b_arg)| match (a_arg, b_arg) {
+                (radix_types::AppliedArg::Type(a), radix_types::AppliedArg::Type(b)) => {
+                    types.equals(*a, *b)
+                }
+                (radix_types::AppliedArg::Size(a), radix_types::AppliedArg::Size(b)) => {
+                    types.index_equals(*a, *b)
+                }
+                _ => false,
+            })
 }
 
 fn function_signature_matches(types: &TypeTable, a: &FuncSig, b: &FuncSig) -> bool {
@@ -2155,9 +2160,10 @@ fn rewrite_value_constants(
     rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
 ) -> bool {
     match &mut value.kind {
-        MirValueKind::Operand(operand) => rewrite_operand_constants(operand, rewrite),
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            rewrite_operand_constants(operand, rewrite)
+        }
         MirValueKind::Closure(closure) => rewrite_closure_value_constants(closure, rewrite),
-        MirValueKind::Unary { operand, .. } => rewrite_operand_constants(operand, rewrite),
         MirValueKind::Binary { lhs, rhs, .. } => {
             rewrite_operand_constants(lhs, rewrite) && rewrite_operand_constants(rhs, rewrite)
         }

@@ -281,6 +281,26 @@ pub fn kernel_plan_for_function_with_limit(
     } else {
         kernel_matmul_shapes(function, validation)?
     };
+    resolve_recipe_for_ops(
+        ops,
+        signature,
+        function,
+        validation,
+        contract,
+        matmul_shapes,
+        stability_max_dead,
+    )
+}
+
+fn resolve_recipe_for_ops(
+    ops: Vec<MirCollectionOp>,
+    signature: &MirKernelSignature,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    contract: Option<CollectionOpContract>,
+    matmul_shapes: Option<MatMulShapes>,
+    stability_max_dead: bool,
+) -> Result<Option<CollectionKernelPlan>, PlanMappingError> {
     let mut recipe: Option<CollectionKernelPlan> = None;
     for op in ops {
         // PGC-R5: a DEAD stability-max reduction is not a recipe — the
@@ -617,7 +637,13 @@ impl RecipeKind {
         match plan {
             CollectionKernelPlan::Elementwise => Self::Elementwise,
             CollectionKernelPlan::TiledMatMul(_) => Self::TiledMatMul,
-            CollectionKernelPlan::TreeReduction(_) => Self::TreeReduction,
+            // SFR-5: the declared distributed sum's floor IS the tree recipe —
+            // a backend with no native collective arm selects the tree-reduction
+            // launch semantics here; native arms (SFR-6/7) match the plan variant
+            // before consulting this tag.
+            CollectionKernelPlan::TreeReduction(_) | CollectionKernelPlan::DistributedSum(_) => {
+                Self::TreeReduction
+            }
             CollectionKernelPlan::Transpose(_) => Self::Transpose,
             CollectionKernelPlan::AxisReduction(_) => Self::AxisReduction,
             CollectionKernelPlan::RowSoftmax(_) => Self::RowSoftmax,
@@ -634,11 +660,6 @@ impl RecipeKind {
             CollectionKernelPlan::LaneGrid { .. } => Self::LaneGrid,
             CollectionKernelPlan::SingleLane => Self::SingleLane,
             CollectionKernelPlan::GridReduce { .. } => Self::GridReduce,
-            // SFR-5: the declared distributed sum's floor IS the tree
-            // recipe — a backend with no native collective arm selects the
-            // tree-reduction launch semantics here; native arms (SFR-6/7)
-            // match the plan variant before consulting this tag.
-            CollectionKernelPlan::DistributedSum(_) => Self::TreeReduction,
         }
     }
 }
@@ -1593,35 +1614,9 @@ impl ExecutorPlanV2Facts {
     /// # Errors
     /// Returns `ExecutorPlanV2Error` when a dynamic fact contradicts the program.
     pub fn validate_for_program(&self, program: &DeviceProgram) -> Result<(), ExecutorPlanV2Error> {
-        let mut allocations = std::collections::BTreeMap::new();
-        for allocation in &self.allocations {
-            let id = allocation.buffer.id;
-            if allocations.insert(id, allocation).is_some() {
-                return Err(ExecutorPlanV2Error::DuplicateAllocation { buffer: id });
-            }
-            if allocation.capacity_bytes == 0 {
-                return Err(ExecutorPlanV2Error::InvalidAllocation {
-                    buffer: id,
-                    detail: "capacity bytes must be nonzero".to_owned(),
-                });
-            }
-            if allocation.lifetime != allocation.buffer.lifetime {
-                return Err(ExecutorPlanV2Error::InvalidAllocation {
-                    buffer: id,
-                    detail: "lifetime disagrees with buffer identity".to_owned(),
-                });
-            }
-        }
+        let allocations = collect_allocation_facts(&self.allocations)?;
 
-        for view in &self.views {
-            let Some(allocation) = allocations.get(&view.allocation) else {
-                return Err(ExecutorPlanV2Error::InvalidView {
-                    allocation: view.allocation,
-                    detail: "view refers to an unknown allocation".to_owned(),
-                });
-            };
-            validate_view_span(view, allocation)?;
-        }
+        validate_view_facts(&self.views, &allocations)?;
 
         let mut seen_bindings = std::collections::BTreeSet::new();
         let mut has_runtime_source = false;
@@ -1716,6 +1711,50 @@ impl ExecutorPlanV2Facts {
         }
         Ok(())
     }
+}
+
+fn collect_allocation_facts(
+    allocations: &[AllocationFact],
+) -> Result<
+    std::collections::BTreeMap<crate::device_program::BufferId, &AllocationFact>,
+    ExecutorPlanV2Error,
+> {
+    let mut by_id = std::collections::BTreeMap::new();
+    for allocation in allocations {
+        let id = allocation.buffer.id;
+        if by_id.insert(id, allocation).is_some() {
+            return Err(ExecutorPlanV2Error::DuplicateAllocation { buffer: id });
+        }
+        if allocation.capacity_bytes == 0 {
+            return Err(ExecutorPlanV2Error::InvalidAllocation {
+                buffer: id,
+                detail: "capacity bytes must be nonzero".to_owned(),
+            });
+        }
+        if allocation.lifetime != allocation.buffer.lifetime {
+            return Err(ExecutorPlanV2Error::InvalidAllocation {
+                buffer: id,
+                detail: "lifetime disagrees with buffer identity".to_owned(),
+            });
+        }
+    }
+    Ok(by_id)
+}
+
+fn validate_view_facts(
+    views: &[ViewFact],
+    allocations: &std::collections::BTreeMap<crate::device_program::BufferId, &AllocationFact>,
+) -> Result<(), ExecutorPlanV2Error> {
+    for view in views {
+        let Some(allocation) = allocations.get(&view.allocation) else {
+            return Err(ExecutorPlanV2Error::InvalidView {
+                allocation: view.allocation,
+                detail: "view refers to an unknown allocation".to_owned(),
+            });
+        };
+        validate_view_span(view, allocation)?;
+    }
+    Ok(())
 }
 
 fn validate_view_span(
@@ -3286,33 +3325,7 @@ pub fn transformer_shape_signature(
     // Bind the typed rank-1 peer here so both the plan/emitter lookup and the
     // decomposition seam see the same stable input ordering: x, gamma, out.
     if op == MirCollectionOp::TensorRmsNorm {
-        let epsilon_local = rms_norm_epsilon_local(function);
-        if let Some(epsilon_local) = epsilon_local {
-            let epsilon_ty = function_local_ty(function, epsilon_local)?;
-            let (epsilon_element_ty, epsilon_count) =
-                data_flow_element_ty_and_count(epsilon_ty, validation)?;
-            signature.extra_inputs.push(storage_input_with_local(
-                1,
-                epsilon_element_ty,
-                epsilon_count,
-                epsilon_local,
-            ));
-        }
-        let gamma_local = rms_norm_gamma_local(function).ok_or_else(|| {
-            PlanMappingError::mapping(
-                "TensorRmsNorm gamma peer has no local in the transformer signature",
-            )
-        })?;
-        let gamma_ty = function_local_ty(function, gamma_local)?;
-        let (gamma_element_ty, gamma_count) = data_flow_element_ty_and_count(gamma_ty, validation)?;
-        let gamma_binding = if epsilon_local.is_some() { 2 } else { 1 };
-        signature.extra_inputs.push(storage_input_with_local(
-            gamma_binding,
-            gamma_element_ty,
-            gamma_count,
-            gamma_local,
-        ));
-        signature.output.binding = gamma_binding + 1;
+        bind_rms_norm_affine_resources(&mut signature, function, validation)?;
     }
     // RoPE's interleaved angle table is a caller-owned kernel resource. Bind
     // the exact fourth MIR operand; the planner and emitters must never scan
@@ -3366,6 +3379,41 @@ pub fn transformer_shape_signature(
         signature.output.binding = 2;
     }
     Ok(signature)
+}
+
+fn bind_rms_norm_affine_resources(
+    signature: &mut MirKernelSignature,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Result<(), PlanMappingError> {
+    let epsilon_local = rms_norm_epsilon_local(function);
+    if let Some(epsilon_local) = epsilon_local {
+        let epsilon_ty = function_local_ty(function, epsilon_local)?;
+        let (epsilon_element_ty, epsilon_count) =
+            data_flow_element_ty_and_count(epsilon_ty, validation)?;
+        signature.extra_inputs.push(storage_input_with_local(
+            1,
+            epsilon_element_ty,
+            epsilon_count,
+            epsilon_local,
+        ));
+    }
+    let gamma_local = rms_norm_gamma_local(function).ok_or_else(|| {
+        PlanMappingError::mapping(
+            "TensorRmsNorm gamma peer has no local in the transformer signature",
+        )
+    })?;
+    let gamma_ty = function_local_ty(function, gamma_local)?;
+    let (gamma_element_ty, gamma_count) = data_flow_element_ty_and_count(gamma_ty, validation)?;
+    let gamma_binding = if epsilon_local.is_some() { 2 } else { 1 };
+    signature.extra_inputs.push(storage_input_with_local(
+        gamma_binding,
+        gamma_element_ty,
+        gamma_count,
+        gamma_local,
+    ));
+    signature.output.binding = gamma_binding + 1;
+    Ok(())
 }
 
 /// The row-gather return element count (GI3-1): the product of the gather
