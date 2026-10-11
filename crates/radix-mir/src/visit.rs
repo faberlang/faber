@@ -350,7 +350,9 @@ pub fn try_walk_stmt<V: FallibleMirVisitor>(
 /// Walk operands and places owned by a terminator, but not successor blocks.
 pub fn walk_terminator<V: MirVisitor>(visitor: &mut V, terminator: &MirTerminator) {
     match &terminator.kind {
-        MirTerminatorKind::Return(Some(value)) | MirTerminatorKind::ReturnError(value) => {
+        MirTerminatorKind::Return(Some(value))
+        | MirTerminatorKind::ReturnError(value)
+        | MirTerminatorKind::Switch { value, .. } => {
             visitor.visit_operand(value);
         }
         MirTerminatorKind::TryCall {
@@ -371,9 +373,6 @@ pub fn walk_terminator<V: MirVisitor>(visitor: &mut V, terminator: &MirTerminato
         }
         MirTerminatorKind::Branch { condition, .. } => {
             visitor.visit_operand(condition);
-        }
-        MirTerminatorKind::Switch { value, .. } => {
-            visitor.visit_operand(value);
         }
         MirTerminatorKind::Return(None)
         | MirTerminatorKind::Goto(_)
@@ -418,9 +417,10 @@ pub fn try_walk_terminator<V: FallibleMirVisitor>(
 
 pub fn walk_value<V: MirVisitor>(visitor: &mut V, value: &MirValue) {
     match &value.kind {
-        MirValueKind::Operand(operand) => visitor.visit_operand(operand),
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            visitor.visit_operand(operand);
+        }
         MirValueKind::Closure(closure) => visitor.visit_operand(&closure.environment),
-        MirValueKind::Unary { operand, .. } => visitor.visit_operand(operand),
         MirValueKind::TensorExtent { tensor, .. } => visitor.visit_operand(tensor),
         MirValueKind::Binary { lhs, rhs, .. } => {
             visitor.visit_operand(lhs);
@@ -437,9 +437,10 @@ pub fn try_walk_value<V: FallibleMirVisitor>(
     value: &MirValue,
 ) -> Result<(), V::Error> {
     match &value.kind {
-        MirValueKind::Operand(operand) => visitor.visit_operand(operand),
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            visitor.visit_operand(operand)
+        }
         MirValueKind::Closure(closure) => visitor.visit_operand(&closure.environment),
-        MirValueKind::Unary { operand, .. } => visitor.visit_operand(operand),
         MirValueKind::TensorExtent { tensor, .. } => visitor.visit_operand(tensor),
         MirValueKind::Binary { lhs, rhs, .. } => {
             visitor.visit_operand(lhs)?;

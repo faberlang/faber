@@ -261,12 +261,8 @@ impl MirDeviceMatrixLayout {
 fn wgsl_element_ty(element: MirScalarLayout) -> Result<&'static str, String> {
     match element {
         MirScalarLayout::Bool => Ok("bool"),
-        MirScalarLayout::I8 => Ok("i32"),
-        MirScalarLayout::I16 => Ok("i32"),
-        MirScalarLayout::I32 => Ok("i32"),
-        MirScalarLayout::U8 => Ok("u32"),
-        MirScalarLayout::U16 => Ok("u32"),
-        MirScalarLayout::U32 => Ok("u32"),
+        MirScalarLayout::I8 | MirScalarLayout::I16 | MirScalarLayout::I32 => Ok("i32"),
+        MirScalarLayout::U8 | MirScalarLayout::U16 | MirScalarLayout::U32 => Ok("u32"),
         MirScalarLayout::F32 => Ok("f32"),
         other => Err(format!("kernel vector element {}", other.spelling())),
     }
@@ -292,14 +288,10 @@ fn metal_element_ty(element: MirScalarLayout) -> Result<&'static str, String> {
 fn llvm_element_ty(element: MirScalarLayout) -> Result<&'static str, String> {
     match element {
         MirScalarLayout::Bool => Ok("i1"),
-        MirScalarLayout::I8 => Ok("i8"),
-        MirScalarLayout::I16 => Ok("i16"),
-        MirScalarLayout::I32 => Ok("i32"),
-        MirScalarLayout::I64 => Ok("i64"),
-        MirScalarLayout::U8 => Ok("i8"),
-        MirScalarLayout::U16 => Ok("i16"),
-        MirScalarLayout::U32 => Ok("i32"),
-        MirScalarLayout::U64 => Ok("i64"),
+        MirScalarLayout::I8 | MirScalarLayout::U8 => Ok("i8"),
+        MirScalarLayout::I16 | MirScalarLayout::U16 => Ok("i16"),
+        MirScalarLayout::I32 | MirScalarLayout::U32 => Ok("i32"),
+        MirScalarLayout::I64 | MirScalarLayout::U64 => Ok("i64"),
         MirScalarLayout::F32 => Ok("float"),
         MirScalarLayout::F64 => Ok("double"),
         other => Err(format!("kernel vector element {}", other.spelling())),
@@ -637,7 +629,8 @@ fn layout_kind_for_type(
         | Type::Infer(_)
         | Type::InferUnion(_)
         | Type::MarkerHole { .. }
-        | Type::Error => LayoutResolution::NoLayout,
+        | Type::Error
+        | Type::Intersection(_) => LayoutResolution::NoLayout,
         Type::Array(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Array)),
         // A ledger is a map underneath; its own carrier lands with the ledger
         // operations (need, L2+).
@@ -671,10 +664,6 @@ fn layout_kind_for_type(
         }
         Type::Enum(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Enum)),
         Type::Union(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Union)),
-        // No MIR aggregate family for intersections; nominal-only operands do
-        // not lower to MIR today, so resolve to no-layout rather than invent
-        // a carrier.
-        Type::Intersection(_) => LayoutResolution::NoLayout,
         Type::Tuple(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Tuple)),
         Type::Primitive(
             Primitive::Ascii
