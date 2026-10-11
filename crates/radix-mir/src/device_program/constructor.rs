@@ -1086,7 +1086,7 @@ impl<'a> KernelBuilder<'a> {
                 entry,
                 Some(subchain_index),
                 &return_tuple_locals,
-                &mut subchain_output_buffer_ids,
+                &mut *subchain_output_buffer_ids,
                 decomposition.subchains.len() == 1,
             )?;
         }
