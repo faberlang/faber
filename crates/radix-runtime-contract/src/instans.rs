@@ -234,6 +234,8 @@ fn nanos_from_offset_minutes(offset_minutes: i32) -> Option<i64> {
     clippy::cast_possible_wrap
 )]
 fn format_rfc3339_utc(nanos: i64, praecisio: InstansPraecisio) -> String {
+    use std::fmt::Write as _;
+
     let truncated = praecisio.truncate_nanos(nanos);
     let day_index = truncated.div_euclid(NANOS_PER_DAY);
     let nanos_of_day = truncated.rem_euclid(NANOS_PER_DAY);
@@ -249,7 +251,7 @@ fn format_rfc3339_utc(nanos: i64, praecisio: InstansPraecisio) -> String {
     if digits > 0 {
         let fraction = nanos_remainder / 10u32.pow(9 - digits as u32);
         out.push('.');
-        out.push_str(&format!("{fraction:0digits$}"));
+        write!(out, "{fraction:0digits$}").ok();
     }
     out.push('Z');
     out
