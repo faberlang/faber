@@ -72,7 +72,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
     }
 
     // `--device` > manifest `[device] device` > `auto`, the same precedence as
-    // `faber run`. `faber test` serves `cpu` (kernels in host form) and `auto`
+    // `faber run`. `faber test` serves `reference` and `cpu` (kernels in host form) and `auto`
     // (kernels refused); a device selection fails closed before any case runs.
     let selection = match package::resolve_device_selection(args.device, &input_path) {
         Ok(selection) => selection,
@@ -165,9 +165,9 @@ pub(super) fn cmd_test(args: &TestArgs) {
             std::process::exit(1);
         }
     };
-    // Rule 16.3: `cpu` lowers `@ kernel` functions as ordinary host functions;
+    // Rule 16.3: `reference` and `cpu` lower `@ kernel` functions as ordinary host functions;
     // the runner policy in `options` then executes them.
-    let config = if selection == DeviceSelection::Cpu {
+    let config = if matches!(selection, DeviceSelection::Cpu | DeviceSelection::Reference) {
         config.with_host_kernels()
     } else {
         config
@@ -226,13 +226,13 @@ pub(super) fn cmd_test(args: &TestArgs) {
 }
 
 /// The fail-closed message for a device selection `faber test` does not serve
-/// (`metal` / `cuda`), or `None` for `cpu` and `auto`. Device dispatch of proba
+/// (`metal` / `cuda`), or `None` for `reference`, `cpu` and `auto`. Device dispatch of proba
 /// cases is a follow-on.
 fn gpu_selection_refusal(selection: DeviceSelection) -> Option<String> {
     match selection {
-        DeviceSelection::Cpu | DeviceSelection::Auto => None,
+        DeviceSelection::Reference | DeviceSelection::Cpu | DeviceSelection::Auto => None,
         DeviceSelection::Metal | DeviceSelection::Cuda => Some(
-            "error: faber test runs cases on the MIR runner; `--device` accepts `cpu` (kernels in host form) or `auto`; device dispatch of proba cases is a follow-on"
+            "error: faber test runs cases on the MIR runner; `--device` accepts `reference` or `cpu` (kernels in host form) or `auto`; device dispatch of proba cases is a follow-on"
                 .to_owned(),
         ),
     }

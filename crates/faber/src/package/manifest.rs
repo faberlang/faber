@@ -81,15 +81,20 @@ pub struct FaberManifest {
 
 /// The `faber run --device` / `[device] device` value set.
 ///
-/// `cpu` is an explicit choice: kernels lower as ordinary functions and run
-/// single-threaded on the MIR runner. It is never substituted for another
-/// choice.
+/// `reference` and `cpu` are explicit choices: kernels lower as ordinary
+/// functions and run single-threaded on the MIR runner (until the worker
+/// device lands `cpu` is the same route as `reference`). Neither is ever
+/// substituted for another choice.
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeviceChoice {
     /// Resolve against host capability probes; fail closed when the machine
     /// admits zero or more than one device.
     Auto,
-    /// Select the CPU device explicitly: run kernels on the MIR runner.
+    /// Select the reference route explicitly: plain sequential code on the
+    /// MIR runner; the oracle device results are checked against.
+    Reference,
+    /// Select the CPU device explicitly: processor cores as a device (until
+    /// the worker device lands this is the same route as `reference`).
     Cpu,
     /// Select Metal explicitly; never silently falls back.
     Metal,
@@ -103,6 +108,7 @@ impl DeviceChoice {
     pub fn from_spelling(spelling: &str) -> Option<Self> {
         match spelling {
             "auto" => Some(Self::Auto),
+            "reference" => Some(Self::Reference),
             "cpu" => Some(Self::Cpu),
             "metal" => Some(Self::Metal),
             "cuda" => Some(Self::Cuda),
@@ -115,6 +121,7 @@ impl DeviceChoice {
     pub const fn spelling(self) -> &'static str {
         match self {
             Self::Auto => "auto",
+            Self::Reference => "reference",
             Self::Cpu => "cpu",
             Self::Metal => "metal",
             Self::Cuda => "cuda",
@@ -127,6 +134,7 @@ impl DeviceChoice {
     pub const fn selection(self) -> DeviceSelection {
         match self {
             Self::Auto => DeviceSelection::Auto,
+            Self::Reference => DeviceSelection::Reference,
             Self::Cpu => DeviceSelection::Cpu,
             Self::Metal => DeviceSelection::Metal,
             Self::Cuda => DeviceSelection::Cuda,
@@ -144,7 +152,7 @@ impl DeviceChoice {
 #[derive(Debug, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ManifestDevice {
-    /// Device selection default: `"auto"` | `"cpu"` | `"metal"` | `"cuda"`.
+    /// Device selection default: `"auto"` | `"reference"` | `"cpu"` | `"metal"` | `"cuda"`.
     /// `None` selects the portable default `auto`.
     #[serde(default)]
     pub device: Option<String>,
@@ -337,7 +345,7 @@ pub fn manifest_device_choice(
             Some(choice) => Ok(Some(choice)),
             None => Err(Box::new(
                 crate::package_diagnostic_error(format!(
-                    "faber.toml device.device '{spelling}' is not supported; use 'auto', 'cpu', 'metal', or 'cuda'"
+                    "faber.toml device.device '{spelling}' is not supported; use 'auto', 'reference', 'cpu', 'metal', or 'cuda'"
                 ))
                 .with_file(path.display().to_string())
                 .with_arg("issue", "package_device_unsupported")

@@ -43,10 +43,15 @@ Common flows:
     faber run --device metal <device-package>   # Apple Metal
     faber run --device cuda  <device-package>   # NVIDIA CUDA
     faber run --device auto  <device-package>   # exactly one admitted device
-    faber run --device cpu   <input>            # run `@ kernel` code on the CPU
-                                                # (MIR runner, single thread)
+    faber run --device reference <input>        # plain sequential code on the MIR
+                                                # runner; the oracle device
+                                                # results are checked against
+    faber run --device cpu   <input>            # processor cores as a device
+                                                # (until the worker device lands
+                                                # this is the same route as
+                                                # reference)
 
-    `--device` takes auto|cpu|metal|cuda. Precedence: `--device` > manifest
+    `--device` takes auto|reference|cpu|metal|cuda. Precedence: `--device` > manifest
     `[device] device` > auto.
 
     A device-capable package has an `@ nucleum` kernel and a `[device]` manifest

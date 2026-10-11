@@ -281,6 +281,10 @@ fn cli_parses_device_choice_and_defaults_to_none() {
         args.device
     };
     assert_eq!(parse(&["--device", "cpu"]), Some(DeviceChoice::Cpu));
+    assert_eq!(
+        parse(&["--device", "reference"]),
+        Some(DeviceChoice::Reference)
+    );
     assert_eq!(parse(&["--device", "metal"]), Some(DeviceChoice::Metal));
     assert_eq!(parse(&[]), None);
 }
@@ -290,13 +294,18 @@ fn gpu_selection_refusal_covers_only_device_selections() {
     assert!(gpu_selection_refusal(DeviceSelection::Metal).is_some());
     assert!(gpu_selection_refusal(DeviceSelection::Cuda).is_some());
     assert!(gpu_selection_refusal(DeviceSelection::Cpu).is_none());
+    assert!(gpu_selection_refusal(DeviceSelection::Reference).is_none());
     assert!(gpu_selection_refusal(DeviceSelection::Auto).is_none());
 }
 
 #[test]
-fn only_the_cpu_selection_executes_kernels() {
+fn only_the_cpu_and_reference_selections_execute_kernels() {
     assert_eq!(
         DeviceSelection::Cpu.kernel_policy(),
+        RunnerKernelPolicy::Execute
+    );
+    assert_eq!(
+        DeviceSelection::Reference.kernel_policy(),
         RunnerKernelPolicy::Execute
     );
     assert_eq!(

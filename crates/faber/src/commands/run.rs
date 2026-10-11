@@ -262,10 +262,13 @@ fn interpret_path(
         std::process::exit(1);
     }
     // An explicit GPU request can never be served here (N1.1 fail closed:
-    // "package has no device program"). `cpu` needs no device program: it runs
+    // "package has no device program"). `reference` and `cpu` need no device program: it runs
     // the file's kernels on the MIR runner.
     #[cfg(not(feature = "device-runtime"))]
-    if !matches!(selection, DeviceSelection::Auto | DeviceSelection::Cpu) {
+    if !matches!(
+        selection,
+        DeviceSelection::Auto | DeviceSelection::Reference | DeviceSelection::Cpu
+    ) {
         eprintln!(
             "error: explicit device selection `{}` cannot be served: a single `.fab` file carries no package device program; device execution requires a package with a `[device]` section",
             selection.spelling()
@@ -408,7 +411,7 @@ pub(super) fn is_single_fab_file(path: &Path) -> bool {
 /// Whether this run takes the in-process device session: an explicit GPU, or
 /// `auto` over a package that declares kernels (a GPU is admitted, or the run
 /// fails closed with `E_DEVICE_NONE_ADMITTED`; `auto` never picks the CPU for
-/// a kernel package). `auto` over a package without kernels, and `cpu`, run
+/// a kernel package). `auto` over a package without kernels, and `reference` / `cpu`, run
 /// the CPU route.
 ///
 /// The `auto` answer prepares the whole package, so it is a stand-alone
@@ -422,7 +425,7 @@ fn device_session_selected(
 ) -> bool {
     match selection {
         DeviceSelection::Metal | DeviceSelection::Cuda => true,
-        DeviceSelection::Cpu => false,
+        DeviceSelection::Reference | DeviceSelection::Cpu => false,
         DeviceSelection::Auto => {
             package::mir::package_declares_kernels(config, input).unwrap_or(false)
         }
@@ -443,7 +446,7 @@ fn try_device_session(
     stats_file: Option<&std::path::PathBuf>,
 ) -> Option<Result<(), Vec<Diagnostic>>> {
     match selection {
-        DeviceSelection::Cpu => None,
+        DeviceSelection::Reference | DeviceSelection::Cpu => None,
         DeviceSelection::Metal | DeviceSelection::Cuda => Some(run_on_device_session(
             config, input, selection, host, stats, stats_file,
         )),

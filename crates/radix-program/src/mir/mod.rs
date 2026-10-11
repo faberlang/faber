@@ -233,9 +233,15 @@ pub enum DeviceSelection {
     /// Resolve against host capability probes; fail closed when the machine
     /// admits zero or more than one backend.
     Auto,
-    /// Select the CPU device explicitly: kernels lower as ordinary functions
-    /// and run single-threaded on the MIR runner. Never a silent fallback of
-    /// another selection.
+    /// Select the reference route explicitly: kernels lower as ordinary
+    /// functions and run as plain sequential code on the MIR runner, no
+    /// device program, no lanes. The oracle device results are checked
+    /// against. Never a silent fallback of another selection.
+    Reference,
+    /// Select the CPU device explicitly: processor cores as a device. Until
+    /// the worker device lands this is the same route as [`Self::Reference`]
+    /// (kernels lower as ordinary functions and run single-threaded on the
+    /// MIR runner). Never a silent fallback of another selection.
     Cpu,
     /// Select Metal explicitly; never silently falls back.
     Metal,
@@ -244,12 +250,13 @@ pub enum DeviceSelection {
 }
 
 impl DeviceSelection {
-    /// Parse a selection from its stable spelling (`auto` / `cpu` / `metal` /
-    /// `cuda`).
+    /// Parse a selection from its stable spelling (`auto` / `reference` /
+    /// `cpu` / `metal` / `cuda`).
     #[must_use]
     pub fn from_spelling(spelling: &str) -> Option<Self> {
         match spelling {
             "auto" => Some(Self::Auto),
+            "reference" => Some(Self::Reference),
             "cpu" => Some(Self::Cpu),
             "metal" => Some(Self::Metal),
             "cuda" => Some(Self::Cuda),
@@ -262,18 +269,20 @@ impl DeviceSelection {
     pub const fn spelling(self) -> &'static str {
         match self {
             Self::Auto => "auto",
+            Self::Reference => "reference",
             Self::Cpu => "cpu",
             Self::Metal => "metal",
             Self::Cuda => "cuda",
         }
     }
 
-    /// How kernels lower under this selection: `cpu` lowers them as ordinary
-    /// host functions, every other selection keeps the device form.
+    /// How kernels lower under this selection: `reference` and `cpu` lower
+    /// them as ordinary host functions, every other selection keeps the
+    /// device form.
     #[must_use]
     pub const fn kernel_lowering(self) -> radix_module::mir::KernelLowering {
         match self {
-            Self::Cpu => radix_module::mir::KernelLowering::Host,
+            Self::Reference | Self::Cpu => radix_module::mir::KernelLowering::Host,
             Self::Auto | Self::Metal | Self::Cuda => radix_module::mir::KernelLowering::Device,
         }
     }
@@ -282,7 +291,7 @@ impl DeviceSelection {
     #[must_use]
     pub const fn kernel_policy(self) -> RunnerKernelPolicy {
         match self {
-            Self::Cpu => RunnerKernelPolicy::Execute,
+            Self::Reference | Self::Cpu => RunnerKernelPolicy::Execute,
             Self::Auto | Self::Metal | Self::Cuda => RunnerKernelPolicy::Refuse,
         }
     }

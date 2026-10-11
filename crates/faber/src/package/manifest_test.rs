@@ -15,6 +15,7 @@ fn absent_device_key_is_none() {
 fn valid_device_spellings_parse() {
     for (spelling, expected) in [
         ("auto", DeviceChoice::Auto),
+        ("reference", DeviceChoice::Reference),
         ("cpu", DeviceChoice::Cpu),
         ("metal", DeviceChoice::Metal),
         ("cuda", DeviceChoice::Cuda),

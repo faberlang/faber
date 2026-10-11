@@ -590,15 +590,18 @@ pub struct RunArgs {
     pub diagnostics_locale: Option<String>,
 
     /// Device selection for device-capable packages (differentiable-GPU
-    /// campaign N1.1): `auto`, `cpu`, `metal`, or `cuda`. When omitted, the
+    /// campaign N1.1): `auto`, `reference`, `cpu`, `metal`, or `cuda`. When omitted, the
     /// manifest `[device] device` wins; otherwise the default `auto` applies.
     /// Precedence: CLI > manifest > `auto`. An explicit device request never
     /// silently falls back: it fails closed before launch
     /// (`E_BACKEND_UNAVAILABLE`) when the device is not admitted on this
     /// machine, and a package with no device program fails closed ("package
-    /// has no device program"). `cpu` lowers `@ kernel` functions as ordinary
-    /// functions and runs them single-threaded on the MIR runner; without it
-    /// a program that calls a kernel is refused. Device programs execute
+    /// has no device program"). `reference` is plain sequential code on the
+    /// MIR runner, the oracle device results are checked against; `cpu` is
+    /// processor cores as a device (until the worker device lands this is the
+    /// same route as `reference`). Both lower `@ kernel` functions as ordinary
+    /// functions and run them single-threaded on the MIR runner; without one
+    /// of them a program that calls a kernel is refused. Device programs execute
     /// through the host driver (the first-party target runtime).
     #[arg(long = "device", value_enum, value_name = "DEVICE")]
     pub device: Option<DeviceChoice>,
@@ -666,8 +669,9 @@ pub struct TestArgs {
     #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
     pub diagnostics_locale: Option<String>,
 
-    /// Device selection for cases that call `@ kernel` functions: `cpu` runs
-    /// them in host form on the MIR runner (the rule 16.3 oracle mode);
+    /// Device selection for cases that call `@ kernel` functions: `reference`
+    /// and `cpu` run them in host form on the MIR runner (the rule 16.3 oracle
+    /// mode; until the worker device lands `cpu` is the same route);
     /// `auto` or absent keeps refusing kernels. `metal` and `cuda` are not
     /// served by `faber test` and fail closed. Precedence: CLI > manifest
     /// `[device] device` > `auto`.

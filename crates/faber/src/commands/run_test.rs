@@ -232,6 +232,34 @@ fn route_selection_cpu_flag_selects_the_cpu_route() {
 }
 
 #[test]
+fn route_selection_reference_flag_selects_the_reference_route() {
+    let dir = temp_dir("device-reference-cli");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let args = run_args(dir.clone(), Some(DeviceChoice::Reference));
+    let selection = resolve_route_selection(&args, &dir).expect("reference resolves");
+    assert_eq!(selection, DeviceSelection::Reference);
+    // Same route semantics as `cpu` today.
+    assert_eq!(
+        selection.kernel_lowering(),
+        DeviceSelection::Cpu.kernel_lowering()
+    );
+    assert_eq!(
+        selection.kernel_policy(),
+        DeviceSelection::Cpu.kernel_policy()
+    );
+
+    let manifest_dir = temp_dir("device-reference-manifest");
+    std::fs::write(manifest_dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&manifest_dir, Some("reference"));
+    let manifest_args = run_args(manifest_dir.clone(), None);
+    assert_eq!(
+        resolve_route_selection(&manifest_args, &manifest_dir).expect("manifest reference"),
+        DeviceSelection::Reference
+    );
+}
+
+#[test]
 fn route_selection_manifest_cpu_selects_the_cpu_route() {
     let dir = temp_dir("device-cpu-manifest");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
@@ -332,6 +360,15 @@ fn route_selection_allows_stats_with_auto_or_absent_device() {
     assert_eq!(
         resolve_route_selection(&cpu_args, &dir).expect("cpu keeps the interpreted route"),
         DeviceSelection::Cpu
+    );
+
+    // `reference` is the same interpreted route.
+    let mut reference_args = run_args(dir.clone(), Some(DeviceChoice::Reference));
+    reference_args.stats = true;
+    assert_eq!(
+        resolve_route_selection(&reference_args, &dir)
+            .expect("reference keeps the interpreted route"),
+        DeviceSelection::Reference
     );
 }
 

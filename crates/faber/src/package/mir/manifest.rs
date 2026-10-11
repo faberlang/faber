@@ -29,7 +29,7 @@ pub(super) fn manifest_device_config(
     let manifest = super::super::read_manifest(&layout.manifest_path)
         .map_err(|diagnostic| vec![*diagnostic])?;
     let inputs = super::super::manifest_device_inputs(&manifest.device.inputs);
-    // `cpu` records no device section (the CPU device runs on the MIR runner
+    // `reference` and `cpu` record no device section (they run on the MIR runner
     // and builds none): it projects to no selection here; `faber run`
     // resolves it from the manifest itself.
     let selection = super::super::manifest_device_choice(
@@ -37,7 +37,12 @@ pub(super) fn manifest_device_config(
         &layout.manifest_path,
     )
     .map_err(|diagnostic| vec![*diagnostic])?
-    .filter(|choice| *choice != super::super::DeviceChoice::Cpu)
+    .filter(|choice| {
+        !matches!(
+            choice,
+            super::super::DeviceChoice::Reference | super::super::DeviceChoice::Cpu
+        )
+    })
     .map(super::super::DeviceChoice::selection);
     // S5-U5b: a zero declared step count is a contradiction (a RepeatingStep
     // program must drive at least one step) — fail closed at the point of

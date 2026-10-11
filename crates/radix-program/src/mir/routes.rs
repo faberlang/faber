@@ -467,7 +467,7 @@ pub fn run_package_fmir_image_with_selection<H: Host + ?Sized>(
 /// execution is the in-process session, which needs a lowered unit that a
 /// loaded image does not carry, so this route never executes a device:
 ///
-/// - `cpu` runs the image on the runner (kernels in host form), even when the
+/// - `reference` and `cpu` run the image on the runner (kernels in host form), even when the
 ///   image carries a device section;
 /// - a device-bearing image under any other selection fails with
 ///   `E_DEVICE_IMAGE_ROUTE_RETIRED`;
@@ -476,7 +476,7 @@ fn admit_runner_route(
     image: &FmirPackageImage,
     selection: DeviceSelection,
 ) -> Result<(), Vec<Diagnostic>> {
-    if selection == DeviceSelection::Cpu {
+    if matches!(selection, DeviceSelection::Cpu | DeviceSelection::Reference) {
         return Ok(());
     }
     if image.device.is_some() {
