@@ -175,10 +175,9 @@ impl TypeChecker<'_> {
             .iter()
             .map(|&index| self.synthesized(HirExpressionKind::Path(coordinate_ids[index]), span))
             .collect();
-        let group = if key_paths.len() == 1 {
-            key_paths.into_iter().next().expect("one kept coordinate")
-        } else {
-            self.synthesized(
+        let group = match <[HirExpression; 1]>::try_from(key_paths) {
+            Ok([only]) => only,
+            Err(key_paths) => self.synthesized(
                 HirExpressionKind::Array(
                     key_paths
                         .into_iter()
@@ -186,7 +185,7 @@ impl TypeChecker<'_> {
                         .collect(),
                 ),
                 span,
-            )
+            ),
         };
         let kind = std::mem::replace(&mut expr.kind, HirExpressionKind::Vacua);
         let HirExpressionKind::MethodCall(receiver, ..) = kind else {
