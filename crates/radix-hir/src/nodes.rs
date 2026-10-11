@@ -1175,6 +1175,26 @@ impl HirExpression {
     }
 }
 
+/// Key expressions of a grouped reduction's `per` / `pro` clause.
+///
+/// WHY: `per [i, j]` is a bracketed coordinate list and `per k` is the
+/// one-key case, so `per k` and `per [k]` name the same single key. A spread
+/// element yields its inner expression; typecheck refuses it, so later passes
+/// only see plain keys.
+#[must_use]
+pub fn reduction_group_keys(group: &HirExpression) -> Vec<&HirExpression> {
+    match &group.kind {
+        HirExpressionKind::Array(elements) => elements
+            .iter()
+            .filter_map(|element| match element {
+                HirArrayElement::Expr(expr) | HirArrayElement::Spread(expr) => Some(expr),
+                HirArrayElement::Infer(_) => None,
+            })
+            .collect(),
+        _ => vec![group],
+    }
+}
+
 /// Function or method call argument.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirCallArg {

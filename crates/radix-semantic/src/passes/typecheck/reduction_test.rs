@@ -159,6 +159,102 @@ functio grouped_max(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tens
     );
 }
 
+// Need: `pro [i, j]` is a bracketed coordinate list; the result is a
+// rank-N tensor whose rank equals the key count and `pro k` is `pro [k]`.
+
+#[test]
+fn grouped_reduction_with_two_keys_checks_against_a_rank_two_result() {
+    assert_accepts(
+        r"
+functio buckets(tensor<numerus, [3]> xs, tensor<numerus, [3]> rows, tensor<numerus, [3]> cols) → tensor<numerus, [2, 4]> {
+    redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]]
+}
+",
+    );
+}
+
+#[test]
+fn grouped_reduction_key_count_must_match_the_result_rank() {
+    assert_rejects_with_issue(
+        r"
+functio too_few(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2, 4]> {
+    redde reducta via summa ex xs apud [i] pro [keys[i]]
+}
+",
+        "reducta_group_rank_mismatch",
+    );
+    assert_rejects_with_issue(
+        r"
+functio too_many(tensor<numerus, [3]> xs, tensor<numerus, [3]> rows, tensor<numerus, [3]> cols) → tensor<numerus, [2]> {
+    redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]]
+}
+",
+        "reducta_group_rank_mismatch",
+    );
+}
+
+#[test]
+fn grouped_reduction_refuses_non_integral_keys_in_a_coordinate_list() {
+    assert_rejects_with_issue(
+        r"
+functio non_integer(tensor<numerus, [3]> xs, tensor<numerus, [3]> rows, tensor<fractus, [3]> cols) → tensor<numerus, [2, 4]> {
+    redde reducta via summa ex xs apud [i] pro [rows[i], cols[i]]
+}
+",
+        "reducta_group_key_not_integer",
+    );
+}
+
+#[test]
+fn grouped_reduction_refuses_spread_and_non_literal_key_lists() {
+    assert_rejects_with_issue(
+        r"
+functio spread(tensor<numerus, [3]> xs, lista<numerus> ks) → tensor<numerus, [2, 4]> {
+    redde reducta via summa ex xs apud [i] pro [sparge ks]
+}
+",
+        "reducta_group_keys_not_literal",
+    );
+    assert_rejects_with_issue(
+        r"
+functio variable(tensor<numerus, [3]> xs, lista<numerus> ks) → tensor<numerus, [2, 4]> {
+    redde reducta via summa ex xs apud [i] pro ks
+}
+",
+        "reducta_group_keys_not_literal",
+    );
+}
+
+#[test]
+fn a_single_key_and_a_one_element_list_agree() {
+    assert_accepts(
+        r"
+functio bare(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
+    redde reducta via summa ex xs apud [i] pro keys[i]
+}
+functio listed(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
+    redde reducta via summa ex xs apud [i] pro [keys[i]]
+}
+",
+    );
+    assert_rejects_with_issue(
+        r"
+functio bare(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2, 4]> {
+    redde reducta via summa ex xs apud [i] pro keys[i]
+}
+",
+        "reducta_group_rank_mismatch",
+    );
+    assert_rejects_with_issue(
+        r"
+functio listed(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2, 4]> {
+    redde reducta via summa ex xs apud [i] pro [keys[i]]
+}
+",
+        "reducta_group_rank_mismatch",
+    );
+}
+
 // Need: `t.summa(axis n)` / `t.media(axis n)` on a rank-2 tensor
 // expand to the grouped reduction and drop the named axis from the shape.
 

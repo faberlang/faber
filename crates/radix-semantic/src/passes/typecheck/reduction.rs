@@ -20,6 +20,8 @@ const ISSUE_REDUCTA_BODY_FORBIDS_CAPE: &str = "reducta_body_forbids_cape";
 const ISSUE_REDUCTA_BODY_FORBIDS_IACE: &str = "reducta_body_forbids_iace";
 const ISSUE_REDUCTA_BODY_EFFECT: &str = "reducta_body_effect";
 const ISSUE_REDUCTA_BODY_CONTEXT: &str = "reducta_body_context";
+const ISSUE_REDUCTA_GROUP_KEYS_NOT_LITERAL: &str = "reducta_group_keys_not_literal";
+const ISSUE_REDUCTA_GROUP_RANK_MISMATCH: &str = "reducta_group_rank_mismatch";
 
 /// Coordinate names the axis expansion binds; interned before typecheck.
 pub(crate) const AXIS_REDUCTION_COORDINATES: [&str; 2] = ["__axis0", "__axis1"];
@@ -292,25 +294,26 @@ pub(super) fn check_reduction_expr(
                 span,
             );
         }
-        let key_ty = checker.check_expr(group);
-        let key_ty = checker.resolve_inferred_type(key_ty);
-        if !matches!(
-            checker.types.get(key_ty),
-            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
-        ) {
-            checker.error_issue(
-                SemanticErrorKind::TypeMismatch,
-                "reducta_group_key_not_integer",
-                group.span,
-            );
-        }
-        if expected_group.is_none_or(|(_, shape)| {
+        let group_ty = checker.check_expr(group);
+        let group_ty = checker.resolve_inferred_type(group_ty);
+        let key_count = check_group_keys(checker, group, group_ty);
+        let rank_known = expected_group.is_some_and(|(_, shape)| {
             crate::i64s_from_literal_index(shape, checker.types)
-                .is_none_or(|d| d.len() != 1 || d[0] < 0)
-        }) {
+                .is_some_and(|d| !d.is_empty() && d.iter().all(|extent| *extent >= 0))
+        });
+        let expected_rank = expected_group.and_then(|(_, shape)| {
+            crate::i64s_from_literal_index(shape, checker.types).map(|d| d.len())
+        });
+        if !rank_known {
             checker.error_issue(
                 SemanticErrorKind::TypeMismatch,
                 "reducta_group_extent_unknown",
+                span,
+            );
+        } else if key_count.is_some_and(|keys| Some(keys) != expected_rank) {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_REDUCTA_GROUP_RANK_MISMATCH,
                 span,
             );
         }
@@ -414,6 +417,63 @@ pub(super) fn check_reduction_expr(
         return checker.error_type;
     }
     result
+}
+
+/// Type-check the keys of a grouped reduction's `per [i, j]` coordinate list.
+///
+/// `per k` is the one-key case of `per [k]`. Returns the key count when the
+/// group is an admitted key list, `None` after a named refusal.
+fn check_group_keys(
+    checker: &mut TypeChecker<'_>,
+    group: &HirExpression,
+    group_ty: TypeId,
+) -> Option<usize> {
+    let literal = matches!(group.kind, HirExpressionKind::Array(_));
+    if literal {
+        let HirExpressionKind::Array(elements) = &group.kind else {
+            return None;
+        };
+        let plain = elements
+            .iter()
+            .all(|element| matches!(element, radix_hir::HirArrayElement::Expr(_)));
+        if !plain || elements.is_empty() {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_REDUCTA_GROUP_KEYS_NOT_LITERAL,
+                group.span,
+            );
+            return None;
+        }
+    } else if matches!(
+        checker.types.get(group_ty),
+        Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::Tuple(_)
+            | Type::Tensor(..)
+            | Type::Matrix(..)
+    ) {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_REDUCTA_GROUP_KEYS_NOT_LITERAL,
+            group.span,
+        );
+        return None;
+    }
+    let keys = radix_hir::reduction_group_keys(group);
+    for key in &keys {
+        let key_ty = checker.resolve_inferred_type(key.ty.unwrap_or(checker.error_type));
+        if !matches!(
+            checker.types.get(key_ty),
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+        ) {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                "reducta_group_key_not_integer",
+                key.span,
+            );
+        }
+    }
+    Some(keys.len())
 }
 
 fn is_numeric_scalar(types: &TypeTable, ty: TypeId) -> bool {
