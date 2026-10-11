@@ -83,11 +83,91 @@ pub fn derive(
         launch_partitions.push(launch_partition(facts, default_owner, resources));
     }
 
-    let registry = program.buffer_registry();
-
     // 1. Partitions (ascending partition id).
+    let partitions = build_partitions(
+        &partition_ids,
+        default_owner,
+        facts,
+        program,
+        &launch_partitions,
+    );
+
+    // 2. Execution graph.
+    let mut operations: Vec<ExecutionOperation> = Vec::new();
+
+    // Result → barrier map, in program result order (barrier ids assigned
+    // before the transfers so completion boundaries can reference them).
+    let mut result_barrier_ids: Vec<(BufferId, u32, BarrierId)> = Vec::new();
+    for (index, result) in program.results.iter().enumerate() {
+        result_barrier_ids.push((
+            result.buffer.id,
+            result.version.version,
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "BarrierId is a u32 ordinal by design; result-row indices are far below u32::MAX"
+            )]
+            BarrierId(index as u32),
+        ));
+    }
+
+    // Launches, in program order.
+    for (index, launch) in program.launches.iter().enumerate() {
+        operations.push(ExecutionOperation::Launch(LaunchOperation {
+            launch: launch.id,
+            partition: launch_partitions[index],
+        }));
+    }
+
+    // Transfers, in registry order (buffer first-reference order) × program
+    // launch order, deduplicated per (buffer, version, source, destination).
+    append_transfers(
+        facts,
+        default_owner,
+        program,
+        &launch_partitions,
+        &launch_resources,
+        &result_barrier_ids,
+        &mut operations,
+    );
+
+    // Collectives (one broadcast per replicated value) and barriers (one per
+    // result row at its declared commit boundary).
+    append_collectives_and_barriers(
+        facts,
+        default_owner,
+        program,
+        &launch_partitions,
+        &launch_resources,
+        &mut operations,
+    );
+
+    // Graph-level declared commit boundary.
+    let mut boundary_launches: Vec<LaunchId> = Vec::new();
+    for result in &program.results {
+        push_launch(&mut boundary_launches, result.produced_by);
+    }
+    let graph = DistributedExecutionGraph {
+        operations,
+        commit_boundary: ExecutionCommitBoundary {
+            barriers: result_barrier_ids.iter().map(|(_, _, id)| *id).collect(),
+            launches: boundary_launches,
+        },
+    };
+
+    (partitions, graph)
+}
+
+/// Partition records for every declared partition id, ascending.
+fn build_partitions(
+    partition_ids: &[PartitionId],
+    default_owner: PartitionId,
+    facts: &[PlacementFact],
+    program: &DeviceProgram,
+    launch_partitions: &[PartitionId],
+) -> Vec<DeviceProgramPartition> {
+    let registry = program.buffer_registry();
     let mut partitions: Vec<DeviceProgramPartition> = Vec::with_capacity(partition_ids.len());
-    for &id in &partition_ids {
+    for &id in partition_ids {
         let mut launches: Vec<LaunchId> = Vec::new();
         let mut kernels: Vec<usize> = Vec::new();
         for (index, launch) in program.launches.iter().enumerate() {
@@ -142,35 +222,21 @@ pub fn derive(
             placements,
         });
     }
+    partitions
+}
 
-    // 2. Execution graph.
-    let mut operations: Vec<ExecutionOperation> = Vec::new();
-
-    // Result → barrier map, in program result order (barrier ids assigned
-    // before the transfers so completion boundaries can reference them).
-    let mut result_barrier_ids: Vec<(BufferId, u32, BarrierId)> = Vec::new();
-    for (index, result) in program.results.iter().enumerate() {
-        result_barrier_ids.push((
-            result.buffer.id,
-            result.version.version,
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "BarrierId is a u32 ordinal by design; result-row indices are far below u32::MAX"
-            )]
-            BarrierId(index as u32),
-        ));
-    }
-
-    // Launches, in program order.
-    for (index, launch) in program.launches.iter().enumerate() {
-        operations.push(ExecutionOperation::Launch(LaunchOperation {
-            launch: launch.id,
-            partition: launch_partitions[index],
-        }));
-    }
-
-    // Transfers, in registry order (buffer first-reference order) × program
-    // launch order, deduplicated per (buffer, version, source, destination).
+/// Append one transfer per cross-partition reference, deduplicated per
+/// `(buffer, version, source, destination)`.
+fn append_transfers(
+    facts: &[PlacementFact],
+    default_owner: PartitionId,
+    program: &DeviceProgram,
+    launch_partitions: &[PartitionId],
+    launch_resources: &[Vec<(BufferId, u32, MirType, MirKernelResourceAccess)>],
+    result_barrier_ids: &[(BufferId, u32, BarrierId)],
+    operations: &mut Vec<ExecutionOperation>,
+) {
+    let registry = program.buffer_registry();
     let mut next_transfer_id: u32 = 0;
     let mut seen_transfers: Vec<(BufferId, u32, PartitionId, PartitionId)> = Vec::new();
     for entry in &registry.buffers {
@@ -210,7 +276,7 @@ pub fn derive(
                     }
                     seen_transfers.push(key);
                     let completion_boundary = ExecutionCommitBoundary {
-                        barriers: barrier_ids_for(&result_barrier_ids, buffer, *version),
+                        barriers: barrier_ids_for(result_barrier_ids, buffer, *version),
                         launches: producing_launch(program, buffer, *version)
                             .into_iter()
                             .collect(),
@@ -234,9 +300,19 @@ pub fn derive(
             }
         }
     }
+}
 
-    // Collectives: one broadcast per replicated value referenced on more
-    // than one partition (registry order).
+/// Append one broadcast per replicated value referenced on more than one
+/// partition, then one barrier per result row at its declared commit boundary.
+fn append_collectives_and_barriers(
+    facts: &[PlacementFact],
+    default_owner: PartitionId,
+    program: &DeviceProgram,
+    launch_partitions: &[PartitionId],
+    launch_resources: &[Vec<(BufferId, u32, MirType, MirKernelResourceAccess)>],
+    operations: &mut Vec<ExecutionOperation>,
+) {
+    let registry = program.buffer_registry();
     let mut next_collective_id: u32 = 0;
     for entry in &registry.buffers {
         let buffer = entry.identity.id;
@@ -298,21 +374,6 @@ pub fn derive(
             partitions: participants,
         }));
     }
-
-    // Graph-level declared commit boundary.
-    let mut boundary_launches: Vec<LaunchId> = Vec::new();
-    for result in &program.results {
-        push_launch(&mut boundary_launches, result.produced_by);
-    }
-    let graph = DistributedExecutionGraph {
-        operations,
-        commit_boundary: ExecutionCommitBoundary {
-            barriers: result_barrier_ids.iter().map(|(_, _, id)| *id).collect(),
-            launches: boundary_launches,
-        },
-    };
-
-    (partitions, graph)
 }
 
 /// All distinct partition ids referenced by the declared facts, ascending.
