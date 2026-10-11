@@ -110,6 +110,9 @@ mod monomorphize;
 #[cfg(test)]
 #[path = "lower/octeti_tensor_run_test.rs"]
 mod octeti_tensor_run_tests;
+#[cfg(test)]
+#[path = "lower/own_class_field_test.rs"]
+mod own_class_field_tests;
 mod package_instantiate;
 mod place;
 mod register_lift;
@@ -2843,10 +2846,12 @@ impl<'a> FunctionBuilder<'a> {
             return None;
         };
 
-        // A `copy` bind elaborates to an exclusive owned value (D-6): the
-        // local stores the payload type, like a `copy` parameter.
+        // A `copy` bind elaborates to an exclusive owned value (D-6), and an
+        // `own` bind takes the source's value over: the local stores the
+        // payload type, like a `copy` / `own` parameter, so field projection
+        // and method receivers see the struct, not the access wrapper.
         let copy_bind = self.types.is_copy_view(ty);
-        let mir_ty = if copy_bind {
+        let mir_ty = if copy_bind || self.types.is_own_view(ty) {
             MirType::semantic(self.types.peel_access_marker(ty).1)
         } else {
             MirType::semantic(ty)

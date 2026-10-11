@@ -1,0 +1,23 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "class_decl", "field_decl", "var_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "member_suffix", "print_stmt"]
+category = "type"
+summary = "MU-3: own bind of a class value; the binding reads the source's field."
+syntax = "const Holder f ← own d"
+related = ["own", "genus"]
+locale = "la"
++++
+# =============================================================================
+# mutabilitas — own bind of a class value (MU-3)
+# =============================================================================
+
+genus Holder {
+    varia f64 x = 0.0
+}
+
+incipit {
+    fixum Holder d ← Holder { x = 2.0 }
+    fixum Holder f ← penes d
+    nota f.x
+}
