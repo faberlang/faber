@@ -547,110 +547,18 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         WireCollectionKernelPlan::Elementwise | WireCollectionKernelPlan::RankExtensionAdd(_) => {
             CollectionKernelPlan::Elementwise
         }
-        WireCollectionKernelPlan::TiledMatMul(plan) => {
-            CollectionKernelPlan::TiledMatMul(MatMulPlan {
-                dims: radix_mir::MatMulDims::Literal {
-                    m: plan.m,
-                    k: plan.k,
-                    n: plan.n,
-                },
-                m: plan.m,
-                k: plan.k,
-                n: plan.n,
-                left_layout: wire_matmul_layout(plan.left_layout),
-                right_layout: wire_matmul_layout(plan.right_layout),
-                tile: plan.tile,
-                workgroup_x: plan.workgroup_x,
-                workgroup_y: plan.workgroup_y,
-                shared_memory: MatMulSharedMemory {
-                    shared_a: wire_shared_layout(&plan.shared_memory.shared_a),
-                    shared_b: wire_shared_layout(&plan.shared_memory.shared_b),
-                },
-                barriers: plan.barriers.iter().map(wire_barrier_point).collect(),
-                oob_padding: wire_oob_padding(plan.oob_padding),
-                // The legacy wire plan carries no batch axes — an ordinary
-                // rank-2 image. Batched images ride the dedicated
-                // `BatchedTiledMatMul` variant, never a silent default.
-                batch: 1,
-                right_batch: 1,
-            })
-        }
+        WireCollectionKernelPlan::TiledMatMul(plan) => wire_tiled_matmul_plan(plan),
         // U1 head-axis: the batched tiled-matmul image (leading head axes;
         // the argument's batch dims a prefix of the receiver's). A distinct
         // variant — not a defaulted field on the rank-2 plan — so a
         // batched fact can never decode as rank-2 by omission.
-        WireCollectionKernelPlan::BatchedTiledMatMul(plan) => {
-            CollectionKernelPlan::TiledMatMul(MatMulPlan {
-                dims: radix_mir::MatMulDims::Literal {
-                    m: plan.m,
-                    k: plan.k,
-                    n: plan.n,
-                },
-                m: plan.m,
-                k: plan.k,
-                n: plan.n,
-                left_layout: wire_matmul_layout(plan.left_layout),
-                right_layout: wire_matmul_layout(plan.right_layout),
-                tile: plan.tile,
-                workgroup_x: plan.workgroup_x,
-                workgroup_y: plan.workgroup_y,
-                shared_memory: MatMulSharedMemory {
-                    shared_a: wire_shared_layout(&plan.shared_memory.shared_a),
-                    shared_b: wire_shared_layout(&plan.shared_memory.shared_b),
-                },
-                barriers: plan.barriers.iter().map(wire_barrier_point).collect(),
-                oob_padding: wire_oob_padding(plan.oob_padding),
-                batch: plan.batch,
-                right_batch: plan.right_batch,
-            })
-        }
-        WireCollectionKernelPlan::TreeReduction(plan) => {
-            CollectionKernelPlan::TreeReduction(ReductionPlan {
-                op: wire_reduce_op(plan.op),
-                length: plan.length,
-                workgroup_x: plan.workgroup_x,
-                partials: plan.partials,
-                shared_memory: wire_shared_layout(&plan.shared_memory),
-                barriers: plan.barriers.iter().map(wire_barrier_point).collect(),
-                oob_padding: wire_oob_padding(plan.oob_padding),
-            })
-        }
-        WireCollectionKernelPlan::Transpose(plan) => {
-            CollectionKernelPlan::Transpose(TransposePlan {
-                m: plan.m,
-                n: plan.n,
-                workgroup_x: plan.workgroup_x,
-                dispatch_x: plan.dispatch_x,
-                // The legacy wire image carries no batch axes — the
-                // ordinary rank-2 law. Batched images ride the dedicated
-                // `BatchedTranspose` variant, never a silent default.
-                batched: None,
-            })
-        }
+        WireCollectionKernelPlan::BatchedTiledMatMul(plan) => wire_batched_tiled_matmul_plan(plan),
+        WireCollectionKernelPlan::TreeReduction(plan) => wire_tree_reduction_plan(plan),
+        WireCollectionKernelPlan::Transpose(plan) => wire_transpose_plan(plan),
         // U3 head-axis: the batched transpose image (leading head axes
         // over the swapped trailing [M, N]).
-        WireCollectionKernelPlan::BatchedTranspose(plan) => {
-            CollectionKernelPlan::Transpose(TransposePlan {
-                m: plan.m,
-                n: plan.n,
-                workgroup_x: plan.workgroup_x,
-                dispatch_x: plan.dispatch_x,
-                batched: Some(plan.batch),
-            })
-        }
-        WireCollectionKernelPlan::AxisReduction(plan) => {
-            CollectionKernelPlan::AxisReduction(AxisReductionPlan {
-                op: wire_reduce_op(plan.op),
-                axis: plan.axis,
-                // The carried reduced-resource projection maps back
-                // field-for-field (council-8 CB-3) — the reverse arm
-                // reconstructs the producer fact, never infers it.
-                projection: ReducedProjection {
-                    axis_extent: plan.projection.axis_extent,
-                    inner_stride: plan.projection.inner_stride,
-                },
-            })
-        }
+        WireCollectionKernelPlan::BatchedTranspose(plan) => wire_batched_transpose_plan(plan),
+        WireCollectionKernelPlan::AxisReduction(plan) => wire_axis_reduction_plan(plan),
         WireCollectionKernelPlan::RowSoftmax(plan) => {
             CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
                 axis: plan.axis,
@@ -662,16 +570,7 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         }
         // U2 head-axis: the batched row-softmax image (leading head/query
         // axes; the additive mask operand kept as a broadcast count).
-        WireCollectionKernelPlan::BatchedRowSoftmax(plan) => {
-            CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
-                axis: plan.axis,
-                batched: Some(RowSoftmaxBatch {
-                    batch: plan.batch,
-                    width: plan.width,
-                    mask: plan.mask_count.map(|count| RowSoftmaxMask { count }),
-                }),
-            })
-        }
+        WireCollectionKernelPlan::BatchedRowSoftmax(plan) => wire_batched_row_softmax_plan(plan),
         WireCollectionKernelPlan::LayerNormalization(plan) => {
             CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: plan.axis })
         }
@@ -706,53 +605,9 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         }
         // R-PACK-01C: packed-kernel wire mirrors reconstruct field-for-field
         // (GI3-1 F1 mechanical-mirror discipline; no extra semantic facts).
-        WireCollectionKernelPlan::QuantizedMatMul(plan) => {
-            CollectionKernelPlan::QuantizedMatMul(QuantizedMatMulPlan {
-                m: plan.m,
-                k: plan.k,
-                n: plan.n,
-                layout: wire_packed_layout(plan.layout),
-                tile: plan.tile,
-                workgroup_x: plan.workgroup_x,
-                workgroup_y: plan.workgroup_y,
-            })
-        }
-        WireCollectionKernelPlan::GroupedMatMul(plan) => {
-            CollectionKernelPlan::GroupedMatMul(GroupedMatMulPlan {
-                m: plan.m,
-                k: plan.k,
-                n: plan.n,
-                groups: plan.groups,
-                layout: wire_packed_layout(plan.layout),
-                tile: plan.tile,
-                workgroup_x: plan.workgroup_x,
-                workgroup_y: plan.workgroup_y,
-            })
-        }
-        WireCollectionKernelPlan::BatchedAttention(plan) => {
-            CollectionKernelPlan::BatchedAttention(BatchedAttentionPlan {
-                kind: match plan.kind {
-                    WireBatchedAttentionKind::ProjectionQ => BatchedAttentionKind::ProjectionQ,
-                    WireBatchedAttentionKind::ProjectionK => BatchedAttentionKind::ProjectionK,
-                    WireBatchedAttentionKind::ProjectionV => BatchedAttentionKind::ProjectionV,
-                    WireBatchedAttentionKind::Scores => BatchedAttentionKind::Scores,
-                    WireBatchedAttentionKind::Softmax => BatchedAttentionKind::Softmax,
-                    WireBatchedAttentionKind::ContextSequenceMajor => {
-                        BatchedAttentionKind::ContextSequenceMajor
-                    }
-                },
-                kv_heads: plan.kv_heads,
-                q_per_kv: plan.q_per_kv,
-                seq: plan.seq,
-                head_dim: plan.head_dim,
-                hidden: plan.hidden,
-                layout: plan.layout.map(wire_packed_layout),
-                rotate_half: plan.rotate_half,
-                output_strides: plan.output_strides,
-                scale_bits: plan.scale_bits,
-                decode_outputs_per_workgroup: plan.decode_outputs_per_workgroup,
-            })
-        }
+        WireCollectionKernelPlan::QuantizedMatMul(plan) => wire_quantized_matmul_plan(plan),
+        WireCollectionKernelPlan::GroupedMatMul(plan) => wire_grouped_matmul_plan(plan),
+        WireCollectionKernelPlan::BatchedAttention(plan) => wire_batched_attention_plan(plan),
         WireCollectionKernelPlan::SsmConv1d(plan) => {
             CollectionKernelPlan::SsmConv1d(SsmConv1dPlan {
                 length: plan.length,
@@ -771,16 +626,193 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
             source_resource: usize::try_from(plan.source_resource).unwrap_or(usize::MAX),
             rank: plan.rank,
         },
-        WireCollectionKernelPlan::GridReduce(plan) => CollectionKernelPlan::GridReduce {
-            source_resource: usize::try_from(plan.source_resource).unwrap_or(usize::MAX),
-            rank: plan.rank,
-            workgroup: plan.workgroup,
-            partials_cap: plan.partials_cap,
-            partial_layout: radix_mir::kernel_plan::GridReducePartialLayout {
-                value_bytes: plan.partial_value_bytes,
-                coordinates: plan.partial_coordinates,
-                seen: plan.partial_seen,
-            },
+        WireCollectionKernelPlan::GridReduce(plan) => wire_grid_reduce_plan(plan),
+    }
+}
+
+fn wire_tiled_matmul_plan(plan: &super::wire::WireMatMulPlan) -> CollectionKernelPlan {
+    CollectionKernelPlan::TiledMatMul(MatMulPlan {
+        dims: radix_mir::MatMulDims::Literal {
+            m: plan.m,
+            k: plan.k,
+            n: plan.n,
+        },
+        m: plan.m,
+        k: plan.k,
+        n: plan.n,
+        left_layout: wire_matmul_layout(plan.left_layout),
+        right_layout: wire_matmul_layout(plan.right_layout),
+        tile: plan.tile,
+        workgroup_x: plan.workgroup_x,
+        workgroup_y: plan.workgroup_y,
+        shared_memory: MatMulSharedMemory {
+            shared_a: wire_shared_layout(&plan.shared_memory.shared_a),
+            shared_b: wire_shared_layout(&plan.shared_memory.shared_b),
+        },
+        barriers: plan.barriers.iter().map(wire_barrier_point).collect(),
+        oob_padding: wire_oob_padding(plan.oob_padding),
+        // The legacy wire plan carries no batch axes — an ordinary
+        // rank-2 image. Batched images ride the dedicated
+        // `BatchedTiledMatMul` variant, never a silent default.
+        batch: 1,
+        right_batch: 1,
+    })
+}
+
+fn wire_batched_tiled_matmul_plan(
+    plan: &super::wire::WireBatchedMatMulPlan,
+) -> CollectionKernelPlan {
+    CollectionKernelPlan::TiledMatMul(MatMulPlan {
+        dims: radix_mir::MatMulDims::Literal {
+            m: plan.m,
+            k: plan.k,
+            n: plan.n,
+        },
+        m: plan.m,
+        k: plan.k,
+        n: plan.n,
+        left_layout: wire_matmul_layout(plan.left_layout),
+        right_layout: wire_matmul_layout(plan.right_layout),
+        tile: plan.tile,
+        workgroup_x: plan.workgroup_x,
+        workgroup_y: plan.workgroup_y,
+        shared_memory: MatMulSharedMemory {
+            shared_a: wire_shared_layout(&plan.shared_memory.shared_a),
+            shared_b: wire_shared_layout(&plan.shared_memory.shared_b),
+        },
+        barriers: plan.barriers.iter().map(wire_barrier_point).collect(),
+        oob_padding: wire_oob_padding(plan.oob_padding),
+        batch: plan.batch,
+        right_batch: plan.right_batch,
+    })
+}
+
+fn wire_tree_reduction_plan(plan: &super::wire::WireReductionPlan) -> CollectionKernelPlan {
+    CollectionKernelPlan::TreeReduction(ReductionPlan {
+        op: wire_reduce_op(plan.op),
+        length: plan.length,
+        workgroup_x: plan.workgroup_x,
+        partials: plan.partials,
+        shared_memory: wire_shared_layout(&plan.shared_memory),
+        barriers: plan.barriers.iter().map(wire_barrier_point).collect(),
+        oob_padding: wire_oob_padding(plan.oob_padding),
+    })
+}
+
+fn wire_transpose_plan(plan: &super::wire::WireTransposePlan) -> CollectionKernelPlan {
+    CollectionKernelPlan::Transpose(TransposePlan {
+        m: plan.m,
+        n: plan.n,
+        workgroup_x: plan.workgroup_x,
+        dispatch_x: plan.dispatch_x,
+        // The legacy wire image carries no batch axes — the
+        // ordinary rank-2 law. Batched images ride the dedicated
+        // `BatchedTranspose` variant, never a silent default.
+        batched: None,
+    })
+}
+
+fn wire_batched_transpose_plan(
+    plan: &super::wire::WireBatchedTransposePlan,
+) -> CollectionKernelPlan {
+    CollectionKernelPlan::Transpose(TransposePlan {
+        m: plan.m,
+        n: plan.n,
+        workgroup_x: plan.workgroup_x,
+        dispatch_x: plan.dispatch_x,
+        batched: Some(plan.batch),
+    })
+}
+
+fn wire_axis_reduction_plan(plan: &super::wire::WireAxisReductionPlan) -> CollectionKernelPlan {
+    CollectionKernelPlan::AxisReduction(AxisReductionPlan {
+        op: wire_reduce_op(plan.op),
+        axis: plan.axis,
+        // The carried reduced-resource projection maps back
+        // field-for-field (council-8 CB-3) — the reverse arm
+        // reconstructs the producer fact, never infers it.
+        projection: ReducedProjection {
+            axis_extent: plan.projection.axis_extent,
+            inner_stride: plan.projection.inner_stride,
+        },
+    })
+}
+
+fn wire_batched_row_softmax_plan(
+    plan: &super::wire::WireBatchedRowSoftmaxPlan,
+) -> CollectionKernelPlan {
+    CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+        axis: plan.axis,
+        batched: Some(RowSoftmaxBatch {
+            batch: plan.batch,
+            width: plan.width,
+            mask: plan.mask_count.map(|count| RowSoftmaxMask { count }),
+        }),
+    })
+}
+
+fn wire_quantized_matmul_plan(plan: &super::wire::WireQuantizedMatMulPlan) -> CollectionKernelPlan {
+    CollectionKernelPlan::QuantizedMatMul(QuantizedMatMulPlan {
+        m: plan.m,
+        k: plan.k,
+        n: plan.n,
+        layout: wire_packed_layout(plan.layout),
+        tile: plan.tile,
+        workgroup_x: plan.workgroup_x,
+        workgroup_y: plan.workgroup_y,
+    })
+}
+
+fn wire_grouped_matmul_plan(plan: &super::wire::WireGroupedMatMulPlan) -> CollectionKernelPlan {
+    CollectionKernelPlan::GroupedMatMul(GroupedMatMulPlan {
+        m: plan.m,
+        k: plan.k,
+        n: plan.n,
+        groups: plan.groups,
+        layout: wire_packed_layout(plan.layout),
+        tile: plan.tile,
+        workgroup_x: plan.workgroup_x,
+        workgroup_y: plan.workgroup_y,
+    })
+}
+
+fn wire_batched_attention_plan(
+    plan: &super::wire::WireBatchedAttentionPlan,
+) -> CollectionKernelPlan {
+    CollectionKernelPlan::BatchedAttention(BatchedAttentionPlan {
+        kind: match plan.kind {
+            WireBatchedAttentionKind::ProjectionQ => BatchedAttentionKind::ProjectionQ,
+            WireBatchedAttentionKind::ProjectionK => BatchedAttentionKind::ProjectionK,
+            WireBatchedAttentionKind::ProjectionV => BatchedAttentionKind::ProjectionV,
+            WireBatchedAttentionKind::Scores => BatchedAttentionKind::Scores,
+            WireBatchedAttentionKind::Softmax => BatchedAttentionKind::Softmax,
+            WireBatchedAttentionKind::ContextSequenceMajor => {
+                BatchedAttentionKind::ContextSequenceMajor
+            }
+        },
+        kv_heads: plan.kv_heads,
+        q_per_kv: plan.q_per_kv,
+        seq: plan.seq,
+        head_dim: plan.head_dim,
+        hidden: plan.hidden,
+        layout: plan.layout.map(wire_packed_layout),
+        rotate_half: plan.rotate_half,
+        output_strides: plan.output_strides,
+        scale_bits: plan.scale_bits,
+        decode_outputs_per_workgroup: plan.decode_outputs_per_workgroup,
+    })
+}
+
+fn wire_grid_reduce_plan(plan: &super::wire::WireGridReducePlan) -> CollectionKernelPlan {
+    CollectionKernelPlan::GridReduce {
+        source_resource: usize::try_from(plan.source_resource).unwrap_or(usize::MAX),
+        rank: plan.rank,
+        workgroup: plan.workgroup,
+        partials_cap: plan.partials_cap,
+        partial_layout: radix_mir::kernel_plan::GridReducePartialLayout {
+            value_bytes: plan.partial_value_bytes,
+            coordinates: plan.partial_coordinates,
+            seen: plan.partial_seen,
         },
     }
 }

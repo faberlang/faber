@@ -357,6 +357,13 @@ fn admit_executor_plan_section(
             ),
         });
     }
+    admit_executor_plan_entries(section)?;
+    Ok(())
+}
+
+fn admit_executor_plan_entries(
+    section: &FmirExecutorPlanSection,
+) -> Result<(), crate::error::FmirImageError> {
     for (position, plan) in section.plans.iter().enumerate() {
         if usize::try_from(plan.kernel_index).ok() != Some(position) {
             return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {

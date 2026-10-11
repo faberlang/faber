@@ -387,45 +387,7 @@ fn validate_wire_generations(wire: &WireDeviceProgram) -> Result<(), crate::erro
             }
         }
     }
-    // Two distinct write/read-write slots may not claim the same
-    // (value, generation).
-    let producers: Vec<(u32, u32, usize, usize)> = wire
-        .kernels
-        .iter()
-        .enumerate()
-        .flat_map(|(kernel_index, kernel)| {
-            kernel
-                .resources
-                .iter()
-                .enumerate()
-                .filter_map(move |(slot_index, resource)| {
-                    if matches!(
-                        resource.access,
-                        WireResourceAccess::Write | WireResourceAccess::ReadWrite
-                    ) {
-                        Some((
-                            resource.buffer.semantic_value,
-                            resource.generation,
-                            kernel_index,
-                            slot_index,
-                        ))
-                    } else {
-                        None
-                    }
-                })
-        })
-        .collect();
-    for (index, (value, generation, kernel, slot)) in producers.iter().enumerate() {
-        for (other_index, (other_value, other_generation, other_kernel, other_slot)) in
-            producers.iter().enumerate()
-        {
-            if index < other_index && value == other_value && generation == other_generation {
-                return Err(wire_invalid(format!(
-                    "semantic value {value} generation {generation} has a second producer (kernels {kernel}/{other_kernel}, slots {slot}/{other_slot}); a later write is a new generation"
-                )));
-            }
-        }
-    }
+    validate_wire_producer_uniqueness(wire)?;
     // A read consumes its generation; a read-write consumes the previous
     // generation. Every consumed generation is produced by a different slot
     // or covered by the buffer's initialization policy.
@@ -478,6 +440,51 @@ fn validate_wire_generations(wire: &WireDeviceProgram) -> Result<(), crate::erro
                 return Err(wire_invalid(format!(
                     "buffer {} reads semantic value {value} generation {consumed}, which no launch produces and no initialization defines (incomplete input)",
                     resource.buffer.id
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_wire_producer_uniqueness(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    // Two distinct write/read-write slots may not claim the same
+    // (value, generation).
+    let producers: Vec<(u32, u32, usize, usize)> = wire
+        .kernels
+        .iter()
+        .enumerate()
+        .flat_map(|(kernel_index, kernel)| {
+            kernel
+                .resources
+                .iter()
+                .enumerate()
+                .filter_map(move |(slot_index, resource)| {
+                    if matches!(
+                        resource.access,
+                        WireResourceAccess::Write | WireResourceAccess::ReadWrite
+                    ) {
+                        Some((
+                            resource.buffer.semantic_value,
+                            resource.generation,
+                            kernel_index,
+                            slot_index,
+                        ))
+                    } else {
+                        None
+                    }
+                })
+        })
+        .collect();
+    for (index, (value, generation, kernel, slot)) in producers.iter().enumerate() {
+        for (other_index, (other_value, other_generation, other_kernel, other_slot)) in
+            producers.iter().enumerate()
+        {
+            if index < other_index && value == other_value && generation == other_generation {
+                return Err(wire_invalid(format!(
+                    "semantic value {value} generation {generation} has a second producer (kernels {kernel}/{other_kernel}, slots {slot}/{other_slot}); a later write is a new generation"
                 )));
             }
         }

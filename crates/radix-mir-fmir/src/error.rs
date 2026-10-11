@@ -286,32 +286,18 @@ impl fmt::Display for FmirImageError {
         match self {
             Self::Parse(detail) => write!(f, "{detail}"),
             Self::VersionMismatch { actual, expected } => {
-                write!(
-                    f,
-                    "unsupported FMIR image version {actual}; expected {expected}"
-                )
+                fmt_version_mismatch(f, *actual, *expected)
             }
-            Self::TargetMismatch { found, expected } => {
-                write!(
-                    f,
-                    "FMIR image target must be `{expected}` (found `{found}`)"
-                )
-            }
+            Self::TargetMismatch { found, expected } => fmt_target_mismatch(f, found, expected),
             Self::ToolchainMismatch { found, expected } => {
-                write!(
-                    f,
-                    "unsupported FMIR image toolchain {found}; expected {expected}"
-                )
+                fmt_toolchain_mismatch(f, found, expected)
             }
             Self::ArtifactDigestMismatch {
                 backend,
                 field,
                 stored,
                 computed,
-            } => write!(
-                f,
-                "FMIR device artifact `{backend}` {field} mismatch (stored {stored}, recomputed {computed}) — digests cover decoded bytes, never the transport spelling (contract §IdentityDomains rule 5)"
-            ),
+            } => fmt_artifact_digest_mismatch(f, backend, field, stored, computed),
             Self::CompilerInputProvenance { backend, detail } => write!(
                 f,
                 "FMIR device artifact `{backend}` provenance rule violated: {detail}"
@@ -324,55 +310,31 @@ impl fmt::Display for FmirImageError {
                 backend,
                 target,
                 expected,
-            } => write!(
-                f,
-                "FMIR device artifact `{backend}` declares target id `{target}`, but the compiled-in leaf's target is `{expected}` — exhaustive compiled-in validation fails closed"
-            ),
-            Self::AbsentArtifactForSelection { selection } => write!(
-                f,
-                "FMIR device backend selection `{selection}` has no artifact of that backend — a missing artifact fails closed (DDCP2-U3 selection validation)"
-            ),
+            } => fmt_target_id_mismatch(f, backend, target, expected),
+            Self::AbsentArtifactForSelection { selection } => fmt_absent_artifact(f, selection),
             Self::ArtifactEncodingMismatch { backend, detail } => {
-                write!(
-                    f,
-                    "FMIR device artifact `{backend}` payload-encoding mismatch: {detail} (contract §Payload encoding)"
-                )
+                fmt_artifact_encoding_mismatch(f, backend, detail)
             }
-            Self::NonAdmittedArtifactBackend { backend } => {
-                write!(
-                    f,
-                    "FMIR device artifact backend `{backend}` is not a compiled-in leaf — representable on the packet and preserved-until-selection (DDCP3-U0 (f)); selection use fails closed with `UnsupportedSelectedBackend`, never silently dropped, remapped, or fallback-laned (contract §Unknown future backends)"
-                )
-            }
+            Self::NonAdmittedArtifactBackend { backend } => fmt_non_admitted_backend(f, backend),
             Self::ArtifactAbiVersionMismatch {
                 backend,
                 actual,
                 accepted,
-            } => write!(
-                f,
-                "FMIR device artifact `{backend}` declares ABI version {actual}; the accepted version is {accepted} — exact-match clean break (DDCP3-U0 (c), riding `HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION`)"
-            ),
+            } => fmt_artifact_abi_version_mismatch(f, backend, *actual, *accepted),
             Self::IncompatibleArtifactCombination { backend, detail } => write!(
                 f,
                 "FMIR device artifact `{backend}` combination is incompatible: {detail} (DDCP3-U0 (d) backend/format/stage/feature combination validation)"
             ),
-            Self::DuplicateRequiredFeature { feature } => write!(
-                f,
-                "FMIR device artifact declares target feature `{feature}` more than once — duplicate required features fail admission (DDCP3-U0 (b) canonical set identity)"
-            ),
-            Self::DuplicateEntrypoint { entry } => write!(
-                f,
-                "FMIR device artifact declares entrypoint `{entry}` more than once — duplicate entrypoint identities fail admission (DDCP3-U0 (b))"
-            ),
+            Self::DuplicateRequiredFeature { feature } => {
+                fmt_duplicate_required_feature(f, feature)
+            }
+            Self::DuplicateEntrypoint { entry } => fmt_duplicate_entrypoint(f, entry),
             Self::NonAdmittedSelectedBackend { backend } => write!(
                 f,
                 "FMIR device backend selection `{backend}` is unknown — selection resolution fails closed (DDCP3-U0 (f) preserve-until-selection; unknown backend artifacts are admitted at load and rejected at selection use)"
             ),
             Self::DeviceProgramVersionMismatch { actual, expected } => {
-                write!(
-                    f,
-                    "incompatible device-program wire version {actual}; this loader accepts wire version {expected} — the serialized device program was produced by a different (incompatible) radix wire revision"
-                )
+                fmt_device_program_version_mismatch(f, *actual, *expected)
             }
             Self::ExecutorPlanSectionVersionMismatch { actual, expected } => write!(
                 f,
@@ -385,10 +347,7 @@ impl fmt::Display for FmirImageError {
                 write!(f, "invalid device program: {detail}")
             }
             Self::DistributedSectionVersionMismatch { actual, expected } => {
-                write!(
-                    f,
-                    "unsupported distributed-section version {actual}; expected {expected}"
-                )
+                fmt_distributed_section_version_mismatch(f, *actual, *expected)
             }
             Self::DistributedSectionInvalid { detail } => {
                 write!(f, "invalid distributed section: {detail}")
@@ -399,21 +358,154 @@ impl fmt::Display for FmirImageError {
             Self::DistributedSectionHashMismatch {
                 expected,
                 recomputed,
-            } => {
-                write!(
-                    f,
-                    "distributed-section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"
-                )
-            }
+            } => fmt_distributed_hash_mismatch(f, expected, recomputed),
             Self::SessionSectionVersionMismatch { actual, expected } => {
-                write!(
-                    f,
-                    "unsupported session-section version {actual}; expected {expected}"
-                )
+                fmt_session_section_version_mismatch(f, *actual, *expected)
             }
             Self::SessionSectionInvalid { detail } => {
                 write!(f, "invalid session section: {detail}")
             }
         }
     }
+}
+
+fn fmt_version_mismatch(f: &mut fmt::Formatter<'_>, actual: u32, expected: u32) -> fmt::Result {
+    write!(
+        f,
+        "unsupported FMIR image version {actual}; expected {expected}"
+    )
+}
+
+fn fmt_target_mismatch(f: &mut fmt::Formatter<'_>, found: &str, expected: &str) -> fmt::Result {
+    write!(
+        f,
+        "FMIR image target must be `{expected}` (found `{found}`)"
+    )
+}
+
+fn fmt_toolchain_mismatch(f: &mut fmt::Formatter<'_>, found: &str, expected: &str) -> fmt::Result {
+    write!(
+        f,
+        "unsupported FMIR image toolchain {found}; expected {expected}"
+    )
+}
+
+fn fmt_artifact_digest_mismatch(
+    f: &mut fmt::Formatter<'_>,
+    backend: &str,
+    field: &str,
+    stored: &str,
+    computed: &str,
+) -> fmt::Result {
+    write!(
+        f,
+        "FMIR device artifact `{backend}` {field} mismatch (stored {stored}, recomputed {computed}) — digests cover decoded bytes, never the transport spelling (contract §IdentityDomains rule 5)"
+    )
+}
+
+fn fmt_target_id_mismatch(
+    f: &mut fmt::Formatter<'_>,
+    backend: &str,
+    target: &str,
+    expected: &str,
+) -> fmt::Result {
+    write!(
+        f,
+        "FMIR device artifact `{backend}` declares target id `{target}`, but the compiled-in leaf's target is `{expected}` — exhaustive compiled-in validation fails closed"
+    )
+}
+
+fn fmt_absent_artifact(f: &mut fmt::Formatter<'_>, selection: &str) -> fmt::Result {
+    write!(
+        f,
+        "FMIR device backend selection `{selection}` has no artifact of that backend — a missing artifact fails closed (DDCP2-U3 selection validation)"
+    )
+}
+
+fn fmt_artifact_encoding_mismatch(
+    f: &mut fmt::Formatter<'_>,
+    backend: &str,
+    detail: &str,
+) -> fmt::Result {
+    write!(
+        f,
+        "FMIR device artifact `{backend}` payload-encoding mismatch: {detail} (contract §Payload encoding)"
+    )
+}
+
+fn fmt_non_admitted_backend(f: &mut fmt::Formatter<'_>, backend: &str) -> fmt::Result {
+    write!(
+        f,
+        "FMIR device artifact backend `{backend}` is not a compiled-in leaf — representable on the packet and preserved-until-selection (DDCP3-U0 (f)); selection use fails closed with `UnsupportedSelectedBackend`, never silently dropped, remapped, or fallback-laned (contract §Unknown future backends)"
+    )
+}
+
+fn fmt_artifact_abi_version_mismatch(
+    f: &mut fmt::Formatter<'_>,
+    backend: &str,
+    actual: u32,
+    accepted: u32,
+) -> fmt::Result {
+    write!(
+        f,
+        "FMIR device artifact `{backend}` declares ABI version {actual}; the accepted version is {accepted} — exact-match clean break (DDCP3-U0 (c), riding `HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION`)"
+    )
+}
+
+fn fmt_duplicate_required_feature(f: &mut fmt::Formatter<'_>, feature: &str) -> fmt::Result {
+    write!(
+        f,
+        "FMIR device artifact declares target feature `{feature}` more than once — duplicate required features fail admission (DDCP3-U0 (b) canonical set identity)"
+    )
+}
+
+fn fmt_duplicate_entrypoint(f: &mut fmt::Formatter<'_>, entry: &str) -> fmt::Result {
+    write!(
+        f,
+        "FMIR device artifact declares entrypoint `{entry}` more than once — duplicate entrypoint identities fail admission (DDCP3-U0 (b))"
+    )
+}
+
+fn fmt_device_program_version_mismatch(
+    f: &mut fmt::Formatter<'_>,
+    actual: u32,
+    expected: u32,
+) -> fmt::Result {
+    write!(
+        f,
+        "incompatible device-program wire version {actual}; this loader accepts wire version {expected} — the serialized device program was produced by a different (incompatible) radix wire revision"
+    )
+}
+
+fn fmt_distributed_section_version_mismatch(
+    f: &mut fmt::Formatter<'_>,
+    actual: u32,
+    expected: u32,
+) -> fmt::Result {
+    write!(
+        f,
+        "unsupported distributed-section version {actual}; expected {expected}"
+    )
+}
+
+fn fmt_distributed_hash_mismatch(
+    f: &mut fmt::Formatter<'_>,
+    expected: &str,
+    recomputed: &str,
+) -> fmt::Result {
+    write!(
+        f,
+        "distributed-section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"
+    )
+}
+
+fn fmt_session_section_version_mismatch(
+    f: &mut fmt::Formatter<'_>,
+    actual: u32,
+    expected: u32,
+) -> fmt::Result {
+    write!(
+        f,
+        "unsupported session-section version {actual}; expected {expected}"
+    )
 }
