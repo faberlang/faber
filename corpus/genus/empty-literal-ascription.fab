@@ -1,7 +1,7 @@
 +++
 term = "genus"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "return_clause", "type_annotation", "owned_type", "base_type", "incipit_stmt", "fixum_decl", "typed_constructor", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "verte_expr", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "return_clause", "type_annotation", "owned_type", "base_type", "incipit_stmt", "fixum_decl", "typed_constructor", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "cast_expr", "nota_stmt"]
 category = "type"
 canonical = false
 summary = "An empty bare `{}` ascribed with `∷` to a class builds that class, like `Class {}`."
