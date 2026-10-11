@@ -164,7 +164,7 @@ pub(super) fn remap_value_text_symbols(
             remap_operand_text_symbols(&mut closure.environment, source, target);
         }
         MirValueKind::Unary { op: _, operand } => {
-            remap_operand_text_symbols(operand, source, target)
+            remap_operand_text_symbols(operand, source, target);
         }
         MirValueKind::Binary { op: _, lhs, rhs } => {
             remap_operand_text_symbols(lhs, source, target);
@@ -196,10 +196,7 @@ pub(super) fn remap_place_text_symbols(
 ) {
     for projection in &mut place.projections {
         match projection {
-            MirProjection::Field(field) => {
-                *field = target.intern(source.resolve(*field));
-            }
-            MirProjection::VariantField { variant: _, field } => {
+            MirProjection::Field(field) | MirProjection::VariantField { variant: _, field } => {
                 *field = target.intern(source.resolve(*field));
             }
             MirProjection::Index(operand) => remap_operand_text_symbols(operand, source, target),
@@ -275,7 +272,6 @@ pub(super) fn remap_runtime_call_text_symbols(
         MirIntrinsic::TensorShapeSize(expression) => {
             remap_shape_expr_text_symbols(expression, source, target);
         }
-        MirIntrinsic::TensorLimes(_) => {}
         // Ids, plans, and tags only — no interner symbols to re-intern.
         MirIntrinsic::Diagnostic(_)
         | MirIntrinsic::Assert
@@ -294,7 +290,8 @@ pub(super) fn remap_runtime_call_text_symbols(
         | MirIntrinsic::TypeCheck(_)
         | MirIntrinsic::TensorLift(_)
         | MirIntrinsic::VectorOp(_)
-        | MirIntrinsic::Duplicate => {}
+        | MirIntrinsic::Duplicate
+        | MirIntrinsic::TensorLimes(_) => {}
     }
     for arg in &mut call.args {
         remap_operand_text_symbols(arg, source, target);
@@ -410,10 +407,8 @@ pub(super) fn remap_option_chain_text_symbols(
                 remap_operand_text_symbols(arg, source, target);
             }
         }
-        MirOptionChainLink::Field(field) => {
-            *field = target.intern(source.resolve(*field));
-        }
-        MirOptionChainLink::VariantField { variant: _, field } => {
+        MirOptionChainLink::Field(field)
+        | MirOptionChainLink::VariantField { variant: _, field } => {
             *field = target.intern(source.resolve(*field));
         }
     }

@@ -198,14 +198,11 @@ pub(super) fn rewrite_value_sources(
     source_rewrites: &SourceRewrites,
 ) {
     match &mut value.kind {
-        MirValueKind::Operand(operand) => {
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
             rewrite_operand_sources(operand, unit_path, source_rewrites);
         }
         MirValueKind::Closure(closure) => {
             rewrite_operand_sources(&mut closure.environment, unit_path, source_rewrites);
-        }
-        MirValueKind::Unary { operand, .. } => {
-            rewrite_operand_sources(operand, unit_path, source_rewrites);
         }
         MirValueKind::Binary { lhs, rhs, .. } => {
             rewrite_operand_sources(lhs, unit_path, source_rewrites);

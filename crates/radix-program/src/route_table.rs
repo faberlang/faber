@@ -226,10 +226,8 @@ fn source_line(path: &Path, body_offset: u32) -> Option<usize> {
 
 fn line_of(raw: &str, byte: usize) -> usize {
     raw.as_bytes()[..byte.min(raw.len())]
-        .iter()
-        .filter(|&&b| b == b'\n')
+        .split(|&b| b == b'\n')
         .count()
-        + 1
 }
 
 #[cfg(test)]

@@ -120,11 +120,11 @@ pub(super) fn collect_runtime_call_requirement(
         | MirIntrinsic::FilumReduce(_)
         | MirIntrinsic::TensorLift(_)
         | MirIntrinsic::VectorOp(_)
-        | MirIntrinsic::Duplicate => {}
+        | MirIntrinsic::Duplicate
+        | MirIntrinsic::CursorStream(_) => {}
         MirIntrinsic::ReadLine => {
             requirements.insert("host:stdin".to_owned());
         }
-        MirIntrinsic::CursorStream(_) => {}
     }
 }
 
@@ -161,7 +161,6 @@ pub(super) fn collect_kernel_host_requirements(
         radix_module::kernel::KernelModule::Aleator => {
             requirements.insert("host:random".to_owned());
         }
-        radix_module::kernel::KernelModule::Json => {}
         radix_module::kernel::KernelModule::Consolum => match verb {
             "dic" | "scribe" => {
                 requirements.insert("host:stdout".to_owned());
@@ -172,6 +171,6 @@ pub(super) fn collect_kernel_host_requirements(
             _ => {}
         },
         // TOML parse/serialize is in-process (no host capability).
-        radix_module::kernel::KernelModule::Toml => {}
+        radix_module::kernel::KernelModule::Json | radix_module::kernel::KernelModule::Toml => {}
     }
 }
