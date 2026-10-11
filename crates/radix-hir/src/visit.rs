@@ -359,7 +359,7 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             walk_non_null(visitor, chain);
         }
         HirExpressionKind::Marked { expr, .. } | HirExpressionKind::TypeCheck { expr, .. } => {
-            visitor.visit_expr(expr)
+            visitor.visit_expr(expr);
         }
         HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
             visitor.visit_block(block);
@@ -973,7 +973,7 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             walk_non_null_mut(visitor, chain);
         }
         HirExpressionKind::Marked { expr, .. } | HirExpressionKind::TypeCheck { expr, .. } => {
-            visitor.visit_expr_mut(expr)
+            visitor.visit_expr_mut(expr);
         }
         HirExpressionKind::Gradient {
             call,
