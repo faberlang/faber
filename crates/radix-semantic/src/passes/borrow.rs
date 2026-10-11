@@ -306,7 +306,7 @@ struct BorrowChecker<'a> {
     /// mutation of the parameter.
     de_aliases: FxHashSet<DefId>,
     /// Read-only tensor views and their backing place. Chained views and
-    /// immutable aliases retain the original root until materialize().
+    /// immutable aliases retain the original root until `materialize()`.
     tensor_view_roots: FxHashMap<DefId, FxHashSet<DefId>>,
     /// Bindings of an aliasing type (genus, contract, collection, tensor, each
     /// also through `T ∪ nihil`) bound by `←` to another place: the binding
@@ -588,118 +588,9 @@ impl<'a> BorrowChecker<'a> {
             .and_then(|facts| facts.cfg().node_for_hir_id(stmt.id));
         match &stmt.kind {
             HirStatementKind::Local(local) => {
-                self.names.insert(local.def_id, local.name);
-                if !local.mutable {
-                    self.immutable_locals.insert(local.def_id);
-                }
-                self.ensure_state(local.def_id);
-                if let Some(HirExpression {
-                    kind: HirExpressionKind::Clausura(_, _, _, closure_body),
-                    ..
-                }) = &local.init
-                {
-                    let known = self.states.keys().copied().collect();
-                    self.note_closure_captures(local.def_id, closure_body, &known);
-                }
-                if let Some(ty) = local.ty {
-                    self.note_ref_root(local.def_id, ty);
-                    self.note_mut_root(local.def_id, ty);
-                    self.note_copy_root(local.def_id, ty);
-                    self.note_own_root(local.def_id, ty);
-                    if self.language_conflicts && self.types.is_mut_view(ty) {
-                        self.warn_mut_local(stmt.span);
-                    }
-                }
+                self.check_local_decl(local, stmt.span);
                 if let Some(init) = &local.init {
-                    if local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
-                        && let Some(param) =
-                            Self::root_def_id(init).and_then(|d| self.nonmut_tensor_origin(d))
-                    {
-                        self.nonmut_tensor_write_error(param, init.span);
-                    }
-                    if local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
-                        && let Some(param) =
-                            Self::root_def_id(init).and_then(|d| self.nonmut_agg_origin(d))
-                    {
-                        self.nonmut_agg_write_error(param, init.span);
-                    }
-                    if self.stores_tensor_view(init) {
-                        if !self.is_tensor_view(init) {
-                            self.error(
-                                SemanticErrorKind::ModeMismatch,
-                                ISSUE_TENSOR_VIEW_ESCAPE,
-                                init.span,
-                            );
-                            self.check_expr(init);
-                            return;
-                        }
-                        if local.mutable
-                            || local.ty.is_some_and(|ty| self.types.is_mut_or_own_view(ty))
-                        {
-                            self.error(
-                                SemanticErrorKind::ModeMismatch,
-                                ISSUE_TENSOR_VIEW_ESCAPE,
-                                init.span,
-                            );
-                            self.check_expr(init);
-                            return;
-                        }
-                        let roots = self.tensor_view_origins(init);
-                        if roots.is_empty() {
-                            self.error(
-                                SemanticErrorKind::ModeMismatch,
-                                ISSUE_TENSOR_VIEW_ESCAPE,
-                                init.span,
-                            );
-                            self.check_expr(init);
-                            return;
-                        }
-                        self.tensor_view_roots.insert(local.def_id, roots.clone());
-                        self.check_expr(init);
-                        for root in roots {
-                            self.borrow_shared_with(root, Some(local.def_id), init.span);
-                        }
-                        return;
-                    }
-                    // Region-routed explicit-ref bind of a marked root: the
-                    // borrowing local's region releases the conflict at last
-                    // use instead of the old block-exit approximation.
-                    if let HirExpressionKind::Ref(kind, inner) = &init.kind
-                        && let Some(source) = Self::root_def_id(inner)
-                        && self.tracks_explicit_ref(source)
-                        && (self.mut_roots.contains(&source) || self.ref_roots.contains(&source))
-                    {
-                        self.check_projection_inputs(inner);
-                        match kind {
-                            radix_hir::HirRefKind::Shared => {
-                                self.borrow_shared_with(source, Some(local.def_id), init.span);
-                            }
-                            radix_hir::HirRefKind::Mutable => {
-                                self.borrow_mut_with(source, Some(local.def_id), init.span);
-                            }
-                        }
-                        return;
-                    }
-                    if local.ty.is_some_and(|ty| self.types.is_copy_view(ty)) {
-                        self.bind_copy_from(init);
-                    } else if local.ty.is_some_and(|ty| self.types.is_own_view(ty)) {
-                        self.bind_own_from(init);
-                    } else if self.language_conflicts
-                        && local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
-                    {
-                        self.bind_mut_from(init, Some(local.def_id));
-                    } else if self.language_conflicts
-                        && local.ty.is_some_and(|ty| self.types.is_ref_view(ty))
-                    {
-                        self.bind_ref_from(init, Some(local.def_id));
-                    } else {
-                        self.check_expr(init);
-                    }
-                    self.note_de_alias(local.def_id, local.ty, init);
-                    self.note_bind_alias(local.def_id, local.ty, init, Rebind::Fresh);
-                    if !local.mutable {
-                        self.const_agg_aliases.insert(local.def_id);
-                    }
+                    self.check_local_init(local, init);
                 }
             }
             HirStatementKind::Expr(expr) => {
@@ -731,6 +622,115 @@ impl<'a> BorrowChecker<'a> {
                     self.check_block(&clause.body);
                 }
             }
+        }
+    }
+
+    fn check_local_decl(&mut self, local: &radix_hir::HirLocal, stmt_span: radix_lexer::Span) {
+        self.names.insert(local.def_id, local.name);
+        if !local.mutable {
+            self.immutable_locals.insert(local.def_id);
+        }
+        self.ensure_state(local.def_id);
+        if let Some(HirExpression {
+            kind: HirExpressionKind::Clausura(_, _, _, closure_body),
+            ..
+        }) = &local.init
+        {
+            let known = self.states.keys().copied().collect();
+            self.note_closure_captures(local.def_id, closure_body, &known);
+        }
+        if let Some(ty) = local.ty {
+            self.note_ref_root(local.def_id, ty);
+            self.note_mut_root(local.def_id, ty);
+            self.note_copy_root(local.def_id, ty);
+            self.note_own_root(local.def_id, ty);
+            if self.language_conflicts && self.types.is_mut_view(ty) {
+                self.warn_mut_local(stmt_span);
+            }
+        }
+    }
+
+    fn check_local_init(&mut self, local: &radix_hir::HirLocal, init: &HirExpression) {
+        if local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
+            && let Some(param) = Self::root_def_id(init).and_then(|d| self.nonmut_tensor_origin(d))
+        {
+            self.nonmut_tensor_write_error(param, init.span);
+        }
+        if local.ty.is_some_and(|ty| self.types.is_mut_view(ty))
+            && let Some(param) = Self::root_def_id(init).and_then(|d| self.nonmut_agg_origin(d))
+        {
+            self.nonmut_agg_write_error(param, init.span);
+        }
+        if self.stores_tensor_view(init) {
+            if !self.is_tensor_view(init) {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_TENSOR_VIEW_ESCAPE,
+                    init.span,
+                );
+                self.check_expr(init);
+                return;
+            }
+            if local.mutable || local.ty.is_some_and(|ty| self.types.is_mut_or_own_view(ty)) {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_TENSOR_VIEW_ESCAPE,
+                    init.span,
+                );
+                self.check_expr(init);
+                return;
+            }
+            let roots = self.tensor_view_origins(init);
+            if roots.is_empty() {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_TENSOR_VIEW_ESCAPE,
+                    init.span,
+                );
+                self.check_expr(init);
+                return;
+            }
+            self.tensor_view_roots.insert(local.def_id, roots.clone());
+            self.check_expr(init);
+            for root in roots {
+                self.borrow_shared_with(root, Some(local.def_id), init.span);
+            }
+            return;
+        }
+        // Region-routed explicit-ref bind of a marked root: the
+        // borrowing local's region releases the conflict at last
+        // use instead of the old block-exit approximation.
+        if let HirExpressionKind::Ref(kind, inner) = &init.kind
+            && let Some(source) = Self::root_def_id(inner)
+            && self.tracks_explicit_ref(source)
+            && (self.mut_roots.contains(&source) || self.ref_roots.contains(&source))
+        {
+            self.check_projection_inputs(inner);
+            match kind {
+                radix_hir::HirRefKind::Shared => {
+                    self.borrow_shared_with(source, Some(local.def_id), init.span);
+                }
+                radix_hir::HirRefKind::Mutable => {
+                    self.borrow_mut_with(source, Some(local.def_id), init.span);
+                }
+            }
+            return;
+        }
+        if local.ty.is_some_and(|ty| self.types.is_copy_view(ty)) {
+            self.bind_copy_from(init);
+        } else if local.ty.is_some_and(|ty| self.types.is_own_view(ty)) {
+            self.bind_own_from(init);
+        } else if self.language_conflicts && local.ty.is_some_and(|ty| self.types.is_mut_view(ty)) {
+            self.bind_mut_from(init, Some(local.def_id));
+        } else if self.language_conflicts && local.ty.is_some_and(|ty| self.types.is_ref_view(ty)) {
+            self.bind_ref_from(init, Some(local.def_id));
+        } else {
+            self.check_expr(init);
+        }
+        self.note_de_alias(local.def_id, local.ty, init);
+        self.note_bind_alias(local.def_id, local.ty, init, Rebind::Fresh);
+        if !local.mutable {
+            self.const_agg_aliases.insert(local.def_id);
         }
     }
 
@@ -767,48 +767,7 @@ impl<'a> BorrowChecker<'a> {
             return;
         };
         let params = params.to_vec();
-        for (index, arg) in args.iter().enumerate() {
-            if !self.stores_tensor_view(&arg.expr) {
-                continue;
-            }
-            if params
-                .get(index)
-                .is_some_and(|param| self.dest_is_mut_or_own(param))
-            {
-                self.error(
-                    SemanticErrorKind::ModeMismatch,
-                    ISSUE_TENSOR_VIEW_READ_ONLY,
-                    arg.expr.span,
-                );
-            }
-            let roots = self.tensor_view_origins(&arg.expr);
-            if roots.is_empty() {
-                continue;
-            }
-            let view_storage = self.storage_of_roots(&roots);
-            for (other_index, other) in args.iter().enumerate() {
-                if other_index == index
-                    || !params
-                        .get(other_index)
-                        .is_some_and(|param| self.dest_is_mut_or_own(param))
-                {
-                    continue;
-                }
-                let mut other_storage =
-                    self.storage_of_roots(&self.tensor_view_origins(&other.expr));
-                if let Some(other_root) = Self::root_def_id(&other.expr) {
-                    other_storage.extend(self.storage_names(other_root));
-                }
-                if view_storage.is_disjoint(&other_storage) {
-                    continue;
-                }
-                self.error(
-                    SemanticErrorKind::ModeMismatch,
-                    ISSUE_TENSOR_VIEW_READ_ONLY,
-                    arg.expr.span,
-                );
-            }
-        }
+        self.check_tensor_view_arg_aliasing(args, &params);
         // Named function Paths leave `callee.ty` unset. Applying the retired
         // lifetime simulation to those calls would reject D-1 unmarked
         // `const` → `mut` param use. Language `mut` dest borrows are
@@ -829,63 +788,7 @@ impl<'a> BorrowChecker<'a> {
             if self.dest_is_mut(param) {
                 self.check_mut_argument_writable(&arg.expr, index);
             }
-            if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
-                && let Some(arg_usage) = self.param_usage.get_mut(&arg_def_id)
-            {
-                if matches!(
-                    param.mode,
-                    SemanticParamMode::MutRef | SemanticParamMode::Move
-                ) {
-                    arg_usage.passed_in_or_ex = true;
-                }
-                if matches!(param.mode, SemanticParamMode::Move) {
-                    arg_usage.passed_ex = true;
-                }
-                if matches!(arg_usage.mode, HirParamMode::De)
-                    && matches!(
-                        param.mode,
-                        SemanticParamMode::MutRef | SemanticParamMode::Move
-                    )
-                {
-                    self.error(
-                        SemanticErrorKind::ModeMismatch,
-                        ISSUE_DE_TO_IN_OR_EX_POSITION,
-                        arg.expr.span,
-                    );
-                }
-            }
-            if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
-                && self.de_aliases.contains(&arg_def_id)
-                && matches!(
-                    param.mode,
-                    SemanticParamMode::MutRef | SemanticParamMode::Move
-                )
-            {
-                self.error(
-                    SemanticErrorKind::ModeMismatch,
-                    ISSUE_DE_TO_IN_OR_EX_POSITION,
-                    arg.expr.span,
-                );
-            }
-            if let Some(origin) = Self::root_def_id(&arg.expr)
-                .and_then(|arg_def_id| self.nonmut_tensor_origin(arg_def_id))
-                && self.dest_is_mut(param)
-            {
-                self.nonmut_tensor_write_error(origin, arg.expr.span);
-            }
-            if let Some(origin) =
-                Self::root_def_id(&arg.expr).and_then(|d| self.nonmut_agg_origin(d))
-                && self.dest_is_mut(param)
-            {
-                self.nonmut_agg_write_error(origin, arg.expr.span);
-            }
-            if self.arg_is_ref_view(&arg.expr) && self.dest_is_mut_or_own(param) {
-                self.error(
-                    SemanticErrorKind::ModeMismatch,
-                    ISSUE_REF_TO_MUT_OR_OWN_POSITION,
-                    arg.expr.span,
-                );
-            }
+            self.check_arg_use(arg, param);
             let dest_copy = self.types.is_copy_view(param.ty);
             let dest_own = self.types.is_own_view(param.ty);
             if self.arg_is_mut_view(&arg.expr) && dest_own {
@@ -963,6 +866,110 @@ impl<'a> BorrowChecker<'a> {
         }
         if language_call_borrows || call_scoped {
             self.pop_scope();
+        }
+    }
+
+    fn check_tensor_view_arg_aliasing(&mut self, args: &[HirCallArg], params: &[ParamType]) {
+        for (index, arg) in args.iter().enumerate() {
+            if !self.stores_tensor_view(&arg.expr) {
+                continue;
+            }
+            if params
+                .get(index)
+                .is_some_and(|param| self.dest_is_mut_or_own(param))
+            {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_TENSOR_VIEW_READ_ONLY,
+                    arg.expr.span,
+                );
+            }
+            let roots = self.tensor_view_origins(&arg.expr);
+            if roots.is_empty() {
+                continue;
+            }
+            let view_storage = self.storage_of_roots(&roots);
+            for (other_index, other) in args.iter().enumerate() {
+                if other_index == index
+                    || !params
+                        .get(other_index)
+                        .is_some_and(|param| self.dest_is_mut_or_own(param))
+                {
+                    continue;
+                }
+                let mut other_storage =
+                    self.storage_of_roots(&self.tensor_view_origins(&other.expr));
+                if let Some(other_root) = Self::root_def_id(&other.expr) {
+                    other_storage.extend(self.storage_names(other_root));
+                }
+                if view_storage.is_disjoint(&other_storage) {
+                    continue;
+                }
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_TENSOR_VIEW_READ_ONLY,
+                    arg.expr.span,
+                );
+            }
+        }
+    }
+
+    fn check_arg_use(&mut self, arg: &HirCallArg, param: &ParamType) {
+        if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
+            && let Some(arg_usage) = self.param_usage.get_mut(&arg_def_id)
+        {
+            if matches!(
+                param.mode,
+                SemanticParamMode::MutRef | SemanticParamMode::Move
+            ) {
+                arg_usage.passed_in_or_ex = true;
+            }
+            if matches!(param.mode, SemanticParamMode::Move) {
+                arg_usage.passed_ex = true;
+            }
+            if matches!(arg_usage.mode, HirParamMode::De)
+                && matches!(
+                    param.mode,
+                    SemanticParamMode::MutRef | SemanticParamMode::Move
+                )
+            {
+                self.error(
+                    SemanticErrorKind::ModeMismatch,
+                    ISSUE_DE_TO_IN_OR_EX_POSITION,
+                    arg.expr.span,
+                );
+            }
+        }
+        if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
+            && self.de_aliases.contains(&arg_def_id)
+            && matches!(
+                param.mode,
+                SemanticParamMode::MutRef | SemanticParamMode::Move
+            )
+        {
+            self.error(
+                SemanticErrorKind::ModeMismatch,
+                ISSUE_DE_TO_IN_OR_EX_POSITION,
+                arg.expr.span,
+            );
+        }
+        if let Some(origin) = Self::root_def_id(&arg.expr)
+            .and_then(|arg_def_id| self.nonmut_tensor_origin(arg_def_id))
+            && self.dest_is_mut(param)
+        {
+            self.nonmut_tensor_write_error(origin, arg.expr.span);
+        }
+        if let Some(origin) = Self::root_def_id(&arg.expr).and_then(|d| self.nonmut_agg_origin(d))
+            && self.dest_is_mut(param)
+        {
+            self.nonmut_agg_write_error(origin, arg.expr.span);
+        }
+        if self.arg_is_ref_view(&arg.expr) && self.dest_is_mut_or_own(param) {
+            self.error(
+                SemanticErrorKind::ModeMismatch,
+                ISSUE_REF_TO_MUT_OR_OWN_POSITION,
+                arg.expr.span,
+            );
         }
     }
 
@@ -1153,7 +1160,7 @@ impl<'a> BorrowChecker<'a> {
             .with_arg("issue", ISSUE_MUTATING_METHOD_ON_IMMUTABLE)
             .with_arg("binding", self.param_spelling(origin).unwrap_or_default());
         if let Some(name) = self.interner.strings().get(method.0 as usize) {
-            error = error.with_arg("method", name.to_string());
+            error = error.with_arg("method", name.clone());
         }
         self.errors.push(error);
     }
@@ -1168,7 +1175,7 @@ impl<'a> BorrowChecker<'a> {
             .get(&def_id)
             .and_then(|name| self.interner.strings().get(name.0 as usize))
         {
-            error = error.with_arg("name", spelling.to_string());
+            error = error.with_arg("name", spelling.clone());
         }
         self.errors.push(error);
     }
@@ -1476,8 +1483,9 @@ impl<'a> BorrowChecker<'a> {
     fn root_def_id(expr: &HirExpression) -> Option<DefId> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => Some(*def_id),
-            HirExpressionKind::Field(object, _) => Self::root_def_id(object),
-            HirExpressionKind::Index(object, _) => Self::root_def_id(object),
+            HirExpressionKind::Field(object, _) | HirExpressionKind::Index(object, _) => {
+                Self::root_def_id(object)
+            }
             HirExpressionKind::Deref(inner) | HirExpressionKind::NonNull(inner, _) => {
                 Self::root_def_id(inner)
             }
@@ -1813,11 +1821,10 @@ impl<'a> BorrowChecker<'a> {
                 }
                 roots
             }
-            HirExpressionKind::NonNull(object, radix_hir::HirNonNullKind::Value)
-            | HirExpressionKind::Block(HirBlock {
+            HirExpressionKind::Block(HirBlock {
                 expr: Some(object), ..
-            }) => self.tensor_view_origins(object),
-            HirExpressionKind::Field(object, _)
+            })
+            | HirExpressionKind::Field(object, _)
             | HirExpressionKind::Index(object, _)
             | HirExpressionKind::Deref(object)
             | HirExpressionKind::NonNull(object, _) => self.tensor_view_origins(object),
@@ -2181,7 +2188,7 @@ impl<'a> BorrowChecker<'a> {
             .get(&def_id)
             .and_then(|name| self.interner.strings().get(name.0 as usize))
         {
-            error = error.with_arg("name", spelling.to_string());
+            error = error.with_arg("name", spelling.clone());
         }
         self.errors.push(error);
     }
