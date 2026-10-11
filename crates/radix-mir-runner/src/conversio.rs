@@ -213,7 +213,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // checker admits no other source); bits live as unsigned cells.
             Type::Bits(_) => match value {
                 Value::UInt(_) => Ok(value),
-                Value::Int(v) => Ok(Value::UInt(v as u64)),
+                Value::Int(v) => Ok(Value::UInt(v.cast_unsigned())),
                 other => Err(RunnerError::unsupported(
                     span,
                     &format!("runtime conversio to bits from {other:?}"),
@@ -269,13 +269,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 {
                     let mut bytes = Vec::with_capacity(cell.borrow().len());
                     for item in cell.borrow().iter() {
-                        let Some(pattern) = bits_pattern(item) else {
+                        let Some(byte) =
+                            bits_pattern(item).and_then(|pattern| u8::try_from(pattern).ok())
+                        else {
                             return Err(RunnerError::internal(
                                 span,
                                 "bytes tensor conversio met an element that is not a byte",
                             ));
                         };
-                        bytes.push(pattern as u8);
+                        bytes.push(byte);
                     }
                     self.convert_octeti_to_tensor(bytes, target_ty, params, recovery, span)
                 }
@@ -307,7 +309,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             {
                 let pattern = bits_pattern(value)?;
                 let shift = 64 - width.bits();
-                Some(Value::Int(((pattern << shift) as i64) >> shift))
+                Some(Value::Int((pattern << shift).cast_signed() >> shift))
             }
             (Type::Bits(width), Type::SizedNumeric(Primitive::Fractus, float)) => {
                 float_from_pattern(bits_pattern(value)?, *width, *float)
@@ -324,7 +326,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 } else {
                     (1u64 << width.bits()) - 1
                 };
-                Some(Value::UInt((*v as u64) & mask))
+                Some(Value::UInt(v.cast_unsigned() & mask))
             }
             (Type::SizedNumeric(Primitive::Fractus, float), Type::Bits(width)) => {
                 pattern_from_float(value, *float, *width)
@@ -387,7 +389,7 @@ pub(crate) fn octeti_into_bits_list(value: Value) -> Value {
 fn bits_pattern(value: &Value) -> Option<u64> {
     match value {
         Value::UInt(v) => Some(*v),
-        Value::Int(v) => Some(*v as u64),
+        Value::Int(v) => Some(v.cast_unsigned()),
         _ => None,
     }
 }
@@ -397,7 +399,7 @@ fn bits_pattern(value: &Value) -> Option<u64> {
 fn float_from_pattern(pattern: u64, width: BitsWidth, float: NumericWidth) -> Option<Value> {
     let value = match (width, float) {
         (BitsWidth::B16, NumericWidth::F16) => {
-            let bits = pattern as u16;
+            let bits = u16::try_from(pattern & 0xffff).ok()?;
             // A NaN keeps its payload: the half seam canonicalizes it.
             if bits & 0x7c00 == 0x7c00 && bits & 0x03ff != 0 {
                 let sign = u32::from(bits >> 15) << 31;
@@ -407,10 +409,12 @@ fn float_from_pattern(pattern: u64, width: BitsWidth, float: NumericWidth) -> Op
                 f64::from(super::half_to_f32(bits))
             }
         }
-        (BitsWidth::B16, NumericWidth::BF16) => {
-            f64::from(f32::from_bits((pattern as u32 & 0xffff) << 16))
+        (BitsWidth::B16, NumericWidth::BF16) => f64::from(f32::from_bits(
+            u32::from(u16::try_from(pattern & 0xffff).ok()?) << 16,
+        )),
+        (BitsWidth::B32, NumericWidth::F32) => {
+            f64::from(f32::from_bits(u32::try_from(pattern & 0xffff_ffff).ok()?))
         }
-        (BitsWidth::B32, NumericWidth::F32) => f64::from(f32::from_bits(pattern as u32)),
         (BitsWidth::B64, NumericWidth::F64) => f64::from_bits(pattern),
         _ => return None,
     };
@@ -426,7 +430,7 @@ fn pattern_from_float(value: &Value, float: NumericWidth, width: BitsWidth) -> O
             if v.is_nan() {
                 // Keep the sign and the top payload bits; never collapse to infinity.
                 let payload = ((wide >> 13) & 0x03ff).max(0x0200);
-                u64::from((((wide >> 16) & 0x8000) | 0x7c00 | payload) as u16)
+                u64::from(u16::try_from(((wide >> 16) & 0x8000) | 0x7c00 | payload).ok()?)
             } else {
                 u64::from(super::f32_to_f16_rn(*v as f32))
             }
@@ -434,7 +438,7 @@ fn pattern_from_float(value: &Value, float: NumericWidth, width: BitsWidth) -> O
         (NumericWidth::BF16, BitsWidth::B16) => {
             let wide = (*v as f32).to_bits();
             if v.is_nan() {
-                u64::from(((wide >> 16) | 0x0040) as u16)
+                u64::from(u16::try_from((wide >> 16) | 0x0040).ok()?)
             } else {
                 let rounded = wide.wrapping_add(0x7fff + ((wide >> 16) & 1));
                 u64::from((rounded >> 16) as u16)
