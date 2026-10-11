@@ -1887,16 +1887,6 @@ impl super::FaberCodegen<'_> {
         source: &HirExpression,
         target: TypeId,
     ) -> bool {
-        if !matches!(self.types.get(target), Type::Vector(..) | Type::Matrix(..)) {
-            return false;
-        }
-        let site = HirTypeSite {
-            owner: HirOwnerRef::Hir(id),
-            slot: HirTypeSlot::AscriptionTarget,
-        };
-        if self.authored_type_forms.contains_key(&site) {
-            return false;
-        }
         fn zero_leaves(expr: &HirExpression) -> bool {
             match &expr.kind {
                 HirExpressionKind::Array(items) => items.iter().all(|item| match item {
@@ -1907,6 +1897,16 @@ impl super::FaberCodegen<'_> {
                 HirExpressionKind::Literal(HirLiteral::Float(value)) => *value == 0.0,
                 _ => false,
             }
+        }
+        if !matches!(self.types.get(target), Type::Vector(..) | Type::Matrix(..)) {
+            return false;
+        }
+        let site = HirTypeSite {
+            owner: HirOwnerRef::Hir(id),
+            slot: HirTypeSlot::AscriptionTarget,
+        };
+        if self.authored_type_forms.contains_key(&site) {
+            return false;
         }
         matches!(source.kind, HirExpressionKind::Array(_)) && zero_leaves(source)
     }

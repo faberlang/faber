@@ -21,10 +21,10 @@
 use crate::surface::KeywordSurface;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
-    DefId, HirAnnotation, HirAvailability, HirBlock, HirEnum, HirExpressionKind, HirFunction,
-    HirFunctionModifierKind, HirInterface, HirItem, HirItemKind, HirOwnerRef, HirParam,
-    HirStatementKind, HirStruct, HirTestModifier, HirTypeParam, HirTypeParamConstraint,
-    HirTypeSite, HirTypeSlot,
+    DefId, HirAnnotation, HirAvailability, HirBlock, HirConst, HirEnum, HirExpressionKind,
+    HirFunction, HirFunctionModifierKind, HirImport, HirInterface, HirItem, HirItemKind,
+    HirOwnerRef, HirParam, HirStatementKind, HirStruct, HirTestModifier, HirTypeParam,
+    HirTypeParamConstraint, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::{CallablePosture, GenericParamKind};
@@ -108,128 +108,152 @@ impl super::FaberCodegen<'_> {
                 writer.newline();
             }
             HirItemKind::Constant(c) => {
-                let await_assignment = self.await_assignment_bindings.contains(&item.def_id);
-                if c.statica.is_some() {
-                    // A module-level constant is spelled `fixum` (st1 R15); the
-                    // `generis` word is only the genus field modifier.
-                    writer.write(surface.contextual_keyword("fixum"));
-                } else {
-                    writer.write(surface.contextual_keyword(if c.mutable {
-                        "varia"
-                    } else {
-                        "fixum"
-                    }));
-                }
-                writer.write(" ");
-                if let Some(ty) = c.ty {
-                    let site = HirTypeSite {
-                        owner: HirOwnerRef::Def(item.def_id),
-                        slot: HirTypeSlot::Declared,
-                    };
-                    // The authored form at this site is the sole authority for
-                    // concrete versus hole spelling. An absent site is a
-                    // synthesized/hand-built binding and uses the canonical
-                    // concrete fallback inside `type_to_faber_at`.
-                    let rendered = self
-                        .type_to_faber_at(&site, ty, names, surface)
-                        .unwrap_or_else(|error| self.record_type_emission_error(error));
-                    writer.write(&rendered);
-                    writer.write(" ");
-                }
-                writer.write(&self.symbol_to_string(c.name));
-                if let HirExpressionKind::ConversioAssign {
-                    source,
-                    recovery,
-                    params,
-                    ..
-                } = &c.value.kind
-                {
-                    // Typed `↤` constant initializer: lowering stores the
-                    // binding as the assignment target, so re-emit as
-                    // `fixum T name ↤ source [⊥ default]`.
-                    writer.write(" ↤ ");
-                    self.write_expr_prec(source, 1, names, surface, writer);
-                    self.write_conversio_assign_via(params, surface, writer);
-                    if let Some(recovery) = recovery {
-                        writer.write(" ⊥ ");
-                        self.write_expr_prec(recovery, 12, names, surface, writer);
-                    }
-                } else if let Some(statica) = &c.statica {
-                    // A module constant is a compile-time fact: `fixum T NAME =
-                    // value`, re-emitted from its authored (unfolded) initializer.
-                    writer.write(" = ");
-                    let value = statica.authored.as_deref().unwrap_or(&c.value);
-                    self.write_expr(value, names, surface, writer);
-                } else {
-                    writer.write(if await_assignment { " ↢ " } else { " ← " });
-                    self.write_expr(&c.value, names, surface, writer);
-                }
-                writer.newline();
+                self.write_constant_item(c, item.def_id, names, surface, writer);
             }
             HirItemKind::Import(import) => {
-                writer.write(surface.keyword(TokenKind::Importa));
-                writer.write(" ");
-                writer.write(surface.keyword(TokenKind::Ex));
-                writer.write(" ");
-                self.write_symbol_literal(import.path, writer);
-                // The parser retired explicit import `privata` (VM-U3); the
-                // absence of `publica` is the private default. Emit only the
-                // non-default tier, mirroring the author/pretty printers.
-                if import.visibility == radix_syntax::Visibility::Publica {
-                    writer.write(" ");
-                    writer.write(surface.keyword(TokenKind::Publica));
-                }
-                if import.selective {
-                    // EOT-2 selective import: `fixum member [ut alias], …`.
-                    // `name` is the exported spelling (source order preserved),
-                    // `alias` the caller-owned local. An explicit identity
-                    // alias collapses to the bare exported name: the member
-                    // list is not a namespace form, so the `* ut` wildcard
-                    // shape never applies here.
-                    writer.write(" ");
-                    writer.write(surface.keyword(TokenKind::Fixum));
-                    for (idx, item) in import.items.iter().enumerate() {
-                        if idx > 0 {
-                            writer.write(",");
-                        }
-                        writer.write(" ");
-                        let name = self.symbol_to_string(item.name);
-                        match item.alias {
-                            Some(alias) if alias != item.name => {
-                                writer.write(&name);
-                                writer.write(" ");
-                                writer.write(surface.keyword(TokenKind::Ut));
-                                writer.write(" ");
-                                writer.write(&self.symbol_to_string(alias));
-                            }
-                            _ => writer.write(&name),
-                        }
-                    }
-                    writer.newline();
-                    return;
-                }
-                for item in &import.items {
-                    writer.write(" ");
-                    let name = self.symbol_to_string(item.name);
-                    if item.alias == Some(item.name) {
-                        writer.write("* ");
-                        writer.write(surface.keyword(TokenKind::Ut));
-                        writer.write(" ");
-                        writer.write(&name);
-                    } else if let Some(alias) = item.alias {
-                        let alias = self.symbol_to_string(alias);
-                        writer.write(&name);
-                        writer.write(" ");
-                        writer.write(surface.keyword(TokenKind::Ut));
-                        writer.write(" ");
-                        writer.write(&alias);
-                    } else {
-                        writer.write(&name);
-                    }
-                }
-                writer.newline();
+                self.write_import_item(import, surface, writer);
             }
         }
+    }
+
+    /// Emit one module constant item, including its `↤` typed initializer and
+    /// the `↢` awaited-binding spelling.
+    fn write_constant_item(
+        &self,
+        constant: &HirConst,
+        def_id: DefId,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        let await_assignment = self.await_assignment_bindings.contains(&def_id);
+        if constant.statica.is_some() {
+            // A module-level constant is spelled `fixum` (st1 R15); the
+            // `generis` word is only the genus field modifier.
+            writer.write(surface.contextual_keyword("fixum"));
+        } else {
+            writer.write(surface.contextual_keyword(if constant.mutable {
+                "varia"
+            } else {
+                "fixum"
+            }));
+        }
+        writer.write(" ");
+        if let Some(ty) = constant.ty {
+            let site = HirTypeSite {
+                owner: HirOwnerRef::Def(def_id),
+                slot: HirTypeSlot::Declared,
+            };
+            // The authored form at this site is the sole authority for
+            // concrete versus hole spelling. An absent site is a
+            // synthesized/hand-built binding and uses the canonical
+            // concrete fallback inside `type_to_faber_at`.
+            let rendered = self
+                .type_to_faber_at(&site, ty, names, surface)
+                .unwrap_or_else(|error| self.record_type_emission_error(error));
+            writer.write(&rendered);
+            writer.write(" ");
+        }
+        writer.write(&self.symbol_to_string(constant.name));
+        if let HirExpressionKind::ConversioAssign {
+            source,
+            recovery,
+            params,
+            ..
+        } = &constant.value.kind
+        {
+            // Typed `↤` constant initializer: lowering stores the
+            // binding as the assignment target, so re-emit as
+            // `fixum T name ↤ source [⊥ default]`.
+            writer.write(" ↤ ");
+            self.write_expr_prec(source, 1, names, surface, writer);
+            self.write_conversio_assign_via(params, surface, writer);
+            if let Some(recovery) = recovery {
+                writer.write(" ⊥ ");
+                self.write_expr_prec(recovery, 12, names, surface, writer);
+            }
+        } else if let Some(statica) = &constant.statica {
+            // A module constant is a compile-time fact: `fixum T NAME =
+            // value`, re-emitted from its authored (unfolded) initializer.
+            writer.write(" = ");
+            let value = statica.authored.as_deref().unwrap_or(&constant.value);
+            self.write_expr(value, names, surface, writer);
+        } else {
+            writer.write(if await_assignment { " ↢ " } else { " ← " });
+            self.write_expr(&constant.value, names, surface, writer);
+        }
+        writer.newline();
+    }
+
+    /// Emit one import declaration: the canonical `importa ex … <visibility>`
+    /// prefix plus either the selective member list or the namespace form.
+    fn write_import_item(
+        &self,
+        import: &HirImport,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        writer.write(surface.keyword(TokenKind::Importa));
+        writer.write(" ");
+        writer.write(surface.keyword(TokenKind::Ex));
+        writer.write(" ");
+        self.write_symbol_literal(import.path, writer);
+        // The parser retired explicit import `privata` (VM-U3); the
+        // absence of `publica` is the private default. Emit only the
+        // non-default tier, mirroring the author/pretty printers.
+        if import.visibility == radix_syntax::Visibility::Publica {
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Publica));
+        }
+        if import.selective {
+            // EOT-2 selective import: `fixum member [ut alias], …`.
+            // `name` is the exported spelling (source order preserved),
+            // `alias` the caller-owned local. An explicit identity
+            // alias collapses to the bare exported name: the member
+            // list is not a namespace form, so the `* ut` wildcard
+            // shape never applies here.
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Fixum));
+            for (idx, item) in import.items.iter().enumerate() {
+                if idx > 0 {
+                    writer.write(",");
+                }
+                writer.write(" ");
+                let name = self.symbol_to_string(item.name);
+                match item.alias {
+                    Some(alias) if alias != item.name => {
+                        writer.write(&name);
+                        writer.write(" ");
+                        writer.write(surface.keyword(TokenKind::Ut));
+                        writer.write(" ");
+                        writer.write(&self.symbol_to_string(alias));
+                    }
+                    _ => writer.write(&name),
+                }
+            }
+            writer.newline();
+            return;
+        }
+        for item in &import.items {
+            writer.write(" ");
+            let name = self.symbol_to_string(item.name);
+            if item.alias == Some(item.name) {
+                writer.write("* ");
+                writer.write(surface.keyword(TokenKind::Ut));
+                writer.write(" ");
+                writer.write(&name);
+            } else if let Some(alias) = item.alias {
+                let alias = self.symbol_to_string(alias);
+                writer.write(&name);
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Ut));
+                writer.write(" ");
+                writer.write(&alias);
+            } else {
+                writer.write(&name);
+            }
+        }
+        writer.newline();
     }
 
     pub(super) fn generate_function(

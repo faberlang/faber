@@ -271,6 +271,79 @@ impl FaberCodegen<'_> {
     ) -> Result<FaberOutput, CodegenError> {
         radix_codegen_shared::reject_hir_errors(hir)?;
         reject_unsupported_legacy_hir(hir)?;
+        self.install_presentation(presentation);
+
+        let mut writer = CodeWriter::new();
+        let names = self.collect_names(hir);
+        (*self.runtime_value_names.borrow_mut()).clone_from(&names);
+        self.runtime_parameter_names.borrow_mut().clear();
+        self.self_def_ids = hir
+            .items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                HirItemKind::Struct(_) | HirItemKind::Enum(_) => Some(item.def_id),
+                _ => None,
+            })
+            .collect();
+        self.static_fields = hir
+            .items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                HirItemKind::Struct(strukt) => Some((item.def_id, strukt)),
+                _ => None,
+            })
+            .flat_map(|(def_id, strukt)| {
+                strukt
+                    .fields
+                    .iter()
+                    .filter(|field| field.is_static())
+                    .map(move |field| (def_id, field.name))
+            })
+            .collect();
+        self.variant_def_ids = hir
+            .items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                HirItemKind::Enum(enm) => Some(&enm.variants),
+                _ => None,
+            })
+            .flatten()
+            .map(|variant| variant.def_id)
+            .collect();
+        // Imported union variants ride the pattern-spelling contract (its keys
+        // are exactly the imported variant def ids). Without them a guard
+        // `iace` payload targeting an imported variant re-emits as a bare
+        // positional call — not re-parseable, not check-green source.
+        self.variant_def_ids
+            .extend(self.imported_pattern_spellings.keys().copied());
+        self.qualified_local_variants = self.ambiguous_local_variant_spellings(hir);
+        self.imported_variant_union_path_ids = self.imported_variants_needing_union_path(hir);
+
+        let rendered_any_item =
+            self.write_module_items(presentation, hir, &names, surface, &mut writer);
+
+        self.write_entry_trivia(
+            !rendered_any_item,
+            !hir.entry_annotations.is_empty(),
+            &mut writer,
+        );
+        self.write_hir_annotations(&hir.entry_annotations, &names, surface, None, &mut writer);
+
+        self.write_entry_block(hir, presentation, &names, surface, &mut writer);
+
+        self.write_program_end_trivia(!rendered_any_item && hir.entry.is_none(), &mut writer);
+
+        if let Some(error) = self.type_emission_error.borrow_mut().take() {
+            return Err(error);
+        }
+        Ok(FaberOutput {
+            code: writer.finish(),
+        })
+    }
+
+    /// Install every per-unit presentation fact on the generator. Called once
+    /// at the head of [`Self::generate`], before any item is emitted.
+    fn install_presentation(&mut self, presentation: &HirPresentation) {
         *self.type_emission_error.borrow_mut() = None;
         self.trivia = TriviaIndex::from_presentation(presentation);
         self.guard_si_ids = presentation.guard_si_ids.iter().copied().collect();
@@ -337,54 +410,20 @@ impl FaberCodegen<'_> {
             .iter()
             .map(|binding| (binding.local, binding.kind))
             .collect();
+    }
 
-        let mut writer = CodeWriter::new();
-        let names = self.collect_names(hir);
-        *self.runtime_value_names.borrow_mut() = names.clone();
-        self.runtime_parameter_names.borrow_mut().clear();
-        self.self_def_ids = hir
-            .items
-            .iter()
-            .filter_map(|item| match &item.kind {
-                HirItemKind::Struct(_) | HirItemKind::Enum(_) => Some(item.def_id),
-                _ => None,
-            })
-            .collect();
-        self.static_fields = hir
-            .items
-            .iter()
-            .filter_map(|item| match &item.kind {
-                HirItemKind::Struct(strukt) => Some((item.def_id, strukt)),
-                _ => None,
-            })
-            .flat_map(|(def_id, strukt)| {
-                strukt
-                    .fields
-                    .iter()
-                    .filter(|field| field.is_static())
-                    .map(move |field| (def_id, field.name))
-            })
-            .collect();
-        self.variant_def_ids = hir
-            .items
-            .iter()
-            .filter_map(|item| match &item.kind {
-                HirItemKind::Enum(enm) => Some(&enm.variants),
-                _ => None,
-            })
-            .flatten()
-            .map(|variant| variant.def_id)
-            .collect();
-        // Imported union variants ride the pattern-spelling contract (its keys
-        // are exactly the imported variant def ids). Without them a guard
-        // `iace` payload targeting an imported variant re-emits as a bare
-        // positional call — not re-parseable, not check-green source.
-        self.variant_def_ids
-            .extend(self.imported_pattern_spellings.keys().copied());
-        self.qualified_local_variants = self.ambiguous_local_variant_spellings(hir);
-        self.imported_variant_union_path_ids = self.imported_variants_needing_union_path(hir);
-
-        let mut rendered_any_item = self.write_region(presentation, hir, surface, &mut writer);
+    /// Emit the `regio` header, then the top-level items — re-opening the
+    /// `describe` chain around each run of consecutive tests — and close every
+    /// suite still open. Returns whether any item rendered.
+    fn write_module_items(
+        &self,
+        presentation: &HirPresentation,
+        hir: &HirModule,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) -> bool {
+        let mut rendered_any_item = self.write_region(presentation, hir, surface, writer);
         // Test items are flattened by lowering: each carries its enclosing
         // `describe` chain as `suite_path`. Re-open that chain around runs of
         // consecutive tests so suite names survive re-emission.
@@ -395,21 +434,21 @@ impl FaberCodegen<'_> {
             }
             let path = item_suite_path(item);
             let keep = shared_prefix_len(&open_suites, path);
-            self.close_suites(&mut open_suites, keep, &hir.items[idx..], &mut writer);
+            self.close_suites(&mut open_suites, keep, &hir.items[idx..], writer);
             // An item that opens suites owns the leading trivia of the source
             // statement that opened them, so the trivia precedes the outermost
             // new `describe` header.
-            self.write_item_trivia(item, !rendered_any_item, &mut writer);
+            self.write_item_trivia(item, !rendered_any_item, writer);
             rendered_any_item = true;
             for suite in &path[keep..] {
                 writer.write(surface.keyword(TokenKind::Probandum));
                 writer.write(" ");
-                self.write_quoted_text(self.interner.resolve(*suite), &mut writer);
+                self.write_quoted_text(self.interner.resolve(*suite), writer);
                 writer.writeln(" {");
                 writer.indent();
                 open_suites.push(*suite);
             }
-            self.generate_item(item, &names, surface, &mut writer);
+            self.generate_item(item, names, surface, writer);
             // Canonical blank separator between items. When the following slot
             // carries leading trivia, the trivia run owns the boundary: this
             // separator would otherwise double the line break the run already
@@ -426,66 +465,63 @@ impl FaberCodegen<'_> {
                 writer.newline();
             }
         }
-        self.close_suites(&mut open_suites, 0, &[], &mut writer);
+        self.close_suites(&mut open_suites, 0, &[], writer);
+        rendered_any_item
+    }
 
-        self.write_entry_trivia(
-            !rendered_any_item,
-            !hir.entry_annotations.is_empty(),
-            &mut writer,
-        );
-        self.write_hir_annotations(&hir.entry_annotations, &names, surface, None, &mut writer);
-
-        if let Some(entry) = &hir.entry {
-            // Fidelity: an implicit entry (top-level statements with no
-            // `incipit` keyword) re-emits in place. Wrapping it in an explicit
-            // block changes the source form and can outlaw top-level-only
-            // statements (template strings are TLA-only inside blocks).
-            let explicit_entry = presentation.entry_explicit
-                || presentation.entry_start_anchor.is_some()
-                || hir.entry_is_async
-                || hir.entry_args_name.is_some()
-                || entry.expr.is_some()
-                || !hir.entry_annotations.is_empty();
-            if explicit_entry {
-                writer.write(if hir.entry_is_async {
-                    surface.keyword(TokenKind::Incipiet)
-                } else {
-                    surface.keyword(TokenKind::Incipit)
-                });
-                if let Some(args) = hir.entry_args_name {
-                    writer.write(" ");
-                    writer.write(surface.keyword(TokenKind::Argumenta));
-                    writer.write(" ");
-                    writer.write(&self.symbol_to_string(args));
-                }
-                // The entry block's tail expression is the authored `exitus`
-                // value (lowering stores it there). It re-emits in the header,
-                // never as a trailing body statement.
-                if let Some(exit) = &entry.expr {
-                    writer.write(" ");
-                    writer.write(surface.keyword(TokenKind::Exitus));
-                    writer.write(" ");
-                    self.write_expr(exit, &names, surface, &mut writer);
-                }
-                writer.writeln(" {");
-                writer.indented(|writer| {
-                    self.write_stmts(&entry.statements, &names, surface, writer);
-                    self.write_block_end_trivia(entry, writer);
-                });
-                writer.writeln("}");
+    /// Emit the program entry (`incipit`) block: the explicit keyword form when
+    /// the source carried one, else the authored top-level statements in place.
+    fn write_entry_block(
+        &self,
+        hir: &HirModule,
+        presentation: &HirPresentation,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        let Some(entry) = &hir.entry else {
+            return;
+        };
+        // Fidelity: an implicit entry (top-level statements with no
+        // `incipit` keyword) re-emits in place. Wrapping it in an explicit
+        // block changes the source form and can outlaw top-level-only
+        // statements (template strings are TLA-only inside blocks).
+        let explicit_entry = presentation.entry_explicit
+            || presentation.entry_start_anchor.is_some()
+            || hir.entry_is_async
+            || hir.entry_args_name.is_some()
+            || entry.expr.is_some()
+            || !hir.entry_annotations.is_empty();
+        if explicit_entry {
+            writer.write(if hir.entry_is_async {
+                surface.keyword(TokenKind::Incipiet)
             } else {
-                self.write_block(entry, &names, surface, &mut writer);
+                surface.keyword(TokenKind::Incipit)
+            });
+            if let Some(args) = hir.entry_args_name {
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Argumenta));
+                writer.write(" ");
+                writer.write(&self.symbol_to_string(args));
             }
+            // The entry block's tail expression is the authored `exitus`
+            // value (lowering stores it there). It re-emits in the header,
+            // never as a trailing body statement.
+            if let Some(exit) = &entry.expr {
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Exitus));
+                writer.write(" ");
+                self.write_expr(exit, names, surface, writer);
+            }
+            writer.writeln(" {");
+            writer.indented(|writer| {
+                self.write_stmts(&entry.statements, names, surface, writer);
+                self.write_block_end_trivia(entry, writer);
+            });
+            writer.writeln("}");
+        } else {
+            self.write_block(entry, names, surface, writer);
         }
-
-        self.write_program_end_trivia(!rendered_any_item && hir.entry.is_none(), &mut writer);
-
-        if let Some(error) = self.type_emission_error.borrow_mut().take() {
-            return Err(error);
-        }
-        Ok(FaberOutput {
-            code: writer.finish(),
-        })
     }
 
     /// Keep emission running long enough to collect the first malformed-form
