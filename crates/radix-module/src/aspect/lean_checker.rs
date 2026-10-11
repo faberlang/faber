@@ -363,37 +363,7 @@ impl HirAspectVerifier for LeanAspectChecker {
         // fabricated verdict. Gate-hole records (APA-L3) are named findings:
         // they short-circuit before any toolchain path so a gate-admitted
         // impure form is never downgraded to an ignorable failed proof.
-        let refused: Vec<HirAspectCheckResult> = recognized
-            .iter()
-            .filter(|r| !has_proof_content(r) && !is_gate_hole_record(r))
-            .map(|r| HirAspectCheckResult {
-                status: HirAspectCheckStatus::Failed,
-                evidence: HirAspectEvidence(format!(
-                    "aspect kind `{}` is registered without proof content; refusing placeholder proof",
-                    aspect_label(r)
-                )),
-                counterexample: Vec::new(),
-                backend: HirAspectBackendKind::Lean,
-            })
-            .collect();
-
-        let gate_holes: Vec<HirAspectCheckResult> = recognized
-            .iter()
-            .filter_map(|r| match &r.detail {
-                HirAspectDetail::GatePurityHole { issue } => Some(issue.label()),
-                _ => None,
-            })
-            .map(|label| {
-                HirAspectCheckResult {
-                    status: HirAspectCheckStatus::Failed,
-                    evidence: HirAspectEvidence(format!(
-                        "gate hole (never downgraded): {label} — the AIR purity gate admitted a form whose Line-3 model translation carries an IO/monadic effect"
-                    )),
-                    counterexample: Vec::new(),
-                    backend: HirAspectBackendKind::Lean,
-                }
-            })
-            .collect();
+        let (refused, gate_holes) = classify_unproven_records(&recognized);
 
         let checkable: Vec<&HirAspectRecord> = recognized
             .iter()
@@ -494,6 +464,46 @@ impl HirAspectVerifier for LeanAspectChecker {
     }
 }
 
+/// Build the deterministic no-fall-through and gate-hole results for the
+/// recognized records that never reach the checker path.
+fn classify_unproven_records(
+    recognized: &[&HirAspectRecord],
+) -> (Vec<HirAspectCheckResult>, Vec<HirAspectCheckResult>) {
+    let refused: Vec<HirAspectCheckResult> = recognized
+        .iter()
+        .filter(|r| !has_proof_content(r) && !is_gate_hole_record(r))
+        .map(|r| HirAspectCheckResult {
+            status: HirAspectCheckStatus::Failed,
+            evidence: HirAspectEvidence(format!(
+                "aspect kind `{}` is registered without proof content; refusing placeholder proof",
+                aspect_label(r)
+            )),
+            counterexample: Vec::new(),
+            backend: HirAspectBackendKind::Lean,
+        })
+        .collect();
+
+    let gate_holes: Vec<HirAspectCheckResult> = recognized
+        .iter()
+        .filter_map(|r| match &r.detail {
+            HirAspectDetail::GatePurityHole { issue } => Some(issue.label()),
+            _ => None,
+        })
+        .map(|label| {
+            HirAspectCheckResult {
+                status: HirAspectCheckStatus::Failed,
+                evidence: HirAspectEvidence(format!(
+                    "gate hole (never downgraded): {label} — the AIR purity gate admitted a form whose Line-3 model translation carries an IO/monadic effect"
+                )),
+                counterexample: Vec::new(),
+                backend: HirAspectBackendKind::Lean,
+            }
+        })
+        .collect();
+
+    (refused, gate_holes)
+}
+
 /// Re-assemble per-record results in the original report order: checkable
 /// records take their checker result, gate-hole records take their named
 /// finding, and refused kinds take their deterministic no-fall-through
@@ -546,7 +556,7 @@ const LAKE_PROJECT_NAME: &str = "FaberGenerated";
 
 /// Generate a minimal `lakefile.toml` for the temp project.
 ///
-/// Lake 4.18+ only registers `[[lean_lib]]` targets from snake_case table
+/// Lake 4.18+ only registers `[[lean_lib]]` targets from `snake_case` table
 /// keys; the camelCase spelling is silently ignored, leaving the default
 /// target unresolvable.  The lib root must be named explicitly so the
 /// generated module is compiled.
@@ -632,7 +642,7 @@ fn generate_lean_source(records: &[&HirAspectRecord]) -> String {
                     writeln!(out, "-- {label}: no structural contract; no proof fabricated").ok();
                 }
             },
-            _ => {
+            HirAspectKind::DiscerneOmnia => {
                 // DiscerneOmnia remains the established generator.  AIR kinds
                 // are admitted here only when their owning line has registered
                 // a real generator; no kind may fall through this branch as a

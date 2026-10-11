@@ -3460,12 +3460,6 @@ impl FunctionBuilder<'_> {
             return true;
         }
         match self.normalized_type(arg_ty.semantic_id()) {
-            Type::Primitive(
-                Primitive::Bivalens | Primitive::Numerus | Primitive::Fractus | Primitive::Octeti | Primitive::Valor,
-            )
-            | Type::Array(_)
-            | Type::Map(_, _)
-            | Type::Set(_) => true,
             // L28 (ab91f49f): sized `fractus<f32>` and `instans` values now
             // render through shared MIR operations too — f32 via the
             // FormatString f32 display carrier (`display_fractus` semantics)
@@ -3473,9 +3467,16 @@ impl FunctionBuilder<'_> {
             // carrier — so multi-arg notas carrying them join like the
             // HIR-Rust lane instead of falling to the per-argument path.
             // This is the FLAGGED continuation of the L23 grouping predicate
-            // (the rows L23 explicitly left open); bounded to these two arms.
-            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => true,
-            Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => true,
+            // (the rows L23 explicitly left open).
+            Type::Primitive(
+                Primitive::Bivalens | Primitive::Numerus | Primitive::Fractus | Primitive::Octeti | Primitive::Valor,
+            )
+            | Type::Array(_)
+            | Type::Map(_, _)
+            | Type::Set(_)
+            | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
+            | Type::Primitive(Primitive::Instans)
+            | Type::SizedInstans(_) => true,
             // Option payloads render as a bare value (`display_option`
             // semantics); nested options are not grouped.
             Type::Option(inner) => {
@@ -3494,18 +3495,13 @@ impl FunctionBuilder<'_> {
         }
         match self.normalized_type(ty.semantic_id()) {
             Type::Primitive(Primitive::Textus) => value,
-            Type::Primitive(Primitive::Bivalens | Primitive::Fractus) => self.runtime_call_value(
-                MirIntrinsic::FormatString { template: self.context.diagnostic_format_templates[0] },
-                vec![value],
-                text_ty,
-                span,
-            ),
             // L28 (ab91f49f): `fractus<f32>` renders through the same
             // `display_fractus` FormatString carrier (the emitter/runtime f32
             // display ABI); `instans` renders its Rust-oracle Debug shape
             // through the opaque format carrier (the runtime's arena lookup
             // renders the handle like `__faber_rt_v1_instans_display`).
-            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
+            Type::Primitive(Primitive::Bivalens | Primitive::Fractus)
+            | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
             | Type::Primitive(Primitive::Instans)
             | Type::SizedInstans(_) => self.runtime_call_value(
                 MirIntrinsic::FormatString { template: self.context.diagnostic_format_templates[0] },
