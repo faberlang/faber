@@ -493,7 +493,9 @@ impl FunctionBuilder<'_> {
         closure: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        let receiver_ty = receiver.ty?;
+        // WHY: a local bound by `← copy` (or `own`/`ref`/`mut`) carries its
+        // access marker on the type; the carrier is the payload under it.
+        let receiver_ty = self.method_receiver_payload_id(receiver.ty?);
         if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
             self.errors.push(MirError::unsupported(
                 receiver.span,

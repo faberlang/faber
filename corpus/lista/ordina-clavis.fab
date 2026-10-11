@@ -67,7 +67,7 @@ main {
 
     # Numeric key, stable: 25s keep Aulus before Cornelia; 30s keep
     # Livia, Marcus, Émilia in source order.
-    var list<Persona> per_aetatem ← personae
+    var list<Persona> per_aetatem ← copy personae
     per_aetatem.sort(Persona p ∴ p.aetas)
     print nomina(per_aetatem)
 

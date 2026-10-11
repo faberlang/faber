@@ -53,3 +53,19 @@ incipit {{
     ));
     assert_eq!(lines, vec![r#"["B", "z", "é"]"#]);
 }
+
+#[test]
+fn ordina_key_sorts_a_copy_bound_list_and_leaves_the_source() {
+    let lines = run_lines(&format!(
+        "{PERSONAE}
+incipit {{
+    varia lista<Persona> ps ← [Persona {{ nomen = \"c\", aetas = 2 }}, Persona {{ nomen = \"a\", aetas = 1 }}, Persona {{ nomen = \"b\", aetas = 2 }}, Persona {{ nomen = \"d\", aetas = 1 }}]
+    varia lista<Persona> ordinata ← copy ps
+    ordinata.ordina(Persona p ∴ p.aetas)
+    nota nomina(ordinata)
+    nota nomina(ps)
+}}
+"
+    ));
+    assert_eq!(lines, vec![r#"["a", "d", "c", "b"]"#, r#"["c", "a", "b", "d"]"#]);
+}
