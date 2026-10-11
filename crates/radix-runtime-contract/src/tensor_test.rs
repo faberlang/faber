@@ -143,10 +143,6 @@ fn err_permute_constants_match_codegen_copy() {
         ERR_PERMUTE_DUPLICATE_AXIS,
         radix_hir_rust::runtime_contract_tensor::ERR_PERMUTE_DUPLICATE_AXIS
     );
-    assert_eq!(
-        ERR_MEDIA_EMPTY,
-        radix_hir_rust::runtime_contract_tensor::ERR_MEDIA_EMPTY
-    );
 }
 
 #[test]
@@ -289,10 +285,6 @@ fn err_permute_constants_have_correct_text() {
     assert_eq!(
         ERR_PERMUTE_DUPLICATE_AXIS,
         "tensor permute axis must appear exactly once"
-    );
-    assert_eq!(
-        ERR_MEDIA_EMPTY,
-        "tensor media (mean) requires at least one element"
     );
 }
 

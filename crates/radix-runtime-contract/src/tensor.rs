@@ -50,7 +50,6 @@ pub const ERR_PERMUTE_RANK: &str = "tensor permute axis count must equal tensor 
 pub const ERR_PERMUTE_NEGATIVE_AXIS: &str = "tensor permute axis must be non-negative";
 pub const ERR_PERMUTE_AXIS_OUT_OF_RANGE: &str = "tensor permute axis out of range";
 pub const ERR_PERMUTE_DUPLICATE_AXIS: &str = "tensor permute axis must appear exactly once";
-pub const ERR_MEDIA_EMPTY: &str = "tensor media (mean) requires at least one element";
 pub const ERR_DIVIDE_NON_FINITE_INPUT: &str = "tensor division input must be finite";
 pub const ERR_DIVIDE_ZERO_DENOMINATOR: &str = "tensor division denominator must be non-zero";
 pub const ERR_DIVIDE_NON_FINITE_RESULT: &str = "tensor division result must be finite";
