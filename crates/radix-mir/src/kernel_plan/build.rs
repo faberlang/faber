@@ -649,7 +649,6 @@ impl CollectionKernelPlan {
     /// kernels always validate.
     pub fn validate(&self) -> Result<(), PlanValidationError> {
         match self {
-            CollectionKernelPlan::Elementwise => Ok(()),
             CollectionKernelPlan::TreeReduction(plan) => validate_reduction_plan(plan),
             CollectionKernelPlan::TiledMatMul(plan) => validate_matmul_plan(plan),
             CollectionKernelPlan::Transpose(plan) => validate_transpose_plan(plan),
@@ -664,7 +663,6 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::RowSoftmax(plan) => {
                 super::validate::validate_row_softmax_plan(plan)
             }
-            CollectionKernelPlan::LayerNormalization(_) => Ok(()),
             // GI3-1: the inference recipes carry no static grid/shared-memory
             // structure — every algorithmic fact (axis/epsilon/gamma-width,
             // pos/dim/row-width, table/id dims, causal extents) is a
@@ -685,7 +683,10 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::DistributedSum(plan) => validate_distributed_sum_plan(plan),
             // gpu-reset C4: a lane grid carries no static grid structure; the
             // lane domain is a call-site fact checked by `geometry_for_call`.
-            CollectionKernelPlan::LaneGrid { .. } | CollectionKernelPlan::SingleLane => Ok(()),
+            CollectionKernelPlan::Elementwise
+            | CollectionKernelPlan::LayerNormalization(_)
+            | CollectionKernelPlan::LaneGrid { .. }
+            | CollectionKernelPlan::SingleLane => Ok(()),
             CollectionKernelPlan::GridReduce {
                 workgroup,
                 partials_cap,

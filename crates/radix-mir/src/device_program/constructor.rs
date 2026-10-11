@@ -1095,8 +1095,8 @@ impl<'a> KernelBuilder<'a> {
 
     /// D-6 gradient-slot → buffer mapping: the companion's gradient slots
     /// index the FULL result-tuple, which the LAST subchain's return-tuple
-    /// Construct binds to locals. The train_step gradient reads alias the
-    /// producing subchains' gradient buffers (the backward → train_step
+    /// Construct binds to locals. The `train_step` gradient reads alias the
+    /// producing subchains' gradient buffers (the backward → `train_step`
     /// device-to-device edge).
     fn record_subchain_gradient_buffers(
         &mut self,
