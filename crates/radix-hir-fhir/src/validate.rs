@@ -1015,78 +1015,10 @@ fn collect_def_registry_for_parts(
     libraries: &radix_hir::LibraryRegistry,
     resolver: &crate::artifact::ResolverSnapshot,
 ) -> FxHashSet<radix_types::DefId> {
-    use radix_hir::HirItemKind;
-
     let mut registry = FxHashSet::default();
 
     // Walk HIR items for definition-site DefIds.
-    for item in &hir.items {
-        registry.insert(item.def_id);
-        for ann in &item.annotations {
-            collect_annotation_defs(ann, &mut registry);
-        }
-        match &item.kind {
-            HirItemKind::Function(func) => {
-                collect_function_defs(func, &mut registry);
-            }
-            HirItemKind::Struct(s) => {
-                for tp in &s.type_params {
-                    registry.insert(tp.def_id);
-                }
-                for field in &s.fields {
-                    registry.insert(field.def_id);
-                    for ann in &field.annotations {
-                        collect_annotation_defs(ann, &mut registry);
-                    }
-                    if let Some(ref init) = field.init {
-                        collect_expr_defs(init, &mut registry);
-                    }
-                }
-                for method in &s.methods {
-                    registry.insert(method.def_id);
-                    for ann in &method.annotations {
-                        collect_annotation_defs(ann, &mut registry);
-                    }
-                    collect_function_defs(&method.func, &mut registry);
-                }
-            }
-            HirItemKind::Enum(e) => {
-                for tp in &e.type_params {
-                    registry.insert(tp.def_id);
-                }
-                for variant in &e.variants {
-                    registry.insert(variant.def_id);
-                }
-            }
-            HirItemKind::Interface(iface) => {
-                for tp in &iface.type_params {
-                    registry.insert(tp.def_id);
-                }
-                for method in &iface.methods {
-                    for param in &method.params {
-                        collect_param_defs(param, &mut registry);
-                    }
-                }
-            }
-            HirItemKind::TypeAlias(a) => {
-                for tp in &a.type_params {
-                    registry.insert(tp.def_id);
-                }
-            }
-            HirItemKind::Schema(_schema) => {
-                // The item def_id is registered above; schema columns carry
-                // symbols and type ids, never def ids of their own.
-            }
-            HirItemKind::Constant(c) => {
-                collect_expr_defs(&c.value, &mut registry);
-            }
-            HirItemKind::Import(imp) => {
-                for ii in &imp.items {
-                    registry.insert(ii.def_id);
-                }
-            }
-        }
-    }
+    collect_item_defs(&hir.items, &mut registry);
 
     // Entry block (if present).
     if let Some(ref entry) = hir.entry {
@@ -1163,6 +1095,78 @@ fn collect_def_registry_for_parts(
     }
 
     registry
+}
+
+fn collect_item_defs(items: &[radix_hir::HirItem], registry: &mut FxHashSet<radix_types::DefId>) {
+    use radix_hir::HirItemKind;
+
+    for item in items {
+        registry.insert(item.def_id);
+        for ann in &item.annotations {
+            collect_annotation_defs(ann, registry);
+        }
+        match &item.kind {
+            HirItemKind::Function(func) => {
+                collect_function_defs(func, registry);
+            }
+            HirItemKind::Struct(s) => {
+                for tp in &s.type_params {
+                    registry.insert(tp.def_id);
+                }
+                for field in &s.fields {
+                    registry.insert(field.def_id);
+                    for ann in &field.annotations {
+                        collect_annotation_defs(ann, registry);
+                    }
+                    if let Some(ref init) = field.init {
+                        collect_expr_defs(init, registry);
+                    }
+                }
+                for method in &s.methods {
+                    registry.insert(method.def_id);
+                    for ann in &method.annotations {
+                        collect_annotation_defs(ann, registry);
+                    }
+                    collect_function_defs(&method.func, registry);
+                }
+            }
+            HirItemKind::Enum(e) => {
+                for tp in &e.type_params {
+                    registry.insert(tp.def_id);
+                }
+                for variant in &e.variants {
+                    registry.insert(variant.def_id);
+                }
+            }
+            HirItemKind::Interface(iface) => {
+                for tp in &iface.type_params {
+                    registry.insert(tp.def_id);
+                }
+                for method in &iface.methods {
+                    for param in &method.params {
+                        collect_param_defs(param, registry);
+                    }
+                }
+            }
+            HirItemKind::TypeAlias(a) => {
+                for tp in &a.type_params {
+                    registry.insert(tp.def_id);
+                }
+            }
+            HirItemKind::Schema(_schema) => {
+                // The item def_id is registered above; schema columns carry
+                // symbols and type ids, never def ids of their own.
+            }
+            HirItemKind::Constant(c) => {
+                collect_expr_defs(&c.value, registry);
+            }
+            HirItemKind::Import(imp) => {
+                for ii in &imp.items {
+                    registry.insert(ii.def_id);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -2413,138 +2417,13 @@ pub(crate) fn validate_referential_integrity(
                 validate_function(func, checks)?;
             }
             HirItemKind::Struct(s) => {
-                checks.check_symbol(s.name)?;
-                for tp in &s.type_params {
-                    checks.check_def(tp.def_id)?;
-                    checks.check_symbol(tp.name)?;
-                    match &tp.constraint {
-                        radix_hir::HirTypeParamConstraint::Any => {}
-                        radix_hir::HirTypeParamConstraint::OneOf(tys) => {
-                            for ty in tys {
-                                checks.check_type(*ty)?;
-                            }
-                        }
-                        radix_hir::HirTypeParamConstraint::Implet(bounds) => {
-                            for bound in bounds {
-                                checks.check_def(bound.contract)?;
-                                for ty in &bound.args {
-                                    checks.check_type(*ty)?;
-                                }
-                            }
-                        }
-                    }
-                    validate_type_param_default(tp.default.as_ref(), checks)?;
-                }
-                for field in &s.fields {
-                    checks.check_def(field.def_id)?;
-                    checks.check_symbol(field.name)?;
-                    checks.check_type(field.ty)?;
-                    for ann in &field.annotations {
-                        validate_annotation(ann, checks)?;
-                    }
-                    if let Some(ref init) = field.init {
-                        validate_expr(init, checks)?;
-                    }
-                }
-                for method in &s.methods {
-                    checks.check_def(method.def_id)?;
-                    for ann in &method.annotations {
-                        validate_annotation(ann, checks)?;
-                    }
-                    validate_function(&method.func, checks)?;
-                }
-                for contract in &s.implements {
-                    checks.check_def(contract.contract)?;
-                    for arg in &contract.args {
-                        checks.check_type(*arg)?;
-                    }
-                }
+                validate_struct_item(s, checks)?;
             }
             HirItemKind::Enum(e) => {
-                checks.check_symbol(e.name)?;
-                for tp in &e.type_params {
-                    checks.check_def(tp.def_id)?;
-                    checks.check_symbol(tp.name)?;
-                    match &tp.constraint {
-                        radix_hir::HirTypeParamConstraint::Any => {}
-                        radix_hir::HirTypeParamConstraint::OneOf(tys) => {
-                            for ty in tys {
-                                checks.check_type(*ty)?;
-                            }
-                        }
-                        radix_hir::HirTypeParamConstraint::Implet(bounds) => {
-                            for bound in bounds {
-                                checks.check_def(bound.contract)?;
-                                for ty in &bound.args {
-                                    checks.check_type(*ty)?;
-                                }
-                            }
-                        }
-                    }
-                    validate_type_param_default(tp.default.as_ref(), checks)?;
-                }
-                for field in &e.commune_fields {
-                    checks.check_symbol(field.name)?;
-                    checks.check_type(field.ty)?;
-                }
-                for variant in &e.variants {
-                    checks.check_def(variant.def_id)?;
-                    checks.check_symbol(variant.name)?;
-                    for field in &variant.fields {
-                        checks.check_symbol(field.name)?;
-                        checks.check_type(field.ty)?;
-                    }
-                }
+                validate_enum_item(e, checks)?;
             }
             HirItemKind::Interface(iface) => {
-                checks.check_symbol(iface.name)?;
-                for tp in &iface.type_params {
-                    checks.check_def(tp.def_id)?;
-                    checks.check_symbol(tp.name)?;
-                    match &tp.constraint {
-                        radix_hir::HirTypeParamConstraint::Any => {}
-                        radix_hir::HirTypeParamConstraint::OneOf(tys) => {
-                            for ty in tys {
-                                checks.check_type(*ty)?;
-                            }
-                        }
-                        radix_hir::HirTypeParamConstraint::Implet(bounds) => {
-                            for bound in bounds {
-                                checks.check_def(bound.contract)?;
-                                for ty in &bound.args {
-                                    checks.check_type(*ty)?;
-                                }
-                            }
-                        }
-                    }
-                    validate_type_param_default(tp.default.as_ref(), checks)?;
-                }
-                for method in &iface.methods {
-                    for a in &method.availability {
-                        let radix_hir::HirAvailability::Nondum { target, reason } = a;
-                        if let Some(t) = target {
-                            checks.check_symbol(*t)?;
-                        }
-                        if let Some(r) = reason {
-                            checks.check_symbol(*r)?;
-                        }
-                    }
-                    checks.check_symbol(method.name)?;
-                    for param in &method.params {
-                        checks.check_def(param.def_id)?;
-                        checks.check_symbol(param.name)?;
-                        checks.check_type(param.ty)?;
-                        if let Some(ref init) = param.default {
-                            validate_expr(init, checks)?;
-                        }
-                    }
-                    if let Some(ty) = method.ret_ty {
-                        checks.check_type(ty)?;
-                    }
-                    if let Some(ty) = method.err_ty {
-                        checks.check_type(ty)?;
-                    }
-                }
+                validate_interface_item(iface, checks)?;
             }
             HirItemKind::TypeAlias(a) => {
                 checks.check_symbol(a.name)?;
@@ -2595,6 +2474,155 @@ pub(crate) fn validate_referential_integrity(
                         checks.check_symbol(a)?;
                     }
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_struct_item(
+        item: &radix_hir::HirStruct,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        checks.check_symbol(item.name)?;
+        for tp in &item.type_params {
+            checks.check_def(tp.def_id)?;
+            checks.check_symbol(tp.name)?;
+            match &tp.constraint {
+                radix_hir::HirTypeParamConstraint::Any => {}
+                radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                    for ty in tys {
+                        checks.check_type(*ty)?;
+                    }
+                }
+                radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                    for bound in bounds {
+                        checks.check_def(bound.contract)?;
+                        for ty in &bound.args {
+                            checks.check_type(*ty)?;
+                        }
+                    }
+                }
+            }
+            validate_type_param_default(tp.default.as_ref(), checks)?;
+        }
+        for field in &item.fields {
+            checks.check_def(field.def_id)?;
+            checks.check_symbol(field.name)?;
+            checks.check_type(field.ty)?;
+            for ann in &field.annotations {
+                validate_annotation(ann, checks)?;
+            }
+            if let Some(ref init) = field.init {
+                validate_expr(init, checks)?;
+            }
+        }
+        for method in &item.methods {
+            checks.check_def(method.def_id)?;
+            for ann in &method.annotations {
+                validate_annotation(ann, checks)?;
+            }
+            validate_function(&method.func, checks)?;
+        }
+        for contract in &item.implements {
+            checks.check_def(contract.contract)?;
+            for arg in &contract.args {
+                checks.check_type(*arg)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_enum_item(
+        item: &radix_hir::HirEnum,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        checks.check_symbol(item.name)?;
+        for tp in &item.type_params {
+            checks.check_def(tp.def_id)?;
+            checks.check_symbol(tp.name)?;
+            match &tp.constraint {
+                radix_hir::HirTypeParamConstraint::Any => {}
+                radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                    for ty in tys {
+                        checks.check_type(*ty)?;
+                    }
+                }
+                radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                    for bound in bounds {
+                        checks.check_def(bound.contract)?;
+                        for ty in &bound.args {
+                            checks.check_type(*ty)?;
+                        }
+                    }
+                }
+            }
+            validate_type_param_default(tp.default.as_ref(), checks)?;
+        }
+        for field in &item.commune_fields {
+            checks.check_symbol(field.name)?;
+            checks.check_type(field.ty)?;
+        }
+        for variant in &item.variants {
+            checks.check_def(variant.def_id)?;
+            checks.check_symbol(variant.name)?;
+            for field in &variant.fields {
+                checks.check_symbol(field.name)?;
+                checks.check_type(field.ty)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_interface_item(
+        item: &radix_hir::HirInterface,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        checks.check_symbol(item.name)?;
+        for tp in &item.type_params {
+            checks.check_def(tp.def_id)?;
+            checks.check_symbol(tp.name)?;
+            match &tp.constraint {
+                radix_hir::HirTypeParamConstraint::Any => {}
+                radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                    for ty in tys {
+                        checks.check_type(*ty)?;
+                    }
+                }
+                radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                    for bound in bounds {
+                        checks.check_def(bound.contract)?;
+                        for ty in &bound.args {
+                            checks.check_type(*ty)?;
+                        }
+                    }
+                }
+            }
+            validate_type_param_default(tp.default.as_ref(), checks)?;
+        }
+        for method in &item.methods {
+            for a in &method.availability {
+                let radix_hir::HirAvailability::Nondum { target, reason } = a;
+                if let Some(t) = target {
+                    checks.check_symbol(*t)?;
+                }
+                if let Some(r) = reason {
+                    checks.check_symbol(*r)?;
+                }
+            }
+            checks.check_symbol(method.name)?;
+            for param in &method.params {
+                checks.check_def(param.def_id)?;
+                checks.check_symbol(param.name)?;
+                checks.check_type(param.ty)?;
+                if let Some(ref init) = param.default {
+                    validate_expr(init, checks)?;
+                }
+            }
+            if let Some(ty) = method.ret_ty {
+                checks.check_type(ty)?;
+            }
+            if let Some(ty) = method.err_ty {
+                checks.check_type(ty)?;
             }
         }
         Ok(())
