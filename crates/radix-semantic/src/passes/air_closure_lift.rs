@@ -4,7 +4,7 @@
 //! gives an equivalent identity to the one closure shape that is safe to admit:
 //! a closure with no free local/parameter references.  The closure body and
 //! parameters move into a synthetic AIR-lane item, and the call-site closure is
-//! replaced by a path to that item.  Reverse AD therefore sees the same DefId
+//! replaced by a path to that item.  Reverse AD therefore sees the same `DefId`
 //! call edge it already handles for named functions.
 //!
 //! Capture detection is deliberately structural.  A module item is not a
@@ -282,7 +282,7 @@ impl HirVisitorMut for LiftVisitor<'_> {
                 };
                 let closure = std::mem::replace(&mut combine.expr, placeholder);
                 if let Ok(path) = self.lift_callback(closure) {
-                    combine.expr = path
+                    combine.expr = path;
                 }
             }
         }

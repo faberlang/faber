@@ -25,7 +25,7 @@
 //! INVARIANTS
 //! ==========
 //! - Companion `DefId` identity is stable: this pass reads the pre-established
-//!   companion DefId from `RadixBackward` and never allocates a new one.
+//!   companion `DefId` from `RadixBackward` and never allocates a new one.
 //! - Only functions with both `@ radix lane "air"` and `@ radix backward "name"`
 //!   receive a companion signature.
 //! - Selected tensor params use the same filter as the reverse-AD transform:
@@ -43,7 +43,7 @@ use rustc_hash::FxHashMap;
 /// Companion signatures ready for typecheck's `collect_items` registration.
 #[derive(Debug, Clone, Default)]
 pub struct CompanionSignatures {
-    /// Companion DefId → typed signature.
+    /// Companion `DefId` → typed signature.
     pub functions: FxHashMap<DefId, FuncSig>,
 }
 

@@ -17,7 +17,10 @@
 //!   and `reduce via any`.
 
 use super::tensor_lift::{LiftSide, RegisterKind, RegisterOperand};
-use super::*;
+use super::{
+    BOOLEAN_OPERAND_REQUIRED, BOOLEAN_OPERANDS_REQUIRED, HirBinOp, HirExpression,
+    NUMERIC_OPERANDS_REQUIRED, Type, TypeChecker, TypeId, integer_range, is_numeric_literal,
+};
 use crate::{IndexConstraint, IndexId};
 use radix_types::IndexExpr;
 
@@ -245,13 +248,13 @@ impl TypeChecker<'_> {
     /// the rank itself is not known yet (a hole standing for a whole shape).
     fn shape_dims(&mut self, shape: IndexId) -> Option<Vec<Option<u64>>> {
         let shape = self.resolve_index(shape);
-        let axes = match self.types.get_index(shape).clone() {
-            IndexExpr::Tuple(axes) => axes,
+        let resolved_axes = match self.types.get_index(shape).clone() {
+            IndexExpr::Tuple(resolved_axes) => resolved_axes,
             IndexExpr::Infer(_) | IndexExpr::Unspecified | IndexExpr::Param(_) => return None,
             _ => vec![shape],
         };
-        let mut dims = Vec::with_capacity(axes.len());
-        for axis in axes {
+        let mut dims = Vec::with_capacity(resolved_axes.len());
+        for axis in resolved_axes {
             let axis = self.resolve_index(axis);
             dims.push(match self.types.get_index(axis) {
                 IndexExpr::Literal(value) => Some(*value),
