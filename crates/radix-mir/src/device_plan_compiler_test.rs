@@ -275,7 +275,10 @@ fn library_operation_spellings_have_one_owner_per_match_site() {
             LibraryOperation::CausalAttention,
             "CausalAttention",
             "Self::CausalAttention => Some(\"CausalAttention\")",
-            "\"CausalAttention\" | \"SwiGlu\" => continue,",
+            // The section producer handles both spellings through its shared
+            // fallback arm since a match_same_arms merge (c3b807c324) folded
+            // them together; the arm is still the single owner of the decision.
+            "_ => continue,",
         ),
         (
             LibraryOperation::QkvProjection,
@@ -293,7 +296,7 @@ fn library_operation_spellings_have_one_owner_per_match_site() {
             LibraryOperation::SwiGlu,
             "SwiGlu",
             "Self::SwiGlu => Some(\"SwiGlu\")",
-            "\"CausalAttention\" | \"SwiGlu\" => continue,",
+            "_ => continue,",
         ),
     ];
 
