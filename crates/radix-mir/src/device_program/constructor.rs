@@ -1085,8 +1085,8 @@ impl<'a> KernelBuilder<'a> {
                 subchain.plan.clone(),
                 entry,
                 Some(subchain_index),
-                &return_tuple_locals,
-                &mut *subchain_output_buffer_ids,
+                return_tuple_locals,
+                subchain_output_buffer_ids,
                 decomposition.subchains.len() == 1,
             )?;
         }

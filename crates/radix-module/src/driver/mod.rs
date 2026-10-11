@@ -1250,10 +1250,10 @@ fn emit_wgsl_graphics_output(
             &bound_types,
         )
         .map_err(wgsl_text_codegen_error)?;
-        return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+        Ok(crate::Output::WgslText(crate::WgslTextOutput {
             code: output.source,
             reflection: Some(output.reflection),
-        }));
+        }))
     } else if has_vertex {
         let output = emit_wgsl_vertex_source_output(
             &graphics_source,
@@ -1264,10 +1264,10 @@ fn emit_wgsl_graphics_output(
             &bound_types,
         )
         .map_err(wgsl_text_codegen_error)?;
-        return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+        Ok(crate::Output::WgslText(crate::WgslTextOutput {
             code: output.source,
             reflection: Some(output.reflection),
-        }));
+        }))
     } else {
         let output = emit_wgsl_fragment_source_output(
             &graphics_source,
@@ -1278,10 +1278,10 @@ fn emit_wgsl_graphics_output(
             &bound_types,
         )
         .map_err(wgsl_text_codegen_error)?;
-        return Ok(crate::Output::WgslText(crate::WgslTextOutput {
+        Ok(crate::Output::WgslText(crate::WgslTextOutput {
             code: output.source,
             reflection: Some(output.reflection),
-        }));
+        }))
     }
 }
 

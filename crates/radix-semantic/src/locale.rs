@@ -2450,12 +2450,12 @@ impl ReaderPackToml {
     }
 }
 
+/// Interface-library identity to its members, keyed by member key.
+type LibraryMemberMap<V> = BTreeMap<InterfaceLibraryIdentity, BTreeMap<LibraryMemberKey, V>>;
+
 fn project_library_members(
     members: Vec<LibraryMemberToml>,
-) -> (
-    BTreeMap<InterfaceLibraryIdentity, BTreeMap<LibraryMemberKey, String>>,
-    BTreeMap<InterfaceLibraryIdentity, BTreeMap<LibraryMemberKey, Vec<String>>>,
-) {
+) -> (LibraryMemberMap<String>, LibraryMemberMap<Vec<String>>) {
     let mut library_members: BTreeMap<
         InterfaceLibraryIdentity,
         BTreeMap<LibraryMemberKey, String>,

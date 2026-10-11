@@ -933,6 +933,13 @@ fn apply_device_form_lowering(
     Ok(())
 }
 
+/// The validated MIR plus the route and tensor-edge-policy tables it carries.
+type LoweringValidation<'a> = (
+    ValidatedMir<'a>,
+    FxHashMap<DefId, Vec<ImportedDeviceRoute>>,
+    Vec<MirTensorEdgePolicyProvider>,
+);
+
 fn build_lowering_validation<'a>(
     unit: &'a AnalyzedModule,
     program: MirProgram,
@@ -940,14 +947,7 @@ fn build_lowering_validation<'a>(
     interner: &Interner,
     display_tokens: &radix_runtime_contract::display_tokens::DisplayTokens,
     closure_environments: &[MirClosureEnvironment],
-) -> Result<
-    (
-        ValidatedMir<'a>,
-        FxHashMap<DefId, Vec<ImportedDeviceRoute>>,
-        Vec<MirTensorEdgePolicyProvider>,
-    ),
-    Vec<MirError>,
-> {
+) -> Result<LoweringValidation<'a>, Vec<MirError>> {
     let mut maps = LoweringContextMaps::collect(unit);
     // KPC-WIRE done_when (c): the module-owned route map is transferred
     // exactly once instead of being dropped with the rest of the walk.

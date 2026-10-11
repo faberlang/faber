@@ -131,7 +131,7 @@ pub(super) fn glyph_transpose_rank_issue(
         | IndexExpr::Divide { .. } => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
         IndexExpr::Tuple(dims) => match dims.len() {
             0 | 1 => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
-            2 | _ => None,
+            _ => None,
         },
         IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => {
             Some(ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED)

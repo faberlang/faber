@@ -1755,6 +1755,13 @@ impl Lowerer<'_> {
     }
 }
 
+/// Coordinate bindings, the optional single binding, and the loop body scope.
+type IteraScopeResult = (
+    Vec<(radix_hir::DefId, radix_lexer::Symbol)>,
+    Option<(radix_hir::DefId, radix_lexer::Symbol)>,
+    HirBlock,
+);
+
 fn enter_itera_scope(
     lowerer: &mut Lowerer,
     iter_stmt: &radix_syntax::IteraStmt,
@@ -1762,11 +1769,7 @@ fn enter_itera_scope(
     binding_name: radix_lexer::Symbol,
     binding: radix_hir::DefId,
     binding_expr: &radix_syntax::Expr,
-) -> (
-    Vec<(radix_hir::DefId, radix_lexer::Symbol)>,
-    Option<(radix_hir::DefId, radix_lexer::Symbol)>,
-    HirBlock,
-) {
+) -> IteraScopeResult {
     lowerer.push_scope();
     let coordinate_bindings = iter_stmt
         .apud
