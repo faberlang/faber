@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 407
+    "analyzable": 424
   },
   "terms": [
     {
@@ -169,7 +169,7 @@
       "term": "copia",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 3
     },
     {
       "term": "cursor",
@@ -373,7 +373,7 @@
       "term": "genus",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 12
+      "analyzable": 16
     },
     {
       "term": "iace",
@@ -427,7 +427,7 @@
       "term": "importa",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 6
+      "analyzable": 7
     },
     {
       "term": "in",
@@ -487,7 +487,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 9
+      "analyzable": 13
     },
     {
       "term": "manifest",
@@ -691,7 +691,7 @@
       "term": "primus_quem",
       "rule": "concept",
       "capable": 0,
-      "analyzable": 0
+      "analyzable": 1
     },
     {
       "term": "privata",
@@ -853,7 +853,7 @@
       "term": "tabula",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 5
     },
     {
       "term": "tacebit",
@@ -889,13 +889,13 @@
       "term": "tensor",
       "rule": "type",
       "capable": 0,
-      "analyzable": 18
+      "analyzable": 20
     },
     {
       "term": "textus",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 4
     },
     {
       "term": "typus",
@@ -1108,13 +1108,13 @@
       "analyzable": 2
     },
     {
-      "term": "≢",
+      "term": "≡",
       "rule": "operator-group",
       "capable": 0,
       "analyzable": 1
     },
     {
-      "term": "≡",
+      "term": "≢",
       "rule": "operator-group",
       "capable": 0,
       "analyzable": 1

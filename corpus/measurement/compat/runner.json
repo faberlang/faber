@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 351,
-    "analyzable": 407
+    "capable": 369,
+    "analyzable": 424
   },
   "terms": [
     {
@@ -168,8 +168,8 @@
     {
       "term": "copia",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "cursor",
@@ -372,8 +372,8 @@
     {
       "term": "genus",
       "rule": "keyword",
-      "capable": 12,
-      "analyzable": 12
+      "capable": 16,
+      "analyzable": 16
     },
     {
       "term": "iace",
@@ -426,8 +426,8 @@
     {
       "term": "importa",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 6
+      "capable": 5,
+      "analyzable": 7
     },
     {
       "term": "in",
@@ -486,8 +486,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 9,
-      "analyzable": 9
+      "capable": 13,
+      "analyzable": 13
     },
     {
       "term": "manifest",
@@ -690,8 +690,8 @@
     {
       "term": "primus_quem",
       "rule": "concept",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "privata",
@@ -852,8 +852,8 @@
     {
       "term": "tabula",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 5
     },
     {
       "term": "tacebit",
@@ -888,14 +888,14 @@
     {
       "term": "tensor",
       "rule": "type",
-      "capable": 17,
-      "analyzable": 18
+      "capable": 19,
+      "analyzable": 20
     },
     {
       "term": "textus",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "typus",
@@ -1044,7 +1044,7 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 19,
+      "capable": 21,
       "analyzable": 25
     },
     {
@@ -1108,13 +1108,13 @@
       "analyzable": 2
     },
     {
-      "term": "≢",
+      "term": "≡",
       "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
     },
     {
-      "term": "≡",
+      "term": "≢",
       "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
