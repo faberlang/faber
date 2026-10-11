@@ -40,7 +40,7 @@ fn target_admits_byte_window(target: Target) -> bool {
 }
 
 /// The type behind aliases and access markers.
-fn resolved<'a>(types: &'a TypeTable, ty: TypeId) -> &'a Type {
+fn resolved(types: &TypeTable, ty: TypeId) -> &Type {
     let mut ty = types.peel_access_marker(ty).1;
     while let Type::Alias(_, inner) = types.get(ty) {
         ty = *inner;
