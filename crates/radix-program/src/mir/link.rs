@@ -2278,18 +2278,8 @@ pub(super) fn rewrite_expr(
         }
         HirExpressionKind::Ref(_, inner)
         | HirExpressionKind::Deref(inner)
-        | HirExpressionKind::Widen { operand: inner, .. } => {
-            rewrite_expr(
-                unit_path,
-                inner,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            );
-        }
-        HirExpressionKind::TypeCheck { expr: inner, .. } => {
+        | HirExpressionKind::Widen { operand: inner, .. }
+        | HirExpressionKind::TypeCheck { expr: inner, .. } => {
             rewrite_expr(
                 unit_path,
                 inner,

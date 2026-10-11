@@ -4013,8 +4013,9 @@ pub(super) fn shift_aggregate_ids(aggregate: &mut MirAggregate, offset: u32) {
         MirAggregateKind::ClosureEnvironment(id) => shift_environment_id(id, offset),
         // Struct/variant DefIds are nominal identities riding the nominal
         // remap, never the function/env merge offset.
-        MirAggregateKind::Struct(_) | MirAggregateKind::EnumVariant(_) => {}
-        MirAggregateKind::Tuple
+        MirAggregateKind::Struct(_)
+        | MirAggregateKind::EnumVariant(_)
+        | MirAggregateKind::Tuple
         | MirAggregateKind::Array
         | MirAggregateKind::Record
         | MirAggregateKind::Map
@@ -4305,8 +4306,8 @@ fn reindex_function_ids(
     display_tokens: &mut radix_module::mir::MirDisplayTokens,
 ) {
     let mut remap = HashMap::new();
-    for (index, function) in program.functions.iter().enumerate() {
-        remap.insert(function.id, MirFunctionId(index as u32));
+    for (function, index) in program.functions.iter().zip(0_u32..) {
+        remap.insert(function.id, MirFunctionId(index));
     }
     remap_device_function_metadata(device_function_metadata, &remap);
     display_tokens.by_function = std::mem::take(&mut display_tokens.by_function)
@@ -4316,8 +4317,8 @@ fn reindex_function_ids(
     let contiguous = program
         .functions
         .iter()
-        .enumerate()
-        .all(|(index, function)| function.id.0 == index as u32);
+        .zip(0_u32..)
+        .all(|(function, index)| function.id.0 == index);
     if contiguous {
         return;
     }
