@@ -622,13 +622,13 @@ impl CliBuilder<'_> {
                 AnnotationKind::Braced(braced) => {
                     match braced_optio_view_strict(braced, self.interner) {
                         BracedView::Valid(_) => {
-                            self.error(annotation.span, ISSUE_ORPHAN_CLI_SURFACE)
+                            self.error(annotation.span, ISSUE_ORPHAN_CLI_SURFACE);
                         }
                         BracedView::Malformed(error) => self.malformed_annotation(error),
                         BracedView::Absent => {
                             match braced_operandus_view_strict(braced, self.interner) {
                                 BracedView::Valid(_) => {
-                                    self.error(annotation.span, ISSUE_ORPHAN_CLI_SURFACE)
+                                    self.error(annotation.span, ISSUE_ORPHAN_CLI_SURFACE);
                                 }
                                 BracedView::Malformed(error) => self.malformed_annotation(error),
                                 BracedView::Absent => {}
@@ -703,7 +703,7 @@ impl CliBuilder<'_> {
             }
             BracedView::Malformed(error) => self.malformed_annotation(error),
             BracedView::Absent => {
-                self.collect_braced_operandus_surface(braced, span, placement, globals, local)
+                self.collect_braced_operandus_surface(braced, span, placement, globals, local);
             }
         }
     }
@@ -741,7 +741,7 @@ impl CliBuilder<'_> {
                 globals.options.push(option);
             }
             (false, SurfacePlacement::TopLevel | SurfacePlacement::Command) => {
-                local.options.push(option)
+                local.options.push(option);
             }
         }
     }
@@ -761,7 +761,7 @@ impl CliBuilder<'_> {
                 globals.operands.push(operand);
             }
             (false, SurfacePlacement::TopLevel | SurfacePlacement::Command) => {
-                local.operands.push(operand)
+                local.operands.push(operand);
             }
         }
     }

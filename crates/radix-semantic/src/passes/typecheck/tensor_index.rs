@@ -130,9 +130,8 @@ pub(super) fn glyph_transpose_rank_issue(
         | IndexExpr::Affine { .. }
         | IndexExpr::Divide { .. } => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
         IndexExpr::Tuple(dims) => match dims.len() {
-            2 => None,
             0 | 1 => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
-            _ => None,
+            2 | _ => None,
         },
         IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => {
             Some(ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED)
@@ -578,7 +577,7 @@ pub(super) fn constrain_conversio_target_hole_from_flat_count(
     }
 }
 
-/// Conversion-row twin of the from_flat method form's shape-VALUE argument:
+/// Conversion-row twin of the `from_flat` method form's shape-VALUE argument:
 /// a target figura that is a single `list<int>` value name
 /// (`data ↦ tensor<f32, shape>`) is a runtime value shape. When the binding
 /// carries a literal-list shape witness — the same fact [`shape_list_index`]
@@ -1129,7 +1128,11 @@ fn constrain_expanded_result_shape(
             let source_term = checker.types.get_index(source).clone();
             let source_extent =
                 if matches!(source_term, IndexExpr::Infer(_) | IndexExpr::Unspecified) {
-                    checker.runtime_expression_axis(receiver.id, &[], source_axis as u32)
+                    checker.runtime_expression_axis(
+                        receiver.id,
+                        &[],
+                        u32::try_from(source_axis).unwrap_or(u32::MAX),
+                    )
                 } else {
                     source
                 };
@@ -1223,16 +1226,21 @@ fn best_expanded_axis_mapping(
                 && !matches!(&target_term, IndexExpr::Literal(1));
             let unresolved = matches!(
                 (&source_term, &target_term),
-                (IndexExpr::Infer(_), _)
-                    | (_, IndexExpr::Infer(_))
-                    | (IndexExpr::Runtime(_), _)
-                    | (_, IndexExpr::Runtime(_))
-                    | (IndexExpr::Param(_), _)
-                    | (_, IndexExpr::Param(_))
-                    | (IndexExpr::Affine { .. }, _)
-                    | (_, IndexExpr::Affine { .. })
-                    | (IndexExpr::Divide { .. }, _)
-                    | (_, IndexExpr::Divide { .. })
+                (
+                    IndexExpr::Infer(_)
+                        | IndexExpr::Runtime(_)
+                        | IndexExpr::Param(_)
+                        | IndexExpr::Affine { .. }
+                        | IndexExpr::Divide { .. },
+                    _
+                ) | (
+                    _,
+                    IndexExpr::Infer(_)
+                        | IndexExpr::Runtime(_)
+                        | IndexExpr::Param(_)
+                        | IndexExpr::Affine { .. }
+                        | IndexExpr::Divide { .. }
+                )
             );
             if !exact && !stretched && !unresolved {
                 continue;
