@@ -70,7 +70,7 @@
 //!
 //! **Decision**: the device program is produced by a **device-program
 //! constructor over typed AIR/MIR facts** — never a structural clone of
-//! `radix-air/src/to_mir.rs` and never a GPU-specific relowering.
+//! `radix-air-bridge/src/to_mir.rs` and never a GPU-specific relowering.
 //!
 //! Evidence:
 //! - `to_mir.rs` is a structural per-function lowering

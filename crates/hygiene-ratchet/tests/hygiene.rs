@@ -546,8 +546,9 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // radix-air reverse-AD call graph: `CallGraphCycleError` carries
         // `functions` and `message` only. Missing field: a kind/issue
         // distinguishing cross-package call, mutual-recursion cycle and
-        // unreachable-function errors.
-        || rel == "crates/radix-air/src/reverse_ad_test.rs"
+        // unreachable-function errors. (The test moved with the AIR→MIR
+        // bridge to `radix-air-bridge` in 63dd2e9f96; the carve-out follows it.)
+        || rel == "crates/radix-air-bridge/src/reverse_ad_test.rs"
         // Device-program planning and kernel decomposition: `PlanMappingError`
         // carries `message` only. Missing field: a stable issue per plan
         // rejection (no kernel plan, binding maximum, conflicting recipes,
