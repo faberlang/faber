@@ -55,28 +55,28 @@ pub fn lower_pattern(lowerer: &mut Lowerer, pattern: &Pattern) -> HirPattern {
 
 /// Lower alternatives while preserving one binding identity for an agreeing arm.
 fn lower_or_pattern(lowerer: &mut Lowerer, alternatives: &[Pattern]) -> HirPattern {
-    let mut lowered: Vec<_> = alternatives
+    let mut lowered_patterns: Vec<_> = alternatives
         .iter()
         .map(|alternative| lower_pattern(lowerer, alternative))
         .collect();
-    let Some(first) = lowered.first() else {
+    let Some(first) = lowered_patterns.first() else {
         return HirPattern::Or(Vec::new());
     };
     let canonical = pattern_bindings(first);
-    if lowered.iter().skip(1).all(|alternative| {
+    if lowered_patterns.iter().skip(1).all(|alternative| {
         pattern_bindings(alternative)
             .iter()
             .map(|(_, name)| *name)
             .eq(canonical.iter().map(|(_, name)| *name))
     }) {
-        for alternative in lowered.iter_mut().skip(1) {
+        for alternative in lowered_patterns.iter_mut().skip(1) {
             rewrite_pattern_bindings(alternative, &canonical);
         }
         for (def_id, name) in canonical {
             lowerer.bind_local(name, def_id);
         }
     }
-    HirPattern::Or(lowered)
+    HirPattern::Or(lowered_patterns)
 }
 
 fn pattern_bindings(pattern: &HirPattern) -> Vec<(radix_hir::DefId, radix_lexer::Symbol)> {

@@ -40,13 +40,13 @@ impl InterfaceFieldDefault {
                 let snapshot = snapshot_interface_type_with_identity(
                     *ty, types, interner, resolver, identity,
                 )?;
-                *ty = TypeId(snapshots.len() as u32);
+                *ty = TypeId(u32::try_from(snapshots.len()).unwrap_or(u32::MAX));
                 snapshots.push(snapshot);
                 Ok(())
             },
             &mut |symbol| {
                 let value = interner.resolve(*symbol).to_owned();
-                *symbol = Symbol(text.len() as u32);
+                *symbol = Symbol(u32::try_from(text.len()).unwrap_or(u32::MAX));
                 text.push(value);
             },
         )?;

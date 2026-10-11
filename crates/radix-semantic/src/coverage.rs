@@ -79,19 +79,15 @@ impl HirCoverageTarget {
 #[must_use]
 pub fn from_target(target: Target) -> Option<HirCoverageTarget> {
     match target {
-        Target::MirStepper => None,
-        Target::HirRust => Some(HirCoverageTarget::Rust),
-        Target::HirTypeScript => Some(HirCoverageTarget::TypeScript),
-        Target::HirGo => Some(HirCoverageTarget::Go),
-        Target::HirSwift => None,
-        Target::HirPython => None,
-        Target::HirHaskell
+        Target::MirStepper
+        | Target::HirSwift
+        | Target::HirPython
+        | Target::HirHaskell
         | Target::HirPascal
         | Target::HirCobol
         | Target::HirFortran
-        | Target::HirOdin => None,
-        Target::HirFaber => Some(HirCoverageTarget::Faber),
-        Target::MirWasm
+        | Target::HirOdin
+        | Target::MirWasm
         | Target::MirLlvm
         | Target::MirLlvmHost
         | Target::MirAmd
@@ -104,6 +100,10 @@ pub fn from_target(target: Target) -> Option<HirCoverageTarget> {
         | Target::MirFmirBinary
         | Target::MirFmirBundle
         | Target::HirFhir => None,
+        Target::HirRust => Some(HirCoverageTarget::Rust),
+        Target::HirTypeScript => Some(HirCoverageTarget::TypeScript),
+        Target::HirGo => Some(HirCoverageTarget::Go),
+        Target::HirFaber => Some(HirCoverageTarget::Faber),
     }
 }
 
@@ -398,7 +398,10 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         | Type::Atomic(element)
         | Type::Intervallum(element)
         | Type::Option(element)
-        | Type::Ref(_, element) => vec![*element],
+        | Type::Ref(_, element)
+        | Type::BoundedArray { element, .. }
+        | Type::BoundedQueue { element, .. }
+        | Type::BoundedStack { element, .. } => vec![*element],
         Type::PromissumFailable(first, alternate) | Type::AsyncCursor(first, alternate) => {
             vec![*first, *alternate]
         }
@@ -433,9 +436,6 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         }
         Type::Union(members) | Type::Intersection(members) => members.clone(),
         Type::Tuple(elements) => elements.clone(),
-        Type::BoundedArray { element, .. }
-        | Type::BoundedQueue { element, .. }
-        | Type::BoundedStack { element, .. } => vec![*element],
         Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {
             Vec::new()
         }

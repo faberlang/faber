@@ -81,7 +81,7 @@ impl Lowerer<'_> {
             .iter()
             .enumerate()
             .map(|(ordinal, annotation)| {
-                self.annotation_ordinal = Some(ordinal as u32);
+                self.annotation_ordinal = Some(u32::try_from(ordinal).unwrap_or(u32::MAX));
                 self.annotation_field_ordinal = 0;
 
                 self.lower_annotation(annotation)
@@ -877,7 +877,8 @@ impl Lowerer<'_> {
             | Type::Promissum(inner)
             | Type::Cursor(inner)
             | Type::Intervallum(inner)
-            | Type::Alias(_, inner) => self.type_param_domain_member_is_concrete(*inner),
+            | Type::Alias(_, inner)
+            | Type::Ref(_, inner) => self.type_param_domain_member_is_concrete(*inner),
             Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
                 self.type_param_domain_member_is_concrete(*success)
                     && self.type_param_domain_member_is_concrete(*alternate)
@@ -887,7 +888,6 @@ impl Lowerer<'_> {
                     && self.type_param_domain_member_is_concrete(*value)
             }
             Type::Tensor(elem, _) => self.type_param_domain_member_is_concrete(*elem),
-            Type::Ref(_, inner) => self.type_param_domain_member_is_concrete(*inner),
             Type::Func(sig) => {
                 sig.type_params.is_empty()
                     && sig
