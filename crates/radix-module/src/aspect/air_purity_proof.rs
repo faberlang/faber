@@ -226,7 +226,12 @@ fn walk_block(block: &crate::hir::HirBlock, walk: &mut Walk) {
         match &statement.kind {
             HirStatementKind::Local(local) => walk.record_local(local),
             HirStatementKind::Redde(Some(expr)) => walk.record_value(walk_expr(expr)),
-            HirStatementKind::Redde(None) => walk.gate_rejects = true,
+            HirStatementKind::Redde(None)
+            | HirStatementKind::Rumpe
+            | HirStatementKind::Perge
+            | HirStatementKind::Tacet
+            | HirStatementKind::IncDec(_)
+            | HirStatementKind::Custodi(_) => walk.gate_rejects = true,
             HirStatementKind::Expr(_) => {
                 // The gate admits only control expressions as statement
                 // forms; every control form is outside the v1 subset and
@@ -234,11 +239,6 @@ fn walk_block(block: &crate::hir::HirBlock, walk: &mut Walk) {
                 // obligation, so one bucket suffices.
                 walk.outside_subset = true;
             }
-            HirStatementKind::Rumpe
-            | HirStatementKind::Perge
-            | HirStatementKind::Tacet
-            | HirStatementKind::IncDec(_)
-            | HirStatementKind::Custodi(_) => walk.gate_rejects = true,
         }
     }
     if let Some(expr) = &block.expr {

@@ -23,6 +23,7 @@ use radix_hir::visit::{HirVisitorMut, walk_expr_mut};
 use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
 use radix_types::{Primitive, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
+use std::fmt::Write as _;
 
 /// Renumbered id families. Each family gets its own first-occurrence counter.
 const RENUMBERED_IDS: &[&str] = &["DefId", "HirId", "InferVar", "IndexVar"];
@@ -299,7 +300,7 @@ impl<'a> Canonicalizer<'a> {
                 match usize::try_from(value).ok().and_then(|i| strings.get(i)) {
                     Some(text) => {
                         out.push_str("Symbol(");
-                        out.push_str(&format!("{text:?}"));
+                        write!(out, "{text:?}").ok();
                         out.push(')');
                     }
                     None => out.push_str("Symbol(<unresolved>)"),

@@ -87,9 +87,8 @@ pub fn serialize_cli_descriptor(program: &CliProgram) -> Vec<u8> {
     writer.bytes(CLI_DESCRIPTOR_MAGIC);
     writer.u8(CLI_DESCRIPTOR_VERSION);
     writer.u8(match program.mode {
-        CliMode::SingleCommand => 0,
+        CliMode::SingleCommand | CliMode::NotCli => 0,
         CliMode::Subcommand => 1,
-        CliMode::NotCli => 0,
     });
     writer.u8(u8::from(program.version.is_some()));
     writer.u8(u8::from(program.description.is_some()));
