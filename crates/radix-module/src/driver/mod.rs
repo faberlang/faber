@@ -575,7 +575,7 @@ fn air_validation_errors_to_spanned(errors: Vec<crate::air::AirValidationError>)
 }
 
 #[cfg(feature = "device")]
-fn air_to_mir_errors_to_spanned(errors: Vec<crate::air::AirToMirError>) -> SpannedCodegenError {
+fn air_to_mir_errors_to_spanned(errors: Vec<radix_air_bridge::AirToMirError>) -> SpannedCodegenError {
     let span = errors.first().map(|e| e.span);
     let message = errors
         .iter()
@@ -2039,9 +2039,9 @@ fn install_unannotated_companions<'a>(
                 span: None,
             }
         })?;
-        let companion_mir = crate::air::to_mir_program(
+        let companion_mir = radix_air_bridge::to_mir_program(
             &companion_program,
-            &crate::air::AirToMirContext::with_interner_and_types(
+            &radix_air_bridge::AirToMirContext::with_interner_and_types(
                 &lowered.interner,
                 lowered.validated.validation().types.as_table(),
             ),
@@ -2647,9 +2647,9 @@ fn air_mir_from_analysis(
     let air = crate::air::lower_program(&analysis.hir, &analysis.radix_lanes, &analysis.interner, &analysis.types)
         .map_err(air_lower_errors_to_spanned)?;
     crate::air::validate_program(&air).map_err(air_validation_errors_to_spanned)?;
-    let air_mir = crate::air::to_mir_program(
+    let air_mir = radix_air_bridge::to_mir_program(
         &air,
-        &crate::air::AirToMirContext::with_interner_and_types(&analysis.interner, &analysis.types),
+        &radix_air_bridge::AirToMirContext::with_interner_and_types(&analysis.interner, &analysis.types),
     )
     .map_err(air_to_mir_errors_to_spanned)?;
 
@@ -2737,8 +2737,10 @@ fn generate_air_lane_backward_with_companion<'a>(
     use crate::air::fusion::{FusionTable, fuse_companion};
     use crate::air::{
         AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef, AirCompanionRelation,
-        AirCompanionSelectedInput, AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
-        admit_generated_gradient_check, air_gradient_check_eligibility_witness,
+        AirCompanionSelectedInput, AirCompanionSelectedOutput,
+    };
+    use radix_air_bridge::{
+        AirGradientCheckAdmissionInputs, admit_generated_gradient_check, air_gradient_check_eligibility_witness,
         validate_generated_backward_to_mir_from_function, validate_mir_backward_result_contract,
     };
 
@@ -2751,7 +2753,7 @@ fn generate_air_lane_backward_with_companion<'a>(
         fuse_companion(companion.body, false)
     };
     let companion = crate::air::AirFunction { body: fused_body, ..companion };
-    let air_to_mir_context = crate::air::AirToMirContext {
+    let air_to_mir_context = radix_air_bridge::AirToMirContext {
         interner: None,
         types: Some(types_ref),
         fusion_table: if fusion_table.is_empty() {
@@ -2814,7 +2816,7 @@ fn generate_air_lane_backward_with_companion<'a>(
         .map_err(|errors| air_proof_errors_to_codegen("gradient check eligibility", &errors))?;
 
     // Build a dummy AirSameShapeTransformProof for the admission gate.
-    let dummy_proof = crate::air::AirSameShapeTransformProof {
+    let dummy_proof = radix_air_bridge::AirSameShapeTransformProof {
         relation,
         oracle_case: "",
         function: companion,
