@@ -13,8 +13,8 @@
 //!
 //! Documented budget defaults (starting anchors; head-cto confirms on land):
 //! - depth 16
-//! - 65_536 cloned MIR nodes per `Entry`
-//! - 1_024 concrete instances per `Entry`
+//! - `65_536` cloned MIR nodes per `Entry`
+//! - `1_024` concrete instances per `Entry`
 //! - 1 inline per call site
 
 use crate::diagnostics::{DiagnosticArg, arg_value};
@@ -516,7 +516,7 @@ impl CompositionPass<'_> {
                 let allowed = match caller_lane {
                     None => false,
                     Some(_) if fragment_lane.mode == MirParamMode::LaneInherited => same_name,
-                    Some(caller) => promoted || (caller.mode == MirParamMode::LaneInherited && same_name),
+                    Some(bound) => promoted || (bound.mode == MirParamMode::LaneInherited && same_name),
                 };
                 if !allowed {
                     let mut diagnostic = error(
@@ -545,76 +545,95 @@ impl CompositionPass<'_> {
                     return;
                 }
             }
-            let enclosing = nesting
-                .get(&site.block_id)
-                .and_then(|block| block.site(site.stmt_index))
-                .cloned()
-                .unwrap_or_else(|| Nesting { depth: 0, chain: Rc::clone(&root) });
-            let depth = enclosing.depth.saturating_add(1);
-            let mut chain = enclosing.chain.as_ref().clone();
-            chain.push(callee.id);
-            if depth > self.budget.max_depth {
-                self.push_expansion("depth", site.span, depth, self.budget.max_depth, &chain);
+            if !Self::expand_step(self, caller_id, &site, &callee, &mut account, &mut nesting, &root) {
                 return;
-            }
-            let cloned_nodes = count_nodes(&callee) + callee.params.len() as u32;
-            if account.nodes.saturating_add(cloned_nodes) > self.budget.max_cloned_nodes_per_entry {
-                self.push_expansion(
-                    "nodes",
-                    site.span,
-                    account.nodes.saturating_add(cloned_nodes),
-                    self.budget.max_cloned_nodes_per_entry,
-                    &chain,
-                );
-                return;
-            }
-            if account.instances.saturating_add(1) > self.budget.max_concrete_instances {
-                self.push_expansion(
-                    "instances",
-                    site.span,
-                    account.instances.saturating_add(1),
-                    self.budget.max_concrete_instances,
-                    &chain,
-                );
-                return;
-            }
-            let site_key = (
-                caller_id,
-                callee.id,
-                site.block_id,
-                site.stmt_index.map_or(u32::MAX, |index| index as u32),
-            );
-            let inlines = account
-                .sites
-                .get(&site_key)
-                .copied()
-                .unwrap_or(0)
-                .saturating_add(1);
-            if inlines > self.budget.max_inlines_per_callsite {
-                self.push_expansion("callsite", site.span, inlines, self.budget.max_inlines_per_callsite, &chain);
-                return;
-            }
-            // A failable call composes only for a callee with an error
-            // channel (U9-6b: a throwing kernel); the instantiation check has
-            // already refused any callee whose error is not a text and any
-            // caller that cannot throw.
-            if site.is_try_call && callee.error_ty.is_none() {
-                self.push_expansion("failable", site.span, 1, 0, &chain);
-                return;
-            }
-            let Some(new_blocks) = self.inline_call(caller_id, &site, &callee) else {
-                self.push_expansion("survived", site.span, 1, 0, &chain);
-                return;
-            };
-            account.nodes = account.nodes.saturating_add(cloned_nodes);
-            account.instances = account.instances.saturating_add(1);
-            account.sites.insert(site_key, inlines);
-            self.inlined.insert(callee.id);
-            let spliced = Nesting { depth, chain: Rc::new(chain) };
-            if let Some(function) = self.function(caller_id) {
-                splice_nesting(&mut nesting, function, &site, &new_blocks, &spliced);
             }
         }
+    }
+
+    /// One expansion step: gate `site` against every budget, compose it, and
+    /// record the splice. `false` means an expansion error was pushed and the
+    /// caller must stop expanding.
+    fn expand_step(
+        pass: &mut CompositionPass<'_>,
+        caller_id: MirFunctionId,
+        site: &CallSite,
+        callee: &MirFunction,
+        account: &mut Account,
+        nesting: &mut FxHashMap<MirBlockId, BlockNesting>,
+        root: &Rc<Vec<MirFunctionId>>,
+    ) -> bool {
+        let enclosing = nesting
+            .get(&site.block_id)
+            .and_then(|block| block.site(site.stmt_index))
+            .cloned()
+            .unwrap_or_else(|| Nesting { depth: 0, chain: Rc::clone(root) });
+        let depth = enclosing.depth.saturating_add(1);
+        let mut chain = enclosing.chain.as_ref().clone();
+        chain.push(callee.id);
+        if depth > pass.budget.max_depth {
+            pass.push_expansion("depth", site.span, depth, pass.budget.max_depth, &chain);
+            return false;
+        }
+        let cloned_nodes = count_nodes(callee) + u32::try_from(callee.params.len()).unwrap_or(u32::MAX);
+        if account.nodes.saturating_add(cloned_nodes) > pass.budget.max_cloned_nodes_per_entry {
+            pass.push_expansion(
+                "nodes",
+                site.span,
+                account.nodes.saturating_add(cloned_nodes),
+                pass.budget.max_cloned_nodes_per_entry,
+                &chain,
+            );
+            return false;
+        }
+        if account.instances.saturating_add(1) > pass.budget.max_concrete_instances {
+            pass.push_expansion(
+                "instances",
+                site.span,
+                account.instances.saturating_add(1),
+                pass.budget.max_concrete_instances,
+                &chain,
+            );
+            return false;
+        }
+        let site_key = (
+            caller_id,
+            callee.id,
+            site.block_id,
+            site.stmt_index
+                .map_or(u32::MAX, |index| u32::try_from(index).unwrap_or(u32::MAX)),
+        );
+        let inlines = account
+            .sites
+            .get(&site_key)
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(1);
+        if inlines > pass.budget.max_inlines_per_callsite {
+            pass.push_expansion("callsite", site.span, inlines, pass.budget.max_inlines_per_callsite, &chain);
+            return false;
+        }
+        // A failable call composes only for a callee with an error
+        // channel (U9-6b: a throwing kernel); the instantiation check has
+        // already refused any callee whose error is not a text and any
+        // caller that cannot throw.
+        if site.is_try_call && callee.error_ty.is_none() {
+            pass.push_expansion("failable", site.span, 1, 0, &chain);
+            return false;
+        }
+        let Some(new_blocks) = pass.inline_call(caller_id, site, callee) else {
+            pass.push_expansion("survived", site.span, 1, 0, &chain);
+            return false;
+        };
+        account.nodes = account.nodes.saturating_add(cloned_nodes);
+        account.instances = account.instances.saturating_add(1);
+        account.sites.insert(site_key, inlines);
+        pass.inlined.insert(callee.id);
+        let spliced = Nesting { depth, chain: Rc::new(chain) };
+        if let Some(function) = pass.function(caller_id) {
+            splice_nesting(nesting, function, site, &new_blocks, &spliced);
+        }
+        true
     }
 
     fn add_propagated_lane_param(&mut self, caller_id: MirFunctionId, fragment_lane: &MirParam) {
@@ -662,23 +681,23 @@ impl CompositionPass<'_> {
             .function(caller_id)
             .and_then(lane_param)
             .map(|param| param.local);
-        let caller = &mut self.functions[caller_index];
-        if site.block_index >= caller.blocks.len() {
+        let target = &mut self.functions[caller_index];
+        if site.block_index >= target.blocks.len() {
             return None;
         }
-        let try_route = try_route_of(caller, site);
+        let try_route = try_route_of(target, site);
         if site.is_try_call && try_route.is_none() {
             return None;
         }
         let stmt_index = match site.stmt_index {
             Some(index) => index,
-            None if try_route.is_some() => caller.blocks[site.block_index].statements.len(),
+            None if try_route.is_some() => target.blocks[site.block_index].statements.len(),
             None => return None,
         };
-        if try_route.is_none() && stmt_index >= caller.blocks[site.block_index].statements.len() {
+        if try_route.is_none() && stmt_index >= target.blocks[site.block_index].statements.len() {
             return None;
         }
-        let mut ids = IdGen::from_function(caller);
+        let mut ids = IdGen::from_function(target);
         let mut alpha = Alpha::default();
         let mut binds = Vec::new();
         // GEA3-A2b: an `in` (MutRef) parameter carries mutating ownership, so
@@ -709,7 +728,7 @@ impl CompositionPass<'_> {
             }
             let new_local = ids.next_local();
             alpha.locals.insert(param.local, new_local);
-            caller.locals.push(MirLocal {
+            target.locals.push(MirLocal {
                 id: new_local,
                 name: param.name,
                 ty: param.ty,
@@ -732,6 +751,19 @@ impl CompositionPass<'_> {
                 mut_writebacks.push((place, new_local, ty));
             }
         }
+        Self::rename_inline_locals(target, &mut alpha, &mut ids, callee, caller_lane_local);
+        Self::emit_inline(target, site, callee, &mut alpha, &mut ids, binds, &mut_writebacks)
+    }
+
+    /// Alpha-rename the callee's lane binding, then every callee local and
+    /// temp the argument binding pass did not already map.
+    fn rename_inline_locals(
+        target: &mut MirFunction,
+        alpha: &mut Alpha,
+        ids: &mut IdGen,
+        callee: &MirFunction,
+        caller_lane_local: Option<MirLocalId>,
+    ) {
         if let Some(fragment_lane) = lane_param(callee)
             && let Some(caller_lane_local) = caller_lane_local
         {
@@ -743,7 +775,7 @@ impl CompositionPass<'_> {
             }
             let new_local = ids.next_local();
             alpha.locals.insert(local.id, new_local);
-            caller.locals.push(MirLocal {
+            target.locals.push(MirLocal {
                 id: new_local,
                 name: local.name,
                 ty: local.ty,
@@ -754,16 +786,35 @@ impl CompositionPass<'_> {
         for temp in &callee.temps {
             let new_temp = ids.next_temp();
             alpha.temps.insert(temp.id, new_temp);
-            caller
+            target
                 .temps
                 .push(MirTemp { id: new_temp, ty: temp.ty, span: temp.span });
         }
+    }
+
+    /// Splice the alpha-renamed callee body into `target`'s call block,
+    /// connecting the cloned return edges to the caller continuation.
+    fn emit_inline(
+        target: &mut MirFunction,
+        site: &CallSite,
+        callee: &MirFunction,
+        alpha: &mut Alpha,
+        ids: &mut IdGen,
+        binds: Vec<MirStatement>,
+        mut_writebacks: &[(MirPlace, MirLocalId, MirType)],
+    ) -> Option<InlineBlocks> {
+        let try_route = try_route_of(target, site);
+        let stmt_index = match site.stmt_index {
+            Some(index) => index,
+            None if try_route.is_some() => target.blocks[site.block_index].statements.len(),
+            None => return None,
+        };
         let dest_ty = site
             .destination
             .as_ref()
-            .and_then(|place| place_ty(caller, place))
+            .and_then(|place| place_ty(target, place))
             .unwrap_or(callee.return_ty);
-        let block = &mut caller.blocks[site.block_index];
+        let block = &mut target.blocks[site.block_index];
         if try_route.is_none() && stmt_index >= block.statements.len() {
             return None;
         }
@@ -785,35 +836,7 @@ impl CompositionPass<'_> {
             && callee.blocks.len() == 1
             && matches!(callee.blocks[0].terminator.kind, MirTerminatorKind::Return(_))
         {
-            let callee_block = &callee.blocks[0];
-            let mut spliced: Vec<_> = callee_block
-                .statements
-                .iter()
-                .map(|stmt| remap_stmt(stmt, &mut alpha, &mut ids))
-                .collect();
-            // GEA3-A2b: publish mut-output clones after the callee body and
-            // before the result assign, so a destination overlapping a mut
-            // place keeps call semantics (param writes precede the
-            // return-value assign).
-            for (place, local, ty) in &mut_writebacks {
-                spliced.push(writeback_stmt(place, *local, *ty, callee_block.terminator.span, &mut ids));
-            }
-            if let (Some(dest), MirTerminatorKind::Return(Some(operand))) =
-                (site.destination.as_ref(), &callee_block.terminator.kind)
-            {
-                spliced.push(MirStatement {
-                    kind: MirStatementKind::Assign {
-                        place: dest.clone(),
-                        value: MirValue {
-                            id: ids.next_value(),
-                            kind: MirValueKind::Operand(alpha.operand(operand, &mut ids)),
-                            ty: dest_ty,
-                            span: callee_block.terminator.span,
-                        },
-                    },
-                    span: callee_block.terminator.span,
-                });
-            }
+            let spliced = Self::direct_splice_statements(&callee.blocks[0], site, dest_ty, alpha, ids, mut_writebacks);
             block.statements.extend(binds);
             block.statements.extend(spliced);
             block.statements.extend(tail);
@@ -834,12 +857,12 @@ impl CompositionPass<'_> {
         for block in &callee.blocks {
             let mapped = remap_and_connect(
                 block,
-                &mut alpha,
-                &mut ids,
+                alpha,
+                ids,
                 site.destination.as_ref(),
                 continue_id,
                 dest_ty,
-                &mut_writebacks,
+                mut_writebacks,
                 try_route
                     .as_ref()
                     .map(|route| (route, callee.error_ty.unwrap_or(callee.return_ty))),
@@ -853,17 +876,58 @@ impl CompositionPass<'_> {
         );
         block.statements.extend(binds);
         if let Some(route) = &try_route {
-            caller.blocks.extend(cloned);
+            target.blocks.extend(cloned);
             if route.propagates {
-                drop_unreferenced_block(caller, route.error_block);
+                drop_unreferenced_block(target, route.error_block);
             }
             return Some(InlineBlocks { cloned: cloned_ids, continue_id: None });
         }
-        caller
+        target
             .blocks
             .push(MirBlock { id: continue_id, statements: tail, terminator: old_term, span: site.span });
-        caller.blocks.extend(cloned);
+        target.blocks.extend(cloned);
         Some(InlineBlocks { cloned: cloned_ids, continue_id: Some(continue_id) })
+    }
+
+    /// Statements for the CDC-3 direct splice: the remapped callee body,
+    /// mut-output writebacks, and the result assign.
+    fn direct_splice_statements(
+        callee_block: &MirBlock,
+        site: &CallSite,
+        dest_ty: MirType,
+        alpha: &mut Alpha,
+        ids: &mut IdGen,
+        mut_writebacks: &[(MirPlace, MirLocalId, MirType)],
+    ) -> Vec<MirStatement> {
+        let mut spliced: Vec<_> = callee_block
+            .statements
+            .iter()
+            .map(|stmt| remap_stmt(stmt, alpha, ids))
+            .collect();
+        // GEA3-A2b: publish mut-output clones after the callee body and
+        // before the result assign, so a destination overlapping a mut
+        // place keeps call semantics (param writes precede the
+        // return-value assign).
+        for (place, local, ty) in mut_writebacks {
+            spliced.push(writeback_stmt(place, *local, *ty, callee_block.terminator.span, ids));
+        }
+        if let (Some(dest), MirTerminatorKind::Return(Some(operand))) =
+            (site.destination.as_ref(), &callee_block.terminator.kind)
+        {
+            spliced.push(MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: dest.clone(),
+                    value: MirValue {
+                        id: ids.next_value(),
+                        kind: MirValueKind::Operand(alpha.operand(operand, ids)),
+                        ty: dest_ty,
+                        span: callee_block.terminator.span,
+                    },
+                },
+                span: callee_block.terminator.span,
+            });
+        }
+        spliced
     }
 
     fn push_expansion(&mut self, reason: &'static str, span: Span, observed: u32, limit: u32, chain: &[MirFunctionId]) {
@@ -1243,7 +1307,7 @@ fn count_nodes(function: &MirFunction) -> u32 {
     let stmts = function
         .blocks
         .iter()
-        .map(|block| block.statements.len() as u32 + 1)
+        .map(|block| u32::try_from(block.statements.len()).unwrap_or(u32::MAX) + 1)
         .sum::<u32>();
     stmts + function.locals.len() as u32 + function.temps.len() as u32 + function.blocks.len() as u32
 }
