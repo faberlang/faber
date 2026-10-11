@@ -657,160 +657,11 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             self.allows_structured_nested_indexed_write_loop_break;
         let previous_allows_structured_nested_indexed_write_loop_continue =
             self.allows_structured_nested_indexed_write_loop_continue;
-        self.in_device_function = self.device.role_for_function(function).is_some();
-        self.allows_structured_return_branch = false;
-        self.allows_structured_indexed_write_branch = false;
-        self.allows_structured_indexed_write_goto = false;
-        self.allows_structured_indexed_write_loop = false;
-        self.allows_structured_indexed_write_loop_break = false;
-        self.allows_structured_indexed_write_loop_continue = false;
-        self.allows_structured_indexed_write_switch = false;
-        self.allows_structured_indexed_value_join_branch = false;
-        self.allows_structured_value_join_branch = false;
-        self.allows_structured_scalar_switch = false;
-        self.allows_structured_scalar_loop = false;
-        self.allows_structured_scalar_loop_break = false;
-        self.allows_structured_scalar_loop_continue = false;
-        self.allows_structured_scalar_return_goto = false;
-        self.allows_structured_nested_scalar_loop_branch = false;
-        self.allows_structured_nested_indexed_write_loop_branch = false;
-        self.allows_structured_nested_indexed_write_loop_break = false;
-        self.allows_structured_nested_indexed_write_loop_continue = false;
+        enter_device_function(self, function);
 
         if self.in_device_function {
-            self.in_lane_form_function = is_structurizable_lane_form(function)
-                || (self.reduction_terms.contains(&function.id)
-                    && crate::structurize::structurize_duplicating_tails(function).is_ok());
-            self.genus_params = self.resolved_genus_params(function);
-            let allows_structured_return_branch = is_structured_return_branch(function);
-            let allows_structured_indexed_write_branch =
-                is_structured_indexed_write_branch(function);
-            let allows_structured_indexed_write_goto = is_structured_indexed_write_goto(function);
-            let allows_structured_indexed_write_loop = is_structured_indexed_write_loop(function);
-            let allows_structured_indexed_write_loop_break =
-                is_structured_indexed_write_loop_break(function);
-            let allows_structured_indexed_write_loop_continue =
-                is_structured_indexed_write_loop_continue(function);
-            let allows_structured_indexed_write_switch =
-                is_structured_indexed_write_switch(function);
-            let allows_structured_indexed_value_join_branch =
-                is_structured_indexed_value_join_branch(function);
-            let allows_structured_value_join_branch = is_structured_value_join_branch(function);
-            let allows_structured_scalar_switch = is_structured_scalar_switch(function);
-            let allows_structured_scalar_loop = is_structured_scalar_loop(function);
-            let allows_structured_scalar_loop_break = is_structured_scalar_loop_break(function);
-            let allows_structured_scalar_loop_continue =
-                is_structured_scalar_loop_continue(function);
-            let allows_structured_scalar_return_goto = is_structured_scalar_return_goto(function);
-            let allows_structured_nested_scalar_loop_branch =
-                is_structured_nested_scalar_loop_branch(function);
-            let allows_structured_nested_indexed_write_loop_branch =
-                is_structured_nested_indexed_write_loop_branch(function);
-            let allows_structured_nested_indexed_write_loop_break =
-                is_structured_nested_indexed_write_loop_break(function);
-            let allows_structured_nested_indexed_write_loop_continue =
-                is_structured_nested_indexed_write_loop_continue(function);
-            self.allows_structured_return_branch = allows_structured_return_branch;
-            self.allows_structured_indexed_write_branch = allows_structured_indexed_write_branch;
-            self.allows_structured_indexed_write_goto = allows_structured_indexed_write_goto;
-            self.allows_structured_indexed_write_loop = allows_structured_indexed_write_loop;
-            self.allows_structured_indexed_write_loop_break =
-                allows_structured_indexed_write_loop_break;
-            self.allows_structured_indexed_write_loop_continue =
-                allows_structured_indexed_write_loop_continue;
-            self.allows_structured_indexed_write_switch = allows_structured_indexed_write_switch;
-            self.allows_structured_indexed_value_join_branch =
-                allows_structured_indexed_value_join_branch;
-            self.allows_structured_value_join_branch = allows_structured_value_join_branch;
-            self.allows_structured_scalar_switch = allows_structured_scalar_switch;
-            self.allows_structured_scalar_loop = allows_structured_scalar_loop;
-            self.allows_structured_scalar_loop_break = allows_structured_scalar_loop_break;
-            self.allows_structured_scalar_loop_continue = allows_structured_scalar_loop_continue;
-            self.allows_structured_scalar_return_goto = allows_structured_scalar_return_goto;
-            self.allows_structured_nested_scalar_loop_branch =
-                allows_structured_nested_scalar_loop_branch;
-            self.allows_structured_nested_indexed_write_loop_branch =
-                allows_structured_nested_indexed_write_loop_branch;
-            self.allows_structured_nested_indexed_write_loop_break =
-                allows_structured_nested_indexed_write_loop_break;
-            self.allows_structured_nested_indexed_write_loop_continue =
-                allows_structured_nested_indexed_write_loop_continue;
-            if function.is_async || function.is_generator {
-                self.record_policy(SHAPE_ASYNC_GENERATOR_DEVICE_FN);
-            }
-            if function.blocks.len() != 1
-                && !allows_structured_return_branch
-                && !allows_structured_indexed_write_branch
-                && !allows_structured_indexed_write_goto
-                && !allows_structured_indexed_write_loop
-                && !allows_structured_indexed_write_loop_break
-                && !allows_structured_indexed_write_loop_continue
-                && !allows_structured_indexed_write_switch
-                && !allows_structured_indexed_value_join_branch
-                && !allows_structured_value_join_branch
-                && !allows_structured_scalar_switch
-                && !allows_structured_scalar_loop
-                && !allows_structured_scalar_loop_break
-                && !allows_structured_scalar_loop_continue
-                && !allows_structured_scalar_return_goto
-                && !allows_structured_nested_scalar_loop_branch
-                && !allows_structured_nested_indexed_write_loop_branch
-                && !allows_structured_nested_indexed_write_loop_break
-                && !allows_structured_nested_indexed_write_loop_continue
-                && !self.in_lane_form_function
-            {
-                self.record_policy(SHAPE_DEVICE_MULTI_BLOCK_CFG);
-            }
-            self.throw_slots = crate::abi::throw_sites(function, self.types).map(|sites| {
-                sites
-                    .into_iter()
-                    .filter_map(|site| site.slot)
-                    .collect::<Vec<_>>()
-            });
-            if function.error_ty.is_some() && self.throw_slots.is_none() {
-                self.record_abi(SHAPE_FAILABLE_DEVICE_FN);
-            }
-            // S3-A1: a result-tuple return is the multi-output kernel contract —
-            // the tuple elements are DISTINCT device output resources (the ABI
-            // lowers them via `multi_output_return_kernel`). Classify each
-            // element instead of the aggregate tuple, which would otherwise
-            // record a "device aggregate value type" gap on a valid contract.
-            match self.types.get(function.return_ty.semantic_id()) {
-                Type::Tuple(elements) if !elements.is_empty() => {
-                    for element in elements {
-                        self.check_device_type(MirType::semantic(*element));
-                    }
-                }
-                _ => self.check_device_type(function.return_ty),
-            }
-            if let Some(error_ty) = function.error_ty
-                && self.throw_slots.is_none()
-            {
-                self.check_device_type(error_ty);
-            }
-            // S5-W-A1: the dead fold-artifact slots (shape-list / vacua
-            // `Array`/`Tensor` slots nothing reads) are precomputed so the
-            // local, temp, and construct checks admit them exactly as the
-            // emitters' S5-U2c skip does.
-            self.dead_fold_artifact_slots = dead_fold_artifact_slots(function, self.types);
-            // a0184031: the dead non-kernel-scalar const-copy slots (i64
-            // axis-const locals/temps nothing reads) are precomputed so the
-            // local/temp declarations and the const-copy statement checks
-            // admit them exactly as the emitters' dead-skip does (Metal
-            // 26424928f Gap 1; NVVM emits the harmless native-i64 store).
-            self.dead_const_copy_slots = dead_non_kernel_scalar_const_slots(function, self.layouts);
-            self.literal_indexed_access =
-                LiteralIndexedAccessPlan::for_function(function, self.types);
-            // S5A-U4: the output-set tuple aggregation slots of this function
-            // (its own result-tuple return aggregation plus a decomposed
-            // multi-output source's kept result-tuple local) — the ONLY
-            // tuple-typed slots the gate admits. Computed per function from
-            // the decomposition's explicit fact; no source-wide `DefId`
-            // allowance.
-            self.result_aggregation_slots =
-                crate::kernel_decomposition::multi_output_result_aggregation_slots(
-                    function, self.types,
-                );
+            classify_structured_allowances(self, function);
+            classify_device_function_slots(self, function);
             crate::visit::walk_function(self, function);
         }
 
@@ -904,39 +755,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
         self.check_genus_write(stmt);
         match &stmt.kind {
             MirStatementKind::Assign { place, value } => {
-                // S5-W-A1: a dead fold-artifact store — a shape-list/vacua
-                // value written into a dead fold-artifact slot (the fold's
-                // temp→local forward, `Local(l) ← Temp(t)`, whose local
-                // nothing reads). The emitters skip the dead store (S5-U2c),
-                // so the gate walks only the destination place, not the
-                // artifact value (whose Array/Tensor type would otherwise
-                // record the aggregate diagnostic).
-                if is_fold_artifact_type(self.types, value.ty)
-                    && self.dead_fold_artifact_slots.contains(&place.base)
-                {
-                    self.visit_place(place);
-                } else if place.projections.is_empty() && self.is_throw_slot(&place.base) {
-                    // U9-6: the constant text of a throw site; the device never
-                    // materializes it, the fault site names it.
-                    self.visit_place(place);
-                } else if self.is_dead_non_kernel_scalar_const_copy(place, value) {
-                    // a0184031: a DEAD const-copy whose value is a scalar the
-                    // kernel surface cannot express (the LayerNorm lowering's
-                    // i64 axis const — the recipe call carries the axis
-                    // directly, so the const local is never read) fails the
-                    // layout gate before any use. The Metal emitter skips
-                    // exactly this statement (26424928f Gap 1) and the NVVM
-                    // emitter emits it as a harmless native-i64 slot store,
-                    // so the gate walks only the destination place, not the
-                    // non-kernel-scalar value. The skip is format/legality-
-                    // only: the CTO council constraints (5f1b1348) are all
-                    // proven structurally (see `is_dead_non_kernel_scalar_
-                    // const_copy`) — a LIVE or merely-difficult i64 stays
-                    // fail-closed with the layout diagnostics.
-                    self.visit_place(place);
-                } else {
-                    crate::visit::walk_stmt(self, stmt);
-                }
+                classify_assign_statement(self, stmt, place, value);
             }
             MirStatementKind::Call { .. } => self.record_policy(SHAPE_DEVICE_FUNCTION_CALL),
             MirStatementKind::RuntimeCall { call, .. }
@@ -956,15 +775,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                         ..
                     },
             } if self.literal_indexed_access.is_some() => {
-                if let Some(destination) = destination {
-                    self.visit_place(destination);
-                }
-                if let Some(receiver) = args.first() {
-                    self.visit_operand(receiver);
-                }
-                if args.len() == 3 {
-                    self.visit_operand(&args[2]);
-                }
+                classify_literal_indexed_access(self, destination, args);
             }
             MirStatementKind::RuntimeCall {
                 call:
@@ -1079,62 +890,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // offending collection op — the first CUDA dense run died
             // unnamed; a diagnostic must not be vaguer than the fact.
             MirStatementKind::RuntimeCall { call, .. } => {
-                let op_name = runtime_call_op_name(&call.intrinsic);
-                let shape = if op_name.is_empty() {
-                    SHAPE_KERNEL_RUNTIME_CALL.to_owned()
-                } else {
-                    format!("{SHAPE_KERNEL_RUNTIME_CALL} {op_name}")
-                };
-                self.record_policy(shape);
+                reject_runtime_call(self, call);
             }
             MirStatementKind::Construct {
                 aggregate,
                 destination,
             } => {
-                // S3-A1: a Tuple construct is the multi-output result
-                // aggregation — the ABI lowers it to DISTINCT output
-                // resources; the container is not a device value.
-                //
-                // S5-W-A1: a DEAD fold-artifact Array/Tensor construct —
-                // the static-shape fold's shape-list (`Array`) / vacua
-                // (`Tensor`) artifacts, written to a destination nothing
-                // reads — is skipped by both emitters (S5-U2c) and must
-                // pass the gate; a LIVE Array/Tensor construct is a true
-                // unplannable kernel aggregate and stays fail-closed with
-                // the aggregate diagnostics (the statement and its
-                // aggregate type are both skipped from classification).
-                let literal_index = self
-                    .literal_indexed_access
-                    .as_ref()
-                    .is_some_and(|plan| plan.is_index_slot(destination));
-                if literal_index {
-                    self.visit_place(destination);
-                    return;
-                }
-                let dead_fold_artifact = self.dead_fold_artifact_slots.contains(&destination.base)
-                    && matches!(
-                        aggregate.kind,
-                        MirAggregateKind::Array | MirAggregateKind::Tensor
-                    );
-                if !dead_fold_artifact
-                    && !matches!(
-                        aggregate.kind,
-                        MirAggregateKind::Vector
-                            | MirAggregateKind::Matrix
-                            | MirAggregateKind::Tuple
-                    )
-                {
-                    self.record_policy(SHAPE_KERNEL_AGGREGATE_CONSTRUCT);
-                }
-                if dead_fold_artifact {
-                    // The destination place is still walked (a write to a
-                    // plain slot); the aggregate — and its non-scalar type —
-                    // is not classified, matching the emitters' whole-
-                    // construct skip.
-                    self.visit_place(destination);
-                } else {
-                    crate::visit::walk_stmt(self, stmt);
-                }
+                classify_construct_statement(self, stmt, aggregate, destination);
             }
         }
     }
@@ -1278,6 +1040,291 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             crate::visit::walk_aggregate(self, aggregate);
         }
     }
+}
+
+fn classify_assign_statement(
+    classifier: &mut DeviceSafeClassifier<'_>,
+    stmt: &MirStatement,
+    place: &MirPlace,
+    value: &MirValue,
+) {
+    // S5-W-A1: a dead fold-artifact store — a shape-list/vacua
+    // value written into a dead fold-artifact slot (the fold's
+    // temp→local forward, `Local(l) ← Temp(t)`, whose local
+    // nothing reads). The emitters skip the dead store (S5-U2c),
+    // so the gate walks only the destination place, not the
+    // artifact value (whose Array/Tensor type would otherwise
+    // record the aggregate diagnostic).
+    if is_fold_artifact_type(classifier.types, value.ty)
+        && classifier.dead_fold_artifact_slots.contains(&place.base)
+    {
+        classifier.visit_place(place);
+    } else if place.projections.is_empty() && classifier.is_throw_slot(&place.base) {
+        // U9-6: the constant text of a throw site; the device never
+        // materializes it, the fault site names it.
+        classifier.visit_place(place);
+    } else if classifier.is_dead_non_kernel_scalar_const_copy(place, value) {
+        // a0184031: a DEAD const-copy whose value is a scalar the
+        // kernel surface cannot express (the LayerNorm lowering's
+        // i64 axis const — the recipe call carries the axis
+        // directly, so the const local is never read) fails the
+        // layout gate before any use. The Metal emitter skips
+        // exactly this statement (26424928f Gap 1) and the NVVM
+        // emitter emits it as a harmless native-i64 slot store,
+        // so the gate walks only the destination place, not the
+        // non-kernel-scalar value. The skip is format/legality-
+        // only: the CTO council constraints (5f1b1348) are all
+        // proven structurally (see `is_dead_non_kernel_scalar_
+        // const_copy`) — a LIVE or merely-difficult i64 stays
+        // fail-closed with the layout diagnostics.
+        classifier.visit_place(place);
+    } else {
+        crate::visit::walk_stmt(classifier, stmt);
+    }
+}
+
+fn classify_construct_statement(
+    classifier: &mut DeviceSafeClassifier<'_>,
+    stmt: &MirStatement,
+    aggregate: &MirAggregate,
+    destination: &MirPlace,
+) {
+    // S3-A1: a Tuple construct is the multi-output result
+    // aggregation — the ABI lowers it to DISTINCT output
+    // resources; the container is not a device value.
+    //
+    // S5-W-A1: a DEAD fold-artifact Array/Tensor construct —
+    // the static-shape fold's shape-list (`Array`) / vacua
+    // (`Tensor`) artifacts, written to a destination nothing
+    // reads — is skipped by both emitters (S5-U2c) and must
+    // pass the gate; a LIVE Array/Tensor construct is a true
+    // unplannable kernel aggregate and stays fail-closed with
+    // the aggregate diagnostics (the statement and its
+    // aggregate type are both skipped from classification).
+    let literal_index = classifier
+        .literal_indexed_access
+        .as_ref()
+        .is_some_and(|plan| plan.is_index_slot(destination));
+    if literal_index {
+        classifier.visit_place(destination);
+        return;
+    }
+    let dead_fold_artifact = classifier
+        .dead_fold_artifact_slots
+        .contains(&destination.base)
+        && matches!(
+            aggregate.kind,
+            MirAggregateKind::Array | MirAggregateKind::Tensor
+        );
+    if !dead_fold_artifact
+        && !matches!(
+            aggregate.kind,
+            MirAggregateKind::Vector | MirAggregateKind::Matrix | MirAggregateKind::Tuple
+        )
+    {
+        classifier.record_policy(SHAPE_KERNEL_AGGREGATE_CONSTRUCT);
+    }
+    if dead_fold_artifact {
+        // The destination place is still walked (a write to a
+        // plain slot); the aggregate — and its non-scalar type —
+        // is not classified, matching the emitters' whole-
+        // construct skip.
+        classifier.visit_place(destination);
+    } else {
+        crate::visit::walk_stmt(classifier, stmt);
+    }
+}
+
+fn classify_literal_indexed_access(
+    classifier: &mut DeviceSafeClassifier<'_>,
+    destination: &Option<MirPlace>,
+    args: &[MirOperand],
+) {
+    if let Some(destination) = destination {
+        classifier.visit_place(destination);
+    }
+    if let Some(receiver) = args.first() {
+        classifier.visit_operand(receiver);
+    }
+    if args.len() == 3 {
+        classifier.visit_operand(&args[2]);
+    }
+}
+
+fn reject_runtime_call(classifier: &mut DeviceSafeClassifier<'_>, call: &MirRuntimeCall) {
+    let op_name = runtime_call_op_name(&call.intrinsic);
+    let shape = if op_name.is_empty() {
+        SHAPE_KERNEL_RUNTIME_CALL.to_owned()
+    } else {
+        format!("{SHAPE_KERNEL_RUNTIME_CALL} {op_name}")
+    };
+    classifier.record_policy(shape);
+}
+
+fn enter_device_function(classifier: &mut DeviceSafeClassifier<'_>, function: &MirFunction) {
+    classifier.in_device_function = classifier.device.role_for_function(function).is_some();
+    classifier.allows_structured_return_branch = false;
+    classifier.allows_structured_indexed_write_branch = false;
+    classifier.allows_structured_indexed_write_goto = false;
+    classifier.allows_structured_indexed_write_loop = false;
+    classifier.allows_structured_indexed_write_loop_break = false;
+    classifier.allows_structured_indexed_write_loop_continue = false;
+    classifier.allows_structured_indexed_write_switch = false;
+    classifier.allows_structured_indexed_value_join_branch = false;
+    classifier.allows_structured_value_join_branch = false;
+    classifier.allows_structured_scalar_switch = false;
+    classifier.allows_structured_scalar_loop = false;
+    classifier.allows_structured_scalar_loop_break = false;
+    classifier.allows_structured_scalar_loop_continue = false;
+    classifier.allows_structured_scalar_return_goto = false;
+    classifier.allows_structured_nested_scalar_loop_branch = false;
+    classifier.allows_structured_nested_indexed_write_loop_branch = false;
+    classifier.allows_structured_nested_indexed_write_loop_break = false;
+    classifier.allows_structured_nested_indexed_write_loop_continue = false;
+}
+
+fn classify_structured_allowances(
+    classifier: &mut DeviceSafeClassifier<'_>,
+    function: &MirFunction,
+) {
+    classifier.in_lane_form_function = is_structurizable_lane_form(function)
+        || (classifier.reduction_terms.contains(&function.id)
+            && crate::structurize::structurize_duplicating_tails(function).is_ok());
+    classifier.genus_params = classifier.resolved_genus_params(function);
+    let allows_structured_return_branch = is_structured_return_branch(function);
+    let allows_structured_indexed_write_branch = is_structured_indexed_write_branch(function);
+    let allows_structured_indexed_write_goto = is_structured_indexed_write_goto(function);
+    let allows_structured_indexed_write_loop = is_structured_indexed_write_loop(function);
+    let allows_structured_indexed_write_loop_break =
+        is_structured_indexed_write_loop_break(function);
+    let allows_structured_indexed_write_loop_continue =
+        is_structured_indexed_write_loop_continue(function);
+    let allows_structured_indexed_write_switch = is_structured_indexed_write_switch(function);
+    let allows_structured_indexed_value_join_branch =
+        is_structured_indexed_value_join_branch(function);
+    let allows_structured_value_join_branch = is_structured_value_join_branch(function);
+    let allows_structured_scalar_switch = is_structured_scalar_switch(function);
+    let allows_structured_scalar_loop = is_structured_scalar_loop(function);
+    let allows_structured_scalar_loop_break = is_structured_scalar_loop_break(function);
+    let allows_structured_scalar_loop_continue = is_structured_scalar_loop_continue(function);
+    let allows_structured_scalar_return_goto = is_structured_scalar_return_goto(function);
+    let allows_structured_nested_scalar_loop_branch =
+        is_structured_nested_scalar_loop_branch(function);
+    let allows_structured_nested_indexed_write_loop_branch =
+        is_structured_nested_indexed_write_loop_branch(function);
+    let allows_structured_nested_indexed_write_loop_break =
+        is_structured_nested_indexed_write_loop_break(function);
+    let allows_structured_nested_indexed_write_loop_continue =
+        is_structured_nested_indexed_write_loop_continue(function);
+    classifier.allows_structured_return_branch = allows_structured_return_branch;
+    classifier.allows_structured_indexed_write_branch = allows_structured_indexed_write_branch;
+    classifier.allows_structured_indexed_write_goto = allows_structured_indexed_write_goto;
+    classifier.allows_structured_indexed_write_loop = allows_structured_indexed_write_loop;
+    classifier.allows_structured_indexed_write_loop_break =
+        allows_structured_indexed_write_loop_break;
+    classifier.allows_structured_indexed_write_loop_continue =
+        allows_structured_indexed_write_loop_continue;
+    classifier.allows_structured_indexed_write_switch = allows_structured_indexed_write_switch;
+    classifier.allows_structured_indexed_value_join_branch =
+        allows_structured_indexed_value_join_branch;
+    classifier.allows_structured_value_join_branch = allows_structured_value_join_branch;
+    classifier.allows_structured_scalar_switch = allows_structured_scalar_switch;
+    classifier.allows_structured_scalar_loop = allows_structured_scalar_loop;
+    classifier.allows_structured_scalar_loop_break = allows_structured_scalar_loop_break;
+    classifier.allows_structured_scalar_loop_continue = allows_structured_scalar_loop_continue;
+    classifier.allows_structured_scalar_return_goto = allows_structured_scalar_return_goto;
+    classifier.allows_structured_nested_scalar_loop_branch =
+        allows_structured_nested_scalar_loop_branch;
+    classifier.allows_structured_nested_indexed_write_loop_branch =
+        allows_structured_nested_indexed_write_loop_branch;
+    classifier.allows_structured_nested_indexed_write_loop_break =
+        allows_structured_nested_indexed_write_loop_break;
+    classifier.allows_structured_nested_indexed_write_loop_continue =
+        allows_structured_nested_indexed_write_loop_continue;
+    if function.is_async || function.is_generator {
+        classifier.record_policy(SHAPE_ASYNC_GENERATOR_DEVICE_FN);
+    }
+    if function.blocks.len() != 1
+        && !allows_structured_return_branch
+        && !allows_structured_indexed_write_branch
+        && !allows_structured_indexed_write_goto
+        && !allows_structured_indexed_write_loop
+        && !allows_structured_indexed_write_loop_break
+        && !allows_structured_indexed_write_loop_continue
+        && !allows_structured_indexed_write_switch
+        && !allows_structured_indexed_value_join_branch
+        && !allows_structured_value_join_branch
+        && !allows_structured_scalar_switch
+        && !allows_structured_scalar_loop
+        && !allows_structured_scalar_loop_break
+        && !allows_structured_scalar_loop_continue
+        && !allows_structured_scalar_return_goto
+        && !allows_structured_nested_scalar_loop_branch
+        && !allows_structured_nested_indexed_write_loop_branch
+        && !allows_structured_nested_indexed_write_loop_break
+        && !allows_structured_nested_indexed_write_loop_continue
+        && !classifier.in_lane_form_function
+    {
+        classifier.record_policy(SHAPE_DEVICE_MULTI_BLOCK_CFG);
+    }
+}
+
+fn classify_device_function_slots(
+    classifier: &mut DeviceSafeClassifier<'_>,
+    function: &MirFunction,
+) {
+    classifier.throw_slots = crate::abi::throw_sites(function, classifier.types).map(|sites| {
+        sites
+            .into_iter()
+            .filter_map(|site| site.slot)
+            .collect::<Vec<_>>()
+    });
+    if function.error_ty.is_some() && classifier.throw_slots.is_none() {
+        classifier.record_abi(SHAPE_FAILABLE_DEVICE_FN);
+    }
+    // S3-A1: a result-tuple return is the multi-output kernel contract —
+    // the tuple elements are DISTINCT device output resources (the ABI
+    // lowers them via `multi_output_return_kernel`). Classify each
+    // element instead of the aggregate tuple, which would otherwise
+    // record a "device aggregate value type" gap on a valid contract.
+    match classifier.types.get(function.return_ty.semantic_id()) {
+        Type::Tuple(elements) if !elements.is_empty() => {
+            for element in elements {
+                classifier.check_device_type(MirType::semantic(*element));
+            }
+        }
+        _ => classifier.check_device_type(function.return_ty),
+    }
+    if let Some(error_ty) = function.error_ty
+        && classifier.throw_slots.is_none()
+    {
+        classifier.check_device_type(error_ty);
+    }
+    // S5-W-A1: the dead fold-artifact slots (shape-list / vacua
+    // `Array`/`Tensor` slots nothing reads) are precomputed so the
+    // local, temp, and construct checks admit them exactly as the
+    // emitters' S5-U2c skip does.
+    classifier.dead_fold_artifact_slots = dead_fold_artifact_slots(function, classifier.types);
+    // a0184031: the dead non-kernel-scalar const-copy slots (i64
+    // axis-const locals/temps nothing reads) are precomputed so the
+    // local/temp declarations and the const-copy statement checks
+    // admit them exactly as the emitters' dead-skip does (Metal
+    // 26424928f Gap 1; NVVM emits the harmless native-i64 store).
+    classifier.dead_const_copy_slots =
+        dead_non_kernel_scalar_const_slots(function, classifier.layouts);
+    classifier.literal_indexed_access =
+        LiteralIndexedAccessPlan::for_function(function, classifier.types);
+    // S5A-U4: the output-set tuple aggregation slots of this function
+    // (its own result-tuple return aggregation plus a decomposed
+    // multi-output source's kept result-tuple local) — the ONLY
+    // tuple-typed slots the gate admits. Computed per function from
+    // the decomposition's explicit fact; no source-wide `DefId`
+    // allowance.
+    classifier.result_aggregation_slots =
+        crate::kernel_decomposition::multi_output_result_aggregation_slots(
+            function,
+            classifier.types,
+        );
 }
 
 /// Packed vector widths a device view admits: the widths whose size equals

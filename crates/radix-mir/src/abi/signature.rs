@@ -1571,70 +1571,14 @@ impl MirKernelSignature {
         let output_element_ty =
             device_view_element_type(output.ty, validation, context.allow_host_owned_tensor_entry)?;
         let output_element_count = device_view_element_count_or_runtime(output.ty, validation)?;
-        let mut input_resources = Vec::new();
-        for (binding, input) in inputs.iter().enumerate() {
-            let genus = genus_param_layout(input.ty, validation)?;
-            let (input_element_ty, input_element_count) = if genus.is_some() {
-                // C4-6b: a genus parameter is a count-one resource whose
-                // element is the struct itself; its layout travels beside the
-                // artifact. It does not take part in tensor compatibility.
-                (input.ty, 1)
-            } else if Self::is_kernel_scalar_input(input.ty, validation)? {
-                // Indexed kernels may carry explicit scalar resources beside
-                // their device-view inputs. The count-one resource is bound
-                // and reflected like every other input; only tensor inputs
-                // must satisfy indexed-view compatibility with the output.
-                (
-                    buffer_element_type(
-                        input.ty,
-                        validation,
-                        context.allow_host_owned_tensor_entry,
-                    )?,
-                    buffer_element_count(input.ty, validation)?,
-                )
-            } else {
-                let input_element_ty = device_view_element_type(
-                    input.ty,
-                    validation,
-                    context.allow_host_owned_tensor_entry,
-                )?;
-                // A lane-form kernel indexes each tensor by its own lane
-                // coordinates, so inputs and the output need not share an
-                // element type or count.
-                if !per_lane && !is_gather_ids_param(function, input, validation) {
-                    require_indexed_element_compatibility(
-                        function,
-                        input_element_ty,
-                        output_element_ty,
-                        validation,
-                        binding == 0,
-                    )?;
-                }
-                let input_element_count =
-                    device_view_element_count_or_runtime(input.ty, validation)?;
-                (input_element_ty, input_element_count)
-            };
-            input_resources.push(MirKernelResource {
-                group: DEFAULT_KERNEL_RESOURCE_GROUP,
-                binding: input_binding(
-                    binding,
-                    context.output_position,
-                    &context.extra_output_positions,
-                )?,
-                kind: genus.map_or(MirKernelResourceKind::StorageBuffer, |layout| {
-                    MirKernelResourceKind::GenusParam {
-                        size_bytes: layout.size,
-                    }
-                }),
-                role: MirKernelResourceRole::Input,
-                access: MirKernelResourceAccess::Read,
-                element_ty: input_element_ty,
-                element_count: input_element_count,
-                source_local: Some(input.local),
-                source_name: param_source_name(input, context.interner),
-                reduced_projection: None,
-            });
-        }
+        let input_resources = Self::multi_input_resources(
+            inputs,
+            function,
+            validation,
+            per_lane,
+            output_element_ty,
+            &context,
+        )?;
 
         let input = input_resources
             .first()
@@ -1715,6 +1659,80 @@ impl MirKernelSignature {
         // compute targets).
         apply_collection_op_contract(function, &mut signature, validation)?;
         Ok(signature)
+    }
+    fn multi_input_resources(
+        inputs: &[MirParam],
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        per_lane: bool,
+        output_element_ty: MirType,
+        context: &IndexedViewKernelContext<'_>,
+    ) -> Result<Vec<MirKernelResource>, MirAbiError> {
+        let mut input_resources = Vec::new();
+        for (binding, input) in inputs.iter().enumerate() {
+            let genus = genus_param_layout(input.ty, validation)?;
+            let (input_element_ty, input_element_count) = if genus.is_some() {
+                // C4-6b: a genus parameter is a count-one resource whose
+                // element is the struct itself; its layout travels beside the
+                // artifact. It does not take part in tensor compatibility.
+                (input.ty, 1)
+            } else if Self::is_kernel_scalar_input(input.ty, validation)? {
+                // Indexed kernels may carry explicit scalar resources beside
+                // their device-view inputs. The count-one resource is bound
+                // and reflected like every other input; only tensor inputs
+                // must satisfy indexed-view compatibility with the output.
+                (
+                    buffer_element_type(
+                        input.ty,
+                        validation,
+                        context.allow_host_owned_tensor_entry,
+                    )?,
+                    buffer_element_count(input.ty, validation)?,
+                )
+            } else {
+                let input_element_ty = device_view_element_type(
+                    input.ty,
+                    validation,
+                    context.allow_host_owned_tensor_entry,
+                )?;
+                // A lane-form kernel indexes each tensor by its own lane
+                // coordinates, so inputs and the output need not share an
+                // element type or count.
+                if !per_lane && !is_gather_ids_param(function, input, validation) {
+                    require_indexed_element_compatibility(
+                        function,
+                        input_element_ty,
+                        output_element_ty,
+                        validation,
+                        binding == 0,
+                    )?;
+                }
+                let input_element_count =
+                    device_view_element_count_or_runtime(input.ty, validation)?;
+                (input_element_ty, input_element_count)
+            };
+            input_resources.push(MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: input_binding(
+                    binding,
+                    context.output_position,
+                    &context.extra_output_positions,
+                )?,
+                kind: genus.map_or(MirKernelResourceKind::StorageBuffer, |layout| {
+                    MirKernelResourceKind::GenusParam {
+                        size_bytes: layout.size,
+                    }
+                }),
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty: input_element_ty,
+                element_count: input_element_count,
+                source_local: Some(input.local),
+                source_name: param_source_name(input, context.interner),
+                reduced_projection: None,
+            });
+        }
+        Ok(input_resources)
     }
 
     /// Whether `function` is a single-lane kernel (gpu-reset A2 rung 3): a

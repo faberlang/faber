@@ -1464,12 +1464,17 @@ pub fn multi_output_result_aggregation_slots(
         }
     }
 
-    // Rule 2: the KEPT source result-tuple local (D-6). The kept local is
-    // never read (the fragment's return assembly is the synthetic's
-    // tuple-temp construct, or nothing), and the fragment is one of the two
-    // shapes a decomposed multi-output source produces: a non-empty-tuple
-    // return (the last subchain / a multi-output intermediate) or nothing (a
-    // single-output intermediate subchain).
+    // Rule 2: the KEPT source result-tuple local (D-6) and its temp analog.
+    collect_kept_result_aggregation_slots(function, types, &mut slots);
+
+    slots
+}
+
+fn collect_kept_result_aggregation_slots(
+    function: &MirFunction,
+    types: &TypeTable,
+    slots: &mut ResultAggregationSlots,
+) {
     let read = crate::read_analysis::function_read_locals(function);
     let returns_tuple_or_nothing = is_non_empty_tuple_type(types, function.return_ty)
         || function
@@ -1539,8 +1544,6 @@ pub fn multi_output_result_aggregation_slots(
             }
         }
     }
-
-    slots
 }
 
 /// Whether a type is a non-empty tuple (the S3-A1 result-tuple contract).
@@ -1659,30 +1662,8 @@ fn build_subchain_function(
     types: &TypeTable,
 ) -> MirFunction {
     let block = &source.blocks[0];
-    let mut written: BTreeSet<MirLocalId> = BTreeSet::new();
-    let mut read_order: Vec<MirLocalId> = Vec::new();
-    for &index in indices {
-        let statement = &block.statements[index];
-        if let Some(destination) = crate::read_analysis::statement_destination(statement) {
-            written.insert(destination);
-        }
-        for local in crate::read_analysis::statement_read_locals(statement) {
-            if !written.contains(&local) && !read_order.contains(&local) {
-                read_order.push(local);
-            }
-        }
-    }
     let span = source.span;
-    let params = read_order
-        .into_iter()
-        .map(|local| MirParam {
-            local,
-            name: None,
-            ty: source_local_ty(source, local),
-            mode: MirParamMode::Owned,
-            span,
-        })
-        .collect();
+    let params = subchain_params(source, indices);
 
     let mut statements: Vec<MirStatement> = indices
         .iter()
@@ -1756,28 +1737,10 @@ fn build_subchain_function(
         terminator = block.terminator.clone();
         return_ty = source.return_ty;
     } else if plan_is_elementwise {
-        // Unit 1A fork/join: an elementwise join child's product is its
-        // cross-kernel output. The synthetic returns the slice's last
-        // destination so the elementwise planner's liveness sees the
-        // cross-kernel read (the D-2a output set exposes exactly this
-        // local) and the full-ABI synthesis binds the join's output
-        // buffer.
-        let last_local = indices.iter().rev().find_map(|&index| {
-            crate::read_analysis::statement_destination(&block.statements[index])
-        });
-        if let Some(local) = last_local {
-            terminator = MirTerminator {
-                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(local)))),
-                span,
-            };
-            return_ty = source_local_ty(source, local);
-        } else {
-            terminator = MirTerminator {
-                kind: MirTerminatorKind::Return(None),
-                span,
-            };
-            return_ty = source.return_ty;
-        }
+        let (elementwise_terminator, elementwise_return_ty) =
+            elementwise_subchain_return(source, block, indices);
+        terminator = elementwise_terminator;
+        return_ty = elementwise_return_ty;
     } else {
         terminator = MirTerminator {
             kind: MirTerminatorKind::Return(None),
@@ -1805,6 +1768,69 @@ fn build_subchain_function(
         is_generator: source.is_generator,
         shader_stage: source.shader_stage,
         span,
+    }
+}
+
+fn subchain_params(source: &MirFunction, indices: &[usize]) -> Vec<MirParam> {
+    let block = &source.blocks[0];
+    let mut written: BTreeSet<MirLocalId> = BTreeSet::new();
+    let mut read_order: Vec<MirLocalId> = Vec::new();
+    for &index in indices {
+        let statement = &block.statements[index];
+        if let Some(destination) = crate::read_analysis::statement_destination(statement) {
+            written.insert(destination);
+        }
+        for local in crate::read_analysis::statement_read_locals(statement) {
+            if !written.contains(&local) && !read_order.contains(&local) {
+                read_order.push(local);
+            }
+        }
+    }
+    let span = source.span;
+    read_order
+        .into_iter()
+        .map(|local| MirParam {
+            local,
+            name: None,
+            ty: source_local_ty(source, local),
+            mode: MirParamMode::Owned,
+            span,
+        })
+        .collect()
+}
+
+fn elementwise_subchain_return(
+    source: &MirFunction,
+    block: &MirBlock,
+    indices: &[usize],
+) -> (MirTerminator, MirType) {
+    let span = source.span;
+    // Unit 1A fork/join: an elementwise join child's product is its
+    // cross-kernel output. The synthetic returns the slice's last
+    // destination so the elementwise planner's liveness sees the
+    // cross-kernel read (the D-2a output set exposes exactly this
+    // local) and the full-ABI synthesis binds the join's output
+    // buffer.
+    let last_local = indices
+        .iter()
+        .rev()
+        .find_map(|&index| crate::read_analysis::statement_destination(&block.statements[index]));
+    if let Some(local) = last_local {
+        (
+            MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(local)))),
+                span,
+            },
+            source_local_ty(source, local),
+        )
+    } else {
+        (
+            MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            source.return_ty,
+        )
     }
 }
 
