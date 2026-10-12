@@ -1,9 +1,9 @@
 use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, DistributedSumPlan,
     GatherPlan, GroupedMatMulPlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
-    MatMulPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan,
-    RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
-    WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
+    MatMulPlan, OobPaddingPolicy, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
+    RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
+    TransposePlan, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
 
@@ -140,6 +140,12 @@ fn validate_shared_memory_sizing(layout: &SharedMemoryLayout) -> Result<(), Plan
     Ok(())
 }
 
+/// Whether the zero-fill policy covers every index in
+/// `[length, covered_until)`. The range is empty when `covered_until <= length`.
+fn oob_tail_covered(policy: &OobPaddingPolicy, length: u64, covered_until: u64) -> bool {
+    (length..covered_until).all(|index| policy.covers(index, length))
+}
+
 /// OOB-padding coverage (L12): the padding policy covers the tail of the
 /// last workgroup — global element indices `[length, workgroup_x * partials)`
 /// (at most `workgroup_x - 1` elements). `ZeroFill` covers every index at or
@@ -163,16 +169,14 @@ fn validate_oob_padding_coverage(plan: &ReductionPlan) -> Result<(), PlanValidat
         });
     }
     // `covered_until - length < workgroup_x` here: the tail is at most one
-    // workgroup's lane span, so the loop is bounded by the workgroup size.
+    // workgroup's lane span, so the scan is bounded by the workgroup size.
     let covered_until = plan.partials.saturating_mul(workgroup_x);
-    for index in plan.length..covered_until {
-        if !plan.oob_padding.covers(index, plan.length) {
-            return Err(PlanValidationError::OobPaddingCoverage {
-                length: plan.length,
-                workgroup_x: plan.workgroup_x,
-                covered_until,
-            });
-        }
+    if !oob_tail_covered(&plan.oob_padding, plan.length, covered_until) {
+        return Err(PlanValidationError::OobPaddingCoverage {
+            length: plan.length,
+            workgroup_x: plan.workgroup_x,
+            covered_until,
+        });
     }
     Ok(())
 }
@@ -607,45 +611,32 @@ fn validate_matmul_oob_padding_coverage(plan: &MatMulPlan) -> Result<(), PlanVal
     // shared_a holds A[row][k_start + tx]: the tail rows past M and the tail
     // K columns past K are both out of bounds of the M×K left matrix.
     let padded_m = plan.m.div_ceil(tile) * tile;
-    for row in plan.m..padded_m {
-        if !plan.oob_padding.covers(row, plan.m) {
-            return Err(PlanValidationError::MatMulOobPaddingCoverage {
-                buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
-                length: plan.m,
-                covered_until: padded_m,
-            });
-        }
+    if !oob_tail_covered(&plan.oob_padding, plan.m, padded_m) {
+        return Err(PlanValidationError::MatMulOobPaddingCoverage {
+            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+            length: plan.m,
+            covered_until: padded_m,
+        });
     }
     let padded_k = plan.k.div_ceil(tile) * tile;
-    for k_index in plan.k..padded_k {
-        if !plan.oob_padding.covers(k_index, plan.k) {
-            return Err(PlanValidationError::MatMulOobPaddingCoverage {
-                buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
-                length: plan.k,
-                covered_until: padded_k,
-            });
-        }
+    if !oob_tail_covered(&plan.oob_padding, plan.k, padded_k) {
+        return Err(PlanValidationError::MatMulOobPaddingCoverage {
+            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+            length: plan.k,
+            covered_until: padded_k,
+        });
     }
-    // shared_b holds B[k_start + ty][col]: the tail K rows past K and the
-    // tail columns past N are both out of bounds of the K×N right matrix.
-    for k_index in plan.k..padded_k {
-        if !plan.oob_padding.covers(k_index, plan.k) {
-            return Err(PlanValidationError::MatMulOobPaddingCoverage {
-                buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
-                length: plan.k,
-                covered_until: padded_k,
-            });
-        }
-    }
+    // shared_b holds B[k_start + ty][col]: the tail columns past N are out
+    // of bounds of the K×N right matrix. Its tail K rows share the exact
+    // range and predicate as the shared_a K check above, so that check
+    // already covers them.
     let padded_n = plan.n.div_ceil(tile) * tile;
-    for col in plan.n..padded_n {
-        if !plan.oob_padding.covers(col, plan.n) {
-            return Err(PlanValidationError::MatMulOobPaddingCoverage {
-                buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
-                length: plan.n,
-                covered_until: padded_n,
-            });
-        }
+    if !oob_tail_covered(&plan.oob_padding, plan.n, padded_n) {
+        return Err(PlanValidationError::MatMulOobPaddingCoverage {
+            buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+            length: plan.n,
+            covered_until: padded_n,
+        });
     }
     Ok(())
 }
