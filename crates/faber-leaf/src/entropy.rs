@@ -140,7 +140,13 @@ fn seed(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "aleator:semina";
     let n = expect_int(ROUTE, args, 0, "n")?;
     let mut guard = rng_state();
-    guard.seeded = u64::try_from(n).ok().map(Rng::seed_from_u64);
+    guard.seeded = if n > 0 {
+        Some(Rng::seed_from_u64(
+            u64::try_from(n).expect("positive i64 fits u64"),
+        ))
+    } else {
+        None
+    };
     Ok(Reply::Unit)
 }
 

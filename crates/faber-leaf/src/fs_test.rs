@@ -1,7 +1,7 @@
 use super::{Arg, Reply, is_route, serve};
 use crate::FsErrorKind;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 fn temp_path(label: &str) -> PathBuf {
@@ -91,4 +91,82 @@ fn route_list_matches_serve() {
     }
     assert!(!is_route("solum:nope"));
     assert!(serve("solum:nope", &[]).is_none());
+}
+
+#[test]
+fn touch_updates_mtime_and_does_not_truncate() {
+    let path = temp_path("touch");
+    let path_text = path.to_string_lossy().into_owned();
+    fs::write(&path, "content").expect("write");
+    let file = fs::File::options().write(true).open(&path).expect("open");
+    file.set_modified(std::time::SystemTime::UNIX_EPOCH)
+        .expect("set old mtime");
+    drop(file);
+    let mut perms = fs::metadata(&path).expect("metadata").permissions();
+    perms.set_readonly(true);
+    fs::set_permissions(&path, perms).expect("readonly");
+
+    assert!(matches!(
+        serve_ok("solum:tange", &[Arg::Str(path_text.clone())]),
+        Reply::Unit
+    ));
+
+    let modified = fs::metadata(&path)
+        .expect("metadata")
+        .modified()
+        .expect("mtime");
+    assert!(
+        modified > std::time::SystemTime::UNIX_EPOCH,
+        "touch must advance mtime"
+    );
+    assert_eq!(fs::read_to_string(&path).expect("read"), "content");
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn touch_creates_missing_file() {
+    let path = temp_path("touch-create");
+    let path_text = path.to_string_lossy().into_owned();
+    assert!(matches!(
+        serve_ok("solum:tange", &[Arg::Str(path_text)]),
+        Reply::Unit
+    ));
+    assert_eq!(fs::read(&path).expect("read"), Vec::<u8>::new());
+    let _ = fs::remove_file(path);
+}
+
+#[cfg(unix)]
+#[test]
+fn mode_follows_symlink() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let target = temp_path("mode-target");
+    let link = temp_path("mode-link");
+    fs::write(&target, "").expect("write");
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o640)).expect("perm");
+    symlink(&target, &link).expect("symlink");
+    let link_text = link.to_string_lossy().into_owned();
+    let Reply::Int(mode) = serve_ok("solum:modus", &[Arg::Str(link_text)]) else {
+        panic!("expected int mode");
+    };
+    assert_eq!(mode, 0o640, "mode must follow the symlink");
+    let _ = fs::remove_file(&link);
+    let _ = fs::remove_file(&target);
+}
+
+#[test]
+fn resolve_missing_path_falls_back_to_cwd() {
+    let relative = "faber-leaf-resolve-missing";
+    let Reply::Str(resolved) = serve_ok("solum:absolve", &[Arg::Str(relative.to_owned())]) else {
+        panic!("expected string");
+    };
+    let cwd = std::env::current_dir().expect("cwd");
+    assert_eq!(PathBuf::from(&resolved), cwd.join(relative));
+    assert!(Path::new(&resolved).is_absolute());
+
+    let absolute = "/no/such/faber-leaf/resolve";
+    assert_eq!(
+        serve_ok("solum:absolve", &[Arg::Str(absolute.to_owned())]),
+        Reply::Str(absolute.to_owned()),
+        "an absolute path is returned as-is"
+    );
 }

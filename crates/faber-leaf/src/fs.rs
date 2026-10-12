@@ -425,7 +425,7 @@ fn mode(args: &[Arg]) -> Result<Reply, FsError> {
     let path = expect_str(ROUTE, args, 0, "path")?;
     #[cfg(unix)]
     {
-        fs::symlink_metadata(path)
+        fs::metadata(path)
             .map(|meta| Reply::Int(i64::from(meta.mode() & 0o7777)))
             .map_err(|err| FsError::from_io(ROUTE, path, &err))
     }
@@ -502,10 +502,8 @@ fn touch(args: &[Arg]) -> Result<Reply, FsError> {
     const ROUTE: &str = "solum:tange";
     let path = expect_str(ROUTE, args, 0, "path")?;
     if Path::new(path).exists() {
-        OpenOptions::new()
-            .write(true)
-            .open(path)
-            .and_then(|file| file.sync_all())
+        File::open(path)
+            .and_then(|file| file.set_modified(std::time::SystemTime::now()))
             .map(|()| Reply::Unit)
             .map_err(|err| FsError::from_io(ROUTE, path, &err))
     } else {
@@ -624,10 +622,20 @@ fn resolve(args: &[Arg]) -> Result<Reply, FsError> {
     let path = expect_str(ROUTE, args, 0, "path")?;
     Ok(Reply::Str(
         fs::canonicalize(path)
-            .unwrap_or_else(|_| PathBuf::from(path))
+            .unwrap_or_else(|_| fallback_absolute(Path::new(path)))
             .to_string_lossy()
             .into_owned(),
     ))
+}
+
+/// `resolve` fallback when canonicalization fails (e.g. the path does not
+/// exist yet): keep an absolute path as-is, otherwise join it onto the
+/// current working directory as a best effort.
+fn fallback_absolute(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    std::env::current_dir().map_or_else(|_| path.to_path_buf(), |cwd| cwd.join(path))
 }
 
 fn home(args: &[Arg]) -> Result<Reply, FsError> {
