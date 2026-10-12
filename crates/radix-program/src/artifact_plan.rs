@@ -162,43 +162,23 @@ pub fn plan_package(package: &AnalyzedProgram, target: Target) -> ArtifactPlan {
                 &mut edges,
                 &mut seen_ids,
             );
-            let entry = nodes
-                .iter()
-                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
-                .map(|n| n.id.clone());
-            (true, None, entry)
+            (true, None, generated_entry_id(&nodes))
         }
         Target::HirGo => {
             plan_go_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
-            let entry = nodes
-                .iter()
-                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
-                .map(|n| n.id.clone());
-            (true, None, entry)
+            (true, None, generated_entry_id(&nodes))
         }
         Target::HirTypeScript => {
             plan_ts_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
-            let entry = nodes
-                .iter()
-                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
-                .map(|n| n.id.clone());
-            (true, None, entry)
+            (true, None, generated_entry_id(&nodes))
         }
         Target::HirPython => {
             plan_python_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
-            let entry = nodes
-                .iter()
-                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
-                .map(|n| n.id.clone());
-            (true, None, entry)
+            (true, None, generated_entry_id(&nodes))
         }
         Target::HirHaskell => {
             plan_haskell_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
-            let entry = nodes
-                .iter()
-                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
-                .map(|n| n.id.clone());
-            (true, None, entry)
+            (true, None, generated_entry_id(&nodes))
         }
         Target::HirFaber => (
             false,
@@ -207,11 +187,7 @@ pub fn plan_package(package: &AnalyzedProgram, target: Target) -> ArtifactPlan {
         ),
         Target::MirWasm => {
             plan_wasm_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
-            let entry = nodes
-                .iter()
-                .find(|n| n.kind == ArtifactKind::GeneratedEntry)
-                .map(|n| n.id.clone());
-            (true, None, entry)
+            (true, None, generated_entry_id(&nodes))
         }
         other => (
             false,
@@ -446,6 +422,14 @@ fn module_key(module: &ModuleId) -> String {
 
 pub(crate) fn target_name(target: Target) -> &'static str {
     target.as_str()
+}
+
+/// First generated-entry artifact id produced by a planning pass, if any.
+fn generated_entry_id(nodes: &[ArtifactNode]) -> Option<String> {
+    nodes
+        .iter()
+        .find(|node| node.kind == ArtifactKind::GeneratedEntry)
+        .map(|node| node.id.clone())
 }
 
 fn push_unique_node(
