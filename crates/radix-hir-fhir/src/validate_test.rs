@@ -693,3 +693,67 @@ fn authored_root_witness_mismatch_fails_closed() {
         }
     ));
 }
+
+/// Shape obligations are validated through one shared table helper, so the
+/// unit's own table gets the same boundary/kind checks as nested provider
+/// tables: a call row carrying a function-boundary relation fails closed
+/// before lowering consumes it.
+#[test]
+fn call_shape_relation_marked_function_boundary_fails_closed() {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let dim = types.intern_index(IndexExpr::Literal(2));
+    artifact.types = types.snapshot();
+    artifact.shape_obligations.calls = vec![crate::artifact::ShapeCallObligationsWire {
+        call: HirId(0),
+        relations: vec![crate::artifact::ShapeRelationWire {
+            left: dim,
+            right: dim,
+            span: Span::default(),
+            boundary: crate::artifact::ShapeRelationBoundaryWire::FunctionEntry,
+        }],
+    }];
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("a call row carrying a non-call relation must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::MalformedSnapshot {
+                kind: "shape obligations",
+                ..
+            }
+        ),
+        "call row with a function-boundary relation must fail closed: {err:?}"
+    );
+}
+
+/// Type-param validation is shared by every HIR owner that declares them; a
+/// generic constraint naming an out-of-arena `TypeId` fails closed through
+/// the shared DanglingIndex path.
+#[test]
+fn dangling_type_param_constraint_fails_closed() {
+    let mut artifact = stub_artifact();
+    let HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.type_params.push(radix_hir::HirTypeParam {
+        def_id: DefId(USER_DEF_ID_BASE + 1),
+        kind: radix_syntax::GenericParamKind::Typus,
+        name: Symbol(0),
+        span: Span::default(),
+        constraint: radix_hir::HirTypeParamConstraint::OneOf(vec![TypeId(99_999)]),
+        default: None,
+    });
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("a dangling type-param constraint TypeId must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex {
+                kind: "TypeId",
+                ..
+            }
+        ),
+        "dangling constraint type must fail closed: {err:?}"
+    );
+}

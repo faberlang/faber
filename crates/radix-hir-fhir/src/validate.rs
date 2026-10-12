@@ -2326,6 +2326,60 @@ pub(crate) fn validate_referential_integrity(
         Ok(())
     }
 
+    // Shared by every HIR owner carrying type params (functions, aliases,
+    // structs, enums, interfaces); each owner's constraint arms are the same
+    // fail-closed walk over defs, symbols, types, and typed defaults.
+    fn validate_type_param(
+        tp: &radix_hir::HirTypeParam,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        checks.check_def(tp.def_id)?;
+        checks.check_symbol(tp.name)?;
+        match &tp.constraint {
+            radix_hir::HirTypeParamConstraint::Any => {}
+            radix_hir::HirTypeParamConstraint::OneOf(tys) => {
+                for ty in tys {
+                    checks.check_type(*ty)?;
+                }
+            }
+            radix_hir::HirTypeParamConstraint::Implet(bounds) => {
+                for bound in bounds {
+                    checks.check_def(bound.contract)?;
+                    for ty in &bound.args {
+                        checks.check_type(*ty)?;
+                    }
+                }
+            }
+        }
+        validate_type_param_default(tp.default.as_ref(), checks)
+    }
+
+    // Shared by item type params and by `Type::Func` / resolver function
+    // signatures; every constraint arm is the same fail-closed walk over
+    // witness types and contract bounds.
+    fn validate_generic_param_constraint(
+        constraint: &radix_types::TypeParamConstraint,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        match constraint {
+            radix_types::TypeParamConstraint::Any => {}
+            radix_types::TypeParamConstraint::OneOf(tys) => {
+                for ty in tys {
+                    checks.check_type(*ty)?;
+                }
+            }
+            radix_types::TypeParamConstraint::Implet(bounds) => {
+                for bound in bounds {
+                    checks.check_def(bound.contract)?;
+                    for ty in &bound.args {
+                        checks.check_type(*ty)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     // Recursive walkers for the HIR tree.
     fn validate_items(
         items: &[radix_hir::HirItem],
@@ -2348,25 +2402,7 @@ pub(crate) fn validate_referential_integrity(
     ) -> Result<(), HirArtifactError> {
         checks.check_symbol(func.name)?;
         for tp in &func.type_params {
-            checks.check_def(tp.def_id)?;
-            checks.check_symbol(tp.name)?;
-            match &tp.constraint {
-                radix_hir::HirTypeParamConstraint::Any => {}
-                radix_hir::HirTypeParamConstraint::OneOf(tys) => {
-                    for ty in tys {
-                        checks.check_type(*ty)?;
-                    }
-                }
-                radix_hir::HirTypeParamConstraint::Implet(bounds) => {
-                    for bound in bounds {
-                        checks.check_def(bound.contract)?;
-                        for ty in &bound.args {
-                            checks.check_type(*ty)?;
-                        }
-                    }
-                }
-            }
-            validate_type_param_default(tp.default.as_ref(), checks)?;
+            validate_type_param(tp, checks)?;
         }
         for param in &func.params {
             checks.check_def(param.def_id)?;
@@ -2428,25 +2464,7 @@ pub(crate) fn validate_referential_integrity(
             HirItemKind::TypeAlias(a) => {
                 checks.check_symbol(a.name)?;
                 for tp in &a.type_params {
-                    checks.check_def(tp.def_id)?;
-                    checks.check_symbol(tp.name)?;
-                    match &tp.constraint {
-                        radix_hir::HirTypeParamConstraint::Any => {}
-                        radix_hir::HirTypeParamConstraint::OneOf(tys) => {
-                            for ty in tys {
-                                checks.check_type(*ty)?;
-                            }
-                        }
-                        radix_hir::HirTypeParamConstraint::Implet(bounds) => {
-                            for bound in bounds {
-                                checks.check_def(bound.contract)?;
-                                for ty in &bound.args {
-                                    checks.check_type(*ty)?;
-                                }
-                            }
-                        }
-                    }
-                    validate_type_param_default(tp.default.as_ref(), checks)?;
+                    validate_type_param(tp, checks)?;
                 }
                 checks.check_type(a.ty)?;
             }
@@ -2485,25 +2503,7 @@ pub(crate) fn validate_referential_integrity(
     ) -> Result<(), HirArtifactError> {
         checks.check_symbol(item.name)?;
         for tp in &item.type_params {
-            checks.check_def(tp.def_id)?;
-            checks.check_symbol(tp.name)?;
-            match &tp.constraint {
-                radix_hir::HirTypeParamConstraint::Any => {}
-                radix_hir::HirTypeParamConstraint::OneOf(tys) => {
-                    for ty in tys {
-                        checks.check_type(*ty)?;
-                    }
-                }
-                radix_hir::HirTypeParamConstraint::Implet(bounds) => {
-                    for bound in bounds {
-                        checks.check_def(bound.contract)?;
-                        for ty in &bound.args {
-                            checks.check_type(*ty)?;
-                        }
-                    }
-                }
-            }
-            validate_type_param_default(tp.default.as_ref(), checks)?;
+            validate_type_param(tp, checks)?;
         }
         for field in &item.fields {
             checks.check_def(field.def_id)?;
@@ -2538,25 +2538,7 @@ pub(crate) fn validate_referential_integrity(
     ) -> Result<(), HirArtifactError> {
         checks.check_symbol(item.name)?;
         for tp in &item.type_params {
-            checks.check_def(tp.def_id)?;
-            checks.check_symbol(tp.name)?;
-            match &tp.constraint {
-                radix_hir::HirTypeParamConstraint::Any => {}
-                radix_hir::HirTypeParamConstraint::OneOf(tys) => {
-                    for ty in tys {
-                        checks.check_type(*ty)?;
-                    }
-                }
-                radix_hir::HirTypeParamConstraint::Implet(bounds) => {
-                    for bound in bounds {
-                        checks.check_def(bound.contract)?;
-                        for ty in &bound.args {
-                            checks.check_type(*ty)?;
-                        }
-                    }
-                }
-            }
-            validate_type_param_default(tp.default.as_ref(), checks)?;
+            validate_type_param(tp, checks)?;
         }
         for field in &item.commune_fields {
             checks.check_symbol(field.name)?;
@@ -2579,25 +2561,7 @@ pub(crate) fn validate_referential_integrity(
     ) -> Result<(), HirArtifactError> {
         checks.check_symbol(item.name)?;
         for tp in &item.type_params {
-            checks.check_def(tp.def_id)?;
-            checks.check_symbol(tp.name)?;
-            match &tp.constraint {
-                radix_hir::HirTypeParamConstraint::Any => {}
-                radix_hir::HirTypeParamConstraint::OneOf(tys) => {
-                    for ty in tys {
-                        checks.check_type(*ty)?;
-                    }
-                }
-                radix_hir::HirTypeParamConstraint::Implet(bounds) => {
-                    for bound in bounds {
-                        checks.check_def(bound.contract)?;
-                        for ty in &bound.args {
-                            checks.check_type(*ty)?;
-                        }
-                    }
-                }
-            }
-            validate_type_param_default(tp.default.as_ref(), checks)?;
+            validate_type_param(tp, checks)?;
         }
         for method in &item.methods {
             for a in &method.availability {
@@ -3381,22 +3345,7 @@ pub(crate) fn validate_referential_integrity(
                     checks.check_type(et)?;
                 }
                 for param in &sig.type_params {
-                    match &param.constraint {
-                        radix_types::TypeParamConstraint::Any => {}
-                        radix_types::TypeParamConstraint::OneOf(tys) => {
-                            for ty in tys {
-                                checks.check_type(*ty)?;
-                            }
-                        }
-                        radix_types::TypeParamConstraint::Implet(bounds) => {
-                            for bound in bounds {
-                                checks.check_def(bound.contract)?;
-                                for ty in &bound.args {
-                                    checks.check_type(*ty)?;
-                                }
-                            }
-                        }
-                    }
+                    validate_generic_param_constraint(&param.constraint, checks)?;
                     if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) = param.default
                     {
                         checks.check_type(ty)?;
@@ -3447,22 +3396,7 @@ pub(crate) fn validate_referential_integrity(
                         checks.check_type(et)?;
                     }
                     for param in &sig.type_params {
-                        match &param.constraint {
-                            radix_types::TypeParamConstraint::Any => {}
-                            radix_types::TypeParamConstraint::OneOf(tys) => {
-                                for ty in tys {
-                                    checks.check_type(*ty)?;
-                                }
-                            }
-                            radix_types::TypeParamConstraint::Implet(bounds) => {
-                                for bound in bounds {
-                                    checks.check_def(bound.contract)?;
-                                    for ty in &bound.args {
-                                        checks.check_type(*ty)?;
-                                    }
-                                }
-                            }
-                        }
+                        validate_generic_param_constraint(&param.constraint, checks)?;
                         if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) =
                             param.default
                         {
@@ -3502,22 +3436,7 @@ pub(crate) fn validate_referential_integrity(
                         }
                         for param in &method.sig.type_params {
                             checks.check_symbol(param.name)?;
-                            match &param.constraint {
-                                radix_types::TypeParamConstraint::Any => {}
-                                radix_types::TypeParamConstraint::OneOf(types) => {
-                                    for ty in types {
-                                        checks.check_type(*ty)?;
-                                    }
-                                }
-                                radix_types::TypeParamConstraint::Implet(bounds) => {
-                                    for bound in bounds {
-                                        checks.check_def(bound.contract)?;
-                                        for ty in &bound.args {
-                                            checks.check_type(*ty)?;
-                                        }
-                                    }
-                                }
-                            }
+                            validate_generic_param_constraint(&param.constraint, checks)?;
                             if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) =
                                 param.default
                             {
@@ -3717,44 +3636,7 @@ pub(crate) fn validate_referential_integrity(
 
     // 8a. Runtime shape obligations (schema v31): each site and every
     //     relation/binding index must resolve before lowering consumes it.
-    for row in &artifact.shape_obligations.calls {
-        checks.check_hir(row.call)?;
-        for relation in &row.relations {
-            checks.check_index(relation.left)?;
-            checks.check_index(relation.right)?;
-            if relation.boundary != crate::artifact::ShapeRelationBoundaryWire::Call {
-                return Err(HirArtifactError::MalformedSnapshot {
-                    kind: "shape obligations",
-                    detail: "call row contains a non-call relation".to_owned(),
-                });
-            }
-        }
-    }
-    for row in &artifact.shape_obligations.call_size_bindings {
-        checks.check_hir(row.call)?;
-        for binding in &row.bindings {
-            checks.check_index(binding.witness)?;
-        }
-    }
-    for row in &artifact.shape_obligations.functions {
-        checks.check_def(row.function)?;
-        for relation in &row.relations {
-            checks.check_index(relation.left)?;
-            checks.check_index(relation.right)?;
-            if relation.boundary == crate::artifact::ShapeRelationBoundaryWire::Call {
-                return Err(HirArtifactError::MalformedSnapshot {
-                    kind: "shape obligations",
-                    detail: "function row contains a call relation".to_owned(),
-                });
-            }
-        }
-    }
-    for row in &artifact.shape_obligations.function_size_bindings {
-        checks.check_def(row.function)?;
-        for binding in &row.bindings {
-            checks.check_index(binding.witness)?;
-        }
-    }
+    validate_shape_obligation_table(&artifact.shape_obligations, &checks)?;
 
     // 8b. Per-target kernel requirements (schema v32) retain the semantic
     //     admission contract across FHIR loading. Every callable and symbolic
