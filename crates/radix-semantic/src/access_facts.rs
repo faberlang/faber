@@ -84,28 +84,6 @@ impl AccessFactTable {
             .unwrap_or(AccessFact::Unknown)
     }
 
-    /// Iterate over expression-site facts recorded from binding initializers.
-    pub fn expressions(&self) -> impl Iterator<Item = (HirId, AccessFact)> + '_ {
-        let mut rows: Vec<_> = self
-            .by_expression
-            .iter()
-            .map(|(id, fact)| (*id, *fact))
-            .collect();
-        rows.sort_by_key(|(id, _)| id.0);
-        rows.into_iter()
-    }
-
-    /// Iterate over binding-site facts recorded from local declarations.
-    pub fn bindings(&self) -> impl Iterator<Item = (DefId, AccessFact)> + '_ {
-        let mut rows: Vec<_> = self
-            .by_binding
-            .iter()
-            .map(|(def_id, fact)| (*def_id, *fact))
-            .collect();
-        rows.sort_by_key(|(def_id, _)| def_id.0);
-        rows.into_iter()
-    }
-
     /// Return dead-source events in deterministic source order.
     #[must_use]
     pub fn dead_sources(&self) -> &[DeadSourceFact] {
@@ -117,14 +95,6 @@ impl AccessFactTable {
         self.dead_sources
             .iter()
             .filter(move |fact| fact.source == source)
-    }
-
-    /// Return the transfer fact recorded at an expression site, if any.
-    #[must_use]
-    pub fn dead_source_at(&self, source: DefId, site: HirId) -> Option<&DeadSourceFact> {
-        self.dead_sources
-            .iter()
-            .find(|fact| fact.source == source && fact.site == Some(site))
     }
 
     /// Number of expression-site rows.
