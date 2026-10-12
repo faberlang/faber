@@ -32,13 +32,18 @@ pub fn decimal_carrier_rust_type(width: NumericWidth) -> Option<&'static str> {
     }
 }
 
+/// The decimal width of a type id, when the type is a sized decimal numeric.
+fn decimal_width_of_type(ty: TypeId, types: &TypeTable) -> Option<NumericWidth> {
+    match types.get(ty) {
+        Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
+        _ => None,
+    }
+}
+
 /// The decimal width of an expression, if its HIR type is decimal.
 #[must_use]
 pub fn decimal_expr_width(expr: &HirExpression, types: &TypeTable) -> Option<NumericWidth> {
-    match expr.ty.map(|ty| types.get(ty)) {
-        Some(Type::SizedNumeric(Primitive::Numerus, width)) if width.is_decimal() => Some(*width),
-        _ => None,
-    }
+    expr.ty.and_then(|ty| decimal_width_of_type(ty, types))
 }
 
 /// The decimal width of an arithmetic operation over decimal operands.
@@ -69,10 +74,7 @@ pub fn decimal_literal_payload(
     let HirExpressionKind::Literal(HirLiteral::FloatText { text, .. }) = &expr.kind else {
         return None;
     };
-    let width = expr.ty.and_then(|ty| match types.get(ty) {
-        Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
-        _ => None,
-    })?;
+    let width = expr.ty.and_then(|ty| decimal_width_of_type(ty, types))?;
     Some((*text, width))
 }
 
@@ -91,10 +93,7 @@ where
     } else {
         expr.ty
     }?;
-    match types.get(ty) {
-        Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
-        _ => None,
-    }
+    decimal_width_of_type(ty, types)
 }
 
 /// Pure round-half-even quotient for values whose intermediate arithmetic has

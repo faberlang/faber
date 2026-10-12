@@ -1,7 +1,8 @@
 //! Decimal carrier math pins for codegen tiers (decimal-widths D5).
 
 use super::{
-    carrier_in_width, decimal_scale_factor, decimal_text_to_carrier, round_half_even_quotient,
+    carrier_in_width, decimal_expr_width, decimal_literal_payload, decimal_scale_factor,
+    decimal_source_width, decimal_text_to_carrier, round_half_even_quotient,
 };
 use radix_hir::{
     DefId, HirBinOp, HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirPattern,
@@ -45,6 +46,42 @@ fn decimal_text_to_carrier_rounds_half_even_at_the_width_scale() {
         decimal_text_to_carrier("42", NumericWidth::D64),
         Some(4_200_000_000)
     );
+}
+
+#[test]
+fn decimal_width_helpers_agree_on_decimal_and_non_decimal_types() {
+    let mut types = TypeTable::new();
+    let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+
+    assert_eq!(
+        decimal_expr_width(&path(1, d64), &types),
+        Some(NumericWidth::D64)
+    );
+    assert_eq!(decimal_expr_width(&path(1, i64), &types), None);
+
+    let literal = HirExpressionKind::Literal(radix_hir::HirLiteral::FloatText {
+        value: 4.2,
+        text: radix_lexer::Symbol(0),
+    });
+    assert_eq!(
+        decimal_literal_payload(&typed(1, d64, literal.clone()), &types),
+        Some((radix_lexer::Symbol(0), NumericWidth::D64))
+    );
+    // A non-decimal expression type hides the literal payload.
+    assert_eq!(decimal_literal_payload(&typed(1, i64, literal), &types), None);
+
+    // A path recovers its declared binding type; the binding wins over the
+    // expression type, and a non-decimal binding stays non-decimal.
+    assert_eq!(
+        decimal_source_width(&path(1, d64), &types, |_| None),
+        Some(NumericWidth::D64)
+    );
+    assert_eq!(
+        decimal_source_width(&path(1, i64), &types, |_| Some(d64)),
+        Some(NumericWidth::D64)
+    );
+    assert_eq!(decimal_source_width(&path(1, i64), &types, |_| None), None);
 }
 
 #[test]
