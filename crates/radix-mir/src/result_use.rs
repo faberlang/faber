@@ -142,20 +142,14 @@ fn follow_result(function: &MirFunction, destination: &MirPlace) -> Option<(MirP
 
 /// Whether any read inside `statement` touches `base`.
 fn stmt_reads(base: &MirPlaceBase, statement: &MirStatement) -> bool {
-    let mut reads = BaseReads {
-        base,
-        found: false,
-    };
+    let mut reads = BaseReads { base, found: false };
     walk_stmt(&mut reads, statement);
     reads.found
 }
 
 /// Whether any read inside `terminator` touches `base`.
 fn terminator_reads(base: &MirPlaceBase, terminator: &MirTerminator) -> bool {
-    let mut reads = BaseReads {
-        base,
-        found: false,
-    };
+    let mut reads = BaseReads { base, found: false };
     walk_terminator(&mut reads, terminator);
     reads.found
 }

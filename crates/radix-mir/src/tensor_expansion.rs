@@ -49,8 +49,7 @@ impl TensorExpansion {
         for source_axis in (0..source.len()).rev() {
             for first_target in (0..target.len()).rev() {
                 for target_axis in first_target..target.len() {
-                    let Some(stretch) =
-                        singleton_stretch(source[source_axis], target[target_axis])
+                    let Some(stretch) = singleton_stretch(source[source_axis], target[target_axis])
                     else {
                         continue;
                     };
