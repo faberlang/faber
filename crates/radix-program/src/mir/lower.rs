@@ -2355,6 +2355,21 @@ fn rewrite_validation_def_ids(
     context.rebuild_variant_positions();
 }
 
+/// Re-key the validation context's closure-environment registry onto the
+/// unit's current environment vec. Every rewrite pass rebuilds `ValidatedMir`
+/// from the rewritten program plus these live environments, so the stale
+/// pre-rewrite registry carried in through `into_parts` must be replaced
+/// before re-validation.
+fn sync_context_closure_environments(
+    context: &mut radix_module::mir::MirValidationContext<'_>,
+    environments: &[MirClosureEnvironment],
+) {
+    context.closure_environments = environments
+        .iter()
+        .map(|environment| (environment.id, environment.clone()))
+        .collect();
+}
+
 pub(super) fn rewrite_lowered_type_ids<'a>(
     mut lowered: LoweredMirUnit<'a>,
     rewrites: &[(TypeId, TypeId)],
@@ -2388,11 +2403,7 @@ pub(super) fn rewrite_lowered_type_ids<'a>(
     rewrite_validation_type_ids(&mut context, rewrites);
     rewrite_validation_def_ids(&mut context, variant_remap, struct_remap);
     remapped.apply(&mut context);
-    context.closure_environments = lowered
-        .closure_environments
-        .iter()
-        .map(|environment| (environment.id, environment.clone()))
-        .collect();
+    sync_context_closure_environments(&mut context, &lowered.closure_environments);
     lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(lowered)
@@ -2609,11 +2620,7 @@ fn remap_lowered_program_text_symbols<'a>(
         context = context.with_owned_types(remapped_types);
     }
     context.interner = radix_module::mir::MirInterner::Owned(std::sync::Arc::new(target.clone()));
-    context.closure_environments = lowered
-        .closure_environments
-        .iter()
-        .map(|environment| (environment.id, environment.clone()))
-        .collect();
+    sync_context_closure_environments(&mut context, &lowered.closure_environments);
     lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(lowered)
@@ -2651,11 +2658,7 @@ fn rewrite_lowered_program_sources<'a>(
             .into_iter()
             .map(|(def, identity)| (rewrite(def), identity))
             .collect();
-    context.closure_environments = lowered
-        .closure_environments
-        .iter()
-        .map(|environment| (environment.id, environment.clone()))
-        .collect();
+    sync_context_closure_environments(&mut context, &lowered.closure_environments);
     lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(lowered)
@@ -2674,8 +2677,7 @@ fn remap_templates_text_symbols<'a>(
     // (param names) and template shape symbols have to agree on one table.
     for (_, params) in &mut lowered.generic_params {
         for param in params {
-            param.name =
-                remap_optional_symbol(Some(param.name), &source, target).unwrap_or(param.name);
+            param.name = remap_symbol(param.name, &source, target);
         }
     }
     lowered
@@ -2959,12 +2961,7 @@ fn instantiate_package_generics<'a>(
     merged.generic_params = generic_params;
     let types: &'static radix_types::TypeTable = Box::leak(Box::new(types));
     let mut context = prior_context.with_types(types);
-    context.closure_environments.clear();
-    for environment in &merged.closure_environments {
-        context
-            .closure_environments
-            .insert(environment.id, environment.clone());
-    }
+    sync_context_closure_environments(&mut context, &merged.closure_environments);
     context.layouts = radix_module::mir::MirLayoutTable::from_types(types);
     if let Some(extra) = extra_validation {
         extra.apply(&mut context);
@@ -3455,8 +3452,14 @@ fn merge_shifted_device_function_metadata(
     Ok(())
 }
 
+/// A pending package unit and a linked library carry the same owned parts
+/// (program, closure environments, templates, device/display metadata), so
+/// the merge steps — id shift, metadata join, prior-template instantiation,
+/// context rebuild — exist once, in `append_shifted_library_parts`. This
+/// adapter only disassembles the unit into those parts; the caller's
+/// `shift_templates` offset matches the one the shared path computes.
 fn append_shifted_program<'merged>(
-    mut merged: LoweredMirUnit<'merged>,
+    merged: LoweredMirUnit<'merged>,
     incoming: LoweredMirUnit<'_>,
     diagnostic_path: &Path,
     extra: &RemappedValidation,
@@ -3466,87 +3469,28 @@ fn append_shifted_program<'merged>(
     consumer_device_roles: &HashMap<DefId, radix_module::mir::MirDeviceRole>,
     consumer_launch_entries: &HashSet<DefId>,
 ) -> Result<(LoweredMirUnit<'merged>, LibraryMirParts), Vec<Diagnostic>> {
-    let (mut merged_program, mut context) = merged.validated.into_parts();
-    let (incoming_program, incoming_context) = incoming.validated.into_parts();
-    let incoming_display_tokens = incoming_context.display_tokens.clone();
-    let mut incoming_parts = LibraryMirParts {
-        program: incoming_program,
+    let (program, incoming_context) = incoming.validated.into_parts();
+    let parts = LibraryMirParts {
+        program,
         environments: incoming.closure_environments,
         templates: incoming.generic_templates,
         generic_params: incoming.generic_params,
         tensor_edge_policy_metadata: incoming.tensor_edge_policy_metadata,
         device_function_metadata: incoming.device_function_metadata,
-        display_tokens: incoming_display_tokens.clone(),
+        display_tokens: incoming_context.display_tokens,
     };
-    let offset = append_shifted_parts(
-        &mut merged_program,
-        &mut merged.closure_environments,
-        &mut incoming_parts.program,
-        &mut incoming_parts.environments,
+    let (merged, parts, _) = append_shifted_library_parts(
+        merged,
+        parts,
         diagnostic_path,
+        extra,
+        prior_templates,
+        prior_generic_params,
+        imported_devices,
+        consumer_device_roles,
+        consumer_launch_entries,
     )?;
-    merge_shifted_device_function_metadata(
-        &mut merged.device_function_metadata,
-        &incoming_parts.device_function_metadata,
-        offset,
-        diagnostic_path,
-    )?;
-    // The incoming unit's display tokens join the merged table; its function
-    // ids shift with the unit's functions.
-    context
-        .display_tokens
-        .absorb(&incoming_display_tokens, |id| MirFunctionId(id.0 + offset));
-    merge_tensor_edge_policy_metadata(
-        &mut merged.tensor_edge_policy_metadata,
-        &incoming_parts.tensor_edge_policy_metadata,
-    );
-    if !prior_templates.is_empty() || !incoming_parts.templates.is_empty() {
-        let mut current_templates = incoming_parts.templates.clone();
-        shift_templates(&mut current_templates, offset);
-        let mut templates = prior_templates.to_vec();
-        templates.extend(current_templates);
-        let mut generic_params = prior_generic_params.to_vec();
-        generic_params.extend(incoming_parts.generic_params.clone());
-        let mut types = TypeTable::from_snapshot(context.types.snapshot())
-            .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
-        let (monomorphizations, registrations) =
-            radix_module::mir::instantiate_merged_generic_calls_with_tensor_edge_policy(
-                &mut merged_program,
-                &templates,
-                &generic_params,
-                &mut types,
-                &merged.interner,
-                Some(extra.joined_with_context(&context).struct_metadata()).as_ref(),
-                &mut merged.device_function_metadata,
-                imported_devices,
-                consumer_device_roles,
-                consumer_launch_entries,
-                &merged.tensor_edge_policy_metadata,
-                false,
-            )
-            .map_err(|errors| {
-                errors
-                    .into_iter()
-                    .map(|error| mir_error_diag(diagnostic_path, error))
-                    .collect::<Vec<_>>()
-            })?;
-        merged.monomorphizations.extend(monomorphizations);
-        merge_imported_device_registrations(
-            &mut merged.imported_device_registrations,
-            registrations,
-        );
-        let types: &'static TypeTable = Box::leak(Box::new(types));
-        context = context.with_types(types);
-    }
-    context.closure_environments = merged
-        .closure_environments
-        .iter()
-        .map(|environment| (environment.id, environment.clone()))
-        .collect();
-    extra.apply(&mut context);
-    merged.validated = radix_module::mir::ValidatedMir::new(merged_program, context)
-        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
-    Ok((merged, incoming_parts))
+    Ok((merged, parts))
 }
 
 fn append_shifted_library_parts<'a>(
@@ -3619,11 +3563,7 @@ fn append_shifted_library_parts<'a>(
         let types: &'static TypeTable = Box::leak(Box::new(types));
         context = context.with_types(types);
     }
-    context.closure_environments = merged
-        .closure_environments
-        .iter()
-        .map(|environment| (environment.id, environment.clone()))
-        .collect();
+    sync_context_closure_environments(&mut context, &merged.closure_environments);
     extra.apply(&mut context);
     merged.validated = radix_module::mir::ValidatedMir::new(merged_program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
@@ -3768,12 +3708,7 @@ pub(super) fn rebuild_merged_validated<'a>(
         &merged.monomorphizations,
         template_tokens,
     );
-    context.closure_environments.clear();
-    for environment in &merged.closure_environments {
-        context
-            .closure_environments
-            .insert(environment.id, environment.clone());
-    }
+    sync_context_closure_environments(&mut context, &merged.closure_environments);
     if let Some(extra) = extra {
         extra.apply(&mut context);
     }
@@ -4598,13 +4533,12 @@ fn scan_mir_function_references(
     program: &MirProgram,
     function_id: MirFunctionId,
 ) -> MirReferenceScan {
-    let scan = MirReferenceScan::default();
     let Some(function) = program
         .functions
         .iter()
         .find(|function| function.id == function_id)
     else {
-        return scan;
+        return MirReferenceScan::default();
     };
     scan_mir_function_body_references(function)
 }
