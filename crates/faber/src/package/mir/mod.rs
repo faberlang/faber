@@ -180,13 +180,15 @@ fn resolve_device_inputs(
                 }
             }
         }
-        let Ok(_signature) =
-            radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
-                function, lowered.validated.validation(), &lowered.interner,
-            )
-        else {
+        if radix_mir::abi::MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+            function,
+            lowered.validated.validation(),
+            &lowered.interner,
+        )
+        .is_err()
+        {
             continue;
-        };
+        }
         for program_name in kernel
             .resources
             .iter()

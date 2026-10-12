@@ -857,16 +857,8 @@ fn judge_run_output(case: &Case, output: &Output) -> (&'static str, Option<Strin
         );
     }
     for (name, path, actual) in [
-        (
-            "stdout",
-            expected.stdout.as_ref(),
-            Some(output.stdout.as_slice()),
-        ),
-        (
-            "stderr",
-            expected.stderr.as_ref(),
-            Some(output.stderr.as_slice()),
-        ),
+        ("stdout", expected.stdout.as_ref(), output.stdout.as_slice()),
+        ("stderr", expected.stderr.as_ref(), output.stderr.as_slice()),
     ] {
         if let Some(path) = path {
             let golden = match fs::read(path) {
@@ -875,11 +867,12 @@ fn judge_run_output(case: &Case, output: &Output) -> (&'static str, Option<Strin
                     return ("fail", Some(format!("cannot read {name} golden: {error}")));
                 }
             };
-            if name == "stdout" {
-                if Some(super::normalize_stdout(&golden)) != actual.map(super::normalize_stdout) {
-                    return ("fail", Some(format!("{name} mismatch")));
-                }
-            } else if Some(golden.as_slice()) != actual {
+            let matches = if name == "stdout" {
+                super::normalize_stdout(&golden) == super::normalize_stdout(actual)
+            } else {
+                golden == actual
+            };
+            if !matches {
                 return ("fail", Some(format!("{name} mismatch")));
             }
         }
