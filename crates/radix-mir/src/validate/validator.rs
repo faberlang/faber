@@ -99,11 +99,7 @@ impl<'a> ValidatedMir<'a> {
     ) -> Result<Self, Vec<MirValidationError>> {
         context.rebuild_variant_positions();
         validate_program(&program, &context)?;
-        Ok(Self {
-            function_index: program.function_index(),
-            program,
-            validation: context,
-        })
+        Ok(Self::from_validated(program, context))
     }
 
     /// Build a validated-MIR token and enforce the nucleum-fragment survivor
@@ -144,11 +140,18 @@ impl<'a> ValidatedMir<'a> {
     ) -> Result<Self, Vec<MirValidationError>> {
         context.rebuild_variant_positions();
         validate_program_with_device_roles_and_metadata(&program, &context, roles, metadata)?;
-        Ok(Self {
-            function_index: program.function_index(),
+        Ok(Self::from_validated(program, context))
+    }
+
+    /// Assemble the proof token from a program that has just passed
+    /// validation and the context that proved it.
+    fn from_validated(program: MirProgram, context: MirValidationContext<'a>) -> Self {
+        let function_index = program.function_index();
+        Self {
             program,
+            function_index,
             validation: context,
-        })
+        }
     }
 
     /// The validated inner program.
@@ -244,12 +247,13 @@ pub fn validate_program_with_device_roles(
 ///
 /// The separate metadata map keeps existing hand-built MIR fixtures source
 /// compatible while making synthetic kernel role facts visible at validation.
+///
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 #[expect(
     clippy::implicit_hasher,
     reason = "FxHashMap is the crate-wide map type for device roles"
 )]
-/// # Errors
-/// Returns an error when the input or persisted artifact is invalid.
 pub fn validate_program_with_device_roles_and_metadata(
     program: &MirProgram,
     context: &MirValidationContext<'_>,
