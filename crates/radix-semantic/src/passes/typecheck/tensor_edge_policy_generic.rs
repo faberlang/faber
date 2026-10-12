@@ -109,9 +109,8 @@ impl PolicyUsageCollector<'_> {
 impl HirVisitor for PolicyUsageCollector<'_> {
     fn visit_item(&mut self, item: &HirItem) {
         match &item.kind {
-            HirItemKind::Function(function) => {
+            HirItemKind::Function(_) => {
                 let previous_owner = self.owner.replace(item.def_id);
-                self.record_function_type_params(function);
                 walk_item(self, item);
                 self.owner = previous_owner;
             }
@@ -134,7 +133,6 @@ impl HirVisitor for PolicyUsageCollector<'_> {
 
     fn visit_method(&mut self, method: &radix_hir::HirMethod) {
         let previous_owner = self.owner.replace(method.def_id);
-        self.record_function_type_params(&method.func);
         walk_method(self, method);
         self.owner = previous_owner;
     }
