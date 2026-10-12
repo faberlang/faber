@@ -372,42 +372,14 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 ));
                 continue;
             };
-            let mut type_ordinal = 0_usize;
-            let mut policy_type_argument = None;
-            for parameter in parameters {
-                if parameter.kind != ParamKind::Typus {
-                    continue;
-                }
-                if parameter.name == policy_symbol {
-                    policy_type_argument = Some(type_ordinal);
-                    break;
-                }
-                type_ordinal += 1;
-            }
-            let Some(policy_type_argument) = policy_type_argument else {
+            let Some(policy_type_argument) = typus_param_ordinal(parameters, policy_symbol) else {
                 self.lowerer.errors.push(MirError::unsupported(
                     pending.span,
                     "deferred tensor limes policy does not name a typus parameter",
                 ));
                 continue;
             };
-            let call_return_ty = template
-                .blocks
-                .iter()
-                .flat_map(|block| &block.statements)
-                .find_map(|statement| match &statement.kind {
-                    MirStatementKind::RuntimeCall { destination: Some(place), call }
-                        if place.base == MirPlaceBase::Temp(pending.destination)
-                            && place.projections.is_empty()
-                            && matches!(
-                                &call.intrinsic,
-                                MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp))
-                            ) =>
-                    {
-                        Some(call.return_ty)
-                    }
-                    _ => None,
-                });
+            let call_return_ty = deferred_limes_placeholder_return_ty(template, pending.destination);
             let Some((_, rank)) = call_return_ty.and_then(|ty| tensor_element_and_rank(self.types(), ty.semantic_id()))
             else {
                 self.lowerer.errors.push(MirError::unsupported(
@@ -620,12 +592,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         let Some(params) = self.generic_param_order.get(&monomorphization.key.source) else {
             return MirShapeBindings::default();
         };
-        params
-            .iter()
-            .filter(|param| param.kind == ParamKind::Magnitudo)
-            .zip(monomorphization.key.shape_args.iter().copied())
-            .map(|(param, shape)| (param.name, shape))
-            .collect()
+        shape_bindings_for_key(params, &monomorphization.key.shape_args)
     }
 
     fn key_for_call(
@@ -1153,19 +1120,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 ));
                 return false;
             };
-            let mut type_ordinal = 0_usize;
-            let mut policy_ordinal = None;
-            for parameter in &params {
-                if parameter.kind != ParamKind::Typus {
-                    continue;
-                }
-                if parameter.name == symbol {
-                    policy_ordinal = Some(type_ordinal);
-                    break;
-                }
-                type_ordinal += 1;
-            }
-            let Some(actual_policy) = policy_ordinal
+            let Some(actual_policy) = typus_param_ordinal(&params, symbol)
                 .and_then(|ordinal| key.type_args.get(ordinal))
                 .map(|ty| ty.semantic_id())
             else {
@@ -1180,17 +1135,12 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             else {
                 return false;
             };
-            let Some(statement) = function.blocks.iter_mut().flat_map(|block| &mut block.statements).find(|statement| {
-                matches!(
-                    &statement.kind,
-                    MirStatementKind::RuntimeCall {
-                        destination: Some(place),
-                        call,
-                    } if place.base == MirPlaceBase::Temp(pending.destination)
-                        && place.projections.is_empty()
-                        && matches!(&call.intrinsic, MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp)))
-                )
-            }) else {
+            let Some(statement) = function
+                .blocks
+                .iter_mut()
+                .flat_map(|block| &mut block.statements)
+                .find(|statement| is_deferred_limes_placeholder(statement, pending.destination))
+            else {
                 self.lowerer.errors.push(MirError::unsupported(
                     pending.span,
                     "deferred tensor limes placeholder changed during specialization",
@@ -1211,24 +1161,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         actual_policy: TypeId,
         callback_ids: &FxHashMap<DefId, MirFunctionId>,
     ) -> Option<MirEdgePolicy> {
-        let call_return_ty = function
-            .blocks
-            .iter()
-            .flat_map(|block| &block.statements)
-            .find_map(|statement| match &statement.kind {
-                MirStatementKind::RuntimeCall { destination: Some(place), call }
-                    if place.base == MirPlaceBase::Temp(pending.destination)
-                        && place.projections.is_empty()
-                        && matches!(
-                            &call.intrinsic,
-                            MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp))
-                        ) =>
-                {
-                    Some(call.return_ty)
-                }
-                _ => None,
-            });
-        let Some(call_return_ty) = call_return_ty else {
+        let Some(call_return_ty) = deferred_limes_placeholder_return_ty(function, pending.destination) else {
             self.lowerer.errors.push(MirError::unsupported(
                 pending.span,
                 "deferred tensor limes placeholder is missing from its concrete instance",
@@ -1320,34 +1253,28 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             })
             .unwrap_or_default();
         for param in &mut function.params {
-            param.ty = match self.substitute_ty(param.ty, bindings, span) {
-                Some(ty) => ty,
-                None => return false,
-            };
+            if !self.substitute_ty_in_place(&mut param.ty, bindings, span) {
+                return false;
+            }
         }
         for local in &mut function.locals {
-            local.ty = match self.substitute_ty(local.ty, bindings, span) {
-                Some(ty) => ty,
-                None => return false,
-            };
+            if !self.substitute_ty_in_place(&mut local.ty, bindings, span) {
+                return false;
+            }
         }
         for temp in &mut function.temps {
-            temp.ty = match self.substitute_ty(temp.ty, bindings, span) {
-                Some(ty) => ty,
-                None => return false,
-            };
+            if !self.substitute_ty_in_place(&mut temp.ty, bindings, span) {
+                return false;
+            }
         }
-        function.return_ty = match self.substitute_ty(function.return_ty, bindings, span) {
-            Some(ty) => ty,
-            None => return false,
-        };
-        function.error_ty = match function.error_ty {
-            Some(error_ty) => match self.substitute_ty(error_ty, bindings, span) {
-                Some(error_ty) => Some(error_ty),
-                None => return false,
-            },
-            None => None,
-        };
+        if !self.substitute_ty_in_place(&mut function.return_ty, bindings, span) {
+            return false;
+        }
+        if let Some(error_ty) = &mut function.error_ty
+            && !self.substitute_ty_in_place(error_ty, bindings, span)
+        {
+            return false;
+        }
 
         for block in &mut function.blocks {
             for statement in &mut block.statements {
@@ -1399,6 +1326,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             MirStatementKind::Construct { aggregate, .. } => self.substitute_aggregate(aggregate, bindings, span),
         }
     }
+
     fn substitute_callee(
         &mut self,
         callee: &mut MirCallee,
@@ -1532,6 +1460,18 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                     .push(MirError::validation(error.span, error.message));
             })
             .ok()
+    }
+
+    /// In-place form of `substitute_ty` for declaration types; a failure is
+    /// reported by `substitute_ty` and aborts the instance at the call site.
+    fn substitute_ty_in_place(&mut self, ty: &mut MirType, bindings: &MirGenericBindings, span: Span) -> bool {
+        match self.substitute_ty(*ty, bindings, span) {
+            Some(substituted) => {
+                *ty = substituted;
+                true
+            }
+            None => false,
+        }
     }
 
     fn apply_rewrites(&mut self, rewrites: Vec<Rewrite>) {
@@ -1778,6 +1718,35 @@ struct OrderedParam {
     runtime_witness: Option<IndexId>,
 }
 
+/// Zero-based position of `name` among the `typus` parameters. A key's
+/// `type_args` index only typus parameters, so `magnitudo` entries do not
+/// advance the ordinal.
+fn typus_param_ordinal(params: &[OrderedParam], name: Symbol) -> Option<usize> {
+    let mut ordinal = 0_usize;
+    for param in params {
+        if param.kind != ParamKind::Typus {
+            continue;
+        }
+        if param.name == name {
+            return Some(ordinal);
+        }
+        ordinal += 1;
+    }
+    None
+}
+
+/// Bind each `magnitudo` parameter to the key's shape argument in the same
+/// declaration order. A key with fewer arguments leaves the trailing parameters unbound;
+/// the finalize survivor net fails closed on those.
+fn shape_bindings_for_key(params: &[OrderedParam], shape_args: &[IndexId]) -> MirShapeBindings {
+    params
+        .iter()
+        .filter(|param| param.kind == ParamKind::Magnitudo)
+        .zip(shape_args.iter().copied())
+        .map(|(param, shape)| (param.name, shape))
+        .collect()
+}
+
 /// Contract-method names and genus method targets for bound-call dispatch.
 fn contract_dispatch_tables(
     hir: &radix_hir::HirModule,
@@ -1922,8 +1891,7 @@ pub(super) fn resolve_parent_shape_binding(
     }
 }
 
-/// All generic parameters in declaration order — `magnitudo` shape params sit
-/// parallel to `typus` params so the witness binds both from the call site.
+/// Interned `IndexExpr::Literal` node for a concrete extent, if present.
 fn find_literal_index(types: &TypeTable, value: u64) -> Option<IndexId> {
     (0..types.index_count()).find_map(|index| {
         #[expect(clippy::cast_possible_truncation, reason = "IndexId is a u32 arena index by design")]
@@ -1990,16 +1958,7 @@ pub fn finalize_monomorphized_shapes(
         let Some(function) = function_index.function_mut(functions, monomorphization.function) else {
             continue;
         };
-        let mut shape_bindings = MirShapeBindings::default();
-        let mut shape_args = monomorphization.key.shape_args.iter();
-        for param in params {
-            if param.kind == ParamKind::Magnitudo {
-                let Some(concrete) = shape_args.next().copied() else {
-                    break;
-                };
-                shape_bindings.insert(param.name, concrete);
-            }
-        }
+        let shape_bindings = shape_bindings_for_key(params, &monomorphization.key.shape_args);
         if !finalize_function_shapes(types, function, &type_bindings, &shape_bindings, &index, &mut errors) {
             continue;
         }
@@ -2291,6 +2250,40 @@ pub(super) fn function_contains_param(types: &TypeTable, function: &MirFunction)
         || function
             .error_ty
             .is_some_and(|error_ty| type_contains_param(types, error_ty.semantic_id()))
+}
+
+/// Whether `statement` is the private `limes` placeholder call whose result
+/// lands in `destination`. The placeholder's staging tag is
+/// `MirBuiltinEdgePolicy::Clamp`; specialization replaces it before
+/// validation.
+fn is_deferred_limes_placeholder(statement: &MirStatement, destination: MirTempId) -> bool {
+    matches!(
+        &statement.kind,
+        MirStatementKind::RuntimeCall { destination: Some(place), call }
+            if place.base == MirPlaceBase::Temp(destination)
+                && place.projections.is_empty()
+                && matches!(
+                    &call.intrinsic,
+                    MirIntrinsic::TensorLimes(MirEdgePolicy::Builtin(MirBuiltinEdgePolicy::Clamp))
+                )
+    )
+}
+
+/// Return type recorded on a pending `limes` placeholder call.
+fn deferred_limes_placeholder_return_ty(function: &MirFunction, destination: MirTempId) -> Option<MirType> {
+    function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| {
+            if !is_deferred_limes_placeholder(statement, destination) {
+                return None;
+            }
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                return None;
+            };
+            Some(call.return_ty)
+        })
 }
 
 fn tensor_edge_policy_param_symbol(types: &TypeTable, mut ty: TypeId) -> Option<Symbol> {
