@@ -180,42 +180,10 @@ pub(crate) fn plan_self_update(
         .map_err(|message| launcher_metadata_error(message, "the install prefix"))?;
     let receipt = read_receipt(&prefix)
         .map_err(|message| launcher_metadata_error(message, prefix.display()))?;
-    let current_version = receipt
-        .get("version")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            launcher_metadata_error(
-                format!("install receipt at {} has no version", prefix.display()),
-                prefix.display(),
-            )
-        })?;
-    let triple = receipt
-        .get("triple")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            launcher_metadata_error(
-                format!("install receipt at {} has no triple", prefix.display()),
-                prefix.display(),
-            )
-        })?;
-    let source = receipt
-        .get("source")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            launcher_metadata_error(
-                format!("install receipt at {} has no source", prefix.display()),
-                prefix.display(),
-            )
-        })?;
-    let base_url = if let Some(url) = args.base_url.as_deref() {
-        url.to_owned()
-    } else {
-        receipt
-            .get("assetBase")
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned)
-            .unwrap_or_else(|| derive_base_url(source, &args.version))
-    };
+    let current_version = required_receipt_str(&receipt, &prefix, "version", launcher_metadata_error)?;
+    let triple = required_receipt_str(&receipt, &prefix, "triple", launcher_metadata_error)?;
+    let source = required_receipt_str(&receipt, &prefix, "source", launcher_metadata_error)?;
+    let base_url = base_url_for(args.base_url.as_deref(), &receipt, source, &args.version);
     Ok(SelfUpdatePlan {
         prefix,
         current_version: current_version.to_owned(),
@@ -242,44 +210,12 @@ pub(crate) fn plan_self_uninstall(
         .map_err(|message| uninstall_metadata_error(message, "the install prefix"))?;
     let receipt = read_receipt(&prefix)
         .map_err(|message| uninstall_metadata_error(message, prefix.display()))?;
-    let current_version = receipt
-        .get("version")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            uninstall_metadata_error(
-                format!("install receipt at {} has no version", prefix.display()),
-                prefix.display(),
-            )
-        })?;
-    let triple = receipt
-        .get("triple")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            uninstall_metadata_error(
-                format!("install receipt at {} has no triple", prefix.display()),
-                prefix.display(),
-            )
-        })?;
-    let source = receipt
-        .get("source")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            uninstall_metadata_error(
-                format!("install receipt at {} has no source", prefix.display()),
-                prefix.display(),
-            )
-        })?;
-    let base_url = if let Some(url) = args.base_url.as_deref() {
-        url.to_owned()
-    } else {
-        receipt
-            .get("assetBase")
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned)
-            // The engine script is published beside the CURRENT version's
-            // assets (the same base that installed this version).
-            .unwrap_or_else(|| derive_base_url(source, current_version))
-    };
+    let current_version = required_receipt_str(&receipt, &prefix, "version", uninstall_metadata_error)?;
+    let triple = required_receipt_str(&receipt, &prefix, "triple", uninstall_metadata_error)?;
+    let source = required_receipt_str(&receipt, &prefix, "source", uninstall_metadata_error)?;
+    // The uninstall engine script is published beside the CURRENT version's
+    // assets (the same base that installed this version).
+    let base_url = base_url_for(args.base_url.as_deref(), &receipt, source, current_version);
     Ok(SelfUninstallPlan {
         prefix,
         current_version: current_version.to_owned(),
@@ -393,6 +329,41 @@ pub(crate) fn derive_base_url(source: &str, target_version: &str) -> String {
         return format!("{host}/faber-v{target_version}");
     }
     base.to_owned()
+}
+
+/// Read a required string field from the install receipt, classifying a
+/// missing or non-string field as lost launcher metadata through `metadata_error`.
+fn required_receipt_str<'a>(
+    receipt: &'a serde_json::Value,
+    prefix: &Path,
+    field: &str,
+    metadata_error: fn(String, String) -> String,
+) -> Result<&'a str, String> {
+    receipt.get(field).and_then(serde_json::Value::as_str).ok_or_else(|| {
+        metadata_error(
+            format!("install receipt at {} has no {field}", prefix.display()),
+            prefix.display().to_string(),
+        )
+    })
+}
+
+/// Resolve the asset base for the bootstrap fetch: explicit `--base-url`
+/// first, then the receipt's recorded `assetBase`, then the release-tag
+/// rewrite of the recorded source against `fallback_version`.
+fn base_url_for(
+    override_url: Option<&str>,
+    receipt: &serde_json::Value,
+    source: &str,
+    fallback_version: &str,
+) -> String {
+    if let Some(url) = override_url {
+        return url.to_owned();
+    }
+    receipt
+        .get("assetBase")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+        .unwrap_or_else(|| derive_base_url(source, fallback_version))
 }
 
 /// Fetch the published bootstrap script and run it under `python3` with the
