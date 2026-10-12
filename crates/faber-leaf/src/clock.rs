@@ -16,6 +16,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Assumed Linux `CLK_TCK` when converting `/proc/self/stat` ticks to ns.
+#[cfg(target_os = "linux")]
 const LINUX_CLK_TCK: i64 = 100;
 
 static MONOTONIC_ORIGIN: OnceLock<Instant> = OnceLock::new();

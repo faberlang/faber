@@ -201,7 +201,7 @@ fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
     command.stdin(Stdio::inherit());
     command.stdout(Stdio::inherit());
     command.stderr(Stdio::inherit());
-    let mut child = command
+    let child = command
         .spawn()
         .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))?;
     let pid = i64::from(child.id());
