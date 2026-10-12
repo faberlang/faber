@@ -337,7 +337,6 @@ impl TypeChecker<'_> {
         allow_tensor_pair: bool,
     ) -> LiftPairing {
         let (left, right) = (self.lift_side(lhs_ty), self.lift_side(rhs_ty));
-        let scalar_is_error = |this: &Self, ty: TypeId| this.is_error(ty);
         match (left, right) {
             (
                 LiftSide::Tensor {
@@ -363,7 +362,7 @@ impl TypeChecker<'_> {
                 })
             }
             (LiftSide::Tensor { elem, shape }, LiftSide::Scalar(scalar)) => {
-                if scalar_is_error(self, scalar) {
+                if self.is_error(scalar) {
                     return LiftPairing::Failed;
                 }
                 LiftPairing::Lifted(LiftPair {
@@ -375,7 +374,7 @@ impl TypeChecker<'_> {
                 })
             }
             (LiftSide::Scalar(scalar), LiftSide::Tensor { elem, shape }) => {
-                if scalar_is_error(self, scalar) {
+                if self.is_error(scalar) {
                     return LiftPairing::Failed;
                 }
                 LiftPairing::Lifted(LiftPair {
