@@ -24,10 +24,6 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-/// Shared target directory for smoke-test cargo builds. Redirects compiled
-/// artifacts to the shared cache so temp project dirs stay small and cleanup
-/// is trivial. Falls back to a per-user cache dir when `CARGO_TARGET_DIR` is
-/// not set by `.cargo/config.toml`.
 /// Cargo target dir for emitted-Rust smoke builds. Lives under the
 /// cargo-managed temp root (`<target-dir>/tmp/smoke-target`) so `cargo clean`
 /// sweeps it; there is deliberately no system-temp fallback.
@@ -191,18 +187,6 @@ fn go_mod_content(runtime: &Path) -> String {
 #[must_use]
 pub fn mangle_emitted_text(code: &str) -> String {
     format!("{code}\n/*smoke-regression-guard*/ __BROKEN_SYNTAX__((!!!")
-}
-
-/// Corrupts a byte offset inside a real emitted Wasm module.
-#[must_use]
-pub fn mangle_emitted_bytes(bytes: &[u8]) -> Vec<u8> {
-    let mut mangled = bytes.to_vec();
-    if mangled.len() > 10 {
-        mangled[9] = 0xFF;
-    } else {
-        mangled.extend_from_slice(b"\0GARBAGE");
-    }
-    mangled
 }
 
 /// Family A entry point: structural validation of full HIR-emitted source text.
