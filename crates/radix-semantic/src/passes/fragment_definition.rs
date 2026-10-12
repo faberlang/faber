@@ -639,17 +639,6 @@ impl FragmentDefinitionChecker<'_> {
             }
             return;
         }
-        if let Some(ty) = self.path_type(def_id)
-            && is_func_type(ty, self.types)
-        {
-            self.effect(span, "dynamic_function");
-        }
-    }
-
-    fn path_type(&self, def_id: DefId) -> Option<TypeId> {
-        self.resolver
-            .get_symbol(def_id)
-            .and_then(|symbol| symbol.ty)
     }
 
     fn is_device_receiver(&self, receiver: &HirExpression) -> bool {
