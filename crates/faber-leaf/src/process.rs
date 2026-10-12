@@ -84,37 +84,23 @@ fn expect_str<'a>(
     }
 }
 
-fn expect_strs(route: &'static str, args: &[Arg], index: usize) -> Result<Vec<String>, LeafError> {
-    match args.get(index) {
-        Some(Arg::Strs(value)) => Ok(value.clone()),
-        Some(Arg::Str(value)) => Ok(vec![value.clone()]),
-        Some(_) => Err(LeafError::invalid_argument(
-            route,
-            "args must be lista<textus>",
-        )),
-        None => Err(LeafError::invalid_argument(route, "missing args")),
-    }
-}
-
-fn optional_str(args: &[Arg], index: usize) -> Result<Option<String>, LeafError> {
-    match args.get(index) {
-        None | Some(Arg::Nil) => Ok(None),
-        Some(Arg::Str(value)) => Ok(Some(value.clone())),
-        Some(_) => Err(LeafError::invalid_argument(
-            "processus:dimitte",
-            "directory must be textus",
-        )),
-    }
-}
-
-fn optional_env(args: &[Arg], index: usize) -> Result<Option<Vec<(String, String)>>, LeafError> {
-    match args.get(index) {
-        None | Some(Arg::Nil) => Ok(None),
-        Some(Arg::Map(value)) => Ok(Some(value.clone())),
-        Some(_) => Err(LeafError::invalid_argument(
-            "processus:dimitte",
-            "environment must be tabula",
-        )),
+/// Collect the child argv from an opener that flattened a `lista<textus>`
+/// into one positional `Str` per element, while still accepting a single
+/// `Arg::Strs` when the list arrived intact.
+fn expect_argv(route: &'static str, args: &[Arg]) -> Result<Vec<String>, LeafError> {
+    match args {
+        [Arg::Strs(value)] => Ok(value.clone()),
+        [] => Err(LeafError::invalid_argument(route, "missing args")),
+        other => other
+            .iter()
+            .map(|arg| match arg {
+                Arg::Str(value) => Ok(value.clone()),
+                _ => Err(LeafError::invalid_argument(
+                    route,
+                    "args must be lista<textus>",
+                )),
+            })
+            .collect(),
     }
 }
 
@@ -128,26 +114,18 @@ fn empty_ok(route: &'static str, args: &[Arg]) -> Result<(), LeafError> {
 
 fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:genera";
-    let argv = expect_strs(ROUTE, args, 0)?;
+    let argv = expect_argv(ROUTE, args)?;
     if argv.is_empty() || argv[0].is_empty() {
         return Err(LeafError::invalid_argument(
             ROUTE,
             "empty argv / empty command",
         ));
     }
-    let directory = optional_str(args, 1)?;
-    let environment = optional_env(args, 2)?;
     let mut command = Command::new(&argv[0]);
     command.args(&argv[1..]);
     command.stdin(Stdio::inherit());
     command.stdout(Stdio::inherit());
     command.stderr(Stdio::inherit());
-    if let Some(directory) = directory {
-        command.current_dir(directory);
-    }
-    if let Some(environment) = environment {
-        command.envs(environment);
-    }
     command
         .spawn()
         .map(|child| Reply::Int(i64::from(child.id())))
@@ -156,26 +134,18 @@ fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
 
 fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:dimitte";
-    let argv = expect_strs(ROUTE, args, 0)?;
+    let argv = expect_argv(ROUTE, args)?;
     if argv.is_empty() || argv[0].is_empty() {
         return Err(LeafError::invalid_argument(
             ROUTE,
             "empty argv / empty command",
         ));
     }
-    let directory = optional_str(args, 1)?;
-    let environment = optional_env(args, 2)?;
     let mut command = Command::new(&argv[0]);
     command.args(&argv[1..]);
     command.stdin(Stdio::null());
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
-    if let Some(directory) = directory {
-        command.current_dir(directory);
-    }
-    if let Some(environment) = environment {
-        command.envs(environment);
-    }
     command
         .spawn()
         .map(|child| Reply::Int(i64::from(child.id())))
@@ -184,7 +154,7 @@ fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
 
 fn capture(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:captura";
-    let argv = expect_strs(ROUTE, args, 0)?;
+    let argv = expect_argv(ROUTE, args)?;
     if argv.is_empty() || argv[0].is_empty() {
         return Err(LeafError::invalid_argument(
             ROUTE,

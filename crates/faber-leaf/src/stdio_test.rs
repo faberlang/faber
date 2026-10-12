@@ -31,6 +31,33 @@ fn write_partial_rejects_missing_text() {
 }
 
 #[test]
+fn write_bytes_accepts_flattened_byte_integers() {
+    let reply = serve(
+        "consolum:funde",
+        &[Arg::Int(111), Arg::Int(107), Arg::Int(10)],
+    )
+    .expect("route")
+    .expect("write");
+    assert_eq!(reply, Reply::Unit);
+}
+
+#[test]
+fn write_bytes_accepts_a_single_bytes_argument() {
+    let reply = serve("consolum:funde", &[Arg::Bytes(b"ok\n".to_vec())])
+        .expect("route")
+        .expect("write");
+    assert_eq!(reply, Reply::Unit);
+}
+
+#[test]
+fn write_bytes_rejects_non_byte_argument() {
+    let error = serve("consolum:funde", &[Arg::Str("nope".to_owned())])
+        .expect("route")
+        .expect_err("type");
+    assert_eq!(error.kind(), crate::LeafErrorKind::InvalidArgument);
+}
+
+#[test]
 fn read_bytes_rejects_negative_length() {
     let error = serve("consolum:hauri", &[Arg::Int(-1)])
         .expect("route")

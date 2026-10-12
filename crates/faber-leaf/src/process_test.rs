@@ -53,6 +53,43 @@ fn capture_returns_status_stdout_and_stderr() {
 }
 
 #[test]
+fn capture_accepts_flattened_argv() {
+    let reply = serve(
+        "processus:captura",
+        &[
+            Arg::Str("sh".to_owned()),
+            Arg::Str("-c".to_owned()),
+            Arg::Str("printf '%s %s' a b".to_owned()),
+        ],
+    )
+    .expect("route")
+    .expect("capture");
+    let Reply::Map(fields) = reply else {
+        panic!("expected map, got {reply:?}");
+    };
+    assert!(fields.contains(&("status".to_owned(), Reply::Int(0))));
+    assert!(fields.contains(&("stdout".to_owned(), Reply::Str("a b".to_owned()))));
+}
+
+#[test]
+fn spawn_accepts_flattened_argv() {
+    let reply = serve(
+        "processus:genera",
+        &[
+            Arg::Str("sh".to_owned()),
+            Arg::Str("-c".to_owned()),
+            Arg::Str("exit 0".to_owned()),
+        ],
+    )
+    .expect("route")
+    .expect("spawn");
+    match reply {
+        Reply::Int(pid) => assert!(pid > 0),
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[test]
 fn exec_returns_stdout() {
     let reply = serve("processus:exsequi", &[Arg::Str("printf hello".to_owned())])
         .expect("route")

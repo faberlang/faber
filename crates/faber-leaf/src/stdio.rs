@@ -76,15 +76,20 @@ fn expect_int(
     }
 }
 
-fn expect_bytes<'a>(
-    route: &'static str,
-    args: &'a [Arg],
-    index: usize,
-) -> Result<&'a [u8], LeafError> {
-    match args.get(index) {
-        Some(Arg::Bytes(value)) => Ok(value),
-        Some(_) => Err(LeafError::invalid_argument(route, "data must be octeti")),
-        None => Err(LeafError::invalid_argument(route, "missing data")),
+/// Collect bytes from an opener that flattened an `octeti` value into one
+/// positional integer per byte, while still accepting a single `Arg::Bytes`.
+fn expect_byte_list(route: &'static str, args: &[Arg]) -> Result<Vec<u8>, LeafError> {
+    match args {
+        [Arg::Bytes(value)] => Ok(value.clone()),
+        [] => Err(LeafError::invalid_argument(route, "missing data")),
+        other => other
+            .iter()
+            .map(|arg| match arg {
+                Arg::Int(value) => u8::try_from(*value)
+                    .map_err(|_| LeafError::invalid_argument(route, "byte must be 0..=255")),
+                _ => Err(LeafError::invalid_argument(route, "data must be octeti")),
+            })
+            .collect(),
     }
 }
 
@@ -160,8 +165,8 @@ fn read_line(args: &[Arg]) -> Result<Reply, LeafError> {
 
 fn write_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "consolum:funde";
-    let data = expect_bytes(ROUTE, args, 0)?;
-    write_stdout(ROUTE, data)
+    let data = expect_byte_list(ROUTE, args)?;
+    write_stdout(ROUTE, &data)
 }
 
 fn write_line(args: &[Arg]) -> Result<Reply, LeafError> {
