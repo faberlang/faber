@@ -503,8 +503,7 @@ impl<'a> LintContext<'a> {
         self.warn_on_shadowed_keyword(name, span);
         self.def_names.insert(def_id, name);
         if record_unused {
-            self.defs
-                .push((def_id, span, WarningKind::UnusedVariable));
+            self.defs.push((def_id, span, WarningKind::UnusedVariable));
         }
         self.check_shadowing(name, def_id, span);
         self.insert_name(name, def_id);
