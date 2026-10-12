@@ -91,17 +91,7 @@ fn scan_go_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 }
             }
         }
-        StmtKind::Probandum(test) => {
-            for setup in &test.body.setup {
-                scan_go_block(&setup.body, file, diagnostics);
-            }
-            for case in &test.body.tests {
-                scan_go_block(&case.body, file, diagnostics);
-            }
-            for nested in &test.body.nested {
-                scan_go_probandum(nested, file, diagnostics);
-            }
-        }
+        StmtKind::Probandum(test) => scan_go_probandum(test, file, diagnostics),
         StmtKind::Proba(test) => {
             scan_go_block(&test.body, file, diagnostics);
         }
@@ -481,17 +471,7 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 }
             }
         }
-        StmtKind::Probandum(test) => {
-            for setup in &test.body.setup {
-                scan_rust_block(&setup.body, file, diagnostics);
-            }
-            for case in &test.body.tests {
-                scan_rust_block(&case.body, file, diagnostics);
-            }
-            for nested in &test.body.nested {
-                scan_rust_probandum(nested, file, diagnostics);
-            }
-        }
+        StmtKind::Probandum(test) => scan_rust_probandum(test, file, diagnostics),
         StmtKind::Proba(test) => scan_rust_block(&test.body, file, diagnostics),
         StmtKind::Si(if_stmt) => {
             scan_rust_expr(&if_stmt.cond, file, diagnostics);

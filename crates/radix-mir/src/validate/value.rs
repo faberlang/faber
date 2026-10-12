@@ -1013,13 +1013,9 @@ fn call_argument_mismatch(
 ) -> String {
     format!(
         "call argument type mismatch (arg {index}: expected {}, got {})",
-        spell_mismatch_ty(types, expected),
-        spell_mismatch_ty(types, actual),
+        spell_type_id(types, expected.semantic_id(), 0),
+        spell_type_id(types, actual.semantic_id(), 0),
     )
-}
-
-fn spell_mismatch_ty(types: &TypeTable, ty: MirType) -> String {
-    spell_type_id(types, ty.semantic_id(), 0)
 }
 
 fn spell_type_id(types: &TypeTable, id: TypeId, depth: u8) -> String {
@@ -1055,17 +1051,13 @@ fn spell_type_id(types: &TypeTable, id: TypeId, depth: u8) -> String {
         Type::Tensor(elem, shape) => format!(
             "tensor<{}, {}>",
             spell_type_id(types, *elem, depth + 1),
-            spell_index(types, *shape, depth + 1)
+            spell_index_at_precedence(types, *shape, depth + 1, 0).0
         ),
         Type::Array(elem) => format!("lista<{}>", spell_type_id(types, *elem, depth + 1)),
         Type::Alias(_, inner) => spell_type_id(types, *inner, depth + 1),
         Type::Param(_) => "T".to_owned(),
         other => format!("{other:?}"),
     }
-}
-
-fn spell_index(types: &TypeTable, id: IndexId, depth: u8) -> String {
-    spell_index_at_precedence(types, id, depth, 0).0
 }
 
 fn spell_index_at_precedence(

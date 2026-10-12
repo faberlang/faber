@@ -298,7 +298,7 @@ impl Validator<'_, '_> {
                 // A range index is a window: a new `lista<T>` of the range
                 // (fully in bounds or a failure; never short, never padded).
                 let (_, index_ty) = index?;
-                if let Type::Intervallum(bound) = self.type_kind(index_ty).clone() {
+                if let Some(bound) = self.intervallum_bound(index_ty) {
                     self.require_assignable(
                         MirType::semantic(bound),
                         self.primitive(Primitive::Numerus),
@@ -386,6 +386,15 @@ impl Validator<'_, '_> {
         }
     }
 
+    /// The bound type of an `intervallum` used as a range index, if the index
+    /// is one.
+    fn intervallum_bound(&self, ty: MirType) -> Option<TypeId> {
+        match self.type_kind(ty) {
+            Type::Intervallum(bound) => Some(*bound),
+            _ => None,
+        }
+    }
+
     /// Range-bound check shared by the scalar collection index arms that read
     /// the live prefix lanes (lista, bounded lista, queue/stack, vector).
     fn require_numerus_index(
@@ -408,11 +417,7 @@ impl Validator<'_, '_> {
             // A range index is a window read, not a scalar numerus key
             // (mirrors the octeti arm above): bounds must still be
             // integer-valued, and the window stays a textus substring.
-            let range_bound = match self.type_kind(index_ty) {
-                Type::Intervallum(bound) => Some(*bound),
-                _ => None,
-            };
-            if let Some(range_bound) = range_bound {
+            if let Some(range_bound) = self.intervallum_bound(index_ty) {
                 self.require_assignable(
                     MirType::semantic(range_bound),
                     self.primitive(Primitive::Numerus),
@@ -441,11 +446,7 @@ impl Validator<'_, '_> {
             // A range index is a window read, not a scalar numerus key.
             // Its bounds must still be integer-valued, and the window
             // preserves the octeti carrier for a following conversion.
-            let range_bound = match self.type_kind(index_ty) {
-                Type::Intervallum(bound) => Some(*bound),
-                _ => None,
-            };
-            if let Some(range_bound) = range_bound {
+            if let Some(range_bound) = self.intervallum_bound(index_ty) {
                 self.require_assignable(
                     MirType::semantic(range_bound),
                     self.primitive(Primitive::Numerus),

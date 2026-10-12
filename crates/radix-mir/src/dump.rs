@@ -40,25 +40,21 @@ use crate::{
 /// structural guarantees should run `validate_program` before dumping.
 #[must_use]
 pub fn dump_program(program: &MirProgram) -> String {
-    let mut dumper = MirDumper {
-        out: String::new(),
-        function_count: 0,
-    };
+    let mut dumper = MirDumper { out: String::new() };
     dumper.visit_program(program);
     dumper.out
 }
 
 struct MirDumper {
     out: String,
-    function_count: usize,
 }
 
 impl MirVisitor for MirDumper {
     fn visit_function(&mut self, function: &MirFunction) {
-        if self.function_count > 0 {
+        // `out` is empty only before the first function; separates functions.
+        if !self.out.is_empty() {
             self.out.push('\n');
         }
-        self.function_count += 1;
 
         let error_ty = function
             .error_ty

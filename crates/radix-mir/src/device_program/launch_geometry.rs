@@ -119,13 +119,10 @@ pub fn geometry_for_call(
                 ));
             };
             if shape.len() != usize::from(*rank) {
-                return Err(GeometryError::new(
-                    GEOMETRY_RANK_MISMATCH,
-                    vec![
-                        ("resource", source_resource.to_string()),
-                        ("expected", rank.to_string()),
-                        ("actual", shape.len().to_string()),
-                    ],
+                return Err(rank_mismatch(
+                    *source_resource,
+                    usize::from(*rank),
+                    shape.len(),
                 ));
             }
             generic_1d(unit, counts[*source_resource])
@@ -177,14 +174,7 @@ fn element_counts(unit: &KernelUnit, shapes: &[Vec<u64>]) -> Result<Vec<u64>, Ge
         if let Some(declared) = &resource.version.shape
             && declared.len() != shape.len()
         {
-            return Err(GeometryError::new(
-                GEOMETRY_RANK_MISMATCH,
-                vec![
-                    ("resource", index.to_string()),
-                    ("expected", declared.len().to_string()),
-                    ("actual", shape.len().to_string()),
-                ],
-            ));
+            return Err(rank_mismatch(index, declared.len(), shape.len()));
         }
         counts.push(element_count(index, shape)?);
     }
@@ -227,13 +217,10 @@ pub fn launch_stages_for_call(
         return Err(uncovered("reduce source resource out of range"));
     };
     if shape.len() != usize::from(*rank) {
-        return Err(GeometryError::new(
-            GEOMETRY_RANK_MISMATCH,
-            vec![
-                ("resource", source_resource.to_string()),
-                ("expected", rank.to_string()),
-                ("actual", shape.len().to_string()),
-            ],
+        return Err(rank_mismatch(
+            *source_resource,
+            usize::from(*rank),
+            shape.len(),
         ));
     }
     let n = counts[*source_resource];
@@ -292,6 +279,19 @@ fn element_count(resource: usize, shape: &[u64]) -> Result<u64, GeometryError> {
         })?;
     }
     Ok(product)
+}
+
+/// The shared rank-mismatch error: `resource`'s shape has `actual` axes where
+/// `expected` were declared.
+fn rank_mismatch(resource: usize, expected: usize, actual: usize) -> GeometryError {
+    GeometryError::new(
+        GEOMETRY_RANK_MISMATCH,
+        vec![
+            ("resource", resource.to_string()),
+            ("expected", expected.to_string()),
+            ("actual", actual.to_string()),
+        ],
+    )
 }
 
 fn output_count(unit: &KernelUnit, counts: &[u64]) -> Result<u64, GeometryError> {
@@ -446,12 +446,12 @@ fn tiled_matmul(
             vec![("plan", "TiledMatMul(batched)".to_owned())],
         ));
     }
-    let matmul = &matmul_launch_plan(matmul, shapes)?;
+    let plan = matmul_launch_plan(matmul, shapes)?;
     let (m, _, n) = matmul_extents(shapes)?;
-    let tile = u64::from(matmul.tile.max(1));
+    let tile = u64::from(plan.tile.max(1));
     let workgroup = MirWorkgroupSize {
-        x: matmul.workgroup_x,
-        y: matmul.workgroup_y,
+        x: plan.workgroup_x,
+        y: plan.workgroup_y,
         z: 1,
     };
     let grid = |extent: u64| {
