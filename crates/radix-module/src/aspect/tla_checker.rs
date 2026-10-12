@@ -128,7 +128,7 @@ impl TlaAspectChecker {
 
 impl TlaAspectCheckerConfig {
     fn java_bin_exists(&self) -> bool {
-        self.java_bin.components().count() == 1 || self.java_bin.is_file()
+        is_bare_command(&self.java_bin) || self.java_bin.is_file()
     }
 }
 

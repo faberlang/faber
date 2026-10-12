@@ -7,6 +7,11 @@ use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 use std::io::{self, BufRead, IsTerminal, Read, Write};
 
+/// The runner's opaque internal diagnostic for a failed host IO operation.
+fn io_error(error: io::Error) -> RunnerError {
+    RunnerError::internal(Span::default(), error.to_string())
+}
+
 /// Render a provider route without exposing interner allocation numbers.
 ///
 /// Provider MIR stores interned symbols, but those numeric ids are an
@@ -400,32 +405,24 @@ impl Host for StdioHost {
             MirDiagnosticKind::Mone | MirDiagnosticKind::Vide => &mut io::stderr(),
             _ => &mut io::stdout(),
         };
-        writeln!(target, "{text}")
-            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))
+        writeln!(target, "{text}").map_err(io_error)
     }
 
     fn write_stdout_raw(&mut self, text: &str) -> Result<(), RunnerError> {
         let mut out = io::stdout();
-        write!(out, "{text}")
-            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))?;
-        out.flush()
-            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))
+        write!(out, "{text}").map_err(io_error)?;
+        out.flush().map_err(io_error)
     }
 
     fn write_stdout_bytes(&mut self, bytes: &[u8]) -> Result<(), RunnerError> {
         let mut out = io::stdout();
-        out.write_all(bytes)
-            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))?;
-        out.flush()
-            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))
+        out.write_all(bytes).map_err(io_error)?;
+        out.flush().map_err(io_error)
     }
 
     fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
         let mut line = String::new();
-        let read = io::stdin()
-            .lock()
-            .read_line(&mut line)
-            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))?;
+        let read = io::stdin().lock().read_line(&mut line).map_err(io_error)?;
         if read == 0 {
             return Ok(None);
         }
@@ -440,10 +437,7 @@ impl Host for StdioHost {
             return Ok(Vec::new());
         }
         let mut buffer = vec![0_u8; len];
-        let read = io::stdin()
-            .lock()
-            .read(&mut buffer)
-            .map_err(|err| RunnerError::internal(Span::default(), err.to_string()))?;
+        let read = io::stdin().lock().read(&mut buffer).map_err(io_error)?;
         buffer.truncate(read);
         Ok(buffer)
     }

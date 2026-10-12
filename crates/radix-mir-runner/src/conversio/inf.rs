@@ -13,7 +13,7 @@ use super::rounding::RoundingMode;
 use super::{Runner, RunnerError, Value};
 use crate::inf::{from_magnus, to_magnus};
 use handroll::{Magnus, Radix};
-use radix_codegen_shared::hints::EndianHint;
+use radix_codegen_shared::hints::{self, EndianHint};
 use radix_lexer::{Span, Symbol};
 use radix_mir::MirOperand;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, effective_width};
@@ -143,8 +143,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn inf_endian(&self, params: &[Symbol]) -> Option<EndianHint> {
-        radix_codegen_shared::hints::endian_hint(params, |param| {
-            radix_codegen_shared::hints::classify(self.interner.resolve(*param))
+        hints::endian_hint(params, |param| {
+            hints::classify(self.interner.resolve(*param))
         })
     }
 }
