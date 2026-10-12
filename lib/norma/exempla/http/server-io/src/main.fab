@@ -9,7 +9,7 @@ locale = "en"
 # `faber check` compiles the listen/open_sse/send_event loop. A rust
 # package run currently hits the faber-runtime tag-pin plus rust-emit
 # residuals in the imported module graph (same window as client-io).
-# The MIR runner has no http:* provider, so `faber run` cannot bind.
+# N5: `http:*` is served by `faber-leaf` on both runtimes.
 #
 # argv: [mode] [port] [n]
 #   mode = sse (default) | stall

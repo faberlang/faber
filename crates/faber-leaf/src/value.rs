@@ -10,6 +10,8 @@ pub enum Arg {
     Bytes(Vec<u8>),
     Strs(Vec<String>),
     Map(Vec<(String, String)>),
+    /// Nested opener (HTTP header rows are a list of name/value maps).
+    List(Vec<Arg>),
 }
 
 /// Successful leaf result.
@@ -23,4 +25,6 @@ pub enum Reply {
     Bytes(Vec<u8>),
     Strs(Vec<String>),
     Map(Vec<(String, Reply)>),
+    /// Nested reply (HTTP header rows live inside the response map).
+    List(Vec<Reply>),
 }

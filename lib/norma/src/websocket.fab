@@ -1,0 +1,66 @@
++++
+locale = "en"
++++
+
+# websocket.fab — WebSocket client and HTTP-upgrade accept
+#
+# Public import: import from "norma:websocket" websocket
+# Leaves: websocket:connect, websocket:accept, websocket:send,
+# websocket:receive, websocket:close.
+
+@ public
+class Socket {
+    var int id = 0
+
+    fn send(string text) → void {
+        return send_text(self, text)
+    }
+
+    fn receive() → string {
+        return receive_text(self)
+    }
+
+    fn close() → void {
+        return close_socket(self)
+    }
+}
+
+@ public
+fn connect(string url) → Socket {
+    const int id ↤ call 'websocket:connect' ([url ↦ value])
+    return Socket { id = id }
+}
+
+@ public
+fn connect_tls(string url, string ca_path) → Socket {
+    const int id ↤ call 'websocket:connect' ([url ↦ value, ca_path ↦ value])
+    return Socket { id = id }
+}
+
+@ public
+fn accept(string request_id) → Socket {
+    const int id ↤ call 'websocket:accept' ([request_id ↦ value])
+    return Socket { id = id }
+}
+
+@ public
+fn send_text(Socket socket, string text) → void {
+    return call 'websocket:send' ([socket.id ↦ value, text ↦ value]) ↦ void
+}
+
+@ public
+fn receive_text(Socket socket) → string {
+    const value raw ↤ call 'websocket:receive' ([socket.id ↦ value])
+    do {
+        const map<string, value> fields ↤ raw
+        return fields["text"] ↦ string
+    }
+    catch err {
+        panic "norma:websocket.receive: malformed carrier: §"(err)
+    }
+}
+
+@ public
+fn close_socket(Socket socket) → void {
+    return call 'websocket:close' ([socket.id ↦ value]) ↦ void
+}

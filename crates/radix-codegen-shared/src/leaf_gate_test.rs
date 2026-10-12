@@ -88,7 +88,7 @@ fn go_and_wasm_reject_fs_by_name() {
 #[test]
 fn builtins_and_unknown_routes_are_untouched() {
     let mut interner = Interner::new();
-    for route in ["processus:exi", "runtime:echo", "http:get"] {
+    for route in ["processus:exi", "runtime:echo", "ignotum:route"] {
         let module = ad_module(&mut interner, route);
         let routes = routes_of(&module, &interner);
         reject_unsupported_leaf(&routes, Target::HirGo)

@@ -23,7 +23,8 @@ locale = "en"
 # performs the `http:*` dispatch. URL split is re-exported from the
 # client leaf. Server verbs proxy the server leaf.
 # The whole surface is @ public.
-# v1 server is plaintext loopback; TLS is explicit-never for the server.
+# Server TLS is `bind_tls` / `http:listen_tls` (PEM paths). Plain `bind`
+# stays loopback HTTP/1.1.
 # Faber packages own request routing and response policy around the handle loop.
 
 import from "norma:http/headers" headers
@@ -135,6 +136,11 @@ fn stop(int handle) → void {
 @ public
 fn bind(int port) → server.Listener {
     return server.bind(port)
+}
+
+@ public
+fn bind_tls(int port, string cert, string key) → server.Listener {
+    return server.bind_tls(port, cert, key)
 }
 
 @ public

@@ -24,6 +24,10 @@ pub enum Leaf {
     Entropy,
     /// TCP/TLS (`caelum:*`).
     Tcp,
+    /// HTTP/1.1 client and server (`http:*`).
+    Http,
+    /// WebSocket (`websocket:*`).
+    Websocket,
 }
 
 impl Leaf {
@@ -35,6 +39,8 @@ impl Leaf {
         Self::Clock,
         Self::Entropy,
         Self::Tcp,
+        Self::Http,
+        Self::Websocket,
     ];
 
     /// Canonical leaf spelling used in diagnostics and `faber targets`.
@@ -47,6 +53,8 @@ impl Leaf {
             Self::Clock => "clock",
             Self::Entropy => "entropy",
             Self::Tcp => "tcp",
+            Self::Http => "http",
+            Self::Websocket => "websocket",
         }
     }
 
@@ -60,6 +68,8 @@ impl Leaf {
             Self::Clock => "tempus",
             Self::Entropy => "aleator",
             Self::Tcp => "caelum",
+            Self::Http => "http",
+            Self::Websocket => "websocket",
         }
     }
 
@@ -79,6 +89,8 @@ impl Leaf {
             "tempus" => Some(Self::Clock),
             "aleator" => Some(Self::Entropy),
             "caelum" => Some(Self::Tcp),
+            "http" => Some(Self::Http),
+            "websocket" => Some(Self::Websocket),
             _ => None,
         }
     }

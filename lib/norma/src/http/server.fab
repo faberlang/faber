@@ -47,6 +47,10 @@ class Listener {
     fn stop() → void {
         return call 'http:stop' (self.handle) ↦ void
     }
+
+    fn port() → int {
+        return listener_port(self.handle)
+    }
 }
 
 # One accepted request plus the provider ids needed to respond.
@@ -143,6 +147,17 @@ fn bind_limited(int port, int max_body_bytes) → Listener {
 fn bind_full(int port, int max_body_bytes, string host) → Listener {
     const int handle ← listen([port ↦ value, max_body_bytes ↦ value, host ↦ value])
     return Listener { handle = handle }
+}
+
+@ public
+fn bind_tls(int port, string cert, string key) → Listener {
+    const int handle ← call 'http:listen_tls' ([port ↦ value, cert ↦ value, key ↦ value]) ↦ int
+    return Listener { handle = handle }
+}
+
+@ public
+fn listener_port(int handle) → int {
+    return call 'http:port' (handle) ↦ int
 }
 
 @ public

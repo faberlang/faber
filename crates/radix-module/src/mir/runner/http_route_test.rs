@@ -1,4 +1,4 @@
-//! A1-H1/H2 proof: the real hosts serve the `http:*` raw routes that
+//! N5 proof: `faber-leaf` serves the `http:*` raw routes that
 //! `norma:http/server` calls (`listen`, `accept`, `respond`, `respond_open`,
 //! `respond_chunk`, `respond_finish`, `stop`) on the MIR runner. The programs
 //! use the exact `call 'http:*'` shapes and carrier handling of
@@ -141,7 +141,13 @@ fn bind_limited_refuses_an_oversize_body() {
     let mut host = BufferHost::default();
     let errors =
         run_host("http-limit.fab", &program(&body), &mut host).expect_err("accept must refuse the oversize body");
-    assert_eq!(errors[0].issue, "runner_sermo_reply_conversion_failed");
+    assert!(
+        errors[0].message.contains("max_body_bytes")
+            || errors.iter().any(|error| error
+                .message
+                .contains("max_body_bytes")),
+        "{errors:?}"
+    );
     assert!(host.stdout_lines.is_empty());
     assert_eq!(reply.join().expect("client"), "", "a refused body gets no response");
 }

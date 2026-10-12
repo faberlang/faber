@@ -6,10 +6,13 @@ description = "Native effect leaves shared by the Faber interpreter and generate
 license = "MIT"
 publish = false
 
-# No hosts, no async runtime (campaign A2 / Q4 / Q5). rustls is the N4b TLS stack.
+# No hosts, no async runtime (campaign A2 / Q4 / Q5). rustls is TLS;
+# httparse + tungstenite are the HTTP/1.1 and WebSocket stacks.
 [dependencies]
+httparse = "1.10.1"
 rustls = { version = "0.23.45", default-features = false, features = ["std", "ring", "tls12"] }
 rustls-pemfile = "2.2.0"
+tungstenite = { version = "0.26.2", default-features = false, features = ["handshake"] }
 webpki-roots = "1.0.9"
 
 # Local lints: this crate is also a path dependency of standalone

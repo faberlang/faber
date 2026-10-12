@@ -17,7 +17,8 @@ fn leaf_matcher_covers_the_n2_families() {
     assert!(is_leaf_ad_route("tempus:dormiet"));
     assert!(is_leaf_ad_route("processus:argumenta"));
     assert!(is_leaf_ad_route("aleator:uuid"));
-    assert!(!is_leaf_ad_route("http:get"));
+    assert!(is_leaf_ad_route("http:get"));
+    assert!(is_leaf_ad_route("websocket:connect"));
 }
 
 #[test]
@@ -26,11 +27,11 @@ fn host_required_routes_drop_terminal_exi_and_leaf() {
         "processus:argumenta".to_owned(),
         "processus:exi".to_owned(),
         "solum:lege".to_owned(),
-        "http:get".to_owned(),
+        "ignotum:route".to_owned(),
     ]);
     let required = host_required_routes(&routes);
     assert!(!required.contains("processus:argumenta"));
     assert!(!required.contains("processus:exi"));
     assert!(!required.contains("solum:lege"));
-    assert!(required.contains("http:get"));
+    assert!(required.contains("ignotum:route"));
 }

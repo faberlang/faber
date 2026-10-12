@@ -10,13 +10,14 @@ fn from_route_maps_each_n2_family() {
     assert_eq!(Leaf::from_route("tempus:dormiet"), Some(Leaf::Clock));
     assert_eq!(Leaf::from_route("aleator:uuid"), Some(Leaf::Entropy));
     assert_eq!(Leaf::from_route("caelum:necte"), Some(Leaf::Tcp));
+    assert_eq!(Leaf::from_route("http:get"), Some(Leaf::Http));
+    assert_eq!(Leaf::from_route("websocket:connect"), Some(Leaf::Websocket));
 }
 
 #[test]
 fn builtins_and_unknown_routes_are_not_leaves() {
     assert_eq!(Leaf::from_route("processus:exi"), None);
     assert_eq!(Leaf::from_route("runtime:echo"), None);
-    assert_eq!(Leaf::from_route("http:get"), None);
     assert_eq!(Leaf::from_route("ignotum:route"), None);
 }
 
@@ -30,7 +31,9 @@ fn all_is_the_n2_set() {
             Leaf::Process,
             Leaf::Clock,
             Leaf::Entropy,
-            Leaf::Tcp
+            Leaf::Tcp,
+            Leaf::Http,
+            Leaf::Websocket
         ]
     );
 }

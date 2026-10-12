@@ -1381,6 +1381,96 @@ surface = "petet"
 
 [[library_members]]
 provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect"
+surface = "necte"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect"
+surface = "necte"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect_tls"
+surface = "necte_tls"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect_tls"
+surface = "necte_tls"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "accept"
+surface = "accipe"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "accept"
+surface = "accipe"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "send_text"
+surface = "mitte"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "send_text"
+surface = "mitte"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "receive_text"
+surface = "accipie"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "receive_text"
+surface = "accipie"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "close_socket"
+surface = "claude"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "close_socket"
+surface = "claude"
+
+[[library_members]]
+provider = "norma"
 module_path = ["yaml"]
 kind = "function"
 canonical = "stringify"

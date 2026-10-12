@@ -1,8 +1,8 @@
 //! Raw frame routes served by the runner's real hosts (`Host::sermo_route`).
 //!
 //! Shared leaves (`faber-leaf`) serve `solum:*`, `consolum:*`, `processus:*`
-//! (except `processus:exi`), `tempus:*`, `aleator:*`, and `caelum:*`.
-//! `processus:exi` stays on `Host::exit`. HTTP is absent until N5.
+//! (except `processus:exi`), `tempus:*`, `aleator:*`, `caelum:*`, `http:*`,
+//! and `websocket:*`. `processus:exi` stays on `Host::exit`.
 
 use super::{Host, MapKey, Value, kernel};
 use faber_leaf::{self as leaf, Arg, Reply};
@@ -82,6 +82,12 @@ fn value_to_arg(value: &Value) -> Option<Arg> {
                         })
                         .collect(),
                 ))
+            } else if let Some(nested) = items
+                .iter()
+                .map(value_to_arg)
+                .collect::<Option<Vec<Arg>>>()
+            {
+                Some(Arg::List(nested))
             } else {
                 kernel::args::octeti_bytes(value).map(Arg::Bytes)
             }
@@ -115,13 +121,41 @@ fn reply_to_values(reply: Reply) -> Vec<Value> {
         Reply::Map(fields) => {
             let mut map = FxHashMap::default();
             for (key, value) in fields {
-                let items = reply_to_values(value);
-                let Some(item) = items.into_iter().next() else {
+                let Some(item) = reply_to_value(value) else {
                     continue;
                 };
                 map.insert(MapKey::Str(key), item);
             }
             vec![Value::Map(Rc::new(RefCell::new(map)))]
         }
+        Reply::List(items) => vec![Value::Array(Rc::new(RefCell::new(
+            items.into_iter().filter_map(reply_to_value).collect(),
+        )))],
+    }
+}
+
+fn reply_to_value(reply: Reply) -> Option<Value> {
+    match reply {
+        Reply::Unit => None,
+        Reply::Bool(value) => Some(Value::Bool(value)),
+        Reply::Int(value) => Some(Value::Int(value)),
+        Reply::Float(value) => Some(Value::Float(value)),
+        Reply::Str(value) => Some(Value::Str(value)),
+        Reply::Bytes(value) => Some(Value::Octeti(value)),
+        Reply::Strs(values) => Some(Value::Array(Rc::new(RefCell::new(
+            values.into_iter().map(Value::Str).collect(),
+        )))),
+        Reply::Map(fields) => {
+            let mut map = FxHashMap::default();
+            for (key, value) in fields {
+                if let Some(item) = reply_to_value(value) {
+                    map.insert(MapKey::Str(key), item);
+                }
+            }
+            Some(Value::Map(Rc::new(RefCell::new(map))))
+        }
+        Reply::List(items) => Some(Value::Array(Rc::new(RefCell::new(
+            items.into_iter().filter_map(reply_to_value).collect(),
+        )))),
     }
 }

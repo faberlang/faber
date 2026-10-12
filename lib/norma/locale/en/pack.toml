@@ -282,3 +282,93 @@ module_path = ["text"]
 kind = "function"
 canonical = "try_decode"
 surface = "try_decode"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect"
+surface = "connect"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect"
+surface = "connect"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect_tls"
+surface = "connect_tls"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "connect_tls"
+surface = "connect_tls"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "accept"
+surface = "accept"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "accept"
+surface = "accept"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "send_text"
+surface = "send_text"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "send_text"
+surface = "send_text"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "receive_text"
+surface = "receive_text"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "receive_text"
+surface = "receive_text"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "close_socket"
+surface = "close_socket"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "function"
+canonical = "close_socket"
+surface = "close_socket"
