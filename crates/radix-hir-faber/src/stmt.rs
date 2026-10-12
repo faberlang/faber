@@ -630,9 +630,7 @@ impl super::FaberCodegen<'_> {
                             owner: HirOwnerRef::Hir(expr.id),
                             slot: HirTypeSlot::DiscardBinding,
                         };
-                        let rendered = self
-                            .type_to_faber_at(&site, ty, names, surface)
-                            .unwrap_or_else(|error| self.record_type_emission_error(error));
+                        let rendered = self.render_type_at(&site, ty, names, surface);
                         writer.write(&rendered);
                         writer.write(" ");
                     }
@@ -752,9 +750,7 @@ impl super::FaberCodegen<'_> {
             // binding with a later assignment type-checks, so materializing
             // the inferred type would change the authored surface and fail
             // output re-validation.
-            let mut rendered = self
-                .type_to_faber_at(&site, ty, names, surface)
-                .unwrap_or_else(|error| self.record_type_emission_error(error));
+            let mut rendered = self.render_type_at(&site, ty, names, surface);
             // Value-side marker: an exclusive `copy`/`own` binding re-emits as
             // `T b ← copy a` / `T b ← own a` (operator ruling 2026-10-08), so
             // the mode word leaves the type and is written before the
@@ -778,9 +774,7 @@ impl super::FaberCodegen<'_> {
             // `ty` field yet. A present form still owns its authored spelling;
             // use its witness for the same site-aware render path.
             if let Some(form_ty) = self.authored_type_forms.get(&site).map(|form| form.ty) {
-                let rendered = self
-                    .type_to_faber_at(&site, form_ty, names, surface)
-                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                let rendered = self.render_type_at(&site, form_ty, names, surface);
                 writer.write(&rendered);
                 writer.write(" ");
             }
