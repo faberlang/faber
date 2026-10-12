@@ -1374,6 +1374,34 @@ fn storage_buffer_limit_record_allows_wider_lane_and_keeps_metal_oracle() {
 }
 
 #[test]
+fn storage_buffer_limit_records_phrase_default_and_lane_owned_wording() {
+    // The established default records keep the shared wording; a lane-owned
+    // record with another capacity names its lane.
+    assert_eq!(
+        DEFAULT_STORAGE_BUFFER_LIMIT.binding_limit_phrase(),
+        "31-buffer binding maximum"
+    );
+    assert_eq!(
+        METAL_STORAGE_BUFFER_LIMIT.binding_limit_phrase(),
+        "31-buffer binding maximum"
+    );
+    assert_eq!(
+        StorageBufferLimitRecord::new("wide-test", 64).binding_limit_phrase(),
+        "64-buffer binding maximum for wide-test lane"
+    );
+}
+
+#[test]
+fn storage_buffer_limit_error_details_a_lane_owned_record() {
+    let error = storage_buffer_limit_error(40, StorageBufferLimitRecord::new("wide-test", 64));
+    assert_eq!(error.issue, "mir_kernel_storage_buffer_limit");
+    assert_eq!(
+        error.detail.as_deref(),
+        Some("lane=wide-test max_storage_buffers=64")
+    );
+}
+
+#[test]
 fn kernel_abi_keeps_f64_scalar_fail_closed_for_pure_scalar_kernel() {
     // S5A-U2: the whole-function scalar surface rejects a PURE-scalar f64
     // kernel (no tensor graph at all) with the same typed diagnostic —

@@ -328,28 +328,25 @@ pub(crate) fn storage_buffer_limit_error(
     buffer_count: usize,
     limit: StorageBufferLimitRecord,
 ) -> crate::abi::MirAbiError {
-    let message = format!(
-        "kernel storage-buffer count {buffer_count} exceeds the {}-buffer binding maximum; \
-         the decomposition must split the body",
-        limit.max_storage_buffers
-    );
     if limit == DEFAULT_STORAGE_BUFFER_LIMIT || limit == METAL_STORAGE_BUFFER_LIMIT {
-        crate::abi::MirAbiError::new(message)
-    } else {
-        let message = format!(
+        return crate::abi::MirAbiError::new(format!(
+            "kernel storage-buffer count {buffer_count} exceeds the {}-buffer binding maximum; \
+             the decomposition must split the body",
+            limit.max_storage_buffers
+        ));
+    }
+    crate::abi::MirAbiError::with_detail(
+        format!(
             "kernel storage-buffer count {buffer_count} exceeds the {}; \
              the decomposition must split the body",
             limit.binding_limit_phrase()
-        );
-        crate::abi::MirAbiError::with_detail(
-            message,
-            "mir_kernel_storage_buffer_limit",
-            format!(
-                "lane={} max_storage_buffers={}",
-                limit.lane, limit.max_storage_buffers
-            ),
-        )
-    }
+        ),
+        "mir_kernel_storage_buffer_limit",
+        format!(
+            "lane={} max_storage_buffers={}",
+            limit.lane, limit.max_storage_buffers
+        ),
+    )
 }
 
 /// Classified builtin usage for a kernel signature — which invocation-header
