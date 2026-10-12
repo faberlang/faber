@@ -457,7 +457,6 @@ pub fn discerne_definitely_covered(
 /// gap, so an `elige` whose only witness is "any other value" is accepted.
 /// Closed spaces (enum variants, `verum`/`falsum`, union members) are checked
 /// for `elige` exactly as for `discerne`.
-#[allow(clippy::too_many_arguments)]
 fn check_coverage(
     scrutinees: &[HirExpression],
     arms: &[HirCasuArm],
