@@ -1,8 +1,8 @@
 //! Raw frame routes served by the runner's real hosts (`Host::sermo_route`).
 //!
 //! Shared leaves (`faber-leaf`) serve `solum:*`, `consolum:*`, `processus:*`
-//! (except `processus:exi`), `tempus:*`, and `aleator:*`. `processus:exi`
-//! stays on `Host::exit`. HTTP is absent until N5.
+//! (except `processus:exi`), `tempus:*`, `aleator:*`, and `caelum:*`.
+//! `processus:exi` stays on `Host::exit`. HTTP is absent until N5.
 
 use super::{Host, MapKey, Value, kernel};
 use faber_leaf::{self as leaf, Arg, Reply};
@@ -68,6 +68,7 @@ fn value_to_arg(value: &Value) -> Option<Arg> {
         Value::Nil | Value::Unit => Some(Arg::Nil),
         Value::Str(text) => Some(Arg::Str(text.clone())),
         Value::Int(n) => Some(Arg::Int(*n)),
+        Value::Bool(value) => Some(Arg::Bool(*value)),
         Value::Octeti(bytes) => Some(Arg::Bytes(bytes.clone())),
         Value::Array(items) => {
             let items = items.borrow();

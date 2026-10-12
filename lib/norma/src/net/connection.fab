@@ -4,41 +4,71 @@ locale = "en"
 # Canonical module: norma:net/connection; Latin locale spelling: connexus.
 
 # net/connection.fab — TCP socket (connected byte stream)
-#
-# Public import: importa ex "norma:net/connection" private connection
-# Depends on: norma:net/endpoint (for Endpoint type in remote()/local())
 
 import from "norma:net/endpoint" endpoint
+import from "norma:value" value
 
 @ public
 class Socket {
     var int id = 0
 
-    # Draw bytes (up to n if provided, otherwise whatever is available)
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn read_bytes(int n optional) → bytes
+    fn read_bytes(int n optional) → bytes {
+        return socket_read(self, n)
+    }
 
     @ future
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn read_bytes_async(int n optional) → bytes
+    fn read_bytes_async(int n optional) → bytes {
+        return socket_read(self, n)
+    }
 
-    # Pour bytes
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn write_bytes(bytes data) → void
+    fn write_bytes(bytes data) → void {
+        return socket_write(self, data)
+    }
 
     @ future
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn write_bytes_async(bytes data) → void
+    fn write_bytes_async(bytes data) → void {
+        return socket_write(self, data)
+    }
 
-    # Close connection
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn close() → void
+    fn close() → void {
+        return socket_close(self)
+    }
 
-    # Remote endpoint
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn remote() → endpoint.Endpoint
+    fn remote() → endpoint.Endpoint {
+        return socket_remote(self)
+    }
 
-    # Local endpoint
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn local() → endpoint.Endpoint
+    fn local() → endpoint.Endpoint {
+        return socket_local(self)
+    }
+}
+
+fn socket_read(Socket socket, int n optional) → bytes {
+    if n is none {
+        return call 'caelum:hauri' (socket.id) ↦ bytes
+    }
+    return call 'caelum:hauri' ([socket.id, n coalesce 0]) ↦ bytes
+}
+
+fn socket_write(Socket socket, bytes data) → void {
+    return call 'caelum:funde' ([socket.id ↦ value, data ↦ value]) ↦ void
+}
+
+fn socket_close(Socket socket) → void {
+    return call 'caelum:claude' (socket.id) ↦ void
+}
+
+fn socket_remote(Socket socket) → endpoint.Endpoint {
+    return endpoint_from(call 'caelum:remotus' (socket.id) ↦ value)
+}
+
+fn socket_local(Socket socket) → endpoint.Endpoint {
+    return endpoint_from(call 'caelum:locus' (socket.id) ↦ value)
+}
+
+fn endpoint_from(value raw) → endpoint.Endpoint {
+    return endpoint.Endpoint {
+        host = value.get(raw, "host") ↦ string ⊥ "",
+        port = value.get(raw, "port") ↦ int ⊥ 0
+    }
 }

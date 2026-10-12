@@ -22,16 +22,19 @@ pub enum Leaf {
     Clock,
     /// Entropy (`aleator:*`).
     Entropy,
+    /// TCP/TLS (`caelum:*`).
+    Tcp,
 }
 
 impl Leaf {
-    /// Every N2 leaf, in declaration order.
+    /// Every declared leaf, in declaration order.
     pub const ALL: &'static [Self] = &[
         Self::Fs,
         Self::Stdio,
         Self::Process,
         Self::Clock,
         Self::Entropy,
+        Self::Tcp,
     ];
 
     /// Canonical leaf spelling used in diagnostics and `faber targets`.
@@ -43,6 +46,7 @@ impl Leaf {
             Self::Process => "process",
             Self::Clock => "clock",
             Self::Entropy => "entropy",
+            Self::Tcp => "tcp",
         }
     }
 
@@ -55,6 +59,7 @@ impl Leaf {
             Self::Process => "processus",
             Self::Clock => "tempus",
             Self::Entropy => "aleator",
+            Self::Tcp => "caelum",
         }
     }
 
@@ -73,6 +78,7 @@ impl Leaf {
             "processus" => Some(Self::Process),
             "tempus" => Some(Self::Clock),
             "aleator" => Some(Self::Entropy),
+            "caelum" => Some(Self::Tcp),
             _ => None,
         }
     }

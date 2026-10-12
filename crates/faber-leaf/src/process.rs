@@ -47,6 +47,7 @@ pub fn is_route(route: &str) -> bool {
 /// Answer a `processus:*` route. `None` means the route is not this leaf.
 pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
     let result = match route {
+        "processus:genera" => spawn(args),
         "processus:dimitte" => detach(args),
         "processus:captura" => capture(args),
         "processus:exsequi" | "processus:exsequetur" => exec(args),
@@ -123,6 +124,34 @@ fn empty_ok(route: &'static str, args: &[Arg]) -> Result<(), LeafError> {
     } else {
         Err(LeafError::invalid_argument(route, "unexpected arguments"))
     }
+}
+
+fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
+    const ROUTE: &str = "processus:genera";
+    let argv = expect_strs(ROUTE, args, 0)?;
+    if argv.is_empty() || argv[0].is_empty() {
+        return Err(LeafError::invalid_argument(
+            ROUTE,
+            "empty argv / empty command",
+        ));
+    }
+    let directory = optional_str(args, 1)?;
+    let environment = optional_env(args, 2)?;
+    let mut command = Command::new(&argv[0]);
+    command.args(&argv[1..]);
+    command.stdin(Stdio::inherit());
+    command.stdout(Stdio::inherit());
+    command.stderr(Stdio::inherit());
+    if let Some(directory) = directory {
+        command.current_dir(directory);
+    }
+    if let Some(environment) = environment {
+        command.envs(environment);
+    }
+    command
+        .spawn()
+        .map(|child| Reply::Int(i64::from(child.id())))
+        .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))
 }
 
 fn detach(args: &[Arg]) -> Result<Reply, LeafError> {

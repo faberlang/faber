@@ -72,6 +72,17 @@ fn unset_env_is_unset() {
 }
 
 #[test]
+fn spawn_returns_a_positive_pid() {
+    let reply = serve("processus:genera", &[Arg::Strs(vec!["true".to_owned()])])
+        .expect("route")
+        .expect("spawn");
+    match reply {
+        Reply::Int(pid) => assert!(pid > 0),
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[test]
 fn empty_detach_argv_is_invalid() {
     let error = serve("processus:dimitte", &[Arg::Strs(Vec::new())])
         .expect("route")

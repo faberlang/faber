@@ -11,8 +11,7 @@ locale = "en"
 # the gateway decides how long to hold a request; Faber's posture is uniform.
 # There is no `@ future` — sync/async is a route-naming distinction, not a
 # Faber-side marker. Sync and async verbs name distinct `processus:*` routes.
-# `spawn` remains deferred: it returns the `Subprocess` genus, which the
-# ad materializer does not yet support (same blocker as fs.stat).
+# `spawn` returns a `Subprocess` built in Norma from the child pid.
 # Drifted annotation state is not preserved: the live surface is @ public.
 #
 # Design principles:
@@ -43,14 +42,13 @@ class Subprocess {
 # Why: Caller maintains control — can wait for exit, capture output via handle.
 # Maps to: Bun.spawn() with handle returned
 
-# Spawn attached process. Deferred because the ad materializer does not yet
-# support arbitrary spawn handles like Subprocess — only vacuum, valor,
-# scalars, octeti, instans, and lista<T>. The param name `argumenta` is also
-# a reserved keyword (TokenKind::Argumenta, used for CLI argument binding),
-# so a native body would need to rename it.
+# Spawn attached process. The leaf returns the pid; Norma wraps `Subprocess`.
+# Param named `args` because `argumenta` is TokenKind::Argumenta.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn spawn(list<string> args, string directory optional, map<string, string> environment optional) → Subprocess
+fn spawn(list<string> args) → Subprocess {
+    const int child ← call 'processus:genera' (args) ↦ int
+    return Subprocess { pid = child }
+}
 
 # =========================================================================
 # SPAWN - Detached

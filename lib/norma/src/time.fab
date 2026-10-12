@@ -177,14 +177,26 @@ fn sleep(int ms) → void {
 # Verb: interval from "vigilare" (to watch, stay awake)
 # Why: Recurring timer; host pushes one frame per interval; Faber drains
 # the cursor. Stop by dropping the cursor or breaking the iteration.
-# Deferred as a bodiless `@ unstable` declaration: the runtime cannot yet return live inbound
-# cursor values from functions ("live tuus cursor values cannot be returned
-# from functions yet"). Matches thesaurus.messages. A native Faber `ad`
-# body becomes possible once cursor-return-from-function ships.
-@ cursor
+# Recurring timer. Live cursor return from functions is still closed, so
+# the opener is a `Ticker` handle: each `next` sleeps then yields `now`.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn interval(int ms) → iterator<instant>
+class Ticker {
+    var int period_ms = 0
+
+    fn next() → instant<ns> {
+        return tick(self)
+    }
+}
+
+fn tick(Ticker ticks) → instant<ns> {
+    sleep(ticks.period_ms)
+    return now()
+}
+
+@ public
+fn interval(int ms) → Ticker {
+    return Ticker { period_ms = ms }
+}
 
 # =========================================================================
 # DURATION CONSTANTS (milliseconds — pure numeric literals)

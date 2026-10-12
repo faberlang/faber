@@ -6,13 +6,14 @@ locale = "en"
 #
 # Etymology: fs — ground / base, local file I/O; Latin locale spelling `solum`.
 #
-# Operations route over `ad`; stat/stat_async are bodiless `@ unstable` declarations (refused at
-# compile time) until Stage 2 can materialize FileStatus values.
+# Operations route over `ad`. `stat` / `stat_async` build `FileStatus` from
+# the `solum:status` tabula (the materializer still cannot return a genus).
 # Top-level path operations proxy norma:fs/path for compatibility.
 #
 # Sync and async wrappers use the same `ad` frame contract; `@ future` marks the
 # async caller posture. Text, bytes, and lines use distinct public operations.
 
+import from "norma:value" value
 
 # =============================================================================
 # TYPES
@@ -223,22 +224,39 @@ fn mode(string path) → int {
 # =========================================================================
 # Maps to: fs.statSync(path) / fs.stat(path) - uses lstat to not follow symlinks
 
-# Get file details (sync)
-# WHY: deferred because the `ad` materializer does not support
-# arbitrary genera like SolumStatus — only vacuum, valor, scalars, octeti,
-# instans, and lista<T> (empirically confirmed July 2026). Migrating to
-# `ad` requires extending the materializer's conversio-valor genus table
-# to lower SolumStatus as a Tabula walk. The host gateway work is the
-# right moment to land that.
-@ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn stat(string path) → FileStatus
+fn status_int(value raw, string key) → int {
+    return value.get(raw, key) ↦ int ⊥ 0
+}
 
-# Get file details (async — same materializer blocker as stat)
+fn status_bool(value raw, string key) → bool {
+    return value.get(raw, key) ↦ bool ⊥ false
+}
+
+fn status_from(value raw) → FileStatus {
+    return FileStatus {
+        mode = status_int(raw, "mode"),
+        link_count = status_int(raw, "link_count"),
+        owner = status_int(raw, "owner"),
+        group = status_int(raw, "group"),
+        byte_length = status_int(raw, "byte_length"),
+        modified = status_int(raw, "modified"),
+        is_directory = status_bool(raw, "is_directory"),
+        is_symlink = status_bool(raw, "is_symlink")
+    }
+}
+
+# Get file details (sync). lstat: does not follow the last symlink.
+@ public
+fn stat(string path) → FileStatus {
+    return status_from(call 'solum:status' (path) ↦ value)
+}
+
+# Get file details (async route; Faber blocks on the same leaf).
 @ future
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn stat_async(string path) → FileStatus
+fn stat_async(string path) → FileStatus {
+    return status_from(call 'solum:status_async' (path) ↦ value)
+}
 
 # =========================================================================
 # FILE INFO - Symlinks

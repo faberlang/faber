@@ -9,6 +9,7 @@ fn from_route_maps_each_n2_family() {
     assert_eq!(Leaf::from_route("processus:argumenta"), Some(Leaf::Process));
     assert_eq!(Leaf::from_route("tempus:dormiet"), Some(Leaf::Clock));
     assert_eq!(Leaf::from_route("aleator:uuid"), Some(Leaf::Entropy));
+    assert_eq!(Leaf::from_route("caelum:necte"), Some(Leaf::Tcp));
 }
 
 #[test]
@@ -28,7 +29,8 @@ fn all_is_the_n2_set() {
             Leaf::Stdio,
             Leaf::Process,
             Leaf::Clock,
-            Leaf::Entropy
+            Leaf::Entropy,
+            Leaf::Tcp
         ]
     );
 }

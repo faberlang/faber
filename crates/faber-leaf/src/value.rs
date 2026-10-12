@@ -6,6 +6,7 @@ pub enum Arg {
     Nil,
     Str(String),
     Int(i64),
+    Bool(bool),
     Bytes(Vec<u8>),
     Strs(Vec<String>),
     Map(Vec<(String, String)>),

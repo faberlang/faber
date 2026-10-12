@@ -2,55 +2,45 @@
 locale = "en"
 +++
 
-# net.fab - Network Socket Device (TCP/UDP)
+# net.fab - Network Socket Device (TCP)
 #
-# Public import: importa ex "norma:net" private net
-# Method ledger: docs/design/caelum-methods.md
-# Sub-modules:
-#   norma:net/endpoint    — TCP endpoint type
-#   norma:net/connection — connected socket (depends on endpoint)
-#   norma:net/listener — listener (depends on connection)
+# Public import: import from "norma:net" net
+# Sub-modules: norma:net/endpoint, norma:net/connection, norma:net/listener
 #
-# Etymology: net — sky / ether; Latin locale spelling `caelum` for the transport layer.
-# Counterpart to fs (ground/local I/O).
-#
-# Design notes:
-# - Verb conjugation encodes sync/async:
-# - Imperative (-a, -e, -i): synchronous (blocking)
-# - Future indicative (-et, -ebit): asynchronous
-# - TLS enabled via optional cert/key params (listen) or tute flag (connect)
-# - TCP: listen/listen_async, connect/connect_async
-# - Sockets are bidirectional byte streams
+# TLS: `listen_tls(port, cert, key)` for PEM paths; `connect` takes `secure`.
 
 import from "norma:net/endpoint" endpoint
 import from "norma:net/connection" connection
 import from "norma:net/listener" listener
 
-
-# =========================================================================
-# TCP SERVER
-# =========================================================================
-
-# Create TCP listener (TLS when cert/key provided)
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn listen(int port, string cert optional, string key optional) → listener.Listener
+fn listen(int port) → listener.Listener {
+    const int id ← call 'caelum:ausculta' (port) ↦ int
+    return listener.Listener { id = id }
+}
 
 @ public
 @ future
-@ unstable "deferred pending Stage 2 dispatch"
-fn listen_async(int port, string cert optional, string key optional) → listener.Listener
+fn listen_async(int port) → listener.Listener {
+    const int id ← call 'caelum:auscultabit' (port) ↦ int
+    return listener.Listener { id = id }
+}
 
-# =========================================================================
-# TCP CLIENT
-# =========================================================================
-
-# Connect to TCP server (TLS when tute=verum)
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn connect(string host, int port, bool secure optional coalesce false) → connection.Socket
+fn listen_tls(int port, string cert, string key) → listener.Listener {
+    const int id ← call 'caelum:ausculta' ([port ↦ value, cert ↦ value, key ↦ value]) ↦ int
+    return listener.Listener { id = id }
+}
+
+@ public
+fn connect(string host, int port, bool secure optional coalesce false) → connection.Socket {
+    const int id ← call 'caelum:necte' ([host ↦ value, port ↦ value, secure ↦ value]) ↦ int
+    return connection.Socket { id = id }
+}
 
 @ public
 @ future
-@ unstable "deferred pending Stage 2 dispatch"
-fn connect_async(string host, int port, bool secure optional coalesce false) → connection.Socket
+fn connect_async(string host, int port, bool secure optional coalesce false) → connection.Socket {
+    const int id ← call 'caelum:nectet' ([host ↦ value, port ↦ value, secure ↦ value]) ↦ int
+    return connection.Socket { id = id }
+}

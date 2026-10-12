@@ -45,6 +45,7 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, FsError>> {
         "solum:vinculumne" => is_symlink(args),
         "solum:mensura" => byte_length(args),
         "solum:modus" => mode(args),
+        "solum:status" | "solum:status_async" => file_status(args),
         "solum:sequere" | "solum:sequetur" => read_link(args),
         "solum:vincula" => create_link(args),
         "solum:dele" | "solum:delet" => delete_file(args),
@@ -314,6 +315,50 @@ fn is_symlink(args: &[Arg]) -> Result<Reply, FsError> {
             .map(|meta| meta.file_type().is_symlink())
             .unwrap_or(false),
     ))
+}
+
+fn file_status(args: &[Arg]) -> Result<Reply, FsError> {
+    const ROUTE: &str = "solum:status";
+    let path = expect_str(ROUTE, args, 0, "path")?;
+    let meta = fs::symlink_metadata(path).map_err(|err| FsError::from_io(ROUTE, path, &err))?;
+    let modified_ms = meta
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|elapsed| i64::try_from(elapsed.as_millis()).ok())
+        .unwrap_or(0);
+    let (mode, link_count, owner, group) = unix_status_fields(&meta);
+    Ok(Reply::Map(vec![
+        ("mode".to_owned(), Reply::Int(mode)),
+        ("link_count".to_owned(), Reply::Int(link_count)),
+        ("owner".to_owned(), Reply::Int(owner)),
+        ("group".to_owned(), Reply::Int(group)),
+        (
+            "byte_length".to_owned(),
+            Reply::Int(i64::try_from(meta.len()).unwrap_or(i64::MAX)),
+        ),
+        ("modified".to_owned(), Reply::Int(modified_ms)),
+        ("is_directory".to_owned(), Reply::Bool(meta.is_dir())),
+        (
+            "is_symlink".to_owned(),
+            Reply::Bool(meta.file_type().is_symlink()),
+        ),
+    ]))
+}
+
+#[cfg(unix)]
+fn unix_status_fields(meta: &fs::Metadata) -> (i64, i64, i64, i64) {
+    (
+        i64::from(meta.mode() & 0o7777),
+        i64::try_from(meta.nlink()).unwrap_or(i64::MAX),
+        i64::from(meta.uid()),
+        i64::from(meta.gid()),
+    )
+}
+
+#[cfg(not(unix))]
+fn unix_status_fields(_meta: &fs::Metadata) -> (i64, i64, i64, i64) {
+    (0, 1, 0, 0)
 }
 
 fn byte_length(args: &[Arg]) -> Result<Reply, FsError> {

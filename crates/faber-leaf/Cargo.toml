@@ -6,8 +6,11 @@ description = "Native effect leaves shared by the Faber interpreter and generate
 license = "MIT"
 publish = false
 
-# std-only. No hosts, no async runtime (campaign A2 / Q4 / Q5).
+# No hosts, no async runtime (campaign A2 / Q4 / Q5). rustls is the N4b TLS stack.
 [dependencies]
+rustls = { version = "0.23.45", default-features = false, features = ["std", "ring", "tls12"] }
+rustls-pemfile = "2.2.0"
+webpki-roots = "1.0.9"
 
 # Local lints: this crate is also a path dependency of standalone
 # `runtime/rust`, which is not the radix workspace.

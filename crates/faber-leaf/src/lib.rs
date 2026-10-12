@@ -1,8 +1,8 @@
 //! Native effect leaves for Faber.
 //!
 //! The interpreter (`faber run`) and generated Rust (`faber build`) share
-//! this crate. N2: fs, stdio, process, clock, and entropy. HTTP stays out
-//! until N5. Nothing is restored from `hosts`.
+//! this crate. N2: fs, stdio, process, clock, and entropy. N4b: tcp/TLS.
+//! HTTP stays out until N5. Nothing is restored from `hosts`.
 
 mod error;
 mod value;
@@ -12,6 +12,7 @@ pub mod entropy;
 pub mod fs;
 pub mod process;
 pub mod stdio;
+pub mod tcp;
 
 pub use error::{FsError, FsErrorKind, LeafError, LeafErrorKind};
 pub use value::{Arg, Reply};
@@ -24,6 +25,7 @@ pub fn is_route(route: &str) -> bool {
         || process::is_route(route)
         || clock::is_route(route)
         || entropy::is_route(route)
+        || tcp::is_route(route)
 }
 
 /// Answer a shared-leaf route. `None` means no leaf owns it.
@@ -40,11 +42,15 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
     if let Some(reply) = clock::serve(route, args) {
         return Some(reply);
     }
-    entropy::serve(route, args)
+    if let Some(reply) = entropy::serve(route, args) {
+        return Some(reply);
+    }
+    tcp::serve(route, args)
 }
 
 /// Reset process-global leaf state that must not cross program executions.
 pub fn reset_execution_state() {
     entropy::reset_seed();
     process::reset_argv();
+    tcp::reset_handles();
 }

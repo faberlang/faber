@@ -4,9 +4,6 @@ locale = "en"
 # Canonical module: norma:net/listener; Latin locale spelling: auscultator.
 
 # net/listener.fab — TCP listener
-#
-# Public import: importa ex "norma:net/listener" private listener
-# Depends on: norma:net/connection (for Socket type in accept())
 
 import from "norma:net/connection" connection
 
@@ -14,19 +11,33 @@ import from "norma:net/connection" connection
 class Listener {
     var int id = 0
 
-    # Accept next incoming connection
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn accept() → connection.Socket
+    fn accept() → connection.Socket {
+        return listener_accept(self)
+    }
 
     @ future
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn accept_async() → connection.Socket
+    fn accept_async() → connection.Socket {
+        return listener_accept(self)
+    }
 
-    # Stop listening
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn close() → void
+    fn close() → void {
+        return listener_close(self)
+    }
 
-    # Local port
-    @ unstable "deferred pending Stage 2 dispatch"
-    fn port() → int
+    fn port() → int {
+        return listener_port(self)
+    }
+}
+
+fn listener_accept(Listener listener) → connection.Socket {
+    const int child ← call 'caelum:accipe' (listener.id) ↦ int
+    return connection.Socket { id = child }
+}
+
+fn listener_close(Listener listener) → void {
+    return call 'caelum:claude' (listener.id) ↦ void
+}
+
+fn listener_port(Listener listener) → int {
+    return call 'caelum:portus' (listener.id) ↦ int
 }

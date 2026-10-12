@@ -63,6 +63,19 @@ fn temp_dir_is_non_empty() {
 }
 
 #[test]
+fn status_reports_byte_length() {
+    let path = temp_path("status");
+    let path_text = path.to_string_lossy().into_owned();
+    fs::write(&path, "stat").expect("write");
+    let Reply::Map(fields) = serve_ok("solum:status", &[Arg::Str(path_text)]) else {
+        panic!("expected status map");
+    };
+    assert!(fields.contains(&("byte_length".to_owned(), Reply::Int(4))));
+    assert!(fields.contains(&("is_directory".to_owned(), Reply::Bool(false))));
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn extension_includes_the_dot() {
     assert_eq!(
         serve_ok("solum:suffixum", &[Arg::Str("a/b.fab".to_owned())]),
