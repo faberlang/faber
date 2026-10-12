@@ -39,12 +39,6 @@ fn target_admits_bits(target: Target) -> bool {
     )
 }
 
-/// The first raw-bits marker (`b8`) a module wrote, if any. The `lista<b8>`
-/// the `octeti` word names is not one: it is seeded unmarked.
-fn first_bits_marker(types: &TypeTable) -> Option<&'static str> {
-    types.first_authored_bits().map(BitsWidth::faber_marker)
-}
-
 /// # Errors
 ///
 /// Returns a [`CodegenError`] (`bits_type_unsupported_on_target`) when the
@@ -53,7 +47,9 @@ pub fn reject_bits_type(types: &TypeTable, target: Target) -> Result<(), Codegen
     if target_admits_bits(target) {
         return Ok(());
     }
-    let Some(marker) = first_bits_marker(types) else {
+    // `first_authored_bits` names only a written `bN` marker: the seeded
+    // `lista<b8>` behind the `octeti` word is not one.
+    let Some(marker) = types.first_authored_bits().map(BitsWidth::faber_marker) else {
         return Ok(());
     };
     Err(CodegenError {
