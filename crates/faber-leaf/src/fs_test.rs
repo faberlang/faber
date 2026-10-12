@@ -50,11 +50,7 @@ fn read_lines_splits_on_newlines() {
     fs::write(&path, "one\ntwo\nthree\n").expect("write");
     assert_eq!(
         serve_ok("solum:carpe", &[Arg::Str(path_text)]),
-        Reply::Strs(vec![
-            "one".to_owned(),
-            "two".to_owned(),
-            "three".to_owned()
-        ])
+        Reply::Strs(vec!["one".to_owned(), "two".to_owned(), "three".to_owned()])
     );
     let _ = fs::remove_file(path);
 }

@@ -388,10 +388,7 @@ fn endpoint_of(args: &[Arg], route: &'static str, remote: bool) -> Result<Reply,
     })
 }
 
-fn pick_addr(
-    stream: &TcpStream,
-    remote: bool,
-) -> std::io::Result<std::net::SocketAddr> {
+fn pick_addr(stream: &TcpStream, remote: bool) -> std::io::Result<std::net::SocketAddr> {
     if remote {
         stream.peer_addr()
     } else {
