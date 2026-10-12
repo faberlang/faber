@@ -283,10 +283,25 @@ fn parse_inline_table(string wire, int start) → cursor.Scan ⇥ string {
     throw "norma:toml.parse: unterminated inline table"
 }
 
-fn take_digits(string wire, int start) → int {
+fn take_digits(string wire, int start) → int ⇥ string {
     var int index ← start
-    while index ≺ wire.length() and (is_digit(wire.slice(index, index + 1)) or wire.slice(index, index + 1) ≡ "_") {
-        index ← index + 1
+    if index ≥ wire.length() or not is_digit(wire.slice(index, index + 1)) {
+        throw "norma:toml.parse: expected digit"
+    }
+    while index ≺ wire.length() {
+        const string c ← wire.slice(index, index + 1)
+        if is_digit(c) {
+            index ← index + 1
+        }
+        elif c ≡ "_" {
+            if index + 1 ≥ wire.length() or not is_digit(wire.slice(index + 1, index + 2)) {
+                throw "norma:toml.parse: underscore must be between digits"
+            }
+            index ← index + 2
+        }
+        else {
+            break
+        }
     }
     return index
 }
