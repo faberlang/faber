@@ -504,19 +504,13 @@ impl Parser {
     /// kind or a contextual identifier claiming it.
     fn token_keyword_identity(&self, kind: &TokenKind) -> Option<TokenKind> {
         match kind {
-            kind if matches!(
-                kind,
-                TokenKind::Importa
-                    | TokenKind::Ex
-                    | TokenKind::Publica
-                    | TokenKind::Fixum
-                    | TokenKind::Ut
-                    | TokenKind::LBrace
-                    | TokenKind::Comma
-            ) =>
-            {
-                Some(kind.clone())
-            }
+            TokenKind::Importa
+            | TokenKind::Ex
+            | TokenKind::Publica
+            | TokenKind::Fixum
+            | TokenKind::Ut
+            | TokenKind::LBrace
+            | TokenKind::Comma => Some(kind.clone()),
             TokenKind::Ident(sym) => self
                 .keyword_claim_key(*sym)
                 .and_then(lookup_keyword_spec)
@@ -539,9 +533,9 @@ impl Parser {
                 match tokens.get(index + 1).map(|token| &token.kind) {
                     None | Some(TokenKind::Eof | TokenKind::Comma | TokenKind::Star) => true,
                     Some(kind) if self.token_keyword_identity(kind) == Some(TokenKind::Ut) => true,
-                    Some(TokenKind::Ident(_)) => tokens
-                        .get(index + 1)
-                        .is_some_and(|token| self.token_keyword_identity(&token.kind).is_some()),
+                    Some(kind) if matches!(kind, TokenKind::Ident(_)) => {
+                        self.token_keyword_identity(kind).is_some()
+                    }
                     _ => false,
                 }
             }
@@ -599,7 +593,7 @@ impl Parser {
     pub fn parse_program(&mut self) -> ParseResult {
         let start = self.current_span();
         let mut stmts = Vec::new();
-        let region = self.parse_leading_region_decl();
+        let region = self.try_parse_region_decl();
 
         while !self.is_at_end() && !self.budget_exhausted {
             if self.reject_misplaced_region_decl(region.is_some()) {
@@ -663,11 +657,12 @@ impl Parser {
         }
     }
 
-    /// Parse `regio NAME` with its leading trivia when it opens the file.
+    /// Parse `regio NAME` with its leading trivia, or rewind when absent.
     ///
     /// Leading comments stay with the first statement when the file has no
-    /// `regio` declaration, so the checkpoint rewinds past them.
-    fn parse_leading_region_decl(&mut self) -> Option<RegionDecl> {
+    /// `regio` declaration, so the checkpoint rewinds past them. The
+    /// misplaced-declaration check reads the same shape speculatively.
+    fn try_parse_region_decl(&mut self) -> Option<RegionDecl> {
         let checkpoint = self.checkpoint();
         let leading_trivia = self.parse_leading_trivia();
         let Some(name) = self.region_decl_name() else {
@@ -701,13 +696,9 @@ impl Parser {
     /// Returns whether one was consumed. A second declaration is a duplicate;
     /// one after any import or declaration is misplaced.
     fn reject_misplaced_region_decl(&mut self, has_region: bool) -> bool {
-        let checkpoint = self.checkpoint();
-        let leading_trivia = self.parse_leading_trivia();
-        let Some(name) = self.region_decl_name() else {
-            self.restore(checkpoint);
+        let Some(decl) = self.try_parse_region_decl() else {
             return false;
         };
-        let decl = self.parse_region_decl(leading_trivia, name);
         let issue = if has_region {
             "module_declaration_duplicate"
         } else {
@@ -1051,7 +1042,6 @@ impl Parser {
     fn advance_raw(&mut self) -> &Token {
         if self.pos < self.tokens.len() {
             self.pos += 1;
-            // Keep non-trivia cursor consistent with raw advances past trivia or real tokens.
             while self.non_trivia_cursor < self.non_trivia_indices.len()
                 && self.non_trivia_indices[self.non_trivia_cursor] < self.pos
             {
@@ -1382,6 +1372,23 @@ impl Parser {
             .with_arg("expected", expected)
     }
 
+    /// Trailing-comma diagnostic shared by every item-list separator.
+    fn item_list_trailing_comma_error(span: Span, position: &'static str) -> ParseError {
+        ParseError::structured(ParseErrorKind::Expected, span)
+            .with_arg("issue", "item_list_trailing_comma")
+            .with_arg("family", "item_list")
+            .with_arg("position", position)
+    }
+
+    /// Missing-separator diagnostic shared by every item-list separator.
+    fn item_list_missing_separator_error(span: Span, position: &'static str) -> ParseError {
+        ParseError::structured(ParseErrorKind::Expected, span)
+            .with_arg("issue", "item_list_missing_separator")
+            .with_arg("family", "item_list")
+            .with_arg("position", position)
+            .with_arg("expected", "comma between items")
+    }
+
     /// Consume the separator after an item-list entry.
     ///
     /// Item lists are strict: a comma is required before another entry and is
@@ -1406,10 +1413,7 @@ impl Parser {
         if self.eat(&TokenKind::Comma) {
             let comma_span = self.previous_span();
             if ends.iter().any(|end| self.check(end)) {
-                let error = ParseError::structured(ParseErrorKind::Expected, comma_span)
-                    .with_arg("issue", "item_list_trailing_comma")
-                    .with_arg("family", "item_list")
-                    .with_arg("position", position);
+                let error = Self::item_list_trailing_comma_error(comma_span, position);
                 let error = if position.starts_with("json_") {
                     error.with_arg(
                         "migration_help",
@@ -1427,13 +1431,10 @@ impl Parser {
             && !self.is_at_end()
             && self.starts_item_list_entry()
         {
-            return Err(
-                ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                    .with_arg("issue", "item_list_missing_separator")
-                    .with_arg("family", "item_list")
-                    .with_arg("position", position)
-                    .with_arg("expected", "comma between items"),
-            );
+            return Err(Self::item_list_missing_separator_error(
+                self.current_span(),
+                position,
+            ));
         }
 
         Ok(false)
@@ -1446,10 +1447,7 @@ impl Parser {
     ) -> Result<(), ParseError> {
         if self.eat(&TokenKind::Comma) {
             let comma_span = self.previous_span();
-            return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
-                .with_arg("issue", "item_list_trailing_comma")
-                .with_arg("family", "item_list")
-                .with_arg("position", position));
+            return Err(Self::item_list_trailing_comma_error(comma_span, position));
         }
         Ok(())
     }
@@ -1475,10 +1473,7 @@ impl Parser {
         if self.eat(&TokenKind::Comma) {
             let comma_span = self.previous_span();
             if self.at_expression_list_boundary() {
-                return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
-                    .with_arg("issue", "item_list_trailing_comma")
-                    .with_arg("family", "item_list")
-                    .with_arg("position", position));
+                return Err(Self::item_list_trailing_comma_error(comma_span, position));
             }
             return Ok(true);
         }
@@ -1487,13 +1482,10 @@ impl Parser {
             return Ok(false);
         }
 
-        Err(
-            ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                .with_arg("issue", "item_list_missing_separator")
-                .with_arg("family", "item_list")
-                .with_arg("position", position)
-                .with_arg("expected", "comma between items"),
-        )
+        Err(Self::item_list_missing_separator_error(
+            self.current_span(),
+            position,
+        ))
     }
 
     /// Reject commas in a declaration-block field position.
@@ -1586,24 +1578,26 @@ impl Parser {
         )
     }
 
+    /// Whether the current token is a restart point for this recovery mode.
+    fn at_recovery_stop(&self, stop_at_rbrace: bool) -> bool {
+        self.is_recovery_boundary(&self.peek().kind)
+            && (stop_at_rbrace || !matches!(self.peek().kind, TokenKind::RBrace))
+    }
+
     /// Synchronize after an error by skipping to the next statement boundary.
     ///
     /// Top-level recovery may consume `}` because there is no enclosing block to
     /// protect. Block recovery can stop before `}` so the caller can close the
     /// block normally and preserve the surrounding `AST` shape.
     fn synchronize(&mut self, stop_at_rbrace: bool) {
-        if self.is_recovery_boundary(&self.peek().kind)
-            && (stop_at_rbrace || !matches!(self.peek().kind, TokenKind::RBrace))
-        {
+        if self.at_recovery_stop(stop_at_rbrace) {
             return;
         }
 
         self.advance();
 
         while !self.is_at_end() {
-            if self.is_recovery_boundary(&self.peek().kind)
-                && (stop_at_rbrace || !matches!(self.peek().kind, TokenKind::RBrace))
-            {
+            if self.at_recovery_stop(stop_at_rbrace) {
                 return;
             }
 
