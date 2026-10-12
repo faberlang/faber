@@ -61,7 +61,7 @@ fn pass_config_file_interfaces_hook_defaults_empty_and_accepts_contracts() {
 
 #[test]
 fn gate_classification_is_conservative() {
-    // Direct classification regression for the `:389` gate predicate. The
+    // Direct classification regression for the pre-lowering gate predicate. The
     // missing-symbol-on-use family (`UndefinedVariable` /
     // `UndefinedFunction` / `UndefinedMember`) is the ONLY set allowed past
     // the pre-lowering gate; every coherence-class / definition-identity /
@@ -250,4 +250,43 @@ fn top_level_statements_without_incipit_keep_the_implicit_entry() {
 fn failed_top_level_declaration_beside_incipit_has_only_its_own_error() {
     let issues = lowering_issues("fixum numerus x\nincipit {\n    scribe \"m\"\n}\n");
     assert_eq!(issues, vec![("top_level_initializer".to_owned(), 1)]);
+}
+
+// ---------------------------------------------------------------------------
+// locale-pack type spellings — edge-policy rows stay out of type position.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn locale_pack_type_spellings_skip_edge_policy_rows() {
+    // `register_locale_pack_type_spellings` deliberately skips `Frame` and
+    // `TensorEdgePolicy` rows: those names resolve in type position through
+    // the parser/lowerer and must not become type aliases a user value
+    // binding could collide with. `modulus_t` is a non-skipped row from the
+    // same pack, proving the registration loop actually ran.
+    let lex = radix_lexer::lex("functio f() {}\n");
+    let mut parsed = radix_parser::parse(lex);
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
+    let program = parsed.program.expect("program");
+    let mut config = PassConfig::base();
+    config.locale_pack = Some(crate::locale::latin_locale_pack());
+
+    let result = analyze(&program, &config, &mut parsed.interner);
+
+    let modulus_t = parsed.interner.intern("modulus_t");
+    assert!(
+        result.resolver.lookup_type(modulus_t).is_some(),
+        "the pack's non-skipped rows must register"
+    );
+    for policy in crate::BuiltinTensorEdgePolicy::ALL {
+        let symbol = parsed.interner.intern(policy.latin());
+        assert!(
+            result.resolver.lookup_type(symbol).is_none(),
+            "edge-policy spelling {} must stay out of type position",
+            policy.latin()
+        );
+    }
 }
