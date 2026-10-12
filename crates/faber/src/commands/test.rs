@@ -379,7 +379,7 @@ fn run_source_with_options(
     let mut metadata = RunMetadata::default();
     for case in cases {
         let started = Instant::now();
-        let mut one = run_proba_on_validated(
+        let one = run_proba_on_validated(
             &lowered.validated,
             std::slice::from_ref(&case),
             &TestSelection::default(),
@@ -391,17 +391,37 @@ fn run_source_with_options(
             options.kernel_policy,
         );
         let elapsed = started.elapsed().as_millis();
-        for result in &mut one.results {
-            result.unit_path = Path::new(name).to_path_buf();
-            metadata.durations_ms.insert(result_key(result), elapsed);
-        }
-        let stop = one.results.iter().any(result_is_failure);
-        report.results.extend(one.results);
+        let stop = record_case_results(
+            &mut report,
+            &mut metadata,
+            one,
+            Path::new(name),
+            elapsed,
+        );
         if options.fail_fast && stop {
             break;
         }
     }
     Ok((report, metadata))
+}
+
+/// Absorb one executed case batch: stamp the unit path on every result, note
+/// per-case durations, and extend `report`. Returns the `fail_fast` stop
+/// signal: true when the batch holds a failure or block.
+fn record_case_results(
+    report: &mut ProbaReport,
+    metadata: &mut RunMetadata,
+    mut one: ProbaReport,
+    unit_path: &Path,
+    elapsed_ms: u128,
+) -> bool {
+    for result in &mut one.results {
+        result.unit_path = unit_path.to_path_buf();
+        metadata.durations_ms.insert(result_key(result), elapsed_ms);
+    }
+    let stop = one.results.iter().any(result_is_failure);
+    report.results.extend(one.results);
+    stop
 }
 
 fn is_solum_case(case: &ProbaCase) -> bool {
@@ -456,7 +476,6 @@ fn run_package_with_options(
         }
     }
     let focused = focused || test_units.iter().any(|(_, cases)| has_solum_cases(cases));
-    let metadata = RunMetadata::default();
     if options.list {
         let mut report = ProbaReport::default();
         for (unit_path, all_cases) in test_units {
@@ -474,10 +493,10 @@ fn run_package_with_options(
                 .results
                 .extend(list_report(&unit_path, &selected).results);
         }
-        return Ok((report, false, metadata));
+        return Ok((report, false, RunMetadata::default()));
     }
 
-    let mut metadata = metadata;
+    let mut metadata = RunMetadata::default();
     let mut combined = ProbaReport::default();
     for (unit_path, cases) in test_units {
         match run_package_test_unit_with_options(
@@ -598,7 +617,7 @@ fn run_package_test_unit_with_options(
             let mut report = ProbaReport::default();
             for case in &cases {
                 let started = Instant::now();
-                let mut one = run_proba_on_validated_with_function_ids(
+                let one = run_proba_on_validated_with_function_ids(
                     validated,
                     unit_path,
                     std::slice::from_ref(case),
@@ -612,12 +631,13 @@ fn run_package_test_unit_with_options(
                     options.kernel_policy,
                 );
                 let elapsed = started.elapsed().as_millis();
-                for result in &mut one.results {
-                    result.unit_path = unit_path.to_path_buf();
-                    metadata.durations_ms.insert(result_key(result), elapsed);
-                }
-                let stop = one.results.iter().any(result_is_failure);
-                report.results.extend(one.results);
+                let stop = record_case_results(
+                    &mut report,
+                    metadata,
+                    one,
+                    unit_path,
+                    elapsed,
+                );
                 if options.fail_fast && stop {
                     break;
                 }
