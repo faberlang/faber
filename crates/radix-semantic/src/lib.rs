@@ -421,7 +421,7 @@ pub fn qualify_rust_borrow(
 /// Whether a diagnostic is a use-site-only name-resolution miss that may let
 /// the pre-lowering gate proceed.
 ///
-/// The `:389` gate ("stop before converting syntax") exists because HIR
+/// The pre-lowering gate ("stop before converting syntax") exists because HIR
 /// lowering assumes definition identities are coherent. Errors that break
 /// that contract — collect-phase/definition failures (duplicates, broken
 /// imports, alias cycles, unknown definitions) and any pre-lowering shape,
@@ -430,9 +430,9 @@ pub fn qualify_rust_borrow(
 /// `UndefinedMember` on an expression or pattern) do not corrupt the
 /// definition table: the lowerer records and continues past them, so the gate
 /// lets lowering run and the lowerer's diagnostics fold in before the
-/// complete-set gate (`:413`) stops the pipeline. Classification is
+/// post-lowering complete-set gate stops the pipeline. Classification is
 /// deliberately CONSERVATIVE — anything not in this family keeps the gate
-/// firing; the `:413` complete-set gate is the backstop.
+/// firing; the post-lowering complete-set gate is the backstop.
 #[must_use]
 pub fn is_use_site_only_error(diag: &SemanticError) -> bool {
     matches!(
@@ -684,10 +684,8 @@ pub fn analyze_with_cli(
         }
         Err(e) => diagnostics.extend(e),
     }
-    {
-        let refusals = passes::ledger_gate::check(&hir, &types);
-        passes::ledger_gate::replace_cascades(&mut diagnostics, refusals);
-    }
+    let refusals = passes::ledger_gate::check(&hir, &types);
+    passes::ledger_gate::replace_cascades(&mut diagnostics, refusals);
     if !diagnostics.iter().any(SemanticError::is_error) {
         diagnostics.extend(passes::filum_independence::check(&hir, &types, interner));
     }
@@ -908,7 +906,6 @@ pub fn analyze_with_cli(
     }
 }
 
-// constructor: moves all parameters into result
 /// Runs the named AIR unroll then AIR purity, returning their diagnostics.
 /// Purity runs only when unroll admitted, matching the in-place pipeline.
 fn run_air_passes(
@@ -1137,12 +1134,12 @@ fn register_locale_pack_type_spellings(
             }
             let ty = match binding.kind {
                 TypeBindingKind::Primitive(prim) => Some(types.primitive(prim)),
-                TypeBindingKind::TensorEdgePolicy(policy) => Some(types.tensor_edge_policy(policy)),
                 // Collections and the tensor family are parameterized shapes
                 // (no bare `TypeId`); their spellings register as name-only
                 // aliases and lower through dedicated type syntax.
                 // Census relational names are reader-surface rows only in S2;
-                // no bare `TypeId` until the S3/S4 type surface lands.
+                // no bare `TypeId` until the S3/S4 type surface lands. Frame and
+                // tensor-edge-policy rows were skipped above.
                 TypeBindingKind::Collection(_)
                 | TypeBindingKind::TensorFamily(_)
                 | TypeBindingKind::ModularWord
@@ -1151,7 +1148,8 @@ fn register_locale_pack_type_spellings(
                 | TypeBindingKind::ByteWord
                 | TypeBindingKind::Relational(_)
                 | TypeBindingKind::Ratio
-                | TypeBindingKind::Frame(_) => None,
+                | TypeBindingKind::Frame(_)
+                | TypeBindingKind::TensorEdgePolicy(_) => None,
             };
             let symbol = scope::Symbol {
                 def_id: resolver.fresh_builtin_def_id(),
