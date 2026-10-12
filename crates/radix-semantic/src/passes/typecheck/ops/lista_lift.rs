@@ -306,20 +306,16 @@ impl TypeChecker<'_> {
             return None;
         }
         let span = lhs.span;
-        let capacity = match (left, right) {
+        let (capacity, scalar_ty) = match (left, right) {
             (Some(left), Some(right)) => {
                 let Some(capacity) = self.lista_pair_capacity(left, right, span, op) else {
                     return Some(self.error_type);
                 };
-                capacity
+                (capacity, None)
             }
-            (Some(list), None) | (None, Some(list)) => list.capacity,
+            (Some(list), None) => (list.capacity, Some(rhs_ty)),
+            (None, Some(list)) => (list.capacity, Some(lhs_ty)),
             (None, None) => return None,
-        };
-        let scalar_ty = match (left, right) {
-            (Some(_), None) => Some(rhs_ty),
-            (None, Some(_)) => Some(lhs_ty),
-            _ => None,
         };
         let mut admitted = true;
         for shape in [left, right].into_iter().flatten() {
