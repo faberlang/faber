@@ -1,5 +1,5 @@
-use super::{judge_stale_build_pin, judge_unexecuted_pin};
-use crate::commands::corpus::{Case, Outcome, TargetExpectation};
+use super::{judge_run_output, judge_stale_build_pin, judge_unexecuted_pin};
+use crate::commands::corpus::{Case, Expected, Outcome, TargetExpectation};
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{ExitStatus, Output};
@@ -66,4 +66,42 @@ fn stale_build_pin_reports_the_run_phase_outcome() {
         reason.as_deref(),
         Some("unexpected pass; update target expectation")
     );
+}
+
+#[test]
+fn run_output_compares_normalized_stdout_and_exact_stderr() {
+    let dir = tempfile::tempdir().expect("temporary golden directory");
+    let stdout = dir.path().join("stdout.golden");
+    let stderr = dir.path().join("stderr.golden");
+    std::fs::write(&stdout, b"line\n").expect("write stdout golden");
+    std::fs::write(&stderr, b"warning\n").expect("write stderr golden");
+
+    let mut golden_case = case(Outcome::Pass, None);
+    golden_case.expect = Some(Expected {
+        exit: 0,
+        exit_nonzero: false,
+        stdout: Some(stdout),
+        stderr: Some(stderr),
+        stdout_contains: None,
+        stderr_contains: None,
+        check_only: false,
+    });
+
+    let matching = Output {
+        status: ExitStatus::from_raw(0),
+        stdout: b"line\r\n\n".to_vec(),
+        stderr: b"warning\n".to_vec(),
+    };
+    let (status, reason) = judge_run_output(&golden_case, &matching);
+    assert_eq!(status, "pass");
+    assert_eq!(reason, None);
+
+    let mismatched = Output {
+        status: ExitStatus::from_raw(0),
+        stdout: b"line\r\n\n".to_vec(),
+        stderr: b"different\n".to_vec(),
+    };
+    let (status, reason) = judge_run_output(&golden_case, &mismatched);
+    assert_eq!(status, "fail");
+    assert_eq!(reason.as_deref(), Some("stderr mismatch"));
 }
