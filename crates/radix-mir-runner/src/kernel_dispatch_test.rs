@@ -2,7 +2,7 @@
 //! function reaches the run's `KernelDispatcher` with evaluated arguments, a
 //! `mut` argument is written back, and the dispatcher's value is the call's.
 
-use super::kernel_dispatch::{self, KernelDispatcher};
+use super::kernel_dispatch::{self, DeviceToken, ElementRange, KernelDispatcher};
 use super::*;
 use crate::host::BufferHost;
 use radix_lexer::Interner;
@@ -226,4 +226,56 @@ fn refused_lane_form_kernel_call_is_the_named_refusal_not_an_arity_error() {
     // The whole diagnostic (message hint included) is the refusal constructor's
     // own value; no prose is re-spelled here.
     assert_eq!(error, kernel_refused(error.span));
+}
+
+/// Counts the residency callbacks a host write makes.
+#[derive(Default)]
+struct WriteRecorder {
+    downloads: Vec<(DeviceToken, ElementRange)>,
+    wrote: Vec<DeviceToken>,
+}
+
+impl KernelDispatcher for WriteRecorder {
+    fn dispatch(
+        &mut self,
+        _function: MirFunctionId,
+        _args: &mut [Value],
+        _span: Span,
+    ) -> Result<Option<Value>, RunnerError> {
+        Ok(None)
+    }
+
+    fn make_host_current(
+        &mut self,
+        token: DeviceToken,
+        range: ElementRange,
+    ) -> Result<(), RunnerError> {
+        self.downloads.push((token, range));
+        Ok(())
+    }
+
+    fn host_wrote(&mut self, token: DeviceToken) {
+        self.wrote.push(token);
+    }
+}
+
+#[test]
+fn before_write_downloads_then_marks_the_device_copy_stale_once() {
+    let slot = kernel_dispatch::ResidencySlot::default();
+    // No marker: a host write is host-only and touches no dispatcher.
+    assert!(slot.before_write(4));
+    let recorder = Rc::new(RefCell::new(WriteRecorder::default()));
+    slot.mark(
+        DeviceToken(7),
+        recorder.clone() as kernel_dispatch::ResidencyHook,
+        false,
+    );
+    assert!(slot.before_write(3));
+    assert_eq!(recorder.borrow().downloads, vec![(DeviceToken(7), 0..3)]);
+    assert_eq!(recorder.borrow().wrote, vec![DeviceToken(7)]);
+    // The device copy is stale now: a second write neither downloads nor
+    // re-marks it.
+    assert!(slot.before_write(3));
+    assert_eq!(recorder.borrow().downloads.len(), 1);
+    assert_eq!(recorder.borrow().wrote.len(), 1);
 }
