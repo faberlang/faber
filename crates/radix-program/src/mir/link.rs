@@ -955,8 +955,7 @@ fn link_library_method_targets(
                     let HirItemKind::Struct(strukt) = &item.kind else {
                         return None;
                     };
-                    (analysis.interner.resolve(strukt.name) == struct_export.name)
-                        .then_some(strukt)
+                    (analysis.interner.resolve(strukt.name) == struct_export.name).then_some(strukt)
                 }) else {
                     continue;
                 };

@@ -497,8 +497,8 @@ fn read_chunk(args: &[Arg]) -> Result<Reply, LeafError> {
     };
     // The map lookup filtered for `Handle::Reader`; the insert-back arm keeps
     // every other handle kind in place under its id.
-    let (mut stream, mut leftover, mut remaining, chunked, mut done) = with_handles(|map| {
-        match map.remove(&id) {
+    let (mut stream, mut leftover, mut remaining, chunked, mut done) =
+        with_handles(|map| match map.remove(&id) {
             Some(Handle::Reader {
                 stream,
                 leftover,
@@ -511,8 +511,7 @@ fn read_chunk(args: &[Arg]) -> Result<Reply, LeafError> {
                 Err(LeafError::invalid_argument(ROUTE, "id is not a reader"))
             }
             None => Err(LeafError::closed(ROUTE, "reader closed")),
-        }
-    })?;
+        })?;
     if done {
         with_handles(|map| {
             map.insert(
