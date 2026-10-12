@@ -500,13 +500,12 @@ pub(super) fn is_package_mir_supported_operand(operand: &CliOperand, is_final: b
 }
 
 pub(super) fn is_package_mir_supported_operand_default(operand: &CliOperand) -> bool {
-    operand.default.as_ref().is_none_or(|default| {
-        is_package_mir_scalar_default(&operand.ty, default)
-            && !matches!(
-                operand.ty,
-                CliType::Octeti | CliType::ListaTextus | CliType::ListaNumerus
-            )
-    })
+    // `is_package_mir_scalar_default` already rejects `octeti` and the list
+    // types, so no separate list/octeti exclusion is needed here.
+    operand
+        .default
+        .as_ref()
+        .is_none_or(|default| is_package_mir_scalar_default(&operand.ty, default))
 }
 
 pub(super) fn is_package_mir_scalar_default(ty: &CliType, default: &CliDefault) -> bool {

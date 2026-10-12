@@ -127,7 +127,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             }
             HirItemKind::Constant(const_item) => {
                 self.reset();
-                self.check_expr(&const_item.value);
+                self.visit_expr(&const_item.value);
             }
             _ => {}
         }
@@ -175,24 +175,24 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             self.check_stmt(stmt);
         }
         if let Some(expr) = &block.expr {
-            self.check_expr(expr);
+            self.visit_expr(expr);
         }
     }
 
     fn check_stmt(&mut self, stmt: &HirStatement) {
         match &stmt.kind {
             HirStatementKind::Local(local) => self.check_local(local),
-            HirStatementKind::Expr(expr) => self.check_expr(expr),
+            HirStatementKind::Expr(expr) => self.visit_expr(expr),
             HirStatementKind::Redde(value) => {
                 if let Some(expr) = value {
-                    self.check_expr(expr);
+                    self.visit_expr(expr);
                 }
             }
             HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
             HirStatementKind::IncDec(inc_dec) => self.op_assign(&inc_dec.target),
             HirStatementKind::Custodi(custodi) => {
                 for clause in &custodi.clauses {
-                    self.check_expr(&clause.cond);
+                    self.visit_expr(&clause.cond);
                     // PRP-057: `take` swaps the current state out in O(1) instead
                     // of cloning the full map at each branch point.
                     let incoming = std::mem::take(&mut self.states);
@@ -219,13 +219,9 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             return;
         }
         if let Some(init) = &local.init {
-            self.check_expr(init);
+            self.visit_expr(init);
             self.mark_assigned(local.def_id);
         }
-    }
-
-    fn check_expr(&mut self, expr: &HirExpression) {
-        self.visit_expr(expr);
     }
 
     fn track_binding(&mut self, def_id: DefId) {
@@ -329,7 +325,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
                 self.mark_assigned(def_id);
             }
         } else {
-            self.check_expr(target);
+            self.visit_expr(target);
         }
     }
 
@@ -354,7 +350,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             self.enforce_write_once(def_id, target.span);
             self.mark_assigned(def_id);
         } else {
-            self.check_expr(target);
+            self.visit_expr(target);
         }
     }
 
@@ -398,7 +394,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
 
     fn check_casu_arm(&mut self, arm: &HirCasuArm) {
         self.assign_pattern_bindings(&arm.patterns);
-        self.check_expr(&arm.body);
+        self.visit_expr(&arm.body);
     }
 
     fn root_def_id(expr: &HirExpression) -> Option<DefId> {
@@ -418,7 +414,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
             }
             HirExpressionKind::Index(object, index) => {
                 self.check_projection_inputs(object);
-                self.check_expr(index);
+                self.visit_expr(index);
             }
             _ => {}
         }
@@ -502,7 +498,7 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.read_binding(*def_id, expr.span),
             HirExpressionKind::Assign(target, value) => {
-                self.check_expr(value);
+                self.visit_expr(value);
                 self.assign_binding(target);
             }
             // `target ⇇ value` writes the storage `target` already names: the
@@ -511,8 +507,8 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
             // rebinds, so it is legal only on `varia` bindings and `mut`
             // parameters, however often it runs.
             HirExpressionKind::CopyInto { target, value } => {
-                self.check_expr(value);
-                self.check_expr(target);
+                self.visit_expr(value);
+                self.visit_expr(target);
                 if let Some(def_id) = Self::root_def_id(target)
                     && self.write_once.contains(&def_id)
                 {
@@ -531,9 +527,9 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                 recovery,
                 ..
             } => {
-                self.check_expr(source);
+                self.visit_expr(source);
                 if let Some(recovery) = recovery {
-                    self.check_expr(recovery);
+                    self.visit_expr(recovery);
                 }
                 self.assign_binding(target);
             }

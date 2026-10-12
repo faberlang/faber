@@ -88,13 +88,19 @@ impl CheckLibraryError {
     }
 }
 
+fn validate_provider_name(name: &str) -> Result<(), CheckLibraryError> {
+    if is_valid_provider_segment(name) {
+        Ok(())
+    } else {
+        Err(CheckLibraryError::InvalidName {
+            name: name.to_owned(),
+        })
+    }
+}
+
 /// Resolve `<name>` from the library home using the resolver root rule.
 pub(crate) fn resolve_dev_library(name: &str) -> Result<DevLibraryCheckout, CheckLibraryError> {
-    if !is_valid_provider_segment(name) {
-        return Err(CheckLibraryError::InvalidName {
-            name: name.to_owned(),
-        });
-    }
+    validate_provider_name(name)?;
     let home = resolved_library_home().ok_or(CheckLibraryError::MissingLibraryHome)?;
     resolve_dev_library_from(name, home)
 }
@@ -103,11 +109,7 @@ pub(crate) fn resolve_dev_library_from(
     name: &str,
     home: ResolvedLibraryHome,
 ) -> Result<DevLibraryCheckout, CheckLibraryError> {
-    if !is_valid_provider_segment(name) {
-        return Err(CheckLibraryError::InvalidName {
-            name: name.to_owned(),
-        });
-    }
+    validate_provider_name(name)?;
     let provider_repo = home.path.join(name);
     if !provider_repo.is_dir() {
         return Err(CheckLibraryError::UnknownProvider {
@@ -216,7 +218,7 @@ pub(crate) fn check_dev_library(checkout: &DevLibraryCheckout) -> Vec<Diagnostic
     };
     match radix::program::analyze::analyze_package_spec(
         &config,
-        clone_spec(&checkout.spec),
+        checkout.spec.clone(),
         &resolver,
         false,
         None,
@@ -224,16 +226,6 @@ pub(crate) fn check_dev_library(checkout: &DevLibraryCheckout) -> Vec<Diagnostic
     ) {
         Ok(program) => program.diagnostics,
         Err(diagnostics) => diagnostics,
-    }
-}
-
-fn clone_spec(spec: &PackageSpec) -> PackageSpec {
-    PackageSpec {
-        package_root: spec.package_root.clone(),
-        source_root: spec.source_root.clone(),
-        entry: spec.entry.clone(),
-        templates: spec.templates.clone(),
-        manifest_backed: spec.manifest_backed,
     }
 }
 

@@ -85,14 +85,7 @@ pub fn print_diagnostics(
 /// Write a text artifact, creating parent directories as needed.
 pub fn write_text_artifact(path: &Path, text: &str) {
     ensure_artifact_parent(path);
-    match fs::write(path, text) {
-        Ok(()) => {}
-        Err(err) if err.kind() == io::ErrorKind::BrokenPipe => {}
-        Err(err) => {
-            eprintln!("error: failed to write '{}': {}", path.display(), err);
-            std::process::exit(1);
-        }
-    }
+    write_artifact_contents(path, text);
 }
 
 fn ensure_artifact_parent(path: &Path) {
@@ -260,7 +253,7 @@ fn parse_eslint_output(code: &str, eslint_output: &str) -> Result<String, String
 fn lint_rust_code(code: &str) -> Result<String, String> {
     use std::process::Command;
 
-    let (temp_dir, main_rs) = write_temp_rust_project(code)?;
+    let (temp_dir, main_rs) = write_temp_rust_project_in(&std::env::temp_dir(), code)?;
 
     let output = Command::new("cargo")
         .args([
@@ -299,10 +292,6 @@ fn lint_rust_code(code: &str) -> Result<String, String> {
             ))
         }
     }
-}
-
-fn write_temp_rust_project(code: &str) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
-    write_temp_rust_project_in(&std::env::temp_dir(), code)
 }
 
 /// Create the lint temp root through the shared exclusive-create retry

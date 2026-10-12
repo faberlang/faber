@@ -1,7 +1,6 @@
 use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::super::binding_manifest::read_binding_manifest;
 use super::{verify_library_binding_shapes, verify_library_bindings};
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);

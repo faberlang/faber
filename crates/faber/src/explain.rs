@@ -662,18 +662,18 @@ fn search_score(entry: &Entry, query: &str) -> Option<u8> {
     // Lower is better. Bias keeps exact/current terminology above prose hits
     // while still allowing body text to make an entry discoverable.
     let mut best: Option<u8> = None;
-    score_term(&mut best, &entry.term, query, 0);
+    score_field(&mut best, &entry.term, query, 0);
 
     for alias in &entry.aliases {
-        score_term(&mut best, alias, query, 1);
+        score_field(&mut best, alias, query, 1);
     }
 
     for legacy in &entry.legacy {
-        score_term(&mut best, legacy, query, 1);
+        score_field(&mut best, legacy, query, 1);
     }
 
     if let Some(canonical_term) = &entry.canonical_term {
-        score_term(&mut best, canonical_term, query, 1);
+        score_field(&mut best, canonical_term, query, 1);
     }
 
     score_field(&mut best, &entry.summary, query, 3);
@@ -684,10 +684,6 @@ fn search_score(entry: &Entry, query: &str) -> Option<u8> {
     score_field(&mut best, &entry.body, query, 4);
 
     best
-}
-
-fn score_term(best: &mut Option<u8>, candidate: &str, query: &str, bias: u8) {
-    score_field(best, candidate, query, bias);
 }
 
 fn score_field(best: &mut Option<u8>, candidate: &str, query: &str, bias: u8) {

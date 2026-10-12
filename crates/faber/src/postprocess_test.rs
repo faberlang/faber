@@ -64,6 +64,19 @@ fn lint_temp_root_is_exclusive_and_ignores_planted_entries() {
 }
 
 #[test]
+fn write_text_artifact_creates_parent_directories_and_writes_contents() {
+    let guard = tempfile::tempdir().expect("tempdir");
+    let path = guard.path().join("nested/deeper/out.rs");
+
+    super::write_text_artifact(&path, "fn main() {}\n");
+
+    assert_eq!(
+        std::fs::read_to_string(&path).expect("read artifact"),
+        "fn main() {}\n"
+    );
+}
+
+#[test]
 fn eslint_output_uses_fixed_source_when_present() {
     let output = r#"[{"filePath":"main.ts","output":"const value = 1;\n"}]"#;
 

@@ -147,51 +147,19 @@ impl<'a> IndexUnifier<'a> {
                     .map_err(|_| IndexUnifyError::Mismatch)
             }
             (IndexExpr::Affine { base, offset }, IndexExpr::Literal(value)) => {
-                let base_value = i128::from(value)
-                    .checked_sub(offset)
-                    .ok_or(IndexUnifyError::Mismatch)?;
-                if base_value < 0 {
-                    return Err(IndexUnifyError::Mismatch);
-                }
-                let base_value =
-                    u64::try_from(base_value).map_err(|_| IndexUnifyError::Mismatch)?;
-                let expected = self.types.intern_index(IndexExpr::Literal(base_value));
-                self.unify(base, expected)?;
+                self.unify_affine_inverse(base, offset, value)?;
                 Ok(b)
             }
             (IndexExpr::Literal(value), IndexExpr::Affine { base, offset }) => {
-                let base_value = i128::from(value)
-                    .checked_sub(offset)
-                    .ok_or(IndexUnifyError::Mismatch)?;
-                if base_value < 0 {
-                    return Err(IndexUnifyError::Mismatch);
-                }
-                let base_value =
-                    u64::try_from(base_value).map_err(|_| IndexUnifyError::Mismatch)?;
-                let expected = self.types.intern_index(IndexExpr::Literal(base_value));
-                self.unify(base, expected)?;
+                self.unify_affine_inverse(base, offset, value)?;
                 Ok(a)
             }
             (IndexExpr::Divide { numerator, divisor }, IndexExpr::Literal(value)) => {
-                if divisor == 0 {
-                    return Err(IndexUnifyError::Mismatch);
-                }
-                let expected_value = value
-                    .checked_mul(divisor)
-                    .ok_or(IndexUnifyError::Mismatch)?;
-                let expected = self.types.intern_index(IndexExpr::Literal(expected_value));
-                self.unify(numerator, expected)?;
+                self.unify_divide_inverse(numerator, divisor, value)?;
                 Ok(b)
             }
             (IndexExpr::Literal(value), IndexExpr::Divide { numerator, divisor }) => {
-                if divisor == 0 {
-                    return Err(IndexUnifyError::Mismatch);
-                }
-                let expected_value = value
-                    .checked_mul(divisor)
-                    .ok_or(IndexUnifyError::Mismatch)?;
-                let expected = self.types.intern_index(IndexExpr::Literal(expected_value));
-                self.unify(numerator, expected)?;
+                self.unify_divide_inverse(numerator, divisor, value)?;
                 Ok(a)
             }
             (IndexExpr::Tuple(a_dims), IndexExpr::Tuple(b_dims)) => {
@@ -321,6 +289,45 @@ impl<'a> IndexUnifier<'a> {
             .map_err(|_| IndexUnifyError::Mismatch)?;
         self.unify(base, target)?;
         Ok(runtime)
+    }
+
+    /// Solve `base + offset = value` for `base`, rejecting a negative or
+    /// non-representable natural base.
+    fn unify_affine_inverse(
+        &mut self,
+        base: IndexId,
+        offset: i128,
+        value: u64,
+    ) -> Result<(), IndexUnifyError> {
+        let base_value = i128::from(value)
+            .checked_sub(offset)
+            .ok_or(IndexUnifyError::Mismatch)?;
+        if base_value < 0 {
+            return Err(IndexUnifyError::Mismatch);
+        }
+        let base_value = u64::try_from(base_value).map_err(|_| IndexUnifyError::Mismatch)?;
+        let expected = self.types.intern_index(IndexExpr::Literal(base_value));
+        self.unify(base, expected)?;
+        Ok(())
+    }
+
+    /// Solve `numerator / divisor = value` for `numerator`, requiring a nonzero
+    /// divisor and an exact product.
+    fn unify_divide_inverse(
+        &mut self,
+        numerator: IndexId,
+        divisor: u64,
+        value: u64,
+    ) -> Result<(), IndexUnifyError> {
+        if divisor == 0 {
+            return Err(IndexUnifyError::Mismatch);
+        }
+        let expected_value = value
+            .checked_mul(divisor)
+            .ok_or(IndexUnifyError::Mismatch)?;
+        let expected = self.types.intern_index(IndexExpr::Literal(expected_value));
+        self.unify(numerator, expected)?;
+        Ok(())
     }
 
     /// BO-S-6: cache per `(IndexVar, resolved IndexId)`; no dims.clone().
