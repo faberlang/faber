@@ -17,9 +17,9 @@ pub(crate) use calls::is_inlinable_kernel;
 use calls::{EffectScan, Frame, Module, Receiver};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
-    DefId, HirArrayElement, HirBlock, HirConversioTarget, HirExpression, HirExpressionKind,
-    HirFunction, HirLocal, HirModule, HirObjectKey, HirParam, HirParamMode, HirStatement,
-    HirStatementKind,
+    DefId, HirArrayElement, HirBlock, HirCallArg, HirConversioTarget, HirExpression,
+    HirExpressionKind, HirFunction, HirLocal, HirModule, HirObjectKey, HirParam, HirParamMode,
+    HirStatement, HirStatementKind,
 };
 use radix_intrinsics::{IntrinsicReceiver, IntrinsicReturnKind};
 use radix_lexer::{Interner, Span, Symbol};
@@ -720,8 +720,14 @@ fn coordinates_of(defs: &[(DefId, Symbol)]) -> Vec<Coordinate> {
 }
 
 impl BodyProof<'_> {
+    /// Index of the innermost `filum` loop around the cursor; the proof only
+    /// records accesses with the loop being proved on the stack.
+    fn current_loop(&self) -> usize {
+        *self.stack.last().expect("inside a filum loop")
+    }
+
     fn owner(&self) -> &LoopCtx {
-        &self.loops[*self.stack.last().expect("inside a filum loop")]
+        &self.loops[self.current_loop()]
     }
 
     fn push_access(
@@ -742,7 +748,7 @@ impl BodyProof<'_> {
             coords,
             write,
             span,
-            owner: *self.stack.last().expect("inside a filum loop"),
+            owner: self.current_loop(),
             depth: self.stack.len(),
             composed,
             every_loop_has_coordinates: self
@@ -830,11 +836,7 @@ impl BodyProof<'_> {
     }
 
     fn decline(&mut self, span: Span, reason: &str) {
-        self.errors.push(
-            SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
-                .with_arg("issue", self.issue)
-                .with_arg("reason", reason),
-        );
+        self.errors.push(issue(self.issue, span, reason));
     }
 
     fn is_storage(&self, ty: Option<TypeId>) -> bool {
@@ -899,6 +901,42 @@ impl BodyProof<'_> {
             }
             _ => self.decline(target.span, "unknown_write_address"),
         }
+    }
+
+    /// An access-intrinsic or pure value-method call: record the storage
+    /// access it names, then read the receiver and the arguments.
+    fn intrinsic_method(
+        &mut self,
+        expr: &HirExpression,
+        receiver: &HirExpression,
+        name: Symbol,
+        type_args: &[TypeId],
+        args: &[HirCallArg],
+    ) {
+        match self.interner.resolve(name) {
+            "accipe" if args.len() == 1 => {
+                self.access(receiver, Some(&args[0].expr), false, expr.span)
+            }
+            "ponde" if args.len() == 2 => {
+                self.access(receiver, Some(&args[0].expr), true, expr.span)
+            }
+            "transpone"
+            | "__faber_glyph_transpose"
+            | "sectio"
+            | "forma"
+            | "expande"
+            | "disloco" => {}
+            "limes" if builtin_edge_policy(type_args, self.types) => {}
+            _ if is_pure_value_method(receiver, name, args.len(), self.types, self.interner) => {}
+            _ => self.decline(expr.span, "unproved_call_effect"),
+        }
+        self.receiver(receiver);
+        let before = self.suppress_reads;
+        self.suppress_reads = false;
+        for arg in args {
+            self.visit_expr(&arg.expr);
+        }
+        self.suppress_reads = before;
     }
 }
 
@@ -965,39 +1003,11 @@ impl HirVisitor for BodyProof<'_> {
                 }
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
-                let intrinsic =
-                    is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner);
-                let pure =
-                    is_pure_value_method(receiver, *name, args.len(), self.types, self.interner);
-                if !intrinsic {
+                if is_access_intrinsic(receiver, *name, args.len(), self.types, self.interner) {
+                    self.intrinsic_method(expr, receiver, *name, type_args, args);
+                } else {
                     self.method_call(expr, receiver, *name, args);
-                    return;
                 }
-                let name = self.interner.resolve(*name);
-                match name {
-                    "accipe" if args.len() == 1 => {
-                        self.access(receiver, Some(&args[0].expr), false, expr.span)
-                    }
-                    "ponde" if args.len() == 2 => {
-                        self.access(receiver, Some(&args[0].expr), true, expr.span)
-                    }
-                    "transpone"
-                    | "__faber_glyph_transpose"
-                    | "sectio"
-                    | "forma"
-                    | "expande"
-                    | "disloco" => {}
-                    "limes" if builtin_edge_policy(type_args, self.types) => {}
-                    _ if pure => {}
-                    _ => self.decline(expr.span, "unproved_call_effect"),
-                }
-                self.receiver(receiver);
-                let before = self.suppress_reads;
-                self.suppress_reads = false;
-                for arg in args {
-                    self.visit_expr(&arg.expr);
-                }
-                self.suppress_reads = before;
             }
             HirExpressionKind::Call(callee, _, args, _) => self.call(expr, callee, args),
             HirExpressionKind::Ad { .. }
@@ -1101,7 +1111,7 @@ fn prove(
         if access.facts.unknown || access.facts.storage.is_empty() {
             proof
                 .errors
-                .push(issue(access.span, "unknown_storage_identity"));
+                .push(issue(ISSUE, access.span, "unknown_storage_identity"));
         }
         let owner = &proof.loops[access.owner];
         for storage in &access.facts.storage {
@@ -1137,7 +1147,7 @@ fn prove(
             if !valid {
                 proof
                     .errors
-                    .push(issue(access.span, "write_not_own_coordinate"));
+                    .push(issue(ISSUE, access.span, "write_not_own_coordinate"));
             }
             if let Some(physical) = physical {
                 if writes
@@ -1146,7 +1156,7 @@ fn prove(
                 {
                     proof
                         .errors
-                        .push(issue(access.span, "inconsistent_written_coordinate"));
+                        .push(issue(ISSUE, access.span, "inconsistent_written_coordinate"));
                 }
                 writes.insert(storage.root, physical);
             }
@@ -1159,13 +1169,13 @@ fn prove(
         if access.facts.unknown || access.facts.storage.is_empty() {
             proof
                 .errors
-                .push(issue(access.span, "unknown_read_storage_identity"));
+                .push(issue(ISSUE, access.span, "unknown_read_storage_identity"));
         }
         for storage in &access.facts.storage {
             if access.bound && writes.contains_key(&storage.root) {
                 proof
                     .errors
-                    .push(issue(access.span, "written_storage_neighbor_read"));
+                    .push(issue(ISSUE, access.span, "written_storage_neighbor_read"));
                 continue;
             }
             if let Some(written) = writes.get(&storage.root) {
@@ -1176,7 +1186,7 @@ fn prove(
                 if physical.as_ref() != Some(written) {
                     proof
                         .errors
-                        .push(issue(access.span, "written_storage_neighbor_read"));
+                        .push(issue(ISSUE, access.span, "written_storage_neighbor_read"));
                 }
             }
         }
@@ -1184,9 +1194,11 @@ fn prove(
     proof.errors
 }
 
-fn issue(span: Span, reason: &str) -> SemanticError {
+/// The one diagnostic shape of this pass: a structured type mismatch naming
+/// the issue and the reason. The issue is this pass's, or a reduction body's.
+fn issue(issue: &'static str, span: Span, reason: &str) -> SemanticError {
     SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
-        .with_arg("issue", ISSUE)
+        .with_arg("issue", issue)
         .with_arg("reason", reason)
 }
 

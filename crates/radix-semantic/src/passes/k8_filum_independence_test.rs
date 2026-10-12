@@ -95,6 +95,15 @@ fn same_coordinate_read_write_accepted() {
 }
 
 #[test]
+fn pure_value_method_call_is_not_an_access() {
+    // A registered value method on a scalar receiver reads no storage: the
+    // call must prove, not decline as an unproved effect.
+    accepted(&body(
+        "fixum numerus magnitude ← value.absolutum()\n grid[i] ← value + magnitude",
+    ));
+}
+
+#[test]
 fn neighbor_read_of_written_tensor_rejected() {
     rejected(
         &body("fixum numerus prior ← grid[i + 1]\n grid[i] ← prior"),
