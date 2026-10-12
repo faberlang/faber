@@ -503,21 +503,15 @@ pub fn source_fragment_entry_from_shader_contract(
     fragment_outputs: &[ShaderFragmentOutput],
     resources: Vec<MirKernelResourceReflection>,
 ) -> Result<MirKernelReflection, MirAbiError> {
-    let varying_reflections = varyings
-        .iter()
-        .map(varying_reflection_from_shader_contract)
-        .collect::<Vec<_>>();
-    let output_reflections = fragment_outputs
-        .iter()
-        .map(fragment_output_reflection_from_shader_contract)
-        .collect::<Vec<_>>();
-    MirKernelReflection::source_fragment_entry(
-        source_def,
+    let mut entry = fragment_entry_from_shader_contract(
+        MirFunctionId(0),
         entry_name,
-        varying_reflections,
-        output_reflections,
+        varyings,
+        fragment_outputs,
         resources,
-    )
+    )?;
+    entry.provenance = MirKernelProvenance::SourceFunction(source_def);
+    Ok(entry)
 }
 
 /// Build a [`MirGraphicsPipelineReflection`] from a vertex + fragment stage
