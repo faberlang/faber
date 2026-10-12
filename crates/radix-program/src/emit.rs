@@ -21,7 +21,7 @@ use crate::analyze::{
     AnalysisSeams, AnalyzedProgram, analyze_package_spec, effective_package_config,
     package_root_for_input,
 };
-use crate::artifact_plan::plan_package;
+use crate::artifact_plan::{ArtifactPlan, plan_package};
 use crate::discovery::discover_package;
 use crate::frontmatter::RustTestSelection;
 use crate::library::LibraryResolver;
@@ -81,6 +81,18 @@ fn finalize_package_compile_result(
         result.output = None;
     }
     result
+}
+
+/// Fail closed with the planner's rejection reason for an unsupported target.
+fn unsupported_plan_failure(plan: ArtifactPlan, input: &Path) -> PackageCompileResult {
+    compile_failure(vec![
+        crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
+            "package compilation does not support this target".to_owned()
+        }))
+        .with_file(input.display().to_string())
+        .with_arg("issue", "package_target_unsupported")
+        .with_arg("target", plan.target),
+    ])
 }
 
 /// Compile a package source graph into one backend output.
@@ -228,14 +240,7 @@ fn compile_package_internal(
     if config.target != Target::HirRust {
         let plan = plan_package(&package, config.target);
         if !plan.supported {
-            return compile_failure(vec![
-                crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
-                    "package compilation does not support this target".to_owned()
-                }))
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target),
-            ]);
+            return unsupported_plan_failure(plan, input);
         }
         // Planner seams exist; full product emit for TS is later deliveries.
         return compile_failure(vec![crate::package_diagnostic_error(format!(
@@ -287,14 +292,7 @@ fn compile_package_go(
     {
         let plan = plan_package(package, Target::HirGo);
         if !plan.supported {
-            return compile_failure(vec![
-                crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
-                    "package compilation does not support this target".to_owned()
-                }))
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target),
-            ]);
+            return unsupported_plan_failure(plan, input);
         }
         (seams.emit_go)(package, input)
     }
@@ -315,14 +313,7 @@ fn compile_package_wasm(package: AnalyzedProgram, input: &Path) -> PackageCompil
     {
         let plan = plan_package(&package, Target::MirWasm);
         if !plan.supported {
-            return compile_failure(vec![
-                crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
-                    "package compilation does not support this target".to_owned()
-                }))
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target),
-            ]);
+            return unsupported_plan_failure(plan, input);
         }
         let mut package = package;
         let options = crate::wasm::PackageWasmOptions::new(
