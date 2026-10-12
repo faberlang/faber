@@ -97,8 +97,7 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
 
         /// Record `ident` as a member name so `visit_ident` ignores it.
         fn note_member_name(&mut self, ident: &radix_syntax::Ident) {
-            self.member_names
-                .insert(std::ptr::from_ref(ident) as usize);
+            self.member_names.insert(std::ptr::from_ref(ident) as usize);
         }
     }
 

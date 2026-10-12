@@ -2,8 +2,8 @@ use super::program_uses_forma;
 use crate::{Resolver, TypeTable};
 use radix_lexer::{Interner, Span};
 use radix_syntax::{
-    BinOp, BinaryExpr, Expr, ExprKind, ExprStmt, Ident, Literal, MemberExpr, MAX_VISIT_DEPTH, Program,
-    Stmt, StmtKind,
+    BinOp, BinaryExpr, Expr, ExprKind, ExprStmt, Ident, Literal, MAX_VISIT_DEPTH, MemberExpr,
+    Program, Stmt, StmtKind,
 };
 
 /// Left-nested `1 + (1 + (…))` spine; its deepest leaf is `depth` nodes down.

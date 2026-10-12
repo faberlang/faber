@@ -435,11 +435,20 @@ fn wasm_binary_lane_mirrors_wasm_text_and_sexp_regex_sources_fail_closed() {
     use ConversioCoverageTarget::{Sexp, SexpStructural, Wasm, WasmText};
     use ConversioTypeFamily::{Fractus, Numerus, Regex, Tensor, Textus};
     for target in [WasmText, Wasm] {
-        assert_eq!(classify_conversio_coverage(Textus, Numerus, target), ConversioCoverage::Dedicated);
-        assert_eq!(classify_conversio_coverage(Numerus, Fractus, target), ConversioCoverage::NotEmitted);
+        assert_eq!(
+            classify_conversio_coverage(Textus, Numerus, target),
+            ConversioCoverage::Dedicated
+        );
+        assert_eq!(
+            classify_conversio_coverage(Numerus, Fractus, target),
+            ConversioCoverage::NotEmitted
+        );
     }
     for target in [SexpStructural, Sexp] {
-        assert_eq!(classify_conversio_coverage(Regex, Tensor, target), ConversioCoverage::NotEmitted);
+        assert_eq!(
+            classify_conversio_coverage(Regex, Tensor, target),
+            ConversioCoverage::NotEmitted
+        );
     }
 }
 

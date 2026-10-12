@@ -180,7 +180,8 @@ pub(crate) fn plan_self_update(
         .map_err(|message| launcher_metadata_error(message, "the install prefix"))?;
     let receipt = read_receipt(&prefix)
         .map_err(|message| launcher_metadata_error(message, prefix.display()))?;
-    let current_version = required_receipt_str(&receipt, &prefix, "version", launcher_metadata_error)?;
+    let current_version =
+        required_receipt_str(&receipt, &prefix, "version", launcher_metadata_error)?;
     let triple = required_receipt_str(&receipt, &prefix, "triple", launcher_metadata_error)?;
     let source = required_receipt_str(&receipt, &prefix, "source", launcher_metadata_error)?;
     let base_url = base_url_for(args.base_url.as_deref(), &receipt, source, &args.version);
@@ -210,7 +211,8 @@ pub(crate) fn plan_self_uninstall(
         .map_err(|message| uninstall_metadata_error(message, "the install prefix"))?;
     let receipt = read_receipt(&prefix)
         .map_err(|message| uninstall_metadata_error(message, prefix.display()))?;
-    let current_version = required_receipt_str(&receipt, &prefix, "version", uninstall_metadata_error)?;
+    let current_version =
+        required_receipt_str(&receipt, &prefix, "version", uninstall_metadata_error)?;
     let triple = required_receipt_str(&receipt, &prefix, "triple", uninstall_metadata_error)?;
     let source = required_receipt_str(&receipt, &prefix, "source", uninstall_metadata_error)?;
     // The uninstall engine script is published beside the CURRENT version's
@@ -339,12 +341,15 @@ fn required_receipt_str<'a>(
     field: &str,
     metadata_error: fn(String, String) -> String,
 ) -> Result<&'a str, String> {
-    receipt.get(field).and_then(serde_json::Value::as_str).ok_or_else(|| {
-        metadata_error(
-            format!("install receipt at {} has no {field}", prefix.display()),
-            prefix.display().to_string(),
-        )
-    })
+    receipt
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            metadata_error(
+                format!("install receipt at {} has no {field}", prefix.display()),
+                prefix.display().to_string(),
+            )
+        })
 }
 
 /// Resolve the asset base for the bootstrap fetch: explicit `--base-url`
