@@ -19,7 +19,9 @@
 use super::*;
 use crate::passes::filum_independence::is_inlinable_kernel;
 
-/// Memberless view for builtin nominal receivers (sermo, directional views).
+/// A struct contract with no fields, methods, or member-visibility overrides.
+/// Builtin nominal receivers start from this; a builtin with field contracts
+/// fills in `fields` only.
 fn empty_struct_info() -> StructInfo {
     StructInfo {
         fields: FxHashMap::default(),
@@ -289,8 +291,7 @@ impl TypeChecker<'_> {
             def_id,
             StructInfo {
                 fields,
-                methods: FxHashMap::default(),
-                method_visibility: FxHashMap::default(),
+                ..empty_struct_info()
             },
         );
     }
@@ -365,8 +366,7 @@ impl TypeChecker<'_> {
                 def_id,
                 StructInfo {
                     fields,
-                    methods: FxHashMap::default(),
-                    method_visibility: FxHashMap::default(),
+                    ..empty_struct_info()
                 },
             );
         }
