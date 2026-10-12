@@ -198,7 +198,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     None => Ok(Value::Nil),
                 }
             }
-            MirIntrinsic::Provider(provider) => self.eval_provider(provider, &call.args, span),
+            MirIntrinsic::Provider(provider) => self.eval_provider(provider, span),
             MirIntrinsic::SermoOpen => self.eval_sermo_open(&call.args, span),
             MirIntrinsic::SermoSetOpener => self.eval_sermo_set_opener(&call.args, span),
             MirIntrinsic::Sermo(op) => self.eval_sermo_op(op, &call.args, call.return_ty, span),
@@ -5455,12 +5455,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     // PROVIDERS
 
-    fn eval_provider(
-        &mut self,
-        provider: &MirProvider,
-        args: &[MirOperand],
-        span: Span,
-    ) -> Result<Value, RunnerError> {
+    fn eval_provider(&mut self, provider: &MirProvider, span: Span) -> Result<Value, RunnerError> {
         let identity = provider_identity(provider, self.interner);
         if let MirProviderKind::Kernel(module) = provider.kind {
             // Raw entry args lower to the legacy `processus.argv` provider, but
