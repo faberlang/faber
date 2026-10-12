@@ -278,7 +278,7 @@ pub fn assert_analysis_rejects_with_issue(source: &str, expected: &str) {
 /// Diagnostics from analysis (errors and warnings).
 #[must_use]
 pub fn analyze_and_get_diagnostics(source: &str) -> Vec<SemanticError> {
-    analyze_source(source).diagnostics.clone().clone()
+    analyze_source(source).diagnostics.clone()
 }
 
 /// Historical compile-path alias: analysis only, no backend.
