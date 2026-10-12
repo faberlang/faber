@@ -217,7 +217,9 @@ fn receive(args: &[Arg]) -> Result<Reply, LeafError> {
             ("done".to_owned(), Reply::Bool(true)),
         ])),
         Ok(Message::Ping(payload)) => {
-            let _ = socket.send(Message::Pong(payload));
+            socket
+                .send(Message::Pong(payload))
+                .map_err(|err| LeafError::from_io(ROUTE, "", &std::io::Error::other(err)))?;
             Ok(Reply::Map(vec![
                 ("text".to_owned(), Reply::Str(String::new())),
                 ("done".to_owned(), Reply::Bool(false)),
@@ -236,7 +238,9 @@ fn close(args: &[Arg]) -> Result<Reply, LeafError> {
     let id = expect_int(ROUTE, args, 0, "id")?;
     with_handles(|map| {
         if let Some(mut socket) = map.remove(&id) {
-            let _ = socket.socket.close(None);
+            // WHY: close is best-effort teardown; the socket is discarded and
+            // a close-frame error is not actionable.
+            drop(socket.socket.close(None));
         }
     });
     Ok(Reply::Unit)
@@ -289,7 +293,9 @@ fn split_ws_url(url: &str) -> Result<(bool, String, u16, String), LeafError> {
 }
 
 fn wrap_tls(stream: TcpStream, host: &str, ca_path: Option<&str>) -> Result<HttpStream, LeafError> {
-    let _ = rustls::crypto::ring::default_provider().install_default();
+    // WHY: installing the process-wide crypto provider is idempotent; an error
+    // only means another caller installed one first.
+    drop(rustls::crypto::ring::default_provider().install_default());
     let mut roots = RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     if let Some(path) = ca_path {

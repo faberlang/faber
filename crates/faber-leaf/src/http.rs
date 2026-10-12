@@ -736,7 +736,9 @@ fn read_next_chunk(
         ));
     }
     if size == 0 {
-        let _ = read_exact_pending(stream, pending, 2);
+        // The terminator CRLF frames the end of the chunked body; a short read
+        // is a truncated message the caller must hear about.
+        read_exact_pending(stream, pending, 2)?;
         return Ok(Some(Vec::new()));
     }
     let mut data = read_exact_pending(stream, pending, size + 2)?;
@@ -1243,7 +1245,9 @@ fn configure_stream(
 }
 
 fn install_ring() {
-    let _ = rustls::crypto::ring::default_provider().install_default();
+    // WHY: installing the process-wide crypto provider is idempotent; an error
+    // only means another caller installed one first.
+    drop(rustls::crypto::ring::default_provider().install_default());
 }
 
 fn wrap_tls_client(
@@ -1316,7 +1320,9 @@ fn reason(status: u16) -> &'static str {
 impl Drop for IoStream {
     fn drop(&mut self) {
         if let Self::Plain(stream) = self {
-            let _ = stream.shutdown(Shutdown::Both);
+            // WHY: Drop cannot report failure; a shutdown error on a stream
+            // already being torn down is not actionable.
+            drop(stream.shutdown(Shutdown::Both));
         }
     }
 }

@@ -141,9 +141,9 @@ fn seed(args: &[Arg]) -> Result<Reply, LeafError> {
     let n = expect_int(ROUTE, args, 0, "n")?;
     let mut guard = rng_state();
     guard.seeded = if n > 0 {
-        Some(Rng::seed_from_u64(
-            u64::try_from(n).expect("positive i64 fits u64"),
-        ))
+        let seed_value = u64::try_from(n)
+            .map_err(|_| LeafError::invalid_argument(ROUTE, "n must be positive"))?;
+        Some(Rng::seed_from_u64(seed_value))
     } else {
         None
     };
