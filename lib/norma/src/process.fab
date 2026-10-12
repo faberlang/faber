@@ -61,11 +61,12 @@ fn spawn(list<string> args, string directory optional, map<string, string> envir
 
 # Dismiss process to run independently - returns PID.
 # Param named `args` because `argumenta` is TokenKind::Argumenta (CLI
-# argument binding). Optional directory/environment travel with the argv
-# on the same `processus:dimitte` opener (R1: one meaning).
+# argument binding). Optional cwd/env are not on this opener: a mixed
+# lista<string | nihil | tabula> is untyped, so they stay off the
+# surface until a later typed record (R1: one meaning).
 @ public
-fn detach(list<string> args, string directory optional, map<string, string> environment optional) → int {
-    return call 'processus:dimitte' ([args, directory, environment]) ↦ int
+fn detach(list<string> args) → int {
+    return call 'processus:dimitte' (args) ↦ int
 }
 
 # Execute an argv vector directly and capture status, stdout, and stderr.
