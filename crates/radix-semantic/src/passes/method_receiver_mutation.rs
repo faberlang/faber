@@ -113,6 +113,9 @@ impl SelfWriteScan<'_> {
 
 impl HirVisitor for SelfWriteScan<'_> {
     fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if self.found {
+            return;
+        }
         if let HirStatementKind::IncDec(inc_dec) = &stmt.kind
             && self.rooted_at_self(&inc_dec.target)
         {
