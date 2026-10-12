@@ -53,12 +53,15 @@ impl TypeChecker<'_> {
             .map_or(0, Vec::len);
         if expected != contract.args.len() {
             let name = self.contract_display_name(contract.contract);
-            self.errors.push(
-                crate::SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
-                    .with_arg("issue", ISSUE_IMPLET_CONTRACT_ARITY)
-                    .with_arg("contract", name)
-                    .with_arg("expected", expected.to_string())
-                    .with_arg("found", contract.args.len().to_string()),
+            self.error_issue_with_args(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_IMPLET_CONTRACT_ARITY,
+                span,
+                &[
+                    ("contract", name),
+                    ("expected", expected.to_string()),
+                    ("found", contract.args.len().to_string()),
+                ],
             );
             return false;
         }
