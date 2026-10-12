@@ -770,6 +770,16 @@ fn is_vector_ty(types: &TypeTable, ty: MirType) -> bool {
     matches!(unalias(types, ty.semantic_id()), Type::Vector(..))
 }
 
+/// One past the largest existing block id, the base for the blocks a split
+/// appends. Ids only need to be fresh, not contiguous.
+fn fresh_block_base(blocks: &[MirBlock]) -> u32 {
+    blocks
+        .iter()
+        .map(|existing| existing.id.0 + 1)
+        .max()
+        .unwrap_or(0)
+}
+
 struct SelectSplit<'a> {
     block: usize,
     index: usize,
@@ -839,11 +849,7 @@ fn select(
         b.statements
     };
 
-    let first_new = blocks
-        .iter()
-        .map(|existing| existing.id.0 + 1)
-        .max()
-        .unwrap_or(0);
+    let first_new = fresh_block_base(blocks);
     // Lane `i` owns the ids `then = 3i`, `else = 3i + 1`, `join = 3i + 2`.
     let ids = |lane_index: u8| {
         let base = first_new + u32::from(lane_index) * 3;
@@ -983,11 +989,7 @@ fn normalized(
         b.statements
     };
 
-    let first_new = blocks
-        .iter()
-        .map(|existing| existing.id.0 + 1)
-        .max()
-        .unwrap_or(0);
+    let first_new = fresh_block_base(blocks);
     let (scale_id, zero_id, join_id) = (
         MirBlockId(first_new),
         MirBlockId(first_new + 1),
