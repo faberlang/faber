@@ -163,7 +163,9 @@ fn wait(args: &[Arg]) -> Result<Reply, LeafError> {
     let pid = expect_pid(ROUTE, args)?;
     let mut child = with_children(|map| map.remove(&pid))
         .ok_or_else(|| LeafError::invalid_argument(ROUTE, "unknown pid"))?;
-    let status = child.wait().map_err(|err| LeafError::from_io(ROUTE, "wait", &err))?;
+    let status = child
+        .wait()
+        .map_err(|err| LeafError::from_io(ROUTE, "wait", &err))?;
     Ok(Reply::Int(i64::from(status.code().unwrap_or(-1))))
 }
 

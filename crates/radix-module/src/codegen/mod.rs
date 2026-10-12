@@ -1170,10 +1170,7 @@ pub fn generate_go_cli(
 ///
 /// Also the whole-package `radix-program` build paths (`wasm.rs`, `llvm.rs`)
 /// call this through the unit's [`crate::driver::AnalyzedModule`].
-pub fn reject_unsupported_leaves(
-    analysis: &crate::driver::AnalyzedModule,
-    target: Target,
-) -> Result<(), CodegenError> {
+pub fn reject_unsupported_leaves(analysis: &crate::driver::AnalyzedModule, target: Target) -> Result<(), CodegenError> {
     let mut routes = Vec::new();
     collect_analysis_ad_routes(analysis, &mut routes);
     radix_codegen_shared::reject_unsupported_leaf(&routes, target)

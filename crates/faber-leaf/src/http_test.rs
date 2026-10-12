@@ -367,9 +367,7 @@ fn hostile_chunk_case_server(side_body: &[u8]) -> String {
     });
     let mut client =
         TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap())).expect("connect");
-    client
-        .write_all(side_body)
-        .expect("write");
+    client.write_all(side_body).expect("write");
     let message = server.join().expect("server");
     assert!(!message.is_empty());
     message
@@ -385,13 +383,19 @@ fn hostile_chunk_request(chunk_header: &str) -> String {
 #[test]
 fn server_rejects_overflowing_chunk_size() {
     let message = hostile_chunk_request("ffffffffffffffff");
-    assert!(message.contains("chunk") || message.contains("body"), "{message}");
+    assert!(
+        message.contains("chunk") || message.contains("body"),
+        "{message}"
+    );
 }
 
 #[test]
 fn server_rejects_huge_chunk_size_without_unbounded_buffering() {
     let message = hostile_chunk_request("7fffffffffffffff");
-    assert!(message.contains("chunk") || message.contains("body"), "{message}");
+    assert!(
+        message.contains("chunk") || message.contains("body"),
+        "{message}"
+    );
 }
 
 #[test]
@@ -410,9 +414,8 @@ fn hostile_chunked_response(chunk_header: &str) -> String {
         let (mut conn, _) = listener.accept().expect("accept");
         let mut request = Vec::new();
         let _ = conn.read(&mut request);
-        let response = format!(
-            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{chunk_header}\r\n"
-        );
+        let response =
+            format!("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{chunk_header}\r\n");
         let _ = conn.write_all(response.as_bytes());
         let _ = conn.flush();
         thread::sleep(std::time::Duration::from_millis(200));

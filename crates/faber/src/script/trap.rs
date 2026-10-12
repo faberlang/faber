@@ -3,9 +3,7 @@
 //! Exit/abort traps so interpreted Faber can return an [`ExitCode`] without
 //! terminating the embedder process.
 
-use radix::module::mir::{
-    Host, MirDiagnosticKind, MirProvider, RunnerError, Value, serve_route,
-};
+use radix::module::mir::{Host, MirDiagnosticKind, MirProvider, RunnerError, Value, serve_route};
 use std::any::Any;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::process::ExitCode;

@@ -142,11 +142,14 @@ fn exspecta_returns_exit_code() {
     reset_children();
     let Reply::Int(pid) = serve(
         "processus:genera",
-        &[Arg::Strs(vec!["sh".to_owned(), "-c".to_owned(), "exit 3".to_owned()])],
+        &[Arg::Strs(vec![
+            "sh".to_owned(),
+            "-c".to_owned(),
+            "exit 3".to_owned(),
+        ])],
     )
     .expect("route")
-    .expect("spawn")
-    else {
+    .expect("spawn") else {
         panic!("expected pid");
     };
     match serve("processus:exspecta", &[Arg::Int(pid)])
@@ -157,9 +160,11 @@ fn exspecta_returns_exit_code() {
         other => panic!("unexpected {other:?}"),
     }
     // Reaped: the pid is no longer known.
-    assert!(serve("processus:exspecta", &[Arg::Int(pid)])
-        .expect("route")
-        .is_err());
+    assert!(
+        serve("processus:exspecta", &[Arg::Int(pid)])
+            .expect("route")
+            .is_err()
+    );
 }
 
 #[test]
@@ -170,12 +175,13 @@ fn neca_kills_and_exspecta_returns_promptly() {
         &[Arg::Strs(vec!["sleep".to_owned(), "30".to_owned()])],
     )
     .expect("route")
-    .expect("spawn")
-    else {
+    .expect("spawn") else {
         panic!("expected pid");
     };
     assert_eq!(
-        serve("processus:neca", &[Arg::Int(pid)]).expect("route").expect("kill"),
+        serve("processus:neca", &[Arg::Int(pid)])
+            .expect("route")
+            .expect("kill"),
         Reply::Unit
     );
     let started = std::time::Instant::now();

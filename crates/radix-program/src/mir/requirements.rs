@@ -100,8 +100,8 @@ pub(super) fn collect_runtime_call_requirement(
                 // provider, but the runner serves it from `Host::argumenta`
                 // (`host:argv`); it is not a deleted kernel module. Do not
                 // declare a kernel requirement no backend can satisfy.
-                let host_served = module == radix_module::kernel::KernelModule::Processus
-                    && verb == "argv";
+                let host_served =
+                    module == radix_module::kernel::KernelModule::Processus && verb == "argv";
                 if !host_served {
                     requirements.insert(format!("kernel:{}.{}", module.name(), verb));
                 }
