@@ -65,7 +65,7 @@ impl ImportedEffects for PackageImportEffects<'_> {
             from: &self.from,
             memo: &mut self.memo,
         }
-        .answer(reference)
+        .callee(reference)
     }
 }
 
@@ -78,29 +78,6 @@ struct Scope<'s> {
 }
 
 impl<'s> Scope<'s> {
-    fn answer(&mut self, reference: &ImportedReference) -> ImportedCallee {
-        if reference.kind == ImportedReferenceKind::Method {
-            return ImportedCallee::Unavailable;
-        }
-        let Some((target_id, target, member)) = self.resolve(reference) else {
-            return ImportedCallee::Unavailable;
-        };
-        match reference.kind {
-            ImportedReferenceKind::Value => {
-                if has_top_level_constant(target, &member) {
-                    ImportedCallee::Pure
-                } else {
-                    ImportedCallee::Unavailable
-                }
-            }
-            ImportedReferenceKind::Call => match top_level_function(target, &member) {
-                Some(def_id) => self.function(target_id, target, def_id),
-                None => ImportedCallee::Unavailable,
-            },
-            ImportedReferenceKind::Method => ImportedCallee::Unavailable,
-        }
-    }
-
     /// The sibling module and member name a namespace reference names.
     fn resolve(
         &self,
@@ -187,7 +164,26 @@ impl<'s> Scope<'s> {
 
 impl ImportedEffects for Scope<'_> {
     fn callee(&mut self, reference: &ImportedReference) -> ImportedCallee {
-        self.answer(reference)
+        if reference.kind == ImportedReferenceKind::Method {
+            return ImportedCallee::Unavailable;
+        }
+        let Some((target_id, target, member)) = self.resolve(reference) else {
+            return ImportedCallee::Unavailable;
+        };
+        match reference.kind {
+            ImportedReferenceKind::Value => {
+                if has_top_level_constant(target, &member) {
+                    ImportedCallee::Pure
+                } else {
+                    ImportedCallee::Unavailable
+                }
+            }
+            ImportedReferenceKind::Call => match top_level_function(target, &member) {
+                Some(def_id) => self.function(target_id, target, def_id),
+                None => ImportedCallee::Unavailable,
+            },
+            ImportedReferenceKind::Method => ImportedCallee::Unavailable,
+        }
     }
 }
 
