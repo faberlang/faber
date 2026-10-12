@@ -657,10 +657,6 @@ impl LibraryInterfaceCache {
         self
     }
 
-    fn locale_loader(&self) -> Option<LocaleLoader> {
-        self.locale_loader
-    }
-
     /// True when `other` would cache byte-identical analysis results: the same
     /// analysis target (the only [`Config`] field `with_config` forwards) and
     /// the same reader-locale loader. A cache carried from one pipeline stage
@@ -991,7 +987,7 @@ fn read_and_parse_library_interface(
     let locale_pack = resolve_library_interface_locale_pack(
         module,
         peeled.frontmatter.as_ref(),
-        library_cache.locale_loader(),
+        library_cache.locale_loader,
     )?;
     // Library interfaces may declare bodyless functions bound by target manifests (G4).
     let tokens = match locale_pack.as_ref() {
@@ -1414,7 +1410,7 @@ fn library_import_interface_maps(
     for dependency in direct_imports {
         namespace_exports.insert(
             dependency.binding.clone(),
-            library_namespace_member_export_surface(dependency, library_resolver, library_cache)?,
+            library_interface_export_surface(dependency, library_resolver, library_cache)?,
         );
     }
     let mut file_interfaces = BTreeMap::new();
@@ -1637,11 +1633,9 @@ pub fn attach_library_provenance_with_links(
     for import in imports {
         let identity = library_identity(&import.module);
         let linked_crate = linked_library_crates.and_then(|map| map.get(&import.module.package));
-        let rust_runtime_module = None;
-        let rust_runtime_methods = BTreeMap::new();
-        let interface_items = library_interface_items(import, library_resolver, library_cache)?;
+        let interface_items = library_interface_items(import, library_cache)?;
         let exported_members =
-            library_namespace_member_export_surface(import, library_resolver, library_cache)?;
+            library_interface_export_surface(import, library_resolver, library_cache)?;
         let has_namespace_binding = library_interface_has_module(import, library_cache)?;
 
         let (binding_def_id, imported_type_def_ids) =
@@ -1653,8 +1647,8 @@ pub fn attach_library_provenance_with_links(
                 LibraryBinding {
                     local_def_id: binding_def_id,
                     identity: identity.clone(),
-                    rust_runtime_module: rust_runtime_module.clone(),
-                    rust_runtime_methods,
+                    rust_runtime_module: None,
+                    rust_runtime_methods: BTreeMap::new(),
                 },
             );
             analysis
@@ -1816,14 +1810,6 @@ fn library_hir_name_index(
     (hir_items, hir_import_bindings)
 }
 
-fn library_namespace_member_export_surface(
-    import: &LibraryImportBinding,
-    library_resolver: &LibraryResolver,
-    library_cache: &mut LibraryInterfaceCache,
-) -> Result<BTreeMap<String, VisibilityTier>, Diagnostic> {
-    library_interface_export_surface(import, library_resolver, library_cache)
-}
-
 fn public_library_imports(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -1886,7 +1872,6 @@ fn library_identity(module: &ResolvedLibraryModule) -> LibraryIdentity {
 
 fn library_interface_items(
     import: &LibraryImportBinding,
-    _library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
 ) -> Result<Vec<LibraryInterfaceItem>, Diagnostic> {
     let cached = load_cached_library_interface(&import.module, library_cache)?;
