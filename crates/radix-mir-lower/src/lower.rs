@@ -771,7 +771,9 @@ pub fn lower_analyzed_unit(
                 &generic_templates,
             )?;
         }
-        let display_tokens = display_tokens_for_file(unit);
+        // The display tokens the file holding the unit prints through: its
+        // own locale pack's words.
+        let display_tokens = unit.display_tokens.clone();
         let (validated, imported_device_routes, tensor_edge_policy_providers) =
             build_lowering_validation(unit, program, types, &interner, &display_tokens, &closure_environments)?;
         Ok(LoweredMirUnit {
@@ -946,14 +948,6 @@ fn build_lowering_validation<'a>(
     Ok((validated, imported_device_routes, tensor_edge_policy_providers))
 }
 
-/// The display tokens the file holding `unit` prints through: its own locale
-/// pack's words.
-fn display_tokens_for_file(
-    unit: AnalyzedModuleApplicationView<'_>,
-) -> radix_runtime_contract::display_tokens::DisplayTokens {
-    unit.display_tokens.clone()
-}
-
 /// Whether the intrinsic renders program output (`print`, interpolation,
 /// `nota`, `vide`, `mone`, `scribe`).
 fn is_print_family(intrinsic: &MirIntrinsic) -> bool {
@@ -1110,57 +1104,79 @@ fn cli_descriptor_record_fields<'a>(
 ) -> Vec<MirRuntimeRecordField> {
     let mut fields = Vec::new();
     for option in options {
-        let value = if option.flag {
-            MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Bool(match &option.default {
-                Some(CliDefault::Bool(value)) => *value,
-                _ => false,
-            })))
-        } else if matches!(option.ty, CliType::Octeti) {
-            if option.default.is_some() {
-                // A defaulted octeti option is a non-optional `list<b8>`; the
-                // runtime rebinds the bytes from argv.
-                MirRuntimeRecordValue::Array { ty: MirType::semantic(types.octeti_list()), items: Vec::new() }
-            } else {
-                MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Nil))
-            }
-        } else if matches!(option.ty, CliType::ListaTextus | CliType::ListaNumerus) {
-            if option.default.is_some() {
-                // Defaulted list options are non-optional `array(element)`; no
-                // literal list default exists, so the compile-time shape is the
-                // empty array.
-                let element = cli_record_base_type(types, &option.ty);
-                MirRuntimeRecordValue::Array { ty: MirType::semantic(types.array(element)), items: Vec::new() }
-            } else {
-                MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Nil))
-            }
-        } else if let Some(default) = &option.default {
-            MirRuntimeRecordValue::Operand(
-                cli_literal_constant(interner, default).unwrap_or_else(|| cli_type_zero_operand(interner, &option.ty)),
-            )
-        } else {
-            // Undefaulted value options are `option(value)` in the record type.
-            MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Nil))
-        };
+        let value = cli_option_record_value(interner, types, option);
         fields.push(MirRuntimeRecordField { name: option.binding_symbol, value });
     }
     for operand in operands {
-        let value = if matches!(operand.ty, CliType::Octeti) && !operand.rest {
-            // An octeti operand is one `list<b8>` array; the runtime rebinds
-            // the bytes from argv.
-            MirRuntimeRecordValue::Array { ty: MirType::semantic(types.octeti_list()), items: Vec::new() }
-        } else if operand.rest || matches!(operand.ty, CliType::ListaTextus | CliType::ListaNumerus) {
-            let element = cli_record_base_type(types, &operand.ty);
-            MirRuntimeRecordValue::Array { ty: MirType::semantic(types.array(element)), items: Vec::new() }
-        } else if let Some(default) = &operand.default {
-            MirRuntimeRecordValue::Operand(
-                cli_literal_constant(interner, default).unwrap_or_else(|| cli_type_zero_operand(interner, &operand.ty)),
-            )
-        } else {
-            MirRuntimeRecordValue::Operand(cli_type_zero_operand(interner, &operand.ty))
-        };
+        let value = cli_operand_record_value(interner, types, operand);
         fields.push(MirRuntimeRecordField { name: operand.binding_symbol, value });
     }
     fields
+}
+
+/// Record value of one CLI option binding. Flags carry their parsed default; a
+/// defaulted list-shaped option is the empty array the runtime rebinds; an
+/// undefaulted value option is `nihil` of its `option(value)` record slot.
+fn cli_option_record_value(
+    interner: &mut Interner,
+    types: &mut TypeTable,
+    option: &CliOption,
+) -> MirRuntimeRecordValue {
+    if option.flag {
+        MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Bool(match &option.default {
+            Some(CliDefault::Bool(value)) => *value,
+            _ => false,
+        })))
+    } else if matches!(option.ty, CliType::Octeti) {
+        if option.default.is_some() {
+            // A defaulted octeti option is a non-optional `list<b8>`; the
+            // runtime rebinds the bytes from argv.
+            MirRuntimeRecordValue::Array { ty: MirType::semantic(types.octeti_list()), items: Vec::new() }
+        } else {
+            MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Nil))
+        }
+    } else if matches!(option.ty, CliType::ListaTextus | CliType::ListaNumerus) {
+        if option.default.is_some() {
+            // Defaulted list options are non-optional `array(element)`; no
+            // literal list default exists, so the compile-time shape is the
+            // empty array.
+            let element = cli_record_base_type(types, &option.ty);
+            MirRuntimeRecordValue::Array { ty: MirType::semantic(types.array(element)), items: Vec::new() }
+        } else {
+            MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Nil))
+        }
+    } else if let Some(default) = &option.default {
+        MirRuntimeRecordValue::Operand(
+            cli_literal_constant(interner, default).unwrap_or_else(|| cli_type_zero_operand(interner, &option.ty)),
+        )
+    } else {
+        // Undefaulted value options are `option(value)` in the record type.
+        MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Nil))
+    }
+}
+
+/// Record value of one CLI operand binding. A non-rest `octeti` operand is one
+/// `list<b8>` array; rest and list operands are empty arrays; an undefaulted
+/// scalar operand is the type-shaped placeholder the runtime rebinds.
+fn cli_operand_record_value(
+    interner: &mut Interner,
+    types: &mut TypeTable,
+    operand: &CliOperand,
+) -> MirRuntimeRecordValue {
+    if matches!(operand.ty, CliType::Octeti) && !operand.rest {
+        // An octeti operand is one `list<b8>` array; the runtime rebinds
+        // the bytes from argv.
+        MirRuntimeRecordValue::Array { ty: MirType::semantic(types.octeti_list()), items: Vec::new() }
+    } else if operand.rest || matches!(operand.ty, CliType::ListaTextus | CliType::ListaNumerus) {
+        let element = cli_record_base_type(types, &operand.ty);
+        MirRuntimeRecordValue::Array { ty: MirType::semantic(types.array(element)), items: Vec::new() }
+    } else if let Some(default) = &operand.default {
+        MirRuntimeRecordValue::Operand(
+            cli_literal_constant(interner, default).unwrap_or_else(|| cli_type_zero_operand(interner, &operand.ty)),
+        )
+    } else {
+        MirRuntimeRecordValue::Operand(cli_type_zero_operand(interner, &operand.ty))
+    }
 }
 
 /// Map a CLI boundary type to the semantic primitive used as its record-field
@@ -1440,6 +1456,17 @@ enum CallableLoweringTarget<'input> {
     },
 }
 
+impl CallableLoweringTarget<'_> {
+    /// The signature/body carrier both targets share: a free function, or a
+    /// method's function body.
+    fn hir_function(&self) -> &HirFunction {
+        match self {
+            Self::Function(function) => function,
+            Self::Method { method, .. } => &method.func,
+        }
+    }
+}
+
 /// Per-function lowering inputs collected once per whole-unit pass.
 pub struct BodyLoweringContext<'maps, 'unit> {
     context_maps: &'maps LoweringContextMaps<'unit>,
@@ -1657,6 +1684,7 @@ impl<'a> MirLowerer<'a> {
             reason = "MirFunctionId is u32 by design; lowered function count is bounded by u32::MAX"
         )]
         let parent_function_id = MirFunctionId(self.functions.len() as u32);
+        let device_role = device_role_for_function(function);
         let CallableLoweringParts {
             params,
             locals,
@@ -1668,13 +1696,7 @@ impl<'a> MirLowerer<'a> {
             device_function_metadata,
         } = self.lower_callable_body(
             body_ctx,
-            CallableLoweringConfig {
-                error_ty,
-                parent_function_id,
-                device_role: device_role_for_function(function),
-                target,
-                def_id,
-            },
+            CallableLoweringConfig { error_ty, parent_function_id, device_role, target, def_id },
         );
         self.errors.extend(errors);
         self.closure_environments.extend(closure_environments);
@@ -1687,7 +1709,7 @@ impl<'a> MirLowerer<'a> {
         // device-program constructor is fail-closed when this row is absent,
         // so populate it at the source-function lowering boundary rather than
         // making package consumers reconstruct HIR visibility later.
-        if let (Some(role), Some(shader_stage)) = (device_role_for_function(function), shader_stage) {
+        if let (Some(role), Some(shader_stage)) = (device_role, shader_stage) {
             self.device_function_metadata.insert(
                 parent_function_id,
                 MirDeviceFunctionMetadata {
@@ -1772,10 +1794,8 @@ impl<'a> MirLowerer<'a> {
             .cloned()
             .unwrap_or_default();
         let formal_parameter_offset = u32::from(matches!(&config.target, CallableLoweringTarget::Method { .. }));
-        let shader_stage = match &config.target {
-            CallableLoweringTarget::Function(function) => shader_stage_for_function(function),
-            CallableLoweringTarget::Method { method, .. } => shader_stage_for_function(&method.func),
-        };
+        let callable = config.target.hir_function();
+        let shader_stage = shader_stage_for_function(callable);
         let mut builder = FunctionBuilder::for_function(
             self.types,
             config.error_ty,
@@ -1786,14 +1806,8 @@ impl<'a> MirLowerer<'a> {
         );
         builder.function_shape_relations = function_shape_relations;
         builder.formal_parameter_offset = formal_parameter_offset;
-        builder.size_params = match &config.target {
-            CallableLoweringTarget::Function(function) => size_param_names(&function.type_params),
-            CallableLoweringTarget::Method { method, .. } => size_param_names(&method.func.type_params),
-        };
-        let size_type_params = match &config.target {
-            CallableLoweringTarget::Function(function) => &function.type_params,
-            CallableLoweringTarget::Method { method, .. } => &method.func.type_params,
-        };
+        builder.size_params = size_param_names(&callable.type_params);
+        let size_type_params = &callable.type_params;
         for binding in function_size_bindings {
             if let Some(parameter) = size_type_params.get(binding.parameter as usize)
                 && !parameter.is_typus()
@@ -1803,10 +1817,7 @@ impl<'a> MirLowerer<'a> {
                     .insert(parameter.def_id, binding.witness);
             }
         }
-        builder.bound_methods = match &config.target {
-            CallableLoweringTarget::Function(function) => self.bound_method_targets(&function.type_params),
-            CallableLoweringTarget::Method { method, .. } => self.bound_method_targets(&method.func.type_params),
-        };
+        builder.bound_methods = self.bound_method_targets(&callable.type_params);
         let (body, cli_args) = match config.target {
             CallableLoweringTarget::Function(function) => {
                 for param in &function.params {
