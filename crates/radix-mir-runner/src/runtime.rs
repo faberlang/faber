@@ -5463,6 +5463,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Value, RunnerError> {
         let identity = provider_identity(provider, self.interner);
         if let MirProviderKind::Kernel(module) = provider.kind {
+            // Raw entry args lower to the legacy `processus.argv` provider, but
+            // the runner has no kernel module to dispatch it to. `Host::argumenta`
+            // already carries the script arguments, so serve it there instead.
+            if module == radix_mir::KernelModule::Processus
+                && self.interner.resolve(provider.name) == "argv"
+            {
+                let argv: Vec<Value> = self
+                    .host
+                    .argumenta()
+                    .map_err(|error| error.with_provider_identity(&identity))?
+                    .iter()
+                    .map(|argument| Value::Str(argument.clone()))
+                    .collect();
+                return Ok(Value::Array(Rc::new(RefCell::new(argv))));
+            }
             let mut evaluated = Vec::with_capacity(args.len());
             for arg in args {
                 let value = self.eval_operand(arg, span)?;

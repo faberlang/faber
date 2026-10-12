@@ -96,7 +96,15 @@ pub(super) fn collect_runtime_call_requirement(
                     |interner| interner.resolve(provider.name).to_owned(),
                 );
                 collect_kernel_host_requirements(module, &verb, requirements);
-                requirements.insert(format!("kernel:{}.{}", module.name(), verb));
+                // Residual raw entry args lower to the `processus.argv`
+                // provider, but the runner serves it from `Host::argumenta`
+                // (`host:argv`); it is not a deleted kernel module. Do not
+                // declare a kernel requirement no backend can satisfy.
+                let host_served = module == radix_module::kernel::KernelModule::Processus
+                    && verb == "argv";
+                if !host_served {
+                    requirements.insert(format!("kernel:{}.{}", module.name(), verb));
+                }
             }
         }
         MirIntrinsic::Assert
@@ -138,7 +146,7 @@ pub(super) fn collect_kernel_host_requirements(
             requirements.insert("host:fs".to_owned());
         }
         radix_module::kernel::KernelModule::Processus => match verb {
-            "argumenta" => {
+            "argumenta" | "argv" => {
                 requirements.insert("host:argv".to_owned());
             }
             "lege" | "scribe" => {
