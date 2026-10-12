@@ -68,14 +68,14 @@ pub const DISPLAY_VALOR: RuntimeItem = RuntimeItem {
 };
 
 /// The targets whose runtime package carries the Rust-only `display` rows.
-const DISPLAY_RUST_TARGETS: &[Target] = &[Target::HirRust];
+const DISPLAY_RUST: &[Target] = &[Target::HirRust];
 
 const fn display_rust_row(name: &'static str) -> RuntimeItem {
     RuntimeItem {
         ns: Namespace::Display,
         name,
         kind: RuntimeKind::Fn,
-        targets: DISPLAY_RUST_TARGETS,
+        targets: DISPLAY_RUST,
     }
 }
 
@@ -111,17 +111,17 @@ pub const DISPLAY_DISPLAY_TOKENS: RuntimeItem = RuntimeItem {
     ns: Namespace::Display,
     name: "DisplayTokens",
     kind: RuntimeKind::Type,
-    targets: DISPLAY_RUST_TARGETS,
+    targets: DISPLAY_RUST,
 };
 
-const DISPLAY_TS_TARGETS: &[Target] = &[Target::HirTypeScript];
+const DISPLAY_TS: &[Target] = &[Target::HirTypeScript];
 
 const fn display_ts_row(name: &'static str) -> RuntimeItem {
     RuntimeItem {
         ns: Namespace::Display,
         name,
         kind: RuntimeKind::Fn,
-        targets: DISPLAY_TS_TARGETS,
+        targets: DISPLAY_TS,
     }
 }
 
@@ -143,14 +143,14 @@ pub const DISPLAY_TAGGED_VALOR: RuntimeItem = display_ts_row("tagged_valor");
 /// `shl`, `shr`, `pow`, `store`), and the TypeScript runtime (`exact` in
 /// `@faber/runtime`, T1-T2) shares every row whose id and meaning match and
 /// carries the rest as its own.
-const EXACT_TARGETS: &[Target] = &[Target::HirRust];
+const EXACT_RUST: &[Target] = &[Target::HirRust];
 const EXACT_RUST_GO_TS: &[Target] = &[Target::HirRust, Target::HirTypeScript, Target::HirGo];
 const EXACT_GO_TS: &[Target] = &[Target::HirTypeScript, Target::HirGo];
 const EXACT_GO: &[Target] = &[Target::HirGo];
 const EXACT_TS: &[Target] = &[Target::HirTypeScript];
 
 const fn exact_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
-    exact_row_for(name, kind, EXACT_TARGETS)
+    exact_row_for(name, kind, EXACT_RUST)
 }
 
 const fn exact_row_for(
@@ -508,14 +508,14 @@ pub const FLOAT_F32_TO_BF16_BITS: RuntimeItem = RuntimeItem {
 /// inline. The functions are unwinding panics with the failure text the inline
 /// form printed. `trap.Trap` is the closed kind enum, spelled at the crate root
 /// as `faber::Trap`. No row applies a width limit.
-const TRAP_RUST_TARGETS: &[Target] = &[Target::HirRust];
+const TRAP_RUST: &[Target] = &[Target::HirRust];
 
 const fn trap_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
     RuntimeItem {
         ns: Namespace::Trap,
         name,
         kind,
-        targets: TRAP_RUST_TARGETS,
+        targets: TRAP_RUST,
     }
 }
 
@@ -1477,7 +1477,7 @@ impl Ord for Namespace {
 pub enum RuntimeKind {
     /// An ordinary helper function.
     Fn,
-    /// A store-family helper (`store`, `modulus` widths): spellable only at a
+    /// A store-family helper (`store`, `wrap` or `clamp`): spellable only at a
     /// store site, through [`spell_store`].
     StoreFn,
     /// A runtime type.
