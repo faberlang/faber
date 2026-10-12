@@ -470,29 +470,6 @@ fn package_mir_accepts_octeti_option_operand_and_rest_operand() {
     );
 }
 
-// ── is_bridged_norma_import_path ───────────────────────────────────────────
-
-#[test]
-fn is_bridged_norma_import_path_rejects_non_norma_prefix() {
-    assert!(!is_bridged_norma_import_path("faber:something"));
-    assert!(!is_bridged_norma_import_path(""));
-    assert!(!is_bridged_norma_import_path("norma:"));
-}
-
-#[test]
-fn is_bridged_norma_import_path_rejects_norma_without_module_name() {
-    assert!(!is_bridged_norma_import_path("norma:"));
-    assert!(!is_bridged_norma_import_path("norma:/solum"));
-}
-
-#[test]
-fn is_bridged_norma_import_path_accepts_known_norma_module() {
-    assert!(!is_bridged_norma_import_path("norma:fs"));
-    assert!(!is_bridged_norma_import_path("norma:solum"));
-    assert!(!is_bridged_norma_import_path("norma:processus"));
-    assert!(is_bridged_norma_import_path("norma:json"));
-}
-
 // ── fmir_text_cli_value_type ───────────────────────────────────────────────
 
 #[test]
@@ -557,21 +534,6 @@ fn fmir_text_runtime_cli_value_type_maps_rest_textus_to_lista() {
 fn fmir_text_cli_value_type_returns_none_for_unsupported_list_types() {
     assert!(fmir_text_cli_value_type(&radix_module::cli::CliType::Octeti).is_none());
     assert!(fmir_text_cli_value_type(&radix_module::cli::CliType::ListaNumerus).is_none());
-}
-
-// ── is_bridged_norma_import_path ───────────────────────────────────────────
-
-#[test]
-fn is_bridged_norma_import_path_returns_false_for_non_norma_provider() {
-    assert!(!is_bridged_norma_import_path("faber:solum"));
-    assert!(!is_bridged_norma_import_path("any-pkg:solum"));
-}
-
-#[test]
-fn is_bridged_norma_import_path_returns_true_for_norma_kernel_module() {
-    assert!(!is_bridged_norma_import_path("norma:processus"));
-    assert!(!is_bridged_norma_import_path("norma:fs"));
-    assert!(is_bridged_norma_import_path("norma:json"));
 }
 
 // ── validate_package_mir_manifest ───────────────────────────────────────────

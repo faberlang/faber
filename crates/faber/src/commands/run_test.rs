@@ -505,10 +505,10 @@ fn single_file_run_process_code_propagates_runner_exit() {
     std::fs::write(
         &entry,
         r#"
-import from "faber:processus" processus
+import from "norma:process" process
 
 main {
-    processus.exit_process(7)
+    process.exit_process(7)
 }
 "#,
     )

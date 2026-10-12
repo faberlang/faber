@@ -595,7 +595,7 @@ use cli_values::{
 };
 use diag::{mir_error_diag, mir_issue_diag, mir_lowering_diag, runner_diagnostics};
 use driver::{
-    is_bridged_norma_import_path, with_prepared_package_mir, with_prepared_package_mir_from_loaded,
+    with_prepared_package_mir, with_prepared_package_mir_from_loaded,
     with_prepared_package_mir_with_cli_mode,
 };
 use image::{

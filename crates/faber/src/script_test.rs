@@ -65,39 +65,23 @@ main {
 }
 
 #[test]
-fn trap_host_forwards_process_env_reads() {
-    let mut host = BufferHost::default().with_env("FABER_TRAP_ENV", "via-trap");
+fn process_read_env_uses_the_shared_leaf() {
+    unsafe { std::env::set_var("FABER_LEAF_ENV", "via-leaf") };
+    let mut host = BufferHost::default();
     let status = run_source(
         r#"
-import from "faber:processus" processus
+import from "norma:process" process
 
 main {
-    print processus.read_env("FABER_TRAP_ENV")
+    print process.read_env("FABER_LEAF_ENV")
 }
 "#,
         &mut host,
     )
-    .expect("trap host forwards env_get to inner host");
+    .expect("norma:process read_env uses faber-leaf");
+    unsafe { std::env::remove_var("FABER_LEAF_ENV") };
     assert_eq!(status, ExitCode::SUCCESS);
-    assert_eq!(host.stdout_lines, vec!["via-trap".to_owned()]);
-}
-
-#[test]
-fn trap_host_forwards_virtual_cwd() {
-    let mut host = BufferHost::default().with_cwd("/trap/sandbox");
-    let status = run_source(
-        r#"
-import from "faber:processus" processus
-
-main {
-    print processus.cwd()
-}
-"#,
-        &mut host,
-    )
-    .expect("trap host forwards cwd to inner host");
-    assert_eq!(status, ExitCode::SUCCESS);
-    assert_eq!(host.stdout_lines, vec!["/trap/sandbox".to_owned()]);
+    assert_eq!(host.stdout_lines, vec!["via-leaf".to_owned()]);
 }
 
 #[test]
@@ -105,15 +89,15 @@ fn run_source_returns_explicit_exit_code() {
     let mut host = BufferHost::default();
     let status = run_source(
         r#"
-import from "faber:processus" processus
+import from "norma:process" process
 
 main {
-    processus.exit_process(7)
+    process.exit_process(7)
 }
 "#,
         &mut host,
     )
-    .expect("exi returns through trap host");
+    .expect("processus:exi returns through Host::exit");
     assert_eq!(status, ExitCode::from(7));
 }
 

@@ -2,7 +2,7 @@
 //!
 //! Shared leaves (`faber-leaf`) serve `solum:*`, `consolum:*`, `processus:*`
 //! (except `processus:exi`), `tempus:*`, and `aleator:*`. `processus:exi`
-//! stays on `Host::exit`. HTTP stays on `kernel/http.rs` until N5.
+//! stays on `Host::exit`. HTTP is absent until N5.
 
 use super::{Host, MapKey, Value, kernel};
 use faber_leaf::{self as leaf, Arg, Reply};
@@ -21,13 +21,6 @@ pub fn serve_route<H: Host + ?Sized>(
     opener: &Value,
     span: Span,
 ) -> Option<Result<Vec<Value>, Value>> {
-    if let Some(reply) = kernel::http::serve(route, opener, span) {
-        return Some(match reply {
-            Ok(Value::Unit | Value::Nil) => Ok(Vec::new()),
-            Ok(value) => Ok(vec![value]),
-            Err(error) => Err(Value::Str(error.message)),
-        });
-    }
     if route == "processus:exi" {
         return Some(exit_process(host, opener, span));
     }

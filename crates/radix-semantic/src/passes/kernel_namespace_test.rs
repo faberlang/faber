@@ -1,7 +1,6 @@
-//! Coverage for kernel-namespace import validation.
+//! Coverage for residual `faber:*` import validation.
 //!
-//! These tests prove that known `faber:*` modules and glob imports pass,
-//! while unknown modules, invalid paths, and glob re-exports are rejected.
+//! N2 deleted the kernel modules. `faber:*` imports fail closed as unknown.
 
 use super::kernel_namespace::validate_kernel_imports;
 use crate::test_support::args_have_no_legacy_message;
@@ -47,7 +46,7 @@ fn expect_structured_error<'a>(
 }
 
 #[test]
-fn known_kernel_imports_pass_validation() {
+fn former_kernel_imports_fail_as_unknown_modules() {
     let errors = analyze_imports(
         r#"
 importa ex "faber:consolum" consolum
@@ -56,13 +55,23 @@ importa ex "faber:processus" processus
 importa ex "faber:aleator" aleator
 "#,
     );
-    assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+    assert_eq!(errors.len(), 4, "unexpected errors: {errors:?}");
+    for module in ["consolum", "json", "processus", "aleator"] {
+        expect_structured_error(
+            &errors,
+            SemanticErrorKind::ImportAbsent,
+            &[("issue", "kernel_unknown_module"), ("module", module)],
+        );
+    }
 }
 
 #[test]
-fn kernel_glob_import_passes_validation() {
+fn kernel_glob_import_is_empty() {
     let errors = analyze_imports(r#"importa ex "faber:*" faber"#);
-    assert!(errors.is_empty(), "unexpected errors: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "empty glob still parses; unexpected errors: {errors:?}"
+    );
 }
 
 #[test]

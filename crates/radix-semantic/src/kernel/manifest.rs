@@ -1,11 +1,8 @@
-//! Compile-time kernel manifest (v1 module set).
+//! Residual `faber:*` kernel import prefix.
 //!
-//! **Parity contract:** each `verbs` list is a **subset** of the matching
-//! `$FABER_LIBRARY_HOME/norma/src/<module>.fab` public file-scope surface. Spellings must match
-//! `norma:*` exactly. Verified by
-//! `kernel_manifest_verbs_are_subset_of_norma_public_surface` in
-//! `kernel_namespace_test.rs`. Application packages use `norma:*`; script mode
-//! uses `faber:*` against this manifest.
+//! N2 deleted the kernel modules. The prefix is still recognized so a
+//! `faber:*` import fails closed as an unknown module. Application packages
+//! use `norma:*`.
 
 /// Kernel import prefix for author paths.
 pub const KERNEL_PREFIX: &str = "faber:";
@@ -28,86 +25,10 @@ pub struct KernelManifestEntry {
     pub since: &'static str,
 }
 
-const V1_SINCE: &str = env!("CARGO_PKG_VERSION");
-
-const MANIFEST: &[KernelManifestEntry] = &[
-    KernelManifestEntry {
-        module: KernelModule::Json,
-        import_path: "faber:json",
-        provider_module: "faber/kernel/json",
-        // English canonicals (Pass B): solve→parse, pange→stringify,
-        // tempta→try_parse. The runner dispatch speaks the same names.
-        verbs: &["parse", "stringify", "try_parse"],
-        since: V1_SINCE,
-    },
-    KernelManifestEntry {
-        module: KernelModule::Processus,
-        import_path: "faber:processus",
-        provider_module: "faber/kernel/processus",
-        // English canonicals (Pass B): argumenta→argv, lege→read_env,
-        // sedes→cwd, muta→chdir, identitas→pid, exi→exit_process,
-        // exsequi→exec, genera→spawn. The runner dispatch speaks the same
-        // names. scribe→write_env is not advertised: hosts dropped the
-        // processus:scribe route (7098458) and norma removed its wrapper
-        // (b62153e).
-        verbs: &[
-            "argv",
-            "read_env",
-            "cwd",
-            "chdir",
-            "pid",
-            "exit_process",
-            "exec",
-            "spawn",
-        ],
-        since: V1_SINCE,
-    },
-    KernelManifestEntry {
-        module: KernelModule::Aleator,
-        import_path: "faber:aleator",
-        provider_module: "faber/kernel/aleator",
-        // English canonicals (Pass B): fractum→random_float, sortire→random_int,
-        // octetos→random_bytes, uuid→uuid, semina→seed. The runner dispatch
-        // speaks the same names.
-        verbs: &["random_float", "random_int", "random_bytes", "uuid", "seed"],
-        since: V1_SINCE,
-    },
-    KernelManifestEntry {
-        module: KernelModule::Consolum,
-        import_path: "faber:consolum",
-        provider_module: "faber/kernel/consolum",
-        // English canonicals (Pass B): dic→write_partial, scribe→write_line,
-        // mone→warn_line, funde→write_bytes, vide→debug_line, lege→read_line,
-        // hauri→read_bytes, audit→stdin_is_tty, loquitur→stdout_is_tty,
-        // admonet→stderr_is_tty. Raw/partial stdout (`write_partial`) unblocks
-        // package-MIR coreutils such as `echo -n` and GNU `printf` without an
-        // implicit newline. The runner dispatch speaks the same names.
-        verbs: &[
-            "write_partial",
-            "write_bytes",
-            "write_line",
-            "warn_line",
-            "debug_line",
-            "read_line",
-            "read_bytes",
-            "stdin_is_tty",
-            "stdout_is_tty",
-            "stderr_is_tty",
-        ],
-        since: V1_SINCE,
-    },
-    KernelManifestEntry {
-        module: KernelModule::Toml,
-        import_path: "faber:toml",
-        provider_module: "faber/kernel/toml",
-        // English canonicals (Pass B): solve→parse, pange→stringify,
-        // tempta→try_parse. The runner dispatch speaks the same names.
-        // Mirrors the `norma:toml` wire-floor facade; TOML datetimes lower to
-        // `Valor::Instans` and TOML trees never contain `Valor::Nihil`.
-        verbs: &["parse", "stringify", "try_parse"],
-        since: V1_SINCE,
-    },
-];
+/// N2 deleted the `faber:*` kernel import surface. The prefix is still
+/// recognized so `importa ex "faber:json"` fails as an unknown module rather
+/// than a silent no-op. There are no remaining kernel modules.
+const MANIFEST: &[KernelManifestEntry] = &[];
 
 /// Return the locked v1 kernel manifest rows.
 #[must_use]

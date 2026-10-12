@@ -62,30 +62,6 @@ const fn parse_work(digits: u64) -> u64 {
 const _: () =
     assert!(parse_work(RUNNER_INF_PARSE_DIGIT_CEILING as u64) <= RUNNER_INF_MUL_WORK_CEILING);
 
-/// Refuse a decimal integer token longer than [`RUNNER_INF_PARSE_DIGIT_CEILING`]
-/// before any quadratic work starts. `digits` is the digit count (no sign).
-pub(crate) fn check_parse_token(
-    digits: usize,
-    span: Span,
-    operation: &str,
-) -> Result<(), RunnerError> {
-    if digits <= RUNNER_INF_PARSE_DIGIT_CEILING {
-        return Ok(());
-    }
-    let mut error = RunnerError::internal_with_issue(
-        span,
-        format!(
-            "inf size exhausted in {operation}: an integer token of {digits} digits exceeds the \
-             runner ceiling of {RUNNER_INF_PARSE_DIGIT_CEILING} digits"
-        ),
-        RUNNER_ISSUE_INF_SIZE_EXHAUSTED,
-    );
-    error
-        .args
-        .push(("operation".to_owned(), operation.to_owned()));
-    Err(error)
-}
-
 /// Stable identity of a runner `inf` resource fault (ruling 45).
 pub const RUNNER_ISSUE_INF_SIZE_EXHAUSTED: &str = "runner_inf_size_exhausted";
 

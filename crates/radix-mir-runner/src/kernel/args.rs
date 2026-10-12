@@ -4,26 +4,7 @@
     clippy::needless_pass_by_value
 )]
 
-use super::super::{RunnerError, Value};
-use radix_lexer::Span;
-
-pub(crate) fn expect_str(value: &Value, span: Span, label: &str) -> Result<String, RunnerError> {
-    match value {
-        Value::Str(text) => Ok(text.clone()),
-        _ => Err(RunnerError::internal(
-            span,
-            format!("{label} expects textus"),
-        )),
-    }
-}
-
-pub(crate) fn optional_usize(value: &Value) -> Option<usize> {
-    match value {
-        Value::Nil | Value::Unit => None,
-        Value::Int(v) => usize::try_from(*v).ok(),
-        _ => None,
-    }
-}
+use super::super::Value;
 
 /// The bytes of an `octeti` argument: the byte value itself, or the
 /// `lista<b8>` array a bit-pattern list arrives as (every element one

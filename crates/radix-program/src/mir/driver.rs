@@ -3,9 +3,8 @@
 use super::{
     AnalyzedProgram, BTreeMap, CliPackagePlan, CliPlanningMode, Config, DefId,
     DeviceManifestConfig, Diagnostic, HashMap, HirItemKind, LibraryInterfaceCache, LoweredMirUnit,
-    MirIntrinsic, MirProviderKind, MirRuntimeCall, MirSeams, MirStatementKind, ModuleId,
-    PackageMirConsumer, PackageMirLinks, Path, PathBuf, PreparedPackageMir, TestFunctionIds,
-    TestPackageScope, air_specialize, canonicalize_direct_definition_callees,
+    MirSeams, ModuleId, PackageMirConsumer, PackageMirLinks, Path, PathBuf, PreparedPackageMir,
+    TestFunctionIds, TestPackageScope, air_specialize, canonicalize_direct_definition_callees,
     collect_package_runtime_requirements, local_namespace_call_targets, lower_package_units,
     mir_diag, mir_lowering_diag, plan_cli_package, rewrite_unit_namespace_calls, validate_program,
 };
@@ -199,7 +198,6 @@ pub(crate) fn link_package_functions<R>(
                 .collect::<Vec<_>>()
         },
     )?;
-    lowered = bridge_norma_providers_to_kernel(lowered, &anchor_path)?;
     let function_ids = linked_test_function_ids(&lowered, &links, scope, &anchor_path)?;
     Ok(run(&lowered.validated, &function_ids))
 }
@@ -379,9 +377,6 @@ fn prepare_package_mir<R>(
                 .collect::<Vec<_>>()
         },
     )?;
-    if consumer == PackageMirConsumer::Interpreted {
-        lowered = bridge_norma_providers_to_kernel(lowered, &entry_path)?;
-    }
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
     let device_config = device_config()?;
     let prepared = PreparedPackageMir {
@@ -576,104 +571,4 @@ pub(super) fn select_entry_node(package: &AnalyzedProgram) -> Result<ModuleId, V
             }
         }
     }
-}
-
-/// Whether an import path string (`norma:solum`) names a kernel-manifest
-/// module the interpreted-package bridge can satisfy. Shared by the
-/// library-import allowlist (identity-based) and the namespace-link pass
-/// (path-based) so the two rejection sites agree.
-pub(super) fn is_bridged_norma_import_path(path: &str) -> bool {
-    path.strip_prefix("norma:")
-        .and_then(radix_module::kernel::resolve_kernel_module_name)
-        .is_some()
-}
-
-/// Bridge interpreted `norma:<kernel-manifest-module>` providers to the
-/// in-process runner kernel.
-///
-/// Post-validation transform (see
-/// `docs/archived/faber-script-runtime/stage1b-package-host-bridge.md`). For
-/// each `Package` provider whose module resolves to a kernel-manifest module,
-/// rewrite `kind` to `Kernel(module)` when the called verb is in the manifest
-/// subset; otherwise fail closed with an actionable diagnostic. Compiled
-/// package execution is unaffected (it never runs this path).
-///
-/// RETIRE: delete this pass once core-stdlib Stage 8 routes `norma:*` over
-/// `ad` to the Rust frame runtime in the runner.
-pub(super) fn bridge_norma_providers_to_kernel<'a>(
-    lowered: LoweredMirUnit<'a>,
-    entry_path: &Path,
-) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
-    let interner = lowered.validated.validation().interner.clone();
-    let Some(interner) = interner.as_interner() else {
-        return Err(vec![mir_diag(
-            entry_path,
-            "package MIR kernel bridge requires interner context",
-        )]);
-    };
-    lowered
-        .patch_program(|program| {
-            let mut diagnostics = Vec::new();
-            for function in &mut program.functions {
-                for block in &mut function.blocks {
-                    for statement in &mut block.statements {
-                        let MirStatementKind::RuntimeCall { call, .. } = &mut statement.kind else {
-                            continue;
-                        };
-                        let MirRuntimeCall {
-                            intrinsic: MirIntrinsic::Provider(provider),
-                            ..
-                        } = call
-                        else {
-                            continue;
-                        };
-                        if !matches!(provider.kind, MirProviderKind::Package) {
-                            continue;
-                        }
-                        let Some(path_symbol) = provider.module.first() else {
-                            continue;
-                        };
-                        let Some(norma_module) = interner.resolve(*path_symbol).strip_prefix("norma:")
-                        else {
-                            continue;
-                        };
-                        let Some(module) = radix_module::kernel::resolve_kernel_module_name(norma_module)
-                        else {
-                            // Non-manifest `norma:*` stays as Package; the runner's
-                            // `host.provider()` reports it unsupported.
-                            continue;
-                        };
-                        let verb = interner.resolve(provider.name);
-                        if radix_module::kernel::kernel_module_supports_verb(module, verb) {
-                            provider.kind = MirProviderKind::Kernel(module);
-                        } else {
-                            diagnostics.push(mir_diag(
-                                entry_path,
-                                format!(
-                                    "package MIR kernel bridge does not support `norma:{norma_module}.{verb}`; use compiled package execution for this surface"
-                                ),
-                            ));
-                        }
-                    }
-                }
-            }
-            if diagnostics.is_empty() {
-                Ok(())
-            } else {
-                Err(diagnostics)
-            }
-        })
-        .map_err(|error| {
-            error.fold(
-                |diagnostics| diagnostics,
-                |errors| {
-                    errors
-                        .into_iter()
-                        .map(|error| {
-                            mir_lowering_diag(entry_path, error.message).with_span(error.span)
-                        })
-                        .collect()
-                },
-            )
-        })
 }

@@ -8,7 +8,7 @@ use super::{
     LibraryLinkTarget, LibraryResolver, MethodCallTargets, NamespaceCallTargets,
     NamespaceDataMemberTargets, NamespaceExports, PACKAGE_MIR_SYNTHETIC_DEF_BASE,
     PackageMirConsumer, PackageMirLinks, Path, PathBuf, Primitive, Resolver, SourceRewrites,
-    Symbol, Type, TypeId, TypeTable, is_bridged_norma_import_path, library_cached_analysis,
+    Symbol, Type, TypeId, TypeTable, library_cached_analysis,
     library_cached_file_interface, resolve_import,
 };
 use radix_module::hir::visit::{
@@ -382,12 +382,6 @@ fn link_package_unit_imports(
                         .copied()
                     {
                         link_sibling_import_items(links, unit, import, sibling, &sibling_product);
-                        continue;
-                    }
-                    // Kernel-manifest `norma:*` modules stay on the
-                    // runner-kernel bridge (`bridge_norma_providers_to_kernel`);
-                    // they are not linked into the program.
-                    if is_bridged_norma_import_path(import_path) {
                         continue;
                     }
                     // Only the interpreted run path links library imports.
@@ -877,9 +871,6 @@ fn link_nested_library_imports(
             continue;
         };
         for site in sites {
-            if is_bridged_norma_import_path(&site.import_path) {
-                continue;
-            }
             match library_resolver.resolve(&site.import_path) {
                 Ok(Some(module)) => {
                     link_library_import_site(

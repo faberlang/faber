@@ -1,8 +1,5 @@
-//! Script kernel manifest and `faber:*` import resolution.
-//!
-//! Kernel modules are compiler-known host builtins for script mode (`faber run`).
-//! Package builds reject `faber:` imports; script mode resolves paths against
-//! [`KERNEL_MANIFEST`] and lowers them with `MirProviderKind::Kernel`.
+//! Residual `faber:*` import recognition. N2 deleted the kernel modules;
+//! resolution fails closed as an unknown module.
 
 mod manifest;
 
