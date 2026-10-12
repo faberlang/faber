@@ -31,8 +31,6 @@ static LIBRARY_HOME_CACHE: OnceLock<Option<PathBuf>> = OnceLock::new();
 /// layout is immutable during a compilation session, so a per-home memo is
 /// safe; thread-local test overrides get fresh temp homes and their own memo
 /// entries, keyed by the resolved home path.
-/// Per-library-home provider-segment → provider repo directory memo (tests
-/// use fresh temp homes and their own entries).
 type ProviderNameMap = FxHashMap<PathBuf, FxHashMap<String, Option<PathBuf>>>;
 
 static PROVIDER_NAME_MEMO: OnceLock<Mutex<ProviderNameMap>> = OnceLock::new();
