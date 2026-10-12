@@ -151,12 +151,27 @@ impl CaseResult {
     /// Display path used in reports: `suite/name` or just `name`.
     #[must_use]
     pub fn display_path(&self) -> String {
-        if self.suite_path.is_empty() {
-            self.name.clone()
-        } else {
-            format!("{}/{}", self.suite_path, self.name)
-        }
+        join_suite_path(&self.suite_path, &self.name)
     }
+}
+
+/// `suite/name`, or just `name` when there is no suite.
+fn join_suite_path(suite_path: &str, name: &str) -> String {
+    if suite_path.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{}/{}", suite_path, name)
+    }
+}
+
+/// Report row for a case that never ran.
+fn skipped_result(unit_path: &Path, case: &ProbaCase, reason: String) -> CaseResult {
+    CaseResult::reported(
+        unit_path.to_path_buf(),
+        case.name.clone(),
+        case.suite_path.clone(),
+        CaseOutcome::Skipped { reason },
+    )
 }
 
 /// Aggregate report for a proba run.
@@ -458,11 +473,7 @@ pub fn is_harness_filter_match(case: &ProbaCase, filter: Option<&str>, exact: bo
     let Some(filter) = filter else {
         return true;
     };
-    let path = if case.suite_path.is_empty() {
-        case.name.clone()
-    } else {
-        format!("{}/{}", case.suite_path, case.name)
-    };
+    let path = join_suite_path(&case.suite_path, &case.name);
     if exact {
         path == filter || case.name == filter
     } else {
@@ -696,23 +707,13 @@ fn run_proba_cases(
             // unless include_ignored is set — matching language-level selection,
             // not Cargo's “ignored suite”.
             if include_ignored {
-                results.push(CaseResult::reported(
-                    unit_path.to_path_buf(),
-                    case.name.clone(),
-                    case.suite_path.clone(),
-                    CaseOutcome::Skipped { reason },
-                ));
+                results.push(skipped_result(unit_path, case, reason));
             }
             continue;
         }
 
         if let Some(reason) = source_skip_reason(case) {
-            results.push(CaseResult::reported(
-                unit_path.to_path_buf(),
-                case.name.clone(),
-                case.suite_path.clone(),
-                CaseOutcome::Skipped { reason },
-            ));
+            results.push(skipped_result(unit_path, case, reason));
             continue;
         }
 
