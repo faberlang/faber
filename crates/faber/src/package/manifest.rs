@@ -323,15 +323,12 @@ pub fn manifest_package_build_target(input: &Path) -> Result<Option<Target>, Box
 /// by the caller: CLI flag beats the section key, which beats the baked
 /// default.
 pub(crate) fn manifest_check_section(input: &Path) -> Option<ManifestCheck> {
-    let Ok(layout) = super::discover_build_layout(input) else {
-        return None;
-    };
-    if !layout.manifest_path.exists() {
-        return None;
-    }
-    read_manifest(&layout.manifest_path)
+    // Same discovery + read seam as [`input_manifest`]; a read failure here
+    // degrades to `None` so the caller applies the baked defaults.
+    input_manifest(input)
         .ok()
-        .map(|manifest| manifest.check)
+        .flatten()
+        .map(|(manifest, _)| manifest.check)
 }
 
 /// Map a manifest `[device] device` value to a device choice (N1.1). `None`
