@@ -302,24 +302,21 @@ fn resolve_shape_sources(
                     );
                 }
                 MirCollectionOp::TensorCreate | MirCollectionOp::TensorFromFlat => {
-                    let dims =
-                        tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
-                            ShapeFoldError::new(
-                                ShapeFoldKind::NonStaticShapeDestination,
-                                format!(
-                                    "shape-construction destination local {} has no literal \
+                    // Fail closed here for a destination with no literal shape.
+                    // The create/from-flat folds re-resolve the dims from the
+                    // same return type, and only a `magnitudines()` result is
+                    // ever consulted as a shape source, so these ops record no
+                    // entry.
+                    tensor_literal_dims(call.return_ty, validation).ok_or_else(|| {
+                        ShapeFoldError::new(
+                            ShapeFoldKind::NonStaticShapeDestination,
+                            format!(
+                                "shape-construction destination local {} has no literal \
                                  tensor shape (dynamic shape is not device-expressible)",
-                                    local.0
-                                ),
-                            )
-                        })?;
-                    shape_sources.insert(
-                        local,
-                        ShapeSource {
-                            dims,
-                            source_receiver: None,
-                        },
-                    );
+                                local.0
+                            ),
+                        )
+                    })?;
                 }
                 _ => {}
             }

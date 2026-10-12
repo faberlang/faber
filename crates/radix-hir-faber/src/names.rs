@@ -131,7 +131,7 @@ impl super::FaberCodegen<'_> {
         // spelling "ns.Union.VARIANT" → (namespace, variant name) pairs.
         let mut namespaces_by_variant: rustc_hash::FxHashMap<&str, rustc_hash::FxHashSet<&str>> =
             rustc_hash::FxHashMap::default();
-        let mut defs_by_spelling: Vec<(DefId, &str, &str)> = Vec::new();
+        let mut defs_by_spelling: Vec<(DefId, &str)> = Vec::new();
         for (def_id, spelling) in &self.imported_pattern_spellings {
             let parts: Vec<&str> = spelling.split('.').collect();
             if parts.len() < 3 {
@@ -143,7 +143,7 @@ impl super::FaberCodegen<'_> {
                 .entry(variant)
                 .or_default()
                 .insert(namespace);
-            defs_by_spelling.push((*def_id, namespace, variant));
+            defs_by_spelling.push((*def_id, variant));
         }
         let local_variant_names: rustc_hash::FxHashSet<&str> = hir
             .items
@@ -158,13 +158,13 @@ impl super::FaberCodegen<'_> {
 
         defs_by_spelling
             .into_iter()
-            .filter(|(_, _, variant)| {
+            .filter(|(_, variant)| {
                 namespaces_by_variant
                     .get(variant)
                     .is_some_and(|namespaces| namespaces.len() > 1)
                     || local_variant_names.contains(variant)
             })
-            .map(|(def_id, _, _)| def_id)
+            .map(|(def_id, _)| def_id)
             .collect()
     }
 }

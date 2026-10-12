@@ -29,10 +29,6 @@ fn lit() -> HirExpression {
     expr(HirExpressionKind::Literal(HirLiteral::Int(1)))
 }
 
-fn path(def_id: u32) -> HirExpression {
-    expr(HirExpressionKind::Path(DefId(def_id)))
-}
-
 fn expr(kind: HirExpressionKind) -> HirExpression {
     HirExpression {
         id: HirId(0),

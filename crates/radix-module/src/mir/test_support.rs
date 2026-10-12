@@ -5,7 +5,6 @@
 //! assertions stay in each `*_text_test.rs` module.
 
 use crate::codegen::Target;
-use crate::device_export::export_device_instance;
 use crate::diagnostics::Diagnostic;
 use crate::driver::ModuleCompileRequest;
 use crate::driver::compile;
@@ -95,21 +94,6 @@ pub fn compile_wgsl_text(source: &str) -> Result<String, String> {
 /// Returns joined diagnostic facts as a string when compilation fails.
 pub fn compile_metal_text_output(source: &str) -> Result<MetalTextOutput, String> {
     compile_target_typed_output(Target::MirMetal, "metal.fab", source)
-}
-
-/// Compile source to Metal text through the device-export surface.
-///
-/// Unlike [`compile_metal_text_output`], the reflection rows carry the
-/// widened shape vectors (the exported contract), so descriptor checks
-/// consume what a host actually receives.
-///
-/// # Errors
-///
-/// Returns joined diagnostic facts as a string when compilation fails.
-pub fn compile_metal_text_export_output(source: &str) -> Result<MetalTextOutput, String> {
-    let export = export_device_instance(&test_session(Target::MirMetal), "metal.fab", source, &[])
-        .map_err(|diagnostics| diagnostic_facts_message(&diagnostics))?;
-    Ok(MetalTextOutput { code: export.code, reflection: Some(export.reflection) })
 }
 
 /// Compile source to Metal text.
@@ -399,40 +383,7 @@ pub fn setup_sparse_group_launch_plan() -> (TypeTable, MirKernelLaunchPlan) {
         shader_stage: MirKernelShaderStage::Compute,
         varyings: Vec::new(),
         fragment_outputs: Vec::new(),
-        resources: vec![
-            MirKernelResourceReflection {
-                group: 2,
-                binding: 0,
-                kind: crate::mir::MirKernelResourceKind::StorageBuffer,
-                role: crate::mir::MirKernelResourceRole::Input,
-                access: crate::mir::MirKernelResourceAccess::Read,
-                element_ty: ty,
-                element_layout: MirScalarLayout::F32,
-                element_byte_width: 4,
-                element_count: 1,
-                shape: None,
-                buffer_byte_len: 4,
-                source_local: None,
-                source_name: None,
-                stage_io_role: crate::mir::ShaderStageIoRole::Other,
-            },
-            MirKernelResourceReflection {
-                group: 0,
-                binding: 0,
-                kind: crate::mir::MirKernelResourceKind::StorageBuffer,
-                role: crate::mir::MirKernelResourceRole::Output,
-                access: crate::mir::MirKernelResourceAccess::Write,
-                element_ty: ty,
-                element_layout: MirScalarLayout::F32,
-                element_byte_width: 4,
-                element_count: 1,
-                shape: None,
-                buffer_byte_len: 4,
-                source_local: None,
-                source_name: None,
-                stage_io_role: crate::mir::ShaderStageIoRole::Other,
-            },
-        ],
+        resources: sparse_group_resources(ty),
         bound_resources: Vec::new(),
         vertex_inputs: Vec::new(),
         builtin_inputs: Vec::new(),
@@ -443,6 +394,45 @@ pub fn setup_sparse_group_launch_plan() -> (TypeTable, MirKernelLaunchPlan) {
     };
     let launch = reflection.launch_plan();
     (types, launch)
+}
+
+/// The two sparse-group resource rows (input group 2, output group 0) shared by
+/// the launch-plan setup helpers.
+fn sparse_group_resources(element_ty: MirType) -> Vec<MirKernelResourceReflection> {
+    vec![
+        MirKernelResourceReflection {
+            group: 2,
+            binding: 0,
+            kind: crate::mir::MirKernelResourceKind::StorageBuffer,
+            role: crate::mir::MirKernelResourceRole::Input,
+            access: crate::mir::MirKernelResourceAccess::Read,
+            element_ty,
+            element_layout: MirScalarLayout::F32,
+            element_byte_width: 4,
+            element_count: 1,
+            shape: None,
+            buffer_byte_len: 4,
+            source_local: None,
+            source_name: None,
+            stage_io_role: crate::mir::ShaderStageIoRole::Other,
+        },
+        MirKernelResourceReflection {
+            group: 0,
+            binding: 0,
+            kind: crate::mir::MirKernelResourceKind::StorageBuffer,
+            role: crate::mir::MirKernelResourceRole::Output,
+            access: crate::mir::MirKernelResourceAccess::Write,
+            element_ty,
+            element_layout: MirScalarLayout::F32,
+            element_byte_width: 4,
+            element_count: 1,
+            shape: None,
+            buffer_byte_len: 4,
+            source_local: None,
+            source_name: None,
+            stage_io_role: crate::mir::ShaderStageIoRole::Other,
+        },
+    ]
 }
 
 // --- WebGPU probe setup (non-unit dispatch) ---
@@ -460,40 +450,7 @@ pub fn setup_webgpu_probe_reflection() -> (TypeTable, MirType, MirKernelReflecti
         shader_stage: MirKernelShaderStage::Compute,
         varyings: Vec::new(),
         fragment_outputs: Vec::new(),
-        resources: vec![
-            MirKernelResourceReflection {
-                group: 2,
-                binding: 0,
-                kind: crate::mir::MirKernelResourceKind::StorageBuffer,
-                role: crate::mir::MirKernelResourceRole::Input,
-                access: crate::mir::MirKernelResourceAccess::Read,
-                element_ty: ty,
-                element_layout: MirScalarLayout::F32,
-                element_byte_width: 4,
-                element_count: 1,
-                shape: None,
-                buffer_byte_len: 4,
-                source_local: None,
-                source_name: None,
-                stage_io_role: crate::mir::ShaderStageIoRole::Other,
-            },
-            MirKernelResourceReflection {
-                group: 0,
-                binding: 0,
-                kind: crate::mir::MirKernelResourceKind::StorageBuffer,
-                role: crate::mir::MirKernelResourceRole::Output,
-                access: crate::mir::MirKernelResourceAccess::Write,
-                element_ty: ty,
-                element_layout: MirScalarLayout::F32,
-                element_byte_width: 4,
-                element_count: 1,
-                shape: None,
-                buffer_byte_len: 4,
-                source_local: None,
-                source_name: None,
-                stage_io_role: crate::mir::ShaderStageIoRole::Other,
-            },
-        ],
+        resources: sparse_group_resources(ty),
         bound_resources: Vec::new(),
         vertex_inputs: Vec::new(),
         builtin_inputs: Vec::new(),

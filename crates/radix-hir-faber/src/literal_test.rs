@@ -65,3 +65,30 @@ fn finite_float_literals_keep_decimal_convention() {
     assert_eq!(render(&HirLiteral::Float(7.0), &LatinSurface), "7.0");
     assert_eq!(render(&HirLiteral::Float(0.125), &LatinSurface), "0.125");
 }
+
+#[test]
+fn object_fields_keep_genus_and_json_separators() {
+    let types = radix_types::TypeTable::new();
+    let mut interner = Interner::new();
+    let key = interner.intern("field");
+    let value = radix_hir::HirExpression {
+        id: radix_hir::HirId(1),
+        kind: radix_hir::HirExpressionKind::Literal(HirLiteral::Int(7)),
+        ty: None,
+        span: radix_diagnostics::Span::default(),
+    };
+    let field = HirObjectField {
+        key: HirObjectKey::Ident(key),
+        value: Some(value),
+    };
+    let codegen = crate::FaberCodegen::new(&types, &interner);
+    let names = FxHashMap::default();
+
+    let mut genus = CodeWriter::new();
+    codegen.write_genus_field(&field, &names, &LatinSurface, &mut genus);
+    assert_eq!(genus.finish(), "field = 7");
+
+    let mut json = CodeWriter::new();
+    codegen.write_json_field(&field, &names, &LatinSurface, &mut json);
+    assert_eq!(json.finish(), "\"field\": 7");
+}
