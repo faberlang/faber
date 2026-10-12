@@ -67,6 +67,8 @@ pub mod fhir;
 pub mod file_interface;
 pub mod frontmatter;
 pub mod import_graph;
+#[cfg(any(feature = "mir-wasm", feature = "mir-llvm"))]
+pub(crate) mod leaf_gate;
 pub mod library;
 #[cfg(feature = "mir-llvm")]
 pub mod llvm;

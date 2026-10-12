@@ -1167,7 +1167,10 @@ pub fn generate_go_cli(
 
 /// Collect `ad` routes from this module, imported handlers, and carried
 /// provider units (Norma wrappers live there on single-file emit).
-pub(crate) fn reject_unsupported_leaves(
+///
+/// Also the whole-package `radix-program` build paths (`wasm.rs`, `llvm.rs`)
+/// call this through the unit's [`crate::driver::AnalyzedModule`].
+pub fn reject_unsupported_leaves(
     analysis: &crate::driver::AnalyzedModule,
     target: Target,
 ) -> Result<(), CodegenError> {
