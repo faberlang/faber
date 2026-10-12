@@ -20,7 +20,9 @@
 use crate::cli::FaberCliTarget;
 use clap::ValueEnum;
 use radix::module::codegen::Target;
-use radix::services::{TargetCapabilities, TargetCommandSurface, target_capabilities_for_surface};
+use radix::services::{
+    TargetCapabilities, TargetCommandSurface, target_capabilities_for_surface, target_leaves_label,
+};
 use std::collections::BTreeSet;
 
 /// One derived emit-target row: the backend target, its CLI spelling, and
@@ -102,18 +104,20 @@ struct TargetRow {
     name: String,
     available: bool,
     capabilities: TargetCapabilities,
+    leaves: String,
 }
 
 impl TargetRow {
     fn render(&self) -> String {
         format!(
-            "{} available={} check={} build={} run={} package={} note={}",
+            "{} available={} check={} build={} run={} package={} leaves={} note={}",
             self.name,
             yes_no(self.available),
             yes_no(self.capabilities.check),
             yes_no(self.capabilities.build),
             yes_no(self.capabilities.run),
             yes_no(self.capabilities.package),
+            self.leaves,
             self.capabilities.note
         )
     }
@@ -150,6 +154,7 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Result<Vec<TargetRow>, Stri
             name: spec.name,
             available,
             capabilities,
+            leaves: target_leaves_label(spec.target),
         });
     }
     for &(name, feature, note) in FABER_CAPABILITY_ROWS {
@@ -166,6 +171,7 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Result<Vec<TargetRow>, Stri
                 package: false,
                 note,
             },
+            leaves: "-".to_owned(),
         });
     }
     Ok(rows)

@@ -25,7 +25,7 @@ pub use inspect::{
 pub use reflection::output_reflection_json;
 pub use targets::{
     TargetCapabilities, TargetCommandSurface, discoverable_targets, target_capabilities,
-    target_capabilities_for_surface, target_extension, target_name,
+    target_capabilities_for_surface, target_extension, target_leaves, target_leaves_label, target_name,
 };
 pub use verify::{VerifySourceResult, verify_source};
 

@@ -1511,6 +1511,10 @@ help = "केवल प्रकार घोषित करें; ledger स
 message = "इस लक्ष्य पर ledger प्रकार अभी समर्थित नहीं है"
 help = "MIR runner या Faber source emitter उपयोग करें, या map ({tabula}) उपयोग करें"
 
+[diagnostics.SEM010.issues.leaf_unsupported_on_target]
+message = "इस लक्ष्य पर {leaf} पत्ती समर्थित नहीं है"
+help = "rust या MIR runner उपयोग करें, या {route} कॉल हटाएँ"
+
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"
 help = "give the sort a body that returns an orderable key, such as a number, text or bool"

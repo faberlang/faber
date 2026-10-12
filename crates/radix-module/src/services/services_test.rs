@@ -8,8 +8,8 @@ use crate::driver::AnalyzeRequest;
 use crate::program::{compile_cli_path, compile_cli_source, compile_cli_source_with_locale_pack};
 use crate::services::{
     TargetCommandSurface, check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack,
-    discoverable_targets, target_capabilities, target_capabilities_for_surface, target_extension, target_name,
-    verify_source,
+    discoverable_targets, target_capabilities, target_capabilities_for_surface, target_extension, target_leaves,
+    target_name, verify_source,
 };
 use std::path::PathBuf;
 
@@ -400,6 +400,20 @@ fn target_name_table_matches_display() {
             "target_name must spell {target:?} exactly as Display does"
         );
     }
+}
+
+#[test]
+fn rust_and_runner_declare_the_n2_leaves() {
+    use crate::codegen::Leaf;
+    for target in [
+        crate::codegen::Target::HirRust,
+        crate::codegen::Target::MirFmir,
+        crate::codegen::Target::MirFmirBinary,
+        crate::codegen::Target::MirFmirBundle,
+    ] {
+        assert_eq!(target_leaves(target), Leaf::ALL, "{target} must declare N2 leaves");
+    }
+    assert!(target_leaves(crate::codegen::Target::HirGo).is_empty());
 }
 
 #[test]

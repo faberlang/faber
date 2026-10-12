@@ -45,6 +45,7 @@ pub mod frame;
 pub mod hints;
 pub mod hygiene;
 pub mod ident;
+pub mod leaf_gate;
 pub mod ledger_gate;
 pub mod list_window_gate;
 pub mod lista_lift_gate;
@@ -312,6 +313,7 @@ pub use ident::{
     SCALAR_LOOP_CANDIDATES, SCALAR_LOOP_FALLBACK, VALUE_JOIN_CANDIDATES, VALUE_JOIN_FALLBACK,
     output_resource_name, sanitize_ident, sanitize_rust_module_ident, unclaimed_name,
 };
+pub use leaf_gate::{collect_ad_routes, reject_unsupported_leaf};
 pub use ledger_gate::reject_ledger_type;
 pub use list_window_gate::reject_list_window;
 pub use tensor_lift_gate::reject_tensor_lift;

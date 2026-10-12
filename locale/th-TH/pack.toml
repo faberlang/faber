@@ -1511,6 +1511,10 @@ help = "ประกาศเฉพาะชนิด; ใช้ map ({tabula}) 
 message = "เป้าหมายนี้ยังไม่รองรับชนิด ledger"
 help = "ใช้ MIR runner หรือ Faber source emitter หรือใช้ map ({tabula})"
 
+[diagnostics.SEM010.issues.leaf_unsupported_on_target]
+message = "เป้าหมายนี้ไม่รองรับใบ {leaf}"
+help = "ใช้ rust หรือ MIR runner หรือลบการเรียก {route}"
+
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"
 help = "give the sort a body that returns an orderable key, such as a number, text or bool"

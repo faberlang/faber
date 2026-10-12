@@ -1499,6 +1499,10 @@ help = "仅声明该类型；在 ledger 操作可用之前请使用 map ({tabula
 message = "此目标暂不支持 ledger 类型"
 help = "请使用 MIR runner 或 Faber 源码发射器，或改用 map ({tabula})"
 
+[diagnostics.SEM010.issues.leaf_unsupported_on_target]
+message = "此目标不支持 {leaf} 叶片"
+help = "请使用 rust 或 MIR runner，或移除 {route} 调用"
+
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"
 help = "give the sort a body that returns an orderable key, such as a number, text or bool"

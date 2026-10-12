@@ -61,6 +61,10 @@ mod coverage_test;
 mod await_store_emit_test;
 
 #[cfg(test)]
+#[path = "leaf_gate_emit_test.rs"]
+mod leaf_gate_emit_test;
+
+#[cfg(test)]
 #[path = "indexed_apud_emit_test.rs"]
 mod indexed_apud_emit_test;
 
@@ -265,7 +269,7 @@ use crate::semantic::{NumericWidth, Primitive, Type, TypeId};
 /// Compilation-target identity lives in the neutral `radix-target` crate;
 /// re-exported here for path stability (`crate::codegen::Target`,
 /// `radix::Target`, `radix_module::codegen::Target`).
-pub use radix_target::Target;
+pub use radix_target::{Leaf, Target};
 
 fn unavailable_target_error(target: Target) -> CodegenError {
     let feature = target.required_feature().unwrap_or("full-targets");
@@ -377,6 +381,7 @@ pub fn generate_from_analyzed_with_options(
     radix_codegen_shared::reject_hir_errors(&analysis.hir)?;
     radix_codegen_shared::reject_bits_type(&analysis.types, target)?;
     radix_codegen_shared::reject_ledger_type(&analysis.types, target)?;
+    reject_unsupported_leaves(analysis, target)?;
     if !target.is_available() {
         return Err(unavailable_target_error(target));
     }
@@ -1123,6 +1128,7 @@ pub fn generate_rust_cli(
         radix_codegen_shared::reject_hir_errors(hir)?;
         radix_codegen_shared::reject_bits_type(types, Target::HirRust)?;
         radix_codegen_shared::reject_ledger_type(types, Target::HirRust)?;
+        reject_leaf_routes_in_hir(hir, interner, Target::HirRust)?;
         reject_rust_unsupported_types(types)?;
         let hir = hir.without_unavailable_declarations(interner);
         let hir = &*hir;
@@ -1149,6 +1155,7 @@ pub fn generate_go_cli(
     {
         radix_codegen_shared::reject_bits_type(types, Target::HirGo)?;
         radix_codegen_shared::reject_ledger_type(types, Target::HirGo)?;
+        reject_leaf_routes_in_hir(hir, interner, Target::HirGo)?;
         let hir = hir.without_unavailable_declarations(interner);
         go::generate_go_cli(&hir, types, interner, cli_program)
     }
@@ -1156,6 +1163,53 @@ pub fn generate_go_cli(
     {
         Err(unavailable_target_error(Target::HirGo))
     }
+}
+
+/// Collect `ad` routes from this module, imported handlers, and carried
+/// provider units (Norma wrappers live there on single-file emit).
+pub(crate) fn reject_unsupported_leaves(
+    analysis: &crate::driver::AnalyzedModule,
+    target: Target,
+) -> Result<(), CodegenError> {
+    let mut routes = Vec::new();
+    collect_analysis_ad_routes(analysis, &mut routes);
+    radix_codegen_shared::reject_unsupported_leaf(&routes, target)
+}
+
+fn collect_analysis_ad_routes(analysis: &crate::driver::AnalyzedModule, routes: &mut Vec<String>) {
+    collect_module_ad_routes(&analysis.hir, &analysis.interner, &analysis.resolver, routes);
+    collect_provider_ad_routes(&analysis.provider_units, routes);
+}
+
+fn collect_module_ad_routes(
+    hir: &HirModule,
+    interner: &Interner,
+    resolver: &crate::semantic::Resolver,
+    routes: &mut Vec<String>,
+) {
+    radix_codegen_shared::collect_ad_routes(hir, interner, routes);
+    for imported in resolver.imported_ad_routes() {
+        let route = interner.resolve(imported.route);
+        if !routes.iter().any(|existing| existing == route) {
+            routes.push(route.to_owned());
+        }
+    }
+}
+
+fn collect_provider_ad_routes(view: &crate::driver::ProviderUnitView, routes: &mut Vec<String>) {
+    for unit in view.units.values() {
+        let Some(guard) = unit.lock_unit() else {
+            continue;
+        };
+        collect_module_ad_routes(&guard.hir, &guard.interner, &guard.resolver, routes);
+        collect_provider_ad_routes(&guard.nested, routes);
+    }
+}
+
+fn reject_leaf_routes_in_hir(hir: &HirModule, interner: &Interner, target: Target) -> Result<(), CodegenError> {
+    let mut routes = Vec::new();
+    radix_codegen_shared::collect_ad_routes(hir, interner, &mut routes);
+    radix_codegen_shared::reject_unsupported_leaf(&routes, target)
 }
 
 #[cfg(feature = "hir-rust")]

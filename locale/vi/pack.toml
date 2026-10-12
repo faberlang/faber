@@ -1499,6 +1499,10 @@ help = "chỉ khai báo kiểu; dùng map ({tabula}) cho đến khi các phép t
 message = "kiểu ledger chưa được hỗ trợ trên đích này"
 help = "dùng MIR runner hoặc bộ phát nguồn Faber, hoặc dùng map ({tabula})"
 
+[diagnostics.SEM010.issues.leaf_unsupported_on_target]
+message = "lá {leaf} không được hỗ trợ trên đích này"
+help = "dùng rust hoặc MIR runner, hoặc bỏ lời gọi {route}"
+
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"
 help = "give the sort a body that returns an orderable key, such as a number, text or bool"

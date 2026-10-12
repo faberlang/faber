@@ -12,6 +12,9 @@
 
 use std::fmt;
 
+mod leaf;
+pub use leaf::Leaf;
+
 /// Compilation target selected after analysis and before backend dispatch.
 ///
 /// This enum is the public routing surface for drivers. Each variant commits to
@@ -292,6 +295,48 @@ impl Target {
             | Target::MirFmirBinary
             | Target::MirFmirBundle => true,
         }
+    }
+
+    /// Leaves this target declares.
+    ///
+    /// Rust and the runner (`fmir*`, stepper) share `faber-leaf`. Faber
+    /// re-emit and FHIR keep the `call` in the artifact. Every other emit
+    /// target has no native leaf crate and must fail closed.
+    #[must_use]
+    pub fn supported_leaves(self) -> &'static [Leaf] {
+        match self {
+            Target::HirRust
+            | Target::MirStepper
+            | Target::MirFmir
+            | Target::MirFmirBinary
+            | Target::MirFmirBundle
+            | Target::HirFaber
+            | Target::HirFhir => Leaf::ALL,
+            Target::HirTypeScript
+            | Target::HirGo
+            | Target::HirSwift
+            | Target::HirPython
+            | Target::HirHaskell
+            | Target::HirPascal
+            | Target::HirCobol
+            | Target::HirFortran
+            | Target::HirOdin
+            | Target::MirWasm
+            | Target::MirLlvm
+            | Target::MirLlvmHost
+            | Target::MirAmd
+            | Target::MirMetal
+            | Target::MirWgsl
+            | Target::MirSexp
+            | Target::MirBasic
+            | Target::MirScena => &[],
+        }
+    }
+
+    /// Whether this target declares `leaf`.
+    #[must_use]
+    pub fn supports_leaf(self, leaf: Leaf) -> bool {
+        self.supported_leaves().contains(&leaf)
     }
 }
 

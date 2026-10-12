@@ -9496,10 +9496,10 @@ entry = "main.fab"
 }
 
 #[test]
-fn package_runtime_plan_collects_library_ad_routes_and_requires_host() {
+fn package_runtime_plan_collects_library_ad_routes_without_host() {
     // Dual-backend honesty (S1-U3): norma-wrapped ad must appear in
-    // non_runtime_routes. tempus:dormiet is a host-required provider route, so
-    // a hostless package using it must fail closed at plan time.
+    // non_runtime_routes. tempus:dormiet is the shared clock leaf, so a
+    // hostless package using it plans without a host provider.
     let pkg = test_temp_dir("runtime-plan-library-tempus");
     fs::create_dir_all(pkg.join("src")).expect("src");
     fs::write(
@@ -9534,12 +9534,10 @@ main {
         plan.non_runtime_routes
     );
     assert!(plan.host.is_none());
-    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
-        .expect("missing host selection diagnostic");
-    assert!(diagnostic_has_issue(
-        &diagnostic,
-        "package_host_selection_required"
-    ));
+    assert!(
+        package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none(),
+        "tempus:* is the shared clock leaf, not a host-required route"
+    );
 }
 
 #[test]

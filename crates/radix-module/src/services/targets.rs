@@ -108,6 +108,28 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
     }
 }
 
+/// Leaves this target declares. Empty means every native leaf is refused
+/// at compile time (`leaf_unsupported_on_target`).
+#[must_use]
+pub fn target_leaves(target: crate::codegen::Target) -> &'static [crate::codegen::Leaf] {
+    target.supported_leaves()
+}
+
+/// Comma-joined leaf spellings for `faber targets` / `radix targets`, or `-`.
+#[must_use]
+pub fn target_leaves_label(target: crate::codegen::Target) -> String {
+    let leaves = target_leaves(target);
+    if leaves.is_empty() {
+        "-".to_owned()
+    } else {
+        leaves
+            .iter()
+            .map(|leaf| leaf.as_str())
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+}
+
 /// Return the canonical CLI spelling owned by [`crate::codegen::Target`].
 ///
 /// This includes hidden targets without a [`DISCOVERABLE_TARGET_ROWS`] entry.

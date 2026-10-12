@@ -1974,6 +1974,10 @@ help = "typum tantum declara; tabula ({tabula}) utere donec operationes tabulae 
 message = "typus tabulae in hoc proposito nondum adhibetur"
 help = "exsecutore MIR aut emissore fontis Faber utere, aut tabula ({tabula}), donec hoc propositum tabulas ferat"
 
+[diagnostics.SEM010.issues.leaf_unsupported_on_target]
+message = "folium {leaf} in hoc proposito non adhibetur"
+help = "utere proposito rust aut exsecutore MIR, aut omitte vocationem {route}"
+
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "elementa ordinem naturalem non habent"
 help = "da ordinationi corpus quod clavem ordinabilem reddat: numerum, textum aut bivalens"

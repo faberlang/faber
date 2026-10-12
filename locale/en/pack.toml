@@ -2285,6 +2285,10 @@ help = "declare the type only; use a map ({tabula}) until the ledger operations 
 message = "the ledger type is not supported on this target yet"
 help = "use the MIR runner or the Faber source emitter, or a map ({tabula}), until this target carries a ledger"
 
+[diagnostics.SEM010.issues.leaf_unsupported_on_target]
+message = "the {leaf} leaf is not supported on this target"
+help = "use rust or the MIR runner, or drop the {route} call"
+
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"
 help = "give the sort a body that returns an orderable key, such as a number, text or bool"
