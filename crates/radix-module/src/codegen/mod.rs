@@ -364,8 +364,9 @@ pub fn generate_from_analyzed(
 /// Dispatch the analyzed `HIR` program with output-mode options.
 ///
 /// When `output_mode` is [`OutputMode::Library`], Swift backends emit `public`
-/// declarations and suppress `@main` entry-point emission. `module_name` sets
-/// the emitted Swift module comment.
+/// declarations and suppress `@main` entry-point emission, and the TypeScript
+/// backend routes through its module entry path. `module_name` sets the emitted
+/// Swift module comment and the TypeScript module namespace.
 ///
 /// # Errors
 ///
@@ -402,13 +403,12 @@ pub fn generate_from_analyzed_with_options(
                 // output module name; HIR symbol ids remain stable.
                 let mut module_interner = analysis.interner.clone();
                 let ts_surface = ts::TsKeywordSurfaceBridge(*surface);
-                let r#gen = if output_mode == OutputMode::Library {
+                let mut r#gen = if output_mode == OutputMode::Library {
                     let namespace = module_interner.intern(module_name.unwrap_or("FaberModule"));
                     ts::TsCodegen::new_module(hir, &analysis.types, &module_interner, namespace)
                 } else {
                     ts::TsCodegen::new(hir, &analysis.types, &module_interner)
                 };
-                let mut r#gen = r#gen;
                 r#gen.set_display_tokens(display_tokens_for_module(analysis));
                 r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
                 r#gen.set_library_registry(&analysis.libraries);
