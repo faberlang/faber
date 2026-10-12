@@ -229,21 +229,20 @@ pub fn divide_index_exact(
     if divisor == 0 {
         return Err(IndexArithmeticError::DivideByZero);
     }
-    match evaluate_index_dimension(numerator, types) {
-        Ok(Some(value)) => {
+    match evaluate_index_dimension(numerator, types)? {
+        Some(value) => {
             if value % divisor != 0 {
                 return Err(IndexArithmeticError::NonIntegral);
             }
             Ok(types.intern_index(IndexExpr::Literal(value / divisor)))
         }
-        Ok(None) => {
+        None => {
             if divisor == 1 {
                 Ok(numerator)
             } else {
                 Ok(types.intern_index(IndexExpr::Divide { numerator, divisor }))
             }
         }
-        Err(error) => Err(error),
     }
 }
 
@@ -361,7 +360,7 @@ fn is_literal_one(id: IndexId, types: &crate::TypeTable) -> bool {
 /// params or non-natural rejects at the resolve site.
 #[must_use]
 pub fn parse_natural_capacity(name: &str) -> Option<u64> {
-    if name.is_empty() || !name.bytes().all(|b| b.is_ascii_digit()) {
+    if !name.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
     name.parse().ok()
