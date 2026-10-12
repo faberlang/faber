@@ -932,11 +932,7 @@ fn push_closed_set_refusal(span: radix_lexer::Span, errors: &mut Vec<SemanticErr
     );
 }
 
-fn resolve_pattern(
-    resolver: &mut Resolver,
-    pattern: &Pattern,
-    errors: &mut Vec<SemanticError>,
-) {
+fn resolve_pattern(resolver: &mut Resolver, pattern: &Pattern, errors: &mut Vec<SemanticError>) {
     match pattern {
         Pattern::Wildcard(_) => {}
         // `discerne` matches a closed set (union members, enum variants). The

@@ -1083,12 +1083,7 @@ impl TypeChecker<'_> {
             // same funnel, no channel-specific typing.
             ErrorSink::Trap(var) => self.trap_sink_type(var),
         }) {
-            self.unify_assign_issue(
-                value_ty,
-                err_ty,
-                value.span,
-                ISSUE_IACE_VALUE_TYPE_MISMATCH,
-            );
+            self.unify_assign_issue(value_ty, err_ty, value.span, ISSUE_IACE_VALUE_TYPE_MISMATCH);
         } else {
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,
