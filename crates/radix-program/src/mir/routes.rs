@@ -36,6 +36,18 @@ fn config_for_selection(config: &Config, selection: DeviceSelection) -> Cow<'_, 
     }
 }
 
+/// Read the host's program arguments, mapping a host failure onto the route's
+/// diagnostic vector.
+fn host_argumenta<H: Host + ?Sized>(
+    input: &Path,
+    host: &mut H,
+) -> Result<Vec<String>, Vec<Diagnostic>> {
+    Ok(host
+        .argumenta()
+        .map_err(|e| vec![mir_diag(input, e.message)])?
+        .to_vec())
+}
+
 /// Prepare the package under the interpreted consumer, bind the host's
 /// program arguments into the CLI entry record exactly as the image routes do,
 /// and lend the lowered unit, the argument-bound validated program, and the
@@ -56,10 +68,7 @@ pub fn with_interpreted_bound_package_mir<R, H: Host + ?Sized>(
         &mut H,
     ) -> Result<R, Vec<Diagnostic>>,
 ) -> Result<R, Vec<Diagnostic>> {
-    let argumenta = host
-        .argumenta()
-        .map_err(|e| vec![mir_diag(input, e.message)])?
-        .to_vec();
+    let argumenta = host_argumenta(input, host)?;
     with_prepared_package_mir(config, input, &argumenta, seams, |prepared, lowered| {
         let (type_snapshot, interner_strings) = super::image::snapshot_context(lowered);
         let types = super::TypeTable::from_snapshot(type_snapshot).map_err(|error| {
@@ -103,10 +112,7 @@ pub fn run_package_mir<H: Host + ?Sized>(
     seams: &MirSeams,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
-    let argumenta = host
-        .argumenta()
-        .map_err(|e| vec![mir_diag(input, e.message)])?
-        .to_vec();
+    let argumenta = host_argumenta(input, host)?;
     with_prepared_package_mir(config, input, &argumenta, seams, |prepared, lowered| {
         let image = fmir_package_image_from_lowered(
             prepared,
@@ -136,10 +142,7 @@ pub fn run_package_mir_with_selection<H: Host + ?Sized>(
     seams: &MirSeams,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
-    let argumenta = host
-        .argumenta()
-        .map_err(|e| vec![mir_diag(input, e.message)])?
-        .to_vec();
+    let argumenta = host_argumenta(input, host)?;
     let config = config_for_selection(config, selection);
     with_prepared_package_mir(&config, input, &argumenta, seams, |prepared, lowered| {
         let image = fmir_package_image_from_lowered(
@@ -166,10 +169,7 @@ pub fn run_package_mir_with_selection_and_stats<H: Host + ?Sized>(
     seams: &MirSeams,
     host: &mut H,
 ) -> Result<PackageRunStats, Vec<Diagnostic>> {
-    let argumenta = host
-        .argumenta()
-        .map_err(|e| vec![mir_diag(input, e.message)])?
-        .to_vec();
+    let argumenta = host_argumenta(input, host)?;
     let config = config_for_selection(config, selection);
     with_prepared_package_mir(&config, input, &argumenta, seams, |prepared, lowered| {
         let image = fmir_package_image_from_lowered(
@@ -196,10 +196,7 @@ pub fn run_package_mir_from_loaded<H: Host + ?Sized>(
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
     let diagnostic_path = package.spec.entry.clone();
-    let argumenta = host
-        .argumenta()
-        .map_err(|e| vec![mir_diag(&diagnostic_path, e.message)])?
-        .to_vec();
+    let argumenta = host_argumenta(&diagnostic_path, host)?;
     with_prepared_package_mir_from_loaded(
         config,
         package,
@@ -405,6 +402,21 @@ pub fn run_package_mir_artifact<H: Host + ?Sized>(
     run_package_mir(config, &artifact.entry, seams, host)
 }
 
+/// Read and decode an FMIR text image file under the route's toolchain
+/// version.
+fn load_fmir_text_image_from_file(
+    image: &PackageFmirTextImage,
+    seams: &MirSeams,
+) -> Result<FmirPackageImage, Vec<Diagnostic>> {
+    let image_text = fs::read_to_string(&image.image_path).map_err(|error| {
+        vec![mir_diag(
+            &image.image_path,
+            format!("could not read fmir-text image: {error}"),
+        )]
+    })?;
+    load_fmir_text_image(&image_text, &image.image_path, seams.toolchain_version)
+}
+
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_fmir_text_image<H: Host + ?Sized>(
@@ -412,13 +424,7 @@ pub fn run_package_fmir_text_image<H: Host + ?Sized>(
     seams: &MirSeams,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
-    let image_text = fs::read_to_string(&image.image_path).map_err(|error| {
-        vec![mir_diag(
-            &image.image_path,
-            format!("could not read fmir-text image: {error}"),
-        )]
-    })?;
-    let loaded = load_fmir_text_image(&image_text, &image.image_path, seams.toolchain_version)?;
+    let loaded = load_fmir_text_image_from_file(image, seams)?;
     run_loaded_fmir_image_route(loaded, host)
 }
 
@@ -430,13 +436,7 @@ pub fn run_package_fmir_text_image_with_selection<H: Host + ?Sized>(
     seams: &MirSeams,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
-    let image_text = fs::read_to_string(&image.image_path).map_err(|error| {
-        vec![mir_diag(
-            &image.image_path,
-            format!("could not read fmir-text image: {error}"),
-        )]
-    })?;
-    let loaded = load_fmir_text_image(&image_text, &image.image_path, seams.toolchain_version)?;
+    let loaded = load_fmir_text_image_from_file(image, seams)?;
     run_loaded_fmir_image_route_with_selection(loaded, selection, host)
 }
 
@@ -546,6 +546,20 @@ pub fn run_fmir_image_path<H: Host + ?Sized>(
     run_fmir_image_path_with_selection(image_path, None, seams, host)
 }
 
+/// Read and decode an FMIR image file under the route's toolchain version.
+fn load_fmir_image_from_path(
+    image_path: &Path,
+    seams: &MirSeams,
+) -> Result<FmirPackageImage, Vec<Diagnostic>> {
+    let image_bytes = fs::read(image_path).map_err(|error| {
+        vec![mir_diag(
+            image_path,
+            format!("could not read fmir image: {error}"),
+        )]
+    })?;
+    load_fmir_image(&image_bytes, image_path, seams.toolchain_version)
+}
+
 /// Run an FMIR image file under the one host-construction policy, with an
 /// optional selection override (the image-runner `--device` flag).
 /// # Errors
@@ -556,13 +570,7 @@ pub fn run_fmir_image_path_with_selection<H: Host + ?Sized>(
     seams: &MirSeams,
     host: &mut H,
 ) -> Result<(), Vec<Diagnostic>> {
-    let image_bytes = fs::read(image_path).map_err(|error| {
-        vec![mir_diag(
-            image_path,
-            format!("could not read fmir image: {error}"),
-        )]
-    })?;
-    let loaded = load_fmir_image(&image_bytes, image_path, seams.toolchain_version)?;
+    let loaded = load_fmir_image_from_path(image_path, seams)?;
     let selection = match selection_override {
         Some(selection) => selection,
         None => loaded.route_selection()?,
@@ -596,13 +604,7 @@ pub fn fmir_image_route_decision(
     image_path: &Path,
     seams: &MirSeams,
 ) -> Result<FmirImageRouteDecision, Vec<Diagnostic>> {
-    let image_bytes = fs::read(image_path).map_err(|error| {
-        vec![mir_diag(
-            image_path,
-            format!("could not read fmir image: {error}"),
-        )]
-    })?;
-    let loaded = load_fmir_image(&image_bytes, image_path, seams.toolchain_version)?;
+    let loaded = load_fmir_image_from_path(image_path, seams)?;
     let requires_device = loaded.device.is_some();
     let declared_selection = loaded.route_selection()?;
     let declared_artifacts = loaded
