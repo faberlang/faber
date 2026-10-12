@@ -3,7 +3,7 @@
 use super::{is_route, reset_handles, serve};
 use crate::value::{Arg, Reply};
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpListener, TcpStream};
 use std::thread;
 
 fn lock() -> std::sync::MutexGuard<'static, ()> {
@@ -259,6 +259,80 @@ fn request_open_reads_chunked_body_incrementally() {
     }
     server.join().expect("server");
     assert_eq!(String::from_utf8_lossy(&body), "onetwo");
+}
+
+#[test]
+fn request_open_reassembles_content_length_body_across_segments() {
+    let _guard = lock();
+    reset_handles();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let server = thread::spawn(move || {
+        let (mut socket, _) = listener.accept().expect("accept");
+        let mut request = [0_u8; 1024];
+        let _ = socket.read(&mut request);
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\n")
+            .expect("head");
+        socket.flush().expect("flush head");
+        thread::sleep(std::time::Duration::from_millis(100));
+        socket.write_all(b"12345").expect("first half");
+        socket.flush().expect("flush first");
+        thread::sleep(std::time::Duration::from_millis(100));
+        socket.write_all(b"67890").expect("second half");
+        socket.flush().expect("flush second");
+    });
+    let url = format!("http://127.0.0.1:{port}/body");
+    let opened = serve_ok(
+        "http:request_open",
+        &[
+            Arg::Str("GET".to_owned()),
+            Arg::Str(url),
+            Arg::List(Vec::new()),
+            Arg::Str(String::new()),
+        ],
+    );
+    let Reply::Map(fields) = opened else {
+        panic!("open: {opened:?}");
+    };
+    let reader = fields
+        .iter()
+        .find(|(key, _)| key == "reader")
+        .and_then(|(_, value)| match value {
+            Reply::Int(reader) => Some(*reader),
+            _ => None,
+        })
+        .expect("reader");
+    let mut body = Vec::new();
+    loop {
+        let chunk = serve_ok("http:read", &[Arg::Int(reader)]);
+        let Reply::Map(fields) = chunk else {
+            panic!("read: {chunk:?}");
+        };
+        let bytes = fields
+            .iter()
+            .find(|(key, _)| key == "bytes")
+            .and_then(|(_, value)| match value {
+                Reply::Bytes(bytes) => Some(bytes.clone()),
+                Reply::Str(text) => Some(text.as_bytes().to_vec()),
+                _ => None,
+            })
+            .expect("bytes");
+        let done = fields
+            .iter()
+            .find(|(key, _)| key == "done")
+            .and_then(|(_, value)| match value {
+                Reply::Bool(done) => Some(*done),
+                _ => None,
+            })
+            .expect("done");
+        body.extend(bytes);
+        if done {
+            break;
+        }
+    }
+    server.join().expect("server");
+    assert_eq!(body, b"1234567890");
 }
 
 #[test]

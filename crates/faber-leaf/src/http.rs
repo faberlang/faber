@@ -620,9 +620,6 @@ fn fill_reader(
                 Ok(0) => *done = true,
                 Ok(n) => {
                     leftover.extend_from_slice(&buf[..n]);
-                    if let Some(left) = remaining.as_deref_mut() {
-                        *left = left.saturating_sub(n as u64);
-                    }
                 }
                 Err(err)
                     if err.kind() == std::io::ErrorKind::UnexpectedEof
