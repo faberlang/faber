@@ -2390,7 +2390,7 @@ main {
 }
 
 #[test]
-fn run_norma_process_argumenta_bridges_to_kernel() {
+fn run_norma_process_argumenta_reads_host_argv() {
     let package = temp_dir("norma-processus-bridge");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
