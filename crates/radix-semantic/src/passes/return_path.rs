@@ -141,7 +141,7 @@ impl HirVisitor for ClosureReturnPathVisitor<'_> {
             };
             if !is_unit_return(*ret_ty, self.types)
                 && is_statement_bodied_closure(body)
-                && !block_terminates_for_expr(body, self.types, self.enum_variants)
+                && !expr_terminates(body, self.types, self.enum_variants)
             {
                 push_missing_return(self.errors, expr.span);
             }
@@ -164,17 +164,6 @@ fn is_statement_bodied_closure(body: &HirExpression) -> bool {
             | HirExpressionKind::Handled { .. }
             | HirExpressionKind::Loop(_)
     )
-}
-
-fn block_terminates_for_expr(
-    expr: &HirExpression,
-    types: &TypeTable,
-    enum_variants: &FxHashMap<radix_hir::DefId, Vec<radix_hir::DefId>>,
-) -> bool {
-    match &expr.kind {
-        HirExpressionKind::Block(block) => block_terminates(block, types, enum_variants),
-        _ => expr_terminates(expr, types, enum_variants),
-    }
 }
 
 /// Decide whether a block definitely terminates (returns or diverges).
