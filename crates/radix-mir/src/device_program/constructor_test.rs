@@ -152,7 +152,7 @@ fn device_function(
     return_ty: MirType,
     compute: bool,
 ) -> MirFunction {
-    let mut locals = named_locals
+    let locals = named_locals
         .iter()
         .map(|&(id, name, ty)| MirLocal {
             id: MirLocalId(id),
@@ -170,7 +170,6 @@ fn device_function(
             .find(|&&(id, _, _)| id == wanted)
             .map_or(return_ty, |&(_, _, ty)| ty)
     };
-    let _ = &mut locals;
     MirFunction {
         id: MirFunctionId(id),
         source: None,
