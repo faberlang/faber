@@ -268,18 +268,13 @@ fn vector_spec(
     })
 }
 
-/// Round `offset` up to `align` (a power of two).
-fn align_up(offset: u32, align: u32) -> u32 {
-    offset.next_multiple_of(align)
-}
-
 /// The shared C-style packer. Fields are placed in the given order.
 fn pack_fields(specs: &[FieldSpec]) -> Result<MirStructLayout, StructLayoutRefusal> {
     let mut fields = Vec::with_capacity(specs.len());
     let mut offset = 0u32;
     let mut struct_align = 1u32;
     for spec in specs {
-        let at = align_up(offset, spec.align);
+        let at = offset.next_multiple_of(spec.align);
         fields.push(MirStructField {
             name: spec.name,
             offset: at,
@@ -290,7 +285,7 @@ fn pack_fields(specs: &[FieldSpec]) -> Result<MirStructLayout, StructLayoutRefus
         offset = at + spec.size;
         struct_align = struct_align.max(spec.align);
     }
-    let size = align_up(offset, struct_align);
+    let size = offset.next_multiple_of(struct_align);
     if size > MAX_STRUCT_LAYOUT_BYTES {
         return Err(StructLayoutRefusal::TooLarge);
     }
