@@ -491,6 +491,19 @@ fn implicit_widening_never_crosses_integer_into_float() {
 }
 
 #[test]
+fn policy_words_never_implicitly_assign_across_their_family() {
+    let mut types = TypeTable::new();
+    let plain = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let modular = types.intern(crate::Type::ModularWord(NumericWidth::U32));
+    let saturating = types.intern(crate::Type::SaturatingWord(NumericWidth::U32));
+    assert!(types.is_assignable(modular, modular));
+    assert!(types.is_assignable(saturating, saturating));
+    assert!(!types.is_assignable(plain, modular));
+    assert!(!types.is_assignable(modular, plain));
+    assert!(!types.is_assignable(modular, saturating));
+}
+
+#[test]
 fn conversio_widening_keeps_signed_into_f64_but_not_u64() {
     use NumericWidth::{F64, I32, I64, U64};
     assert!(NumericWidth::is_conversio_widening(I32, F64));

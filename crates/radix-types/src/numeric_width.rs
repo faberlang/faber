@@ -1020,37 +1020,40 @@ pub fn tensor_method_requires_numeric_element(method_name: &str) -> bool {
     )
 }
 
-/// Whether two numeric types are assignable via equality or widening.
-#[must_use]
-pub fn is_numeric_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
-    // WHY: modular and saturating words share an integer carrier with `numerus`, but their
-    // arithmetic policy is part of the type family. Only explicit `↦`
-    // conversion can cross that boundary.
+/// The effective widths of two numeric types that share one arithmetic policy
+/// family; `None` on a policy mismatch or a non-numeric side.
+///
+/// WHY: modular and saturating words share an integer carrier with `numerus`,
+/// but their arithmetic policy is part of the type family. Only an explicit
+/// `↦` conversion can cross that boundary.
+fn same_family_widths(
+    types: &TypeTable,
+    from: TypeId,
+    to: TypeId,
+) -> Option<(NumericWidth, NumericWidth)> {
     if is_modular_word(types, from) != is_modular_word(types, to)
         || is_saturating_word(types, from) != is_saturating_word(types, to)
     {
-        return false;
+        return None;
     }
-    let from_w = effective_width(types, from);
-    let to_w = effective_width(types, to);
-    match (from_w, to_w) {
-        (Some(a), Some(b)) => NumericWidth::is_widening_assignable(a, b),
-        _ => false,
+    match (effective_width(types, from), effective_width(types, to)) {
+        (Some(a), Some(b)) => Some((a, b)),
+        _ => None,
     }
+}
+
+/// Whether two numeric types are assignable via equality or widening.
+#[must_use]
+pub fn is_numeric_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
+    same_family_widths(types, from, to)
+        .is_some_and(|(a, b)| NumericWidth::is_widening_assignable(a, b))
 }
 
 /// Whether `from` -> `to` is ordinary widening for an explicit `↦` (looser
 /// than implicit assignability: signed integers may convert into `f64`).
 fn is_numeric_conversio_widening(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
-    if is_modular_word(types, from) != is_modular_word(types, to)
-        || is_saturating_word(types, from) != is_saturating_word(types, to)
-    {
-        return false;
-    }
-    match (effective_width(types, from), effective_width(types, to)) {
-        (Some(a), Some(b)) => NumericWidth::is_conversio_widening(a, b),
-        _ => false,
-    }
+    same_family_widths(types, from, to)
+        .is_some_and(|(a, b)| NumericWidth::is_conversio_widening(a, b))
 }
 
 fn is_saturating_word(types: &TypeTable, ty: TypeId) -> bool {
