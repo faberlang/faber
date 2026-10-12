@@ -167,7 +167,7 @@ fn plan_sibling_target_instances(
         return;
     }
 
-    run_sibling_concrete_gates(target_path, target, errors);
+    run_concrete_gates(target_path, &mut target.analysis, errors);
 
     for (_, instance) in report.instance_defs {
         let synthetic = DefId(links.next_synthetic);
@@ -199,29 +199,29 @@ fn plan_sibling_target_instances(
     }
 }
 
-/// Run the concrete-only unroll and AIR-purity gates over a target whose
+/// Run the concrete-only unroll and AIR-purity gates over an analysis whose
 /// ordinary semantic pipeline has already completed.
-fn run_sibling_concrete_gates(
+fn run_concrete_gates(
     target_path: &Path,
-    target: &mut crate::analyze::AnalyzedProgramNode,
+    analysis: &mut radix_module::driver::AnalyzedModule,
     errors: &mut Vec<Diagnostic>,
 ) {
     if let Err(instance_errors) = radix_module::semantic::passes::air_unroll::unroll(
-        &mut target.analysis.hir,
-        &mut target.analysis.presentation,
-        &target.analysis.radix_lanes,
-        &mut target.analysis.interner,
-        &target.analysis.types,
+        &mut analysis.hir,
+        &mut analysis.presentation,
+        &analysis.radix_lanes,
+        &mut analysis.interner,
+        &analysis.types,
     ) {
         errors.extend(instance_errors.into_iter().map(|error| {
             Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
         }));
     }
     if let Err(instance_errors) = radix_module::semantic::passes::air_purity::check(
-        &mut target.analysis.hir,
-        &mut target.analysis.radix_lanes,
-        &mut target.analysis.interner,
-        &target.analysis.types,
+        &mut analysis.hir,
+        &mut analysis.radix_lanes,
+        &mut analysis.interner,
+        &analysis.types,
     ) {
         errors.extend(instance_errors.into_iter().map(|error| {
             Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
@@ -429,27 +429,7 @@ fn plan_instances_in_library_analysis(
     // The library's ordinary semantic pipeline has already run; the newly
     // materialized clones must pass the same concrete-only gates before the
     // package lowers the library unit to AIR/MIR.
-    if let Err(instance_errors) = radix_module::semantic::passes::air_unroll::unroll(
-        &mut analysis.hir,
-        &mut analysis.presentation,
-        &analysis.radix_lanes,
-        &mut analysis.interner,
-        &analysis.types,
-    ) {
-        semantic_errors.extend(instance_errors.into_iter().map(|error| {
-            Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
-        }));
-    }
-    if let Err(instance_errors) = radix_module::semantic::passes::air_purity::check(
-        &mut analysis.hir,
-        &mut analysis.radix_lanes,
-        &mut analysis.interner,
-        &analysis.types,
-    ) {
-        semantic_errors.extend(instance_errors.into_iter().map(|error| {
-            Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
-        }));
-    }
+    run_concrete_gates(target_path, analysis, semantic_errors);
 
     let mut companions = HashMap::new();
     for (_, instance) in &report.instance_defs {
@@ -676,13 +656,11 @@ fn request_for_target(
             .map(|(binding, param)| {
                 let witness =
                     rehome_witness(binding.witness, &source_types, target_types, &mut imported)?;
-                (binding_sort(param.kind) == witness_sort(witness)).then_some(
-                    ResolvedGenericBinding {
-                        name: param.name,
-                        source: binding.source,
-                        witness,
-                    },
-                )
+                (param.kind == witness_sort(witness)).then_some(ResolvedGenericBinding {
+                    name: param.name,
+                    source: binding.source,
+                    witness,
+                })
             })
             .collect();
     }
@@ -768,10 +746,6 @@ fn intern_index_canonical(target: &mut TypeTable, expr: IndexExpr) -> IndexId {
         .filter_map(|raw| u32::try_from(raw).ok().map(IndexId))
         .find(|id| target.get_index(*id) == &expr)
         .unwrap_or_else(|| target.intern_index(expr))
-}
-
-fn binding_sort(kind: GenericParamKind) -> GenericParamKind {
-    kind
 }
 
 fn witness_sort(witness: GenericWitness) -> GenericParamKind {

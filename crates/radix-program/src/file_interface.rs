@@ -358,25 +358,14 @@ fn snapshot_enum(
                 .fields
                 .iter()
                 .map(|field| {
-                    snapshot_interface_type_with_identity(
+                    snapshot_public_field(
+                        field.name,
                         field.ty,
-                        &analysis.types,
-                        &analysis.interner,
-                        &analysis.resolver,
-                        export_identity.map(identity_for).as_ref(),
+                        analysis,
+                        file_label,
+                        analysis.interner.resolve(variant.name),
+                        export_identity,
                     )
-                    .map(|ty| InterfaceStructField {
-                        name: analysis.interner.resolve(field.name).to_owned(),
-                        ty,
-                        optional: false,
-                        required: true,
-                        default: None,
-                        modifier: None,
-                        visibility: MemberVisibility::Publica,
-                    })
-                    .map_err(|err| {
-                        interface_error(file_label, &variant_name(analysis, variant), err)
-                    })
                 })
                 .collect::<Result<Vec<_>, Diagnostic>>()?;
             Ok(InterfaceEnumVariant {
@@ -389,23 +378,14 @@ fn snapshot_enum(
         .commune_fields
         .iter()
         .map(|field| {
-            snapshot_interface_type_with_identity(
+            snapshot_public_field(
+                field.name,
                 field.ty,
-                &analysis.types,
-                &analysis.interner,
-                &analysis.resolver,
-                export_identity.map(identity_for).as_ref(),
+                analysis,
+                file_label,
+                &name,
+                export_identity,
             )
-            .map(|ty| InterfaceStructField {
-                name: analysis.interner.resolve(field.name).to_owned(),
-                ty,
-                optional: false,
-                required: true,
-                default: None,
-                modifier: None,
-                visibility: MemberVisibility::Publica,
-            })
-            .map_err(|err| interface_error(file_label, &name, err))
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
     Ok(InterfaceNominalExport {
@@ -418,8 +398,32 @@ fn snapshot_enum(
     })
 }
 
-fn variant_name(analysis: &AnalyzedModule, variant: &radix_module::hir::HirVariant) -> String {
-    analysis.interner.resolve(variant.name).to_owned()
+/// Snapshot one public payload field shared by enum variants and communes.
+fn snapshot_public_field(
+    field_name: radix_module::lexer::Symbol,
+    field_ty: radix_module::semantic::TypeId,
+    analysis: &AnalyzedModule,
+    file_label: &str,
+    label: &str,
+    export_identity: Option<&ExportIdentityContext>,
+) -> Result<InterfaceStructField, Diagnostic> {
+    snapshot_interface_type_with_identity(
+        field_ty,
+        &analysis.types,
+        &analysis.interner,
+        &analysis.resolver,
+        export_identity.map(identity_for).as_ref(),
+    )
+    .map(|ty| InterfaceStructField {
+        name: analysis.interner.resolve(field_name).to_owned(),
+        ty,
+        optional: false,
+        required: true,
+        default: None,
+        modifier: None,
+        visibility: MemberVisibility::Publica,
+    })
+    .map_err(|err| interface_error(file_label, label, err))
 }
 
 fn identity_for(ctx: &ExportIdentityContext) -> InterfaceLibraryIdentity {

@@ -1,10 +1,9 @@
 //! Typed dense element storage for runner tensors (design:
 //! `docs/factory/gpu-reset/typed-dense-storage-design.md`, unit U0).
 //!
-//! This module introduces the storage type only. No tensor is built on it yet;
-//! U1 swaps `TensorValue::data` over. Reads and writes reproduce what the
-//! runner does today with `Vec<Value>` elements and what the device mirror
-//! does with `ScalarKind::{encode, decode}`:
+//! `TensorValue::data` holds a `DenseCell`; reads and writes reproduce what the
+//! runner does with `Vec<Value>` elements and what the device mirror does with
+//! `ScalarKind::{encode, decode}`:
 //!
 //! - an `F32` cell stores `value as f32` (round-to-nearest, overflow to
 //!   infinity) and reads back as `Value::Float(f64::from(x))`;
@@ -13,11 +12,6 @@
 //!   out-of-range or wrong-carrier value is refused (`set` returns `false`);
 //! - the byte view is the little-endian layout of the element array, one
 //!   `bool` per byte as `0`/`1`.
-
-// WHY: U1 migrates `TensorValue::data` onto `DenseCell` behind shims; the typed
-// constructors, slices, byte views and `Bool` kind are exercised by tests until
-// U2-U4 add production callers, so the allow stays for what is still unused.
-#![allow(dead_code)]
 
 use crate::value::Value;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
@@ -401,10 +395,6 @@ impl DenseStorage {
     }
 }
 
-fn owned_bytes(bytes: Cow<'_, [u8]>) -> Vec<u8> {
-    bytes.into_owned()
-}
-
 fn store<T>(items: &mut [T], index: usize, value: Option<T>) -> Option<()> {
     let value = value?;
     *items.get_mut(index)? = value;
@@ -627,7 +617,7 @@ impl DenseCell {
 
     /// Owned copy of the little-endian bytes of the element `range`.
     pub fn as_le_bytes(&self, range: Range<usize>) -> Option<Vec<u8>> {
-        self.with_le_bytes(range, owned_bytes)
+        self.with_le_bytes(range, |bytes| bytes.into_owned())
     }
 
     /// See [`DenseStorage::write_le_bytes`].

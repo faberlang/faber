@@ -1,5 +1,3 @@
-#![allow(clippy::map_unwrap_or)]
-
 //! Target-directed `↦` conversion for the MIR runner.
 //!
 //! WHY: MIR validation proves `MirConversion.target_ty`; guessing from the
