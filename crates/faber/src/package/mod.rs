@@ -386,9 +386,9 @@ pub fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
     ))
 }
 
-/// Test probe: how many times this thread built the package-preparation
-/// library cache. Every package preparation builds it once per MIR link, so the
-/// count measures "how many times was the package prepared".
+// Test probe: how many times this thread built the package-preparation
+// library cache. Every package preparation builds it once per MIR link, so the
+// count measures "how many times was the package prepared".
 #[cfg(test)]
 thread_local! {
     pub(crate) static LIBRARY_CACHE_BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
