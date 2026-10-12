@@ -298,9 +298,6 @@ pub(super) fn local_namespace_call_targets(
 
     if consumer == PackageMirConsumer::Interpreted {
         link_nested_library_imports(&mut links, library_resolver, library_cache);
-    }
-
-    if consumer == PackageMirConsumer::Interpreted {
         // FMIR e2e-hardening (CTO-1): link genus-method call targets for
         // methods on linked library nominals (receiver.method(args) →
         // Path(synthetic)(receiver, args)). Runs after the library closure is
@@ -514,39 +511,28 @@ fn link_sibling_import_items(
     product: &str,
 ) {
     for import_item in &import.items {
-        link_import_item_to_sibling(links, unit, import_item, sibling, product);
+        // Derive the caller's exports under the item's effective binding; each
+        // target is keyed by `(unit, import item def, member)`.
+        let binding = unit
+            .analysis
+            .interner
+            .resolve(import_item.alias.unwrap_or(import_item.name));
+        let exports = unit
+            .namespace_exports
+            .get(binding)
+            .cloned()
+            .unwrap_or_default()
+            .into_keys()
+            .collect::<BTreeSet<_>>();
+        link_sibling_import_item(
+            links,
+            &unit.path,
+            import_item.def_id,
+            sibling,
+            &exports,
+            product,
+        );
     }
-}
-
-/// Link one import item of a package-owned sibling: derive the caller's
-/// exports under the item's effective binding and hand them to
-/// [`link_sibling_import_item`].
-fn link_import_item_to_sibling(
-    links: &mut PackageMirLinkAccumulator,
-    unit: &AnalyzedProgramNode,
-    import_item: &radix_module::hir::HirImportItem,
-    sibling: &AnalyzedProgramNode,
-    product: &str,
-) {
-    let binding = unit
-        .analysis
-        .interner
-        .resolve(import_item.alias.unwrap_or(import_item.name));
-    let exports = unit
-        .namespace_exports
-        .get(binding)
-        .cloned()
-        .unwrap_or_default()
-        .into_keys()
-        .collect::<BTreeSet<_>>();
-    link_sibling_import_item(
-        links,
-        &unit.path,
-        import_item.def_id,
-        sibling,
-        &exports,
-        product,
-    );
 }
 
 fn link_sibling_import_item(
@@ -965,15 +951,13 @@ fn link_library_method_targets(
                     continue;
                 };
                 // Find the source struct item (methods carry the def ids).
-                let Some(struct_item) = analysis.hir.items.iter().find(|item| {
+                let Some(strukt) = analysis.hir.items.iter().find_map(|item| {
                     let HirItemKind::Struct(strukt) = &item.kind else {
-                        return false;
+                        return None;
                     };
-                    analysis.interner.resolve(strukt.name) == struct_export.name
+                    (analysis.interner.resolve(strukt.name) == struct_export.name)
+                        .then_some(strukt)
                 }) else {
-                    continue;
-                };
-                let HirItemKind::Struct(strukt) = &struct_item.kind else {
                     continue;
                 };
                 for method in &strukt.methods {
@@ -1486,6 +1470,32 @@ pub(super) fn rewrite_stmt(
     }
 }
 
+/// The synthetic direct call that replaces a linked namespace call.
+///
+/// Explicit call-site type arguments ride the rewritten direct call so
+/// same-module generic lowering runs. Inferred call sites carry empty
+/// `type_args` (semantic lowering writes HIR type args only for spelled
+/// `<...>` arguments), so one forward covers both forms.
+fn synthetic_namespace_call_kind(
+    receiver: &HirExpression,
+    target_def: DefId,
+    type_args: &mut Vec<radix_types::TypeId>,
+    args: &mut Vec<HirCallArg>,
+) -> HirExpressionKind {
+    let callee = HirExpression {
+        id: receiver.id,
+        kind: HirExpressionKind::Path(target_def),
+        ty: None,
+        span: receiver.span,
+    };
+    HirExpressionKind::Call(
+        Box::new(callee),
+        std::mem::take(type_args),
+        std::mem::take(args),
+        None,
+    )
+}
+
 pub(super) fn rewrite_expr(
     unit_path: &Path,
     expr: &mut HirExpression,
@@ -1584,22 +1594,8 @@ pub(super) fn rewrite_expr(
                 if let Some(target_def) =
                     namespace_call_target(unit_path, receiver, *method, interner, targets)
                 {
-                    // Forward explicit call-site type arguments onto the
-                    // rewritten direct call so the same-module generic
-                    // lowering runs. Inferred call sites carry empty
-                    // `type_args` (the semantic lowering writes HIR type
-                    // args only for spelled `<...>` arguments), so one
-                    // forward covers both forms.
-                    let call_type_args = std::mem::take(type_args);
-                    let call_args = std::mem::take(args);
-                    let callee = HirExpression {
-                        id: receiver.id,
-                        kind: HirExpressionKind::Path(target_def),
-                        ty: None,
-                        span: receiver.span,
-                    };
                     expr.kind =
-                        HirExpressionKind::Call(Box::new(callee), call_type_args, call_args, None);
+                        synthetic_namespace_call_kind(receiver, target_def, type_args, args);
                     return;
                 }
                 if let Some(message) =
@@ -1666,19 +1662,7 @@ pub(super) fn rewrite_expr(
             if let Some(target_def) =
                 namespace_call_target(unit_path, receiver, *method, interner, targets)
             {
-                // Same forward-on-rewrite as the `Call` branch: explicit
-                // type arguments ride the rewritten direct call; inferred
-                // call sites arrive with empty `type_args`.
-                let call_type_args = std::mem::take(type_args);
-                let call_args = std::mem::take(args);
-                let callee = HirExpression {
-                    id: receiver.id,
-                    kind: HirExpressionKind::Path(target_def),
-                    ty: None,
-                    span: receiver.span,
-                };
-                expr.kind =
-                    HirExpressionKind::Call(Box::new(callee), call_type_args, call_args, None);
+                expr.kind = synthetic_namespace_call_kind(receiver, target_def, type_args, args);
             } else if let Some(message) =
                 namespace_call_diagnostic(unit_path, receiver, *method, interner, namespaces)
             {
@@ -2862,6 +2846,22 @@ impl LibraryMethodCallRewriter<'_> {
     }
 }
 
+/// Replace a rewritten method call in place with its synthetic direct-call
+/// form, keeping the original expression's id, type and span.
+fn replace_with_synthetic_call(
+    expr: &mut HirExpression,
+    callee: HirExpression,
+    type_args: Vec<radix_types::TypeId>,
+    args: Vec<HirCallArg>,
+) {
+    *expr = HirExpression {
+        id: expr.id,
+        kind: HirExpressionKind::Call(Box::new(callee), type_args, args, None),
+        ty: expr.ty,
+        span: expr.span,
+    };
+}
+
 impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         match &mut expr.kind {
@@ -2869,12 +2869,7 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
                 if let Some((callee, type_args, args)) =
                     self.synthetic_call_parts(receiver, *method, type_args, args)
                 {
-                    *expr = HirExpression {
-                        id: expr.id,
-                        kind: HirExpressionKind::Call(Box::new(callee), type_args, args, None),
-                        ty: expr.ty,
-                        span: expr.span,
-                    };
+                    replace_with_synthetic_call(expr, callee, type_args, args);
                 }
             }
             HirExpressionKind::Call(callee, type_args, args, _) => {
@@ -2888,12 +2883,7 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
                 if let Some((new_callee, type_args, args)) =
                     self.synthetic_call_parts(receiver, method, type_args, args)
                 {
-                    *expr = HirExpression {
-                        id: expr.id,
-                        kind: HirExpressionKind::Call(Box::new(new_callee), type_args, args, None),
-                        ty: expr.ty,
-                        span: expr.span,
-                    };
+                    replace_with_synthetic_call(expr, new_callee, type_args, args);
                 }
             }
             _ => {}
