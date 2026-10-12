@@ -129,25 +129,10 @@ fn octeti_bytes(value: &Value) -> Option<Vec<u8>> {
 fn reply_to_values(reply: Reply) -> Vec<Value> {
     match reply {
         Reply::Unit => Vec::new(),
-        Reply::Bool(value) => vec![Value::Bool(value)],
-        Reply::Int(value) => vec![Value::Int(value)],
-        Reply::Float(value) => vec![Value::Float(value)],
-        Reply::Str(value) => vec![Value::Str(value)],
-        Reply::Bytes(value) => vec![Value::Octeti(value)],
+        // `Strs` is the only terminal that expands to several content items;
+        // every other reply maps to at most one value.
         Reply::Strs(values) => values.into_iter().map(Value::Str).collect(),
-        Reply::Map(fields) => {
-            let mut map = FxHashMap::default();
-            for (key, value) in fields {
-                let Some(item) = reply_to_value(value) else {
-                    continue;
-                };
-                map.insert(MapKey::Str(key), item);
-            }
-            vec![Value::Map(Rc::new(RefCell::new(map)))]
-        }
-        Reply::List(items) => vec![Value::Array(Rc::new(RefCell::new(
-            items.into_iter().filter_map(reply_to_value).collect(),
-        )))],
+        other => reply_to_value(other).into_iter().collect(),
     }
 }
 
