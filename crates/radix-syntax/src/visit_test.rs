@@ -2,9 +2,9 @@ use super::{DepthExceeded, MAX_VISIT_DEPTH, Visitor, walk_expr, walk_stmt, walk_
 use crate::TypeFormLevel;
 use crate::{AstMutability, ExField, PathPattern};
 use crate::{
-    BinOp, BinaryExpr, BlockStmt, CapeClause, CasuArm, DiscerneStmt, Expr, ExprKind, FuncDecl, Ident,
-    IfBody, Literal, Pattern, PatternBind, ProbandumBody, ProbandumDecl, SiStmt, Stmt, StmtKind,
-    TypeExpr, TypeExprKind,
+    BinOp, BinaryExpr, BlockStmt, CapeClause, CasuArm, DiscerneStmt, Expr, ExprKind, FuncDecl,
+    Ident, IfBody, Literal, Pattern, PatternBind, ProbandumBody, ProbandumDecl, SiStmt, Stmt,
+    StmtKind, TypeExpr, TypeExprKind,
 };
 use crate::{PraeparaBlock, PraeparaKind};
 use radix_lexer::{Span, Symbol};
