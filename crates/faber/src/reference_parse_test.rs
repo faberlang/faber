@@ -59,3 +59,19 @@ incipit {}
     let entry = entry_from_exempla("ok.fab", source, "x").expect("extra keys ok");
     assert_eq!(entry.term, "x");
 }
+
+#[test]
+fn entry_body_wraps_prose_and_fab_block() {
+    let source = r#"+++
+term = "x"
+kind = "keyword"
+category = "t"
+summary = "S"
+syntax = "x"
++++
+# Prose line
+incipit {}
+"#;
+    let entry = entry_from_exempla("ok.fab", source, "x").expect("entry");
+    assert_eq!(entry.body, "Prose line\n\n```fab\nincipit {}\n```\n");
+}

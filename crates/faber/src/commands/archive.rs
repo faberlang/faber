@@ -183,7 +183,6 @@ fn safe_archive_path(name: &str) -> Result<PathBuf, ()> {
     for component in path.components() {
         match component {
             Component::Normal(part) => out.push(part),
-            Component::CurDir if out.as_os_str().is_empty() => {}
             Component::CurDir => {}
             Component::ParentDir | Component::RootDir | Component::Prefix(_) => return Err(()),
         }

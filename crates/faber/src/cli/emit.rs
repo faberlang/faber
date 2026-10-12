@@ -1,6 +1,7 @@
-//! `faber emit` CLI shapes, including the forma-backed Faber target.
+//! `faber emit` CLI shapes, including the HIR-backed Faber target.
 
 use clap::{Args, ValueEnum};
+use radix::module::codegen::Target;
 use std::path::PathBuf;
 
 /// Parsed `faber emit` command payload after clap normalization.
@@ -151,31 +152,31 @@ impl FaberCliTarget {
     }
 
     /// Convert to the radix backend target.
-    pub fn to_radix(self) -> radix::module::codegen::Target {
+    pub fn to_radix(self) -> Target {
         match self {
-            FaberCliTarget::HirFaber => radix::module::codegen::Target::HirFaber,
-            FaberCliTarget::HirRust => radix::module::codegen::Target::HirRust,
-            FaberCliTarget::HirTypeScript => radix::module::codegen::Target::HirTypeScript,
-            FaberCliTarget::HirGo => radix::module::codegen::Target::HirGo,
-            FaberCliTarget::HirPython => radix::module::codegen::Target::HirPython,
-            FaberCliTarget::HirHaskell => radix::module::codegen::Target::HirHaskell,
-            FaberCliTarget::HirPascal => radix::module::codegen::Target::HirPascal,
-            FaberCliTarget::HirCobol => radix::module::codegen::Target::HirCobol,
-            FaberCliTarget::HirFortran => radix::module::codegen::Target::HirFortran,
-            FaberCliTarget::HirOdin => radix::module::codegen::Target::HirOdin,
-            FaberCliTarget::MirWasm => radix::module::codegen::Target::MirWasm,
-            FaberCliTarget::MirLlvm => radix::module::codegen::Target::MirLlvm,
-            FaberCliTarget::MirMetal => radix::module::codegen::Target::MirMetal,
-            FaberCliTarget::MirWgsl => radix::module::codegen::Target::MirWgsl,
-            FaberCliTarget::MirSexp => radix::module::codegen::Target::MirSexp,
-            FaberCliTarget::MirBasic => radix::module::codegen::Target::MirBasic,
-            FaberCliTarget::HirSwift => radix::module::codegen::Target::HirSwift,
-            FaberCliTarget::HirFhir => radix::module::codegen::Target::HirFhir,
-            FaberCliTarget::MirLlvmHost => radix::module::codegen::Target::MirLlvmHost,
-            FaberCliTarget::MirScena => radix::module::codegen::Target::MirScena,
-            FaberCliTarget::MirFmir => radix::module::codegen::Target::MirFmir,
-            FaberCliTarget::MirFmirBinary => radix::module::codegen::Target::MirFmirBinary,
-            FaberCliTarget::MirFmirBundle => radix::module::codegen::Target::MirFmirBundle,
+            FaberCliTarget::HirFaber => Target::HirFaber,
+            FaberCliTarget::HirRust => Target::HirRust,
+            FaberCliTarget::HirTypeScript => Target::HirTypeScript,
+            FaberCliTarget::HirGo => Target::HirGo,
+            FaberCliTarget::HirPython => Target::HirPython,
+            FaberCliTarget::HirHaskell => Target::HirHaskell,
+            FaberCliTarget::HirPascal => Target::HirPascal,
+            FaberCliTarget::HirCobol => Target::HirCobol,
+            FaberCliTarget::HirFortran => Target::HirFortran,
+            FaberCliTarget::HirOdin => Target::HirOdin,
+            FaberCliTarget::MirWasm => Target::MirWasm,
+            FaberCliTarget::MirLlvm => Target::MirLlvm,
+            FaberCliTarget::MirMetal => Target::MirMetal,
+            FaberCliTarget::MirWgsl => Target::MirWgsl,
+            FaberCliTarget::MirSexp => Target::MirSexp,
+            FaberCliTarget::MirBasic => Target::MirBasic,
+            FaberCliTarget::HirSwift => Target::HirSwift,
+            FaberCliTarget::HirFhir => Target::HirFhir,
+            FaberCliTarget::MirLlvmHost => Target::MirLlvmHost,
+            FaberCliTarget::MirScena => Target::MirScena,
+            FaberCliTarget::MirFmir => Target::MirFmir,
+            FaberCliTarget::MirFmirBinary => Target::MirFmirBinary,
+            FaberCliTarget::MirFmirBundle => Target::MirFmirBundle,
         }
     }
 }

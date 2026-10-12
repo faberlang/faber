@@ -264,9 +264,10 @@ fn rank_two_literal_target(
     target: TypeId,
     types: &TypeTable,
 ) -> Result<RankTwoLiteralTarget, RectangularListaLiteralError> {
-    if !matches!(normalized_type(target, types), Type::Tensor(_, _)) {
+    let Type::Tensor(elem, _) = normalized_type(target, types) else {
         return Err(RectangularListaLiteralError::NonNestedLiteral);
-    }
+    };
+    let elem = *elem;
     let ListaToTensorShape::Literal(dims) = resolve_lista_to_tensor_shape(target, types)
         .ok_or(RectangularListaLiteralError::NonLiteralTarget)?
     else {
@@ -278,21 +279,11 @@ fn rank_two_literal_target(
     let rows = dim_to_usize(dims[0])?;
     let cols = dim_to_usize(dims[1])?;
     Ok(RankTwoLiteralTarget {
-        elem: tensor_element(target, types)?,
+        elem,
         rows,
         cols,
         dims,
     })
-}
-
-fn tensor_element(
-    target: TypeId,
-    types: &TypeTable,
-) -> Result<TypeId, RectangularListaLiteralError> {
-    match normalized_type(target, types) {
-        Type::Tensor(elem, _) => Ok(*elem),
-        _ => Err(RectangularListaLiteralError::NonNestedLiteral),
-    }
 }
 
 fn collect_literal_row_leaves<'a>(

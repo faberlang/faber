@@ -129,7 +129,7 @@ pub fn collect(
                             .define_variant(enum_def, member.name.name, member.name.span)
                             .is_none()
                     {
-                        duplicate_variant_error(&mut errors, member.name.span);
+                        duplicate_definition_error(&mut errors, member.name.span);
                     }
                 }
             }
@@ -147,7 +147,7 @@ pub fn collect(
                             .define_variant(enum_def, variant.name.name, variant.name.span)
                             .is_none()
                     {
-                        duplicate_variant_error(&mut errors, variant.name.span);
+                        duplicate_definition_error(&mut errors, variant.name.span);
                     }
                 }
             }
@@ -294,18 +294,15 @@ fn define_symbol(
     };
 
     if resolver.define(symbol).is_err() {
-        errors.push(
-            SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
-                .with_arg("issue", "duplicate_definition"),
-        );
+        duplicate_definition_error(errors, span);
         None
     } else {
         Some(def_id)
     }
 }
 
-/// Raise SEM005 for a duplicate variant name within one union.
-fn duplicate_variant_error(errors: &mut Vec<SemanticError>, span: radix_lexer::Span) {
+/// Raise SEM005 for a duplicate top-level or variant definition name.
+fn duplicate_definition_error(errors: &mut Vec<SemanticError>, span: radix_lexer::Span) {
     errors.push(
         SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
             .with_arg("issue", "duplicate_definition"),

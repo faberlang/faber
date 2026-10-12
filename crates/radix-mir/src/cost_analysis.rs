@@ -7,7 +7,9 @@
 //! cost`; [`cost_rollups`] produces the data.
 
 use crate::figura::i64s_from_literal_index;
-use crate::read_analysis::{operand_local, statement_destination, temp_forward_local};
+use crate::read_analysis::{
+    operand_local, statement_destination, statement_destination_place, temp_forward_local,
+};
 use crate::visit::terminator_successors;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirBlockId, MirCallee, MirConversion,
@@ -673,7 +675,7 @@ fn absorb_statement(
         changed |= consider_local(local, src_foldable, params, foldable, tainted_locals);
         return changed;
     }
-    let Some(place) = statement_dest_place(statement) else {
+    let Some(place) = statement_destination_place(statement) else {
         return changed;
     };
     changed |= consider_temp_place(place, src_foldable, foldable, tainted_temps);
@@ -698,17 +700,6 @@ fn statement_source_foldable(
             _ => false,
         },
         MirStatementKind::Call { .. } => false,
-    }
-}
-
-fn statement_dest_place(statement: &MirStatement) -> Option<&MirPlace> {
-    match &statement.kind {
-        MirStatementKind::Assign { place, .. }
-        | MirStatementKind::Construct {
-            destination: place, ..
-        } => Some(place),
-        MirStatementKind::RuntimeCall { destination, .. }
-        | MirStatementKind::Call { destination, .. } => destination.as_ref(),
     }
 }
 

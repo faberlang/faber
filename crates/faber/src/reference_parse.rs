@@ -135,27 +135,28 @@ fn build_entry_body(comment_header: &str, fab_source: &str) -> String {
 
     let fab_source = fab_source.trim();
     if !fab_source.is_empty() {
-        body.push_str("```fab\n");
-        body.push_str(fab_source);
-        if !fab_source.ends_with('\n') {
-            body.push('\n');
-        }
-        body.push_str("```\n");
+        push_fab_block(&mut body, fab_source);
     }
 
     body
+}
+
+/// Append a fenced `fab` block, guaranteeing a trailing newline inside the
+/// fence even when `code` does not end in one.
+fn push_fab_block(body: &mut String, code: &str) {
+    body.push_str("```fab\n");
+    body.push_str(code);
+    if !code.ends_with('\n') {
+        body.push('\n');
+    }
+    body.push_str("```\n");
 }
 
 fn legacy_body(redirect_term: &str, canonical: &str, canonical_entry: &Entry) -> String {
     let mut body =
         format!("`{redirect_term}` is not canonical Faber source. Use `{canonical}`.\n\n");
     if let Some(example) = first_fab_block(&canonical_entry.body) {
-        body.push_str("```fab\n");
-        body.push_str(example);
-        if !example.ends_with('\n') {
-            body.push('\n');
-        }
-        body.push_str("```\n");
+        push_fab_block(&mut body, example);
     } else if !canonical_entry.body.trim().is_empty() {
         body.push_str(&canonical_entry.body);
     }
