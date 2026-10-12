@@ -45,7 +45,7 @@ const ALIAS_NORMALIZATIONS: &[(&str, &str)] = &[
 ];
 
 /// One labeled, canonical segment of an analyzed program.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct MeaningSegment {
     /// Human label for diagnostics (`item 3 (Color)`, `entry`).
     pub label: String,
@@ -54,7 +54,7 @@ pub(crate) struct MeaningSegment {
 }
 
 /// First place where two meaning fingerprints disagree.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct MeaningDifference {
     /// Segment label where the difference starts.
     pub segment: String,
