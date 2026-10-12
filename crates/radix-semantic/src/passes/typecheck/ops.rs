@@ -1456,100 +1456,15 @@ impl TypeChecker<'_> {
             HirBinOp::ApproxEq
             | HirBinOp::ApproxNotEq
             | HirBinOp::FuzzyEq
-            | HirBinOp::FuzzyNotEq => {
-                let lhs_ty = self.check_expr(lhs);
-                let rhs_ty = match self.check_constant_beside_decimal(rhs, lhs_ty) {
-                    Some(ty) => ty,
-                    None => self.check_expr(rhs),
-                };
-                let lhs_ty = self
-                    .check_constant_beside_decimal(lhs, rhs_ty)
-                    .unwrap_or(lhs_ty);
-                if let Some(result) = self.check_lista_compare(op, lhs_ty, rhs_ty, lhs.span) {
-                    return result;
-                }
-                if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
-                    return result;
-                }
-                if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq)
-                    && let Some(result) = self.check_approx_aggregate(op, lhs_ty, rhs_ty, lhs.span)
-                {
-                    return result;
-                }
-                if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty)
-                    && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
-                {
-                    self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
-                }
-                self.bool_type()
-            }
+            | HirBinOp::FuzzyNotEq => self.check_approximate_equality_binary(op, lhs, rhs),
             HirBinOp::Eq
             | HirBinOp::NotEq
             | HirBinOp::StrictEq
             | HirBinOp::StrictNotEq
             | HirBinOp::Is
-            | HirBinOp::IsNot => {
-                let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, false);
-                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
-                    return result;
-                }
-                if !matches!(op, HirBinOp::Is | HirBinOp::IsNot)
-                    && let Some(result) =
-                        self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty)
-                {
-                    return result;
-                }
-                let lhs_is_nil = matches!(
-                    self.types.get(self.resolve_inferred_type(lhs_ty)),
-                    Type::Primitive(Primitive::Nihil)
-                );
-                let rhs_is_nil = matches!(
-                    self.types.get(self.resolve_inferred_type(rhs_ty)),
-                    Type::Primitive(Primitive::Nihil)
-                );
-                if !(lhs_is_nil || rhs_is_nil)
-                    && !self.equality_constant_exempt(lhs, lhs_ty, rhs, rhs_ty)
-                    && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
-                    && !self.word_pair(lhs, rhs)
-                {
-                    self.exact_equality_types_for_operands(lhs, lhs_ty, rhs, rhs_ty, lhs.span);
-                }
-                self.bool_type()
-            }
+            | HirBinOp::IsNot => self.check_equality_binary(op, lhs, rhs),
             HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq => {
-                let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, true);
-                if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
-                    return result;
-                }
-                if let Some(result) = self.check_lista_compare(op, lhs_ty, rhs_ty, lhs.span) {
-                    return result;
-                }
-                if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
-                    return result;
-                }
-                if let Some(result) = self.check_contract_ordering(op, lhs, rhs, lhs_ty, rhs_ty) {
-                    // D1.4: genus/parameter glyphs call `compare`; tuples
-                    // order lexicographically.
-                    return result;
-                }
-                if self.is_instans(lhs_ty) && self.is_instans(rhs_ty) {
-                    self.instans_join(lhs_ty, rhs_ty, lhs.span);
-                } else if self.is_textus(lhs_ty) && self.is_textus(rhs_ty) {
-                    // D1.6: whole-string `textus` order is Unicode code-point order.
-                } else if self.scalar_ordered_text_bin(lhs, rhs, lhs_ty, rhs_ty, lhs.span) {
-                    // Single-scalar Unicode order (Seam B); not lexicographic cord compare.
-                } else if self.word_pair(lhs, rhs) {
-                    // Both sides are values of one `saturating` word, computed
-                    // exactly: they compare by value.
-                } else if self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
-                    // A `wrapping`/`saturating` word beside a constant or a
-                    // plain integer: exact values (rulings 12, 22).
-                } else if self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty) {
-                    // A float cell beside a written constant: exact values.
-                } else {
-                    self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
-                }
-                self.bool_type()
+                self.check_ordering_binary(op, lhs, rhs)
             }
             HirBinOp::InRange | HirBinOp::NotInRange => {
                 let lhs_ty = self.check_expr(lhs);
@@ -1602,6 +1517,126 @@ impl TypeChecker<'_> {
             HirBinOp::TensorProduct => self.check_glyph_tensor_product(op, lhs, rhs),
             HirBinOp::Hadamard | HirBinOp::HadamardDiv => self.check_glyph_hadamard(op, lhs, rhs),
         }
+    }
+
+    /// Operands and admission law of `≅`, `≇`, `≈`, `≉`.
+    ///
+    /// A written constant beside a decimal peer joins the decimal family by
+    /// exact value before the aggregate and value-comparison rules run.
+    fn check_approximate_equality_binary(
+        &mut self,
+        op: HirBinOp,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+    ) -> TypeId {
+        let lhs_ty = self.check_expr(lhs);
+        let rhs_ty = match self.check_constant_beside_decimal(rhs, lhs_ty) {
+            Some(ty) => ty,
+            None => self.check_expr(rhs),
+        };
+        let lhs_ty = self
+            .check_constant_beside_decimal(lhs, rhs_ty)
+            .unwrap_or(lhs_ty);
+        if let Some(result) = self.check_lista_compare(op, lhs_ty, rhs_ty, lhs.span) {
+            return result;
+        }
+        if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
+            return result;
+        }
+        if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq)
+            && let Some(result) = self.check_approx_aggregate(op, lhs_ty, rhs_ty, lhs.span)
+        {
+            return result;
+        }
+        if !self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty)
+            && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
+        {
+            self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
+        }
+        self.bool_type()
+    }
+
+    /// Operands and admission law of `≡`/`≢`, `est`/`non est`.
+    ///
+    /// `nihil` peers and written-constant exemptions skip the exact-type
+    /// rule; every other pair compares its carrier exactly.
+    fn check_equality_binary(
+        &mut self,
+        op: HirBinOp,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+    ) -> TypeId {
+        let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, false);
+        if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+            return result;
+        }
+        if !matches!(op, HirBinOp::Is | HirBinOp::IsNot)
+            && let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty)
+        {
+            return result;
+        }
+        let lhs_is_nil = matches!(
+            self.types.get(self.resolve_inferred_type(lhs_ty)),
+            Type::Primitive(Primitive::Nihil)
+        );
+        let rhs_is_nil = matches!(
+            self.types.get(self.resolve_inferred_type(rhs_ty)),
+            Type::Primitive(Primitive::Nihil)
+        );
+        if !(lhs_is_nil || rhs_is_nil)
+            && !self.equality_constant_exempt(lhs, lhs_ty, rhs, rhs_ty)
+            && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
+            && !self.word_pair(lhs, rhs)
+        {
+            self.exact_equality_types_for_operands(lhs, lhs_ty, rhs, rhs_ty, lhs.span);
+        }
+        self.bool_type()
+    }
+
+    /// Operands and comparison join of `<`, `>`, `≤`, `≥`.
+    ///
+    /// Collection, tensor, contract, and text orderings each have their own
+    /// adapter; the scalar remainder compares exact numeric values through
+    /// [`Self::numeric_ordering_bin`].
+    fn check_ordering_binary(
+        &mut self,
+        op: HirBinOp,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+    ) -> TypeId {
+        let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, true);
+        if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
+            return result;
+        }
+        if let Some(result) = self.check_lista_compare(op, lhs_ty, rhs_ty, lhs.span) {
+            return result;
+        }
+        if let Some(result) = self.check_tensor_lift_compare(op, lhs, rhs, lhs_ty, rhs_ty) {
+            return result;
+        }
+        if let Some(result) = self.check_contract_ordering(op, lhs, rhs, lhs_ty, rhs_ty) {
+            // D1.4: genus/parameter glyphs call `compare`; tuples
+            // order lexicographically.
+            return result;
+        }
+        if self.is_instans(lhs_ty) && self.is_instans(rhs_ty) {
+            self.instans_join(lhs_ty, rhs_ty, lhs.span);
+        } else if self.is_textus(lhs_ty) && self.is_textus(rhs_ty) {
+            // D1.6: whole-string `textus` order is Unicode code-point order.
+        } else if self.scalar_ordered_text_bin(lhs, rhs, lhs_ty, rhs_ty, lhs.span) {
+            // Single-scalar Unicode order (Seam B); not lexicographic cord compare.
+        } else if self.word_pair(lhs, rhs) {
+            // Both sides are values of one `saturating` word, computed
+            // exactly: they compare by value.
+        } else if self.word_value_comparison(lhs, lhs_ty, rhs, rhs_ty) {
+            // A `wrapping`/`saturating` word beside a constant or a
+            // plain integer: exact values (rulings 12, 22).
+        } else if self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty) {
+            // A float cell beside a written constant: exact values.
+        } else {
+            self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
+        }
+        self.bool_type()
     }
 
     /// `·` inner product: contracts the inner dimension(s). vec·vec → scalar;
@@ -1996,35 +2031,45 @@ impl TypeChecker<'_> {
             ) => self
                 .check_lista_hadamard(op, lhs_resolved, rhs_resolved, lhs.span)
                 .unwrap_or(self.error_type),
-            _ => {
-                if let Some(result) =
-                    self.check_queue_stack_hadamard(op, lhs_resolved, rhs_resolved, lhs.span)
-                {
-                    return result;
-                }
-                let kinds = (
-                    self.glyph_aggregate_kind(lhs_resolved),
-                    self.glyph_aggregate_kind(rhs_resolved),
-                );
-                let scalar_peer = match kinds {
-                    (Some(kind), None) if self.is_numeric_scalar(rhs_resolved) => Some(kind),
-                    (None, Some(kind)) if self.is_numeric_scalar(lhs_resolved) => Some(kind),
-                    _ => None,
-                };
-                match scalar_peer {
-                    Some(kind) => self.invalid_operand_types_with_args(
-                        GLYPH_SCALAR_OPERAND,
-                        lhs.span,
-                        &[
-                            ("op", op.glyph_spelling().unwrap_or("?").to_owned()),
-                            ("kind", kind.to_owned()),
-                        ],
-                    ),
-                    None => self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span),
-                }
-                self.error_type
-            }
+            _ => self.check_glyph_hadamard_fallback(op, lhs_resolved, rhs_resolved, lhs.span),
         }
+    }
+
+    /// `⊙`/`⊘` outside the vector/matrix/tensor arms: a queue/stack pair
+    /// takes the elementwise result; everything else reports the aggregate
+    /// scalar peer when one side is an aggregate and the other numeric, or
+    /// the unsupported-operand diagnostic.
+    fn check_glyph_hadamard_fallback(
+        &mut self,
+        op: HirBinOp,
+        lhs_ty: TypeId,
+        rhs_ty: TypeId,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        if let Some(result) = self.check_queue_stack_hadamard(op, lhs_ty, rhs_ty, span) {
+            return result;
+        }
+        let kinds = (
+            self.glyph_aggregate_kind(lhs_ty),
+            self.glyph_aggregate_kind(rhs_ty),
+        );
+        let scalar_peer = match kinds {
+            (Some(kind), None) if self.is_numeric_scalar(rhs_ty) => Some(kind),
+            (None, Some(kind)) if self.is_numeric_scalar(lhs_ty) => Some(kind),
+            _ => None,
+        };
+        match scalar_peer {
+            Some(kind) => self.invalid_operand_types_with_args(
+                GLYPH_SCALAR_OPERAND,
+                span,
+                &[
+                    ("op", op.glyph_spelling().unwrap_or("?").to_owned()),
+                    ("kind", kind.to_owned()),
+                ],
+            ),
+            None => self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, span),
+        }
+        self.error_type
     }
 
     /// Check both glyph operands and resolve; `None` carries an already
@@ -2442,13 +2487,7 @@ impl TypeChecker<'_> {
             None => self.is_unresolved_membership_type(payload, true),
         };
         if unresolved {
-            let found = self.format_type_for_diagnostic(rhs_ty);
-            self.error_issue_with_args(
-                SemanticErrorKind::TypeMismatch,
-                MEMBERSHIP_OPERAND_UNRESOLVED,
-                rhs_span,
-                &[("found", found)],
-            );
+            self.reject_membership_operand(MEMBERSHIP_OPERAND_UNRESOLVED, rhs_ty, rhs_span);
             return;
         }
         match shape {
@@ -2463,24 +2502,26 @@ impl TypeChecker<'_> {
             | Type::BoundedAscii { .. } => {
                 // OD-1: no membership operator over text; the text method is
                 // the one spelling for substring containment.
-                let found = self.format_type_for_diagnostic(rhs_ty);
-                self.error_issue_with_args(
-                    SemanticErrorKind::TypeMismatch,
-                    MEMBERSHIP_OVER_TEXT,
-                    rhs_span,
-                    &[("found", found)],
-                );
+                self.reject_membership_operand(MEMBERSHIP_OVER_TEXT, rhs_ty, rhs_span);
             }
-            _ => {
-                let found = self.format_type_for_diagnostic(rhs_ty);
-                self.error_issue_with_args(
-                    SemanticErrorKind::TypeMismatch,
-                    MEMBERSHIP_REQUIRES_COLLECTION,
-                    rhs_span,
-                    &[("found", found)],
-                );
-            }
+            _ => self.reject_membership_operand(MEMBERSHIP_REQUIRES_COLLECTION, rhs_ty, rhs_span),
         }
+    }
+
+    /// Report a rejected membership right operand with its type as `found`.
+    fn reject_membership_operand(
+        &mut self,
+        issue: &'static str,
+        rhs_ty: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        let found = self.format_type_for_diagnostic(rhs_ty);
+        self.error_issue_with_args(
+            SemanticErrorKind::TypeMismatch,
+            issue,
+            span,
+            &[("found", found)],
+        );
     }
 
     /// Whether a membership right operand (or its element or key type) is an
@@ -2678,7 +2719,3 @@ fn numeric_literal_family(expr: &HirExpression) -> Option<Primitive> {
         _ => None,
     }
 }
-
-// U-04 integration tests live here (not `mod.rs`, which is U-02's frozen
-// surface): the join under a `∪`-hole expectation is owned by this module's
-// `common_type` path and `check_array`/`check_if` sibling callers.
