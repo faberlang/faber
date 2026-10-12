@@ -198,11 +198,7 @@ impl TypeChecker<'_> {
         let actual_dims = Self::shape_dimensions(actual_shape, self.types)?;
         let expected_dims = Self::shape_dimensions(expected_shape, self.types)?;
         if actual_dims.len() != expected_dims.len() {
-            self.error_issue(
-                SemanticErrorKind::TypeMismatch,
-                ISSUE_INCOMPATIBLE_TENSOR_INDEX,
-                span,
-            );
+            self.incompatible_tensor_index(span);
             return Some(Err(()));
         }
 
@@ -218,6 +214,15 @@ impl TypeChecker<'_> {
             unified_dims.first().copied().unwrap_or(actual_shape)
         };
         Some(Ok(unified))
+    }
+
+    /// Report a concrete tensor-shape contradiction at `span`.
+    fn incompatible_tensor_index(&mut self, span: Span) {
+        self.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            span,
+        );
     }
 
     /// Unify a boundary call's or return's shape one axis at a time, retaining
@@ -299,11 +304,7 @@ impl TypeChecker<'_> {
                 if radix_types::evaluate_index_dimension(actual, self.types).is_err()
                     || radix_types::evaluate_index_dimension(expected, self.types).is_err()
                 {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        ISSUE_INCOMPATIBLE_TENSOR_INDEX,
-                        span,
-                    );
+                    self.incompatible_tensor_index(span);
                     return Some(Err(()));
                 }
                 let actual_static = radix_types::evaluate_index_dimension(actual, self.types)
@@ -314,11 +315,7 @@ impl TypeChecker<'_> {
                     .flatten();
                 if let (Some(left), Some(right)) = (actual_static, expected_static) {
                     if left != right {
-                        self.error_issue(
-                            SemanticErrorKind::TypeMismatch,
-                            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
-                            span,
-                        );
+                        self.incompatible_tensor_index(span);
                         return Some(Err(()));
                     }
                     unified_dims.push(self.types.intern_index(IndexExpr::Literal(left)));
