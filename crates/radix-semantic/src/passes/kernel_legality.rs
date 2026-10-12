@@ -170,6 +170,9 @@ pub fn check(
     };
     let mut sink = Sink::default();
     let mut edges: FxHashMap<DefId, Vec<DefId>> = FxHashMap::default();
+    // Built in the same walk: the callback pass below needs every callable
+    // body, not only the kernels checked here.
+    let mut callables: FxHashMap<DefId, (&HirFunction, Span)> = FxHashMap::default();
 
     for item in &hir.items {
         match &item.kind {
@@ -182,6 +185,7 @@ pub fn check(
                     function,
                     item.span,
                 );
+                callables.insert(item.def_id, (function.as_ref(), item.span));
             }
             HirItemKind::Struct(strukt) => {
                 for method in &strukt.methods {
@@ -193,6 +197,7 @@ pub fn check(
                         &method.func,
                         method.span,
                     );
+                    callables.insert(method.def_id, (&method.func, method.span));
                 }
             }
             _ => {}
@@ -215,20 +220,6 @@ pub fn check(
         })
         .flatten()
         .collect();
-    let mut callables: FxHashMap<DefId, (&HirFunction, Span)> = FxHashMap::default();
-    for item in &hir.items {
-        match &item.kind {
-            HirItemKind::Function(function) => {
-                callables.insert(item.def_id, (function.as_ref(), item.span));
-            }
-            HirItemKind::Struct(strukt) => {
-                for method in &strukt.methods {
-                    callables.insert(method.def_id, (&method.func, method.span));
-                }
-            }
-            _ => {}
-        }
-    }
     let mut callback_queue: Vec<DefId> = edges
         .values()
         .flatten()
