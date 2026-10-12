@@ -59,8 +59,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             }
             let carrier = match value {
                 Value::Int(value) => decimal_carrier_value(value, width, span)?,
-                Value::Float(value) => decimal_text_to_carrier(&value.to_string(), width)
-                    .map_err(|error| decimal_text_error(error, span))?,
+                Value::Float(value) => decimal_float_carrier(value, width, span)?,
                 other => {
                     return Err(RunnerError::internal(
                         span,
@@ -104,12 +103,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 return self.materialize_sermo_textus(sermo, recovery, span);
             }
             Value::Octeti(bytes) => {
-                return match String::from_utf8(bytes) {
-                    Ok(text) => Ok(Value::Str(text)),
-                    Err(_) => {
-                        self.recover_or_fail(recovery, span, "octeti to textus conversion failed")
-                    }
-                };
+                return self.decode_textus_octeti(bytes, recovery, span);
             }
             Value::Array(items) => {
                 // `octeti` is semantically bidirectionally assignable with
@@ -134,12 +128,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                         "octeti to textus conversion failed",
                     );
                 };
-                return match String::from_utf8(bytes) {
-                    Ok(text) => Ok(Value::Str(text)),
-                    Err(_) => {
-                        self.recover_or_fail(recovery, span, "octeti to textus conversion failed")
-                    }
-                };
+                return self.decode_textus_octeti(bytes, recovery, span);
             }
             other => {
                 return Err(RunnerError::internal(
@@ -148,6 +137,22 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 ));
             }
         }))
+    }
+
+    /// UTF-8 decode shared by the `octeti` and `lista<numerus<u8>>` textus
+    /// arms.
+    fn decode_textus_octeti(
+        &mut self,
+        bytes: Vec<u8>,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        match String::from_utf8(bytes) {
+            Ok(text) => Ok(Value::Str(text)),
+            Err(_) => {
+                self.recover_or_fail(recovery, span, "octeti to textus conversion failed")
+            }
+        }
     }
 
     pub(crate) fn convert_to_numerus_from(
@@ -335,8 +340,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
         let raw = match value {
             Value::Int(value) => decimal_carrier_value(value, source_width, span),
-            Value::Float(value) => decimal_text_to_carrier(&value.to_string(), source_width)
-                .map_err(|error| decimal_text_error(error, span)),
+            Value::Float(value) => decimal_float_carrier(value, source_width, span),
             Value::Sermo(sermo) => {
                 let value = self.sermo_first_item(&sermo, span)?;
                 return self.decimal_integer_value(value, source_width, mode, span);
@@ -669,13 +673,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     let scale = decimal_scale_factor(source_width).ok_or_else(|| {
                         RunnerError::internal(span, "decimal conversion requires decimal width")
                     })?;
-                    (
-                        i128::from(
-                            decimal_text_to_carrier(&value.to_string(), source_width)
-                                .map_err(|error| decimal_text_error(error, span))?,
-                        ),
-                        scale,
-                    )
+                    (i128::from(decimal_float_carrier(value, source_width, span)?), scale)
                 }
                 other => {
                     return Err(RunnerError::internal(
@@ -1435,15 +1433,9 @@ fn decimal_text_error(error: DecimalTextError, span: Span) -> RunnerError {
 }
 
 fn decimal_carrier_value(value: i64, width: NumericWidth, span: Span) -> Result<i64, RunnerError> {
-    let (lo, hi) = int_width_range(width);
-    if (lo..=hi).contains(&i128::from(value)) {
-        Ok(value)
-    } else {
-        Err(RunnerError::internal(
-            span,
-            "decimal carrier is outside declared width",
-        ))
-    }
+    decimal_carrier_from_raw(i128::from(value), width).map_err(|_| {
+        RunnerError::internal(span, "decimal carrier is outside declared width")
+    })
 }
 
 fn decimal_carrier_from_raw(value: i128, width: NumericWidth) -> Result<i64, DecimalTextError> {
@@ -1483,30 +1475,17 @@ fn decimal_text_to_carrier(text: &str, width: NumericWidth) -> Result<i64, Decim
     }
 }
 
+/// The carrier of an `f64` source at a decimal width, parsed through the
+/// shared decimal oracle and mapped to the recoverable conversion error.
+fn decimal_float_carrier(value: f64, width: NumericWidth, span: Span) -> Result<i64, RunnerError> {
+    decimal_text_to_carrier(&value.to_string(), width)
+        .map_err(|error| decimal_text_error(error, span))
+}
+
+/// Render a stored decimal carrier: `d64` is the only decimal width, so its
+/// scale is 8 and the stored-carrier renderer applies unchanged.
 fn format_decimal_carrier(value: i64, width: NumericWidth) -> String {
-    let digits = usize::try_from(width.decimal_scale().unwrap_or(0)).unwrap_or(0);
-    let factor = decimal_scale_factor(width).unwrap_or(1);
-    let value = i128::from(value);
-    let negative = value < 0;
-    let magnitude = if negative { -value } else { value };
-    let integer = magnitude / factor;
-    let remainder = magnitude % factor;
-    if remainder == 0 || digits == 0 {
-        return if negative {
-            format!("-{integer}")
-        } else {
-            integer.to_string()
-        };
-    }
-    let mut fraction = format!("{remainder:0>digits$}");
-    while fraction.ends_with('0') {
-        fraction.pop();
-    }
-    if negative {
-        format!("-{integer}.{fraction}")
-    } else {
-        format!("{integer}.{fraction}")
-    }
+    crate::decimal::format(i128::from(value), width.decimal_scale().unwrap_or(0))
 }
 
 /// `true` when `v` fits the signed range of `width`. Mirrors Rust codegen's
