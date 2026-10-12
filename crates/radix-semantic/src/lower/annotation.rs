@@ -202,22 +202,12 @@ impl Lowerer<'_> {
     fn lower_braced_annotation(&mut self, braced: &BracedAnnotation, span: Span) -> HirAnnotation {
         let family_owned = self.interner.resolve(braced.name.name).to_owned();
 
-        if let Some(nomen) = braced_cli_nomen(braced, self.interner) {
-            return HirAnnotation {
-                family: braced.name.name,
-                fields: vec![HirAnnotationField {
-                    name: self.intern_field_name("nomen"),
-                    value: HirAnnotationValue::String(nomen),
-                    span,
-                }],
-                raw_args: Vec::new(),
-                brace_authored: true,
-                contract_id: None,
-                span,
-            };
-        }
-
-        if let Some(nomen) = braced_imperium_nomen(braced, self.interner) {
+        // Both families lower to the same `nomen` record, so one shared
+        // builder covers `@ cli` and `@ imperium`; the family check inside
+        // each view helper keeps them mutually exclusive.
+        let nomen = braced_cli_nomen(braced, self.interner)
+            .or_else(|| braced_imperium_nomen(braced, self.interner));
+        if let Some(nomen) = nomen {
             return HirAnnotation {
                 family: braced.name.name,
                 fields: vec![HirAnnotationField {
