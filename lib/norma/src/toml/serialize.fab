@@ -13,7 +13,7 @@ fn stringify(value document) → string ⇥ string {
     if document is none then throw "norma:toml.stringify: TOML has no null"
     if document is map<string, value> {
         const map<string, value> fields ↤ document ⊥ empty
-        return encode_table(fields)
+        return encode_document(document)
     }
     throw "norma:toml.stringify: document must be a table"
 }
@@ -80,7 +80,7 @@ fn emit_key(string key) → string {
     return quote(key)
 }
 
-fn encode_scalar(value node) → string {
+fn encode_scalar(value node) → string ⇥ string {
     if node is bool {
         if as_bool(node) then return "true"
         return "false"
@@ -92,19 +92,20 @@ fn encode_scalar(value node) → string {
         const string wire ↤ node ⊥ ""
         return wire
     }
+    if node is none then throw "norma:toml.stringify: TOML has no null"
     do {
         const inf big ↤ node
         return big ↦ string
     }
     catch err {
     }
-    panic "norma:toml.stringify: unsupported scalar"
+    throw "norma:toml.stringify: unsupported scalar"
 }
 
-fn encode_array(list<value> items) → string {
+fn encode_array(list<value> items) → string ⇥ string {
     var list<string> encoded ← empty
     for from items const item {
-        if item is map<string, value> then panic "norma:toml.stringify: inline table arrays use [[tables]]"
+        if item is map<string, value> then throw "norma:toml.stringify: table arrays must be top-level [[tables]]"
         if item is list<value> {
             const list<value> nested ↤ item ⊥ empty
             encoded.append(encode_array(nested))
@@ -116,7 +117,14 @@ fn encode_array(list<value> items) → string {
     return text.join(["[", text.join(encoded, ", "), "]"], "")
 }
 
-fn encode_value(value node) → string {
+fn is_table_array(list<value> items) → bool {
+    for from items const item {
+        if not (item is map<string, value>) then return false
+    }
+    return true
+}
+
+fn encode_value(value node) → string ⇥ string {
     if node is list<value> {
         const list<value> items ↤ node ⊥ empty
         return encode_array(items)
@@ -134,7 +142,7 @@ fn encode_value(value node) → string {
     return encode_scalar(node)
 }
 
-fn encode_table(map<string, value> fields) → string {
+fn encode_members(map<string, value> fields) → string ⇥ string {
     var list<string> keys ← fields.keys()
     keys.sort()
     var list<string> members ← empty
@@ -142,4 +150,35 @@ fn encode_table(map<string, value> fields) → string {
         members.append(text.join([emit_key(key), " = ", encode_value(fields[key])], ""))
     }
     return text.join(members, "\n") + "\n"
+}
+
+fn encode_document(value document) → string ⇥ string {
+    const map<string, value> fields ↤ document ⊥ empty
+    var list<string> keys ← fields.keys()
+    keys.sort()
+    var list<string> members ← empty
+    var list<string> tables ← empty
+    for from keys const key {
+        const value item ↤ fields[key]
+        if item is map<string, value> {
+            const map<string, value> inner ↤ item ⊥ empty
+            tables.append(text.join(["[", emit_key(key), "]\n", encode_members(inner), "\n"], ""))
+        }
+        elif item is list<value> {
+            const list<value> items ↤ item ⊥ empty
+            if is_table_array(items) {
+                for from items const entry {
+                    const map<string, value> inner ↤ entry ⊥ empty
+                    tables.append(text.join(["[[", emit_key(key), "]]\n", encode_members(inner), "\n"], ""))
+                }
+            }
+            else {
+                members.append(text.join([emit_key(key), " = ", encode_value(item)], ""))
+            }
+        }
+        else {
+            members.append(text.join([emit_key(key), " = ", encode_value(item)], ""))
+        }
+    }
+    return text.join(members, "\n") + "\n" + text.join(tables, "")
 }
