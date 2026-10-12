@@ -141,8 +141,7 @@ pub fn scan_template(template: &str) -> TemplateHoleAnalysis {
 }
 
 fn named_hole_at(template: &str, marker_end: usize) -> Option<(&str, usize)> {
-    let rest = template.get(marker_end..)?;
-    if !rest.starts_with('{') {
+    if !template.get(marker_end..)?.starts_with('{') {
         return None;
     }
     let label_start = marker_end + '{'.len_utf8();
@@ -153,13 +152,12 @@ fn named_hole_at(template: &str, marker_end: usize) -> Option<(&str, usize)> {
 }
 
 fn indexed_hole_at(template: &str, marker_end: usize) -> Option<(&str, usize)> {
-    let digits_start = marker_end;
     let bytes = template.as_bytes();
-    let mut end = digits_start;
+    let mut end = marker_end;
     while bytes.get(end).is_some_and(u8::is_ascii_digit) {
         end += 1;
     }
-    (end > digits_start).then_some((&template[digits_start..end], end))
+    (end > marker_end).then_some((&template[marker_end..end], end))
 }
 
 // Keep this predicate aligned with the language's identifier shape without
