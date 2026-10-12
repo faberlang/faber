@@ -128,7 +128,7 @@ fn specialize_with_requests(
     while cursor < work.len() {
         let item = work[cursor].clone();
         cursor += 1;
-        let (template_id, bindings, site) = match item {
+        let (template, template_id, bindings, site) = match item {
             SpecializationWork::Call(site) => {
                 let Some(template) = templates.get(&site.callee) else {
                     continue;
@@ -139,7 +139,7 @@ fn specialize_with_requests(
                 if !bindings_are_concrete(&template.function.type_params, &bindings, types) {
                     continue;
                 }
-                (site.callee, bindings, Some(site))
+                (template, site.callee, bindings, Some(site))
             }
             SpecializationWork::Request(request) => {
                 let Some(template) = templates.get(&request.template) else {
@@ -149,11 +149,8 @@ fn specialize_with_requests(
                 {
                     continue;
                 }
-                (request.template, request.bindings, None)
+                (template, request.template, request.bindings, None)
             }
-        };
-        let Some(template) = templates.get(&template_id) else {
-            continue;
         };
         let key = AirInstanceKey {
             template: template_id,
