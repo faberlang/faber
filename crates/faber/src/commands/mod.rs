@@ -390,8 +390,7 @@ fn dispatch(command: Command) {
 fn cmd_check(args: crate::cli::CheckArgs) {
     reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
     validate_deny_codes(&args.deny);
-    let package_shaped =
-        args.package || package::should_treat_as_package_from_args(&args.input);
+    let package_shaped = args.package || package::should_treat_as_package_from_args(&args.input);
     if args.air {
         // ALA-1: the advisory AIR report is single-file only. Plain
         // `check` routes bare `.fab` files through the package loader;

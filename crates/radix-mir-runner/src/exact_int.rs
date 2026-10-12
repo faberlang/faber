@@ -278,7 +278,8 @@ pub(crate) fn cmp_scaled_float(
     }
     let floor = float.floor();
     let fraction = float - floor; // exact, in [0, 1)
-    #[allow(clippy::cast_possible_truncation)] // `floor` is bounded by the F64_EXACT_LIMIT guard above
+    #[allow(clippy::cast_possible_truncation)]
+    // `floor` is bounded by the F64_EXACT_LIMIT guard above
     let whole = floor as i128;
     let (quotient, remainder) = (floor_div(scaled, scale), floor_rem(scaled, scale));
     match quotient.cmp(&whole) {
