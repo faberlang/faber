@@ -794,6 +794,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Magnus(_) => self.bivalens_from_scalar_truthiness(true, recovery, span),
             Value::Float(v) => self.bivalens_from_scalar_truthiness(v != 0.0, recovery, span),
             Value::Bool(v) => Ok(Value::Bool(v)),
+            Value::Sermo(sermo) => match self.sermo_first_item(&sermo, span) {
+                Ok(value) => self.convert_to_bivalens(value, recovery, span),
+                Err(_) if recovery.is_some() => {
+                    self.recover_or_fail(recovery, span, "sermo to bivalens conversion failed")
+                }
+                Err(error) => Err(error),
+            },
             other => Err(RunnerError::internal(
                 span,
                 format!("unsupported conversio to bivalens from {other:?}"),

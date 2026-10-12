@@ -6,8 +6,6 @@
 
 use super::super::{RunnerError, Value};
 use radix_lexer::Span;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub(crate) fn expect_str(value: &Value, span: Span, label: &str) -> Result<String, RunnerError> {
     match value {
@@ -41,8 +39,21 @@ pub(crate) fn value_lista_to_strings(
         .collect()
 }
 
-pub(crate) fn strings_to_value_lista(items: Vec<String>) -> Value {
-    Value::Array(Rc::new(RefCell::new(
-        items.into_iter().map(Value::Str).collect(),
-    )))
+/// The bytes of an `octeti` argument: the byte value itself, or the
+/// `lista<b8>` array a bit-pattern list arrives as (every element one
+/// unsigned pattern below 256).
+pub(crate) fn octeti_bytes(value: &Value) -> Option<Vec<u8>> {
+    match value {
+        Value::Octeti(bytes) => Some(bytes.clone()),
+        Value::Array(items) => items
+            .borrow()
+            .iter()
+            .map(|item| match item {
+                Value::UInt(v) => u8::try_from(*v).ok(),
+                Value::Int(v) => u8::try_from(*v).ok(),
+                _ => None,
+            })
+            .collect(),
+        _ => None,
+    }
 }

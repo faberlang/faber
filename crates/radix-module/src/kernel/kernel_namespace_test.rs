@@ -91,13 +91,13 @@ fn kernel_manifest_verbs_are_subset_of_norma_public_surface() {
 }
 
 #[test]
-fn manifest_lists_exactly_six_v1_modules() {
+fn manifest_lists_exactly_five_v1_modules() {
     let entries = kernel_manifest_entries();
-    assert_eq!(kernel_module_count(), 6);
-    assert_eq!(entries.len(), 6);
+    assert_eq!(kernel_module_count(), 5);
+    assert_eq!(entries.len(), 5);
 
     let names: Vec<_> = entries.iter().map(|entry| entry.module.name()).collect();
-    assert_eq!(names, ["json", "solum", "processus", "aleator", "consolum", "toml"]);
+    assert_eq!(names, ["json", "processus", "aleator", "consolum", "toml"]);
 
     for entry in entries {
         assert_eq!(entry.import_path, entry.module.import_path());

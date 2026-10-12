@@ -1,0 +1,18 @@
+[package]
+name = "faber-leaf"
+version = "0.1.0"
+edition = "2024"
+description = "Native effect leaves shared by the Faber interpreter and generated Rust (core-norma N2)"
+license = "MIT"
+publish = false
+
+# std-only. No hosts, no async runtime (campaign A2 / Q4 / Q5).
+[dependencies]
+
+# Local lints: this crate is also a path dependency of standalone
+# `runtime/rust`, which is not the radix workspace.
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+
+[dev-dependencies]
+hygiene-ratchet = { path = "../hygiene-ratchet" }

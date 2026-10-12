@@ -50,7 +50,7 @@ fn expect_structured_error<'a>(
 fn known_kernel_imports_pass_validation() {
     let errors = analyze_imports(
         r#"
-importa ex "faber:solum" solum
+importa ex "faber:consolum" consolum
 importa ex "faber:json" json
 importa ex "faber:processus" processus
 importa ex "faber:aleator" aleator

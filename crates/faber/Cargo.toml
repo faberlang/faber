@@ -48,6 +48,8 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 # through zip's deflate backend). Build-time compressor + runtime decoder.
 flate2 = "1"
 handroll = { path = "../handroll" }
+# Shared native leaves (core-norma N2): plan-time `solum:*` classification.
+faber-leaf = { path = "../faber-leaf" }
 
 [build-dependencies]
 flate2 = "1"

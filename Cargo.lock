@@ -340,6 +340,7 @@ name = "faber"
 version = "1.13.0"
 dependencies = [
  "clap",
+ "faber-leaf",
  "flate2",
  "handroll",
  "hygiene-ratchet",
@@ -355,6 +356,13 @@ dependencies = [
  "tempfile",
  "toml",
  "zip",
+]
+
+[[package]]
+name = "faber-leaf"
+version = "0.1.0"
+dependencies = [
+ "hygiene-ratchet",
 ]
 
 [[package]]
@@ -898,6 +906,7 @@ dependencies = [
 name = "radix-mir-runner"
 version = "0.84.0"
 dependencies = [
+ "faber-leaf",
  "handroll",
  "hygiene-ratchet",
  "radix-codegen-shared",

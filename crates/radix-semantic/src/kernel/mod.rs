@@ -37,7 +37,8 @@ pub fn is_kernel_glob_import_path(path: &str) -> bool {
 #[must_use]
 pub fn resolve_kernel_module_name(name: &str) -> Option<KernelModule> {
     match name {
-        "fs" => Some(KernelModule::Solum),
+        // N2 fs unit: `norma:fs` runs through `ad` / the shared leaf. Do not
+        // alias it onto the retired Solum kernel.
         "console" => Some(KernelModule::Consolum),
         "random" => Some(KernelModule::Aleator),
         "process" => Some(KernelModule::Processus),

@@ -110,14 +110,16 @@ fn hauri_returns_the_bytes_and_honours_the_ceiling() {
 }
 
 #[test]
-fn digestio_matches_the_sha256_hex_of_the_bytes() {
-    let bytes: Vec<u8> = (0..200_000_u32).map(|i| (i % 251) as u8).collect();
-    let (_dir, path) = fixture(&bytes);
-    let host = run_ok(
+fn digestio_is_gone_with_the_solum_kernel() {
+    let (_dir, path) = fixture(b"abc");
+    let mut host = BufferHost::default();
+    let errors = run_host(
         "route-digestio.fab",
         &program(&format!("    nota ad 'solum:digestio' (\"{path}\") ↦ textus")),
-    );
-    assert_eq!(host.stdout_lines, [handroll::sha256_hex(&bytes)]);
+        &mut host,
+    )
+    .expect_err("solum:digestio was runner-only and is deleted (R1)");
+    assert_eq!(errors[0].code, "runner_unsupported");
 }
 
 #[test]

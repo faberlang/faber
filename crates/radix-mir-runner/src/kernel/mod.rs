@@ -5,12 +5,11 @@
 //! their verb contracts.
 
 mod aleator;
-mod args;
+pub(crate) mod args;
 mod consolum;
 pub(crate) mod http;
 mod json;
 mod processus;
-mod solum;
 mod toml;
 
 use super::{Host, RunnerError, Value};
@@ -38,7 +37,10 @@ pub fn dispatch_kernel<H: Host + ?Sized>(
     match module {
         KernelModule::Processus => processus::dispatch(host, verb, args, span),
         KernelModule::Json => json::dispatch(verb, args, span),
-        KernelModule::Solum => solum::dispatch(verb, args, span),
+        KernelModule::Solum => Err(RunnerError::unsupported(
+            span,
+            "kernel solum was deleted; norma:fs runs through ad / faber-leaf",
+        )),
         KernelModule::Aleator => aleator::dispatch(verb, args, span),
         KernelModule::Consolum => consolum::dispatch(host, verb, args, span),
         KernelModule::Toml => toml::dispatch(verb, args, span),

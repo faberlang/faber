@@ -2304,10 +2304,10 @@ fn run_manifestless_single_file_uses_single_source_runner() {
 }
 
 #[test]
-fn run_norma_fs_package_reads_file_through_kernel_bridge() {
-    // One `norma:*` import block; interpreted package execution satisfies it
-    // through the runner kernel (Stage 1b host bridge). No second runner-only
-    // source file, no compiled-Rust fallback.
+fn run_norma_fs_package_reads_file_through_ad_leaf() {
+    // One `norma:*` import block; interpreted package execution runs Norma
+    // through `ad` / the shared fs leaf. No runner kernel, no compiled-Rust
+    // fallback.
     let package = temp_dir("norma-solum-bridge");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -2341,7 +2341,7 @@ main {{
 
     let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
-    assert!(ok, "norma:fs package bridge failed:\n{stderr}");
+    assert!(ok, "norma:fs package through ad/leaf failed:\n{stderr}");
     assert_eq!(stdout, "bridge-ok\n");
     assert!(
         !stderr.contains("Compiling") && !stderr.contains("cargo"),
@@ -2351,7 +2351,7 @@ main {{
 }
 
 #[test]
-fn run_norma_fs_unsupported_verb_fails_closed() {
+fn run_norma_fs_missing_file_fails_closed() {
     let package = temp_dir("norma-solum-unsupported");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -2380,11 +2380,11 @@ main {
 
     let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
-    assert!(!ok, "unsupported norma:fs verb should fail closed");
+    assert!(!ok, "missing-file norma:fs read should fail closed");
     assert_eq!(stdout, "");
     assert!(
-        stderr.contains("package MIR kernel bridge does not support `norma:fs.read_file_async`"),
-        "expected kernel bridge fail-closed diagnostic:\n{stderr}"
+        !stderr.contains("package MIR kernel bridge does not support"),
+        "norma:fs must not go through the retired kernel bridge:\n{stderr}"
     );
     assert_no_generated_rust(&package);
 }

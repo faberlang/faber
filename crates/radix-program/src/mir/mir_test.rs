@@ -487,7 +487,8 @@ fn is_bridged_norma_import_path_rejects_norma_without_module_name() {
 
 #[test]
 fn is_bridged_norma_import_path_accepts_known_norma_module() {
-    assert!(is_bridged_norma_import_path("norma:solum"));
+    assert!(!is_bridged_norma_import_path("norma:fs"));
+    assert!(!is_bridged_norma_import_path("norma:solum"));
     assert!(is_bridged_norma_import_path("norma:processus"));
 }
 
@@ -567,7 +568,8 @@ fn is_bridged_norma_import_path_returns_false_for_non_norma_provider() {
 
 #[test]
 fn is_bridged_norma_import_path_returns_true_for_norma_kernel_module() {
-    assert!(is_bridged_norma_import_path("norma:solum"));
+    assert!(is_bridged_norma_import_path("norma:processus"));
+    assert!(!is_bridged_norma_import_path("norma:fs"));
 }
 
 // ── validate_package_mir_manifest ───────────────────────────────────────────

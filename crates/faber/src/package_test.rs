@@ -9387,11 +9387,9 @@ entry = "main.fab"
 }
 
 #[test]
-fn package_runtime_plan_inline_ad_requires_host_for_provider_routes() {
-    // S1-U3 honest classification: solum:lege is a host-required provider
-    // route (only `runtime:echo` is builtin-covered this release). Inline ad
-    // without [target.rust] host must fail closed at plan time instead of
-    // shipping a binary that fails at runtime.
+fn package_runtime_plan_inline_ad_leaf_needs_no_host() {
+    // core-norma N2: solum:lege is the shared fs leaf. Inline ad without
+    // [target.rust] host must plan; LeafDispatch answers at runtime.
     let pkg = test_temp_dir("runtime-plan-builtin-hostless");
     fs::create_dir_all(pkg.join("src")).expect("src");
     fs::write(
@@ -9419,12 +9417,10 @@ entry = "main.fab"
         vec!["solum:lege".to_owned()]
     );
     assert!(plan.host.is_none());
-    let diagnostic = package_host_selection_diagnostic(&plan, &pkg.join("faber.toml"))
-        .expect("missing host selection diagnostic");
-    assert!(diagnostic_has_issue(
-        &diagnostic,
-        "package_host_selection_required"
-    ));
+    assert!(
+        package_host_selection_diagnostic(&plan, &pkg.join("faber.toml")).is_none(),
+        "solum:* is the shared fs leaf, not a host-required route"
+    );
 }
 
 #[test]
@@ -9669,9 +9665,11 @@ fn emit_generated_crate_works_without_manifest_using_fallback_name() {
 #[test]
 fn package_host_routes_fail_closed_with_and_without_native_host() {
     // The native host route and its providers were dropped (single-repo-
-    // development Q3): a package that uses a host-required route (solum:lege)
-    // must fail at plan time whether or not `[target.rust] host = "native"`
-    // is set, while the manifest line itself still parses.
+    // development Q3): a package that uses a host-required route
+    // (`ignotum:route`) must fail at plan time whether or not
+    // `[target.rust] host = "native"` is set, while the manifest line
+    // itself still parses. `solum:*` is the shared fs leaf and is not
+    // host-required (core-norma N2).
     for (label, target_rust, issue) in [
         (
             "package-host-route-hostless",
@@ -9695,7 +9693,7 @@ fn package_host_routes_fail_closed_with_and_without_native_host() {
         .expect("write manifest");
         fs::write(
             pkg.join("src/main.fab"),
-            r#"main { const string body ← call 'solum:lege' ("x") ↦ string print body }"#,
+            r#"main { const string body ← call 'ignotum:route' ("x") ↦ string print body }"#,
         )
         .expect("write entry");
 

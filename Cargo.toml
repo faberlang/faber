@@ -2,6 +2,7 @@
 members = [
     "crates/hygiene-ratchet",
     "crates/handroll",
+    "crates/faber-leaf",
     "crates/radix",
     "crates/radix-module",
     "crates/radix-codegen-shared",

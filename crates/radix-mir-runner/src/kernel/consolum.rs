@@ -5,8 +5,7 @@
 //! dispatch handled by `super::dispatch_kernel`.
 
 use super::super::{Host, RunnerError, Value};
-use super::args::expect_str;
-use super::solum::octeti_bytes;
+use super::args::{expect_str, octeti_bytes};
 use radix_lexer::Span;
 use radix_mir::MirDiagnosticKind;
 

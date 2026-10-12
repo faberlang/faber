@@ -47,6 +47,7 @@ const RUNTIME_ROOTS: &[&str] = &[
     "runtime/swift",
     "runtime/llvm",
     "crates/radix-host-abi",
+    "crates/faber-leaf",
     "lib/norma/src",
     "lib/norma/locale",
 ];

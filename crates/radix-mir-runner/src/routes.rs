@@ -1,33 +1,15 @@
 //! Raw frame routes served by the runner's real hosts (`Host::sermo_route`).
 //!
-//! A raw `call 'solum:mensura' (path) ↦ numerus` is an `ad` expression the
-//! runner answers from its static table, `runtime:echo`, then the host. This
-//! module is the host answer for the process-capability routes a Faber
-//! application reaches without a norma wrapper. Each route reuses the native
-//! kernel verb the interpreted-package bridge dispatches, so the two paths
-//! share one implementation, including the 512 MiB `read_range` cap.
-//!
-//! | route               | kernel verb                 | opener                  |
-//! | ------------------- | --------------------------- | ----------------------- |
-//! | `solum:partem`      | `solum.read_range`          | `[via, initium, longitudo]` |
-//! | `solum:mensura`     | `solum.byte_length`         | `via` or `[via]`        |
-//! | `solum:hauri`       | `solum.read_bytes`          | `via` or `[via, max]`   |
-//! | `solum:digestio`    | `solum.digest_file`         | `via` or `[via]`        |
-//! | `consolum:dic`      | `consolum.write_partial`    | `text` or `[text]`      |
-//! | `consolum:mone`     | `consolum.warn_line`        | `text` or `[text]`      |
-//! | `processus:exi`     | `processus.exit_process`    | `code` or `[code]`      |
-//!
-//! The `http:*` family (`listen`, `accept`, `respond`, `respond_open`,
-//! `respond_chunk`, `respond_finish`, `stop`) is served by `kernel/http.rs`
-//! directly: listeners and connections are runner-thread state, not a
-//! `KernelModule` verb.
+//! `solum:*` is the shared fs leaf (`faber-leaf`). Console and process
+//! leftovers still reuse kernel verbs until those leaves land. HTTP stays
+//! on `kernel/http.rs` until N5; A2 forbids restoring `hosts`.
 //!
 //! Unknown routes return `None` and stay unrouted (the router fails closed).
 
-use super::{Host, RunnerError, Value, kernel};
+use super::{Host, Value, kernel};
+use faber_leaf::fs::{self as leaf, Arg, Reply};
 use radix_lexer::Span;
 use radix_mir::KernelModule;
-use std::fs;
 
 /// Answer a raw route, or `None` when the route is not served here.
 ///
@@ -46,19 +28,22 @@ pub fn serve_route<H: Host + ?Sized>(
             Err(error) => Err(Value::Str(error.message)),
         });
     }
+    if leaf::is_route(route) {
+        let args = opener_leaf_args(opener);
+        return Some(match leaf::serve(route, &args) {
+            Some(Ok(reply)) => Ok(reply_to_values(reply)),
+            Some(Err(error)) => Err(Value::Str(error.to_string())),
+            None => return None,
+        });
+    }
     let (module, verb) = match route {
-        "solum:partem" => (KernelModule::Solum, "read_range"),
-        "solum:mensura" => (KernelModule::Solum, "byte_length"),
-        "solum:hauri" => (KernelModule::Solum, "read_bytes"),
-        "solum:digestio" => (KernelModule::Solum, "digest_file"),
         "consolum:dic" => (KernelModule::Consolum, "write_partial"),
         "consolum:mone" => (KernelModule::Consolum, "warn_line"),
         "processus:exi" => (KernelModule::Processus, "exit_process"),
         _ => return None,
     };
-    let mut args = opener_args(opener);
-    let reply = ceiling_check(route, &mut args, span)
-        .and_then(|()| kernel::dispatch_kernel(host, module, verb, &args, span));
+    let args = opener_args(opener);
+    let reply = kernel::dispatch_kernel(host, module, verb, &args, span);
     Some(match reply {
         Ok(Value::Unit | Value::Nil) => Ok(Vec::new()),
         Ok(value) => Ok(vec![value]),
@@ -74,29 +59,31 @@ fn opener_args(opener: &Value) -> Vec<Value> {
     }
 }
 
-/// `solum:hauri` takes an optional byte ceiling `[via, max]`: refuse a larger
-/// file before reading it whole, then hand the kernel the path alone.
-fn ceiling_check(route: &str, args: &mut Vec<Value>, span: Span) -> Result<(), RunnerError> {
-    if route != "solum:hauri" || args.len() != 2 {
-        return Ok(());
+fn opener_leaf_args(opener: &Value) -> Vec<Arg> {
+    match opener {
+        Value::Array(items) => items.borrow().iter().filter_map(value_to_arg).collect(),
+        Value::Unit | Value::Nil => Vec::new(),
+        other => value_to_arg(other).into_iter().collect(),
     }
-    let (Value::Str(path), Value::Int(max)) = (&args[0], &args[1]) else {
-        return Err(RunnerError::internal(
-            span,
-            "solum.read_bytes expects [textus, numerus]",
-        ));
-    };
-    let max = u64::try_from(*max)
-        .map_err(|_| RunnerError::internal(span, "solum.read_bytes max must be non-negative"))?;
-    let size = fs::metadata(path)
-        .map_err(|err| RunnerError::internal(span, format!("solum.read_bytes failed: {err}")))?
-        .len();
-    if size > max {
-        return Err(RunnerError::internal(
-            span,
-            format!("solum.read_bytes file is {size} bytes, exceeding the {max}-byte ceiling"),
-        ));
+}
+
+fn value_to_arg(value: &Value) -> Option<Arg> {
+    match value {
+        Value::Str(text) => Some(Arg::Str(text.clone())),
+        Value::Int(n) => Some(Arg::Int(*n)),
+        Value::Octeti(bytes) => Some(Arg::Bytes(bytes.clone())),
+        other => kernel::args::octeti_bytes(other).map(Arg::Bytes),
     }
-    args.truncate(1);
-    Ok(())
+}
+
+fn reply_to_values(reply: Reply) -> Vec<Value> {
+    match reply {
+        Reply::Unit => Vec::new(),
+        Reply::Bool(value) => vec![Value::Bool(value)],
+        Reply::Int(value) => vec![Value::Int(value)],
+        Reply::Str(value) => vec![Value::Str(value)],
+        Reply::Bytes(value) => vec![Value::Octeti(value)],
+        // `↦ lista<T>` materializes one content frame per element.
+        Reply::Strs(values) => values.into_iter().map(Value::Str).collect(),
+    }
 }
