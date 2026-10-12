@@ -6,10 +6,9 @@
 //! mutating unroll pass never touches the real pipeline result. Report-only:
 //! verdicts never change exit status or diagnostics.
 
-use radix::module::hir::visit::{HirVisitor, walk_expr, walk_stmt};
+use radix::module::hir::visit::{HirVisitor, walk_expr};
 use radix::module::hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirIteraMode,
-    HirStatement,
 };
 use radix::module::lexer::Span;
 use radix::module::semantic::passes::{air_purity, air_unroll};
@@ -475,19 +474,6 @@ fn contains_itera_ab(body: Option<&HirBlock>) -> bool {
 struct IteraAbFinder(bool);
 
 impl HirVisitor for IteraAbFinder {
-    fn visit_block(&mut self, block: &HirBlock) {
-        for stmt in &block.statements {
-            self.visit_stmt(stmt);
-        }
-        if let Some(expr) = &block.expr {
-            self.visit_expr(expr);
-        }
-    }
-
-    fn visit_stmt(&mut self, stmt: &HirStatement) {
-        walk_stmt(self, stmt);
-    }
-
     fn visit_expr(&mut self, expr: &HirExpression) {
         if let HirExpressionKind::Itera {
             mode: HirIteraMode::Ab,
