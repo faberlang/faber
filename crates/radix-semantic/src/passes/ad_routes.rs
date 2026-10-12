@@ -219,7 +219,11 @@ pub fn route_exports(
         let Some((annotation, route)) = item
             .annotations
             .iter()
-            .find_map(|annotation| Some((annotation, annotation.ad_route(interner)?)))
+            .find_map(|annotation| {
+                annotation
+                    .ad_route(interner)
+                    .map(|route| (annotation, route))
+            })
         else {
             continue;
         };
