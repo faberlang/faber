@@ -44,8 +44,6 @@ pub(crate) fn presentation_json(
     presentation: &radix_hir::HirPresentation,
     interner: &crate::lexer::Interner,
 ) -> String {
-    use std::fmt::Write;
-
     let mut out = String::new();
     out.push_str("{\n");
 
