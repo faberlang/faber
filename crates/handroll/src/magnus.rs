@@ -384,12 +384,15 @@ fn negate_twos(v: &mut [u32]) {
     }
 }
 
-fn u128_limbs(mut x: u128) -> Vec<u32> {
-    let mut v = Vec::with_capacity(4);
-    while x != 0 {
-        v.push(lo(u64::try_from(x & 0xFFFF_FFFF).unwrap_or(0)));
-        x >>= 32;
-    }
+fn u128_limbs(x: u128) -> Vec<u32> {
+    let mut v: Vec<u32> = x
+        .to_le_bytes()
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|bytes| u32::from_le_bytes(*bytes))
+        .collect();
+    trim(&mut v);
     v
 }
 
