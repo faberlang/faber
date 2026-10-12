@@ -913,7 +913,7 @@ fn resolve_discerne(
     for arm in &stmt.arms {
         resolver.enter_scope(ScopeKind::Block);
         for pattern in &arm.patterns {
-            resolve_pattern(resolver, interner, pattern, errors);
+            resolve_pattern(resolver, pattern, errors);
         }
         resolve_if_body(resolver, interner, &arm.body, errors);
         resolver.exit_scope();
@@ -934,7 +934,6 @@ fn push_closed_set_refusal(span: radix_lexer::Span, errors: &mut Vec<SemanticErr
 
 fn resolve_pattern(
     resolver: &mut Resolver,
-    _interner: &Interner,
     pattern: &Pattern,
     errors: &mut Vec<SemanticError>,
 ) {
@@ -992,13 +991,13 @@ fn resolve_pattern(
             let Some((first, rest)) = alternatives.split_first() else {
                 return;
             };
-            resolve_pattern(resolver, _interner, first, errors);
+            resolve_pattern(resolver, first, errors);
             for alternative in rest {
                 // Alternative-only bindings must not collide with the arm's
                 // canonical first-alternative bindings. Lowering/typecheck
                 // compare the alternatives and expose the common environment.
                 resolver.enter_scope(ScopeKind::Match);
-                resolve_pattern(resolver, _interner, alternative, errors);
+                resolve_pattern(resolver, alternative, errors);
                 resolver.exit_scope();
             }
         }
@@ -1040,42 +1039,7 @@ fn resolve_pattern(
                         });
                         if let Some(parent_enum) = parent_enum {
                             if resolver.variant_child(parent_enum, last.name).is_none() {
-                                // The suffix is not one of this union's variants.
-                                // Preserve the legacy behavior: a known non-variant
-                                // name is `name_not_variant`; a multi-union bare
-                                // name is an explicit ambiguity; anything else is
-                                // an unknown variant.
-                                match resolver.lookup(last.name) {
-                                    Some(_) => {
-                                        errors.push(
-                                            SemanticError::structured(
-                                                SemanticErrorKind::VariableUndefined,
-                                                last.span,
-                                            )
-                                            .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
-                                        );
-                                    }
-                                    None => match resolver.lookup_variant_bare(last.name) {
-                                        BareVariantLookup::Ambiguous { .. } => {
-                                            errors.push(
-                                                SemanticError::structured(
-                                                    SemanticErrorKind::VariableUndefined,
-                                                    last.span,
-                                                )
-                                                .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
-                                            );
-                                        }
-                                        BareVariantLookup::Single(_) | BareVariantLookup::None => {
-                                            errors.push(
-                                                SemanticError::structured(
-                                                    SemanticErrorKind::VariableUndefined,
-                                                    last.span,
-                                                )
-                                                .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
-                                            );
-                                        }
-                                    },
-                                }
+                                report_non_variant_suffix(resolver, last, errors);
                             }
                         } else {
                             resolve_variant_path_without_enum_parent(
@@ -1132,6 +1096,40 @@ fn resolve_variant_path_without_enum_parent(
             }
             resolve_variant_ident(resolver, last, errors);
         }
+    }
+}
+
+/// Report the diagnostic for a suffix that names no variant of its known
+/// enum/union parent.
+///
+/// A known non-variant name is `name_not_variant`; a multi-union bare name is
+/// an explicit ambiguity; anything else is an unknown variant.
+fn report_non_variant_suffix(
+    resolver: &Resolver,
+    suffix: &radix_syntax::Ident,
+    errors: &mut Vec<SemanticError>,
+) {
+    match resolver.lookup(suffix.name) {
+        Some(_) => {
+            errors.push(
+                SemanticError::structured(SemanticErrorKind::VariableUndefined, suffix.span)
+                    .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
+            );
+        }
+        None => match resolver.lookup_variant_bare(suffix.name) {
+            BareVariantLookup::Ambiguous { .. } => {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::VariableUndefined, suffix.span)
+                        .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+                );
+            }
+            BareVariantLookup::Single(_) | BareVariantLookup::None => {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::VariableUndefined, suffix.span)
+                        .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
+                );
+            }
+        },
     }
 }
 
@@ -1783,61 +1781,26 @@ fn resolve_type_expr(
                 }
                 return;
             }
-            if name_str == "tensor" {
-                // Resolve type params before the incomplete/missing-figura
-                // error so unknown element types are reported too.
+            // Tensor-family heads report incomplete/shape errors after their
+            // arguments resolve, so unknown element types are reported too.
+            let family_issues = match name_str {
+                "tensor" => Some((ISSUE_TENSOR_INCOMPLETE, ISSUE_TENSOR_MISSING_FIGURA)),
+                "sparsa" => Some((ISSUE_SPARSA_INCOMPLETE, ISSUE_SPARSA_MISSING_FIGURA)),
+                "atomic" => Some((ISSUE_ATOMIC_INCOMPLETE, ISSUE_ATOMIC_ARITY)),
+                "vector" => Some((ISSUE_VECTOR_INCOMPLETE, ISSUE_VECTOR_MISSING_WIDTH)),
+                "matrix" => Some((ISSUE_MATRIX_INCOMPLETE, ISSUE_MATRIX_MISSING_FIGURA)),
+                _ => None,
+            };
+            if let Some((incomplete, missing_shape)) = family_issues {
                 for param in params {
                     resolve_generic_arg(resolver, interner, param, errors);
                 }
-                if params.is_empty() {
-                    errors.push(type_mismatch_error(ISSUE_TENSOR_INCOMPLETE, name.span));
+                let issue = if params.is_empty() {
+                    incomplete
                 } else {
-                    errors.push(type_mismatch_error(ISSUE_TENSOR_MISSING_FIGURA, name.span));
-                }
-                return;
-            }
-            if name_str == "sparsa" {
-                for param in params {
-                    resolve_generic_arg(resolver, interner, param, errors);
-                }
-                if params.is_empty() {
-                    errors.push(type_mismatch_error(ISSUE_SPARSA_INCOMPLETE, name.span));
-                } else {
-                    errors.push(type_mismatch_error(ISSUE_SPARSA_MISSING_FIGURA, name.span));
-                }
-                return;
-            }
-            if name_str == "atomic" {
-                for param in params {
-                    resolve_generic_arg(resolver, interner, param, errors);
-                }
-                if params.is_empty() {
-                    errors.push(type_mismatch_error(ISSUE_ATOMIC_INCOMPLETE, name.span));
-                } else {
-                    errors.push(type_mismatch_error(ISSUE_ATOMIC_ARITY, name.span));
-                }
-                return;
-            }
-            if name_str == "vector" {
-                for param in params {
-                    resolve_generic_arg(resolver, interner, param, errors);
-                }
-                if params.is_empty() {
-                    errors.push(type_mismatch_error(ISSUE_VECTOR_INCOMPLETE, name.span));
-                } else {
-                    errors.push(type_mismatch_error(ISSUE_VECTOR_MISSING_WIDTH, name.span));
-                }
-                return;
-            }
-            if name_str == "matrix" {
-                for param in params {
-                    resolve_generic_arg(resolver, interner, param, errors);
-                }
-                if params.is_empty() {
-                    errors.push(type_mismatch_error(ISSUE_MATRIX_INCOMPLETE, name.span));
-                } else {
-                    errors.push(type_mismatch_error(ISSUE_MATRIX_MISSING_FIGURA, name.span));
-                }
+                    missing_shape
+                };
+                errors.push(type_mismatch_error(issue, name.span));
                 return;
             }
             for param in params {
@@ -2523,38 +2486,7 @@ fn resolve_variant_path(
     });
     if let Some(parent_enum) = parent_enum {
         if resolver.variant_child(parent_enum, last.name).is_none() {
-            // The suffix is not one of this union's variants. Preserve the
-            // pattern-path behavior: a known non-variant name is
-            // `name_not_variant`; a multi-union bare name is an explicit
-            // ambiguity; anything else is an unknown variant.
-            match resolver.lookup(last.name) {
-                Some(_) => {
-                    errors.push(
-                        SemanticError::structured(SemanticErrorKind::VariableUndefined, last.span)
-                            .with_arg("issue", ISSUE_NAME_NOT_VARIANT),
-                    );
-                }
-                None => match resolver.lookup_variant_bare(last.name) {
-                    BareVariantLookup::Ambiguous { .. } => {
-                        errors.push(
-                            SemanticError::structured(
-                                SemanticErrorKind::VariableUndefined,
-                                last.span,
-                            )
-                            .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
-                        );
-                    }
-                    BareVariantLookup::Single(_) | BareVariantLookup::None => {
-                        errors.push(
-                            SemanticError::structured(
-                                SemanticErrorKind::VariableUndefined,
-                                last.span,
-                            )
-                            .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
-                        );
-                    }
-                },
-            }
+            report_non_variant_suffix(resolver, last, errors);
         }
     } else {
         // The penultimate segment names no ordinary Enum binding. A qualified
@@ -2872,16 +2804,6 @@ fn define_binding_pattern(
     }
 }
 
-fn symbol_by_text(interner: &Interner, text: &str) -> Option<radix_lexer::Symbol> {
-    interner
-        .strings()
-        .iter()
-        .position(|interned| interned == text)
-        .map(|index| {
-            radix_lexer::Symbol(u32::try_from(index).expect("interned symbol count fits u32"))
-        })
-}
-
 fn define_shader_stage_locals_for_resolution(
     resolver: &mut Resolver,
     interner: &Interner,
@@ -2903,7 +2825,7 @@ fn define_shader_stage_locals_for_resolution(
 
     if has_annotation("vertex") {
         for (name, mutable) in [("position", false), ("uv", false), ("out_position", true)] {
-            if let Some(symbol) = symbol_by_text(interner, name) {
+            if let Some(symbol) = interner.lookup(name) {
                 define_symbol(resolver, symbol, span, SymbolKind::Local, mutable, errors);
             }
         }
@@ -2915,7 +2837,7 @@ fn define_shader_stage_locals_for_resolution(
             ("uv", false),
             ("out_color", true),
         ] {
-            if let Some(symbol) = symbol_by_text(interner, name) {
+            if let Some(symbol) = interner.lookup(name) {
                 define_symbol(resolver, symbol, span, SymbolKind::Local, mutable, errors);
             }
         }

@@ -1598,6 +1598,24 @@ fn reports_non_variant_pattern() {
 }
 
 #[test]
+fn reports_non_variant_finge_suffix() {
+    // The `finge` path shares the enum-suffix diagnostic policy with the
+    // `discerne` pattern path.
+    compile_and_expect(
+        "ordo MyEnum { Red }\n functio NotAVariant() → vacuum {}\n incipit { fixum _ v ← finge MyEnum.NotAVariant { } }",
+        "SEM001",
+        "name_not_variant",
+    );
+}
+
+#[test]
+fn stage_annotation_defines_stage_locals() {
+    // `uv` is stage-local, not a global builtin: only the annotation defines
+    // it, through the interner reverse lookup.
+    resolve_ok("@ vertex\nfunctio v() → vacuum { nota uv }");
+}
+
+#[test]
 fn reports_unknown_variant_with_structured_event() {
     compile_and_expect(
         "ordo MyEnum { Red, Green }\n incipit { fixum numerus subject ← 1\n discerne subject { casu MyEnum.Missing {} } }",
@@ -1973,22 +1991,6 @@ functio exemplo() → numerus {
 }
 ";
     compile_and_expect(source, "SEM031", "continue_outside_loop");
-}
-
-fn resolve_source(source: &str) -> Vec<crate::SemanticError> {
-    let parsed = parse(lex(source));
-    assert!(
-        parsed.errors.is_empty(),
-        "parse errors: {:?}",
-        parsed.errors
-    );
-    let mut resolver = Resolver::new();
-    let mut types = TypeTable::new();
-    let program = parsed.program.as_ref().expect("program");
-    collect::collect(program, &mut resolver, &mut types).expect("collect");
-    resolve::resolve(program, &mut resolver, &parsed.interner, &mut types)
-        .err()
-        .unwrap_or_default()
 }
 
 #[test]
