@@ -107,7 +107,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 span,
             )?,
             Value::Set(cell) => {
-                let mut items: Vec<Value> = cell.borrow().iter().map(map_key_to_value).collect();
+                let mut items: Vec<Value> = cell.borrow().iter().map(MapKey::to_value).collect();
                 // D19.2/D19.6: copia order is unspecified; shuffle under the
                 // test-only seed so `copia ↦ lista<T>` cannot quietly pin the
                 // runner's FxHashSet order.
@@ -372,7 +372,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Vec<Value>, RunnerError> {
         if let Type::Map(key_ty, value_ty) = self.types.get(source_ty) {
             if self.types.equals(*key_ty, element) {
-                return Ok(map.keys().map(map_key_to_value).collect());
+                return Ok(map.keys().map(MapKey::to_value).collect());
             }
             if self.types.equals(*value_ty, element) {
                 return Ok(map.values().cloned().collect());
@@ -853,10 +853,6 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Err(RunnerError::conversion(span, message))
         }
     }
-}
-
-fn map_key_to_value(key: &MapKey) -> Value {
-    key.to_value()
 }
 
 fn lista_to_tensor_shape(target_ty: TypeId, types: &TypeTable, flat_len: usize) -> Vec<i64> {

@@ -534,6 +534,20 @@ impl FaberCodegen<'_> {
         "<error>".to_owned()
     }
 
+    /// Render a type at its authored occurrence site, recording the first
+    /// malformed-form error (surfaced at the end of [`Self::generate`]) rather
+    /// than aborting the item that contains it.
+    pub(super) fn render_type_at(
+        &self,
+        site: &HirTypeSite,
+        ty: TypeId,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+    ) -> String {
+        self.type_to_faber_at(site, ty, names, surface)
+            .unwrap_or_else(|error| self.record_type_emission_error(error))
+    }
+
     /// u32 ordinal for an enumerated type slot. A count beyond `u32::MAX`
     /// cannot render canonically, so it records the emission error (surfaces
     /// at the end of `generate`) and yields a placeholder ordinal instead of
@@ -581,17 +595,34 @@ impl FaberCodegen<'_> {
         let Some(trivia) = self.trivia.for_hir(item.id) else {
             return;
         };
-        // The first rendered item opens the file: its leading newlines are all
-        // boundary (see `trivia::at_file_start`), keeping the emit idempotent.
+        self.write_slot_trivia(
+            trivia,
+            file_start,
+            item_has_rendered_annotations(item),
+            writer,
+        );
+    }
+
+    /// Write one trivia slot with its boundary normalization.
+    ///
+    /// `file_start` drops every leading boundary newline (the first rendered
+    /// slot has no preceding construct newline, so all of them are boundary and
+    /// canonical output never begins with blank lines). `annotation_follows`
+    /// drops the trailing line terminator the annotation re-emitter writes
+    /// itself. Together these keep the emit idempotent.
+    fn write_slot_trivia(
+        &self,
+        trivia: &[radix_hir::HirTrivia],
+        file_start: bool,
+        annotation_follows: bool,
+        writer: &mut CodeWriter,
+    ) {
         let trivia = if file_start {
             crate::trivia::at_file_start(trivia)
         } else {
             trivia
         };
-        // An annotation sequence follows for annotated functions; its line
-        // terminator is re-emitted by the annotation writer (see
-        // `trivia::without_following_annotation`).
-        let trivia = if item_has_rendered_annotations(item) {
+        let trivia = if annotation_follows {
             crate::trivia::without_following_annotation(trivia)
         } else {
             trivia
@@ -642,28 +673,13 @@ impl FaberCodegen<'_> {
         let Some(trivia) = self.trivia.entry_trivia() else {
             return;
         };
-        let trivia = if file_start {
-            crate::trivia::at_file_start(trivia)
-        } else {
-            trivia
-        };
-        let trivia = if has_annotations {
-            crate::trivia::without_following_annotation(trivia)
-        } else {
-            trivia
-        };
-        write_leading_trivia(trivia, self.interner, writer);
+        self.write_slot_trivia(trivia, file_start, has_annotations, writer);
     }
 
     /// Emit program-end trivia before EOF.
     fn write_program_end_trivia(&self, file_start: bool, writer: &mut CodeWriter) {
         if let Some(trivia) = self.trivia.program_end_trivia() {
-            let trivia = if file_start {
-                crate::trivia::at_file_start(trivia)
-            } else {
-                trivia
-            };
-            write_leading_trivia(trivia, self.interner, writer);
+            self.write_slot_trivia(trivia, file_start, false, writer);
         }
     }
 }

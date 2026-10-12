@@ -276,78 +276,7 @@ fn dispatch(command: Command) {
             reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
             cmd_cost(args);
         }
-        Command::Check(args) => {
-            reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
-            validate_deny_codes(&args.deny);
-            let package_shaped =
-                args.package || package::should_treat_as_package_from_args(&args.input);
-            if args.air {
-                // ALA-1: the advisory AIR report is single-file only. Plain
-                // `check` routes bare `.fab` files through the package loader;
-                // under `--air` a plain file stays in file mode so the report
-                // rides the single-file pipeline. Directory/manifest-shaped
-                // inputs stay unsupported.
-                let input_is_plain_file = if args.package {
-                    false
-                } else if package_shaped {
-                    !args.input.is_empty() && std::path::Path::new(&args.input[0]).is_file()
-                } else {
-                    true
-                };
-                if !input_is_plain_file {
-                    let message = check_air::PACKAGE_AIR_MESSAGE;
-                    eprintln!("{message}");
-                    std::process::exit(1);
-                }
-                cmd_check_file(
-                    CheckCommand {
-                        input: args.input,
-                        package: args.package,
-                        permissive: args.permissive,
-                        deny_warnings: args.deny_warnings,
-                        deny_codes: args.deny,
-                        diagnostic_mode: diagnostic_mode(args.diagnostics),
-                        diagnostics_locale_pack: None,
-                        locale: None,
-                        diagnostics_locale: args.diagnostics_locale,
-                    },
-                    true,
-                    args.json,
-                );
-            } else if package_shaped {
-                package::cmd_check_package(
-                    CheckCommand {
-                        input: args.input,
-                        package: args.package,
-                        permissive: args.permissive,
-                        deny_warnings: args.deny_warnings,
-                        deny_codes: args.deny,
-                        diagnostic_mode: diagnostic_mode(args.diagnostics),
-                        diagnostics_locale_pack: None,
-                        locale: args.locale,
-                        diagnostics_locale: args.diagnostics_locale,
-                    },
-                    args.complexity_budget,
-                    args.kernel_complexity_budget,
-                );
-            } else {
-                cmd_check_file(
-                    CheckCommand {
-                        input: args.input,
-                        package: args.package,
-                        permissive: args.permissive,
-                        deny_warnings: args.deny_warnings,
-                        deny_codes: args.deny,
-                        diagnostic_mode: diagnostic_mode(args.diagnostics),
-                        diagnostics_locale_pack: None,
-                        locale: None,
-                        diagnostics_locale: args.diagnostics_locale,
-                    },
-                    false,
-                    false,
-                );
-            }
-        }
+        Command::Check(args) => cmd_check(args),
         Command::Verify(args) => {
             if verify_input_is_package_shaped(&args.input, args.package) {
                 eprintln!(
@@ -455,6 +384,78 @@ fn dispatch(command: Command) {
         Command::Host(args) => cmd_host(args.command),
         Command::Model(args) => cmd_model(args.command),
         Command::SelfManage(args) => cmd_self(&args),
+    }
+}
+
+fn cmd_check(args: crate::cli::CheckArgs) {
+    reject_reader_locale_without_package(args.locale.as_deref(), &args.input, args.package);
+    validate_deny_codes(&args.deny);
+    let package_shaped = args.package || package::should_treat_as_package_from_args(&args.input);
+    if args.air {
+        // ALA-1: the advisory AIR report is single-file only. Plain
+        // `check` routes bare `.fab` files through the package loader;
+        // under `--air` a plain file stays in file mode so the report
+        // rides the single-file pipeline. Directory/manifest-shaped
+        // inputs stay unsupported.
+        let input_is_plain_file = if args.package {
+            false
+        } else if package_shaped {
+            !args.input.is_empty() && std::path::Path::new(&args.input[0]).is_file()
+        } else {
+            true
+        };
+        if !input_is_plain_file {
+            let message = check_air::PACKAGE_AIR_MESSAGE;
+            eprintln!("{message}");
+            std::process::exit(1);
+        }
+        cmd_check_file(
+            CheckCommand {
+                input: args.input,
+                package: args.package,
+                permissive: args.permissive,
+                deny_warnings: args.deny_warnings,
+                deny_codes: args.deny,
+                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostics_locale_pack: None,
+                locale: None,
+                diagnostics_locale: args.diagnostics_locale,
+            },
+            true,
+            args.json,
+        );
+    } else if package_shaped {
+        package::cmd_check_package(
+            CheckCommand {
+                input: args.input,
+                package: args.package,
+                permissive: args.permissive,
+                deny_warnings: args.deny_warnings,
+                deny_codes: args.deny,
+                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostics_locale_pack: None,
+                locale: args.locale,
+                diagnostics_locale: args.diagnostics_locale,
+            },
+            args.complexity_budget,
+            args.kernel_complexity_budget,
+        );
+    } else {
+        cmd_check_file(
+            CheckCommand {
+                input: args.input,
+                package: args.package,
+                permissive: args.permissive,
+                deny_warnings: args.deny_warnings,
+                deny_codes: args.deny,
+                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostics_locale_pack: None,
+                locale: None,
+                diagnostics_locale: args.diagnostics_locale,
+            },
+            false,
+            false,
+        );
     }
 }
 

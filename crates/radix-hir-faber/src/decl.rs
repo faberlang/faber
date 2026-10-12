@@ -70,9 +70,7 @@ impl super::FaberCodegen<'_> {
                     owner: HirOwnerRef::Def(item.def_id),
                     slot: HirTypeSlot::AliasBody,
                 };
-                let ty = self
-                    .type_to_faber_at(&site, a.ty, names, surface)
-                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                let ty = self.render_type_at(&site, a.ty, names, surface);
                 writer.write(&ty);
                 writer.newline();
             }
@@ -91,9 +89,7 @@ impl super::FaberCodegen<'_> {
                                 self.slot_ordinal(ordinal, "schema column count"),
                             ),
                         };
-                        let rendered = self
-                            .type_to_faber_at(&site, column.ty, names, surface)
-                            .unwrap_or_else(|error| self.record_type_emission_error(error));
+                        let rendered = self.render_type_at(&site, column.ty, names, surface);
                         writer.write(&rendered);
                         writer.write(" ");
                         writer.write(&self.symbol_to_string(column.name));
@@ -148,9 +144,7 @@ impl super::FaberCodegen<'_> {
             // concrete versus hole spelling. An absent site is a
             // synthesized/hand-built binding and uses the canonical
             // concrete fallback inside `type_to_faber_at`.
-            let rendered = self
-                .type_to_faber_at(&site, ty, names, surface)
-                .unwrap_or_else(|error| self.record_type_emission_error(error));
+            let rendered = self.render_type_at(&site, ty, names, surface);
             writer.write(&rendered);
             writer.write(" ");
         }
@@ -441,9 +435,7 @@ impl super::FaberCodegen<'_> {
                     owner: HirOwnerRef::Def(def_id),
                     slot: HirTypeSlot::Field(self.slot_ordinal(ordinal, "struct field count")),
                 };
-                let rendered = self
-                    .type_to_faber_at(&site, field.ty, names, surface)
-                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                let rendered = self.render_type_at(&site, field.ty, names, surface);
                 writer.write(&rendered);
                 writer.write(" ");
                 writer.write(&self.symbol_to_string(field.name));
@@ -564,9 +556,7 @@ impl super::FaberCodegen<'_> {
                         owner: HirOwnerRef::Def(def_id),
                         slot: HirTypeSlot::Field(self.slot_ordinal(ordinal, "commune field count")),
                     };
-                    let rendered = self
-                        .type_to_faber_at(&site, field.ty, names, surface)
-                        .unwrap_or_else(|error| self.record_type_emission_error(error));
+                    let rendered = self.render_type_at(&site, field.ty, names, surface);
                     writer.write(&rendered);
                     writer.write(" ");
                     writer.write(&self.symbol_to_string(field.name));
@@ -601,9 +591,7 @@ impl super::FaberCodegen<'_> {
                                     self.slot_ordinal(ordinal, "variant field count"),
                                 ),
                             };
-                            let rendered = self
-                                .type_to_faber_at(&site, field.ty, names, surface)
-                                .unwrap_or_else(|error| self.record_type_emission_error(error));
+                            let rendered = self.render_type_at(&site, field.ty, names, surface);
                             writer.write(&rendered);
                             writer.write(" ");
                             writer.write(&self.symbol_to_string(field.name));
@@ -727,9 +715,7 @@ impl super::FaberCodegen<'_> {
             owner: HirOwnerRef::Def(param.def_id),
             slot,
         };
-        let rendered = self
-            .type_to_faber_at(&site, param.ty, names, surface)
-            .unwrap_or_else(|error| self.record_type_emission_error(error));
+        let rendered = self.render_type_at(&site, param.ty, names, surface);
         writer.write(&rendered);
         writer.write(" ");
         writer.write(&self.symbol_to_string(param.name));
@@ -793,8 +779,7 @@ impl super::FaberCodegen<'_> {
                         owner: HirOwnerRef::Def(owner),
                         slot: HirTypeSlot::Return,
                     };
-                    self.type_to_faber_at(&site, ret, names, surface)
-                        .unwrap_or_else(|error| self.record_type_emission_error(error))
+                    self.render_type_at(&site, ret, names, surface)
                 },
             );
             writer.write(&rendered);
@@ -808,8 +793,7 @@ impl super::FaberCodegen<'_> {
                         owner: HirOwnerRef::Def(owner),
                         slot: HirTypeSlot::Error,
                     };
-                    self.type_to_faber_at(&site, err, names, surface)
-                        .unwrap_or_else(|error| self.record_type_emission_error(error))
+                    self.render_type_at(&site, err, names, surface)
                 },
             );
             writer.write(&rendered);
