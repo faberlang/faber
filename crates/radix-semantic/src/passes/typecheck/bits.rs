@@ -38,8 +38,7 @@ enum BitsConversioPeer {
 impl TypeChecker<'_> {
     /// The `bN` width of `ty`, looking through aliases and resolved holes.
     pub(super) fn bits_width_of(&self, ty: TypeId) -> Option<BitsWidth> {
-        let resolved = self.numeric_expected_type(self.resolve_inferred_type(ty));
-        match self.types.get(resolved) {
+        match self.types.get(self.bits_type_of(ty)) {
             Type::Bits(width) => Some(*width),
             _ => None,
         }
