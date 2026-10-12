@@ -229,330 +229,334 @@ width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SP
 # [109] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
 # [110] figura
-figura ::= figura_product (('+' | '-') NATURAL)*
-# [111] figura_product
+figura ::= spelled_lift | figura_product (('+' | '-') NATURAL)*
+# [111] spelled_lift
+spelled_lift ::= '尺寸' lift_extent
+# [112] lift_extent
+lift_extent ::= NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER
+# [113] figura_product
 figura_product ::= figura_primary ('/' NATURAL)*
-# [112] figura_primary
+# [114] figura_primary
 figura_primary ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
-# [113] figura_list
+# [115] figura_list
 figura_list ::= figura (',' figura)*
-# [114] function_type
+# [116] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [115] type_list
+# [117] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [116] si_stmt
+# [118] si_stmt
 si_stmt ::= '若' si_tail
-# [117] si_tail
+# [119] si_tail
 si_tail ::= expression arm ('否則若' si_tail | secus_clause)?
-# [118] secus_clause
+# [120] secus_clause
 secus_clause ::= '否則' else_arm
-# [119] arm
+# [121] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [120] else_arm
+# [122] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [121] dum_stmt
+# [123] dum_stmt
 dum_stmt ::= '當' expression (block_stmt | ergo_joint statement) cape_clause?
-# [122] itera_stmt
+# [124] itera_stmt
 itera_stmt ::= '遍歷' ('取自' expression (',' expression)* | '從' expression | '範圍' expression (',' expression)*) apud_clause? filum_clause? ('定值' | '變值') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [123] itera_binding
+# [125] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [124] apud_clause
+# [126] apud_clause
 apud_clause ::= '於' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [125] elige_stmt
+# [127] elige_stmt
 elige_stmt ::= '選擇' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [126] casu_elige_clause
+# [128] casu_elige_clause
 casu_elige_clause ::= '分支' expression (block_stmt | ergo_joint statement)
-# [127] ceterum_clause
+# [129] ceterum_clause
 ceterum_clause ::= '預設' (block_stmt | ergo_joint statement)
-# [128] discerne_stmt
+# [130] discerne_stmt
 discerne_stmt ::= '比對' '全部'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [129] discriminants
+# [131] discriminants
 discriminants ::= subject_path ('且' subject_path)*
-# [130] subject_path
+# [132] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [131] casu_variant_clause
+# [133] casu_variant_clause
 casu_variant_clause ::= '分支' patterns (block_stmt | ergo_joint statement)
-# [132] patterns
+# [134] patterns
 patterns ::= pattern ('且' pattern)*
-# [133] pattern
+# [135] pattern
 pattern ::= pattern_atom ('或' pattern_atom)*
-# [134] pattern_atom
+# [136] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [135] negated_number
+# [137] negated_number
 negated_number ::= '-' NUMBER
-# [136] type_pattern
+# [138] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [137] ut_pattern
+# [139] ut_pattern
 ut_pattern ::= ('作為' IDENTIFIER) | (('定值' | '變值') pattern_binding (',' pattern_binding)*)
-# [138] pattern_binding
+# [140] pattern_binding
 pattern_binding ::= IDENTIFIER ('作為' IDENTIFIER)?
-# [139] custodi_stmt
+# [141] custodi_stmt
 custodi_stmt ::= '守衛' '{' si_guard_clause+ '}'
-# [140] si_guard_clause
+# [142] si_guard_clause
 si_guard_clause ::= '若' expression (block_stmt | ergo_joint statement)
-# [141] ex_stmt
+# [143] ex_stmt
 ex_stmt ::= '取自' expression ('定值' | '變值') extract_fields
-# [142] extract_fields
+# [144] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [143] extract_field
+# [145] extract_field
 extract_field ::= IDENTIFIER ('作為' IDENTIFIER)?
-# [144] ceteri_field
+# [146] ceteri_field
 ceteri_field ::= '其餘' IDENTIFIER
-# [145] redde_stmt
+# [147] redde_stmt
 redde_stmt ::= '傳回' expression?
-# [146] reddet_stmt
+# [148] reddet_stmt
 reddet_stmt ::= '等返' expression
-# [147] tacebit_stmt
+# [149] tacebit_stmt
 tacebit_stmt ::= '等棄' expression
-# [148] cede_stmt
+# [150] cede_stmt
 cede_stmt ::= '讓出' expression
-# [149] rumpe_stmt
+# [151] rumpe_stmt
 rumpe_stmt ::= '中斷'
-# [150] perge_stmt
+# [152] perge_stmt
 perge_stmt ::= '繼續'
-# [151] tacet_stmt
+# [153] tacet_stmt
 tacet_stmt ::= '靜默'
-# [152] iace_stmt
+# [154] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [153] iace_expr
+# [155] iace_expr
 iace_expr ::= ('拋出' | '崩潰') expression
-# [154] iace_guarded_expr
+# [156] iace_guarded_expr
 iace_guarded_expr ::= ('拋出' | '崩潰') expression NO_NEWLINE '若' expression
-# [155] cape_clause
+# [157] cape_clause
 cape_clause ::= '捕捉' IDENTIFIER block_stmt
-# [156] adfirma_stmt
+# [158] adfirma_stmt
 adfirma_stmt ::= '斷言' expression ('崩潰' expression)?
-# [157] requirit_stmt
+# [159] requirit_stmt
 requirit_stmt ::= '需要' expression '拋出' expression
-# [158] reice_stmt
+# [160] reice_stmt
 reice_stmt ::= '拒絕' expression '拋出' expression
-# [159] expression
+# [161] expression
 expression ::= assignment
-# [160] transfer
+# [162] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [161] value_marker
+# [163] value_marker
 value_marker ::= '擁有' | '拷貝'
-# [162] assignment
+# [164] assignment
 assignment ::= transfer ('←' '拷貝'? assignment | '↤' assignment inline_default?)?
-# [163] inc_dec_stmt
+# [165] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [164] place
+# [166] place
 place ::= call_expr
-# [165] ternary
+# [167] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [166] aut_expr
+# [168] aut_expr
 aut_expr ::= et_expr (('或') et_expr)*
-# [167] et_expr
+# [169] et_expr
 et_expr ::= equality (('且') equality)*
-# [168] equality
+# [170] equality
 equality ::= comparison equality_tail*
-# [169] equality_tail
+# [171] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('是' | '非' '是') type_annotation
-# [170] comparison
+# [172] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [171] format_expr
+# [173] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [172] bitwise_or_expr
+# [174] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [173] bitwise_xor_expr
+# [175] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [174] bitwise_and_expr
+# [176] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [175] shift_expr
+# [177] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [176] range_expr
+# [178] range_expr
 range_expr ::= additive_expr range_tail?
-# [177] range_tail
+# [179] range_tail
 range_tail ::= ('‥' | '…' | '之前' | '直到') additive_expr ('每' additive_expr)?
-# [178] additive_expr
+# [180] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [179] multiplicative_expr
+# [181] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [180] vel_expr
+# [182] vel_expr
 vel_expr ::= unary_expr ('或取' vel_rhs)*
-# [181] vel_rhs
+# [183] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [182] vel_range_tail
+# [184] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | '之前' | '直到') unary_expr ('每' unary_expr)?
-# [183] unary_expr
+# [185] unary_expr
 unary_expr ::= ('-' | '¬' | '非') unary_expr | rounding_expr | finge_expr | cast_expr
-# [184] rounding_expr
+# [186] rounding_expr
 rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
-# [185] gradient_expr
+# [187] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [186] gradient_selection
+# [188] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [187] gradient_place
+# [189] gradient_place
 gradient_place ::= expression
-# [188] cast_expr
+# [190] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [189] conversio_expr
+# [191] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [190] interval_target
+# [192] interval_target
 interval_target ::= range_expr
-# [191] via_clause
+# [193] via_clause
 via_clause ::= '經由' IDENTIFIER
-# [192] inline_default
+# [194] inline_default
 inline_default ::= '⊥' unary_expr
-# [193] call_expr
+# [195] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [194] call_suffix
+# [196] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [195] member_suffix
+# [197] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [196] transpose_suffix
+# [198] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [197] optional_suffix
+# [199] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [198] non_null_suffix
+# [200] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [199] argument_list
+# [201] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [200] argument
+# [202] argument
 argument ::= template_argument | (call_marker | '軸')? '展開'? expression
-# [201] call_marker
+# [203] call_marker
 call_marker ::= '從' | '傳入' | '擁有' | '拷貝'
-# [202] template_argument
+# [204] template_argument
 template_argument ::= '展開'? IDENTIFIER ':' expression
-# [203] literal
+# [205] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '可空' | '∞' | 'nan'
-# [204] primary
+# [206] primary
 primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
-# [205] ad_expr
+# [207] ad_expr
 ad_expr ::= '端點' ASCII_STRING ad_opener?
-# [206] ad_opener
+# [208] ad_opener
 ad_opener ::= '(' expression ')'
-# [207] array_literal
+# [209] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [208] array_element_list
+# [210] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [209] array_element
+# [211] array_element
 array_element ::= argument | '_'
-# [210] iuncta_expr
+# [212] iuncta_expr
 iuncta_expr ::= '元組' type_arguments '[' argument_list? ']'
-# [211] json_literal
+# [213] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [212] json_member
+# [214] json_member
 json_member ::= STRING ':' json_value
-# [213] typed_constructor
-typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal
-# [214] field_list
+# [215] typed_constructor
+typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal | '{' field_list '}' construction_source?
+# [216] field_list
 field_list ::= field_init (',' field_init)*
-# [215] field_init
+# [217] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [216] field_key
+# [218] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [217] construction_source
+# [219] construction_source
 construction_source ::= '取自' call_expr
-# [218] json_value
+# [220] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [219] json_object
+# [221] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [220] json_array
+# [222] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [221] json_string
+# [223] json_string
 json_string ::= STRING
-# [222] json_number
+# [224] json_number
 json_number ::= NUMBER
-# [223] finge_expr
+# [225] finge_expr
 finge_expr ::= '虛構' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [224] qualified_ident
+# [226] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [225] praefixum_expr
+# [227] praefixum_expr
 praefixum_expr ::= '前綴' block_stmt
-# [226] scriptum_expr
+# [228] scriptum_expr
 scriptum_expr ::= '格式文字' '(' STRING (',' expression)* ')'
-# [227] lege_expr
+# [229] lege_expr
 lege_expr ::= '讀取' '行'?
-# [228] first_match_expr
+# [230] first_match_expr
 first_match_expr ::= '首個匹配' '(' expression apud_clause? ',' '其中' IDENTIFIER block_stmt ')'
-# [229] reducta_expr
+# [231] reducta_expr
 reducta_expr ::= '歸約' '經由' reducta_op '取自' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [230] reducta_op
+# [232] reducta_op
 reducta_op ::= '求和' | '求積' | '最大' | '最小' | '最大值索引' | '最小值索引' | '全部' | '任一' | '計數'
-# [231] reducta_group
+# [233] reducta_group
 reducta_group ::= '按' expression
-# [232] reducta_body
+# [234] reducta_body
 reducta_body ::= ('定值' | '變值') IDENTIFIER block_stmt
-# [233] reducta_identity
+# [235] reducta_identity
 reducta_identity ::= '或取' expression
-# [234] sort_expr
+# [236] sort_expr
 sort_expr ::= '排序' '經由' sort_direction ('取自' | '從') expression sort_body?
-# [235] sort_direction
+# [237] sort_direction
 sort_direction ::= '升序' | '降序'
-# [236] sort_body
+# [238] sort_body
 sort_body ::= ('定值' | '變值') IDENTIFIER block_stmt
-# [237] filum_clause
+# [239] filum_clause
 filum_clause ::= '執行緒' IDENTIFIER
-# [238] capta_expr
+# [240] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [239] object_pattern
+# [241] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [240] pattern_property
+# [242] pattern_property
 pattern_property ::= '其餘'? IDENTIFIER ('作為' IDENTIFIER)?
-# [241] array_pattern
+# [243] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [242] array_pattern_element
+# [244] array_pattern_element
 array_pattern_element ::= '_' | '其餘'? IDENTIFIER
-# [243] nota_stmt
+# [245] nota_stmt
 nota_stmt ::= ('註記' | '檢視' | '警告' | '寫出') expression (',' expression)*
-# [244] entry_header
+# [246] entry_header
 entry_header ::= ('引數' IDENTIFIER)? ('出口' expression)?
-# [245] incipit_stmt
+# [247] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [246] incipiet_stmt
+# [248] incipiet_stmt
 incipiet_stmt ::= '非同步入口' entry_header block_stmt
-# [247] probandum_decl
+# [249] probandum_decl
 probandum_decl ::= '測試規格' STRING proba_modifier* '{' probandum_body '}'
-# [248] probandum_body
+# [250] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [249] proba_stmt
+# [251] proba_stmt
 proba_stmt ::= '測試' STRING proba_modifier* block_stmt
-# [250] proba_modifier
+# [252] proba_modifier
 proba_modifier ::= '預期失敗' | '略過' STRING | '預期' STRING | '僅限' | '標籤' STRING | '時限' NATURAL | '測量' | '重複' NATURAL | '脆弱' NATURAL | '僅限於' STRING
-# [251] praepara_block
+# [253] praepara_block
 praepara_block ::= ('準備' | '準備非同步' | '後置準備' | '後置準備非同步') '全部'? block_stmt
-# [252] fac_stmt
+# [254] fac_stmt
 fac_stmt ::= '執行' block_stmt cape_clause? ('當' expression)?
-# [253] IDENTIFIER
+# [255] IDENTIFIER
 IDENTIFIER ::=
-# [254] NUMBER
+# [256] NUMBER
 NUMBER ::=
-# [255] NATURAL
+# [257] NATURAL
 NATURAL ::=
-# [256] STRING
+# [258] STRING
 STRING ::=
-# [257] ASCII_STRING
+# [259] ASCII_STRING
 ASCII_STRING ::=
-# [258] BACKTICK_STRING
+# [260] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [259] OCTETI_STRING
+# [261] OCTETI_STRING
 OCTETI_STRING ::=
-# [260] NEWLINE
+# [262] NEWLINE
 NEWLINE ::=
-# [261] WIDTH_MARKER
+# [263] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [262] LISTA_WIDTH_SUGAR
+# [264] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [263] TENSOR_WIDTH_SUGAR
+# [265] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [264] SPARSA_WIDTH_SUGAR
+# [266] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [265] VECTOR_WIDTH_SUGAR
+# [267] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [266] MATRIX_WIDTH_SUGAR
+# [268] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [267] FRONTMATTER_DELIMITER
+# [269] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [268] TOML_LINES
+# [270] TOML_LINES
 TOML_LINES ::=
-# [269] ANNOTATION_NAME
+# [271] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [270] ANNOTATION_FIELD_NAME
+# [272] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [271] NON_NEWLINE_TOKEN
+# [273] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [272] NO_NEWLINE
+# [274] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -690,6 +694,8 @@ NO_NEWLINE ::=
 | [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live |
 | [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live |
 | [`figura`](#figura) | `#figura` | live |
+| [`spelled_lift`](#spelled-lift) | `#spelled-lift` | live |
+| [`lift_extent`](#lift-extent) | `#lift-extent` | live |
 | [`figura_product`](#figura-product) | `#figura-product` | live |
 | [`figura_primary`](#figura-primary) | `#figura-primary` | live |
 | [`figura_list`](#figura-list) | `#figura-list` | live |
@@ -1982,18 +1988,18 @@ matrix and the numeric model; this file states only the language.
 | `atomic<T>` | storage-sensitive atomic cell; v1 accepts `i32` / `u32` elements only and access must go through atomic methods |
 | `sparsa<T, Figura>` | sparse homogeneous buffer whose shape `Figura` is part of the type (element type and rank static; extents compile-time today, run-time-bindable once K14 lands — admitted, scheduled, not shipped); omitted coordinates equal zero; numeric methods require numeric element types |
 
-A `figura` is `_`, a natural number, a size identifier, or a bracketed list of nested figura values; empty `[]` is rank-0. Dimension arithmetic admits addition or subtraction of natural constants and division by positive natural constants: `[N-1]`, `[D/2]`, and `[(D-2)/3]`. Division binds more tightly than addition or subtraction. Size division is exact, so a negative extent, zero divisor, or nonintegral result is invalid; it does not use ordinary integer floor division. Bare `tensor<T>` is incomplete — use `tensor<T, []>` for rank-0 or `tensor<T, _>` to infer shape.
+A `figura` is `_`, a natural number, a size identifier, or a bracketed list of nested figura values; empty `[]` is rank-0. Dimension arithmetic admits addition or subtraction of natural constants and division by positive natural constants: `[N-1]`, `[D/2]`, and `[(D-2)/3]`. Division binds more tightly than addition or subtraction. Size division is exact, so a negative extent, zero divisor, or nonintegral result is invalid; it does not use ordinary integer floor division. Bare `tensor<T>` is incomplete — use `tensor<T, []>` for rank-0 or `tensor<T, _>` to infer shape. A spelled lift marks a run-time extent: `size N` (la `尺寸 N`) takes a name, a natural, or a parenthesized figura term (`size (n - 1)`); the extent binds at run time and its value is checked at the store that observes it.
 
 An expression shape list can contain `_`, as in `row.expanded([_, 64])`. These structural holes are valid in tensor shape arguments only. A shape witness or the expected tensor type must supply their extents; they do not introduce a scalar placeholder value.
 
-Extents follow the same binding-time rule as capacities (see the capacity paragraph above): shipped, every extent is a compile-time value and a `_` extent infers from a witness; admitted, scheduled (K14), not shipped: `[H, W]` accepts compile-time and run-time extents alike (one syntax, no separate run-time marker), and an unresolved `_` extent is bound at run time instead of being an error. Rank and layout stay static.
+Extents follow the same binding-time rule as capacities (see the capacity paragraph above): an unmarked extent is a compile-time value and a `_` extent infers from a witness; a spelled lift (`size N`, the `spelled_lift` rule) marks a run-time extent, bound at run time and checked at its store. Rank and layout stay static.
 
 `vacua` is the default empty instance of the declared type on the left, whatever that type is. A list, map, or set gets the empty collection. A dense `tensor<T, Figura>`, `vector<T, N>`, or `matrix<T, [R, C]>` gets its zero, so `tf32[2, 3] blank ← vacua` means exactly `tf32[2, 3] blank ← tf32[2, 3] {}`: the shape is the declared shape and every element is zero. That holds wherever the type is known (a declaration, an assignment target, a parameter, a return). Every extent must be resolved, as for the typed zero: a `_` extent, a non-literal vector width or matrix extent, or an affine extent (`[N+1]`) leaves nothing to build and is refused with `SEM011 vacua_requires_resolved_extents`. `vacua` for `tensor<T, []>` produces a rank-0 tensor (one default-initialized element slot, its zero). `vacua` for `sparsa<T, Figura>` (any shape) produces an all-zero sparse tensor with no stored entries.
 `matrix<T, Figura>` requires exactly two dimensions; bare `matrix<T>` and one- or three-axis matrix shapes are rejected.
 `atomic<T>` requires `T` to be `i32` or `u32` in v1. Atomic cells are not interchangeable with their element type; use `load`, `store`, `exchange`, and `compare_exchange` receiver methods.
 Construct multi-dimensional tensors via `structa` / `↦`, or build the typed zero with `Type {}` (below).
 
-**The typed zero `Type {}`.** The zero of a type is written as the type followed by empty braces; it is the `typed_constructor` rule (`Genus { field = value }`) applied to every type: `{}` means build a value and override nothing, so every part takes its default. It is legal for `tensor<T, Figura>`, `vector<T, N>`, `matrix<T, [R, C]>` and their prefixed sugar (`tf32[2, 3] {}`, `vf32[4] {}`, `mf32[2, 2] {}`), including a tensor whose element is a vector (`tensor<vector<f32, 4>, [H, W]> {}`) and extents that are size parameters; a vector width and a matrix extent must be literals (`constructor_register_extent_requires_literal`). It is a value expression, so it can be a receiver (`tf32[4] {}.reple(1.5)`). Where the type is already declared, `vacua` is sugar for it: `T x ← vacua` and `T x ← T {}` are the same value for a tensor, vector, or matrix `T`. The bare type as a value (`← tf32[2, 3]`) is retired and refused with `PARSE030 constructor_requires_empty_braces`; `Type []` is refused by the same diagnostic; `lista<…> {}` is refused by name (`constructor_type_not_claimed`); a call-form constructor is refused (`constructor_store_position_only`). There is no fill form: data enters a typed value by conversion (`↦`), never by the constructor. **The inferred constructor `_ { … }`.** With the hole type `_` before the braces the constructor builds the expected type, so the type is not written; it takes fields (`_ { name = value }`), entries (`_ { "key": value }`, the `json_literal` members) or the empty `{}`, and without an expected type it is `SEM016 inferred_constructor_no_expected_type`.
+**The typed zero `Type {}`.** The zero of a type is written as the type followed by empty braces; it is the `typed_constructor` rule (`Genus { field = value }`) applied to every type: `{}` means build a value and override nothing, so every part takes its default. It is legal for `tensor<T, Figura>`, `vector<T, N>`, `matrix<T, [R, C]>` and their prefixed sugar (`tf32[2, 3] {}`, `vf32[4] {}`, `mf32[2, 2] {}`), including a tensor whose element is a vector (`tensor<vector<f32, 4>, [H, W]> {}`) and extents that are size parameters; a vector width and a matrix extent must be literals (`constructor_register_extent_requires_literal`). It is a value expression, so it can be a receiver (`tf32[4] {}.reple(1.5)`). Where the type is already declared, `vacua` is sugar for it: `T x ← vacua` and `T x ← T {}` are the same value for a tensor, vector, or matrix `T`. The bare type as a value (`← tf32[2, 3]`) is retired and refused with `PARSE030 constructor_requires_empty_braces`; `Type []` is refused by the same diagnostic; `lista<…> {}` is refused by name (`constructor_type_not_claimed`); a call-form constructor is refused (`constructor_store_position_only`). There is no fill form: data enters a typed value by conversion (`↦`), never by the constructor. **The inferred constructor `_ { … }`.** With the hole type `_` before the braces the constructor builds the expected type, so the type is not written; it takes fields (`_ { name = value }`), entries (`_ { "key": value }`, the `json_literal` members) or the empty `{}`, and without an expected type it is `SEM016 inferred_constructor_no_expected_type`. The braces alone carry the same meaning: `{ field = value }` leaves the type slot out, which implies the hole, and the cell supplies the type; the bare form claims only when its head member is a `field = value` init, so `{}` and `{"key": value}` stay JSON literals.
 `Type(...)` is not a construction form: `vector<f32, 4>(...)`, `matrix<f32, [2, 2]>(...)`, `tensor<f32, [2, 2]>(...)`, and scalar forms such as `numerus("42")` are rejected. Use `value ↦ Type`, named library constructors, or `Genus { field = value }` records.
 
 Tensor index/shape intrinsic slots (`accipe`, `ponde`, `forma`, `crea`, `structa`) accept integer lists that fit the canonical `lista<numerus>` / `&[i64]` runtime boundary at call sites (e.g. `lista<u32>` for GPU thread ids; not `lista<u64>`). This is a structural exception scoped to those slots — it does not widen the signed↔unsigned numeric lattice (see Index vector parameter policy in `tensor-intrinsics.md`).

@@ -1215,7 +1215,12 @@ width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
                 | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix?
                 | MATRIX_WIDTH_SUGAR shape_suffix
 shape_suffix    := '[' figura_list? ']'
-figura          := figura_product (('+' | '-') NATURAL)*
+# A spelled lift marks a run-time extent: `magnitudo` (en `size`) then a name,
+# a natural, or a parenthesized figura term (`size (n - 1)`). The value is
+# checked at the store that observes it.
+figura          := spelled_lift | figura_product (('+' | '-') NATURAL)*
+spelled_lift    := 'magnitudo' lift_extent
+lift_extent     := NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER
 figura_product  := figura_primary ('/' NATURAL)*
 figura_primary  := '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
 figura_list     := figura (',' figura)*
@@ -1461,12 +1466,16 @@ array_literal := '[' array_element_list? ']'
 array_element_list := array_element (',' array_element)*
 array_element := argument | '_'
 iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
-# Bare `{ ... }` is a JSON document literal. Keys are quoted JSON strings separated
-# by `:`; values are JSON constants. Anonymous Faber objects (`{ key = expr }`)
-# are retired (literal-family Stage 6). Genus construction uses `typedConstructor`.
+# Bare `{ ... }` with no member or with quoted `:` members is a JSON document
+# literal. Anonymous Faber objects are retired (literal-family Stage 6).
+# Genus construction uses `typedConstructor`: a typed head (`Type { … }`), the
+# hole (`_ { … }`), or braces alone, which imply the hole — the cell supplies
+# the type (operator ruling 2026-10-10). The bare form claims only when the
+# head member is an `IDENTIFIER = value` init, so empty braces and quoted
+# members stay a json_literal.
 json_literal := '{' (json_member (',' json_member)*)? '}'
 json_member  := STRING ':' json_value
-typed_constructor := type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal
+typed_constructor := type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal | '{' field_list '}' construction_source?
 field_list := field_init (',' field_init)*
 field_init := (field_key '=' expression) | IDENTIFIER
 field_key := IDENTIFIER | STRING | '[' expression ']'
