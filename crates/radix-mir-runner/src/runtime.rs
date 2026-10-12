@@ -5478,16 +5478,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .collect();
                 return Ok(Value::Array(Rc::new(RefCell::new(argv))));
             }
-            let mut evaluated = Vec::with_capacity(args.len());
-            for arg in args {
-                let value = self.eval_operand(arg, span)?;
-                evaluated.push(self.prepare_tensor_escape(value, span)?);
-            }
-            let verb = self.interner.resolve(provider.name);
-            return self
-                .host
-                .kernel_call(module, verb, &evaluated, span)
-                .map_err(|error| error.with_provider_identity(&identity));
+            return Err(RunnerError::unsupported(
+                span,
+                &format!(
+                    "kernel {} provider `{}` was deleted; no runner kernel serves it",
+                    module.name(),
+                    self.interner.resolve(provider.name)
+                ),
+            )
+            .with_provider_identity(&identity));
         }
         self.host
             .provider(provider)

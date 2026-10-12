@@ -15,7 +15,6 @@ mod device_block;
 mod exact_int;
 mod host;
 pub mod inf;
-pub mod kernel;
 pub mod kernel_dispatch;
 pub mod kernel_lanes;
 mod regex_program;
@@ -38,7 +37,9 @@ pub use host::{BufferHost, Host, StdioHost};
 pub use inf::{
     RUNNER_INF_BIT_CEILING, RUNNER_INF_MUL_WORK_CEILING, RUNNER_ISSUE_INF_SIZE_EXHAUSTED,
 };
-pub use kernel::reset_execution_state;
+pub fn reset_execution_state() {
+    faber_leaf::reset_execution_state();
+}
 pub use routes::serve_route;
 pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
 pub use value::{FieldOrder, MapKey, Value};
@@ -3898,10 +3899,6 @@ mod capability_test;
 #[cfg(test)]
 #[path = "kernel_dispatch_test.rs"]
 mod kernel_dispatch_test;
-
-#[cfg(test)]
-#[path = "kernel_test.rs"]
-mod kernel_test;
 
 #[cfg(test)]
 #[path = "value_test.rs"]
