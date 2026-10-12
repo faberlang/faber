@@ -1,4 +1,4 @@
-use super::{Arg, Reply, install_argv, is_route, reset_argv, serve};
+use super::{Arg, Reply, install_argv, is_route, reset_argv, reset_children, serve};
 
 #[test]
 fn route_list_matches_serve() {
@@ -135,4 +135,56 @@ fn empty_detach_argv_is_invalid() {
         .expect("route")
         .expect_err("empty");
     assert_eq!(error.kind(), crate::LeafErrorKind::InvalidArgument);
+}
+
+#[test]
+fn exspecta_returns_exit_code() {
+    reset_children();
+    let Reply::Int(pid) = serve(
+        "processus:genera",
+        &[Arg::Strs(vec!["sh".to_owned(), "-c".to_owned(), "exit 3".to_owned()])],
+    )
+    .expect("route")
+    .expect("spawn")
+    else {
+        panic!("expected pid");
+    };
+    match serve("processus:exspecta", &[Arg::Int(pid)])
+        .expect("route")
+        .expect("wait")
+    {
+        Reply::Int(code) => assert_eq!(code, 3),
+        other => panic!("unexpected {other:?}"),
+    }
+    // Reaped: the pid is no longer known.
+    assert!(serve("processus:exspecta", &[Arg::Int(pid)])
+        .expect("route")
+        .is_err());
+}
+
+#[test]
+fn neca_kills_and_exspecta_returns_promptly() {
+    reset_children();
+    let Reply::Int(pid) = serve(
+        "processus:genera",
+        &[Arg::Strs(vec!["sleep".to_owned(), "30".to_owned()])],
+    )
+    .expect("route")
+    .expect("spawn")
+    else {
+        panic!("expected pid");
+    };
+    assert_eq!(
+        serve("processus:neca", &[Arg::Int(pid)]).expect("route").expect("kill"),
+        Reply::Unit
+    );
+    let started = std::time::Instant::now();
+    match serve("processus:exspecta", &[Arg::Int(pid)])
+        .expect("route")
+        .expect("wait")
+    {
+        Reply::Int(code) => assert_eq!(code, -1, "signal-killed child has no exit code"),
+        other => panic!("unexpected {other:?}"),
+    }
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
 }

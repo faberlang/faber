@@ -1550,3 +1550,48 @@ kind = "function"
 canonical = "parse"
 surface = "solve"
 
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "wait"
+surface = "exspecta"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "wait"
+surface = "exspecta"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "kill"
+surface = "neca"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "kill"
+surface = "neca"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "type"
+canonical = "Subprocess"
+surface = "Subprocess"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "type"
+canonical = "Subprocess"
+surface = "Subprocess"
