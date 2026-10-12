@@ -347,9 +347,6 @@ impl<'a> Lexer<'a> {
 
             '∞' => TokenKind::Float(f64::INFINITY),
 
-            // Postfix tensor transpose (tensor-glyphs family).
-            'ᵀ' => TokenKind::Transpose,
-
             // Postfix gradient selection (tensor-glyphs family).
             '∇' => TokenKind::Nabla,
 
@@ -525,6 +522,19 @@ impl<'a> Lexer<'a> {
         self.cursor.advance();
     }
 
+    /// Skip one escape inside a single-line literal.
+    ///
+    /// WHY (PRP-014): `\<newline>` must not consume the newline inside the
+    /// escape skip. Advance past just the backslash so the next loop iteration
+    /// hits the newline rejection branch.
+    fn skip_single_line_escape(&mut self) {
+        if matches!(self.cursor.peek_next(), Some('\n' | '\r')) {
+            self.cursor.advance();
+        } else {
+            self.skip_escaped_char();
+        }
+    }
+
     /// Scan one token or recoverable lexical error from the current position.
     ///
     /// This is the scanner's dispatch boundary. Specialized scanners own
@@ -691,17 +701,7 @@ impl<'a> Lexer<'a> {
                     );
                     break;
                 }
-                Some('\\') => {
-                    // PRP-014: `\<newline>` in single-line literals must not
-                    // consume the newline inside the escape skip. Advance past
-                    // just the backslash so the next iteration hits the
-                    // `Some('\n')` rejection branch below.
-                    if matches!(self.cursor.peek_next(), Some('\n' | '\r')) {
-                        self.cursor.advance();
-                    } else {
-                        self.skip_escaped_char();
-                    }
-                }
+                Some('\\') => self.skip_single_line_escape(),
                 Some('\'') => {
                     self.cursor.advance();
                     terminated = true;
@@ -807,17 +807,7 @@ impl<'a> Lexer<'a> {
                     );
                     break;
                 }
-                Some('\\') => {
-                    // PRP-014: `\<newline>` in single-line literals must not
-                    // consume the newline inside the escape skip. Advance past
-                    // just the backslash so the next iteration hits the
-                    // `Some('\n')` rejection branch below.
-                    if matches!(self.cursor.peek_next(), Some('\n' | '\r')) {
-                        self.cursor.advance();
-                    } else {
-                        self.skip_escaped_char();
-                    }
-                }
+                Some('\\') => self.skip_single_line_escape(),
                 Some('"') => {
                     self.cursor.advance();
                     terminated = true;
