@@ -381,7 +381,9 @@ struct PlaceAlias {
     /// Frame containing the caller place. The caller remains on the stack for
     /// the lifetime of the callee frame, so this is a stable in-runner cell.
     frame: usize,
-    place: MirPlace,
+    /// Only the base is kept: an alias is created for a projection-free
+    /// caller place, so there are no projections to replay.
+    base: MirPlaceBase,
 }
 
 struct Frame {
@@ -1015,24 +1017,10 @@ pub fn run_entry_with_stats_and_kernel_policy<H: Host + ?Sized>(
     host: &mut H,
     kernel_policy: RunnerKernelPolicy,
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
-    let context = validated.validation();
-    let program = validated.program();
-    let interner = context.interner.as_interner().ok_or_else(|| {
-        vec![RunnerError::internal(
-            Span::default(),
-            "runner requires interner context",
-        )]
-    })?;
-    let names = radix_mir::names::MirNames::new(program, context.types.as_table(), interner);
-    let Some(entry) = names.explicit_entry_function() else {
-        return Err(vec![RunnerError::internal(
-            Span::default(),
-            "no entry function in MIR program",
-        )]);
-    };
+    let entry = explicit_entry_id(validated)?;
     run_function_with_explicit_limits_and_stats(
         validated,
-        entry.id,
+        entry,
         host,
         None,
         None,
@@ -1367,14 +1355,13 @@ fn run_function_dispatching<H: Host + ?Sized>(
             "runner requires interner context",
         )]
     })?;
-    if validated.function_by_id(function_id).is_none() {
+    let Some(function) = validated.function_by_id(function_id) else {
         return Err(vec![RunnerError::internal(
             Span::default(),
             format!("no MIR function with id {}", function_id.0),
         )]);
-    }
+    };
     if kernel_policy == RunnerKernelPolicy::Refuse
-        && let Some(function) = validated.function_by_id(function_id)
         && function.shader_stage == Some(MirKernelShaderStage::Compute)
     {
         return Err(vec![kernel_refused(function.span)]);
@@ -2411,7 +2398,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         local,
                         PlaceAlias {
                             frame: depth - 1,
-                            place: place.clone(),
+                            base: place.base.clone(),
                         },
                     );
                 } else {
@@ -3008,7 +2995,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 .and_then(|frame| frame.aliases.get(id))
                 .cloned();
             if let Some(alias) = alias {
-                return self.write_base_place(alias.frame, &alias.place.base, value, span);
+                return self.write_base_place(alias.frame, &alias.base, value, span);
             }
         }
         let frame = self
@@ -3178,7 +3165,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .and_then(|frame| frame.aliases.get(&id))
             .cloned();
         if let Some(alias) = alias {
-            return self.read_base_place(alias.frame, &alias.place.base, span);
+            return self.read_base_place(alias.frame, &alias.base, span);
         }
         self.frames
             .get(frame_index)
@@ -3924,7 +3911,6 @@ mod inf_test;
 #[path = "decimal_shared_agreement_test.rs"]
 mod decimal_shared_agreement_test;
 
-#[cfg(test)]
 #[cfg(test)]
 #[path = "extremum_test.rs"]
 mod extremum_test;
