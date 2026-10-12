@@ -5,7 +5,7 @@ locale = "en"
 
 # value.fab — codec-agnostic value tree navigation
 #
-# Shared surface for the tree-shaped codecs under the flat codec modules (json, toml, yaml).
+# Shared surface for the tree-shaped codecs under the flat codec modules (json, toml).
 # Each codec owns its wire floor; this module owns the operations on the
 # value tree shape they all produce. CSV is excluded — it produces a flat
 # list<list<string>>, not a valor tree.

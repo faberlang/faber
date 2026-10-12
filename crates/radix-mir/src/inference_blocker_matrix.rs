@@ -91,8 +91,8 @@ pub const INFERENCE_BLOCKER_ROWS: &[InferenceBlockerRow] = &[
     InferenceBlockerRow {
         category: InferenceBlockerKind::ModelLoading,
         status: InferenceBlockerStatus::Parked,
-        blocker: "GGUF parsing, tokenizer ownership, quantization, and dynamic-shape handoff remain parked; no production model loader is claimed. F32 safetensors tensor materialization is product-ready (norma/src/model.fab safetensors_tensor_f32). Inference fragment architecture (tiny linear → BERT-shaped) defines the vertical integration path (docs/factory/mir-swarm/fragment-architecture.md).",
-        evidence: "docs/factory/mir-swarm/fragment-architecture.md; norma/src/model.fab safetensors_tensor_f32; docs/factory/safetensors-gguf-breakpoint-spike/goal.md",
+        blocker: "GGUF parsing, tokenizer ownership, quantization, and dynamic-shape handoff remain parked; no production model loader is claimed. F32 safetensors tensor materialization lives in Gradus (`gradus/src/model/`). Inference fragment architecture (tiny linear → BERT-shaped) defines the vertical integration path (docs/factory/mir-swarm/fragment-architecture.md).",
+        evidence: "docs/factory/mir-swarm/fragment-architecture.md; gradus/src/model/; docs/factory/safetensors-gguf-breakpoint-spike/goal.md",
     },
     InferenceBlockerRow {
         category: InferenceBlockerKind::TensorOps,

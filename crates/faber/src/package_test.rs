@@ -5944,7 +5944,7 @@ main {
 }
 
 #[test]
-fn compile_package_refuses_nondum_norma_yaml_calls() {
+fn compile_package_refuses_removed_norma_yaml_module() {
     let dir = test_temp_dir("norma-yaml-import");
     let entry = dir.join("main.fab");
     fs::write(
@@ -5952,36 +5952,31 @@ fn compile_package_refuses_nondum_norma_yaml_calls() {
         r#"
 import from "norma:yaml" yaml
 
-main {
-  const value doc ← yaml.parse("count: 1")
-  const _ text ← yaml.stringify(doc)
-}
+main {}
 "#,
     )
     .expect("write entry");
 
-    // `yaml.parse` and `yaml.stringify` are bodiless `@ unstable` declarations:
-    // the import resolves, every use is refused at compile time.
+    // Q2: yaml left core. The specifier is an unknown library module.
     let result = compile_with_faber_seams(&Config::default(), &entry);
-    assert!(
-        !result.success(),
-        "an @ unstable norma function must refuse every use"
-    );
-    let nondum_refusals = result
+    assert!(result.output.is_none());
+    let unknown_module = result
         .diagnostics
         .iter()
-        .filter(|diag| diag.issue() == Some("nondum_function_for_target"))
-        .count();
-    assert_eq!(
-        nondum_refusals,
-        2,
-        "expected one nondum_function_for_target per yaml call, got {:?}",
-        result
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.code, diag.issue()))
-            .collect::<Vec<_>>()
-    );
+        .find(|diag| diagnostic_has_issue(diag, "unknown_library_module"))
+        .expect("unknown built-in library module diagnostic");
+    assert!(diagnostic_has_arg(
+        unknown_module,
+        "specifier",
+        "norma:yaml"
+    ));
+    let known_modules = unknown_module
+        .args
+        .iter()
+        .find(|arg| arg.name == "known_modules")
+        .map(|arg| arg.value.as_str())
+        .expect("known_modules arg");
+    assert!(!known_modules.contains("yaml"));
 }
 
 #[test]

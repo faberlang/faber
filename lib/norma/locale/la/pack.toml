@@ -1471,36 +1471,6 @@ surface = "claude"
 
 [[library_members]]
 provider = "norma"
-module_path = ["yaml"]
-kind = "function"
-canonical = "stringify"
-surface = "pange"
-
-[[library_members]]
-provider = "package"
-package = "norma"
-module_path = ["yaml"]
-kind = "function"
-canonical = "stringify"
-surface = "pange"
-
-[[library_members]]
-provider = "norma"
-module_path = ["yaml"]
-kind = "function"
-canonical = "parse"
-surface = "solve"
-
-[[library_members]]
-provider = "package"
-package = "norma"
-module_path = ["yaml"]
-kind = "function"
-canonical = "parse"
-surface = "solve"
-
-[[library_members]]
-provider = "norma"
 module_path = ["toml"]
 kind = "function"
 canonical = "parse"
@@ -1514,32 +1484,3 @@ kind = "function"
 canonical = "parse"
 surface = "solve"
 
-[[library_members]]
-provider = "norma"
-module_path = ["model"]
-kind = "function"
-canonical = "detect_format"
-surface = "formatum"
-
-[[library_members]]
-provider = "package"
-package = "norma"
-module_path = ["model"]
-kind = "function"
-canonical = "detect_format"
-surface = "formatum"
-
-[[library_members]]
-provider = "norma"
-module_path = ["model"]
-kind = "function"
-canonical = "diagnose"
-surface = "diagnosticum"
-
-[[library_members]]
-provider = "package"
-package = "norma"
-module_path = ["model"]
-kind = "function"
-canonical = "diagnose"
-surface = "diagnosticum"

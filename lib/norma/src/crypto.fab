@@ -12,16 +12,11 @@ locale = "en"
 # Design notes:
 # - digest: hash (digerere = to digest) - native body below
 # - hmac: HMAC (authenticare = to authenticate)
-# - encrypt/decrypt: symmetric encryption (celare/revelare = to hide/reveal)
-# - sign/verify: asymmetric signatures
-# - generate_key/generate_pair: key generation
-# - derive_key: key derivation (async - intentionally slow)
+# Encryption, signing, and key generation left core at N6 (Q2: delete).
 #
 # Algorithms:
 # - Hash: sha256, sha384, sha512
 # - HMAC: hmac-sha256, hmac-sha384, hmac-sha512
-# - Symmetric: aes-256-gcm
-# - Asymmetric: ed25519
 
 # =========================================================================
 # HASHING
@@ -424,68 +419,4 @@ fn concat_bytes(bytes a, bytes b) → bytes {
         i ← i + 1
     }
     return out ↦ list<b8>
-}
-
-# =========================================================================
-# SYMMETRIC ENCRYPTION
-# =========================================================================
-
-# Encrypt (aes-256-gcm, aes-256-cbc)
-# Returns ciphertext with IV prepended
-@ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn encrypt(string alg, bytes key, bytes data) → bytes
-
-# Decrypt (expects IV prepended to ciphertext)
-@ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn decrypt(string alg, bytes key, bytes data) → bytes
-
-# =========================================================================
-# ASYMMETRIC SIGNATURES
-# =========================================================================
-
-# Sign with private key
-@ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn sign(bytes secret, bytes data) → bytes
-
-# Verify with public key
-@ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn verify(bytes public_key, bytes data, bytes signature) → bool
-
-# =========================================================================
-# KEY GENERATION
-# =========================================================================
-
-# Generate symmetric key (aes-256)
-@ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn generate_key(string alg) → bytes
-
-# Generate asymmetric key pair (ed25519, rsa-2048, rsa-4096)
-@ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn generate_pair(string alg) → KeyPair
-
-# =========================================================================
-# KEY DERIVATION
-# =========================================================================
-
-# Derive key from password (pbkdf2, argon2id, scrypt)
-# Async because intentionally slow for security
-@ future
-@ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn derive_key(string alg, string password, bytes salt, int length) → bytes
-
-# Asymmetric key pair
-@ public
-interface KeyPair {
-    fn public_key() → bytes
-
-    fn private_key() → bytes
-
-    fn algorithm() → string
 }
