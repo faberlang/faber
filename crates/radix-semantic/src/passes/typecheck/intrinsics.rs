@@ -271,13 +271,6 @@ pub(super) fn check_intrinsic_method_call(
         || "method".to_owned(),
         |interner| interner.resolve(*name).to_owned(),
     );
-    // Pack-authoritative lookup (db54b442): the active pack is the sole
-    // authority for intrinsic spellings under non-la locales. Under a NON-la
-    // pack, only spellings the pack declares as a surface for the receiver's
-    // family resolve — through the family-scoped surface→canonical cache; the
-    // canonical Latin spelling is a miss and a compile error (no registry
-    // bypass, no Latin fallback). Under the la pack or no pack, lookup is
-    // registry-direct: the spelling IS the canonical Latin identity.
     let mut effective_name = method_name.as_str();
     let mut entry = None;
     let is_modular = matches!(checker.types.get(payload_ty), Type::ModularWord(_));
@@ -598,7 +591,34 @@ pub(super) fn check_intrinsic_method_call(
                 Some(resolved)
             }
         }
-        _ => {
+        _ => Some(check_registered_intrinsic(
+            checker,
+            entry,
+            ctx,
+            bounded_appende,
+            receiver,
+            receiver_ty,
+            explicit_type_args,
+            args,
+            span,
+        )),
+    }
+}
+
+/// Resolve and check one registered intrinsic row whose params and return
+/// shape are published from the receiver's element types (every row except
+/// the mapper and reducer rows routed to their own signatures above).
+fn check_registered_intrinsic(
+    checker: &mut TypeChecker<'_>,
+    entry: &MethodIntrinsic,
+    ctx: IntrinsicTypeContext,
+    bounded_appende: bool,
+    receiver: &HirExpression,
+    receiver_ty: TypeId,
+    explicit_type_args: &[TypeId],
+    args: &mut [HirCallArg],
+    span: radix_lexer::Span,
+) -> TypeId {
             let params = resolve_param_types(checker, entry, &ctx);
             let ret = resolve_return_type(checker, entry, &ctx, span);
             // WHY: tensor `NumerusArray` slots accept `lista<integer>` values
@@ -711,7 +731,7 @@ pub(super) fn check_intrinsic_method_call(
                 result
             };
             if checker.reject_negative_potentia_exponent(entry, receiver_ty, args) {
-                return Some(checker.error_type);
+                return checker.error_type;
             }
             let result = checker.integer_method_range_type(entry, receiver_ty, args, result);
             if entry.faber_name == "accipe" && !entry.failable && !args.is_empty() {
@@ -732,9 +752,7 @@ pub(super) fn check_intrinsic_method_call(
                     span,
                 );
             }
-            Some(result)
-        }
-    }
+            result
 }
 
 /// `regex.muta(text, closure)` (RX-5): the closure takes the match and returns
