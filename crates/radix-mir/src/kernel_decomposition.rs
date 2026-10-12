@@ -1685,10 +1685,8 @@ fn build_subchain_function(
     // scalar-return reduction shape survives the slice — and a single-output
     // intermediate subchain is a buffer-producing kernel that returns
     // nothing.
-    let terminator;
-    let return_ty;
     let mut temps = source.temps.clone();
-    if needs_synthetic_tuple_return(outputs, is_last, source) {
+    let (terminator, return_ty) = if needs_synthetic_tuple_return(outputs, is_last, source) {
         let element_ids: Vec<TypeId> = outputs
             .iter()
             .map(|&local| source_local_ty(source, local).semantic_id())
@@ -1725,29 +1723,29 @@ fn build_subchain_function(
             },
             span,
         });
-        terminator = MirTerminator {
-            kind: MirTerminatorKind::Return(Some(MirOperand::Temp(tuple_temp))),
-            span,
-        };
-        return_ty = tuple_ty;
+        (
+            MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Temp(tuple_temp))),
+                span,
+            },
+            tuple_ty,
+        )
     } else if is_last {
         // The last subchain keeps the source return terminator: the return
         // local keeps its original id, so the scalar-return reduction shape
         // survives the slice.
-        terminator = block.terminator.clone();
-        return_ty = source.return_ty;
+        (block.terminator.clone(), source.return_ty)
     } else if plan_is_elementwise {
-        let (elementwise_terminator, elementwise_return_ty) =
-            elementwise_subchain_return(source, block, indices);
-        terminator = elementwise_terminator;
-        return_ty = elementwise_return_ty;
+        elementwise_subchain_return(source, block, indices)
     } else {
-        terminator = MirTerminator {
-            kind: MirTerminatorKind::Return(None),
-            span,
-        };
-        return_ty = source.return_ty;
-    }
+        (
+            MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            source.return_ty,
+        )
+    };
 
     MirFunction {
         id: source.id,

@@ -257,7 +257,7 @@ fn hardware_blocks() -> Option<BlocksFn> {
 /// Portable backend: [`compress`] over each 64-byte block.
 fn compress_blocks_portable(state: &mut [u32; 8], blocks: &[u8]) {
     debug_assert_eq!(blocks.len() % 64, 0);
-    for block in blocks.chunks_exact(64) {
+    for block in blocks.as_chunks::<64>().0 {
         compress(state, block);
     }
 }
@@ -298,7 +298,7 @@ unsafe fn compress_sha2(state: &mut [u32; 8], blocks: &[u8]) {
     unsafe {
         let mut abcd = vld1q_u32(state.as_ptr());
         let mut efgh = vld1q_u32(state.as_ptr().add(4));
-        for block in blocks.chunks_exact(64) {
+        for block in blocks.as_chunks::<64>().0 {
             let (abcd_in, efgh_in) = (abcd, efgh);
             let mut msg = [
                 vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(block.as_ptr()))),

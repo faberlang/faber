@@ -62,18 +62,15 @@ impl Element {
 macro_rules! decode_vec {
     ($ty:ty, $bytes:expr, $endian:expr) => {{
         const WIDTH: usize = std::mem::size_of::<$ty>();
-        let chunks = $bytes.chunks_exact(WIDTH);
-        let read = |chunk: &[u8]| -> [u8; WIDTH] {
-            let mut array = [0_u8; WIDTH];
-            array.copy_from_slice(chunk);
-            array
-        };
+        let chunks = $bytes.as_chunks::<WIDTH>().0;
         match $endian {
             EndianHint::Le => chunks
-                .map(|chunk| <$ty>::from_le_bytes(read(chunk)))
+                .iter()
+                .map(|chunk| <$ty>::from_le_bytes(*chunk))
                 .collect::<Vec<$ty>>(),
             EndianHint::Be => chunks
-                .map(|chunk| <$ty>::from_be_bytes(read(chunk)))
+                .iter()
+                .map(|chunk| <$ty>::from_be_bytes(*chunk))
                 .collect::<Vec<$ty>>(),
         }
     }};
