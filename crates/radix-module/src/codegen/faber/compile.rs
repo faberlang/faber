@@ -559,10 +559,6 @@ impl HirVisitor for StructuralOwnerIndex<'_> {
         }
     }
 
-    fn visit_function(&mut self, function: &crate::hir::HirFunction) {
-        walk_function(self, function);
-    }
-
     fn visit_expr(&mut self, expr: &HirExpression) {
         if let HirExpressionKind::Clausura(..) = &expr.kind {
             let parent = self.current_function_path();
@@ -593,6 +589,8 @@ impl HirVisitor for StructuralOwnerIndex<'_> {
             .insert(def_id, StructuralOwner::Local { function: frame.path.clone(), name, ordinal });
     }
 
+    // WHY: the default `visit_type_param` calls `visit_def`, which would index a
+    // type parameter as a local binding; only value bindings get owner paths here.
     fn visit_type_param(&mut self, _type_param: &crate::hir::HirTypeParam) {}
 }
 
