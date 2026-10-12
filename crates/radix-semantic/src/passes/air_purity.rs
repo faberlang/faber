@@ -150,6 +150,15 @@ impl AirPurityChecker<'_> {
         }
     }
 
+    /// Check a handler body as the try region (ATH-2) and return its normal
+    /// exit type for the recovery-arity check.
+    fn check_handler_region(&mut self, body: &HirBlock) -> Option<TypeId> {
+        self.handler_regions.push(HandlerRegion::Try);
+        self.check_block(body);
+        self.handler_regions.pop();
+        self.normal_exit_type(body)
+    }
+
     fn check_stmt(&mut self, stmt: &HirStatement) {
         match &stmt.kind {
             HirStatementKind::Local(local) => self.check_local(local, stmt.span),
@@ -280,10 +289,8 @@ impl AirPurityChecker<'_> {
                 // the catch arm itself declines as a rethrow.
                 self.check_expr(cond);
                 if let Some(catch) = then_catch {
-                    self.handler_regions.push(HandlerRegion::Try);
-                    self.check_block(then_block);
-                    self.handler_regions.pop();
-                    self.check_recovery(catch, self.normal_exit_type(then_block));
+                    let outer = self.check_handler_region(then_block);
+                    self.check_recovery(catch, outer);
                 } else {
                     self.check_block(then_block);
                 }
@@ -451,25 +458,19 @@ impl AirPurityChecker<'_> {
                 // in-region throw source), and the recovery arm must resolve
                 // to the whole expression's type. Keep-out forms inside the
                 // body (loops, effects) still decline under their own causes.
-                self.handler_regions.push(HandlerRegion::Try);
-                self.check_block(body);
-                self.handler_regions.pop();
-                self.check_recovery(catch, self.normal_exit_type(body));
+                let outer = self.check_handler_region(body);
+                self.check_recovery(catch, outer);
             }
             // UT: the capture boundary locally resolves the body's alternate
             // exits into a value union — the same ATH-2 admission shape as a
             // local handler, with no recovery arm (the value is the recovery).
             HirExpressionKind::Trap(body) => {
-                self.handler_regions.push(HandlerRegion::Try);
-                self.check_block(body);
-                self.handler_regions.pop();
+                self.check_handler_region(body);
             }
             // D17.7: the call default is a trap whose recovery arm is the
             // default value, evaluated outside the handler region.
             HirExpressionKind::CallDefault { body, default, .. } => {
-                self.handler_regions.push(HandlerRegion::Try);
-                self.check_block(body);
-                self.handler_regions.pop();
+                self.check_handler_region(body);
                 self.check_expr(default);
             }
             HirExpressionKind::Clausura(params, _, _, body) => {
