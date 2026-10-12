@@ -15,12 +15,8 @@ pub(super) fn rewrite_templates_sources(
     if source_rewrites.is_empty() || templates.is_empty() {
         return;
     }
-    let mut program = MirProgram {
-        functions: templates.to_vec(),
-    };
-    rewrite_program_sources(&mut program, unit_path, source_rewrites);
-    for (template, rewritten) in templates.iter_mut().zip(program.functions) {
-        *template = rewritten;
+    for template in templates {
+        rewrite_function_sources(template, unit_path, source_rewrites);
     }
 }
 
@@ -48,17 +44,27 @@ pub(super) fn rewrite_program_sources(
         return;
     }
     for function in &mut program.functions {
-        if let Some(source) = function.source
-            && let Some(rewritten) = rewritten_source(unit_path, source, source_rewrites)
-        {
-            function.source = Some(rewritten);
+        rewrite_function_sources(function, unit_path, source_rewrites);
+    }
+}
+
+/// Rewrite one function's own source id, its statement operands, and its
+/// terminators through the unit's source map.
+fn rewrite_function_sources(
+    function: &mut MirFunction,
+    unit_path: &Path,
+    source_rewrites: &SourceRewrites,
+) {
+    if let Some(source) = function.source
+        && let Some(rewritten) = rewritten_source(unit_path, source, source_rewrites)
+    {
+        function.source = Some(rewritten);
+    }
+    for block in &mut function.blocks {
+        for statement in &mut block.statements {
+            rewrite_statement_sources(statement, unit_path, source_rewrites);
         }
-        for block in &mut function.blocks {
-            for statement in &mut block.statements {
-                rewrite_statement_sources(statement, unit_path, source_rewrites);
-            }
-            rewrite_terminator_sources(&mut block.terminator, unit_path, source_rewrites);
-        }
+        rewrite_terminator_sources(&mut block.terminator, unit_path, source_rewrites);
     }
 }
 
