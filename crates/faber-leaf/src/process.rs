@@ -105,10 +105,6 @@ fn expect_str<'a>(
 ) -> Result<&'a str, LeafError> {
     match args.get(index) {
         Some(Arg::Str(value)) => Ok(value),
-        Some(Arg::Nil) => Err(LeafError::invalid_argument(
-            route,
-            format!("{name} must be textus"),
-        )),
         Some(_) => Err(LeafError::invalid_argument(
             route,
             format!("{name} must be textus"),
@@ -122,11 +118,12 @@ fn expect_str<'a>(
 
 /// Collect the child argv from an opener that flattened a `lista<textus>`
 /// into one positional `Str` per element, while still accepting a single
-/// `Arg::Strs` when the list arrived intact.
+/// `Arg::Strs` when the list arrived intact. An empty program or command is
+/// rejected here so every spawn/exec caller shares the guard.
 fn expect_argv(route: &'static str, args: &[Arg]) -> Result<Vec<String>, LeafError> {
-    match args {
-        [Arg::Strs(value)] => Ok(value.clone()),
-        [] => Err(LeafError::invalid_argument(route, "missing args")),
+    let argv = match args {
+        [Arg::Strs(value)] => value.clone(),
+        [] => return Err(LeafError::invalid_argument(route, "missing args")),
         other => other
             .iter()
             .map(|arg| match arg {
@@ -136,8 +133,15 @@ fn expect_argv(route: &'static str, args: &[Arg]) -> Result<Vec<String>, LeafErr
                     "args must be lista<textus>",
                 )),
             })
-            .collect(),
+            .collect::<Result<Vec<_>, _>>()?,
+    };
+    if argv.is_empty() || argv[0].is_empty() {
+        return Err(LeafError::invalid_argument(
+            route,
+            "empty argv / empty command",
+        ));
     }
+    Ok(argv)
 }
 
 fn empty_ok(route: &'static str, args: &[Arg]) -> Result<(), LeafError> {
@@ -192,12 +196,6 @@ fn kill(args: &[Arg]) -> Result<Reply, LeafError> {
 fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:genera";
     let argv = expect_argv(ROUTE, args)?;
-    if argv.is_empty() || argv[0].is_empty() {
-        return Err(LeafError::invalid_argument(
-            ROUTE,
-            "empty argv / empty command",
-        ));
-    }
     let mut command = Command::new(&argv[0]);
     command.args(&argv[1..]);
     command.stdin(Stdio::inherit());
@@ -214,12 +212,6 @@ fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
 fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:dimitte";
     let argv = expect_argv(ROUTE, args)?;
-    if argv.is_empty() || argv[0].is_empty() {
-        return Err(LeafError::invalid_argument(
-            ROUTE,
-            "empty argv / empty command",
-        ));
-    }
     let mut command = Command::new(&argv[0]);
     command.args(&argv[1..]);
     command.stdin(Stdio::null());
@@ -241,12 +233,6 @@ fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
 fn capture(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:captura";
     let argv = expect_argv(ROUTE, args)?;
-    if argv.is_empty() || argv[0].is_empty() {
-        return Err(LeafError::invalid_argument(
-            ROUTE,
-            "empty argv / empty command",
-        ));
-    }
     let output = Command::new(&argv[0])
         .args(&argv[1..])
         .output()
