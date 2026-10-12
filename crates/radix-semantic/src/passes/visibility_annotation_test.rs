@@ -286,3 +286,43 @@ functio secretum() → vacuum {
         ],
     );
 }
+
+#[test]
+fn interface_method_protecta_is_rejected() {
+    let source = r"
+implendum Canens {
+    @ protecta
+    functio canta() → vacuum
+}
+";
+    let lex_result = radix_lexer::lex(source);
+    let parse_result = radix_parser::parse(lex_result);
+    let program = parse_result.program.expect("parse");
+    let interner = &parse_result.interner;
+    let errors = check(&program, interner).expect_err("protecta method annotation should be rejected");
+    expect_structured_error(
+        &errors,
+        SemanticErrorKind::AnnotationInvalid,
+        &[("issue", "protecta_reserved")],
+    );
+}
+
+#[test]
+fn interface_method_publica_and_privata_are_accepted() {
+    for annotation in ["@ publica", "@ privata"] {
+        let source = format!(
+            r"
+implendum Canens {{
+    {annotation}
+    functio canta() → vacuum
+}}
+"
+        );
+        let lex_result = radix_lexer::lex(&source);
+        let parse_result = radix_parser::parse(lex_result);
+        let program = parse_result.program.expect("parse");
+        let interner = &parse_result.interner;
+        let result = check(&program, interner);
+        assert!(result.is_ok(), "{annotation}: {result:?}");
+    }
+}

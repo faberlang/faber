@@ -142,14 +142,6 @@ fn check_declaration_visibility(
     }
 }
 
-fn check_member_annotations(
-    annotations: &[Annotation],
-    interner: &Interner,
-    errors: &mut Vec<SemanticError>,
-) {
-    push_protecta_diagnostics(annotations, interner, errors);
-}
-
 /// Warn on redundant member `@ publica` and reject a `genus` member that
 /// mixes distinct visibility tiers. `@ privata` / `@ interna` are enforced
 /// by typecheck (D5.3).
@@ -229,7 +221,7 @@ fn check_stmt(stmt: &Stmt, interner: &Interner, errors: &mut Vec<SemanticError>)
         }
         StmtKind::Interface(iface) => {
             for method in &iface.methods {
-                check_member_annotations(&method.annotations, interner, errors);
+                push_protecta_diagnostics(&method.annotations, interner, errors);
             }
         }
         _ => {}
