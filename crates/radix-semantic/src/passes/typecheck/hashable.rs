@@ -134,23 +134,18 @@ impl TypeChecker<'_> {
         let Some(info) = self.structs.get(&def_id) else {
             return true;
         };
-        let fields: Vec<TypeId> = info.fields.values().map(|field| field.ty).collect();
-        fields
-            .into_iter()
-            .all(|field| self.is_hashable(field, seen))
+        info.fields
+            .values()
+            .all(|field| self.is_hashable(field.ty, seen))
     }
 
     fn variant_fields_hashable(&self, enum_def: DefId, seen: &mut FxHashSet<TypeId>) -> bool {
-        let fields: Vec<TypeId> = self
-            .variant_parent
+        self.variant_parent
             .iter()
             .filter(|(_, parent)| **parent == enum_def)
             .filter_map(|(variant, _)| self.variant_fields.get(variant))
             .flatten()
             .copied()
-            .collect();
-        fields
-            .into_iter()
             .all(|field| self.is_hashable(field, seen))
     }
 }
