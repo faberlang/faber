@@ -34,8 +34,7 @@ impl TypeChecker<'_> {
         issue: &'static str,
         span: radix_lexer::Span,
     ) {
-        self.errors
-            .push(SemanticError::structured(kind, span).with_arg("issue", issue));
+        self.error_issue_with_args(kind, issue, span, &[]);
     }
 
     /// [`Self::error_issue`] carrying named message arguments.
@@ -88,12 +87,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         args: &[(&'static str, String)],
     ) {
-        let mut error = SemanticError::structured(SemanticErrorKind::OperandTypesInvalid, span)
-            .with_arg("issue", issue);
-        for (name, value) in args {
-            error = error.with_arg(name, value);
-        }
-        self.errors.push(error);
+        self.error_issue_with_args(SemanticErrorKind::OperandTypesInvalid, issue, span, args);
     }
 
     pub fn undefined_member(&mut self, issue: &'static str, span: radix_lexer::Span) {
@@ -106,12 +100,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         args: &[(&'static str, String)],
     ) {
-        let mut error = SemanticError::structured(SemanticErrorKind::MemberUndefined, span)
-            .with_arg("issue", issue);
-        for (name, value) in args {
-            error = error.with_arg(name, value);
-        }
-        self.errors.push(error);
+        self.error_issue_with_args(SemanticErrorKind::MemberUndefined, issue, span, args);
     }
 
     pub fn unavailable_declaration(
@@ -140,12 +129,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         args: &[(&'static str, String)],
     ) {
-        let mut error = SemanticError::structured(SemanticErrorKind::ImmutableAssignment, span)
-            .with_arg("issue", issue);
-        for (name, value) in args {
-            error = error.with_arg(name, value);
-        }
-        self.errors.push(error);
+        self.error_issue_with_args(SemanticErrorKind::ImmutableAssignment, issue, span, args);
     }
 
     pub fn missing_type_annotation(&mut self, issue: &'static str, span: radix_lexer::Span) {
@@ -618,7 +602,7 @@ impl TypeChecker<'_> {
                 self.big_integer_literal_type(digits, span, expected)
             }
             HirLiteral::Float(_) => self
-                .expected_fractus_literal_type(expected)
+                .expected_float_slot_type(expected)
                 .unwrap_or_else(|| self.fractus_type()),
             // decimal-widths D1: annotated decimals carry exact digit text to
             // typing; `numerus<d64>` accept the literal at the
@@ -626,7 +610,7 @@ impl TypeChecker<'_> {
             HirLiteral::FloatText { text, value } => {
                 if let Some(ty) = self.expected_decimal_literal_type(expected, *text, span) {
                     ty
-                } else if let Some(float_ty) = self.expected_fractus_literal_type(expected) {
+                } else if let Some(float_ty) = self.expected_float_slot_type(expected) {
                     // Ruling 20(2): a written float outside the slot's finite
                     // range is an error, never infinity.
                     if self.check_float_literal_range(float_ty, *value, span) {
@@ -680,7 +664,8 @@ impl TypeChecker<'_> {
         self.error_type
     }
 
-    fn expected_fractus_literal_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
+    /// The float type of an expected slot, when the expectation is `fractus`.
+    pub(super) fn expected_float_slot_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
         let expected = self.resolve_inferred_type(expected?);
         match self.types.get(expected) {
             Type::Primitive(Primitive::Fractus)
@@ -688,11 +673,6 @@ impl TypeChecker<'_> {
             | Type::PolicyFloat(_, _) => Some(expected),
             _ => None,
         }
-    }
-
-    /// The float type of an expected slot, when the expectation is `fractus`.
-    pub(super) fn expected_float_slot_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
-        self.expected_fractus_literal_type(expected)
     }
 
     /// d11-6 rulings 16/20: an integer constant stored into a float slot takes
