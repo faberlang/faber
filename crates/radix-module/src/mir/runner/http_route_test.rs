@@ -143,9 +143,9 @@ fn bind_limited_refuses_an_oversize_body() {
         run_host("http-limit.fab", &program(&body), &mut host).expect_err("accept must refuse the oversize body");
     assert!(
         errors[0].message.contains("max_body_bytes")
-            || errors.iter().any(|error| error
-                .message
-                .contains("max_body_bytes")),
+            || errors
+                .iter()
+                .any(|error| error.message.contains("max_body_bytes")),
         "{errors:?}"
     );
     assert!(host.stdout_lines.is_empty());

@@ -118,7 +118,9 @@ pub fn reset_handles() {
 }
 
 /// Take a pending request so the WebSocket leaf can upgrade it.
-pub(crate) fn take_upgrade(request_id: &str) -> Result<(IoStream, Vec<(String, String)>), LeafError> {
+pub(crate) fn take_upgrade(
+    request_id: &str,
+) -> Result<(IoStream, Vec<(String, String)>), LeafError> {
     with_requests(|map| match map.remove(request_id) {
         Some(slot) => Ok((slot.stream, slot.headers)),
         None => Err(LeafError::closed("websocket:accept", "request closed")),
@@ -387,10 +389,7 @@ fn split_url(url: &str) -> Result<UrlParts, LeafError> {
             })?;
             (host.to_owned(), parsed)
         }
-        _ => (
-            authority.to_owned(),
-            if https { 443 } else { 80 },
-        ),
+        _ => (authority.to_owned(), if https { 443 } else { 80 }),
     };
     let target = if path.is_empty() { "/" } else { path }.to_owned();
     Ok(UrlParts {
@@ -402,12 +401,11 @@ fn split_url(url: &str) -> Result<UrlParts, LeafError> {
 }
 
 fn exchange(opener: &ClientOpener, open: bool) -> Result<Reply, LeafError> {
-    let (timeout, ca_path) = opener
-        .agent
-        .map_or((DEFAULT_TIMEOUT, None), lookup_agent);
+    let (timeout, ca_path) = opener.agent.map_or((DEFAULT_TIMEOUT, None), lookup_agent);
     let url = split_url(&opener.url)?;
     let addr = format!("{}:{}", url.host, url.port);
-    let tcp = TcpStream::connect(&addr).map_err(|err| LeafError::from_io("http:request", &addr, &err))?;
+    let tcp =
+        TcpStream::connect(&addr).map_err(|err| LeafError::from_io("http:request", &addr, &err))?;
     configure_stream(&tcp, timeout, "http:request")?;
     let mut stream = if url.https {
         wrap_tls_client(tcp, &url.host, ca_path.as_deref())?
@@ -584,10 +582,12 @@ fn fill_reader(
             continue;
         }
         if leftover.is_empty() && remaining.as_deref() != Some(&0) {
-            let want = remaining.as_deref().map_or(max - out.len(), |left| {
-                usize::try_from(*left).unwrap_or(max - out.len())
-            })
-            .min(max - out.len());
+            let want = remaining
+                .as_deref()
+                .map_or(max - out.len(), |left| {
+                    usize::try_from(*left).unwrap_or(max - out.len())
+                })
+                .min(max - out.len());
             let mut buf = vec![0_u8; want.max(1)];
             match stream.read(&mut buf) {
                 Ok(0) => *done = true,
@@ -656,7 +656,11 @@ fn read_next_chunk(stream: &mut IoStream) -> Result<Option<Vec<u8>>, LeafError> 
 }
 
 fn listen(args: &[Arg], tls: bool) -> Result<Reply, LeafError> {
-    let route = if tls { "http:listen_tls" } else { "http:listen" };
+    let route = if tls {
+        "http:listen_tls"
+    } else {
+        "http:listen"
+    };
     let port = expect_int(route, args, 0, "port")?;
     if !(0..=65_535).contains(&port) {
         return Err(LeafError::invalid_argument(route, "port out of range"));
@@ -974,7 +978,8 @@ fn read_http_message(
         )
     };
     let chunked = headers.iter().any(|(name, value)| {
-        name.eq_ignore_ascii_case("transfer-encoding") && value.to_ascii_lowercase().contains("chunked")
+        name.eq_ignore_ascii_case("transfer-encoding")
+            && value.to_ascii_lowercase().contains("chunked")
     });
     let content_length = headers.iter().find_map(|(name, value)| {
         name.eq_ignore_ascii_case("content-length")
@@ -1020,7 +1025,9 @@ fn collect_headers(headers: &[httparse::Header<'_>]) -> Vec<(String, String)> {
 }
 
 fn find_header_end(buf: &[u8]) -> Option<usize> {
-    buf.windows(4).position(|window| window == b"\r\n\r\n").map(|index| index + 4)
+    buf.windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|index| index + 4)
 }
 
 fn read_length_body(
@@ -1147,7 +1154,8 @@ fn wrap_tls_client(
     let mut roots = RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     if let Some(path) = ca_path {
-        let bytes = std::fs::read(path).map_err(|err| LeafError::from_io("http:request", path, &err))?;
+        let bytes =
+            std::fs::read(path).map_err(|err| LeafError::from_io("http:request", path, &err))?;
         for cert in rustls_pemfile::certs(&mut bytes.as_slice()) {
             let cert = cert.map_err(|err| {
                 LeafError::invalid_argument("http:request", format!("ca pem: {err}"))

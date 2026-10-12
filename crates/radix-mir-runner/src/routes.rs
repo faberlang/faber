@@ -82,10 +82,8 @@ fn value_to_arg(value: &Value) -> Option<Arg> {
                         })
                         .collect(),
                 ))
-            } else if let Some(nested) = items
-                .iter()
-                .map(value_to_arg)
-                .collect::<Option<Vec<Arg>>>()
+            } else if let Some(nested) =
+                items.iter().map(value_to_arg).collect::<Option<Vec<Arg>>>()
             {
                 Some(Arg::List(nested))
             } else {

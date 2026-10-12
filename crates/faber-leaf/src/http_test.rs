@@ -63,8 +63,8 @@ fn plaintext_get_round_trips() {
         );
         serve_ok("http:stop", &[Arg::Int(listener)]);
     });
-    let mut client = TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap()))
-        .expect("connect");
+    let mut client =
+        TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap())).expect("connect");
     client
         .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n")
         .expect("write");
@@ -121,10 +121,7 @@ fn client_posts_to_local_listener() {
         serve_ok("http:stop", &[Arg::Int(listener)]);
     });
     let url = format!("http://127.0.0.1:{port}/post");
-    let reply = serve_ok(
-        "http:post",
-        &[Arg::Str(url), Arg::Str("hello".to_owned())],
-    );
+    let reply = serve_ok("http:post", &[Arg::Str(url), Arg::Str("hello".to_owned())]);
     server.join().expect("server");
     let Reply::Map(fields) = reply else {
         panic!("post: {reply:?}");
@@ -152,14 +149,11 @@ fn oversize_body_is_refused() {
         let _ = serve("http:stop", &[Arg::Int(listener)]);
         error.to_string()
     });
-    let mut client = TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap()))
-        .expect("connect");
+    let mut client =
+        TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap())).expect("connect");
     client
         .write_all(b"POST /big HTTP/1.1\r\nHost: localhost\r\nContent-Length: 9\r\n\r\n123456789")
         .expect("write");
     let message = server.join().expect("server");
-    assert!(
-        message.contains("max_body_bytes"),
-        "{message}"
-    );
+    assert!(message.contains("max_body_bytes"), "{message}");
 }

@@ -127,9 +127,9 @@ fn connect(args: &[Arg]) -> Result<Reply, LeafError> {
         HttpStream::Plain(tcp)
     };
     let handshake = format!("ws://{host}:{port}{target}");
-    let request = handshake.into_client_request().map_err(|err| {
-        LeafError::invalid_argument(ROUTE, format!("websocket request: {err}"))
-    })?;
+    let request = handshake
+        .into_client_request()
+        .map_err(|err| LeafError::invalid_argument(ROUTE, format!("websocket request: {err}")))?;
     let (socket, _) = tungstenite::client(request, stream)
         .map_err(|err| LeafError::unavailable(ROUTE, format!("websocket handshake: {err}")))?;
     Ok(Reply::Int(insert(socket)))
@@ -217,11 +217,7 @@ fn receive(args: &[Arg]) -> Result<Reply, LeafError> {
             ("text".to_owned(), Reply::Str(String::new())),
             ("done".to_owned(), Reply::Bool(false)),
         ])),
-        Err(err) => Err(LeafError::from_io(
-            ROUTE,
-            "",
-            &std::io::Error::other(err),
-        )),
+        Err(err) => Err(LeafError::from_io(ROUTE, "", &std::io::Error::other(err))),
     })
 }
 
@@ -282,17 +278,13 @@ fn split_ws_url(url: &str) -> Result<(bool, String, u16, String), LeafError> {
     Ok((secure, host, port, path.to_owned()))
 }
 
-fn wrap_tls(
-    stream: TcpStream,
-    host: &str,
-    ca_path: Option<&str>,
-) -> Result<HttpStream, LeafError> {
+fn wrap_tls(stream: TcpStream, host: &str, ca_path: Option<&str>) -> Result<HttpStream, LeafError> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut roots = RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     if let Some(path) = ca_path {
-        let bytes =
-            std::fs::read(path).map_err(|err| LeafError::from_io("websocket:connect", path, &err))?;
+        let bytes = std::fs::read(path)
+            .map_err(|err| LeafError::from_io("websocket:connect", path, &err))?;
         for cert in rustls_pemfile::certs(&mut bytes.as_slice()) {
             let cert = cert.map_err(|err| {
                 LeafError::invalid_argument("websocket:connect", format!("ca pem: {err}"))
@@ -313,8 +305,9 @@ fn wrap_tls(
             format!("invalid TLS server name `{host}`"),
         )
     })?;
-    let conn = ClientConnection::new(config, name).map_err(|err| {
-        LeafError::unavailable("websocket:connect", format!("tls client: {err}"))
-    })?;
-    Ok(HttpStream::TlsClient(rustls::StreamOwned::new(conn, stream)))
+    let conn = ClientConnection::new(config, name)
+        .map_err(|err| LeafError::unavailable("websocket:connect", format!("tls client: {err}")))?;
+    Ok(HttpStream::TlsClient(rustls::StreamOwned::new(
+        conn, stream,
+    )))
 }

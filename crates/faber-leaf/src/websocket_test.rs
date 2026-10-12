@@ -65,10 +65,7 @@ fn echo_round_trips() {
                 _ => None,
             })
             .expect("text");
-        serve_ok(
-            "websocket:send",
-            &[Arg::Int(socket), Arg::Str(text)],
-        );
+        serve_ok("websocket:send", &[Arg::Int(socket), Arg::Str(text)]);
         serve_ok("websocket:close", &[Arg::Int(socket)]);
         http_ok("http:stop", &[Arg::Int(listener)]);
     });
