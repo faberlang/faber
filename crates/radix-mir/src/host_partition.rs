@@ -324,17 +324,6 @@ pub enum PartitionRole {
     Device,
 }
 
-impl PartitionRole {
-    /// Stable diagnostic spelling.
-    #[must_use]
-    pub fn spelling(self) -> &'static str {
-        match self {
-            Self::Host => "host",
-            Self::Device => "device",
-        }
-    }
-}
-
 /// Exact membership of one function in the partition (DDCP3-U3 gate bullet 1).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PartitionMember {
