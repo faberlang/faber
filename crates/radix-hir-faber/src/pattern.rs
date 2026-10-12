@@ -142,11 +142,7 @@ impl super::FaberCodegen<'_> {
     /// Keep an authored qualified path when lowering erased its segments. If
     /// no path fact exists, qualify only when the shorter form cannot
     /// re-resolve.
-    fn variant_pattern_spelling(
-        &self,
-        def_id: DefId,
-        names: &FxHashMap<DefId, Symbol>,
-    ) -> String {
+    fn variant_pattern_spelling(&self, def_id: DefId, names: &FxHashMap<DefId, Symbol>) -> String {
         self.authored_variant_spellings
             .get(&def_id)
             .cloned()
