@@ -215,24 +215,9 @@ impl Parser {
             return self.parse_size_decl(mutability);
         }
 
-        let marker_span = self.current_span();
-        let marker = self.current_word();
-        let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
-            None
-        } else {
-            Some(self.parse_type()?)
-        };
-
-        let binding = self.parse_binding_pattern()?;
-        if ty
-            .as_ref()
-            .is_some_and(|slot| matches!(slot.mode, Some(TypeMode::Copy | TypeMode::Own)))
-        {
-            self.record_binding_marker_retired(marker_span, keyword, marker, &binding);
-        }
+        let (mut ty, binding) = self.parse_typed_binding(keyword)?;
 
         let mut compile_time = false;
-        let mut ty = ty;
         let (init, await_form) = if self.eat(&TokenKind::Assign) {
             // Value-side marker (`var T b ← copy a`, `var T b ← own a`): the
             // marker names what happens to the initializer, and the binding
@@ -315,6 +300,33 @@ impl Parser {
                 .with_arg("marker", marker)
                 .with_arg("name", name),
         );
+    }
+
+    /// Parse the optional written type and the binding pattern of a binding
+    /// declaration. A retired binding-side `copy`/`own` marker leaves the
+    /// declaration parsing whole but is recorded through
+    /// [`Self::record_binding_marker_retired`].
+    fn parse_typed_binding(
+        &mut self,
+        keyword: String,
+    ) -> Result<(Option<TypeExpr>, BindingPattern), ParseError> {
+        let marker_span = self.current_span();
+        let marker = self.current_word();
+        let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
+            None
+        } else {
+            Some(self.parse_type()?)
+        };
+
+        let binding = self.parse_binding_pattern()?;
+        if ty
+            .as_ref()
+            .is_some_and(|slot| matches!(slot.mode, Some(TypeMode::Copy | TypeMode::Own)))
+        {
+            self.record_binding_marker_retired(marker_span, keyword, marker, &binding);
+        }
+
+        Ok((ty, binding))
     }
 
     /// Parse the `= expr` initializer of a local compile-time constant
@@ -413,16 +425,10 @@ impl Parser {
     ) -> Result<Expr, ParseError> {
         let has_concrete_type = ty.is_some_and(|t| !matches!(t.kind, TypeExprKind::Infer));
         let BindingPattern::Ident(ident) = binding else {
-            return Err(
-                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
-                    .with_arg("issue", "conversio_assign_requires_concrete_type"),
-            );
+            return Err(self.conversio_assign_requires_concrete_type_error());
         };
         if !has_concrete_type {
-            return Err(
-                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
-                    .with_arg("issue", "conversio_assign_requires_concrete_type"),
-            );
+            return Err(self.conversio_assign_requires_concrete_type_error());
         }
         // `Ident` is not `Clone`; rebuild the binding name for the target
         // expression from its Copy fields.
@@ -440,6 +446,13 @@ impl Parser {
         self.parse_assignment_tail(target, ident_span)
     }
 
+    /// The `↤` destination error shared by declarations whose written type
+    /// cannot name a conversion target (`fixum _`, `sit`, destructuring).
+    fn conversio_assign_requires_concrete_type_error(&self) -> ParseError {
+        ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
+            .with_arg("issue", "conversio_assign_requires_concrete_type")
+    }
+
     /// Parse `figendum` / `variandum` awaited binding declarations.
     ///
     /// GRAMMAR:
@@ -452,21 +465,7 @@ impl Parser {
         let keyword = self.current_word();
         self.advance();
 
-        let marker_span = self.current_span();
-        let marker = self.current_word();
-        let ty = if self.check(&TokenKind::LBracket) || self.check(&TokenKind::LBrace) {
-            None
-        } else {
-            Some(self.parse_type()?)
-        };
-
-        let binding = self.parse_binding_pattern()?;
-        if ty
-            .as_ref()
-            .is_some_and(|slot| matches!(slot.mode, Some(TypeMode::Copy | TypeMode::Own)))
-        {
-            self.record_binding_marker_retired(marker_span, keyword, marker, &binding);
-        }
+        let (ty, binding) = self.parse_typed_binding(keyword)?;
 
         // `figendum`/`variandum` retain `←`: combining implicit conversion and
         // await ordering needs a separate language decision, so `↤` here is a
@@ -580,10 +579,7 @@ impl Parser {
         } else if self.check(&TokenKind::ConversioAssign) {
             // `sit` is an inferred binding (≡ `fixum _`): no concrete
             // destination type, so conversion-directed assignment is rejected.
-            return Err(
-                ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
-                    .with_arg("issue", "conversio_assign_requires_concrete_type"),
-            );
+            return Err(self.conversio_assign_requires_concrete_type_error());
         } else if self.eat(&TokenKind::AwaitAssign) {
             (
                 Some(Box::new(self.parse_expression()?)),
@@ -646,31 +642,9 @@ impl Parser {
 
         while !self.check(&TokenKind::RBracket) && !self.is_at_end() {
             if self.eat_keyword_ident(TokenKind::Ceteri) {
-                if rest.is_some() {
-                    return Err(ParseError::structured(
-                        ParseErrorKind::Expected,
-                        self.current_span(),
-                    )
-                    .with_arg("issue", "duplicate_rest_pattern")
-                    .with_arg("keyword", "ceteri"));
-                }
-                let name = self.parse_ident()?;
-                rest = Some(name);
+                rest = Some(self.parse_ident()?);
                 if self.check(&TokenKind::Comma) {
-                    let comma_span = self.current_span();
-                    self.advance();
-                    if self.check_keyword_ident(TokenKind::Ceteri) {
-                        return Err(ParseError::structured(
-                            ParseErrorKind::Expected,
-                            self.current_span(),
-                        )
-                        .with_arg("issue", "duplicate_rest_pattern")
-                        .with_arg("keyword", "ceteri"));
-                    }
-                    return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
-                        .with_arg("issue", "item_list_trailing_comma")
-                        .with_arg("family", "item_list")
-                        .with_arg("position", "array_binding_pattern"));
+                    return Err(self.rest_item_comma_error("array_binding_pattern"));
                 }
                 break;
             }
@@ -716,30 +690,9 @@ impl Parser {
 
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             if self.eat_keyword_ident(TokenKind::Ceteri) {
-                if rest.is_some() {
-                    return Err(ParseError::structured(
-                        ParseErrorKind::Expected,
-                        self.current_span(),
-                    )
-                    .with_arg("issue", "duplicate_rest_pattern")
-                    .with_arg("keyword", "ceteri"));
-                }
                 rest = Some(self.parse_ident()?);
                 if self.check(&TokenKind::Comma) {
-                    let comma_span = self.current_span();
-                    self.advance();
-                    if self.check_keyword_ident(TokenKind::Ceteri) {
-                        return Err(ParseError::structured(
-                            ParseErrorKind::Expected,
-                            self.current_span(),
-                        )
-                        .with_arg("issue", "duplicate_rest_pattern")
-                        .with_arg("keyword", "ceteri"));
-                    }
-                    return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
-                        .with_arg("issue", "item_list_trailing_comma")
-                        .with_arg("family", "item_list")
-                        .with_arg("position", "object_binding_pattern"));
+                    return Err(self.rest_item_comma_error("object_binding_pattern"));
                 }
                 break;
             }
@@ -764,6 +717,24 @@ impl Parser {
             is_rest: rest,
             span,
         })
+    }
+
+    /// Diagnose a comma after a rest element: the rest element is always last,
+    /// so a following `ceteri` is a duplicate and anything else is a trailing
+    /// comma. `position` names the enclosing list for the trailing-comma
+    /// diagnostic.
+    fn rest_item_comma_error(&mut self, position: &'static str) -> ParseError {
+        let comma_span = self.current_span();
+        self.advance();
+        if self.check_keyword_ident(TokenKind::Ceteri) {
+            return ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                .with_arg("issue", "duplicate_rest_pattern")
+                .with_arg("keyword", "ceteri");
+        }
+        ParseError::structured(ParseErrorKind::Expected, comma_span)
+            .with_arg("issue", "item_list_trailing_comma")
+            .with_arg("family", "item_list")
+            .with_arg("position", position)
     }
 
     // FUNCTION DECLARATIONS
@@ -1767,7 +1738,7 @@ impl Parser {
             ImportKind::Selective {
                 members: self.parse_selective_import_members()?,
             }
-        } else if self.is_import_named_binding_start()
+        } else if Self::is_import_binding_name(&self.peek().kind)
             && !self.at_following_import_decl()
             && (explicit_visibility || !self.import_binding_continues_expression())
             && (explicit_visibility || !matches!(self.peek().kind, TokenKind::Tag))
@@ -1900,10 +1871,6 @@ impl Parser {
         self.check_keyword_ident(TokenKind::Importa)
             && (self.keyword_ident_at(1) == Some(TokenKind::Ex)
                 || self.peek_at(1).kind == TokenKind::LBrace)
-    }
-
-    fn is_import_named_binding_start(&self) -> bool {
-        Self::is_import_binding_name(&self.peek().kind)
     }
 
     /// Whether a token may occupy an import binding name slot.
