@@ -284,14 +284,11 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::Call(callee, type_args, args, _) => {
                 // Postfix expression forms bind tighter than every infix form
                 // currently emitted by this backend.
-                let mut wrote_finge = false;
                 if let HirExpressionKind::Path(def_id) = &callee.kind
                     && self.variant_def_ids.contains(def_id)
                 {
                     self.write_finge_construction(*def_id, args, names, surface, writer);
-                    wrote_finge = true;
-                }
-                if !wrote_finge {
+                } else {
                     self.write_expr_prec(callee, 13, names, surface, writer);
                     self.write_call_type_args(type_args, names, surface, writer);
                     writer.write("(");
@@ -649,29 +646,8 @@ impl super::FaberCodegen<'_> {
                 });
                 writer.write(" ");
                 self.write_expr(iter, names, surface, writer);
-                // Coordinate clause from the shared `apud` production; the
-                // bindings are loop-visible, so dropping them breaks bodies
-                // that reference the coordinate.
-                if !coordinates.is_empty() {
-                    writer.write(" ");
-                    writer.write(surface.keyword(TokenKind::Apud));
-                    writer.write(" [");
-                    for (index, (_, name)) in coordinates.iter().enumerate() {
-                        if index > 0 {
-                            writer.write(", ");
-                        }
-                        writer.write(&self.symbol_to_string(*name));
-                    }
-                    writer.write("]");
-                }
-                // Lane-binder clause from the shared `filum` production;
-                // dropping it rewrites the declared source head.
-                if let Some((_, lane)) = filum {
-                    writer.write(" ");
-                    writer.write(surface.contextual_keyword("filum"));
-                    writer.write(" ");
-                    writer.write(&self.symbol_to_string(*lane));
-                }
+                self.write_apud_coordinates(coordinates, surface, writer);
+                self.write_filum_clause(*filum, surface, writer);
                 writer.write(" ");
                 // A destructuring binder lowers to a synthetic element local
                 // plus a leading run of pattern locals; re-sugar that run.
@@ -1291,42 +1267,22 @@ impl super::FaberCodegen<'_> {
                 writer.write(surface.keyword(TokenKind::Ex));
                 writer.write(" ");
                 self.write_expr_prec(source, 12, names, surface, writer);
-                if !coordinates.is_empty() {
-                    writer.write(" ");
-                    writer.write(surface.keyword(TokenKind::Apud));
-                    writer.write(" [");
-                    for (index, (_, name)) in coordinates.iter().enumerate() {
-                        if index > 0 {
-                            writer.write(", ");
-                        }
-                        writer.write(&self.symbol_to_string(*name));
-                    }
-                    writer.write("]");
-                }
+                self.write_apud_coordinates(coordinates, surface, writer);
                 if let Some(group) = group {
                     writer.write(" ");
                     writer.write(surface.contextual_keyword("pro"));
                     writer.write(" ");
                     self.write_expr_prec(group, 12, names, surface, writer);
                 }
-                if let Some((_, lane)) = filum {
-                    writer.write(" ");
-                    writer.write(surface.contextual_keyword("filum"));
-                    writer.write(" ");
-                    writer.write(&self.symbol_to_string(*lane));
-                }
-                if let (Some(binding), Some(body)) = (binding, body) {
-                    writer.write(" ");
-                    writer.write(loop_binder_keyword(*mutable, surface));
-                    writer.write(" ");
-                    writer.write(&self.symbol_to_string(binding.1));
-                    writer.writeln(" {");
-                    writer.indented(|writer| {
-                        self.write_block(body, names, surface, writer);
-                        self.write_block_end_trivia(body, writer);
-                    });
-                    writer.write("}");
-                }
+                self.write_filum_clause(*filum, surface, writer);
+                self.write_binder_body_clause(
+                    *binding,
+                    body.as_ref(),
+                    *mutable,
+                    names,
+                    surface,
+                    writer,
+                );
                 if let Some(identity) = identity {
                     writer.write(" ");
                     writer.write(surface.contextual_keyword("vel"));
@@ -1354,18 +1310,14 @@ impl super::FaberCodegen<'_> {
                 }));
                 writer.write(" ");
                 self.write_expr_prec(source, 12, names, surface, writer);
-                if let (Some(binding), Some(body)) = (binding, body) {
-                    writer.write(" ");
-                    writer.write(loop_binder_keyword(*mutable, surface));
-                    writer.write(" ");
-                    writer.write(&self.symbol_to_string(binding.1));
-                    writer.writeln(" {");
-                    writer.indented(|writer| {
-                        self.write_block(body, names, surface, writer);
-                        self.write_block_end_trivia(body, writer);
-                    });
-                    writer.write("}");
-                }
+                self.write_binder_body_clause(
+                    *binding,
+                    body.as_ref(),
+                    *mutable,
+                    names,
+                    surface,
+                    writer,
+                );
             }
             HirExpressionKind::FirstMatch {
                 source,
@@ -1379,18 +1331,7 @@ impl super::FaberCodegen<'_> {
                 writer.write(surface.contextual_keyword("primus_quem"));
                 writer.write("(");
                 self.write_expr(source, names, surface, writer);
-                if !coordinates.is_empty() {
-                    writer.write(" ");
-                    writer.write(surface.keyword(TokenKind::Apud));
-                    writer.write(" [");
-                    for (index, (_, name)) in coordinates.iter().enumerate() {
-                        if index > 0 {
-                            writer.write(", ");
-                        }
-                        writer.write(&self.symbol_to_string(*name));
-                    }
-                    writer.write("]");
-                }
+                self.write_apud_coordinates(coordinates, surface, writer);
                 writer.write(", ");
                 writer.write(surface.contextual_keyword("ubi"));
                 writer.write(" ");
@@ -1435,6 +1376,71 @@ impl super::FaberCodegen<'_> {
         writer: &mut CodeWriter,
     ) {
         self.write_expr_prec(expr, 0, names, surface, writer);
+    }
+
+    /// The `apud [i, j]` coordinate clause from the shared `apud`
+    /// production: the coordinate bindings are visible to the construct's
+    /// body, so dropping the clause breaks bodies that reference them.
+    fn write_apud_coordinates(
+        &self,
+        coordinates: &[(DefId, Symbol)],
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        if !coordinates.is_empty() {
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Apud));
+            writer.write(" [");
+            for (index, (_, name)) in coordinates.iter().enumerate() {
+                if index > 0 {
+                    writer.write(", ");
+                }
+                writer.write(&self.symbol_to_string(*name));
+            }
+            writer.write("]");
+        }
+    }
+
+    /// The lane-binder clause from the shared `filum` production; dropping
+    /// it rewrites the declared source head.
+    fn write_filum_clause(
+        &self,
+        filum: Option<(DefId, Symbol)>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        if let Some((_, lane)) = filum {
+            writer.write(" ");
+            writer.write(surface.contextual_keyword("filum"));
+            writer.write(" ");
+            writer.write(&self.symbol_to_string(lane));
+        }
+    }
+
+    /// The `fixum binder { body }` tail shared by `reducta` and `ordinata`:
+    /// HIR keeps binder and body jointly present or absent, so one clause
+    /// writes both or neither.
+    fn write_binder_body_clause(
+        &self,
+        binding: Option<(DefId, Symbol)>,
+        body: Option<&HirBlock>,
+        mutable: bool,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        if let (Some((_, binder)), Some(body)) = (binding, body) {
+            writer.write(" ");
+            writer.write(loop_binder_keyword(mutable, surface));
+            writer.write(" ");
+            writer.write(&self.symbol_to_string(binder));
+            writer.writeln(" {");
+            writer.indented(|writer| {
+                self.write_block(body, names, surface, writer);
+                self.write_block_end_trivia(body, writer);
+            });
+            writer.write("}");
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
