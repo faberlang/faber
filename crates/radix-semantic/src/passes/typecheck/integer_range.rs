@@ -142,6 +142,17 @@ enum Operand {
     Other,
 }
 
+/// The operand of an untyped integer constant expression, at any size.
+fn const_operand(expr: &HirExpression) -> Option<Operand> {
+    const_int_exact(expr).map(|value| value.to_i128().map_or(Operand::Big, Operand::Const))
+}
+
+/// Ruling 8: a `u64` beside a signed typed integer has no lossless join.
+fn u64_meets_signed(a: NumericWidth, b: NumericWidth) -> bool {
+    (a == NumericWidth::U64 && b.is_signed_int())
+        || (b == NumericWidth::U64 && a.is_signed_int())
+}
+
 /// What an expected type means for a constant-only expression.
 enum ConstSlot {
     /// An integer slot: the constant takes its type.
@@ -291,8 +302,8 @@ impl TypeChecker<'_> {
     }
 
     fn classify_operand(&self, expr: &HirExpression, ty: TypeId) -> Operand {
-        if let Some(value) = const_int_exact(expr) {
-            return value.to_i128().map_or(Operand::Big, Operand::Const);
+        if let Some(operand) = const_operand(expr) {
+            return operand;
         }
         self.range_int_width(ty)
             .map_or(Operand::Other, Operand::Plain)
@@ -342,6 +353,12 @@ impl TypeChecker<'_> {
             Operand::Plain(width) => width.integer_range(),
             Operand::Big | Operand::Other => None,
         }
+    }
+
+    /// Exact interval of a declared width, or of a constant value that takes
+    /// part by value in its place.
+    fn width_or_const_range(width: NumericWidth, konst: Option<i128>) -> Option<IntRange> {
+        konst.map_or_else(|| width.integer_range(), |value| Some((value, value)))
     }
 
     /// Type of a constant-only expression: the integer slot's type, a float
@@ -577,8 +594,7 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         if let (Operand::Plain(a), Operand::Plain(b)) = (l, r)
-            && ((a == NumericWidth::U64 && b.is_signed_int())
-                || (b == NumericWidth::U64 && a.is_signed_int()))
+            && u64_meets_signed(a, b)
         {
             self.invalid_operand_types(U64_SIGNED_ARITHMETIC_REQUIRES_CONVERSION, span);
             return Some(self.error_type);
@@ -851,8 +867,8 @@ impl TypeChecker<'_> {
         // operand joins by value.
         let operands: Vec<Operand> = [(lhs, lhs_ty), (rhs, rhs_ty)]
             .iter()
-            .map(|(expr, ty)| match const_int_exact(expr) {
-                Some(value) => value.to_i128().map_or(Operand::Big, Operand::Const),
+            .map(|(expr, ty)| match const_operand(expr) {
+                Some(operand) => operand,
                 None => self
                     .numeric_shape(self.resolve_inferred_type(*ty))
                     .map_or(Operand::Plain(NumericWidth::I64), |shape| {
@@ -930,8 +946,7 @@ impl TypeChecker<'_> {
         let (a, b) = (Self::operand_range(l)?, Self::operand_range(r)?);
         if let (Operand::Plain(x), Operand::Plain(y)) = (l, r)
             && matches!(op, HirBinOp::BitAnd | HirBinOp::BitOr | HirBinOp::BitXor)
-            && ((x == NumericWidth::U64 && y.is_signed_int())
-                || (y == NumericWidth::U64 && x.is_signed_int()))
+            && u64_meets_signed(x, y)
         {
             self.invalid_operand_types(U64_SIGNED_ARITHMETIC_REQUIRES_CONVERSION, span);
             return Some(self.error_type);
@@ -1039,16 +1054,15 @@ impl TypeChecker<'_> {
         if self.current_device_function {
             return None;
         }
-        let range_of = |this: &Self, (ty, konst): (TypeId, Option<i128>)| match konst {
-            Some(value) => Some((value, value)),
-            None => this.plain_int_width(ty)?.integer_range(),
-        };
         // Both sides must be integers even where a constant supplies the range.
         let (wa, wb) = (self.plain_int_width(a.0)?, self.plain_int_width(b.0)?);
         if wa == NumericWidth::Inf || wb == NumericWidth::Inf {
             return Some(self.inf_type());
         }
-        let joined = range::hull(range_of(self, a)?, range_of(self, b)?);
+        let joined = range::hull(
+            Self::width_or_const_range(wa, a.1)?,
+            Self::width_or_const_range(wb, b.1)?,
+        );
         Some(self.join_range_type(joined, span))
     }
 
@@ -1130,15 +1144,12 @@ impl TypeChecker<'_> {
                 return Some(self.inf_type());
             }
         }
-        let range_of = |width: NumericWidth, konst: Option<i128>| {
-            konst.map_or_else(|| width.integer_range(), |value| Some((value, value)))
-        };
         if start_const.is_some() && end_const.is_some() {
             return None;
         }
         let joined = range::hull(
-            range_of(start_width, start_const)?,
-            range_of(end_width, end_const)?,
+            Self::width_or_const_range(start_width, start_const)?,
+            Self::width_or_const_range(end_width, end_const)?,
         );
         Some(self.join_range_type(joined, span))
     }

@@ -172,6 +172,16 @@ fn u64_with_signed_typed_operand_rejects() {
 }
 
 #[test]
+fn u64_with_signed_bitwise_operand_rejects() {
+    for op in ["∧", "∨", "⊻"] {
+        test_support::assert_analysis_rejects_with_issue(
+            &format!("functio f(u64 a, i32 b) {{\n    fixum _ r ← a {op} b\n}}\n"),
+            "u64_signed_arithmetic_requires_conversion",
+        );
+    }
+}
+
+#[test]
 fn u64_with_constants_is_not_an_error() {
     test_support::assert_analysis_accepts(
         "functio f(u64 a) {\n    fixum _ r ← a - 1\n    fixum _ s ← a + -5\n}\n",
