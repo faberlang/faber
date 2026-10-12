@@ -17,19 +17,27 @@ locale = "en"
 # from predicate overrides — norma:value's generic predicates are correct.
 
 
+import from "norma:toml/solve" parser
+
+import from "norma:toml/serialize" encoder
+
 # =========================================================================
 # SERIALIZATION (wire floor)
 # =========================================================================
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn stringify(value value) → string
+fn stringify(value document) → string ⇥ string {
+    return encoder.stringify(document)
+}
 
 # =========================================================================
 # PARSING (wire floor)
 # =========================================================================
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn parse(string toml) → value
+fn parse(string toml) → value ⇥ string {
+    return parser.parse(toml)
+}
+
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn try_parse(string toml) → value ∪ none
+fn try_parse(string toml) → value ∪ none {
+    return parser.try_parse(toml)
+}

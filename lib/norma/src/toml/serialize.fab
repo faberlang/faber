@@ -1,0 +1,145 @@
++++
+locale = "en"
++++
+# toml/serialize.fab — TOML wire serializer
+#
+# Ordinary Faber. Renders a codec-neutral value tree as TOML text.
+# Nested maps become [tables]; lists of maps become [[array of tables]].
+
+import from "norma:text" text
+
+@ public
+fn stringify(value document) → string ⇥ string {
+    if document is none then throw "norma:toml.stringify: TOML has no null"
+    if document is map<string, value> {
+        const map<string, value> fields ↤ document ⊥ empty
+        return encode_table(fields)
+    }
+    throw "norma:toml.stringify: document must be a table"
+}
+
+fn as_text(value node) → string {
+    return node ↦ string ⊥ ""
+}
+
+fn as_bool(value node) → bool {
+    return node ↦ bool ⊥ false
+}
+
+fn as_integer(value node) → inf {
+    return node ↦ inf ⊥ 0
+}
+
+fn as_float(value node) → float {
+    return node ↦ float ⊥ 0.0
+}
+
+fn quote(string s) → string {
+    var string out ← «\"»
+    var int i ← 0
+    while i ≺ s.length() {
+        const string c ← s.slice(i, i + 1)
+        if c ≡ «\"» {
+            out ← out + «\\\"»
+        }
+        elif c ≡ "\\" {
+            out ← out + "\\\\"
+        }
+        elif c ≡ "\n" {
+            out ← out + "\\n"
+        }
+        elif c ≡ "\r" {
+            out ← out + "\\r"
+        }
+        elif c ≡ "\t" {
+            out ← out + "\\t"
+        }
+        else {
+            out ← out + c
+        }
+        i ← i + 1
+    }
+    return out + «\"»
+}
+
+fn is_bare_key(string key) → bool {
+    if key.length() ≡ 0 then return false
+    var int i ← 0
+    while i ≺ key.length() {
+        const string c ← key.slice(i, i + 1)
+        if not "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-".contains(c) {
+            return false
+        }
+        i ← i + 1
+    }
+    return true
+}
+
+fn emit_key(string key) → string {
+    if is_bare_key(key) then return key
+    return quote(key)
+}
+
+fn encode_scalar(value node) → string {
+    if node is bool {
+        if as_bool(node) then return "true"
+        return "false"
+    }
+    if node is string then return quote(as_text(node))
+    if node is int then return as_integer(node) ↦ string
+    if node is float then return as_float(node) ↦ string
+    if node is instant {
+        const string wire ↤ node ⊥ ""
+        return wire
+    }
+    do {
+        const inf big ↤ node
+        return big ↦ string
+    }
+    catch err {
+    }
+    panic "norma:toml.stringify: unsupported scalar"
+}
+
+fn encode_array(list<value> items) → string {
+    var list<string> encoded ← empty
+    for from items const item {
+        if item is map<string, value> then panic "norma:toml.stringify: inline table arrays use [[tables]]"
+        if item is list<value> {
+            const list<value> nested ↤ item ⊥ empty
+            encoded.append(encode_array(nested))
+        }
+        else {
+            encoded.append(encode_scalar(item))
+        }
+    }
+    return text.join(["[", text.join(encoded, ", "), "]"], "")
+}
+
+fn encode_value(value node) → string {
+    if node is list<value> {
+        const list<value> items ↤ node ⊥ empty
+        return encode_array(items)
+    }
+    if node is map<string, value> {
+        const map<string, value> table ↤ node ⊥ empty
+        var list<string> keys ← table.keys()
+        keys.sort()
+        var list<string> pairs ← empty
+        for from keys const key {
+            pairs.append(text.join([emit_key(key), " = ", encode_value(table[key])], ""))
+        }
+        return text.join(["{ ", text.join(pairs, ", "), " }"], "")
+    }
+    return encode_scalar(node)
+}
+
+fn encode_table(map<string, value> fields) → string {
+    var list<string> keys ← fields.keys()
+    keys.sort()
+    var list<string> members ← empty
+    for from keys const key {
+        members.append(text.join([emit_key(key), " = ", encode_value(fields[key])], ""))
+    }
+    return text.join(members, "\n") + "\n"
+}

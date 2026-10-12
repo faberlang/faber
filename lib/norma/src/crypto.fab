@@ -362,8 +362,69 @@ fn sha384(bytes data) → bytes {
 
 # HMAC (hmac-sha256, hmac-sha384, hmac-sha512)
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn hmac(string alg, bytes key, bytes data) → bytes
+fn hmac(string alg, bytes key, bytes data) → bytes ⇥ string {
+    if data.length() ≻ 67108864 then throw "norma:crypto.hmac: input exceeds 67108864-byte limit"
+    if key.length() ≻ 1048576 then throw "norma:crypto.hmac: key exceeds 1048576-byte limit"
+    var string hash ← ""
+    var int block ← 0
+    if alg ≡ "hmac-sha256" {
+        hash ← "sha256"
+        block ← 64
+    }
+    elif alg ≡ "hmac-sha384" {
+        hash ← "sha384"
+        block ← 128
+    }
+    elif alg ≡ "hmac-sha512" {
+        hash ← "sha512"
+        block ← 128
+    }
+    else {
+        throw "norma:crypto.hmac: algorithm must be hmac-sha256, hmac-sha384, or hmac-sha512"
+    }
+    var bytes k ← key
+    if k.length() ≻ block {
+        k ← digest(hash, k)
+    }
+    const bytes inner ← digest(hash, concat_bytes(xor_pad(k, block, 54), data))
+    return digest(hash, concat_bytes(xor_pad(k, block, 92), inner))
+}
+
+@ private
+fn byte_int(bytes src, int i) → int {
+    return (src.get(i) coalesce (0 ∷ b8)) ↦ u8 ↦ int
+}
+
+@ private
+fn xor_pad(bytes key, int block, int mask) → bytes {
+    var list<u8> out ← []
+    var int i ← 0
+    while i ≺ block {
+        var int b ← 0
+        if i ≺ key.length() {
+            b ← byte_int(key, i)
+        }
+        out.append((b ⊻ mask) ↦ u8 ⊥ 0)
+        i ← i + 1
+    }
+    return out ↦ list<b8>
+}
+
+@ private
+fn concat_bytes(bytes a, bytes b) → bytes {
+    var list<u8> out ← []
+    var int i ← 0
+    while i ≺ a.length() {
+        out.append((a.get(i) coalesce (0 ∷ b8)) ↦ u8)
+        i ← i + 1
+    }
+    i ← 0
+    while i ≺ b.length() {
+        out.append((b.get(i) coalesce (0 ∷ b8)) ↦ u8)
+        i ← i + 1
+    }
+    return out ↦ list<b8>
+}
 
 # =========================================================================
 # SYMMETRIC ENCRYPTION

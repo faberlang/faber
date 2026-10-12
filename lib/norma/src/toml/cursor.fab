@@ -1,0 +1,14 @@
++++
+locale = "en"
++++
+# toml/cursor.fab — parser cursor type
+#
+# Position-threading class for the recursive-descent parser in solve.fab.
+# Faber has no tuple returns, so each scanner returns Scan carrying the
+# parsed value and the next index.
+
+@ public
+class Scan {
+    var value payload
+    var int index
+}

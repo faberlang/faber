@@ -352,8 +352,26 @@ fn split_frontmatter(string document, string delimiter) → list<string> ⇥ str
 # Why: Collapse runs of ASCII spaces to a single space. This is
 # normalization, not byte encoding.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn collapse_spaces(string s) → string
+fn collapse_spaces(string s) → string {
+    var string out ← ""
+    var bool in_space ← false
+    var int i ← 0
+    while i ≺ s.length() {
+        const string c ← s.slice(i, i + 1)
+        if c ≡ " " {
+            if not in_space {
+                out ← out + " "
+                in_space ← true
+            }
+        }
+        else {
+            out ← out + c
+            in_space ← false
+        }
+        i ← i + 1
+    }
+    return out
+}
 
 # Name: to_ascii (Latin locale: angustata) from angustare, "to narrow."
 # Morphologia: Perfectum result adjective; the returned value is narrowed to
@@ -361,16 +379,23 @@ fn collapse_spaces(string s) → string
 # Why: Trust-boundary narrowing from textus to ascii.
 # Edge: Throws textus when any codepoint cannot be represented as ascii.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn to_ascii(string s) → ascii ⇥ string
+fn to_ascii(string s) → ascii ⇥ string {
+    return s ↦ ascii
+}
 
 # Name: try_to_ascii (Latin locale: temptat) from temptare, "to try."
 # Morphologia: Praesens active verb; it attempts narrowing and reports
 # absence with nihil instead of throwing.
 # Why: Trust-boundary twin of to_ascii, distinct from mechanical try_decode.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn try_to_ascii(string s) → ascii ∪ none
+fn try_to_ascii(string s) → ascii ∪ none {
+    do {
+        return to_ascii(s)
+    }
+    catch err {
+        return null
+    }
+}
 
 # =========================================================================
 # SPLIT (limited — unbounded split stays on textus.divide)
@@ -381,9 +406,40 @@ fn try_to_ascii(string s) → ascii ∪ none
 # after it has been cut into pieces.
 # Why: Split s by separator into at most limitem segments.
 # Edge: Unbounded split remains on textus.divide; this is the limited form.
+# limitem <= 0 → empty list; limitem == 1 → [s]; after limitem-1 cuts the
+# remainder keeps its separators.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn split_n(string s, string separator, int limit) → list<string>
+fn split_n(string s, string separator, int limit) → list<string> {
+    if limit ≤ 0 then return empty
+    if limit ≡ 1 then return [s]
+    var list<string> out ← []
+    var string rest ← s
+    var int cuts ← 0
+    while cuts ≺ limit - 1 {
+        const int pos ← index_of(rest, separator)
+        if pos ≺ 0 {
+            out.append(rest)
+            return out
+        }
+        out.append(rest.slice(0, pos))
+        rest ← rest.slice(pos + separator.length(), rest.length())
+        cuts ← cuts + 1
+    }
+    out.append(rest)
+    return out
+}
+
+@ private
+fn index_of(string s, string needle) → int {
+    const int nlen ← needle.length()
+    if nlen ≡ 0 then return 0
+    var int i ← 0
+    while i + nlen ≤ s.length() {
+        if s.slice(i, i + nlen) ≡ needle then return i
+        i ← i + 1
+    }
+    return -1
+}
 
 # =========================================================================
 # MECHANICAL TRIO (UTF-8 textus ↔ octeti)
@@ -393,21 +449,29 @@ fn split_n(string s, string separator, int limit) → list<string>
 # Morphologia: Imperativus mechanical verb shared with structured codecs.
 # Why: Materialize textus as UTF-8 octeti for outward or storable byte form.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn encode(string s) → bytes
+fn encode(string s) → bytes {
+    return s ↦ bytes
+}
 
 # Name: decode (Latin locale: solve) from solvere, "to loosen" or "to untangle."
 # Morphologia: Imperativus mechanical verb paired with encode.
 # Why: Interpret UTF-8 octeti as textus.
 # Edge: Invalid UTF-8 throws through the backing runtime.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn decode(bytes data) → string
+fn decode(bytes data) → string ⇥ string {
+    return data ↦ string
+}
 
 # Name: try_decode (Latin locale: tempta) from temptare, "to try" or "to attempt."
 # Morphologia: Imperativus mechanical verb; try decode without alternate
 # exit propagation.
 # Why: Decode UTF-8 when possible and return nihil on invalid bytes.
 @ public
-@ unstable "deferred pending Stage 2 dispatch"
-fn try_decode(bytes data) → string ∪ none
+fn try_decode(bytes data) → string ∪ none {
+    do {
+        return data ↦ string
+    }
+    catch err {
+        return null
+    }
+}

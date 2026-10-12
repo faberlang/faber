@@ -1,0 +1,547 @@
++++
+locale = "en"
++++
+# toml/solve.fab — recursive-descent TOML parser
+#
+# Ordinary Faber. Builds a codec-neutral `value` tree. Comments, dotted
+# keys, [tables], [[array of tables]], strings, numbers, bools, arrays,
+# inline tables, and RFC3339 instants are accepted.
+
+import from "norma:toml/cursor" cursor
+
+@ public
+fn parse(string wire) → value ⇥ string {
+    var map<string, value> root ← empty
+    var list<string> current ← empty
+    var int index ← skip_ignored(wire, 0)
+    while index ≺ wire.length() {
+        if wire.slice(index, index + 1) ≡ "[" {
+            const cursor.Scan header ← parse_header(wire, index)
+            const map<string, value> mark ↤ header.payload ⊥ empty
+            current ← as_string_list(mark.get("keys"))
+            const bool array ← flag_bool(mark.get("array"))
+            if array {
+                root ← append_table_array(root, current)
+            }
+            else {
+                root ← ensure_table(root, current)
+            }
+            index ← skip_ignored(wire, header.index)
+        }
+        else {
+            const cursor.Scan pair ← parse_keyval(wire, index)
+            const map<string, value> mark ↤ pair.payload ⊥ empty
+            const list<string> rel ← as_string_list(mark.get("keys"))
+            root ← put_path(root, concat_keys(current, rel), mark.get("value"))
+            index ← skip_ignored(wire, pair.index)
+        }
+    }
+    return root ↦ value
+}
+
+@ public
+fn try_parse(string wire) → value ∪ none {
+    do {
+        return parse(wire)
+    }
+    catch err {
+        return null
+    }
+}
+
+fn as_string_list(value node) → list<string> {
+    const list<string> keys ↤ node ⊥ empty
+    return keys
+}
+
+fn as_value_list(value node) → list<value> {
+    const list<value> items ↤ node ⊥ empty
+    return items
+}
+
+fn flag_bool(value node) → bool {
+    if node is bool then return node ↦ bool ⊥ false
+    return false
+}
+
+fn result(value payload, int index) → cursor.Scan {
+    return cursor.Scan { payload = payload, index = index }
+}
+
+fn is_space(string c) → bool {
+    return c ≡ " " or c ≡ "\t"
+}
+
+fn is_newline(string c) → bool {
+    return c ≡ "\n" or c ≡ "\r"
+}
+
+fn is_digit(string c) → bool {
+    return "0123456789".contains(c)
+}
+
+fn is_bare(string c) → bool {
+    return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-".contains(c)
+}
+
+fn skip_space(string wire, int start) → int {
+    var int index ← start
+    while index ≺ wire.length() and is_space(wire.slice(index, index + 1)) {
+        index ← index + 1
+    }
+    return index
+}
+
+fn skip_comment(string wire, int start) → int {
+    var int index ← start
+    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "#" {
+        while index ≺ wire.length() and not is_newline(wire.slice(index, index + 1)) {
+            index ← index + 1
+        }
+    }
+    return index
+}
+
+fn skip_ignored(string wire, int start) → int {
+    var int index ← start
+    while index ≺ wire.length() {
+        const string c ← wire.slice(index, index + 1)
+        if is_space(c) or is_newline(c) {
+            index ← index + 1
+        }
+        elif c ≡ "#" {
+            index ← skip_comment(wire, index)
+        }
+        else {
+            return index
+        }
+    }
+    return index
+}
+
+fn hex_value(string c) → int ∪ none {
+    const string lower ← "0123456789abcdef"
+    const string upper ← "0123456789ABCDEF"
+    var int digit ← 0
+    while digit ≺ 16 {
+        if lower.slice(digit, digit + 1) ≡ c or upper.slice(digit, digit + 1) ≡ c then return digit
+        digit ← digit + 1
+    }
+    return null
+}
+
+fn unescape(string letter) → string ∪ none {
+    if letter ≡ «\"» then return «\"»
+    if letter ≡ "\\" then return "\\"
+    if letter ≡ "b" then return ([8] ↦ bytes) ↦ string ⊥ ""
+    if letter ≡ "f" then return ([12] ↦ bytes) ↦ string ⊥ ""
+    if letter ≡ "n" then return "\n"
+    if letter ≡ "r" then return "\r"
+    if letter ≡ "t" then return "\t"
+    return null
+}
+
+fn parse_basic_string(string wire, int start) → cursor.Scan ⇥ string {
+    var string out ← ""
+    var int index ← start + 1
+    while index ≺ wire.length() {
+        const string c ← wire.slice(index, index + 1)
+        if c ≡ «\"» then return result(out ↦ value, index + 1)
+        if c ≡ "\n" then throw "norma:toml.parse: unterminated string"
+        if c ≡ "\\" {
+            if index + 1 ≥ wire.length() then throw "norma:toml.parse: truncated escape"
+            const string letter ← wire.slice(index + 1, index + 2)
+            if letter ≡ "u" {
+                const cursor.Scan escaped ← parse_unicode(wire, index + 2)
+                const string piece ↤ escaped.payload ⊥ ""
+                out ← out + piece
+                index ← escaped.index
+            }
+            else {
+                const string ∪ none raw ← unescape(letter)
+                if raw is none then throw "norma:toml.parse: unknown escape"
+                out ← out + (raw ↦ string ⊥ "")
+                index ← index + 2
+            }
+        }
+        else {
+            out ← out + c
+            index ← index + 1
+        }
+    }
+    throw "norma:toml.parse: unterminated string"
+}
+
+fn parse_unicode(string wire, int start) → cursor.Scan ⇥ string {
+    if start + 4 ≻ wire.length() then throw "norma:toml.parse: truncated unicode escape"
+    var int code ← 0
+    var int i ← 0
+    while i ≺ 4 {
+        const int ∪ none digit ← hex_value(wire.slice(start + i, start + i + 1))
+        if digit is none then throw "norma:toml.parse: invalid unicode escape"
+        code ← code * 16 + (digit ↦ int ⊥ 0)
+        i ← i + 1
+    }
+    if code ≺ 0 or code ≻ 127 then throw "norma:toml.parse: unicode escape out of ASCII v1"
+    return result((([code ↦ u8 ⊥ 0] ↦ list<b8>) ↦ string ⊥ "") ↦ value, start + 4)
+}
+
+fn parse_literal_string(string wire, int start) → cursor.Scan ⇥ string {
+    var string out ← ""
+    var int index ← start + 1
+    while index ≺ wire.length() {
+        const string c ← wire.slice(index, index + 1)
+        if c ≡ "'" then return result(out ↦ value, index + 1)
+        if c ≡ "\n" then throw "norma:toml.parse: unterminated literal string"
+        out ← out + c
+        index ← index + 1
+    }
+    throw "norma:toml.parse: unterminated literal string"
+}
+
+fn parse_key(string wire, int start) → cursor.Scan ⇥ string {
+    const int index ← skip_space(wire, start)
+    if index ≥ wire.length() then throw "norma:toml.parse: expected key"
+    const string c ← wire.slice(index, index + 1)
+    if c ≡ «\"» then return parse_basic_string(wire, index)
+    if c ≡ "'" then return parse_literal_string(wire, index)
+    if not is_bare(c) then throw "norma:toml.parse: expected key"
+    var int end ← index
+    while end ≺ wire.length() and is_bare(wire.slice(end, end + 1)) {
+        end ← end + 1
+    }
+    return result(wire.slice(index, end) ↦ value, end)
+}
+
+fn parse_key_path(string wire, int start) → cursor.Scan ⇥ string {
+    var list<string> keys ← empty
+    var int index ← start
+    var bool more ← true
+    while more {
+        const cursor.Scan key ← parse_key(wire, index)
+        const string name ↤ key.payload ⊥ ""
+        keys.append(name)
+        index ← skip_space(wire, key.index)
+        if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "." {
+            index ← index + 1
+        }
+        else {
+            more ← false
+        }
+    }
+    return result(keys ↦ value, index)
+}
+
+fn parse_array(string wire, int start) → cursor.Scan ⇥ string {
+    var list<value> items ← empty
+    var int index ← skip_ignored(wire, start + 1)
+    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "]" {
+        return result(items ↦ value, index + 1)
+    }
+    while index ≺ wire.length() {
+        const cursor.Scan item ← parse_value(wire, index)
+        items.append(item.payload)
+        index ← skip_ignored(wire, item.index)
+        if index ≥ wire.length() then throw "norma:toml.parse: unterminated array"
+        const string delim ← wire.slice(index, index + 1)
+        if delim ≡ "]" then return result(items ↦ value, index + 1)
+        if delim ≡ "," {
+            index ← skip_ignored(wire, index + 1)
+            if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "]" {
+                return result(items ↦ value, index + 1)
+            }
+        }
+        else {
+            throw "norma:toml.parse: expected ',' or ']'"
+        }
+    }
+    throw "norma:toml.parse: unterminated array"
+}
+
+fn parse_inline_table(string wire, int start) → cursor.Scan ⇥ string {
+    var map<string, value> fields ← empty
+    var int index ← skip_space(wire, start + 1)
+    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "}" {
+        return result(fields ↦ value, index + 1)
+    }
+    while index ≺ wire.length() {
+        const cursor.Scan path ← parse_key_path(wire, index)
+        index ← skip_space(wire, path.index)
+        if index ≥ wire.length() or wire.slice(index, index + 1) ≢ "=" {
+            throw "norma:toml.parse: expected '=' in inline table"
+        }
+        const cursor.Scan scanned ← parse_value(wire, index + 1)
+        const list<string> keys ↤ path.payload ⊥ empty
+        fields ← put_path(fields, keys, scanned.payload)
+        index ← skip_space(wire, scanned.index)
+        if index ≥ wire.length() then throw "norma:toml.parse: unterminated inline table"
+        const string delim ← wire.slice(index, index + 1)
+        if delim ≡ "}" then return result(fields ↦ value, index + 1)
+        if delim ≢ "," then throw "norma:toml.parse: expected ',' or '}'"
+        index ← skip_space(wire, index + 1)
+    }
+    throw "norma:toml.parse: unterminated inline table"
+}
+
+fn take_digits(string wire, int start) → int {
+    var int index ← start
+    while index ≺ wire.length() and is_digit(wire.slice(index, index + 1)) {
+        index ← index + 1
+    }
+    return index
+}
+
+fn looks_like_datetime(string wire, int start) → bool {
+    if start + 10 ≻ wire.length() then return false
+    const string token ← wire.slice(start, start + 10)
+    if token.slice(4, 5) ≢ "-" or token.slice(7, 8) ≢ "-" then return false
+    return is_digit(token.slice(0, 1))
+}
+
+fn parse_datetime(string wire, int start) → cursor.Scan ⇥ string {
+    var int index ← start
+    while index ≺ wire.length() {
+        const string c ← wire.slice(index, index + 1)
+        if is_space(c) or is_newline(c) or c ≡ "#" or c ≡ "," or c ≡ "]" or c ≡ "}" {
+            break
+        }
+        index ← index + 1
+    }
+    const string token ← wire.slice(start, index)
+    do {
+        const instant stamp ← token ↦ instant
+        return result(stamp ↦ value, index)
+    }
+    catch err {
+        throw "norma:toml.parse: invalid datetime"
+    }
+}
+
+fn parse_number(string wire, int start) → cursor.Scan ⇥ string {
+    var int index ← start
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ≡ "+" or wire.slice(index, index + 1) ≡ "-") {
+        index ← index + 1
+    }
+    if looks_like_datetime(wire, index) then return parse_datetime(wire, start)
+    var bool is_float ← false
+    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "0" and index + 1 ≺ wire.length() {
+        const string mark ← wire.slice(index + 1, index + 2)
+        if mark ≡ "x" or mark ≡ "o" or mark ≡ "b" {
+            return parse_prefixed_int(wire, start, index + 2, mark)
+        }
+    }
+    index ← take_digits(wire, index)
+    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "." {
+        is_float ← true
+        index ← take_digits(wire, index + 1)
+    }
+    if index ≺ wire.length() {
+        const string exp ← wire.slice(index, index + 1)
+        if exp ≡ "e" or exp ≡ "E" {
+            is_float ← true
+            index ← index + 1
+            if index ≺ wire.length() and (wire.slice(index, index + 1) ≡ "+" or wire.slice(index, index + 1) ≡ "-") {
+                index ← index + 1
+            }
+            index ← take_digits(wire, index)
+        }
+    }
+    const string token ← wire.slice(start, index).replace("_", "")
+    if is_float {
+        return result((token ↦ float) ↦ value, index)
+    }
+    return result((token ↦ int) ↦ value, index)
+}
+
+fn parse_prefixed_int(string wire, int token_start, int digits_start, string mark) → cursor.Scan ⇥ string {
+    var int index ← digits_start
+    var int radix ← 16
+    if mark ≡ "o" then radix ← 8
+    if mark ≡ "b" then radix ← 2
+    var int acc ← 0
+    var bool any ← false
+    while index ≺ wire.length() {
+        const string c ← wire.slice(index, index + 1)
+        if c ≡ "_" {
+            index ← index + 1
+            continue
+        }
+        const int ∪ none digit ← hex_value(c)
+        if digit is none then break
+        const int d ← digit ↦ int ⊥ 0
+        if d ≥ radix then break
+        acc ← acc * radix + d
+        any ← true
+        index ← index + 1
+    }
+    if not any then throw "norma:toml.parse: invalid integer prefix"
+    if wire.slice(token_start, token_start + 1) ≡ "-" then acc ← 0 - acc
+    return result(acc ↦ value, index)
+}
+
+fn parse_keyword(string wire, int start, string word, value payload) → cursor.Scan ⇥ string {
+    const int end ← start + word.length()
+    if end ≻ wire.length() or wire.slice(start, end) ≢ word {
+        throw "norma:toml.parse: invalid keyword"
+    }
+    return result(payload, end)
+}
+
+fn parse_value(string wire, int start) → cursor.Scan ⇥ string {
+    const int index ← skip_space(wire, start)
+    if index ≥ wire.length() then throw "norma:toml.parse: expected value"
+    const string c ← wire.slice(index, index + 1)
+    if c ≡ «\"» then return parse_basic_string(wire, index)
+    if c ≡ "'" then return parse_literal_string(wire, index)
+    if c ≡ "[" then return parse_array(wire, index)
+    if c ≡ "{" then return parse_inline_table(wire, index)
+    if c ≡ "t" then return parse_keyword(wire, index, "true", true ↦ value)
+    if c ≡ "f" then return parse_keyword(wire, index, "false", false ↦ value)
+    if c ≡ "+" or c ≡ "-" or is_digit(c) then return parse_number(wire, index)
+    throw "norma:toml.parse: unexpected token"
+}
+
+fn parse_keyval(string wire, int start) → cursor.Scan ⇥ string {
+    const cursor.Scan path ← parse_key_path(wire, start)
+    const int eq ← skip_space(wire, path.index)
+    if eq ≥ wire.length() or wire.slice(eq, eq + 1) ≢ "=" {
+        throw "norma:toml.parse: expected '='"
+    }
+    const cursor.Scan scanned ← parse_value(wire, eq + 1)
+    var map<string, value> mark ← empty
+    mark.put("keys", path.payload)
+    mark.put("value", scanned.payload)
+    return result(mark ↦ value, scanned.index)
+}
+
+fn parse_header(string wire, int start) → cursor.Scan ⇥ string {
+    var bool array ← false
+    var int index ← start + 1
+    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "[" {
+        array ← true
+        index ← index + 1
+    }
+    const cursor.Scan path ← parse_key_path(wire, index)
+    index ← skip_space(wire, path.index)
+    if index ≥ wire.length() or wire.slice(index, index + 1) ≢ "]" {
+        throw "norma:toml.parse: expected ']'"
+    }
+    index ← index + 1
+    if array {
+        if index ≥ wire.length() or wire.slice(index, index + 1) ≢ "]" {
+            throw "norma:toml.parse: expected ']]'"
+        }
+        index ← index + 1
+    }
+    var map<string, value> mark ← empty
+    mark.put("array", array ↦ value)
+    mark.put("keys", path.payload)
+    return result(mark ↦ value, index)
+}
+
+fn concat_keys(list<string> prefix, list<string> extra) → list<string> {
+    var list<string> out ← empty
+    for from prefix const key {
+        out.append(key)
+    }
+    for from extra const key {
+        out.append(key)
+    }
+    return out
+}
+
+fn copy_map(map<string, value> src) → map<string, value> {
+    var map<string, value> out ← empty
+    const list<string> keys ← src.keys()
+    for from keys const key {
+        out.put(key, src.get(key))
+    }
+    return out
+}
+
+fn map_of(value node) → map<string, value> ⇥ string {
+    if node not is map<string, value> then throw "norma:toml.parse: expected table"
+    return node ↦ map<string, value> ⊥ empty
+}
+
+fn rest_keys(list<string> path) → list<string> {
+    var list<string> rest ← empty
+    var int i ← 1
+    while i ≺ path.length() {
+        rest.append(path.get(i) coalesce "")
+        i ← i + 1
+    }
+    return rest
+}
+
+fn put_path(map<string, value> incoming, list<string> path, value payload) → map<string, value> ⇥ string {
+    var map<string, value> root ← copy_map(incoming)
+    if path.length() ≡ 0 then throw "norma:toml.parse: empty key"
+    if path.length() ≡ 1 {
+        const string key ← path.get(0) coalesce ""
+        if root.has(key) then throw "norma:toml.parse: duplicate key §"(key)
+        root.put(key, payload)
+        return root
+    }
+    const string head ← path.get(0) coalesce ""
+    var map<string, value> child ← empty
+    if root.has(head) {
+        child ← map_of(root.get(head))
+    }
+    child ← put_path(child, rest_keys(path), payload)
+    root.put(head, child ↦ value)
+    return root
+}
+
+fn ensure_table(map<string, value> incoming, list<string> path) → map<string, value> ⇥ string {
+    if path.length() ≡ 0 then return incoming
+    return put_path_table(incoming, path)
+}
+
+fn put_path_table(map<string, value> incoming, list<string> path) → map<string, value> ⇥ string {
+    var map<string, value> root ← copy_map(incoming)
+    if path.length() ≡ 0 then return root
+    const string head ← path.get(0) coalesce ""
+    var map<string, value> child ← empty
+    if root.has(head) {
+        const value existing ← root.get(head)
+        if existing is list<value> {
+            const list<value> items ↤ existing ⊥ empty
+            if items.length() ≡ 0 then throw "norma:toml.parse: empty table array"
+            const value last ← items.get(items.length() - 1)
+            child ← map_of(last)
+            child ← put_path_table(child, rest_keys(path))
+            return root
+        }
+        child ← map_of(existing)
+    }
+    child ← put_path_table(child, rest_keys(path))
+    root.put(head, child ↦ value)
+    return root
+}
+
+fn append_table_array(map<string, value> incoming, list<string> path) → map<string, value> ⇥ string {
+    var map<string, value> root ← copy_map(incoming)
+    if path.length() ≡ 0 then throw "norma:toml.parse: empty table array path"
+    if path.length() ≡ 1 {
+        const string key ← path.get(0) coalesce ""
+        var list<value> items ← empty
+        if root.has(key) {
+            const value existing ← root.get(key)
+            if existing not is list<value> then throw "norma:toml.parse: key is not a table array"
+            items ← as_value_list(existing)
+        }
+        var map<string, value> child ← empty
+        items.append(child ↦ value)
+        root.put(key, items ↦ value)
+        return root
+    }
+    const string head ← path.get(0) coalesce ""
+    var map<string, value> child ← empty
+    if root.has(head) {
+        child ← map_of(root.get(head))
+    }
+    child ← append_table_array(child, rest_keys(path))
+    root.put(head, child ↦ value)
+    return root
+}

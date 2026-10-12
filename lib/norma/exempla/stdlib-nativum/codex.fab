@@ -3,107 +3,30 @@ term = "codex"
 kind = "concept"
 category = "stdlib"
 canonical = false
-summary = "norma:codex encoding/decoding API contract tests."
-syntax = "norma:codex — base64 | hex | url (all mori deferred)"
-related = ["codex", "stdlib-nativum"]
+summary = "norma:encoding encoding/decoding API contract tests."
+syntax = "norma:encoding — base64 | hex | url"
+related = ["encoding", "stdlib-nativum"]
 locale = "en"
 +++
 
-# stdlib-nativum/codex — norma:codex encoding/decoding API contract tests
+# stdlib-nativum/codex — norma:encoding encoding/decoding API contract tests
 #
-# All 9 public functions are deferred via mori. This exemplum verifies:
-#   1. Each function can be imported and called
-#   2. Each mori body throws
+# N4a: all public functions are ordinary Faber bodies.
 
-import from "norma:codex" codex
+import from "norma:encoding" encoding
 
 main {
-    # -----------------------------------------------------------------------
-    # Base64 — mori deferred
-    # -----------------------------------------------------------------------
-    do {
-        codex.base64(|61 62 63|)
-        assert false
-    }
-    catch err {
-        print err
-    }
+    assert encoding.base64(|61 62 63|) ≡ "YWJj"
+    assert encoding.hex(encoding.decode_base64("AQID")) ≡ "010203"
+    assert encoding.try_decode_base64("!!!!") is none
 
-    do {
-        codex.decode_base64("AQID")
-        assert false
-    }
-    catch err {
-        print err
-    }
+    assert encoding.hex(|61 62 63|) ≡ "616263"
+    assert encoding.hex(encoding.decode_hex("616263")) ≡ "616263"
+    assert encoding.try_decode_hex("zz") is none
 
-    do {
-        codex.try_decode_base64("AQID")
-        assert false
-    }
-    catch err {
-        print err
-    }
-
-    # -----------------------------------------------------------------------
-    # Hex — mori deferred
-    # -----------------------------------------------------------------------
-    do {
-        codex.hex(|61 62 63|)
-        assert false
-    }
-    catch err {
-        print err
-    }
-
-    do {
-        codex.decode_hex("616263")
-        assert false
-    }
-    catch err {
-        print err
-    }
-
-    do {
-        codex.try_decode_hex("616263")
-        assert false
-    }
-    catch err {
-        print err
-    }
-
-    # -----------------------------------------------------------------------
-    # URL encoding — mori deferred
-    # -----------------------------------------------------------------------
-    do {
-        codex.url("hello world")
-        assert false
-    }
-    catch err {
-        print err
-    }
-
-    do {
-        codex.decode_url("hello+world")
-        assert false
-    }
-    catch err {
-        print err
-    }
-
-    do {
-        codex.encode_url_component("a&b=c")
-        assert false
-    }
-    catch err {
-        print err
-    }
-
-    do {
-        codex.decode_url_component("a%26b%3Dc")
-        assert false
-    }
-    catch err {
-        print err
-    }
+    assert encoding.url("hello world") ≡ "hello+world"
+    assert encoding.decode_url("hello+world") ≡ "hello world"
+    assert encoding.encode_url_component("a&b=c") ≡ "a%26b%3Dc"
+    assert encoding.decode_url_component("a%26b%3Dc") ≡ "a&b=c"
+    print "codex-ok"
 }

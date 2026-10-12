@@ -5238,14 +5238,13 @@ main {
     assert!(output.code.contains("fn reverse"));
     assert!(output.code.contains("pub mod text"));
     assert!(output.code.contains("crate::text::reverse"));
-    // `text.encode`/`text.decode` are bodiless `@ unstable` declarations: no
-    // backend emits them.
-    assert!(!output.code.contains("pub(crate) fn encode"));
+    // N4a: encode/decode are ordinary Faber bodies and must be emitted.
+    assert!(output.code.contains("pub(crate) fn encode"));
 }
 
 #[test]
-fn compile_package_refuses_nondum_norma_text_encode() {
-    let dir = test_temp_dir("norma-text-encode-nondum");
+fn compile_package_emits_norma_text_encode() {
+    let dir = test_temp_dir("norma-text-encode");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
@@ -5262,15 +5261,8 @@ main {
 
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
-        !result.success(),
-        "an @ unstable norma function must refuse every use"
-    );
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diag| diag.issue() == Some("nondum_function_for_target")),
-        "expected nondum_function_for_target, got {:?}",
+        result.success(),
+        "expected norma:text encode/decode compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5280,7 +5272,7 @@ main {
 }
 
 #[test]
-fn compile_package_refuses_nondum_norma_toml_parse() {
+fn compile_package_emits_norma_toml_parse() {
     let dir = test_temp_dir("norma-toml-import");
     let entry = dir.join("main.fab");
     fs::write(
@@ -5295,19 +5287,10 @@ main {
     )
     .expect("write entry");
 
-    // `toml.parse` is a bodiless `@ unstable` declaration: the import resolves,
-    // every use is refused at compile time.
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
-        !result.success(),
-        "an @ unstable norma function must refuse every use"
-    );
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diag| diag.issue() == Some("nondum_function_for_target")),
-        "expected nondum_function_for_target, got {:?}",
+        result.success(),
+        "expected norma:toml parse compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -10433,8 +10416,8 @@ main {
     };
     assert!(output.code.contains("pub mod csv"));
     assert!(output.code.contains("pub mod text"));
-    // `text.split_n` is a bodiless `@ unstable` declaration: never emitted.
-    assert!(!output.code.contains("fn split_n"));
+    // N4a: split_n is an ordinary Faber body and must be emitted.
+    assert!(output.code.contains("fn split_n"));
     assert!(output.code.contains("pub(crate) fn join"));
 
     let layout = discover_build_layout(&entry).expect("layout");
