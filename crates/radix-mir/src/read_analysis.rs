@@ -27,8 +27,8 @@
 
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirCollectionOp, MirFunction, MirIntrinsic,
-    MirLocalId, MirOperand, MirOptionOp, MirPlace, MirPlaceBase, MirStatement, MirStatementKind,
-    MirTempId, MirTerminatorKind, MirValue, MirValueKind,
+    MirLocalId, MirOperand, MirOptionOp, MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement,
+    MirStatementKind, MirTempId, MirTerminatorKind, MirValue, MirValueKind,
 };
 use rustc_hash::FxHashSet;
 
@@ -55,19 +55,7 @@ pub(crate) fn statement_read_locals(statement: &MirStatement) -> Vec<MirLocalId>
             value_read_locals(value, &mut read);
         }
         MirStatementKind::RuntimeCall { call, .. } => {
-            // TensorFill's first operand is a shape receiver only. The
-            // device emitters derive the output extent from the destination
-            // type and consume only the scalar fill operand, so a folded
-            // vacua seed used solely in this position is not a live value.
-            let args = if matches!(
-                call.intrinsic,
-                MirIntrinsic::Collection(MirCollectionOp::TensorFill)
-            ) {
-                call.args.get(1..).unwrap_or_default()
-            } else {
-                &call.args
-            };
-            read.extend(args.iter().filter_map(operand_local));
+            read.extend(live_call_args(call).iter().filter_map(operand_local));
         }
         MirStatementKind::Call { args, .. } => {
             read.extend(args.iter().filter_map(operand_local));
@@ -155,11 +143,7 @@ pub(crate) fn statement_destination_place(statement: &MirStatement) -> Option<&M
             destination: place, ..
         } => Some(place),
         MirStatementKind::RuntimeCall { destination, .. }
-        | MirStatementKind::Call {
-            destination,
-            callee: _,
-            args: _,
-        } => destination.as_ref(),
+        | MirStatementKind::Call { destination, .. } => destination.as_ref(),
     }
 }
 
@@ -194,15 +178,7 @@ pub(crate) fn statement_read_slots(statement: &MirStatement) -> Vec<MirPlaceBase
             value_read_slots(value, &mut read);
         }
         MirStatementKind::RuntimeCall { call, .. } => {
-            let args = if matches!(
-                call.intrinsic,
-                MirIntrinsic::Collection(MirCollectionOp::TensorFill)
-            ) {
-                call.args.get(1..).unwrap_or_default()
-            } else {
-                &call.args
-            };
-            read.extend(args.iter().filter_map(operand_slot));
+            read.extend(live_call_args(call).iter().filter_map(operand_slot));
         }
         MirStatementKind::Call { args, .. } => {
             read.extend(args.iter().filter_map(operand_slot));
@@ -260,6 +236,22 @@ pub(crate) fn terminator_return_local(terminator: &MirTerminatorKind) -> Option<
 // ---------------------------------------------------------------------------
 // Collection helpers (private to the module)
 // ---------------------------------------------------------------------------
+
+/// The call arguments that carry live value reads. TensorFill's first
+/// operand is a shape receiver only: the device emitters derive the output
+/// extent from the destination type and consume only the scalar fill
+/// operand, so a folded vacua seed used solely in this position is not a
+/// live value. Every read walker (locals and slots) shares this exclusion.
+fn live_call_args(call: &MirRuntimeCall) -> &[MirOperand] {
+    if matches!(
+        call.intrinsic,
+        MirIntrinsic::Collection(MirCollectionOp::TensorFill)
+    ) {
+        call.args.get(1..).unwrap_or_default()
+    } else {
+        &call.args
+    }
+}
 
 /// Collect the locals a value reads into `out`.
 fn value_read_locals(value: &MirValue, out: &mut Vec<MirLocalId>) {
