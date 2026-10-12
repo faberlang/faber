@@ -178,9 +178,7 @@ impl TypeChecker<'_> {
         };
 
         let resolved_lhs = self.resolve_inferred_type(lhs_ty);
-        if self.is_infer(resolved_lhs) {
-            self.unify_assign_issue(lhs_ty, bound, lhs_span, ISSUE_RANGE_OPERAND_TYPE_MISMATCH);
-        } else if !is_intervallum_bound_type(self.types, resolved_lhs) {
+        if !self.is_infer(resolved_lhs) && !is_intervallum_bound_type(self.types, resolved_lhs) {
             self.invalid_operand_types(ISSUE_RANGE_OPERAND_MUST_BE_NUMERIC, lhs_span);
         } else {
             self.unify_assign_issue(lhs_ty, bound, lhs_span, ISSUE_RANGE_OPERAND_TYPE_MISMATCH);
