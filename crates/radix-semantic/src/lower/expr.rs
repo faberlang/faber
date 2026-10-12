@@ -427,12 +427,12 @@ impl Lowerer<'_> {
     /// ambiguous or unowned bare name yields nothing rather than a silent
     /// pick; the caller reports the miss.
     fn lookup_variant_bare_single(&self, name: radix_lexer::Symbol) -> Option<radix_hir::DefId> {
-        self.resolver.lookup(name).or_else(|| {
-            match self.resolver.lookup_variant_bare(name) {
+        self.resolver
+            .lookup(name)
+            .or_else(|| match self.resolver.lookup_variant_bare(name) {
                 crate::BareVariantLookup::Single(def_id) => Some(def_id),
                 crate::BareVariantLookup::Ambiguous { .. } | crate::BareVariantLookup::None => None,
-            }
-        })
+            })
     }
 
     /// Lower binary expression (binarius)
