@@ -232,8 +232,11 @@ impl ResidencySlot {
     /// is downloaded first (the device copy is about to be abandoned), then
     /// the device copy is marked stale with one `host_wrote`.
     pub(crate) fn before_write(&self, len: usize) -> bool {
-        if self.0.borrow().is_none() || !self.ensure_host(0..len) {
-            return self.0.borrow().is_none();
+        if self.0.borrow().is_none() {
+            return true;
+        }
+        if !self.ensure_host(0..len) {
+            return false;
         }
         let (token, hook) = {
             let mut guard = self.0.borrow_mut();

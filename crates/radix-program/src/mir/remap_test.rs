@@ -1,11 +1,11 @@
 //! Symbol-bearing intrinsic payloads must survive merging independently
 //! interned modules.
 
-use super::remap::remap_runtime_call_text_symbols;
+use super::remap::{remap_constant_text_symbols, remap_runtime_call_text_symbols};
 use radix_module::lexer::{Interner, Span};
 use radix_module::mir::{
-    MirFilumCoordinate, MirFilumReduceOp, MirIntrinsic, MirLocalId, MirProvider, MirProviderKind,
-    MirRuntimeCall, MirStatement, MirStatementKind, MirType,
+    MirConstant, MirFilumCoordinate, MirFilumReduceOp, MirIntrinsic, MirLocalId, MirProvider,
+    MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirType,
 };
 use radix_types::{Primitive, TypeTable};
 
@@ -99,4 +99,32 @@ fn filum_declaration_symbols_keep_their_text_after_module_merge() {
         panic!("expected nested format string")
     };
     assert_eq!(target.resolve(*template), "lane {}");
+}
+
+#[test]
+fn constant_text_symbols_keep_their_text_after_module_merge() {
+    let mut source = Interner::new();
+    let string = source.intern("salve");
+    let pattern = source.intern("^a+$");
+    let flags = source.intern("im");
+    let mut target = Interner::new();
+    target.intern("unrelated-entry-symbol");
+
+    let mut constant = MirConstant::String(string);
+    remap_constant_text_symbols(&mut constant, &source, &mut target);
+    let MirConstant::String(string) = constant else {
+        panic!("constant kind changed")
+    };
+    assert_eq!(target.resolve(string), "salve");
+
+    let mut constant = MirConstant::Regex {
+        pattern,
+        flags: Some(flags),
+    };
+    remap_constant_text_symbols(&mut constant, &source, &mut target);
+    let MirConstant::Regex { pattern, flags } = constant else {
+        panic!("constant kind changed")
+    };
+    assert_eq!(target.resolve(pattern), "^a+$");
+    assert_eq!(target.resolve(flags.expect("flags")), "im");
 }

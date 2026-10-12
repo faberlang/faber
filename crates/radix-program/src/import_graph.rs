@@ -400,10 +400,6 @@ fn validate_mounted_global_collisions(
 
 #[must_use]
 pub fn detect_import_cycles(spec: &PackageSpec, files: &[PackageFile]) -> Vec<Diagnostic> {
-    let by_path = files
-        .iter()
-        .map(|file| (file.path.clone(), file))
-        .collect::<BTreeMap<_, _>>();
     let mut graph = BTreeMap::<PathBuf, Vec<(PathBuf, Span)>>::new();
     for file in files {
         let mut edges = Vec::new();
@@ -427,7 +423,6 @@ pub fn detect_import_cycles(spec: &PackageSpec, files: &[PackageFile]) -> Vec<Di
         detect_import_cycles_from(
             &file.path,
             &graph,
-            &by_path,
             &mut visiting,
             &mut visited,
             &mut stack,
@@ -529,7 +524,6 @@ fn proba_import_forbidden_diagnostic(from_file: &Path, import_path: &str) -> Dia
 fn detect_import_cycles_from(
     path: &PathBuf,
     graph: &BTreeMap<PathBuf, Vec<(PathBuf, Span)>>,
-    by_path: &BTreeMap<PathBuf, &PackageFile>,
     visiting: &mut BTreeSet<PathBuf>,
     visited: &mut BTreeSet<PathBuf>,
     stack: &mut Vec<PathBuf>,
@@ -562,8 +556,8 @@ fn detect_import_cycles_from(
             );
             continue;
         }
-        if by_path.contains_key(next) {
-            detect_import_cycles_from(next, graph, by_path, visiting, visited, stack, diagnostics);
+        if graph.contains_key(next) {
+            detect_import_cycles_from(next, graph, visiting, visited, stack, diagnostics);
         }
     }
 

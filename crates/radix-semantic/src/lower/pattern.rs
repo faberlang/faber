@@ -53,6 +53,17 @@ pub fn lower_pattern(lowerer: &mut Lowerer, pattern: &Pattern) -> HirPattern {
     }
 }
 
+/// Record the diagnostic for a mutable payload binding.
+///
+/// Mutable pattern bindings are parsed but not semantically implemented here
+/// (see the module error strategy); the binding structure is kept so later
+/// phases still report useful errors for the rest of the arm.
+fn reject_mutable_pattern_binding(lowerer: &mut Lowerer, mutability: AstMutability) {
+    if mutability == AstMutability::Mutable {
+        lowerer.error("mutable_pattern_binding");
+    }
+}
+
 /// Lower alternatives while preserving one binding identity for an agreeing arm.
 fn lower_or_pattern(lowerer: &mut Lowerer, alternatives: &[Pattern]) -> HirPattern {
     let mut lowered_patterns: Vec<_> = alternatives
@@ -175,9 +186,7 @@ fn lower_type_pattern(
             mutability,
             bindings,
         }) => {
-            if *mutability == AstMutability::Mutable {
-                lowerer.error("mutable_pattern_binding");
-            }
+            reject_mutable_pattern_binding(lowerer, *mutability);
             let Some(field) = bindings.first() else {
                 lowerer.error("type_pattern_binding_required");
                 return HirPattern::TypeTest {
@@ -266,9 +275,7 @@ fn lower_ident_pattern(
                 mutability,
                 bindings,
             }) => {
-                if *mutability == AstMutability::Mutable {
-                    lowerer.error("mutable_pattern_binding");
-                }
+                reject_mutable_pattern_binding(lowerer, *mutability);
                 HirPattern::Variant(def_id, lower_pattern_bindings(lowerer, bindings))
             }
         };
@@ -308,9 +315,7 @@ fn lower_ident_pattern(
             mutability,
             bindings,
         }) => {
-            if *mutability == AstMutability::Mutable {
-                lowerer.error("mutable_pattern_binding");
-            }
+            reject_mutable_pattern_binding(lowerer, *mutability);
             HirPattern::Variant(def_id, lower_pattern_bindings(lowerer, bindings))
         }
     }
@@ -445,9 +450,7 @@ fn lower_path_pattern(lowerer: &mut Lowerer, path: &PathPattern) -> HirPattern {
             mutability,
             bindings,
         }) => {
-            if *mutability == AstMutability::Mutable {
-                lowerer.error("mutable_pattern_binding");
-            }
+            reject_mutable_pattern_binding(lowerer, *mutability);
             HirPattern::Variant(def_id, lower_pattern_bindings(lowerer, bindings))
         }
     }

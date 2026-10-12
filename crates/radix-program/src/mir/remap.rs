@@ -197,7 +197,7 @@ pub(super) fn remap_place_text_symbols(
     for projection in &mut place.projections {
         match projection {
             MirProjection::Field(field) | MirProjection::VariantField { variant: _, field } => {
-                *field = target.intern(source.resolve(*field));
+                *field = remap_symbol(*field, source, target);
             }
             MirProjection::Index(operand) => remap_operand_text_symbols(operand, source, target),
             MirProjection::ClosureCapture {
@@ -359,7 +359,7 @@ pub(super) fn remap_aggregate_text_symbols(
         }
         MirAggregateFields::Named(items) => {
             for item in items {
-                item.name = target.intern(source.resolve(item.name));
+                item.name = remap_symbol(item.name, source, target);
                 remap_operand_text_symbols(&mut item.value, source, target);
             }
         }
@@ -409,7 +409,7 @@ pub(super) fn remap_option_chain_text_symbols(
         }
         MirOptionChainLink::Field(field)
         | MirOptionChainLink::VariantField { variant: _, field } => {
-            *field = target.intern(source.resolve(*field));
+            *field = remap_symbol(*field, source, target);
         }
     }
 }
@@ -421,12 +421,12 @@ pub(super) fn remap_constant_text_symbols(
 ) {
     match constant {
         MirConstant::String(symbol) | MirConstant::Ascii(symbol) => {
-            *symbol = target.intern(source.resolve(*symbol));
+            *symbol = remap_symbol(*symbol, source, target);
         }
         MirConstant::Regex { pattern, flags } => {
-            *pattern = target.intern(source.resolve(*pattern));
+            *pattern = remap_symbol(*pattern, source, target);
             if let Some(flags) = flags {
-                *flags = target.intern(source.resolve(*flags));
+                *flags = remap_symbol(*flags, source, target);
             }
         }
         MirConstant::Int(_)
