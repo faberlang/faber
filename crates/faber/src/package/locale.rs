@@ -28,13 +28,14 @@ fn embedded_locales_list() -> String {
 }
 
 fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnostic {
+    let embedded_locales = embedded_locales_list();
     crate::package_diagnostic_error(format!(
         "failed to load reader locale '{locale}': {err}\n\
          next action: choose one of the embedded reader locales ({})",
-        embedded_locales_list()
+        embedded_locales
     ))
     .with_arg("locale", locale.to_owned())
-    .with_arg("embedded_locales", embedded_locales_list())
+    .with_arg("embedded_locales", embedded_locales)
 }
 
 /// Build the product-default code config for inputs without package context.
@@ -43,8 +44,7 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
 ///
 /// Returns an error if the embedded product-default `en` pack cannot be loaded.
 pub fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnostic>> {
-    let pack = load_embedded_locale_pack(DEFAULT_CODE_LOCALE)
-        .map_err(|err| Box::new(embedded_load_diagnostic(DEFAULT_CODE_LOCALE, err)))?;
+    let pack = embedded_conversion_locale_pack(DEFAULT_CODE_LOCALE)?;
     Ok(Config::default().with_target(target).with_locale_pack(pack))
 }
 
