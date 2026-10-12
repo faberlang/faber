@@ -229,7 +229,7 @@ pub fn collect_local_contracts(
         collect_declaration_contract(stmt, resolver, interner, &mut registry, &mut errors);
         reject_misplaced_annotatio(stmt, interner, &mut errors);
         reject_misplaced_commune(stmt, interner, &mut errors);
-        reject_misplaced_conversio(stmt, interner, &mut errors);
+        reject_misplaced_conversio(stmt, &mut errors);
         reject_commune_field_uniqueness(stmt, &mut errors);
     }
 
@@ -399,7 +399,9 @@ fn parse_annotatio_target(
         AnnotationKind::Statement(stmt) if stmt.args.is_empty() => {
             Some(AnnotationAttachmentTarget::Functio)
         }
-        AnnotationKind::Braced(braced) => parse_braced_annotatio_target(braced, interner, errors),
+        AnnotationKind::Braced(braced) => {
+            Some(parse_braced_annotatio_target(braced, interner, errors))
+        }
         AnnotationKind::Statement(_) => {
             errors.push(
                 invalid_annotation(annotation.span, ISSUE_INVALID_MARKER).with_arg(
@@ -417,9 +419,9 @@ fn parse_braced_annotatio_target(
     braced: &BracedAnnotation,
     interner: &Interner,
     errors: &mut Vec<SemanticError>,
-) -> Option<AnnotationAttachmentTarget> {
+) -> AnnotationAttachmentTarget {
     if braced.fields.is_empty() {
-        return Some(AnnotationAttachmentTarget::Functio);
+        return AnnotationAttachmentTarget::Functio;
     }
 
     let mut target = AnnotationAttachmentTarget::Functio;
@@ -451,7 +453,7 @@ fn parse_braced_annotatio_target(
             }
         }
     }
-    Some(target)
+    target
 }
 
 fn target_from_field_value(
@@ -634,7 +636,7 @@ fn reject_conversio_on_list(
     }
 }
 
-fn reject_misplaced_conversio(stmt: &Stmt, _interner: &Interner, errors: &mut Vec<SemanticError>) {
+fn reject_misplaced_conversio(stmt: &Stmt, errors: &mut Vec<SemanticError>) {
     let on_function = matches!(stmt.kind, StmtKind::Func(_));
     reject_conversio_on_list(&stmt.annotations, on_function, errors);
     match &stmt.kind {
