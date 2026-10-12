@@ -40,9 +40,7 @@ use crate::{
 /// structural guarantees should run `validate_program` before dumping.
 #[must_use]
 pub fn dump_program(program: &MirProgram) -> String {
-    let mut dumper = MirDumper {
-        out: String::new(),
-    };
+    let mut dumper = MirDumper { out: String::new() };
     dumper.visit_program(program);
     dumper.out
 }

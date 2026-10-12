@@ -119,7 +119,11 @@ pub fn geometry_for_call(
                 ));
             };
             if shape.len() != usize::from(*rank) {
-                return Err(rank_mismatch(*source_resource, usize::from(*rank), shape.len()));
+                return Err(rank_mismatch(
+                    *source_resource,
+                    usize::from(*rank),
+                    shape.len(),
+                ));
             }
             generic_1d(unit, counts[*source_resource])
         }
@@ -213,7 +217,11 @@ pub fn launch_stages_for_call(
         return Err(uncovered("reduce source resource out of range"));
     };
     if shape.len() != usize::from(*rank) {
-        return Err(rank_mismatch(*source_resource, usize::from(*rank), shape.len()));
+        return Err(rank_mismatch(
+            *source_resource,
+            usize::from(*rank),
+            shape.len(),
+        ));
     }
     let n = counts[*source_resource];
     if n > i32::MAX as u64 {

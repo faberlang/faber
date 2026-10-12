@@ -193,6 +193,8 @@ pub use radix_mir::device::{
     MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirImportedEntryError, MirImportedEntryFact,
     merge_imported_entry_roles,
 };
+#[cfg(test)]
+pub(crate) use radix_mir::type_contains_param;
 pub use radix_mir::{CapabilityGap, Lowerability};
 pub use radix_mir::{
     INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL, MirEnumRepresentation,
@@ -250,8 +252,6 @@ pub use radix_mir::{
     TensorSystemsTarget, TensorSystemsTargetLayout, TensorSystemsTargetRank, TensorSystemsTargetRow,
     TensorSystemsTargetStatus, selected_tensor_systems_family, tensor_systems_target_rows,
 };
-#[cfg(test)]
-pub(crate) use radix_mir::type_contains_param;
 #[cfg(feature = "runner")]
 pub use runner::{
     BufferHost, Host, RUNNER_KERNEL_REFUSED_ISSUE, RunSourceError, RunnerDispatchStatus, RunnerError,
