@@ -82,25 +82,34 @@ impl super::FaberCodegen<'_> {
                         self.write_quoted_symbol(*name, writer);
                     }
                 }
-                if let Some(value) = &field.value {
-                    writer.write(style.value_separator());
-                    self.write_expr(value, names, surface, writer);
-                }
+                self.write_object_field_value(field, style, names, surface, writer);
             }
             HirObjectKey::Computed(expr) => {
                 writer.write("[");
                 self.write_expr(expr, names, surface, writer);
                 writer.write("]");
-                if let Some(value) = &field.value {
-                    writer.write(style.value_separator());
-                    self.write_expr(value, names, surface, writer);
-                }
+                self.write_object_field_value(field, style, names, surface, writer);
             }
             HirObjectKey::Spread(expr) => {
                 writer.write(surface.keyword(TokenKind::Sparge));
                 writer.write(" ");
                 self.write_expr(expr, names, surface, writer);
             }
+        }
+    }
+
+    /// Write the explicit value of an object field, if the field has one.
+    fn write_object_field_value(
+        &self,
+        field: &HirObjectField,
+        style: ObjectFieldStyle,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        if let Some(value) = &field.value {
+            writer.write(style.value_separator());
+            self.write_expr(value, names, surface, writer);
         }
     }
 
