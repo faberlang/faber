@@ -1663,7 +1663,10 @@ impl TypeChecker<'_> {
     ) {
         let mut args = vec![
             ("source", self.format_union_constituent_type(source_ty)),
-            ("destination", self.format_union_constituent_type(destination_ty)),
+            (
+                "destination",
+                self.format_union_constituent_type(destination_ty),
+            ),
         ];
         // CTR-04: names are the ambiguity escape — when the pair names a
         // helper enrolled in a non-visible scope, suggest it explicitly.

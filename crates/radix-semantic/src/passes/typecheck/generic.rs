@@ -267,8 +267,7 @@ impl TypeChecker<'_> {
         } else {
             FxHashSet::default()
         };
-        let (sig, param_vars, mut shape_vars, explicit_bound) = if explicit_type_args.is_empty()
-        {
+        let (sig, param_vars, mut shape_vars, explicit_bound) = if explicit_type_args.is_empty() {
             self.instantiate_inferred_bindings(&sig, &shape_symbols)
         } else if let Some(error_ty) =
             self.reject_invalid_explicit_type_args(&sig, explicit_type_args, args, span)

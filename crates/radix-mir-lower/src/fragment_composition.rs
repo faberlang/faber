@@ -602,11 +602,7 @@ impl CompositionPass<'_> {
             );
             return false;
         }
-        let site_key = (
-            callee.id,
-            site.block_id,
-            site.stmt_index.map_or(u32::MAX, saturating_u32),
-        );
+        let site_key = (callee.id, site.block_id, site.stmt_index.map_or(u32::MAX, saturating_u32));
         let inlines = account
             .sites
             .get(&site_key)
