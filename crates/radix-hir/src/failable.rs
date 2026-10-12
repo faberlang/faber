@@ -163,6 +163,13 @@ impl DependencyVisitor<'_> {
         f(self);
         self.suppressed = previous;
     }
+
+    /// Record a call edge unless the call sits inside a containing boundary.
+    fn note_call(&mut self, callee: DefId) {
+        if !self.suppressed {
+            self.deps.calls.insert(callee);
+        }
+    }
 }
 
 impl HirVisitor for DependencyVisitor<'_> {
@@ -181,21 +188,18 @@ impl HirVisitor for DependencyVisitor<'_> {
                 walk_expr(self, expr);
             }
             HirExpressionKind::Call(callee, _, _, _) => {
-                if !self.suppressed
-                    && let HirExpressionKind::Path(def_id) = &callee.kind
-                {
-                    self.deps.calls.insert(*def_id);
+                if let HirExpressionKind::Path(def_id) = &callee.kind {
+                    self.note_call(*def_id);
                 }
                 walk_expr(self, expr);
             }
             // F-034: track method calls to failable methods so callers are
             // also marked failable.
             HirExpressionKind::MethodCall(receiver, method, _, _, _) => {
-                if !self.suppressed
-                    && let Some(method_def) =
-                        resolve_method_call_def(self.method_index, receiver, *method, self.types)
+                if let Some(method_def) =
+                    resolve_method_call_def(self.method_index, receiver, *method, self.types)
                 {
-                    self.deps.calls.insert(method_def);
+                    self.note_call(method_def);
                 }
                 walk_expr(self, expr);
             }
