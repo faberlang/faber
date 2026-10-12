@@ -106,6 +106,14 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// The initializer's span, or the declaration site when a local has none.
+    fn local_init_span(local: &HirLocal) -> radix_lexer::Span {
+        local
+            .init
+            .as_ref()
+            .map_or(radix_lexer::Span::default(), |init| init.span)
+    }
+
     /// Establish a local declaration's type and install its binding.
     ///
     /// The four local shapes deliberately map to different inference policies:
@@ -126,10 +134,7 @@ impl TypeChecker<'_> {
             self.static_size_values.insert(local.def_id, *value);
         }
         if let Some(ty) = local.ty {
-            let span = local
-                .init
-                .as_ref()
-                .map_or_else(radix_lexer::Span::default, |init| init.span);
+            let span = Self::local_init_span(local);
             self.reject_tensor_edge_policy_value_type(ty, span);
         }
         if local.is_await {
@@ -315,10 +320,7 @@ impl TypeChecker<'_> {
 
     fn check_await_local(&mut self, local: &mut HirLocal) {
         if !self.current_await_context {
-            let span = local
-                .init
-                .as_ref()
-                .map_or(radix_lexer::Span::default(), |init| init.span);
+            let span = Self::local_init_span(local);
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,
                 ISSUE_AWAIT_BIND_REQUIRES_ASYNC_CONTEXT,
@@ -349,10 +351,7 @@ impl TypeChecker<'_> {
                 self.unify_assign_issue(
                     awaited,
                     ty,
-                    local
-                        .init
-                        .as_ref()
-                        .map_or(radix_lexer::Span::default(), |init| init.span),
+                    Self::local_init_span(local),
                     ISSUE_INITIALIZER_ANNOTATION_MISMATCH,
                 );
                 ty
