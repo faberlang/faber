@@ -81,3 +81,10 @@ docs/**/comparator.stdout
 docs/**/comparator.stderr
 docs/**/faber.stdout
 docs/**/faber.stderr
+
+# Key material — generated at run time, never tracked.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
