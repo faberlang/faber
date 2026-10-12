@@ -53,10 +53,28 @@ pub fn reset_handles() {
     with_handles(HashMap::clear);
 }
 
-/// Whether `route` belongs to this leaf.
+/// Route names this leaf serves. Must match the `serve` match arms below.
+const ROUTES: &[&str] = &[
+    "caelum:ausculta",
+    "caelum:auscultabit",
+    "caelum:necte",
+    "caelum:nectet",
+    "caelum:accipe",
+    "caelum:accipiet",
+    "caelum:hauri",
+    "caelum:hauriet",
+    "caelum:funde",
+    "caelum:fundet",
+    "caelum:claude",
+    "caelum:portus",
+    "caelum:remotus",
+    "caelum:locus",
+];
+
+/// Whether `route` belongs to this leaf. Pure name lookup; opens no socket.
 #[must_use]
 pub fn is_route(route: &str) -> bool {
-    serve(route, &[]).is_some()
+    ROUTES.contains(&route)
 }
 
 /// Answer a `caelum:*` route. `None` means the route is not this leaf.

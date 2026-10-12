@@ -1,5 +1,16 @@
-use super::{Arg, Reply, reset_seed, serve};
+use super::{Arg, Reply, is_route, reset_seed, serve};
 use crate::LeafErrorKind;
+
+#[test]
+fn route_list_matches_serve() {
+    for route in super::ROUTES {
+        assert!(is_route(route), "{route} not recognized");
+        assert!(serve(route, &[]).is_some(), "{route} not served");
+    }
+    assert!(!is_route("aleator:nope"));
+    assert!(serve("aleator:nope", &[]).is_none());
+    reset_seed();
+}
 
 #[test]
 fn seed_makes_sortire_deterministic() {

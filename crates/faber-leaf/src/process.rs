@@ -38,10 +38,24 @@ fn program_argv() -> Vec<String> {
         .unwrap_or_else(|| std::env::args().skip(1).collect())
 }
 
-/// Whether `route` belongs to this leaf.
+/// Route names this leaf serves. Must match the `serve` match arms below.
+const ROUTES: &[&str] = &[
+    "processus:genera",
+    "processus:dimitte",
+    "processus:captura",
+    "processus:exsequi",
+    "processus:exsequetur",
+    "processus:lege",
+    "processus:sedes",
+    "processus:muta",
+    "processus:identitas",
+    "processus:argumenta",
+];
+
+/// Whether `route` belongs to this leaf. Pure name lookup; spawns nothing.
 #[must_use]
 pub fn is_route(route: &str) -> bool {
-    serve(route, &[]).is_some()
+    ROUTES.contains(&route)
 }
 
 /// Answer a `processus:*` route. `None` means the route is not this leaf.

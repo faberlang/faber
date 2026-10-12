@@ -21,10 +21,61 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 /// not a language constant. Same bound the retired runner kernel used.
 pub const MAX_RANGE_READ_BYTES: usize = 512 * 1024 * 1024;
 
-/// Whether `route` belongs to this leaf.
+/// Route names this leaf serves. Must match the `serve` match arms below.
+const ROUTES: &[&str] = &[
+    "solum:lege",
+    "solum:hauri",
+    "solum:hauriet",
+    "solum:partem",
+    "solum:inveni",
+    "solum:carpe",
+    "solum:carpiet",
+    "solum:scribe",
+    "solum:scribet",
+    "solum:funde",
+    "solum:appone",
+    "solum:apponet",
+    "solum:exstat",
+    "solum:exstabit",
+    "solum:directoriumne",
+    "solum:regularene",
+    "solum:legibilene",
+    "solum:vinculumne",
+    "solum:mensura",
+    "solum:modus",
+    "solum:status",
+    "solum:status_async",
+    "solum:sequere",
+    "solum:sequetur",
+    "solum:vincula",
+    "solum:dele",
+    "solum:delet",
+    "solum:copy",
+    "solum:copy_async",
+    "solum:renomina",
+    "solum:renominabit",
+    "solum:tange",
+    "solum:tanget",
+    "solum:modum",
+    "solum:crea",
+    "solum:creabit",
+    "solum:enumera",
+    "solum:enumerabit",
+    "solum:amputa",
+    "solum:amputabit",
+    "solum:iunge",
+    "solum:parens",
+    "solum:nomen",
+    "solum:suffixum",
+    "solum:absolve",
+    "solum:domus",
+    "solum:temporarium",
+];
+
+/// Whether `route` belongs to this leaf. Pure name lookup; touches no file.
 #[must_use]
 pub fn is_route(route: &str) -> bool {
-    serve(route, &[]).is_some()
+    ROUTES.contains(&route)
 }
 
 /// Answer a `solum:*` route. `None` means the route is not this leaf.

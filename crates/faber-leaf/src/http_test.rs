@@ -1,6 +1,6 @@
 //! HTTP/1.1 leaf: listen, accept, respond, client get/post.
 
-use super::{reset_handles, serve};
+use super::{is_route, reset_handles, serve};
 use crate::value::{Arg, Reply};
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -259,4 +259,16 @@ fn request_open_reads_chunked_body_incrementally() {
     }
     server.join().expect("server");
     assert_eq!(String::from_utf8_lossy(&body), "onetwo");
+}
+
+#[test]
+fn route_list_matches_serve() {
+    let _guard = lock();
+    for route in super::ROUTES {
+        assert!(is_route(route), "{route} not recognized");
+        assert!(serve(route, &[]).is_some(), "{route} not served");
+    }
+    assert!(!is_route("http:nope"));
+    assert!(serve("http:nope", &[]).is_none());
+    reset_handles();
 }

@@ -1,6 +1,16 @@
 use super::{Arg, Reply, is_route, serve};
 
 #[test]
+fn route_list_matches_serve() {
+    for route in super::ROUTES {
+        assert!(is_route(route), "{route} not recognized");
+        assert!(serve(route, &[]).is_some(), "{route} not served");
+    }
+    assert!(!is_route("consolum:nope"));
+    assert!(serve("consolum:nope", &[]).is_none());
+}
+
+#[test]
 fn unknown_route_is_not_this_leaf() {
     assert!(!is_route("solum:lege"));
     assert!(serve("solum:lege", &[]).is_none());

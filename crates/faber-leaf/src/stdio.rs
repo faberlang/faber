@@ -14,10 +14,30 @@ use std::io::{self, BufRead, IsTerminal, Read, Write};
 /// Hosts-provider bound reused: `consolum:hauri` rejects reads larger than 1 MiB.
 pub const MAX_STDIN_READ_BYTES: i64 = 1024 * 1024;
 
-/// Whether `route` belongs to this leaf.
+/// Route names this leaf serves. Must match the `serve` match arms below.
+const ROUTES: &[&str] = &[
+    "consolum:hauri",
+    "consolum:hauriet",
+    "consolum:lege",
+    "consolum:leget",
+    "consolum:funde",
+    "consolum:scribe",
+    "consolum:scribet",
+    "consolum:dic",
+    "consolum:dicet",
+    "consolum:mone",
+    "consolum:monet",
+    "consolum:vide",
+    "consolum:videbit",
+    "consolum:audit",
+    "consolum:loquitur",
+    "consolum:admonet",
+];
+
+/// Whether `route` belongs to this leaf. Pure name lookup; runs no handler.
 #[must_use]
 pub fn is_route(route: &str) -> bool {
-    serve(route, &[]).is_some()
+    ROUTES.contains(&route)
 }
 
 /// Answer a `consolum:*` route. `None` means the route is not this leaf.

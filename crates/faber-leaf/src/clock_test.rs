@@ -1,5 +1,15 @@
-use super::{Arg, Reply, serve};
+use super::{Arg, Reply, is_route, serve};
 use crate::LeafErrorKind;
+
+#[test]
+fn route_list_matches_serve() {
+    for route in super::ROUTES {
+        assert!(is_route(route), "{route} not recognized");
+        assert!(serve(route, &[]).is_some(), "{route} not served");
+    }
+    assert!(!is_route("tempus:nope"));
+    assert!(serve("tempus:nope", &[]).is_none());
+}
 
 #[test]
 fn now_returns_a_positive_epoch_ns() {

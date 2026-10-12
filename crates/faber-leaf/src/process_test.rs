@@ -1,4 +1,14 @@
-use super::{Arg, Reply, install_argv, reset_argv, serve};
+use super::{Arg, Reply, install_argv, is_route, reset_argv, serve};
+
+#[test]
+fn route_list_matches_serve() {
+    for route in super::ROUTES {
+        assert!(is_route(route), "{route} not recognized");
+        assert!(serve(route, &[]).is_some(), "{route} not served");
+    }
+    assert!(!is_route("processus:nope"));
+    assert!(serve("processus:nope", &[]).is_none());
+}
 
 #[test]
 fn argv_uses_the_installed_override() {

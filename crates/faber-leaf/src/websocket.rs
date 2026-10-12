@@ -49,10 +49,20 @@ pub fn reset_handles() {
     with_handles(HashMap::clear);
 }
 
-/// Whether `route` belongs to this leaf.
+/// Route names this leaf serves. Must match the `serve` match arms below.
+const ROUTES: &[&str] = &[
+    "websocket:connect",
+    "websocket:accept",
+    "websocket:send",
+    "websocket:send_bytes",
+    "websocket:receive",
+    "websocket:close",
+];
+
+/// Whether `route` belongs to this leaf. Pure name lookup; opens no peer.
 #[must_use]
 pub fn is_route(route: &str) -> bool {
-    serve(route, &[]).is_some()
+    ROUTES.contains(&route)
 }
 
 /// Answer a `websocket:*` route. `None` means the route is not this leaf.

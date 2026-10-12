@@ -127,10 +127,32 @@ pub(crate) fn take_upgrade(
     })
 }
 
-/// Whether `route` belongs to this leaf.
+/// Route names this leaf serves. Must match the `serve` match arms below.
+const ROUTES: &[&str] = &[
+    "http:agent",
+    "http:get",
+    "http:delete",
+    "http:post",
+    "http:put",
+    "http:patch",
+    "http:request",
+    "http:request_open",
+    "http:read",
+    "http:listen",
+    "http:listen_tls",
+    "http:accept",
+    "http:respond",
+    "http:respond_open",
+    "http:respond_chunk",
+    "http:respond_finish",
+    "http:stop",
+    "http:port",
+];
+
+/// Whether `route` belongs to this leaf. Pure name lookup; opens no handle.
 #[must_use]
 pub fn is_route(route: &str) -> bool {
-    serve(route, &[]).is_some()
+    ROUTES.contains(&route)
 }
 
 /// Answer an `http:*` route. `None` means the route is not this leaf.

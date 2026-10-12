@@ -1,6 +1,6 @@
 //! WebSocket leaf: HTTP upgrade, connect, echo.
 
-use super::{reset_handles, serve};
+use super::{is_route, reset_handles, serve};
 use crate::http;
 use crate::value::{Arg, Reply};
 use std::thread;
@@ -85,4 +85,14 @@ fn echo_round_trips() {
         panic!("client receive: {got:?}");
     };
     assert!(fields.contains(&("text".to_owned(), Reply::Str("ping".to_owned()))));
+}
+
+#[test]
+fn route_list_matches_serve() {
+    for route in super::ROUTES {
+        assert!(is_route(route), "{route} not recognized");
+        assert!(serve(route, &[]).is_some(), "{route} not served");
+    }
+    assert!(!is_route("websocket:nope"));
+    assert!(serve("websocket:nope", &[]).is_none());
 }

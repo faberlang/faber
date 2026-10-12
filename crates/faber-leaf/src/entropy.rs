@@ -42,10 +42,19 @@ fn with_rng<R>(f: impl FnOnce(&mut Rng) -> R) -> R {
     }
 }
 
-/// Whether `route` belongs to this leaf.
+/// Route names this leaf serves. Must match the `serve` match arms below.
+const ROUTES: &[&str] = &[
+    "aleator:fractum",
+    "aleator:sortire",
+    "aleator:octetos",
+    "aleator:uuid",
+    "aleator:semina",
+];
+
+/// Whether `route` belongs to this leaf. Pure name lookup; draws no entropy.
 #[must_use]
 pub fn is_route(route: &str) -> bool {
-    serve(route, &[]).is_some()
+    ROUTES.contains(&route)
 }
 
 /// Answer an `aleator:*` route. `None` means the route is not this leaf.

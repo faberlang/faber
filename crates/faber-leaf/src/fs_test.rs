@@ -82,3 +82,13 @@ fn extension_includes_the_dot() {
         Reply::Str(".fab".to_owned())
     );
 }
+
+#[test]
+fn route_list_matches_serve() {
+    for route in super::ROUTES {
+        assert!(is_route(route), "{route} not recognized");
+        assert!(serve(route, &[]).is_some(), "{route} not served");
+    }
+    assert!(!is_route("solum:nope"));
+    assert!(serve("solum:nope", &[]).is_none());
+}

@@ -20,10 +20,18 @@ const LINUX_CLK_TCK: i64 = 100;
 
 static MONOTONIC_ORIGIN: OnceLock<Instant> = OnceLock::new();
 
-/// Whether `route` belongs to this leaf.
+/// Route names this leaf serves. Must match the `serve` match arms below.
+const ROUTES: &[&str] = &[
+    "tempus:nunc",
+    "tempus:monotonicum",
+    "tempus:activum",
+    "tempus:dormiet",
+];
+
+/// Whether `route` belongs to this leaf. Pure name lookup; reads no clock.
 #[must_use]
 pub fn is_route(route: &str) -> bool {
-    serve(route, &[]).is_some()
+    ROUTES.contains(&route)
 }
 
 /// Answer a `tempus:*` route. `None` means the route is not this leaf.
