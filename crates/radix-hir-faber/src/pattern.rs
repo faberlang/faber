@@ -100,26 +100,7 @@ impl super::FaberCodegen<'_> {
                 }
             }
             HirPattern::Variant(def_id, patterns) => {
-                // Keep an authored qualified path when lowering erased its
-                // segments. If no path fact exists, qualify only when the
-                // shorter form cannot re-resolve.
-                let spelling = self
-                    .authored_variant_spellings
-                    .get(def_id)
-                    .cloned()
-                    .or_else(|| self.qualified_local_variants.get(def_id).cloned())
-                    .or_else(|| {
-                        self.imported_variant_union_path_ids
-                            .contains(def_id)
-                            .then(|| {
-                                self.imported_pattern_spellings
-                                    .get(def_id)
-                                    .cloned()
-                                    .unwrap_or_default()
-                            })
-                            .filter(|spelling| !spelling.is_empty())
-                    })
-                    .unwrap_or_else(|| self.name_for_def_imported(*def_id, names));
+                let spelling = self.variant_pattern_spelling(*def_id, names);
                 writer.write(&spelling);
                 if !patterns.is_empty() {
                     writer.write(" ");
@@ -154,6 +135,34 @@ impl super::FaberCodegen<'_> {
                 self.write_literal(lit, surface, writer);
             }
         }
+    }
+
+    /// Resolve the canonical spelling for a variant pattern.
+    ///
+    /// Keep an authored qualified path when lowering erased its segments. If
+    /// no path fact exists, qualify only when the shorter form cannot
+    /// re-resolve.
+    fn variant_pattern_spelling(
+        &self,
+        def_id: DefId,
+        names: &FxHashMap<DefId, Symbol>,
+    ) -> String {
+        self.authored_variant_spellings
+            .get(&def_id)
+            .cloned()
+            .or_else(|| self.qualified_local_variants.get(&def_id).cloned())
+            .or_else(|| {
+                self.imported_variant_union_path_ids
+                    .contains(&def_id)
+                    .then(|| {
+                        self.imported_pattern_spellings
+                            .get(&def_id)
+                            .cloned()
+                            .unwrap_or_default()
+                    })
+                    .filter(|spelling| !spelling.is_empty())
+            })
+            .unwrap_or_else(|| self.name_for_def_imported(def_id, names))
     }
 
     /// Arm-head patterns, one per subject, separated by `et`.
