@@ -235,41 +235,7 @@ fn document_stmt(stmt: &Stmt, interner: &Interner, body: &str) -> Option<DocItem
                 .map_or(stmt.span.end, |block| block.span.start),
         ),
         StmtKind::Class(class) => {
-            members = class
-                .members
-                .iter()
-                .filter_map(|member| {
-                    let visibility = member_visibility(&member.annotations, interner);
-                    let visibility = match visibility {
-                        MemberVisibility::Publica => "publica",
-                        MemberVisibility::Interna => "interna",
-                        MemberVisibility::Privata => return None,
-                    };
-                    let (kind, name, end) = match &member.kind {
-                        ClassMemberKind::Field(field) => {
-                            ("field", field.name.name, member.span.end)
-                        }
-                        ClassMemberKind::Method(method) => (
-                            "method",
-                            method.name.name,
-                            method
-                                .body
-                                .as_ref()
-                                .map_or(member.span.end, |block| block.span.start),
-                        ),
-                    };
-                    Some(DocMember::new(
-                        kind,
-                        interner.resolve(name),
-                        visibility,
-                        &member.annotations,
-                        &member.leading_trivia,
-                        Span::new(member.span.start, end),
-                        src,
-                        interner,
-                    ))
-                })
-                .collect();
+            members = class_members(class, src, interner);
             (
                 "genus",
                 interner.resolve(class.name.name).to_owned(),
@@ -391,6 +357,45 @@ fn document_stmt(stmt: &Stmt, interner: &Interner, body: &str) -> Option<DocItem
         summary,
         members,
     })
+}
+
+fn class_members(
+    class: &radix::module::syntax::ClassDecl,
+    src: Source<'_>,
+    interner: &Interner,
+) -> Vec<DocMember> {
+    class
+        .members
+        .iter()
+        .filter_map(|member| {
+            let visibility = match member_visibility(&member.annotations, interner) {
+                MemberVisibility::Publica => "publica",
+                MemberVisibility::Interna => "interna",
+                MemberVisibility::Privata => return None,
+            };
+            let (kind, name, end) = match &member.kind {
+                ClassMemberKind::Field(field) => ("field", field.name.name, member.span.end),
+                ClassMemberKind::Method(method) => (
+                    "method",
+                    method.name.name,
+                    method
+                        .body
+                        .as_ref()
+                        .map_or(member.span.end, |block| block.span.start),
+                ),
+            };
+            Some(DocMember::new(
+                kind,
+                interner.resolve(name),
+                visibility,
+                &member.annotations,
+                &member.leading_trivia,
+                Span::new(member.span.start, end),
+                src,
+                interner,
+            ))
+        })
+        .collect()
 }
 
 impl DocMember {
