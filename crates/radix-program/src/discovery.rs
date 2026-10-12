@@ -176,7 +176,7 @@ pub fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
     if input.is_dir() {
         return true;
     }
-    input.is_file() && nearest_manifest_for_file(&normalize_path(&input)).is_some()
+    input.is_file() && nearest_manifest_for_file(&input).is_some()
 }
 
 /// # Errors
@@ -241,15 +241,7 @@ pub fn discover_package_with_base(input: &Path, base: &Path) -> PackageDiscovery
 }
 
 fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
-    let manifest = read_manifest(path)?;
-    let package_root = path
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
-
-    validate_compiler_manifest(&manifest, path)?;
-
-    let source_root = resolve_source_root(&package_root, &manifest.paths.source, path)?;
+    let (package_root, manifest, source_root) = read_validated_manifest(path)?;
     let entry = manifest
         .paths
         .entry
@@ -268,15 +260,7 @@ fn parse_manifest(path: &Path) -> PackageDiscoveryResult {
 }
 
 fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryResult {
-    let manifest = read_manifest(path)?;
-    let package_root = path
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
-
-    validate_compiler_manifest(&manifest, path)?;
-
-    let source_root = resolve_source_root(&package_root, &manifest.paths.source, path)?;
+    let (package_root, manifest, source_root) = read_validated_manifest(path)?;
     let templates = resolve_path_templates(&package_root, &manifest.paths.templates, path)?;
     Ok(PackageSpec {
         package_root,
@@ -285,6 +269,24 @@ fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryRes
         templates,
         manifest_backed: true,
     })
+}
+
+/// Read and validate a manifest and resolve its source root.
+///
+/// Entry and template resolution stay with each caller to preserve diagnostic
+/// ordering: `parse_manifest` resolves the entry before templates, while
+/// `parse_manifest_with_entry` skips entry resolution entirely.
+fn read_validated_manifest(
+    path: &Path,
+) -> Result<(PathBuf, FaberManifest, PathBuf), Box<Diagnostic>> {
+    let manifest = read_manifest(path)?;
+    let package_root = path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    validate_compiler_manifest(&manifest, path)?;
+    let source_root = resolve_source_root(&package_root, &manifest.paths.source, path)?;
+    Ok((package_root, manifest, source_root))
 }
 
 /// Compiler-view manifest validation for discovery.
