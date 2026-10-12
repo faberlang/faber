@@ -709,11 +709,7 @@ impl TypeChecker<'_> {
         let target_carrier = self.value_carrier_type(target_resolved);
 
         if let Some(result_ty) = self.check_json_genus_conversio(source_ty, target_resolved, span) {
-            if let Some(recovery) = recovery {
-                self.note_conversio_recovery_checked(recovery, target_resolved);
-            } else {
-                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            }
+            self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             return result_ty;
         }
 
@@ -748,11 +744,7 @@ impl TypeChecker<'_> {
             span,
         ) {
             if !self.types.equals(result_ty, self.error_type) {
-                if let Some(recovery) = recovery {
-                    self.note_conversio_recovery_checked(recovery, target_resolved);
-                } else {
-                    self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-                }
+                self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             }
             return result_ty;
         }
@@ -763,11 +755,7 @@ impl TypeChecker<'_> {
             {
                 return error_ty;
             }
-            if let Some(recovery) = recovery {
-                self.note_conversio_recovery_checked(recovery, target_resolved);
-            } else {
-                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            }
+            self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             return target_resolved;
         }
 
@@ -777,29 +765,17 @@ impl TypeChecker<'_> {
             {
                 return error_ty;
             }
-            if let Some(recovery) = recovery {
-                self.note_conversio_recovery_checked(recovery, target_resolved);
-            } else {
-                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            }
+            self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             return target_resolved;
         }
 
         if self.is_bounded_octeti_conversio(source_ty, target_resolved) {
-            if let Some(recovery) = recovery {
-                self.note_conversio_recovery_checked(recovery, target_resolved);
-            } else {
-                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            }
+            self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             return target_resolved;
         }
 
         if self.is_bounded_lista_conversio(source_ty, target_resolved) {
-            if let Some(recovery) = recovery {
-                self.note_conversio_recovery_checked(recovery, target_resolved);
-            } else {
-                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            }
+            self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             return target_resolved;
         }
 
@@ -851,11 +827,7 @@ impl TypeChecker<'_> {
             self.check_octeti_to_lista_conversio(source_ty, target_resolved, span)
         {
             if !self.types.equals(result_ty, self.error_type) {
-                if let Some(recovery) = recovery {
-                    self.note_conversio_recovery_checked(recovery, target_resolved);
-                } else {
-                    self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-                }
+                self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             }
             return result_ty;
         }
@@ -877,11 +849,7 @@ impl TypeChecker<'_> {
             span,
         ) {
             if !self.types.equals(result_ty, self.error_type) {
-                if let Some(recovery) = recovery {
-                    self.note_conversio_recovery_checked(recovery, target_resolved);
-                } else {
-                    self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-                }
+                self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             }
             return result_ty;
         }
@@ -960,11 +928,7 @@ impl TypeChecker<'_> {
             {
                 return error_ty;
             }
-            if let Some(recovery) = recovery {
-                self.note_conversio_recovery_checked(recovery, target_resolved);
-            } else {
-                self.check_conversio_propagation_channel(source_ty, target_resolved, span);
-            }
+            self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             return target_resolved;
         }
 
@@ -1051,6 +1015,23 @@ impl TypeChecker<'_> {
             written
         } else {
             result
+        }
+    }
+
+    /// Settle a successful `↦` arm: an inline `⊥` value is checked against the
+    /// declared target, while a bare conversion propagates through the active
+    /// alternate-exit channel.
+    fn settle_conversio_result(
+        &mut self,
+        recovery: Option<&mut HirExpression>,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        if let Some(recovery) = recovery {
+            self.note_conversio_recovery_checked(recovery, target_resolved);
+        } else {
+            self.check_conversio_propagation_channel(source_ty, target_resolved, span);
         }
     }
 
@@ -1368,7 +1349,8 @@ impl TypeChecker<'_> {
     /// `tensor<E, [d1, ..]> ↦ octeti via Be|Le` is the exact inverse of
     /// `octeti ↦ tensor`: element `i` becomes bytes `[i*w, (i+1)*w)` in the
     /// hinted order, no numeric conversion. The hint is required for every
-    /// width and the row cannot fail (the length is `product(shape) x w`).
+    /// element wider than 8 bits and the row cannot fail (the length is
+    /// `product(shape) x w`).
     fn check_tensor_to_octeti_conversio(
         &mut self,
         source_ty: TypeId,
