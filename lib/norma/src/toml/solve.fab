@@ -285,7 +285,7 @@ fn parse_inline_table(string wire, int start) → cursor.Scan ⇥ string {
 
 fn take_digits(string wire, int start) → int {
     var int index ← start
-    while index ≺ wire.length() and is_digit(wire.slice(index, index + 1)) {
+    while index ≺ wire.length() and (is_digit(wire.slice(index, index + 1)) or wire.slice(index, index + 1) ≡ "_") {
         index ← index + 1
     }
     return index
@@ -486,7 +486,18 @@ fn put_path(map<string, value> incoming, list<string> path, value payload) → m
     const string head ← path.get(0) coalesce ""
     var map<string, value> child ← empty
     if root.has(head) {
-        child ← map_of(root.get(head))
+        const value existing ← root.get(head)
+        if existing is list<value> {
+            var list<value> items ← as_value_list(existing)
+            if items.length() ≡ 0 then throw "norma:toml.parse: empty table array"
+            const int last ← items.length() - 1
+            child ← map_of(items.get(last))
+            child ← put_path(child, rest_keys(path), payload)
+            items[last] ← child ↦ value
+            root.put(head, items ↦ value)
+            return root
+        }
+        child ← map_of(existing)
     }
     child ← put_path(child, rest_keys(path), payload)
     root.put(head, child ↦ value)
@@ -506,11 +517,13 @@ fn put_path_table(map<string, value> incoming, list<string> path) → map<string
     if root.has(head) {
         const value existing ← root.get(head)
         if existing is list<value> {
-            const list<value> items ↤ existing ⊥ empty
+            var list<value> items ← as_value_list(existing)
             if items.length() ≡ 0 then throw "norma:toml.parse: empty table array"
-            const value last ← items.get(items.length() - 1)
-            child ← map_of(last)
+            const int last ← items.length() - 1
+            child ← map_of(items.get(last))
             child ← put_path_table(child, rest_keys(path))
+            items[last] ← child ↦ value
+            root.put(head, items ↦ value)
             return root
         }
         child ← map_of(existing)
