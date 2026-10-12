@@ -171,7 +171,7 @@ pub(super) fn collect_host_wiring(
         .functions
         .iter()
         .filter(|function| selected_kernels.contains(&function.id))
-        .filter_map(|function| Some((function.source?, function.id)))
+        .filter_map(|function| function.source.map(|source| (source, function.id)))
         .collect();
     let mut collector = Collector {
         selected: selected_kernels,
