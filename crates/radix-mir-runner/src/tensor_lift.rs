@@ -271,7 +271,7 @@ fn true_divide(
     span: Span,
 ) -> Result<Value, RunnerError> {
     let divisor_is_zero = int_value(right) == Some(0);
-    if int_value(left).is_some() && int_value(right).is_some() && divisor_is_zero {
+    if int_value(left).is_some() && divisor_is_zero {
         return Err(RunnerError::internal(span, DIVISION_FAILED));
     }
     let quotient = as_f64(left, span)? / as_f64(right, span)?;
