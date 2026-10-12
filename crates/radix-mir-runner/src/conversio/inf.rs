@@ -143,6 +143,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     }
 
     fn inf_endian(&self, params: &[Symbol]) -> Option<EndianHint> {
-        hints::endian_hint(params, |param| hints::classify(self.interner.resolve(*param)))
+        hints::endian_hint(params, |param| {
+            hints::classify(self.interner.resolve(*param))
+        })
     }
 }

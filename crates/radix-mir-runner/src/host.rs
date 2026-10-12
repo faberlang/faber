@@ -422,10 +422,7 @@ impl Host for StdioHost {
 
     fn read_line(&mut self) -> Result<Option<String>, RunnerError> {
         let mut line = String::new();
-        let read = io::stdin()
-            .lock()
-            .read_line(&mut line)
-            .map_err(io_error)?;
+        let read = io::stdin().lock().read_line(&mut line).map_err(io_error)?;
         if read == 0 {
             return Ok(None);
         }
@@ -440,10 +437,7 @@ impl Host for StdioHost {
             return Ok(Vec::new());
         }
         let mut buffer = vec![0_u8; len];
-        let read = io::stdin()
-            .lock()
-            .read(&mut buffer)
-            .map_err(io_error)?;
+        let read = io::stdin().lock().read(&mut buffer).map_err(io_error)?;
         buffer.truncate(read);
         Ok(buffer)
     }
