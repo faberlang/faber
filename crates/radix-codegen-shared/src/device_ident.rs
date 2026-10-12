@@ -194,10 +194,14 @@ fn is_vector_or_matrix_type(name: &str) -> bool {
 
 /// `t3`, `l5`, `p0`: the generated temp, local and fallback-parameter names.
 fn is_generated_slot(name: &str) -> bool {
-    let mut chars = name.chars();
-    matches!(chars.next(), Some('t' | 'l' | 'p'))
-        && !name[1..].is_empty()
-        && name[1..].bytes().all(|byte| byte.is_ascii_digit())
+    let Some(rest) = name
+        .strip_prefix('t')
+        .or_else(|| name.strip_prefix('l'))
+        .or_else(|| name.strip_prefix('p'))
+    else {
+        return false;
+    };
+    !rest.is_empty() && rest.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 /// Whether `name` must be mangled before it reaches device source.
