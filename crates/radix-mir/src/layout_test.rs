@@ -402,6 +402,30 @@ fn alias_is_transparent_and_not_a_census_row() {
     assert_eq!(layout.kind, MirLayoutKind::Scalar(MirScalarLayout::F64));
 }
 
+/// The derived `MirLayout` row carries a scalar's width, or `None` for a
+/// kind with no fixed size (a device view here). Pins the size/align
+/// derivation for both branches of the fixed-scalar classification.
+#[test]
+fn layout_rows_carry_size_and_align_for_scalars_and_none_for_unsized() {
+    let mut types = TypeTable::new();
+    let int64_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let octeti8 = bounded_octeti(&mut types, IndexExpr::Literal(8));
+    let table = MirLayoutTable::from_types(&types);
+
+    let scalar = table
+        .layout_for_type(MirType::semantic(int64_ty))
+        .expect("i64 scalar layout");
+    assert_eq!(scalar.size_bits, Some(64));
+    assert_eq!(scalar.align_bits, Some(64));
+
+    let view_row = table
+        .layout_for_type(MirType::semantic(octeti8))
+        .expect("octeti<8> device-view layout");
+    assert!(matches!(view_row.kind, MirLayoutKind::DeviceView(_)));
+    assert_eq!(view_row.size_bits, None);
+    assert_eq!(view_row.align_bits, None);
+}
+
 /// Sized-numeric outcome under the fallthrough law.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SizedNumericOutcome {

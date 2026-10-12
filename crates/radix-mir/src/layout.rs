@@ -370,7 +370,7 @@ impl MirLayoutTable {
             let ty = TypeId(index as u32);
             match layout_kind_for_type(types, ty, &mut memo, &mut visiting) {
                 LayoutResolution::Resolved(kind) => {
-                    table.insert_type_layout(ty, kind);
+                    table.set_type_layout(ty, kind);
                 }
                 LayoutResolution::MissingFact(message, args) => {
                     table.missing_facts.insert(ty, (message, args));
@@ -435,10 +435,6 @@ impl MirLayoutTable {
         id
     }
 
-    fn insert_type_layout(&mut self, ty: TypeId, kind: MirLayoutKind) -> MirLayoutId {
-        self.set_type_layout(ty, kind)
-    }
-
     fn insert_layout_row(&mut self, kind: MirLayoutKind) -> MirLayoutId {
         // MirLayoutId is a u32 backend handle by design; rows derive from the u32-bounded type arena.
         #[expect(
@@ -457,9 +453,12 @@ impl MirLayoutTable {
 }
 
 impl MirLayoutKind {
-    fn size_bits(self) -> Option<u16> {
+    /// The scalar carrier of a fixed-size kind, or `None` for the unsized
+    /// kinds: `Magnus` is a heap bignum, aggregates/views/vectors/matrices and
+    /// opaque handles have no fixed size, packed numerics are not a scalar,
+    /// and void/never carry no value.
+    fn fixed_scalar(self) -> Option<MirScalarLayout> {
         match self {
-            // `Magnus` is an unsized heap carrier: no fixed bit size.
             Self::Scalar(MirScalarLayout::Magnus)
             | Self::Aggregate(_)
             | Self::DeviceView(_)
@@ -469,25 +468,17 @@ impl MirLayoutKind {
             | Self::PackedNumeric(_)
             | Self::Void
             | Self::Never => None,
-            Self::Scalar(scalar) => Some(scalar.size_bits()),
-            Self::Atomic(atomic) => Some(atomic.element.size_bits()),
+            Self::Scalar(scalar) => Some(scalar),
+            Self::Atomic(atomic) => Some(atomic.element),
         }
     }
 
+    fn size_bits(self) -> Option<u16> {
+        self.fixed_scalar().map(MirScalarLayout::size_bits)
+    }
+
     fn align_bits(self) -> Option<u16> {
-        match self {
-            Self::Scalar(MirScalarLayout::Magnus)
-            | Self::Aggregate(_)
-            | Self::DeviceView(_)
-            | Self::DeviceVector(_)
-            | Self::DeviceMatrix(_)
-            | Self::OpaqueHandle
-            | Self::PackedNumeric(_)
-            | Self::Void
-            | Self::Never => None,
-            Self::Scalar(scalar) => Some(scalar.align_bits()),
-            Self::Atomic(atomic) => Some(atomic.element.align_bits()),
-        }
+        self.fixed_scalar().map(MirScalarLayout::align_bits)
     }
 }
 
