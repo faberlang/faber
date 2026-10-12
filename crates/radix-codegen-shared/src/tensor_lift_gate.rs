@@ -148,13 +148,22 @@ pub fn reject_tensor_lift(
     }
 }
 
-/// The tensor of a type, aliases and access markers peeled.
-fn tensor_element(types: &TypeTable, ty: Option<TypeId>) -> Option<TypeId> {
-    let mut ty = types.peel_access_marker(ty?).1;
+/// The type with its aliases peeled (no access-marker peel).
+fn peel_aliases(types: &TypeTable, mut ty: TypeId) -> TypeId {
     while let Type::Alias(_, inner) = types.get(ty) {
         ty = *inner;
     }
-    match types.get(ty) {
+    ty
+}
+
+/// The type with its access marker and aliases peeled.
+fn peeled(types: &TypeTable, ty: TypeId) -> TypeId {
+    peel_aliases(types, types.peel_access_marker(ty).1)
+}
+
+/// The tensor of a type, aliases and access markers peeled.
+fn tensor_element(types: &TypeTable, ty: Option<TypeId>) -> Option<TypeId> {
+    match types.get(peeled(types, ty?)) {
         Type::Tensor(element, _) => Some(*element),
         _ => None,
     }
@@ -162,11 +171,7 @@ fn tensor_element(types: &TypeTable, ty: Option<TypeId>) -> Option<TypeId> {
 
 /// The register family of a type, aliases and access markers peeled.
 fn register_family(types: &TypeTable, ty: Option<TypeId>) -> Option<Family> {
-    let mut ty = types.peel_access_marker(ty?).1;
-    while let Type::Alias(_, inner) = types.get(ty) {
-        ty = *inner;
-    }
-    match types.get(ty) {
+    match types.get(peeled(types, ty?)) {
         Type::Vector(..) => Some(Family::Vector),
         Type::Matrix(..) => Some(Family::Matrix),
         _ => None,
@@ -214,10 +219,10 @@ fn register_form(
             // between two registers never type-check; `÷`, the comparisons and
             // the logic pair them.
             if same_family(left, right) {
-                let retained = matches!(op, HirBinOp::Add | HirBinOp::Sub);
-                return (!retained)
-                    .then(|| left.map(|family| (family, spelling.to_owned(), Operands::Pair)))
-                    .flatten();
+                if matches!(op, HirBinOp::Add | HirBinOp::Sub) {
+                    return None;
+                }
+                return left.map(|family| (family, spelling.to_owned(), Operands::Pair));
             }
             let scalar = |operand: &HirExpression| {
                 tensor_element(types, operand.ty).is_none()
@@ -261,13 +266,8 @@ fn register_form(
 
 /// Whether a type is a tensor whose element type is nullable.
 fn is_nullable_tensor(types: &TypeTable, ty: Option<TypeId>) -> bool {
-    tensor_element(types, ty).is_some_and(|element| {
-        let mut element = element;
-        while let Type::Alias(_, inner) = types.get(element) {
-            element = *inner;
-        }
-        matches!(types.get(element), Type::Option(_))
-    })
+    tensor_element(types, ty)
+        .is_some_and(|element| matches!(types.get(peel_aliases(types, element)), Type::Option(_)))
 }
 
 /// The label of a lifted form, when `expr` is one.
