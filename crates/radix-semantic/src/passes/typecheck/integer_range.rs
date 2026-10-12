@@ -149,8 +149,7 @@ fn const_operand(expr: &HirExpression) -> Option<Operand> {
 
 /// Ruling 8: a `u64` beside a signed typed integer has no lossless join.
 fn u64_meets_signed(a: NumericWidth, b: NumericWidth) -> bool {
-    (a == NumericWidth::U64 && b.is_signed_int())
-        || (b == NumericWidth::U64 && a.is_signed_int())
+    (a == NumericWidth::U64 && b.is_signed_int()) || (b == NumericWidth::U64 && a.is_signed_int())
 }
 
 /// What an expected type means for a constant-only expression.
