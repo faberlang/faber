@@ -233,13 +233,7 @@ impl TypeChecker<'_> {
             if let Some(widened) = self.widen_into_inf(expr, ty, slot_ty) {
                 return widened;
             }
-            if let Some(target) = self
-                .store_narrowing_target(ty, slot_ty)
-                .or_else(|| self.capped_store_target(expr, ty, slot_ty))
-                .or_else(|| self.word_store_target(expr, ty, slot_ty))
-                .or_else(|| self.trapping_float_store_target(expr, ty, slot_ty))
-                .or_else(|| self.decimal_store_target(expr, ty, slot_ty))
-            {
+            if let Some(target) = self.implicit_store_target(expr, ty, slot_ty) {
                 return self.wrap_implicit_store(expr, ty, target, site);
             }
             return ty;
@@ -257,16 +251,27 @@ impl TypeChecker<'_> {
         slot_ty: TypeId,
         site: StoreSite,
     ) -> TypeId {
-        match self
-            .store_narrowing_target(ty, slot_ty)
+        match self.implicit_store_target(expr, ty, slot_ty) {
+            Some(target) => self.wrap_implicit_store(expr, ty, target, site),
+            None => self.unify_expected(ty, slot_ty, expr.span),
+        }
+    }
+
+    /// The implicit store node a value of type `ty` needs to land in `slot_ty`,
+    /// trying each store rule in order: an integer narrowing, the 64-bit cap, a
+    /// `wrapping`/`saturating` word, a `trapping` float cell, or a computed
+    /// decimal. `None` keeps the ordinary assignment unification.
+    fn implicit_store_target(
+        &self,
+        expr: &HirExpression,
+        ty: TypeId,
+        slot_ty: TypeId,
+    ) -> Option<TypeId> {
+        self.store_narrowing_target(ty, slot_ty)
             .or_else(|| self.capped_store_target(expr, ty, slot_ty))
             .or_else(|| self.word_store_target(expr, ty, slot_ty))
             .or_else(|| self.trapping_float_store_target(expr, ty, slot_ty))
             .or_else(|| self.decimal_store_target(expr, ty, slot_ty))
-        {
-            Some(target) => self.wrap_implicit_store(expr, ty, target, site),
-            None => self.unify_expected(ty, slot_ty, expr.span),
-        }
     }
 
     /// The `wrapping` or `saturating` word whose arithmetic `expr` is, if any:
