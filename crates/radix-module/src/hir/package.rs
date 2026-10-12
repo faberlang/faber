@@ -766,7 +766,11 @@ pub fn decode_nucleum_metadata(bytes: &[u8]) -> Result<NucleumProgramMetadata, p
 pub fn nucleum_metadata_from_unit_inputs(
     modules: &[PackageUnitInput<'_>],
 ) -> Result<NucleumProgramMetadata, NucleumPackageError> {
-    merge_nucleum_units(modules.iter().map(|input| (input.analysis, input.relative_path.as_str())))
+    merge_nucleum_units(
+        modules
+            .iter()
+            .map(|input| (input.analysis, input.relative_path.as_str())),
+    )
 }
 
 /// Collect nucleum metadata from loaded package modules.
@@ -778,7 +782,11 @@ pub fn nucleum_metadata_from_unit_inputs(
 pub fn nucleum_metadata_from_loaded_modules(
     modules: &[LoadedHirModule],
 ) -> Result<NucleumProgramMetadata, NucleumPackageError> {
-    merge_nucleum_units(modules.iter().map(|module| (&module.unit, module.relative_path.as_str())))
+    merge_nucleum_units(
+        modules
+            .iter()
+            .map(|module| (&module.unit, module.relative_path.as_str())),
+    )
 }
 
 /// Merge per-unit metadata over analyzed units and run the import gates.

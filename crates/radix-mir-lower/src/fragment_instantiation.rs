@@ -291,7 +291,11 @@ impl<'a> InstantiationChecker<'a> {
             self.ty(caller, "layout", span, definition_span, Some(&expected), Some(&actual));
             return;
         }
-        let callable_params = sig.params.iter().filter(|param| is_callable_param(param)).collect::<Vec<_>>();
+        let callable_params = sig
+            .params
+            .iter()
+            .filter(|param| is_callable_param(param))
+            .collect::<Vec<_>>();
         if args.len() != callable_params.len() {
             self.ty(
                 caller,
@@ -391,7 +395,12 @@ impl<'a> InstantiationChecker<'a> {
         sig: &MirFunction,
         args: &[MirOperand],
     ) -> Option<(String, String)> {
-        for (param, arg) in sig.params.iter().filter(|param| is_callable_param(param)).zip(args.iter()) {
+        for (param, arg) in sig
+            .params
+            .iter()
+            .filter(|param| is_callable_param(param))
+            .zip(args.iter())
+        {
             let Some(actual) = self.operand_ty(caller_fn, arg) else {
                 continue;
             };
@@ -410,7 +419,12 @@ impl<'a> InstantiationChecker<'a> {
         sig: &MirFunction,
         args: &[MirOperand],
     ) -> Option<(String, String)> {
-        for (param, arg) in sig.params.iter().filter(|param| is_callable_param(param)).zip(args.iter()) {
+        for (param, arg) in sig
+            .params
+            .iter()
+            .filter(|param| is_callable_param(param))
+            .zip(args.iter())
+        {
             if !self.needs_device_layout(param.ty) {
                 continue;
             }
