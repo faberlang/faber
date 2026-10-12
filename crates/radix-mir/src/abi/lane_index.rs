@@ -115,6 +115,20 @@ struct Defs<'a> {
     multi: std::collections::BTreeSet<BaseKey>,
 }
 
+impl<'a> Defs<'a> {
+    fn note(&mut self, place: &MirPlace, value: Option<&'a crate::MirValue>) {
+        let base = BaseKey::of(&place.base);
+        match value {
+            Some(value) if place.projections.is_empty() && !self.single.contains_key(&base) => {
+                self.single.insert(base, value);
+            }
+            _ => {
+                self.multi.insert(base);
+            }
+        }
+    }
+}
+
 /// The proof state for one lane-form function.
 pub struct LaneIndexProof<'a> {
     function: &'a MirFunction,
@@ -164,28 +178,8 @@ impl MirVisitor for IndexPlaces {
     }
 }
 
-/// Collects every written local or temp.
-struct Writes<'a> {
-    single: BTreeMap<BaseKey, &'a crate::MirValue>,
-    multi: std::collections::BTreeSet<BaseKey>,
-}
-
-impl<'a> Writes<'a> {
-    fn note(&mut self, place: &MirPlace, value: Option<&'a crate::MirValue>) {
-        let base = BaseKey::of(&place.base);
-        match value {
-            Some(value) if place.projections.is_empty() && !self.single.contains_key(&base) => {
-                self.single.insert(base, value);
-            }
-            _ => {
-                self.multi.insert(base);
-            }
-        }
-    }
-}
-
 fn collect_writes(function: &MirFunction) -> Defs<'_> {
-    let mut writes = Writes {
+    let mut writes = Defs {
         single: BTreeMap::new(),
         multi: std::collections::BTreeSet::new(),
     };
@@ -214,10 +208,7 @@ fn collect_writes(function: &MirFunction) -> Defs<'_> {
             writes.note(error_place, None);
         }
     }
-    Defs {
-        single: writes.single,
-        multi: writes.multi,
-    }
+    writes
 }
 
 impl<'a> LaneIndexProof<'a> {
