@@ -272,3 +272,119 @@ fn route_list_matches_serve() {
     assert!(serve("http:nope", &[]).is_none());
     reset_handles();
 }
+
+fn hostile_chunk_case_server(side_body: &[u8]) -> String {
+    let _guard = lock();
+    reset_handles();
+    let listener = match serve_ok("http:listen", &[Arg::Int(0)]) {
+        Reply::Int(id) => id,
+        other => panic!("listen: {other:?}"),
+    };
+    let port = match serve_ok("http:port", &[Arg::Int(listener)]) {
+        Reply::Int(port) => port,
+        other => panic!("port: {other:?}"),
+    };
+    let server = thread::spawn(move || {
+        let error = serve("http:accept", &[Arg::Int(listener)])
+            .expect("route")
+            .expect_err("hostile chunk size");
+        let _ = serve("http:stop", &[Arg::Int(listener)]);
+        error.to_string()
+    });
+    let mut client =
+        TcpStream::connect(("127.0.0.1", u16::try_from(port).unwrap())).expect("connect");
+    client
+        .write_all(side_body)
+        .expect("write");
+    let message = server.join().expect("server");
+    assert!(!message.is_empty());
+    message
+}
+
+fn hostile_chunk_request(chunk_header: &str) -> String {
+    let request = format!(
+        "POST /chunked HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n{chunk_header}\r\n"
+    );
+    hostile_chunk_case_server(request.as_bytes())
+}
+
+#[test]
+fn server_rejects_overflowing_chunk_size() {
+    let message = hostile_chunk_request("ffffffffffffffff");
+    assert!(message.contains("chunk") || message.contains("body"), "{message}");
+}
+
+#[test]
+fn server_rejects_huge_chunk_size_without_unbounded_buffering() {
+    let message = hostile_chunk_request("7fffffffffffffff");
+    assert!(message.contains("chunk") || message.contains("body"), "{message}");
+}
+
+#[test]
+fn server_rejects_non_hex_chunk_size() {
+    let message = hostile_chunk_request("zzzz");
+    assert!(message.contains("invalid chunk size"), "{message}");
+}
+
+fn hostile_chunked_response(chunk_header: &str) -> String {
+    let chunk_header = chunk_header.to_owned();
+    let _guard = lock();
+    reset_handles();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let server = thread::spawn(move || {
+        let (mut conn, _) = listener.accept().expect("accept");
+        let mut request = Vec::new();
+        let _ = conn.read(&mut request);
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{chunk_header}\r\n"
+        );
+        let _ = conn.write_all(response.as_bytes());
+        let _ = conn.flush();
+        thread::sleep(std::time::Duration::from_millis(200));
+    });
+    let url = format!("http://127.0.0.1:{port}/hostile");
+    let opened = serve_ok(
+        "http:request_open",
+        &[
+            Arg::Str("GET".to_owned()),
+            Arg::Str(url),
+            Arg::List(Vec::new()),
+            Arg::Str(String::new()),
+        ],
+    );
+    let Reply::Map(fields) = opened else {
+        panic!("open: {opened:?}");
+    };
+    let reader = fields
+        .iter()
+        .find(|(key, _)| key == "reader")
+        .and_then(|(_, value)| match value {
+            Reply::Int(reader) => Some(*reader),
+            _ => None,
+        })
+        .expect("reader");
+    let error = serve("http:read", &[Arg::Int(reader), Arg::Int(65_536)])
+        .expect("route")
+        .expect_err("hostile chunk size");
+    server.join().expect("server");
+    error.to_string()
+}
+
+#[test]
+fn client_rejects_overflowing_chunk_size() {
+    let message = hostile_chunked_response("ffffffffffffffff");
+    assert!(!message.is_empty(), "{message}");
+}
+
+#[test]
+fn client_rejects_huge_chunk_size() {
+    let message = hostile_chunked_response("7fffffffffffffff");
+    assert!(!message.is_empty(), "{message}");
+}
+
+#[test]
+fn client_rejects_non_hex_chunk_size() {
+    let message = hostile_chunked_response("zzzz");
+    assert!(message.contains("invalid chunk size"), "{message}");
+}
