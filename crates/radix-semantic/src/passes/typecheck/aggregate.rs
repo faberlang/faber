@@ -55,9 +55,7 @@ impl TypeChecker<'_> {
         target: TypeId,
         span: radix_lexer::Span,
     ) {
-        let field_types = if let Some(info) = self.structs.get(&def_id) {
-            info.fields.clone()
-        } else {
+        let Some(info) = self.structs.get(&def_id) else {
             self.error_issue(
                 SemanticErrorKind::TypeUndefined,
                 ISSUE_UNKNOWN_STRUCT,
@@ -68,6 +66,7 @@ impl TypeChecker<'_> {
             );
             return;
         };
+        let field_types = info.fields.clone();
         let field_types: FxHashMap<Symbol, StructFieldInfo> = {
             let mut vars = FxHashMap::default();
             let mut shape_vars = FxHashMap::default();
@@ -380,9 +379,7 @@ impl TypeChecker<'_> {
         def_id: DefId,
         fields: &mut Vec<(Symbol, HirExpression)>,
     ) -> TypeId {
-        let field_types = if let Some(info) = self.structs.get(&def_id) {
-            info.fields.clone()
-        } else {
+        let Some(info) = self.structs.get(&def_id) else {
             self.error_issue(
                 SemanticErrorKind::TypeUndefined,
                 ISSUE_UNKNOWN_STRUCT,
@@ -393,6 +390,7 @@ impl TypeChecker<'_> {
             );
             return self.error_type;
         };
+        let field_types = info.fields.clone();
         let witnesses = self.constructor_witnesses(def_id, &[], None, radix_lexer::Span::default());
         let applied_args: Vec<radix_types::AppliedArg> = witnesses
             .iter()
