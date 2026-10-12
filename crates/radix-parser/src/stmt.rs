@@ -47,13 +47,6 @@ impl Parser {
         Ok(StmtKind::Si(self.parse_si_tail()?))
     }
 
-    /// Parse `sin` after the keyword has already been consumed.
-    ///
-    /// `sin` shares the same tail shape as `si`; only the leading keyword differs.
-    fn parse_sin_stmt(&mut self) -> Result<SiStmt, ParseError> {
-        self.parse_si_tail()
-    }
-
     /// Parse the shared condition/body/catch/tail shape for `si` and `sin`.
     fn parse_si_tail(&mut self) -> Result<SiStmt, ParseError> {
         let cond = Box::new(self.parse_expression()?);
@@ -73,7 +66,7 @@ impl Parser {
             } else {
                 self.expect_keyword_ident(TokenKind::Sin, "expected 'sin'")?;
                 Some(SecusClause::Sin {
-                    stmt: Box::new(self.parse_sin_stmt()?),
+                    stmt: Box::new(self.parse_si_tail()?),
                     leading_trivia,
                 })
             }
