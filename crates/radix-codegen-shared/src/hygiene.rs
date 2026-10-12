@@ -10,6 +10,8 @@
 //! Runtime prelude symbols (frame shim helpers) intentionally stay
 //! in the runtime namespace and are not routed through this ledger.
 
+use std::collections::{HashMap, HashSet};
+
 /// `fac` / `cape` / `iace` success binding in `match` arms.
 pub const FAC_OK: &str = "ok";
 
@@ -92,9 +94,9 @@ const FIXED_NAMES: [&str; 14] = [
 /// spelling. One `(kind, key)` always returns one name within a scope.
 #[derive(Debug, Clone)]
 pub struct TempScope {
-    taken: std::collections::HashSet<String>,
-    assigned: std::collections::HashMap<(char, u32), String>,
-    next: std::collections::HashMap<char, u32>,
+    taken: HashSet<String>,
+    assigned: HashMap<(char, u32), String>,
+    next: HashMap<char, u32>,
 }
 
 impl TempScope {
@@ -106,13 +108,13 @@ impl TempScope {
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
-        let mut taken: std::collections::HashSet<String> =
+        let mut taken: HashSet<String> =
             FIXED_NAMES.iter().map(|name| (*name).to_owned()).collect();
         taken.extend(user_names.into_iter().map(|name| name.as_ref().to_owned()));
         Self {
             taken,
-            assigned: std::collections::HashMap::new(),
-            next: std::collections::HashMap::new(),
+            assigned: HashMap::new(),
+            next: HashMap::new(),
         }
     }
 
