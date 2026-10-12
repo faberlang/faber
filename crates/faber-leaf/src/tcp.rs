@@ -374,27 +374,9 @@ fn endpoint_of(args: &[Arg], route: &'static str, remote: bool) -> Result<Reply,
     let id = expect_int(route, args, 0, "id")?;
     with_handles(|map| {
         let addr = match map.get(&id) {
-            Some(Handle::Stream(stream)) => {
-                if remote {
-                    stream.peer_addr()
-                } else {
-                    stream.local_addr()
-                }
-            }
-            Some(Handle::TlsClient(stream)) => {
-                if remote {
-                    stream.sock.peer_addr()
-                } else {
-                    stream.sock.local_addr()
-                }
-            }
-            Some(Handle::TlsServer(stream)) => {
-                if remote {
-                    stream.sock.peer_addr()
-                } else {
-                    stream.sock.local_addr()
-                }
-            }
+            Some(Handle::Stream(stream)) => pick_addr(stream, remote),
+            Some(Handle::TlsClient(stream)) => pick_addr(&stream.sock, remote),
+            Some(Handle::TlsServer(stream)) => pick_addr(&stream.sock, remote),
             Some(_) => return Err(LeafError::invalid_argument(route, "id is a listener")),
             None => return Err(LeafError::closed(route, "socket closed")),
         }
@@ -404,6 +386,17 @@ fn endpoint_of(args: &[Arg], route: &'static str, remote: bool) -> Result<Reply,
             ("port".to_owned(), Reply::Int(i64::from(addr.port()))),
         ]))
     })
+}
+
+fn pick_addr(
+    stream: &TcpStream,
+    remote: bool,
+) -> std::io::Result<std::net::SocketAddr> {
+    if remote {
+        stream.peer_addr()
+    } else {
+        stream.local_addr()
+    }
 }
 
 fn configure_stream(stream: &TcpStream, route: &'static str) -> Result<(), LeafError> {

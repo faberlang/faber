@@ -67,6 +67,15 @@ fn plaintext_echo_round_trips() {
         Reply::Int(id) => id,
         other => panic!("unexpected {other:?}"),
     };
+    let Reply::Map(fields) = serve_ok("caelum:remotus", &[Arg::Int(socket)]) else {
+        panic!("expected endpoint map");
+    };
+    assert!(fields.contains(&("host".to_owned(), Reply::Str("127.0.0.1".to_owned()))));
+    assert!(fields.contains(&("port".to_owned(), Reply::Int(port))));
+    let Reply::Map(fields) = serve_ok("caelum:locus", &[Arg::Int(socket)]) else {
+        panic!("expected endpoint map");
+    };
+    assert!(fields.contains(&("host".to_owned(), Reply::Str("127.0.0.1".to_owned()))));
     assert!(matches!(
         serve_ok(
             "caelum:funde",
