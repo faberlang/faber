@@ -291,11 +291,7 @@ impl<'a> InstantiationChecker<'a> {
             self.ty(caller, "layout", span, definition_span, Some(&expected), Some(&actual));
             return;
         }
-        let callable_params = sig
-            .params
-            .iter()
-            .filter(|param| !matches!(param.mode, MirParamMode::Lane | MirParamMode::LaneInherited))
-            .collect::<Vec<_>>();
+        let callable_params = sig.params.iter().filter(|param| is_callable_param(param)).collect::<Vec<_>>();
         if args.len() != callable_params.len() {
             self.ty(
                 caller,
@@ -395,12 +391,7 @@ impl<'a> InstantiationChecker<'a> {
         sig: &MirFunction,
         args: &[MirOperand],
     ) -> Option<(String, String)> {
-        for (param, arg) in sig
-            .params
-            .iter()
-            .filter(|param| !matches!(param.mode, MirParamMode::Lane | MirParamMode::LaneInherited))
-            .zip(args.iter())
-        {
+        for (param, arg) in sig.params.iter().filter(|param| is_callable_param(param)).zip(args.iter()) {
             let Some(actual) = self.operand_ty(caller_fn, arg) else {
                 continue;
             };
@@ -419,12 +410,7 @@ impl<'a> InstantiationChecker<'a> {
         sig: &MirFunction,
         args: &[MirOperand],
     ) -> Option<(String, String)> {
-        for (param, arg) in sig
-            .params
-            .iter()
-            .filter(|param| !matches!(param.mode, MirParamMode::Lane | MirParamMode::LaneInherited))
-            .zip(args.iter())
-        {
+        for (param, arg) in sig.params.iter().filter(|param| is_callable_param(param)).zip(args.iter()) {
             if !self.needs_device_layout(param.ty) {
                 continue;
             }
@@ -643,6 +629,13 @@ impl<'a> InstantiationChecker<'a> {
     }
 }
 
+/// Whether the call argument list covers `param`. Lane bindings are filled by
+/// the enclosing iteration, not by call arguments, so shape, layout, and
+/// argument-count checks must all skip them identically.
+fn is_callable_param(param: &radix_mir::MirParam) -> bool {
+    !matches!(param.mode, MirParamMode::Lane | MirParamMode::LaneInherited)
+}
+
 /// Whether `function` declares the text error channel (`⇥ text`), the only
 /// error a kernel can carry.
 fn throws_text(types: &TypeTable, function: &MirFunction) -> bool {
@@ -670,23 +663,9 @@ fn resolve_ty(types: &TypeTable, ty: TypeId) -> TypeId {
 
 fn is_device_safe_type(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(resolve_ty(types, ty)) {
-        Type::Primitive(Primitive::Textus | Primitive::Ascii | Primitive::Octeti | Primitive::Ignotum)
-        | Type::Param(_)
-        | Type::Infer(_)
-        | Type::Array(_)
-        | Type::Map(_, _)
-        | Type::Set(_)
-        | Type::Record(_)
-        | Type::Promissum(_)
-        | Type::PromissumFailable(_, _)
-        | Type::Cursor(_)
-        | Type::AsyncCursor(_, _)
-        | Type::Ref(_, _)
-        | Type::Func(_)
-        | Type::Option(_)
-        | Type::Intervallum(_)
-        | Type::Enum(_)
-        | Type::Interface(_) => false,
+        // These primitives are the host-side carriers the device cannot hold;
+        // every other primitive is a fixed-width numeric.
+        Type::Primitive(Primitive::Textus | Primitive::Ascii | Primitive::Octeti | Primitive::Ignotum) => false,
         Type::Primitive(_)
         | Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
@@ -698,6 +677,8 @@ fn is_device_safe_type(types: &TypeTable, ty: TypeId) -> bool {
         | Type::Atomic(_)
         | Type::Struct(_) => true,
         Type::Applied(inner, _) => is_device_safe_type(types, *inner),
+        // WHY: fail closed — a type not enumerated here (param, infer, ref,
+        // cursor, promissum, …) is rejected on the device target.
         _ => false,
     }
 }
