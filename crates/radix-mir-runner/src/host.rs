@@ -1,8 +1,7 @@
 #![allow(clippy::needless_lifetimes)]
 
-use super::{RunnerError, Value, kernel};
+use super::{RunnerError, Value};
 use radix_lexer::{Interner, Span};
-use radix_mir::KernelModule;
 use radix_mir::{MirDiagnosticKind, MirProvider, MirProviderKind};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
@@ -62,19 +61,6 @@ pub trait Host {
     fn abort(&mut self, reason: &str) -> !;
     #[allow(clippy::missing_errors_doc)]
     fn provider(&mut self, provider: &MirProvider) -> Result<Value, RunnerError>;
-    #[allow(clippy::missing_errors_doc)]
-    fn kernel_call(
-        &mut self,
-        _module: KernelModule,
-        _verb: &str,
-        _args: &[Value],
-        _span: Span,
-    ) -> Result<Value, RunnerError> {
-        Err(RunnerError::unsupported(
-            Span::default(),
-            "host kernel_call",
-        ))
-    }
     fn exit(&mut self, code: i32) -> !;
 
     /// Tier-3 conversation answer for a frame route (A4/U9): `Some(Ok(items))`
@@ -355,16 +341,6 @@ impl Host for BufferHost {
         panic!("runner exit: {code}");
     }
 
-    fn kernel_call(
-        &mut self,
-        module: KernelModule,
-        verb: &str,
-        args: &[Value],
-        span: Span,
-    ) -> Result<Value, RunnerError> {
-        kernel::dispatch_kernel(self, module, verb, args, span)
-    }
-
     fn argumenta(&self) -> Result<&[String], RunnerError> {
         Ok(&self.argumenta)
     }
@@ -495,16 +471,6 @@ impl Host for StdioHost {
 
     fn exit(&mut self, code: i32) -> ! {
         std::process::exit(code);
-    }
-
-    fn kernel_call(
-        &mut self,
-        module: KernelModule,
-        verb: &str,
-        args: &[Value],
-        span: Span,
-    ) -> Result<Value, RunnerError> {
-        kernel::dispatch_kernel(self, module, verb, args, span)
     }
 
     fn argumenta(&self) -> Result<&[String], RunnerError> {

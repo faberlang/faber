@@ -4,7 +4,7 @@
 //! (except `processus:exi`), `tempus:*`, `aleator:*`, `caelum:*`, `http:*`,
 //! and `websocket:*`. `processus:exi` stays on `Host::exit`.
 
-use super::{Host, MapKey, Value, kernel};
+use super::{Host, MapKey, Value};
 use faber_leaf::{self as leaf, Arg, Reply};
 use radix_lexer::Span;
 use rustc_hash::FxHashMap;
@@ -87,7 +87,7 @@ fn value_to_arg(value: &Value) -> Option<Arg> {
             {
                 Some(Arg::List(nested))
             } else {
-                kernel::args::octeti_bytes(value).map(Arg::Bytes)
+                octeti_bytes(value).map(Arg::Bytes)
             }
         }
         Value::Map(map) => {
@@ -103,7 +103,26 @@ fn value_to_arg(value: &Value) -> Option<Arg> {
             }
             Some(Arg::Map(fields))
         }
-        other => kernel::args::octeti_bytes(other).map(Arg::Bytes),
+        other => octeti_bytes(other).map(Arg::Bytes),
+    }
+}
+
+/// The bytes of an `octeti` argument: the byte value itself, or the
+/// `lista<b8>` array a bit-pattern list arrives as (every element one
+/// unsigned pattern below 256).
+fn octeti_bytes(value: &Value) -> Option<Vec<u8>> {
+    match value {
+        Value::Octeti(bytes) => Some(bytes.clone()),
+        Value::Array(items) => items
+            .borrow()
+            .iter()
+            .map(|item| match item {
+                Value::UInt(v) => u8::try_from(*v).ok(),
+                Value::Int(v) => u8::try_from(*v).ok(),
+                _ => None,
+            })
+            .collect(),
+        _ => None,
     }
 }
 

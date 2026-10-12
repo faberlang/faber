@@ -22,7 +22,6 @@
 
 use super::*;
 
-use radix_mir::KernelModule;
 use radix_mir::MirTerminator;
 use radix_mir::MirType;
 use radix_mir::{
@@ -1763,21 +1762,6 @@ fn package_provider_routes_fail_closed() {
     assert_eq!(
         error.issue,
         "runner_faberscript_unsupported_provider_package_geomlib_data_data_layout_count"
-    );
-}
-
-#[test]
-fn host_kernel_call_default_rejects() {
-    let mut host = MinimalHost;
-    let result = host.kernel_call(KernelModule::Processus, "exec", &[], Span::default());
-    assert!(
-        result.is_err(),
-        "default kernel_call must reject unsupported"
-    );
-    let err = result.unwrap_err();
-    assert!(
-        err.issue.contains("kernel_call"),
-        "error issue must mention kernel_call, got: {err:?}"
     );
 }
 

@@ -4,7 +4,7 @@
 //! terminating the embedder process.
 
 use radix::module::mir::{
-    Host, KernelModule, MirDiagnosticKind, MirProvider, RunnerError, Value, serve_route,
+    Host, MirDiagnosticKind, MirProvider, RunnerError, Value, serve_route,
 };
 use std::any::Any;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -45,33 +45,6 @@ impl Host for TrapHost<'_> {
 
     fn provider(&mut self, provider: &MirProvider) -> Result<Value, RunnerError> {
         self.inner.provider(provider)
-    }
-
-    fn kernel_call(
-        &mut self,
-        module: KernelModule,
-        verb: &str,
-        args: &[Value],
-        span: radix::module::lexer::Span,
-    ) -> Result<Value, RunnerError> {
-        // process.exit_process must hit TrapHost::exit (HostTrap) rather than the
-        // inner BufferHost::exit panic, so embedders can return ExitCode.
-        if matches!(module, KernelModule::Processus) && verb == "exit_process" {
-            let [code] = args else {
-                return Err(RunnerError::internal(span, "exit_process provider arity"));
-            };
-            let code = match code {
-                Value::Int(v) => i32::try_from(*v).unwrap_or(i32::MAX),
-                _ => {
-                    return Err(RunnerError::internal(
-                        span,
-                        "exit_process code is not numerus",
-                    ));
-                }
-            };
-            self.exit(code);
-        }
-        self.inner.kernel_call(module, verb, args, span)
     }
 
     fn sermo_route(
