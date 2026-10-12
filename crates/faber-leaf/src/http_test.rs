@@ -157,3 +157,106 @@ fn oversize_body_is_refused() {
     let message = server.join().expect("server");
     assert!(message.contains("max_body_bytes"), "{message}");
 }
+
+#[test]
+fn request_open_reads_chunked_body_incrementally() {
+    let _guard = lock();
+    reset_handles();
+    let listener = match serve_ok("http:listen", &[Arg::Int(0)]) {
+        Reply::Int(id) => id,
+        other => panic!("listen: {other:?}"),
+    };
+    let port = match serve_ok("http:port", &[Arg::Int(listener)]) {
+        Reply::Int(port) => port,
+        other => panic!("port: {other:?}"),
+    };
+    let server = thread::spawn(move || {
+        let incoming = serve_ok("http:accept", &[Arg::Int(listener)]);
+        let Reply::Map(fields) = incoming else {
+            panic!("accept: {incoming:?}");
+        };
+        let id = fields
+            .iter()
+            .find(|(key, _)| key == "id")
+            .and_then(|(_, value)| match value {
+                Reply::Str(id) => Some(id.clone()),
+                _ => None,
+            })
+            .expect("id");
+        let writer = match serve_ok(
+            "http:respond_open",
+            &[
+                Arg::Str(id),
+                Arg::Int(200),
+                Arg::List(vec![Arg::Map(vec![
+                    ("name".to_owned(), "Content-Type".to_owned()),
+                    ("value".to_owned(), "text/event-stream".to_owned()),
+                ])]),
+            ],
+        ) {
+            Reply::Int(writer) => writer,
+            other => panic!("respond_open: {other:?}"),
+        };
+        serve_ok(
+            "http:respond_chunk",
+            &[Arg::Int(writer), Arg::Str("one".to_owned())],
+        );
+        serve_ok(
+            "http:respond_chunk",
+            &[Arg::Int(writer), Arg::Str("two".to_owned())],
+        );
+        serve_ok("http:respond_finish", &[Arg::Int(writer), Arg::Bool(false)]);
+        serve_ok("http:stop", &[Arg::Int(listener)]);
+    });
+    let url = format!("http://127.0.0.1:{port}/sse");
+    let opened = serve_ok(
+        "http:request_open",
+        &[
+            Arg::Str("GET".to_owned()),
+            Arg::Str(url),
+            Arg::List(Vec::new()),
+            Arg::Str(String::new()),
+        ],
+    );
+    let Reply::Map(fields) = opened else {
+        panic!("open: {opened:?}");
+    };
+    let reader = fields
+        .iter()
+        .find(|(key, _)| key == "reader")
+        .and_then(|(_, value)| match value {
+            Reply::Int(reader) => Some(*reader),
+            _ => None,
+        })
+        .expect("reader");
+    let mut body = Vec::new();
+    loop {
+        let chunk = serve_ok("http:read", &[Arg::Int(reader)]);
+        let Reply::Map(fields) = chunk else {
+            panic!("read: {chunk:?}");
+        };
+        let bytes = fields
+            .iter()
+            .find(|(key, _)| key == "bytes")
+            .and_then(|(_, value)| match value {
+                Reply::Bytes(bytes) => Some(bytes.clone()),
+                Reply::Str(text) => Some(text.as_bytes().to_vec()),
+                _ => None,
+            })
+            .expect("bytes");
+        let done = fields
+            .iter()
+            .find(|(key, _)| key == "done")
+            .and_then(|(_, value)| match value {
+                Reply::Bool(done) => Some(*done),
+                _ => None,
+            })
+            .expect("done");
+        body.extend(bytes);
+        if done {
+            break;
+        }
+    }
+    server.join().expect("server");
+    assert_eq!(String::from_utf8_lossy(&body), "onetwo");
+}

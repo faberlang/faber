@@ -372,3 +372,69 @@ module_path = ["websocket"]
 kind = "function"
 canonical = "close_socket"
 surface = "close_socket"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+kind = "type"
+canonical = "Socket"
+surface = "Socket"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+kind = "type"
+canonical = "Socket"
+surface = "Socket"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+owner = "Socket"
+kind = "method"
+canonical = "send"
+surface = "send"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+owner = "Socket"
+kind = "method"
+canonical = "send"
+surface = "send"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+owner = "Socket"
+kind = "method"
+canonical = "receive"
+surface = "receive"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+owner = "Socket"
+kind = "method"
+canonical = "receive"
+surface = "receive"
+
+[[library_members]]
+provider = "norma"
+module_path = ["websocket"]
+owner = "Socket"
+kind = "method"
+canonical = "close"
+surface = "close"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["websocket"]
+owner = "Socket"
+kind = "method"
+canonical = "close"
+surface = "close"

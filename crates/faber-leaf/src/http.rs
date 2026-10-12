@@ -444,7 +444,7 @@ fn exchange(opener: &ClientOpener, open: bool) -> Result<Reply, LeafError> {
         })
         .and_then(|()| stream.flush())
         .map_err(|err| LeafError::from_io("http:request", &addr, &err))?;
-    let parsed = read_http_message(&mut stream, DEFAULT_MAX_BODY, true)?;
+    let parsed = read_http_message(&mut stream, DEFAULT_MAX_BODY, true, !open)?;
     if open {
         let remaining = parsed.content_length;
         let id = insert_handle(Handle::Reader {
@@ -514,16 +514,20 @@ fn read_chunk(args: &[Arg]) -> Result<Reply, LeafError> {
         ]));
     }
     let mut out = Vec::new();
-    take_leftover(&mut leftover, remaining.as_mut(), max, &mut out);
-    fill_reader(
-        &mut stream,
-        &mut leftover,
-        remaining.as_mut(),
-        chunked,
-        &mut done,
-        max,
-        &mut out,
-    )?;
+    if !chunked {
+        take_leftover(&mut leftover, remaining.as_mut(), max, &mut out);
+    }
+    if out.is_empty() {
+        fill_reader(
+            &mut stream,
+            &mut leftover,
+            remaining.as_mut(),
+            chunked,
+            &mut done,
+            max,
+            &mut out,
+        )?;
+    }
     if remaining == Some(0) && leftover.is_empty() {
         done = true;
     }
@@ -572,11 +576,12 @@ fn fill_reader(
     out: &mut Vec<u8>,
 ) -> Result<(), LeafError> {
     while out.len() < max && !*done {
-        if chunked && leftover.is_empty() {
-            match read_next_chunk(stream) {
+        if chunked {
+            match read_next_chunk(stream, leftover) {
                 Ok(Some(chunk)) if chunk.is_empty() => *done = true,
-                Ok(Some(chunk)) => *leftover = chunk,
+                Ok(Some(chunk)) => out.extend(chunk),
                 Ok(None) => *done = true,
+                Err(err) if is_peer_closed(&err) => *done = true,
                 Err(err) => return Err(err),
             }
             continue;
@@ -597,6 +602,13 @@ fn fill_reader(
                         *left = left.saturating_sub(n as u64);
                     }
                 }
+                Err(err)
+                    if err.kind() == std::io::ErrorKind::UnexpectedEof
+                        || err.kind() == std::io::ErrorKind::ConnectionReset
+                        || err.kind() == std::io::ErrorKind::BrokenPipe =>
+                {
+                    *done = true;
+                }
                 Err(err) => return Err(LeafError::from_io("http:read", "", &err)),
             }
             continue;
@@ -612,25 +624,79 @@ fn fill_reader(
     Ok(())
 }
 
-fn read_next_chunk(stream: &mut IoStream) -> Result<Option<Vec<u8>>, LeafError> {
+fn is_peer_closed(err: &LeafError) -> bool {
+    let text = err.to_string();
+    text.contains("UnexpectedEof")
+        || text.contains("Connection reset")
+        || text.contains("Broken pipe")
+        || text.contains("peer closed")
+}
+
+fn read_byte(stream: &mut IoStream, pending: &mut Vec<u8>) -> Result<Option<u8>, LeafError> {
+    if !pending.is_empty() {
+        return Ok(Some(pending.remove(0)));
+    }
+    let mut byte = [0_u8; 1];
+    match stream.read(&mut byte) {
+        Ok(0) => Ok(None),
+        Ok(_) => Ok(Some(byte[0])),
+        Err(err)
+            if err.kind() == std::io::ErrorKind::UnexpectedEof
+                || err.kind() == std::io::ErrorKind::ConnectionReset
+                || err.kind() == std::io::ErrorKind::BrokenPipe =>
+        {
+            Ok(None)
+        }
+        Err(err) => Err(LeafError::from_io("http:read", "", &err)),
+    }
+}
+
+fn read_exact_pending(
+    stream: &mut IoStream,
+    pending: &mut Vec<u8>,
+    want: usize,
+) -> Result<Vec<u8>, LeafError> {
+    let mut out = Vec::with_capacity(want);
+    while out.len() < want {
+        if !pending.is_empty() {
+            let take = pending.len().min(want - out.len());
+            out.extend_from_slice(&pending[..take]);
+            pending.drain(..take);
+            continue;
+        }
+        let mut buf = vec![0_u8; want - out.len()];
+        match stream.read(&mut buf) {
+            Ok(0) => {
+                return Err(LeafError::closed("http:read", "truncated chunk"));
+            }
+            Ok(n) => out.extend_from_slice(&buf[..n]),
+            Err(err) => return Err(LeafError::from_io("http:read", "", &err)),
+        }
+    }
+    Ok(out)
+}
+
+fn read_next_chunk(
+    stream: &mut IoStream,
+    pending: &mut Vec<u8>,
+) -> Result<Option<Vec<u8>>, LeafError> {
     let mut line = Vec::new();
     loop {
-        let mut byte = [0_u8; 1];
-        let n = stream
-            .read(&mut byte)
-            .map_err(|err| LeafError::from_io("http:read", "", &err))?;
-        if n == 0 {
-            return Ok(None);
-        }
-        line.push(byte[0]);
-        if line.ends_with(b"\r\n") {
-            break;
-        }
-        if line.len() > 64 {
-            return Err(LeafError::invalid_argument(
-                "http:read",
-                "chunk size line too long",
-            ));
+        match read_byte(stream, pending)? {
+            None if line.is_empty() => return Ok(None),
+            None => return Err(LeafError::closed("http:read", "truncated chunk size")),
+            Some(byte) => {
+                line.push(byte);
+                if line.ends_with(b"\r\n") {
+                    break;
+                }
+                if line.len() > 64 {
+                    return Err(LeafError::invalid_argument(
+                        "http:read",
+                        "chunk size line too long",
+                    ));
+                }
+            }
         }
     }
     let hex = std::str::from_utf8(&line[..line.len() - 2])
@@ -643,14 +709,10 @@ fn read_next_chunk(stream: &mut IoStream) -> Result<Option<Vec<u8>>, LeafError> 
         LeafError::invalid_argument("http:read", format!("invalid chunk size `{hex}`"))
     })?;
     if size == 0 {
-        let mut trailer = [0_u8; 2];
-        let _ = stream.read_exact(&mut trailer);
+        let _ = read_exact_pending(stream, pending, 2);
         return Ok(Some(Vec::new()));
     }
-    let mut data = vec![0_u8; size + 2];
-    stream
-        .read_exact(&mut data)
-        .map_err(|err| LeafError::from_io("http:read", "", &err))?;
+    let mut data = read_exact_pending(stream, pending, size + 2)?;
     data.truncate(size);
     Ok(Some(data))
 }
@@ -739,7 +801,7 @@ fn accept(args: &[Arg]) -> Result<Reply, LeafError> {
         }
         None => IoStream::Plain(tcp),
     };
-    let parsed = read_http_message(&mut stream, max_body, false)?;
+    let parsed = read_http_message(&mut stream, max_body, false, true)?;
     let connection = NEXT_CONN.fetch_add(1, Ordering::Relaxed);
     let request_id = connection.to_string();
     with_requests(|map| {
@@ -917,6 +979,7 @@ fn read_http_message(
     stream: &mut IoStream,
     max_body: usize,
     response: bool,
+    drain_body: bool,
 ) -> Result<ParsedMessage, LeafError> {
     let mut buf = Vec::new();
     let mut scratch = [0_u8; 4096];
@@ -994,7 +1057,9 @@ fn read_http_message(
             "request body exceeds max_body_bytes",
         ));
     }
-    let body = if chunked {
+    let body = if !drain_body {
+        leftover
+    } else if chunked {
         read_chunked_body(stream, leftover, max_body)?
     } else if content_length.is_some() || response {
         read_length_body(stream, leftover, content_length, max_body)?
