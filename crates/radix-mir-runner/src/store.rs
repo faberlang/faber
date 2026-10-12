@@ -273,11 +273,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .map(|ty| ty.semantic_id()),
             _ => None,
         }?;
-        let mut ty = self.types.peel_access_marker(ty).1;
-        while let Type::Alias(_, inner) = self.types.get(ty) {
-            ty = *inner;
-        }
-        Some(ty)
+        // `peel_access_marker` already returns an alias-free id; re-peeling
+        // here was dead.
+        Some(self.types.peel_access_marker(ty).1)
     }
 
     /// Whether an operand's static type is the unbounded `inf`.

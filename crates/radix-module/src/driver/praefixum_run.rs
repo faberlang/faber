@@ -38,7 +38,7 @@ pub(super) fn evaluation_items(
     def_id: DefId,
     span: Span,
 ) -> Result<Vec<HirItem>, SemanticError> {
-    let function = evaluation_function(unit, def_id, span)?;
+    let (function, id) = evaluation_function(unit, def_id, span)?;
     let reached = semantic::passes::praefixum::reached_functions(&unit.hir, &unit.types, def_id);
     // Lower only what the body needs: the synthetic function, the functions
     // it reaches, and every declaration. Statics still awaiting evaluation
@@ -54,10 +54,10 @@ pub(super) fn evaluation_items(
         })
         .map(|item| runnable_item(item, &reached))
         .chain(std::iter::once(HirItem {
-            id: function.1,
+            id,
             def_id: EVALUATION_DEF_ID,
             annotations: Vec::new(),
-            kind: HirItemKind::Function(Box::new(function.0)),
+            kind: HirItemKind::Function(Box::new(function)),
             span,
         }))
         .collect())

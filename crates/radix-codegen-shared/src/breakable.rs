@@ -110,7 +110,7 @@ pub fn block_contains_rumpe(block: &HirBlock) -> bool {
     }
 
     impl HirVisitor for RumpeFinder {
-        fn visit_stmt(&mut self, stmt: &radix_hir::HirStatement) {
+        fn visit_stmt(&mut self, stmt: &HirStatement) {
             if self.found {
                 return;
             }
@@ -140,26 +140,15 @@ pub fn block_may_exit_early(block: &HirBlock) -> bool {
 #[must_use]
 pub fn fac_expr_body(expr: &HirExpression) -> Option<&HirBlock> {
     match &expr.kind {
-        HirExpressionKind::Block(block)
-            if block
-                .breakable
-                .is_some_and(radix_hir::HirBreakableKind::is_scope) =>
-        {
-            Some(block)
-        }
+        HirExpressionKind::Block(block) if is_breakable(block) => Some(block),
         HirExpressionKind::Handled { body, .. } => {
-            if body
-                .breakable
-                .is_some_and(radix_hir::HirBreakableKind::is_scope)
-            {
+            if is_breakable(body) {
                 return Some(body);
             }
             if body.statements.is_empty()
                 && let Some(inner) = body.expr.as_deref()
                 && let HirExpressionKind::Block(block) = &inner.kind
-                && block
-                    .breakable
-                    .is_some_and(radix_hir::HirBreakableKind::is_scope)
+                && is_breakable(block)
             {
                 return Some(block);
             }
@@ -417,10 +406,7 @@ pub fn write_labeled_breakable_scope<F>(
 where
     F: FnOnce(&mut CodeWriter),
 {
-    if block
-        .breakable
-        .is_some_and(radix_hir::HirBreakableKind::is_scope)
-    {
+    if is_breakable(block) {
         if loop_style.drops_dead_shell() && !block_may_exit_early(block) {
             // No `rumpe` and no routed `perge`: the loop would run once and
             // `break` at its end. Keep the braces (they scope the body's
