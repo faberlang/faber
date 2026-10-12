@@ -195,7 +195,6 @@ impl TypeChecker<'_> {
         if self.is_error(left.elem) || self.is_error(right.elem) {
             return Some(self.error_type);
         }
-        let tensor = left.kind == AggregateKind::Tensor;
         // A shape that is part of the type and differs is a type question; a
         // shape known only at run time is a value question (`falsum`). A
         // sparsa compares as its mathematical tensor, so its shapes never
@@ -215,14 +214,14 @@ impl TypeChecker<'_> {
             );
             return Some(self.bool_type());
         }
-        if tensor {
-            // Bind inference holes the two shapes agree on; a pair that cannot
-            // unify (distinct run-time extents) is compared at run time.
-            self.solve_index_constraints(&[IndexConstraint::Equal(left.extent, right.extent)]);
-        }
-        if !tensor {
+        // Only a tensor pair continues here; a vector or matrix pair keeps the
+        // exact-type rule, and a sparsa or list pair compares as itself.
+        if left.kind != AggregateKind::Tensor {
             return None;
         }
+        // Bind inference holes the two shapes agree on; a pair that cannot
+        // unify (distinct run-time extents) is compared at run time.
+        self.solve_index_constraints(&[IndexConstraint::Equal(left.extent, right.extent)]);
         // A comparison is a `bivalens` even when its elements are rejected, so
         // the error does not cascade into the surrounding expression.
         self.exact_equality_types(left.elem, right.elem, span);
