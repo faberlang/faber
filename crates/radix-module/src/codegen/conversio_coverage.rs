@@ -381,16 +381,9 @@ pub fn classify_conversio_coverage(
                 ConversioCoverage::NotEmitted
             }
         }
-        ConversioCoverageTarget::WasmText => {
-            if wasm_text_lowers_conversio(src, tgt) {
-                ConversioCoverage::Dedicated
-            } else {
-                ConversioCoverage::NotEmitted
-            }
-        }
-        ConversioCoverageTarget::Wasm => {
-            // The `wasm` binary lane shares the wasm-text emit path plus a
-            // binary-encode step; the prediction mirrors wasm-text.
+        // The `wasm` binary lane shares the wasm-text emit path plus a
+        // binary-encode step; the prediction mirrors wasm-text for both.
+        ConversioCoverageTarget::WasmText | ConversioCoverageTarget::Wasm => {
             if wasm_text_lowers_conversio(src, tgt) {
                 ConversioCoverage::Dedicated
             } else {
@@ -495,7 +488,6 @@ fn sexp_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> 
                 | ConversioTypeFamily::Vector
                 | ConversioTypeFamily::Matrix
                 | ConversioTypeFamily::Sparsa
-                | ConversioTypeFamily::Regex
         );
     }
     if tgt == ConversioTypeFamily::Textus {
