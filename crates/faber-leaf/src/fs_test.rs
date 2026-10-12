@@ -44,6 +44,22 @@ fn write_then_read_text_round_trips() {
 }
 
 #[test]
+fn read_lines_splits_on_newlines() {
+    let path = temp_path("lines");
+    let path_text = path.to_string_lossy().into_owned();
+    fs::write(&path, "one\ntwo\nthree\n").expect("write");
+    assert_eq!(
+        serve_ok("solum:carpe", &[Arg::Str(path_text)]),
+        Reply::Strs(vec![
+            "one".to_owned(),
+            "two".to_owned(),
+            "three".to_owned()
+        ])
+    );
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn missing_file_is_not_found() {
     let error = serve(
         "solum:lege",

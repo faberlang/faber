@@ -81,7 +81,7 @@ pub fn is_route(route: &str) -> bool {
 /// Answer a `solum:*` route. `None` means the route is not this leaf.
 pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, FsError>> {
     let result = match route {
-        "solum:lege" => read_text(args),
+        "solum:lege" => read_text(args).map(Reply::Str),
         "solum:hauri" | "solum:hauriet" => read_bytes(args),
         "solum:partem" => read_range(args),
         "solum:inveni" => find(args),
@@ -183,13 +183,11 @@ fn empty_ok(route: &'static str, args: &[Arg]) -> Result<(), FsError> {
     }
 }
 
-fn read_text(args: &[Arg]) -> Result<Reply, FsError> {
+fn read_text(args: &[Arg]) -> Result<String, FsError> {
     const ROUTE: &str = "solum:lege";
     let path = expect_str(ROUTE, args, 0, "path")?;
     refuse_directory(ROUTE, path)?;
-    fs::read_to_string(path)
-        .map(Reply::Str)
-        .map_err(|err| FsError::from_io(ROUTE, path, &err))
+    fs::read_to_string(path).map_err(|err| FsError::from_io(ROUTE, path, &err))
 }
 
 fn read_bytes(args: &[Arg]) -> Result<Reply, FsError> {
@@ -281,10 +279,8 @@ fn find(args: &[Arg]) -> Result<Reply, FsError> {
 }
 
 fn read_lines(args: &[Arg]) -> Result<Reply, FsError> {
-    match read_text(args)? {
-        Reply::Str(text) => Ok(Reply::Strs(text.lines().map(str::to_owned).collect())),
-        other => Ok(other),
-    }
+    let text = read_text(args)?;
+    Ok(Reply::Strs(text.lines().map(str::to_owned).collect()))
 }
 
 fn write_text(args: &[Arg]) -> Result<Reply, FsError> {
