@@ -537,16 +537,7 @@ impl TensorValue {
         if logical_index >= count || self.strides.len() != self.shape.len() {
             return None;
         }
-        let mut remainder = logical_index;
-        let mut coordinates = vec![0; self.shape.len()];
-        for axis in (0..self.shape.len()).rev() {
-            let dimension = usize::try_from(self.shape[axis]).ok()?;
-            if dimension == 0 {
-                return None;
-            }
-            coordinates[axis] = remainder % dimension;
-            remainder /= dimension;
-        }
+        let coordinates = decompose_row_major(logical_index, &self.shape)?;
         self.physical_offset_for_coordinates(&coordinates)
     }
 
@@ -577,17 +568,7 @@ impl TensorValue {
         if logical_index >= count {
             return None;
         }
-        let mut remainder = logical_index;
-        let mut coordinates = vec![0; self.shape.len()];
-        for axis in (0..self.shape.len()).rev() {
-            let dimension = usize::try_from(self.shape[axis]).ok()?;
-            if dimension == 0 {
-                return None;
-            }
-            coordinates[axis] = remainder % dimension;
-            remainder /= dimension;
-        }
-        Some(coordinates)
+        decompose_row_major(logical_index, &self.shape)
     }
 
     pub(crate) fn push_edge_shift(&mut self, descriptor: RunnerTensorEdgeDescriptor) {
@@ -1110,17 +1091,25 @@ fn unflatten_coordinate(flat: usize, shape: &[i64]) -> Option<Vec<usize>> {
     if flat >= count {
         return None;
     }
+    decompose_row_major(flat, shape)
+}
+
+/// Row-major coordinates of a flat ordinal: the last axis varies fastest.
+/// Fails when an extent does not fit `usize` or is zero; every caller checks
+/// the ordinal against the shape's element count first, so the zero-extent
+/// arm only guards direct misuse.
+fn decompose_row_major(flat: usize, shape: &[i64]) -> Option<Vec<usize>> {
     let mut remainder = flat;
-    let mut coordinate = vec![0; shape.len()];
+    let mut coordinates = vec![0; shape.len()];
     for axis in (0..shape.len()).rev() {
         let extent = usize::try_from(shape[axis]).ok()?;
         if extent == 0 {
             return None;
         }
-        coordinate[axis] = remainder % extent;
+        coordinates[axis] = remainder % extent;
         remainder /= extent;
     }
-    Some(coordinate)
+    Some(coordinates)
 }
 
 /// Opaque gradient-handle storage for the in-process runner.
@@ -1389,15 +1378,8 @@ impl Value {
             Value::Float(v) => display_float_at_width(*v, float_width),
             Value::Bool(v) => display_bivalens(*v, order.tokens).to_owned(),
             Value::Str(v) => display_text_payload(v).to_owned(),
-            Value::Ascii(b) => {
-                let ch = char::from(*b);
-                let mut buf = [0u8; 4];
-                display_text_payload(ch.encode_utf8(&mut buf)).to_owned()
-            }
-            Value::Char(ch) => {
-                let mut buf = [0u8; 4];
-                display_text_payload(ch.encode_utf8(&mut buf)).to_owned()
-            }
+            Value::Ascii(b) => display_char(char::from(*b)),
+            Value::Char(ch) => display_char(*ch),
             Value::Nil => order.tokens.none.clone(),
             Value::Unit => String::new(),
             Value::Octeti(bytes) => String::from_utf8_lossy(bytes).into_owned(),
@@ -1587,30 +1569,6 @@ fn display_matrix(
     Ok(format!("[{}]", row_parts.join(", ")))
 }
 
-fn display_in_collection(
-    value: &Value,
-    interner: &Interner,
-    order: FieldOrder<'_>,
-    span: Span,
-    float_width: Option<NumericWidth>,
-) -> Result<String, RunnerError> {
-    Ok(match value {
-        Value::Int(v) => display_int_at_width(*v, float_width),
-        Value::UInt(v) => order
-            .bits
-            .map_or_else(|| v.to_string(), |width| display_bits(*v, width)),
-        Value::Magnus(v) => v.to_string(),
-        Value::Array(items) => display_list(&items.borrow(), interner, order, span, float_width)?,
-        Value::Map(entries) => {
-            display_tabula_map(&entries.borrow(), interner, order, span, float_width)?
-        }
-        Value::Struct(def, fields) => {
-            display_tabula_struct(*def, fields, interner, order, span, float_width)?
-        }
-        other => other.display_typed(interner, order, span, float_width)?,
-    })
-}
-
 /// A printed set is list-shaped (`[3, 7]`, `["x"]`): every element is rendered
 /// exactly as a list element is, so the display tokens of the printing
 /// function apply the same way. A set has no defined order (D19.2/D19.6), so
@@ -1693,7 +1651,7 @@ fn display_tabula_map(
             MapKey::Unit => order.tokens.none.clone(),
             MapKey::Tuple(parts) => display_tuple_key(parts, order.tokens),
         };
-        let val_str = display_in_collection(value, interner, order, span, float_width)?;
+        let val_str = value.display_typed(interner, order, span, float_width)?;
         parts.push(format!("{key_str}: {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
@@ -1782,7 +1740,7 @@ fn display_json_object(
                 .copied()
                 .or(inherited)
         });
-        let val_str = display_in_collection(value, interner, order, span, width)?;
+        let val_str = value.display_typed(interner, order, span, width)?;
         parts.push(format!("\"{name}\": {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
@@ -1839,10 +1797,10 @@ fn display_construction(
 }
 
 /// A value inside a composite (list element or construction-literal field):
-/// text and every `ascii` print double-quoted and a `littera` single-quoted, as
-/// in source (the static type decides, see [`FieldCharSet`]); everything else renders as it does in a collection. A value shown
-/// through a dynamic `valor`/`json` carrier keeps the unquoted JSON-shaped
-/// form.
+/// text and every `ascii` print double-quoted and a `littera` single-quoted,
+/// as in source (the static type decides, see [`FieldCharSet`]); everything
+/// else renders as it does at the top level. A value shown through a dynamic
+/// `valor`/`json` carrier keeps the unquoted JSON-shaped form.
 fn display_element(
     value: &Value,
     interner: &Interner,
@@ -1851,7 +1809,7 @@ fn display_element(
     float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     if order.dynamic {
-        return display_in_collection(value, interner, order, span, float_width);
+        return value.display_typed(interner, order, span, float_width);
     }
     match value {
         Value::Str(text) => Ok(format!("{text:?}")),
@@ -1864,8 +1822,14 @@ fn display_element(
         Value::SharedCell(cell) => {
             display_element(&cell.borrow(), interner, order, span, float_width)
         }
-        other => display_in_collection(other, interner, order, span, float_width),
+        other => other.display_typed(interner, order, span, float_width),
     }
+}
+
+/// One Unicode scalar as its text payload (the top-level char display).
+fn display_char(ch: char) -> String {
+    let mut buf = [0u8; 4];
+    display_text_payload(ch.encode_utf8(&mut buf)).to_owned()
 }
 
 /// Render an integer carrier at its declared width: a `d64` carrier prints as
@@ -2053,12 +2017,7 @@ pub(crate) fn modular_word_float_result(value: f64, width: NumericWidth) -> Valu
 
 /// Reduce `value` into the ring and surface it in the width's carrier.
 pub(crate) fn modular_word_result(value: i128, width: NumericWidth) -> Value {
-    let reduced = modular_word_reduce(value, width);
-    if width == NumericWidth::U64 {
-        Value::UInt(u64::try_from(reduced).unwrap_or(0))
-    } else {
-        Value::Int(i64::try_from(reduced).unwrap_or(0))
-    }
+    word_carrier(modular_word_reduce(value, width), width)
 }
 
 /// The exact representative a wrapping word carries.
@@ -2216,11 +2175,17 @@ pub fn modular_word_compare_values(
 /// `modular_word_result`: `UInt` at `u64`, `Int` below it.
 pub(crate) fn saturating_word_result(value: i128, width: NumericWidth) -> Value {
     let (lo, hi) = int_width_range(width);
-    let clamped = value.clamp(lo, hi);
+    word_carrier(value.clamp(lo, hi), width)
+}
+
+/// Surface a representative already inside `width`'s range in the width's
+/// carrier: `UInt` at `u64`, `Int` at every other width. The `unwrap_or(0)`
+/// keeps the helper total; callers reduce or clamp before calling.
+fn word_carrier(value: i128, width: NumericWidth) -> Value {
     if width == NumericWidth::U64 {
-        Value::UInt(u64::try_from(clamped).unwrap_or(0))
+        Value::UInt(u64::try_from(value).unwrap_or(0))
     } else {
-        Value::Int(i64::try_from(clamped).unwrap_or(0))
+        Value::Int(i64::try_from(value).unwrap_or(0))
     }
 }
 
