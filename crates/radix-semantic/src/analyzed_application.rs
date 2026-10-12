@@ -196,7 +196,6 @@ impl AnalyzedApplication {
     ///
     /// Returns [`AnalyzedApplicationError`] when required function facts are
     /// missing or incomplete for any top-level function or struct method.
-    // public constructor: destructures parts into snapshot
     pub fn build(
         parts: AnalyzedApplicationParts,
         interner: &radix_lexer::Interner,
@@ -471,7 +470,7 @@ pub fn qualify_for_target(
             radix_types::Lowerability::Capable => {
                 notes.push(format!(
                     "{} H1 coverage classifier: capable",
-                    target_label(target)
+                    target.as_str()
                 ));
             }
             radix_types::Lowerability::Rejected(gaps) => {
@@ -479,7 +478,7 @@ pub fn qualify_for_target(
                     gap_slugs.push(gap.slug());
                     notes.push(format!(
                         "{} H1 gap `{}` ({})",
-                        target_label(target),
+                        target.as_str(),
                         gap.slug(),
                         gap.shape()
                     ));
@@ -491,7 +490,7 @@ pub fn qualify_for_target(
         status = QualificationStatus::SupportedWithLimitations;
         notes.push(format!(
             "{} is outside the HIR application-lane product set for G5",
-            target_label(target)
+            target.as_str()
         ));
     }
 
@@ -518,8 +517,4 @@ pub fn qualify_for_target(
         gap_slugs,
         notes,
     }
-}
-
-fn target_label(target: radix_target::Target) -> &'static str {
-    target.as_str()
 }
