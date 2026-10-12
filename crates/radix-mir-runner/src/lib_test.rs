@@ -5969,6 +5969,18 @@ fn none_step_budget_applies_default_guard_to_infinite_loop() {
 }
 
 #[test]
+fn stats_entry_without_an_explicit_entry_reports_the_runner_identity() {
+    let mut interner = Interner::new();
+    let types = radix_types::TypeTable::new();
+    // The fixture's only function is named, so there is no explicit entry.
+    let validated = validated_loop_function(&mut interner, &types, self_loop_blocks());
+    let mut host = BufferHost::default();
+    let errors = run_entry_with_stats(&validated, &mut host)
+        .expect_err("a program without an explicit entry cannot start");
+    assert_eq!(errors[0].issue, "runner_no_entry_function_in_mir_program");
+}
+
+#[test]
 fn explicit_unbounded_variant_completes_bounded_program() {
     let mut interner = Interner::new();
     let types = radix_types::TypeTable::new();
