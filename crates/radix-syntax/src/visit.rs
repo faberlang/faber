@@ -26,9 +26,10 @@
 use std::cell::Cell;
 
 use super::ast::{
-    ArrayElement, BindingPattern, BlockStmt, ClassMemberKind, ClausuraBody, ConversioTarget, Expr,
-    ExprKind, GenericArgExpr, Ident, IfBody, ImportKind, NonNullKind, OptionalChainKind, Pattern,
-    PatternBind, Program, SecusClause, Stmt, StmtKind, TypeExpr, TypeExprKind,
+    ArrayElement, BindingPattern, BlockStmt, CapeClause, ClassMemberKind, ClausuraBody,
+    ConversioTarget, Expr, ExprKind, FuncDecl, GenericArgExpr, Ident, IfBody, ImportKind,
+    NonNullKind, OptionalChainKind, Pattern, PatternBind, Program, SecusClause, Stmt, StmtKind,
+    TypeExpr, TypeExprKind,
 };
 
 /// Maximum AST nesting depth before the walker refuses to descend further.
@@ -165,22 +166,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
             visitor.visit_ident(&decl.name);
             visitor.visit_expr(&decl.init);
         }
-        StmtKind::Func(decl) => {
-            visitor.visit_ident(&decl.name);
-            for param in &decl.params {
-                visitor.visit_type_expr(&param.ty);
-                visitor.visit_ident(&param.name);
-            }
-            if let Some(ret) = &decl.ret {
-                visitor.visit_type_expr(ret);
-            }
-            if let Some(err) = &decl.err {
-                visitor.visit_type_expr(err);
-            }
-            if let Some(body) = &decl.body {
-                visitor.visit_block(body);
-            }
-        }
+        StmtKind::Func(decl) => walk_func_decl(visitor, decl),
         StmtKind::Class(decl) => {
             visitor.visit_ident(&decl.name);
             for member in &decl.members {
@@ -192,22 +178,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                             visitor.visit_expr(init);
                         }
                     }
-                    ClassMemberKind::Method(method) => {
-                        visitor.visit_ident(&method.name);
-                        for param in &method.params {
-                            visitor.visit_type_expr(&param.ty);
-                            visitor.visit_ident(&param.name);
-                        }
-                        if let Some(ret) = &method.ret {
-                            visitor.visit_type_expr(ret);
-                        }
-                        if let Some(err) = &method.err {
-                            visitor.visit_type_expr(err);
-                        }
-                        if let Some(body) = &method.body {
-                            visitor.visit_block(body);
-                        }
-                    }
+                    ClassMemberKind::Method(method) => walk_func_decl(visitor, method),
                 }
             }
         }
@@ -224,8 +195,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
             visitor.visit_expr(&if_stmt.cond);
             walk_if_body(visitor, &if_stmt.then);
             if let Some(catch) = &if_stmt.catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
+                walk_catch(visitor, catch);
             }
             if let Some(else_) = &if_stmt.else_ {
                 walk_secus_clause(visitor, else_);
@@ -235,8 +205,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
             visitor.visit_expr(&while_stmt.cond);
             walk_if_body(visitor, &while_stmt.body);
             if let Some(catch) = &while_stmt.catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
+                walk_catch(visitor, catch);
             }
         }
         StmtKind::Itera(iter_stmt) => {
@@ -248,8 +217,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
             }
             walk_if_body(visitor, &iter_stmt.body);
             if let Some(catch) = &iter_stmt.catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
+                walk_catch(visitor, catch);
             }
         }
         StmtKind::Ex(extract_stmt) => {
@@ -356,8 +324,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 walk_if_body(visitor, &default.body);
             }
             if let Some(catch) = &stmt.catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
+                walk_catch(visitor, catch);
             }
         }
         StmtKind::Discerne(stmt) => {
@@ -383,8 +350,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
         StmtKind::Fac(stmt) => {
             visitor.visit_block(&stmt.body);
             if let Some(catch) = &stmt.catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
+                walk_catch(visitor, catch);
             }
             if let Some(while_) = &stmt.while_ {
                 visitor.visit_expr(while_);
@@ -789,6 +755,32 @@ fn walk_if_body<V: Visitor>(visitor: &mut V, body: &IfBody) {
     }
 }
 
+/// Walk a function declaration's name, parameter types and names, return and
+/// error annotations, and body. Shared by `functio` statements and `genus`
+/// methods: [`ClassMemberKind::Method`] stores the same [`FuncDecl`].
+fn walk_func_decl<V: Visitor>(visitor: &mut V, decl: &FuncDecl) {
+    visitor.visit_ident(&decl.name);
+    for param in &decl.params {
+        visitor.visit_type_expr(&param.ty);
+        visitor.visit_ident(&param.name);
+    }
+    if let Some(ret) = &decl.ret {
+        visitor.visit_type_expr(ret);
+    }
+    if let Some(err) = &decl.err {
+        visitor.visit_type_expr(err);
+    }
+    if let Some(body) = &decl.body {
+        visitor.visit_block(body);
+    }
+}
+
+/// Visit a `cape` clause's binding identifier and body block.
+fn walk_catch<V: Visitor>(visitor: &mut V, catch: &CapeClause) {
+    visitor.visit_ident(&catch.binding);
+    visitor.visit_block(&catch.body);
+}
+
 /// Walk a `secus` chain (an `else` subtree) so walker consumers do not miss
 /// its statements, catches, and nested `si`/`sin` conditionals.
 fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
@@ -797,8 +789,7 @@ fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
             visitor.visit_expr(&stmt.cond);
             walk_if_body(visitor, &stmt.then);
             if let Some(catch) = &stmt.catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
+                walk_catch(visitor, catch);
             }
             if let Some(else_) = &stmt.else_ {
                 walk_secus_clause(visitor, else_);
@@ -807,15 +798,13 @@ fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
         SecusClause::Block { body, catch, .. } => {
             visitor.visit_block(body);
             if let Some(catch) = catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
+                walk_catch(visitor, catch);
             }
         }
         SecusClause::Stmt { stmt, catch, .. } => {
             visitor.visit_stmt(stmt);
             if let Some(catch) = catch {
-                visitor.visit_ident(&catch.binding);
-                visitor.visit_block(&catch.body);
+                walk_catch(visitor, catch);
             }
         }
     }

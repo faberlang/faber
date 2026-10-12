@@ -2,9 +2,9 @@ use super::{DepthExceeded, MAX_VISIT_DEPTH, Visitor, walk_expr, walk_stmt, walk_
 use crate::TypeFormLevel;
 use crate::{AstMutability, ExField, PathPattern};
 use crate::{
-    BinOp, BinaryExpr, BlockStmt, CasuArm, DiscerneStmt, Expr, ExprKind, FuncDecl, Ident, IfBody,
-    Literal, Pattern, PatternBind, ProbandumBody, ProbandumDecl, Stmt, StmtKind, TypeExpr,
-    TypeExprKind,
+    BinOp, BinaryExpr, BlockStmt, CapeClause, CasuArm, DiscerneStmt, Expr, ExprKind, FuncDecl, Ident,
+    IfBody, Literal, Pattern, PatternBind, ProbandumBody, ProbandumDecl, SiStmt, Stmt, StmtKind,
+    TypeExpr, TypeExprKind,
 };
 use crate::{PraeparaBlock, PraeparaKind};
 use radix_lexer::{Span, Symbol};
@@ -330,6 +330,33 @@ fn walk_probandum_setup() {
     walk_stmt(&mut visitor, &stmt);
 
     assert_eq!(visitor.blocks, 1, "must visit setup block");
+}
+
+#[test]
+fn walk_si_walks_catch_binding_and_body() {
+    let si = SiStmt {
+        cond: Box::new(lit_expr(0)),
+        then: IfBody::Block(test_block()),
+        catch: Some(CapeClause {
+            binding: test_ident(1),
+            body: test_block(),
+            span: Span::new(0, 1),
+        }),
+        else_: None,
+    };
+    let stmt = Stmt {
+        id: 0,
+        kind: StmtKind::Si(si),
+        span: Span::new(0, 1),
+        annotations: vec![],
+        leading_trivia: vec![],
+    };
+
+    let mut visitor = CountVisitor::new();
+    walk_stmt(&mut visitor, &stmt);
+
+    assert_eq!(visitor.idents, 1, "must visit catch binding");
+    assert_eq!(visitor.blocks, 2, "must visit then and catch bodies");
 }
 
 #[test]
