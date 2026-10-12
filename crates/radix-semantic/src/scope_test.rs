@@ -448,6 +448,49 @@ fn namespace_variant_value_position_flagged_row_is_pinned() {
     assert!(!kind.1.contains(&broken_def));
 }
 
+/// A generic struct export installs its ordered declaration parameter names,
+/// which the MIR lowering context reads back through `imported_file_structs`
+/// to register `struct_type_params` for applied imported nominals.
+#[test]
+fn imported_generic_struct_carries_decl_param_names() {
+    use crate::TypeTable;
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceGenericParam, InterfaceStructExport,
+    };
+    use std::collections::BTreeMap;
+
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Box".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
+            name: "Box".to_owned(),
+            params: vec![InterfaceGenericParam {
+                name: "T".to_owned(),
+                kind: radix_syntax::GenericParamKind::Typus,
+            }],
+            fields: Vec::new(),
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+
+    let mut resolver = Resolver::new();
+    let mut interner = radix_lexer::Interner::new();
+    let mut types = TypeTable::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("mod".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("generic struct interface installs");
+
+    let exported = resolver.imported_file_structs();
+    assert_eq!(exported.len(), 1);
+    assert_eq!(exported[0].3, vec![interner.intern("T")]);
+}
+
 #[cfg(feature = "hir-fhir")]
 #[test]
 fn resolver_snapshot_round_trips_conversion_rows() {
