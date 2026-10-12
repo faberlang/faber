@@ -33,6 +33,10 @@ const OVERFLOW: &str = "numerus overflow";
 const DIVISION: &str = "numerus division failed";
 const NEGATIVE_SHIFT: &str = "negative shift count";
 
+/// 2^127 as an `f64`: a float at or past it is beyond every exact integer, and
+/// above every decimal magnitude that fits the 128-bit carrier.
+const F64_EXACT_LIMIT: f64 = 170_141_183_460_469_231_731_687_303_715_884_105_728.0;
+
 /// The exact value of an integer carrier.
 pub(crate) fn int_value(value: &Value) -> Option<i128> {
     match value {
@@ -197,15 +201,13 @@ pub(crate) fn exact_bitnot(
 /// `None` when the float is NaN.
 pub(crate) fn cmp_int_float(int: i128, float: f64) -> Option<std::cmp::Ordering> {
     use std::cmp::Ordering;
-    // 2^127 as f64: a float at or past it is beyond every exact integer.
-    const LIMIT: f64 = 170_141_183_460_469_231_731_687_303_715_884_105_728.0;
     if float.is_nan() {
         return None;
     }
-    if float >= LIMIT {
+    if float >= F64_EXACT_LIMIT {
         return Some(Ordering::Less);
     }
-    if float <= -LIMIT {
+    if float <= -F64_EXACT_LIMIT {
         return Some(Ordering::Greater);
     }
     let whole = float.trunc();
@@ -258,16 +260,13 @@ pub(crate) fn cmp_scaled_float(
     float: f64,
 ) -> Option<std::cmp::Ordering> {
     use std::cmp::Ordering;
-    // A decimal's magnitude is below 2^127 whatever its scale, so a float
-    // past that dominates.
-    const HUGE: f64 = 170_141_183_460_469_231_731_687_303_715_884_105_728.0;
     if float.is_nan() {
         return None;
     }
-    if float >= HUGE {
+    if float >= F64_EXACT_LIMIT {
         return Some(Ordering::Less);
     }
-    if float <= -HUGE {
+    if float <= -F64_EXACT_LIMIT {
         return Some(Ordering::Greater);
     }
     // `float - floor` is exact only for a non-negative float, so a negative
@@ -279,7 +278,7 @@ pub(crate) fn cmp_scaled_float(
     }
     let floor = float.floor();
     let fraction = float - floor; // exact, in [0, 1)
-    #[allow(clippy::cast_possible_truncation)] // `floor` is bounded by the HUGE guard above
+    #[allow(clippy::cast_possible_truncation)] // `floor` is bounded by the F64_EXACT_LIMIT guard above
     let whole = floor as i128;
     let (quotient, remainder) = (floor_div(scaled, scale), floor_rem(scaled, scale));
     match quotient.cmp(&whole) {
