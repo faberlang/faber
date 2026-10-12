@@ -383,12 +383,7 @@ impl HirAspectVerifier for LeanAspectChecker {
         let temp_dir = match make_temp_project_dir() {
             Ok(dir) => dir,
             Err(error) => {
-                let err_result = HirAspectCheckResult {
-                    status: HirAspectCheckStatus::Error,
-                    evidence: HirAspectEvidence(error),
-                    counterexample: Vec::new(),
-                    backend: HirAspectBackendKind::Lean,
-                };
+                let err_result = lean_result(HirAspectCheckStatus::Error, HirAspectEvidence(error));
                 return merge_results(
                     &recognized,
                     checkable.iter().map(|_| err_result.clone()).collect(),
@@ -401,12 +396,10 @@ impl HirAspectVerifier for LeanAspectChecker {
         // Write the generated files.
         let lean_path = temp_dir.join(format!("{LAKE_PROJECT_NAME}.lean"));
         if let Err(error) = std::fs::write(&lean_path, &lean_source) {
-            let err_result = HirAspectCheckResult {
-                status: HirAspectCheckStatus::Error,
-                evidence: HirAspectEvidence(format!("failed to write Lean source: {error}")),
-                counterexample: Vec::new(),
-                backend: HirAspectBackendKind::Lean,
-            };
+            let err_result = lean_result(
+                HirAspectCheckStatus::Error,
+                HirAspectEvidence(format!("failed to write Lean source: {error}")),
+            );
             ignore_result(std::fs::remove_dir_all(&temp_dir));
             return merge_results(
                 &recognized,
@@ -416,12 +409,10 @@ impl HirAspectVerifier for LeanAspectChecker {
             );
         }
         if let Err(error) = std::fs::write(temp_dir.join("lakefile.toml"), &lakefile_toml) {
-            let err_result = HirAspectCheckResult {
-                status: HirAspectCheckStatus::Error,
-                evidence: HirAspectEvidence(format!("failed to write lakefile.toml: {error}")),
-                counterexample: Vec::new(),
-                backend: HirAspectBackendKind::Lean,
-            };
+            let err_result = lean_result(
+                HirAspectCheckStatus::Error,
+                HirAspectEvidence(format!("failed to write lakefile.toml: {error}")),
+            );
             ignore_result(std::fs::remove_dir_all(&temp_dir));
             return merge_results(
                 &recognized,
@@ -472,14 +463,14 @@ fn classify_unproven_records(
     let refused: Vec<HirAspectCheckResult> = recognized
         .iter()
         .filter(|r| !has_proof_content(r) && !is_gate_hole_record(r))
-        .map(|r| HirAspectCheckResult {
-            status: HirAspectCheckStatus::Failed,
-            evidence: HirAspectEvidence(format!(
-                "aspect kind `{}` is registered without proof content; refusing placeholder proof",
-                aspect_label(r)
-            )),
-            counterexample: Vec::new(),
-            backend: HirAspectBackendKind::Lean,
+        .map(|r| {
+            lean_result(
+                HirAspectCheckStatus::Failed,
+                HirAspectEvidence(format!(
+                    "aspect kind `{}` is registered without proof content; refusing placeholder proof",
+                    aspect_label(r)
+                )),
+            )
         })
         .collect();
 
@@ -490,14 +481,12 @@ fn classify_unproven_records(
             _ => None,
         })
         .map(|label| {
-            HirAspectCheckResult {
-                status: HirAspectCheckStatus::Failed,
-                evidence: HirAspectEvidence(format!(
+            lean_result(
+                HirAspectCheckStatus::Failed,
+                HirAspectEvidence(format!(
                     "gate hole (never downgraded): {label} — the AIR purity gate admitted a form whose Line-3 model translation carries an IO/monadic effect"
                 )),
-                counterexample: Vec::new(),
-                backend: HirAspectBackendKind::Lean,
-            }
+            )
         })
         .collect();
 
@@ -541,14 +530,18 @@ fn merge_results(
 /// Every record owes exactly one result of its class, so this marks an
 /// internal bookkeeping fault and is never reported as proven.
 fn missing_result(class: &str) -> HirAspectCheckResult {
-    HirAspectCheckResult {
-        status: HirAspectCheckStatus::Failed,
-        evidence: HirAspectEvidence(format!(
+    lean_result(
+        HirAspectCheckStatus::Failed,
+        HirAspectEvidence(format!(
             "internal error: no {class} result was produced for this aspect record; refusing to report it as proven"
         )),
-        counterexample: Vec::new(),
-        backend: HirAspectBackendKind::Lean,
-    }
+    )
+}
+
+/// Build a backend-neutral Lean result. Only the status and evidence vary
+/// across call sites; the counterexample and backend are always empty Lean.
+fn lean_result(status: HirAspectCheckStatus, evidence: HirAspectEvidence) -> HirAspectCheckResult {
+    HirAspectCheckResult { status, evidence, counterexample: Vec::new(), backend: HirAspectBackendKind::Lean }
 }
 
 /// Lake project name used for generated temp projects.
@@ -726,49 +719,24 @@ static NEXT_TEMP_INDEX: AtomicU64 = AtomicU64::new(0);
 #[must_use]
 pub fn normalize_result(lake_output: LakeResult) -> HirAspectCheckResult {
     if lake_output.timed_out {
-        return HirAspectCheckResult {
-            status: HirAspectCheckStatus::Timeout,
-            evidence: HirAspectEvidence(lake_output.stderr),
-            counterexample: Vec::new(),
-            backend: HirAspectBackendKind::Lean,
-        };
+        return lean_result(HirAspectCheckStatus::Timeout, HirAspectEvidence(lake_output.stderr));
     }
 
     let Some(exit_code) = lake_output.exit_code else {
         // Process did not produce an exit code — launch or toolchain failure.
         let combined = [lake_output.stdout.as_str(), lake_output.stderr.as_str()].concat();
         if is_toolchain_missing_evidence(&combined) {
-            return HirAspectCheckResult {
-                status: HirAspectCheckStatus::ToolchainMissing,
-                evidence: HirAspectEvidence(combined),
-                counterexample: Vec::new(),
-                backend: HirAspectBackendKind::Lean,
-            };
+            return lean_result(HirAspectCheckStatus::ToolchainMissing, HirAspectEvidence(combined));
         }
-        return HirAspectCheckResult {
-            status: HirAspectCheckStatus::Error,
-            evidence: HirAspectEvidence(combined),
-            counterexample: Vec::new(),
-            backend: HirAspectBackendKind::Lean,
-        };
+        return lean_result(HirAspectCheckStatus::Error, HirAspectEvidence(combined));
     };
 
     match exit_code {
-        0 => HirAspectCheckResult {
-            status: HirAspectCheckStatus::Proven,
-            evidence: HirAspectEvidence(lake_output.stdout),
-            counterexample: Vec::new(),
-            backend: HirAspectBackendKind::Lean,
-        },
+        0 => lean_result(HirAspectCheckStatus::Proven, HirAspectEvidence(lake_output.stdout)),
         _ => {
             // Non-zero exit — syntax error, type error, etc.
             // U2 adds more granular classification (sorry, axioms).
-            HirAspectCheckResult {
-                status: HirAspectCheckStatus::Failed,
-                evidence: HirAspectEvidence(lake_output.stderr),
-                counterexample: Vec::new(),
-                backend: HirAspectBackendKind::Lean,
-            }
+            lean_result(HirAspectCheckStatus::Failed, HirAspectEvidence(lake_output.stderr))
         }
     }
 }
@@ -798,34 +766,28 @@ pub fn combined_verdict(
     }
 
     if let SorryVerdict::Found { line_numbers } = sorry_verdict {
-        return HirAspectCheckResult {
-            status: HirAspectCheckStatus::Failed,
-            evidence: HirAspectEvidence(format!("sorry detected at lines: {line_numbers:?}")),
-            counterexample: Vec::new(),
-            backend: HirAspectBackendKind::Lean,
-        };
+        return lean_result(
+            HirAspectCheckStatus::Failed,
+            HirAspectEvidence(format!("sorry detected at lines: {line_numbers:?}")),
+        );
     }
 
     if matches!(axiom_verdict, AxiomVerdict::UnresolvedImport) {
-        return HirAspectCheckResult {
-            status: HirAspectCheckStatus::Failed,
-            evidence: HirAspectEvidence(
+        return lean_result(
+            HirAspectCheckStatus::Failed,
+            HirAspectEvidence(
                 "axiom audit unresolved: the #print-axioms wrapper import did not resolve; axioms are unverified"
                     .into(),
             ),
-            counterexample: Vec::new(),
-            backend: HirAspectBackendKind::Lean,
-        };
+        );
     }
 
     if let AxiomVerdict::Rejected { disallowed } = axiom_verdict {
         let names: Vec<&str> = disallowed.iter().map(|d| d.axiom_name.as_str()).collect();
-        return HirAspectCheckResult {
-            status: HirAspectCheckStatus::Failed,
-            evidence: HirAspectEvidence(format!("disallowed axioms: {names:?}")),
-            counterexample: Vec::new(),
-            backend: HirAspectBackendKind::Lean,
-        };
+        return lean_result(
+            HirAspectCheckStatus::Failed,
+            HirAspectEvidence(format!("disallowed axioms: {names:?}")),
+        );
     }
 
     lake_result
