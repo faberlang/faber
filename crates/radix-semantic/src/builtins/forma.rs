@@ -5,6 +5,8 @@
 //! when the program uses forma literals. Validation and rendering of forma
 //! payloads belong here, not in the lexer.
 
+use std::collections::HashSet;
+
 use crate::{Primitive, Resolver, SymbolKind, Type, TypeId, TypeTable};
 use radix_hir::{DefId, HirField, HirId, HirItem, HirItemKind, HirStruct};
 use radix_lexer::{Interner, Span, Symbol};
@@ -77,7 +79,7 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
         forma_name: Symbol,
         found: bool,
         /// Addresses of member-name identifiers, which never name the genus.
-        member_names: std::collections::HashSet<usize>,
+        member_names: HashSet<usize>,
         /// Depth the walker refused to enter, if it stopped short.
         depth_exceeded: Option<DepthExceeded>,
     }
@@ -91,6 +93,11 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
                     break;
                 }
             }
+        }
+
+        /// Record `ident` as a member name so `visit_ident` ignores it.
+        fn note_member_name(&mut self, ident: &radix_syntax::Ident) {
+            self.member_names.insert(std::ptr::from_ref(ident) as usize);
         }
     }
 
@@ -128,17 +135,16 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
                 // name's address so `visit_ident` skips exactly that site while
                 // `walk_expr` keeps its depth guard.
                 ExprKind::Member(member) => {
-                    self.member_names
-                        .insert(std::ptr::from_ref(&member.member) as usize);
+                    self.note_member_name(&member.member);
                 }
                 ExprKind::OptionalChain(opt) => {
                     if let radix_syntax::OptionalChainKind::Member(ident) = &opt.chain {
-                        self.member_names.insert(std::ptr::from_ref(ident) as usize);
+                        self.note_member_name(ident);
                     }
                 }
                 ExprKind::NonNull(non_null) => {
                     if let radix_syntax::NonNullKind::Member(ident) = &non_null.chain {
-                        self.member_names.insert(std::ptr::from_ref(ident) as usize);
+                        self.note_member_name(ident);
                     }
                 }
                 _ => {}
@@ -167,7 +173,7 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
     let mut visitor = FormaUsageVisitor {
         forma_name: symbol.name,
         found: false,
-        member_names: std::collections::HashSet::new(),
+        member_names: HashSet::new(),
         depth_exceeded: None,
     };
     visitor.scan(program);

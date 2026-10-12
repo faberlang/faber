@@ -88,20 +88,12 @@ pub fn lookup_embedded_diagnostic(
     };
     let locale = locale.unwrap_or(DEFAULT_READER_LOCALE);
     let pack = load_embedded_reader_pack(locale)?;
-    Ok(resolve_diagnostic_in_pack(query, &pack, key))
+    Ok(resolve_diagnostic_row(query, &pack, &key))
 }
 
 /// Resolve a diagnostic explanation from an already loaded reader pack.
 pub fn lookup_diagnostic_in_pack(query: &str, pack: &LocalePack) -> Option<DiagnosticExplanation> {
     let key = DiagnosticLookupKey::parse(query)?;
-    resolve_diagnostic_in_pack(query, pack, key)
-}
-
-fn resolve_diagnostic_in_pack(
-    query: &str,
-    pack: &LocalePack,
-    key: DiagnosticLookupKey,
-) -> Option<DiagnosticExplanation> {
     resolve_diagnostic_row(query, pack, &key)
 }
 

@@ -425,6 +425,33 @@ fn wasm_text_has_no_fallback_tier() {
     }
 }
 
+// --- wasm binary + sexp regex-source pins ------------------------------------
+
+#[test]
+fn wasm_binary_lane_mirrors_wasm_text_and_sexp_regex_sources_fail_closed() {
+    // The `wasm` binary column shares the wasm-text prediction arm; the sexp
+    // lanes refuse every regex source (RX-10f) before the tensor allow-list
+    // runs, so no regex cell can be dedicated on either lane.
+    use ConversioCoverageTarget::{Sexp, SexpStructural, Wasm, WasmText};
+    use ConversioTypeFamily::{Fractus, Numerus, Regex, Tensor, Textus};
+    for target in [WasmText, Wasm] {
+        assert_eq!(
+            classify_conversio_coverage(Textus, Numerus, target),
+            ConversioCoverage::Dedicated
+        );
+        assert_eq!(
+            classify_conversio_coverage(Numerus, Fractus, target),
+            ConversioCoverage::NotEmitted
+        );
+    }
+    for target in [SexpStructural, Sexp] {
+        assert_eq!(
+            classify_conversio_coverage(Regex, Tensor, target),
+            ConversioCoverage::NotEmitted
+        );
+    }
+}
+
 // --- TypeScript / Go / Faber prediction arms ---------------------------------
 
 #[test]
