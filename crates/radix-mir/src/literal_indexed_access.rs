@@ -70,13 +70,13 @@ impl LiteralIndexedAccessPlan {
                     continue;
                 }
                 let slot = MirSlot::from_place(destination)?;
-                let values = literal_array_values(aggregate.fields.clone())?;
+                let values = literal_array_values(&aggregate.fields)?;
                 indices.insert(resolve_slot(slot, &aliases)?, values);
             }
         }
 
         let returned_output = returned_tensor_slot(function, types, &aliases)?;
-        let (_, output_dims) = tensor_parts(slot_ty(function, returned_output)?, types)?;
+        let output_dims = tensor_shape(slot_ty(function, returned_output)?, types)?;
         let output_elements = output_dims
             .iter()
             .try_fold(1_u64, |count, dim| count.checked_mul(*dim))?;
@@ -169,18 +169,18 @@ impl LiteralIndexedAccessPlan {
     }
 }
 
-fn literal_array_values(fields: MirAggregateFields) -> Option<Vec<u64>> {
+fn literal_array_values(fields: &MirAggregateFields) -> Option<Vec<u64>> {
     let MirAggregateFields::Ordered(items) = fields else {
         return None;
     };
     items
-        .into_iter()
+        .iter()
         .map(|item| match item {
             MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(value))) => {
-                u64::try_from(value).ok()
+                u64::try_from(*value).ok()
             }
             MirAggregateItem::Operand(MirOperand::Constant(MirConstant::UInt(value))) => {
-                Some(value)
+                Some(*value)
             }
             MirAggregateItem::Operand(_) | MirAggregateItem::Spread(_) => None,
         })
@@ -242,18 +242,17 @@ fn slot_ty(function: &MirFunction, slot: MirSlot) -> Option<MirType> {
     }
 }
 
-fn tensor_parts(ty: MirType, types: &TypeTable) -> Option<(radix_types::TypeId, Vec<u64>)> {
+fn tensor_shape(ty: MirType, types: &TypeTable) -> Option<Vec<u64>> {
     let mut semantic = ty.semantic_id();
     loop {
         match types.get(semantic) {
             Type::Alias(_, inner) => semantic = *inner,
-            Type::Tensor(element, shape) => {
-                let dims = i64s_from_literal_index(*shape, types)?
+            Type::Tensor(_, shape) => {
+                return i64s_from_literal_index(*shape, types)?
                     .into_iter()
                     .map(u64::try_from)
                     .collect::<Result<Vec<_>, _>>()
-                    .ok()?;
-                return Some((*element, dims));
+                    .ok();
             }
             _ => return None,
         }
@@ -271,7 +270,7 @@ fn returned_tensor_slot(
             continue;
         };
         let slot = resolve_slot(MirSlot::from_operand(operand)?, aliases)?;
-        tensor_parts(slot_ty(function, slot)?, types)?;
+        tensor_shape(slot_ty(function, slot)?, types)?;
         if returned.replace(slot).is_some_and(|prior| prior != slot) {
             return None;
         }
@@ -287,7 +286,7 @@ fn literal_call_offset(
     indices: &FxHashMap<MirSlot, Vec<u64>>,
 ) -> Option<u64> {
     let receiver = resolve_slot(MirSlot::from_operand(call.args.first()?)?, aliases)?;
-    let (_, dims) = tensor_parts(slot_ty(function, receiver)?, types)?;
+    let dims = tensor_shape(slot_ty(function, receiver)?, types)?;
     let index = resolve_slot(MirSlot::from_operand(call.args.get(1)?)?, aliases)?;
     let coordinates = indices.get(&index)?;
     if coordinates.len() != dims.len() {
