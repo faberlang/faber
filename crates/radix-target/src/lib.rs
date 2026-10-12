@@ -160,34 +160,13 @@ impl Target {
     /// conveniences owned by the caller, not canonical spellings.
     #[must_use]
     pub fn from_spelling(spelling: &str) -> Option<Self> {
-        match spelling {
-            "stepper" => Some(Self::MirStepper),
-            "rust" => Some(Self::HirRust),
-            "ts" => Some(Self::HirTypeScript),
-            "go" => Some(Self::HirGo),
-            "swift" => Some(Self::HirSwift),
-            "python" => Some(Self::HirPython),
-            "haskell" => Some(Self::HirHaskell),
-            "pascal" => Some(Self::HirPascal),
-            "cobol" => Some(Self::HirCobol),
-            "fortran" => Some(Self::HirFortran),
-            "odin" => Some(Self::HirOdin),
-            "faber" => Some(Self::HirFaber),
-            "fhir" => Some(Self::HirFhir),
-            "wasm-text" => Some(Self::MirWasm),
-            "llvm-text" => Some(Self::MirLlvm),
-            "llvm-host" => Some(Self::MirLlvmHost),
-            "amd" => Some(Self::MirAmd),
-            "metal-text" => Some(Self::MirMetal),
-            "wgsl-text" => Some(Self::MirWgsl),
-            "sexp" => Some(Self::MirSexp),
-            "basic" => Some(Self::MirBasic),
-            "scena" => Some(Self::MirScena),
-            "fmir-text" => Some(Self::MirFmir),
-            "fmir" => Some(Self::MirFmirBinary),
-            "fmir-bin" => Some(Self::MirFmirBundle),
-            _ => None,
-        }
+        // WHY: derive from [`Self::ALL`] + [`Self::as_str`] so the spelling
+        // table lives once; `all_is_exactly_the_variant_set` keeps `ALL`
+        // exhaustive over the variant domain.
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|target| target.as_str() == spelling)
     }
 
     /// Every variant of this enum, in declaration order — the single owned

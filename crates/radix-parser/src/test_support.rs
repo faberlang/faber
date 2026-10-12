@@ -39,11 +39,6 @@ pub fn parse_program(source: &str) -> ParseResult {
     parse(lex(source))
 }
 
-/// Parse source and assert success before returning the result.
-///
-/// # Panics
-///
-/// Panics if parsing fails (any parse errors).
 /// Parse `source` and require that the only errors are the retired ASCII
 /// comparison diagnostic (`comparison_ascii_retired`), at least one of them.
 ///
@@ -64,6 +59,11 @@ pub fn parse_recovering_ascii_comparison(source: &str) -> ParseResult {
     result
 }
 
+/// Parse source and assert success before returning the result.
+///
+/// # Panics
+///
+/// Panics if parsing fails (any parse errors).
 #[must_use]
 pub fn parse_ok(source: &str) -> ParseResult {
     let result = parse_program(source);
@@ -121,13 +121,13 @@ pub enum ParseExpectation {
 /// Panics if no parse error matches the expected pattern.
 pub fn assert_parse_error_matches(source: &str, expected: ParseExpectation) {
     let result = parse_program(source);
-    let errors = result.errors.iter().collect::<Vec<_>>();
     assert!(
         result
             .errors
             .iter()
             .any(|err| parse_error_matches_expected(err, expected)),
-        "expected structured parse error, got {errors:?}"
+        "expected structured parse error, got {:?}",
+        result.errors
     );
 }
 
@@ -136,10 +136,10 @@ pub fn assert_parse_error_matches(source: &str, expected: ParseExpectation) {
 /// Panics when an assertion or unwrap path fails (test/helper utilities).
 pub fn assert_parse_error_issue(source: &str, issue: &str) {
     let result = parse_program(source);
-    let errors = result.errors.iter().collect::<Vec<_>>();
     assert!(
         result.errors.iter().any(|err| has_arg(err, "issue", issue)),
-        "expected parse error issue {issue:?}, got {errors:?}"
+        "expected parse error issue {issue:?}, got {:?}",
+        result.errors
     );
 }
 

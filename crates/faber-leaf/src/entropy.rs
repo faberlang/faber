@@ -14,18 +14,14 @@ use crate::value::{Arg, Reply};
 use std::io::{self, Read};
 use std::sync::{Mutex, MutexGuard};
 
-struct RngState {
-    seeded: Option<Rng>,
-}
-
-static RNG_STATE: Mutex<RngState> = Mutex::new(RngState { seeded: None });
+static RNG_STATE: Mutex<Option<Rng>> = Mutex::new(None);
 
 /// Clear the deterministic seed at an execution boundary.
 pub fn reset_seed() {
-    rng_state().seeded = None;
+    *rng_state() = None;
 }
 
-fn rng_state() -> MutexGuard<'static, RngState> {
+fn rng_state() -> MutexGuard<'static, Option<Rng>> {
     match RNG_STATE.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
@@ -34,7 +30,7 @@ fn rng_state() -> MutexGuard<'static, RngState> {
 
 fn with_rng<R>(f: impl FnOnce(&mut Rng) -> R) -> R {
     let mut guard = rng_state();
-    if let Some(ref mut rng) = guard.seeded {
+    if let Some(rng) = guard.as_mut() {
         f(rng)
     } else {
         let mut rng = Rng::from_entropy();
@@ -140,7 +136,7 @@ fn seed(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "aleator:semina";
     let n = expect_int(ROUTE, args, 0, "n")?;
     let mut guard = rng_state();
-    guard.seeded = if n > 0 {
+    *guard = if n > 0 {
         let seed_value = u64::try_from(n)
             .map_err(|_| LeafError::invalid_argument(ROUTE, "n must be positive"))?;
         Some(Rng::seed_from_u64(seed_value))
