@@ -68,12 +68,11 @@ impl TypeChecker<'_> {
     /// Record an imported implendum whose file interface names the role.
     pub(super) fn register_imported_contract_role(&mut self, def_id: DefId) {
         self.register_imported_closing_contract(def_id);
-        if self
+        let role = self
             .resolver
             .imported_contract_role(def_id)
-            .and_then(RadixContractRole::parse)
-            == Some(RadixContractRole::Ordering)
-        {
+            .and_then(RadixContractRole::parse);
+        if role == Some(RadixContractRole::Ordering) {
             self.claim_ordering_contract(def_id, radix_lexer::Span::default());
         }
     }
@@ -219,10 +218,9 @@ impl TypeChecker<'_> {
         }
         let lhs_resolved = self.resolve_inferred_type(lhs_ty);
         let rhs_resolved = self.resolve_inferred_type(rhs_ty);
-        if !self.types.equals(
-            self.types.peel_access_marker(lhs_resolved).1,
-            self.types.peel_access_marker(rhs_resolved).1,
-        ) {
+        let lhs_peeled = self.types.peel_access_marker(lhs_resolved).1;
+        let rhs_peeled = self.types.peel_access_marker(rhs_resolved).1;
+        if !self.types.equals(lhs_peeled, rhs_peeled) {
             self.invalid_operand_types(ISSUE_ORDERING_OPERAND_MISMATCH, rhs.span);
             return Some(self.bool_type());
         }
