@@ -391,13 +391,7 @@ fn run_source_with_options(
             options.kernel_policy,
         );
         let elapsed = started.elapsed().as_millis();
-        let stop = record_case_results(
-            &mut report,
-            &mut metadata,
-            one,
-            Path::new(name),
-            elapsed,
-        );
+        let stop = record_case_results(&mut report, &mut metadata, one, Path::new(name), elapsed);
         if options.fail_fast && stop {
             break;
         }
@@ -631,13 +625,7 @@ fn run_package_test_unit_with_options(
                     options.kernel_policy,
                 );
                 let elapsed = started.elapsed().as_millis();
-                let stop = record_case_results(
-                    &mut report,
-                    metadata,
-                    one,
-                    unit_path,
-                    elapsed,
-                );
+                let stop = record_case_results(&mut report, metadata, one, unit_path, elapsed);
                 if options.fail_fast && stop {
                     break;
                 }
