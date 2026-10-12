@@ -42,6 +42,16 @@ const ISSUE_CANNOT_INFER_TENSOR_SHAPE: &str = "cannot_infer_tensor_shape";
 /// sidecar binding.
 pub(super) const ISSUE_SIZE_LIFT_NEGATIVE: &str = "size_lift_negative";
 
+/// Per-call generic instantiation state: the substituted signature, the
+/// Typus infer/bound-witness map, the fresh index hole per magnitudo
+/// symbol, and the symbols bound by an explicit argument prefix.
+type CallInstantiation = (
+    FuncSig,
+    FxHashMap<Symbol, TypeId>,
+    FxHashMap<Symbol, IndexId>,
+    FxHashSet<Symbol>,
+);
+
 impl TypeChecker<'_> {
     /// Whether `ty` names one of the active function's type parameters.
     ///
@@ -257,21 +267,9 @@ impl TypeChecker<'_> {
         } else {
             FxHashSet::default()
         };
-        let (sig, inferred_vars, mut shape_vars, explicit_bound) = if explicit_type_args.is_empty()
+        let (sig, param_vars, mut shape_vars, explicit_bound) = if explicit_type_args.is_empty()
         {
-            let mut param_vars = FxHashMap::default();
-            // Pre-create one infer per Typus descriptor so a param that
-            // occurs in no signature type still has a bindable slot for
-            // defaults and for the resolved-binding record.
-            for param in &sig.type_params {
-                if param.sort == GenericParamSort::Typus {
-                    let infer = self.fresh_infer();
-                    param_vars.insert(param.name, infer);
-                }
-            }
-            let mut shape_vars = self.shape_vars_for(&shape_symbols);
-            let sig = self.substitute_func_sig(&sig, &mut param_vars, Some(&mut shape_vars));
-            (sig, Some(param_vars), shape_vars, FxHashSet::default())
+            self.instantiate_inferred_bindings(&sig, &shape_symbols)
         } else if let Some(error_ty) =
             self.reject_invalid_explicit_type_args(&sig, explicit_type_args, args, span)
         {
@@ -280,63 +278,7 @@ impl TypeChecker<'_> {
             self.typecheck_call_arg_exprs(args);
             return self.error_type;
         } else {
-            let mut param_vars = FxHashMap::default();
-            let mut explicit_bound = FxHashSet::default();
-            let size_prefix = self.explicit_args_are_magnitudo_list(explicit_type_args)
-                || (sig
-                    .type_params
-                    .iter()
-                    .all(|param| param.sort != GenericParamSort::Typus)
-                    && self.explicit_args_are_size_witnesses(explicit_type_args));
-            if size_prefix {
-                // Positional size prefix: every zipped descriptor is a
-                // magnitudo param (sort-checked by the arity validator).
-                let mut shape_vars = self.shape_vars_for(&shape_symbols);
-                self.bind_explicit_magnitudo_args(
-                    &sig,
-                    explicit_type_args,
-                    &mut shape_vars,
-                    &mut explicit_bound,
-                );
-                for param in &sig.type_params {
-                    if param.sort == GenericParamSort::Typus {
-                        let infer = self.fresh_infer();
-                        param_vars.insert(param.name, infer);
-                    }
-                }
-                (
-                    self.substitute_func_sig(&sig, &mut param_vars, Some(&mut shape_vars)),
-                    Some(param_vars),
-                    shape_vars,
-                    explicit_bound,
-                )
-            } else {
-                // Type prefix binds the leading typus params; the rest are
-                // instantiated as fresh infers so inference can solve them.
-                for (param, ty) in sig
-                    .type_params
-                    .iter()
-                    .filter(|param| param.sort == GenericParamSort::Typus)
-                    .zip(explicit_type_args.iter())
-                {
-                    param_vars.insert(param.name, *ty);
-                    explicit_bound.insert(param.name);
-                }
-                for param in &sig.type_params {
-                    if param.sort == GenericParamSort::Typus {
-                        param_vars
-                            .entry(param.name)
-                            .or_insert_with(|| self.fresh_infer());
-                    }
-                }
-                let mut shape_vars = self.shape_vars_for(&shape_symbols);
-                (
-                    self.substitute_func_sig(&sig, &mut param_vars, Some(&mut shape_vars)),
-                    Some(param_vars),
-                    shape_vars,
-                    explicit_bound,
-                )
-            }
+            self.bind_explicit_type_args(&sig, explicit_type_args, &shape_symbols)
         };
 
         let invalid_arithmetic = sig
@@ -404,10 +346,9 @@ impl TypeChecker<'_> {
         // for downstream specialization. A defaulted hole counts as bound, so
         // the rejections below only fire for genuinely unresolved slots.
         if solve_shape_params
-            && let Some(param_vars) = &inferred_vars
             && let Some(mut bindings) = self.resolve_generic_bindings(
                 &sig,
-                param_vars,
+                &param_vars,
                 &mut shape_vars,
                 &explicit_bound,
                 span,
@@ -456,19 +397,110 @@ impl TypeChecker<'_> {
         if self.reject_unbound_shape_params(&shape_vars, span) {
             return self.error_type;
         }
-        if let Some(param_vars) = inferred_vars {
-            if self.reject_inferred_type_arg_domain_misses(&sig, &param_vars, span) {
-                return self.error_type;
-            }
-            // D1.3: every witness nominally declares its parameter's bounds.
-            // The call's result type stays known, so a miss reports once
-            // without cascading into the surrounding binding.
-            self.reject_bound_misses(&sig, &param_vars, span);
+        if self.reject_inferred_type_arg_domain_misses(&sig, &param_vars, span) {
+            return self.error_type;
         }
+        // D1.3: every witness nominally declares its parameter's bounds.
+        // The call's result type stays known, so a miss reports once
+        // without cascading into the surrounding binding.
+        self.reject_bound_misses(&sig, &param_vars, span);
         if self.reject_failable_call(&sig, span) {
             return self.error_type;
         }
         self.resolve_inferred_type(sig.ret)
+    }
+
+    /// Call-site instantiation with no explicit type arguments: one fresh
+    /// infer per Typus descriptor, one fresh index hole per magnitudo
+    /// symbol, then signature substitution.
+    fn instantiate_inferred_bindings(
+        &mut self,
+        sig: &FuncSig,
+        shape_symbols: &FxHashSet<Symbol>,
+    ) -> CallInstantiation {
+        let mut param_vars = FxHashMap::default();
+        // Pre-create one infer per Typus descriptor so a param that
+        // occurs in no signature type still has a bindable slot for
+        // defaults and for the resolved-binding record.
+        for param in &sig.type_params {
+            if param.sort == GenericParamSort::Typus {
+                let infer = self.fresh_infer();
+                param_vars.insert(param.name, infer);
+            }
+        }
+        let mut shape_vars = self.shape_vars_for(shape_symbols);
+        let sig = self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars));
+        (sig, param_vars, shape_vars, FxHashSet::default())
+    }
+
+    /// Call-site instantiation for an explicit argument prefix. A positional
+    /// size prefix (all NATURAL literals, or size witnesses on a size-only
+    /// callee) binds the magnitudo descriptors in order; otherwise the
+    /// prefix binds the leading Typus params and every remaining Typus slot
+    /// falls to a fresh infer for argument-driven solving.
+    fn bind_explicit_type_args(
+        &mut self,
+        sig: &FuncSig,
+        explicit_type_args: &[TypeId],
+        shape_symbols: &FxHashSet<Symbol>,
+    ) -> CallInstantiation {
+        let mut param_vars = FxHashMap::default();
+        let mut explicit_bound = FxHashSet::default();
+        let size_prefix = self.explicit_args_are_magnitudo_list(explicit_type_args)
+            || (sig
+                .type_params
+                .iter()
+                .all(|param| param.sort != GenericParamSort::Typus)
+                && self.explicit_args_are_size_witnesses(explicit_type_args));
+        if size_prefix {
+            // Positional size prefix: every zipped descriptor is a
+            // magnitudo param (sort-checked by the arity validator).
+            let mut shape_vars = self.shape_vars_for(shape_symbols);
+            self.bind_explicit_magnitudo_args(
+                sig,
+                explicit_type_args,
+                &mut shape_vars,
+                &mut explicit_bound,
+            );
+            for param in &sig.type_params {
+                if param.sort == GenericParamSort::Typus {
+                    let infer = self.fresh_infer();
+                    param_vars.insert(param.name, infer);
+                }
+            }
+            (
+                self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
+                param_vars,
+                shape_vars,
+                explicit_bound,
+            )
+        } else {
+            // Type prefix binds the leading typus params; the rest are
+            // instantiated as fresh infers so inference can solve them.
+            for (param, ty) in sig
+                .type_params
+                .iter()
+                .filter(|param| param.sort == GenericParamSort::Typus)
+                .zip(explicit_type_args.iter())
+            {
+                param_vars.insert(param.name, *ty);
+                explicit_bound.insert(param.name);
+            }
+            for param in &sig.type_params {
+                if param.sort == GenericParamSort::Typus {
+                    param_vars
+                        .entry(param.name)
+                        .or_insert_with(|| self.fresh_infer());
+                }
+            }
+            let mut shape_vars = self.shape_vars_for(shape_symbols);
+            (
+                self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
+                param_vars,
+                shape_vars,
+                explicit_bound,
+            )
+        }
     }
 
     /// Z1: reject a size-slot argument whose compile-time value is negative.
@@ -583,22 +615,20 @@ impl TypeChecker<'_> {
         debug_assert!(!explicit_type_args.is_empty());
 
         if self.explicit_args_are_magnitudo_list(explicit_type_args) {
-            for param in sig
-                .type_params
-                .iter()
-                .zip(explicit_type_args.iter())
-                .map(|(param, _)| param)
-            {
+            // Only the zipped prefix may reject on sort: a Typus descriptor
+            // beyond the explicit prefix is an arity miss, not a sort miss.
+            for param in sig.type_params.iter().take(explicit_type_args.len()) {
                 if param.sort == GenericParamSort::Typus {
                     self.reject_type_arg_sort(param, span);
-                    self.typecheck_call_arg_exprs(args);
-                    return Some(self.error_type);
+                    return self.reject_explicit_args(args);
                 }
             }
-            if !self.explicit_prefix_len_in_range(&sig.type_params, explicit_type_args.len()) {
+            if !crate::types::generic_explicit_prefix_len_in_range(
+                &sig.type_params,
+                explicit_type_args.len(),
+            ) {
                 self.wrong_arity("wrong_number_of_type_arguments", span);
-                self.typecheck_call_arg_exprs(args);
-                return Some(self.error_type);
+                return self.reject_explicit_args(args);
             }
             return None;
         }
@@ -624,10 +654,12 @@ impl TypeChecker<'_> {
             if !sig.type_params.is_empty()
                 && self.explicit_args_are_size_witnesses(explicit_type_args)
             {
-                if !self.explicit_prefix_len_in_range(&sig.type_params, explicit_type_args.len()) {
+                if !crate::types::generic_explicit_prefix_len_in_range(
+                    &sig.type_params,
+                    explicit_type_args.len(),
+                ) {
                     self.wrong_arity("wrong_number_of_type_arguments", span);
-                    self.typecheck_call_arg_exprs(args);
-                    return Some(self.error_type);
+                    return self.reject_explicit_args(args);
                 }
                 return None;
             }
@@ -640,18 +672,15 @@ impl TypeChecker<'_> {
                     })
             }) {
                 self.reject_type_arg_sort(&sig.type_params[0], span);
-                self.typecheck_call_arg_exprs(args);
-                return Some(self.error_type);
+                return self.reject_explicit_args(args);
             }
             self.wrong_arity("callee_type_args_unsupported", span);
-            self.typecheck_call_arg_exprs(args);
-            return Some(self.error_type);
+            return self.reject_explicit_args(args);
         }
         let len = explicit_type_args.len();
         if len < typus_min || len > type_param_count {
             self.wrong_arity("wrong_number_of_type_arguments", span);
-            self.typecheck_call_arg_exprs(args);
-            return Some(self.error_type);
+            return self.reject_explicit_args(args);
         }
         for (param, ty) in sig
             .type_params
@@ -661,8 +690,7 @@ impl TypeChecker<'_> {
         {
             if self.magnitudo_literal_of(*ty).is_some() {
                 self.reject_type_arg_sort(param, span);
-                self.typecheck_call_arg_exprs(args);
-                return Some(self.error_type);
+                return self.reject_explicit_args(args);
             }
         }
         if explicit_type_args
@@ -674,21 +702,17 @@ impl TypeChecker<'_> {
             // callee param, so reject with a named issue rather than leaking
             // an unsolved InferUnion as cannot_infer_variable_type.
             self.invalid_operand_types("explicit_union_type_arg_unsupported", span);
-            self.typecheck_call_arg_exprs(args);
-            return Some(self.error_type);
+            return self.reject_explicit_args(args);
         }
         None
     }
 
-    /// Whether an explicit prefix of `len` arguments is an admissible length
-    /// for `params` in positional order: it must cover every non-defaulted
-    /// parameter and may omit only the defaulted trailing suffix.
-    fn explicit_prefix_len_in_range(
-        &self,
-        params: &[radix_types::GenericParamDescriptor],
-        len: usize,
-    ) -> bool {
-        crate::types::generic_explicit_prefix_len_in_range(params, len)
+    /// Complete one explicit-argument rejection: the call arguments are still
+    /// typechecked so their own diagnostics surface, then the call yields the
+    /// shared error type.
+    fn reject_explicit_args(&mut self, args: &mut [HirCallArg]) -> Option<TypeId> {
+        self.typecheck_call_arg_exprs(args);
+        Some(self.error_type)
     }
 
     /// Structured wrong-sort rejection for one explicit generic argument.
@@ -808,15 +832,13 @@ impl TypeChecker<'_> {
     /// from the callee body and are pinned at the caller's store (Z2 dw8).
     fn instantiate_anonymous_extents(&mut self, sig: &FuncSig) -> FuncSig {
         let mut holes: FxHashMap<radix_types::IndexVar, IndexId> = FxHashMap::default();
-        let mut freshen =
-            |this: &mut Self, ty: TypeId| this.freshen_anonymous_type_holes(ty, &mut holes);
         FuncSig {
             type_params: sig.type_params.clone(),
             params: sig
                 .params
                 .iter()
                 .map(|param| ParamType {
-                    ty: freshen(self, param.ty),
+                    ty: self.freshen_anonymous_type_holes(param.ty, &mut holes),
                     mode: param.mode,
                     optional: param.optional,
                     sponte: param.sponte,
@@ -1283,7 +1305,7 @@ impl TypeChecker<'_> {
     /// Index witness of an explicit magnitudo argument: NATURAL spellings
     /// lower to literal indices, symbolic params forward as rigid
     /// `IndexExpr::Param` so the caller's shape identity is preserved.
-    fn explicit_size_witness_index(&mut self, ty: TypeId) -> Option<crate::IndexId> {
+    fn explicit_size_witness_index(&mut self, ty: TypeId) -> Option<IndexId> {
         let Type::Param(sym) = self.types.get(ty) else {
             return None;
         };
@@ -1319,7 +1341,7 @@ impl TypeChecker<'_> {
         &mut self,
         sig: &FuncSig,
         explicit_type_args: &[TypeId],
-        shape_vars: &mut FxHashMap<Symbol, crate::IndexId>,
+        shape_vars: &mut FxHashMap<Symbol, IndexId>,
         explicit_bound: &mut FxHashSet<Symbol>,
     ) {
         for (param, ty) in sig.type_params.iter().zip(explicit_type_args.iter()) {
