@@ -330,13 +330,19 @@ fn close(args: &[Arg]) -> Result<Reply, LeafError> {
     let id = expect_int(ROUTE, args, 0, "id")?;
     with_handles(|map| match map.remove(&id) {
         Some(Handle::Stream(stream)) => {
-            let _ = stream.shutdown(Shutdown::Both);
+            // WHY: close is best-effort teardown; the stream is discarded and
+            // a shutdown error is not actionable.
+            drop(stream.shutdown(Shutdown::Both));
         }
         Some(Handle::TlsClient(mut stream)) => {
-            let _ = stream.flush();
+            // WHY: close is best-effort teardown; a failed final flush on a
+            // discarded TLS stream is not actionable.
+            drop(stream.flush());
         }
         Some(Handle::TlsServer(mut stream)) => {
-            let _ = stream.flush();
+            // WHY: close is best-effort teardown; a failed final flush on a
+            // discarded TLS stream is not actionable.
+            drop(stream.flush());
         }
         Some(Handle::Listener(_) | Handle::TlsListener { .. }) | None => {}
     });
@@ -410,7 +416,9 @@ fn configure_stream(stream: &TcpStream, route: &'static str) -> Result<(), LeafE
 }
 
 fn install_ring() {
-    let _ = rustls::crypto::ring::default_provider().install_default();
+    // WHY: installing the process-wide crypto provider is idempotent; an error
+    // only means another caller installed one first.
+    drop(rustls::crypto::ring::default_provider().install_default());
 }
 
 fn client_config() -> Arc<ClientConfig> {

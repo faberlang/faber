@@ -174,8 +174,9 @@ fn kill(args: &[Arg]) -> Result<Reply, LeafError> {
     let pid = expect_pid(ROUTE, args)?;
     let known = with_children(|map| match map.get_mut(&pid) {
         Some(child) => {
-            // Already-exited children report InvalidInput from kill(); that is fine.
-            let _ = child.kill();
+            // WHY: an already-exited child reports InvalidInput from kill();
+            // the child is being discarded either way, so it is not actionable.
+            drop(child.kill());
             true
         }
         None => false,
@@ -228,7 +229,9 @@ fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
     let pid = i64::from(child.id());
     // Reap in the background so a detached child never becomes a zombie.
     std::thread::spawn(move || {
-        let _ = child.wait();
+        // WHY: reaping is best-effort in a detached thread; a wait error has
+        // no caller to report to.
+        drop(child.wait());
     });
     Ok(Reply::Int(pid))
 }
