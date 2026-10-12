@@ -843,12 +843,7 @@ impl TypeChecker<'_> {
             if self.flow_bases.contains_key(&def_id) {
                 continue;
             }
-            let saved = self
-                .assert_refinements
-                .iter()
-                .rev()
-                .flat_map(|frame| frame.iter().rev())
-                .find_map(|(saved_def, saved)| (*saved_def == def_id).then_some(*saved).flatten());
+            let saved = self.saved_assert_refinement(def_id);
             self.flow_bases.insert(def_id, saved.unwrap_or(info));
         }
     }
@@ -898,14 +893,11 @@ impl TypeChecker<'_> {
                 }
                 continue;
             }
-            let Some(before_state) = incoming.bindings.get(&def_id) else {
-                continue;
-            };
             let changed_edges = states.iter().all(|state| {
                 state
                     .bindings
                     .get(&def_id)
-                    .is_some_and(|info| !self.member_type_equals(before_state.ty, info.ty))
+                    .is_some_and(|info| !self.member_type_equals(before.ty, info.ty))
             });
             if !changed_edges {
                 continue;
@@ -969,6 +961,16 @@ impl TypeChecker<'_> {
         state
     }
 
+    /// The saved declared type a currently open assert-refinement frame holds
+    /// for `def_id`, if any frame registered one.
+    fn saved_assert_refinement(&self, def_id: DefId) -> Option<BindingInfo> {
+        self.assert_refinements
+            .iter()
+            .rev()
+            .flat_map(|frame| frame.iter().rev())
+            .find_map(|(saved_def, saved)| (*saved_def == def_id).then_some(*saved).flatten())
+    }
+
     /// Restore the declared binding state and remove all active assert facts
     /// for a binding whose cell has been assigned.
     pub(crate) fn invalidate_flow_fact(&mut self, def_id: DefId) {
@@ -979,15 +981,7 @@ impl TypeChecker<'_> {
             .flow_bases
             .get(&def_id)
             .copied()
-            .or_else(|| {
-                self.assert_refinements
-                    .iter()
-                    .rev()
-                    .flat_map(|frame| frame.iter().rev())
-                    .find_map(|(saved_def, saved)| {
-                        (*saved_def == def_id).then_some(*saved).flatten()
-                    })
-            })
+            .or_else(|| self.saved_assert_refinement(def_id))
             .unwrap_or(current);
         for scope in &mut self.scopes {
             if scope.contains_key(&def_id) {
