@@ -766,13 +766,7 @@ pub fn decode_nucleum_metadata(bytes: &[u8]) -> Result<NucleumProgramMetadata, p
 pub fn nucleum_metadata_from_unit_inputs(
     modules: &[PackageUnitInput<'_>],
 ) -> Result<NucleumProgramMetadata, NucleumPackageError> {
-    let mut metadata = NucleumProgramMetadata::new();
-    for input in modules {
-        metadata.merge(collect_nucleum_metadata(input.analysis, &input.relative_path)?);
-    }
-    metadata.require_importable_fragment_bodies()?;
-    metadata.require_acyclic()?;
-    Ok(metadata)
+    merge_nucleum_units(modules.iter().map(|input| (input.analysis, input.relative_path.as_str())))
 }
 
 /// Collect nucleum metadata from loaded package modules.
@@ -784,9 +778,26 @@ pub fn nucleum_metadata_from_unit_inputs(
 pub fn nucleum_metadata_from_loaded_modules(
     modules: &[LoadedHirModule],
 ) -> Result<NucleumProgramMetadata, NucleumPackageError> {
+    merge_nucleum_units(modules.iter().map(|module| (&module.unit, module.relative_path.as_str())))
+}
+
+/// Merge per-unit metadata over analyzed units and run the import gates.
+///
+/// Both package entry points (build-side unit inputs, load-side modules)
+/// share this pass; only the source of each `(analysis, relative_path)`
+/// pair differs.
+///
+/// # Errors
+///
+/// Returns [`NucleumPackageError`] when a unit's metadata cannot be
+/// collected, an importable device function is signature-only, or the
+/// combined device call graph is cyclic.
+fn merge_nucleum_units<'a>(
+    units: impl Iterator<Item = (&'a AnalyzedModule, &'a str)>,
+) -> Result<NucleumProgramMetadata, NucleumPackageError> {
     let mut metadata = NucleumProgramMetadata::new();
-    for module in modules {
-        metadata.merge(collect_nucleum_metadata(&module.unit, &module.relative_path)?);
+    for (analysis, relative_path) in units {
+        metadata.merge(collect_nucleum_metadata(analysis, relative_path)?);
     }
     metadata.require_importable_fragment_bodies()?;
     metadata.require_acyclic()?;
