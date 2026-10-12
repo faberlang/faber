@@ -749,10 +749,7 @@ fn dangling_type_param_constraint_fails_closed() {
     assert!(
         matches!(
             err,
-            crate::error::HirArtifactError::DanglingIndex {
-                kind: "TypeId",
-                ..
-            }
+            crate::error::HirArtifactError::DanglingIndex { kind: "TypeId", .. }
         ),
         "dangling constraint type must fail closed: {err:?}"
     );
