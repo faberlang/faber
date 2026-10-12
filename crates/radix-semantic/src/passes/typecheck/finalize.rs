@@ -215,10 +215,7 @@ impl TypeChecker<'_> {
                 // is the only reader. Members may still contain pending `_`
                 // holes (cross-shape flows), so each member is canonicalized
                 // before the solve.
-                let members: Vec<TypeId> = {
-                    let borrowed = self.union_members.borrow();
-                    borrowed.get(&var).cloned().unwrap_or_default()
-                };
+                let members = self.union_members_snapshot(var);
                 if members.is_empty() {
                     // No constraints reached the hole: leave it visible so
                     // `report_unresolved_type_inference` can raise the
@@ -226,22 +223,7 @@ impl TypeChecker<'_> {
                     // open hole past finalize.
                     return resolved;
                 }
-                let mut canonical: Vec<TypeId> = Vec::new();
-                for member in members {
-                    if member == self.error_type {
-                        continue;
-                    }
-                    let c = self.canonicalize_type(member);
-                    if c == self.error_type {
-                        continue;
-                    }
-                    if !canonical
-                        .iter()
-                        .any(|existing| self.types.equals(*existing, c))
-                    {
-                        canonical.push(c);
-                    }
-                }
+                let canonical = self.canonicalize_union_members(members);
                 match canonical.len() {
                     // All members errored out: keep the hole unresolved so the
                     // missing-annotation error still fires.
@@ -255,6 +237,37 @@ impl TypeChecker<'_> {
             }
             _ => resolved,
         }
+    }
+
+    /// Read the accumulated member snapshot for a `∪` hole. `union_members`
+    /// is frozen once checking converges; finalize is the only reader.
+    fn union_members_snapshot(&self, var: InferVar) -> Vec<TypeId> {
+        let borrowed = self.union_members.borrow();
+        borrowed.get(&var).cloned().unwrap_or_default()
+    }
+
+    /// Canonicalize a `∪` hole's accumulated member set: drop errored
+    /// members, canonicalize each survivor, and deduplicate while preserving
+    /// accumulation order. Shared by the solve ([`Self::canonicalize_type_uncached`])
+    /// and the WARN017 shape reader ([`Self::collect_hole_shape_warnings`]).
+    fn canonicalize_union_members(&mut self, members: Vec<TypeId>) -> Vec<TypeId> {
+        let mut canonical: Vec<TypeId> = Vec::new();
+        for member in members {
+            if member == self.error_type {
+                continue;
+            }
+            let c = self.canonicalize_type(member);
+            if c == self.error_type {
+                continue;
+            }
+            if !canonical
+                .iter()
+                .any(|existing| self.types.equals(*existing, c))
+            {
+                canonical.push(c);
+            }
+        }
+        canonical
     }
 
     /// Finalize a declaration type that may be part of a public contract.
@@ -517,26 +530,8 @@ impl TypeChecker<'_> {
                 }
             }
             Type::InferUnion(var) => {
-                let members: Vec<TypeId> = {
-                    let borrowed = self.union_members.borrow();
-                    borrowed.get(&var).cloned().unwrap_or_default()
-                };
-                let mut canonical: Vec<TypeId> = Vec::new();
-                for member in members {
-                    if member == self.error_type {
-                        continue;
-                    }
-                    let c = self.canonicalize_type(member);
-                    if c == self.error_type {
-                        continue;
-                    }
-                    if !canonical
-                        .iter()
-                        .any(|existing| self.types.equals(*existing, c))
-                    {
-                        canonical.push(c);
-                    }
-                }
+                let members = self.union_members_snapshot(var);
+                let canonical = self.canonicalize_union_members(members);
                 if canonical.len() == 1 {
                     let display = self.format_type_value(canonical[0]);
                     self.warn_hole_shape_once(
