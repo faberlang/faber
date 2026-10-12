@@ -111,30 +111,7 @@ pub(crate) fn loaded_package_to_analyzed(
         .map(|(index, module)| (module.relative_path.clone(), index))
         .collect::<BTreeMap<_, _>>();
 
-    // Contract invariant: every library import must be backed by a declared
-    // dependency coordinate in the envelope (the dependency record is the
-    // store's closure key). An import without a declared dependency fails
-    // before codegen with a structured error — never by reparsing source.
-    let declared_packages = loaded
-        .dependencies
-        .iter()
-        .map(|dependency| dependency.name.as_str())
-        .collect::<BTreeSet<_>>();
-    for module in &loaded.modules {
-        for import in &module.library_imports {
-            if !declared_packages.contains(import.package.as_str()) {
-                return Err(vec![fhir_issue_diag(
-                    &package_root.join(&module.relative_path),
-                    "fhir_dependency_unresolved",
-                    format!(
-                        "FHIR package import `{}` references library `{}` with no declared dependency record",
-                        import.binding, import.package
-                    ),
-                )
-                .with_arg("package", import.package.clone())]);
-            }
-        }
-    }
+    validate_declared_dependencies(&loaded, &package_root)?;
 
     // Precompute namespace_exports per module while every module is still
     // borrowable (the loop below consumes `loaded.modules` by value).
@@ -223,6 +200,37 @@ pub(crate) fn loaded_package_to_analyzed(
         library_resolver: LibraryResolver::with_optional_home(None),
         routes,
     })
+}
+
+/// Contract invariant: every library import must be backed by a declared
+/// dependency coordinate in the envelope (the dependency record is the
+/// store's closure key). An import without a declared dependency fails
+/// before codegen with a structured error — never by reparsing source.
+fn validate_declared_dependencies(
+    loaded: &LoadedHirPackage,
+    package_root: &Path,
+) -> Result<(), Vec<Diagnostic>> {
+    let declared_packages = loaded
+        .dependencies
+        .iter()
+        .map(|dependency| dependency.name.as_str())
+        .collect::<BTreeSet<_>>();
+    for module in &loaded.modules {
+        for import in &module.library_imports {
+            if !declared_packages.contains(import.package.as_str()) {
+                return Err(vec![fhir_issue_diag(
+                    &package_root.join(&module.relative_path),
+                    "fhir_dependency_unresolved",
+                    format!(
+                        "FHIR package import `{}` references library `{}` with no declared dependency record",
+                        import.binding, import.package
+                    ),
+                )
+                .with_arg("package", import.package.clone())]);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Per-unit binding → target module path map for the loaded package, keyed by

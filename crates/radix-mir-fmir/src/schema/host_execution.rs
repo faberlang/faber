@@ -513,38 +513,55 @@ fn validate_window(
                     "maximum byte offset must satisfy the declared alignment",
                 ));
             }
-            let declared = DynamicWindow {
-                maximum_byte_offset: *maximum_byte_offset,
-                maximum_byte_length: *maximum_byte_length,
-                byte_alignment: *byte_alignment,
-            };
-            match dynamic_windows.get(window_slot) {
-                Some(previous) if previous != &declared => {
-                    return Err(HostExecutionWireError::invalid(
-                        field,
-                        "reused dynamic window slots must retain one physical envelope",
-                    ));
-                }
-                Some(_) => {}
-                None if *window_slot == *next_dynamic_slot => {
-                    dynamic_windows.insert(*window_slot, declared);
-                    *next_dynamic_slot = next_dynamic_slot.checked_add(1).ok_or_else(|| {
-                        HostExecutionWireError::invalid(
-                            field,
-                            "dynamic window-slot assignment overflows u32",
-                        )
-                    })?;
-                }
-                None => {
-                    return Err(HostExecutionWireError::invalid(
-                        field,
-                        "dynamic window slots must be assigned by first use starting at one",
-                    ));
-                }
-            }
+            admit_dynamic_window(
+                field,
+                *window_slot,
+                DynamicWindow {
+                    maximum_byte_offset: *maximum_byte_offset,
+                    maximum_byte_length: *maximum_byte_length,
+                    byte_alignment: *byte_alignment,
+                },
+                dynamic_windows,
+                next_dynamic_slot,
+            )?;
         }
     }
     Ok(())
+}
+
+/// Admit one invocation window against the per-artifact dynamic-slot map.
+///
+/// A slot is assigned on first use in physical order (`next_dynamic_slot`)
+/// and every later reuse must repeat the exact physical envelope; a slot may
+/// not be silently redefined at a new launch.
+fn admit_dynamic_window(
+    field: &'static str,
+    window_slot: u32,
+    declared: DynamicWindow,
+    dynamic_windows: &mut BTreeMap<u32, DynamicWindow>,
+    next_dynamic_slot: &mut u32,
+) -> Result<(), HostExecutionWireError> {
+    match dynamic_windows.get(&window_slot) {
+        Some(previous) if previous != &declared => Err(HostExecutionWireError::invalid(
+            field,
+            "reused dynamic window slots must retain one physical envelope",
+        )),
+        Some(_) => Ok(()),
+        None if window_slot == *next_dynamic_slot => {
+            dynamic_windows.insert(window_slot, declared);
+            *next_dynamic_slot = next_dynamic_slot.checked_add(1).ok_or_else(|| {
+                HostExecutionWireError::invalid(
+                    field,
+                    "dynamic window-slot assignment overflows u32",
+                )
+            })?;
+            Ok(())
+        }
+        None => Err(HostExecutionWireError::invalid(
+            field,
+            "dynamic window slots must be assigned by first use starting at one",
+        )),
+    }
 }
 
 fn validate_invocation(
