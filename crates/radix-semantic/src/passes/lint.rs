@@ -333,16 +333,7 @@ impl<'a> LintContext<'a> {
     fn check_function(&mut self, func: &HirFunction) {
         self.push_scope();
         for param in &func.params {
-            self.warn_on_shadowed_keyword(param.name, param.span);
-            self.def_names.insert(param.def_id, param.name);
-            // A signature-only declaration has no body that could read its
-            // parameters, so they are never "unused".
-            if func.body.is_some() {
-                self.defs
-                    .push((param.def_id, param.span, WarningKind::UnusedVariable));
-            }
-            self.check_shadowing(param.name, param.def_id, param.span);
-            self.insert_name(param.name, param.def_id);
+            self.declare_binding(param.name, param.def_id, param.span, func.body.is_some());
             self.warn_on_explicit_ignotum(param.ty, param.span);
         }
         if let Some(body) = &func.body {
@@ -435,12 +426,7 @@ impl<'a> LintContext<'a> {
     }
 
     fn check_local(&mut self, local: &HirLocal, span: Span) {
-        self.warn_on_shadowed_keyword(local.name, span);
-        self.def_names.insert(local.def_id, local.name);
-        self.defs
-            .push((local.def_id, span, WarningKind::UnusedVariable));
-        self.check_shadowing(local.name, local.def_id, span);
-        self.insert_name(local.name, local.def_id);
+        self.declare_binding(local.name, local.def_id, span, true);
         if let Some(ty) = local.ty {
             self.warn_on_explicit_ignotum(ty, span);
         }
@@ -501,6 +487,27 @@ impl<'a> LintContext<'a> {
         if let Some(scope) = self.scope.last_mut() {
             scope.insert(name, def_id);
         }
+    }
+
+    /// Record a source binding for shadowing, `DefId` spelling, unused
+    /// tracking, and scope insertion — the preamble shared by parameters and
+    /// locals. `record_unused` is false for a signature-only parameter, which
+    /// has no body that could read it.
+    fn declare_binding(
+        &mut self,
+        name: radix_lexer::Symbol,
+        def_id: radix_hir::DefId,
+        span: Span,
+        record_unused: bool,
+    ) {
+        self.warn_on_shadowed_keyword(name, span);
+        self.def_names.insert(def_id, name);
+        if record_unused {
+            self.defs
+                .push((def_id, span, WarningKind::UnusedVariable));
+        }
+        self.check_shadowing(name, def_id, span);
+        self.insert_name(name, def_id);
     }
 
     fn push_scope(&mut self) {
