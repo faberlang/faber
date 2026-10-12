@@ -599,7 +599,7 @@ fn fill_reader(
 ) -> Result<(), LeafError> {
     while out.len() < max && !*done {
         if chunked {
-            match read_next_chunk(stream, leftover) {
+            match read_next_chunk(stream, leftover, max) {
                 Ok(Some(chunk)) if chunk.is_empty() => *done = true,
                 Ok(Some(chunk)) => out.extend(chunk),
                 Ok(None) => *done = true,
@@ -675,7 +675,8 @@ fn read_exact_pending(
     pending: &mut Vec<u8>,
     want: usize,
 ) -> Result<Vec<u8>, LeafError> {
-    let mut out = Vec::with_capacity(want);
+    // Never reserve from an untrusted size; grow as bytes actually arrive.
+    let mut out = Vec::with_capacity(want.min(8192));
     while out.len() < want {
         if !pending.is_empty() {
             let take = pending.len().min(want - out.len());
@@ -683,7 +684,7 @@ fn read_exact_pending(
             pending.drain(..take);
             continue;
         }
-        let mut buf = vec![0_u8; want - out.len()];
+        let mut buf = vec![0_u8; (want - out.len()).min(8192)];
         match stream.read(&mut buf) {
             Ok(0) => {
                 return Err(LeafError::closed("http:read", "truncated chunk"));
@@ -698,6 +699,7 @@ fn read_exact_pending(
 fn read_next_chunk(
     stream: &mut IoStream,
     pending: &mut Vec<u8>,
+    max: usize,
 ) -> Result<Option<Vec<u8>>, LeafError> {
     let mut line = Vec::new();
     loop {
@@ -727,6 +729,12 @@ fn read_next_chunk(
     let size = usize::from_str_radix(hex, 16).map_err(|_| {
         LeafError::invalid_argument("http:read", format!("invalid chunk size `{hex}`"))
     })?;
+    if size > max {
+        return Err(LeafError::invalid_argument(
+            "http:read",
+            "chunk size exceeds read limit",
+        ));
+    }
     if size == 0 {
         let _ = read_exact_pending(stream, pending, 2);
         return Ok(Some(Vec::new()));
@@ -1186,11 +1194,20 @@ fn read_chunked_body(
         let hex = std::str::from_utf8(&pending[..end]).unwrap_or("");
         let size = usize::from_str_radix(hex.split(';').next().unwrap_or("").trim(), 16)
             .map_err(|_| LeafError::invalid_argument("http:accept", "invalid chunk size"))?;
+        if size > max_body || body.len().saturating_add(size) > max_body {
+            return Err(LeafError::invalid_argument(
+                "http:accept",
+                "request body exceeds max_body_bytes",
+            ));
+        }
         pending.drain(..end + 2);
         if size == 0 {
             break;
         }
-        while pending.len() < size + 2 {
+        let want = size
+            .checked_add(2)
+            .ok_or_else(|| LeafError::invalid_argument("http:accept", "invalid chunk size"))?;
+        while pending.len() < want {
             let mut scratch = [0_u8; 4096];
             let n = stream
                 .read(&mut scratch)
