@@ -1,6 +1,6 @@
 //! WebSocket leaf: HTTP upgrade, connect, echo.
 
-use super::{is_route, reset_handles, serve};
+use super::{empty_text_frame, is_route, reset_handles, serve};
 use crate::http;
 use crate::value::{Arg, Reply};
 use std::thread;
@@ -15,6 +15,24 @@ fn serve_ok(route: &str, args: &[Arg]) -> Reply {
     serve(route, args)
         .expect("websocket route")
         .unwrap_or_else(|err| panic!("{route}: {err}"))
+}
+
+#[test]
+fn empty_text_frame_carries_text_and_done() {
+    assert_eq!(
+        empty_text_frame(false),
+        Reply::Map(vec![
+            ("text".to_owned(), Reply::Str(String::new())),
+            ("done".to_owned(), Reply::Bool(false)),
+        ])
+    );
+    assert_eq!(
+        empty_text_frame(true),
+        Reply::Map(vec![
+            ("text".to_owned(), Reply::Str(String::new())),
+            ("done".to_owned(), Reply::Bool(true)),
+        ])
+    );
 }
 
 fn http_ok(route: &str, args: &[Arg]) -> Reply {

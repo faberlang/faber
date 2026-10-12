@@ -212,25 +212,26 @@ fn receive(args: &[Arg]) -> Result<Reply, LeafError> {
             ("bytes".to_owned(), Reply::Bytes(bytes.to_vec())),
             ("done".to_owned(), Reply::Bool(false)),
         ])),
-        Ok(Message::Close(_)) | Err(tungstenite::Error::AlreadyClosed) => Ok(Reply::Map(vec![
-            ("text".to_owned(), Reply::Str(String::new())),
-            ("done".to_owned(), Reply::Bool(true)),
-        ])),
+        Ok(Message::Close(_)) | Err(tungstenite::Error::AlreadyClosed) => {
+            Ok(empty_text_frame(true))
+        }
         Ok(Message::Ping(payload)) => {
             socket
                 .send(Message::Pong(payload))
                 .map_err(|err| LeafError::from_io(ROUTE, "", &std::io::Error::other(err)))?;
-            Ok(Reply::Map(vec![
-                ("text".to_owned(), Reply::Str(String::new())),
-                ("done".to_owned(), Reply::Bool(false)),
-            ]))
+            Ok(empty_text_frame(false))
         }
-        Ok(_) => Ok(Reply::Map(vec![
-            ("text".to_owned(), Reply::Str(String::new())),
-            ("done".to_owned(), Reply::Bool(false)),
-        ])),
+        Ok(_) => Ok(empty_text_frame(false)),
         Err(err) => Err(LeafError::from_io(ROUTE, "", &std::io::Error::other(err))),
     })
+}
+
+/// A frame with no text payload; `done` marks a peer close.
+fn empty_text_frame(done: bool) -> Reply {
+    Reply::Map(vec![
+        ("text".to_owned(), Reply::Str(String::new())),
+        ("done".to_owned(), Reply::Bool(done)),
+    ])
 }
 
 fn close(args: &[Arg]) -> Result<Reply, LeafError> {
