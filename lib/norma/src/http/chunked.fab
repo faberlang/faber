@@ -20,8 +20,7 @@ fn encode(bytes data) → bytes {
     var list<b8> out ← bytes_list(size_line ↦ bytes)
     out ← extend(out, data)
     out ← extend(out, "\r\n0\r\n\r\n" ↦ bytes)
-    const bytes result ← out
-    return result
+    return out
 }
 
 # Reconstruct the body. Rejects invalid size lines, truncated frames,
@@ -39,8 +38,7 @@ fn decode(bytes data) → bytes ⇥ string {
         if size ≡ 0 {
             i ← skip_trailers(data, i)
             if i ≢ n then throw "norma:http/chunked.decode: trailing data"
-            const bytes result ← body
-            return result
+            return body
         }
         if i + size + 2 ≻ n then throw "norma:http/chunked.decode: truncated"
         var int k ← 0
