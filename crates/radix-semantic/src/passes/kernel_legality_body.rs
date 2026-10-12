@@ -33,19 +33,7 @@ pub(super) fn check_kernel_function(
     function: &HirFunction,
     span: Span,
 ) -> Vec<DefId> {
-    let mut walk = KernelWalk {
-        env,
-        sink,
-        function_span: span,
-        callees: Vec::new(),
-        quiet: 0,
-        check_lane_abi: true,
-    };
-    walk.check_signature(function);
-    if let Some(body) = &function.body {
-        walk.visit_block(body);
-    }
-    walk.callees
+    walk_kernel_body(env, sink, function, span, true)
 }
 
 /// Check one ordinary custom tensor-edge policy method as an exact device
@@ -57,13 +45,26 @@ pub(super) fn check_policy_callback(
     function: &HirFunction,
     span: Span,
 ) -> Vec<DefId> {
+    walk_kernel_body(env, sink, function, span, false)
+}
+
+/// Run the device-body rules over `function` and collect the kernels it calls.
+/// Policy callbacks pass `check_lane_abi: false`: they share the body, type and
+/// effect checks but not the kernel launch ABI.
+fn walk_kernel_body(
+    env: &Env<'_>,
+    sink: &mut Sink,
+    function: &HirFunction,
+    span: Span,
+    check_lane_abi: bool,
+) -> Vec<DefId> {
     let mut walk = KernelWalk {
         env,
         sink,
         function_span: span,
         callees: Vec::new(),
         quiet: 0,
-        check_lane_abi: false,
+        check_lane_abi,
     };
     walk.check_signature(function);
     if let Some(body) = &function.body {
