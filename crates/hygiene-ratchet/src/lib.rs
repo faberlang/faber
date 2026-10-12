@@ -168,12 +168,11 @@ pub fn scan_command_new(files: &[SourceFile]) -> Vec<CommandSpawn> {
             let mut offset = 0;
             while let Some(relative) = line[offset..].find("Command::new") {
                 let absolute = offset + relative;
-                let starts_at_ident = absolute > 0
-                    && line[..absolute]
-                        .chars()
-                        .next_back()
-                        .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_');
-                if !starts_at_ident {
+                let preceded_by_identifier = line[..absolute]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_');
+                if !preceded_by_identifier {
                     spawns.push(CommandSpawn {
                         path: file.path.clone(),
                         line: index + 1,
