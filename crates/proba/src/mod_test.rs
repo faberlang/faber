@@ -351,7 +351,7 @@ probandum "math" {
 }
 
 fn report_with_missing_mir_function() -> ProbaReport {
-    let mut analysis = analyze_prepared_program_name(
+    let analysis = analyze_prepared_program_name(
         &session(),
         "blocked.fab",
         r#"
