@@ -148,14 +148,7 @@ pub fn constant_ty_with_index(
 ) -> Result<MirType, MirTypeError> {
     let primitive = match constant {
         MirConstant::Int(_) => Primitive::Numerus,
-        MirConstant::UInt(_) => {
-            return Ok(types
-                .find_sized_numeric(Primitive::Numerus, NumericWidth::U64)
-                .map_or_else(
-                    || MirType::semantic(types.primitive(Primitive::Numerus)),
-                    MirType::semantic,
-                ));
-        }
+        MirConstant::UInt(_) => return Ok(sized_numerus_or_fallback(types, NumericWidth::U64)),
         MirConstant::Bool(_) => Primitive::Bivalens,
         MirConstant::Unit => Primitive::Vacuum,
         MirConstant::String(_) => Primitive::Textus,
@@ -174,24 +167,22 @@ pub fn constant_ty_with_index(
         MirConstant::Float(_) | MirConstant::ShapeSize { .. } => Primitive::Fractus,
         // An exact bignum constant is the unbounded integer; the sized type
         // is interned whenever an `inf` is declared.
-        MirConstant::Magnus(_) => {
-            return Ok(types
-                .find_sized_numeric(Primitive::Numerus, NumericWidth::Inf)
-                .map_or_else(
-                    || MirType::semantic(types.primitive(Primitive::Numerus)),
-                    MirType::semantic,
-                ));
-        }
+        MirConstant::Magnus(_) => return Ok(sized_numerus_or_fallback(types, NumericWidth::Inf)),
     };
     Ok(MirType::semantic(types.primitive(primitive)))
 }
 
-/// Result type for an index projection on a supported collection or text base.
-///
-/// `octeti` follows the same rule as `lista<numerus<u8>>`: index yields the u8
-/// element type. See DEFER-029 / DEFER-030 parity.
-/// # Errors
-/// Returns an error when validation or type resolution fails. See [`MirTypeError`].
+/// The interned `numerus<width>` row, or the unsized `numerus` row when that
+/// width is not declared.
+fn sized_numerus_or_fallback(types: &TypeTable, width: NumericWidth) -> MirType {
+    types
+        .find_sized_numeric(Primitive::Numerus, width)
+        .map_or_else(
+            || MirType::semantic(types.primitive(Primitive::Numerus)),
+            MirType::semantic,
+        )
+}
+
 /// Locate the `ascii<1>` row (the `'x'` scalar) without interning — a scan of
 /// the append-only arena. The typecheck `itera`/index arms intern it for any
 /// source that reaches a bounded byte index projection, so callers may treat
@@ -207,6 +198,10 @@ pub fn find_bounded_ascii_one(types: &TypeTable) -> Option<TypeId> {
         })
 }
 
+/// Result type for an index projection on a supported collection or text base.
+///
+/// `octeti` follows the same rule as `lista<numerus<u8>>`: index yields the u8
+/// element type. See DEFER-029 / DEFER-030 parity.
 /// # Errors
 /// Returns `MirTypeError` when the base type admits no index projection.
 pub fn index_projection_result_ty(
