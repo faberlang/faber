@@ -332,10 +332,6 @@ impl<'a> HirAspectCollector<'a> {
         Self { hir, types, enum_variants, interner, report: HirAspectReport::new(HirAspectPrecondition::CheckedHir) }
     }
 
-    fn push(&mut self, record: HirAspectRecord) {
-        self.report.push(record);
-    }
-
     fn finish(mut self) -> HirAspectReport {
         self.report.sort_records();
         self.report
@@ -390,25 +386,22 @@ impl<'a> HirAspectCollector<'a> {
             None
         };
 
-        match reason {
-            Some(reason) => self.push(
-                HirAspectRecord::not_proven(
-                    HirAspectKind::DiscerneOmnia,
-                    HirAspectSpan::Source(expr.span),
-                    Some(expr.id),
-                    reason,
-                )
-                .with_detail(detail),
-            ),
-            None => self.push(
-                HirAspectRecord::recognized(
-                    HirAspectKind::DiscerneOmnia,
-                    HirAspectSpan::Source(expr.span),
-                    Some(expr.id),
-                )
-                .with_detail(detail),
-            ),
-        }
+        let record = match reason {
+            Some(reason) => HirAspectRecord::not_proven(
+                HirAspectKind::DiscerneOmnia,
+                HirAspectSpan::Source(expr.span),
+                Some(expr.id),
+                reason,
+            )
+            .with_detail(detail),
+            None => HirAspectRecord::recognized(
+                HirAspectKind::DiscerneOmnia,
+                HirAspectSpan::Source(expr.span),
+                Some(expr.id),
+            )
+            .with_detail(detail),
+        };
+        self.report.push(record);
     }
 
     fn record_mask_neutrality(
@@ -453,7 +446,7 @@ impl<'a> HirAspectCollector<'a> {
             )
             .with_detail(detail),
         };
-        self.push(record);
+        self.report.push(record);
     }
 
     fn record_unroll_equivalence(
@@ -468,7 +461,7 @@ impl<'a> HirAspectCollector<'a> {
         let Some(facts) = unroll_route_facts(mode, coordinates.len(), source, self.types) else {
             return;
         };
-        self.push(
+        self.report.push(
             HirAspectRecord::recognized(
                 HirAspectKind::UnrollEquivalence,
                 HirAspectSpan::Source(expr.span),
@@ -487,14 +480,14 @@ impl<'a> HirAspectCollector<'a> {
             GatePurityFinding::GateHole { issue } => HirAspectDetail::GatePurityHole { issue },
             GatePurityFinding::NoObligation => return,
         };
-        self.push(
+        self.report.push(
             HirAspectRecord::recognized(HirAspectKind::GatePurity, HirAspectSpan::Source(item.span), Some(item.id))
                 .with_detail(detail),
         );
     }
 
     fn push_skipped(&mut self, expr: &HirExpression, reason: HirAspectReason) {
-        self.push(HirAspectRecord::skipped_candidate(
+        self.report.push(HirAspectRecord::skipped_candidate(
             HirAspectKind::DiscerneOmnia,
             HirAspectSpan::Source(expr.span),
             Some(expr.id),

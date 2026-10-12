@@ -249,7 +249,7 @@ fn append_transfers(
         };
         let owner = buffer_owner(facts, default_owner, buffer);
         let copies = buffer_copies(facts, default_owner, buffer);
-        for (launch_index, _launch) in program.launches.iter().enumerate() {
+        for launch_index in 0..program.launches.len() {
             let launch_partition = launch_partitions[launch_index];
             if copies.contains(&launch_partition) {
                 // The partition already holds a copy (owner, or a replica
@@ -326,7 +326,7 @@ fn append_collectives_and_barriers(
             continue;
         };
         let mut participants: Vec<PartitionId> = replicas.clone();
-        for (launch_index, _launch) in program.launches.iter().enumerate() {
+        for launch_index in 0..program.launches.len() {
             if launch_resources[launch_index]
                 .iter()
                 .any(|(referenced, _, _, _)| *referenced == buffer)
@@ -355,7 +355,7 @@ fn append_collectives_and_barriers(
     for (index, result) in program.results.iter().enumerate() {
         let buffer = result.buffer.id;
         let mut participants: Vec<PartitionId> = buffer_copies(facts, default_owner, buffer);
-        for (launch_index, _launch) in program.launches.iter().enumerate() {
+        for launch_index in 0..program.launches.len() {
             if launch_resources[launch_index]
                 .iter()
                 .any(|(referenced, _, _, _)| *referenced == buffer)

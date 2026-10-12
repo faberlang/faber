@@ -1,12 +1,12 @@
 use super::error::DeviceProgramError;
 use super::helpers::{
-    record_identity, record_shape, registry_buffer_mut, registry_version_mut, result_is_produced,
-    role_permits_access,
+    ShapeRecord, record_identity, record_shape, registry_buffer_mut, registry_version_mut,
+    result_is_produced, role_permits_access,
 };
 use super::registry::{BufferRegistry, RegistryBuffer};
 use super::types::{
     Binding, BufferIdentity, BufferLifetime, BufferRole, DeviceProgram, DeviceProgramLifetime,
-    LaunchId, ObservationCadence,
+    KernelUnit, LaunchId, ObservationCadence,
 };
 use crate::abi::MirKernelResourceAccess;
 use crate::device_semantics::DeviceSemantics;
@@ -456,9 +456,7 @@ impl DeviceProgram {
 /// Per-kernel consistency rules: a non-empty entry name, a valid plan,
 /// unique `(group, binding)` slots, version numbers ≥ 1, and role/access
 /// agreement.
-fn validate_kernel_resources(
-    kernels: &[super::types::KernelUnit],
-) -> Result<(), DeviceProgramError> {
+fn validate_kernel_resources(kernels: &[KernelUnit]) -> Result<(), DeviceProgramError> {
     for (kernel_index, kernel) in kernels.iter().enumerate() {
         if kernel.entry.trim().is_empty() {
             return Err(DeviceProgramError::EmptyEntryName {
@@ -502,7 +500,7 @@ fn validate_kernel_resources(
 /// and every result is actually produced by its named launch.
 fn validate_recorded_identities(program: &DeviceProgram) -> Result<(), DeviceProgramError> {
     let mut first_identities: Vec<BufferIdentity> = Vec::new();
-    let mut first_shapes: Vec<super::helpers::ShapeRecord> = Vec::new();
+    let mut first_shapes: Vec<ShapeRecord> = Vec::new();
     for kernel in &program.kernels {
         for resource in &kernel.resources {
             record_identity(&mut first_identities, &resource.buffer)?;
