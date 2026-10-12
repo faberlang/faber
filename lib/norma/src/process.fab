@@ -29,7 +29,8 @@ locale = "en"
 # =============================================================================
 
 # Spawned subprocess handle for attached processes
-# Maps to: Bun.spawn() result
+# Holds the child pid; pass it to `wait` (block for exit code) or `kill`
+# (terminate the child). Both call the same `processus:*` routes by pid.
 @ public
 class Subprocess {
     var int pid
@@ -48,6 +49,32 @@ class Subprocess {
 fn spawn(list<string> args) → Subprocess {
     const int child ← call 'processus:genera' (args) ↦ int
     return Subprocess { pid = child }
+}
+
+# =========================================================================
+# LIFECYCLE - Wait / Kill
+# =========================================================================
+# Verb: wait from "exspectare" (to wait for, expect)
+# Why: Attached spawn owns the child lifecycle; wait reaps it and yields the
+# exit code (-1 when the child was killed by a signal).
+# Maps to: proc.waited / waitpid
+
+# Block until the child exits; returns its exit code (-1 if signal-killed)
+@ public
+fn wait(Subprocess child) → int {
+    return call 'processus:exspecta' (child.pid) ↦ int
+}
+
+# =========================================================================
+# Verb: kill from "necare" (to kill)
+# Why: Terminates an attached child; killing an already-exited child is not
+# an error. Reap afterwards with `wait`.
+# Maps to: proc.kill()
+
+# Kill the child process
+@ public
+fn kill(Subprocess child) → void {
+    return call 'processus:neca' (child.pid) ↦ void
 }
 
 # =========================================================================

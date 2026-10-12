@@ -10,10 +10,28 @@ mod tests;
 
 use crate::error::LeafError;
 use crate::value::{Arg, Reply};
-use std::process::{Command, Stdio};
+use std::collections::HashMap;
+use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 
 static PROGRAM_ARGV: Mutex<Option<Vec<String>>> = Mutex::new(None);
+
+/// Live spawned children keyed by pid, so `exspecta` / `neca` can reach them.
+static CHILDREN: Mutex<Option<HashMap<i64, Child>>> = Mutex::new(None);
+
+fn with_children<T>(f: impl FnOnce(&mut HashMap<i64, Child>) -> T) -> T {
+    let mut guard = match CHILDREN.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    f(guard.get_or_insert_with(HashMap::new))
+}
+
+/// Drop every tracked child. Test isolation only.
+#[cfg(test)]
+fn reset_children() {
+    with_children(HashMap::clear);
+}
 
 /// Install the Faber program argv for this execution (excludes runtime/script).
 pub fn install_argv(args: Vec<String>) {
@@ -50,6 +68,8 @@ const ROUTES: &[&str] = &[
     "processus:muta",
     "processus:identitas",
     "processus:argumenta",
+    "processus:exspecta",
+    "processus:neca",
 ];
 
 /// Whether `route` belongs to this leaf. Pure name lookup; spawns nothing.
@@ -70,6 +90,8 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
         "processus:muta" => chdir(args),
         "processus:identitas" => pid(args),
         "processus:argumenta" => argv(args),
+        "processus:exspecta" => wait(args),
+        "processus:neca" => kill(args),
         _ => return None,
     };
     Some(result)
@@ -126,6 +148,44 @@ fn empty_ok(route: &'static str, args: &[Arg]) -> Result<(), LeafError> {
     }
 }
 
+fn expect_pid(route: &'static str, args: &[Arg]) -> Result<i64, LeafError> {
+    match args {
+        [Arg::Int(value)] => Ok(*value),
+        [] => Err(LeafError::invalid_argument(route, "missing pid")),
+        _ => Err(LeafError::invalid_argument(route, "pid must be int")),
+    }
+}
+
+/// `processus:exspecta` — block until the tracked child exits; return its
+/// exit code (-1 when killed by a signal) and stop tracking it.
+fn wait(args: &[Arg]) -> Result<Reply, LeafError> {
+    const ROUTE: &str = "processus:exspecta";
+    let pid = expect_pid(ROUTE, args)?;
+    let mut child = with_children(|map| map.remove(&pid))
+        .ok_or_else(|| LeafError::invalid_argument(ROUTE, "unknown pid"))?;
+    let status = child.wait().map_err(|err| LeafError::from_io(ROUTE, "wait", &err))?;
+    Ok(Reply::Int(i64::from(status.code().unwrap_or(-1))))
+}
+
+/// `processus:neca` — kill the tracked child. Killing a child that already
+/// exited is not an error; an unknown pid is.
+fn kill(args: &[Arg]) -> Result<Reply, LeafError> {
+    const ROUTE: &str = "processus:neca";
+    let pid = expect_pid(ROUTE, args)?;
+    let known = with_children(|map| match map.get_mut(&pid) {
+        Some(child) => {
+            // Already-exited children report InvalidInput from kill(); that is fine.
+            let _ = child.kill();
+            true
+        }
+        None => false,
+    });
+    if !known {
+        return Err(LeafError::invalid_argument(ROUTE, "unknown pid"));
+    }
+    Ok(Reply::Unit)
+}
+
 fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:genera";
     let argv = expect_argv(ROUTE, args)?;
@@ -140,10 +200,12 @@ fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
     command.stdin(Stdio::inherit());
     command.stdout(Stdio::inherit());
     command.stderr(Stdio::inherit());
-    command
+    let mut child = command
         .spawn()
-        .map(|child| Reply::Int(i64::from(child.id())))
-        .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))
+        .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))?;
+    let pid = i64::from(child.id());
+    with_children(|map| map.insert(pid, child));
+    Ok(Reply::Int(pid))
 }
 
 fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
@@ -160,10 +222,15 @@ fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
     command.stdin(Stdio::null());
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
-    command
+    let mut child = command
         .spawn()
-        .map(|child| Reply::Int(i64::from(child.id())))
-        .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))
+        .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))?;
+    let pid = i64::from(child.id());
+    // Reap in the background so a detached child never becomes a zombie.
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(Reply::Int(pid))
 }
 
 fn capture(args: &[Arg]) -> Result<Reply, LeafError> {
