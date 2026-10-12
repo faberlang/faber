@@ -149,9 +149,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Value, RunnerError> {
         match String::from_utf8(bytes) {
             Ok(text) => Ok(Value::Str(text)),
-            Err(_) => {
-                self.recover_or_fail(recovery, span, "octeti to textus conversion failed")
-            }
+            Err(_) => self.recover_or_fail(recovery, span, "octeti to textus conversion failed"),
         }
     }
 
@@ -673,7 +671,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     let scale = decimal_scale_factor(source_width).ok_or_else(|| {
                         RunnerError::internal(span, "decimal conversion requires decimal width")
                     })?;
-                    (i128::from(decimal_float_carrier(value, source_width, span)?), scale)
+                    (
+                        i128::from(decimal_float_carrier(value, source_width, span)?),
+                        scale,
+                    )
                 }
                 other => {
                     return Err(RunnerError::internal(
@@ -1433,9 +1434,8 @@ fn decimal_text_error(error: DecimalTextError, span: Span) -> RunnerError {
 }
 
 fn decimal_carrier_value(value: i64, width: NumericWidth, span: Span) -> Result<i64, RunnerError> {
-    decimal_carrier_from_raw(i128::from(value), width).map_err(|_| {
-        RunnerError::internal(span, "decimal carrier is outside declared width")
-    })
+    decimal_carrier_from_raw(i128::from(value), width)
+        .map_err(|_| RunnerError::internal(span, "decimal carrier is outside declared width"))
 }
 
 fn decimal_carrier_from_raw(value: i128, width: NumericWidth) -> Result<i64, DecimalTextError> {

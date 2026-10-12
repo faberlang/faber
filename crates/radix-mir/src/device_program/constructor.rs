@@ -679,9 +679,7 @@ pub fn build_device_program(
                     // Every slot carrying a projection/shape registered its
                     // buffer in the reconciliation passes above, so the
                     // reconciled maps are the sole authority here.
-                    reduced_projection: projection_by_buffer
-                        .get(&resource.buffer_id)
-                        .copied(),
+                    reduced_projection: projection_by_buffer.get(&resource.buffer_id).copied(),
                     shape: shape_by_buffer.get(&resource.buffer_id).cloned(),
                 };
                 DeviceResource {

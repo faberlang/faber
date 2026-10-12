@@ -1951,7 +1951,10 @@ fn single_lane_form_synthesizes_a_one_lane_signature() {
         id: MirFunctionId(30),
         source: Some(DefId(30)),
         name: None,
-        params: vec![param(0, MirParamMode::Owned), param(1, MirParamMode::MutRef)],
+        params: vec![
+            param(0, MirParamMode::Owned),
+            param(1, MirParamMode::MutRef),
+        ],
         locals: Vec::new(),
         temps: Vec::new(),
         blocks: vec![MirBlock {
