@@ -299,7 +299,8 @@ implendum Canens {
     let parse_result = radix_parser::parse(lex_result);
     let program = parse_result.program.expect("parse");
     let interner = &parse_result.interner;
-    let errors = check(&program, interner).expect_err("protecta method annotation should be rejected");
+    let errors =
+        check(&program, interner).expect_err("protecta method annotation should be rejected");
     expect_structured_error(
         &errors,
         SemanticErrorKind::AnnotationInvalid,

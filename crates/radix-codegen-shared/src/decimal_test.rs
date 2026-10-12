@@ -69,7 +69,10 @@ fn decimal_width_helpers_agree_on_decimal_and_non_decimal_types() {
         Some((radix_lexer::Symbol(0), NumericWidth::D64))
     );
     // A non-decimal expression type hides the literal payload.
-    assert_eq!(decimal_literal_payload(&typed(1, i64, literal), &types), None);
+    assert_eq!(
+        decimal_literal_payload(&typed(1, i64, literal), &types),
+        None
+    );
 
     // A path recovers its declared binding type; the binding wins over the
     // expression type, and a non-decimal binding stays non-decimal.

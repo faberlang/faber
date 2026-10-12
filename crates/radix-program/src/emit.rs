@@ -86,9 +86,10 @@ fn finalize_package_compile_result(
 /// Fail closed with the planner's rejection reason for an unsupported target.
 fn unsupported_plan_failure(plan: ArtifactPlan, input: &Path) -> PackageCompileResult {
     compile_failure(vec![
-        crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
-            "package compilation does not support this target".to_owned()
-        }))
+        crate::package_diagnostic_error(
+            plan.rejection
+                .unwrap_or_else(|| "package compilation does not support this target".to_owned()),
+        )
         .with_file(input.display().to_string())
         .with_arg("issue", "package_target_unsupported")
         .with_arg("target", plan.target),

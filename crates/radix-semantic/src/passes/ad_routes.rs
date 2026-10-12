@@ -216,15 +216,11 @@ pub fn route_exports(
         let HirItemKind::Function(func) = &item.kind else {
             continue;
         };
-        let Some((annotation, route)) = item
-            .annotations
-            .iter()
-            .find_map(|annotation| {
-                annotation
-                    .ad_route(interner)
-                    .map(|route| (annotation, route))
-            })
-        else {
+        let Some((annotation, route)) = item.annotations.iter().find_map(|annotation| {
+            annotation
+                .ad_route(interner)
+                .map(|route| (annotation, route))
+        }) else {
             continue;
         };
         let snapshot =
