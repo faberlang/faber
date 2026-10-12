@@ -311,14 +311,11 @@ impl Validator<'_, '_> {
         // stage matches the plain-`Call` treatment of cross-unit
         // definitions. A never-resolvable def is caught downstream the
         // same way a plain `Call` to one is: by the runner/emitter.
-        if sig.is_none() {
-            match &callee {
-                MirCallee::Definition { .. } => {}
-                _ => self.error(
-                    terminator.span,
-                    "try_call callee does not have a known failable signature",
-                ),
-            }
+        if sig.is_none() && !matches!(callee, MirCallee::Definition { .. }) {
+            self.error(
+                terminator.span,
+                "try_call callee does not have a known failable signature",
+            );
         }
         match (sig.as_ref().and_then(|sig| sig.error_ty), error_place_ty) {
             (Some(error_ty), Some(place_ty)) => {
@@ -403,7 +400,7 @@ impl Validator<'_, '_> {
             return;
         }
 
-        // 2. Reachability — BFS from entry block.
+        // 2. Reachability — DFS from the entry block.
         let block_map: FxHashMap<MirBlockId, &MirBlock> =
             function.blocks.iter().map(|b| (b.id, b)).collect();
 
