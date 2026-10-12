@@ -251,7 +251,7 @@ pub use radix_mir::{
     TensorSystemsTargetStatus, selected_tensor_systems_family, tensor_systems_target_rows,
 };
 #[cfg(test)]
-pub(crate) use radix_mir::{instantiate_existing_generic_type, type_contains_param};
+pub(crate) use radix_mir::type_contains_param;
 #[cfg(feature = "runner")]
 pub use runner::{
     BufferHost, Host, RUNNER_KERNEL_REFUSED_ISSUE, RunSourceError, RunnerDispatchStatus, RunnerError,
