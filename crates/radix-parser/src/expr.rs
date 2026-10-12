@@ -662,11 +662,11 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_range(&mut self) -> Result<Expr, ParseError> {
-        let start = self.current_span();
-        let left = self.parse_range_bound()?;
-
-        let kind = if self.check(&TokenKind::DotDot) {
+    /// Consume the range operator at the cursor, if any: `‥`/`ante` exclusive,
+    /// `…`/`usque` inclusive. Shared by full range literals and the `vel`
+    /// fallback interval so both accept the same spellings.
+    fn parse_range_kind(&mut self) -> Option<RangeKind> {
+        if self.check(&TokenKind::DotDot) {
             self.advance();
             Some(RangeKind::Exclusive)
         } else if self.check(&TokenKind::Ellipsis) {
@@ -680,7 +680,14 @@ impl Parser {
             Some(RangeKind::Inclusive)
         } else {
             None
-        };
+        }
+    }
+
+    fn parse_range(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        let left = self.parse_range_bound()?;
+
+        let kind = self.parse_range_kind();
 
         if let Some(kind) = kind {
             let end = Box::new(self.parse_range_bound()?);
@@ -756,7 +763,7 @@ impl Parser {
     /// Multiplicative over local nullable defaulting (`vel`).
     ///
     /// GRAMMAR:
-    ///   multiplicative := coalesce (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') coalesce)*
+    ///   multiplicative := coalesce (('*' | '/' | '%' | '÷' | '·' | '×' | '⊗' | '⊙' | '⊘') coalesce)*
     ///   coalesce       := unary (`vel` `vel_rhs`)*
     ///   `vel_rhs`        := unary (`range_op` unary (`per` unary)?)?
     ///
@@ -853,23 +860,7 @@ impl Parser {
         let start = self.current_span();
         let left = self.parse_unary_inner()?;
 
-        let kind = if self.check(&TokenKind::DotDot) {
-            self.advance();
-            Some(RangeKind::Exclusive)
-        } else if self.check(&TokenKind::Ellipsis) {
-            self.advance();
-            Some(RangeKind::Inclusive)
-        } else if self.check_keyword_ident(TokenKind::Ante) {
-            self.advance();
-            Some(RangeKind::Exclusive)
-        } else if self.check_keyword_ident(TokenKind::Usque) {
-            self.advance();
-            Some(RangeKind::Inclusive)
-        } else {
-            None
-        };
-
-        if let Some(kind) = kind {
+        if let Some(kind) = self.parse_range_kind() {
             let end = Box::new(self.parse_unary_inner()?);
             let step = if self.eat_keyword_ident(TokenKind::Per) {
                 Some(Box::new(self.parse_unary_inner()?))
@@ -900,10 +891,6 @@ impl Parser {
     ///   unary-op := '-' | '¬' | `non`
     ///
     /// EDGE: `finge` is a unary-position variant constructor, not a prefix operator.
-    fn parse_unary(&mut self) -> Result<Expr, ParseError> {
-        self.parse_unary_inner()
-    }
-
     fn parse_unary_inner(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
 
@@ -1066,9 +1053,9 @@ impl Parser {
     /// Token-shaped tokens use the static [`Self::can_start_prefix_operand`]
     /// predicate. A tokenless keyword arrives as an `Ident`, so resolve its
     /// Latin identity against the keyword registry: only expression-primary
-    /// claims (owners `Constructor`, `BuiltinCall`, `Literal`) start value
-    /// operands; statement, declaration, and type keywords are grammar
-    /// structure, not operands. This keeps the retired `nihil x` detection
+    /// claims (owners `Constructor`, `BuiltinCall`, `Literal`,
+    /// `ExpressionIntroducer`) start value operands; statement, declaration,
+    /// and type keywords are grammar structure, not operands. This keeps the retired `nihil x` detection
     /// from firing on a value `nihil` followed by a migrated keyword (e.g.
     /// `nota`) on the next line.
     fn peek_at_one_starts_prefix_operand(&self) -> bool {
@@ -1265,7 +1252,7 @@ impl Parser {
     /// admitted here; whether the call is failable is a semantic question.
     fn parse_call_default(&mut self, start: Span, call: Expr) -> Result<Expr, ParseError> {
         self.advance();
-        let default = Box::new(self.parse_unary()?);
+        let default = Box::new(self.parse_unary_inner()?);
         if self.check(&TokenKind::ExitArrow) {
             return Err(self.invalid_expression_error("default_with_propagation"));
         }
@@ -1616,7 +1603,7 @@ impl Parser {
         if !self.eat(&TokenKind::UpTack) {
             return Ok(None);
         }
-        let default = self.parse_unary()?;
+        let default = self.parse_unary_inner()?;
         if self.check(&TokenKind::ExitArrow) {
             return Err(self.invalid_expression_error("default_with_propagation"));
         }
@@ -1871,13 +1858,7 @@ impl Parser {
         } else {
             None
         };
-        let has_body = !body_barred
-            && matches!(
-                self.keyword_ident_at(0),
-                Some(TokenKind::Fixum | TokenKind::Varia)
-            )
-            && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
-            && self.peek_at(2).kind == TokenKind::LBrace;
+        let has_body = !body_barred && self.inline_body_head();
         let (mutability, binding, body) = if has_body {
             (
                 self.parse_mutability()?,
@@ -1953,13 +1934,7 @@ impl Parser {
         // moves the counter, and the bar applies to this expression's depth.
         let body_barred = self.sort_body_barred_at == Some(self.expression_contexts);
         let source = self.parse_expression()?;
-        let has_body = !body_barred
-            && matches!(
-                self.keyword_ident_at(0),
-                Some(TokenKind::Fixum | TokenKind::Varia)
-            )
-            && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
-            && self.peek_at(2).kind == TokenKind::LBrace;
+        let has_body = !body_barred && self.inline_body_head();
         let (mutability, binding, body) = if has_body {
             (
                 self.parse_mutability()?,
@@ -2030,6 +2005,18 @@ impl Parser {
             .with_arg("operators", operators)
     }
 
+    /// Whether the cursor is an inline body head: `(fixum | varia) NAME {`.
+    ///
+    /// Reduce and sort expressions attach such a head only outside a barred
+    /// loop body; that guard stays with the caller.
+    fn inline_body_head(&self) -> bool {
+        matches!(
+            self.keyword_ident_at(0),
+            Some(TokenKind::Fixum | TokenKind::Varia)
+        ) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
+            && self.peek_at(2).kind == TokenKind::LBrace
+    }
+
     /// Return the head word when a former reduction occurs in its old expression shape.
     ///
     /// The words remain ordinary identifiers everywhere else. Only the old
@@ -2060,11 +2047,7 @@ impl Parser {
             self.advance();
             self.parse_ident()?;
         }
-        let has_term_body = matches!(
-            self.keyword_ident_at(0),
-            Some(TokenKind::Fixum | TokenKind::Varia)
-        ) && matches!(self.peek_at(1).kind, TokenKind::Ident(_))
-            && self.peek_at(2).kind == TokenKind::LBrace;
+        let has_term_body = self.inline_body_head();
         if has_term_body {
             self.parse_mutability()?;
             self.parse_ident()?;

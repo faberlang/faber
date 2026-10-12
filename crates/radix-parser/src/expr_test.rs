@@ -13,7 +13,7 @@ use radix_diagnostics::Span;
 use radix_lexer::lex;
 use radix_syntax::{
     AssignOp, BinOp, CallDefaultExpr, ConversioTarget, Expr, ExprKind, FiguraExpr, JsonValue,
-    Literal, NonNullKind, OptionalChainKind, StmtKind, TypeExprKind,
+    Literal, NonNullKind, OptionalChainKind, RangeKind, StmtKind, TypeExprKind,
 };
 
 fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
@@ -553,6 +553,44 @@ fn vel_rhs_completes_intervallum_constructor() {
         "expected interval constructor RHS, got {:?}",
         coalesce.rhs.kind
     );
+}
+
+/// Both range positions scan the same operator spellings: the standalone
+/// range tier and the `vel` fallback interval.
+#[test]
+fn range_operator_spellings_match_in_range_and_vel_positions() {
+    for (op, inclusive) in [("‥", false), ("…", true), ("ante", false), ("usque", true)] {
+        let result = parse_ok(&format!("fixum _ value ← a {op} b"));
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Var(var) = &program.statements[0].kind else {
+            panic!("expected variable declaration");
+        };
+        let ExprKind::Intervallum(range) = &var.init.as_deref().expect("initializer").kind else {
+            panic!("expected interval for `{op}`");
+        };
+        assert_range_kind(range.kind, inclusive, op);
+
+        let result = parse_ok(&format!("fixum _ value ← maybe vel a {op} b"));
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Var(var) = &program.statements[0].kind else {
+            panic!("expected variable declaration");
+        };
+        let ExprKind::Binary(coalesce) = &var.init.as_deref().expect("initializer").kind else {
+            panic!("expected coalesce for `{op}`");
+        };
+        let ExprKind::Intervallum(range) = &coalesce.rhs.kind else {
+            panic!("expected fallback interval for `{op}`");
+        };
+        assert_range_kind(range.kind, inclusive, op);
+    }
+}
+
+fn assert_range_kind(kind: RangeKind, inclusive: bool, op: &str) {
+    if inclusive {
+        assert!(matches!(kind, RangeKind::Inclusive), "`{op}` is inclusive");
+    } else {
+        assert!(matches!(kind, RangeKind::Exclusive), "`{op}` is exclusive");
+    }
 }
 
 /// `vel` chains left-associatively at the local defaulting tier.
