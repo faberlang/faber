@@ -4,8 +4,6 @@
 //! rendering. The parent catalog owns shared reader fallback helpers, and
 //! `catalog_semantic` owns analysis-phase mappings.
 
-#![allow(dead_code)]
-
 use super::catalog::{DiagnosticSpec, arg_value, quote_arg};
 use radix_diagnostics::DiagnosticArg;
 use radix_lexer::{HOMOGLYPH_ISSUE, LexErrorKind};
