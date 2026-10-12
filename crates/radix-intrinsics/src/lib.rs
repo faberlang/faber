@@ -17,8 +17,7 @@ pub use registry::{
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use radix_types::{MirAtomicOp, MirCollectionOp};
-use radix_types::{Primitive, Type, TypeId, TypeTable};
+use radix_types::{MirAtomicOp, MirCollectionOp, Primitive, Type, TypeId, TypeTable};
 
 /// Once-built key index over [`INTRINSICS`]: catalog row positions grouped by
 /// `(receiver, faber_name)`, every bucket in catalog order. The static catalog
