@@ -5,10 +5,10 @@
 
 use crate::qualified_identity::QualifiedIdentityTable;
 use crate::{Type, TypeId, TypeTable};
-use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_pattern, walk_stmt};
+use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_pattern};
 use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirItemKind, HirLocal, HirModule, HirParam,
-    HirPattern, HirStatement,
+    HirPattern,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -139,15 +139,10 @@ impl ResolvedUseIndex {
 
     fn push_with_local(&mut self, local_def: Option<DefId>, use_site: ResolvedUse) {
         let idx = self.uses.len();
-        let fallback_local = if matches!(use_site.kind, ResolvedUseKind::ImportBinding) {
-            None
-        } else {
-            match &use_site.key {
-                ResolvedUseKey::Local(def) => Some(*def),
-                ResolvedUseKey::Portable(_) => None,
-            }
-        };
-        if let Some(def) = local_def.or(fallback_local) {
+        // `push` only receives `ImportBinding` uses and `push_local` always
+        // supplies a `DefId`, so the caller's value is authoritative: a
+        // binding site is never itself a local use.
+        if let Some(def) = local_def {
             self.by_local.entry(def).or_default().push(idx);
         }
         if let ResolvedUseKey::Portable(key) = &use_site.key {
@@ -453,10 +448,6 @@ impl HirVisitor for UseVisitor<'_> {
             }
             _ => walk_expr(self, expr),
         }
-    }
-
-    fn visit_stmt(&mut self, stmt: &HirStatement) {
-        walk_stmt(self, stmt);
     }
 
     fn visit_pattern(&mut self, pattern: &HirPattern) {
