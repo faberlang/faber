@@ -110,14 +110,15 @@ impl Rng {
         // Number of outcomes in [lo, hi] computed mod 2^64: the full i64
         // span wraps to 0, which the `== 0` branch handles by drawing a raw
         // word directly.
-        let span = u64::from_le_bytes(hi.to_le_bytes())
-            .wrapping_sub(u64::from_le_bytes(lo.to_le_bytes()))
+        let span = hi
+            .cast_unsigned()
+            .wrapping_sub(lo.cast_unsigned())
             .wrapping_add(1);
         if span == 0 {
-            lo.wrapping_add(i64::from_le_bytes(self.next_u64().to_le_bytes()))
+            lo.wrapping_add(self.next_u64().cast_signed())
         } else {
             let sample = self.next_u64_below(span);
-            lo.wrapping_add(i64::from_le_bytes(sample.to_le_bytes()))
+            lo.wrapping_add(sample.cast_signed())
         }
     }
 
