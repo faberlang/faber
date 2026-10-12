@@ -464,11 +464,7 @@ fn check_group_keys(
     group: &HirExpression,
     group_ty: TypeId,
 ) -> Option<usize> {
-    let literal = matches!(group.kind, HirExpressionKind::Array(_));
-    if literal {
-        let HirExpressionKind::Array(elements) = &group.kind else {
-            return None;
-        };
+    if let HirExpressionKind::Array(elements) = &group.kind {
         let plain = elements
             .iter()
             .all(|element| matches!(element, radix_hir::HirArrayElement::Expr(_)));
