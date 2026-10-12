@@ -1069,37 +1069,18 @@ impl Parser {
 }
 
 fn flatten_union_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
-    if member.nullable || member.mode.is_some() {
-        members.push(member);
-        return;
-    }
-
-    let TypeExpr {
-        nullable,
-        mode,
-        kind,
-        span,
-        form,
-        iuncta_label,
-    } = member;
-    match kind {
-        TypeExprKind::Union(nested) => {
-            for nested_member in nested {
-                flatten_union_member(nested_member, members);
-            }
-        }
-        kind => members.push(TypeExpr {
-            nullable,
-            mode,
-            kind,
-            span,
-            form,
-            iuncta_label,
-        }),
-    }
+    flatten_members(member, members, true);
 }
 
 fn flatten_intersection_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
+    flatten_members(member, members, false);
+}
+
+/// Flatten one nested union or intersection member in place.
+///
+/// `is_union` selects which associative kind is spliced; the other kind stays
+/// an ordinary member because `∪` and `∩` do not nest through each other.
+fn flatten_members(member: TypeExpr, members: &mut Vec<TypeExpr>, is_union: bool) {
     if member.nullable || member.mode.is_some() {
         members.push(member);
         return;
@@ -1113,20 +1094,23 @@ fn flatten_intersection_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
         form,
         iuncta_label,
     } = member;
-    match kind {
-        TypeExprKind::Intersection(nested) => {
-            for nested_member in nested {
-                flatten_intersection_member(nested_member, members);
-            }
+    let nested = match kind {
+        TypeExprKind::Union(nested) if is_union => nested,
+        TypeExprKind::Intersection(nested) if !is_union => nested,
+        kind => {
+            members.push(TypeExpr {
+                nullable,
+                mode,
+                kind,
+                span,
+                form,
+                iuncta_label,
+            });
+            return;
         }
-        kind => members.push(TypeExpr {
-            nullable,
-            mode,
-            kind,
-            span,
-            form,
-            iuncta_label,
-        }),
+    };
+    for nested_member in nested {
+        flatten_members(nested_member, members, is_union);
     }
 }
 
