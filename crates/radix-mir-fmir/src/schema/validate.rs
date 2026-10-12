@@ -350,7 +350,8 @@ fn validate_wire_semantic_values(
             }
         }
     }
-    for buffer in wire_buffers(wire) {
+    let buffers = wire_buffers(wire);
+    for buffer in &buffers {
         let value = buffer.semantic_value;
         if !wire.semantic_values.iter().any(|row| row.id == value) {
             return Err(wire_invalid(format!(
@@ -359,8 +360,8 @@ fn validate_wire_semantic_values(
             )));
         }
     }
-    for left in wire_buffers(wire) {
-        for right in wire_buffers(wire) {
+    for left in &buffers {
+        for right in &buffers {
             if left.id == right.id && left.semantic_value != right.semantic_value {
                 return Err(wire_invalid(format!(
                     "buffer {} holds semantic values {} and {}; one buffer holds one value",
@@ -825,6 +826,7 @@ pub(crate) fn validate_wire_distributed_section(
         )));
     }
 
+    let buffers = wire_buffers(wire);
     for fact in &section.declared_placement {
         if !wire
             .semantic_values
@@ -836,10 +838,7 @@ pub(crate) fn validate_wire_distributed_section(
                 fact.value
             )));
         }
-        if !wire_buffers(wire)
-            .iter()
-            .any(|buffer| buffer.id == fact.buffer)
-        {
+        if !buffers.iter().any(|buffer| buffer.id == fact.buffer) {
             return Err(distributed_invalid(format!(
                 "declared placement fact names buffer {}, which the single-device program never references",
                 fact.buffer
