@@ -27,7 +27,6 @@
 //! never reaches — is acceptable and conservative: the structural tier is a
 //! lower bound on run-tier capability, never an upper bound.
 
-use radix_lexer::Interner;
 use radix_mir::names::MirNames;
 use radix_mir::{
     CapabilityGap, Lowerability, MirAggregateFields, MirAggregateItem, MirCallee, MirIntrinsic,
@@ -142,12 +141,7 @@ pub fn classify_runner_lowerability(validated: &ValidatedMir<'_>) -> Lowerabilit
     for function in &program.functions {
         for block in &function.blocks {
             for statement in &block.statements {
-                classify_statement(
-                    &statement.kind,
-                    validation.interner.as_interner(),
-                    &mut gaps,
-                    &mut seen,
-                );
+                classify_statement(&statement.kind, &mut gaps, &mut seen);
             }
             classify_terminator(&block.terminator.kind, &mut gaps, &mut seen);
         }
@@ -162,7 +156,6 @@ pub fn classify_runner_lowerability(validated: &ValidatedMir<'_>) -> Lowerabilit
 
 fn classify_statement(
     kind: &MirStatementKind,
-    interner: Option<&Interner>,
     gaps: &mut Vec<CapabilityGap>,
     seen: &mut FxHashSet<String>,
 ) {
@@ -186,7 +179,7 @@ fn classify_statement(
             }
         }
         MirStatementKind::RuntimeCall { destination, call } => {
-            classify_runtime_call(call, interner, gaps, seen);
+            classify_runtime_call(call, gaps, seen);
             classify_operands(&call.args, gaps, seen);
             if let Some(place) = destination {
                 classify_place_write(place, gaps, seen);
@@ -204,11 +197,10 @@ fn classify_statement(
 
 fn classify_runtime_call(
     call: &MirRuntimeCall,
-    interner: Option<&Interner>,
     gaps: &mut Vec<CapabilityGap>,
     seen: &mut FxHashSet<String>,
 ) {
-    classify_intrinsic(&call.intrinsic, interner, gaps, seen);
+    classify_intrinsic(&call.intrinsic, gaps, seen);
     // Sparse and dense tensors share the runner's `Value::Tensor` carrier.
     // The declared target type still controls sparse operations, so a
     // tensor↔sparsa conversion is structurally dispatchable and must not be
@@ -258,7 +250,6 @@ fn classify_terminator(
 /// Classify a runtime intrinsic by family against the supported script-mode set.
 fn classify_intrinsic(
     intrinsic: &MirIntrinsic,
-    _interner: Option<&Interner>,
     gaps: &mut Vec<CapabilityGap>,
     seen: &mut FxHashSet<String>,
 ) {

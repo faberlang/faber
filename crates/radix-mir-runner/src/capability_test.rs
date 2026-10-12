@@ -144,7 +144,7 @@ fn every_runtime_family_has_a_runner_ledger_status() {
     // family) is a deliberate change visible in this test and in
     // docs/factory/stepper-alignment/stepper-runtime-ledger.md.
     use RunnerDispatchStatus::*;
-    let expected: [(MirRuntimeAbiFamily, RunnerDispatchStatus); 16] = [
+    let expected: [(MirRuntimeAbiFamily, RunnerDispatchStatus); 23] = [
         (MirRuntimeAbiFamily::RuntimeDiagnostic, Implement),
         (MirRuntimeAbiFamily::RuntimeAssert, Implement),
         (MirRuntimeAbiFamily::RuntimeFormat, Implement),
@@ -164,12 +164,25 @@ fn every_runtime_family_has_a_runner_ledger_status() {
         // S5-U3: `est <type>` variant-tag checks dispatch in-process via
         // runtime.rs eval_type_check (tag carried by the Value variant).
         (MirRuntimeAbiFamily::RuntimeTypeCheck, Implement),
+        (MirRuntimeAbiFamily::RuntimeTensorShapeCheck, Implement),
+        (MirRuntimeAbiFamily::RuntimeTensorShapeSize, Implement),
+        (MirRuntimeAbiFamily::RuntimeTensorLimes, Implement),
+        // SFR-5: the filum sum declaration is device-lane only; the host script
+        // runner rejects it by target policy.
+        (MirRuntimeAbiFamily::RuntimeFilumReduce, IntentionalReject),
+        (MirRuntimeAbiFamily::RuntimeDuplicate, Implement),
+        // K4: elementwise operator lift over tensors; the runner is the
+        // reference, other lanes reject it.
+        (MirRuntimeAbiFamily::RuntimeTensorLift, Implement),
+        // A deferred vector op is expanded before any executor runs, so no lane
+        // dispatches this family.
+        (MirRuntimeAbiFamily::RuntimeVectorOp, IntentionalReject),
         (MirRuntimeAbiFamily::RuntimeGpuBuiltin, IntentionalReject),
     ];
     assert_eq!(
         expected.len(),
-        16,
-        "ledger must cover all sixteen runtime families"
+        23,
+        "ledger must cover all twenty-three runtime families"
     );
     for (family, want) in expected {
         assert_eq!(
