@@ -379,3 +379,28 @@ fn unmetered_runner_keeps_stats_state_absent() {
     runner.pop_frame();
     assert!(runner.stats.is_none());
 }
+
+#[test]
+fn a_function_absent_from_the_name_table_falls_back_to_its_root_slot() {
+    let types = TypeTable::new();
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let mut program = MirProgram::new();
+    program.functions.push(function(
+        MirFunctionId(0),
+        None,
+        None,
+        MirType::semantic(vacuum),
+        None,
+        vec![empty_block()],
+    ));
+
+    let mut collector = StatsCollector::new(&program, &context, &interner);
+    collector.record_function_sample(MirFunctionId(7), 5, 5);
+    let stats = collector.finish();
+    assert_eq!(stats.functions.len(), 1);
+    assert_eq!(stats.functions[0].module, "root");
+    assert_eq!(stats.functions[0].name, "f7");
+    assert_eq!(stats.functions[0].calls, 1);
+}

@@ -256,21 +256,36 @@ impl StatsCollector {
         debug_assert_eq!(active.function, function);
         let elapsed_ns = duration_ns(active.started.elapsed());
         let self_ns = elapsed_ns.saturating_sub(active.child_ns);
-        let key = self
-            .function_names
+        let key = self.key_for_function(function);
+        self.record_function(key, elapsed_ns, self_ns, active.counts_call);
+        if let Some(parent) = self.active_calls.last_mut() {
+            parent.child_ns = parent.child_ns.saturating_add(elapsed_ns);
+        }
+    }
+
+    /// Stable key for an observed function, falling back to the root module
+    /// for a function absent from the program's name table.
+    fn key_for_function(&self, function: MirFunctionId) -> FunctionKey {
+        self.function_names
             .get(&function)
             .cloned()
             .unwrap_or_else(|| FunctionKey {
                 module: "root".to_owned(),
                 name: format!("f{}", function.0),
-            });
+            })
+    }
+
+    fn record_function(
+        &mut self,
+        key: FunctionKey,
+        duration_ns: u64,
+        self_ns: u64,
+        counts_call: bool,
+    ) {
         self.functions
             .entry(key)
             .or_insert_with(FunctionAccumulator::new)
-            .record(elapsed_ns, self_ns, active.counts_call);
-        if let Some(parent) = self.active_calls.last_mut() {
-            parent.child_ns = parent.child_ns.saturating_add(elapsed_ns);
-        }
+            .record(duration_ns, self_ns, counts_call);
     }
 
     pub(crate) fn begin_intrinsic() -> Instant {
@@ -294,18 +309,8 @@ impl StatsCollector {
         duration_ns: u64,
         self_ns: u64,
     ) {
-        let key = self
-            .function_names
-            .get(&function)
-            .cloned()
-            .unwrap_or_else(|| FunctionKey {
-                module: "root".to_owned(),
-                name: format!("f{}", function.0),
-            });
-        self.functions
-            .entry(key)
-            .or_insert_with(FunctionAccumulator::new)
-            .record(duration_ns, self_ns, true);
+        let key = self.key_for_function(function);
+        self.record_function(key, duration_ns, self_ns, true);
     }
 
     #[cfg(test)]
