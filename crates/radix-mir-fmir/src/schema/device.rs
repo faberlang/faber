@@ -549,28 +549,44 @@ impl FmirDeviceArtifact {
                 encoding_tag,
                 decoded_byte_length,
                 canonical_unpadded_base64: declared_base64,
-            } => {
-                if encoding_tag.is_empty() {
-                    return Err(DevicePayloadEncodingError::EncodingTagEmpty);
-                }
-                if *decoded_byte_length != self.bytes.len() as u64 {
-                    return Err(DevicePayloadEncodingError::DecodedByteLengthMismatch {
-                        declared: *decoded_byte_length,
-                        actual: self.bytes.len(),
-                    });
-                }
-                let canonical = canonical_unpadded_base64(&self.bytes);
-                if canonical != *declared_base64 {
-                    return Err(DevicePayloadEncodingError::Base64CanonicalityMismatch {
-                        detail: format!(
-                            "declared `{declared_base64}` is not the canonical unpadded base64 (`{canonical}`) of the decoded bytes"
-                        ),
-                    });
-                }
-                Ok(())
-            }
+            } => validate_binary_encoding(
+                &self.bytes,
+                encoding_tag,
+                *decoded_byte_length,
+                declared_base64,
+            ),
         }
     }
+}
+
+/// Validate a binary payload declaration against its canonical decoded bytes
+/// (contract §Payload encoding): non-empty encoding tag, a decoded length
+/// equal to the carried bytes, and a declared base64 that is the canonical
+/// unpadded base64 of those bytes.
+fn validate_binary_encoding(
+    bytes: &[u8],
+    encoding_tag: &str,
+    decoded_byte_length: u64,
+    declared_base64: &str,
+) -> Result<(), DevicePayloadEncodingError> {
+    if encoding_tag.is_empty() {
+        return Err(DevicePayloadEncodingError::EncodingTagEmpty);
+    }
+    if decoded_byte_length != bytes.len() as u64 {
+        return Err(DevicePayloadEncodingError::DecodedByteLengthMismatch {
+            declared: decoded_byte_length,
+            actual: bytes.len(),
+        });
+    }
+    let canonical = canonical_unpadded_base64(bytes);
+    if canonical != declared_base64 {
+        return Err(DevicePayloadEncodingError::Base64CanonicalityMismatch {
+            detail: format!(
+                "declared `{declared_base64}` is not the canonical unpadded base64 (`{canonical}`) of the decoded bytes"
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// Backend a declared artifact targets (N1.3). `auto` is a selection, not a
