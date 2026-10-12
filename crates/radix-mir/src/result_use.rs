@@ -10,8 +10,8 @@
 
 use crate::visit::{MirVisitor, walk_operand, walk_stmt, walk_terminator};
 use crate::{
-    MirFunction, MirOperand, MirPlace, MirPlaceBase, MirStatementKind, MirTerminatorKind,
-    MirValueKind,
+    MirFunction, MirOperand, MirPlace, MirPlaceBase, MirStatement, MirStatementKind, MirTerminator,
+    MirTerminatorKind, MirValueKind,
 };
 
 /// Whether nothing but plain forwards and the kernel's `Return` reads a
@@ -119,25 +119,13 @@ fn follow_result(function: &MirFunction, destination: &MirPlace) -> Option<(MirP
                     forwards.push(place.base.clone());
                     continue;
                 }
-                let mut reads = BaseReads {
-                    base: &base,
-                    found: false,
-                };
-                walk_stmt(&mut reads, statement);
-                other_read |= reads.found;
+                other_read |= stmt_reads(&base, statement);
             }
             match &block.terminator.kind {
                 MirTerminatorKind::Return(Some(operand)) if operand_is_plain(operand, &base) => {
                     returned = true;
                 }
-                _ => {
-                    let mut reads = BaseReads {
-                        base: &base,
-                        found: false,
-                    };
-                    walk_terminator(&mut reads, &block.terminator);
-                    other_read |= reads.found;
-                }
+                _ => other_read |= terminator_reads(&base, &block.terminator),
             }
         }
         if other_read {
@@ -150,6 +138,20 @@ fn follow_result(function: &MirFunction, destination: &MirPlace) -> Option<(MirP
         }
     }
     None
+}
+
+/// Whether any read inside `statement` touches `base`.
+fn stmt_reads(base: &MirPlaceBase, statement: &MirStatement) -> bool {
+    let mut reads = BaseReads { base, found: false };
+    walk_stmt(&mut reads, statement);
+    reads.found
+}
+
+/// Whether any read inside `terminator` touches `base`.
+fn terminator_reads(base: &MirPlaceBase, terminator: &MirTerminator) -> bool {
+    let mut reads = BaseReads { base, found: false };
+    walk_terminator(&mut reads, terminator);
+    reads.found
 }
 
 /// How many places in the function write `base`, counting any write through a

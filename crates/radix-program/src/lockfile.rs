@@ -7,14 +7,9 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::package_diagnostic_error;
 use radix_module::diagnostics::Diagnostic;
 use serde::Deserialize;
-
-/// Package diagnostics carry the same code as faber's package surface
-/// (`PKG001`) so moved compiler diagnostics keep their identity.
-fn package_diagnostic_error(message: impl Into<String>) -> Diagnostic {
-    Diagnostic::error(message).with_code("PKG001")
-}
 
 pub const LOCK_FILE: &str = "faber.lock";
 

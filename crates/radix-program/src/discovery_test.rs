@@ -197,3 +197,34 @@ fn compiler_manifest_accepts_target_spelling_table() {
     validate_compiler_manifest(&manifest, Path::new("faber.toml"))
         .expect("a target-spelling table passes discovery validation");
 }
+
+fn manifest_temp_dir(label: &str) -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "faber-discovery-{label}-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time")
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&path).expect("mkdir");
+    path
+}
+
+#[test]
+fn discover_package_reads_manifest_backed_source_root_and_entry() {
+    let root = manifest_temp_dir("manifest");
+    std::fs::write(
+        root.join("faber.toml"),
+        "[package]\nname = \"demo\"\n\n[paths]\nentry = \"main.fab\"\n",
+    )
+    .expect("write manifest");
+
+    let spec = discover_package(&root).expect("discover manifest-backed package");
+
+    assert!(spec.manifest_backed);
+    assert_eq!(spec.package_root, root);
+    assert_eq!(spec.source_root, root.join("src"));
+    assert_eq!(spec.entry, root.join("src").join("main.fab"));
+    assert!(spec.templates.is_empty());
+    let _ = std::fs::remove_dir_all(&root);
+}

@@ -22,6 +22,19 @@ pub struct TensorExpansion {
     pub source_axes: Vec<usize>,
 }
 
+/// Cost of mapping one source axis onto one target axis: zero for an exact
+/// extent match, one when a singleton source axis stretches, `None` when the
+/// source axis cannot map onto the target axis at all.
+fn singleton_stretch(source_dim: u64, target_dim: u64) -> Option<usize> {
+    if source_dim == target_dim {
+        Some(0)
+    } else if source_dim == 1 {
+        Some(1)
+    } else {
+        None
+    }
+}
+
 impl TensorExpansion {
     /// Exact matches win over singleton stretches; ties choose rightmost axes,
     /// as in the semantic checker and MIR runner's `expanded_view`.
@@ -36,11 +49,8 @@ impl TensorExpansion {
         for source_axis in (0..source.len()).rev() {
             for first_target in (0..target.len()).rev() {
                 for target_axis in first_target..target.len() {
-                    let stretch = if source[source_axis] == target[target_axis] {
-                        0
-                    } else if source[source_axis] == 1 {
-                        1
-                    } else {
+                    let Some(stretch) = singleton_stretch(source[source_axis], target[target_axis])
+                    else {
                         continue;
                     };
                     let suffix = costs[source_axis + 1][target_axis + 1];
@@ -59,13 +69,7 @@ impl TensorExpansion {
         let mut first_target = 0;
         for source_axis in 0..source.len() {
             let (axis, stretch) = (first_target..target.len()).rev().find_map(|axis| {
-                let stretch = if source[source_axis] == target[axis] {
-                    0
-                } else if source[source_axis] == 1 {
-                    1
-                } else {
-                    return None;
-                };
+                let stretch = singleton_stretch(source[source_axis], target[axis])?;
                 let suffix = costs[source_axis + 1][axis + 1];
                 (suffix != impossible && suffix + stretch == remaining).then_some((axis, stretch))
             })?;
@@ -166,6 +170,11 @@ pub(crate) fn fold_expansion_witnesses(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<MirFunction, ShapeFoldError> {
+    // The fold handles straight-line shape producers only. A multi-block
+    // producer needs dominance and mutation proof, not global slot guessing.
+    if function.blocks.len() != 1 {
+        return Ok(function.clone());
+    }
     let mut definitions = FxHashMap::<MirSlot, usize>::default();
     for statement in function.blocks.iter().flat_map(|b| &b.statements) {
         if let Some(slot) = crate::read_analysis::statement_destination_place(statement)
@@ -176,11 +185,6 @@ pub(crate) fn fold_expansion_witnesses(
     }
     let mut witnesses = FxHashMap::<MirSlot, MirOperand>::default();
     let mut forwarded_shapes = FxHashMap::<MirSlot, MirSlot>::default();
-    // The fold handles straight-line shape producers only. A multi-block
-    // producer needs dominance and mutation proof, not global slot guessing.
-    if function.blocks.len() != 1 {
-        return Ok(function.clone());
-    }
     for statement in &function.blocks[0].statements {
         let Some(slot) = crate::read_analysis::statement_destination_place(statement)
             .and_then(MirSlot::from_place)

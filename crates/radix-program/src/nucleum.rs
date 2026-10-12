@@ -16,6 +16,16 @@ use std::path::{Path, PathBuf};
 /// Sidecar file written beside `package.fhirpkg`.
 pub const NUCLEUM_FRAGMENT_ARTIFACT_FILE: &str = "nucleum-fragments.bin";
 
+/// Relative path key for a unit: its file name when present, otherwise the
+/// full display path. The same key names the unit in fragment metadata and the
+/// canonical MIR sidecar.
+fn node_relative_path(node: &AnalyzedProgramNode) -> String {
+    node.path.file_name().map_or_else(
+        || node.path.display().to_string(),
+        |name| name.to_string_lossy().into_owned(),
+    )
+}
+
 /// Collect and validate nucleum metadata for an analyzed package.
 ///
 /// Signature-only fragments fail closed. The concrete fragment call graph
@@ -30,10 +40,7 @@ pub fn metadata_for_program(
 ) -> Result<NucleumProgramMetadata, Diagnostic> {
     let mut metadata = NucleumProgramMetadata::new();
     for node in program.nodes.values() {
-        let relative = node.path.file_name().map_or_else(
-            || node.path.display().to_string(),
-            |name| name.to_string_lossy().into_owned(),
-        );
+        let relative = node_relative_path(node);
         metadata.merge(
             collect_nucleum_metadata(&node.analysis, &relative)
                 .map_err(|error| nucleum_diagnostic(&node.path, &error))?,
@@ -85,10 +92,7 @@ pub fn attach_canonical_mir(
         return Ok(());
     }
     for node in nodes.values_mut() {
-        let relative = node.path.file_name().map_or_else(
-            || node.path.display().to_string(),
-            |name| name.to_string_lossy().into_owned(),
-        );
+        let relative = node_relative_path(node);
         if !fragment_paths.contains(&relative) {
             continue;
         }
