@@ -61,11 +61,11 @@ fn spawn(list<string> args, string directory optional, map<string, string> envir
 
 # Dismiss process to run independently - returns PID.
 # Param named `args` because `argumenta` is TokenKind::Argumenta (CLI
-# argument binding). Optional directorium/ambitus are accepted at the
-# Faber surface; the host route currently receives args only.
+# argument binding). Optional directory/environment travel with the argv
+# on the same `processus:dimitte` opener (R1: one meaning).
 @ public
 fn detach(list<string> args, string directory optional, map<string, string> environment optional) → int {
-    return call 'processus:dimitte' (args) ↦ int
+    return call 'processus:dimitte' ([args, directory, environment]) ↦ int
 }
 
 # Execute an argv vector directly and capture status, stdout, and stderr.

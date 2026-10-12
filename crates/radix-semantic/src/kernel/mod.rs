@@ -37,11 +37,10 @@ pub fn is_kernel_glob_import_path(path: &str) -> bool {
 #[must_use]
 pub fn resolve_kernel_module_name(name: &str) -> Option<KernelModule> {
     match name {
-        // N2 fs unit: `norma:fs` runs through `ad` / the shared leaf. Do not
-        // alias it onto the retired Solum kernel.
-        "console" => Some(KernelModule::Consolum),
-        "random" => Some(KernelModule::Aleator),
-        "process" => Some(KernelModule::Processus),
+        // N2: I/O Norma modules run through `ad` / the shared leaf. Do not
+        // alias them onto retired kernel modules.
+        "fs" | "solum" | "console" | "consolum" | "random" | "aleator" | "process"
+        | "processus" => None,
         _ => manifest::lookup_module(name),
     }
 }

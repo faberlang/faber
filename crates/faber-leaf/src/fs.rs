@@ -9,6 +9,7 @@
 mod tests;
 
 use crate::error::FsError;
+use crate::value::{Arg, Reply};
 use std::fs::{self, File, OpenOptions};
 use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -19,26 +20,6 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 /// Largest single `solum:partem` allocation (512 MiB). Implementation ceiling,
 /// not a language constant. Same bound the retired runner kernel used.
 pub const MAX_RANGE_READ_BYTES: usize = 512 * 1024 * 1024;
-
-/// A positional opener value after the host flattened a bare valor or a list.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Arg {
-    Str(String),
-    Int(i64),
-    Bytes(Vec<u8>),
-    Strs(Vec<String>),
-}
-
-/// Successful leaf result.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Reply {
-    Unit,
-    Bool(bool),
-    Int(i64),
-    Str(String),
-    Bytes(Vec<u8>),
-    Strs(Vec<String>),
-}
 
 /// Whether `route` belongs to this leaf.
 #[must_use]

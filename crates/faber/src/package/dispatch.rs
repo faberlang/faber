@@ -3,12 +3,12 @@ use std::collections::BTreeSet;
 /// Plan-time route classification for the builtin runtime dispatch.
 ///
 /// `runtime:echo` and the terminal builtin `processus:exi` are served
-/// in-process. `solum:*` is the shared fs leaf (`faber-leaf`) on both
-/// runtimes (core-norma N2). Every other route is host-required: the native
-/// host route and its provider crates were dropped with `hosts`
-/// (single-repo-development Q3). This mirror is a radix-owned plan fact and
-/// must stay aligned with the runtime-side `is_builtin_route` coverage plus
-/// `faber_leaf::fs::is_route`.
+/// in-process. Shared leaves (`solum:*`, `consolum:*`, `processus:*`,
+/// `tempus:*`, `aleator:*`) are `faber-leaf` on both runtimes (core-norma N2).
+/// Every other route is host-required: the native host route and its
+/// provider crates were dropped with `hosts` (single-repo-development Q3).
+/// This mirror is a radix-owned plan fact and must stay aligned with the
+/// runtime-side `is_builtin_route` coverage plus `faber_leaf::is_route`.
 pub(crate) fn is_builtin_ad_route(route: &str) -> bool {
     matches!(route, "runtime:echo" | "processus:exi")
 }
@@ -16,7 +16,7 @@ pub(crate) fn is_builtin_ad_route(route: &str) -> bool {
 /// Whether the shared native leaf crate serves this route.
 #[must_use]
 pub(crate) fn is_leaf_ad_route(route: &str) -> bool {
-    faber_leaf::fs::is_route(route)
+    faber_leaf::is_route(route)
 }
 
 /// Non-`runtime:` routes that are **not** covered by builtin dispatch or the

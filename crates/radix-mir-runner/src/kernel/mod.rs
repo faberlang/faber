@@ -4,21 +4,18 @@
 //! operands are evaluated to Values. Owns the match dispatch; submodules own
 //! their verb contracts.
 
-mod aleator;
 pub(crate) mod args;
-mod consolum;
 pub(crate) mod http;
 mod json;
-mod processus;
 mod toml;
 
 use super::{Host, RunnerError, Value};
 use radix_lexer::Span;
 use radix_mir::KernelModule;
 
-/// Reset process-global kernel state that must not cross program executions.
+/// Reset process-global kernel and leaf state that must not cross executions.
 pub fn reset_execution_state() {
-    aleator::reset_seed();
+    faber_leaf::reset_execution_state();
     http::reset();
 }
 
@@ -28,21 +25,30 @@ pub fn reset_execution_state() {
 ///
 /// Returns an error when the kernel verb is unsupported or execution fails.
 pub fn dispatch_kernel<H: Host + ?Sized>(
-    host: &mut H,
+    _host: &mut H,
     module: KernelModule,
     verb: &str,
     args: &[Value],
     span: Span,
 ) -> Result<Value, RunnerError> {
     match module {
-        KernelModule::Processus => processus::dispatch(host, verb, args, span),
+        KernelModule::Processus => Err(RunnerError::unsupported(
+            span,
+            "kernel processus was deleted; norma:process runs through ad / faber-leaf",
+        )),
         KernelModule::Json => json::dispatch(verb, args, span),
         KernelModule::Solum => Err(RunnerError::unsupported(
             span,
             "kernel solum was deleted; norma:fs runs through ad / faber-leaf",
         )),
-        KernelModule::Aleator => aleator::dispatch(verb, args, span),
-        KernelModule::Consolum => consolum::dispatch(host, verb, args, span),
+        KernelModule::Aleator => Err(RunnerError::unsupported(
+            span,
+            "kernel aleator was deleted; norma:random runs through ad / faber-leaf",
+        )),
+        KernelModule::Consolum => Err(RunnerError::unsupported(
+            span,
+            "kernel consolum was deleted; norma:console runs through ad / faber-leaf",
+        )),
         KernelModule::Toml => toml::dispatch(verb, args, span),
     }
 }

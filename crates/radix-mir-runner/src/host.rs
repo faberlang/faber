@@ -255,6 +255,7 @@ pub struct BufferHost {
 impl BufferHost {
     #[must_use]
     pub fn with_argumenta(argumenta: Vec<String>) -> Self {
+        faber_leaf::process::install_argv(argumenta.clone());
         Self {
             argumenta,
             ..Self::default()
@@ -403,6 +404,7 @@ pub struct StdioHost {
 impl StdioHost {
     #[must_use]
     pub fn with_argumenta(argumenta: Vec<String>) -> Self {
+        faber_leaf::process::install_argv(argumenta.clone());
         Self { argumenta }
     }
 }

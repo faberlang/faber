@@ -1,31 +1,40 @@
-//! Structured fs-leaf errors. Kind is the identity; text is for the frame.
+//! Structured leaf errors. Kind is the identity; text is for the frame.
 
 use std::fmt;
 use std::io;
 
 /// Identity a conformance test asserts. The renderer owns prose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FsErrorKind {
+pub enum LeafErrorKind {
     NotFound,
     Permission,
     NotADirectory,
     IsADirectory,
     InvalidArgument,
     Io,
+    Closed,
+    Unset,
+    Unavailable,
+    Cancelled,
 }
 
-/// One failed fs leaf call.
+/// One failed leaf call.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FsError {
-    kind: FsErrorKind,
+pub struct LeafError {
+    kind: LeafErrorKind,
     route: &'static str,
     path: String,
     source: String,
 }
 
-impl FsError {
+/// Fs-leaf name kept so existing fs tests and docs stay stable.
+pub type FsError = LeafError;
+/// Fs-leaf kind name kept so existing fs tests stay stable.
+pub type FsErrorKind = LeafErrorKind;
+
+impl LeafError {
     #[must_use]
-    pub fn kind(&self) -> FsErrorKind {
+    pub fn kind(&self) -> LeafErrorKind {
         self.kind
     }
 
@@ -42,7 +51,7 @@ impl FsError {
     #[must_use]
     pub fn invalid_argument(route: &'static str, message: impl Into<String>) -> Self {
         Self {
-            kind: FsErrorKind::InvalidArgument,
+            kind: LeafErrorKind::InvalidArgument,
             route,
             path: String::new(),
             source: message.into(),
@@ -50,9 +59,49 @@ impl FsError {
     }
 
     #[must_use]
+    pub fn closed(route: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            kind: LeafErrorKind::Closed,
+            route,
+            path: String::new(),
+            source: message.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn unset(route: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            kind: LeafErrorKind::Unset,
+            route,
+            path: String::new(),
+            source: message.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn unavailable(route: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            kind: LeafErrorKind::Unavailable,
+            route,
+            path: String::new(),
+            source: message.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn cancelled(route: &'static str) -> Self {
+        Self {
+            kind: LeafErrorKind::Cancelled,
+            route,
+            path: String::new(),
+            source: "cancelled".to_owned(),
+        }
+    }
+
+    #[must_use]
     pub fn is_a_directory(route: &'static str, path: impl Into<String>) -> Self {
         Self {
-            kind: FsErrorKind::IsADirectory,
+            kind: LeafErrorKind::IsADirectory,
             route,
             path: path.into(),
             source: "is a directory".to_owned(),
@@ -62,7 +111,7 @@ impl FsError {
     #[must_use]
     pub fn not_a_directory(route: &'static str, path: impl Into<String>) -> Self {
         Self {
-            kind: FsErrorKind::NotADirectory,
+            kind: LeafErrorKind::NotADirectory,
             route,
             path: path.into(),
             source: "not a directory".to_owned(),
@@ -73,9 +122,10 @@ impl FsError {
     pub fn from_io(route: &'static str, path: impl Into<String>, err: &io::Error) -> Self {
         let path = path.into();
         let kind = match err.kind() {
-            io::ErrorKind::NotFound => FsErrorKind::NotFound,
-            io::ErrorKind::PermissionDenied => FsErrorKind::Permission,
-            _ => FsErrorKind::Io,
+            io::ErrorKind::NotFound => LeafErrorKind::NotFound,
+            io::ErrorKind::PermissionDenied => LeafErrorKind::Permission,
+            io::ErrorKind::BrokenPipe => LeafErrorKind::Closed,
+            _ => LeafErrorKind::Io,
         };
         Self {
             kind,
@@ -86,7 +136,7 @@ impl FsError {
     }
 }
 
-impl fmt::Display for FsError {
+impl fmt::Display for LeafError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.path.is_empty() {
             write!(f, "{}: {}", self.route, self.source)
@@ -96,4 +146,4 @@ impl fmt::Display for FsError {
     }
 }
 
-impl std::error::Error for FsError {}
+impl std::error::Error for LeafError {}

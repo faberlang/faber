@@ -644,6 +644,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        if let Value::Sermo(sermo) = value {
+            let value = self.sermo_first_item(&sermo, span)?;
+            return self.convert_to_fractus_from(value, source_ty, params, width, recovery, span);
+        }
         if let Some(source_width) = decimal_source_width(self.types, source_ty) {
             let (carrier, scale) = match value {
                 Value::Int(value) => {
@@ -1376,6 +1380,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Value, RunnerError> {
         let precision = instans_precision(target);
         match value {
+            Value::Sermo(sermo) => {
+                let value = self.sermo_first_item(&sermo, span)?;
+                self.convert_to_instans(value, target, recovery, span)
+            }
             Value::Instans(value) => Ok(Value::Instans(value.ad_praecisionem(precision))),
             // String sources parse as RFC3339 wire text; recovery honors `⊥`.
             Value::Str(text) => match Instans::from_rfc3339(&text, precision) {

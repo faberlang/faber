@@ -16,9 +16,8 @@
 //! plus `crates/radix-module/src/codegen`.
 //!
 //! Allowlisted by policy (spawns are deliberate; entries only shrink):
-//!   - `radix-mir-runner/src/kernel/processus.rs` — the `processus` provider
-//!     (`exec`/`captura`/shell) is a Faber *language capability* kernel, not a
-//!     toolchain dependency.
+//!   - `faber-leaf/src/process.rs` — the process leaf (`exec`/`captura`/shell)
+//!     is a Faber language capability, not a toolchain dependency.
 //!   - cfg(test) harness spawns — files compiled only under `#[cfg(test)]`
 //!     (`radix-hir-python/src/golden.rs` pinned-interpreter checks; the scan's
 //!     test-support convention already excludes `test_support` files).
@@ -118,9 +117,6 @@ fn emit_crates_do_not_spawn_toolchains() {
     let config = ScanConfig {
         source_roots,
         exclude_path_suffixes: vec![
-            // Allowlisted: processus provider — Faber language capability
-            // kernel (`exec`/`captura`/shell), not a toolchain dependency.
-            "radix-mir-runner/src/kernel/processus.rs".to_string(),
             // cfg(test) harness spawns: pinned-interpreter golden checks.
             "radix-hir-python/src/golden.rs".to_string(),
             // Documented out of scope: the ts-import node driver (default-off
@@ -156,7 +152,7 @@ fn emit_crates_do_not_spawn_toolchains() {
 fn allowlisted_and_out_of_scope_surfaces_still_spawn() {
     let workspace = workspace();
     for rel in [
-        "crates/radix-mir-runner/src/kernel/processus.rs",
+        "crates/faber-leaf/src/process.rs",
         "crates/radix-hir-python/src/golden.rs",
         "crates/radix-lower-ts/src/driver.rs",
         "crates/radix-module/src/llvm_host.rs",

@@ -25,20 +25,6 @@ pub(crate) fn optional_usize(value: &Value) -> Option<usize> {
     }
 }
 
-pub(crate) fn value_lista_to_strings(
-    value: &Value,
-    span: Span,
-) -> Result<Vec<String>, RunnerError> {
-    let Value::Array(items) = value else {
-        return Err(RunnerError::internal(span, "expected lista<textus>"));
-    };
-    items
-        .borrow()
-        .iter()
-        .map(|item| expect_str(item, span, "lista element"))
-        .collect()
-}
-
 /// The bytes of an `octeti` argument: the byte value itself, or the
 /// `lista<b8>` array a bit-pattern list arrives as (every element one
 /// unsigned pattern below 256).
