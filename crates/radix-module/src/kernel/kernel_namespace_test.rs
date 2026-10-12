@@ -1,8 +1,8 @@
 //! Residual `faber:*` prefix: N2 deleted the kernel modules.
 
 use super::{
-    KernelModule, KernelResolveError, is_kernel_import_path, kernel_manifest_entries,
-    kernel_module_count, resolve_kernel_module,
+    KernelModule, KernelResolveError, is_kernel_import_path, kernel_manifest_entries, kernel_module_count,
+    resolve_kernel_module,
 };
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
@@ -36,19 +36,9 @@ fn nested_faber_paths_are_invalid() {
 #[test]
 fn former_kernel_import_is_unknown() {
     let err = resolve_kernel_module("faber:processus").unwrap_err();
-    assert_eq!(
-        err,
-        KernelResolveError::UnknownModule {
-            name: "processus".to_owned()
-        }
-    );
+    assert_eq!(err, KernelResolveError::UnknownModule { name: "processus".to_owned() });
     let err = resolve_kernel_module("faber:json").unwrap_err();
-    assert_eq!(
-        err,
-        KernelResolveError::UnknownModule {
-            name: "json".to_owned()
-        }
-    );
+    assert_eq!(err, KernelResolveError::UnknownModule { name: "json".to_owned() });
 }
 
 #[test]

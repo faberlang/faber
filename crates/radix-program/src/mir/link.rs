@@ -8,8 +8,8 @@ use super::{
     LibraryLinkTarget, LibraryResolver, MethodCallTargets, NamespaceCallTargets,
     NamespaceDataMemberTargets, NamespaceExports, PACKAGE_MIR_SYNTHETIC_DEF_BASE,
     PackageMirConsumer, PackageMirLinks, Path, PathBuf, Primitive, Resolver, SourceRewrites,
-    Symbol, Type, TypeId, TypeTable, library_cached_analysis,
-    library_cached_file_interface, resolve_import,
+    Symbol, Type, TypeId, TypeTable, library_cached_analysis, library_cached_file_interface,
+    resolve_import,
 };
 use radix_module::hir::visit::{
     HirVisitor, HirVisitorMut, walk_expr, walk_expr_mut, walk_program_mut,
