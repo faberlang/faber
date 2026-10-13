@@ -1,11 +1,11 @@
 +++
 locale = "en"
 +++
-import from "norma:crypta" crypta
+import from "norma:crypto" crypto
 
 # Native Faber SHA-2 proof package.
 #
-# Exercises the public norma:crypta.digest surface against pinned NIST FIPS 180-4
+# Exercises the public norma:crypto.digest surface against pinned NIST FIPS 180-4
 # known-answer vectors for SHA-256, SHA-384, and SHA-512: empty input, "abc",
 # an embedded-zero input, SHA-256/SHA-512 padding-boundary inputs (maximum
 # single-block sizes: 55 bytes for SHA-256, 111 bytes for SHA-512),
@@ -17,8 +17,8 @@ import from "norma:crypta" crypta
 fn expect(bytes got, bytes want, string label) → void ⇥ string {
     if got.length() ≢ want.length() then throw "§: wrong length"(label)
     for range 0‥got.length() const i {
-        const u8 g ← got.get(i) coalesce (0 ∷ u8)
-        const u8 w ← want.get(i) coalesce (0 ∷ u8)
+        const b8 g ← got.get(i) coalesce (0 ∷ b8)
+        const b8 w ← want.get(i) coalesce (0 ∷ b8)
         if g ≢ w then throw "§: byte mismatch at §"(label, i)
     }
 }
@@ -28,41 +28,41 @@ fn _repeat(int n, u8 b) → bytes {
     for range 0‥n const i {
         out.append(b)
     }
-    const bytes result ← out
+    const bytes result ← out ↦ list<b8>
     return result
 }
 
 main {
     do {
         const bytes abc ← |61 62 63|
-        const list<u8> empty_bytes ← empty
+        const list<b8> empty_bytes ← empty
         const bytes empty_msg ← empty_bytes
         const bytes zeros ← |61 00 62 00 63|
 
         # SHA-256
-        expect(crypta.digest("sha256", abc), |ba 78 16 bf 8f 01 cf ea 41 41 40 de 5d ae 22 23 b0 03 61 a3 96 17 7a 9c b4 10 ff 61 f2 00 15 ad|, "sha256 abc")
-        expect(crypta.digest("sha256", empty_msg), |e3 b0 c4 42 98 fc 1c 14 9a fb f4 c8 99 6f b9 24 27 ae 41 e4 64 9b 93 4c a4 95 99 1b 78 52 b8 55|, "sha256 empty")
-        expect(crypta.digest("sha256", zeros), |8b ad de 10 c7 60 e9 b7 02 de fb 4b 5e 22 5d e7 9c 51 5b 1d 2a 5c fb 00 0e 14 0f 3c 6f bb 56 29|, "sha256 embedded-zero")
-        expect(crypta.digest("sha256", _repeat(55, 97 ∷ u8)), |9f 43 90 f8 d3 0c 2d d9 2e c9 f0 95 b6 5e 2b 9a e9 b0 a9 25 a5 25 8e 24 1c 9f 1e 91 0f 73 43 18|, "sha256 padding-boundary 55")
+        expect(crypto.digest("sha256", abc), |ba 78 16 bf 8f 01 cf ea 41 41 40 de 5d ae 22 23 b0 03 61 a3 96 17 7a 9c b4 10 ff 61 f2 00 15 ad|, "sha256 abc")
+        expect(crypto.digest("sha256", empty_msg), |e3 b0 c4 42 98 fc 1c 14 9a fb f4 c8 99 6f b9 24 27 ae 41 e4 64 9b 93 4c a4 95 99 1b 78 52 b8 55|, "sha256 empty")
+        expect(crypto.digest("sha256", zeros), |8b ad de 10 c7 60 e9 b7 02 de fb 4b 5e 22 5d e7 9c 51 5b 1d 2a 5c fb 00 0e 14 0f 3c 6f bb 56 29|, "sha256 embedded-zero")
+        expect(crypto.digest("sha256", _repeat(55, 97 ∷ u8)), |9f 43 90 f8 d3 0c 2d d9 2e c9 f0 95 b6 5e 2b 9a e9 b0 a9 25 a5 25 8e 24 1c 9f 1e 91 0f 73 43 18|, "sha256 padding-boundary 55")
 
         # SHA-384 (shared SHA-512-family engine, distinct IV, 48-byte truncation)
-        expect(crypta.digest("sha384", abc), |cb 00 75 3f 45 a3 5e 8b b5 a0 3d 69 9a c6 50 07 27 2c 32 ab 0e de d1 63 1a 8b 60 5a 43 ff 5b ed 80 86 07 2b a1 e7 cc 23 58 ba ec a1 34 c8 25 a7|, "sha384 abc")
-        expect(crypta.digest("sha384", empty_msg), |38 b0 60 a7 51 ac 96 38 4c d9 32 7e b1 b1 e3 6a 21 fd b7 11 14 be 07 43 4c 0c c7 bf 63 f6 e1 da 27 4e de bf e7 6f 65 fb d5 1a d2 f1 48 98 b9 5b|, "sha384 empty")
-        expect(crypta.digest("sha384", zeros), |d5 d5 72 a3 12 1f 3d 3b 74 97 32 02 2e 94 bc df bc 54 cb f4 5a 50 e2 73 5a 08 57 69 28 05 d6 bb fd 36 34 91 5b ef cd c5 80 d4 94 ba fc 11 00 ec|, "sha384 embedded-zero")
+        expect(crypto.digest("sha384", abc), |cb 00 75 3f 45 a3 5e 8b b5 a0 3d 69 9a c6 50 07 27 2c 32 ab 0e de d1 63 1a 8b 60 5a 43 ff 5b ed 80 86 07 2b a1 e7 cc 23 58 ba ec a1 34 c8 25 a7|, "sha384 abc")
+        expect(crypto.digest("sha384", empty_msg), |38 b0 60 a7 51 ac 96 38 4c d9 32 7e b1 b1 e3 6a 21 fd b7 11 14 be 07 43 4c 0c c7 bf 63 f6 e1 da 27 4e de bf e7 6f 65 fb d5 1a d2 f1 48 98 b9 5b|, "sha384 empty")
+        expect(crypto.digest("sha384", zeros), |d5 d5 72 a3 12 1f 3d 3b 74 97 32 02 2e 94 bc df bc 54 cb f4 5a 50 e2 73 5a 08 57 69 28 05 d6 bb fd 36 34 91 5b ef cd c5 80 d4 94 ba fc 11 00 ec|, "sha384 embedded-zero")
 
         # SHA-512
-        expect(crypta.digest("sha512", abc), |dd af 35 a1 93 61 7a ba cc 41 73 49 ae 20 41 31 12 e6 fa 4e 89 a9 7e a2 0a 9e ee e6 4b 55 d3 9a 21 92 99 2a 27 4f c1 a8 36 ba 3c 23 a3 fe eb bd 45 4d 44 23 64 3c e8 0e 2a 9a c9 4f a5 4c a4 9f|, "sha512 abc")
-        expect(crypta.digest("sha512", empty_msg), |cf 83 e1 35 7e ef b8 bd f1 54 28 50 d6 6d 80 07 d6 20 e4 05 0b 57 15 dc 83 f4 a9 21 d3 6c e9 ce 47 d0 d1 3c 5d 85 f2 b0 ff 83 18 d2 87 7e ec 2f 63 b9 31 bd 47 41 7a 81 a5 38 32 7a f9 27 da 3e|, "sha512 empty")
-        expect(crypta.digest("sha512", zeros), |cf d2 52 bb cd e6 28 6a 9b 3f a6 3c 19 3e 29 e5 83 b5 c1 08 a3 9b 6b 52 77 2f c8 64 3d 0b c7 84 3a b6 8f 70 72 a8 d9 06 c6 32 76 1c cb 9e 74 8e bb ee b8 4e ca 02 57 2b 21 af 99 a7 31 a3 42 dc|, "sha512 embedded-zero")
-        expect(crypta.digest("sha512", _repeat(111, 97 ∷ u8)), |fa 91 21 c7 b3 2b 9e 01 73 3d 03 4c fc 78 cb f6 7f 92 6c 7e d8 3e 82 20 0e f8 68 18 19 69 21 76 0b 4b ef f4 84 04 df 81 1b 95 38 28 27 44 61 67 3c 68 d0 4e 29 7b 0e b7 b2 b4 d6 0f c6 b5 66 a2|, "sha512 padding-boundary 111")
+        expect(crypto.digest("sha512", abc), |dd af 35 a1 93 61 7a ba cc 41 73 49 ae 20 41 31 12 e6 fa 4e 89 a9 7e a2 0a 9e ee e6 4b 55 d3 9a 21 92 99 2a 27 4f c1 a8 36 ba 3c 23 a3 fe eb bd 45 4d 44 23 64 3c e8 0e 2a 9a c9 4f a5 4c a4 9f|, "sha512 abc")
+        expect(crypto.digest("sha512", empty_msg), |cf 83 e1 35 7e ef b8 bd f1 54 28 50 d6 6d 80 07 d6 20 e4 05 0b 57 15 dc 83 f4 a9 21 d3 6c e9 ce 47 d0 d1 3c 5d 85 f2 b0 ff 83 18 d2 87 7e ec 2f 63 b9 31 bd 47 41 7a 81 a5 38 32 7a f9 27 da 3e|, "sha512 empty")
+        expect(crypto.digest("sha512", zeros), |cf d2 52 bb cd e6 28 6a 9b 3f a6 3c 19 3e 29 e5 83 b5 c1 08 a3 9b 6b 52 77 2f c8 64 3d 0b c7 84 3a b6 8f 70 72 a8 d9 06 c6 32 76 1c cb 9e 74 8e bb ee b8 4e ca 02 57 2b 21 af 99 a7 31 a3 42 dc|, "sha512 embedded-zero")
+        expect(crypto.digest("sha512", _repeat(111, 97 ∷ u8)), |fa 91 21 c7 b3 2b 9e 01 73 3d 03 4c fc 78 cb f6 7f 92 6c 7e d8 3e 82 20 0e f8 68 18 19 69 21 76 0b 4b ef f4 84 04 df 81 1b 95 38 28 27 44 61 67 3c 68 d0 4e 29 7b 0e b7 b2 b4 d6 0f c6 b5 66 a2|, "sha512 padding-boundary 111")
 
         # SHA-384 padding-boundary (111 bytes — maximum single-block for SHA-384/512 family)
-        expect(crypta.digest("sha384", _repeat(111, 97 ∷ u8)), |3c 37 95 50 51 cb 5c 30 26 f9 4d 55 1d 5b 5e 2a c3 8d 57 2a e4 e0 71 72 08 5f ed 81 f8 46 6b 8f 90 dc 23 a8 ff cd ea 0b 8d 8e 58 e8 fd ac c8 0a|, "sha384 padding-boundary 111")
+        expect(crypto.digest("sha384", _repeat(111, 97 ∷ u8)), |3c 37 95 50 51 cb 5c 30 26 f9 4d 55 1d 5b 5e 2a c3 8d 57 2a e4 e0 71 72 08 5f ed 81 f8 46 6b 8f 90 dc 23 a8 ff cd ea 0b 8d 8e 58 e8 fd ac c8 0a|, "sha384 padding-boundary 111")
 
         # Multi-block vectors (minimum two blocks: 56+ bytes for SHA-256, 112+ bytes for SHA-384/512)
-        expect(crypta.digest("sha256", _repeat(65, 97 ∷ u8)), |63 53 61 c4 8b b9 ea b1 41 98 e7 6e a8 ab 7f 1a 41 68 5d 6a d6 2a a9 14 6d 30 1d 4f 17 eb 0a e0|, "sha256 multi-block 65×a")
-        expect(crypta.digest("sha384", _repeat(129, 97 ∷ u8)), |39 b6 f5 a7 b0 e7 81 db c4 19 f7 2e 49 b3 0e aa c1 0f 2c 98 c4 40 3b c6 10 da 31 06 7f d1 b4 8f 32 41 38 c8 61 5d 2b 49 6d 08 d7 3d 5e 86 53 26|, "sha384 multi-block 129×a")
-        expect(crypta.digest("sha512", _repeat(129, 97 ∷ u8)), |4f 68 1e 0b d5 3c da 4b 5a 20 41 cc 8a 06 f2 ea bd e4 4f b1 6c 95 1f bd 5b 87 70 2f 07 ae ab 61 15 65 b1 9c 47 fd e3 05 87 17 7e bb 85 2e 39 71 bb d8 d3 fd 30 da 18 d7 10 37 df bd 98 42 04 29|, "sha512 multi-block 129×a")
+        expect(crypto.digest("sha256", _repeat(65, 97 ∷ u8)), |63 53 61 c4 8b b9 ea b1 41 98 e7 6e a8 ab 7f 1a 41 68 5d 6a d6 2a a9 14 6d 30 1d 4f 17 eb 0a e0|, "sha256 multi-block 65×a")
+        expect(crypto.digest("sha384", _repeat(129, 97 ∷ u8)), |39 b6 f5 a7 b0 e7 81 db c4 19 f7 2e 49 b3 0e aa c1 0f 2c 98 c4 40 3b c6 10 da 31 06 7f d1 b4 8f 32 41 38 c8 61 5d 2b 49 6d 08 d7 3d 5e 86 53 26|, "sha384 multi-block 129×a")
+        expect(crypto.digest("sha512", _repeat(129, 97 ∷ u8)), |4f 68 1e 0b d5 3c da 4b 5a 20 41 cc 8a 06 f2 ea bd e4 4f b1 6c 95 1f bd 5b 87 70 2f 07 ae ab 61 15 65 b1 9c 47 fd e3 05 87 17 7e bb 85 2e 39 71 bb d8 d3 fd 30 da 18 d7 10 37 df bd 98 42 04 29|, "sha512 multi-block 129×a")
 
         print "crypta-sha2: all NIST vectors matched"
     }
@@ -71,12 +71,12 @@ main {
     }
 
     # API contract — invalid algorithm names must fail with the exact error text
-    const string ALG_ERROR ← "norma:crypta.digest: algorithm must be sha256, sha384, or sha512"
+    const string ALG_ERROR ← "norma:crypto.digest: algorithm must be sha256, sha384, or sha512"
 
     var list<string> failed ← empty
     for from ["", "md5", "SHA256", "Sha384", "sha-256"] const alg {
         do {
-            const bytes result ← crypta.digest(alg, |61 62 63|)
+            const bytes result ← crypto.digest(alg, |61 62 63|)
             failed.append(alg)
         }
         catch err {
@@ -85,7 +85,7 @@ main {
     }
 
     do {
-        if failed.nonvacua() then {
+        if not failed.is_empty() then {
             var string msg ← "crypta-sha2: algorithm rejection missed these names: "
             for from failed const name {
                 msg ← (msg + name) + " "

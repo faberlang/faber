@@ -20,10 +20,10 @@ import from "norma:http/server" server
 import from "norma:http/sse" sse
 import from "norma:http/headers" headers
 import from "norma:http/request" httpreq
-import from "norma:processus" processus
+import from "norma:process" process
 
 fn arg_at(int index, string fallback) → string {
-    const list<string> args ← processus.argv()
+    const list<string> args ← process.argv()
     if args.length() ≻ index {
         const string ∪ none item ← args.get(index)
         if item not is none {
