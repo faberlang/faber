@@ -41,8 +41,8 @@ impl super::FaberCodegen<'_> {
         }
     }
 
-    // Site-threaded authored-form emission carries owner/slot beside the
-    // shared rendering context.
+    // Entry point for one annotation: `owner` and `annotation_ordinal` name
+    // the site its type-valued fields are re-emitted against.
     pub(super) fn write_hir_annotation(
         &self,
         annotation: &HirAnnotation,
