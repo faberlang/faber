@@ -71,6 +71,30 @@ fn expect_decline_causa<'a>(errors: &'a [SemanticError], causa: &str) -> &'a Sem
     err
 }
 
+/// Regression for need: the shared fixtures bind a tensor accumulator
+/// from a read-only parameter. The binding must stay legal (value-side `copy`,
+/// or an `in`-marked parameter) so typecheck does not suppress the AIR passes —
+/// a bare `varia … acc ← x` is SEM065 `const_shared_into_var`, after which the
+/// AIR assertions below only observe an empty, vacuous diagnostic list.
+#[test]
+fn repaired_accumulator_fixtures_do_not_trip_const_shared_into_var() {
+    for (name, source) in [
+        ("full_prefix", FULL_PREFIX_TENSOR_LOOP),
+        ("apud_rank2", APUD_RANK2_GRID),
+        ("masked_lane_mean", MASKED_LANE_MEAN),
+    ] {
+        let result = analyze(source);
+        assert!(
+            !result
+                .diagnostics
+                .iter()
+                .any(|err| err.kind == SemanticErrorKind::ConstSharedIntoVar),
+            "{name} must stay legal under SEM065: {:?}",
+            result.diagnostics
+        );
+    }
+}
+
 fn has_itera(hir: &HirModule) -> bool {
     let mut found = FindItera(false);
     walk_program(&mut found, hir);
@@ -148,7 +172,7 @@ functio loop_count() → f32 {
 const FULL_PREFIX_TENSOR_LOOP: &str = r#"
 @ radix lane "air"
 @ radix backward "lane_sum_backward"
-functio lane_sum(tensor<f32, [4]> x) → f32 {
+functio lane_sum(in tensor<f32, [4]> x) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
         acc ← acc + x
@@ -195,7 +219,7 @@ fn tensor_ex_rank1_admits_guard_free_element_lets() {
 const APUD_RANK2_GRID: &str = r#"
 @ radix lane "air"
 @ radix backward "grid_backward"
-functio grid_sum(tensor<f32, [2, 3]> x) → f32 {
+functio grid_sum(in tensor<f32, [2, 3]> x) → f32 {
     varia tensor<f32, [2, 3]> acc ← x
     itera ex x apud [i, j] fixum cell {
         acc ← acc + x
@@ -241,7 +265,7 @@ fn apud_rank1_driver_reaches_reverse_ad_with_lane_count() {
         r#"
 @ radix lane "air"
 @ radix backward "line_backward"
-functio line_sum(tensor<f32, [8]> x) → f32 {
+functio line_sum(in tensor<f32, [8]> x) → f32 {
     varia tensor<f32, [8]> acc ← x
     itera ex x apud [i] fixum cell {
         acc ← acc + x
@@ -274,7 +298,7 @@ fn apud_rank3_driver_reaches_reverse_ad_with_lane_count() {
         r#"
 @ radix lane "air"
 @ radix backward "cube_backward"
-functio cube_sum(tensor<f32, [2, 2, 2]> x) → f32 {
+functio cube_sum(in tensor<f32, [2, 2, 2]> x) → f32 {
     varia tensor<f32, [2, 2, 2]> acc ← x
     itera ex x apud [i, j, k] fixum cell {
         acc ← acc + x
@@ -551,7 +575,7 @@ fn evaluation_order_and_failure_lane_are_preserved() {
         r#"
 @ radix lane "air"
 functio boom(tensor<f32, [4]> x) → tensor<f32, [4]> ⇥ textus {
-    varia tensor<f32, [4]> acc ← x
+    varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥4 fixum i {
         si i ≻ 1 {
             iace "boom"
@@ -598,7 +622,7 @@ fn budget_exceeding_n_declines_with_causa() {
         r#"
 @ radix lane "air"
 functio too_wide(tensor<f32, [4]> x) → f32 {
-    varia tensor<f32, [4]> acc ← x
+    varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥65 fixum i {
         acc ← acc + x
     }
@@ -632,7 +656,7 @@ fn unsupported_return_declines_with_causa() {
         r#"
 @ radix lane "air"
 functio early(tensor<f32, [4]> x) → f32 {
-    varia tensor<f32, [4]> acc ← x
+    varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥4 fixum i {
         redde acc.media()
     }
@@ -649,7 +673,7 @@ fn generic_or_runtime_bound_declines_not_concrete() {
         r#"
 @ radix lane "air"
 functio runtime_n(numerus n, tensor<f32, [4]> x) → f32 {
-    varia tensor<f32, [4]> acc ← x
+    varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥n fixum i {
         acc ← acc + x
     }
@@ -688,7 +712,7 @@ functio host_loop() → numerus {
 const MASKED_LANE_MEAN: &str = r#"
 @ radix lane "air"
 @ radix backward "masked_mean_backward"
-functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
+functio masked_lane_mean(in tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
         acc ← acc + x
@@ -722,7 +746,7 @@ fn two_data_tensors_stay_full_prefix() {
         r#"
 @ radix lane "air"
 @ radix backward "pair_backward"
-functio pair_sum(tensor<f32, [4]> a, tensor<f32, [4]> b) → f32 {
+functio pair_sum(in tensor<f32, [4]> a, tensor<f32, [4]> b) → f32 {
     varia tensor<f32, [4]> acc ← a
     itera ab 0‥4 fixum i {
         acc ← acc + b
@@ -747,7 +771,7 @@ fn in_region_fill_mask_declines_with_causa() {
         r#"
 @ radix lane "air"
 @ radix backward "fill_backward"
-functio fill_mask(tensor<f32, [4]> x) → f32 {
+functio fill_mask(in tensor<f32, [4]> x) → f32 {
     fixum tensor<f32, [4]> mask ← x.reple(1.0)
     varia tensor<f32, [4]> acc ← x
     itera ab 0‥4 fixum i {
@@ -767,7 +791,7 @@ fn in_region_scalar_comparison_declines_with_causa() {
 @ radix lane "air"
 @ radix backward "cmp_backward"
 functio cmp_mask(tensor<f32, [4]> x, numerus len) → f32 ⇥ textus {
-    varia tensor<f32, [4]> acc ← x
+    varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥4 fixum i {
         si i ≺ len {
             iace "pad"
@@ -842,7 +866,7 @@ fn unmasked_reduction_exit_declines_with_causa() {
 @ radix lane "air"
 @ radix backward "leak_backward"
 functio unmasked_exit(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
-    varia tensor<f32, [4]> acc ← x
+    varia tensor<f32, [4]> acc ← copy x
     itera ab 0‥4 fixum i {
         acc ← acc + x
     }
@@ -1223,7 +1247,7 @@ fn apud_causal_body_si_i_le_j_admits_per_lane_conditions() {
 @ radix lane "air"
 @ radix backward "causal_backward"
 functio causal(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
-    varia tensor<f32, [2, 2]> acc ← x
+    varia tensor<f32, [2, 2]> acc ← copy x
     itera ex x apud [i, j] fixum cell {
         si i ≻ j { iace "upper" }
         acc ← acc + x
@@ -1267,7 +1291,7 @@ fn apud_triangular_arithmetic_body_admits_per_lane_conditions() {
 @ radix lane "air"
 @ radix backward "triangular_backward"
 functio triangular(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> ⇥ textus {
-    varia tensor<f32, [2, 2]> acc ← x
+    varia tensor<f32, [2, 2]> acc ← copy x
     itera ex x apud [i, j] fixum cell {
         fixum numerus idx ← i * 2 + j
         si idx ≻ 2 { iace "upper" }
@@ -1337,7 +1361,7 @@ fn apud_mixed_admit_and_decline_reports_only_the_declined_loop() {
 @ radix lane "air"
 @ radix backward "mixed_backward"
 functio mixed(tensor<f32, [40]> x) → f32 {
-    varia tensor<f32, [40]> acc ← x
+    varia tensor<f32, [40]> acc ← copy x
     itera ex x apud [i] fixum cell {
         acc ← acc + x
     }

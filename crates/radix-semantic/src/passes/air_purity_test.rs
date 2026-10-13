@@ -1540,7 +1540,7 @@ fn air_rejects_arithmetic_over_declared_numerus_binding_even_if_initializer_is_b
         r#"
 @ radix lane "air"
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
-    varia tensor<f32, [2, 2]> acc ← x
+    varia tensor<f32, [2, 2]> acc ← copy x
     itera ab 0‥16 fixum i {
         fixum numerus k ← i * 2 + 1
         fixum numerus m ← k * k
