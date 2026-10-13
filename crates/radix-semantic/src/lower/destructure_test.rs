@@ -160,6 +160,22 @@ fn ex_extraction_binds_each_field_and_the_rest_source() {
 }
 
 #[test]
+fn ex_extraction_calls_its_source_once() {
+    let unit = test_support::analyze_ok(
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    ex fac() fixum x, y\n    nota x + y\n}\n",
+    );
+    assert_eq!(entry_call_count(&unit), 1);
+}
+
+#[test]
+fn ex_extraction_with_rest_calls_its_source_once() {
+    let unit = test_support::analyze_ok(
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nfunctio fac() → Punctum {\n    redde Punctum { x = 1, y = 2 }\n}\nincipit {\n    ex fac() fixum x, ceteri r\n    nota x\n    nota r\n}\n",
+    );
+    assert_eq!(entry_call_count(&unit), 1);
+}
+
+#[test]
 fn guard_desugars_requirit_and_reice_to_opposite_si_conditions() {
     let unit = test_support::analyze_ok(
         "functio guardia() → numerus ⇥ textus {\n    requirit verum iace \"opus\"\n    reice falsum iace \"vitium\"\n    redde 1\n}\n",

@@ -91,3 +91,14 @@ functio probe(textus u) → vacuum {
         "discerne_pattern_not_in_closed_set",
     );
 }
+
+#[test]
+fn alias_over_a_binding_pattern_types_the_inner_binding() {
+    test_support::assert_accepts(
+        r"functio probe(numerus n) → numerus {
+    discerne n {
+        casu x ut y { redde x + y }
+    }
+}",
+    );
+}

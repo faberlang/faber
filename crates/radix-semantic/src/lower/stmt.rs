@@ -627,6 +627,9 @@ impl Lowerer<'_> {
     fn lower_ex_stmt(&mut self, stmt: &radix_syntax::ExStmt) -> Vec<HirStatement> {
         let mut out = Vec::new();
         let mutable = stmt.mutability == radix_syntax::AstMutability::Mutable;
+        let (hoisted, hoisted_subject) = self.destructure_subject(&stmt.source, false, stmt.span);
+        out.extend(hoisted);
+        let subject = hoisted_subject.as_ref().unwrap_or(&stmt.source);
 
         for field in &stmt.fields {
             let name = field
@@ -637,10 +640,7 @@ impl Lowerer<'_> {
             self.bind_local(name, def_id);
             let init = HirExpression {
                 id: self.next_hir_id(),
-                kind: HirExpressionKind::Field(
-                    Box::new(self.lower_expr(&stmt.source)),
-                    field.name.name,
-                ),
+                kind: HirExpressionKind::Field(Box::new(self.lower_expr(subject)), field.name.name),
                 ty: None,
                 span: field.name.span,
             };
@@ -654,7 +654,7 @@ impl Lowerer<'_> {
                 def_id,
                 name: rest.name,
                 ty: None,
-                init: Some(self.lower_expr(&stmt.source)),
+                init: Some(self.lower_expr(subject)),
                 mutable: stmt.mutability == radix_syntax::AstMutability::Mutable,
                 is_await: false,
                 runtime_provided: false,

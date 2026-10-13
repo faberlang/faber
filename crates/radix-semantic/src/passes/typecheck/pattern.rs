@@ -131,9 +131,6 @@ impl TypeChecker<'_> {
             }
             HirPattern::Alias(def_id, _name, pattern) => {
                 self.insert_binding(*def_id, expected);
-                if matches!(pattern.as_ref(), HirPattern::Binding(_, _)) {
-                    return;
-                }
                 if let HirPattern::Variant(variant_def, patterns) = pattern.as_ref()
                     && patterns.is_empty()
                 {
