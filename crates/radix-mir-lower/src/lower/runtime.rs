@@ -315,12 +315,7 @@ impl FunctionBuilder<'_> {
             }),
             IndexExpr::Divide { .. } => Err("runtime shape division has a zero divisor".to_owned()),
             IndexExpr::Param(symbol) => {
-                let source = self.size_params.iter().find_map(|(def_id, name)| {
-                    (*name == symbol)
-                        .then(|| self.size_param_sources.get(def_id).copied())
-                        .flatten()
-                });
-                if let Some(source) = source {
+                if let Some(source) = self.size_param_source(symbol) {
                     return self.lower_shape_expr(
                         source,
                         arguments,
@@ -4228,7 +4223,7 @@ impl FunctionBuilder<'_> {
             Type::Array(element) => matches!(self.normalized_type(*element), Type::Bits(radix_types::BitsWidth::B8)),
             _ => false,
         };
-        octeti_source && index_contains_runtime_extent(self.types, *shape, &mut FxHashSet::default())
+        octeti_source && self.body_index_contains_runtime_extent(*shape, &mut FxHashSet::default())
     }
 
     /// The shape operand of [`Self::is_octeti_runtime_extent_tensor`]: the
@@ -4332,7 +4327,7 @@ impl FunctionBuilder<'_> {
                             direct
                         } else {
                             let scalar =
-                                if index_contains_runtime_extent(self.types, dimension, &mut FxHashSet::default()) {
+                                if self.body_index_contains_runtime_extent(dimension, &mut FxHashSet::default()) {
                                     let mut shape_arguments = Vec::new();
                                     let expression = match self.lower_shape_expr(
                                         dimension,
@@ -5304,3 +5299,7 @@ fn vector_lane_operand(place: &MirPlace, lane: u8) -> MirOperand {
 pub(super) fn matrix_cell_operand(place: &MirPlace, row: u8, column: u8) -> MirOperand {
     projected_operand(place, MirProjection::MatrixCell { row, column })
 }
+
+#[cfg(test)]
+#[path = "octeti_tensor_size_param_test.rs"]
+mod octeti_tensor_size_param_test;
