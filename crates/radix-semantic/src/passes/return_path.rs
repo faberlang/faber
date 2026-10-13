@@ -50,8 +50,8 @@
 use crate::passes::exhaustive::discerne_definitely_covered;
 use crate::{SemanticError, SemanticErrorKind, TypeTable};
 use radix_hir::{
-    HirBlock, HirExpression, HirExpressionKind, HirItem, HirItemKind, HirModule, HirStatement,
-    HirStatementKind,
+    HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItem, HirItemKind, HirModule,
+    HirStatement, HirStatementKind,
     visit::{HirVisitor, walk_expr, walk_program},
 };
 use rustc_hash::FxHashMap;
@@ -106,22 +106,34 @@ impl ReturnPathChecker<'_> {
     }
 
     fn check_item(&mut self, item: &HirItem) {
+        match &item.kind {
+            HirItemKind::Function(func) => self.check_function(func, item.span),
+            // A method owes the same normal-return contract as a free
+            // function; its body is no less able to fall off the end.
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    self.check_function(&method.func, method.span);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn check_function(&mut self, func: &HirFunction, span: radix_lexer::Span) {
         // Generators (`@ cursor`) are excluded: their declared `→ T` is the
         // yielded type produced by `cede`, not a normal return, so they owe
         // no `redde`. Async (`@ futura`) functions still return a value through
         // `redde` (wrapped in a future), so they are checked.
-        if let HirItemKind::Function(func) = &item.kind {
-            if func.is_generator {
-                return;
-            }
-            let Some(ret_ty) = func.ret_ty else { return };
-            if is_unit_return(ret_ty, self.types) {
-                return;
-            }
-            let Some(body) = &func.body else { return };
-            if !block_terminates(body, self.types, self.enum_variants) {
-                push_missing_return(&mut self.errors, item.span);
-            }
+        if func.is_generator {
+            return;
+        }
+        let Some(ret_ty) = func.ret_ty else { return };
+        if is_unit_return(ret_ty, self.types) {
+            return;
+        }
+        let Some(body) = &func.body else { return };
+        if !block_terminates(body, self.types, self.enum_variants) {
+            push_missing_return(&mut self.errors, span);
         }
     }
 }

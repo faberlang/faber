@@ -44,6 +44,7 @@ use radix_hir::{
     HirLocal, HirMethod, HirOwnerRef, HirParam, HirParamMode, HirReceiver, HirSchema,
     HirSchemaColumn, HirStatement, HirStatementKind, HirStruct, HirTriviaOwnerKind, HirTypeAlias,
     HirTypeParam, HirTypeParamConstraint, HirTypeSlot, HirVariant, HirVariantField,
+    visit::{HirVisitor, walk_expr, walk_stmt},
 };
 use radix_lexer::{Span, Symbol};
 use radix_syntax::{
@@ -683,13 +684,9 @@ impl Lowerer<'_> {
             self.error_with_args_at(vec![issue("conversio_signature")], marker_span);
             return;
         };
-        if let Some(body) = body {
-            let mut impure = None;
-            check_conversio_purity(body, &mut impure);
-            if let Some(span) = impure {
-                self.error_with_args_at(vec![issue("conversio_impure_body")], span);
-                return;
-            }
+        if let Some(span) = body.and_then(check_conversio_purity) {
+            self.error_with_args_at(vec![issue("conversio_impure_body")], span);
+            return;
         }
         if self.types.equals(source_ty, destination_ty) {
             self.error_with_args_at(vec![issue("conversio_self_pair")], marker_span);
@@ -1368,43 +1365,44 @@ pub(crate) fn conversion_pair_is_orphan(
 /// Purity gate for one `@ conversio` function body (CTR-04): a marked row is a
 /// pure re-presentation, so local mutation (assignment, conversion-directed
 /// assignment, mutation of a mutable binding, increment/decrement) fails
-/// closed. Records the first offending span when found.
-fn check_conversio_purity(block: &HirBlock, impure: &mut Option<Span>) {
-    if impure.is_some() {
-        return;
-    }
-    for stmt in &block.statements {
+/// closed wherever it nests in the body. Returns the first offending span.
+fn check_conversio_purity(block: &HirBlock) -> Option<Span> {
+    let mut gate = ConversioPurityGate { impure: None };
+    gate.visit_block(block);
+    gate.impure
+}
+
+/// Walks the whole body through the shared HIR traversal so a new control-flow
+/// construct cannot hide a mutation from the gate.
+struct ConversioPurityGate {
+    impure: Option<Span>,
+}
+
+impl HirVisitor for ConversioPurityGate {
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if self.impure.is_some() {
+            return;
+        }
         match &stmt.kind {
-            HirStatementKind::Local(local) => {
-                if local.mutable && impure.is_none() {
-                    *impure = Some(stmt.span);
-                }
-            }
-            HirStatementKind::IncDec(_) => {
-                if impure.is_none() {
-                    *impure = Some(stmt.span);
-                }
-            }
-            HirStatementKind::Redde(Some(expr)) | HirStatementKind::Expr(expr) => {
-                check_conversio_expr_purity(expr, impure);
-            }
-            _ => {}
+            HirStatementKind::Local(local) if local.mutable => self.impure = Some(stmt.span),
+            HirStatementKind::IncDec(_) => self.impure = Some(stmt.span),
+            _ => walk_stmt(self, stmt),
         }
     }
-    if let Some(expr) = &block.expr {
-        check_conversio_expr_purity(expr, impure);
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if self.impure.is_some() {
+            return;
+        }
+        match &expr.kind {
+            HirExpressionKind::Assign(..) | HirExpressionKind::ConversioAssign { .. } => {
+                self.impure = Some(expr.span);
+            }
+            _ => walk_expr(self, expr),
+        }
     }
 }
 
-fn check_conversio_expr_purity(expr: &HirExpression, impure: &mut Option<Span>) {
-    if impure.is_some() {
-        return;
-    }
-    match &expr.kind {
-        HirExpressionKind::Assign(..) | HirExpressionKind::ConversioAssign { .. } => {
-            *impure = Some(expr.span);
-        }
-        HirExpressionKind::Block(block) => check_conversio_purity(block, impure),
-        _ => {}
-    }
-}
+#[cfg(test)]
+#[path = "decl_test.rs"]
+mod decl_test;

@@ -410,3 +410,74 @@ fn rejects_dum_verum_with_rumpe_in_closure_body() {
         }",
     );
 }
+
+#[test]
+fn rejects_genus_method_with_value_return_and_no_redde() {
+    // A method owes the same normal-return contract as a free function. Before
+    // the pass visited struct methods this passed `check` and only failed late
+    // in MIR with "no-value return in value-returning function".
+    assert_rejects(
+        "genus Counter {
+            functio get() → numerus {
+                nota \"x\"
+            }
+        }",
+    );
+}
+
+#[test]
+fn rejects_genus_method_when_only_one_branch_returns() {
+    assert_rejects(
+        "genus Counter {
+            functio half(numerus x) → numerus {
+                si x ≻ 0 {
+                    redde x
+                } secus {
+                    nota x
+                }
+            }
+        }",
+    );
+}
+
+#[test]
+fn accepts_genus_method_returning_on_every_path() {
+    assert_accepts(
+        "genus Counter {
+            functio abs(numerus x) → numerus {
+                si x ≻ 0 {
+                    redde x
+                } secus {
+                    redde 0 - x
+                }
+            }
+        }",
+    );
+}
+
+#[test]
+fn accepts_genus_method_without_a_value_result() {
+    assert_accepts(
+        "genus Counter {
+            functio noop() → vacuum {
+                nota \"x\"
+            }
+        }",
+    );
+}
+
+#[test]
+fn accepts_genus_generator_method_without_redde() {
+    // A generator's `→ T` is the yielded type, so a method owes no `redde`
+    // either; the exemption is the same one free functions get.
+    assert_accepts(
+        "genus Streamer {
+            @ cursor
+            functio rangeSync(numerus n) → numerus {
+                itera ab 0‥n fixum i {
+                    cede i
+                }
+            }
+        }",
+    );
+}

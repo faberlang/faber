@@ -856,28 +856,45 @@ impl Lowerer<'_> {
         self.interner.intern(name)
     }
 
+    /// Whether an `allowed` domain member names a concrete type: no `ignotum`,
+    /// generic parameter, or unresolved hole anywhere inside it. Exhaustive on
+    /// purpose, so a new compound type cannot count as concrete by default.
     fn type_param_domain_member_is_concrete(&self, ty: TypeId) -> bool {
         match self.types.get(ty) {
-            Type::Primitive(Primitive::Ignotum) | Type::Param(_) | Type::Infer(_) | Type::Error => {
-                false
-            }
+            Type::Primitive(Primitive::Ignotum)
+            | Type::Param(_)
+            | Type::Infer(_)
+            | Type::InferUnion(_)
+            | Type::MarkerHole { .. }
+            | Type::Error => false,
             Type::Array(inner)
+            | Type::Queue(inner)
+            | Type::Stack(inner)
+            | Type::BoundedArray { element: inner, .. }
+            | Type::BoundedQueue { element: inner, .. }
+            | Type::BoundedStack { element: inner, .. }
             | Type::Option(inner)
             | Type::Set(inner)
             | Type::Promissum(inner)
             | Type::Cursor(inner)
+            | Type::Atomic(inner)
             | Type::Intervallum(inner)
             | Type::Alias(_, inner)
-            | Type::Ref(_, inner) => self.type_param_domain_member_is_concrete(*inner),
-            Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
-                self.type_param_domain_member_is_concrete(*success)
-                    && self.type_param_domain_member_is_concrete(*alternate)
+            | Type::Ref(_, inner)
+            | Type::Tensor(inner, _)
+            | Type::Vector(inner, _)
+            | Type::Matrix(inner, _)
+            | Type::Sparsa(inner, _) => self.type_param_domain_member_is_concrete(*inner),
+            Type::PromissumFailable(first, second)
+            | Type::AsyncCursor(first, second)
+            | Type::Map(first, second)
+            | Type::Ledger(first, second) => {
+                self.type_param_domain_member_is_concrete(*first)
+                    && self.type_param_domain_member_is_concrete(*second)
             }
-            Type::Map(key, value) => {
-                self.type_param_domain_member_is_concrete(*key)
-                    && self.type_param_domain_member_is_concrete(*value)
-            }
-            Type::Tensor(elem, _) => self.type_param_domain_member_is_concrete(*elem),
+            Type::Record(fields) => fields
+                .values()
+                .all(|field| self.type_param_domain_member_is_concrete(*field)),
             Type::Func(sig) => {
                 sig.type_params.is_empty()
                     && sig
@@ -898,10 +915,27 @@ impl Lowerer<'_> {
                         radix_types::AppliedArg::Size(_) => true,
                     })
             }
-            Type::Union(types) => types
+            Type::Union(members) | Type::Intersection(members) | Type::Tuple(members) => members
                 .iter()
                 .all(|member| self.type_param_domain_member_is_concrete(*member)),
-            _ => true,
+            Type::Primitive(_)
+            | Type::TensorEdgePolicy(_)
+            | Type::BoundedTextus { .. }
+            | Type::BoundedAscii { .. }
+            | Type::BoundedOcteti { .. }
+            | Type::SizedNumeric(..)
+            | Type::Bits(_)
+            | Type::ModularWord(_)
+            | Type::SaturatingWord(_)
+            | Type::PolicyFloat(..)
+            | Type::SizedInstans(_)
+            | Type::Struct(_)
+            | Type::Enum(_)
+            | Type::Interface(_) => true,
         }
     }
 }
+
+#[cfg(test)]
+#[path = "annotation_test.rs"]
+mod annotation_test;
