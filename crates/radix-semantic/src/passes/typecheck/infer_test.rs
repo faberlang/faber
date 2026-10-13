@@ -473,3 +473,39 @@ fn unify_applied_args_pairs_type_and_size_slots() {
     assert!(!checker.errors.is_empty());
     assert_eq!(failed, checker.error_type);
 }
+
+/// A-03 residual: the Atomic and Record arms exist in `unify_with_policy`; this
+/// pins the inference bind they perform. The fallback `is_assignable` cannot
+/// see checker-local inference holes, so a missing bind would surface as a
+/// spurious SEM010 at the generic call site.
+#[test]
+fn unify_with_policy_binds_infer_inside_atomic_and_record() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let span = radix_lexer::Span::default();
+    let numerus = checker.numerus_type();
+
+    let atomic_hole = checker.fresh_infer();
+    let atomic_infer = checker.types.atomic(atomic_hole);
+    let atomic_numerus = checker.types.atomic(numerus);
+    let atomic_joined = checker.unify_join(atomic_infer, atomic_numerus, span, "test");
+    let atomic_resolved = checker.resolve_inferred_type(atomic_joined);
+    assert_eq!(
+        atomic_resolved, atomic_numerus,
+        "atomic<T> must bind T := numerus, got {:?}",
+        checker.types.get(atomic_resolved)
+    );
+
+    let field = radix_lexer::Symbol(900);
+    let record_hole = checker.fresh_infer();
+    let record_infer = checker.types.record([(field, record_hole)]);
+    let record_numerus = checker.types.record([(field, numerus)]);
+    let record_joined = checker.unify_join(record_infer, record_numerus, span, "test");
+    let record_resolved = checker.resolve_inferred_type(record_joined);
+    assert_eq!(
+        record_resolved, record_numerus,
+        "record field hole must bind to numerus, got {:?}",
+        checker.types.get(record_resolved)
+    );
+}
