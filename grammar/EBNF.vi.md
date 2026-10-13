@@ -343,7 +343,7 @@ transfer ::= ternary ('⇇' ternary)?
 # [166] value_marker
 value_marker ::= 'sở_hữu' | 'sao_chép'
 # [167] assignment
-assignment ::= transfer ('←' 'sao_chép'? assignment | '↤' assignment inline_default?)?
+assignment ::= transfer ('←' 'sao_chép'? assignment | '↤' assignment via_clause? inline_default?)?
 # [168] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
 # [169] place
@@ -2305,6 +2305,8 @@ operator is preserved verbatim through syntax and emission; it is never
 rewritten to `←` or `↦`. Typed `hằng`/`biến` initializers accept `↤`
 (convert to the written type, then initialize); `hằng _`, `đặt`, and untyped
 destructuring have no concrete destination and are rejected.
+
+The rounding hint on `↤` takes the same `thông_qua` word as `↦` (`thông_qua Floor|Ceil|HalfEven|Trunc`): `a ↤ x thông_qua Trunc ⊥ 0` converts `x` to the type of `a` with the hint, and the clause binds tighter than the `⊥` default.
 
 `là` and `không là` are a **type test**: the right-hand side is always a type —
 including a declared or imported one — and the result is a runtime variant/type

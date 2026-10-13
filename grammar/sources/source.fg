@@ -1333,7 +1333,9 @@ transfer   := ternary ('⇇' ternary)?
 # in an assignment only `copy` is written (`b ← copy c`). The word is a marker
 # only when an operand follows; otherwise it is an ordinary identifier.
 value_marker := 'own' | 'copy'
-assignment := transfer ('←' 'copy'? assignment | '↤' assignment inline_default?)?
+# `↤` takes the same `via` rounding/convert hint as `↦` (`a ↤ x via Trunc ⊥ 0`);
+# the clause binds tighter than the `⊥` default.
+assignment := transfer ('←' 'copy'? assignment | '↤' assignment via_clause? inline_default?)?
 inc_dec_stmt := place ('↑' | '↓')
 place      := call_expr  (* semantic analysis requires an assignable target *)
 # `c ✓ a ✗ b` is the one value conditional (D4.5), one level only (D4.6): a

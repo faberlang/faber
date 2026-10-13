@@ -343,7 +343,7 @@ transfer ::= ternary ('⇇' ternary)?
 # [166] value_marker
 value_marker ::= 'เป็นเจ้าของ' | 'สำเนา'
 # [167] assignment
-assignment ::= transfer ('←' 'สำเนา'? assignment | '↤' assignment inline_default?)?
+assignment ::= transfer ('←' 'สำเนา'? assignment | '↤' assignment via_clause? inline_default?)?
 # [168] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
 # [169] place
@@ -2305,6 +2305,8 @@ operator is preserved verbatim through syntax and emission; it is never
 rewritten to `←` or `↦`. Typed `คงที่`/`แปร` initializers accept `↤`
 (convert to the written type, then initialize); `คงที่ _`, `อนุมานคงที่`, and untyped
 destructuring have no concrete destination and are rejected.
+
+The rounding hint on `↤` takes the same `ผ่านทาง` word as `↦` (`ผ่านทาง Floor|Ceil|HalfEven|Trunc`): `a ↤ x ผ่านทาง Trunc ⊥ 0` converts `x` to the type of `a` with the hint, and the clause binds tighter than the `⊥` default.
 
 `เป็น` and `ไม่ เป็น` are a **type test**: the right-hand side is always a type —
 including a declared or imported one — and the result is a runtime variant/type

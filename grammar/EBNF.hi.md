@@ -343,7 +343,7 @@ transfer ::= ternary ('⇇' ternary)?
 # [166] value_marker
 value_marker ::= 'स्वामित्व' | 'प्रतिलिपि'
 # [167] assignment
-assignment ::= transfer ('←' 'प्रतिलिपि'? assignment | '↤' assignment inline_default?)?
+assignment ::= transfer ('←' 'प्रतिलिपि'? assignment | '↤' assignment via_clause? inline_default?)?
 # [168] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
 # [169] place
@@ -2305,6 +2305,8 @@ operator is preserved verbatim through syntax and emission; it is never
 rewritten to `←` or `↦`. Typed `स्थिर`/`चर` initializers accept `↤`
 (convert to the written type, then initialize); `स्थिर _`, `बैठा`, and untyped
 destructuring have no concrete destination and are rejected.
+
+The rounding hint on `↤` takes the same `द्वारा` word as `↦` (`द्वारा Floor|Ceil|HalfEven|Trunc`): `a ↤ x द्वारा Trunc ⊥ 0` converts `x` to the type of `a` with the hint, and the clause binds tighter than the `⊥` default.
 
 `है` and `नहीं है` are a **type test**: the right-hand side is always a type —
 including a declared or imported one — and the result is a runtime variant/type

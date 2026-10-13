@@ -1267,6 +1267,8 @@ rewritten to `←` or `↦`. Typed `fixum`/`varia` initializers accept `↤`
 (convert to the written type, then initialize); `fixum _`, `sit`, and untyped
 destructuring have no concrete destination and are rejected.
 
+The rounding hint on `↤` takes the same `via` word as `↦` (`via Floor|Ceil|HalfEven|Trunc`): `a ↤ x via Trunc ⊥ 0` converts `x` to the type of `a` with the hint, and the clause binds tighter than the `⊥` default.
+
 `est` and `non est` are a **type test**: the right-hand side is always a type —
 including a declared or imported one — and the result is a runtime variant/type
 test on the value. They never convert and never compare values; a value spelling
