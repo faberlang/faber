@@ -2068,7 +2068,8 @@ impl HirBinOp {
         )
     }
 
-    /// Unicode spelling of a glyph-product operator; `None` for non-glyph ops.
+    /// Unicode spelling of a glyph operator: the glyph products and `÷` true
+    /// division (named in diagnostics); `None` for ops with no glyph spelling.
     #[must_use]
     pub fn glyph_spelling(&self) -> Option<&'static str> {
         match self {

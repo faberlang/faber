@@ -2,8 +2,9 @@
 //!
 //! A `bN` is exactly N bits: no arithmetic, no width above its own, bit
 //! operations at the type's width (operator ruling 2026-10-10, need).
-//! Only the Faber source emitter (which prints the marker) and the MIR runner
-//! (which executes it) implement the type. Every other emitter would read the
+//! The Faber source emitter (which prints the marker), the MIR runner (which
+//! executes it) and the Phase 3 emitters named in [`target_admits_bits`]
+//! implement the type. Every other emitter would read the
 //! width as "not an integer" or print a plain integer carrier, which is a wrong
 //! program, not a missing one. This gate rejects any module whose type table
 //! names a `bN` before an emitter runs, naming the type and the target, so no

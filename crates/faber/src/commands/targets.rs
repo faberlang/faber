@@ -178,7 +178,7 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Result<Vec<TargetRow>, Stri
 }
 
 /// Faber-surface capability overrides on top of radix's
-/// `faber_target_capabilities`.
+/// `target_capabilities_for_surface(TargetCommandSurface::Faber, ..)`.
 ///
 /// `faber targets` reports the *faber* package surface, not radix emit truth.
 /// FMIR image targets are faber package build/run/package targets

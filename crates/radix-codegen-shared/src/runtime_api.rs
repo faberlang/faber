@@ -327,7 +327,7 @@ const fn inf_row(name: &'static str, kind: RuntimeKind, targets: &'static [Targe
 }
 
 /// `inf` rows (T1-G4): the unbounded-integer (`*big.Int`) carrier of the Go
-/// runtime (`rt.Inf*`), the rows below the Rust block. An `inf` is a `*big.Int` treated as immutable; a nil
+/// runtime (`rt.Inf*`), the rows above the Rust block. An `inf` is a `*big.Int` treated as immutable; a nil
 /// pointer reads as zero through `INF_Z`. The width limit applies only in the
 /// store family (`store_i`, `store_u`, `wrap`, `clamp_i`, `clamp_u`): a value
 /// leaves the carrier into a bounded slot there and nowhere else. `INF_PART` is
