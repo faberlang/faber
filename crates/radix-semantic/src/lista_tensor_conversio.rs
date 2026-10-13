@@ -183,32 +183,63 @@ pub fn is_numeric_element(ty: TypeId, types: &TypeTable) -> bool {
     )
 }
 
-/// Route C padded snapshot facts: the element type and the literal bound `N`,
-/// when `source` is a numeric bounded lista whose capacity matches the
-/// rank-1 literal dim of the tensor `target`.
-#[must_use]
-pub fn resolve_bounded_lista_padded_shape(
+/// Route C shape facts shared by the padded route and literal adoption: the
+/// source element, the target tensor element, the bounded capacity, and the
+/// literal bound `N`, when `source` is a numeric bounded lista whose capacity
+/// matches the rank-1 literal dim of the tensor `target`.
+fn padded_bound(
     source: TypeId,
     target: TypeId,
     types: &TypeTable,
-) -> Option<(TypeId, i64)> {
+) -> Option<(TypeId, TypeId, IndexId, i64)> {
     match (
         normalized_type(source, types),
         normalized_type(target, types),
     ) {
-        (Type::BoundedArray { element, capacity }, Type::Tensor(_, shape)) => {
+        (Type::BoundedArray { element, capacity }, Type::Tensor(target_elem, shape)) => {
             let elem = *element;
             if !is_numeric_element(elem, types) {
                 return None;
             }
             let dim =
                 i64s_from_literal_index(*shape, types).and_then(|dims| dims.first().copied())?;
-            let capacity =
+            let bound =
                 i64s_from_literal_index(*capacity, types).and_then(|dims| dims.first().copied())?;
-            (dim == capacity).then_some((elem, dim))
+            (dim == bound).then_some((elem, *target_elem, *capacity, dim))
         }
         _ => None,
     }
+}
+
+/// Route C padded snapshot facts: the element type and the literal bound `N`,
+/// when `source` is a numeric bounded lista whose element type is the tensor
+/// `target`'s element and whose capacity matches the rank-1 literal dim.
+///
+/// The element rule is the flat route's (`validate_flat_source`): a source
+/// whose element differs is not a padded snapshot and takes the flat route's
+/// `ElementMismatch` rejection.
+#[must_use]
+pub fn resolve_bounded_lista_padded_shape(
+    source: TypeId,
+    target: TypeId,
+    types: &TypeTable,
+) -> Option<(TypeId, i64)> {
+    let (elem, target_elem, _, dim) = padded_bound(source, target, types)?;
+    types.equals(elem, target_elem).then_some((elem, dim))
+}
+
+/// Route C facts for a list *literal* whose element type is not yet the
+/// tensor's element: the source element, the tensor element, and the bound
+/// `N`. A literal's constants adopt the tensor element by store rules, so the
+/// caller admits it element by element instead of by type equality.
+#[must_use]
+pub fn padded_literal_facts(
+    source: TypeId,
+    target: TypeId,
+    types: &TypeTable,
+) -> Option<(TypeId, TypeId, i64)> {
+    let (elem, target_elem, _, dim) = padded_bound(source, target, types)?;
+    Some((elem, target_elem, dim))
 }
 
 /// Analyze a rectangular lista literal against a known tensor target type.

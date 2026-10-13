@@ -34,7 +34,8 @@ use radix_hir::HirStoreKind;
 
 use crate::lista_tensor_conversio::{
     ListaToTensorError, RectangularListaLiteralError, analyze_rectangular_lista_literal,
-    ensure_lista_numerus_type, resolve_bounded_lista_padded_shape, validate_lista_to_tensor_source,
+    ensure_lista_numerus_type, is_numeric_element, padded_literal_facts,
+    resolve_bounded_lista_padded_shape, validate_lista_to_tensor_source,
 };
 
 const ISSUE_INTERVALLUM_CLAMP_RECOVERY: &str = "intervallum_clamp_recovery_unsupported";
@@ -786,6 +787,7 @@ impl TypeChecker<'_> {
         // read of the carrier's uninitialized slots.
         if let Some((fill_elem, _bound)) =
             resolve_bounded_lista_padded_shape(source_ty, target_resolved, self.types)
+                .or_else(|| self.literal_padded_shape(source, source_ty, target_resolved))
         {
             // The MIR padded-snapshot arm lowers its shape carrier as
             // `lista<numerus>`; intern it here like the flat path does.
@@ -2410,6 +2412,47 @@ impl TypeChecker<'_> {
                 Some(self.error_type)
             }
         }
+    }
+
+    /// Padded-snapshot facts for a list literal whose element type differs
+    /// from the tensor element only because its constants are untyped: every
+    /// item must adopt the tensor element (an integer constant into a numeric
+    /// element, a float constant into a float element) or already be of it.
+    /// A non-literal source never gets here: it meets the flat route's strict
+    /// element rule in `resolve_bounded_lista_padded_shape`.
+    fn literal_padded_shape(
+        &mut self,
+        source: &HirExpression,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+    ) -> Option<(TypeId, i64)> {
+        let HirExpressionKind::Array(items) = &source.kind else {
+            return None;
+        };
+        let source_resolved = self.resolve_inferred_type(source_ty);
+        let (elem, target_elem, dim) =
+            padded_literal_facts(source_resolved, target_resolved, self.types)?;
+        let adopts = items.iter().all(|item| match item {
+            HirArrayElement::Expr(expr) => self.literal_item_adopts(expr, target_elem),
+            HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => false,
+        });
+        adopts.then_some((elem, dim))
+    }
+
+    fn literal_item_adopts(&mut self, expr: &HirExpression, target_elem: TypeId) -> bool {
+        if static_integer_magnitude(expr).is_some() {
+            return is_numeric_element(target_elem, self.types);
+        }
+        if static_float_magnitude(expr).is_some() {
+            return matches!(
+                self.types.get(target_elem),
+                Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+            );
+        }
+        expr.ty.is_some_and(|ty| {
+            let resolved = self.resolve_inferred_type(ty);
+            self.types.equals(resolved, target_elem)
+        })
     }
 
     fn register_lista_to_tensor_conversio_prereqs(&mut self) {

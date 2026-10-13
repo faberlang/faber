@@ -326,3 +326,71 @@ fn lista_tensor_conversio_refuses_multi_hole_target() {
         "cannot_infer_tensor_shape",
     );
 }
+
+#[test]
+fn lista_tensor_conversio_rejects_bounded_source_with_mismatched_target_element() {
+    // `lista<numerus, 8> ↦ tensor<textus, [8]>` must not take the padded
+    // snapshot route: the target element type is part of the contract.
+    assert_rejects_with_issue(
+        r"functio selecta(lista<numerus, 8> src) → tensor<textus, [8]> {
+  redde src ↦ tensor<textus, [8]>
+}",
+        "lista_to_tensor_element_mismatch",
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_accepts_literal_list_for_narrow_float_tensor() {
+    // A list literal's element type is not yet the tensor element: the flat
+    // route accepts it, so the padded route must not reject it either.
+    assert_accepts(
+        r"incipit {
+  fixum tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
+  nota row.longitudo()
+}",
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_accepts_literal_list_for_long_form_tensor() {
+    assert_accepts(
+        r"incipit {
+  fixum tensor<f32, [2]> pair ← [1.0, 2.0] ↦ tensor<f32, [2]>
+  nota pair.longitudo()
+}",
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_padded_shape_requires_matching_target_element() {
+    // The padded snapshot fills dead slots with source-element values, so a
+    // target tensor of a different element type is not a padded snapshot.
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let textus = types.primitive(Primitive::Textus);
+    let lista = bounded_lista(&mut types, numerus, 8);
+    let shape = types.intern_index(IndexExpr::Literal(8));
+    let tensor = types.intern(Type::Tensor(textus, shape));
+
+    assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Err(ListaToTensorError::ElementMismatch)
+    );
+    assert_eq!(
+        resolve_bounded_lista_padded_shape(lista, tensor, &types),
+        None
+    );
+}
+
+#[test]
+fn lista_tensor_conversio_rejects_literal_list_for_text_tensor() {
+    // A literal adopts the tensor element by store rules, so a numeric
+    // literal cannot be stored into a `textus` element.
+    let result = crate::test_support::analyze_source(
+        r"incipit {
+  fixum tensor<textus, [3]> t ← [1, 2, 3] ↦ tensor<textus, [3]>
+  nota t.longitudo()
+}",
+    );
+    assert!(!result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}
