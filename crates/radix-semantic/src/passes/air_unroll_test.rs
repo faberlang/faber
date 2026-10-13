@@ -25,8 +25,50 @@ fn analyze(source: &str) -> crate::SemanticResult {
     crate::analyze(&program, &config, &mut parse.interner)
 }
 
+/// Guard for every fixture handed to the AIR diagnostic helpers: analysis
+/// skips the AIR passes once typecheck has reported an error (their HIR types
+/// would be unreliable), which leaves the AIR diagnostics empty and makes
+/// every `is_empty` / `!has_air_issue` assertion vacuous. A fixture that
+/// intentionally carries a typecheck error needs its own explicitly named
+/// helper, never this assertion.
+///
+/// Diagnostics that only post-AIR passes can emit are exempt: they cannot
+/// have suppressed the AIR passes, so an AIR observation made beside them is
+/// still real. Every other error still fails this guard.
+#[track_caller]
+fn assert_no_typecheck_error(diagnostics: &[SemanticError]) {
+    let pre_air_errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|err| {
+            err.is_error()
+                && err.kind != SemanticErrorKind::AirPurityViolation
+                && !is_post_air_only(err)
+        })
+        .collect();
+    assert!(
+        pre_air_errors.is_empty(),
+        "fixture must typecheck before AIR assertions: {pre_air_errors:?}"
+    );
+}
+
+/// Emitted only by passes scheduled after the AIR gate: borrow mode analysis
+/// (`tensor_view_escape`) and definite-assignment / borrow write-once
+/// (`immutable_second_assignment`). Neither can skip the AIR passes.
+fn is_post_air_only(err: &SemanticError) -> bool {
+    matches!(
+        (err.kind, err.issue()),
+        (SemanticErrorKind::ModeMismatch, Some("tensor_view_escape"))
+            | (
+                SemanticErrorKind::ImmutableAssignment,
+                Some("immutable_second_assignment")
+            )
+    )
+}
+
 fn air_errors(source: &str) -> Vec<SemanticError> {
-    analyze(source)
+    let result = analyze(source);
+    assert_no_typecheck_error(&result.diagnostics);
+    result
         .diagnostics
         .into_iter()
         .filter(|err| err.kind == SemanticErrorKind::AirPurityViolation)
@@ -478,6 +520,7 @@ functio two_loops(tensor<f32, [40]> a, tensor<f32, [40]> b) → f32 {
 }
 
 fn air_errors_from(result: &crate::SemanticResult) -> Vec<SemanticError> {
+    assert_no_typecheck_error(&result.diagnostics);
     result
         .diagnostics
         .iter()
