@@ -5,10 +5,11 @@
 //! async/generator posture, or capture sets from HIR walks at emit time.
 
 use crate::{Type, TypeId, TypeTable};
+use radix_hir::capture::CaptureFacts;
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
-    DefId, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule, HirParam,
-    HirStatementKind,
+    DefId, HirArgMarker, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule,
+    HirParam, HirStatement, HirStatementKind,
 };
 use radix_lexer::Symbol;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -219,13 +220,35 @@ pub fn analyze_function_facts(hir: &HirModule, types: &TypeTable) -> FunctionFac
         let Some(body) = &func.body else {
             return;
         };
+        // The shared HIR capture analysis (crates/radix-hir/src/capture.rs)
+        // owns captured-local membership and the assigned / content-mutated
+        // mutation classes. The closure walk adds captures that analysis does
+        // not model (module items, loop binders) and the write forms it does
+        // not classify yet (`⇇` copy-into targets, `own` moves).
+        let mutation_facts = CaptureFacts::for_block(body);
         let mut collector = ClosureCaptureCollector {
             bound: func.params.iter().map(|p| p.def_id).collect(),
             captures: Vec::new(),
+            mutations: CaptureMutations::default(),
         };
         collector.visit_block(body);
+        let mut captures = collector.captures;
+        let mut captured_locals: Vec<DefId> = mutation_facts.captured.iter().copied().collect();
+        captured_locals.sort_by_key(|def_id| def_id.0);
+        for local in captured_locals {
+            if captures.iter().all(|capture| capture.def_id != local) {
+                captures.push(CaptureFact {
+                    def_id: local,
+                    mode: CaptureMode::Read,
+                });
+            }
+        }
+        for capture in &mut captures {
+            capture.mode =
+                derive_capture_mode(capture.def_id, &mutation_facts, &collector.mutations);
+        }
         if let Some(fact) = table.by_def.get_mut(&def_id) {
-            fact.captures = collector.captures;
+            fact.captures = captures;
         }
     });
 
@@ -455,13 +478,107 @@ impl HirVisitor for BodyVisitor<'_> {
     }
 }
 
+/// Derive the access mode one captured binding demands.
+///
+/// The shared capture analysis supplies the assigned (`shared`) and
+/// content-mutated classes; the closure walk supplies `⇇` copy-into targets,
+/// `own` moves, and loop binders the shared analysis does not track.
+fn derive_capture_mode(
+    def_id: DefId,
+    mutation_facts: &CaptureFacts,
+    mutations: &CaptureMutations,
+) -> CaptureMode {
+    match mutations.mode(def_id) {
+        CaptureMode::Consume => CaptureMode::Consume,
+        CaptureMode::Mutate => CaptureMode::Mutate,
+        CaptureMode::Read => {
+            if mutation_facts.shared.contains(&def_id)
+                || mutation_facts.content_mutated.contains(&def_id)
+            {
+                CaptureMode::Mutate
+            } else {
+                CaptureMode::Read
+            }
+        }
+    }
+}
+
+/// Write and move classes observed while walking a callable body.
+///
+/// `written` records assignment, conversion-assignment, increment/decrement,
+/// method-call receiver, and `⇇` copy-into roots. `moved` records `own`-marked
+/// call arguments. Both are keyed by the root binding definition.
+#[derive(Default)]
+pub(crate) struct CaptureMutations {
+    written: FxHashSet<DefId>,
+    moved: FxHashSet<DefId>,
+}
+
+impl CaptureMutations {
+    pub(crate) fn note_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Assign(target, _)
+            | HirExpressionKind::ConversioAssign { target, .. } => self.note_place(target),
+            HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
+                self.note_place(receiver);
+                self.note_moves(args);
+            }
+            HirExpressionKind::Call(_, _, args, _) => self.note_moves(args),
+            HirExpressionKind::CopyInto { target, .. } => self.note_place(target),
+            _ => {}
+        }
+    }
+
+    pub(crate) fn note_stmt(&mut self, stmt: &HirStatement) {
+        if let HirStatementKind::IncDec(inc_dec) = &stmt.kind {
+            self.note_place(&inc_dec.target);
+        }
+    }
+
+    /// The strongest access mode the walked body demands directly: a move out
+    /// is a consume, any recorded write is a mutate, otherwise a read.
+    pub(crate) fn mode(&self, def_id: DefId) -> CaptureMode {
+        if self.moved.contains(&def_id) {
+            CaptureMode::Consume
+        } else if self.written.contains(&def_id) {
+            CaptureMode::Mutate
+        } else {
+            CaptureMode::Read
+        }
+    }
+
+    fn note_place(&mut self, place: &HirExpression) {
+        match &place.kind {
+            HirExpressionKind::Path(def_id) => {
+                self.written.insert(*def_id);
+            }
+            HirExpressionKind::Field(base, _) | HirExpressionKind::Index(base, _) => {
+                self.note_place(base);
+            }
+            _ => {}
+        }
+    }
+
+    fn note_moves(&mut self, args: &[radix_hir::HirCallArg]) {
+        for arg in args {
+            if arg.marker == Some(HirArgMarker::Own)
+                && let HirExpressionKind::Path(def_id) = &arg.expr.kind
+            {
+                self.moved.insert(*def_id);
+            }
+        }
+    }
+}
+
 struct ClosureCaptureCollector {
     bound: FxHashSet<DefId>,
     captures: Vec<CaptureFact>,
+    mutations: CaptureMutations,
 }
 
 impl HirVisitor for ClosureCaptureCollector {
     fn visit_expr(&mut self, expr: &HirExpression) {
+        self.mutations.note_expr(expr);
         match &expr.kind {
             HirExpressionKind::Path(def_id) => {
                 if !self.bound.contains(def_id) && self.captures.iter().all(|c| c.def_id != *def_id)
@@ -487,6 +604,7 @@ impl HirVisitor for ClosureCaptureCollector {
     }
 
     fn visit_stmt(&mut self, stmt: &radix_hir::HirStatement) {
+        self.mutations.note_stmt(stmt);
         if let HirStatementKind::Local(local) = &stmt.kind {
             self.bound.insert(local.def_id);
         }

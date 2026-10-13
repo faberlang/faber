@@ -1269,7 +1269,10 @@ fn ensure_runtime_extent_shape_array_type(types: &mut TypeTable) {
             reason = "TypeId is u32 by design; type_count is bounded by u32::MAX"
         )]
         match types.get(TypeId(index as u32)) {
-            Type::Tensor(_, shape) => index_contains_runtime_extent(types, *shape, &mut seen),
+            Type::Tensor(_, shape) => {
+                index_contains_runtime_extent(types, *shape, &mut seen)
+                    || index_may_contain_runtime_extent(types, *shape, &mut FxHashSet::default())
+            }
             _ => false,
         }
     });
@@ -2129,17 +2132,34 @@ fn symbolic_size_index(types: &TypeTable, name: Symbol) -> Option<IndexId> {
 }
 
 fn index_contains_runtime_extent(types: &TypeTable, index: IndexId, seen: &mut FxHashSet<IndexId>) -> bool {
+    index_contains_extent(types, index, false, seen)
+}
+
+/// As [`index_contains_runtime_extent`], but a symbolic `size` parameter also
+/// counts: lowering resolves a witnessed parameter to a run-time tensor axis,
+/// so the shape array type must exist before that resolution is known.
+fn index_may_contain_runtime_extent(types: &TypeTable, index: IndexId, seen: &mut FxHashSet<IndexId>) -> bool {
+    index_contains_extent(types, index, true, seen)
+}
+
+fn index_contains_extent(
+    types: &TypeTable,
+    index: IndexId,
+    param_is_runtime: bool,
+    seen: &mut FxHashSet<IndexId>,
+) -> bool {
     if !seen.insert(index) {
         return false;
     }
     match types.get_index(index) {
         IndexExpr::Runtime(_) => true,
-        IndexExpr::Affine { base, .. } => index_contains_runtime_extent(types, *base, seen),
-        IndexExpr::Divide { numerator, .. } => index_contains_runtime_extent(types, *numerator, seen),
+        IndexExpr::Param(_) => param_is_runtime,
+        IndexExpr::Affine { base, .. } => index_contains_extent(types, *base, param_is_runtime, seen),
+        IndexExpr::Divide { numerator, .. } => index_contains_extent(types, *numerator, param_is_runtime, seen),
         IndexExpr::Tuple(dimensions) => dimensions
             .iter()
-            .any(|dimension| index_contains_runtime_extent(types, *dimension, seen)),
-        IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
+            .any(|dimension| index_contains_extent(types, *dimension, param_is_runtime, seen)),
+        IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
     }
 }
 
@@ -2593,6 +2613,41 @@ impl<'a> FunctionBuilder<'a> {
     /// lowering call, kernel or not.
     fn is_host_kernel_lowering(&self) -> bool {
         self.context.kernel_lowering == KernelLowering::Host
+    }
+
+    /// The run-time witness recorded for a body-visible `size` parameter: the
+    /// tensor argument axis that carries its value (`fn decode<size N>(
+    /// tensor<f32, [N]> proto, ..)` records `proto`'s first axis). `None`
+    /// means the parameter has no value at the use site.
+    fn size_param_source(&self, symbol: Symbol) -> Option<IndexId> {
+        let def_id = self
+            .size_params
+            .iter()
+            .find_map(|(def_id, name)| (*name == symbol).then_some(*def_id))?;
+        self.size_param_sources.get(&def_id).copied()
+    }
+
+    /// Whether a declared extent is bound at run time in this body. A `size`
+    /// parameter is resolved through its recorded tensor-axis witness first —
+    /// the same resolution [`Self::lower_shape_expr`] applies — so a witnessed
+    /// parameter reads as a run-time extent while an unwitnessed one stays
+    /// symbolic.
+    fn body_index_contains_runtime_extent(&self, index: IndexId, seen: &mut FxHashSet<IndexId>) -> bool {
+        if !seen.insert(index) {
+            return false;
+        }
+        match self.types.get_index(index) {
+            IndexExpr::Param(symbol) => self
+                .size_param_source(*symbol)
+                .is_some_and(|source| self.body_index_contains_runtime_extent(source, seen)),
+            IndexExpr::Runtime(_) => true,
+            IndexExpr::Affine { base, .. } => self.body_index_contains_runtime_extent(*base, seen),
+            IndexExpr::Divide { numerator, .. } => self.body_index_contains_runtime_extent(*numerator, seen),
+            IndexExpr::Tuple(dimensions) => dimensions
+                .iter()
+                .any(|dimension| self.body_index_contains_runtime_extent(*dimension, seen)),
+            IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
+        }
     }
 
     /// The innermost active `capta` trap when it is the innermost capture

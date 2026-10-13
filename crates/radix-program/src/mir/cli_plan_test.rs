@@ -197,3 +197,75 @@ fn run() args args {
     .unwrap_or_else(|diagnostics| panic!("mounted command must run, got {diagnostics:?}"));
     assert_eq!(lines, vec!["-x".to_owned()]);
 }
+
+// ── octeti/bytes CLI values ────────────────────────────────
+//
+// An `octeti` (`bytes` on the English surface) option or rest operand arrives
+// on the package-MIR runner as the argument's UTF-8 byte list, not as text:
+// the option field is `lista<b8>` and the rest field is a row list of those.
+// The Rust emitter side of the same need is pinned in
+// `radix-hir-rust::cli`.
+
+const OCTETI_OPTION_MAIN: &str = r#"
+@ cli "tool"
+@ option payload long "payload" type bytes
+main args args {
+  const bytes payload ← args.payload coalesce |21|
+  print payload.length()
+}
+"#;
+
+#[test]
+fn package_mir_cli_octeti_option_value_is_the_arguments_utf8_bytes() {
+    let lines = run_cli_package(
+        "cli-octeti-option",
+        &[("main.fab", OCTETI_OPTION_MAIN)],
+        &["--payload", "Az"],
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "octeti option must parse on the runner, got {:?}",
+            diagnostic_identities(&diagnostics)
+        )
+    });
+    assert_eq!(lines, vec!["2".to_owned()]);
+
+    let lines = run_cli_package(
+        "cli-octeti-option-default",
+        &[("main.fab", OCTETI_OPTION_MAIN)],
+        &[],
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "an omitted octeti option must take its default, got {:?}",
+            diagnostic_identities(&diagnostics)
+        )
+    });
+    assert_eq!(lines, vec!["1".to_owned()]);
+}
+
+const OCTETI_REST_OPERAND_MAIN: &str = r#"
+@ cli "tool"
+@ operand rest bytes data
+main args args {
+  print args.data.length()
+  print args.data[0].length()
+  print args.data[1].length()
+}
+"#;
+
+#[test]
+fn package_mir_cli_octeti_rest_operand_value_is_rows_of_utf8_bytes() {
+    let lines = run_cli_package(
+        "cli-octeti-rest",
+        &[("main.fab", OCTETI_REST_OPERAND_MAIN)],
+        &["Az", "Q"],
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "octeti rest operand must parse on the runner, got {:?}",
+            diagnostic_identities(&diagnostics)
+        )
+    });
+    assert_eq!(lines, vec!["2".to_owned(), "2".to_owned(), "1".to_owned()]);
+}
