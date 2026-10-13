@@ -69,494 +69,500 @@ generic_type_default ::= '=' type_annotation
 # [029] generic_size_default
 generic_size_default ::= '=' NATURAL
 # [030] call_type_args
-call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
-# [031] parameter
+call_type_args ::= '<' call_type_arg (',' call_type_arg)* '>'
+# [031] call_type_arg
+call_type_arg ::= type_annotation | call_size_arg
+# [032] call_size_arg
+call_size_arg ::= NATURAL dimension_tail? | IDENTIFIER dimension_tail | spelled_lift | '[' figura_list? ']'
+# [033] dimension_tail
+dimension_tail ::= ('/' NATURAL)+ (('+' | '-') NATURAL)* | (('+' | '-') NATURAL)+
+# [034] parameter
 parameter ::= 'còn_lại'? 'trục'? type_annotation IDENTIFIER 'tự_nguyện'? ('như' IDENTIFIER)? ('hoặc_nếu_rỗng' expression)?
-# [032] func_modifier
+# [035] func_modifier
 func_modifier ::= 'đối_số' IDENTIFIER | 'lỗi' IDENTIFIER | 'thoát' (IDENTIFIER | NATURAL) | 'bất_biến' | 'ném_lỗi' | 'lựa_chọn' IDENTIFIER
-# [033] callable_posture
+# [036] callable_posture
 callable_posture ::= 'async' | 'sinh' | 'async_sinh'
-# [034] return_clause
+# [037] return_clause
 return_clause ::= '→' type_annotation
-# [035] alternate_exit_clause
+# [038] alternate_exit_clause
 alternate_exit_clause ::= '⇥' type_annotation
-# [036] ergo_joint
+# [039] ergo_joint
 ergo_joint ::= 'do_đó'
-# [037] clausura_joint
+# [040] clausura_joint
 clausura_joint ::= '∴'
-# [038] clausura_expr
+# [041] clausura_expr
 clausura_expr ::= compact_clausura_expr | clausura_legacy_expr
-# [039] compact_clausura_expr
+# [042] compact_clausura_expr
 compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_block)
-# [040] clausura_signature
+# [043] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
-# [041] fac_block
+# [044] fac_block
 fac_block ::= 'làm' block_stmt cape_clause?
-# [042] clausura_legacy_expr
+# [045] clausura_legacy_expr
 clausura_legacy_expr ::= 'đóng' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
-# [043] clausura_params
+# [046] clausura_params
 clausura_params ::= clausura_param (',' clausura_param)*
-# [044] clausura_param
+# [047] clausura_param
 clausura_param ::= type_annotation IDENTIFIER
-# [045] genus_decl
+# [048] genus_decl
 genus_decl ::= 'kiểu' IDENTIFIER generic_params? ('thực_thi' contract_ref ((',' | '∩') contract_ref)*)? '{' genus_member* '}'
-# [046] genus_member
+# [049] genus_member
 genus_member ::= annotation* (genus_field_decl | functio_method_decl) | nondum_method_decl
-# [047] nondum_method_decl
+# [050] nondum_method_decl
 nondum_method_decl ::= annotation* nondum_annotation annotation* 'hàm' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# [048] genus_field_decl
+# [051] genus_field_decl
 genus_field_decl ::= ('hằng' | 'biến' | 'tĩnh') type_annotation IDENTIFIER 'tự_nguyện'? ('=' const_init)?
-# [049] field_decl
+# [052] field_decl
 field_decl ::= ('hằng' | 'biến' | 'tĩnh')? type_annotation IDENTIFIER 'tự_nguyện'? ('=' const_init)?
-# [050] functio_method_decl
+# [053] functio_method_decl
 functio_method_decl ::= 'hàm' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
-# [051] annotation
+# [054] annotation
 annotation ::= nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
-# [052] annotation_name
+# [055] annotation_name
 annotation_name ::= ANNOTATION_NAME
-# [053] braced_annotation
+# [056] braced_annotation
 braced_annotation ::= '@' annotation_name '{' annotation_field_list? '}'
-# [054] annotation_field_list
+# [057] annotation_field_list
 annotation_field_list ::= annotation_field (',' annotation_field)*
-# [055] annotation_field
+# [058] annotation_field
 annotation_field ::= ANNOTATION_FIELD_NAME '=' (expression | concrete_type)
-# [056] annotation_sugar
+# [059] annotation_sugar
 annotation_sugar ::= '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
-# [057] nucleum_annotation
+# [060] nucleum_annotation
 nucleum_annotation ::= nucleum_sugar | nucleum_braced
-# [058] nucleum_sugar
+# [061] nucleum_sugar
 nucleum_sugar ::= '@' 'hạt_nhân' nucleum_modifier? NEWLINE
-# [059] nucleum_braced
+# [062] nucleum_braced
 nucleum_braced ::= '@' 'hạt_nhân' '{' nucleum_field_list? '}'
-# [060] nucleum_modifier
+# [063] nucleum_modifier
 nucleum_modifier ::= 'mảnh'
-# [061] nucleum_field_list
+# [064] nucleum_field_list
 nucleum_field_list ::= nucleum_field (',' nucleum_field)*
-# [062] nucleum_field
+# [065] nucleum_field
 nucleum_field ::= 'mảnh' '=' ('đúng' | 'sai')
-# [063] radix_annotation
+# [066] radix_annotation
 radix_annotation ::= '@' 'radix' radix_directive NEWLINE
-# [064] radix_directive
+# [067] radix_directive
 radix_directive ::= 'làn' STRING | 'backward' STRING | 'contract' STRING | 'kiểu_tên' IDENTIFIER 'vào' concrete_type+
-# [065] ad_annotation
+# [068] ad_annotation
 ad_annotation ::= '@' 'gọi' ASCII_STRING NEWLINE
-# [066] nondum_annotation
+# [069] nondum_annotation
 nondum_annotation ::= '@' 'không_ổn_định' NON_NEWLINE_TOKEN* NEWLINE | '@' 'không_ổn_định' '{' annotation_field_list? '}'
-# [067] implendum_decl
+# [070] implendum_decl
 implendum_decl ::= 'giao_ước' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
-# [068] implendum_method_decl
+# [071] implendum_method_decl
 implendum_method_decl ::= annotation* 'hàm' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# [069] typus_decl
+# [072] typus_decl
 typus_decl ::= 'kiểu_tên' IDENTIFIER generic_params? '=' type_annotation
-# [070] ordo_decl
+# [073] ordo_decl
 ordo_decl ::= 'liệt_kê' IDENTIFIER '{' enum_member (',' enum_member)* '}'
-# [071] enum_member
+# [074] enum_member
 enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-# [072] discretio_decl
+# [075] discretio_decl
 discretio_decl ::= 'hợp_nhất' IDENTIFIER generic_params? '{' union_fields? variant (',' variant)* '}'
-# [073] union_fields
+# [076] union_fields
 union_fields ::= annotation+ field_decl union_member*
-# [074] union_member
+# [077] union_member
 union_member ::= annotation* field_decl
-# [075] variant
+# [078] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
-# [076] variant_fields
+# [079] variant_fields
 variant_fields ::= (type_annotation IDENTIFIER)*
-# [077] schema_decl
+# [080] schema_decl
 schema_decl ::= 'lược_đồ' IDENTIFIER '{' (schema_column (NEWLINE schema_column)*)? '}'
-# [078] schema_column
+# [081] schema_column
 schema_column ::= 'cột' type_annotation IDENTIFIER (':' IDENTIFIER)?
-# [079] importa_decl
+# [082] importa_decl
 importa_decl ::= importa_record | importa_sugar
-# [080] importa_record
+# [083] importa_record
 importa_record ::= 'nhập' '{' import_field_list '}'
-# [081] import_field_list
+# [084] import_field_list
 import_field_list ::= import_field (',' import_field)*
-# [082] import_field
+# [085] import_field
 import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
-# [083] ex_field
+# [086] ex_field
 ex_field ::= 'từ' '=' STRING
-# [084] visibilitas_field
+# [087] visibilitas_field
 visibilitas_field ::= 'visibilitas' '=' publica
-# [085] nomen_field
+# [088] nomen_field
 nomen_field ::= 'tên' '=' IDENTIFIER
-# [086] ut_field
+# [089] ut_field
 ut_field ::= 'như' '=' IDENTIFIER
-# [087] omnia_field
+# [090] omnia_field
 omnia_field ::= 'tất_cả' '=' IDENTIFIER
-# [088] importa_sugar
+# [091] importa_sugar
 importa_sugar ::= 'nhập' 'từ' STRING publica? (named_import | wildcard_import | selective_import)?
-# [089] publica
+# [092] publica
 publica ::= 'công_khai'
-# [090] named_import
+# [093] named_import
 named_import ::= IDENTIFIER ('như' IDENTIFIER)?
-# [091] wildcard_import
+# [094] wildcard_import
 wildcard_import ::= '*' 'như' IDENTIFIER
-# [092] selective_import
+# [095] selective_import
 selective_import ::= 'hằng' import_value_binding (',' import_value_binding)*
-# [093] import_value_binding
+# [096] import_value_binding
 import_value_binding ::= IDENTIFIER ('như' IDENTIFIER)?
-# [094] type_annotation
+# [097] type_annotation
 type_annotation ::= union_hole_type | concrete_type
-# [095] concrete_type
+# [098] concrete_type
 concrete_type ::= intersection_type ('∪' intersection_type)*
-# [096] union_hole_type
+# [099] union_hole_type
 union_hole_type ::= ('ra' | 'vào' | 'sở_hữu' | 'sao_chép')? '∪'
-# [097] intersection_type
+# [100] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
-# [098] owned_type
+# [101] owned_type
 owned_type ::= ('ra' | 'vào' | 'sở_hữu' | 'sao_chép')? base_type
-# [099] base_type
+# [102] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
-# [100] failable_promissum_type
+# [103] failable_promissum_type
 failable_promissum_type ::= IDENTIFIER '<' type_annotation alternate_exit_clause '>'
-# [101] ratio_type
+# [104] ratio_type
 ratio_type ::= 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
-# [102] hole_type
+# [105] hole_type
 hole_type ::= '_'
-# [103] qualified_type
+# [106] qualified_type
 qualified_type ::= type_head ('.' IDENTIFIER)*
-# [104] type_head
+# [107] type_head
 type_head ::= IDENTIFIER | 'môđun'
-# [105] type_arguments
+# [108] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# [106] type_argument
+# [109] type_argument
 type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# [107] labeled_type_argument
+# [110] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [108] width_type_sugar
+# [111] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [109] shape_suffix
+# [112] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [110] figura
+# [113] figura
 figura ::= spelled_lift | figura_product (('+' | '-') NATURAL)*
-# [111] spelled_lift
+# [114] spelled_lift
 spelled_lift ::= 'kích_thước' lift_extent
-# [112] lift_extent
+# [115] lift_extent
 lift_extent ::= NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER
-# [113] figura_product
+# [116] figura_product
 figura_product ::= figura_primary ('/' NATURAL)*
-# [114] figura_primary
+# [117] figura_primary
 figura_primary ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
-# [115] figura_list
+# [118] figura_list
 figura_list ::= figura (',' figura)*
-# [116] function_type
+# [119] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [117] type_list
+# [120] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [118] si_stmt
+# [121] si_stmt
 si_stmt ::= 'nếu' si_tail
-# [119] si_tail
+# [122] si_tail
 si_tail ::= expression arm ('nếukhôngthì' si_tail | secus_clause)?
-# [120] secus_clause
+# [123] secus_clause
 secus_clause ::= 'khác' else_arm
-# [121] arm
+# [124] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [122] else_arm
+# [125] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [123] dum_stmt
+# [126] dum_stmt
 dum_stmt ::= 'trong_khi' expression (block_stmt | ergo_joint statement) cape_clause?
-# [124] itera_stmt
+# [127] itera_stmt
 itera_stmt ::= 'lặp' ('từ' expression (',' expression)* | 'ra' expression | 'khoảng' expression (',' expression)*) apud_clause? filum_clause? ('hằng' | 'biến') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [125] itera_binding
+# [128] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [126] apud_clause
+# [129] apud_clause
 apud_clause ::= 'tại' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [127] elige_stmt
+# [130] elige_stmt
 elige_stmt ::= 'chọn' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [128] casu_elige_clause
+# [131] casu_elige_clause
 casu_elige_clause ::= 'trường_hợp' expression (block_stmt | ergo_joint statement)
-# [129] ceterum_clause
+# [132] ceterum_clause
 ceterum_clause ::= 'mặc_định' (block_stmt | ergo_joint statement)
-# [130] discerne_stmt
+# [133] discerne_stmt
 discerne_stmt ::= 'phân_tích' 'tất_cả'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [131] discriminants
+# [134] discriminants
 discriminants ::= subject_path ('và' subject_path)*
-# [132] subject_path
+# [135] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [133] casu_variant_clause
+# [136] casu_variant_clause
 casu_variant_clause ::= 'trường_hợp' patterns (block_stmt | ergo_joint statement)
-# [134] patterns
+# [137] patterns
 patterns ::= pattern ('và' pattern)*
-# [135] pattern
+# [138] pattern
 pattern ::= pattern_atom ('hoặc' pattern_atom)*
-# [136] pattern_atom
+# [139] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [137] negated_number
+# [140] negated_number
 negated_number ::= '-' NUMBER
-# [138] type_pattern
+# [141] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [139] ut_pattern
+# [142] ut_pattern
 ut_pattern ::= ('như' IDENTIFIER) | (('hằng' | 'biến') pattern_binding (',' pattern_binding)*)
-# [140] pattern_binding
+# [143] pattern_binding
 pattern_binding ::= IDENTIFIER ('như' IDENTIFIER)?
-# [141] custodi_stmt
+# [144] custodi_stmt
 custodi_stmt ::= 'canh_gác' '{' si_guard_clause+ '}'
-# [142] si_guard_clause
+# [145] si_guard_clause
 si_guard_clause ::= 'nếu' expression (block_stmt | ergo_joint statement)
-# [143] ex_stmt
+# [146] ex_stmt
 ex_stmt ::= 'từ' expression ('hằng' | 'biến') extract_fields
-# [144] extract_fields
+# [147] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [145] extract_field
+# [148] extract_field
 extract_field ::= IDENTIFIER ('như' IDENTIFIER)?
-# [146] ceteri_field
+# [149] ceteri_field
 ceteri_field ::= 'còn_lại' IDENTIFIER
-# [147] redde_stmt
+# [150] redde_stmt
 redde_stmt ::= 'trả' expression?
-# [148] reddet_stmt
+# [151] reddet_stmt
 reddet_stmt ::= 'đợi_trả' expression
-# [149] tacebit_stmt
+# [152] tacebit_stmt
 tacebit_stmt ::= 'đợi_bỏ' expression
-# [150] cede_stmt
+# [153] cede_stmt
 cede_stmt ::= 'nhường' expression
-# [151] rumpe_stmt
+# [154] rumpe_stmt
 rumpe_stmt ::= 'dừng'
-# [152] perge_stmt
+# [155] perge_stmt
 perge_stmt ::= 'tiếp'
-# [153] tacet_stmt
+# [156] tacet_stmt
 tacet_stmt ::= 'im_lặng'
-# [154] iace_stmt
+# [157] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [155] iace_expr
+# [158] iace_expr
 iace_expr ::= ('ném' | 'chết') expression
-# [156] iace_guarded_expr
+# [159] iace_guarded_expr
 iace_guarded_expr ::= ('ném' | 'chết') expression NO_NEWLINE 'nếu' expression
-# [157] cape_clause
+# [160] cape_clause
 cape_clause ::= 'bắt' IDENTIFIER block_stmt
-# [158] adfirma_stmt
+# [161] adfirma_stmt
 adfirma_stmt ::= 'khẳng_định' expression ('chết' expression)?
-# [159] requirit_stmt
+# [162] requirit_stmt
 requirit_stmt ::= 'yêu_cầu' expression 'ném' expression
-# [160] reice_stmt
+# [163] reice_stmt
 reice_stmt ::= 'từ_chối' expression 'ném' expression
-# [161] expression
+# [164] expression
 expression ::= assignment
-# [162] transfer
+# [165] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [163] value_marker
+# [166] value_marker
 value_marker ::= 'sở_hữu' | 'sao_chép'
-# [164] assignment
+# [167] assignment
 assignment ::= transfer ('←' 'sao_chép'? assignment | '↤' assignment inline_default?)?
-# [165] inc_dec_stmt
+# [168] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [166] place
+# [169] place
 place ::= call_expr
-# [167] ternary
+# [170] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [168] aut_expr
+# [171] aut_expr
 aut_expr ::= et_expr (('hoặc') et_expr)*
-# [169] et_expr
+# [172] et_expr
 et_expr ::= equality (('và') equality)*
-# [170] equality
+# [173] equality
 equality ::= comparison equality_tail*
-# [171] equality_tail
+# [174] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('là' | 'không' 'là') type_annotation
-# [172] comparison
+# [175] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [173] format_expr
+# [176] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [174] bitwise_or_expr
+# [177] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [175] bitwise_xor_expr
+# [178] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [176] bitwise_and_expr
+# [179] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [177] shift_expr
+# [180] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [178] range_expr
+# [181] range_expr
 range_expr ::= additive_expr range_tail?
-# [179] range_tail
+# [182] range_tail
 range_tail ::= ('‥' | '…' | 'trước' | 'tới') additive_expr ('qua' additive_expr)?
-# [180] additive_expr
+# [183] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [181] multiplicative_expr
+# [184] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [182] vel_expr
+# [185] vel_expr
 vel_expr ::= unary_expr ('hoặc_nếu_rỗng' vel_rhs)*
-# [183] vel_rhs
+# [186] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [184] vel_range_tail
+# [187] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'trước' | 'tới') unary_expr ('qua' unary_expr)?
-# [185] unary_expr
+# [188] unary_expr
 unary_expr ::= ('-' | '¬' | 'không') unary_expr | rounding_expr | finge_expr | cast_expr
-# [186] rounding_expr
+# [189] rounding_expr
 rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
-# [187] gradient_expr
+# [190] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [188] gradient_selection
+# [191] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [189] gradient_place
+# [192] gradient_place
 gradient_place ::= expression
-# [190] cast_expr
+# [193] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [191] conversio_expr
+# [194] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [192] interval_target
+# [195] interval_target
 interval_target ::= range_expr
-# [193] via_clause
+# [196] via_clause
 via_clause ::= 'thông_qua' IDENTIFIER
-# [194] inline_default
+# [197] inline_default
 inline_default ::= '⊥' unary_expr
-# [195] call_expr
+# [198] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [196] call_suffix
+# [199] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [197] member_suffix
+# [200] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [198] transpose_suffix
+# [201] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [199] optional_suffix
+# [202] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [200] non_null_suffix
+# [203] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [201] argument_list
+# [204] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [202] argument
+# [205] argument
 argument ::= template_argument | (call_marker | 'trục')? 'rải'? expression
-# [203] call_marker
+# [206] call_marker
 call_marker ::= 'ra' | 'vào' | 'sở_hữu' | 'sao_chép'
-# [204] template_argument
+# [207] template_argument
 template_argument ::= 'rải'? IDENTIFIER ':' expression
-# [205] literal
+# [208] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'đúng' | 'sai' | 'không_gì' | '∞' | 'nan'
-# [206] primary
+# [209] primary
 primary ::= IDENTIFIER | literal | 'tôi' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
-# [207] ad_expr
+# [210] ad_expr
 ad_expr ::= 'gọi' ASCII_STRING ad_opener?
-# [208] ad_opener
+# [211] ad_opener
 ad_opener ::= '(' expression ')'
-# [209] array_literal
+# [212] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [210] array_element_list
+# [213] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [211] array_element
+# [214] array_element
 array_element ::= argument | '_'
-# [212] iuncta_expr
+# [215] iuncta_expr
 iuncta_expr ::= 'bộ' type_arguments '[' argument_list? ']'
-# [213] json_literal
+# [216] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [214] json_member
+# [217] json_member
 json_member ::= STRING ':' json_value
-# [215] typed_constructor
+# [218] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | hole_type json_literal | '{' field_list '}' construction_source?
-# [216] field_list
+# [219] field_list
 field_list ::= field_init (',' field_init)*
-# [217] field_init
+# [220] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [218] field_key
+# [221] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [219] construction_source
+# [222] construction_source
 construction_source ::= 'từ' call_expr
-# [220] json_value
+# [223] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [221] json_object
+# [224] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [222] json_array
+# [225] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [223] json_string
+# [226] json_string
 json_string ::= STRING
-# [224] json_number
+# [227] json_number
 json_number ::= NUMBER
-# [225] finge_expr
+# [228] finge_expr
 finge_expr ::= 'tạo' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [226] qualified_ident
+# [229] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [227] praefixum_expr
+# [230] praefixum_expr
 praefixum_expr ::= 'tiền_tố' block_stmt
-# [228] scriptum_expr
+# [231] scriptum_expr
 scriptum_expr ::= 'văn_bản_hóa' '(' STRING (',' expression)* ')'
-# [229] lege_expr
+# [232] lege_expr
 lege_expr ::= 'đọc' 'dòng'?
-# [230] first_match_expr
+# [233] first_match_expr
 first_match_expr ::= 'khớp_đầu_tiên' '(' expression apud_clause? ',' 'nơi' IDENTIFIER block_stmt ')'
-# [231] reducta_expr
+# [234] reducta_expr
 reducta_expr ::= 'rút_gọn' 'thông_qua' reducta_op 'từ' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [232] reducta_op
+# [235] reducta_op
 reducta_op ::= 'tổng' | 'tích' | 'lớn_nhất' | 'nhỏ_nhất' | 'argmax' | 'argmin' | 'tất_cả' | 'bất_kỳ' | 'đếm'
-# [233] reducta_group
+# [236] reducta_group
 reducta_group ::= 'theo' expression
-# [234] reducta_body
+# [237] reducta_body
 reducta_body ::= ('hằng' | 'biến') IDENTIFIER block_stmt
-# [235] reducta_identity
+# [238] reducta_identity
 reducta_identity ::= 'hoặc_nếu_rỗng' expression
-# [236] sort_expr
+# [239] sort_expr
 sort_expr ::= 'sắp_xếp' 'thông_qua' sort_direction ('từ' | 'ra') expression sort_body?
-# [237] sort_direction
+# [240] sort_direction
 sort_direction ::= 'tăng_dần' | 'giảm_dần'
-# [238] sort_body
+# [241] sort_body
 sort_body ::= ('hằng' | 'biến') IDENTIFIER block_stmt
-# [239] filum_clause
+# [242] filum_clause
 filum_clause ::= 'sợi' IDENTIFIER
-# [240] capta_expr
+# [243] capta_expr
 capta_expr ::= 'bẫy' block_stmt
-# [241] object_pattern
+# [244] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [242] pattern_property
+# [245] pattern_property
 pattern_property ::= 'còn_lại'? IDENTIFIER ('như' IDENTIFIER)?
-# [243] array_pattern
+# [246] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [244] array_pattern_element
+# [247] array_pattern_element
 array_pattern_element ::= '_' | 'còn_lại'? IDENTIFIER
-# [245] nota_stmt
+# [248] nota_stmt
 nota_stmt ::= ('ghi_chú' | 'xem' | 'cảnh_báo' | 'viết') expression (',' expression)*
-# [246] entry_header
+# [249] entry_header
 entry_header ::= ('đối_số' IDENTIFIER)? ('thoát' expression)?
-# [247] incipit_stmt
+# [250] incipit_stmt
 incipit_stmt ::= 'bắt_đầu' entry_header block_stmt
-# [248] incipiet_stmt
+# [251] incipiet_stmt
 incipiet_stmt ::= 'bắt_đầu_bất_đồng_bộ' entry_header block_stmt
-# [249] probandum_decl
+# [252] probandum_decl
 probandum_decl ::= 'đối_tượng_kiểm_thử' STRING proba_modifier* '{' probandum_body '}'
-# [250] probandum_body
+# [253] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [251] proba_stmt
+# [254] proba_stmt
 proba_stmt ::= 'kiểm_thử' STRING proba_modifier* block_stmt
-# [252] proba_modifier
+# [255] proba_modifier
 proba_modifier ::= 'mong_đợi_thất_bại' | 'bỏ_qua' STRING | 'việc_cần_làm' STRING | 'chỉ' | 'nhãn' STRING | 'thời_gian' NATURAL | 'đo_lường' | 'lặp_lại' NATURAL | 'mong_manh' NATURAL | 'chỉ_trong' STRING
-# [253] praepara_block
+# [256] praepara_block
 praepara_block ::= ('chuẩn_bị' | 'sẽ_chuẩn_bị' | 'sau_chuẩn_bị' | 'sẽ_sau_chuẩn_bị') 'tất_cả'? block_stmt
-# [254] fac_stmt
+# [257] fac_stmt
 fac_stmt ::= 'làm' block_stmt cape_clause? ('trong_khi' expression)?
-# [255] IDENTIFIER
+# [258] IDENTIFIER
 IDENTIFIER ::=
-# [256] NUMBER
+# [259] NUMBER
 NUMBER ::=
-# [257] NATURAL
+# [260] NATURAL
 NATURAL ::=
-# [258] STRING
+# [261] STRING
 STRING ::=
-# [259] ASCII_STRING
+# [262] ASCII_STRING
 ASCII_STRING ::=
-# [260] BACKTICK_STRING
+# [263] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [261] OCTETI_STRING
+# [264] OCTETI_STRING
 OCTETI_STRING ::=
-# [262] NEWLINE
+# [265] NEWLINE
 NEWLINE ::=
-# [263] WIDTH_MARKER
+# [266] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [264] LISTA_WIDTH_SUGAR
+# [267] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [265] TENSOR_WIDTH_SUGAR
+# [268] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [266] SPARSA_WIDTH_SUGAR
+# [269] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [267] VECTOR_WIDTH_SUGAR
+# [270] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [268] MATRIX_WIDTH_SUGAR
+# [271] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [269] FRONTMATTER_DELIMITER
+# [272] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [270] TOML_LINES
+# [273] TOML_LINES
 TOML_LINES ::=
-# [271] ANNOTATION_NAME
+# [274] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [272] ANNOTATION_FIELD_NAME
+# [275] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [273] NON_NEWLINE_TOKEN
+# [276] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [274] NO_NEWLINE
+# [277] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -614,6 +620,9 @@ NO_NEWLINE ::=
 | [`generic_type_default`](#generic-type-default) | `#generic-type-default` | live |
 | [`generic_size_default`](#generic-size-default) | `#generic-size-default` | live |
 | [`call_type_args`](#call-type-args) | `#call-type-args` | live |
+| [`call_type_arg`](#call-type-arg) | `#call-type-arg` | live |
+| [`call_size_arg`](#call-size-arg) | `#call-size-arg` | live |
+| [`dimension_tail`](#dimension-tail) | `#dimension-tail` | live |
 | [`parameter`](#parameter) | `#parameter` | live |
 | [`func_modifier`](#func-modifier) | `#func-modifier` | live |
 | [`callable_posture`](#callable-posture) | `#callable-posture` | live |
@@ -1527,6 +1536,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
+- A call-site argument list (`callTypeArgs`) admits the same size forms: a natural (`take<2, 2>(a)`), a bracketed shape, a spelled lift (`size n`) or a dimension term (`n + 1`, `d / 2`). A bare name or `_` is a type there; the callee decides whether it binds a type or a `kích_thước` parameter.
 - Applied `NATURAL` arguments are `kích_thước` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
 - **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `thông_qua` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`octeti<16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.

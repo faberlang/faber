@@ -1028,7 +1028,15 @@ generic_bound := 'implet' contract_ref ('∩' contract_ref)*
 contract_ref := IDENTIFIER ('<' type_annotation (',' type_annotation)* '>')?
 generic_type_default := '=' type_annotation
 generic_size_default := '=' NATURAL
-call_type_args  := '<' type_annotation (',' type_annotation)* '>'
+# A call-site list is unambiguously an argument list, so each member is a type or
+# a size. A size is a natural (`take<2, 2>(a)`), a bracketed shape, a spelled lift
+# (`size n`) or a dimension term (`n + 1`, `d / 2`): the `figura` forms a shape slot
+# takes. A bare name or `_` stays a type; whether the callee reads it as a type or
+# as a `magnitudo` argument is semantic, not grammatical.
+call_type_args  := '<' call_type_arg (',' call_type_arg)* '>'
+call_type_arg   := type_annotation | call_size_arg
+call_size_arg   := NATURAL dimension_tail? | IDENTIFIER dimension_tail | spelled_lift | '[' figura_list? ']'
+dimension_tail  := ('/' NATURAL)+ (('+' | '-') NATURAL)* | (('+' | '-') NATURAL)+
 parameter    := 'ceteri'? 'axis'? type_annotation IDENTIFIER 'sponte'? ('ut' IDENTIFIER)? ('vel' expression)?
 func_modifier := 'argumenta' IDENTIFIER | 'errata' IDENTIFIER | 'exitus' (IDENTIFIER | NATURAL) | 'immutata' | 'iacit' | 'optiones' IDENTIFIER
 callable_posture := 'fiet' | 'fiunt' | 'fient'
