@@ -34,6 +34,10 @@ use crate::{
 };
 use radix_diagnostics::DiagnosticArg;
 use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
+use radix_types::{
+    AppliedArg, BuiltinTensorEdgePolicy, compose_index_affine_constant, divide_index_exact,
+    evaluate_index_dimension,
+};
 
 const FIGURA_LIFT_PRIMARY_MSG: &str =
     "size lift extent expects a natural literal, a name, or a parenthesized expression";
@@ -42,8 +46,6 @@ const FIGURA_LIFT_PRIMARY_MSG: &str =
 /// invisible int→size crossing; the spelled `size <name>` lift is the
 /// did-you-mean. Locale rows live under SEM008 beside the slot refusal.
 const ISSUE_ANNOTATION_EXTENT_BARE_VALUE_NAME: &str = "annotation_extent_bare_value_name";
-use radix_types::{AppliedArg, BuiltinTensorEdgePolicy};
-use radix_types::{compose_index_affine_constant, divide_index_exact, evaluate_index_dimension};
 
 fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
     match arg {
@@ -196,34 +198,7 @@ impl Lowerer<'_> {
             }
             TypeExprKind::Named(name, params) => self.lower_named_type(name, params),
             TypeExprKind::Qualified(path, params) => self.lower_qualified_type(path, params),
-            TypeExprKind::Func(func) => {
-                let params = func
-                    .params
-                    .iter()
-                    .map(|param| {
-                        let ty = self.lower_parameter_type(param);
-                        ParamType {
-                            ty,
-                            mode: match param.mode {
-                                Some(type_mode) => super::type_mode_semantic_param_mode(type_mode),
-                                None => SemanticParamMode::Owned,
-                            },
-                            optional: false,
-                            sponte: false,
-                        }
-                    })
-                    .collect();
-                let ret = self.lower_signature_type(&func.ret);
-                let err = func.err.as_ref().map(|err| self.lower_signature_type(err));
-                self.types.function(FuncSig {
-                    type_params: Vec::new(),
-                    params,
-                    ret,
-                    err,
-                    is_async: false,
-                    is_generator: false,
-                })
-            }
+            TypeExprKind::Func(func) => self.lower_function_type(func),
             TypeExprKind::Union(members) => self.lower_union_type(members),
             TypeExprKind::Intersection(members) => self.lower_intersection_type(members),
         };
@@ -243,6 +218,38 @@ impl Lowerer<'_> {
         }
 
         ty_id
+    }
+
+    /// Lower a `functio(T, …) → R` type expression into the interned function
+    /// shape. Parameters keep the parameter-slot marker rules; the return and
+    /// error channels keep the signature-slot hole refusal.
+    fn lower_function_type(&mut self, func: &radix_syntax::FuncTypeExpr) -> TypeId {
+        let params = func
+            .params
+            .iter()
+            .map(|param| {
+                let ty = self.lower_parameter_type(param);
+                ParamType {
+                    ty,
+                    mode: match param.mode {
+                        Some(type_mode) => super::type_mode_semantic_param_mode(type_mode),
+                        None => SemanticParamMode::Owned,
+                    },
+                    optional: false,
+                    sponte: false,
+                }
+            })
+            .collect();
+        let ret = self.lower_signature_type(&func.ret);
+        let err = func.err.as_ref().map(|err| self.lower_signature_type(err));
+        self.types.function(FuncSig {
+            type_params: Vec::new(),
+            params,
+            ret,
+            err,
+            is_async: false,
+            is_generator: false,
+        })
     }
 
     /// Apply an access marker, rejecting one that cannot modify a scalar.
@@ -475,6 +482,14 @@ impl Lowerer<'_> {
         }
     }
 
+    /// True when `name` resolves to a declared `IndexParam` symbol.
+    fn is_declared_index_param(&self, name: radix_lexer::Symbol) -> bool {
+        self.resolver
+            .lookup(name)
+            .and_then(|def_id| self.resolver.get_symbol(def_id))
+            .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
+    }
+
     fn lower_named_index_arg(&mut self, ident: &Ident) -> Option<IndexId> {
         match self.lexical_generic_param_kind(ident.name) {
             Some(GenericParamKind::Magnitudo) => {
@@ -485,11 +500,7 @@ impl Lowerer<'_> {
                 None
             }
             None => {
-                if let Some(crate::SymbolKind::IndexParam) = self
-                    .resolver
-                    .lookup(ident.name)
-                    .and_then(|def_id| self.resolver.get_symbol(def_id).map(|symbol| symbol.kind))
-                {
+                if self.is_declared_index_param(ident.name) {
                     Some(self.types.intern_index(IndexExpr::Param(ident.name)))
                 } else {
                     self.error("generic_type_argument_in_size_position");
@@ -523,12 +534,7 @@ impl Lowerer<'_> {
                     })
             }
             GenericArgExpr::Name(ident) => {
-                let is_index = self
-                    .resolver
-                    .lookup(ident.name)
-                    .and_then(|def_id| self.resolver.get_symbol(def_id))
-                    .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam);
-                if is_index {
+                if self.is_declared_index_param(ident.name) {
                     self.lower_generic_index_arg(arg)
                         .map(AppliedArg::Size)
                         .unwrap_or_else(|| {
@@ -540,6 +546,18 @@ impl Lowerer<'_> {
             }
             GenericArgExpr::Type(ty) => AppliedArg::Type(self.lower_nested_type(ty)),
         }
+    }
+
+    /// True when `def_id` declares at least one generic parameter, by either
+    /// descriptor list or kind list.
+    fn has_declared_generic_params(&self, def_id: crate::DefId) -> bool {
+        self.resolver
+            .generic_param_descriptors(def_id)
+            .is_some_and(|descriptors| !descriptors.is_empty())
+            || self
+                .resolver
+                .generic_param_kinds(def_id)
+                .is_some_and(|kinds| !kinds.is_empty())
     }
 
     /// Lower a named declaration's explicit prefix and append its declared
@@ -621,13 +639,7 @@ impl Lowerer<'_> {
                         self.error("generic_argument_kind_mismatch");
                         AppliedArg::Type(self.types.intern(Type::Error))
                     }
-                    GenericArgExpr::Name(ident)
-                        if self
-                            .resolver
-                            .lookup(ident.name)
-                            .and_then(|id| self.resolver.get_symbol(id))
-                            .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam) =>
-                    {
+                    GenericArgExpr::Name(ident) if self.is_declared_index_param(ident.name) => {
                         self.error("generic_argument_kind_mismatch");
                         AppliedArg::Type(self.types.intern(Type::Error))
                     }
@@ -642,11 +654,7 @@ impl Lowerer<'_> {
                         AppliedArg::Size(self.types.intern_index(IndexExpr::Unspecified))
                     }
                     GenericArgExpr::Name(ident)
-                        if !self
-                            .resolver
-                            .lookup(ident.name)
-                            .and_then(|id| self.resolver.get_symbol(id))
-                            .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
+                        if !self.is_declared_index_param(ident.name)
                             && !matches!(
                                 self.lexical_generic_param_kind(ident.name),
                                 Some(GenericParamKind::Magnitudo)
@@ -677,11 +685,7 @@ impl Lowerer<'_> {
             return false;
         }
         radix_types::parse_natural_capacity(self.interner.resolve(ident.name)).is_some()
-            || self
-                .resolver
-                .lookup(ident.name)
-                .and_then(|id| self.resolver.get_symbol(id))
-                .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
+            || self.is_declared_index_param(ident.name)
             || matches!(
                 self.lexical_generic_param_kind(ident.name),
                 Some(GenericParamKind::Magnitudo)
@@ -767,14 +771,7 @@ impl Lowerer<'_> {
             }
         };
 
-        let has_declared_params = self
-            .resolver
-            .generic_param_descriptors(def_id)
-            .is_some_and(|descriptors| !descriptors.is_empty())
-            || self
-                .resolver
-                .generic_param_kinds(def_id)
-                .is_some_and(|kinds| !kinds.is_empty());
+        let has_declared_params = self.has_declared_generic_params(def_id);
         if params.is_empty() && (!has_declared_params || self.allow_bare_generic_construction) {
             return base;
         }
@@ -1172,61 +1169,39 @@ fn generic_arg_is_ascii_format_hint(
     }
 }
 
+/// Signature of one sized-word lowering entry ([`crate::numeric_width`]'s
+/// `lower_modular_word`/`lower_trapping_word`/`lower_saturating_word`).
+type WordLowering = fn(
+    &[TypeExpr],
+    &radix_lexer::Interner,
+    &mut radix_types::TypeTable,
+    &mut dyn FnMut(crate::numeric_width::WidthLowerIssue),
+) -> TypeId;
+
 impl Lowerer<'_> {
     fn lower_modular_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
-        let Some(type_params) = generic_type_exprs(params) else {
-            self.error("generic_size_argument_in_type_position");
-            return self.types.intern(Type::Error);
-        };
-        let mut issues = Vec::new();
-        let ty = crate::numeric_width::lower_modular_word(
-            &type_params,
-            self.interner,
-            self.types,
-            &mut |issue| {
-                issues.push(issue);
-            },
-        );
-        if let Some(issue) = issues.first() {
-            self.error(issue.issue());
-        }
-        ty
+        self.lower_word_type(params, crate::numeric_width::lower_modular_word)
     }
 
     fn lower_trapping_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
-        let Some(type_params) = generic_type_exprs(params) else {
-            self.error("generic_size_argument_in_type_position");
-            return self.types.intern(Type::Error);
-        };
-        let mut issues = Vec::new();
-        let ty = crate::numeric_width::lower_trapping_word(
-            &type_params,
-            self.interner,
-            self.types,
-            &mut |issue| {
-                issues.push(issue);
-            },
-        );
-        if let Some(issue) = issues.first() {
-            self.error(issue.issue());
-        }
-        ty
+        self.lower_word_type(params, crate::numeric_width::lower_trapping_word)
     }
 
     fn lower_saturating_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
+        self.lower_word_type(params, crate::numeric_width::lower_saturating_word)
+    }
+
+    /// Lower one sized word wrapper (`modulus`/`saturatus`/`exactus`) and
+    /// report its first width-lowering issue, if any.
+    fn lower_word_type(&mut self, params: &[GenericArgExpr], lower: WordLowering) -> TypeId {
         let Some(type_params) = generic_type_exprs(params) else {
             self.error("generic_size_argument_in_type_position");
             return self.types.intern(Type::Error);
         };
         let mut issues = Vec::new();
-        let ty = crate::numeric_width::lower_saturating_word(
-            &type_params,
-            self.interner,
-            self.types,
-            &mut |issue| {
-                issues.push(issue);
-            },
-        );
+        let ty = lower(&type_params, self.interner, self.types, &mut |issue| {
+            issues.push(issue);
+        });
         if let Some(issue) = issues.first() {
             self.error(issue.issue());
         }
@@ -1360,14 +1335,7 @@ impl Lowerer<'_> {
                             .map(|type_id| (def_id, type_id))
                     })
         {
-            let has_declared_params = self
-                .resolver
-                .generic_param_descriptors(def_id)
-                .is_some_and(|descriptors| !descriptors.is_empty())
-                || self
-                    .resolver
-                    .generic_param_kinds(def_id)
-                    .is_some_and(|kinds| !kinds.is_empty());
+            let has_declared_params = self.has_declared_generic_params(def_id);
             if params.is_empty() && !has_declared_params {
                 return type_id;
             }
@@ -1468,22 +1436,16 @@ impl Lowerer<'_> {
     }
 
     fn lower_vector_width_expr(&mut self, width: &FiguraExpr) -> Result<IndexId, &'static str> {
-        match width {
+        let extent = match width {
             // The unwrapped single dim is still an extent position.
-            FiguraExpr::Tuple(dims) if dims.len() == 1 => {
-                self.figura_extent_nesting += 1;
-                let lowered = self.lower_figura_expr(&dims[0]);
-                self.figura_extent_nesting -= 1;
-                lowered
-            }
-            FiguraExpr::Tuple(_) => Err(crate::VECTOR_WIDTH_SINGLE_DIM_MSG),
-            other => {
-                self.figura_extent_nesting += 1;
-                let lowered = self.lower_figura_expr(other);
-                self.figura_extent_nesting -= 1;
-                lowered
-            }
-        }
+            FiguraExpr::Tuple(dims) if dims.len() == 1 => &dims[0],
+            FiguraExpr::Tuple(_) => return Err(crate::VECTOR_WIDTH_SINGLE_DIM_MSG),
+            other => other,
+        };
+        self.figura_extent_nesting += 1;
+        let lowered = self.lower_figura_expr(extent);
+        self.figura_extent_nesting -= 1;
+        lowered
     }
 
     fn lower_matrix_shape_expr(&mut self, shape: &FiguraExpr) -> Result<IndexId, &'static str> {

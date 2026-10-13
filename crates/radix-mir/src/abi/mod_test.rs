@@ -1925,3 +1925,75 @@ fn kernel_admission_adds_rank_three_and_four_with_rank_five_closed() {
     let error = require_kernel_device_view(rank5, false).expect_err("rank 5 stays fail-closed");
     assert_eq!(error.issue, "mir_kernel_device_view_rank_unsupported");
 }
+
+#[test]
+fn single_lane_form_synthesizes_a_one_lane_signature() {
+    // A void compute function with no lane/index parameter and one `mut`
+    // tensor output is sequential: one input resource per remaining
+    // parameter, the `mut` tensor the output at its declared position, no
+    // builtin inputs, a 1x1x1 dispatch. Pins the `single_lane_kernel` ABI
+    // arm through the full storage-buffer synthesis.
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let shape = types.intern_index(IndexExpr::Literal(4));
+    let tensor_ty = MirType::semantic(types.tensor_with_shape(f32, shape));
+    let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let validation = validation_with_device_tensor_layouts(&types);
+    let span = Span::default();
+    let param = |local: u32, mode: MirParamMode| MirParam {
+        local: MirLocalId(local),
+        name: None,
+        ty: tensor_ty,
+        mode,
+        span,
+    };
+    let function = MirFunction {
+        id: MirFunctionId(30),
+        source: Some(DefId(30)),
+        name: None,
+        params: vec![
+            param(0, MirParamMode::Owned),
+            param(1, MirParamMode::MutRef),
+        ],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: vacuum_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    };
+
+    assert!(MirKernelSignature::is_single_lane_form(
+        &function,
+        &validation
+    ));
+    let signature =
+        MirKernelSignature::storage_buffer_kernel(&function, &validation).expect("signature");
+
+    assert_eq!(signature.input.binding, 0);
+    assert_eq!(signature.input.source_local, Some(MirLocalId(0)));
+    assert!(signature.extra_inputs.is_empty());
+    assert_eq!(signature.output.binding, 1);
+    assert_eq!(signature.output.source_local, Some(MirLocalId(1)));
+    assert!(signature.builtin_inputs.is_empty());
+    assert_eq!(
+        (
+            signature.dispatch_size.x,
+            signature.dispatch_size.y,
+            signature.dispatch_size.z
+        ),
+        (1, 1, 1)
+    );
+    assert!(signature.runtime_extent().is_none());
+}

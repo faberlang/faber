@@ -600,7 +600,7 @@ pub fn build_device_program(
     // Council-8 CB-3: the reduced-resource projection is a fact of the BUFFER
     // VERSION, defined by its producing slot — reconciled to ONE fact per
     // (buffer, version); two distinct `Some` facts fail closed here.
-    let mut projection_by_buffer: BTreeMap<BufferId, Option<crate::abi::ReducedProjection>> =
+    let mut projection_by_buffer: BTreeMap<BufferId, crate::abi::ReducedProjection> =
         BTreeMap::new();
     for build in &builder.builds {
         for resource in &build.resources {
@@ -608,15 +608,17 @@ pub fn build_device_program(
                 continue;
             };
             if let Some(previous) = projection_by_buffer.get(&resource.buffer_id) {
-                if *previous != Some(projection) {
+                if *previous != projection {
                     return Err(DeviceProgramBuildError::ReducedProjection {
                         buffer: resource.buffer_id,
-                        first: format!("{previous:?}"),
+                        // The prior diagnostic rendered the first fact as an
+                        // `Option`; keep that rendering byte-for-byte.
+                        first: format!("Some({previous:?})"),
                         second: format!("{projection:?}"),
                     });
                 }
             } else {
-                projection_by_buffer.insert(resource.buffer_id, Some(projection));
+                projection_by_buffer.insert(resource.buffer_id, projection);
             }
         }
     }
@@ -625,22 +627,24 @@ pub fn build_device_program(
     // BUFFER VERSION, defined by its producing slot — reconciled to ONE fact
     // per (buffer, version); two distinct `Some` facts fail closed, exactly
     // like the reduced projection above.
-    let mut shape_by_buffer: BTreeMap<BufferId, Option<Vec<u64>>> = BTreeMap::new();
+    let mut shape_by_buffer: BTreeMap<BufferId, Vec<u64>> = BTreeMap::new();
     for build in &builder.builds {
         for resource in &build.resources {
             let Some(shape) = &resource.shape else {
                 continue;
             };
             if let Some(previous) = shape_by_buffer.get(&resource.buffer_id) {
-                if previous.as_deref() != Some(shape.as_slice()) {
+                if previous.as_slice() != shape.as_slice() {
                     return Err(DeviceProgramBuildError::BufferShape {
                         buffer: resource.buffer_id,
-                        first: format!("{previous:?}"),
+                        // The prior diagnostic rendered the first fact as an
+                        // `Option`; keep that rendering byte-for-byte.
+                        first: format!("Some({previous:?})"),
                         second: format!("Some({shape:?})"),
                     });
                 }
             } else {
-                shape_by_buffer.insert(resource.buffer_id, Some(shape.clone()));
+                shape_by_buffer.insert(resource.buffer_id, shape.clone());
             }
         }
     }
@@ -672,16 +676,11 @@ pub fn build_device_program(
                     version: 1,
                     element_ty: resource.element_ty,
                     element_count: resource.element_count,
-                    reduced_projection: projection_by_buffer
-                        .get(&resource.buffer_id)
-                        .copied()
-                        .flatten()
-                        .or(resource.reduced_projection),
-                    shape: shape_by_buffer
-                        .get(&resource.buffer_id)
-                        .cloned()
-                        .flatten()
-                        .or_else(|| resource.shape.clone()),
+                    // Every slot carrying a projection/shape registered its
+                    // buffer in the reconciliation passes above, so the
+                    // reconciled maps are the sole authority here.
+                    reduced_projection: projection_by_buffer.get(&resource.buffer_id).copied(),
+                    shape: shape_by_buffer.get(&resource.buffer_id).cloned(),
                 };
                 DeviceResource {
                     buffer: identity,
@@ -1280,7 +1279,9 @@ impl<'a> KernelBuilder<'a> {
                 // buffer — the buffer becomes an InOut per-step intermediate,
                 // never an observation point.
                 if let Some(entry) = self.buffers.iter_mut().find(|entry| entry.id == alias) {
-                    entry.role = merge_buffer_roles(entry.role, BufferRole::InOut);
+                    // `merge_buffer_roles` with `InOut` is `InOut` for every
+                    // previous role; assign the unified role directly.
+                    entry.role = BufferRole::InOut;
                     entry.consumed = true;
                 }
                 alias
@@ -1783,8 +1784,8 @@ fn producing_launch(program: &DeviceProgram, buffer: BufferId) -> Option<LaunchI
 fn declared_result_rows(
     program: &DeviceProgram,
     buffers: &[ProgramBuffer],
-    projection_by_buffer: &BTreeMap<BufferId, Option<crate::abi::ReducedProjection>>,
-    shape_by_buffer: &BTreeMap<BufferId, Option<Vec<u64>>>,
+    projection_by_buffer: &BTreeMap<BufferId, crate::abi::ReducedProjection>,
+    shape_by_buffer: &BTreeMap<BufferId, Vec<u64>>,
     training_program: bool,
     per_step_observation: Option<BufferId>,
     train_step_gradients: &BTreeSet<BufferId>,
@@ -1825,8 +1826,8 @@ fn declared_result_rows(
                 version: 1,
                 element_ty: buffer.element_ty,
                 element_count: buffer.element_count,
-                reduced_projection: projection_by_buffer.get(&buffer.id).copied().flatten(),
-                shape: shape_by_buffer.get(&buffer.id).cloned().flatten(),
+                reduced_projection: projection_by_buffer.get(&buffer.id).copied(),
+                shape: shape_by_buffer.get(&buffer.id).cloned(),
             },
             role: buffer.role,
             produced_by,
