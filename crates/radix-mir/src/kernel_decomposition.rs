@@ -706,12 +706,10 @@ fn split_oversized_elementwise_body(
     // The first field-writing statement. The statements before it are the
     // "pre" range; the statements from it onward are the field range (field
     // writers grouped in order, with the return assembly at the tail).
-    let Some(first_field_raw) = indices.iter().position(|&index| {
-        written_at
-            .get(index)
-            .and_then(|written| *written)
-            .is_some_and(|local| field_set.contains(&local))
-    }) else {
+    let Some(first_field_raw) = written_at
+        .iter()
+        .position(|written| written.is_some_and(|local| field_set.contains(&local)))
+    else {
         return Err(PlanMappingError::mapping(format!(
             "elementwise body storage-buffer count {whole_count} exceeds the \
              {limit_phrase} and the body \
@@ -737,8 +735,8 @@ fn split_oversized_elementwise_body(
     // writers or the return assembly (the tuple Construct). Temp-writing
     // collection calls (the real lowering's call-then-forward pairs) write
     // no local and contribute no output ordering, so they are free.
-    for &index in indices.iter().skip(first_field) {
-        let Some(written) = written_at[index] else {
+    for (position, &index) in indices.iter().enumerate().skip(first_field) {
+        let Some(written) = written_at[position] else {
             continue;
         };
         if field_set.contains(&written) {

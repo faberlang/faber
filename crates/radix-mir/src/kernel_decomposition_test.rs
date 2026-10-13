@@ -1493,6 +1493,74 @@ fn oversized_elementwise_body_splits_within_the_buffer_budget() {
     );
 }
 
+/// `oversized_elementwise_train_step` with one dead `Sum` recipe statement
+/// (its result local is never read) spliced in at statement `at`. The
+/// slicer drops the dead recipe, so the elementwise slice's statement
+/// indices are no longer contiguous from zero.
+fn oversized_elementwise_train_step_with_dead_recipe(
+    types: &mut TypeTable,
+    at: usize,
+) -> MirFunction {
+    let tensor = rank1_tensor_ty(types, 8);
+    let mut function = oversized_elementwise_train_step(types);
+    function.locals.push(MirLocal {
+        id: MirLocalId(54),
+        name: None,
+        ty: tensor,
+        mutable: false,
+        span: test_span(),
+    });
+    function.blocks[0]
+        .statements
+        .insert(at, collection_statement(MirCollectionOp::Sum, &[0], 54, tensor));
+    function
+}
+
+/// A dropped dead recipe leaves a gap in the elementwise slice's statement
+/// indices. The split indexes its per-position tables by position, not by
+/// statement index, so the same body with a dead recipe at `at` must split
+/// exactly as the body without it, shifted past the dead statement.
+fn assert_dead_recipe_does_not_perturb_the_split(at: usize) {
+    let mut types = TypeTable::new();
+    let baseline_function = oversized_elementwise_train_step(&mut types);
+    let function = oversized_elementwise_train_step_with_dead_recipe(&mut types, at);
+    let validation = MirValidationContext::new(&types);
+    let baseline = decompose_kernel_function(&baseline_function, &validation)
+        .expect("the baseline oversized body decomposes");
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("a dead recipe must not break the oversized elementwise split");
+
+    let shift = |statement: usize| if statement >= at { statement + 1 } else { statement };
+    let expected: Vec<Vec<usize>> = baseline
+        .subchains
+        .iter()
+        .map(|subchain| subchain.statements.iter().copied().map(shift).collect())
+        .collect();
+    let actual: Vec<Vec<usize>> = decomposition
+        .subchains
+        .iter()
+        .map(|subchain| subchain.statements.clone())
+        .collect();
+    assert_eq!(
+        actual, expected,
+        "the dead recipe at statement {at} must be dropped and the split unchanged"
+    );
+    assert!(
+        actual.iter().flatten().all(|&statement| statement != at),
+        "the dead recipe at statement {at} must belong to no subchain"
+    );
+}
+
+#[test]
+fn oversized_elementwise_split_survives_dead_recipe_at_statement_zero() {
+    assert_dead_recipe_does_not_perturb_the_split(0);
+}
+
+#[test]
+fn oversized_elementwise_split_survives_dead_recipe_inside_the_pre_range() {
+    assert_dead_recipe_does_not_perturb_the_split(7);
+}
+
 #[test]
 fn divergent_data_flow_consumes_multiple_prior_subchains() {
     // s = sum(x); m = mean(x); t = s + m: Sum and Mean are independent
