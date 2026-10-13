@@ -218,6 +218,9 @@ impl TypeChecker<'_> {
             let scalar_text = self.mark_chorda_scalar_closure_param && idx == 0;
             let mutable =
                 matches!(param.mode, HirParamMode::In) || self.types.is_exclusive_value(param.ty);
+            if !mutable {
+                self.read_only_param_roots.insert(param.def_id);
+            }
             self.insert_binding_with_scalar(param.def_id, param.ty, scalar_text, mutable);
         }
         self.mark_chorda_scalar_closure_param = false;

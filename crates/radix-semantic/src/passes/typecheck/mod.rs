@@ -349,6 +349,12 @@ pub(crate) struct TypeChecker<'a> {
     /// mutating receiver rooted in one is rejected.
     pub const_locals: FxHashSet<DefId>,
 
+    /// Read-only parameters (unmarked or `de`) seen while checking bodies.
+    /// Like a `const` local, such a parameter is a read-only value: a plain
+    /// `var T y ← p` of a shareable value is SEM065. DefIds
+    /// are unique, so the set needs no per-body scope.
+    pub read_only_param_roots: FxHashSet<DefId>,
+
     /// Function signatures collected before body checking so calls can be
     /// checked regardless of declaration order.
     pub functions: FxHashMap<DefId, FuncSig>,
@@ -835,6 +841,7 @@ impl<'a> TypeChecker<'a> {
             binding_shadow: FxHashMap::default(),
             binding_names: FxHashMap::default(),
             const_locals: FxHashSet::default(),
+            read_only_param_roots: FxHashSet::default(),
             functions: FxHashMap::default(),
             nucleum_roles: FxHashMap::default(),
             inlinable_kernels: FxHashSet::default(),

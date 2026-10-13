@@ -16,8 +16,50 @@ fn analyze(source: &str) -> Vec<crate::SemanticError> {
     crate::analyze(&program, &config, &mut parse.interner).diagnostics
 }
 
+/// Guard for every fixture handed to [`air_errors`]: analysis skips the AIR
+/// passes once typecheck has reported an error (their HIR types would be
+/// unreliable), which leaves the AIR diagnostics empty and makes every
+/// `is_empty` / `!has_air_issue` assertion vacuous. A fixture that
+/// intentionally carries a typecheck error needs its own explicitly named
+/// helper, never this assertion.
+///
+/// Diagnostics that only post-AIR passes can emit are exempt: they cannot
+/// have suppressed the AIR passes, so an AIR observation made beside them is
+/// still real. Every other error still fails this guard.
+#[track_caller]
+fn assert_no_typecheck_error(diagnostics: &[SemanticError]) {
+    let pre_air_errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|err| {
+            err.is_error()
+                && err.kind != SemanticErrorKind::AirPurityViolation
+                && !is_post_air_only(err)
+        })
+        .collect();
+    assert!(
+        pre_air_errors.is_empty(),
+        "fixture must typecheck before AIR assertions: {pre_air_errors:?}"
+    );
+}
+
+/// Emitted only by passes scheduled after the AIR gate: borrow mode analysis
+/// (`tensor_view_escape`) and definite-assignment / borrow write-once
+/// (`immutable_second_assignment`). Neither can skip the AIR passes.
+fn is_post_air_only(err: &SemanticError) -> bool {
+    matches!(
+        (err.kind, err.issue()),
+        (SemanticErrorKind::ModeMismatch, Some("tensor_view_escape"))
+            | (
+                SemanticErrorKind::ImmutableAssignment,
+                Some("immutable_second_assignment")
+            )
+    )
+}
+
 fn air_errors(source: &str) -> Vec<crate::SemanticError> {
-    analyze(source)
+    let diagnostics = analyze(source);
+    assert_no_typecheck_error(&diagnostics);
+    diagnostics
         .into_iter()
         .filter(|err| err.kind == SemanticErrorKind::AirPurityViolation)
         .collect()
@@ -249,7 +291,7 @@ fn accepts_forma_tensor_method_in_air_lane() {
         r#"
 @ radix lane "air"
 functio reshape(tf32[6] x) → tf32[2, 3] {
-    redde x.forma()
+    redde x.forma([2, 3])
 }
 "#,
     );
@@ -364,18 +406,15 @@ functio silu_op(tf32[2, 2] x) → tf32[2, 2] {
 
 #[test]
 fn accepts_activatio_tanh_tensor_method_in_air_lane() {
-    let errors = air_errors(
-        r#"
-@ radix lane "air"
-functio tanh_op(tf32[2, 2] x) → tf32[2, 2] {
-    redde x.activatio_tanh()
-}
-"#,
-    );
-
+    // `activatio_tanh` is an AIR-lane allowlist row (`AirTensorOp::Tanh`),
+    // but the source tensor catalog deliberately does not own it: a fixture
+    // calling `x.activatio_tanh()` never typechecks (`unknown_method`), so
+    // the old probe only ever observed an empty, AIR-suppressed list. Pin the
+    // admission row directly instead of a fixture that cannot reach the AIR
+    // passes.
     assert!(
-        errors.is_empty(),
-        "unexpected AIR errors for activatio_tanh: {errors:?}"
+        super::air_tensor_intrinsics::is_allowed_tensor_intrinsic("activatio_tanh"),
+        "AIR-lane tanh row must stay admitted"
     );
 }
 
@@ -971,11 +1010,12 @@ fn air_lane_admits_sin_arm_cape_when_locally_resolved() {
 functio sin_arm(bivalens bad) → numerus {
     si bad {
         redde 1
-    } sin {
+    } sin bad {
         iace "x"
     } cape err {
         redde 0
     }
+    redde 3
 }
 "#,
     );
@@ -1080,7 +1120,7 @@ fn air_lane_declines_whole_loop_cape_under_loop_spectrum_causes() {
         r#"
 @ radix lane "air"
 functio d(numerus n) → numerus {
-    fixum numerus total ← 0
+    varia numerus total ← 0
     dum n ≻ 0 {
         total ← 1
     } cape err { redde 0 }
@@ -1094,7 +1134,7 @@ functio d(numerus n) → numerus {
         r#"
 @ radix lane "air"
 functio e(numerus n) → numerus {
-    fixum numerus total ← 0
+    varia numerus total ← 0
     itera ab 0‥4 fixum i {
         total ← i
     } cape err { redde 0 }
@@ -1438,7 +1478,7 @@ fn air_admits_apud_coordinate_arithmetic_proven_by_tensor_dims() {
         r#"
 @ radix lane "air"
 functio pick(tensor<f32, [4, 4]> x) → tensor<f32, [4, 4]> ⇥ textus {
-    varia tensor<f32, [4, 4]> acc ← x
+    varia tensor<f32, [4, 4]> acc ← copy x
     itera ex x apud [i, j] fixum cell {
         fixum numerus idx ← i * 2 + j
         si idx ≻ 20 { iace "upper" }
@@ -1463,7 +1503,7 @@ fn air_admits_range_loop_index_arithmetic_proven_by_constant_bounds() {
         r#"
 @ radix lane "air"
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
-    varia tensor<f32, [2, 2]> acc ← x
+    varia tensor<f32, [2, 2]> acc ← copy x
     itera ab 0‥16 fixum i {
         fixum numerus k ← i * 2 + 1
         acc ← acc + x
@@ -1519,7 +1559,7 @@ fn air_admits_arithmetic_over_inferred_fixum_of_proven_index_expression() {
         r#"
 @ radix lane "air"
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
-    varia tensor<f32, [2, 2]> acc ← x
+    varia tensor<f32, [2, 2]> acc ← copy x
     itera ab 0‥16 fixum i {
         fixum _ k ← i * 2 + 1
         fixum _ m ← k * 2 + i
@@ -1540,7 +1580,7 @@ fn air_rejects_arithmetic_over_declared_numerus_binding_even_if_initializer_is_b
         r#"
 @ radix lane "air"
 functio pick(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
-    varia tensor<f32, [2, 2]> acc ← x
+    varia tensor<f32, [2, 2]> acc ← copy x
     itera ab 0‥16 fixum i {
         fixum numerus k ← i * 2 + 1
         fixum numerus m ← k * k

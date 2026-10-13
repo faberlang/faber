@@ -256,8 +256,10 @@ impl TypeChecker<'_> {
     /// The legal spellings are `← copy x` (an independent value) and
     /// `← own x` (take it over); scalars copy by value and stay legal.
     ///
-    /// A `ref` parameter source is not rejected here: the borrow pass already
-    /// tracks the alias and refuses its mutation (SEM056).
+    /// The same rule covers a read-only parameter source: an
+    /// unmarked or `de` parameter is a read-only value by the grammar's own
+    /// words (`mut`/`own`/`copy` remain writable sources), so sharing it into a
+    /// writable name is the same error.
     fn reject_read_only_share_into_var(&mut self, local: &HirLocal, slot_ty: TypeId) {
         if !local.mutable {
             return;
@@ -298,18 +300,32 @@ impl TypeChecker<'_> {
             .or_else(|| self.resolver.get_symbol(root).map(|symbol| symbol.name));
         let binding = name_of(self, binding_symbol);
         let name = name_of(self, Some(local.name));
+        // The structured source lets the reader pack name `← copy x` without
+        // the `← own x` alternative for a parameter (own of a read-only
+        // parameter is already `own_argument_unmarked_parameter`).
+        let source = if self.read_only_param_roots.contains(&root) {
+            "parameter"
+        } else {
+            "constant"
+        };
         self.error_issue_with_args(
             SemanticErrorKind::ConstSharedIntoVar,
             ISSUE_CONST_SHARED_INTO_VAR,
             init.span,
-            &[("binding", binding), ("name", name)],
+            &[
+                ("binding", binding),
+                ("name", name),
+                ("source", source.to_owned()),
+            ],
         );
     }
 
-    /// A `const` local, or a module-level constant (an item with no local
-    /// binding, the same test `check_lvalue` uses for `assignment_to_constant`).
+    /// A `const` local, a module-level constant (an item with no local binding,
+    /// the same test `check_lvalue` uses for `assignment_to_constant`), or a
+    /// read-only (`unmarked`/`de`) parameter.
     fn is_read_only_root(&self, root: radix_hir::DefId) -> bool {
         self.const_locals.contains(&root)
+            || self.read_only_param_roots.contains(&root)
             || (self.lookup_binding(root).is_none() && self.consts.contains_key(&root))
     }
 
