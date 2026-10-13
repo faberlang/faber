@@ -97,6 +97,7 @@ impl TypeChecker<'_> {
             None,
             false,
             false,
+            None,
         )
     }
 
@@ -111,6 +112,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
         expected: Option<TypeId>,
+        axis_override: Option<&[bool]>,
     ) -> TypeId {
         self.check_instantiated_call_impl(
             sig,
@@ -123,11 +125,16 @@ impl TypeChecker<'_> {
             None,
             false,
             true,
+            axis_override,
         )
     }
 
     /// Typecheck a call to a library function reached through a namespace: a
     /// user function for the K5 lifting diagnostic, without a stable callee id.
+    ///
+    /// `axis` carries the imported function's declared `axis` markers when the
+    /// call was resolved through a file interface; a local callee reads them
+    /// from its `DefId` instead.
     pub fn check_user_function_call(
         &mut self,
         sig: &FuncSig,
@@ -136,6 +143,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         expected: Option<TypeId>,
         policy_callee: Option<radix_hir::DefId>,
+        axis: Option<&[bool]>,
     ) -> TypeId {
         self.check_instantiated_call_impl(
             sig,
@@ -148,6 +156,7 @@ impl TypeChecker<'_> {
             policy_callee,
             true,
             true,
+            axis,
         )
     }
 
@@ -174,6 +183,7 @@ impl TypeChecker<'_> {
             Some(callee),
             true,
             true,
+            None,
         )
     }
 
@@ -200,6 +210,7 @@ impl TypeChecker<'_> {
             Some(callee),
             false,
             true,
+            None,
         )
     }
 
@@ -228,6 +239,7 @@ impl TypeChecker<'_> {
             None,
             false,
             false,
+            None,
         )
     }
 
@@ -243,6 +255,7 @@ impl TypeChecker<'_> {
         policy_callee: Option<radix_hir::DefId>,
         user_function: bool,
         markers: bool,
+        axis_override: Option<&[bool]>,
     ) -> TypeId {
         // Size-type Z3 (Q3): `_` extent holes in a callee signature are
         // anonymous size parameters chosen per call. The declared signature
@@ -306,8 +319,14 @@ impl TypeChecker<'_> {
         // diagnosed error. The scalar result type is not the tensor the
         // caller meant, so the call takes the type its context expects
         // instead of cascading a second mismatch.
-        let axis_key = callee.or(if user_function { None } else { policy_callee });
-        let axis = axis_key.and_then(|key| self.axis_params.get(&key).cloned());
+        //
+        // An imported function has no consumer-local declaration `DefId` on
+        // the namespace path, so its interface flags arrive as an explicit
+        // override; local callees and imported methods read `axis_params`.
+        let axis = axis_override.map(<[bool]>::to_vec).or_else(|| {
+            let axis_key = callee.or(if user_function { None } else { policy_callee });
+            axis_key.and_then(|key| self.axis_params.get(&key).cloned())
+        });
         if self.check_call_args_lifting(&sig, args, span, user_function, markers, axis.as_deref()) {
             return expected.unwrap_or(self.error_type);
         }

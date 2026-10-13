@@ -262,6 +262,7 @@ fn text_callable() -> InterfaceCallable {
             mode: SemanticParamMode::Owned,
             optional: false,
             sponte: false,
+            axis: false,
         }],
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
         err: None,
