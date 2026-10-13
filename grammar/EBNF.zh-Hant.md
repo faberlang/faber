@@ -267,7 +267,7 @@ itera_stmt ::= '遍歷' ('取自' expression (',' expression)* | '從' expressio
 # [128] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [129] apud_clause
-apud_clause ::= '於' '[' IDENTIFIER (',' IDENTIFIER)* ']'
+apud_clause ::= '在' '[' IDENTIFIER (',' IDENTIFIER)* ']'
 # [130] elige_stmt
 elige_stmt ::= '選擇' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
 # [131] casu_elige_clause
@@ -718,7 +718,7 @@ NO_NEWLINE ::=
 | [`dum_stmt`](#dum-stmt) | `#當-stmt` | live |
 | [`itera_stmt`](#itera-stmt) | `#遍歷-stmt` | live |
 | [`itera_binding`](#itera-binding) | `#遍歷-binding` | live |
-| [`apud_clause`](#apud-clause) | `#於-clause` | live |
+| [`apud_clause`](#apud-clause) | `#在-clause` | live |
 | [`elige_stmt`](#elige-stmt) | `#選擇-stmt` | live |
 | [`casu_elige_clause`](#casu-elige-clause) | `#分支-選擇-clause` | live |
 | [`ceterum_clause`](#ceterum-clause) | `#預設-clause` | live |
@@ -887,7 +887,7 @@ productions. It is not a second keyword authority.
 | Endpoints | `端點` | capability call |
 | Error | `斷言` | assert |
 | Iteration | `之前` | range until exclusive |
-| Grammar | `於` | keyword literal derived from the production |
+| Grammar | `在` | keyword literal derived from the production |
 | Expression | `最大值索引` | argmax reduction operator (en `argmax`) |
 | Expression | `最小值索引` | argmin reduction operator (en `argmin`) |
 | Params | `引數` | CLI arguments modifier |
@@ -2699,11 +2699,11 @@ first live match is selected, and a no-match or empty source yields `nihil`
 head and never shares the reduce/scan `定值`/`變值` binder tail.
 `首個匹配` claims only the expression-head position immediately followed
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
-`於` coordinate clause binds per-axis indices as in `遍歷 取自`.
+`在` coordinate clause binds per-axis indices as in `遍歷 取自`.
 
-`歸約 經由 <op> 取自 source [於 [coords]] [按 key] ([執行緒 f] (定值 | 變值) x { 傳回 term } | 或取 identity)?` is the general reduction form. The optional tail is either a body (with an optional `執行緒`) or a bodiless identity; without either, the source elements are the terms. `經由` is mandatory and selects exactly one of `求和`, `求積`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, or `計數`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `經由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.歸約(f)` (en `xs.reduce(f)`).
+`歸約 經由 <op> 取自 source [在 [coords]] [按 key] ([執行緒 f] (定值 | 變值) x { 傳回 term } | 或取 identity)?` is the general reduction form. The optional tail is either a body (with an optional `執行緒`) or a bodiless identity; without either, the source elements are the terms. `經由` is mandatory and selects exactly one of `求和`, `求積`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, or `計數`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `經由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.歸約(f)` (en `xs.reduce(f)`).
 
-The source is a shaped tensor or matrix; lists keep their methods. An optional `於 [coords]` binds one integer coordinate per source axis. A body is claimed only when `(定值 | 變值) IDENTIFIER '{'` follows, so a declaration such as `定值 numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `傳回` term per element. Without a body, each source element is the term. `執行緒 f` requires a body and a kernel context; it retains the existing sum path, while other `執行緒` operators fail closed by name until their lowering is implemented. Without `執行緒`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
+The source is a shaped tensor or matrix; lists keep their methods. An optional `在 [coords]` binds one integer coordinate per source axis. A body is claimed only when `(定值 | 變值) IDENTIFIER '{'` follows, so a declaration such as `定值 numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `傳回` term per element. Without a body, each source element is the term. `執行緒 f` requires a body and a kernel context; it retains the existing sum path, while other `執行緒` operators fail closed by name until their lowering is implemented. Without `執行緒`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
 | Operators | Term | Result | Empty source |
 | --- | --- | --- | --- |
@@ -2926,32 +2926,32 @@ key types are rejected.
 
 `取自` is used for iteration (`遍歷 取自 items 定值 x`) and imports (`匯入 取自 "path"`).
 
-### Iteration coordinates (`於`)
+### Iteration coordinates (`在`)
 
-The optional `於` coordinate clause names the index a loop is walking. The
-en reader spelling is "at": `遍歷 取自 grid 於 [r, c]` reads as iterating
+The optional `在` coordinate clause names the index a loop is walking. The
+en reader spelling is "at": `遍歷 取自 grid 在 [r, c]` reads as iterating
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`遍歷 取自 items 於 [i] 定值 v`).
+  (`遍歷 取自 items 在 [i] 定值 v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`遍歷 取自 m 於 [k] 定值 v`); a composite-key
+  (`遍歷 取自 m 在 [k] 定值 v`); a composite-key
   `tabula<元組<K1, …, Kn>, V>` takes N names, one per part of the `元組`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
   axis, and later names walk successively inner axes; arity must equal rank
   (fewer or more names is a structured reject).
-- **No index surface, no `於`.** `copia`, cursors, generators, `textus`, and
-  `sparsa` have no index to name; `於` on any of them is a structured
+- **No index surface, no `在`.** `copia`, cursors, generators, `textus`, and
+  `sparsa` have no index to name; `在` on any of them is a structured
   reject (`itera_apud_requires_indexed_iterable`), not a silent no-op.
-- **`於` requires `取自`.** The coordinate clause is only valid on `遍歷 取自`
+- **`在` requires `取自`.** The coordinate clause is only valid on `遍歷 取自`
   (element iteration); `遍歷 範圍` range loops and `遍歷 從` reject it.
 - The coordinate names are immutable index bindings scoped to the loop body,
   distinct from the element binder that follows the clause.
 - **`執行緒` lane binder (FLD K2).** An optional `執行緒 IDENTIFIER` clause
-  (`filum_clause`, shared with `歸約`) follows the `於` clause and
-  precedes the mutability marker: `遍歷 取自 t 於 [i, j] 執行緒 f 定值 v { … }`.
-  The clause also parses without `於` (`遍歷 取自 t 執行緒 f 定值 v { … }`).
+  (`filum_clause`, shared with `歸約`) follows the `在` clause and
+  precedes the mutability marker: `遍歷 取自 t 在 [i, j] 執行緒 f 定值 v { … }`.
+  The clause also parses without `在` (`遍歷 取自 t 執行緒 f 定值 v { … }`).
   The parser claims `執行緒` only in that slot, so a binder named `執行緒` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.

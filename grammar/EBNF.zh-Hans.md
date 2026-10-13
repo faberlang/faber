@@ -267,7 +267,7 @@ itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expres
 # [128] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [129] apud_clause
-apud_clause ::= '于' '[' IDENTIFIER (',' IDENTIFIER)* ']'
+apud_clause ::= '在' '[' IDENTIFIER (',' IDENTIFIER)* ']'
 # [130] elige_stmt
 elige_stmt ::= '选择' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
 # [131] casu_elige_clause
@@ -718,7 +718,7 @@ NO_NEWLINE ::=
 | [`dum_stmt`](#dum-stmt) | `#当-stmt` | live |
 | [`itera_stmt`](#itera-stmt) | `#遍历-stmt` | live |
 | [`itera_binding`](#itera-binding) | `#遍历-binding` | live |
-| [`apud_clause`](#apud-clause) | `#于-clause` | live |
+| [`apud_clause`](#apud-clause) | `#在-clause` | live |
 | [`elige_stmt`](#elige-stmt) | `#选择-stmt` | live |
 | [`casu_elige_clause`](#casu-elige-clause) | `#情况-选择-clause` | live |
 | [`ceterum_clause`](#ceterum-clause) | `#默认-clause` | live |
@@ -887,7 +887,7 @@ productions. It is not a second keyword authority.
 | Endpoints | `调用` | capability call |
 | Error | `断言` | assert |
 | Iteration | `迄` | range until exclusive |
-| Grammar | `于` | keyword literal derived from the production |
+| Grammar | `在` | keyword literal derived from the production |
 | Expression | `最大值索引` | argmax reduction operator (en `argmax`) |
 | Expression | `最小值索引` | argmin reduction operator (en `argmin`) |
 | Params | `参数` | CLI arguments modifier |
@@ -2699,11 +2699,11 @@ first live match is selected, and a no-match or empty source yields `nihil`
 head and never shares the reduce/scan `常量`/`变量` binder tail.
 `首个匹配` claims only the expression-head position immediately followed
 by `(`; elsewhere the spelling stays an ordinary identifier. An optional
-`于` coordinate clause binds per-axis indices as in `遍历 取自`.
+`在` coordinate clause binds per-axis indices as in `遍历 取自`.
 
-`归约 经由 <op> 取自 source [于 [coords]] [按 key] ([线程 f] (常量 | 变量) x { 返回 term } | 兜底 identity)?` is the general reduction form. The optional tail is either a body (with an optional `线程`) or a bodiless identity; without either, the source elements are the terms. `经由` is mandatory and selects exactly one of `求和`, `求积`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, or `计数`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `经由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.归约(f)` (en `xs.reduce(f)`).
+`归约 经由 <op> 取自 source [在 [coords]] [按 key] ([线程 f] (常量 | 变量) x { 返回 term } | 兜底 identity)?` is the general reduction form. The optional tail is either a body (with an optional `线程`) or a bodiless identity; without either, the source elements are the terms. `经由` is mandatory and selects exactly one of `求和`, `求积`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, or `计数`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `经由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.归约(f)` (en `xs.reduce(f)`).
 
-The source is a shaped tensor or matrix; lists keep their methods. An optional `于 [coords]` binds one integer coordinate per source axis. A body is claimed only when `(常量 | 变量) IDENTIFIER '{'` follows, so a declaration such as `常量 numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `返回` term per element. Without a body, each source element is the term. `线程 f` requires a body and a kernel context; it retains the existing sum path, while other `线程` operators fail closed by name until their lowering is implemented. Without `线程`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
+The source is a shaped tensor or matrix; lists keep their methods. An optional `在 [coords]` binds one integer coordinate per source axis. A body is claimed only when `(常量 | 变量) IDENTIFIER '{'` follows, so a declaration such as `常量 numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `返回` term per element. Without a body, each source element is the term. `线程 f` requires a body and a kernel context; it retains the existing sum path, while other `线程` operators fail closed by name until their lowering is implemented. Without `线程`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
 | Operators | Term | Result | Empty source |
 | --- | --- | --- | --- |
@@ -2926,32 +2926,32 @@ key types are rejected.
 
 `取自` is used for iteration (`遍历 取自 items 常量 x`) and imports (`导入 取自 "path"`).
 
-### Iteration coordinates (`于`)
+### Iteration coordinates (`在`)
 
-The optional `于` coordinate clause names the index a loop is walking. The
-en reader spelling is "at": `遍历 取自 grid 于 [r, c]` reads as iterating
+The optional `在` coordinate clause names the index a loop is walking. The
+en reader spelling is "at": `遍历 取自 grid 在 [r, c]` reads as iterating
 `grid` at coordinates `[r, c]`.
 
 - **`lista`** (D3.1): one name binds the element's position
-  (`遍历 取自 items 于 [i] 常量 v`).
+  (`遍历 取自 items 在 [i] 常量 v`).
 - **`tabula`** (D3.1-D3.3): one name binds the entry's key
-  (`遍历 取自 m 于 [k] 常量 v`); a composite-key
+  (`遍历 取自 m 在 [k] 常量 v`); a composite-key
   `tabula<元组<K1, …, Kn>, V>` takes N names, one per part of the `元组`
   key, in declared part order.
 - **Tensor / matrix**: as before — one name per axis, first name = outermost
   axis, and later names walk successively inner axes; arity must equal rank
   (fewer or more names is a structured reject).
-- **No index surface, no `于`.** `copia`, cursors, generators, `textus`, and
-  `sparsa` have no index to name; `于` on any of them is a structured
+- **No index surface, no `在`.** `copia`, cursors, generators, `textus`, and
+  `sparsa` have no index to name; `在` on any of them is a structured
   reject (`itera_apud_requires_indexed_iterable`), not a silent no-op.
-- **`于` requires `取自`.** The coordinate clause is only valid on `遍历 取自`
+- **`在` requires `取自`.** The coordinate clause is only valid on `遍历 取自`
   (element iteration); `遍历 范围` range loops and `遍历 借自` reject it.
 - The coordinate names are immutable index bindings scoped to the loop body,
   distinct from the element binder that follows the clause.
 - **`线程` lane binder (FLD K2).** An optional `线程 IDENTIFIER` clause
-  (`filum_clause`, shared with `归约`) follows the `于` clause and
-  precedes the mutability marker: `遍历 取自 t 于 [i, j] 线程 f 常量 v { … }`.
-  The clause also parses without `于` (`遍历 取自 t 线程 f 常量 v { … }`).
+  (`filum_clause`, shared with `归约`) follows the `在` clause and
+  precedes the mutability marker: `遍历 取自 t 在 [i, j] 线程 f 常量 v { … }`.
+  The clause also parses without `在` (`遍历 取自 t 线程 f 常量 v { … }`).
   The parser claims `线程` only in that slot, so a binder named `线程` after
   the mutability marker stays an ordinary name. The binder is declared
   metadata; semantic passes own what it binds.
