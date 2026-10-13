@@ -800,7 +800,9 @@ impl std::hash::Hash for MirConstant {
         match self {
             Self::Int(v) => v.hash(state),
             Self::UInt(v) => v.hash(state),
-            Self::Float(v) => v.to_bits().hash(state),
+            // WHY: derived `PartialEq` makes `0.0 == -0.0`, so both zeros
+            // must share one hash.
+            Self::Float(v) => (if *v == 0.0 { 0 } else { v.to_bits() }).hash(state),
             Self::String(v) | Self::Ascii(v) => v.hash(state),
             Self::Bool(v) => v.hash(state),
             Self::Nil | Self::Unit => {}
@@ -1759,3 +1761,7 @@ pub enum MirOptionChainLink {
         args: Vec<MirOperand>,
     },
 }
+
+#[cfg(test)]
+#[path = "nodes_test.rs"]
+mod nodes_test;

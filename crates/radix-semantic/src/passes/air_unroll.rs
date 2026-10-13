@@ -299,8 +299,10 @@ fn rewrite_block(
                     *presentation = nested_presentation;
                     let (unrolled, acc_final) =
                         emit_unrolled_lanes(presentation, &ready, interner, ids);
+                    // WHY: the loop is the tail, so every statement precedes it
+                    // and keeps reading the accumulator's own definition; the
+                    // lane-final defs exist only inside the unrolled block.
                     freeze_accumulators(block, &acc_final);
-                    remap_acc_paths_in_stmts(&mut block.statements, &acc_final);
                     block.expr = Some(Box::new(HirExpression {
                         id: ids.next_hir(),
                         kind: HirExpressionKind::Block(HirBlock::simple(unrolled, None, span)),

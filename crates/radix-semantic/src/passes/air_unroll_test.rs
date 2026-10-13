@@ -9,10 +9,11 @@
 //! causae, and a still-green full-prefix path.
 
 use crate::test_support::args_have_no_legacy_message;
-use crate::{PassConfig, SemanticError, SemanticErrorKind};
+use crate::{PassConfig, RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_program, walk_stmt};
 use radix_hir::{
-    HirExpression, HirExpressionKind, HirLiteral, HirModule, HirStatement, HirStatementKind,
+    HirExpression, HirExpressionKind, HirItemKind, HirLiteral, HirLocal, HirModule, HirStatement,
+    HirStatementKind,
 };
 use radix_target::Target;
 
@@ -1849,4 +1850,91 @@ impl HirVisitor for FindIteraRange {
         }
         walk_expr(self, expr);
     }
+}
+
+/// A-180: when the loop is the block's tail expression every statement of the
+/// block precedes it, so a pre-loop read of an updated accumulator must keep
+/// pointing at the accumulator's own definition. Remapping it to the lane-final
+/// definition would read a binding that exists only inside the unrolled tail
+/// block.
+///
+/// No source construct places an `itera ab` in the tail slot of an AIR-lane
+/// function today, so the case is built by moving the loop statement of a
+/// host-lane function into the tail slot and running the pass on it directly.
+#[test]
+fn tail_position_unroll_leaves_pre_loop_accumulator_reads_alone() {
+    let source = r"
+functio tail_loop() → vacuum {
+    varia f32 total ← 0.0
+    fixum f32 before ← total
+    itera ab 0‥4 fixum i {
+        total ← total + 1.0
+    }
+}
+";
+    let lex = radix_lexer::lex(source);
+    let mut parse = radix_parser::parse(lex);
+    let program = parse.program.expect("parse");
+    let config = PassConfig::for_target(Target::MirWasm);
+    let mut result = crate::analyze(&program, &config, &mut parse.interner);
+    assert!(
+        result.is_ok(),
+        "host-lane loop must analyze: {:?}",
+        result.diagnostics
+    );
+    let mut hir = result.hir.take().expect("typed HIR");
+
+    let mut lanes = RadixLaneMetadata::default();
+    for item in &mut hir.items {
+        let def_id = item.def_id;
+        let HirItemKind::Function(function) = &mut item.kind else {
+            continue;
+        };
+        let body = function.body.as_mut().expect("function body");
+        let stmt = body.statements.pop().expect("loop statement");
+        let HirStatementKind::Expr(expr) = stmt.kind else {
+            panic!("the trailing statement is the loop expression");
+        };
+        assert!(matches!(expr.kind, HirExpressionKind::Itera { .. }));
+        body.expr = Some(Box::new(expr));
+        lanes.insert(def_id, RadixLane::Air);
+    }
+
+    super::air_unroll::unroll(
+        &mut hir,
+        &mut result.presentation,
+        &lanes,
+        &mut parse.interner,
+        &result.types,
+    )
+    .expect("tail-position loop must unroll");
+    assert!(!has_itera(&hir), "tail-position loop must be unrolled");
+
+    let body = hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Function(function) => function.body.as_ref(),
+            _ => None,
+        })
+        .expect("function body");
+    let locals: Vec<&HirLocal> = body
+        .statements
+        .iter()
+        .filter_map(|stmt| match &stmt.kind {
+            HirStatementKind::Local(local) => Some(local),
+            _ => None,
+        })
+        .collect();
+    let [total, before] = locals.as_slice() else {
+        panic!("expected the two pre-loop locals, found {}", locals.len());
+    };
+    assert!(
+        matches!(
+            &before.init,
+            Some(HirExpression { kind: HirExpressionKind::Path(def), .. }) if *def == total.def_id
+        ),
+        "pre-loop read must stay on the accumulator's own definition: {:?}",
+        before.init
+    );
 }
