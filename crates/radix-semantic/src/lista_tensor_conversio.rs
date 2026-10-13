@@ -184,8 +184,8 @@ pub fn is_numeric_element(ty: TypeId, types: &TypeTable) -> bool {
 }
 
 /// Route C padded snapshot facts: the element type and the literal bound `N`,
-/// when `source` is a numeric bounded lista whose capacity matches the
-/// rank-1 literal dim of the tensor `target`.
+/// when `source` is a numeric bounded lista whose element type is the tensor
+/// `target`'s element and whose capacity matches the rank-1 literal dim.
 #[must_use]
 pub fn resolve_bounded_lista_padded_shape(
     source: TypeId,
@@ -196,9 +196,9 @@ pub fn resolve_bounded_lista_padded_shape(
         normalized_type(source, types),
         normalized_type(target, types),
     ) {
-        (Type::BoundedArray { element, capacity }, Type::Tensor(_, shape)) => {
+        (Type::BoundedArray { element, capacity }, Type::Tensor(target_elem, shape)) => {
             let elem = *element;
-            if !is_numeric_element(elem, types) {
+            if !is_numeric_element(elem, types) || !types.equals(elem, *target_elem) {
                 return None;
             }
             let dim =
