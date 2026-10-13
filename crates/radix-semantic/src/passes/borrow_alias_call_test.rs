@@ -268,3 +268,120 @@ fn conditional_source_rebind_keeps_the_may_alias() {
 fn unconditional_alias_rebind_clears_the_alias() {
     assert_accepts("    var tf32[2, 2] alias ← g\n    alias ← fresh\n    mut_read(mut g, alias)");
 }
+
+// =============================================================================
+// User method calls: the receiver's methods obey the same overlap rule
+// =============================================================================
+
+const METHOD_PRELUDE: &str = r"class Kern {
+    fn mut_read(mut tf32[2, 2] a, tf32[2, 2] b) → void {
+        a ⇇ b
+    }
+
+    fn mut_ref(mut tf32[2, 2] a, ref tf32[2, 2] b) → void {
+        a ⇇ b
+    }
+
+    fn mut_mut(mut tf32[2, 2] a, mut tf32[2, 2] b) → void {
+        a ⇇ b
+    }
+
+    fn read_read(tf32[2, 2] a, tf32[2, 2] b) → void {
+        print a.flatten()
+        print b.flatten()
+    }
+}
+";
+
+/// `body` runs in `main` after `g`, `fresh` and a `Kern` receiver `k`.
+fn method_program(body: &str) -> String {
+    format!(
+        r"{METHOD_PRELUDE}
+main {{
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    var tf32[2, 2] g ← flat ↦ tf32[2, 2]
+    var tf32[2, 2] fresh ← flat ↦ tf32[2, 2]
+    const Kern k ← Kern {{}}
+{body}
+}}
+"
+    )
+}
+
+fn method_errors(body: &str) -> Vec<(SemanticErrorKind, String)> {
+    analyze_en(&method_program(body))
+        .result
+        .diagnostics
+        .iter()
+        .filter(|d| d.is_error())
+        .map(|d| (d.kind.clone(), issue(d).unwrap_or_default().to_string()))
+        .collect()
+}
+
+fn assert_method_accepts(body: &str) {
+    let found = method_errors(body);
+    assert!(found.is_empty(), "expected no error, got: {found:?}");
+}
+
+fn assert_method_rejects(body: &str, expected: &str) {
+    let found = method_errors(body);
+    assert!(
+        found.iter().any(|(_, issue)| issue == expected),
+        "expected issue {expected:?}, got: {found:?}"
+    );
+}
+
+#[test]
+fn method_call_with_the_same_tensor_mut_and_read_is_rejected() {
+    assert_method_rejects("    k.mut_read(mut g, g)", "use_while_mutably_borrowed");
+}
+
+#[test]
+fn method_call_with_the_same_tensor_in_two_mut_arguments_is_rejected() {
+    assert_method_rejects("    k.mut_mut(mut g, mut g)", "mutable_borrow_conflict");
+}
+
+#[test]
+fn method_call_with_the_same_tensor_mut_and_ref_is_rejected() {
+    assert_method_rejects("    k.mut_ref(mut g, g)", "shared_borrow_conflict");
+}
+
+#[test]
+fn method_call_overlap_through_an_alias_is_rejected() {
+    assert_method_rejects(
+        "    var tf32[2, 2] alias ← g\n    k.mut_read(mut g, alias)",
+        "use_while_mutably_borrowed",
+    );
+    assert_method_rejects(
+        "    var tf32[2, 2] alias ← g\n    k.mut_read(mut alias, g)",
+        "use_while_mutably_borrowed",
+    );
+    assert_method_rejects(
+        "    var tf32[2, 2] alias ← g\n    k.mut_mut(mut g, mut alias)",
+        "mutable_borrow_conflict",
+    );
+}
+
+#[test]
+fn method_call_view_of_the_mut_argument_is_rejected() {
+    assert_method_rejects(
+        "    k.mut_read(mut g, g.transpose())",
+        "tensor_view_read_only",
+    );
+}
+
+#[test]
+fn method_call_without_overlap_stays_legal() {
+    assert_method_accepts("    k.mut_read(mut g, fresh)");
+    assert_method_accepts("    k.mut_mut(mut g, mut fresh)");
+    assert_method_accepts("    k.read_read(g, g)");
+    assert_method_accepts("    var tf32[2, 2] dup ← copy g\n    k.mut_read(mut g, dup)");
+}
+
+#[test]
+fn sequential_method_calls_release_call_scoped_borrows() {
+    assert_method_accepts("    k.mut_read(mut g, fresh)\n    k.mut_read(mut g, fresh)");
+    assert_method_accepts(
+        "    var tf32[2, 2] alias ← g\n    k.mut_read(mut g, fresh)\n    k.mut_read(mut alias, fresh)",
+    );
+}

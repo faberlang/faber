@@ -345,6 +345,10 @@ struct BorrowChecker<'a> {
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
+    /// Declared class-method param contracts keyed by `(class, method name)`: a
+    /// user `MethodCall` carries no callee expression, so the call-site rules
+    /// resolve its parameters from the receiver's class.
+    method_params: FxHashMap<(DefId, radix_lexer::Symbol), Vec<ParamType>>,
     /// BRI-2 region facts consumed (never reconstructed) for marked-value
     /// conflict decisions; `None` keeps the block-scope approximation.
     regions: Option<&'a RegionFacts>,
@@ -404,6 +408,7 @@ impl<'a> BorrowChecker<'a> {
             immutable_locals: FxHashSet::default(),
             unmarked_params: FxHashSet::default(),
             func_params: FxHashMap::default(),
+            method_params: FxHashMap::default(),
             regions,
             stmt_node: None,
             errors: Vec::new(),
@@ -430,6 +435,10 @@ impl<'a> BorrowChecker<'a> {
             HirItemKind::Struct(strukt) => {
                 for method in &strukt.methods {
                     self.index_function(method.def_id, &method.func);
+                    self.method_params.insert(
+                        (item.def_id, method.func.name),
+                        Self::declared_params(&method.func),
+                    );
                 }
             }
             HirItemKind::Constant(_) => self.own.note_module_const(item.def_id),
@@ -438,8 +447,11 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn index_function(&mut self, def_id: DefId, func: &HirFunction) {
-        let params = func
-            .params
+        self.func_params.insert(def_id, Self::declared_params(func));
+    }
+
+    fn declared_params(func: &HirFunction) -> Vec<ParamType> {
+        func.params
             .iter()
             .map(|param| ParamType {
                 ty: param.ty,
@@ -452,8 +464,7 @@ impl<'a> BorrowChecker<'a> {
                 optional: param.optional,
                 sponte: param.sponte,
             })
-            .collect();
-        self.func_params.insert(def_id, params);
+            .collect()
     }
 
     fn check_item(&mut self, item: &HirItem) {
@@ -761,13 +772,27 @@ impl<'a> BorrowChecker<'a> {
             return;
         };
         let params = params.to_vec();
-        self.check_tensor_view_arg_aliasing(args, &params);
         // Named function Paths leave `callee.ty` unset. Applying the retired
         // lifetime simulation to those calls would reject D-1 unmarked
         // `const` → `mut` param use. Language `mut` dest borrows are
         // call-scoped so sequential use after a single `mut` param call stays
         // legal. Own-param transfers still run below.
-        let rust_sim = callee.ty.is_some();
+        self.check_args_against(&params, callee.ty.is_some(), args);
+    }
+
+    /// The parameters a user `MethodCall` is checked against, when the
+    /// receiver's class declares the method in this module.
+    fn user_method_params(
+        &self,
+        receiver: &HirExpression,
+        method: radix_lexer::Symbol,
+    ) -> Option<Vec<ParamType>> {
+        let class = super::method_receiver_mutation::class_def(self.types, receiver.ty?)?;
+        self.method_params.get(&(class, method)).cloned()
+    }
+
+    fn check_args_against(&mut self, params: &[ParamType], rust_sim: bool, args: &[HirCallArg]) {
+        self.check_tensor_view_arg_aliasing(args, params);
         let language_call_borrows = !(rust_sim && self.rust_lifetime);
         // Their mut/ref dest-call borrows are call-scoped in every pass: real
         // Rust releases an argument's `&mut`/`&` reborrow when the call ends,
@@ -2500,8 +2525,14 @@ impl HirVisitor for BorrowChecker<'_> {
                 } else {
                     self.visit_expr(receiver);
                 }
-                for arg in args {
-                    self.check_arg_expr(arg);
+                // A declared class method is held to its parameter modes like
+                // a named function: a `mut` argument may not overlap another.
+                if let Some(params) = self.user_method_params(receiver, *method) {
+                    self.check_args_against(&params, false, args);
+                } else {
+                    for arg in args {
+                        self.check_arg_expr(arg);
+                    }
                 }
             }
             _ => walk_expr(self, expr),
