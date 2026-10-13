@@ -1978,13 +1978,21 @@ fn pd26_optional_non_null_postfix_matrix() {
     assert_eq!(optional.object.span, span_for(source, "object"));
     assert!(matches!(optional.chain, OptionalChainKind::Member(_)));
 
-    for (source, expected) in [
-        ("fixum _ value ← a?.", "identifier"),
-        ("fixum _ value ← a?[0", "']'"),
-        ("fixum _ value ← a?(1", "')'"),
-        ("fixum _ value ← a!.", "identifier"),
-        ("fixum _ value ← a![0", "']'"),
-        ("fixum _ value ← a!(1", "')'"),
+    for (source, arg_name, expected) in [
+        ("fixum _ value ← a?.", "expected", "identifier"),
+        ("fixum _ value ← a?[0", "issue", "optional_index_end"),
+        (
+            "fixum _ value ← a?(1",
+            "issue",
+            "optional_call_arguments_end",
+        ),
+        ("fixum _ value ← a!.", "expected", "identifier"),
+        ("fixum _ value ← a![0", "issue", "non_null_index_end"),
+        (
+            "fixum _ value ← a!(1",
+            "issue",
+            "non_null_call_arguments_end",
+        ),
     ] {
         let result = parse_program(source);
         let error = result
@@ -1995,7 +2003,7 @@ fn pd26_optional_non_null_postfix_matrix() {
                     && error
                         .args
                         .iter()
-                        .any(|arg| arg.name == "expected" && arg.value == expected)
+                        .any(|arg| arg.name == arg_name && arg.value == expected)
             })
             .unwrap_or_else(|| panic!("expected {expected:?} error, got {:?}", result.errors));
         let expected_span = if expected == "identifier" {

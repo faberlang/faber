@@ -3624,3 +3624,63 @@ message = "expected an opening brace for the custodi body"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "expected a closing brace after the custodi clauses"
+
+[diagnostics.PARSE001.issues.conditional_else_marker]
+message = "expected '✗' after the conditional value"
+
+[diagnostics.PARSE001.issues.call_arguments_end]
+message = "expected ')' after the call arguments"
+
+[diagnostics.PARSE001.issues.index_end]
+message = "expected ']' after the index expression"
+
+[diagnostics.PARSE001.issues.gradient_selectors_end]
+message = "expected ']' after the gradient selectors"
+
+[diagnostics.PARSE001.issues.optional_index_end]
+message = "expected ']' after the optional index expression"
+
+[diagnostics.PARSE001.issues.optional_call_arguments_end]
+message = "expected ')' after the optional call arguments"
+
+[diagnostics.PARSE001.issues.non_null_index_end]
+message = "expected ']' after the non-null index expression"
+
+[diagnostics.PARSE001.issues.non_null_call_arguments_end]
+message = "expected ')' after the non-null call arguments"
+
+[diagnostics.PARSE001.issues.first_match_start]
+message = "expected '(' after 'primus_quem'"
+
+[diagnostics.PARSE001.issues.first_match_source_separator]
+message = "expected ',' after the first-match source"
+
+[diagnostics.PARSE001.issues.first_match_predicate_tail]
+message = "expected the 'ubi' predicate tail"
+
+[diagnostics.PARSE001.issues.first_match_end]
+message = "expected ')' after the first-match predicate"
+
+[diagnostics.PARSE001.issues.typed_constructor_fields_end]
+message = "expected a closing brace after the constructor fields"
+
+[diagnostics.PARSE001.issues.inferred_constructor_elements_end]
+message = "expected ']' after the inferred constructor elements"
+
+[diagnostics.PARSE001.issues.array_literal_end]
+message = "expected ']' after the array elements"
+
+[diagnostics.PARSE001.issues.parenthesized_expression_end]
+message = "expected ')' after the parenthesized expression"
+
+[diagnostics.PARSE001.issues.ratio_type_arguments_start]
+message = "expected '<' after 'ratio'"
+
+[diagnostics.PARSE001.issues.ratio_type_arguments_end]
+message = "expected '>' after the ratio type arguments"
+
+[diagnostics.PARSE001.issues.ratio_fields_start]
+message = "expected an opening brace after the ratio type arguments"
+
+[diagnostics.PARSE001.issues.ratio_fields_end]
+message = "expected a closing brace after the ratio fields"

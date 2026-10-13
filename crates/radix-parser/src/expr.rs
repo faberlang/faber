@@ -307,7 +307,7 @@ impl Parser {
         first_inner_id: NodeId,
     ) -> Result<Expr, ParseError> {
         let then = Box::new(self.parse_expression()?);
-        self.expect_token(&TokenKind::Ballot, "expected '✗' in conditional")?;
+        self.expect_issue(&TokenKind::Ballot, "conditional_else_marker")?;
         let else_span = self.current_span();
         let else_ = Box::new(self.nested(
             ParseErrorKind::ExpressionInvalid,
@@ -1283,7 +1283,7 @@ impl Parser {
             ExprKind::Literal(Literal::String(_) | Literal::Forma(_))
         );
         let args = self.parse_argument_list(allows_template_labels)?;
-        self.expect_token(&TokenKind::RParen, "expected ')'")?;
+        self.expect_issue(&TokenKind::RParen, "call_arguments_end")?;
         Ok(self.postfix_expr(
             start,
             ExprKind::Call(CallExpr {
@@ -1309,7 +1309,7 @@ impl Parser {
     fn parse_index_postfix(&mut self, start: Span, object: Expr) -> Result<Expr, ParseError> {
         self.advance();
         let index = Box::new(self.parse_expression()?);
-        self.expect_token(&TokenKind::RBracket, "expected ']'")?;
+        self.expect_issue(&TokenKind::RBracket, "index_end")?;
         Ok(self.postfix_expr(
             start,
             ExprKind::Index(IndexExpr {
@@ -1375,10 +1375,7 @@ impl Parser {
                     break;
                 }
             }
-            self.expect_token(
-                &TokenKind::RBracket,
-                "expected ']' after gradient selectors",
-            )?;
+            self.expect_issue(&TokenKind::RBracket, "gradient_selectors_end")?;
             selectors
         } else {
             Vec::new()
@@ -1406,12 +1403,12 @@ impl Parser {
                     PostfixPayload::Member => OptionalChainKind::Member(self.parse_member_ident()?),
                     PostfixPayload::Index => {
                         let index = Box::new(self.parse_expression()?);
-                        self.expect_token(&TokenKind::RBracket, "expected ']'")?;
+                        self.expect_issue(&TokenKind::RBracket, "optional_index_end")?;
                         OptionalChainKind::Index(index)
                     }
                     PostfixPayload::Call => {
                         let args = self.parse_argument_list(false)?;
-                        self.expect_token(&TokenKind::RParen, "expected ')'")?;
+                        self.expect_issue(&TokenKind::RParen, "optional_call_arguments_end")?;
                         OptionalChainKind::Call(args)
                     }
                 };
@@ -1428,12 +1425,12 @@ impl Parser {
                     PostfixPayload::Member => NonNullKind::Member(self.parse_member_ident()?),
                     PostfixPayload::Index => {
                         let index = Box::new(self.parse_expression()?);
-                        self.expect_token(&TokenKind::RBracket, "expected ']'")?;
+                        self.expect_issue(&TokenKind::RBracket, "non_null_index_end")?;
                         NonNullKind::Index(index)
                     }
                     PostfixPayload::Call => {
                         let args = self.parse_argument_list(false)?;
-                        self.expect_token(&TokenKind::RParen, "expected ')'")?;
+                        self.expect_issue(&TokenKind::RParen, "non_null_call_arguments_end")?;
                         NonNullKind::Call(args)
                     }
                 };
@@ -2088,7 +2085,7 @@ impl Parser {
     fn parse_first_match_expr(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         self.eat_identifier_text("primus_quem");
-        self.expect_token(&TokenKind::LParen, "expected '(' after 'primus_quem'")?;
+        self.expect_issue(&TokenKind::LParen, "first_match_start")?;
 
         let source = Box::new(self.parse_expression()?);
         let apud = if self.eat_keyword_ident(TokenKind::Apud) {
@@ -2096,19 +2093,16 @@ impl Parser {
         } else {
             Vec::new()
         };
-        self.expect_token(
-            &TokenKind::Comma,
-            "expected ',' after the first-match source",
-        )?;
+        self.expect_issue(&TokenKind::Comma, "first_match_source_separator")?;
         if !self.eat_identifier_text("ubi") {
-            return Err(self.expected_message_error("expected 'ubi' predicate tail"));
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "first_match_predicate_tail"),
+            );
         }
         let binding = self.parse_ident()?;
         let body = self.parse_block()?;
-        self.expect_token(
-            &TokenKind::RParen,
-            "expected ')' after the first-match predicate",
-        )?;
+        self.expect_issue(&TokenKind::RParen, "first_match_end")?;
 
         Ok(Expr {
             id: self.next_id(),
@@ -2372,7 +2366,7 @@ impl Parser {
                     let type_span = ident.span;
                     self.advance();
                     let mut fields = self.parse_object_fields()?;
-                    self.expect_token(&TokenKind::RBrace, "expected '}'")?;
+                    self.expect_issue(&TokenKind::RBrace, "typed_constructor_fields_end")?;
                     self.parse_construction_source(&mut fields)?;
                     let object = Expr {
                         id: self.next_id(),
@@ -2429,7 +2423,7 @@ impl Parser {
                 self.advance();
                 self.advance();
                 let elements = self.parse_array_elements()?;
-                self.expect_token(&TokenKind::RBracket, "expected ']'")?;
+                self.expect_issue(&TokenKind::RBracket, "inferred_constructor_elements_end")?;
                 let array = Expr {
                     id: self.next_id(),
                     kind: ExprKind::Array(ArrayExpr { elements }),
@@ -2485,7 +2479,7 @@ impl Parser {
             TokenKind::LBracket => {
                 self.advance();
                 let elements = self.parse_array_elements()?;
-                self.expect_token(&TokenKind::RBracket, "expected ']'")?;
+                self.expect_issue(&TokenKind::RBracket, "array_literal_end")?;
                 ExprKind::Array(ArrayExpr { elements })
             }
 
@@ -2500,7 +2494,7 @@ impl Parser {
             TokenKind::LParen => {
                 self.advance();
                 let inner = self.parse_expression()?;
-                self.expect_token(&TokenKind::RParen, "expected ')'")?;
+                self.expect_issue(&TokenKind::RParen, "parenthesized_expression_end")?;
                 ExprKind::Paren(Box::new(inner))
             }
 
@@ -2545,7 +2539,7 @@ impl Parser {
     /// the constructed type matches the annotation path under any reader pack.
     fn parse_ratio_constructor(&mut self, name: Ident) -> Result<ExprKind, ParseError> {
         let name = self.canonical_type_ident(name);
-        self.expect_token(&TokenKind::LtAscii, "expected '<' after 'ratio'")?;
+        self.expect_issue(&TokenKind::LtAscii, "ratio_type_arguments_start")?;
 
         let mut type_args = Vec::new();
         let mut labels = HashSet::new();
@@ -2557,15 +2551,12 @@ impl Parser {
                 break;
             }
         }
-        self.expect_token(&TokenKind::GtAscii, "expected '>'")?;
+        self.expect_issue(&TokenKind::GtAscii, "ratio_type_arguments_end")?;
         let type_span = name.span.merge(self.previous_span());
 
-        self.expect_token(
-            &TokenKind::LBrace,
-            "expected '{' after ratio type arguments",
-        )?;
+        self.expect_issue(&TokenKind::LBrace, "ratio_fields_start")?;
         let mut fields = self.parse_object_fields()?;
-        self.expect_token(&TokenKind::RBrace, "expected '}' after ratio fields")?;
+        self.expect_issue(&TokenKind::RBrace, "ratio_fields_end")?;
         self.parse_construction_source(&mut fields)?;
 
         let object = Expr {
