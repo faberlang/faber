@@ -564,11 +564,16 @@ fn link_sibling_import_items(
 ) {
     for import_item in &import.items {
         // Derive the caller's exports under the item's effective binding; each
-        // target is keyed by `(unit, import item def, member)`.
-        let binding = unit
-            .analysis
-            .interner
-            .resolve(import_item.alias.unwrap_or(import_item.name));
+        // target is keyed by `(unit, import item def, member)`. A selective
+        // import binds no namespace, so its surface is keyed by the import
+        // path (`import_binding` in analyze.rs), not by the member's name.
+        let binding = if import.selective {
+            unit.analysis.interner.resolve(import.path)
+        } else {
+            unit.analysis
+                .interner
+                .resolve(import_item.alias.unwrap_or(import_item.name))
+        };
         let exports = unit
             .namespace_exports
             .get(binding)

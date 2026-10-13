@@ -133,3 +133,88 @@ fn package_mir_links_aliased_selective_library_function_call() {
         vec!["15".to_owned()]
     );
 }
+
+const SIBLING_LOCAL: &str = r#"+++
+locale = "en"
++++
+fn double(int x) → int {
+    return x + x
+}
+
+@ public
+fn quad(int x) → int {
+    return double(double(x))
+}
+"#;
+
+const SIBLING_SELECTIVE_MAIN: &str = r#"+++
+locale = "en"
++++
+import from "./local" const quad
+
+main {
+    print quad(3)
+}
+"#;
+
+const SIBLING_ALIAS_MAIN: &str = r#"+++
+locale = "en"
++++
+import from "./local" const quad as fourfold
+
+main {
+    print fourfold(5)
+}
+"#;
+
+fn run_sibling_main(tag: &str, main: &str) -> Result<Vec<String>, Vec<Diagnostic>> {
+    let dir = crate::test_support::test_temp_dir(tag);
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "selective-sibling-link"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("local.fab"), SIBLING_LOCAL).expect("write local.fab");
+    fs::write(src.join("main.fab"), main).expect("write main.fab");
+    let mut host = BufferHost::default();
+    run_package_mir(
+        &Config::default(),
+        &src.join("main.fab"),
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )?;
+    Ok(host.stdout_lines)
+}
+
+#[test]
+fn package_mir_links_selective_sibling_function_calls() {
+    assert_eq!(
+        run_sibling_main("selective-link-sibling", SIBLING_SELECTIVE_MAIN)
+            .unwrap_or_else(|errors| panic!("sibling selective import must link, got {errors:?}")),
+        vec!["12".to_owned()]
+    );
+}
+
+#[test]
+fn package_mir_links_aliased_selective_sibling_function_call() {
+    assert_eq!(
+        run_sibling_main("selective-link-sibling-alias", SIBLING_ALIAS_MAIN).unwrap_or_else(
+            |errors| panic!("aliased sibling selective import must link, got {errors:?}")
+        ),
+        vec!["20".to_owned()]
+    );
+}
