@@ -1158,7 +1158,7 @@ fn load_package_with_session(
                     diagnostics.push(import_unsupported_diagnostic(&canonical, decl, import_path));
                 }
                 ImportResolution::Error(diag) => {
-                    diagnostics.push(diag.with_span(decl.span));
+                    diagnostics.push(import_error_at_decl(diag, &canonical, &loaded, decl));
                 }
             }
         }
@@ -1220,6 +1220,26 @@ fn load_package_with_session(
 enum ImportTarget {
     Local(PathBuf),
     Library(crate::library::ResolvedLibraryModule),
+}
+
+/// Pin an import-resolution failure to its import declaration with a physical
+/// line. A bare span renders its byte offset as the location (`main.fab:474`
+/// for a 100-line file). Spans are body-relative, so the frontmatter's lines
+/// are added back.
+fn import_error_at_decl(
+    diagnostic: Diagnostic,
+    file: &Path,
+    loaded: &crate::source_files::LoadedPackageSource,
+    decl: &ImportDecl,
+) -> Diagnostic {
+    let mut diagnostic =
+        diagnostic.with_source_context(&file.display().to_string(), &loaded.body, decl.span);
+    radix_module::driver::adjust_diagnostic_lines_for_body(
+        std::slice::from_mut(&mut diagnostic),
+        &loaded.raw_source,
+        loaded.body_byte_offset,
+    );
+    diagnostic
 }
 
 /// Bind every package file's imports once the whole source graph has loaded.

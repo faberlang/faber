@@ -574,3 +574,81 @@ fn add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<
     );
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// Resolver whose only provider (`web`) is locked to an empty interface root,
+/// so `web:nope` deterministically yields `PKG001:unknown_library_module`
+/// without touching a library home.
+fn locked_empty_provider_resolver(root: &Path) -> LibraryResolver {
+    let interface_root = root.join("vendor");
+    fs::create_dir_all(&interface_root).expect("mkdir vendor");
+    let mut locked = BTreeMap::new();
+    locked.insert(
+        "web".to_owned(),
+        crate::library::LockedLibraryPackage {
+            name: "web".to_owned(),
+            version: "0.1.0".to_owned(),
+            interface_root,
+        },
+    );
+    LibraryResolver::with_optional_home(None).with_package_lock(BTreeMap::new(), locked)
+}
+
+fn unknown_library_module_diagnostic(source: &str, label: &str) -> Diagnostic {
+    let dir = temp_root(label);
+    let entry = dir.join("main.fab");
+    fs::write(&entry, source).expect("write entry");
+    let spec = discover_package(&entry).expect("discover package");
+    let resolver = locked_empty_provider_resolver(&dir);
+
+    let diagnostics = match analyze_package_spec_with_deadline(
+        &Config::default(),
+        spec,
+        &resolver,
+        false,
+        None,
+        None,
+        &test_seams(),
+    ) {
+        Ok(_) => panic!("unknown library module must fail package analysis"),
+        Err(diagnostics) => diagnostics,
+    };
+    let _ = fs::remove_dir_all(&dir);
+    diagnostics
+        .into_iter()
+        .find(|diag| diag.issue() == Some("unknown_library_module"))
+        .expect("unknown_library_module diagnostic")
+}
+
+/// The compact renderer prints `file:line`; a bare byte span printed
+/// `file:<byte offset>` (`main.fab:474` for a 100-line file).
+#[test]
+fn unknown_library_module_diagnostic_names_the_import_line() {
+    let diagnostic = unknown_library_module_diagnostic(
+        "\n\nimport from \"web:nope\" nope\nmain {}\n",
+        "unknown-module-line",
+    );
+
+    assert_eq!(diagnostic.code, Some("PKG001"));
+    assert_eq!(diagnostic.line, Some(3), "{diagnostic:?}");
+    assert_eq!(
+        diagnostic.display_location(),
+        format!("{}:3", diagnostic.file)
+    );
+}
+
+/// Spans are body-relative; frontmatter lines must be added back so the
+/// reported line is the physical line in the file.
+#[test]
+fn unknown_library_module_diagnostic_line_counts_frontmatter() {
+    let diagnostic = unknown_library_module_diagnostic(
+        "+++\nlocale = \"en\"\n+++\n\nimport from \"web:nope\" nope\nmain {}\n",
+        "unknown-module-frontmatter-line",
+    );
+
+    assert_eq!(diagnostic.code, Some("PKG001"));
+    assert_eq!(diagnostic.line, Some(5), "{diagnostic:?}");
+    assert_eq!(
+        diagnostic.display_location(),
+        format!("{}:5", diagnostic.file)
+    );
+}
