@@ -5373,3 +5373,27 @@ message = "expected '>' after generic parameters"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "expected '>' after contract type arguments"
+
+[diagnostics.PARSE001.issues.apud_coordinates_start]
+message = "expected '[' after 'apud'"
+
+[diagnostics.PARSE001.issues.apud_coordinates_end]
+message = "expected ']' after the 'apud' coordinates"
+
+[diagnostics.PARSE001.issues.elige_body_start]
+message = "expected an opening brace for the elige body"
+
+[diagnostics.PARSE001.issues.elige_body_end]
+message = "expected a closing brace after the elige cases"
+
+[diagnostics.PARSE001.issues.discerne_body_start]
+message = "expected an opening brace for the discerne body"
+
+[diagnostics.PARSE001.issues.discerne_body_end]
+message = "expected a closing brace after the discerne arms"
+
+[diagnostics.PARSE001.issues.custodi_body_start]
+message = "expected an opening brace for the custodi body"
+
+[diagnostics.PARSE001.issues.custodi_body_end]
+message = "expected a closing brace after the custodi clauses"

@@ -794,16 +794,32 @@ fn parses_itera_loop_apud_clause_and_preserves_coordinate_order() {
 
 #[test]
 fn rejects_malformed_itera_apud_clauses_with_structured_errors() {
-    for (source, expected) in [
-        (r"itera ex m apud fixum cell { }", "'[' after 'apud'"),
-        (r"itera ex m apud (i, j) fixum cell { }", "'[' after 'apud'"),
-        (r"itera ex m apud [] fixum cell { }", "identifier"),
-        (r"itera ex m apud [i,] fixum cell { }", "identifier"),
+    for (source, arg, value) in [
+        (
+            r"itera ex m apud fixum cell { }",
+            "issue",
+            "apud_coordinates_start",
+        ),
+        (
+            r"itera ex m apud (i, j) fixum cell { }",
+            "issue",
+            "apud_coordinates_start",
+        ),
+        (
+            r"itera ex m apud [] fixum cell { }",
+            "expected",
+            "identifier",
+        ),
+        (
+            r"itera ex m apud [i,] fixum cell { }",
+            "expected",
+            "identifier",
+        ),
     ] {
         let result = parse_program(source);
         assert!(
             result.errors.iter().any(|error| {
-                error.kind == ParseErrorKind::Expected && has_arg(error, "expected", expected)
+                error.kind == ParseErrorKind::Expected && has_arg(error, arg, value)
             }),
             "expected structured apud rejection for {source:?}, got {:?}",
             result.errors
