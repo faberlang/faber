@@ -68,3 +68,33 @@ incipit {
     assert_eq!(lines[..2], ["6", "2"]);
     assert_eq!(sorted(lines[2..].to_vec()), ["east 2024 6", "west 2024 7"]);
 }
+
+#[test]
+fn one_part_composite_key_tabula_destructures_the_key() {
+    // A-98: one `apud` name over `iuncta<textus>` binds the one key part, the
+    // way the two-part arm binds each part — not the whole one-element tuple.
+    let lines = run(r#"
+incipit {
+    varia tabula<iuncta<textus>, numerus> totals ← vacua
+    totals[["east"]] ← 5
+    totals[["west"]] ← 7
+    itera ex totals apud [regio] fixum v {
+        nota regio, v
+    }
+}"#);
+    assert_eq!(sorted(lines), ["east 5", "west 7"]);
+}
+
+#[test]
+fn one_part_composite_key_part_is_usable_as_its_element_type() {
+    // The destructured part keeps the part type, so text methods apply to it.
+    let lines = run(r#"
+incipit {
+    varia tabula<iuncta<textus>, numerus> totals ← vacua
+    totals[["east"]] ← 5
+    itera ex totals apud [regio] fixum v {
+        nota regio.longitudo(), v
+    }
+}"#);
+    assert_eq!(lines, ["4 5"]);
+}

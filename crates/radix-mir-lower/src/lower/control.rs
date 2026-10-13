@@ -5029,8 +5029,12 @@ impl FunctionBuilder<'_> {
     ) -> MirOperand {
         let key_ty = MirType::semantic(key);
         let key_local = self.next_local_id();
+        // WHY: typecheck types each `apud` name as one key part whenever the
+        // key is a tuple, so a one-part `iuncta` key must destructure like the
+        // N-part arm instead of binding the whole tuple to a part-typed name.
+        let key_is_tuple = matches!(self.normalized_type(key), Type::Tuple(_));
         let single = match iter.coordinates {
-            [(coordinate, name)] => Some((*coordinate, *name)),
+            [(coordinate, name)] if !key_is_tuple => Some((*coordinate, *name)),
             _ => None,
         };
         self.locals.push(MirLocalDecl {
