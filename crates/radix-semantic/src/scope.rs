@@ -867,6 +867,10 @@ pub struct Resolver {
     unavailable_bindings: FxHashMap<DefId, Vec<InterfaceUnavailable>>,
     /// Declaration parameter names of imported implendum exports (D1.2).
     imported_contract_type_params: FxHashMap<DefId, Vec<LexSymbol>>,
+    /// Declaration parameter names of imported generic enum exports, keyed by
+    /// the consumer enum `DefId`. Variant payload fields reference these names,
+    /// so construction needs them to substitute applied witnesses.
+    imported_enum_type_params: FxHashMap<DefId, Vec<LexSymbol>>,
     /// `@ radix contract` roles of imported implendum exports (D1.4).
     imported_contract_roles: FxHashMap<DefId, String>,
 }
@@ -923,6 +927,7 @@ impl Resolver {
             selective_type_imports: FxHashMap::default(),
             unavailable_bindings: FxHashMap::default(),
             imported_contract_type_params: FxHashMap::default(),
+            imported_enum_type_params: FxHashMap::default(),
             imported_contract_roles: FxHashMap::default(),
         }
     }
@@ -1609,6 +1614,12 @@ impl Resolver {
         let decl_param_kinds = InterfaceGenericParam::kinds(&nominal.params);
         if !decl_param_kinds.is_empty() {
             self.register_generic_param_kinds(enum_def, decl_param_kinds.clone());
+            let params = nominal
+                .params
+                .iter()
+                .map(|param| interner.intern(&param.name))
+                .collect();
+            self.imported_enum_type_params.insert(enum_def, params);
         }
         // Phase 1 installs the enum nominal + variant shells (names, symbols,
         // parents) only. Payload fields are remapped in phase 2 once every
@@ -2822,6 +2833,14 @@ impl Resolver {
     pub fn imported_contract_type_params(&self, def_id: DefId) -> Option<&[LexSymbol]> {
         self.imported_contract_type_params
             .get(&def_id)
+            .map(Vec::as_slice)
+    }
+
+    /// Declaration parameter names of an imported generic enum.
+    #[must_use]
+    pub fn imported_enum_type_params(&self, enum_def: DefId) -> Option<&[LexSymbol]> {
+        self.imported_enum_type_params
+            .get(&enum_def)
             .map(Vec::as_slice)
     }
 

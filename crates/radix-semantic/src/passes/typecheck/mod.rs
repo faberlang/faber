@@ -1022,6 +1022,11 @@ impl<'a> TypeChecker<'a> {
     /// members).
     pub fn collect_imported_enum_variants(&mut self) {
         for (enum_def, _, variants) in self.resolver.imported_file_enums() {
+            // Same registration as a local enum (`collect.rs`): variant
+            // construction substitutes applied witnesses through these names.
+            if let Some(params) = self.resolver.imported_enum_type_params(enum_def) {
+                self.type_params_by_def.insert(enum_def, params.to_vec());
+            }
             let commune = self.resolver.commune_fields(enum_def);
             for variant in &variants {
                 let mut fields: Vec<TypeId> = commune.iter().map(|field| field.ty).collect();
@@ -1106,6 +1111,10 @@ mod access_operand_test;
 #[cfg(test)]
 #[path = "axis_marker_test.rs"]
 mod axis_marker_test;
+
+#[cfg(test)]
+#[path = "imported_generic_enum_test.rs"]
+mod imported_generic_enum_test;
 
 #[cfg(test)]
 #[path = "ascii_cursor_test.rs"]
