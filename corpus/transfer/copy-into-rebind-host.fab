@@ -1,0 +1,40 @@
++++
+term = "⇇"
+kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "expression", "ternary", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "fixum_decl", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "On the host a whole-tensor ← into a mut tensor parameter is the ordinary rebind; only a kernel parameter needs ⇇."
+syntax = "<mut tensor parameter> ← <tensor>"
+related = ["tensor", "⇇"]
+locale = "en"
++++
+# =============================================================================
+# ⇇ — a host `mut` tensor parameter may be rebound whole (R6, host side).
+# =============================================================================
+#
+# What this teaches:
+#   • `←` rebinds a name, and on the host that includes a `mut` tensor
+#     parameter: `b ← a + a` is the ordinary rebind, not an error
+#   • only a kernel parameter is a device buffer with no binding to rebind;
+#     there a whole-tensor `←` is rejected (`mut_tensor_param_rebind`, see
+#     copy-into-rebind-reject) and `⇇` is the one way to write it
+#
+# See also: ⇇, tensor
+# =============================================================================
+
+# EXPECTED stdout:
+#   [2.0, 4.0, 6.0, 8.0]
+
+fn double_into(tf32[2, 2] a, mut tf32[2, 2] b) → void {
+    b ← a + a
+    print b.flatten()
+}
+
+main {
+    const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
+    const list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
+    const tf32[2, 2] source ← flat_a ↦ tf32[2, 2]
+    var tf32[2, 2] target ← flat_b ↦ tf32[2, 2]
+    double_into(source, mut target)
+}
