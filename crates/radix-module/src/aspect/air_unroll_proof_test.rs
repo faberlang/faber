@@ -84,11 +84,39 @@ fn route_facts_cover_inclusive_negative_and_stepped_ranges() {
     let inclusive = unroll_route_facts(HirIteraMode::Ab, 0, &interval(1, 0, 2, None, true), &types);
     assert_eq!(inclusive.map(|facts| facts.lanes), Some(vec![0, 1, 2]));
 
-    let descending = unroll_route_facts(HirIteraMode::Ab, 0, &interval(20, 3, 0, Some(-1), false), &types);
-    assert_eq!(descending.map(|facts| facts.lanes), Some(vec![3, 2, 1]));
-
     let stepped = unroll_route_facts(HirIteraMode::Ab, 0, &interval(40, 0, 6, Some(2), false), &types);
     assert_eq!(stepped.map(|facts| facts.lanes), Some(vec![0, 2, 4]));
+}
+
+#[test]
+fn route_facts_take_range_direction_from_the_bounds() {
+    let types = TypeTable::new();
+
+    // The pass counts down for `3‥0` with no step: the step is a positive
+    // stride and the bounds pick the direction.
+    let descending = unroll_route_facts(HirIteraMode::Ab, 0, &interval(20, 3, 0, None, false), &types);
+    assert_eq!(descending.map(|facts| facts.lanes), Some(vec![3, 2, 1]));
+
+    let descending_inclusive = unroll_route_facts(HirIteraMode::Ab, 0, &interval(20, 3, 0, None, true), &types);
+    assert_eq!(descending_inclusive.map(|facts| facts.lanes), Some(vec![3, 2, 1, 0]));
+
+    let descending_stepped = unroll_route_facts(HirIteraMode::Ab, 0, &interval(40, 6, 0, Some(2), false), &types);
+    assert_eq!(descending_stepped.map(|facts| facts.lanes), Some(vec![6, 4, 2]));
+}
+
+#[test]
+fn route_facts_decline_non_positive_explicit_steps() {
+    let types = TypeTable::new();
+
+    // The pass declines a step that is not a positive stride, so the
+    // recognizer must not hand the proof line a lane sequence for it.
+    for (id, start, end, step) in [(20, 3, 0, -1), (40, 0, 3, -1), (60, 0, 3, 0)] {
+        let source = interval(id, start, end, Some(step), false);
+        assert!(
+            unroll_route_facts(HirIteraMode::Ab, 0, &source, &types).is_none(),
+            "step {step} over {start}..{end} must decline"
+        );
+    }
 }
 
 #[test]
