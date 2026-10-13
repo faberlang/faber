@@ -797,7 +797,7 @@ help = "ประกาศตัวแปรก่อนใช้{?suggestion|; 
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "variant ไม่รู้จัก"
-help = "ประกาศตัวแปรก่อนใช้{?suggestion|; หมายถึง |?}"
+help = "ประกาศตัวแปรก่อนใช้{?members| (|)}{?suggestion|; หมายถึง |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "ฟิลด์ variant ไม่รู้จัก"

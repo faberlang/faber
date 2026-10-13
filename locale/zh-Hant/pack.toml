@@ -793,7 +793,7 @@ help = "在使用前宣告變數{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "未知變體"
-help = "在使用前宣告變數{?suggestion|; did you mean |?}"
+help = "在使用前宣告變數{?members| (|)}{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "未知變體欄位"

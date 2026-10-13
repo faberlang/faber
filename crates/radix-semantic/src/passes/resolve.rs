@@ -298,6 +298,7 @@ fn resolve_stmt(
                     crate::tuple_labels::record_from_type_expr(
                         resolver, interner, def_id, &param.ty,
                     );
+                    record_subject_member_set(resolver, interner, def_id, &param.ty);
                 }
                 if let Some(default) = &param.default {
                     resolve_expr(resolver, interner, default, errors);
@@ -492,8 +493,15 @@ fn resolve_stmt(
         }
         StmtKind::Elige(stmt) => {
             resolve_expr(resolver, interner, &stmt.expr, errors);
+            let subject_members = subject_member_set(resolver, &stmt.expr);
             for case in &stmt.cases {
-                resolve_elige_case_value(resolver, interner, &case.value, errors);
+                resolve_elige_case_value(
+                    resolver,
+                    interner,
+                    &case.value,
+                    subject_members.as_deref(),
+                    errors,
+                );
                 resolve_if_body(resolver, interner, &case.body, errors);
             }
             if let Some(default) = &stmt.default {
@@ -849,12 +857,29 @@ fn resolve_secus_clause(
 /// that is not a real qualifier fails closed as an unknown variant;
 /// two-segment paths (`casu A.X { }`) keep the existing member-resolution
 /// behavior, and every other value resolves as an ordinary expression.
+///
+/// When the subject's annotation names a closed set, a bare name that
+/// resolves to nothing is a misspelled member: it reports the set's members
+/// and the nearest spelling instead of the generic unknown-identifier error.
 fn resolve_elige_case_value(
     resolver: &mut Resolver,
     interner: &Interner,
     value: &Expr,
+    subject_members: Option<&[String]>,
     errors: &mut Vec<SemanticError>,
 ) {
+    if let ExprKind::Ident(ident) = &value.kind
+        && let Some(members) = subject_members
+        && !members.is_empty()
+        && resolver.lookup(ident.name).is_none()
+        && matches!(
+            resolver.lookup_variant_bare(ident.name),
+            BareVariantLookup::None
+        )
+    {
+        errors.push(elige_case_not_member_error(interner, ident, members));
+        return;
+    }
     if let ExprKind::Member(member) = &value.kind {
         let last_span = member.member.span;
         if let Some(segments) = member_segments(member)
@@ -975,9 +1000,11 @@ fn pattern_member_parent(
 /// Member names of the closed set each subject position of a `discerne`
 /// matches, in declaration order.
 ///
-/// Resolution runs before types are known, so the set is read from the
-/// variants the arms of that position already name. A position whose arms
-/// name no variant has no known set and yields an empty list.
+/// Resolution runs before value types are known. A binding whose annotation
+/// names a union or an enum/discretio carries its members on the resolver (see
+/// [`Resolver::subject_member_set`]); otherwise the set is read from the
+/// variants the arms of that position already name. A position with neither
+/// source has no known set and yields an empty list.
 fn discerne_member_sets(
     resolver: &Resolver,
     interner: &Interner,
@@ -987,6 +1014,13 @@ fn discerne_member_sets(
         resolver.variant_parents_all().into_iter().collect();
     (0..stmt.subjects.len())
         .map(|position| {
+            if let Some(members) = stmt
+                .subjects
+                .get(position)
+                .and_then(|subject| subject_member_set(resolver, subject))
+            {
+                return members;
+            }
             let parent = stmt
                 .arms
                 .iter()
@@ -995,17 +1029,7 @@ fn discerne_member_sets(
             let Some(parent) = parent else {
                 return Vec::new();
             };
-            let mut variants: Vec<DefId> = parents
-                .iter()
-                .filter(|(_, owner)| **owner == parent)
-                .map(|(variant, _)| *variant)
-                .collect();
-            variants.sort_by_key(|variant| variant.0);
-            variants
-                .into_iter()
-                .filter_map(|variant| resolver.get_symbol(variant))
-                .map(|symbol| interner.resolve(symbol.name).to_owned())
-                .collect()
+            parent_variant_names(resolver, interner, parent).unwrap_or_default()
         })
         .collect()
 }
@@ -1025,6 +1049,24 @@ fn nearest_member<'a>(spelling: &str, members: &'a [String]) -> Option<&'a str> 
         .map(|(_, member)| member)
 }
 
+/// Attach the matched set's members and the nearest member spelling to a
+/// member-miss diagnostic; a set with no spellable members stays bare.
+fn with_member_suggestion(
+    mut error: SemanticError,
+    interner: &Interner,
+    ident: &radix_syntax::Ident,
+    members: &[String],
+) -> SemanticError {
+    if !members.is_empty() {
+        error = error.with_arg("members", members.join(", "));
+        let spelling = interner.resolve(ident.name);
+        if let Some(suggestion) = nearest_member(spelling, members) {
+            error = error.with_arg("suggestion", suggestion.to_owned());
+        }
+    }
+    error
+}
+
 /// An arm name that is not a member of the matched set.
 ///
 /// `discerne` iterates a closed set, so a bare arm name is a member or an
@@ -1035,16 +1077,26 @@ fn arm_not_member_error(
     members: &[String],
 ) -> SemanticError {
     let spelling = interner.resolve(ident.name);
-    let mut error = SemanticError::structured(SemanticErrorKind::TypeMismatch, ident.span)
+    let error = SemanticError::structured(SemanticErrorKind::TypeMismatch, ident.span)
         .with_arg("issue", ISSUE_DISCERNE_ARM_NOT_MEMBER)
         .with_arg("name", spelling.to_owned());
-    if !members.is_empty() {
-        error = error.with_arg("members", members.join(", "));
-        if let Some(suggestion) = nearest_member(spelling, members) {
-            error = error.with_arg("suggestion", suggestion.to_owned());
-        }
-    }
-    error
+    with_member_suggestion(error, interner, ident, members)
+}
+
+/// An `elige` case name that resolves to nothing while the subject's
+/// annotation names a closed set.
+///
+/// `elige` cases are value expressions; over a known enum or union annotation
+/// an unresolved bare name is a misspelled member rather than an open-set
+/// value, so the diagnostic carries the member list and nearest spelling.
+fn elige_case_not_member_error(
+    interner: &Interner,
+    ident: &radix_syntax::Ident,
+    members: &[String],
+) -> SemanticError {
+    let error = SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
+        .with_arg("issue", ISSUE_UNKNOWN_VARIANT);
+    with_member_suggestion(error, interner, ident, members)
 }
 
 fn resolve_pattern(
@@ -2976,7 +3028,90 @@ fn record_iuncta_labels_for_name(
 ) {
     if let Some(def_id) = resolver.lookup(name) {
         crate::tuple_labels::record_from_type_expr(resolver, interner, def_id, ty);
+        record_subject_member_set(resolver, interner, def_id, ty);
     }
+}
+
+/// Record the closed-set members a binding's annotation names, keyed by the
+/// binding identity, so a later `discerne` subject lookup can spell the set
+/// even when no arm names a member correctly.
+fn record_subject_member_set(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    def_id: DefId,
+    ty: &TypeExpr,
+) {
+    let members = match &ty.kind {
+        TypeExprKind::Union(members) => union_annotation_member_names(interner, members),
+        TypeExprKind::Named(name, params) if params.is_empty() => {
+            resolver
+                .lookup_type(name.name)
+                .and_then(|parent| parent_variant_names(resolver, interner, parent))
+        }
+        _ => None,
+    };
+    if let Some(members) = members {
+        resolver.record_subject_member_set(def_id, members);
+    }
+}
+
+/// Source spellings of an explicit union annotation's members, or `None` when
+/// no member is a nameable identifier. Qualified members contribute their
+/// terminal spelling; family members keep the arm-derived fallback.
+fn union_annotation_member_names(
+    interner: &Interner,
+    members: &[TypeExpr],
+) -> Option<Vec<String>> {
+    let names: Vec<String> = members
+        .iter()
+        .filter_map(|member| match &member.kind {
+            TypeExprKind::Named(ident, _) => Some(interner.resolve(ident.name).to_owned()),
+            TypeExprKind::Qualified(path, _) => {
+                path.last().map(|ident| interner.resolve(ident.name).to_owned())
+            }
+            _ => None,
+        })
+        .collect();
+    (!names.is_empty()).then_some(names)
+}
+
+/// Variant spellings of one enum/discretio parent in declaration order, or
+/// `None` when the parent is not a variant-bearing enum.
+fn parent_variant_names(
+    resolver: &Resolver,
+    interner: &Interner,
+    parent: DefId,
+) -> Option<Vec<String>> {
+    if resolver.get_symbol(parent).map(|symbol| symbol.kind) != Some(SymbolKind::Enum) {
+        return None;
+    }
+    let mut variants: Vec<DefId> = resolver
+        .variant_parents_all()
+        .into_iter()
+        .filter(|(_, owner)| *owner == parent)
+        .map(|(variant, _)| variant)
+        .collect();
+    if variants.is_empty() {
+        return None;
+    }
+    variants.sort_by_key(|variant| variant.0);
+    Some(
+        variants
+            .into_iter()
+            .filter_map(|variant| resolver.get_symbol(variant))
+            .map(|symbol| interner.resolve(symbol.name).to_owned())
+            .collect(),
+    )
+}
+
+/// Member names the subject's own annotation names, when the subject is a
+/// binding with a recorded closed-set annotation.
+fn subject_member_set(resolver: &Resolver, subject: &Expr) -> Option<Vec<String>> {
+    let ExprKind::Ident(ident) = &subject.kind else {
+        return None;
+    };
+    let def_id = resolver.lookup(ident.name)?;
+    resolver.subject_member_set(def_id).map(<[String]>::to_vec)
 }
 
 fn record_iuncta_labels_for_var(

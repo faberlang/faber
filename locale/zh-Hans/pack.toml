@@ -793,7 +793,7 @@ help = "先声明变量再使用{?suggestion|；你是不是想用 |？}"
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "未知 variant"
-help = "先声明变量再使用{?suggestion|；你是不是想用 |？}"
+help = "先声明变量再使用{?members| (|)}{?suggestion|；你是不是想用 |？}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "未知 variant fields"

@@ -2202,6 +2202,14 @@ value; it does not match inside those fields. Nested patterns are left out for
 simplicity, not because they cannot be checked: a `discerne` inside an arm is
 two flat exhaustive switches.
 
+An arm names a member of the scrutinee's closed set. A bare name that is not a
+member is rejected (`SEM010 discerne_arm_not_member`); it never becomes a
+binding, and the diagnostic names the set's members and the nearest member
+spelling when one is close. `_` matches anything, and `ceterum` is the default
+arm; those are the only two wildcards. How the parser classifies an arm name
+internally (a type name, a variant name, or a plain identifier) is not part of
+the language.
+
 A negative number pattern is written with a leading minus (`casu -1`,
 `casu -∞`). The lexer never signs a number, so the pattern claims the sign;
 `-` before anything else is not pattern syntax.
