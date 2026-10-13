@@ -206,7 +206,9 @@ impl TypeChecker<'_> {
         }
         let (l_elem, r_elem, capacity) = match (left, right) {
             (Some(left), Some(right)) => {
-                let capacity = self.lista_pair_capacity(left, right, span, op)?;
+                let Some(capacity) = self.lista_pair_capacity(left, right, span, op) else {
+                    return Some(self.error_type);
+                };
                 (left.element, right.element, capacity)
             }
             (Some(list), None) => (list.element, rhs_ty, list.capacity),

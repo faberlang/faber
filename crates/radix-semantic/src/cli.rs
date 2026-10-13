@@ -404,9 +404,11 @@ impl CliBuilder<'_> {
         self.reject_nested_module_mounts(program);
 
         let mut commands = self.collect_commands(program);
-        self.validate_commands(&commands, &CliSurface::default(), false);
+        // WHY: validate once, as authored. Prefixing preserves every path and
+        // alias collision, and the authored-alias `/` check only holds before
+        // the mount prefix is added; a second pass reports each error twice.
+        self.validate_commands(&commands, &CliSurface::default());
         prefix_mounted_commands(&mut commands, mount_prefix);
-        self.validate_commands(&commands, &CliSurface::default(), true);
 
         self.mounted_analysis(commands)
     }
@@ -469,7 +471,7 @@ impl CliBuilder<'_> {
                 globals,
             );
         }
-        self.validate_commands(commands, globals, false);
+        self.validate_commands(commands, globals);
     }
 
     fn root_cli_program(&self, input: RootCliProgramInput<'_>) -> CliProgram {
@@ -1113,24 +1115,13 @@ impl CliBuilder<'_> {
         }
     }
 
-    fn validate_commands(
-        &mut self,
-        commands: &[CliCommand],
-        globals: &CliSurface,
-        allow_alias_paths: bool,
-    ) {
+    fn validate_commands(&mut self, commands: &[CliCommand], globals: &CliSurface) {
         let paths = self.command_paths(commands);
         let mut aliases = FxHashSet::default();
         // BO-D-9: build the global binding set once; reuse per command.
         let global_bindings = self.global_bindings(globals);
         for command in commands {
-            self.validate_command(
-                command,
-                &global_bindings,
-                &paths,
-                &mut aliases,
-                allow_alias_paths,
-            );
+            self.validate_command(command, &global_bindings, &paths, &mut aliases);
         }
     }
 
@@ -1151,9 +1142,8 @@ impl CliBuilder<'_> {
         global_bindings: &FxHashSet<&str>,
         paths: &FxHashSet<String>,
         aliases: &mut FxHashSet<String>,
-        allow_alias_paths: bool,
     ) {
-        self.validate_command_aliases(command, paths, aliases, allow_alias_paths);
+        self.validate_command_aliases(command, paths, aliases);
         let label = command_label(command);
         self.validate_surface(&label, &command.options, &command.operands);
         self.validate_global_option_collisions(&label, &command.options, global_bindings);
@@ -1165,10 +1155,9 @@ impl CliBuilder<'_> {
         command: &CliCommand,
         paths: &FxHashSet<String>,
         aliases: &mut FxHashSet<String>,
-        allow_alias_paths: bool,
     ) {
         for alias in &command.aliases {
-            self.validate_command_alias(command, alias, paths, aliases, allow_alias_paths);
+            self.validate_command_alias(command, alias, paths, aliases);
         }
     }
 
@@ -1178,9 +1167,8 @@ impl CliBuilder<'_> {
         alias: &str,
         paths: &FxHashSet<String>,
         aliases: &mut FxHashSet<String>,
-        allow_alias_paths: bool,
     ) {
-        if path_segments(alias).is_empty() || (!allow_alias_paths && alias.contains('/')) {
+        if path_segments(alias).is_empty() || alias.contains('/') {
             self.error_with(
                 command.span,
                 ISSUE_INVALID_COMMAND_ALIAS,
@@ -1427,3 +1415,7 @@ fn string_metadata_all(annotations: &[Annotation], interner: &Interner, name: &s
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "cli_test.rs"]
+mod cli_test;

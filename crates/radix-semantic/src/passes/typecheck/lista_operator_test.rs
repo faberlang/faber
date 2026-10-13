@@ -586,3 +586,33 @@ fn bool_list_logic_result_is_not_a_scalar_bool() {
         "return_type_mismatch",
     );
 }
+
+#[test]
+fn numeric_lista_comparison_capacity_mismatch_adds_no_scalar_operand_diagnostic() {
+    for glyph in ["≺", "≅"] {
+        let source = format!(
+            "functio mismatched(lista<numerus, 4> a, lista<numerus, 8> b) → lista<bivalens, 4> {{
+    redde a {glyph} b
+}}"
+        );
+        let issues: Vec<String> = crate::test_support::analyze_and_get_diagnostics(&source)
+            .iter()
+            .filter(|err| err.is_error())
+            .filter_map(|err| crate::test_support::issue(err).map(str::to_owned))
+            .collect();
+        assert_eq!(
+            issues
+                .iter()
+                .filter(|issue| *issue == "lista_capacity_mismatch")
+                .count(),
+            1,
+            "`{glyph}` over mismatched capacities: {issues:?}"
+        );
+        assert!(
+            !issues
+                .iter()
+                .any(|issue| issue == "numeric_operands_required"),
+            "`{glyph}` over mismatched capacities fell through to the scalar path: {issues:?}"
+        );
+    }
+}

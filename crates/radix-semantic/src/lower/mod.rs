@@ -429,7 +429,10 @@ impl<'a> Lowerer<'a> {
                 entry = Some(block);
             } else {
                 let lowered_items = self.lower_stmt_items(stmt);
-                if lowered_items.is_empty() {
+                // A suite holding no case lowers to no item; it is still a
+                // declaration, never an executable statement for the entry.
+                let is_suite = matches!(&stmt.kind, StmtKind::Probandum(_));
+                if lowered_items.is_empty() && !is_suite {
                     if !implicit_entry_scope {
                         self.push_scope();
                         implicit_entry_scope = true;
@@ -1354,6 +1357,9 @@ mod construct_test;
 #[cfg(test)]
 #[path = "destructure_test.rs"]
 mod destructure_test;
+#[cfg(test)]
+#[path = "empty_suite_test.rs"]
+mod empty_suite_test;
 #[cfg(test)]
 #[path = "size_decl_test.rs"]
 mod size_decl_test;
