@@ -282,7 +282,7 @@ impl TypeChecker<'_> {
             }
         }
         if let Type::Tensor(elem, shape) = resolved_kind {
-            return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);
+            return self.check_tensor_bracket_index(elem, shape, idx_ty, index_span);
         }
         // S0-G8: vector lane access. A register vector lane is an O(1) scalar
         // read — `v[i]` yields the element directly (no nullable wrap), at
@@ -365,7 +365,6 @@ impl TypeChecker<'_> {
         elem: TypeId,
         shape: crate::index::IndexId,
         idx_ty: TypeId,
-        _object_span: radix_lexer::Span,
         index_span: radix_lexer::Span,
     ) -> TypeId {
         let resolved_idx = self.resolve_inferred_type(idx_ty);
@@ -436,10 +435,8 @@ impl TypeChecker<'_> {
         name: Symbol,
         span: radix_lexer::Span,
     ) -> TypeId {
-        if matches!(
-            self.types.get(self.resolve_inferred_type(object_ty)),
-            Type::Option(_)
-        ) {
+        let resolved = self.resolve_inferred_type(object_ty);
+        if matches!(self.types.get(resolved), Type::Option(_)) {
             self.undefined_member("optional_receiver_requires_chain", span);
             return self.error_type;
         }
@@ -477,19 +474,13 @@ impl TypeChecker<'_> {
                 return self.error_type;
             }
         }
-        if matches!(
-            self.types.get(self.resolve_inferred_type(object_ty)),
-            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
-        ) && self
-            .interner
-            .is_some_and(|interner| interner.resolve(name) == "nuntius")
-        {
-            return self.types.primitive(Primitive::Textus);
+        if let Some(field_ty) = self.nuntius_field_type(object_ty, name) {
+            return field_ty;
         }
-        if let Type::Map(_, value_ty) = self.types.get(self.resolve_inferred_type(object_ty)) {
+        if let Type::Map(_, value_ty) = self.types.get(resolved) {
             return *value_ty;
         }
-        if let Type::Record(fields) = self.types.get(self.resolve_inferred_type(object_ty)) {
+        if let Type::Record(fields) = self.types.get(resolved) {
             if let Some(field_ty) = fields.get(&name).copied() {
                 return field_ty;
             }
@@ -500,10 +491,7 @@ impl TypeChecker<'_> {
             );
             return self.error_type;
         }
-        if matches!(
-            self.types.get(self.resolve_inferred_type(object_ty)),
-            Type::Tuple(_)
-        ) {
+        if matches!(self.types.get(resolved), Type::Tuple(_)) {
             self.undefined_member("unknown_tuple_element_label", span);
             return self.error_type;
         }
@@ -516,6 +504,26 @@ impl TypeChecker<'_> {
         }
         self.report_fieldless_type_access(object_ty, name, span);
         self.error_type
+    }
+
+    /// The `.nuntius` built-in field read: `textus` and `ignotum` receivers
+    /// expose the message text as a field. Shared by the ordinary field rule
+    /// and the union common-member rule (U1R); one of the two hard-coded
+    /// field exceptions named in [`Self::report_fieldless_type_access`].
+    fn nuntius_field_type(&self, receiver_ty: TypeId, name: Symbol) -> Option<TypeId> {
+        if !matches!(
+            self.types.get(self.resolve_inferred_type(receiver_ty)),
+            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+        ) {
+            return None;
+        }
+        if !self
+            .interner
+            .is_some_and(|interner| interner.resolve(name) == "nuntius")
+        {
+            return None;
+        }
+        Some(self.types.primitive(Primitive::Textus))
     }
 
     /// Named diagnostic for a field access on a type that has no such field.
@@ -556,7 +564,7 @@ impl TypeChecker<'_> {
                 | Type::BoundedArray { .. }
         );
         if is_length && sequence_receiver {
-            self.undefined_member_with_args("length_is_method", span, &[]);
+            self.undefined_member("length_is_method", span);
             return;
         }
         let type_name = self.display_union_constituent(resolved);
@@ -663,14 +671,8 @@ impl TypeChecker<'_> {
         if let Some(enum_def) = self.enum_def_from_type(member) {
             return self.resolver.commune_field(enum_def, name).map(|f| f.ty);
         }
-        if matches!(
-            self.types.get(self.resolve_inferred_type(member)),
-            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
-        ) && self
-            .interner
-            .is_some_and(|interner| interner.resolve(name) == "nuntius")
-        {
-            return Some(self.types.primitive(Primitive::Textus));
+        if let Some(field_ty) = self.nuntius_field_type(member, name) {
+            return Some(field_ty);
         }
         if let Type::Map(_, value_ty) = self.types.get(self.resolve_inferred_type(member)) {
             return Some(*value_ty);
@@ -716,18 +718,7 @@ impl TypeChecker<'_> {
         let Some(params) = self.type_params_by_def.get(&struct_def) else {
             return field_ty;
         };
-        let mut vars = FxHashMap::default();
-        let mut shape_vars = FxHashMap::default();
-        for (param, arg) in params.iter().zip(args.iter()) {
-            match arg {
-                radix_types::AppliedArg::Type(witness) => {
-                    vars.insert(*param, *witness);
-                }
-                radix_types::AppliedArg::Size(witness) => {
-                    shape_vars.insert(*param, *witness);
-                }
-            }
-        }
+        let (mut vars, mut shape_vars) = applied_argument_bindings(params, &args);
         if vars.is_empty() && shape_vars.is_empty() {
             return field_ty;
         }
@@ -759,18 +750,7 @@ impl TypeChecker<'_> {
         let Some(params) = self.type_params_by_def.get(&struct_def).cloned() else {
             return sig;
         };
-        let mut vars = FxHashMap::default();
-        let mut shape_vars = FxHashMap::default();
-        for (param, arg) in params.iter().zip(args.iter()) {
-            match arg {
-                radix_types::AppliedArg::Type(witness) => {
-                    vars.insert(*param, *witness);
-                }
-                radix_types::AppliedArg::Size(witness) => {
-                    shape_vars.insert(*param, *witness);
-                }
-            }
-        }
+        let (mut vars, mut shape_vars) = applied_argument_bindings(&params, &args);
         if vars.is_empty() && shape_vars.is_empty() {
             return sig;
         }
@@ -1007,7 +987,7 @@ impl TypeChecker<'_> {
                 self.invalid_operand_types(ISSUE_WINDOW_REQUIRES_LIST, object.span);
                 return self.error_type;
             }
-            return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
+            return self.check_tuple_index(&elements, index, index.span);
         }
         let idx_ty = match self.check_tuple_key_bracket(resolved, index) {
             Some(ty) => ty,
@@ -1081,9 +1061,7 @@ impl TypeChecker<'_> {
         &mut self,
         elements: &[TypeId],
         index: &HirExpression,
-        _object_span: radix_lexer::Span,
         index_span: radix_lexer::Span,
-        _idx_ty: TypeId,
     ) -> TypeId {
         let const_idx = if let HirExpressionKind::Literal(HirLiteral::Int(n)) = &index.kind {
             // A literal too large to fit `usize` cannot index any real tuple,
@@ -1129,13 +1107,13 @@ impl TypeChecker<'_> {
             .peel_access_marker(self.resolve_inferred_type(obj_ty))
             .1;
         if let Type::Tensor(elem, shape) = self.types.get(resolved).clone() {
-            self.check_tensor_bracket_index(elem, shape, idx_ty, object.span, index.span);
+            self.check_tensor_bracket_index(elem, shape, idx_ty, index.span);
             super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
             super::tensor_index::warn_unproven_kernel_index(self, obj_ty, index);
             return elem;
         }
         if let Type::Tuple(elements) = self.types.get(resolved).clone() {
-            return self.check_tuple_index(&elements, index, object.span, index.span, idx_ty);
+            return self.check_tuple_index(&elements, index, index.span);
         }
         // A window is a read: a range index on a list write keeps the
         // integer-index refusal.
@@ -1412,6 +1390,31 @@ impl TypeChecker<'_> {
         self.error_issue(SemanticErrorKind::VariableUndefined, issue, span);
         self.error_type
     }
+}
+
+/// Bind an applied nominal's arguments to its declared generic parameters
+/// (S0-G8): `Type` witnesses fill type slots, `Size` witnesses fill magnitudo
+/// slots. The lists are zipped, so a length mismatch leaves the tail unbound.
+fn applied_argument_bindings(
+    params: &[Symbol],
+    args: &[radix_types::AppliedArg],
+) -> (
+    FxHashMap<Symbol, TypeId>,
+    FxHashMap<Symbol, crate::index::IndexId>,
+) {
+    let mut vars = FxHashMap::default();
+    let mut shape_vars = FxHashMap::default();
+    for (param, arg) in params.iter().zip(args.iter()) {
+        match arg {
+            radix_types::AppliedArg::Type(witness) => {
+                vars.insert(*param, *witness);
+            }
+            radix_types::AppliedArg::Size(witness) => {
+                shape_vars.insert(*param, *witness);
+            }
+        }
+    }
+    (vars, shape_vars)
 }
 
 /// Exclusive `[start, end)` window for a constant octeti index, when both
