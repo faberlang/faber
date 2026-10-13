@@ -26,9 +26,10 @@
 //! unification is inert for every reachable body.
 
 use crate::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirCollectionOp, MirFunction, MirIntrinsic,
-    MirLocalId, MirOperand, MirOptionOp, MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement,
-    MirStatementKind, MirTempId, MirTerminatorKind, MirValue, MirValueKind,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirCollectionOp, MirFunction,
+    MirIntrinsic, MirLocalId, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirPlaceBase,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminatorKind, MirValue,
+    MirValueKind,
 };
 use rustc_hash::FxHashSet;
 
@@ -445,51 +446,127 @@ pub(crate) fn temp_directly_read(function: &MirFunction, temp: MirTempId) -> boo
 fn statement_reads_temp(statement: &MirStatement, temp: MirTempId) -> bool {
     match &statement.kind {
         MirStatementKind::Assign { value, .. } => value_reads_temp(value, temp),
-        MirStatementKind::RuntimeCall { call, .. } => call
-            .args
-            .iter()
-            .any(|operand| operand_reads_temp(operand, temp)),
-        MirStatementKind::Construct { aggregate, .. } => matches!(
-            &aggregate.fields,
-            MirAggregateFields::Ordered(fields)
-                if fields.iter().any(|field| matches!(
-                    field,
-                    MirAggregateItem::Operand(operand) if operand_reads_temp(operand, temp)
-                ))
-        ),
-        MirStatementKind::Call { .. } => false,
+        MirStatementKind::Call { callee, args, .. } => {
+            callee_reads_temp(callee, temp) || operand_list_reads_temp(args, temp)
+        }
+        MirStatementKind::RuntimeCall { call, .. } => operand_list_reads_temp(&call.args, temp),
+        MirStatementKind::Construct { aggregate, .. } => aggregate_reads_temp(aggregate, temp),
     }
 }
 
-/// Whether a value reads the given temp.
-fn value_reads_temp(value: &MirValue, temp: MirTempId) -> bool {
-    match &value.kind {
-        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+/// Whether an aggregate construct reads the given temp (its field operands;
+/// the destination is a write). Every field shape counts, including ordered
+/// spreads and keyed keys.
+fn aggregate_reads_temp(aggregate: &MirAggregate, temp: MirTempId) -> bool {
+    match &aggregate.fields {
+        MirAggregateFields::Ordered(items) => items
+            .iter()
+            .any(|item| aggregate_item_reads_temp(item, temp)),
+        MirAggregateFields::Named(fields) => fields
+            .iter()
+            .any(|field| operand_reads_temp(&field.value, temp)),
+        MirAggregateFields::Keyed(fields) => fields.iter().any(|field| {
+            operand_reads_temp(&field.key, temp) || operand_reads_temp(&field.value, temp)
+        }),
+    }
+}
+
+/// Whether one ordered aggregate item reads the given temp.
+fn aggregate_item_reads_temp(item: &MirAggregateItem, temp: MirTempId) -> bool {
+    match item {
+        MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand) => {
             operand_reads_temp(operand, temp)
         }
+    }
+}
+
+/// Whether a value reads the given temp, over every value shape (plain and
+/// unary/binary operands, tensor extents, option operations, and closure
+/// environments).
+fn value_reads_temp(value: &MirValue, temp: MirTempId) -> bool {
+    match &value.kind {
+        MirValueKind::Operand(operand) => operand_reads_temp(operand, temp),
+        MirValueKind::Closure(closure) => operand_reads_temp(&closure.environment, temp),
+        MirValueKind::Unary { operand, .. } => operand_reads_temp(operand, temp),
         MirValueKind::Binary { lhs, rhs, .. } => {
             operand_reads_temp(lhs, temp) || operand_reads_temp(rhs, temp)
         }
-        _ => false,
+        MirValueKind::Option(op) => option_reads_temp(op, temp),
+        MirValueKind::TensorExtent { tensor, .. } => operand_reads_temp(tensor, temp),
+    }
+}
+
+/// Whether an option operation reads the given temp, including the operands
+/// carried by an optional-chain link.
+fn option_reads_temp(op: &MirOptionOp, temp: MirTempId) -> bool {
+    match op {
+        MirOptionOp::None => false,
+        MirOptionOp::Some(operand)
+        | MirOptionOp::IsNil(operand)
+        | MirOptionOp::IsNotNil(operand) => operand_reads_temp(operand, temp),
+        MirOptionOp::Unwrap { value, .. } => operand_reads_temp(value, temp),
+        MirOptionOp::Coalesce { value, fallback } => {
+            operand_reads_temp(value, temp) || operand_reads_temp(fallback, temp)
+        }
+        MirOptionOp::Chain { base, link } => {
+            operand_reads_temp(base, temp) || option_chain_link_reads_temp(link, temp)
+        }
+    }
+}
+
+/// Whether an optional-chain link reads the given temp — an index operand or
+/// a link call's callee/arguments.
+fn option_chain_link_reads_temp(link: &MirOptionChainLink, temp: MirTempId) -> bool {
+    match link {
+        MirOptionChainLink::Field(_) | MirOptionChainLink::VariantField { .. } => false,
+        MirOptionChainLink::Index(index) => operand_reads_temp(index, temp),
+        MirOptionChainLink::Call { callee, args } => {
+            callee_reads_temp(callee, temp) || operand_list_reads_temp(args, temp)
+        }
     }
 }
 
 /// Whether a terminator reads the given temp.
 fn terminator_reads_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> bool {
     match terminator {
-        MirTerminatorKind::Return(Some(operand)) => operand_reads_temp(operand, temp),
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            operand_reads_temp(operand, temp)
+        }
+        MirTerminatorKind::TryCall { callee, args, .. } => {
+            callee_reads_temp(callee, temp) || operand_list_reads_temp(args, temp)
+        }
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => false,
         MirTerminatorKind::Branch { condition, .. } => operand_reads_temp(condition, temp),
         MirTerminatorKind::Switch { value, .. } => operand_reads_temp(value, temp),
-        _ => false,
     }
 }
 
-/// Whether an operand reads the given temp as a plain base slot.
+/// Whether a call target reads the given temp: a closure carries its
+/// environment operand and a first-class callee is itself an operand.
+/// Symbolic function/definition callees read nothing.
+fn callee_reads_temp(callee: &MirCallee, temp: MirTempId) -> bool {
+    match callee {
+        MirCallee::Function(_) | MirCallee::Definition { .. } => false,
+        MirCallee::Closure(closure) => operand_reads_temp(&closure.environment, temp),
+        MirCallee::Value(operand) => operand_reads_temp(operand, temp),
+    }
+}
+
+/// Whether any operand in a call/projection argument list reads the given
+/// temp.
+fn operand_list_reads_temp(operands: &[MirOperand], temp: MirTempId) -> bool {
+    operands.iter().any(|operand| operand_reads_temp(operand, temp))
+}
+
+/// Whether an operand reads the given temp as a plain base slot. A value id
+/// was already scanned at its defining statement; a constant reads nothing.
 fn operand_reads_temp(operand: &MirOperand, temp: MirTempId) -> bool {
     match operand {
         MirOperand::Temp(t) => *t == temp,
         MirOperand::Place(place) => matches!(place.base, MirPlaceBase::Temp(t) if t == temp),
-        _ => false,
+        MirOperand::Value(_) | MirOperand::Constant(_) => false,
     }
 }
 
