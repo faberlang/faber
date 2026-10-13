@@ -1203,6 +1203,50 @@ fn constructor_declares_observation_cadence_and_effective_steps() {
     });
 }
 
+/// The empty-device-set early return must still report the admitted
+/// training step count: the declared count is the caller's fallback only
+/// when there are no training facts at all.
+#[test]
+fn empty_device_set_returns_training_step_count_not_declared_steps() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let scalar = f32(&mut types);
+    let host_only = device_function(
+        1,
+        &mut interner,
+        "host_only",
+        &[(0, "value", scalar)],
+        &[0],
+        Vec::new(),
+        Some(MirOperand::Place(MirPlace::local(MirLocalId(0)))),
+        Vec::new(),
+        scalar,
+        false,
+    );
+    let validated = validated(&types, vec![host_only]);
+    let facts = DeviceTrainingFacts {
+        step_count: 5,
+        ..DeviceTrainingFacts::default()
+    };
+
+    let (program, _semantics, effective_steps) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        Some(&facts),
+        DeviceProgramLifetime::RepeatingStep,
+        9,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("a program with no device body builds the empty pair");
+
+    assert!(program.kernels.is_empty(), "no device body, no kernels");
+    assert_eq!(
+        effective_steps, 5,
+        "the training facts' admitted count wins over the declared count"
+    );
+}
+
 /// An elementwise-only body is ONE whole-function kernel whose resources bind
 /// in the source parameter order — the order every emitter lays out the
 /// kernel's buffer indices in. `rk(x, v) = v ⊙ v + x` reads `v` before `x`;

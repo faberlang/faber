@@ -489,13 +489,19 @@ pub fn build_device_program(
         }
     }
 
+    // The effective declared step count (S5-U5b): the admitted training-plan
+    // count when the program is a RepeatingStep training program; otherwise
+    // the caller's declared value.  Computed before the empty guard so both
+    // return sites report the same count.
+    let effective_steps = training.map_or(declared_steps, |facts| facts.step_count);
+
     // A validated MIR with no device body has no payload.  Returning the empty
     // pair keeps the constructor total and lets host-partition remain a view.
     if ordered_ids.is_empty() {
         return Ok((
             DeviceProgram::new(lifetime),
             DeviceSemantics::default(),
-            declared_steps,
+            effective_steps,
         ));
     }
 
@@ -755,10 +761,6 @@ pub fn build_device_program(
         .validate_with_semantics(&semantics)
         .map_err(DeviceProgramBuildError::Program)?;
 
-    // The effective declared step count (S5-U5b): the admitted training-plan
-    // count when the program is a RepeatingStep training program; otherwise
-    // the caller's declared value.
-    let effective_steps = training.map_or(declared_steps, |facts| facts.step_count);
     Ok((device_program, semantics, effective_steps))
 }
 
