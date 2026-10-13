@@ -223,6 +223,10 @@ tuus = "استقبال"
 message = "حزمة القارئ '{pack}' وجدت كتابة تشبه كلمة مفتاحية '{spelling}'"
 help = "استخدم '{suggestion}' إذا كنت تقصد الكلمة المفتاحية؛ '{spelling}' اسم صالح كما هو مكتوب"
 
+[diagnostics.LOCALE002.issues.source_reads_as_other_locale]
+message = "المصدر لا يعلن locale وتُقرأ كلماته المفتاحية كـ '{detected}'"
+help = "صرّح بالـ locale عبر frontmatter `+++ locale = \"{detected}\" +++` أو مرّر `--locale {detected}`؛ هذا التنبيه لا يختار الـ locale"
+
 [diagnostics.LOCALE004]
 message = "المعرّف '{identifier}' يخلط بين أنظمة كتابة: {scripts}"
 help = "تحقق من وجود أحرف متشابهة من أبجدية أخرى؛ الاسم مقبول كما هو مكتوب"
@@ -746,6 +750,10 @@ help = "تحقق من صياغة الاستيراد"
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "حقل استيراد غير معروف"
 help = "استخدم {ex} أو visibilitas أو nomen أو {ut} أو {omnia}"
+
+[diagnostics.PARSE050.issues.duplicate_import_field]
+message = "حقل استيراد مكرر `{field}`"
+help = "لكل حقل استيراد ظهور واحد؛ احذف الحقل المكرر"
 
 [diagnostics.PARSE050.issues.missing_import_source]
 message = "import record يتطلب {ex} source"
@@ -3497,247 +3505,247 @@ message = "مطلوب ']' بعد أبعاد الشكل"
 message = "مطلوب ')' بعد الشكل بين القوسين"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
-message = "expected '←' after the awaited binding"
+message = "مطلوب '←' بعد الربط المنتظر"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
-message = "expected '[' to start the array binding pattern"
+message = "مطلوب '[' لبدء نمط ربط المصفوفة"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
-message = "expected ']' to end the array binding pattern"
+message = "مطلوب ']' لإنهاء نمط ربط المصفوفة"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
-message = "expected an opening brace for the object binding pattern"
+message = "مطلوب قوس فتح لنمط ربط الكائن"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
-message = "expected a closing brace for the object binding pattern"
+message = "مطلوب قوس إغلاق لنمط ربط الكائن"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
-message = "expected '(' before function declaration parameters"
+message = "مطلوب '(' قبل معلمات تصريح الدالة"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
-message = "expected ')' after function declaration parameters"
+message = "مطلوب ')' بعد معلمات تصريح الدالة"
 
 [diagnostics.PARSE001.issues.class_body_end]
-message = "expected a closing brace after the class body"
+message = "مطلوب قوس إغلاق بعد جسم الصنف"
 
 [diagnostics.PARSE001.issues.interface_body_start]
-message = "expected an opening brace for the interface body"
+message = "مطلوب قوس فتح لجسم interface"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
-message = "expected '(' before interface method parameters"
+message = "مطلوب '(' قبل معلمات method الـ interface"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
-message = "expected ')' after interface method parameters"
+message = "مطلوب ')' بعد معلمات method الـ interface"
 
 [diagnostics.PARSE001.issues.interface_body_end]
-message = "expected a closing brace after the interface body"
+message = "مطلوب قوس إغلاق بعد جسم interface"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
-message = "expected '=' before the type alias value"
+message = "مطلوب '=' قبل قيمة الاسم المستعار للنوع"
 
 [diagnostics.PARSE001.issues.schema_body_start]
-message = "expected an opening brace for the schema body"
+message = "مطلوب قوس فتح لجسم schema"
 
 [diagnostics.PARSE001.issues.schema_body_end]
-message = "expected a closing brace after the schema body"
+message = "مطلوب قوس إغلاق بعد جسم schema"
 
 [diagnostics.PARSE001.issues.enum_body_start]
-message = "expected an opening brace for the enum body"
+message = "مطلوب قوس فتح لجسم enum"
 
 [diagnostics.PARSE001.issues.enum_body_end]
-message = "expected a closing brace after the enum body"
+message = "مطلوب قوس إغلاق بعد جسم enum"
 
 [diagnostics.PARSE001.issues.union_body_start]
-message = "expected an opening brace for the union body"
+message = "مطلوب قوس فتح لجسم union"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
-message = "expected a closing brace after the union variant fields"
+message = "مطلوب قوس إغلاق بعد حقول variants الخاصة بـ union"
 
 [diagnostics.PARSE001.issues.union_body_end]
-message = "expected a closing brace after the union body"
+message = "مطلوب قوس إغلاق بعد جسم union"
 
 [diagnostics.PARSE001.issues.import_record_start]
-message = "expected an opening brace for the import record"
+message = "مطلوب قوس فتح لـ import record"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
-message = "expected '=' after the import field name"
+message = "مطلوب '=' بعد اسم حقل الاستيراد"
 
 [diagnostics.PARSE001.issues.import_record_end]
-message = "expected a closing brace after the import record fields"
+message = "مطلوب قوس إغلاق بعد حقول import record"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
-message = "expected an opening brace for the probandum body"
+message = "مطلوب قوس فتح لجسم probandum"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
-message = "expected a closing brace after the probandum body"
+message = "مطلوب قوس إغلاق بعد جسم probandum"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
-message = "expected an opening brace for the annotation fields"
+message = "مطلوب قوس فتح لحقول التعليمة"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
-message = "expected '=' after the annotation field name"
+message = "مطلوب '=' بعد اسم حقل التعليمة"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
-message = "expected a closing brace after the annotation fields"
+message = "مطلوب قوس إغلاق بعد حقول التعليمة"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
-message = "expected an opening brace for the nucleum annotation fields"
+message = "مطلوب قوس فتح لحقول تعليمة nucleum"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
-message = "expected '=' after the nucleum annotation field name"
+message = "مطلوب '=' بعد اسم حقل تعليمة nucleum"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
-message = "expected a closing brace after the nucleum annotation fields"
+message = "مطلوب قوس إغلاق بعد حقول تعليمة nucleum"
 
 [diagnostics.PARSE001.issues.block_start]
-message = "expected an opening brace for the block"
+message = "مطلوب قوس فتح للكتلة"
 
 [diagnostics.PARSE001.issues.block_end]
-message = "expected a closing brace to end the block"
+message = "مطلوب قوس إغلاق لإنهاء الكتلة"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
-message = "expected '>' after generic parameters"
+message = "مطلوب '>' بعد المعاملات العامة"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
-message = "expected '>' after contract type arguments"
+message = "مطلوب '>' بعد معاملات نوع contract"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
-message = "expected '[' after 'apud'"
+message = "مطلوب '[' بعد 'apud'"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
-message = "expected ']' after the 'apud' coordinates"
+message = "مطلوب ']' بعد إحداثيات 'apud'"
 
 [diagnostics.PARSE001.issues.elige_body_start]
-message = "expected an opening brace for the elige body"
+message = "مطلوب قوس فتح لجسم elige"
 
 [diagnostics.PARSE001.issues.elige_body_end]
-message = "expected a closing brace after the elige cases"
+message = "مطلوب قوس إغلاق بعد حالات elige"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
-message = "expected an opening brace for the discerne body"
+message = "مطلوب قوس فتح لجسم discerne"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
-message = "expected a closing brace after the discerne arms"
+message = "مطلوب قوس إغلاق بعد فروع discerne"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
-message = "expected an opening brace for the custodi body"
+message = "مطلوب قوس فتح لجسم custodi"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
-message = "expected a closing brace after the custodi clauses"
+message = "مطلوب قوس إغلاق بعد بنود custodi"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
-message = "expected '✗' after the conditional value"
+message = "مطلوب '✗' بعد قيمة الشرط"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
-message = "expected ')' after the call arguments"
+message = "مطلوب ')' بعد وسائط الاستدعاء"
 
 [diagnostics.PARSE001.issues.index_end]
-message = "expected ']' after the index expression"
+message = "مطلوب ']' بعد تعبير الفهرس"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
-message = "expected ']' after the gradient selectors"
+message = "مطلوب ']' بعد gradient selectors"
 
 [diagnostics.PARSE001.issues.optional_index_end]
-message = "expected ']' after the optional index expression"
+message = "مطلوب ']' بعد تعبير الفهرس الاختياري"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
-message = "expected ')' after the optional call arguments"
+message = "مطلوب ')' بعد وسائط الاستدعاء الاختيارية"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
-message = "expected ']' after the non-null index expression"
+message = "مطلوب ']' بعد تعبير الفهرس غير null"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
-message = "expected ')' after the non-null call arguments"
+message = "مطلوب ')' بعد وسائط الاستدعاء غير null"
 
 [diagnostics.PARSE001.issues.first_match_start]
-message = "expected '(' after 'primus_quem'"
+message = "مطلوب '(' بعد 'primus_quem'"
 
 [diagnostics.PARSE001.issues.first_match_source_separator]
-message = "expected ',' after the first-match source"
+message = "مطلوب ',' بعد مصدر المطابقة الأولى"
 
 [diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "expected the 'ubi' predicate tail"
+message = "مطلوب ذيل شرط 'ubi'"
 
 [diagnostics.PARSE001.issues.first_match_end]
-message = "expected ')' after the first-match predicate"
+message = "مطلوب ')' بعد شرط المطابقة الأولى"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
-message = "expected a closing brace after the constructor fields"
+message = "مطلوب قوس إغلاق بعد حقول المنشئ"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
-message = "expected ']' after the inferred constructor elements"
+message = "مطلوب ']' بعد عناصر المنشئ المستنتَج"
 
 [diagnostics.PARSE001.issues.array_literal_end]
-message = "expected ']' after the array elements"
+message = "مطلوب ']' بعد عناصر المصفوفة"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
-message = "expected ')' after the parenthesized expression"
+message = "مطلوب ')' بعد التعبير بين القوسين"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
-message = "expected '<' after 'ratio'"
+message = "مطلوب '<' بعد 'ratio'"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
-message = "expected '>' after the ratio type arguments"
+message = "مطلوب '>' بعد معاملات نوع ratio"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
-message = "expected an opening brace after the ratio type arguments"
+message = "مطلوب قوس فتح بعد معاملات نوع ratio"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
-message = "expected a closing brace after the ratio fields"
+message = "مطلوب قوس إغلاق بعد حقول ratio"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
-message = "expected a closing brace after the typed constructor fields"
+message = "مطلوب قوس إغلاق بعد حقول المنشئ المنمط"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
-message = "expected a closing brace after the finge fields"
+message = "مطلوب قوس إغلاق بعد حقول finge"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
-message = "expected '<' after 'iuncta'"
+message = "مطلوب '<' بعد 'iuncta'"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
-message = "expected '[' after the iuncta type arguments"
+message = "مطلوب '[' بعد معاملات نوع iuncta"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
-message = "expected ']' after the iuncta elements"
+message = "مطلوب ']' بعد عناصر iuncta"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
-message = "expected ')' after the closure parameters"
+message = "مطلوب ')' بعد معلمات الإغلاق"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
-message = "expected '∴' after the closure signature"
+message = "مطلوب '∴' بعد توقيع الإغلاق"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
-message = "expected ')' after the ad opener"
+message = "مطلوب ')' بعد opener الـ ad"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
-message = "expected ':' after the argument label"
+message = "مطلوب ':' بعد تسمية الوسيطة"
 
 [diagnostics.PARSE001.issues.computed_key_end]
-message = "expected ']' after the computed object key"
+message = "مطلوب ']' بعد المفتاح المحسوب للكائن"
 
 [diagnostics.PARSE001.issues.json_key_separator]
-message = "expected ':' after the JSON key"
+message = "مطلوب ':' بعد مفتاح JSON"
 
 [diagnostics.PARSE001.issues.json_object_end]
-message = "expected a closing brace after the JSON object"
+message = "مطلوب قوس إغلاق بعد كائن JSON"
 
 [diagnostics.PARSE001.issues.json_array_end]
-message = "expected ']' after the JSON array"
+message = "مطلوب ']' بعد مصفوفة JSON"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
-message = "expected a closing brace after the inferred constructor fields"
+message = "مطلوب قوس إغلاق بعد حقول المنشئ المستنتَج"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
-message = "expected '>' after the call type arguments"
+message = "مطلوب '>' بعد معاملات نوع الاستدعاء"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
-message = "expected '<' before the constructor type arguments"
+message = "مطلوب '<' قبل معاملات نوع المنشئ"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
-message = "expected '>' after the constructor type arguments"
+message = "مطلوب '>' بعد معاملات نوع المنشئ"
 
 [diagnostics.PARSE001.issues.scriptum_start]
-message = "expected '(' after 'scriptum'"
+message = "مطلوب '(' بعد 'scriptum'"
 
 [diagnostics.PARSE001.issues.scriptum_end]
-message = "expected ')' after the scriptum arguments"
+message = "مطلوب ')' بعد وسائط scriptum"

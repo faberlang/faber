@@ -223,6 +223,10 @@ tuus = "पाना"
 message = "रीडर locale '{pack}' को keyword जैसी spelling '{spelling}' मिली"
 help = "यदि आप उस कीवर्ड का मतलब रखते हैं तो '{suggestion}' का उपयोग करें; '{spelling}' वैसा ही एक वैध नाम है"
 
+[diagnostics.LOCALE002.issues.source_reads_as_other_locale]
+message = "source में कोई घोषित locale नहीं है और उसके keywords '{detected}' जैसे पढ़े जाते हैं"
+help = "`+++ locale = \"{detected}\" +++` frontmatter से locale घोषित करें या `--locale {detected}` पास करें; यह नोट locale नहीं चुनता"
+
 [diagnostics.LOCALE004]
 message = "identifier '{identifier}' में कई scripts मिले हैं: {scripts}"
 help = "दूसरी alphabet के समान दिखने वाले अक्षर जांचें; नाम वैसा ही वैध है"
@@ -746,6 +750,10 @@ help = "import syntax जांचें"
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "अज्ञात import field"
 help = "ex, visibilitas, nomen, ut, या omnia उपयोग करें"
+
+[diagnostics.PARSE050.issues.duplicate_import_field]
+message = "डुप्लिकेट import field `{field}`"
+help = "हर import field केवल एक बार आ सकता है; दोहराया गया field हटाएँ"
 
 [diagnostics.PARSE050.issues.missing_import_source]
 message = "import record के लिए ex source आवश्यक है"
@@ -3509,247 +3517,247 @@ message = "आकार के आयामों के बाद ']' अपे
 message = "कोष्ठक में आकार के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
-message = "expected '←' after the awaited binding"
+message = "awaited binding के बाद '←' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
-message = "expected '[' to start the array binding pattern"
+message = "array binding pattern शुरू करने के लिए '[' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
-message = "expected ']' to end the array binding pattern"
+message = "array binding pattern समाप्त करने के लिए ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
-message = "expected an opening brace for the object binding pattern"
+message = "object binding pattern के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
-message = "expected a closing brace for the object binding pattern"
+message = "object binding pattern के लिए एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
-message = "expected '(' before function declaration parameters"
+message = "function declaration parameters से पहले '(' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
-message = "expected ')' after function declaration parameters"
+message = "function declaration parameters के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.class_body_end]
-message = "expected a closing brace after the class body"
+message = "class body के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.interface_body_start]
-message = "expected an opening brace for the interface body"
+message = "interface body के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
-message = "expected '(' before interface method parameters"
+message = "interface method parameters से पहले '(' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
-message = "expected ')' after interface method parameters"
+message = "interface method parameters के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.interface_body_end]
-message = "expected a closing brace after the interface body"
+message = "interface body के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
-message = "expected '=' before the type alias value"
+message = "type alias value से पहले '=' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.schema_body_start]
-message = "expected an opening brace for the schema body"
+message = "schema body के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.schema_body_end]
-message = "expected a closing brace after the schema body"
+message = "schema body के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.enum_body_start]
-message = "expected an opening brace for the enum body"
+message = "enum body के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.enum_body_end]
-message = "expected a closing brace after the enum body"
+message = "enum body के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.union_body_start]
-message = "expected an opening brace for the union body"
+message = "union body के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
-message = "expected a closing brace after the union variant fields"
+message = "union variant fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.union_body_end]
-message = "expected a closing brace after the union body"
+message = "union body के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.import_record_start]
-message = "expected an opening brace for the import record"
+message = "import record के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
-message = "expected '=' after the import field name"
+message = "import field name के बाद '=' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.import_record_end]
-message = "expected a closing brace after the import record fields"
+message = "import record fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
-message = "expected an opening brace for the probandum body"
+message = "probandum body के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
-message = "expected a closing brace after the probandum body"
+message = "probandum body के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
-message = "expected an opening brace for the annotation fields"
+message = "annotation fields के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
-message = "expected '=' after the annotation field name"
+message = "annotation field name के बाद '=' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
-message = "expected a closing brace after the annotation fields"
+message = "annotation fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
-message = "expected an opening brace for the nucleum annotation fields"
+message = "nucleum annotation fields के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
-message = "expected '=' after the nucleum annotation field name"
+message = "nucleum annotation field name के बाद '=' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
-message = "expected a closing brace after the nucleum annotation fields"
+message = "nucleum annotation fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.block_start]
-message = "expected an opening brace for the block"
+message = "block के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.block_end]
-message = "expected a closing brace to end the block"
+message = "block समाप्त करने के लिए एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
-message = "expected '>' after generic parameters"
+message = "generic parameters के बाद '>' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
-message = "expected '>' after contract type arguments"
+message = "contract type arguments के बाद '>' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
-message = "expected '[' after 'apud'"
+message = "'apud' के बाद '[' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
-message = "expected ']' after the 'apud' coordinates"
+message = "'apud' coordinates के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.elige_body_start]
-message = "expected an opening brace for the elige body"
+message = "elige body के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.elige_body_end]
-message = "expected a closing brace after the elige cases"
+message = "elige cases के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
-message = "expected an opening brace for the discerne body"
+message = "discerne body के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
-message = "expected a closing brace after the discerne arms"
+message = "discerne arms के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
-message = "expected an opening brace for the custodi body"
+message = "custodi body के लिए एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
-message = "expected a closing brace after the custodi clauses"
+message = "custodi clauses के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
-message = "expected '✗' after the conditional value"
+message = "conditional value के बाद '✗' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
-message = "expected ')' after the call arguments"
+message = "call arguments के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.index_end]
-message = "expected ']' after the index expression"
+message = "index expression के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
-message = "expected ']' after the gradient selectors"
+message = "gradient selectors के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.optional_index_end]
-message = "expected ']' after the optional index expression"
+message = "optional index expression के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
-message = "expected ')' after the optional call arguments"
+message = "optional call arguments के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
-message = "expected ']' after the non-null index expression"
+message = "non-null index expression के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
-message = "expected ')' after the non-null call arguments"
+message = "non-null call arguments के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.first_match_start]
-message = "expected '(' after 'primus_quem'"
+message = "'primus_quem' के बाद '(' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.first_match_source_separator]
-message = "expected ',' after the first-match source"
+message = "first-match source के बाद ',' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "expected the 'ubi' predicate tail"
+message = "'ubi' predicate tail अपेक्षित है"
 
 [diagnostics.PARSE001.issues.first_match_end]
-message = "expected ')' after the first-match predicate"
+message = "first-match predicate के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
-message = "expected a closing brace after the constructor fields"
+message = "constructor fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
-message = "expected ']' after the inferred constructor elements"
+message = "inferred constructor elements के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.array_literal_end]
-message = "expected ']' after the array elements"
+message = "array elements के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
-message = "expected ')' after the parenthesized expression"
+message = "parenthesized expression के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
-message = "expected '<' after 'ratio'"
+message = "'ratio' के बाद '<' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
-message = "expected '>' after the ratio type arguments"
+message = "ratio type arguments के बाद '>' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
-message = "expected an opening brace after the ratio type arguments"
+message = "ratio type arguments के बाद एक opening brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
-message = "expected a closing brace after the ratio fields"
+message = "ratio fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
-message = "expected a closing brace after the typed constructor fields"
+message = "typed constructor fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
-message = "expected a closing brace after the finge fields"
+message = "finge fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
-message = "expected '<' after 'iuncta'"
+message = "'iuncta' के बाद '<' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
-message = "expected '[' after the iuncta type arguments"
+message = "iuncta type arguments के बाद '[' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
-message = "expected ']' after the iuncta elements"
+message = "iuncta elements के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
-message = "expected ')' after the closure parameters"
+message = "closure parameters के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
-message = "expected '∴' after the closure signature"
+message = "closure signature के बाद '∴' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
-message = "expected ')' after the ad opener"
+message = "'ad' opener के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
-message = "expected ':' after the argument label"
+message = "argument label के बाद ':' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.computed_key_end]
-message = "expected ']' after the computed object key"
+message = "computed object key के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.json_key_separator]
-message = "expected ':' after the JSON key"
+message = "JSON key के बाद ':' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.json_object_end]
-message = "expected a closing brace after the JSON object"
+message = "JSON object के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.json_array_end]
-message = "expected ']' after the JSON array"
+message = "JSON array के बाद ']' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
-message = "expected a closing brace after the inferred constructor fields"
+message = "inferred constructor fields के बाद एक closing brace अपेक्षित है"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
-message = "expected '>' after the call type arguments"
+message = "call type arguments के बाद '>' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
-message = "expected '<' before the constructor type arguments"
+message = "constructor type arguments से पहले '<' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
-message = "expected '>' after the constructor type arguments"
+message = "constructor type arguments के बाद '>' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.scriptum_start]
-message = "expected '(' after 'scriptum'"
+message = "'scriptum' के बाद '(' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.scriptum_end]
-message = "expected ')' after the scriptum arguments"
+message = "scriptum arguments के बाद ')' अपेक्षित है"
