@@ -34,6 +34,37 @@ fn registry_rows_are_unique_per_receiver_name_generic_arity_and_value_arity() {
     }
 }
 
+/// The `intrinsic!` helper centralizes the policy defaults (`failable`,
+/// `range_checked_arg`, and the three generic-diagnostic slots). Only the rows
+/// named here may deviate, so a row that grows a policy field has to be added
+/// deliberately instead of inheriting one by accident.
+#[test]
+fn macro_rows_keep_default_policy_unless_named() {
+    let special: HashSet<(IntrinsicReceiver, &str, usize)> = [
+        (IntrinsicReceiver::Lista, "apud", 1),
+        (IntrinsicReceiver::Tabula, "apud", 1),
+        (IntrinsicReceiver::Textus, "apud", 1),
+        (IntrinsicReceiver::Tensor, "accipe", 1),
+        (IntrinsicReceiver::Tensor, "ponde", 2),
+        (IntrinsicReceiver::Tensor, "formata", 0),
+        (IntrinsicReceiver::Tensor, "rope_norm", 2),
+        (IntrinsicReceiver::Tensor, "limes", 0),
+    ]
+    .into_iter()
+    .collect();
+    for entry in INTRINSICS {
+        let key = (entry.receiver, entry.faber_name, entry.arg_count);
+        if special.contains(&key) {
+            continue;
+        }
+        assert_eq!(entry.missing_generic_issue, None, "{key:?}");
+        assert_eq!(entry.excess_generic_issue, None, "{key:?}");
+        assert_eq!(entry.value_arity_issue, None, "{key:?}");
+        assert!(!entry.failable, "{key:?}");
+        assert_eq!(entry.range_checked_arg, None, "{key:?}");
+    }
+}
+
 #[test]
 fn empty_generic_rows_reject_angle_brackets_and_declared_rows_are_explicit() {
     let formata = lookup_method(IntrinsicReceiver::Tensor, "formata", 0).expect("formata");

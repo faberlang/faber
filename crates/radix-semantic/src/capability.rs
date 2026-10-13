@@ -494,7 +494,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
             Type::Struct(_) | Type::Enum(_) => {
                 visiting.push(ty);
                 let result = self
-                    .nominal_field_types(ty, &mut Vec::new())
+                    .nominal_field_types(ty)
                     .and_then(|fields| self.classify_fields(&fields, visiting));
                 visiting.pop();
                 result
@@ -543,31 +543,16 @@ impl<'a> DerivedCapabilityQueries<'a> {
 
     /// Field types of one nominal declaration.
     ///
-    /// A missing declaration (imported nominal) is [`CapabilityReason::MissingFact`];
-    /// re-entering a declaration already on the walk is
-    /// [`CapabilityReason::UnsupportedRecursion`].
-    fn nominal_field_types(
-        &self,
-        ty: TypeId,
-        visited_defs: &mut Vec<DefId>,
-    ) -> Result<Vec<TypeId>, CapabilityReason> {
+    /// A missing declaration (imported nominal) is
+    /// [`CapabilityReason::MissingFact`]. Nominal recursion is caught by the
+    /// caller's type-identity walk, which pushes the nominal `TypeId` before
+    /// descending into these fields.
+    fn nominal_field_types(&self, ty: TypeId) -> Result<Vec<TypeId>, CapabilityReason> {
         let def = match self.types.get(ty) {
             Type::Struct(def) | Type::Enum(def) => *def,
             _ => return Ok(Vec::new()),
         };
-        self.decl_field_types(def, visited_defs)
-    }
-
-    fn decl_field_types(
-        &self,
-        def: DefId,
-        visited_defs: &mut Vec<DefId>,
-    ) -> Result<Vec<TypeId>, CapabilityReason> {
-        if visited_defs.contains(&def) {
-            return Err(CapabilityReason::UnsupportedRecursion);
-        }
-        visited_defs.push(def);
-        let result = match self.nominal_decl(def) {
+        match self.nominal_decl(def) {
             Some(NominalDecl::Struct(strukt)) => Ok(strukt.fields.iter().map(|f| f.ty).collect()),
             Some(NominalDecl::Enum(enumeratio)) => {
                 let mut fields: Vec<TypeId> =
@@ -578,9 +563,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
                 Ok(fields)
             }
             None => Err(CapabilityReason::MissingFact),
-        };
-        visited_defs.pop();
-        result
+        }
     }
 
     // ── type laws ────────────────────────────────────────────────────────
@@ -692,17 +675,15 @@ impl<'a> DerivedCapabilityQueries<'a> {
             }
             Type::Struct(_) | Type::Enum(_) => {
                 visiting.push(ty);
-                let result = self
-                    .nominal_field_types(ty, &mut Vec::new())
-                    .and_then(|fields| {
-                        let mut holds = true;
-                        for field in &fields {
-                            if !self.type_law(*field, law, visiting)? {
-                                holds = false;
-                            }
+                let result = self.nominal_field_types(ty).and_then(|fields| {
+                    let mut holds = true;
+                    for field in &fields {
+                        if !self.type_law(*field, law, visiting)? {
+                            holds = false;
                         }
-                        Ok(holds)
-                    });
+                    }
+                    Ok(holds)
+                });
                 visiting.pop();
                 result
             }
@@ -797,7 +778,6 @@ impl<'a> DerivedCapabilityQueries<'a> {
         self.index_solved(shape)?;
         if let IndexExpr::Tuple(dims) = self.types.get_index(shape) {
             for dim in dims {
-                self.index_solved(*dim)?;
                 identity.dimensions.push(*dim);
                 identity.tuple_order.push(*dim);
             }
@@ -862,14 +842,12 @@ impl<'a> DerivedCapabilityQueries<'a> {
             }
             Type::Struct(_) | Type::Enum(_) => {
                 visiting.push(ty);
-                let result = self
-                    .nominal_field_types(ty, &mut Vec::new())
-                    .and_then(|fields| {
-                        for field in fields {
-                            self.solved_identity(field, visiting, identity)?;
-                        }
-                        Ok(())
-                    });
+                let result = self.nominal_field_types(ty).and_then(|fields| {
+                    for field in fields {
+                        self.solved_identity(field, visiting, identity)?;
+                    }
+                    Ok(())
+                });
                 visiting.pop();
                 result
             }

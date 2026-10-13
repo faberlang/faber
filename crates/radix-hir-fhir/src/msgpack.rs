@@ -398,11 +398,7 @@ fn read_value(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Value, Msgp
         0xc3 => Ok(Value::Bool(true)),
         0xc4..=0xc6 => {
             let len = read_len(bytes, pos, marker)?;
-            let body = bytes
-                .get(*pos..pos.saturating_add(len))
-                .ok_or(MsgpackError::Truncated)?;
-            *pos += len;
-            Ok(Value::Bin(body.to_vec()))
+            Ok(Value::Bin(read_body(bytes, pos, len)?.to_vec()))
         }
         0xca => Ok(Value::F32(f32::from_be_bytes(read_exact::<4>(bytes, pos)?))),
         0xcb => Ok(Value::F64(f64::from_be_bytes(read_exact::<8>(bytes, pos)?))),
@@ -435,13 +431,20 @@ fn read_value(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Value, Msgp
     }
 }
 
-fn read_str(bytes: &[u8], pos: &mut usize, len: usize) -> Result<Value, MsgpackError> {
+/// Borrows the next `len` bytes and advances `pos`; a short tail is a
+/// truncation error.
+fn read_body<'b>(bytes: &'b [u8], pos: &mut usize, len: usize) -> Result<&'b [u8], MsgpackError> {
     let body = bytes
         .get(*pos..pos.saturating_add(len))
         .ok_or(MsgpackError::Truncated)?;
+    *pos += len;
+    Ok(body)
+}
+
+fn read_str(bytes: &[u8], pos: &mut usize, len: usize) -> Result<Value, MsgpackError> {
+    let body = read_body(bytes, pos, len)?;
     let s = std::str::from_utf8(body)
         .map_err(|_| MsgpackError::Decode("msgpack str is not UTF-8".to_string()))?;
-    *pos += len;
     Ok(Value::Str(s.to_string()))
 }
 
@@ -1530,58 +1533,62 @@ fn gate_package_versions(value: &Value) -> Result<(), MsgpackError> {
         }
     };
     for module in modules {
-        let module_entries = match module {
-            Value::Map(entries) => entries,
-            other => {
-                return Err(MsgpackError::Decode(format!(
-                    "a module record must be a map, found {other:?}"
-                )));
-            }
-        };
-        let path = match named_field(module_entries, "path")? {
-            Value::Str(path) => path.clone(),
-            other => {
-                return Err(MsgpackError::Decode(format!(
-                    "module path must be a str, found {other:?}"
-                )));
-            }
-        };
-        let manifest = named_field(module_entries, "unit_schema_version")?
-            .as_u64()
-            .ok_or_else(|| {
-                MsgpackError::Decode("unit_schema_version must be a uint".to_string())
-            })?;
-        if manifest != u64::from(SCHEMA_VERSION) {
-            return Err(MsgpackError::InvalidPackage(
-                FhirPackageError::UnsupportedUnitSchemaVersion {
-                    module: path,
-                    found: u32::try_from(manifest).unwrap_or(u32::MAX),
-                    expected: SCHEMA_VERSION,
-                },
-            ));
+        gate_module_versions(module)?;
+    }
+    Ok(())
+}
+
+/// Gates one module record: the `unit_schema_version` manifest copy and the
+/// nested unit's own `schema_version`, both read before payload
+/// interpretation, with module attribution.
+fn gate_module_versions(module: &Value) -> Result<(), MsgpackError> {
+    let module_entries = match module {
+        Value::Map(entries) => entries,
+        other => {
+            return Err(MsgpackError::Decode(format!(
+                "a module record must be a map, found {other:?}"
+            )));
         }
-        let unit_entries = match named_field(module_entries, "unit")? {
-            Value::Map(entries) => entries,
-            other => {
-                return Err(MsgpackError::Decode(format!(
-                    "the embedded unit must be a nested named map, found {other:?}"
-                )));
-            }
-        };
-        let unit_version = named_field(unit_entries, "schema_version")?
-            .as_u64()
-            .ok_or_else(|| {
-                MsgpackError::Decode("unit schema_version must be a uint".to_string())
-            })?;
-        if unit_version != u64::from(SCHEMA_VERSION) {
-            return Err(MsgpackError::InvalidPackage(
-                FhirPackageError::UnsupportedUnitSchemaVersion {
-                    module: path,
-                    found: u32::try_from(unit_version).unwrap_or(u32::MAX),
-                    expected: SCHEMA_VERSION,
-                },
-            ));
+    };
+    let path = match named_field(module_entries, "path")? {
+        Value::Str(path) => path.clone(),
+        other => {
+            return Err(MsgpackError::Decode(format!(
+                "module path must be a str, found {other:?}"
+            )));
         }
+    };
+    let manifest = named_field(module_entries, "unit_schema_version")?
+        .as_u64()
+        .ok_or_else(|| MsgpackError::Decode("unit_schema_version must be a uint".to_string()))?;
+    if manifest != u64::from(SCHEMA_VERSION) {
+        return Err(MsgpackError::InvalidPackage(
+            FhirPackageError::UnsupportedUnitSchemaVersion {
+                module: path,
+                found: u32::try_from(manifest).unwrap_or(u32::MAX),
+                expected: SCHEMA_VERSION,
+            },
+        ));
+    }
+    let unit_entries = match named_field(module_entries, "unit")? {
+        Value::Map(entries) => entries,
+        other => {
+            return Err(MsgpackError::Decode(format!(
+                "the embedded unit must be a nested named map, found {other:?}"
+            )));
+        }
+    };
+    let unit_version = named_field(unit_entries, "schema_version")?
+        .as_u64()
+        .ok_or_else(|| MsgpackError::Decode("unit schema_version must be a uint".to_string()))?;
+    if unit_version != u64::from(SCHEMA_VERSION) {
+        return Err(MsgpackError::InvalidPackage(
+            FhirPackageError::UnsupportedUnitSchemaVersion {
+                module: path,
+                found: u32::try_from(unit_version).unwrap_or(u32::MAX),
+                expected: SCHEMA_VERSION,
+            },
+        ));
     }
     Ok(())
 }
