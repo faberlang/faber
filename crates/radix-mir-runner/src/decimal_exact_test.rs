@@ -40,6 +40,29 @@ fn compare_aligns_scales_and_survives_overflow() {
 }
 
 #[test]
+fn compare_with_a_zero_carrier_past_the_power_of_ten_gap_orders_by_the_other_sign() {
+    // Scale 48 against scale 8 is a gap of 40: `10^40` overflows the i128
+    // carrier, so a zero carrier cannot be rescaled by multiplication.
+    let wide = |carrier: i128| (carrier, 48);
+    let stored = |carrier: i128| (carrier, 8);
+
+    // positive vs zero, zero vs positive
+    assert_eq!(compare(wide(1), stored(0)), Ordering::Greater);
+    assert_eq!(compare(stored(0), wide(1)), Ordering::Less);
+    // negative vs zero, zero vs negative
+    assert_eq!(compare(wide(-1), stored(0)), Ordering::Less);
+    assert_eq!(compare(stored(0), wide(-1)), Ordering::Greater);
+    // the zero is the wide side
+    assert_eq!(compare(wide(0), stored(1)), Ordering::Less);
+    assert_eq!(compare(stored(1), wide(0)), Ordering::Greater);
+    assert_eq!(compare(wide(0), stored(-1)), Ordering::Greater);
+    assert_eq!(compare(stored(-1), wide(0)), Ordering::Less);
+    // equal zero at different scales
+    assert_eq!(compare(wide(0), stored(0)), Ordering::Equal);
+    assert_eq!(compare(stored(0), wide(0)), Ordering::Equal);
+}
+
+#[test]
 fn store_rounds_half_even_and_checks_the_carrier_range() {
     assert_eq!(store_carrier(25, 9), Some(2)); // 0.000000025 -> 2 (even tie)
     assert_eq!(store_carrier(35, 9), Some(4)); // 0.000000035 -> 4

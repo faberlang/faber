@@ -139,12 +139,19 @@ pub(crate) fn neg(value: &crate::Value, span: Span) -> Result<crate::Value, Runn
 /// Exact three-way comparison of two decimal values.
 pub(crate) fn compare(a: (i128, u32), b: (i128, u32)) -> Ordering {
     let scale = a.1.max(b.1);
-    let up =
-        |(carrier, from): (i128, u32)| pow10(scale - from).and_then(|f| carrier.checked_mul(f));
+    // A zero carrier is zero at every scale: it never goes through `pow10`,
+    // which overflows past a gap of 38 digits and would misread it as a
+    // dominating magnitude.
+    let up = |(carrier, from): (i128, u32)| {
+        if carrier == 0 {
+            return Some(0);
+        }
+        pow10(scale - from).and_then(|f| carrier.checked_mul(f))
+    };
     match (up(a), up(b)) {
         (Some(x), Some(y)) => x.cmp(&y),
-        // A side that overflows the shared scale dominates the other in
-        // magnitude, so its sign decides.
+        // A nonzero side that overflows the shared scale dominates the other
+        // in magnitude, so its sign decides.
         (None, _) => {
             if a.0 < 0 {
                 Ordering::Less
