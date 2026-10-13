@@ -122,18 +122,48 @@ fn digestio_is_gone_with_the_solum_kernel() {
     assert_eq!(errors[0].code, "runner_unsupported");
 }
 
+/// Marks the re-executed test binary that runs the console program itself.
+const CONSOLE_CHILD: &str = "RADIX_ROUTE_SERVE_CONSOLE_CHILD";
+
+// WHY: the stdio leaf writes `consolum:dic` / `consolum:mone` straight to the
+// process's own fd 1 / fd 2, not into the `BufferHost` line buffers, so the
+// streams are only observable from outside the process. The test re-executes
+// its own binary and reads the child's real stdout and stderr.
 #[test]
 fn dic_writes_stdout_and_mone_writes_stderr() {
-    let host = run_ok(
-        "route-console.fab",
-        &program(
-            "    fixum vacuum a ← ad 'consolum:dic' (\"salve\") ↦ vacuum\n    \
-             fixum vacuum b ← ad 'consolum:mone' (\"cave\") ↦ vacuum\n    \
-             nota \"fin\"",
-        ),
-    );
-    assert_eq!(host.stdout_lines, ["salvefin"]);
-    assert_eq!(host.stderr_lines, ["cave"]);
+    if std::env::var_os(CONSOLE_CHILD).is_some() {
+        let host = run_ok(
+            "route-console.fab",
+            &program(
+                "    fixum vacuum a ← ad 'consolum:dic' (\"salve\") ↦ vacuum\n    \
+                 fixum vacuum b ← ad 'consolum:mone' (\"cave\") ↦ vacuum\n    \
+                 nota \"fin\"",
+            ),
+        );
+        assert_eq!(host.stdout_lines, ["fin"]);
+        assert!(host.stderr_lines.is_empty(), "{:?}", host.stderr_lines);
+        return;
+    }
+    let module = module_path!()
+        .split_once("::")
+        .map_or(module_path!(), |(_, path)| path);
+    let output = std::process::Command::new(std::env::current_exe().expect("test binary path"))
+        .args([
+            "--exact",
+            &format!("{module}::dic_writes_stdout_and_mone_writes_stderr"),
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(CONSOLE_CHILD, "1")
+        .output()
+        .expect("re-run the test binary");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "child failed:\n{stdout}\n{stderr}");
+    assert!(stdout.contains("salve"), "dic must write stdout: {stdout:?}");
+    assert!(!stdout.contains("cave"), "mone must not write stdout: {stdout:?}");
+    assert!(stderr.contains("cave\n"), "mone must write a stderr line: {stderr:?}");
+    assert!(!stderr.contains("salve"), "dic must not write stderr: {stderr:?}");
 }
 
 #[test]

@@ -95,7 +95,15 @@ fn a_thread_client_gets_200_from_health() {
     let reply = reply.join().expect("client");
     assert!(reply.starts_with("HTTP/1.1 200 OK\r\n"), "{reply}");
     assert!(reply.ends_with("\r\n\r\nok GET /health"), "{reply}");
-    assert_eq!(host.stdout_lines, ["1"]);
+    // WHY: the leaf numbers connections from a process-global counter, so the
+    // printed id depends on which sibling test accepted first.
+    let [connection] = host.stdout_lines.as_slice() else {
+        panic!("expected one printed connection id: {:?}", host.stdout_lines);
+    };
+    assert!(
+        connection.parse::<i64>().is_ok_and(|id| id >= 1),
+        "connection id must be a positive integer: {connection}"
+    );
 }
 
 #[test]
