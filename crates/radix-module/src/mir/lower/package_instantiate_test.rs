@@ -1578,15 +1578,7 @@ fn try_call_error_place_binds_the_generic_error_type() {
 
     let monomorphizations =
         instantiate_merged_generic_calls(&mut program, &[template], &generic_params, &mut types, &interner, None)
-            .unwrap_or_else(|errors| {
-                panic!(
-                    "the catch place must fix E; link errors: {:?}",
-                    errors
-                        .iter()
-                        .map(|error| error.message.as_str())
-                        .collect::<Vec<_>>()
-                )
-            });
+            .unwrap_or_else(|errors| panic!("the catch place must fix E; link errors: {errors:?}"));
 
     assert_eq!(monomorphizations.len(), 1, "one concrete instance is created");
     assert_eq!(
