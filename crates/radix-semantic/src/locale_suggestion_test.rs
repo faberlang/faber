@@ -124,3 +124,65 @@ fn repeated_identifier_is_computed_once() {
     assert_eq!(clone.keyword_suggestion("zzzzzzzz"), None);
     assert_eq!(computed(), 2);
 }
+
+#[test]
+fn suggestion_key_folds_width_and_accents() {
+    assert_eq!(suggestion_key("d\u{fc}m"), "dum");
+    assert_eq!(suggestion_key("w\u{e9}hile"), "wehile");
+    assert_eq!(
+        suggestion_key("\u{ff57}\u{ff48}\u{ff49}\u{ff4c}\u{ff45}"),
+        "while"
+    );
+    assert_eq!(suggestion_key("caf\u{e9}_name"), "cafe_name");
+    assert_eq!(suggestion_key("plain"), "plain");
+}
+
+#[test]
+fn latin_scaffold_carries_word_type_rows() {
+    let pack = latin_locale_pack();
+    assert_eq!(pack.type_latin_key("modulus_t"), Some("modulus"));
+    assert_eq!(pack.type_latin_key("saturatus"), Some("saturatus"));
+    assert_eq!(pack.type_latin_key("exactus"), Some("exactus"));
+    assert_eq!(pack.type_latin_key("octetus"), Some("octetus"));
+    assert_eq!(pack.type_surface(TypeBindingKind::ModularWord), "modulus_t");
+    assert_eq!(pack.type_surface(TypeBindingKind::SaturatingWord), "saturatus");
+}
+
+#[test]
+fn duplicate_library_member_surface_is_rejected_in_owner_scope() {
+    let err = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "en"
+
+[[library_members]]
+provider = "package"
+package = "demo"
+module_path = ["math"]
+kind = "function"
+canonical = "summa"
+surface = "sum"
+
+[[library_members]]
+provider = "package"
+package = "demo"
+module_path = ["math"]
+kind = "function"
+canonical = "differentia"
+surface = "sum"
+
+[llm]
+system_prompt_snippet = "emit English reader-locale Faber"
+exemplars = ["salve-munde.en.fab"]
+"#,
+    )
+    .expect_err("duplicate scope surface should fail validation");
+    let LocalePackLoadError::Validation(issues) = err else {
+        panic!("expected validation errors");
+    };
+    assert!(issues.iter().any(|issue| matches!(
+        issue,
+        LocalePackIssue::DuplicateLibraryMemberSurface { owner: None, surface, .. }
+            if surface == "sum"
+    )));
+}

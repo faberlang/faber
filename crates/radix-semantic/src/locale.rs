@@ -826,10 +826,12 @@ fn build_type_fallbacks(type_surfaces: &HashMap<TypeBindingKind, String>) -> Vec
                 .filter(|spec| spec.canonical)
                 .map(|spec| TypeBindingKind::TensorFamily(spec.kind)),
         )
-        .chain(std::iter::once(TypeBindingKind::ModularWord))
-        .chain(std::iter::once(TypeBindingKind::SaturatingWord))
-        .chain(std::iter::once(TypeBindingKind::TrappingWord))
-        .chain(std::iter::once(TypeBindingKind::ByteWord))
+        .chain([
+            TypeBindingKind::ModularWord,
+            TypeBindingKind::SaturatingWord,
+            TypeBindingKind::TrappingWord,
+            TypeBindingKind::ByteWord,
+        ])
         .chain(
             BuiltinTensorEdgePolicy::ALL
                 .into_iter()
@@ -1394,42 +1396,25 @@ fn latin_spec_type_bindings() -> BTreeMap<String, TypeBinding> {
 }
 
 fn insert_latin_extra_types(types: &mut BTreeMap<String, TypeBinding>) {
-    types.insert(
-        "modulus".to_owned(),
-        TypeBinding {
-            key: "modulus".to_owned(),
-            canonical: "modulus_t".to_owned(),
-            aliases: Vec::new(),
-            kind: TypeBindingKind::ModularWord,
-        },
-    );
-    types.insert(
-        "saturatus".to_owned(),
-        TypeBinding {
-            key: "saturatus".to_owned(),
-            canonical: "saturatus".to_owned(),
-            aliases: Vec::new(),
-            kind: TypeBindingKind::SaturatingWord,
-        },
-    );
-    types.insert(
-        "exactus".to_owned(),
-        TypeBinding {
-            key: "exactus".to_owned(),
-            canonical: "exactus".to_owned(),
-            aliases: Vec::new(),
-            kind: TypeBindingKind::TrappingWord,
-        },
-    );
-    types.insert(
-        "octetus".to_owned(),
-        TypeBinding {
-            key: "octetus".to_owned(),
-            canonical: "octetus".to_owned(),
-            aliases: Vec::new(),
-            kind: TypeBindingKind::ByteWord,
-        },
-    );
+    // All four word families are single-spelling rows. `modulus` needs the
+    // disambiguated canonical for the same reason as the primitive scan above
+    // (its spelling collides with the keyword); the other three are identity.
+    for (key, canonical, kind) in [
+        ("modulus", "modulus_t", TypeBindingKind::ModularWord),
+        ("saturatus", "saturatus", TypeBindingKind::SaturatingWord),
+        ("exactus", "exactus", TypeBindingKind::TrappingWord),
+        ("octetus", "octetus", TypeBindingKind::ByteWord),
+    ] {
+        types.insert(
+            key.to_owned(),
+            TypeBinding {
+                key: key.to_owned(),
+                canonical: canonical.to_owned(),
+                aliases: Vec::new(),
+                kind,
+            },
+        );
+    }
     for policy in BuiltinTensorEdgePolicy::ALL {
         let key = policy.latin().to_owned();
         types.insert(
@@ -1598,7 +1583,7 @@ pub fn format_locale_pack_load_error(err: &LocalePackLoadError) -> String {
 #[must_use]
 pub fn suggestion_key(text: &str) -> String {
     text.nfkc()
-        .flat_map(|ch| ch.to_string().nfd().collect::<Vec<_>>())
+        .nfd()
         .filter(|ch| !is_combining_mark(*ch))
         .collect()
 }
@@ -2024,7 +2009,7 @@ fn validate_library_members(pack: &LocalePack, issues: &mut Vec<LocalePackIssue>
             });
         }
 
-        let mut surfaces: BTreeMap<(Option<String>, String), String> = BTreeMap::new();
+        let mut surfaces: BTreeSet<(Option<String>, String)> = BTreeSet::new();
         for (key, primary_surface) in members {
             if key.canonical.trim().is_empty() {
                 issues.push(LocalePackIssue::InvalidLibraryMemberMapping {
@@ -2057,7 +2042,7 @@ fn validate_library_members(pack: &LocalePack, issues: &mut Vec<LocalePackIssue>
                 }
 
                 let scope = (key.owner.clone(), surface.clone());
-                if surfaces.insert(scope, key.canonical.clone()).is_some() {
+                if !surfaces.insert(scope) {
                     issues.push(LocalePackIssue::DuplicateLibraryMemberSurface {
                         interface: identity.display_key(),
                         owner: key.owner.clone(),
@@ -2456,14 +2441,8 @@ type LibraryMemberMap<V> = BTreeMap<InterfaceLibraryIdentity, BTreeMap<LibraryMe
 fn project_library_members(
     members: Vec<LibraryMemberToml>,
 ) -> (LibraryMemberMap<String>, LibraryMemberMap<Vec<String>>) {
-    let mut library_members: BTreeMap<
-        InterfaceLibraryIdentity,
-        BTreeMap<LibraryMemberKey, String>,
-    > = BTreeMap::new();
-    let mut library_member_surfaces: BTreeMap<
-        InterfaceLibraryIdentity,
-        BTreeMap<LibraryMemberKey, Vec<String>>,
-    > = BTreeMap::new();
+    let mut library_members: LibraryMemberMap<String> = BTreeMap::new();
+    let mut library_member_surfaces: LibraryMemberMap<Vec<String>> = BTreeMap::new();
     for member in members {
         let identity = InterfaceLibraryIdentity {
             provider: member.provider,
