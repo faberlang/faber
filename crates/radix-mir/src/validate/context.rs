@@ -285,6 +285,7 @@ impl<'a> MirValidationContext<'a> {
         context
             .struct_type_params
             .clone_from(&self.struct_type_params);
+        context.struct_contracts.clone_from(&self.struct_contracts);
         context.enum_type_params.clone_from(&self.enum_type_params);
         context
             .optional_struct_fields

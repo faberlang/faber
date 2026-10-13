@@ -8,7 +8,7 @@
 use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind};
 
 use crate::figura::i64s_from_literal_index;
-use radix_types::{Primitive, Type, TypeId, TypeTable};
+use radix_types::{IndexId, Primitive, Type, TypeId, TypeTable};
 
 /// Outcome-ladder label when `structa` rejects a flat buffer against the target `Figura`.
 pub const LISTA_TO_TENSOR_STRUCTA_COUNT_MSG: &str =
@@ -109,15 +109,23 @@ pub fn validate_lista_to_tensor_source(
             if !is_numeric_element(elem, types) {
                 return Err(ListaToTensorError::NonNumericElement);
             }
-            let dim = i64s_from_literal_index(*shape, types).and_then(|dims| dims.first().copied());
-            let capacity =
-                i64s_from_literal_index(*capacity, types).and_then(|dims| dims.first().copied());
+            let dim = rank_one_literal_dim(*shape, types);
+            let capacity = rank_one_literal_dim(*capacity, types);
             if dim.is_none() || dim != capacity {
                 return Err(ListaToTensorError::CapacityMismatch);
             }
             Ok(())
         }
         _ => Err(ListaToTensorError::NotListaToTensor),
+    }
+}
+
+/// The single literal extent of a rank-1 index; `None` for any other rank, so a
+/// `[N, M]` target never passes for its leading dim alone.
+fn rank_one_literal_dim(index: IndexId, types: &TypeTable) -> Option<i64> {
+    match i64s_from_literal_index(index, types)?.as_slice() {
+        [dim] => Some(*dim),
+        _ => None,
     }
 }
 
@@ -166,10 +174,8 @@ pub fn resolve_bounded_lista_padded_shape(
             if !is_numeric_element(elem, types) {
                 return None;
             }
-            let dim =
-                i64s_from_literal_index(*shape, types).and_then(|dims| dims.first().copied())?;
-            let capacity =
-                i64s_from_literal_index(*capacity, types).and_then(|dims| dims.first().copied())?;
+            let dim = rank_one_literal_dim(*shape, types)?;
+            let capacity = rank_one_literal_dim(*capacity, types)?;
             (dim == capacity).then_some((elem, dim))
         }
         _ => None,

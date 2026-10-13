@@ -94,7 +94,8 @@ impl Validator<'_, '_> {
                 }
                 // The optional third operand is a window step; it is numeric,
                 // not an element of the interval.
-                for item in items.iter().take(2) {
+                let (bounds, step) = items.split_at(items.len().min(2));
+                for item in bounds {
                     let MirAggregateItem::Operand(bound) = item else {
                         self.error(span, "interval aggregate bound cannot spread");
                         continue;
@@ -107,6 +108,9 @@ impl Validator<'_, '_> {
                             "interval aggregate bound type mismatch",
                         );
                     }
+                }
+                if let Some(step) = step.first() {
+                    self.validate_interval_step(scope, step, span);
                 }
             }
             (MirAggregateKind::Vector, MirAggregateFields::Ordered(items)) => {
@@ -364,6 +368,25 @@ impl Validator<'_, '_> {
                 span,
                 "aggregate payload shape does not match aggregate kind",
             ),
+        }
+    }
+
+    /// The optional third interval operand: a stride, so it is a defined
+    /// numeric operand and never a spread.
+    fn validate_interval_step(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        step: &MirAggregateItem,
+        span: Span,
+    ) {
+        let MirAggregateItem::Operand(step) = step else {
+            self.error(span, "interval aggregate step cannot spread");
+            return;
+        };
+        if let Some(step_ty) = self.validate_operand(scope, step, span)
+            && !self.is_numeric_type(step_ty)
+        {
+            self.error(span, "interval aggregate step must be numeric");
         }
     }
 

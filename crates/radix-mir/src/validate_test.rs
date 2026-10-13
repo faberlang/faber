@@ -5158,3 +5158,134 @@ fn applied_receiver_of_the_same_class_satisfies_a_struct_self_parameter() {
         "an Applied receiver of a different class is still a mismatch"
     );
 }
+
+// -----------------------------------------------------------------------
+// Interval aggregate window step
+// -----------------------------------------------------------------------
+
+/// One function constructing `intervallum<numerus>` from `items`.
+fn interval_program(types: &mut TypeTable, items: Vec<MirAggregateItem>) -> MirProgram {
+    let numerus = types.primitive(Primitive::Numerus);
+    let interval_ty = MirType::semantic(types.intern(Type::Intervallum(numerus)));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: interval_ty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Interval { inclusive: false },
+                            ty: interval_ty,
+                            fields: MirAggregateFields::Ordered(items),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+fn interval_items(step: Option<MirAggregateItem>) -> Vec<MirAggregateItem> {
+    let mut items = vec![
+        MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(0))),
+        MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(6))),
+    ];
+    items.extend(step);
+    items
+}
+
+#[test]
+fn interval_aggregate_accepts_numeric_step() {
+    let mut types = TypeTable::new();
+    let step = MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(2)));
+    let program = interval_program(&mut types, interval_items(Some(step)));
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn interval_aggregate_rejects_undefined_step_operand() {
+    let mut types = TypeTable::new();
+    let step = MirAggregateItem::Operand(MirOperand::Value(MirValueId(9)));
+    let program = interval_program(&mut types, interval_items(Some(step)));
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("value v9 is not defined")),
+        "expected the step operand to be validated, got: {errors:?}"
+    );
+}
+
+#[test]
+fn interval_aggregate_rejects_non_numeric_step() {
+    let mut types = TypeTable::new();
+    let step = MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Bool(true)));
+    let program = interval_program(&mut types, interval_items(Some(step)));
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("interval aggregate step must be numeric")),
+        "expected non-numeric step rejected, got: {errors:?}"
+    );
+}
+
+#[test]
+fn interval_aggregate_rejects_spread_step() {
+    let mut types = TypeTable::new();
+    let step = MirAggregateItem::Spread(MirOperand::Constant(MirConstant::Int(2)));
+    let program = interval_program(&mut types, interval_items(Some(step)));
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("interval aggregate step cannot spread")),
+        "expected spread step rejected, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Context rehoming keeps contract conformance
+// -----------------------------------------------------------------------
+
+#[test]
+fn with_types_carries_struct_contracts() {
+    let types = TypeTable::new();
+    let mut context = MirValidationContext::new(&types);
+    let mut contracts = rustc_hash::FxHashSet::default();
+    contracts.insert(DefId(2));
+    context.struct_contracts.insert(DefId(3), contracts);
+
+    let rehomed_types = types.clone();
+    let rehomed = context.with_types(&rehomed_types);
+
+    assert_eq!(rehomed.struct_contracts, context.struct_contracts);
+}

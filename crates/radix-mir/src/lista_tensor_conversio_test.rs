@@ -136,3 +136,22 @@ fn nested_int_literal(types: &mut TypeTable, elem: TypeId, rows: &[&[u64]]) -> H
         span: Span::default(),
     }
 }
+
+#[test]
+fn bounded_source_rejects_rank_two_target_whose_leading_dim_matches_capacity() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let lista = bounded_lista(&mut types, f32, 8);
+    // `tensor<f32, [8, 3]>`: the leading dim equals the capacity, but the
+    // padded snapshot only fills a rank-1 `[N]` tensor.
+    let tensor = tensor_type(&mut types, f32, &[8, 3]);
+
+    assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Err(ListaToTensorError::CapacityMismatch)
+    );
+    assert_eq!(
+        resolve_bounded_lista_padded_shape(lista, tensor, &types),
+        None
+    );
+}
