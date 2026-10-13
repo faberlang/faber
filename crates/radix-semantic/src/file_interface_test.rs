@@ -271,7 +271,9 @@ fn async_callable_import_wraps_return_in_promissum_failable() {
         tensor_edge_policy_requirements: Vec::new(),
         params: Vec::new(),
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
-        err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
+        err: Some(Box::new(InterfaceTypeSnapshot::Primitive(
+            Primitive::Textus,
+        ))),
         is_async: true,
         is_generator: false,
         device: None,
@@ -290,7 +292,10 @@ fn async_callable_import_wraps_return_in_promissum_failable() {
         panic!("expected imported callable");
     };
     let Type::PromissumFailable(success, alternate) = types.get(sig.ret) else {
-        panic!("expected promissum failable return, got {:?}", types.get(sig.ret));
+        panic!(
+            "expected promissum failable return, got {:?}",
+            types.get(sig.ret)
+        );
     };
     assert_eq!(*success, types.primitive(Primitive::Numerus));
     assert_eq!(*alternate, types.primitive(Primitive::Textus));
@@ -304,7 +309,9 @@ fn async_generator_callable_import_wraps_return_in_async_cursor() {
         tensor_edge_policy_requirements: Vec::new(),
         params: Vec::new(),
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
-        err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
+        err: Some(Box::new(InterfaceTypeSnapshot::Primitive(
+            Primitive::Textus,
+        ))),
         is_async: true,
         is_generator: true,
         device: None,
