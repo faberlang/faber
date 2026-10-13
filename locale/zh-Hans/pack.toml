@@ -3505,109 +3505,109 @@ message = "形状维度后需要 ']'"
 message = "括号内的形状后需要 ')'"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
-message = "expected '←' after the awaited binding"
+message = "等定/等变绑定后需要 '←'"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
-message = "expected '[' to start the array binding pattern"
+message = "数组绑定模式需要以 '[' 开始"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
-message = "expected ']' to end the array binding pattern"
+message = "数组绑定模式需要以 ']' 结束"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
-message = "expected an opening brace for the object binding pattern"
+message = "对象绑定模式需要以花括号开始"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
-message = "expected a closing brace for the object binding pattern"
+message = "对象绑定模式需要以 '}' 结束"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
-message = "expected '(' before function declaration parameters"
+message = "函数声明参数前需要 '('"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
-message = "expected ')' after function declaration parameters"
+message = "函数声明参数后需要 ')'"
 
 [diagnostics.PARSE001.issues.class_body_end]
-message = "expected a closing brace after the class body"
+message = "类体后需要 '}'"
 
 [diagnostics.PARSE001.issues.interface_body_start]
-message = "expected an opening brace for the interface body"
+message = "interface 主体需要以花括号开始"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
-message = "expected '(' before interface method parameters"
+message = "interface method 参数前需要 '('"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
-message = "expected ')' after interface method parameters"
+message = "interface method 参数后需要 ')'"
 
 [diagnostics.PARSE001.issues.interface_body_end]
-message = "expected a closing brace after the interface body"
+message = "interface 主体后需要 '}'"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
-message = "expected '=' before the type alias value"
+message = "type alias 值前需要 '='"
 
 [diagnostics.PARSE001.issues.schema_body_start]
-message = "expected an opening brace for the schema body"
+message = "schema 主体需要以花括号开始"
 
 [diagnostics.PARSE001.issues.schema_body_end]
-message = "expected a closing brace after the schema body"
+message = "schema 主体后需要 '}'"
 
 [diagnostics.PARSE001.issues.enum_body_start]
-message = "expected an opening brace for the enum body"
+message = "enum 主体需要以花括号开始"
 
 [diagnostics.PARSE001.issues.enum_body_end]
-message = "expected a closing brace after the enum body"
+message = "enum 主体后需要 '}'"
 
 [diagnostics.PARSE001.issues.union_body_start]
-message = "expected an opening brace for the union body"
+message = "union 主体需要以花括号开始"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
-message = "expected a closing brace after the union variant fields"
+message = "union variant 字段后需要 '}'"
 
 [diagnostics.PARSE001.issues.union_body_end]
-message = "expected a closing brace after the union body"
+message = "union 主体后需要 '}'"
 
 [diagnostics.PARSE001.issues.import_record_start]
-message = "expected an opening brace for the import record"
+message = "import record 需要以花括号开始"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
-message = "expected '=' after the import field name"
+message = "导入字段名后需要 '='"
 
 [diagnostics.PARSE001.issues.import_record_end]
-message = "expected a closing brace after the import record fields"
+message = "import record 字段后需要 '}'"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
-message = "expected an opening brace for the probandum body"
+message = "probandum 主体需要以花括号开始"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
-message = "expected a closing brace after the probandum body"
+message = "probandum 主体后需要 '}'"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
-message = "expected an opening brace for the annotation fields"
+message = "注解字段需要以花括号开始"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
-message = "expected '=' after the annotation field name"
+message = "注解字段名后需要 '='"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
-message = "expected a closing brace after the annotation fields"
+message = "注解字段后需要 '}'"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
-message = "expected an opening brace for the nucleum annotation fields"
+message = "nucleum 注解字段需要以花括号开始"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
-message = "expected '=' after the nucleum annotation field name"
+message = "nucleum 注解字段名后需要 '='"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
-message = "expected a closing brace after the nucleum annotation fields"
+message = "nucleum 注解字段后需要 '}'"
 
 [diagnostics.PARSE001.issues.block_start]
-message = "expected an opening brace for the block"
+message = "代码块需要以花括号开始"
 
 [diagnostics.PARSE001.issues.block_end]
-message = "expected a closing brace to end the block"
+message = "代码块需要以 '}' 结束"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
-message = "expected '>' after generic parameters"
+message = "泛型参数后需要 '>'"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
-message = "expected '>' after contract type arguments"
+message = "contract 类型实参后需要 '>'"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "'apud' 后需要 '['"
