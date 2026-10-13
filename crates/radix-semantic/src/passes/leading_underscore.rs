@@ -9,7 +9,8 @@
 //! INVARIANTS
 //! ==========
 //! - Only the identifier as declared is checked, never each use: function and
-//!   method names, type names, fields, locals, parameters, and constants.
+//!   method names, type names, fields, locals, parameters, constants, and
+//!   `ordo` members.
 //! - A bare `_` is the hole/wildcard and never warns.
 //! - AST-only and source-shaped, so desugared HIR names cannot trip it.
 //! - The walk is warn-only. A depth-limited subtree simply goes unlinted; it
@@ -211,7 +212,12 @@ impl Checker<'_> {
             }
             StmtKind::TypeAlias(decl) => self.ident(&decl.name, DeclarationKind::Type),
             StmtKind::Schema(decl) => self.ident(&decl.name, DeclarationKind::Type),
-            StmtKind::Enum(decl) => self.ident(&decl.name, DeclarationKind::Type),
+            StmtKind::Enum(decl) => {
+                self.ident(&decl.name, DeclarationKind::Type);
+                for member in &decl.members {
+                    self.ident(&member.name, DeclarationKind::Static);
+                }
+            }
             StmtKind::Union(decl) => {
                 self.ident(&decl.name, DeclarationKind::Type);
                 for shared in &decl.shared_fields {

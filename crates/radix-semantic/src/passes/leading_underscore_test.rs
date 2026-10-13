@@ -91,6 +91,28 @@ fn parameter_warns() {
 }
 
 #[test]
+fn enum_member_warns_as_constant() {
+    assert_single("ordo Color { _Red, Green }", "_Red", "constant");
+}
+
+#[test]
+fn enum_without_leading_underscore_never_warns() {
+    let source = "ordo Color { Red, Green }";
+    let result = analyze_source(source);
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
+    assert!(underscore_findings(source).is_empty());
+}
+
+#[test]
+fn union_variant_warns_as_type() {
+    assert_single(
+        "discretio Figura { _Circulus { fractus r }, Quadratum { fractus l } }",
+        "_Circulus",
+        "type",
+    );
+}
+
+#[test]
 fn static_warns() {
     assert_single("fixum numerus _LIMES = 4096", "_LIMES", "constant");
 }
