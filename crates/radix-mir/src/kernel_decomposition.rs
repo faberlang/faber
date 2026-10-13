@@ -177,18 +177,6 @@ pub fn decompose_kernel_function_with_limit(
         lineage_of_temp: &BTreeMap<MirTempId, usize>,
     ) -> BTreeSet<usize> {
         let mut cross = BTreeSet::new();
-        if std::env::var("FABER_1A_DEBUG").is_ok() {
-            eprintln!(
-                "cross_reads: stmt locals={:?} refs={:?} cur_writes={:?} cur_tdefs={:?}",
-                crate::read_analysis::statement_read_locals(statement),
-                {
-                    let (_, r) = statement_temp_sets(statement);
-                    r
-                },
-                current_writes,
-                current_temp_defs
-            );
-        }
         for local in crate::read_analysis::statement_read_locals(statement) {
             if current_writes.contains(&local) {
                 continue;
@@ -318,31 +306,16 @@ pub fn decompose_kernel_function_with_limit(
     let mut index = 0usize;
     while index < block.statements.len() {
         let statement = &block.statements[index];
-        let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
-            // D-6: the returned tuple assembly folds into the open slice
-            // by ABI contract — it is the output boundary, not a join.
-            if is_return_assembly(statement) {
-                current.push(index);
-                record_writes(statement, &mut current_writes, &mut current_temp_defs);
-                index += 1;
-                continue;
-            }
-            let cross = cross_reads(
-                statement,
-                &current_writes,
-                &current_temp_defs,
-                &lineage_of_local,
-                &lineage_of_temp,
-            );
-            if cross.is_subset(&current_lineage) {
-                // Plain fold into the open slice.
-            } else if !current_lineage.is_empty() && !current_has_recipe {
-                // An open JOIN slice absorbs a further producer lineage —
-                // fan-in of any arity is one join child.
-                current_lineage.extend(&cross);
-            } else {
-                // Close the open slice and start a join with this lineage.
-                if !current.is_empty() {
+        if let Some(op) = crate::collection_ops::statement_collection_op(statement) {
+            if is_recipe_op(op) {
+                // S3-A5: a recipe op whose result is never read is dead — not
+                // part of the kernel semantics, and it must not force a recipe
+                // boundary or a contract the live plan does not carry.
+                if statement_destination_is_dead(function, statement) {
+                    index += 1;
+                    continue;
+                }
+                if current_has_recipe || !current_lineage.is_empty() {
                     close_current(
                         &mut slices,
                         &mut current,
@@ -354,23 +327,44 @@ pub fn decompose_kernel_function_with_limit(
                         &mut lineage_of_temp,
                     );
                 }
-                current_has_recipe = false;
-                current_lineage = cross;
+                current_has_recipe = true;
+                current.push(index);
+                record_writes(statement, &mut current_writes, &mut current_temp_defs);
+                index += 1;
+                continue;
             }
+            if !is_elementwise_collection_op(op) {
+                return Err(PlanMappingError::mapping(format!(
+                    "collection op {op:?} has no kernel plan \
+                     (no recipe and not an elementwise transform)"
+                )));
+            }
+        } else if is_return_assembly(statement) {
+            // D-6: the returned tuple assembly folds into the open slice
+            // by ABI contract — it is the output boundary, not a join.
             current.push(index);
             record_writes(statement, &mut current_writes, &mut current_temp_defs);
             index += 1;
             continue;
-        };
-        if is_recipe_op(op) {
-            // S3-A5: a recipe op whose result is never read is dead — not
-            // part of the kernel semantics, and it must not force a recipe
-            // boundary or a contract the live plan does not carry.
-            if statement_destination_is_dead(function, statement) {
-                index += 1;
-                continue;
-            }
-            if current_has_recipe || !current_lineage.is_empty() {
+        }
+        // The statement is elementwise (a collection transform or plain value
+        // math): fold it by its cross-reads, or open a join with its lineage.
+        let cross = cross_reads(
+            statement,
+            &current_writes,
+            &current_temp_defs,
+            &lineage_of_local,
+            &lineage_of_temp,
+        );
+        if cross.is_subset(&current_lineage) {
+            // Plain fold into the open slice.
+        } else if !current_lineage.is_empty() && !current_has_recipe {
+            // An open JOIN slice absorbs a further producer lineage —
+            // fan-in of any arity is one join child.
+            current_lineage.extend(&cross);
+        } else {
+            // Close the open slice and start a join with this lineage.
+            if !current.is_empty() {
                 close_current(
                     &mut slices,
                     &mut current,
@@ -382,52 +376,12 @@ pub fn decompose_kernel_function_with_limit(
                     &mut lineage_of_temp,
                 );
             }
-            current_has_recipe = true;
-            current.push(index);
-            record_writes(statement, &mut current_writes, &mut current_temp_defs);
-            index += 1;
-            continue;
+            current_has_recipe = false;
+            current_lineage = cross;
         }
-        if is_elementwise_collection_op(op) {
-            let cross = cross_reads(
-                statement,
-                &current_writes,
-                &current_temp_defs,
-                &lineage_of_local,
-                &lineage_of_temp,
-            );
-            if cross.is_subset(&current_lineage) {
-                // Plain fold into the open slice.
-            } else if !current_lineage.is_empty() && !current_has_recipe {
-                // An open JOIN slice absorbs a further producer lineage —
-                // fan-in of any arity is one join child.
-                current_lineage.extend(&cross);
-            } else {
-                // Close the open slice and start a join with this lineage.
-                if !current.is_empty() {
-                    close_current(
-                        &mut slices,
-                        &mut current,
-                        &mut current_writes,
-                        &mut current_temp_defs,
-                        &mut current_lineage,
-                        &mut current_has_recipe,
-                        &mut lineage_of_local,
-                        &mut lineage_of_temp,
-                    );
-                }
-                current_has_recipe = false;
-                current_lineage = cross;
-            }
-            current.push(index);
-            record_writes(statement, &mut current_writes, &mut current_temp_defs);
-            index += 1;
-            continue;
-        }
-        return Err(PlanMappingError::mapping(format!(
-            "collection op {op:?} has no kernel plan \
-             (no recipe and not an elementwise transform)"
-        )));
+        current.push(index);
+        record_writes(statement, &mut current_writes, &mut current_temp_defs);
+        index += 1;
     }
     if !current.is_empty() {
         close_current(
@@ -742,15 +696,7 @@ fn split_oversized_elementwise_body(
             suffix_written[i].insert(local);
         }
         suffix_params[i] = suffix_params[i + 1].clone();
-        if let Some(local) = written_at[i] {
-            suffix_params[i].remove(&local);
-        }
-        suffix_params[i].extend(
-            reads_at[i]
-                .iter()
-                .copied()
-                .filter(|local| !suffix_written[i].contains(local)),
-        );
+        suffix_params[i].extend(reads_at[i].iter().copied());
         suffix_params[i].retain(|local| !suffix_written[i].contains(local));
 
         suffix_temp_references[i] = suffix_temp_references[i + 1].clone();
@@ -778,12 +724,10 @@ fn split_oversized_elementwise_body(
     // together: a temp defined in the pre range and referenced by a field
     // writer in the field range would make every pre-range cut invalid).
     let mut first_field = first_field_raw;
-    for (index, defined_at) in temps_defined_at[..first_field_raw].iter().enumerate() {
+    for (position, defined_at) in temps_defined_at[..first_field_raw].iter().enumerate() {
         for &temp in defined_at {
-            let feeds_field_range =
-                (first_field_raw..n).any(|later| temps_referenced_at[later].contains(&temp));
-            if feeds_field_range {
-                first_field = first_field.min(index);
+            if suffix_temp_references[first_field_raw].contains(&temp) {
+                first_field = first_field.min(position);
             }
         }
     }

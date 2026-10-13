@@ -120,7 +120,7 @@ fn unroll_function(
     };
     let root_locals = block_local_defs(body);
     let mask = MaskAnalysis::analyze(&function.params, body, types, interner);
-    let fullness = FullnessFacts::from_block(body, interner, types);
+    let fullness = fullness_facts(body, interner, types);
     let mut emitted_lanes = 0;
     rewrite_block(
         presentation,
@@ -750,23 +750,19 @@ fn rewrite_nested_expr(
 /// iteration count. This fact table records an exact length only for an
 /// immutable literal/conversion chain; parameters and mutable values stay
 /// unknown and therefore cannot admit Route A.
-struct FullnessFacts;
-
-impl FullnessFacts {
-    fn from_block(
-        block: &HirBlock,
-        interner: &Interner,
-        types: &TypeTable,
-    ) -> FxHashMap<DefId, usize> {
-        let mut facts = FxHashMap::default();
-        let mut collector = Collector {
-            facts: &mut facts,
-            interner,
-            types,
-        };
-        collector.visit_block(block);
-        facts
-    }
+fn fullness_facts(
+    block: &HirBlock,
+    interner: &Interner,
+    types: &TypeTable,
+) -> FxHashMap<DefId, usize> {
+    let mut facts = FxHashMap::default();
+    let mut collector = Collector {
+        facts: &mut facts,
+        interner,
+        types,
+    };
+    collector.visit_block(block);
+    facts
 }
 
 struct Collector<'a> {
@@ -1763,7 +1759,6 @@ fn emit_unrolled_lanes(
         let mut remap = Remap {
             index_def: ready.index_def,
             index_value: *value,
-            index_ty: None,
             binding_value: None,
             coordinate_bindings,
             acc_current: acc_current.clone(),
@@ -1997,7 +1992,6 @@ fn ssa_local(
 struct Remap {
     index_def: DefId,
     index_value: i64,
-    index_ty: Option<crate::TypeId>,
     binding_value: Option<DefId>,
     coordinate_bindings: FxHashMap<DefId, DefId>,
     acc_current: FxHashMap<DefId, DefId>,
@@ -2047,9 +2041,6 @@ impl HirVisitorMut for FreshRemap<'_> {
                     expr.kind = HirExpressionKind::Path(binding);
                 } else {
                     expr.kind = int_literal(self.remap.index_value, self.ids);
-                    if expr.ty.is_none() {
-                        expr.ty = self.remap.index_ty;
-                    }
                 }
                 return;
             }

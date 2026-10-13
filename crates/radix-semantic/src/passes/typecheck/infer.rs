@@ -541,34 +541,10 @@ impl TypeChecker<'_> {
             (Type::Applied(base_a, args_a), Type::Applied(base_b, args_b))
                 if self.types.equals(base_a, base_b) && args_a.len() == args_b.len() =>
             {
-                let mut args = Vec::with_capacity(args_a.len());
-                for (arg_a, arg_b) in args_a.into_iter().zip(args_b) {
-                    match (arg_a, arg_b) {
-                        (radix_types::AppliedArg::Type(a), radix_types::AppliedArg::Type(b)) => {
-                            args.push(radix_types::AppliedArg::Type(
-                                self.unify_with_policy(a, b, span, issue, policy),
-                            ));
-                        }
-                        (
-                            radix_types::AppliedArg::Size(actual),
-                            radix_types::AppliedArg::Size(expected),
-                        ) => {
-                            args.push(radix_types::AppliedArg::Size(
-                                self.unify_size_at_boundary(actual, expected, span)
-                                    .unwrap_or_else(|| {
-                                        super::tensor_index::unify_tensor_shape_indices(
-                                            self, actual, expected, span,
-                                        )
-                                        .unwrap_or(actual)
-                                    }),
-                            ));
-                        }
-                        _ => {
-                            self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
-                            return self.error_type;
-                        }
-                    }
-                }
+                let Some(args) = self.unify_applied_args(args_a, args_b, span, issue, policy)
+                else {
+                    return self.error_type;
+                };
                 return self.types.intern(Type::Applied(base_a, args));
             }
             // F-010: structural unify for Vector, Matrix, Sparsa, Atomic, Intervallum.
@@ -684,6 +660,51 @@ impl TypeChecker<'_> {
 
         self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
         self.error_type
+    }
+
+    /// Unify paired arguments of two same-base `Type::Applied` entries.
+    ///
+    /// The caller has already checked base identity and equal argument
+    /// counts. Size slots keep boundary provenance through
+    /// [`Self::unify_size_at_boundary`]. Returns `None` after emitting
+    /// `issue` when the paired argument kinds differ.
+    fn unify_applied_args(
+        &mut self,
+        args_a: Vec<radix_types::AppliedArg>,
+        args_b: Vec<radix_types::AppliedArg>,
+        span: radix_lexer::Span,
+        issue: &'static str,
+        policy: UnifyPolicy,
+    ) -> Option<Vec<radix_types::AppliedArg>> {
+        let mut args = Vec::with_capacity(args_a.len());
+        for (arg_a, arg_b) in args_a.into_iter().zip(args_b) {
+            match (arg_a, arg_b) {
+                (radix_types::AppliedArg::Type(a), radix_types::AppliedArg::Type(b)) => {
+                    args.push(radix_types::AppliedArg::Type(
+                        self.unify_with_policy(a, b, span, issue, policy),
+                    ));
+                }
+                (
+                    radix_types::AppliedArg::Size(actual),
+                    radix_types::AppliedArg::Size(expected),
+                ) => {
+                    args.push(radix_types::AppliedArg::Size(
+                        self.unify_size_at_boundary(actual, expected, span)
+                            .unwrap_or_else(|| {
+                                super::tensor_index::unify_tensor_shape_indices(
+                                    self, actual, expected, span,
+                                )
+                                .unwrap_or(actual)
+                            }),
+                    ));
+                }
+                _ => {
+                    self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                    return None;
+                }
+            }
+        }
+        Some(args)
     }
 
     /// Compare a nominal size argument at a call/return boundary. Unlike a
