@@ -16,7 +16,6 @@ workspace = true
 [features]
 hir-faber = []
 hir-fhir = []
-mir-fmir = []
 
 [dev-dependencies]
 hygiene-ratchet = { path = "../hygiene-ratchet" }
