@@ -179,6 +179,7 @@ pub fn walk_item<V: HirVisitor>(visitor: &mut V, item: &HirItem) {
                 visitor.visit_type_param(type_param);
             }
             for method in &interface.methods {
+                visitor.visit_def(method.def_id, method.name);
                 for param in &method.params {
                     visitor.visit_param(param);
                 }
@@ -803,6 +804,7 @@ pub fn walk_item_mut<V: HirVisitorMut>(visitor: &mut V, item: &mut HirItem) {
                 visitor.visit_type_param_mut(type_param);
             }
             for method in &mut interface.methods {
+                visitor.visit_def(method.def_id, method.name);
                 for param in &mut method.params {
                     visitor.visit_param_mut(param);
                 }

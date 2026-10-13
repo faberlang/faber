@@ -347,3 +347,61 @@ fn visit_program_mut_reports_type_alias_type_params() {
         "visit_program_mut must report the alias, then its type parameter"
     );
 }
+
+// Interface method signatures carry their own contract-method DefId; a
+// visitor that builds a definition index (the AIR specializer's id scan)
+// must see it, same as struct methods reached through `walk_method`.
+fn program_with_interface_methods() -> HirModule {
+    use crate::nodes::{HirInterface, HirInterfaceMethod, HirItem, HirItemKind};
+    let method = |def_id: u32| HirInterfaceMethod {
+        def_id: DefId(def_id),
+        availability: Vec::new(),
+        name: Symbol(def_id),
+        params: Vec::new(),
+        ret_ty: None,
+        err_ty: None,
+        posture: radix_syntax::CallablePosture::SyncFinite,
+        span: Span::default(),
+    };
+    HirModule {
+        items: vec![HirItem {
+            annotations: Vec::new(),
+            id: HirId(0),
+            def_id: DefId(1),
+            kind: HirItemKind::Interface(HirInterface {
+                name: Symbol(0),
+                type_params: Vec::new(),
+                methods: vec![method(2), method(3)],
+            }),
+            span: Span::default(),
+        }],
+        entry: None,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+#[test]
+fn visit_program_reports_interface_method_defs() {
+    let program = program_with_interface_methods();
+    let mut collector = DefCollector::default();
+    collector.visit_program(&program);
+    assert_eq!(
+        collector.defs,
+        vec![1, 2, 3],
+        "visit_program must report the interface, then each method's contract DefId"
+    );
+}
+
+#[test]
+fn visit_program_mut_reports_interface_method_defs() {
+    let mut program = program_with_interface_methods();
+    let mut collector = DefCollector::default();
+    collector.visit_program_mut(&mut program);
+    assert_eq!(
+        collector.defs,
+        vec![1, 2, 3],
+        "visit_program_mut must report the interface, then each method's contract DefId"
+    );
+}
