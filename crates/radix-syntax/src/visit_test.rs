@@ -2,9 +2,11 @@ use super::{DepthExceeded, MAX_VISIT_DEPTH, Visitor, walk_expr, walk_stmt, walk_
 use crate::TypeFormLevel;
 use crate::{AstMutability, ExField, PathPattern};
 use crate::{
-    BinOp, BinaryExpr, BlockStmt, CapeClause, CasuArm, DiscerneStmt, Expr, ExprKind, FuncDecl,
-    Ident, IfBody, Literal, Pattern, PatternBind, ProbandumBody, ProbandumDecl, SiStmt, Stmt,
-    StmtKind, TypeExpr, TypeExprKind,
+    AstParamMode, BinOp, BinaryExpr, BindingPattern, BlockStmt, CapeClause, CasuArm, ClausuraBody,
+    ClausuraExpr, ContractRefExpr, DiscerneStmt, Expr, ExprKind, FacStmt, FuncDecl, FuncTypeExpr,
+    GenericParamDefault, GenericParamKind, Ident, IfBody, IteraMode, IteraStmt, Literal, Param,
+    Pattern, PatternBind, ProbandumBody, ProbandumDecl, SiStmt, Stmt, StmtKind, TypeExpr,
+    TypeExprKind, TypeParam,
 };
 use crate::{PraeparaBlock, PraeparaKind};
 use radix_lexer::{Span, Symbol};
@@ -408,4 +410,221 @@ fn walk_discern_patterns() {
     //   - Bindings: name=5 + alias=6 + name=7       = 3
     // Total: 7
     assert_eq!(visitor.idents, 7, "must visit all pattern idents");
+}
+
+/// Visitor that records every identifier the walker hands it, in visit order.
+struct IdentLog {
+    idents: Vec<u32>,
+}
+
+impl IdentLog {
+    fn new() -> Self {
+        Self { idents: Vec::new() }
+    }
+}
+
+impl Visitor for IdentLog {
+    fn visit_ident(&mut self, ident: &Ident) {
+        self.idents.push(ident.name.0);
+    }
+}
+
+fn named_type(sym: u32) -> TypeExpr {
+    TypeExpr {
+        nullable: false,
+        mode: None,
+        kind: TypeExprKind::Named(test_ident(sym), vec![]),
+        span: Span::new(0, 1),
+        form: TypeFormLevel::LONG,
+        iuncta_label: None,
+    }
+}
+
+fn ident_expr(sym: u32) -> Expr {
+    Expr {
+        id: 0,
+        kind: ExprKind::Ident(test_ident(sym)),
+        span: Span::new(0, 1),
+    }
+}
+
+fn func_stmt(decl: FuncDecl) -> Stmt {
+    Stmt {
+        id: 0,
+        kind: StmtKind::Func(decl),
+        span: Span::new(0, 1),
+        annotations: vec![],
+        leading_trivia: vec![],
+    }
+}
+
+fn plain_func(name: u32) -> FuncDecl {
+    FuncDecl {
+        name: test_ident(name),
+        type_params: vec![],
+        params: vec![],
+        modifiers: vec![],
+        posture: crate::CallablePosture::SyncFinite,
+        ret: None,
+        err: None,
+        body: None,
+        annotations: vec![],
+        leading_trivia: vec![],
+    }
+}
+
+fn plain_param(ty: u32, name: u32) -> Param {
+    Param {
+        sponte: false,
+        mode: AstParamMode::Owned,
+        is_rest: false,
+        ty: named_type(ty),
+        name: test_ident(name),
+        alias: None,
+        default: None,
+        span: Span::new(0, 1),
+    }
+}
+
+/// A-203: `apud` coordinates and the `filum` lane binder are identifiers the
+/// iteration head declares; they are visited between the sources and the
+/// element binder, in source order.
+#[test]
+fn walk_itera_walks_apud_and_filum_idents() {
+    let itera = IteraStmt {
+        mode: IteraMode::Ex,
+        sources: vec![lit_expr(0)],
+        apud: vec![test_ident(10), test_ident(11)],
+        filum: Some(test_ident(12)),
+        mutability: AstMutability::Immutable,
+        bindings: vec![BindingPattern::Ident(test_ident(13))],
+        body: IfBody::Block(test_block()),
+        catch: None,
+    };
+    let stmt = Stmt {
+        id: 0,
+        kind: StmtKind::Itera(itera),
+        span: Span::new(0, 1),
+        annotations: vec![],
+        leading_trivia: vec![],
+    };
+
+    let mut visitor = IdentLog::new();
+    walk_stmt(&mut visitor, &stmt);
+
+    assert_eq!(
+        visitor.idents,
+        vec![10, 11, 12, 13],
+        "must visit apud coordinates, the filum binder, then the element binder"
+    );
+}
+
+/// A-204: the `cape` clause of a closure's `fac` body is walked exactly like the
+/// statement-level `fac`: binding identifier, then body block.
+#[test]
+fn walk_clausura_fac_walks_catch_binding_and_body() {
+    let closure = Expr {
+        id: 0,
+        kind: ExprKind::Clausura(Box::new(ClausuraExpr {
+            params: vec![],
+            ret: None,
+            err: None,
+            body: ClausuraBody::Fac(FacStmt {
+                omnia: false,
+                body: test_block(),
+                catch: Some(CapeClause {
+                    binding: test_ident(1),
+                    body: test_block(),
+                    span: Span::new(0, 1),
+                }),
+                while_: None,
+            }),
+        })),
+        span: Span::new(0, 1),
+    };
+
+    let mut visitor = CountVisitor::new();
+    walk_expr(&mut visitor, &closure);
+
+    assert_eq!(
+        visitor.idents, 1,
+        "must visit the closure fac catch binding"
+    );
+    assert_eq!(visitor.blocks, 2, "must visit the fac body and catch body");
+}
+
+/// A-205: `(T) → R ⇥ E` carries its error type on `FuncTypeExpr::err`.
+#[test]
+fn walk_type_expr_func_walks_err() {
+    let ty = TypeExpr {
+        nullable: false,
+        mode: None,
+        kind: TypeExprKind::Func(FuncTypeExpr {
+            params: vec![named_type(1)],
+            ret: Box::new(named_type(2)),
+            err: Some(Box::new(named_type(3))),
+        }),
+        span: Span::new(0, 1),
+        form: TypeFormLevel::LONG,
+        iuncta_label: None,
+    };
+
+    let mut visitor = IdentLog::new();
+    walk_type_expr(&mut visitor, &ty);
+
+    assert_eq!(
+        visitor.idents,
+        vec![1, 2, 3],
+        "must visit the parameter, return, and error types"
+    );
+}
+
+/// A-206: a function's generic parameters are walked: name, default type, and
+/// each bound's contract name and type arguments, before the value parameters.
+#[test]
+fn walk_func_decl_walks_type_params() {
+    let mut decl = plain_func(19);
+    decl.type_params = vec![TypeParam {
+        kind: GenericParamKind::Typus,
+        name: test_ident(20),
+        default: Some(GenericParamDefault::Typus(Box::new(named_type(21)))),
+        bounds: vec![ContractRefExpr {
+            name: test_ident(22),
+            args: vec![named_type(23)],
+            span: Span::new(0, 1),
+        }],
+        span: Span::new(0, 1),
+    }];
+    decl.params = vec![plain_param(24, 25)];
+    let stmt = func_stmt(decl);
+
+    let mut visitor = IdentLog::new();
+    walk_stmt(&mut visitor, &stmt);
+
+    assert_eq!(
+        visitor.idents,
+        vec![19, 20, 21, 22, 23, 24, 25],
+        "must visit the type parameter name, default, and bounds before the params"
+    );
+}
+
+/// A-206: a parameter's `ut` alias and `←` default are children of the
+/// parameter; the default is an expression, so it goes through `visit_expr`.
+#[test]
+fn walk_func_decl_walks_param_alias_and_default() {
+    let mut decl = plain_func(30);
+    let mut param = plain_param(31, 32);
+    param.alias = Some(test_ident(33));
+    param.default = Some(Box::new(ident_expr(34)));
+    decl.params = vec![param];
+    let stmt = func_stmt(decl);
+
+    let mut visitor = IdentLog::new();
+    walk_stmt(&mut visitor, &stmt);
+
+    assert_eq!(
+        visitor.idents,
+        vec![30, 31, 32, 33, 34],
+        "must visit the param type, name, alias, then default expression"
+    );
 }

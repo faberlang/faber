@@ -27,9 +27,9 @@ use std::cell::Cell;
 
 use super::ast::{
     ArrayElement, BindingPattern, BlockStmt, CapeClause, ClassMemberKind, ClausuraBody,
-    ConversioTarget, Expr, ExprKind, FuncDecl, GenericArgExpr, Ident, IfBody, ImportKind,
-    NonNullKind, OptionalChainKind, Pattern, PatternBind, Program, SecusClause, Stmt, StmtKind,
-    TypeExpr, TypeExprKind,
+    ConversioTarget, Expr, ExprKind, FuncDecl, GenericArgExpr, GenericParamDefault, Ident, IfBody,
+    ImportKind, NonNullKind, OptionalChainKind, Pattern, PatternBind, Program, SecusClause, Stmt,
+    StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
 
 /// Maximum AST nesting depth before the walker refuses to descend further.
@@ -211,6 +211,12 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
         StmtKind::Itera(iter_stmt) => {
             for source in &iter_stmt.sources {
                 visitor.visit_expr(source);
+            }
+            for coordinate in &iter_stmt.apud {
+                visitor.visit_ident(coordinate);
+            }
+            if let Some(filum) = &iter_stmt.filum {
+                visitor.visit_ident(filum);
             }
             for binding in &iter_stmt.bindings {
                 walk_binding_pattern(visitor, binding);
@@ -475,7 +481,7 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 ClausuraBody::Fac(f) => {
                     visitor.visit_block(&f.body);
                     if let Some(catch) = &f.catch {
-                        visitor.visit_block(&catch.body);
+                        walk_catch(visitor, catch);
                     }
                     if let Some(while_) = &f.while_ {
                         visitor.visit_expr(while_);
@@ -697,6 +703,9 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
                 visitor.visit_type_expr(param);
             }
             visitor.visit_type_expr(&func.ret);
+            if let Some(err) = &func.err {
+                visitor.visit_type_expr(err);
+            }
         }
         // Union and Intersection share one walk: both are flat member lists.
         TypeExprKind::Union(members) | TypeExprKind::Intersection(members) => {
@@ -755,14 +764,24 @@ fn walk_if_body<V: Visitor>(visitor: &mut V, body: &IfBody) {
     }
 }
 
-/// Walk a function declaration's name, parameter types and names, return and
-/// error annotations, and body. Shared by `functio` statements and `genus`
-/// methods: [`ClassMemberKind::Method`] stores the same [`FuncDecl`].
+/// Walk a function declaration's name, generic parameters, parameter types,
+/// names, aliases and defaults, return and error annotations, and body. Shared
+/// by `functio` statements and `genus` methods: [`ClassMemberKind::Method`]
+/// stores the same [`FuncDecl`].
 fn walk_func_decl<V: Visitor>(visitor: &mut V, decl: &FuncDecl) {
     visitor.visit_ident(&decl.name);
+    for type_param in &decl.type_params {
+        walk_type_param(visitor, type_param);
+    }
     for param in &decl.params {
         visitor.visit_type_expr(&param.ty);
         visitor.visit_ident(&param.name);
+        if let Some(alias) = &param.alias {
+            visitor.visit_ident(alias);
+        }
+        if let Some(default) = &param.default {
+            visitor.visit_expr(default);
+        }
     }
     if let Some(ret) = &decl.ret {
         visitor.visit_type_expr(ret);
@@ -772,6 +791,21 @@ fn walk_func_decl<V: Visitor>(visitor: &mut V, decl: &FuncDecl) {
     }
     if let Some(body) = &decl.body {
         visitor.visit_block(body);
+    }
+}
+
+/// Walk one generic parameter's name, `=` default type, and `implet` bounds.
+/// A `magnitudo` default is a bare literal, so it has no child to descend into.
+fn walk_type_param<V: Visitor>(visitor: &mut V, type_param: &TypeParam) {
+    visitor.visit_ident(&type_param.name);
+    if let Some(GenericParamDefault::Typus(ty)) = &type_param.default {
+        visitor.visit_type_expr(ty);
+    }
+    for bound in &type_param.bounds {
+        visitor.visit_ident(&bound.name);
+        for arg in &bound.args {
+            visitor.visit_type_expr(arg);
+        }
     }
 }
 
