@@ -1,0 +1,78 @@
++++
+locale = "en"
+term = "reducta-axis-rank3-en"
+kind = "concept"
+category = "collection"
+grammar = ["reducta_expr", "reducta_op", "reducta_group", "reducta_body", "reducta_identity"]
+canonical = false
++++
+# =============================================================================
+# t.sum(axis n) at rank 3 — the sugar and its explicit reduction, side by side
+# =============================================================================
+#
+# What this teaches:
+#   • `t.sum(axis n)` is sugar over the grouped reduction: it is exactly
+#     `reduce via sum from t at [i, j, k] per [kept coordinates]`, the
+#     coordinates other than `n`, in order
+#   • the explicit form reaches every result the method reaches, so each
+#     method call below has a written twin that prints the same numbers
+#
+# Worked values (a printed tensor lists its elements flat, row-major):
+#   cube[i, j, k] = 1 + 12 i + 4 j + k over shape [2, 3, 4]
+#     sum(axis 2) = per [i, j] = 10 + 48 i + 16 j
+#                 = [10, 26, 42, 58, 74, 90]            shape [2, 3]
+#     sum(axis 1) = per [i, k] = 15 + 36 i + 3 k
+#                 = [15, 18, 21, 24, 51, 54, 57, 60]    shape [2, 4]
+#
+# See also: reducta-pro-multikey-en, axis-builtins-rank-n
+# =============================================================================
+
+fn last_sugar(tf32[2, 3, 4] cube) → tf32[2, 3] {
+    return cube.sum(axis 2)
+}
+
+fn last_explicit(tf32[2, 3, 4] cube) → tf32[2, 3] {
+    return reduce via sum from cube at [i, j, k] per [i, j] const s { return s }
+}
+
+fn middle_sugar(tf32[2, 3, 4] cube) → tf32[2, 4] {
+    return cube.sum(axis 1)
+}
+
+fn middle_explicit(tf32[2, 3, 4] cube) → tf32[2, 4] {
+    return reduce via sum from cube at [i, j, k] per [i, k] const s { return s }
+}
+
+main {
+    const list<f32> flat ← [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+        16.0,
+        17.0,
+        18.0,
+        19.0,
+        20.0,
+        21.0,
+        22.0,
+        23.0,
+        24.0
+    ]
+    const tf32[2, 3, 4] cube ← flat ↦ tf32[2, 3, 4]
+    print last_sugar(cube)
+    print last_explicit(cube)
+    print middle_sugar(cube)
+    print middle_explicit(cube)
+}

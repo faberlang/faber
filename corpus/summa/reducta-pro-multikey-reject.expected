@@ -1,0 +1,3 @@
+# Reject oracle: a grouped reduction whose key list is shorter than the result rank.
+# Tokens: stable semantic issue identity.
+SEM010:reducta_group_rank_mismatch

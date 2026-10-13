@@ -1,0 +1,14 @@
++++
+term = "reducta"
+kind = "reject"
+grammar = ["reducta_expr", "reducta_op", "reducta_group", "reducta_body", "reducta_identity"]
+category = "collection"
+summary = "A grouped reduction's key list must have one key per axis of the expected result."
+syntax = "reducta via <op> ex <tensor> apud [i] pro [key, key] fixum x { redde term }"
+related = ["reducta", "pro", "summa", "tensor"]
+locale = "la"
++++
+
+functio too_few(tf32[6] pondera, tensor<numerus, [6]> ordines) → tf32[2, 3] {
+    redde reducta via summa ex pondera apud [i] pro [ordines[i]] fixum s { redde s }
+}

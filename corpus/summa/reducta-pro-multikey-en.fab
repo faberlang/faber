@@ -1,0 +1,62 @@
++++
+locale = "en"
+term = "reducta-pro-multikey-en"
+kind = "concept"
+category = "collection"
+grammar = ["reducta_expr", "reducta_op", "reducta_group", "reducta_body", "reducta_identity"]
+canonical = false
++++
+# =============================================================================
+# reduce … per [i, j] — a grouped reduction with a rank-2 result
+# =============================================================================
+#
+# What this teaches:
+#   • `per [i, j]` is a bracketed coordinate list, one key per result axis; the
+#     result is `tensor<R, [I, J]>` with its extents taken from the expected
+#     type, so the key count must equal the result rank
+#   • the keys are the coordinates themselves (`per [i, j]` over `at [i, j, k]`
+#     folds away the last axis) or key tensors read at the loop coordinate
+#     (`per [rows[i], cols[i]]` scatters each element to its bucket)
+#   • a bucket nothing falls into keeps the operator's identity (0.0 for sum,
+#     0 for count)
+#
+# Worked values (a printed tensor lists its elements flat, row-major):
+#   cube[i, j, k] = 1 + 6 i + 3 j + k over shape [2, 2, 3]
+#     sum   per [i, j] = [[6, 15], [24, 33]]
+#     count per [i, j] of values above 5.0 = [[0, 1], [3, 3]]
+#   weights [1, 2, 3, 4, 5, 6] with rows [0, 0, 1, 1, 0, 1] and cols
+#   [0, 2, 1, 1, 0, 2] scatter into shape [2, 3]:
+#     sum = [[1 + 5, 0, 2], [0, 3 + 4, 6]] = [[6, 0, 2], [0, 7, 6]]
+#
+# Common mistakes:
+#   • a key list whose length differs from the result rank — declined
+#     (reducta_group_rank_mismatch, see reducta-pro-multikey-reject)
+#   • `ka[i, j]` inside the key list, or `ka[i][j]` — the key list takes one
+#     expression per result axis
+#
+# See also: reducta-pro, reducta-axis-rank3-en
+# =============================================================================
+
+fn per_cell(tf32[2, 2, 3] cube) → tf32[2, 2] {
+    return reduce via sum from cube at [i, j, k] per [i, j] const s { return s }
+}
+
+fn big_per_cell(tf32[2, 2, 3] cube) → tensor<int, [2, 2]> {
+    return reduce via count from cube at [i, j, k] per [i, j] const s { return s ≻ 5.0 }
+}
+
+fn per_bucket(tf32[6] weights, tensor<int, [6]> rows, tensor<int, [6]> cols) → tf32[2, 3] {
+    return reduce via sum from weights at [i] per [rows[i], cols[i]] const s { return s }
+}
+
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+    const tf32[2, 2, 3] cube ← flat ↦ tf32[2, 2, 3]
+    const list<f32> loose ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    const tf32[6] weights ← loose ↦ tf32[6]
+    const tensor<int, [6]> rows ← [0, 0, 1, 1, 0, 1] ↦ tensor<int, [6]>
+    const tensor<int, [6]> cols ← [0, 2, 1, 1, 0, 2] ↦ tensor<int, [6]>
+    print per_cell(cube)
+    print big_per_cell(cube)
+    print per_bucket(weights, rows, cols)
+}
