@@ -254,3 +254,39 @@ fn de_param_scalar_into_var_is_accepted() {
         "functio prend(de numerus n) → numerus {\n    varia numerus m ← n\n    redde m\n}\nincipit { }",
     );
 }
+
+/// The catalog help renderer (`semantic_help`), through the real emitted args.
+fn rendered_sem065_help(source: &str) -> String {
+    let result = test_support::analyze_source(source);
+    let err = result
+        .diagnostics
+        .iter()
+        .find(|err| {
+            matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+                && test_support::issue(err) == Some(ISSUE)
+        })
+        .unwrap_or_else(|| panic!("expected SEM065 {ISSUE}, got {:?}", result.diagnostics));
+    crate::catalog_semantic::semantic_help(err.kind, &err.args)
+        .unwrap_or_else(|| panic!("catalog renders SEM065 help, args {:?}", err.args))
+}
+
+#[test]
+fn parameter_source_help_names_copy_only() {
+    let help = rendered_sem065_help(
+        "functio prend(de lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← xs\n    redde ys.longitudo()\n}\nincipit { }",
+    );
+    assert!(help.contains("copy"), "parameter help names copy: {help}");
+    assert!(
+        !help.contains("own"),
+        "parameter help must not name own (own of a read-only parameter is SEM057): {help}"
+    );
+}
+
+#[test]
+fn const_local_source_help_names_copy_and_own() {
+    let help = rendered_sem065_help(
+        "incipit {\n    fixum lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← xs\n    ys.appende(2)\n    nota xs\n}",
+    );
+    assert!(help.contains("copy"), "const help names copy: {help}");
+    assert!(help.contains("own"), "const help names own: {help}");
+}
