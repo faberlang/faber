@@ -4945,3 +4945,60 @@ message = "expected an opening brace after the ratio type arguments"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "expected a closing brace after the ratio fields"
+
+[diagnostics.PARSE001.issues.type_constructor_fields_end]
+message = "expected a closing brace after the typed constructor fields"
+
+[diagnostics.PARSE001.issues.finge_fields_end]
+message = "expected a closing brace after the finge fields"
+
+[diagnostics.PARSE001.issues.iuncta_type_arguments_start]
+message = "expected '<' after 'iuncta'"
+
+[diagnostics.PARSE001.issues.iuncta_elements_start]
+message = "expected '[' after the iuncta type arguments"
+
+[diagnostics.PARSE001.issues.iuncta_elements_end]
+message = "expected ']' after the iuncta elements"
+
+[diagnostics.PARSE001.issues.closure_parameters_end]
+message = "expected ')' after the closure parameters"
+
+[diagnostics.PARSE001.issues.closure_body_marker]
+message = "expected '∴' after the closure signature"
+
+[diagnostics.PARSE001.issues.ad_opener_end]
+message = "expected ')' after the ad opener"
+
+[diagnostics.PARSE001.issues.argument_label_separator]
+message = "expected ':' after the argument label"
+
+[diagnostics.PARSE001.issues.computed_key_end]
+message = "expected ']' after the computed object key"
+
+[diagnostics.PARSE001.issues.json_key_separator]
+message = "expected ':' after the JSON key"
+
+[diagnostics.PARSE001.issues.json_object_end]
+message = "expected a closing brace after the JSON object"
+
+[diagnostics.PARSE001.issues.json_array_end]
+message = "expected ']' after the JSON array"
+
+[diagnostics.PARSE001.issues.inferred_field_constructor_end]
+message = "expected a closing brace after the inferred constructor fields"
+
+[diagnostics.PARSE001.issues.call_type_arguments_end]
+message = "expected '>' after the call type arguments"
+
+[diagnostics.PARSE001.issues.constructor_type_arguments_start]
+message = "expected '<' before the constructor type arguments"
+
+[diagnostics.PARSE001.issues.constructor_type_arguments_end]
+message = "expected '>' after the constructor type arguments"
+
+[diagnostics.PARSE001.issues.scriptum_start]
+message = "expected '(' after 'scriptum'"
+
+[diagnostics.PARSE001.issues.scriptum_end]
+message = "expected ')' after the scriptum arguments"

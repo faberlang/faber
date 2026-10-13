@@ -13,7 +13,7 @@ use std::path::PathBuf;
 const LOCALES: [&str; 8] = ["en", "la", "ar", "hi", "vi", "th-TH", "zh-Hans", "zh-Hant"];
 
 /// Minimal broken source per expression-level token contract.
-const EXPR_CASES: [(&str, &str); 18] = [
+const EXPR_CASES: [(&str, &str); 30] = [
     ("conditional_else_marker", "fixum _ x ← a ✓ b"),
     ("call_arguments_end", "fixum _ x ← f(1"),
     ("index_end", "fixum _ x ← a[1"),
@@ -35,13 +35,47 @@ const EXPR_CASES: [(&str, &str); 18] = [
     ("ratio_type_arguments_end", "fixum _ x ← ratio<g: f32"),
     ("ratio_fields_start", "fixum _ x ← ratio<g: f32> 1"),
     ("ratio_fields_end", "fixum _ x ← ratio<g: f32> { g = 1.0"),
+    ("type_constructor_fields_end", "fixum _ x ← pkg.Box { a = 1"),
+    ("finge_fields_end", "fixum _ x ← finge Bonum { a = 1"),
+    ("iuncta_type_arguments_start", "fixum _ x ← iuncta [1]"),
+    ("iuncta_elements_start", "fixum _ x ← iuncta<numerus> 1"),
+    ("iuncta_elements_end", "fixum _ x ← iuncta<numerus> [1"),
+    ("ad_opener_end", "fixum _ x ← ad 'route'(1"),
+    ("computed_key_end", "fixum _ x ← Point { a = 1, [k"),
+    ("json_key_separator", "fixum _ x ← { \"a\" 1 }"),
+    ("json_object_end", "fixum _ x ← { \"a\": 1"),
+    ("json_array_end", "fixum _ x ← { \"a\": [1"),
+    ("inferred_field_constructor_end", "fixum _ x ← _ { a = 1"),
+    ("scriptum_end", "fixum _ x ← scriptum(\"a\""),
 ];
 
-/// Contracts whose dispatch already guarantees the token, so no source can
-/// break them: `primus_quem` claims only when `(` follows, and the `ratio`
-/// constructor claims only when `<` follows. They still route through the
-/// issue so the guard can move without reintroducing prose.
-const GUARDED_SLUGS: [&str; 2] = ["first_match_start", "ratio_type_arguments_start"];
+/// Contracts that no source can surface as a diagnostic. They still route
+/// through the issue so the guard can move without reintroducing prose.
+///
+/// - `first_match_start`: `primus_quem` claims only when `(` follows.
+/// - `ratio_type_arguments_start`: the `ratio` constructor claims only when
+///   `<` follows.
+/// - `closure_parameters_end`, `closure_body_marker`: the compact closure
+///   parses speculatively and rolls back every error raised before `∴` is
+///   consumed, so the parenthesized or type-first reading takes over.
+/// - `argument_label_separator`: `argument_label_start` already proved the
+///   `:` is next.
+/// - `call_type_arguments_end`, `constructor_type_arguments_start`,
+///   `constructor_type_arguments_end`: both type-argument lists parse
+///   speculatively and a failure restores the cursor, so `<` falls back to
+///   comparison.
+/// - `scriptum_start`: `scriptum` is claimed only when `(` follows.
+const GUARDED_SLUGS: [&str; 9] = [
+    "first_match_start",
+    "ratio_type_arguments_start",
+    "closure_parameters_end",
+    "closure_body_marker",
+    "argument_label_separator",
+    "call_type_arguments_end",
+    "constructor_type_arguments_start",
+    "constructor_type_arguments_end",
+    "scriptum_start",
+];
 
 fn issue_of(error: &ParseError) -> Option<&str> {
     error

@@ -2629,7 +2629,7 @@ impl Parser {
         }
         self.advance();
         let mut fields = self.parse_object_fields()?;
-        self.expect_token(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_issue(&TokenKind::RBrace, "type_constructor_fields_end")?;
         self.parse_construction_source(&mut fields)?;
         let object = Expr {
             id: self.next_id(),
@@ -2712,7 +2712,7 @@ impl Parser {
                     break;
                 }
             }
-            self.expect_token(&TokenKind::RBrace, "expected '}'")?;
+            self.expect_issue(&TokenKind::RBrace, "finge_fields_end")?;
             fields
         } else {
             Vec::new()
@@ -2745,13 +2745,10 @@ impl Parser {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Iuncta, "expected 'iuncta'")?;
 
-        self.expect_token(&TokenKind::LtAscii, "expected '<' after 'iuncta'")?;
+        self.expect_issue(&TokenKind::LtAscii, "iuncta_type_arguments_start")?;
         let type_args = self.finish_iuncta_type_args_list()?;
 
-        self.expect_token(
-            &TokenKind::LBracket,
-            "expected '[' after iuncta type arguments",
-        )?;
+        self.expect_issue(&TokenKind::LBracket, "iuncta_elements_start")?;
         let mut elements = Vec::new();
         while !self.check(&TokenKind::RBracket) && !self.is_at_end() {
             elements.push(self.parse_expression()?);
@@ -2759,7 +2756,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect_token(&TokenKind::RBracket, "expected ']' after iuncta elements")?;
+        self.expect_issue(&TokenKind::RBracket, "iuncta_elements_end")?;
 
         let span = start.merge(self.previous_span());
         let id = self.next_id();
@@ -2916,7 +2913,7 @@ impl Parser {
         let start = self.current_span();
         let params = if self.eat(&TokenKind::LParen) {
             let params = self.parse_clausura_param_list_until(&TokenKind::RParen)?;
-            self.expect_token(&TokenKind::RParen, "expected ')' after closure parameters")?;
+            self.expect_issue(&TokenKind::RParen, "closure_parameters_end")?;
             params
         } else {
             vec![self.parse_clausura_param()?]
@@ -2929,10 +2926,7 @@ impl Parser {
                 self.current_span(),
             ));
         }
-        self.expect_token(
-            &TokenKind::Therefore,
-            "expected '∴' after closure signature",
-        )?;
+        self.expect_issue(&TokenKind::Therefore, "closure_body_marker")?;
         let body = self.parse_compact_clausura_body()?;
 
         let span = start.merge(self.previous_span());
@@ -2998,7 +2992,7 @@ impl Parser {
 
         let opener = if self.eat(&TokenKind::LParen) {
             let expr = self.parse_expression()?;
-            self.expect_token(&TokenKind::RParen, "expected ')' after ad opener")?;
+            self.expect_issue(&TokenKind::RParen, "ad_opener_end")?;
             Some(Box::new(expr))
         } else {
             None
@@ -3073,7 +3067,7 @@ impl Parser {
                         .with_arg("issue", "labeled_actual_non_template_call")
                         .with_arg("label", self.interner.resolve(label.name).to_owned()));
                 }
-                self.expect_token(&TokenKind::Colon, "expected ':' after argument label")?;
+                self.expect_issue(&TokenKind::Colon, "argument_label_separator")?;
                 Some((label.name, label_span))
             } else {
                 None
@@ -3313,7 +3307,7 @@ impl Parser {
             } else if self.check(&TokenKind::LBracket) {
                 self.advance();
                 let key_expr = Box::new(self.parse_expression()?);
-                self.expect_token(&TokenKind::RBracket, "expected ']'")?;
+                self.expect_issue(&TokenKind::RBracket, "computed_key_end")?;
                 self.expect_field_value_separator()?;
                 let value = Some(Box::new(self.parse_expression()?));
                 let span = start.merge(self.previous_span());
@@ -3367,7 +3361,7 @@ impl Parser {
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let key_span = self.current_span();
             let key = self.parse_json_key()?;
-            self.expect_token(&TokenKind::Colon, "expected ':' after JSON key")?;
+            self.expect_issue(&TokenKind::Colon, "json_key_separator")?;
             let value = self.parse_json_value()?;
             members.push(JsonMember {
                 key_span,
@@ -3378,7 +3372,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect_token(&TokenKind::RBrace, "expected '}' after JSON object")?;
+        self.expect_issue(&TokenKind::RBrace, "json_object_end")?;
         Ok(members)
     }
 
@@ -3482,7 +3476,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect_token(&TokenKind::RBracket, "expected ']' after JSON array")?;
+        self.expect_issue(&TokenKind::RBracket, "json_array_end")?;
         Ok(JsonValue::Array(elements))
     }
 
@@ -3529,7 +3523,7 @@ impl Parser {
         hole_span: Span,
     ) -> Result<ExprKind, ParseError> {
         let mut fields = self.parse_object_fields()?;
-        self.expect_token(&TokenKind::RBrace, "expected '}'")?;
+        self.expect_issue(&TokenKind::RBrace, "inferred_field_constructor_end")?;
         self.parse_construction_source(&mut fields)?;
         let object = Expr {
             id: self.next_id(),
@@ -3589,7 +3583,7 @@ impl Parser {
             }
         }
 
-        self.expect_token(&TokenKind::GtAscii, "expected '>'")?;
+        self.expect_issue(&TokenKind::GtAscii, "call_type_arguments_end")?;
         Ok(args)
     }
 
@@ -3599,7 +3593,7 @@ impl Parser {
     /// Mirrors the generic-head production in type position: natural literals
     /// and shape tuples are size expressions, other arguments are types.
     fn parse_constructor_type_args(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
-        self.expect_token(&TokenKind::LtAscii, "expected '<'")?;
+        self.expect_issue(&TokenKind::LtAscii, "constructor_type_arguments_start")?;
         let mut args = Vec::new();
         loop {
             args.push(self.parse_type_argument()?);
@@ -3607,7 +3601,7 @@ impl Parser {
                 break;
             }
         }
-        self.expect_token(&TokenKind::GtAscii, "expected '>'")?;
+        self.expect_issue(&TokenKind::GtAscii, "constructor_type_arguments_end")?;
         Ok(args)
     }
 
@@ -3634,7 +3628,7 @@ impl Parser {
             return Err(self.expected_expression_error("scriptum"));
         };
         self.expect_keyword_ident(TokenKind::Scriptum, "expected 'scriptum'")?;
-        self.expect_token(&TokenKind::LParen, "expected '(' after 'scriptum'")?;
+        self.expect_issue(&TokenKind::LParen, "scriptum_start")?;
 
         let template = self.parse_string()?;
 
@@ -3663,7 +3657,7 @@ impl Parser {
             args.push(self.parse_expression()?);
         }
 
-        self.expect_token(&TokenKind::RParen, "expected ')'")?;
+        self.expect_issue(&TokenKind::RParen, "scriptum_end")?;
 
         let span = start.merge(self.previous_span());
         let id = self.next_id();
