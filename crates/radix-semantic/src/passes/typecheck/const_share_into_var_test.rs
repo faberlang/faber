@@ -178,3 +178,79 @@ fn const_to_const_share_is_accepted() {
         "incipit {\n    fixum lista<numerus> xs ← [1, 2]\n    fixum lista<numerus> ys ← xs\n    nota ys\n}",
     );
 }
+
+#[test]
+fn de_param_genus_shared_into_var_is_rejected() {
+    let source = "genus Punctum {\n    varia numerus x\n}\nfunctio prend(de Punctum q) → vacuum {\n    varia Punctum b ← q\n    nota b.x\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn de_param_list_shared_into_var_is_rejected() {
+    let source = "functio prend(de lista<numerus> xs) → numerus {\n    varia lista<numerus> ys ← xs\n    redde ys.longitudo()\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    let found = result
+        .diagnostics
+        .iter()
+        .find(|err| {
+            matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+                && test_support::issue(err) == Some(ISSUE)
+        })
+        .unwrap_or_else(|| panic!("expected SEM065 {ISSUE}, got {:?}", result.diagnostics));
+    assert!(
+        found
+            .args
+            .iter()
+            .any(|arg| arg.name == "source" && arg.value == "parameter"),
+        "expected source=parameter, got {:?}",
+        found.args
+    );
+}
+
+#[test]
+fn unmarked_param_genus_shared_into_var_is_rejected() {
+    let source = "genus Punctum {\n    varia numerus x\n}\nfunctio prend(Punctum q) → vacuum {\n    varia Punctum b ← q\n    nota b.x\n}\nincipit { }";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn de_param_const_alias_is_accepted() {
+    test_support::assert_accepts(
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(de Punctum q) → numerus {\n    fixum Punctum b ← q\n    redde b.x\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn de_param_copy_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(de Punctum q) → numerus {\n    varia Punctum b ← copy q\n    redde b.x\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn in_param_genus_shared_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "genus Punctum {\n    varia numerus x\n}\nfunctio prend(in Punctum q) → numerus {\n    varia Punctum b ← q\n    redde b.x\n}\nincipit { }",
+    );
+}
+
+#[test]
+fn de_param_scalar_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "functio prend(de numerus n) → numerus {\n    varia numerus m ← n\n    redde m\n}\nincipit { }",
+    );
+}

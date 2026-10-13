@@ -46,7 +46,7 @@ fn assert_accepted(body: &str) {
 #[test]
 fn vector_alias_of_de_param_rejects_element_write() {
     assert_rejected(
-        "functio f(de vector<f32, 4> v) → vacuum { varia vector<f32, 4> w ← v\n w[0] ← 9.0 }",
+        "functio f(de vector<f32, 4> v) → vacuum { fixum vector<f32, 4> w ← v\n w[0] ← 9.0 }",
     );
 }
 
