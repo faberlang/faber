@@ -49,7 +49,8 @@ use radix_lexer::{Span, Symbol};
 use radix_syntax::{
     AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassDecl, ClassMember,
     ClassMemberKind, EnumDecl, EnumValue, FuncDecl, ImportDecl, ImportKind, InterfaceDecl,
-    InterfaceMethod, Param, SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl, Variant,
+    InterfaceMethod, Param, SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl,
+    Variant,
 };
 
 type ModifierLocal = (DefId, Symbol, Span);
@@ -853,7 +854,8 @@ impl Lowerer<'_> {
         self.pop_type_params();
 
         let posture = self.resolve_callable_posture(method.posture, &annotations, member.span);
-        let (nucleum_entry, nucleum_fragment) = Self::nucleum_role_bits(&annotations, self.interner);
+        let (nucleum_entry, nucleum_fragment) =
+            Self::nucleum_role_bits(&annotations, self.interner);
 
         let func = HirFunction {
             name: method.name.name,

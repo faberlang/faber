@@ -1071,8 +1071,8 @@ fn deny_warnings_promotes_leading_underscore_in_real_compile() {
 fn frontmatter_locale_rejects_path_shaped_ids() {
     let config = crate::driver::Config::default();
     for id in ["/etc", "la/extra", "..", ".", "..\\x", "a/../b"] {
-        let diagnostic = super::resolve_frontmatter_locale_pack(&config, id)
-            .expect_err("path-shaped locale ids must be rejected");
+        let diagnostic =
+            super::resolve_frontmatter_locale_pack(&config, id).expect_err("path-shaped locale ids must be rejected");
         assert_eq!(diagnostic.code, Some("LOCALE003"));
         assert_eq!(diagnostic.issue(), Some("invalid_id"), "id {id}");
         assert!(
