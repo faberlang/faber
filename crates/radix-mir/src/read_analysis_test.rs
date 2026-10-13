@@ -270,7 +270,10 @@ fn terminator_reads_temp_covers_return_error_and_try_call_operands() {
         error_place: MirPlace::local(MirLocalId(9)),
         error_block: MirBlockId(1),
     };
-    assert!(terminator_reads_temp(&try_call_closure_callee, MirTempId(3)));
+    assert!(terminator_reads_temp(
+        &try_call_closure_callee,
+        MirTempId(3)
+    ));
 
     let none = MirTerminatorKind::Return(None);
     assert!(!terminator_reads_temp(&none, MirTempId(0)));

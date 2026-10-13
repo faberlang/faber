@@ -557,7 +557,9 @@ fn callee_reads_temp(callee: &MirCallee, temp: MirTempId) -> bool {
 /// Whether any operand in a call/projection argument list reads the given
 /// temp.
 fn operand_list_reads_temp(operands: &[MirOperand], temp: MirTempId) -> bool {
-    operands.iter().any(|operand| operand_reads_temp(operand, temp))
+    operands
+        .iter()
+        .any(|operand| operand_reads_temp(operand, temp))
 }
 
 /// Whether an operand reads the given temp as a plain base slot. A value id

@@ -244,7 +244,8 @@ pub fn analyze_function_facts(hir: &HirModule, types: &TypeTable) -> FunctionFac
             }
         }
         for capture in &mut captures {
-            capture.mode = derive_capture_mode(capture.def_id, &mutation_facts, &collector.mutations);
+            capture.mode =
+                derive_capture_mode(capture.def_id, &mutation_facts, &collector.mutations);
         }
         if let Some(fact) = table.by_def.get_mut(&def_id) {
             fact.captures = captures;
