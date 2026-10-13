@@ -223,6 +223,10 @@ tuus = "nhận"
 message = "gói đọc '{pack}' thấy cách viết giống từ khóa '{spelling}'"
 help = "dùng '{suggestion}' nếu bạn muốn từ khóa đó; '{spelling}' vẫn là tên hợp lệ như đã viết"
 
+[diagnostics.LOCALE002.issues.source_reads_as_other_locale]
+message = "nguồn không khai báo locale và các từ khóa của nó đọc giống '{detected}'"
+help = "khai báo locale bằng frontmatter `+++ locale = \"{detected}\" +++` hoặc truyền `--locale {detected}`; ghi chú này không chọn locale"
+
 [diagnostics.LOCALE004]
 message = "định danh '{identifier}' trộn nhiều hệ chữ viết: {scripts}"
 help = "kiểm tra ký tự có hình dạng giống từ bảng chữ khác; tên vẫn hợp lệ như đã viết"
@@ -746,6 +750,10 @@ help = "kiểm tra cú pháp import"
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "trường import không xác định"
 help = "dùng ex, visibilitas, nomen, ut, hoặc omnia"
+
+[diagnostics.PARSE050.issues.duplicate_import_field]
+message = "trường import `{field}` trùng lặp"
+help = "mỗi trường import chỉ được xuất hiện một lần; xóa trường bị lặp"
 
 [diagnostics.PARSE050.issues.missing_import_source]
 message = "bản ghi import yêu cầu nguồn ex"
@@ -3497,247 +3505,247 @@ message = "cần ']' sau các chiều hình dạng"
 message = "cần ')' sau hình dạng trong ngoặc"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
-message = "expected '←' after the awaited binding"
+message = "cần '←' sau binding đã đợi"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
-message = "expected '[' to start the array binding pattern"
+message = "cần '[' để bắt đầu pattern binding của mảng"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
-message = "expected ']' to end the array binding pattern"
+message = "cần ']' để kết thúc pattern binding của mảng"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
-message = "expected an opening brace for the object binding pattern"
+message = "cần dấu ngoặc nhọn mở cho pattern binding của object"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
-message = "expected a closing brace for the object binding pattern"
+message = "cần dấu ngoặc nhọn đóng đóng cho pattern binding của object"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
-message = "expected '(' before function declaration parameters"
+message = "cần '(' trước các tham số của khai báo hàm"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
-message = "expected ')' after function declaration parameters"
+message = "cần ')' sau các tham số của khai báo hàm"
 
 [diagnostics.PARSE001.issues.class_body_end]
-message = "expected a closing brace after the class body"
+message = "cần dấu ngoặc nhọn đóng sau thân class"
 
 [diagnostics.PARSE001.issues.interface_body_start]
-message = "expected an opening brace for the interface body"
+message = "cần dấu ngoặc nhọn mở cho thân interface"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
-message = "expected '(' before interface method parameters"
+message = "cần '(' trước các tham số của method interface"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
-message = "expected ')' after interface method parameters"
+message = "cần ')' sau các tham số của method interface"
 
 [diagnostics.PARSE001.issues.interface_body_end]
-message = "expected a closing brace after the interface body"
+message = "cần dấu ngoặc nhọn đóng sau thân interface"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
-message = "expected '=' before the type alias value"
+message = "cần '=' trước giá trị của type alias"
 
 [diagnostics.PARSE001.issues.schema_body_start]
-message = "expected an opening brace for the schema body"
+message = "cần dấu ngoặc nhọn mở cho thân schema"
 
 [diagnostics.PARSE001.issues.schema_body_end]
-message = "expected a closing brace after the schema body"
+message = "cần dấu ngoặc nhọn đóng sau thân schema"
 
 [diagnostics.PARSE001.issues.enum_body_start]
-message = "expected an opening brace for the enum body"
+message = "cần dấu ngoặc nhọn mở cho thân enum"
 
 [diagnostics.PARSE001.issues.enum_body_end]
-message = "expected a closing brace after the enum body"
+message = "cần dấu ngoặc nhọn đóng sau thân enum"
 
 [diagnostics.PARSE001.issues.union_body_start]
-message = "expected an opening brace for the union body"
+message = "cần dấu ngoặc nhọn mở cho thân union"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
-message = "expected a closing brace after the union variant fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường variant của union"
 
 [diagnostics.PARSE001.issues.union_body_end]
-message = "expected a closing brace after the union body"
+message = "cần dấu ngoặc nhọn đóng sau thân union"
 
 [diagnostics.PARSE001.issues.import_record_start]
-message = "expected an opening brace for the import record"
+message = "cần dấu ngoặc nhọn mở cho bản ghi import"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
-message = "expected '=' after the import field name"
+message = "cần '=' sau tên trường import"
 
 [diagnostics.PARSE001.issues.import_record_end]
-message = "expected a closing brace after the import record fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường của bản ghi import"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
-message = "expected an opening brace for the probandum body"
+message = "cần dấu ngoặc nhọn mở cho thân probandum"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
-message = "expected a closing brace after the probandum body"
+message = "cần dấu ngoặc nhọn đóng sau thân probandum"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
-message = "expected an opening brace for the annotation fields"
+message = "cần dấu ngoặc nhọn mở cho các trường annotation"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
-message = "expected '=' after the annotation field name"
+message = "cần '=' sau tên trường annotation"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
-message = "expected a closing brace after the annotation fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường annotation"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
-message = "expected an opening brace for the nucleum annotation fields"
+message = "cần dấu ngoặc nhọn mở cho các trường annotation của nucleum"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
-message = "expected '=' after the nucleum annotation field name"
+message = "cần '=' sau tên trường annotation của nucleum"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
-message = "expected a closing brace after the nucleum annotation fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường annotation của nucleum"
 
 [diagnostics.PARSE001.issues.block_start]
-message = "expected an opening brace for the block"
+message = "cần dấu ngoặc nhọn mở cho khối"
 
 [diagnostics.PARSE001.issues.block_end]
-message = "expected a closing brace to end the block"
+message = "cần dấu ngoặc nhọn đóng để kết thúc khối"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
-message = "expected '>' after generic parameters"
+message = "cần '>' sau các tham số generic"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
-message = "expected '>' after contract type arguments"
+message = "cần '>' sau các đối số kiểu của contract"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
-message = "expected '[' after 'apud'"
+message = "cần '[' sau 'apud'"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
-message = "expected ']' after the 'apud' coordinates"
+message = "cần ']' sau tọa độ 'apud'"
 
 [diagnostics.PARSE001.issues.elige_body_start]
-message = "expected an opening brace for the elige body"
+message = "cần dấu ngoặc nhọn mở cho thân elige"
 
 [diagnostics.PARSE001.issues.elige_body_end]
-message = "expected a closing brace after the elige cases"
+message = "cần dấu ngoặc nhọn đóng sau các case của elige"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
-message = "expected an opening brace for the discerne body"
+message = "cần dấu ngoặc nhọn mở cho thân discerne"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
-message = "expected a closing brace after the discerne arms"
+message = "cần dấu ngoặc nhọn đóng sau các nhánh của discerne"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
-message = "expected an opening brace for the custodi body"
+message = "cần dấu ngoặc nhọn mở cho thân custodi"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
-message = "expected a closing brace after the custodi clauses"
+message = "cần dấu ngoặc nhọn đóng sau các mệnh đề của custodi"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
-message = "expected '✗' after the conditional value"
+message = "cần '✗' sau giá trị điều kiện"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
-message = "expected ')' after the call arguments"
+message = "cần ')' sau các đối số lời gọi"
 
 [diagnostics.PARSE001.issues.index_end]
-message = "expected ']' after the index expression"
+message = "cần ']' sau biểu thức chỉ mục"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
-message = "expected ']' after the gradient selectors"
+message = "cần ']' sau các gradient selector"
 
 [diagnostics.PARSE001.issues.optional_index_end]
-message = "expected ']' after the optional index expression"
+message = "cần ']' sau biểu thức chỉ mục tùy chọn"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
-message = "expected ')' after the optional call arguments"
+message = "cần ')' sau các đối số lời gọi tùy chọn"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
-message = "expected ']' after the non-null index expression"
+message = "cần ']' sau biểu thức chỉ mục không null"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
-message = "expected ')' after the non-null call arguments"
+message = "cần ')' sau các đối số lời gọi không null"
 
 [diagnostics.PARSE001.issues.first_match_start]
-message = "expected '(' after 'primus_quem'"
+message = "cần '(' sau 'primus_quem'"
 
 [diagnostics.PARSE001.issues.first_match_source_separator]
-message = "expected ',' after the first-match source"
+message = "cần ',' sau nguồn của first-match"
 
 [diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "expected the 'ubi' predicate tail"
+message = "cần phần đuôi predicate 'ubi'"
 
 [diagnostics.PARSE001.issues.first_match_end]
-message = "expected ')' after the first-match predicate"
+message = "cần ')' sau predicate của first-match"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
-message = "expected a closing brace after the constructor fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường của bộ khởi tạo"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
-message = "expected ']' after the inferred constructor elements"
+message = "cần ']' sau các phần tử của bộ khởi tạo suy ra"
 
 [diagnostics.PARSE001.issues.array_literal_end]
-message = "expected ']' after the array elements"
+message = "cần ']' sau các phần tử của mảng"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
-message = "expected ')' after the parenthesized expression"
+message = "cần ')' sau biểu thức trong ngoặc đơn"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
-message = "expected '<' after 'ratio'"
+message = "cần '<' sau 'ratio'"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
-message = "expected '>' after the ratio type arguments"
+message = "cần '>' sau các đối số kiểu của ratio"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
-message = "expected an opening brace after the ratio type arguments"
+message = "cần dấu ngoặc nhọn mở sau các đối số kiểu của ratio"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
-message = "expected a closing brace after the ratio fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường của ratio"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
-message = "expected a closing brace after the typed constructor fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường của bộ khởi tạo có kiểu"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
-message = "expected a closing brace after the finge fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường của finge"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
-message = "expected '<' after 'iuncta'"
+message = "cần '<' sau 'iuncta'"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
-message = "expected '[' after the iuncta type arguments"
+message = "cần '[' sau các đối số kiểu của iuncta"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
-message = "expected ']' after the iuncta elements"
+message = "cần ']' sau các phần tử của iuncta"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
-message = "expected ')' after the closure parameters"
+message = "cần ')' sau các parameter của closure"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
-message = "expected '∴' after the closure signature"
+message = "cần '∴' sau chữ ký closure"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
-message = "expected ')' after the ad opener"
+message = "cần ')' sau phần mở đầu ad"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
-message = "expected ':' after the argument label"
+message = "cần ':' sau nhãn đối số"
 
 [diagnostics.PARSE001.issues.computed_key_end]
-message = "expected ']' after the computed object key"
+message = "cần ']' sau key object tính toán"
 
 [diagnostics.PARSE001.issues.json_key_separator]
-message = "expected ':' after the JSON key"
+message = "cần ':' sau key JSON"
 
 [diagnostics.PARSE001.issues.json_object_end]
-message = "expected a closing brace after the JSON object"
+message = "cần dấu ngoặc nhọn đóng sau object JSON"
 
 [diagnostics.PARSE001.issues.json_array_end]
-message = "expected ']' after the JSON array"
+message = "cần ']' sau mảng JSON"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
-message = "expected a closing brace after the inferred constructor fields"
+message = "cần dấu ngoặc nhọn đóng sau các trường của bộ khởi tạo suy ra"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
-message = "expected '>' after the call type arguments"
+message = "cần '>' sau các đối số kiểu của lời gọi"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
-message = "expected '<' before the constructor type arguments"
+message = "cần '<' trước các đối số kiểu của bộ khởi tạo"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
-message = "expected '>' after the constructor type arguments"
+message = "cần '>' sau các đối số kiểu của bộ khởi tạo"
 
 [diagnostics.PARSE001.issues.scriptum_start]
-message = "expected '(' after 'scriptum'"
+message = "cần '(' sau 'scriptum'"
 
 [diagnostics.PARSE001.issues.scriptum_end]
-message = "expected ')' after the scriptum arguments"
+message = "cần ')' sau các đối số của scriptum"
