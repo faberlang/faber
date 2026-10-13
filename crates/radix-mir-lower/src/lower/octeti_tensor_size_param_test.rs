@@ -95,7 +95,7 @@ fn witnessed_size_param_extent_attaches_the_runtime_shape_operand() {
     let block = builder.fresh_block(Span::default());
     builder.switch_to(block);
     let source = MirOperand::Constant(MirConstant::Int(0));
-    let shape = builder.lower_lista_to_tensor_shape(source, fixture.target, Span::default());
+    let shape = builder.lower_octeti_tensor_shape(source, fixture.target, Span::default());
     assert!(shape.is_some(), "a witnessed size-param target lowers a shape operand");
     assert!(builder.errors.is_empty(), "lowering reported errors");
     assert!(
@@ -136,7 +136,7 @@ fn lista_source_conversion_keeps_the_symbolic_shape_terms_despite_a_witness() {
     let block = builder.fresh_block(Span::default());
     builder.switch_to(block);
     let source = MirOperand::Constant(MirConstant::Int(0));
-    let shape = builder.lower_lista_to_tensor_shape_from_list(source, fixture.target, Span::default());
+    let shape = builder.lower_lista_to_tensor_shape(source, fixture.target, Span::default());
     assert!(shape.is_some(), "a witnessed size-param target lowers a shape operand");
     assert!(builder.errors.is_empty(), "lowering reported errors");
     assert!(
@@ -146,5 +146,37 @@ fn lista_source_conversion_keeps_the_symbolic_shape_terms_despite_a_witness() {
     assert!(
         !lowered_shape_reads_the_witness(&builder),
         "a lista-source conversion must not read a runtime witness"
+    );
+}
+
+/// Pre-371f48cfa1 behaviour on the shared path: a declared `Runtime` extent
+/// (here a tensor-binding axis with a formal parameter present) lowers to
+/// the run-time `TensorShapeSize` read even where witnessed `size`
+/// parameters stay symbolic. The witness flag must gate parameters only,
+/// never the run-time extents themselves.
+#[test]
+fn runtime_extent_axis_lowers_the_runtime_shape_operand_on_the_lista_source_path() {
+    let mut types = TypeTable::new();
+    types.ensure_array(types.primitive(Primitive::Numerus));
+    let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let axis = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+        parameter: 0,
+        axis: 0,
+    }));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![axis]));
+    let target = types.tensor_with_shape(f32_ty, shape);
+
+    let mut builder = FunctionBuilder::new(&types);
+    builder.add_param(DefId(2), PROTO_NAME, target, HirParamMode::Owned, Span::default());
+
+    let block = builder.fresh_block(Span::default());
+    builder.switch_to(block);
+    let source = MirOperand::Constant(MirConstant::Int(0));
+    let lowered = builder.lower_lista_to_tensor_shape(source, target, Span::default());
+    assert!(lowered.is_some(), "a run-time extent target lowers a shape operand");
+    assert!(builder.errors.is_empty(), "lowering reported errors");
+    assert!(
+        lowered_shape_reads_the_witness(&builder),
+        "a declared run-time extent must keep the TensorShapeSize read on the lista-source path"
     );
 }

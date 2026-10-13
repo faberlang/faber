@@ -2627,25 +2627,40 @@ impl<'a> FunctionBuilder<'a> {
         self.size_param_sources.get(&def_id).copied()
     }
 
-    /// Whether a declared extent is bound at run time in this body. A `size`
-    /// parameter is resolved through its recorded tensor-axis witness first —
-    /// the same resolution [`Self::lower_shape_expr`] applies — so a witnessed
-    /// parameter reads as a run-time extent while an unwitnessed one stays
-    /// symbolic.
-    fn body_index_contains_runtime_extent(&self, index: IndexId, seen: &mut FxHashSet<IndexId>) -> bool {
+    /// Whether a declared extent is bound at run time in this body. A
+    /// `Runtime` extent always is, on every path. A `size` parameter counts
+    /// through its recorded tensor-axis witness only when
+    /// `witnessed_size_params` says this path reads witnesses (the octeti
+    /// conversion, the same resolution [`Self::lower_shape_expr`] applies
+    /// there); elsewhere a parameter stays symbolic, as
+    /// [`index_contains_runtime_extent`] treats it, so package finalization
+    /// can substitute the axis's `ShapeSize` term (GSF-2).
+    fn body_index_contains_runtime_extent(
+        &self,
+        index: IndexId,
+        seen: &mut FxHashSet<IndexId>,
+        witnessed_size_params: bool,
+    ) -> bool {
         if !seen.insert(index) {
             return false;
         }
         match self.types.get_index(index) {
-            IndexExpr::Param(symbol) => self
+            IndexExpr::Param(symbol) if witnessed_size_params => self
                 .size_param_source(*symbol)
-                .is_some_and(|source| self.body_index_contains_runtime_extent(source, seen)),
+                .is_some_and(|source| {
+                    self.body_index_contains_runtime_extent(source, seen, witnessed_size_params)
+                }),
+            IndexExpr::Param(_) => false,
             IndexExpr::Runtime(_) => true,
-            IndexExpr::Affine { base, .. } => self.body_index_contains_runtime_extent(*base, seen),
-            IndexExpr::Divide { numerator, .. } => self.body_index_contains_runtime_extent(*numerator, seen),
-            IndexExpr::Tuple(dimensions) => dimensions
-                .iter()
-                .any(|dimension| self.body_index_contains_runtime_extent(*dimension, seen)),
+            IndexExpr::Affine { base, .. } => {
+                self.body_index_contains_runtime_extent(*base, seen, witnessed_size_params)
+            }
+            IndexExpr::Divide { numerator, .. } => {
+                self.body_index_contains_runtime_extent(*numerator, seen, witnessed_size_params)
+            }
+            IndexExpr::Tuple(dimensions) => dimensions.iter().any(|dimension| {
+                self.body_index_contains_runtime_extent(*dimension, seen, witnessed_size_params)
+            }),
             IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
         }
     }
