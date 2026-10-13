@@ -55,17 +55,28 @@ fn solum_funde_does_not_convert_a_non_byte_int_list() {
     // A list with an out-of-range element, or a non-integer element, is not
     // a byte list: it keeps the generic list path and the leaf refuses it —
     // nothing is written.
-    let path =
-        std::env::temp_dir().join(format!("radix-routes-test-{}-nonbyte.bin", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "radix-routes-test-{}-nonbyte.bin",
+        std::process::id()
+    ));
     let path_text = path.to_string_lossy().into_owned();
     for data in [
         lista(vec![Value::Int(300), Value::Int(0x6b)]),
-        lista(vec![Value::Int(0x6f), Value::Str("not an integer".to_owned())]),
+        lista(vec![
+            Value::Int(0x6f),
+            Value::Str("not an integer".to_owned()),
+        ]),
     ] {
         let opener = lista(vec![Value::Str(path_text.clone()), data]);
-        assert!(serve("solum:funde", &opener).is_err(), "non-byte list must be refused");
+        assert!(
+            serve("solum:funde", &opener).is_err(),
+            "non-byte list must be refused"
+        );
     }
-    assert!(!path.exists(), "a refused non-byte list must not write the file");
+    assert!(
+        !path.exists(),
+        "a refused non-byte list must not write the file"
+    );
 }
 
 #[test]

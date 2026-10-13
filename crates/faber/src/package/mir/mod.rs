@@ -26,7 +26,12 @@ mod manifest;
 #[path = "mir_test.rs"]
 mod tests;
 
-#[cfg(all(test, feature = "runner", feature = "device-runtime", target_os = "macos"))]
+#[cfg(all(
+    test,
+    feature = "runner",
+    feature = "device-runtime",
+    target_os = "macos"
+))]
 #[path = "auto_device_test.rs"]
 mod auto_device_tests;
 

@@ -2465,8 +2465,7 @@ struct IdenticalToEnEntry {
 
 fn load_identical_to_en_entries() -> Vec<IdenticalToEnEntry> {
     let path = identical_to_en_path();
-    let source =
-        std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err:?}", path.display()));
+    let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err:?}", path.display()));
     let parsed: IdenticalToEnFile =
         toml::from_str(&source).unwrap_or_else(|err| panic!("parse {}: {err:?}", path.display()));
     parsed.entry
@@ -2479,9 +2478,9 @@ fn reason_class_is_sanctioned(reason: &str) -> bool {
 
 /// A field is exempt when an entry names the exact (pack, code, issue, field).
 fn is_exempt(exemptions: &[IdenticalToEnEntry], pack: &str, code: &str, issue: Option<&str>, field: &str) -> bool {
-    exemptions
-        .iter()
-        .any(|entry| entry.pack == pack && entry.code == code && entry.issue.as_deref() == issue && entry.field == field)
+    exemptions.iter().any(|entry| {
+        entry.pack == pack && entry.code == code && entry.issue.as_deref() == issue && entry.field == field
+    })
 }
 
 /// Every text field of `pack` whose value equals the `en` pack's value for the
@@ -2498,7 +2497,10 @@ fn fields_identical_to_en(pack: &LocalePack, en_pack: &LocalePack) -> Vec<(Strin
         };
         let rows =
             std::iter::once((None, template, en_template)).chain(template.issues.iter().filter_map(|(issue, row)| {
-                en_template.issues.get(issue).map(|en_row| (Some(issue.as_str()), row, en_row))
+                en_template
+                    .issues
+                    .get(issue)
+                    .map(|en_row| (Some(issue.as_str()), row, en_row))
             }));
         for (issue, row, en_row) in rows {
             for (field, ours, theirs) in [
@@ -2528,7 +2530,9 @@ fn locale_pack_completeness_translated_packs_do_not_ship_english_rows_unless_exe
         let pack = owned_pack(locale);
         for (code, issue, field) in fields_identical_to_en(&pack, &en_pack) {
             if !is_exempt(&exemptions, locale, &code, issue.as_deref(), &field) {
-                let row = issue.as_ref().map_or_else(String::new, |i| format!("issues.{i}."));
+                let row = issue
+                    .as_ref()
+                    .map_or_else(String::new, |i| format!("issues.{i}."));
                 failures.push(format!("{locale} ships English text for {code}.{row}{field}"));
             }
         }
@@ -2551,8 +2555,10 @@ fn locale_pack_completeness_translated_packs_do_not_ship_english_rows_unless_exe
 fn locale_pack_completeness_identical_to_en_exemptions_must_stay_live() {
     let en_pack = owned_pack("en");
     let exemptions = load_identical_to_en_entries();
-    let packs: HashMap<&str, LocalePack> =
-        TRANSLATED_PACKS.iter().map(|locale| (*locale, owned_pack(locale))).collect();
+    let packs: HashMap<&str, LocalePack> = TRANSLATED_PACKS
+        .iter()
+        .map(|locale| (*locale, owned_pack(locale)))
+        .collect();
     let mut stale = Vec::new();
     for entry in &exemptions {
         let name = format!(
