@@ -1766,3 +1766,81 @@ fn compile_misspelled_keyword_at_parse_error_keeps_locale002() {
         result.diagnostics
     );
 }
+
+// ── undeclared source that reads as another locale (analysis routes) ──
+
+// Latin keyword surface copied from corpus/cape/fac-omnia-dum.fab, with the
+// frontmatter dropped so no locale is declared.
+const UNDECLARED_LATIN_SOURCE: &str = "incipit {\n    varia numerus i ← 0\n    fac omnia {\n        i ← i + 1\n        nota \"iteratio §\"(i)\n        si i ≥ 3 {\n            iace \"tertia\"\n        }\n    }\n    cape err {\n        nota \"interceptum\"\n    } dum i ≺ 10\n    nota \"finis §\"(i)\n}\n";
+
+fn session_with_installed_pack(locale: &str) -> Session {
+    let pack_path = crate::locale::workspace_locale_pack_path(locale);
+    let pack = crate::locale::LocalePack::from_toml_path(pack_path).expect("installed pack should load");
+    Session::new(
+        Config::default()
+            .with_target(Target::HirRust)
+            .with_locale_pack(pack),
+    )
+}
+
+fn other_locale_note_position(diagnostics: &[crate::diagnostics::Diagnostic]) -> Option<usize> {
+    diagnostics.iter().position(|diagnostic| {
+        diagnostic.code == Some("LOCALE002")
+            && radix_semantic::arg_value(&diagnostic.args, "issue") == Some("source_reads_as_other_locale")
+            && radix_semantic::arg_value(&diagnostic.args, "detected") == Some("la")
+    })
+}
+
+fn assert_other_locale_note_leads_errors(diagnostics: &[crate::diagnostics::Diagnostic]) {
+    let position = other_locale_note_position(diagnostics)
+        .unwrap_or_else(|| panic!("no detected-locale diagnostic: {diagnostics:?}"));
+    assert_eq!(position, 0, "the note must precede every error: {diagnostics:?}");
+    assert!(!diagnostics[position].is_error(), "detection must not be an error");
+    assert!(
+        diagnostics
+            .iter()
+            .any(crate::diagnostics::Diagnostic::is_error),
+        "the wrong-locale read must still fail: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn analyze_source_reports_the_locale_an_undeclared_source_reads_as() {
+    let session = session_with_installed_pack("en");
+    let diagnostics = crate::driver::analyze_source(
+        &session,
+        "main.fab",
+        UNDECLARED_LATIN_SOURCE,
+        crate::driver::AnalyzeRequest::default(),
+    )
+    .err()
+    .expect("Latin keywords read as en must fail");
+
+    assert_other_locale_note_leads_errors(&diagnostics);
+}
+
+#[test]
+fn run_route_analysis_reports_the_locale_an_undeclared_source_reads_as() {
+    // `faber -c` and `faber run` analyze through `analyze_prepared_program_name`.
+    let session = session_with_installed_pack("en");
+    let diagnostics = crate::program::analyze_prepared_program_name(&session, "<source>", UNDECLARED_LATIN_SOURCE)
+        .err()
+        .expect("Latin keywords read as en must fail");
+
+    assert_other_locale_note_leads_errors(&diagnostics);
+}
+
+#[test]
+fn analyze_source_with_declared_locale_reports_no_other_locale() {
+    let session = session_with_installed_pack("en");
+    let source = format!("+++\nlocale = \"en\"\n+++\n{UNDECLARED_LATIN_SOURCE}");
+    let diagnostics =
+        crate::driver::analyze_source(&session, "main.fab", &source, crate::driver::AnalyzeRequest::default())
+            .err()
+            .expect("Latin keywords read as declared en must fail");
+
+    assert!(
+        other_locale_note_position(&diagnostics).is_none(),
+        "a declared locale is never second-guessed: {diagnostics:?}"
+    );
+}

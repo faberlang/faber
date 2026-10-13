@@ -11,7 +11,9 @@ pub const MAX_PACKAGE_SOURCE_FILES: usize = 4096;
 pub const MAX_PACKAGE_SOURCE_BYTES: u64 = 64 * 1024 * 1024;
 
 use radix_module::diagnostics::Diagnostic;
-use radix_module::driver::{Config, FileFrontmatter, peel_raw_source, source_load_diagnostic};
+use radix_module::driver::{
+    Config, FileFrontmatter, peel_raw_source, source_load_diagnostic, source_reads_as_other_locale,
+};
 use radix_module::lexer::Interner;
 use radix_module::syntax::Program;
 
@@ -209,12 +211,30 @@ pub fn load_package_source(
         peeled.frontmatter.as_ref(),
         diagnostics,
     )?;
+    // A locale is declared by the caller (`--locale`), the manifest, or the
+    // source frontmatter; the product default is not a declaration.
+    let locale_declared = config.locale_pack_explicit
+        || manifest.is_some_and(|manifest| manifest.locale.locale.is_some())
+        || peeled
+            .frontmatter
+            .as_ref()
+            .and_then(FileFrontmatter::locale_result)
+            .is_some();
     let body_byte_offset = peeled.body_byte_offset;
     let radix_module::driver::PeeledSource {
         body, frontmatter, ..
     } = peeled;
     let body = body.to_owned();
     let source_diagnostic_start = diagnostics.len();
+    // WHY: a wrong-locale read hides behind this file's lex and parse errors.
+    // The note is advisory only; it never changes the locale the file is read in.
+    let other_locale_note = || {
+        if locale_declared {
+            return None;
+        }
+        let baseline = locale_pack.as_ref()?;
+        source_reads_as_other_locale(config, &display_name, &body, baseline)
+    };
     let lex_result = match locale_pack.as_ref() {
         Some(pack) => radix_module::lexer::lex_with_locale_pack(&body, pack),
         None => radix_module::lexer::lex(&body),
@@ -242,6 +262,9 @@ pub fn load_package_source(
         );
         let kept = Diagnostic::filter_locale_suggestions(locale_candidates, diagnostics);
         diagnostics.extend(kept);
+        if let Some(note) = other_locale_note() {
+            diagnostics.insert(source_diagnostic_start, note);
+        }
         radix_module::driver::adjust_diagnostic_lines_for_body(
             &mut diagnostics[source_diagnostic_start..],
             &raw_source,
@@ -267,6 +290,9 @@ pub fn load_package_source(
     let kept = Diagnostic::filter_locale_suggestions(locale_candidates, diagnostics);
     diagnostics.extend(kept);
     if !parse.success() {
+        if let Some(note) = other_locale_note() {
+            diagnostics.insert(source_diagnostic_start, note);
+        }
         radix_module::driver::adjust_diagnostic_lines_for_body(
             &mut diagnostics[source_diagnostic_start..],
             &raw_source,

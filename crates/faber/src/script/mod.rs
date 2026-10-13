@@ -93,12 +93,10 @@ pub fn run_with_session(
 pub fn print_run_source_error(error: &RunSourceError) {
     match error {
         RunSourceError::Frontend(diagnostics) => {
+            // Same renderer as `faber check`, so a coded advisory such as
+            // LOCALE002 shows its code and issue instead of bare message text.
             for diag in diagnostics {
-                if diag.is_error() {
-                    eprintln!("error: {}", diag.message);
-                } else {
-                    eprintln!("warning: {}", diag.message);
-                }
+                eprintln!("{}", radix::module::diagnostics::render_plain(diag));
             }
         }
         RunSourceError::Mir(errors) => {

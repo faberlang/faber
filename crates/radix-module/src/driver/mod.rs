@@ -3420,6 +3420,7 @@ pub fn analyze_source_with_kernel_template_admissions(
         }
         Err(mut diagnostics) => {
             push_filtered_locale_suggestions(&mut diagnostics, locale_candidates);
+            note_other_locale_reading(session, name, &peeled, &mut diagnostics);
             adjust_diagnostic_lines_for_body(&mut diagnostics, source, body_byte_offset);
             Err(diagnostics)
         }
@@ -3430,6 +3431,101 @@ pub fn analyze_source_with_kernel_template_admissions(
 fn push_filtered_locale_suggestions(diagnostics: &mut Vec<Diagnostic>, candidates: Vec<Diagnostic>) {
     let kept = Diagnostic::filter_locale_suggestions(candidates, diagnostics);
     diagnostics.extend(kept);
+}
+
+/// The product default code locale id: the reading a source gets when nothing declares one.
+const DEFAULT_CODE_LOCALE_ID: &str = "en";
+
+/// Reader locales probed when a source that declares none fails to check or analyze.
+const DETECTABLE_LOCALE_IDS: [&str; 8] = ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
+
+/// Distinct declared keyword and type spellings the pack claims in a lexed source.
+fn declared_surface_hits(lex_result: &lexer::LexResult) -> usize {
+    lex_result.reader_keyword_latin_keys.len() + lex_result.reader_type_latin_keys.len()
+}
+
+/// The built-in locale whose keywords match `source` better than `baseline`,
+/// the pack the source was read with (`None` is the Latin reading).
+fn detect_other_locale(config: &Config, source: &str, baseline: Option<&LocalePack>) -> Option<&'static str> {
+    let baseline_hits = declared_surface_hits(&match baseline {
+        Some(pack) => lexer::lex_with_locale_pack(source, pack),
+        None => lexer::lex(source),
+    });
+    DETECTABLE_LOCALE_IDS
+        .iter()
+        .filter_map(|id| {
+            let pack = resolve_frontmatter_locale_pack(config, id).ok()?;
+            let hits = declared_surface_hits(&lexer::lex_with_locale_pack(source, &pack));
+            (hits > baseline_hits).then_some((hits, *id))
+        })
+        .max_by_key(|(hits, _)| *hits)
+        .map(|(_, id)| id)
+}
+
+fn source_reads_as_other_locale_diagnostic(
+    config: &Config,
+    name: &str,
+    body: &str,
+    baseline: Option<&LocalePack>,
+) -> Option<Diagnostic> {
+    let detected = detect_other_locale(config, body, baseline)?;
+    Some(
+        Diagnostic::warning(format!("source has no declared locale and its keywords read as '{detected}'"))
+            .with_phase(DiagnosticPhase::Tool)
+            .with_code("LOCALE002")
+            .with_args(vec![
+                DiagnosticArg::new("issue", "source_reads_as_other_locale"),
+                DiagnosticArg::new("detected", detected),
+            ])
+            .with_file(name.to_owned()),
+    )
+}
+
+/// Advisory for a source read as Latin (no reader pack) that reads better as
+/// another built-in locale. The caller decides whether a locale was declared.
+pub(crate) fn latin_source_reads_as_other_locale(config: &Config, name: &str, body: &str) -> Option<Diagnostic> {
+    source_reads_as_other_locale_diagnostic(config, name, body, None)
+}
+
+/// Advisory for a source read with the product-default `en` pack that reads
+/// better as another built-in locale; never selects a locale.
+///
+/// WHY: a resolved pack reaches the driver the same way whether it is the
+/// default or was declared by a manifest, `--locale`, or the source, so only
+/// the default `en` reading is second-guessed. The caller decides whether the
+/// source declared a locale itself.
+#[must_use]
+pub fn source_reads_as_other_locale(
+    config: &Config,
+    name: &str,
+    body: &str,
+    baseline: &LocalePack,
+) -> Option<Diagnostic> {
+    if baseline.metadata.id != DEFAULT_CODE_LOCALE_ID {
+        return None;
+    }
+    source_reads_as_other_locale_diagnostic(config, name, body, Some(baseline))
+}
+
+/// Put the detected-locale advisory ahead of the errors of a failed analysis.
+///
+/// WHY: a wrong-locale read hides behind unknown-identifier errors. The note
+/// is advisory only; it never changes the locale the source was read in.
+fn note_other_locale_reading(session: &Session, name: &str, peeled: &PeeledSource, diagnostics: &mut Vec<Diagnostic>) {
+    if peeled
+        .frontmatter
+        .as_ref()
+        .and_then(FileFrontmatter::locale_result)
+        .is_some()
+    {
+        return;
+    }
+    let Some(baseline) = session.config.locale_pack.as_ref() else {
+        return;
+    };
+    if let Some(note) = source_reads_as_other_locale(&session.config, name, peeled.body, baseline) {
+        diagnostics.insert(0, note);
+    }
 }
 
 /// Translate diagnostics whose spans were calculated against a peeled body

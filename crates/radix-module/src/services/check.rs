@@ -5,9 +5,6 @@ use crate::driver::MISSING_PARSE_PROGRAM_MESSAGE;
 
 const PERMISSIVE_DOWNGRADE_MESSAGE: &str = "permissive mode downgraded unresolved/import-driven semantic errors";
 
-/// Reader locales probed when an unlocated source fails to check.
-const DETECTABLE_LOCALE_IDS: [&str; 8] = ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
-
 struct CheckErrorTally {
     fatal_errors: usize,
     downgraded: usize,
@@ -55,10 +52,9 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     // advisory only; it never changes the locale the source was read in.
     if !result.success && code_pack.is_none() && !source_declares_locale(name, source) {
         let body = crate::driver::peel_raw_source(name, source).map_or(source, |peeled| peeled.body);
-        if let Some(detected) = detect_other_locale(body) {
-            result
-                .diagnostics
-                .insert(0, source_reads_as_other_locale_diagnostic(name, detected));
+        let config = crate::driver::Config::default();
+        if let Some(note) = crate::driver::latin_source_reads_as_other_locale(&config, name, body) {
+            result.diagnostics.insert(0, note);
         }
     }
     result
@@ -71,39 +67,6 @@ fn source_declares_locale(name: &str, source: &str) -> bool {
             crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref())
         })
         .is_some()
-}
-
-/// Distinct declared keyword and type spellings the pack claims in `source`.
-fn declared_surface_hits(lex_result: &crate::lexer::LexResult) -> usize {
-    lex_result.reader_keyword_latin_keys.len() + lex_result.reader_type_latin_keys.len()
-}
-
-/// The built-in locale whose keywords match `source` better than the Latin reading.
-fn detect_other_locale(source: &str) -> Option<&'static str> {
-    let latin_hits = declared_surface_hits(&crate::lexer::lex(source));
-    let config = crate::driver::Config::default();
-    DETECTABLE_LOCALE_IDS
-        .iter()
-        .filter_map(|id| {
-            let pack = crate::driver::resolve_frontmatter_locale_pack(&config, id).ok()?;
-            let hits = declared_surface_hits(&crate::lexer::lex_with_locale_pack(source, &pack));
-            (hits > latin_hits).then_some((hits, *id))
-        })
-        .max_by_key(|(hits, _)| *hits)
-        .map(|(_, id)| id)
-}
-
-fn source_reads_as_other_locale_diagnostic(name: &str, detected: &str) -> crate::diagnostics::Diagnostic {
-    crate::diagnostics::Diagnostic::warning(format!(
-        "source has no declared locale and its keywords read as '{detected}'"
-    ))
-    .with_phase(crate::diagnostics::DiagnosticPhase::Tool)
-    .with_code("LOCALE002")
-    .with_args(vec![
-        crate::diagnostics::DiagnosticArg::new("issue", "source_reads_as_other_locale"),
-        crate::diagnostics::DiagnosticArg::new("detected", detected),
-    ])
-    .with_file(name.to_owned())
 }
 
 fn check_source_deferring_locale(

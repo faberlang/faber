@@ -13870,3 +13870,42 @@ main {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn check_package_reports_the_locale_an_undeclared_file_reads_as() {
+    // `faber check <file>` takes the package route; the default `en` reading
+    // of Latin keywords fails, and the advisory names the locale that fits.
+    // Latin surface copied from corpus/cape/fac-omnia-dum.fab, no frontmatter.
+    let dir = test_temp_dir("undeclared-latin-file");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        "incipit {\n    varia numerus i ← 0\n    fac omnia {\n        i ← i + 1\n        nota \"iteratio §\"(i)\n        si i ≥ 3 {\n            iace \"tertia\"\n        }\n    }\n    cape err {\n        nota \"interceptum\"\n    } dum i ≺ 10\n    nota \"finis §\"(i)\n}\n",
+    )
+    .expect("write entry");
+
+    let (config, _) =
+        config_with_locale(Target::HirRust, &entry, None, None).expect("default config");
+    let diagnostics = check_with_faber_seams(&config, &entry);
+
+    let note = diagnostics
+        .iter()
+        .position(|diag| {
+            diag.code == Some("LOCALE002")
+                && diagnostic_has_issue(diag, "source_reads_as_other_locale")
+                && diagnostic_has_arg(diag, "detected", "la")
+        })
+        .unwrap_or_else(|| panic!("no detected-locale diagnostic: {diagnostics:?}"));
+    let first_error = diagnostics
+        .iter()
+        .position(Diagnostic::is_error)
+        .unwrap_or_else(|| panic!("the wrong-locale read must still fail: {diagnostics:?}"));
+    assert!(
+        note < first_error,
+        "the note must precede the errors: {diagnostics:?}"
+    );
+    assert!(
+        !diagnostics[note].is_error(),
+        "detection must not be an error"
+    );
+}
