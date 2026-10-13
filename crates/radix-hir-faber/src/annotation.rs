@@ -14,6 +14,11 @@ use radix_hir::{
 use radix_lexer::{Symbol, Token, TokenKind, lookup_keyword_spec};
 use rustc_hash::FxHashMap;
 
+// Registered here, not in `lib.rs`, so the module stays beside its subject.
+#[cfg(test)]
+#[path = "annotation_test.rs"]
+mod annotation_test;
+
 impl super::FaberCodegen<'_> {
     pub(super) fn write_hir_annotations(
         &self,
@@ -166,7 +171,7 @@ impl super::FaberCodegen<'_> {
             HirAnnotationValue::Bool(true) => writer.write(surface.contextual_keyword("verum")),
             HirAnnotationValue::Bool(false) => writer.write(surface.contextual_keyword("falsum")),
             HirAnnotationValue::Int(n) => writer.write(&n.to_string()),
-            HirAnnotationValue::Float(n) => writer.write(&n.to_string()),
+            HirAnnotationValue::Float(n) => writer.write(&self.format_float_literal(*n)),
             HirAnnotationValue::Nihil => writer.write(surface.contextual_keyword("nulla")),
             HirAnnotationValue::Type(ty) => {
                 let rendered = match (owner, field_ordinal) {
