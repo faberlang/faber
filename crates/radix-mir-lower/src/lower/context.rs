@@ -717,13 +717,19 @@ impl<'a> LoweringContextMaps<'a> {
                 continue;
             };
             for import_item in &import.items {
+                // The package-identity map is keyed by the binding this module
+                // actually binds (`import_binding`: the alias when one is
+                // spelled, else the imported name), and the resolver installs
+                // the file interface under that same binding. Look the binding
+                // up once and use it for both so an aliased import registers
+                // its implementors like the plain spelling does.
+                let binding = import_item.alias.unwrap_or(import_item.name);
                 if !package_identities
                     .imports
-                    .contains_key(self.interner.resolve(import_item.name))
+                    .contains_key(self.interner.resolve(binding))
                 {
                     continue;
                 }
-                let binding = import_item.alias.unwrap_or(import_item.name);
                 for (def_id, _, methods, type_params) in unit.resolver.imported_file_structs_for_namespace(binding) {
                     let Some((_, declared)) = contracts.iter().find(|(def, _)| *def == def_id) else {
                         continue;

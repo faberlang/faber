@@ -1,0 +1,10 @@
+import from "./shapes" shapes as s
+
+fn render(s.Figurable f) → string {
+    return f.draw()
+}
+
+main {
+    const s.Circle c ← s.Circle { radius = 25 }
+    print render(c)
+}

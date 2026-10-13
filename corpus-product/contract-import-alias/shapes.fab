@@ -1,0 +1,15 @@
+module shapes
+
+@ public
+interface Figurable {
+    fn draw() → string
+}
+
+@ public
+class Circle implements Figurable {
+    var int radius = 10
+
+    fn draw() → string {
+        return "circle §"(self.radius)
+    }
+}
