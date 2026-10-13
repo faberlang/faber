@@ -132,23 +132,37 @@ impl super::FaberCodegen<'_> {
                 self.type_to_faber(*alternate, names, surface)
             ),
 
-            Type::Tensor(elem, shape) => self.format_tensor_type(*elem, *shape, names, surface),
-
-            Type::Vector(elem, width) => format!(
-                "{}<{}, {}>",
-                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Vector)),
-                self.type_to_faber(*elem, names, surface),
-                self.format_figura(*width, surface)
+            Type::Tensor(elem, shape) => self.format_tensor_family_type(
+                TensorFamilyKind::Tensor,
+                *elem,
+                *shape,
+                names,
+                surface,
             ),
 
-            Type::Matrix(elem, shape) => format!(
-                "{}<{}, {}>",
-                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Matrix)),
-                self.type_to_faber(*elem, names, surface),
-                self.format_figura(*shape, surface)
+            Type::Vector(elem, width) => self.format_tensor_family_type(
+                TensorFamilyKind::Vector,
+                *elem,
+                *width,
+                names,
+                surface,
             ),
 
-            Type::Sparsa(elem, shape) => self.format_sparsa_type(*elem, *shape, names, surface),
+            Type::Matrix(elem, shape) => self.format_tensor_family_type(
+                TensorFamilyKind::Matrix,
+                *elem,
+                *shape,
+                names,
+                surface,
+            ),
+
+            Type::Sparsa(elem, shape) => self.format_tensor_family_type(
+                TensorFamilyKind::Sparsa,
+                *elem,
+                *shape,
+                names,
+                surface,
+            ),
 
             Type::Atomic(elem) => self.format_unary_type(
                 surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic)),
@@ -329,21 +343,15 @@ impl super::FaberCodegen<'_> {
                 self.type_to_faber(*element, names, surface),
                 self.format_figura(*capacity, surface)
             ),
-            Type::BoundedTextus { capacity } => format!(
-                "{}<{}>",
-                surface.type_surface(TypeBindingKind::Primitive(Primitive::Textus)),
-                self.format_figura(*capacity, surface)
-            ),
-            Type::BoundedAscii { capacity } => format!(
-                "{}<{}>",
-                surface.type_surface(TypeBindingKind::Primitive(Primitive::Ascii)),
-                self.format_figura(*capacity, surface)
-            ),
-            Type::BoundedOcteti { capacity } => format!(
-                "{}<{}>",
-                surface.type_surface(TypeBindingKind::Primitive(Primitive::Octeti)),
-                self.format_figura(*capacity, surface)
-            ),
+            Type::BoundedTextus { capacity } => {
+                self.bounded_primitive_head(Primitive::Textus, *capacity, surface)
+            }
+            Type::BoundedAscii { capacity } => {
+                self.bounded_primitive_head(Primitive::Ascii, *capacity, surface)
+            }
+            Type::BoundedOcteti { capacity } => {
+                self.bounded_primitive_head(Primitive::Octeti, *capacity, surface)
+            }
         }
     }
 
@@ -1161,38 +1169,20 @@ impl super::FaberCodegen<'_> {
         )
     }
 
-    fn format_tensor_type(
+    /// Canonical fallback for presentation-absent sites: the long
+    /// `tensor<f32, [2, 2]>` surface re-parses in every locale. Authored
+    /// `tf32[2, 2]` roots render through `type_to_faber_at` from their
+    /// recorded form instead; this helper is never that path.
+    fn format_tensor_family_type(
         &self,
+        kind: TensorFamilyKind,
         elem: TypeId,
-        shape: radix_types::IndexId,
+        figura: IndexId,
         names: &FxHashMap<DefId, Symbol>,
         surface: &impl KeywordSurface,
     ) -> String {
-        // Canonical fallback for presentation-absent sites: the long
-        // `tensor<f32, [2, 2]>` surface re-parses in every locale. Authored
-        // `tf32[2, 2]` roots render through `type_to_faber_at` from their
-        // recorded form instead; this helper is never that path.
-        format!(
-            "{}<{}, {}>",
-            surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor)),
-            self.type_to_faber(elem, names, surface),
-            self.format_figura(shape, surface)
-        )
-    }
-
-    fn format_sparsa_type(
-        &self,
-        elem: TypeId,
-        shape: radix_types::IndexId,
-        names: &FxHashMap<DefId, Symbol>,
-        surface: &impl KeywordSurface,
-    ) -> String {
-        format!(
-            "{}<{}, {}>",
-            surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Sparsa)),
-            self.type_to_faber(elem, names, surface),
-            self.format_figura(shape, surface)
-        )
+        let child = self.type_to_faber(elem, names, surface);
+        self.figura_tensor_head(kind, &child, figura, surface)
     }
 }
 
