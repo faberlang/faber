@@ -64,6 +64,27 @@ fn lowered_shape_reads_the_witness(builder: &FunctionBuilder<'_>) -> bool {
         })
 }
 
+/// Whether a shape dimension lowered as the symbolic `ShapeSize` term inside
+/// its `fractus → numerus` conversion — the form package finalization
+/// substitutes for a generic pin (GSF-2).
+fn lowered_shape_stays_symbolic(builder: &FunctionBuilder<'_>) -> bool {
+    builder
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .any(|statement| {
+            matches!(
+                &statement.kind,
+                MirStatementKind::RuntimeCall { call, .. }
+                    if matches!(call.intrinsic, MirIntrinsic::Convert(_))
+                        && matches!(
+                            call.args.first(),
+                            Some(MirOperand::Constant(MirConstant::ShapeSize { .. }))
+                        )
+            )
+        })
+}
+
 #[test]
 fn witnessed_size_param_extent_attaches_the_runtime_shape_operand() {
     let fixture = Fixture::new();
@@ -99,5 +120,31 @@ fn unwitnessed_size_param_extent_stays_symbolic() {
     assert!(
         !lowered_shape_reads_the_witness(&builder),
         "an unwitnessed size parameter must not read a runtime witness"
+    );
+}
+
+/// GSF-2 regression: the ordinary `lista ↦ tensor<f32, [N]>` row with the
+/// same witnessed `size` parameter must keep the symbolic `ShapeSize` term —
+/// package finalization substitutes it for a generic pin, and a run-time
+/// witness read would leak an unfinalizable `TensorShapeSize` into the pin's
+/// shape operand (the linked `[T, D]` pin bakes `[3, 4]`).
+#[test]
+fn lista_source_conversion_keeps_the_symbolic_shape_terms_despite_a_witness() {
+    let fixture = Fixture::new();
+    let mut builder = fixture.builder(true);
+
+    let block = builder.fresh_block(Span::default());
+    builder.switch_to(block);
+    let source = MirOperand::Constant(MirConstant::Int(0));
+    let shape = builder.lower_lista_to_tensor_shape_from_list(source, fixture.target, Span::default());
+    assert!(shape.is_some(), "a witnessed size-param target lowers a shape operand");
+    assert!(builder.errors.is_empty(), "lowering reported errors");
+    assert!(
+        lowered_shape_stays_symbolic(&builder),
+        "a lista-source conversion must keep the finalizable ShapeSize term"
+    );
+    assert!(
+        !lowered_shape_reads_the_witness(&builder),
+        "a lista-source conversion must not read a runtime witness"
     );
 }

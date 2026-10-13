@@ -801,6 +801,7 @@ impl FunctionBuilder<'_> {
                 expr_ty.semantic_id(),
                 Some(&expression_value),
                 expr.span,
+                false,
             )?)
         } else {
             None
@@ -4241,7 +4242,24 @@ impl FunctionBuilder<'_> {
     }
 
     fn lower_lista_to_tensor_shape(&mut self, flat: MirOperand, target: TypeId, span: Span) -> Option<MirOperand> {
-        self.lower_lista_to_tensor_shape_with_expression(flat, target, None, span)
+        // Octeti row: the byte source carries no shape and
+        // the runner cannot read a run-time shape from the target type, so a
+        // witnessed extent must be read from its tensor-axis witness at run
+        // time.
+        self.lower_lista_to_tensor_shape_with_expression(flat, target, None, span, false)
+    }
+
+    /// The lista-source shape lowering. Every symbolic axis stays a
+    /// `ShapeSize` term that package finalization substitutes for a generic
+    /// pin (GSF-2), so a witnessed `size` parameter must not preempt it with
+    /// a run-time witness read the finalizer cannot fold.
+    fn lower_lista_to_tensor_shape_from_list(
+        &mut self,
+        flat: MirOperand,
+        target: TypeId,
+        span: Span,
+    ) -> Option<MirOperand> {
+        self.lower_lista_to_tensor_shape_with_expression(flat, target, None, span, false)
     }
 
     /// A target figura that is a single `list<int>` value name is a runtime
@@ -4275,6 +4293,7 @@ impl FunctionBuilder<'_> {
         target: TypeId,
         expression_value: Option<&(u32, MirOperand)>,
         span: Span,
+        runtime_extents: bool,
     ) -> Option<MirOperand> {
         let shape_type = lista_numerus_type(self.types).or_else(|| {
             self.errors.push(MirError::unsupported(
@@ -4327,7 +4346,9 @@ impl FunctionBuilder<'_> {
                             direct
                         } else {
                             let scalar =
-                                if self.body_index_contains_runtime_extent(dimension, &mut FxHashSet::default()) {
+                                if runtime_extents
+                                    && self.body_index_contains_runtime_extent(dimension, &mut FxHashSet::default())
+                                {
                                     let mut shape_arguments = Vec::new();
                                     let expression = match self.lower_shape_expr(
                                         dimension,
