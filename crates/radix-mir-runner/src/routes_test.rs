@@ -44,3 +44,18 @@ fn solum_funde_round_trips_a_nested_byte_list() {
     std::fs::remove_file(&path).expect("remove scratch file");
     assert_eq!(read, Ok(vec![Value::Octeti(data.to_vec())]));
 }
+
+#[test]
+fn solum_hauri_reply_reaches_consolum_funde() {
+    let path = std::env::temp_dir().join(format!("radix-routes-chain-{}.bin", std::process::id()));
+    let path_text = path.to_string_lossy().into_owned();
+    let data = b"chain\n".to_vec();
+    let opener = lista(vec![Value::Str(path_text.clone()), byte_list(&data)]);
+    assert_eq!(serve("solum:funde", &opener), Ok(Vec::new()));
+    let read = serve("solum:hauri", &Value::Str(path_text)).expect("read bytes");
+    std::fs::remove_file(&path).expect("remove scratch file");
+    assert_eq!(read, vec![Value::Octeti(data)]);
+    // The `solum.read_bytes` reply value is accepted by `consolum` write as a
+    // whole-opener byte value, with no re-wrapping or text round trip.
+    assert_eq!(serve("consolum:funde", &read[0]), Ok(Vec::new()));
+}
