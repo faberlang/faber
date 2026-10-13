@@ -7,11 +7,12 @@
 //! function or, after the merge shift, collides with another function's id.
 
 use super::*;
-use radix_module::lexer::Span;
-use radix_module::mir::{
-    MirDeviceFunctionMetadata, MirDeviceRole, MirFunctionOrigin, MirFunctionVisibility,
-    MirKernelShaderStage, MirSyntheticFunctionIdentity,
+use radix_mir::device::MirDeviceFunctionMetadata;
+use radix_mir::{
+    MirDeviceRole, MirFunctionOrigin, MirFunctionVisibility, MirKernelShaderStage,
+    MirSyntheticFunctionIdentity,
 };
+use radix_module::lexer::Span;
 use radix_types::{NumericWidth, TypeTable};
 
 /// Ordinal carried by the row of the kept kernel.
@@ -76,7 +77,7 @@ fn library(
         generic_params: Vec::new(),
         tensor_edge_policy_metadata: MirTensorEdgePolicyMetadata::default(),
         device_function_metadata,
-        display_tokens: radix_module::mir::MirDisplayTokens::default(),
+        display_tokens: radix_mir::MirDisplayTokens::default(),
     }
 }
 

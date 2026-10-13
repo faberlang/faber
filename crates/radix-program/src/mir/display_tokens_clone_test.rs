@@ -4,12 +4,13 @@
 //! Two distinct token sets (Latin, English) are used so a swap would show.
 
 use super::*;
-use radix_module::lexer::Span;
-use radix_module::mir::{
-    MirDeviceFunctionMetadataMap, MirDiagnosticKind, MirDisplayTokens, MirIntrinsic,
-    MirMonomorphization, MirMonomorphizationKey, MirRuntimeCall, MirStatement, MirStatementKind,
-    MirTensorEdgePolicyMetadata,
+use radix_mir::device::MirDeviceFunctionMetadataMap;
+use radix_mir::{
+    MirDiagnosticKind, MirDisplayTokens, MirIntrinsic, MirMonomorphization, MirMonomorphizationKey,
+    MirRuntimeCall, MirStatement, MirStatementKind,
 };
+use radix_mir_lower::lower::MirTensorEdgePolicyMetadata;
+use radix_module::lexer::Span;
 use radix_module::runtime_contract::display_tokens::DisplayTokens;
 use radix_types::{NumericWidth, Primitive, TypeTable};
 

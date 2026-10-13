@@ -18,7 +18,7 @@
 //! closures always linked; the controls below pin that seam.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 fn write_self_provider_package(
     dir: &Path,
@@ -193,7 +193,7 @@ fn run_closure_env_package_tests(package_root: &Path, stdlib_home: &Path) -> Vec
         |validated, function_ids| {
             let mut host = BufferHost::default();
             for function_id in function_ids.values() {
-                radix_module::mir::run_function(validated, *function_id, &mut host)
+                radix_mir_runner::run_function(validated, *function_id, &mut host)
                     .expect("closure-env proba test must execute on the test-link lane");
             }
             host.stdout_lines

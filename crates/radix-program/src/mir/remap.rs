@@ -6,7 +6,7 @@ use super::{
     MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirValue,
     MirValueKind, Symbol,
 };
-use radix_module::mir::{MirFilumReduceOp, MirIntrinsic, MirShapeExpr};
+use radix_mir::{MirFilumReduceOp, MirIntrinsic, MirShapeExpr};
 
 /// Remap a name symbol from the lowering interner into the merged interner.
 /// A `Symbol` always means text in its named interner (ARCH2-2), so the

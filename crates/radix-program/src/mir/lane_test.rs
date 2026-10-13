@@ -14,9 +14,9 @@
 //! 7df48a51).
 
 use super::*;
+use radix_mir::{MirConversion, MirConversionFlavor};
+use radix_mir_runner::BufferHost;
 use radix_module::lexer::Span;
-use radix_module::mir::BufferHost;
-use radix_module::mir::{MirConversion, MirConversionFlavor};
 use radix_module::semantic::Resolver;
 use std::path::PathBuf;
 
@@ -82,7 +82,7 @@ fn package_mir_rewrites_imported_type_check_targets() {
             kind: MirStatementKind::RuntimeCall {
                 destination: None,
                 call: MirRuntimeCall {
-                    intrinsic: MirIntrinsic::TypeCheck(radix_module::mir::MirTypeCheckOp {
+                    intrinsic: MirIntrinsic::TypeCheck(radix_mir::MirTypeCheckOp {
                         positive,
                         ty: MirType::semantic(TypeId(2)),
                     }),
@@ -466,7 +466,7 @@ fn prove_linked_bodies() {
             );
             let mut host = BufferHost::default();
             for function_id in function_ids.values() {
-                radix_module::mir::run_function(validated, *function_id, &mut host)
+                radix_mir_runner::run_function(validated, *function_id, &mut host)
                     .expect("linked Faber bodies must execute");
             }
             host.stdout_lines

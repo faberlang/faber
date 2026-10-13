@@ -8,7 +8,7 @@
 //! observes the declared `[T, D]` shape. Non-REF-01 dimensions (3, 4).
 
 use super::*;
-use radix_module::mir::{
+use radix_mir::{
     MirAggregateFields, MirAggregateItem, MirCollectionOp, MirConstant, MirIntrinsic, MirOperand,
     MirPlaceBase, MirStatementKind,
 };
@@ -98,7 +98,7 @@ fn literal_dims(
 }
 
 /// The instantiated `gather` imported at the concrete `[3, 4]` signature.
-fn gather_instance<'a>(lowered: &'a LoweredMirUnit<'_>) -> &'a radix_module::mir::MirFunction {
+fn gather_instance<'a>(lowered: &'a LoweredMirUnit<'_>) -> &'a radix_mir::MirFunction {
     let types = lowered.validated.validation().types.as_table();
     lowered
         .validated
@@ -125,7 +125,7 @@ fn gather_instance<'a>(lowered: &'a LoweredMirUnit<'_>) -> &'a radix_module::mir
 /// One materialized shape-operand dimension: a constant, or a temp whose
 /// defining runtime conversion carries the constant (the shape-size term
 /// after package finalization).
-fn operand_dim(function: &radix_module::mir::MirFunction, operand: &MirOperand) -> Option<i64> {
+fn operand_dim(function: &radix_mir::MirFunction, operand: &MirOperand) -> Option<i64> {
     match operand {
         MirOperand::Constant(MirConstant::Int(value)) => Some(*value),
         MirOperand::Constant(MirConstant::Float(value)) if value.fract() == 0.0 => {
@@ -157,7 +157,7 @@ fn operand_dim(function: &radix_module::mir::MirFunction, operand: &MirOperand) 
 
 /// The dims of the `TensorFromFlat` shape operand of the flat pin path, as
 /// materialized in the linked instance.
-fn tensor_from_flat_shape_dims(function: &radix_module::mir::MirFunction) -> Option<Vec<i64>> {
+fn tensor_from_flat_shape_dims(function: &radix_mir::MirFunction) -> Option<Vec<i64>> {
     let shape_arg = function
         .blocks
         .iter()
@@ -241,7 +241,7 @@ fn package_mir_runs_symbolic_rank_two_pin_at_declared_shape() {
     let entry = write_pin_package(dir.as_ref(), PIN_MAIN);
     let config = Config::default();
 
-    let mut host = radix_module::mir::BufferHost::default();
+    let mut host = radix_mir_runner::BufferHost::default();
     run_package_mir(
         &config,
         &entry,
@@ -263,7 +263,7 @@ fn package_mir_symbolic_pin_wrong_count_fails_closed() {
     let entry = write_pin_package(dir.as_ref(), PIN_MAIN_WRONG_COUNT);
     let config = Config::default();
 
-    let mut host = radix_module::mir::BufferHost::default();
+    let mut host = radix_mir_runner::BufferHost::default();
     let errors = run_package_mir(
         &config,
         &entry,

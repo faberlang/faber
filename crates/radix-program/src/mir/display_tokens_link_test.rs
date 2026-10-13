@@ -68,7 +68,7 @@ fn linked_modules_remap_display_token_ids_so_each_function_keeps_its_entry() {
                         .any(|statement| {
                             matches!(
                                 &statement.kind,
-                                radix_module::mir::MirStatementKind::RuntimeCall { call, .. }
+                                radix_mir::MirStatementKind::RuntimeCall { call, .. }
                                     if matches!(call.intrinsic, MirIntrinsic::Diagnostic(_))
                             )
                         })
@@ -82,7 +82,7 @@ fn linked_modules_remap_display_token_ids_so_each_function_keeps_its_entry() {
             for id in printing {
                 assert_eq!(
                     tokens.by_function.get(&id),
-                    Some(&radix_module::mir::DisplayTokensId(0)),
+                    Some(&radix_mir::DisplayTokensId(0)),
                     "{id:?}"
                 );
             }
@@ -100,7 +100,7 @@ fn printing_words(lowered: &LoweredMirUnit<'_>) -> Vec<(MirFunctionId, String)> 
         .program()
         .functions
         .iter()
-        .filter(|function| radix_module::mir::holds_print_site(function))
+        .filter(|function| radix_mir_lower::lower::holds_print_site(function))
         .map(|function| {
             let words = tokens
                 .for_function(function.id)

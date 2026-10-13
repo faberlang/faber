@@ -299,10 +299,7 @@ fn library_import_composes_consumer_local_kernel_caller() {
         .values()
         .find(|node| node.is_entry)
         .map(|node| {
-            radix_module::mir::device_entry_roles_from_hir(
-                &node.analysis.hir,
-                &node.analysis.interner,
-            )
+            radix_mir::device_entry_roles_from_hir(&node.analysis.hir, &node.analysis.interner)
         })
         .unwrap_or_default();
 
@@ -357,19 +354,16 @@ fn library_import_composes_consumer_local_kernel_caller() {
                 ),
                 "the caller's original Return terminator must survive the splice: {probe:#?}"
             );
-            let merged = radix_module::mir::merge_imported_entry_roles(
+            let merged = radix_mir::device::merge_imported_entry_roles(
                 local_roles.clone(),
                 &facts,
                 lowered.validated.program(),
             )
             .expect("imported entry facts must merge with the consumer-local roles");
-            let mut device = radix_module::mir::MirDeviceContext::from_hir_roles(merged);
+            let mut device = radix_mir::MirDeviceContext::from_hir_roles(merged);
             device.attach_program(lowered.validated.program());
             assert_eq!(
-                radix_module::mir::classify_device_safe_for_target_entry(
-                    &lowered.validated,
-                    &device
-                ),
+                radix_mir::classify_device_safe_for_target_entry(&lowered.validated, &device),
                 radix_types::Lowerability::Capable,
                 "the single-block composed program must pass the shared device-safe gate"
             );
@@ -407,10 +401,7 @@ fn sibling_import_composes_consumer_local_kernel_caller() {
         .values()
         .find(|node| node.is_entry)
         .map(|node| {
-            radix_module::mir::device_entry_roles_from_hir(
-                &node.analysis.hir,
-                &node.analysis.interner,
-            )
+            radix_mir::device_entry_roles_from_hir(&node.analysis.hir, &node.analysis.interner)
         })
         .unwrap_or_default();
 
@@ -473,19 +464,16 @@ fn sibling_import_composes_consumer_local_kernel_caller() {
                 ),
                 "the caller's original Return terminator must survive the splice: {probe:#?}"
             );
-            let merged = radix_module::mir::merge_imported_entry_roles(
+            let merged = radix_mir::device::merge_imported_entry_roles(
                 local_roles.clone(),
                 &imported_entry_facts(lowered),
                 lowered.validated.program(),
             )
             .expect("the consumer-local role map must merge with the sibling registration facts");
-            let mut device = radix_module::mir::MirDeviceContext::from_hir_roles(merged);
+            let mut device = radix_mir::MirDeviceContext::from_hir_roles(merged);
             device.attach_program(lowered.validated.program());
             assert_eq!(
-                radix_module::mir::classify_device_safe_for_target_entry(
-                    &lowered.validated,
-                    &device
-                ),
+                radix_mir::classify_device_safe_for_target_entry(&lowered.validated, &device),
                 radix_types::Lowerability::Capable,
                 "the single-block composed program must pass the shared device-safe gate"
             );

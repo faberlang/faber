@@ -15,7 +15,7 @@
 //! that proof); this lane pins the package transplant/link seam only.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 fn write_const_member_package(
     dir: &Path,
@@ -106,7 +106,7 @@ fn run_const_member_package_tests(src: &Path) -> Vec<String> {
         |validated, function_ids| {
             let mut host = BufferHost::default();
             for function_id in function_ids.values() {
-                radix_module::mir::run_function(validated, *function_id, &mut host)
+                radix_mir_runner::run_function(validated, *function_id, &mut host)
                     .expect("const-member proba test must execute on the test-link lane");
             }
             host.stdout_lines

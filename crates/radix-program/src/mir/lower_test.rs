@@ -13,7 +13,7 @@ fn remapped_validation_keeps_colliding_struct_and_variant_consumers() {
 
     let source_types = TypeTable::new();
     let number = source_types.primitive(Primitive::Numerus);
-    let mut source = radix_module::mir::MirValidationContext::new(&source_types);
+    let mut source = radix_mir::MirValidationContext::new(&source_types);
     let mut source_interner = Interner::new();
     let struct_field = source_interner.intern("struct_field");
     let variant_field = source_interner.intern("variant_field");
@@ -84,7 +84,7 @@ fn rewrite_validation_def_ids_moves_source_local_fields_off_remapped_dests() {
 
     let types = TypeTable::new();
     let text = types.primitive(Primitive::Textus);
-    let mut context = radix_module::mir::MirValidationContext::new(&types);
+    let mut context = radix_mir::MirValidationContext::new(&types);
     let mut interner = Interner::new();
     let message = interner.intern("message");
     context.variant_fields.entry(i32_source).or_default();
@@ -153,7 +153,7 @@ fn rewrite_lowered_type_ids_applies_remapped_validation_off_rewritten_keys() {
 
     let types = TypeTable::new();
     let text = types.primitive(Primitive::Textus);
-    let mut source = radix_module::mir::MirValidationContext::new(&types);
+    let mut source = radix_mir::MirValidationContext::new(&types);
     let mut interner = Interner::new();
     let message = interner.intern("message");
     source.variant_fields.entry(i32_source).or_default();
@@ -171,7 +171,7 @@ fn rewrite_lowered_type_ids_applies_remapped_validation_off_rewritten_keys() {
         .enum_variants
         .insert(dtype_error, vec![unknown_name_source]);
 
-    let validated = radix_module::mir::ValidatedMir::new(MirProgram::new(), source.clone())
+    let validated = radix_mir::ValidatedMir::new(MirProgram::new(), source.clone())
         .expect("sibling dtype unit validates before the rewrite");
     let lowered = LoweredMirUnit {
         interner: Interner::new(),

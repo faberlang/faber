@@ -76,7 +76,7 @@ fn run_stdout(name: &str, util: Option<&str>, main_source: &str) -> Vec<String> 
     let dir = crate::test_support::test_temp_dir(name);
     let entry = write_package(dir.as_ref(), util, main_source);
     let config = Config::default();
-    let mut host = radix_module::mir::BufferHost::default();
+    let mut host = radix_mir_runner::BufferHost::default();
     run_package_mir(
         &config,
         &entry,

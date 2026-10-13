@@ -124,9 +124,9 @@ fn literal_shape(types: &radix_types::TypeTable, index: radix_types::IndexId) ->
 }
 
 fn registration_of<'a>(
-    lowered: &'a radix_module::mir::LoweredMirUnit,
+    lowered: &'a radix_mir_lower::lower::LoweredMirUnit,
     verb: &str,
-) -> &'a radix_module::mir::ImportedDeviceRegistration {
+) -> &'a radix_mir_lower::lower::ImportedDeviceRegistration {
     lowered
         .imported_device_registrations
         .iter()
@@ -251,19 +251,16 @@ fn imported_twin_instance_records_key_route_registration_and_visibility() {
                 .device_function_metadata
                 .get(&twin_add.function)
                 .expect("the registered public instance must carry source metadata");
-            assert_eq!(metadata.role, radix_module::mir::MirDeviceRole::Kernel);
+            assert_eq!(metadata.role, radix_mir::MirDeviceRole::Kernel);
             assert_eq!(
                 metadata.shader_stage,
-                radix_module::mir::MirKernelShaderStage::Compute
+                radix_mir::MirKernelShaderStage::Compute
             );
             assert_eq!(
                 metadata.visibility,
-                radix_module::mir::MirFunctionVisibility::Public
+                radix_mir::MirFunctionVisibility::Public
             );
-            assert_eq!(
-                metadata.origin,
-                radix_module::mir::MirFunctionOrigin::Source
-            );
+            assert_eq!(metadata.origin, radix_mir::MirFunctionOrigin::Source);
             assert!(
                 lowered
                     .generic_templates

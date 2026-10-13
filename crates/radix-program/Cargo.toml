@@ -28,6 +28,13 @@ toml = "1.1.2"
 # RP5: the moved package-MIR/FMIR subset consumes the FMIR codec and schema
 # types directly (image construction/loading, route decisions, test support).
 radix-mir-fmir = { path = "../radix-mir-fmir", optional = true }
+# Phase D: package MIR names its MIR core, HIR→MIR lowering, runner and LLVM
+# emit surfaces at their owning leaf crates instead of through
+# `radix_module::mir`. Each is admitted by the same feature that admits the
+# matching radix-module leaf, so target-only lanes keep their small graph.
+radix-mir = { path = "../radix-mir", optional = true }
+radix-mir-lower = { path = "../radix-mir-lower", optional = true }
+radix-mir-runner = { path = "../radix-mir-runner", optional = true }
 # RP5: the moved package-MIR linker works with the shared semantic TypeId
 # surface directly (mirroring faber's own direct radix-types dependency).
 radix-types = { path = "../radix-types" }
@@ -47,7 +54,7 @@ tempfile = "3"
 [features]
 default = ["full-targets"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "runner"]
-package-mir = ["radix-module/mir-core", "radix-module/runner", "dep:radix-mir-fmir"]
+package-mir = ["radix-module/mir-core", "radix-module/runner", "dep:radix-mir-fmir", "dep:radix-mir", "dep:radix-mir-lower", "dep:radix-mir-runner"]
 hir-faber = ["radix-module/hir-faber"]
 hir-fhir = ["radix-module/hir-fhir", "dep:handroll"]
 mir-fmir = ["package-mir", "radix-module/mir-fmir"]

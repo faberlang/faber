@@ -2,8 +2,8 @@
 //! issue and secondary definition span.
 
 use super::diag::mir_error_diag;
+use radix_mir_lower::lower::MirError;
 use radix_module::lexer::Span;
-use radix_module::mir::MirError;
 use std::path::PathBuf;
 
 fn error(span: Span, definition_span: Option<Span>) -> MirError {

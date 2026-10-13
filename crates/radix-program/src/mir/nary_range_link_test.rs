@@ -5,9 +5,10 @@
 
 use super::*;
 use crate::mir::{run_package_mir, with_interpreted_lowered_package_mir};
+use radix_mir::{MirFunctionId, dump_program};
+use radix_mir_lower::lower::LoweredMirUnit;
+use radix_mir_runner::BufferHost;
 use radix_module::driver::Config;
-use radix_module::mir::LoweredMirUnit;
-use radix_module::mir::{BufferHost, MirFunctionId, dump_program};
 use std::fs;
 
 const RANGE_UTIL: &str = "@ public\nfn row_max() → int {\n    return 2\n}\n\n@ public\nfn col_max() → int {\n    return 3\n}\n\n@ public\nfn emit_cell(int v) → int {\n    return v\n}\n";

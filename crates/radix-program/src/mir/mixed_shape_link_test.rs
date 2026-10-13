@@ -100,11 +100,11 @@ fn prove_mixed_shape_family() {
 
 fn tensor_shape_of_first_param(
     types: &radix_types::TypeTable,
-    ty: radix_module::mir::MirType,
+    ty: radix_mir::MirType,
 ) -> Option<Vec<i64>> {
     match types.get(ty.semantic_id()) {
         Type::Array(elem) | Type::Set(elem) => {
-            tensor_shape_of_first_param(types, radix_module::mir::MirType::semantic(*elem))
+            tensor_shape_of_first_param(types, radix_mir::MirType::semantic(*elem))
         }
         Type::Tensor(_, shape) => literal_dims(types, *shape),
         _ => None,

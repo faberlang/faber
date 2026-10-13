@@ -1,7 +1,8 @@
 use super::*;
-use radix_module::mir::{
-    MirDeviceFunctionMetadata, MirDeviceRole, MirFunctionOrigin, MirFunctionVisibility,
-    MirKernelShaderStage, MirSyntheticFunctionIdentity,
+use radix_mir::device::MirDeviceFunctionMetadata;
+use radix_mir::{
+    MirDeviceRole, MirFunctionOrigin, MirFunctionVisibility, MirKernelShaderStage,
+    MirSyntheticFunctionIdentity,
 };
 
 fn synthetic_row(parent: u32, ordinal: u32) -> MirDeviceFunctionMetadata {

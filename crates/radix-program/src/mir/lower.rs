@@ -23,8 +23,10 @@ use super::{
     rewrite_generic_param_sources, rewrite_program_sources, rewrite_templates_sources,
     source_nominal_names, with_library_cached_analysis_mut,
 };
+use radix_mir::MirFunctionSignature;
+use radix_mir::device::MirDeviceFunctionMetadataMap;
 use radix_module::file_interface::FileInterface;
-use radix_module::mir::{KernelLowering, MirDeviceFunctionMetadataMap, MirFunctionSignature};
+use radix_types::KernelLowering;
 
 /// Struct/enum/function validation metadata remapped from a sibling or
 /// library unit into the entry's `DefId` / `TypeId` / Symbol space.
@@ -57,8 +59,8 @@ impl RemappedValidation {
     /// Merged struct metadata for the package generic instantiator: field
     /// types and generic param names let it type projected call arguments
     /// (`layer.ln1` on an applied nominal) while binding witnesses.
-    pub(super) fn struct_metadata(&self) -> radix_module::mir::PackageStructMetadata<'_> {
-        radix_module::mir::PackageStructMetadata {
+    pub(super) fn struct_metadata(&self) -> radix_mir_lower::lower::PackageStructMetadata<'_> {
+        radix_mir_lower::lower::PackageStructMetadata {
             struct_fields: &self.struct_fields,
             struct_type_params: &self.struct_type_params,
         }
@@ -70,7 +72,7 @@ impl RemappedValidation {
     /// of an entry-owned class the same as one of a linked unit's class.
     pub(super) fn joined_with_context(
         &self,
-        context: &radix_module::mir::MirValidationContext<'_>,
+        context: &radix_mir::MirValidationContext<'_>,
     ) -> Self {
         let mut joined = Self::default();
         for (def, fields) in &context.struct_fields {
@@ -139,7 +141,7 @@ impl RemappedValidation {
         }
     }
 
-    fn apply(&self, context: &mut radix_module::mir::MirValidationContext<'_>) {
+    fn apply(&self, context: &mut radix_mir::MirValidationContext<'_>) {
         for (def, fields) in &self.struct_fields {
             context
                 .struct_fields
@@ -234,7 +236,7 @@ fn complete_def_remap(
     }
 }
 
-fn source_nominal_defs(source: &radix_module::mir::MirValidationContext<'_>) -> Vec<DefId> {
+fn source_nominal_defs(source: &radix_mir::MirValidationContext<'_>) -> Vec<DefId> {
     let mut defs: Vec<DefId> = source.struct_fields.keys().copied().collect();
     defs.extend(source.enum_variants.keys().copied());
     defs.extend(source.variant_parents.values().copied());
@@ -446,7 +448,7 @@ fn collect_place_variant_defs(place: &MirPlace, variants: &mut Vec<DefId>) {
     }
 }
 
-fn source_variant_defs(source: &radix_module::mir::MirValidationContext<'_>) -> Vec<DefId> {
+fn source_variant_defs(source: &radix_mir::MirValidationContext<'_>) -> Vec<DefId> {
     let mut defs: Vec<DefId> = source.variant_parents.keys().copied().collect();
     defs.extend(source.variant_fields.keys().copied());
     defs.sort_by_key(|def| def.0);
@@ -510,7 +512,7 @@ fn remap_metadata_type(ty: MirType, type_rewrites: &[(TypeId, TypeId)]) -> MirTy
 }
 
 fn collect_remapped_validation(
-    source: &radix_module::mir::MirValidationContext<'_>,
+    source: &radix_mir::MirValidationContext<'_>,
     source_interner: &Interner,
     entry_interner: &mut Interner,
     type_rewrites: &[(TypeId, TypeId)],
@@ -580,7 +582,7 @@ fn collect_remapped_validation(
 }
 
 fn remap_struct_and_variant_defs(
-    source: &radix_module::mir::MirValidationContext<'_>,
+    source: &radix_mir::MirValidationContext<'_>,
     source_interner: &Interner,
     entry_interner: &mut Interner,
     type_rewrites: &[(TypeId, TypeId)],
@@ -816,8 +818,7 @@ pub(super) fn lower_package_units<'a>(
     // merged program's source DefIds. Collected at each unit's `lower_unit`
     // site while its analysis is freely borrowable; consumed by the
     // package-seam composition as the leaf-tail union with the routes.
-    let mut consumer_device_roles: HashMap<DefId, radix_module::mir::MirDeviceRole> =
-        HashMap::default();
+    let mut consumer_device_roles: HashMap<DefId, radix_mir::MirDeviceRole> = HashMap::default();
     let mut consumer_launch_entries: HashSet<DefId> = HashSet::default();
     // Mutable copy of the link sources: the library-lowering pass extends it
     // with synthetic ids for auto-generated sub-companion sources.
@@ -1141,7 +1142,7 @@ pub(super) fn lower_package_units<'a>(
                 };
                 let mut lowered = match lower_analyzed_unit(
                     analysis.application_view(),
-                    radix_module::mir::MirLoweringOptions {
+                    radix_mir_lower::lower::MirLoweringOptions {
                         kernel_lowering,
                         ..Default::default()
                     },
@@ -1435,9 +1436,9 @@ pub(super) fn lower_package_units<'a>(
     // functions, so the composition inputs stay empty.
     let imported_device_index = match kernel_lowering {
         KernelLowering::Device => {
-            radix_module::mir::ImportedDeviceIndex::from_routes(imported_device_routes.clone())
+            radix_mir_lower::lower::ImportedDeviceIndex::from_routes(imported_device_routes.clone())
         }
-        KernelLowering::Host => radix_module::mir::ImportedDeviceIndex::default(),
+        KernelLowering::Host => radix_mir_lower::lower::ImportedDeviceIndex::default(),
     };
     let mut planning_program = merged.validated.program().clone();
     let mut planning_environments = merged.closure_environments.clone();
@@ -2248,7 +2249,7 @@ pub(super) fn imported_dispatch_type_rewrites(
 
 fn validation_diagnostics(
     diagnostic_path: &Path,
-    errors: Vec<radix_module::mir::MirValidationError>,
+    errors: Vec<radix_mir::MirValidationError>,
 ) -> Vec<Diagnostic> {
     errors
         .into_iter()
@@ -2257,7 +2258,7 @@ fn validation_diagnostics(
 }
 
 fn rewrite_validation_type_ids(
-    context: &mut radix_module::mir::MirValidationContext<'_>,
+    context: &mut radix_mir::MirValidationContext<'_>,
     rewrites: &[(TypeId, TypeId)],
 ) {
     for signature in context.functions.values_mut() {
@@ -2306,7 +2307,7 @@ fn rewrite_validation_type_ids(
 /// fails as "named aggregate is missing required field". Rewrite the keys
 /// first so leftover source-local metadata cannot alias a remapped dest.
 fn rewrite_validation_def_ids(
-    context: &mut radix_module::mir::MirValidationContext<'_>,
+    context: &mut radix_mir::MirValidationContext<'_>,
     variant_remap: &HashMap<DefId, DefId>,
     struct_remap: &HashMap<DefId, DefId>,
 ) {
@@ -2361,7 +2362,7 @@ fn rewrite_validation_def_ids(
 /// pre-rewrite registry carried in through `into_parts` must be replaced
 /// before re-validation.
 fn sync_context_closure_environments(
-    context: &mut radix_module::mir::MirValidationContext<'_>,
+    context: &mut radix_mir::MirValidationContext<'_>,
     environments: &[MirClosureEnvironment],
 ) {
     context.closure_environments = environments
@@ -2404,7 +2405,7 @@ pub(super) fn rewrite_lowered_type_ids<'a>(
     rewrite_validation_def_ids(&mut context, variant_remap, struct_remap);
     remapped.apply(&mut context);
     sync_context_closure_environments(&mut context, &lowered.closure_environments);
-    lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
+    lowered.validated = radix_mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(lowered)
 }
@@ -2425,20 +2426,19 @@ fn rewrite_lowered_shape_size_indices<'a>(
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     let (mut program, context) = lowered.validated.into_parts();
     let mut rewrite_function = |function: &mut MirFunction| {
-        let completed =
-            radix_module::mir::generic::rewrite_function_constants(function, &mut |constant| {
-                let MirConstant::ShapeSize { shape, .. } = constant else {
-                    return true;
-                };
-                *shape = import_shape_size_index(
-                    source_types,
-                    target_types,
-                    *shape,
-                    param_symbols,
-                    record_field_symbols,
-                );
-                true
-            });
+        let completed = radix_mir::generic::rewrite_function_constants(function, &mut |constant| {
+            let MirConstant::ShapeSize { shape, .. } = constant else {
+                return true;
+            };
+            *shape = import_shape_size_index(
+                source_types,
+                target_types,
+                *shape,
+                param_symbols,
+                record_field_symbols,
+            );
+            true
+        });
         // The callback never aborts the walk.
         debug_assert!(completed);
     };
@@ -2466,7 +2466,7 @@ fn rewrite_lowered_shape_size_indices<'a>(
     let target_snapshot: &'static TypeTable = Box::leak(Box::new(target_snapshot));
     let mut context = context.with_types(target_snapshot);
     remapped.apply(&mut context);
-    lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
+    lowered.validated = radix_mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(lowered)
 }
@@ -2619,9 +2619,9 @@ fn remap_lowered_program_text_symbols<'a>(
             .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
         context = context.with_owned_types(remapped_types);
     }
-    context.interner = radix_module::mir::MirInterner::Owned(std::sync::Arc::new(target.clone()));
+    context.interner = radix_mir::MirInterner::Owned(std::sync::Arc::new(target.clone()));
     sync_context_closure_environments(&mut context, &lowered.closure_environments);
-    lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
+    lowered.validated = radix_mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(lowered)
 }
@@ -2659,7 +2659,7 @@ fn rewrite_lowered_program_sources<'a>(
             .map(|(def, identity)| (rewrite(def), identity))
             .collect();
     sync_context_closure_environments(&mut context, &lowered.closure_environments);
-    lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
+    lowered.validated = radix_mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(lowered)
 }
@@ -2736,10 +2736,10 @@ fn rewrite_generic_identity<'a>(
 }
 
 fn rewrite_tensor_edge_type_identity(
-    identity: &mut radix_module::mir::MirTensorEdgeTypeIdentity,
+    identity: &mut radix_mir_lower::lower::MirTensorEdgeTypeIdentity,
     rewrites: &HashMap<DefId, DefId>,
 ) {
-    use radix_module::mir::{MirTensorEdgeAppliedArg, MirTensorEdgeTypeIdentity};
+    use radix_mir_lower::lower::{MirTensorEdgeAppliedArg, MirTensorEdgeTypeIdentity};
 
     match identity {
         MirTensorEdgeTypeIdentity::Struct(definition)
@@ -2801,7 +2801,7 @@ fn collect_consumer_device_facts(
     analysis: &radix_module::driver::AnalyzedModule,
     unit_path: &Path,
     source_rewrites: Option<&SourceRewrites>,
-    device_roles: &mut HashMap<DefId, radix_module::mir::MirDeviceRole>,
+    device_roles: &mut HashMap<DefId, radix_mir::MirDeviceRole>,
     launch_entries: &mut HashSet<DefId>,
 ) {
     let remap = |def: DefId| -> DefId {
@@ -2809,13 +2809,11 @@ fn collect_consumer_device_facts(
             .and_then(|rewrites| rewrites.get(&(unit_path.to_path_buf(), def)).copied())
             .unwrap_or(def)
     };
-    for (def, role) in radix_module::mir::device_roles_from_hir(&analysis.hir) {
+    for (def, role) in radix_mir::device_roles_from_hir(&analysis.hir) {
         device_roles.insert(remap(def), role);
     }
-    for (def, role) in
-        radix_module::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner)
-    {
-        if role == radix_module::mir::MirDeviceRole::Kernel {
+    for (def, role) in radix_mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner) {
+        if role == radix_mir::MirDeviceRole::Kernel {
             launch_entries.insert(remap(def));
         }
     }
@@ -2832,12 +2830,12 @@ fn joined_imported_device_routes<'routes>(
     unit_routes: impl IntoIterator<
         Item = (
             &'routes DefId,
-            &'routes Vec<radix_module::mir::ImportedDeviceRoute>,
+            &'routes Vec<radix_mir_lower::lower::ImportedDeviceRoute>,
         ),
     >,
     links: &PackageMirLinks,
     caller_path: &Path,
-) -> Vec<(DefId, radix_module::mir::ImportedDeviceRoute)> {
+) -> Vec<(DefId, radix_mir_lower::lower::ImportedDeviceRoute)> {
     let mut joined = Vec::new();
     for (import_def_id, routes) in unit_routes {
         for route in routes {
@@ -2855,8 +2853,8 @@ fn joined_imported_device_routes<'routes>(
 }
 
 fn merge_imported_device_registrations(
-    target: &mut Vec<radix_module::mir::ImportedDeviceRegistration>,
-    incoming: Vec<radix_module::mir::ImportedDeviceRegistration>,
+    target: &mut Vec<radix_mir_lower::lower::ImportedDeviceRegistration>,
+    incoming: Vec<radix_mir_lower::lower::ImportedDeviceRegistration>,
 ) {
     for registration in incoming {
         if target
@@ -2904,11 +2902,11 @@ fn shift_templates(templates: &mut [MirFunction], offset: u32) {
 fn instantiate_package_generics<'a>(
     mut merged: LoweredMirUnit<'a>,
     templates: Vec<MirFunction>,
-    generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
+    generic_params: Vec<(DefId, Vec<radix_mir_lower::lower::MirGenericParam>)>,
     diagnostic_path: &Path,
     extra_validation: Option<&RemappedValidation>,
-    imported_devices: radix_module::mir::ImportedDeviceIndex,
-    consumer_device_roles: HashMap<DefId, radix_module::mir::MirDeviceRole>,
+    imported_devices: radix_mir_lower::lower::ImportedDeviceIndex,
+    consumer_device_roles: HashMap<DefId, radix_mir::MirDeviceRole>,
     consumer_launch_entries: HashSet<DefId>,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     if templates.is_empty() {
@@ -2929,7 +2927,7 @@ fn instantiate_package_generics<'a>(
     let joined_validation =
         extra_validation.map(|validation| validation.joined_with_context(&prior_context));
     let (extra, registrations) =
-        radix_module::mir::instantiate_merged_generic_calls_with_tensor_edge_policy(
+        radix_mir_lower::lower::instantiate_merged_generic_calls_with_tensor_edge_policy(
             &mut program,
             &templates,
             &generic_params,
@@ -2962,11 +2960,11 @@ fn instantiate_package_generics<'a>(
     let types: &'static radix_types::TypeTable = Box::leak(Box::new(types));
     let mut context = prior_context.with_types(types);
     sync_context_closure_environments(&mut context, &merged.closure_environments);
-    context.layouts = radix_module::mir::MirLayoutTable::from_types(types);
+    context.layouts = radix_mir::MirLayoutTable::from_types(types);
     if let Some(extra) = extra_validation {
         extra.apply(&mut context);
     }
-    merged.validated = radix_module::mir::ValidatedMir::new(program, context)
+    merged.validated = radix_mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(merged)
 }
@@ -3001,9 +2999,9 @@ fn rewrite_function_type_ids(function: &mut MirFunction, rewrites: &[(TypeId, Ty
     }
 }
 
-pub(super) fn rewrite_type_id(ty: &mut radix_module::mir::MirType, rewrites: &[(TypeId, TypeId)]) {
+pub(super) fn rewrite_type_id(ty: &mut radix_mir::MirType, rewrites: &[(TypeId, TypeId)]) {
     if let Some((_, to)) = rewrites.iter().find(|(from, _)| ty.semantic_id() == *from) {
-        *ty = radix_module::mir::MirType::semantic(*to);
+        *ty = radix_mir::MirType::semantic(*to);
     }
 }
 
@@ -3125,7 +3123,7 @@ fn rewrite_function_struct_defs(function: &mut MirFunction, struct_remap: &HashM
                     }
                 }
                 MirStatementKind::RuntimeCall { call, .. } => {
-                    if let MirIntrinsic::TensorLimes(radix_module::mir::MirEdgePolicy::Custom {
+                    if let MirIntrinsic::TensorLimes(radix_mir::MirEdgePolicy::Custom {
                         policy_def,
                         ..
                     }) = &mut call.intrinsic
@@ -3322,7 +3320,7 @@ pub(super) fn install_cli_dispatch_entry<'a>(
     let types = lowered.validated.validation().types.clone();
     lowered
         .patch_program(|program| {
-            let referenced = radix_module::mir::names::referenced_functions(program);
+            let referenced = radix_mir::names::referenced_functions(program);
             let Some(entry_index) = program.functions.iter().position(|function| {
                 is_explicit_entry_function(function, &types) && !referenced.contains(&function.id)
             }) else {
@@ -3389,7 +3387,7 @@ pub(super) fn lower_unit<'a>(
             .unwrap_or_default();
         lower_analyzed_unit(
             unit.analysis.application_view(),
-            radix_module::mir::MirLoweringOptions {
+            radix_mir_lower::lower::MirLoweringOptions {
                 cli_record_fields_by_local: std::sync::Arc::new(fields.into_iter().collect()),
                 kernel_lowering,
                 ..Default::default()
@@ -3398,7 +3396,7 @@ pub(super) fn lower_unit<'a>(
     } else {
         lower_analyzed_unit(
             unit.analysis.application_view(),
-            radix_module::mir::MirLoweringOptions {
+            radix_mir_lower::lower::MirLoweringOptions {
                 kernel_lowering,
                 ..Default::default()
             },
@@ -3464,9 +3462,9 @@ fn append_shifted_program<'merged>(
     diagnostic_path: &Path,
     extra: &RemappedValidation,
     prior_templates: &[MirFunction],
-    prior_generic_params: &[(DefId, Vec<radix_module::mir::MirGenericParam>)],
-    imported_devices: &radix_module::mir::ImportedDeviceIndex,
-    consumer_device_roles: &HashMap<DefId, radix_module::mir::MirDeviceRole>,
+    prior_generic_params: &[(DefId, Vec<radix_mir_lower::lower::MirGenericParam>)],
+    imported_devices: &radix_mir_lower::lower::ImportedDeviceIndex,
+    consumer_device_roles: &HashMap<DefId, radix_mir::MirDeviceRole>,
     consumer_launch_entries: &HashSet<DefId>,
 ) -> Result<(LoweredMirUnit<'merged>, LibraryMirParts), Vec<Diagnostic>> {
     let (program, incoming_context) = incoming.validated.into_parts();
@@ -3499,9 +3497,9 @@ fn append_shifted_library_parts<'a>(
     diagnostic_path: &Path,
     extra: &RemappedValidation,
     prior_templates: &[MirFunction],
-    prior_generic_params: &[(DefId, Vec<radix_module::mir::MirGenericParam>)],
-    imported_devices: &radix_module::mir::ImportedDeviceIndex,
-    consumer_device_roles: &HashMap<DefId, radix_module::mir::MirDeviceRole>,
+    prior_generic_params: &[(DefId, Vec<radix_mir_lower::lower::MirGenericParam>)],
+    imported_devices: &radix_mir_lower::lower::ImportedDeviceIndex,
+    consumer_device_roles: &HashMap<DefId, radix_mir::MirDeviceRole>,
     consumer_launch_entries: &HashSet<DefId>,
 ) -> Result<(LoweredMirUnit<'a>, LibraryMirParts, u32), Vec<Diagnostic>> {
     let (mut merged_program, mut context) = merged.validated.into_parts();
@@ -3535,7 +3533,7 @@ fn append_shifted_library_parts<'a>(
         let mut types = TypeTable::from_snapshot(context.types.snapshot())
             .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
         let (monomorphizations, registrations) =
-            radix_module::mir::instantiate_merged_generic_calls_with_tensor_edge_policy(
+            radix_mir_lower::lower::instantiate_merged_generic_calls_with_tensor_edge_policy(
                 &mut merged_program,
                 &templates,
                 &generic_params,
@@ -3565,7 +3563,7 @@ fn append_shifted_library_parts<'a>(
     }
     sync_context_closure_environments(&mut context, &merged.closure_environments);
     extra.apply(&mut context);
-    merged.validated = radix_module::mir::ValidatedMir::new(merged_program, context)
+    merged.validated = radix_mir::ValidatedMir::new(merged_program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok((merged, library, offset))
 }
@@ -3664,7 +3662,7 @@ fn record_template_display_tokens(
 ) {
     for template in templates
         .iter()
-        .filter(|template| radix_module::mir::holds_print_site(template))
+        .filter(|template| radix_mir_lower::lower::holds_print_site(template))
     {
         if let Some(source) = template.source {
             template_tokens
@@ -3679,8 +3677,8 @@ fn record_template_display_tokens(
 /// clone recorded at lowering) keeps its own entry; a clone whose template
 /// has no recorded tokens stays without an id.
 fn assign_clone_display_tokens(
-    table: &mut radix_module::mir::MirDisplayTokens,
-    monomorphizations: &[radix_module::mir::MirMonomorphization],
+    table: &mut radix_mir::MirDisplayTokens,
+    monomorphizations: &[radix_mir::MirMonomorphization],
     template_tokens: &HashMap<DefId, radix_module::runtime_contract::display_tokens::DisplayTokens>,
 ) {
     for clone in monomorphizations {
@@ -3712,7 +3710,7 @@ pub(super) fn rebuild_merged_validated<'a>(
     if let Some(extra) = extra {
         extra.apply(&mut context);
     }
-    merged.validated = radix_module::mir::ValidatedMir::new(program, context)
+    merged.validated = radix_mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(merged)
 }
@@ -3927,10 +3925,8 @@ pub(super) fn shift_runtime_call_ids(call: &mut MirRuntimeCall, offset: u32) {
     for arg in &mut call.args {
         shift_operand_ids(arg, offset);
     }
-    if let MirIntrinsic::TensorLimes(radix_module::mir::MirEdgePolicy::Custom {
-        remap,
-        transform,
-        ..
+    if let MirIntrinsic::TensorLimes(radix_mir::MirEdgePolicy::Custom {
+        remap, transform, ..
     }) = &mut call.intrinsic
     {
         shift_function_id(remap, offset);
@@ -4124,14 +4120,14 @@ struct LibraryMirParts {
     program: MirProgram,
     environments: Vec<MirClosureEnvironment>,
     templates: Vec<MirFunction>,
-    generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
+    generic_params: Vec<(DefId, Vec<radix_mir_lower::lower::MirGenericParam>)>,
     tensor_edge_policy_metadata: MirTensorEdgePolicyMetadata,
     /// Synthetic-kernel metadata carried from the lowered unit; merged with
     /// the same id shift as the program (KCM-05).
     device_function_metadata: MirDeviceFunctionMetadataMap,
     /// The unit's display-token table, keyed by the unit's own function ids
     /// (absorbed with the merge shift like the program itself).
-    display_tokens: radix_module::mir::MirDisplayTokens,
+    display_tokens: radix_mir::MirDisplayTokens,
 }
 
 fn prune_unreachable_library_functions(
@@ -4238,7 +4234,7 @@ fn reindex_function_ids(
     program: &mut MirProgram,
     environments: &mut [MirClosureEnvironment],
     device_function_metadata: &mut MirDeviceFunctionMetadataMap,
-    display_tokens: &mut radix_module::mir::MirDisplayTokens,
+    display_tokens: &mut radix_mir::MirDisplayTokens,
 ) {
     let mut remap = HashMap::new();
     for (function, index) in program.functions.iter().zip(0_u32..) {
@@ -4423,7 +4419,7 @@ fn remap_statement_function_ids(
             for arg in &mut call.args {
                 remap_operand_function_ids(arg, remap);
             }
-            if let MirIntrinsic::TensorLimes(radix_module::mir::MirEdgePolicy::Custom {
+            if let MirIntrinsic::TensorLimes(radix_mir::MirEdgePolicy::Custom {
                 remap: callback,
                 transform,
                 ..
@@ -4567,7 +4563,7 @@ fn scan_statement_references(statement: &MirStatement, scan: &mut MirReferenceSc
             for arg in &call.args {
                 scan_operand_references(arg, scan);
             }
-            if let MirIntrinsic::TensorLimes(radix_module::mir::MirEdgePolicy::Custom {
+            if let MirIntrinsic::TensorLimes(radix_mir::MirEdgePolicy::Custom {
                 remap,
                 transform,
                 ..

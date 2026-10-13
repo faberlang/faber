@@ -299,7 +299,7 @@ struct PackageMirLinkAccumulator {
     /// Imported-device routes joined to their synthetic template source
     /// `DefId` (KPC-WIRE): one entry per device-bearing library function,
     /// carried to package lowering for the device-aware instantiation index.
-    imported_device_routes: Vec<(DefId, radix_module::mir::ImportedDeviceRoute)>,
+    imported_device_routes: Vec<(DefId, radix_mir_lower::lower::ImportedDeviceRoute)>,
 }
 
 impl Default for PackageMirLinkAccumulator {
@@ -633,8 +633,8 @@ fn link_sibling_import_item(
         {
             links.imported_device_routes.push((
                 synthetic,
-                radix_module::mir::ImportedDeviceRoute {
-                    identity: radix_module::mir::MirExternalFunctionIdentity::new(
+                radix_mir_lower::lower::ImportedDeviceRoute {
+                    identity: radix_mir::MirExternalFunctionIdentity::new(
                         product.to_owned(),
                         sibling.module_segments.clone(),
                         function.name.clone(),
@@ -739,8 +739,8 @@ fn link_library_import_site(
             {
                 links.imported_device_routes.push((
                     synthetic,
-                    radix_module::mir::ImportedDeviceRoute {
-                        identity: radix_module::mir::MirExternalFunctionIdentity::new(
+                    radix_mir_lower::lower::ImportedDeviceRoute {
+                        identity: radix_mir::MirExternalFunctionIdentity::new(
                             module.package.clone(),
                             module.module_path.clone(),
                             function.name.clone(),

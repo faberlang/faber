@@ -10,7 +10,7 @@
 //! export) keep their callees via the global fixpoint.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 const REACH_UTIL: &str = "@ publica\nfunctio usata() → textus {\n    redde adjutrix()\n}\n\nfunctio adjutrix() → textus {\n    redde \"usata\"\n}\n\n@ publica\nfunctio non_usata() → textus {\n    redde \"non_usata\"\n}\n";
 const REACH_MAIN: &str = "import from \"reachlib:vals\" vals\n\nfn run() → string {\n    return vals.usata()\n}\n\nmain {\n    print run()\n}\n";

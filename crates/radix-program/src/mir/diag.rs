@@ -1,8 +1,8 @@
 //! Package-MIR diagnostic constructors.
 
 use super::{Diagnostic, DiagnosticPhase, Path, RunnerError};
+use radix_mir_lower::lower::MirError;
 use radix_module::lexer::Span;
-use radix_module::mir::MirError;
 
 pub fn mir_diag(path: &Path, message: impl Into<String>) -> Diagnostic {
     crate::package_diagnostic_error(message).with_file(path.display().to_string())

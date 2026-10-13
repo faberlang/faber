@@ -1,7 +1,7 @@
 //! Typed JSON conversions retain imported record identity and field metadata.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 #[test]
 fn package_mir_round_trips_imported_json_record() {

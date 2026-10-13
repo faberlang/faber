@@ -127,6 +127,14 @@ pub struct MirSeams {
     /// version after the move (RP5 byte-parity).
     pub toolchain_version: &'static str,
 }
+use radix_mir::{
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
+    MirCallee, MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue,
+    MirConstant, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirNamedOperand,
+    MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection,
+    MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
+    MirTerminatorKind, MirType, MirValue, MirValueKind, validate_program,
+};
 use radix_mir_fmir::{
     FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, FmirBinaryImageFile, FmirDeviceSection,
     FmirDeviceSelection, FmirImageError, FmirTextCliOperand, FmirTextCliRootSection,
@@ -135,6 +143,14 @@ use radix_mir_fmir::{
     FmirTextToolchainSection, FmirTextTypesSection, PACKAGE_MIR_ARTIFACT_VERSION,
     decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
     is_known_host_requirement,
+};
+use radix_mir_lower::lower::{
+    LoweredMirUnit, MirRuntimeRecordField, MirRuntimeRecordValue, MirTensorEdgePolicyMetadata,
+    MirTensorEdgePolicySelector, lower_analyzed_unit,
+};
+use radix_mir_runner::{
+    Host, RunnerError, RunnerKernelPolicy, RunnerStats, run_entry_with_kernel_policy,
+    run_entry_with_stats_and_kernel_policy,
 };
 use radix_module::cli::{
     CliCommand, CliDefault, CliExit, CliMode, CliOperand, CliOption, CliProgram, CliType,
@@ -148,18 +164,6 @@ use radix_module::hir::{
     HirStatementKind,
 };
 use radix_module::lexer::{Interner, Symbol};
-use radix_module::mir::{
-    Host, LoweredMirUnit, MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind,
-    MirBlock, MirBlockId, MirCallee, MirClosureCallee, MirClosureEnvironment,
-    MirClosureEnvironmentId, MirClosureValue, MirConstant, MirDiagnosticKind, MirFunction,
-    MirFunctionId, MirIntrinsic, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp,
-    MirPlace, MirProgram, MirProjection, MirProviderKind, MirRuntimeCall, MirRuntimeRecordField,
-    MirRuntimeRecordValue, MirStatement, MirStatementKind, MirSwitchCase,
-    MirTensorEdgePolicyMetadata, MirTensorEdgePolicySelector, MirTerminator, MirTerminatorKind,
-    MirType, MirValue, MirValueKind, RunnerError, RunnerKernelPolicy, RunnerStats,
-    lower_analyzed_unit, run_entry_with_kernel_policy, run_entry_with_stats_and_kernel_policy,
-    validate_program,
-};
 use radix_module::semantic::{
     IndexExpr, Primitive, Resolver, SymbolKind, Type, TypeId, TypeTable, TypeTableSnapshot,
 };
@@ -280,10 +284,10 @@ impl DeviceSelection {
     /// them as ordinary host functions, every other selection keeps the
     /// device form.
     #[must_use]
-    pub const fn kernel_lowering(self) -> radix_module::mir::KernelLowering {
+    pub const fn kernel_lowering(self) -> radix_types::KernelLowering {
         match self {
-            Self::Reference | Self::Cpu => radix_module::mir::KernelLowering::Host,
-            Self::Auto | Self::Metal | Self::Cuda => radix_module::mir::KernelLowering::Device,
+            Self::Reference | Self::Cpu => radix_types::KernelLowering::Host,
+            Self::Auto | Self::Metal | Self::Cuda => radix_types::KernelLowering::Device,
         }
     }
 
@@ -392,8 +396,7 @@ impl TestPackageScope {
 }
 
 /// Caller-visible identity map for functions in a linked package test MIR.
-pub type TestFunctionIds =
-    HashMap<(PathBuf, radix_module::hir::DefId), radix_module::mir::MirFunctionId>;
+pub type TestFunctionIds = HashMap<(PathBuf, radix_module::hir::DefId), radix_mir::MirFunctionId>;
 
 #[derive(Default)]
 struct CliPackagePlan {
@@ -465,7 +468,7 @@ struct PackageMirLinks {
     /// (KPC-WIRE): each device-bearing linked-library function carries its
     /// provider identity + v2 device contract, ready for the device-aware
     /// package instantiation index.
-    imported_device_routes: Vec<(DefId, radix_module::mir::ImportedDeviceRoute)>,
+    imported_device_routes: Vec<(DefId, radix_mir_lower::lower::ImportedDeviceRoute)>,
 }
 
 /// One linked const data member. The linker allocates a synthetic def id in
@@ -644,7 +647,7 @@ pub use lower::canonicalize_direct_definition_callees;
 /// This is the package-path exposure of the registration carrier — the same
 /// translation the radix-module driver performs for its text-target handoff.
 /// Consumers merge these facts with a local entry-role map through
-/// [`radix_module::mir::merge_imported_entry_roles`]: a public, composable
+/// [`radix_mir::device::merge_imported_entry_roles`]: a public, composable
 /// Kernel route admits its concrete instances as launch entries; private
 /// helpers and Fragment roles stay composition-only. Role and launch facts
 /// come from the registration's carried v2 contract, never from symbol
@@ -652,13 +655,14 @@ pub use lower::canonicalize_direct_definition_callees;
 #[must_use]
 pub fn imported_entry_facts(
     lowered: &LoweredMirUnit<'_>,
-) -> Vec<radix_module::mir::MirImportedEntryFact> {
+) -> Vec<radix_mir::device::MirImportedEntryFact> {
     lowered
         .imported_device_registrations
         .iter()
         .map(|registration| {
+            use radix_mir::MirDeviceRole;
+            use radix_mir::device::MirImportedEntryFact;
             use radix_module::file_interface::{InterfaceDeviceRole, InterfaceDeviceVisibility};
-            use radix_module::mir::{MirDeviceRole, MirImportedEntryFact};
             let contract = &registration.route.contract;
             let role = match contract.role {
                 InterfaceDeviceRole::Kernel => MirDeviceRole::Kernel,

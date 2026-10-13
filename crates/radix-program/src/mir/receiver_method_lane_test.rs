@@ -6,7 +6,7 @@
 //! already green; this lock is the sibling-unit hole.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 #[test]
 fn package_test_same_unit_receiver_methods_execute() {
@@ -147,7 +147,7 @@ fn prove_same_unit_method() {
         |validated, function_ids| {
             let mut host = BufferHost::default();
             for function_id in function_ids.values() {
-                radix_module::mir::run_function(validated, *function_id, &mut host)
+                radix_mir_runner::run_function(validated, *function_id, &mut host)
                     .expect("same-unit receiver methods must execute on the test-link lane");
             }
             host.stdout_lines

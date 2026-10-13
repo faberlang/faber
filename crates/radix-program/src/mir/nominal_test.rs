@@ -12,7 +12,7 @@
 //! same remap.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 use radix_module::semantic::Type;
 
 const NOMINAL_UTIL: &str = "@ public\nclass Persona {\n    var string nomen\n}\n\n@ public\nfn saluta(Persona p) → string {\n    return p.nomen\n}\n";

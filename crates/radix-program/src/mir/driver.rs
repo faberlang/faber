@@ -114,7 +114,7 @@ pub fn with_linked_test_package_mir<R>(
     scope: &TestPackageScope,
     config: &Config,
     seams: &MirSeams,
-    run: impl for<'a> FnOnce(&radix_module::mir::ValidatedMir<'a>, &TestFunctionIds) -> R,
+    run: impl for<'a> FnOnce(&radix_mir::ValidatedMir<'a>, &TestFunctionIds) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
     if package
         .diagnostics
@@ -140,7 +140,7 @@ pub(crate) fn link_package_functions<R>(
     scope: &TestPackageScope,
     config: &Config,
     library_cache: &mut LibraryInterfaceCache,
-    run: impl for<'a> FnOnce(&radix_module::mir::ValidatedMir<'a>, &TestFunctionIds) -> R,
+    run: impl for<'a> FnOnce(&radix_mir::ValidatedMir<'a>, &TestFunctionIds) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
     let library_resolver = package.library_resolver.clone();
     let anchor_id = apply_test_link_scope(&mut package, scope)?;

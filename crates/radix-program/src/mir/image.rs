@@ -18,7 +18,7 @@ use super::{
 /// images (codex-gap S1 U2 VALUE members).
 ///
 /// The source-built run path re-validates the merged program inside
-/// [`run_fmir_package_image`] with a fresh [`radix_module::mir::MirValidationContext`].
+/// [`run_fmir_package_image`] with a fresh [`radix_mir::MirValidationContext`].
 /// Enum-variant constructs require the merged variant surface (parent
 /// metadata, variant lists, variant field types) to validate — an empty
 /// context errors with "enum variant is missing parent metadata". Captured
@@ -33,7 +33,7 @@ pub struct FmirValidationMetadata {
     pub struct_field_order: HashMap<DefId, Vec<Symbol>>,
     pub variant_field_order: HashMap<DefId, Vec<Symbol>>,
     pub display_names: HashMap<DefId, String>,
-    pub display_tokens: radix_module::mir::MirDisplayTokens,
+    pub display_tokens: radix_mir::MirDisplayTokens,
     pub struct_type_params: HashMap<DefId, Vec<Symbol>>,
     pub enum_type_params: HashMap<DefId, Vec<Symbol>>,
     pub optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
@@ -52,7 +52,7 @@ pub struct FmirValidationMetadata {
 /// Snapshot the merged program's struct/variant validation surface from a
 /// validated context (defs are stable across the merged type table).
 pub(super) fn snapshot_validation_metadata(
-    validation: &radix_module::mir::MirValidationContext<'_>,
+    validation: &radix_mir::MirValidationContext<'_>,
 ) -> FmirValidationMetadata {
     let mut closure_environments = validation
         .closure_environments
@@ -143,7 +143,7 @@ pub(super) fn snapshot_validation_metadata(
 /// Apply carried struct/variant metadata to a freshly built validation
 /// context before re-validating the merged program.
 pub(super) fn apply_validation_metadata(
-    context: &mut radix_module::mir::MirValidationContext<'_>,
+    context: &mut radix_mir::MirValidationContext<'_>,
     metadata: &FmirValidationMetadata,
 ) {
     context.struct_fields = metadata
@@ -303,11 +303,11 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
         host,
         &image.diagnostic_path,
     )?;
-    let mut validation = radix_module::mir::MirValidationContext::new(&types);
-    validation.interner = radix_module::mir::MirInterner::Borrowed(&interner);
+    let mut validation = radix_mir::MirValidationContext::new(&types);
+    validation.interner = radix_mir::MirInterner::Borrowed(&interner);
     apply_validation_metadata(&mut validation, &image.validation);
-    let validated = radix_module::mir::ValidatedMir::new(image.program.clone(), validation)
-        .map_err(|errors| {
+    let validated =
+        radix_mir::ValidatedMir::new(image.program.clone(), validation).map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| mir_diag(&image.diagnostic_path, error.message))
@@ -356,11 +356,11 @@ pub(super) fn run_fmir_package_image_with_stats<H: Host + ?Sized>(
         host,
         &image.diagnostic_path,
     )?;
-    let mut validation = radix_module::mir::MirValidationContext::new(&types);
-    validation.interner = radix_module::mir::MirInterner::Borrowed(&interner);
+    let mut validation = radix_mir::MirValidationContext::new(&types);
+    validation.interner = radix_mir::MirInterner::Borrowed(&interner);
     apply_validation_metadata(&mut validation, &image.validation);
-    let validated = radix_module::mir::ValidatedMir::new(image.program.clone(), validation)
-        .map_err(|errors| {
+    let validated =
+        radix_mir::ValidatedMir::new(image.program.clone(), validation).map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| mir_diag(&image.diagnostic_path, error.message))

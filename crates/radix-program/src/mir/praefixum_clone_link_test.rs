@@ -2,7 +2,7 @@
 //! machinery and runs an imported call, without touching the original program.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 #[test]
 fn cloned_closure_links_and_runs_imported_call() {
@@ -72,12 +72,8 @@ fn cloned_closure_links_and_runs_imported_call() {
     };
     let lines = with_linked_test_package_mir(eval, &scope, &config, &seams, |validated, ids| {
         let mut host = BufferHost::default();
-        radix_module::mir::run_function(
-            validated,
-            ids[&(entry_path.clone(), synthetic)],
-            &mut host,
-        )
-        .unwrap();
+        radix_mir_runner::run_function(validated, ids[&(entry_path.clone(), synthetic)], &mut host)
+            .unwrap();
         host.stdout_lines
     })
     .unwrap();

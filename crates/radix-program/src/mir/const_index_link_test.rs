@@ -8,7 +8,7 @@
 //! keeps the typecheck type, so `t[c.IDX]` lowers exactly like `t[[c.IDX]]`.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 const INDEX_PROVIDER: &str = "@ public\nconst int IDX = 2\n";
 

@@ -55,7 +55,7 @@ fn run_cli_package(
     for (name, source) in files {
         std::fs::write(dir.join(name), source).expect("write package file");
     }
-    let mut host = radix_module::mir::BufferHost::with_argumenta(
+    let mut host = radix_mir_runner::BufferHost::with_argumenta(
         argumenta
             .iter()
             .map(|argument| (*argument).to_owned())

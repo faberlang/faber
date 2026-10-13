@@ -10,7 +10,7 @@
 //! enum/aggregate metadata.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 const DTYPE_LIB: &str = r#"+++
 locale = "en"
@@ -336,7 +336,7 @@ fn package_test_self_provider_nested_tensor_methods_execute() {
         |validated, function_ids| {
             let mut host = BufferHost::default();
             for function_id in function_ids.values() {
-                radix_module::mir::run_function(validated, *function_id, &mut host)
+                radix_mir_runner::run_function(validated, *function_id, &mut host)
                     .expect("self-provider nested tensor methods must execute");
             }
             host.stdout_lines
@@ -511,7 +511,7 @@ fn package_test_sibling_union_payloads_project() {
         |validated, function_ids| {
             let mut host = BufferHost::default();
             for function_id in function_ids.values() {
-                radix_module::mir::run_function(validated, *function_id, &mut host)
+                radix_mir_runner::run_function(validated, *function_id, &mut host)
                     .expect("sibling union payload projections must execute");
             }
             host.stdout_lines
@@ -584,7 +584,7 @@ fn package_mir_nested_library_method_calls_link_through_test_package() {
         |validated, function_ids| {
             let mut host = BufferHost::default();
             for function_id in function_ids.values() {
-                radix_module::mir::run_function(validated, *function_id, &mut host)
+                radix_mir_runner::run_function(validated, *function_id, &mut host)
                     .expect("nested tensor methods must execute on the test-link lane");
             }
             host.stdout_lines

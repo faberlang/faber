@@ -115,10 +115,10 @@ fn twin_instances_carry_device_rows(with_local_module: bool) {
                         lowered.device_function_metadata.keys().collect::<Vec<_>>()
                     )
                 });
-            assert_eq!(metadata.role, radix_module::mir::MirDeviceRole::Kernel);
+            assert_eq!(metadata.role, radix_mir::MirDeviceRole::Kernel);
             assert_eq!(
                 metadata.shader_stage,
-                radix_module::mir::MirKernelShaderStage::Compute
+                radix_mir::MirKernelShaderStage::Compute
             );
         },
     )

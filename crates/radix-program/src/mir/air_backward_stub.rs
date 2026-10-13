@@ -1,7 +1,7 @@
 //! No-op AIR backward bundle when the `device` feature is off.
 
+use radix_mir_lower::lower::LoweredMirUnit;
 use radix_module::driver::AnalyzedModule;
-use radix_module::mir::LoweredMirUnit;
 
 pub(super) type AirBundle = ();
 

@@ -4,8 +4,8 @@ use super::lower::{append_shifted_parts, checked_shifted_function_id};
 use super::manifest::escape_manifest_value;
 use super::requirements::{is_known_fmir_kernel_requirement, is_known_fmir_runtime_requirement};
 use super::*;
+use radix_mir::MirTempId;
 use radix_module::lexer::Span;
-use radix_module::mir::MirTempId;
 use std::path::Path;
 
 // The SOURCE-IDENTITY FNV-1a 64-bit constants (ddpp0-contract §FnvRemoval
@@ -215,12 +215,12 @@ fn package_mir_monomorphization_key_distinguishes_shapes() {
     // instances of one generic at [2] and [8] must not collide in the
     // package-link instance index (MIXED-SHAPE-MIR-LINK).
     let source = DefId(2_000_000_143);
-    let two = radix_module::mir::MirMonomorphizationKey {
+    let two = radix_mir::MirMonomorphizationKey {
         source,
         type_args: Vec::new(),
         shape_args: vec![radix_module::semantic::IndexId(2)],
     };
-    let eight = radix_module::mir::MirMonomorphizationKey {
+    let eight = radix_mir::MirMonomorphizationKey {
         source,
         type_args: Vec::new(),
         shape_args: vec![radix_module::semantic::IndexId(8)],
