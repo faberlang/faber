@@ -754,3 +754,104 @@ fn dangling_type_param_constraint_fails_closed() {
         "dangling constraint type must fail closed: {err:?}"
     );
 }
+
+/// A-59: the export-snapshot `Function` arm validated each generic
+/// parameter's constraint and default but never its name, so a snapshot
+/// function carrying a dangling generic-param `Symbol` loaded while the
+/// same symbol on a struct method was rejected. The fix routes the name
+/// through `check_symbol` like every neighbouring arm.
+#[test]
+fn function_export_dangling_generic_param_name_fails_closed() {
+    use crate::artifact::{FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot};
+    use radix_types::{FuncSig, GenericParamDescriptor, GenericParamSort, TypeParamConstraint};
+
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let ret = types.primitive(Primitive::Numerus);
+    artifact.types = types.snapshot();
+    artifact.resolver = ResolverSnapshot {
+        namespace_exports: Vec::new(),
+        file_interfaces: vec![(
+            Symbol(0),
+            FileInterfaceSnapshot {
+                exports: vec![(
+                    Symbol(1),
+                    FileExportSnapshot::Function(FuncSig {
+                        type_params: vec![GenericParamDescriptor {
+                            name: Symbol(99_999),
+                            sort: GenericParamSort::Typus,
+                            constraint: TypeParamConstraint::Any,
+                            default: None,
+                        }],
+                        params: Vec::new(),
+                        ret,
+                        err: None,
+                        is_async: false,
+                        is_generator: false,
+                    }),
+                )],
+                unavailable: Vec::new(),
+            },
+        )],
+        used_namespaces: Vec::new(),
+        imported_nominal_types: Vec::new(),
+        ambiguous_imported_nominal_types: Vec::new(),
+        conversion_rows: Vec::new(),
+    };
+
+    let bytes = encode(&artifact).expect("encode artifact");
+    let err = decode(&bytes)
+        .expect_err("a dangling generic-param name on a function export must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "Symbol", .. }
+        ),
+        "dangling generic-param name must fail closed: {err:?}"
+    );
+}
+
+/// The companion positive case: a function export whose generic parameter
+/// names are interned symbols must keep loading.
+#[test]
+fn function_export_valid_generic_param_name_loads() {
+    use crate::artifact::{FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot};
+    use radix_types::{FuncSig, GenericParamDescriptor, GenericParamSort, TypeParamConstraint};
+
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let ret = types.primitive(Primitive::Numerus);
+    artifact.types = types.snapshot();
+    artifact.resolver = ResolverSnapshot {
+        namespace_exports: Vec::new(),
+        file_interfaces: vec![(
+            Symbol(0),
+            FileInterfaceSnapshot {
+                exports: vec![(
+                    Symbol(1),
+                    FileExportSnapshot::Function(FuncSig {
+                        type_params: vec![GenericParamDescriptor {
+                            name: Symbol(1),
+                            sort: GenericParamSort::Typus,
+                            constraint: TypeParamConstraint::Any,
+                            default: None,
+                        }],
+                        params: Vec::new(),
+                        ret,
+                        err: None,
+                        is_async: false,
+                        is_generator: false,
+                    }),
+                )],
+                unavailable: Vec::new(),
+            },
+        )],
+        used_namespaces: Vec::new(),
+        imported_nominal_types: Vec::new(),
+        ambiguous_imported_nominal_types: Vec::new(),
+        conversion_rows: Vec::new(),
+    };
+
+    let bytes = encode(&artifact).expect("encode artifact");
+    decode(&bytes).expect("a valid generic-param name must keep loading");
+}

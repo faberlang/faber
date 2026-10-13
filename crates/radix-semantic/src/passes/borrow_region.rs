@@ -205,7 +205,12 @@ pub fn reduce(
                 let Some(root) = root else {
                     return Err(ProvenanceError::Incoherent { function: def_id });
                 };
-                if let Some(region) = regions.and_then(|facts| facts.region_for(root)) {
+                let mut region_found = false;
+                for region in regions
+                    .into_iter()
+                    .flat_map(|facts| facts.regions_for(root))
+                {
+                    region_found = true;
                     let provenance = if params.iter().any(|param| param.def_id == region.source) {
                         ReturnedBorrowProvenance::Parameter(region.source)
                     } else {
@@ -220,12 +225,15 @@ pub fn reduce(
                         from: region.source,
                         to: region.borrower,
                     });
-                } else if params.iter().any(|param| param.def_id == root) {
-                    // Returning a borrow-typed parameter re-exports the
-                    // caller's borrow; no intra-body region is created.
-                    returned_borrow = ReturnedBorrowProvenance::Parameter(root);
-                } else {
-                    return Err(ProvenanceError::Incoherent { function: def_id });
+                }
+                if !region_found {
+                    if params.iter().any(|param| param.def_id == root) {
+                        // Returning a borrow-typed parameter re-exports the
+                        // caller's borrow; no intra-body region is created.
+                        returned_borrow = ReturnedBorrowProvenance::Parameter(root);
+                    } else {
+                        return Err(ProvenanceError::Incoherent { function: def_id });
+                    }
                 }
             }
         }

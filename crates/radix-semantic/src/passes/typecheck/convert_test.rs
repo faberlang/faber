@@ -2203,6 +2203,103 @@ functio probe(modulus<u8> m) → modulus<u32> {
     );
 }
 
+// D1.11: two nominal genus types with no declared relation are not a provable
+// `∷` fact — the ascription is a conversion (`↦`), and the diagnostic names
+// both sides.
+
+#[test]
+fn verte_ascription_rejects_unrelated_genus_pair() {
+    test_support::assert_rejects_with_args(
+        r"
+genus P { varia numerus x }
+
+genus Q { varia numerus y }
+
+functio probe(P p) → Q {
+    redde p ∷ Q
+}
+",
+        &[
+            radix_diagnostics::DiagnosticArg::new("issue", "nominal_ascription_not_provable"),
+            radix_diagnostics::DiagnosticArg::new("found", "P"),
+            radix_diagnostics::DiagnosticArg::new("expected", "Q"),
+        ],
+    );
+}
+
+#[test]
+fn verte_ascription_rejects_foreign_interface() {
+    test_support::assert_rejects_with_issue(
+        r"
+implendum Nominatum {
+    functio plenum() → textus
+}
+
+genus Civis {
+    varia textus nomen
+}
+
+functio probe(Civis civis) → Nominatum {
+    redde civis ∷ Nominatum
+}
+",
+        "nominal_ascription_not_provable",
+    );
+}
+
+#[test]
+fn verte_ascription_accepts_same_genus() {
+    test_support::assert_accepts(
+        r"
+genus P { varia numerus x }
+
+functio probe(P p) → P {
+    redde p ∷ P
+}
+",
+    );
+}
+
+#[test]
+fn verte_ascription_accepts_declared_interface_conformance() {
+    test_support::assert_accepts(
+        r#"
+implendum Nominatum {
+    functio plenum() → textus
+}
+
+genus Civis implet Nominatum {
+    varia textus nomen
+
+    functio plenum() → textus { redde "§"(ego.nomen) }
+}
+
+incipit {
+    fixum Civis civis ← Civis { nomen = "Aurelia" }
+    fixum Nominatum boxed ← civis ∷ Nominatum
+    fixum Nominatum built ← Civis { nomen = "Iulia" } ∷ Nominatum
+    nota boxed.plenum()
+    nota built.plenum()
+}
+"#,
+    );
+}
+
+#[test]
+fn verte_ascription_accepts_alias_to_same_genus() {
+    test_support::assert_accepts(
+        r"
+genus Civis { varia textus nomen }
+
+typus Cives = Civis
+
+functio probe(Civis civis) → Cives {
+    redde civis ∷ Cives
+}
+",
+    );
+}
+
 // D11.6 ruling 24: `↦` into `wrapping`/`saturating` applies the policy and
 // cannot fail — no `⊥`, no failure channel, integer and `d64` sources only.
 

@@ -328,7 +328,7 @@ fn K64() → list<wrapping<u64>> {
 fn sha512_engine(bytes data, list<wrapping<u64>> iv, int n_words) → bytes {
     const list<u8> padded ← pad64(data)
     const list<wrapping<u64>> k ← K64()
-    var list<wrapping<u64>> state ← iv
+    var list<wrapping<u64>> state ← copy iv
     const int n_blocks ← padded.length() / 128
     for range 0‥n_blocks const bi {
         const list<wrapping<u64>> w ← schedule64(padded, bi * 128)
@@ -377,7 +377,7 @@ fn hmac(string alg, bytes key, bytes data) → bytes ⇥ string {
     else {
         throw "norma:crypto.hmac: algorithm must be hmac-sha256, hmac-sha384, or hmac-sha512"
     }
-    var bytes k ← key
+    var bytes k ← copy key
     if k.length() ≻ block {
         k ← digest(hash, k)
     }

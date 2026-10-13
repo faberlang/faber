@@ -1258,7 +1258,7 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "unknown variant"
-help = "declare the variable before use{?suggestion|; did you mean |?}"
+help = "declare the variable before use{?members| (|)}{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "unknown variant fields"
@@ -2632,6 +2632,10 @@ help = "make the expression type match the expected type"
 [diagnostics.SEM010.issues.matmul_receiver_shape_must_be_tuple]
 message = "matmul requires rank-2 tensor receiver with tuple shape"
 help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.nominal_ascription_not_provable]
+message = "`∷` states a fact the compiler can prove; '{found}' is not '{expected}' and no {implet} relation is declared"
+help = "make the source type match the target, declare the contract in {implet}, or convert explicitly with `↦`"
 
 [diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"

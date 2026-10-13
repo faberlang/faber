@@ -876,12 +876,14 @@ fn math_namespace_interface() -> crate::file_interface::FileInterface {
                     mode: crate::SemanticParamMode::Owned,
                     optional: false,
                     sponte: false,
+                    axis: false,
                 },
                 InterfaceParam {
                     ty: tensor_mn.clone(),
                     mode: crate::SemanticParamMode::Owned,
                     optional: false,
                     sponte: false,
+                    axis: false,
                 },
             ],
             ret: Box::new(tensor_mn),
@@ -1167,4 +1169,125 @@ incipit {
     );
     assert_eq!(plain, 1, "control: one diagnostic for the plain call");
     assert_eq!(spread, 1, "spread argument must be checked once");
+}
+
+// ---------------------------------------------------------------------------
+// A-03 residual: the inferred call form (no explicit type arguments) must bind
+// the type parameter through every container shape the explicit form already
+// binds. `substitute_type_params` rewrites `T` to a fresh inference hole
+// inside the declared container; `unify_with_policy` then has to walk the
+// element (and capacity) slots, exactly as the `lista<T>` arm does.
+
+#[test]
+fn inferred_generic_call_binds_through_queue_and_stack() {
+    accepts(
+        r#"functio peek_lista<T>(lista<T> xs) → numerus {
+    redde 0
+}
+
+functio peek_queue<T>(queue<T> q) → numerus {
+    redde 0
+}
+
+functio peek_stack<T>(stack<T> s) → numerus {
+    redde 0
+}
+
+functio caller(lista<numerus> l, queue<numerus> q, stack<numerus> s) → numerus {
+    redde peek_lista(l) + peek_queue(q) + peek_stack(s)
+}"#,
+    );
+}
+
+#[test]
+fn inferred_generic_call_binds_through_bounded_queue_and_stack() {
+    accepts(
+        r#"functio peek_bounded_queue<T>(queue<T, 4> q) → numerus {
+    redde 0
+}
+
+functio peek_bounded_stack<T>(stack<T, 4> s) → numerus {
+    redde 0
+}
+
+functio caller(queue<numerus, 4> bq, stack<numerus, 4> bs) → numerus {
+    redde peek_bounded_queue(bq) + peek_bounded_stack(bs)
+}"#,
+    );
+}
+
+#[test]
+fn inferred_generic_call_binds_through_ledger() {
+    accepts(
+        r#"functio peek_ledger<T>(tabulae<textus, T> m) → numerus {
+    redde 0
+}
+
+functio caller(tabulae<textus, numerus> m) → numerus {
+    redde peek_ledger(m)
+}"#,
+    );
+}
+
+#[test]
+fn inferred_generic_call_binds_through_intersection() {
+    accepts(
+        r#"implendum Nomen {
+    functio nomen() → textus
+}
+
+implendum Salutans {
+    functio saluta() → textus
+}
+
+genus Civis implet Nomen ∩ Salutans {
+    functio nomen() → textus {
+        redde "civis"
+    }
+
+    functio saluta() → textus {
+        redde "salve"
+    }
+}
+
+functio peek<T>(T ∩ Nomen x) → numerus {
+    redde 0
+}
+
+functio caller_inter(Nomen ∩ Salutans ns) → numerus {
+    redde peek(ns)
+}
+
+functio caller_genus(Civis c) → numerus {
+    redde peek(c)
+}"#,
+    );
+}
+
+#[test]
+fn inferred_generic_call_rejects_container_element_mismatch() {
+    rejects_with_issue(
+        r#"functio wants(queue<numerus> q) → numerus {
+    redde 0
+}
+
+functio caller(queue<textus> q) → numerus {
+    redde wants(q)
+}"#,
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn inferred_generic_call_rejects_bounded_capacity_mismatch() {
+    rejects_with_issue(
+        r#"functio wants(queue<numerus, 4> q) → numerus {
+    redde 0
+}
+
+functio caller(queue<numerus, 8> q) → numerus {
+    redde wants(q)
+}"#,
+        "incompatible_tensor_index",
+    );
 }

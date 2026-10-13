@@ -1007,13 +1007,22 @@ impl<'a> LoweringContextMaps<'a> {
                 continue;
             }
             for import_item in &import.items {
-                let binding = self.interner.resolve(import_item.name);
-                let Some(target_segments) = package_identities.imports.get(binding) else {
+                // The package-identity map is keyed by the binding this module
+                // actually binds (`import_binding`: the alias when one is
+                // spelled, else the imported name), and the resolver installs
+                // the file interface under that same binding. Look the
+                // binding up once and use it for both, like
+                // `record_imported_struct_contracts` does, so an aliased
+                // import records its identities like the plain spelling
+                // does.
+                let binding = import_item.alias.unwrap_or(import_item.name);
+                let Some(target_segments) = package_identities
+                    .imports
+                    .get(self.interner.resolve(binding))
+                else {
                     continue;
                 };
-                let exports = unit
-                    .resolver
-                    .namespace_file_function_exports(import_item.name);
+                let exports = unit.resolver.namespace_file_function_exports(binding);
                 if exports.is_empty() {
                     continue;
                 }
@@ -1061,7 +1070,10 @@ impl<'a> LoweringContextMaps<'a> {
                 // by a signature-only call. The interface is served from the
                 // unit's own `PackageImportIdentities` — a fact about this
                 // unit's imports, not a process-wide registry (S01-7).
-                if let Some(interface) = package_identities.device_interfaces.get(binding) {
+                if let Some(interface) = package_identities
+                    .device_interfaces
+                    .get(self.interner.resolve(binding))
+                {
                     let routes =
                         ImportedDeviceRoute::from_interface(&package_identities.product, target_segments, interface);
                     if !routes.is_empty() {
@@ -1215,3 +1227,7 @@ impl HirVisitor for LoweringContextMaps<'_> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "context_test.rs"]
+mod context_tests;

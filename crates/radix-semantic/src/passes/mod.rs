@@ -165,6 +165,10 @@ mod borrow_alias_call_types_test;
 mod borrow_alias_container_test;
 
 #[cfg(test)]
+#[path = "borrow_alias_symmetry_test.rs"]
+mod borrow_alias_symmetry_test;
+
+#[cfg(test)]
 #[path = "borrow_alias_register_option_test.rs"]
 mod borrow_alias_register_option_test;
 

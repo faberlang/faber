@@ -307,6 +307,14 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
     {
         return Some("use an ordinary loop, or prove own-coordinate writes and same-coordinate reads of written storage without loop-carried locals or hidden effects".to_owned());
     }
+    if kind == SemanticErrorKind::TypeMismatch
+        && arg_value(args, "issue") == Some("nominal_ascription_not_provable")
+    {
+        return Some(
+            "make the source type match the target, declare the contract in `implet`, or convert explicitly with `↦`"
+                .to_owned(),
+        );
+    }
     match kind {
         SemanticErrorKind::AirPurityViolation => semantic_air_purity_help(args),
         SemanticErrorKind::ConflictingVisibility => semantic_conflicting_visibility_help(args),

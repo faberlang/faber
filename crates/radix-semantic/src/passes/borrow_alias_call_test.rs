@@ -569,12 +569,14 @@ fn imported_mutator_interface() -> crate::file_interface::FileInterface {
                     mode: SemanticParamMode::MutRef,
                     optional: false,
                     sponte: false,
+                    axis: false,
                 },
                 InterfaceParam {
                     ty: list_int(),
                     mode: SemanticParamMode::Owned,
                     optional: false,
                     sponte: false,
+                    axis: false,
                 },
             ],
             ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
@@ -591,12 +593,65 @@ fn imported_mutator_interface() -> crate::file_interface::FileInterface {
         name: "Mutator".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
-            implements: Vec::new(),
+            implements: vec![InterfaceTypeSnapshot::Nominal(
+                crate::file_interface::InterfaceNominalType {
+                    kind: crate::file_interface::InterfaceNominalKind::Interface,
+                    name: "MutatorContract".to_owned(),
+                    identity: None,
+                    kind_guessed: false,
+                },
+            )],
             name: "Mutator".to_owned(),
             params: Vec::new(),
             fields: Vec::new(),
-            methods: vec![read],
+            methods: vec![read.clone()],
             annotation_contract: None,
+        }),
+    });
+    // An exported contract with the same method: a `typus` alias of a genus
+    // that names it in `implet` can be bound as a contract-typed receiver.
+    interface.insert(FileExport {
+        name: "MutatorContract".to_owned(),
+        kind: FileExportKind::Interface(crate::file_interface::InterfaceNominalExport {
+            name: "MutatorContract".to_owned(),
+            params: Vec::new(),
+            methods: vec![read],
+            variants: Vec::new(),
+            shared_fields: Vec::new(),
+            radix_contract: None,
+        }),
+    });
+    // An exported `typus MutatorAlias ← Mutator`: the producer strips the
+    // local alias to the genus nominal, so the export body is a `Nominal`.
+    // The consumer names the alias in a type position and gets the genus's
+    // methods through it.
+    interface.insert(FileExport {
+        name: "MutatorAlias".to_owned(),
+        kind: FileExportKind::TypeAlias(crate::file_interface::InterfaceAliasExport {
+            name: "MutatorAlias".to_owned(),
+            params: Vec::new(),
+            body: InterfaceTypeSnapshot::Nominal(crate::file_interface::InterfaceNominalType {
+                kind: crate::file_interface::InterfaceNominalKind::Struct,
+                name: "Mutator".to_owned(),
+                identity: None,
+                kind_guessed: false,
+            }),
+        }),
+    });
+    // `typus MutatorContractAlias ← MutatorContract`: the alias names the
+    // method-carrying contract, so a receiver bound through the alias is an
+    // interface-typed value.
+    interface.insert(FileExport {
+        name: "MutatorContractAlias".to_owned(),
+        kind: FileExportKind::TypeAlias(crate::file_interface::InterfaceAliasExport {
+            name: "MutatorContractAlias".to_owned(),
+            params: Vec::new(),
+            body: InterfaceTypeSnapshot::Nominal(crate::file_interface::InterfaceNominalType {
+                kind: crate::file_interface::InterfaceNominalKind::Interface,
+                name: "MutatorContract".to_owned(),
+                identity: None,
+                kind_guessed: false,
+            }),
         }),
     });
     interface
@@ -613,7 +668,12 @@ fn analyze_imported_en(source: &str) -> AnalyzedFixture {
     );
     config.namespace_exports = std::collections::BTreeMap::from([(
         "library".to_owned(),
-        std::collections::BTreeMap::from([("Mutator".to_owned(), VisibilityTier::Publica)]),
+        std::collections::BTreeMap::from([
+            ("Mutator".to_owned(), VisibilityTier::Publica),
+            ("MutatorAlias".to_owned(), VisibilityTier::Publica),
+            ("MutatorContract".to_owned(), VisibilityTier::Publica),
+            ("MutatorContractAlias".to_owned(), VisibilityTier::Publica),
+        ]),
     )]);
     config.file_interfaces =
         std::collections::BTreeMap::from([("library".to_owned(), imported_mutator_interface())]);
@@ -662,6 +722,48 @@ fn imported_method_same_storage_overlap_is_rejected() {
 fn imported_method_alias_spelled_overlap_is_rejected() {
     let found = imported_errors(&imported_program(
         "    var list<int> alias ← xs\n    m.read(mut xs, alias)",
+    ));
+    assert!(
+        found.iter().any(
+            |(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"
+        ),
+        "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
+    );
+}
+
+#[test]
+fn imported_alias_method_same_storage_overlap_is_rejected() {
+    let found = imported_errors(&imported_program(
+        "    const library.MutatorAlias ma ← library.Mutator {}\n    ma.read(mut xs, xs)",
+    ));
+    assert!(
+        found.iter().any(
+            |(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"
+        ),
+        "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
+    );
+}
+
+#[test]
+fn imported_alias_contract_method_same_storage_overlap_is_rejected() {
+    let found = imported_errors(&imported_program(
+        "    const library.MutatorContractAlias ma ← m\n    ma.read(mut xs, xs)",
+    ));
+    assert!(
+        found.iter().any(
+            |(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"
+        ),
+        "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
+    );
+}
+
+#[test]
+fn imported_contract_receiver_overlap_is_rejected() {
+    let found = imported_errors(&imported_program(
+        "    const library.MutatorContract c ← m\n    c.read(mut xs, xs)",
     ));
     assert!(
         found.iter().any(

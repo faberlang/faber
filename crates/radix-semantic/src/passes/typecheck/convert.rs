@@ -117,6 +117,7 @@ pub(super) const ISSUE_INFERRED_CONSTRUCTOR_FIELDS_FOR_MAP: &str =
 pub(super) const ISSUE_INFERRED_CONSTRUCTOR_AMBIGUOUS_UNION: &str =
     "inferred_constructor_ambiguous_union";
 const ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION: &str = "numeric_ascription_requires_conversion";
+const ISSUE_NOMINAL_ASCRIPTION_NOT_PROVABLE: &str = "nominal_ascription_not_provable";
 const ISSUE_INVALID_CAST: &str = "invalid_cast";
 const ISSUE_ARRAY_ELEMENT_TYPE_MISMATCH: &str = "array_element_type_mismatch";
 const ISSUE_ARRAY_SPREAD_ELEMENT_TYPE_MISMATCH: &str = "array_spread_element_type_mismatch";
@@ -3543,6 +3544,13 @@ impl TypeChecker<'_> {
             // diagnostics for ill-typed sources.
             _ => {}
         }
+        // Nominal targets carry the D1.11 proof law: two genus types with no
+        // declared relation are not an ascription, they are a conversion.
+        // Constructor sources are construction, already checked against the
+        // target above.
+        if !constructor_source {
+            self.check_verte_nominal_fact(source_resolved, effective_target, span);
+        }
         effective_target
     }
 
@@ -3640,6 +3648,143 @@ impl TypeChecker<'_> {
         if !source_fact.family.admits(target_fact.family) {
             self.invalid_conversion(ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION, span);
         }
+    }
+
+    /// Enforce DECISIONS D1.11 for `∷` between nominal types: the ascription
+    /// must state a fact the compiler can prove. The proved facts are the same
+    /// nominal type — a `type` alias resolves to its target before this runs —
+    /// and a genus ascribed to an interface its declaration names in `implet`
+    /// (D1.3). Class inheritance was removed (D8.1), so every other nominal
+    /// pair (class→class, enum→enum, interface→class) is unprovable and takes
+    /// the explicit `↦` conversion.
+    ///
+    /// Constructor sources are construction, not ascription: their fields are
+    /// checked against the target directly, so they are not this law's
+    /// business.
+    fn check_verte_nominal_fact(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        let source_ty = self.resolve_inferred_type(source);
+        let target_ty = self.resolve_inferred_type(target);
+        if self.types.equals(source_ty, target_ty) {
+            return;
+        }
+        if self.nominal_def(source_ty).is_none() || self.nominal_def(target_ty).is_none() {
+            return;
+        }
+        if self.nominal_declares_interface(source_ty, target_ty) {
+            return;
+        }
+        let found = self.format_union_constituent_type(source_ty);
+        let expected = self.format_union_constituent_type(target_ty);
+        self.error_issue_with_args(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_NOMINAL_ASCRIPTION_NOT_PROVABLE,
+            span,
+            &[("found", found), ("expected", expected)],
+        );
+    }
+
+    /// The struct/enum/interface declaration a resolved nominal type names,
+    /// after peeling aliases, access markers and applied arguments.
+    fn nominal_def(&self, ty: TypeId) -> Option<DefId> {
+        match self.types.get(self.resolve_inferred_type(ty)) {
+            Type::Struct(def) | Type::Enum(def) | Type::Interface(def) => Some(*def),
+            Type::Ref(_, inner) => self.nominal_def(*inner),
+            Type::Applied(base, _) => self.nominal_def(*base),
+            _ => None,
+        }
+    }
+
+    /// Whether the source genus declares the target interface in its `implet`
+    /// clause. This is the one nominal ascription that states a fact beyond
+    /// type identity: the declaration already commits the genus to the
+    /// contract (D1.3), so casting a value of the genus to the contract adds
+    /// no unproven claim.
+    fn nominal_declares_interface(&self, source: TypeId, target: TypeId) -> bool {
+        let target_resolved = self.resolve_inferred_type(target);
+        // `None` in a slot is a size argument on the contract application:
+        // the contract identity is the proof, and the size slot is not this
+        // law's evidence.
+        let (target_def, target_args): (DefId, Vec<Option<TypeId>>) =
+            match self.types.get(target_resolved) {
+                Type::Interface(def) => (*def, Vec::new()),
+                Type::Applied(base, args) => {
+                    let Type::Interface(def) = self.types.get(self.resolve_inferred_type(*base))
+                    else {
+                        return false;
+                    };
+                    let args = args
+                        .iter()
+                        .map(|arg| match arg {
+                            radix_types::AppliedArg::Type(ty) => Some(*ty),
+                            radix_types::AppliedArg::Size(_) => None,
+                        })
+                        .collect();
+                    (*def, args)
+                }
+                _ => return false,
+            };
+        let Some(source_def) = self.struct_def_from_type(source) else {
+            return false;
+        };
+        let Some(declared) = self.implemented_contracts.get(&source_def) else {
+            return false;
+        };
+        declared.iter().any(|contract| {
+            contract.contract == target_def
+                && contract.args.len() == target_args.len()
+                && contract
+                    .args
+                    .iter()
+                    .zip(&target_args)
+                    .all(|(declared_arg, target_arg)| {
+                        target_arg.is_none_or(|target_arg| {
+                            self.declared_contract_arg_matches(
+                                source,
+                                source_def,
+                                *declared_arg,
+                                target_arg,
+                            )
+                        })
+                    })
+        })
+    }
+
+    /// Whether one declared `implet` argument matches the target's. A declared
+    /// argument that is a source type parameter reads the source's applied
+    /// witness at that position; when the source is unapplied the declaration
+    /// itself is the proof, so the argument is accepted rather than rejected.
+    fn declared_contract_arg_matches(
+        &self,
+        source: TypeId,
+        source_def: DefId,
+        declared: TypeId,
+        target: TypeId,
+    ) -> bool {
+        let declared = self.resolve_inferred_type(declared);
+        let target = self.resolve_inferred_type(target);
+        let Type::Param(sym) = self.types.get(declared) else {
+            return self.types.equals(declared, target);
+        };
+        let Some(position) = self
+            .type_params_by_def
+            .get(&source_def)
+            .and_then(|params| params.iter().position(|param| *param == *sym))
+        else {
+            return true;
+        };
+        let Type::Applied(_, args) = self.types.get(self.resolve_inferred_type(source)) else {
+            return true;
+        };
+        let Some(radix_types::AppliedArg::Type(witness)) = args.get(position) else {
+            return true;
+        };
+        self.types
+            .equals(self.resolve_inferred_type(*witness), target)
     }
 
     /// Whether a `∷` source is a variant-constructor call (finge-lowered

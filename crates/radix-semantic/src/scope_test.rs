@@ -787,6 +787,136 @@ fn resolver_snapshot_round_trips_nondum_gates_for_functions_and_methods() {
     );
 }
 
+/// A-189: an imported enum's consumer-side variant rows (`imported_enum_variants`)
+/// and `@ commune` shared fields (`commune_fields`) must survive the FHIR
+/// snapshot boundary, so a scope rebuilt from a snapshot matches the scope that
+/// produced it.
+///
+/// Blocked (A-189, both halves): `Resolver::to_snapshot` serializes an enum
+/// export as `FileExportSnapshot::Type { ty, def_id }` — variant names,
+/// variant DefIds (consumer-fresh, unreproducible), payload fields, and
+/// commune shared fields exist nowhere on the FHIR wire. Restoring either
+/// table needs new fields in the `radix-hir-fhir` wire schema (a
+/// `SCHEMA_VERSION` bump; decode enforces exact equality) and is outside this
+/// unit's write scope. Re-enable when the wire carries enum payloads.
+#[cfg(feature = "hir-fhir")]
+#[ignore = "A-189 blocked: imported_enum_variants/commune_fields need enum payload on the FHIR wire (ResolverSnapshot/FileExportSnapshot) = SCHEMA_VERSION bump, outside unit scope"]
+#[test]
+fn resolver_snapshot_round_trips_imported_enum_variants_and_commune_fields() {
+    use crate::TypeTable;
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport,
+        InterfaceStructField, InterfaceTypeSnapshot,
+    };
+    use std::collections::BTreeMap;
+
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Kind".to_owned(),
+        kind: FileExportKind::Enum(InterfaceNominalExport {
+            name: "Kind".to_owned(),
+            params: Vec::new(),
+            methods: Vec::new(),
+            shared_fields: vec![InterfaceStructField {
+                name: "message".to_owned(),
+                ty: InterfaceTypeSnapshot::Primitive(crate::Primitive::Textus),
+                optional: false,
+                required: true,
+                default: None,
+                modifier: None,
+                visibility: radix_syntax::MemberVisibility::Publica,
+            }],
+            radix_contract: None,
+            variants: vec![
+                InterfaceEnumVariant {
+                    name: "Fine".to_owned(),
+                    fields: Vec::new(),
+                },
+                InterfaceEnumVariant {
+                    name: "Sized".to_owned(),
+                    fields: vec![InterfaceStructField {
+                        name: "payload".to_owned(),
+                        ty: InterfaceTypeSnapshot::Primitive(crate::Primitive::Numerus),
+                        optional: false,
+                        required: true,
+                        default: None,
+                        modifier: None,
+                        visibility: radix_syntax::MemberVisibility::Publica,
+                    }],
+                },
+            ],
+        }),
+    });
+
+    let mut resolver = Resolver::new();
+    let mut interner = radix_lexer::Interner::new();
+    let mut types = TypeTable::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("mod".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("enum interface installs");
+
+    let fine = interner.intern("Fine");
+    let sized = interner.intern("Sized");
+    let message = interner.intern("message");
+
+    // Live install: both tables are populated for the enum.
+    let live_enums = resolver.imported_file_enums();
+    assert_eq!(
+        live_enums.len(),
+        1,
+        "live install keeps the enum's variant rows"
+    );
+    let (enum_def, _, live_variants) = &live_enums[0];
+    assert_eq!(live_variants.len(), 2, "both variants install");
+    assert_eq!(live_variants[0].name, fine);
+    assert_eq!(live_variants[1].name, sized);
+    assert_eq!(live_variants[1].fields.len(), 1, "variant payload remaps");
+    assert!(!live_variants[1].payload_unresolved);
+    let live_commune = resolver.commune_fields(*enum_def);
+    assert_eq!(
+        live_commune.len(),
+        1,
+        "live install keeps the commune region"
+    );
+    assert_eq!(live_commune[0].name, message);
+
+    // Round trip through the FHIR snapshot.
+    let restored = Resolver::from_snapshot(resolver.to_snapshot());
+    let restored_enums = restored.imported_file_enums();
+    assert_eq!(
+        restored_enums.len(),
+        live_enums.len(),
+        "A-189 half 1: imported_enum_variants survive the snapshot boundary"
+    );
+    let restored_commune = restored.commune_fields(*enum_def);
+    assert_eq!(
+        restored_commune.len(),
+        live_commune.len(),
+        "A-189 half 2: commune_fields survive the snapshot boundary"
+    );
+    if let Some(field) = restored_commune.first() {
+        assert_eq!(field.name, live_commune[0].name);
+        assert_eq!(field.ty, live_commune[0].ty);
+    }
+    if let Some((_, _, restored_variants)) = restored_enums.first() {
+        let live_names: Vec<_> = live_variants.iter().map(|v| (v.def_id, v.name)).collect();
+        let restored_names: Vec<_> = restored_variants
+            .iter()
+            .map(|v| (v.def_id, v.name))
+            .collect();
+        assert_eq!(restored_names, live_names);
+        assert_eq!(
+            restored_variants[1].fields.len(),
+            live_variants[1].fields.len(),
+            "variant payload fields survive"
+        );
+    }
+}
+
 /// Producer-shaped interface exporting the given enums (name, variants) and
 /// primitive-bodied type aliases. Aliases install as `Type` exports without a
 /// definition identity, so they are not enums.
@@ -893,5 +1023,91 @@ fn namespace_variant_scan_skips_non_enum_type_exports() {
             .namespace_file_variant(namespace, variant)
             .is_some(),
         "an alias export must not hide the enum's variant"
+    );
+}
+
+/// An imported function's and method's declared `axis` markers survive the
+/// file-interface install and are readable by the canonical accessors
+/// (polish A-202). The echo rule reads these at every imported call site.
+#[test]
+fn imported_axis_markers_round_trip_through_the_resolver() {
+    use crate::Primitive;
+    use crate::SemanticParamMode;
+    use crate::TypeTable;
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceMethodExport,
+        InterfaceParam, InterfaceStructExport, InterfaceTypeSnapshot,
+    };
+    use std::collections::BTreeMap;
+
+    let number = || InterfaceTypeSnapshot::Primitive(Primitive::Numerus);
+    let param = |axis| InterfaceParam {
+        ty: number(),
+        mode: SemanticParamMode::Owned,
+        optional: false,
+        sponte: false,
+        axis,
+    };
+    let callable = |params| InterfaceCallable {
+        type_params: Vec::new(),
+        params,
+        ret: Box::new(number()),
+        err: None,
+        is_async: false,
+        is_generator: false,
+        tensor_edge_policy_requirements: Vec::new(),
+        device: None,
+    };
+
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "rows".to_owned(),
+        kind: FileExportKind::Function(callable(vec![param(true), param(false)])),
+    });
+    interface.insert(FileExport {
+        name: "Row".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
+            implements: Vec::new(),
+            name: "Row".to_owned(),
+            params: Vec::new(),
+            fields: Vec::new(),
+            methods: vec![InterfaceMethodExport {
+                name: "rows".to_owned(),
+                callable: callable(vec![param(true)]),
+                visibility: radix_syntax::MemberVisibility::Publica,
+                unavailable: Vec::new(),
+            }],
+            annotation_contract: None,
+        }),
+    });
+
+    let mut resolver = Resolver::new();
+    let mut interner = radix_lexer::Interner::new();
+    let mut types = TypeTable::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("lib".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("axis interface installs");
+
+    let namespace = interner.intern("lib");
+    let rows = interner.intern("rows");
+    assert_eq!(
+        resolver.namespace_file_axis_params_canonical(namespace, rows),
+        Some(&[true, false][..]),
+        "imported function axis flags stay on the exported parameter records"
+    );
+
+    let exported = resolver.imported_file_structs();
+    assert_eq!(exported.len(), 1);
+    let methods = &exported[0].2;
+    assert_eq!(methods.len(), 1);
+    assert_eq!(
+        methods[0].axis,
+        vec![true],
+        "imported method axis flags stay on the imported method record"
     );
 }

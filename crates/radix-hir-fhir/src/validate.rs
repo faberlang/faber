@@ -3396,6 +3396,7 @@ pub(crate) fn validate_referential_integrity(
                         checks.check_type(et)?;
                     }
                     for param in &sig.type_params {
+                        checks.check_symbol(param.name)?;
                         validate_generic_param_constraint(&param.constraint, checks)?;
                         if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) =
                             param.default

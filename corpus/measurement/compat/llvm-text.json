@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 390,
-    "analyzable": 430
+    "capable": 392,
+    "analyzable": 432
   },
   "terms": [
     {
@@ -372,8 +372,8 @@
     {
       "term": "genus",
       "rule": "keyword",
-      "capable": 15,
-      "analyzable": 16
+      "capable": 17,
+      "analyzable": 18
     },
     {
       "term": "iace",

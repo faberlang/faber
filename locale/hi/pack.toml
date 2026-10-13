@@ -797,7 +797,7 @@ help = "उपयोग से पहले चर घोषित करें{
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "अज्ञात variant"
-help = "उपयोग से पहले चर घोषित करें{?suggestion|; क्या आपका आशय |?}"
+help = "उपयोग से पहले चर घोषित करें{?members| (|)}{?suggestion|; क्या आपका आशय |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "अज्ञात variant fields"
