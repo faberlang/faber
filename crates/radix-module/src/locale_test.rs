@@ -18,7 +18,7 @@ use crate::locale::TypeBindingKind;
 use crate::parser::{ParseError, ParseErrorKind, parse};
 use crate::semantic::{CollectionKind, Primitive, SemanticError, SemanticErrorKind, TensorFamilyKind};
 use crate::syntax::{BindingPattern, ExprKind, StmtKind};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 
 fn temp_pack_path(label: &str) -> (tempfile::TempDir, PathBuf) {
@@ -2420,5 +2420,209 @@ fn locale_suggestion_filter_keeps_accent_matches_and_guesses_at_error_spans_only
         ),
     ] {
         assert_eq!(kept_spellings(candidates.clone(), &[error]), vec!["ham"]);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Translated-pack rows must not ship English text (need, R12).
+//
+// The key-set completeness tests above prove a row EXISTS in each pack; they
+// cannot see a row whose text was copied from `en` unchanged, and two rulings
+// of 2026-10-13 lean on that distinction. The two tests below close the gap:
+// every diagnostics text field of a translated pack that still equals the
+// `en` text must carry an exemption in `locale/identical-to-en.toml`, and
+// every exemption must still be live. `la` is deliberately outside the gate:
+// it is the canonical Latin pack whose issue rows were English before the R12
+// range, so its rows are fallback data, not translation debt.
+// ---------------------------------------------------------------------------
+
+/// Packs the identical-to-en gate treats as real translations (every installed
+/// pack except the `en` comparison source and the canonical `la`).
+const TRANSLATED_PACKS: &[&str] = &["ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
+
+/// `locale/identical-to-en.toml`, the shrink-only exemption list.
+fn identical_to_en_path() -> PathBuf {
+    crate::locale::workspace_locale_root().join("identical-to-en.toml")
+}
+
+#[derive(serde::Deserialize)]
+struct IdenticalToEnFile {
+    #[serde(default)]
+    entry: Vec<IdenticalToEnEntry>,
+}
+
+#[derive(serde::Deserialize)]
+struct IdenticalToEnEntry {
+    pack: String,
+    code: String,
+    /// Absent for a code's base row; present for an issue row.
+    #[serde(default)]
+    issue: Option<String>,
+    /// `message` or `help` — every text field the row type has.
+    field: String,
+    reason: String,
+}
+
+fn load_identical_to_en_entries() -> Vec<IdenticalToEnEntry> {
+    let path = identical_to_en_path();
+    let source =
+        std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err:?}", path.display()));
+    let parsed: IdenticalToEnFile =
+        toml::from_str(&source).unwrap_or_else(|err| panic!("parse {}: {err:?}", path.display()));
+    parsed.entry
+}
+
+/// The two sanctioned reason classes for exemption entries.
+fn reason_class_is_sanctioned(reason: &str) -> bool {
+    reason == "language-neutral" || reason.starts_with("untranslated-debt:")
+}
+
+/// A field is exempt when an entry names the exact (pack, code, issue, field).
+fn is_exempt(exemptions: &[IdenticalToEnEntry], pack: &str, code: &str, issue: Option<&str>, field: &str) -> bool {
+    exemptions
+        .iter()
+        .any(|entry| entry.pack == pack && entry.code == code && entry.issue.as_deref() == issue && entry.field == field)
+}
+
+/// Every text field of `pack` whose value equals the `en` pack's value for the
+/// same code/issue/field, as `(code, issue, field)` triples.
+///
+/// Rows or issue rows missing from `en` are skipped: their absence is the
+/// scaffold key-set gate's business, not an equality fact. A translated row
+/// missing only `help` compares `message` alone.
+fn fields_identical_to_en(pack: &LocalePack, en_pack: &LocalePack) -> Vec<(String, Option<String>, String)> {
+    let mut identical = Vec::new();
+    for (code, template) in &pack.diagnostics {
+        let Some(en_template) = en_pack.diagnostics.get(code) else {
+            continue;
+        };
+        let rows =
+            std::iter::once((None, template, en_template)).chain(template.issues.iter().filter_map(|(issue, row)| {
+                en_template.issues.get(issue).map(|en_row| (Some(issue.as_str()), row, en_row))
+            }));
+        for (issue, row, en_row) in rows {
+            for (field, ours, theirs) in [
+                ("message", Some(row.message.as_str()), Some(en_row.message.as_str())),
+                ("help", row.help.as_deref(), en_row.help.as_deref()),
+            ] {
+                if ours.is_some() && ours == theirs {
+                    identical.push((code.clone(), issue.map(str::to_string), field.to_string()));
+                }
+            }
+        }
+    }
+    identical
+}
+
+/// A translated pack must not carry diagnostics text copied from `en`.
+///
+/// Equality with `en` is tolerated only through `locale/identical-to-en.toml`,
+/// so copied English is always a recorded, reviewable decision. The list may
+/// only shrink: a translation must delete its entry.
+#[test]
+fn locale_pack_completeness_translated_packs_do_not_ship_english_rows_unless_exempt() {
+    let en_pack = owned_pack("en");
+    let exemptions = load_identical_to_en_entries();
+    let mut failures = Vec::new();
+    for locale in TRANSLATED_PACKS {
+        let pack = owned_pack(locale);
+        for (code, issue, field) in fields_identical_to_en(&pack, &en_pack) {
+            if !is_exempt(&exemptions, locale, &code, issue.as_deref(), &field) {
+                let row = issue.as_ref().map_or_else(String::new, |i| format!("issues.{i}."));
+                failures.push(format!("{locale} ships English text for {code}.{row}{field}"));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "translated packs ship diagnostics text byte-equal to en without an exemption in {}:\n  {}",
+        identical_to_en_path().display(),
+        failures.join("\n  ")
+    );
+}
+
+/// An exemption entry must name a live field that still equals `en`.
+///
+/// The list cannot rot: a deleted row, a deleted field, a renamed issue, or a
+/// field that HAS been translated makes the entry stale, and the test fails
+/// until the entry is removed (or corrected). Unknown packs, unknown fields,
+/// and off-vocabulary reasons are stale too.
+#[test]
+fn locale_pack_completeness_identical_to_en_exemptions_must_stay_live() {
+    let en_pack = owned_pack("en");
+    let exemptions = load_identical_to_en_entries();
+    let packs: HashMap<&str, LocalePack> =
+        TRANSLATED_PACKS.iter().map(|locale| (*locale, owned_pack(locale))).collect();
+    let mut stale = Vec::new();
+    for entry in &exemptions {
+        let name = format!(
+            "{} {} {} {}",
+            entry.pack,
+            entry.code,
+            entry.issue.as_deref().unwrap_or("-"),
+            entry.field
+        );
+        let Some(pack) = packs.get(entry.pack.as_str()) else {
+            stale.push(format!("{name}: pack is not one of the translated packs this gate covers"));
+            continue;
+        };
+        let Some(template) = pack.diagnostics.get(&entry.code) else {
+            stale.push(format!("{name}: row no longer exists; delete the entry"));
+            continue;
+        };
+        let row = match entry.issue.as_deref() {
+            Some(issue) => match template.issues.get(issue) {
+                Some(row) => row,
+                None => {
+                    stale.push(format!("{name}: issue row no longer exists; delete the entry"));
+                    continue;
+                }
+            },
+            None => template,
+        };
+        let ours = match entry.field.as_str() {
+            "message" => Some(row.message.as_str()),
+            "help" => row.help.as_deref(),
+            _ => None,
+        };
+        let Some(ours) = ours else {
+            stale.push(format!("{name}: field no longer exists; delete the entry"));
+            continue;
+        };
+        let Some(theirs) = english_field_text(&en_pack, &entry.code, entry.issue.as_deref(), &entry.field) else {
+            stale.push(format!("{name}: the en side of the field no longer exists; delete the entry"));
+            continue;
+        };
+        if ours != theirs {
+            stale.push(format!(
+                "{name}: translated ({ours:?} != {theirs:?}); delete the entry — the list may only shrink"
+            ));
+        }
+        if !reason_class_is_sanctioned(&entry.reason) {
+            stale.push(format!(
+                "{name}: reason {:?} is not one of the two sanctioned classes (language-neutral, untranslated-debt)",
+                entry.reason
+            ));
+        }
+    }
+    assert!(
+        stale.is_empty(),
+        "stale exemptions in {}:\n  {}",
+        identical_to_en_path().display(),
+        stale.join("\n  ")
+    );
+}
+
+/// The `en` pack's text for one exempted field, if the row and field exist.
+fn english_field_text<'a>(en_pack: &'a LocalePack, code: &str, issue: Option<&str>, field: &str) -> Option<&'a str> {
+    let template = en_pack.diagnostics.get(code)?;
+    let row = match issue {
+        Some(issue) => template.issues.get(issue)?,
+        None => template,
+    };
+    match field {
+        "message" => Some(row.message.as_str()),
+        "help" => row.help.as_deref(),
+        _ => None,
     }
 }
