@@ -380,10 +380,34 @@ fn public_kernel_writing_elsewhere_is_rejected() {
 // =============================================================================
 
 #[test]
-fn overlapping_mut_arguments_of_a_method_call_are_declined_by_the_pass() {
-    // The call-site borrow rule does not check a user-method call's
-    // arguments: the proof must not lean on it.
-    let source = kernel(OVER_OUT, "s.both(in out, in out, i)");
+fn overlapping_mut_arguments_of_a_method_call_are_a_borrow_error() {
+    // The call-site borrow rule checks a user-method call's arguments (need
+    // 1ce9ea98 hole 1), so two `in` arguments naming one tensor are rejected
+    // there first. The filum pass still declines the same call on its own, so
+    // both diagnostics are present; the second owner is not leaned on.
+    let result = analyze_source(&kernel(OVER_OUT, "s.both(in out, in out, i)"));
+    let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.issue() == Some("mutable_borrow_conflict")),
+        "{errors:?}"
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|d| has_reason(d, "overlapping_call_arguments")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn overlapping_mut_arguments_through_the_receiver_are_declined_by_the_pass() {
+    // The borrow rule compares the argument places: `out` and `s.data` are
+    // different places to it, though `s` holds `out`. Only the filum pass maps
+    // the receiver's field to the storage it holds, so it is the sole owner of
+    // this spelling.
+    let source = kernel(OVER_OUT, "s.both(in out, in s.data, i)");
     let result = analyze_source(&source);
     let errors: Vec<_> = result.diagnostics.iter().filter(|d| d.is_error()).collect();
     assert!(
