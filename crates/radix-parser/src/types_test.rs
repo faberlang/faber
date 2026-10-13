@@ -245,6 +245,33 @@ fn union_type_preserves_member_modes_when_flattening() {
 }
 
 #[test]
+fn function_type_arrow_is_greedy_over_union_tail() {
+    // The return type consumes `∪ nihil`, so the union sits inside the arrow
+    // and the function type itself is not a union member.
+    let result = parse_ok("typus Probe = (numerus) → numerus ∪ nihil");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias");
+    };
+    let TypeExprKind::Func(func) = &alias.ty.kind else {
+        panic!(
+            "expected function type at the top level, got {:?}",
+            alias.ty.kind
+        );
+    };
+    let TypeExprKind::Union(members) = &func.ret.kind else {
+        panic!("expected union return type, got {:?}", func.ret.kind);
+    };
+    assert_eq!(members.len(), 2);
+    assert!(
+        matches!(&members[0].kind, TypeExprKind::Named(n, _) if result.interner.resolve(n.name) == "numerus")
+    );
+    assert!(
+        matches!(&members[1].kind, TypeExprKind::Named(n, _) if result.interner.resolve(n.name) == "nihil")
+    );
+}
+
+#[test]
 fn parses_tensor_with_literal_and_infer_figura() {
     let result = parse_ok("functio f(tensor<f32, [2, 3]> value) → vacuum {}");
     let program = result.program.as_ref().expect("program");

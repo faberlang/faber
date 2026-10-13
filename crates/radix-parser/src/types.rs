@@ -193,7 +193,7 @@ impl Parser {
                 form: TypeFormLevel::LONG,
                 iuncta_label: None,
             };
-            return self.parse_union_tail(core, start);
+            return Ok(core);
         }
 
         // Standalone `∪` is a union hole. A second cup is a parse error; the
