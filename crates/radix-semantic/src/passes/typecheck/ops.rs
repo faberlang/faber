@@ -505,9 +505,10 @@ impl TypeChecker<'_> {
 
     /// Allow cross-precision `instans` operands for ordering only.
     ///
-    /// WHY: ordering compares at the coarser declared precision; operands need
-    /// not unify to one precision marker in the type table. Equality uses
-    /// [`Self::exact_equality_types`] instead.
+    /// WHY: operands need not unify to one precision marker in the type table,
+    /// so this only checks that both sides are `instans` and returns the
+    /// resolved rhs type; the caller discards it (ordering yields `bivalens`).
+    /// Equality uses [`Self::exact_equality_types`] instead.
     fn instans_join(&mut self, lhs: TypeId, rhs: TypeId, span: radix_lexer::Span) -> TypeId {
         let lhs_resolved = self.resolve_inferred_type(lhs);
         let rhs_resolved = self.resolve_inferred_type(rhs);

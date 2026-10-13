@@ -228,9 +228,6 @@ mod union_member_refinement_test;
 #[path = "union_overlap_access_test.rs"]
 mod union_overlap_access_test;
 
-// Lane-gated: compiles through the full driver to the Rust target; a
-// core-only build excludes the module.
-
 /// Type information for a value currently visible in lexical scope.
 #[derive(Clone, Copy)]
 pub(crate) struct BindingInfo {
@@ -1097,9 +1094,6 @@ fn param_mode_from_hir(mode: HirParamMode) -> SemanticParamMode {
         HirParamMode::Ex => SemanticParamMode::Move,
     }
 }
-
-// Lane-gated: compiles through the full driver to the Rust target; a
-// core-only build excludes the module.
 
 #[cfg(test)]
 #[path = "test_support.rs"]

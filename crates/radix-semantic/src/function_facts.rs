@@ -183,9 +183,9 @@ pub fn analyze_function_facts(hir: &HirModule, types: &TypeTable) -> FunctionFac
         );
     }
 
-    // Closure capture facts are attached under the enclosing function's row as
-    // nested walk results; also index free-standing closure expressions that
-    // appear in the entry body.
+    // The entry body gets its own row (failure, await and call edges only; its
+    // `captures` stay empty). Closure captures are collected per function in
+    // the second pass below.
     if let Some(entry) = &hir.entry {
         let mut visitor = BodyVisitor {
             types,

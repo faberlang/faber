@@ -156,7 +156,8 @@ impl TypeChecker<'_> {
         self.errors.push(error);
     }
 
-    /// Whether `ty` is a `meus<T>` view whose peer is a Faber handler.
+    /// Whether `ty` is the typecheck-only closed `meus<T, marker>` view (two
+    /// applied args) that a `meus` toward a Faber handler yields.
     pub(super) fn is_closed_meus(&self, ty: TypeId) -> bool {
         let Some(meus_def) = frame_types::meus_def_id(self.resolver) else {
             return false;

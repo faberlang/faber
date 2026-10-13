@@ -2,7 +2,7 @@
 //!
 //! Score = 1 (base) + decision points, per declared function with a body.
 //! The counting rules are the contract in
-//! `docs/factory/complexity-diagnostics/goal.md` §Proposal; the row-per-row
+//! `docs/archived/complexity-diagnostics/goal.md` §Proposal; the row-per-row
 //! tests in `complexity_test.rs` pin every row. Closures are not declared
 //! functions: their bodies fold into the enclosing function's score (the
 //! HIR walk does not stop at `Clausura` boundaries).
@@ -22,14 +22,14 @@ use radix_lexer::{Interner, Span};
 const ISSUE_COMPLEXITY_BUDGET_EXCEEDED: &str = "complexity_budget_exceeded";
 
 /// Baked per-function complexity budget, fixed by the CC-U4 census (CC-U5):
-/// `docs/factory/complexity-diagnostics/census-report.md` recommends 12 —
+/// `docs/archived/complexity-diagnostics/census-report.md` recommends 12 —
 /// the nearest candidate to the measured pooled p95 = 11, firing on the top
 /// 4.4% of the 2393 scored functions.
 pub const DEFAULT_COMPLEXITY_BUDGET: u32 = 12;
 
 /// Baked complexity budget for `@ nucleum` kernel entries
 /// ([`HirFunction::is_kernel`]), fixed by the CC-U4 census kernel subset:
-/// `docs/factory/complexity-diagnostics/census-report.md` recommends 2 —
+/// `docs/archived/complexity-diagnostics/census-report.md` recommends 2 —
 /// all 84 measured kernel functions score ≤ 2 (six at 2), so the budget
 /// fires on nothing today and trips any future kernel scoring 3+.
 /// Advisory-only: it warns, it never gates kernel admission.

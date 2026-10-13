@@ -330,7 +330,8 @@ impl<'a> IndexUnifier<'a> {
         Ok(())
     }
 
-    /// BO-S-6: cache per `(IndexVar, resolved IndexId)`; no dims.clone().
+    /// BO-S-6: cache per `(IndexVar, resolved IndexId)`; the tuple arm clones
+    /// `dims` to release the `types` borrow before recursing.
     fn occurs_in(&mut self, var: IndexVar, id: IndexId) -> bool {
         let id = self.resolve(id);
         if let Some(&cached) = self.occurs_cache.get(&(var, id)) {

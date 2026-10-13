@@ -554,7 +554,8 @@ fn int_binary(op: HirBinOp, a: i128, b: i128, span: Span) -> Result<Value, Fault
     // no count masking; a negative count is an error.
     let shift_left = || {
         // The count is validated before the operand, as the runner does
-        // (exact_int.rs): `0 ⇐ (0 - 1)` is the negative-shift error, not 0.
+        // (exact_int.rs): `0 ⇐ (0 - 1)` is an error, not 0, reported as
+        // `constant_arithmetic_overflow` (there is no separate negative-shift issue).
         if b < 0 {
             return Err(overflow);
         }
