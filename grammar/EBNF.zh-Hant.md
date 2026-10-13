@@ -2773,6 +2773,7 @@ comment.
 
 - `入口` = sync entry, `非同步入口` = async entry.
 - `引數` binds parsed command-line arguments; `出口` supplies the process exit expression. Their order is fixed by `entryHeader`.
+- Raw entry arguments never include the program name, on every target: `args[0]` is the first argument the program was given.
 
 ---
 

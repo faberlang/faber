@@ -2773,6 +2773,7 @@ comment.
 
 - `เริ่ม` = sync entry, `เริ่มอะซิงก์` = async entry.
 - `อาร์กิวเมนต์` binds parsed command-line arguments; `ทางออก` supplies the process exit expression. Their order is fixed by `entryHeader`.
+- Raw entry arguments never include the program name, on every target: `args[0]` is the first argument the program was given.
 
 ---
 

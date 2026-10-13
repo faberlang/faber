@@ -1,0 +1,31 @@
++++
+term = "argumenta"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "entry_header", "expression", "nota_stmt"]
+category = "entry"
+canonical = false
+summary = "A raw `main args` entry binds the arguments the program was given, never the program name."
+syntax = "main args <name> <block>"
+related = ["argumenta", "incipit", "cli"]
+locale = "en"
++++
+# =============================================================================
+# Raw entry arguments — the list holds the arguments, not the program name
+# =============================================================================
+#
+# What this teaches:
+#   • `main args <name>` without `@ cli` binds the raw argument list
+#   • the list holds the arguments the program was given; the program name is
+#     never an element, on every target
+#
+# Common mistakes:
+#   • reading `args[0]` as the program name — it is the first argument
+#
+# See also: argumenta, incipit, cli
+# =============================================================================
+
+# EXPECTED stdout: see argumenta-raw.expected (run with arguments `a b`)
+
+main args args {
+    print args
+}

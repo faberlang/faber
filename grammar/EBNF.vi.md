@@ -2773,6 +2773,7 @@ comment.
 
 - `bắt_đầu` = sync entry, `bắt_đầu_bất_đồng_bộ` = async entry.
 - `đối_số` binds parsed command-line arguments; `thoát` supplies the process exit expression. Their order is fixed by `entryHeader`.
+- Raw entry arguments never include the program name, on every target: `args[0]` is the first argument the program was given.
 
 ---
 

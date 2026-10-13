@@ -1,0 +1,31 @@
++++
+term = "argumenta"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "entry_header", "expression", "nota_stmt"]
+category = "entry"
+canonical = false
+summary = "A raw `incipit argumenta` entry binds the arguments the program was given, never the program name."
+syntax = "incipit argumenta <name> <block>"
+related = ["argumenta", "incipit", "cli"]
+locale = "la"
++++
+# =============================================================================
+# Raw entry arguments — the list holds the arguments, not the program name
+# =============================================================================
+#
+# What this teaches:
+#   • `incipit argumenta <name>` without `@ cli` binds the raw argument list
+#   • the list holds the arguments the program was given; the program name is
+#     never an element, on every target
+#
+# Common mistakes:
+#   • reading `args[0]` as the program name — it is the first argument
+#
+# See also: argumenta, incipit, cli
+# =============================================================================
+
+# EXPECTED stdout: see argumenta-raw-la.expected (run with arguments `a b`)
+
+incipit argumenta args {
+    nota args
+}

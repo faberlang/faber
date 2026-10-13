@@ -2773,6 +2773,7 @@ comment.
 
 - `بداية` = sync entry, `استهلال` = async entry.
 - `وسائط` binds parsed command-line arguments; `مخرج` supplies the process exit expression. Their order is fixed by `entryHeader`.
+- Raw entry arguments never include the program name, on every target: `args[0]` is the first argument the program was given.
 
 ---
 
