@@ -839,13 +839,6 @@ impl PackageInstantiate<'_> {
         true
     }
 
-    fn magnitudo_literal_of(&self, ty: MirType) -> Option<u64> {
-        let Type::Param(sym) = self.types.get(ty.semantic_id()) else {
-            return None;
-        };
-        radix_types::parse_natural_capacity(self.interner.resolve(*sym))
-    }
-
     /// Index witness of an explicit magnitudo argument: a NATURAL spelling
     /// maps to its literal index; a caller-owned symbolic `Param` resolves
     /// through the calling instance's shape bindings (GSF-1 forwarding —
@@ -862,7 +855,7 @@ impl PackageInstantiate<'_> {
             return None;
         };
         let sym = *sym;
-        if let Some(value) = self.magnitudo_literal_of(concrete) {
+        if let Some(value) = radix_types::parse_natural_capacity(self.interner.resolve(sym)) {
             let index = find_literal_index(self.types, value);
             if index.is_none() {
                 self.errors.push(MirError::validation(
@@ -1376,7 +1369,7 @@ impl PackageInstantiate<'_> {
             MirOperand::Place(place) => self.place_ty(place, scope, span),
             MirOperand::Temp(id) => scope.temps.get(id).copied(),
             MirOperand::Value(id) => scope.values.get(id).copied(),
-            MirOperand::Constant(constant) => self.constant_ty(constant, span),
+            MirOperand::Constant(constant) => self.constant_ty(constant),
         }
     }
 
@@ -1451,7 +1444,7 @@ impl PackageInstantiate<'_> {
         }
     }
 
-    fn constant_ty(&self, constant: &radix_mir::MirConstant, _span: Span) -> Option<MirType> {
+    fn constant_ty(&self, constant: &radix_mir::MirConstant) -> Option<MirType> {
         use radix_mir::MirConstant;
         let primitive = match constant {
             MirConstant::Int(_) | MirConstant::UInt(_) => Primitive::Numerus,
@@ -1603,10 +1596,8 @@ fn rewrite_call_callee(function: &mut MirFunction, call: &PendingCall, target: M
         return;
     };
     if let Some(statement_index) = call.statement_index {
-        if let Some(MirStatementKind::Call { callee, .. }) = block
-            .statements
-            .get_mut(statement_index)
-            .map(|statement| &mut statement.kind)
+        if let Some(statement) = block.statements.get_mut(statement_index)
+            && let MirStatementKind::Call { callee, .. } = &mut statement.kind
         {
             *callee = MirCallee::Function(target);
         }

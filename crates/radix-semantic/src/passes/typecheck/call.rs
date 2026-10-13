@@ -303,9 +303,13 @@ impl TypeChecker<'_> {
         self.report_unavailable_function(&gates, name, span)
     }
 
-    /// Assembles a provisional function signature from already-checked argument types.
-    // moves params into FuncSig
-    fn signature_from_arg_types(&mut self, params: Vec<ParamType>) -> FuncSig {
+    /// Builds a provisional function signature from actual arguments.
+    ///
+    /// This is an inference device, not a declaration model. Each argument is
+    /// checked once, then the callee's inference variable can be unified with a
+    /// callable type that reflects the use site.
+    pub fn build_call_signature(&mut self, args: &mut [HirCallArg]) -> FuncSig {
+        let params = self.typecheck_call_args_once(args);
         FuncSig {
             type_params: Vec::new(),
             params,
@@ -314,16 +318,6 @@ impl TypeChecker<'_> {
             is_async: false,
             is_generator: false,
         }
-    }
-
-    /// Builds a provisional function signature from actual arguments.
-    ///
-    /// This is an inference device, not a declaration model. Each argument is
-    /// checked once, then the callee's inference variable can be unified with a
-    /// callable type that reflects the use site.
-    pub fn build_call_signature(&mut self, args: &mut [HirCallArg]) -> FuncSig {
-        let params = self.typecheck_call_args_once(args);
-        self.signature_from_arg_types(params)
     }
 
     /// Inferred-callee path: check arguments once, unify callee, return result type.
@@ -706,6 +700,23 @@ impl TypeChecker<'_> {
             .or_else(|| self.binding_names.get(&def_id).copied())
     }
 
+    /// Active-locale surface spelling for a canonical intrinsic name.
+    ///
+    /// Rewrites `name` to the interned surface symbol when the active pack has
+    /// one, so the ordinary intrinsic checker performs its locale mapping while
+    /// every backend still receives the canonical Latin name.
+    fn intrinsic_surface_name(&self, canonical: &str, name: &mut Symbol) -> String {
+        let surface = self
+            .locale_pack
+            .map_or(canonical, |pack| pack.intrinsic_surface(canonical));
+        if let Some(interner) = self.interner
+            && let Some(symbol) = interner.lookup(surface)
+        {
+            *name = symbol;
+        }
+        surface.to_owned()
+    }
+
     /// Checks method-call syntax after the receiver has been synthesized.
     ///
     /// Declared/interface methods are preferred. The array branch preserves a
@@ -765,15 +776,7 @@ impl TypeChecker<'_> {
                 self.invalid_operand_types("glyph_rounding_tensor_unsupported", receiver.span);
                 return self.error_type;
             }
-            let surface = self
-                .locale_pack
-                .map_or(canonical, |pack| pack.intrinsic_surface(canonical));
-            if let Some(interner) = self.interner
-                && let Some(symbol) = interner.lookup(surface)
-            {
-                *name = symbol;
-            }
-            surface.to_owned()
+            self.intrinsic_surface_name(canonical, name)
         } else if method_name == super::tensor_index::GLYPH_TRANSPOSE_METHOD {
             if !explicit_type_args.is_empty() || !args.is_empty() {
                 self.typecheck_call_arg_exprs(args);
@@ -792,17 +795,7 @@ impl TypeChecker<'_> {
             // alongside the private glyph marker. Rewriting to the active
             // pack's surface lets the ordinary intrinsic checker perform its
             // locale mapping while every backend still receives `transpone`.
-            let surface = self
-                .locale_pack
-                .map_or(super::tensor_index::TENSOR_TRANSPONE, |pack| {
-                    pack.intrinsic_surface(super::tensor_index::TENSOR_TRANSPONE)
-                });
-            if let Some(interner) = self.interner
-                && let Some(symbol) = interner.lookup(surface)
-            {
-                *name = symbol;
-            }
-            surface.to_owned()
+            self.intrinsic_surface_name(super::tensor_index::TENSOR_TRANSPONE, name)
         } else {
             method_name
         };
@@ -989,7 +982,6 @@ impl TypeChecker<'_> {
 
         let resolved_receiver_ty = self.resolve_inferred_type(receiver_ty);
         let (_, intrinsic_ty) = self.types.peel_access_marker(resolved_receiver_ty);
-        let _resolved_receiver = self.types.get(intrinsic_ty);
         // S0-G2: applied aliases are value-transparent for intrinsic-method
         // dispatch — the receiver's builtin carrier owns the closed
         // tensor/vector/matrix method surface, including its unknown-method
@@ -1251,27 +1243,13 @@ impl TypeChecker<'_> {
                 span,
             )),
             (DirectionalViewKind::Meus, "fini") => {
-                if !args.is_empty() {
-                    self.typecheck_call_arg_exprs(args);
-                    self.wrong_arity_with_arg(
-                        "method_accepts_no_arguments",
-                        span,
-                        "method",
-                        "meus.fini",
-                    );
+                if self.reject_view_method_args(args, span, "meus.fini") {
                     return Some(self.error_type);
                 }
                 Some(status_ty)
             }
             (DirectionalViewKind::Tuus, "accipe") => {
-                if !args.is_empty() {
-                    self.typecheck_call_arg_exprs(args);
-                    self.wrong_arity_with_arg(
-                        "method_accepts_no_arguments",
-                        span,
-                        "method",
-                        "tuus.accipe",
-                    );
+                if self.reject_view_method_args(args, span, "tuus.accipe") {
                     return Some(self.error_type);
                 }
                 let Some(scrinium_def) =
@@ -1288,14 +1266,7 @@ impl TypeChecker<'_> {
                 Some(self.types.intern(Type::Union(vec![frame_ty, nihil])))
             }
             (DirectionalViewKind::Tuus, "cursor") => {
-                if !args.is_empty() {
-                    self.typecheck_call_arg_exprs(args);
-                    self.wrong_arity_with_arg(
-                        "method_accepts_no_arguments",
-                        span,
-                        "method",
-                        "tuus.cursor",
-                    );
+                if self.reject_view_method_args(args, span, "tuus.cursor") {
                     return Some(self.error_type);
                 }
                 let Some(scrinium_def) =
@@ -1312,33 +1283,37 @@ impl TypeChecker<'_> {
                 Some(self.types.cursor(frame_ty))
             }
             (DirectionalViewKind::Tuus, "exhauri") => {
-                if !args.is_empty() {
-                    self.typecheck_call_arg_exprs(args);
-                    self.wrong_arity_with_arg(
-                        "method_accepts_no_arguments",
-                        span,
-                        "method",
-                        "tuus.exhauri",
-                    );
+                if self.reject_view_method_args(args, span, "tuus.exhauri") {
                     return Some(self.error_type);
                 }
                 Some(payload_ty)
             }
             (DirectionalViewKind::Tuus, "fini") => {
-                if !args.is_empty() {
-                    self.typecheck_call_arg_exprs(args);
-                    self.wrong_arity_with_arg(
-                        "method_accepts_no_arguments",
-                        span,
-                        "method",
-                        "tuus.fini",
-                    );
+                if self.reject_view_method_args(args, span, "tuus.fini") {
                     return Some(self.error_type);
                 }
                 Some(status_ty)
             }
             _ => None,
         }
+    }
+
+    /// Rejects arguments on a zero-argument directional view method.
+    ///
+    /// Returns `true` after reporting `method_accepts_no_arguments`; the caller
+    /// then yields the shared error type without typing the view.
+    fn reject_view_method_args(
+        &mut self,
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+        method: &str,
+    ) -> bool {
+        if args.is_empty() {
+            return false;
+        }
+        self.typecheck_call_arg_exprs(args);
+        self.wrong_arity_with_arg("method_accepts_no_arguments", span, "method", method);
+        true
     }
 
     fn directional_view_payload(
@@ -1438,7 +1413,6 @@ impl TypeChecker<'_> {
         self.sermo_shape(receiver_ty).is_some()
     }
 
-    // moves params into FuncSig
     pub fn check_known_method_args(
         &mut self,
         args: &mut [HirCallArg],
@@ -1688,13 +1662,10 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) {
         let mut args = vec![
-            (
-                "source",
-                self.format_conversion_type_for_diagnostic(source_ty),
-            ),
+            ("source", self.format_union_constituent_type(source_ty)),
             (
                 "destination",
-                self.format_conversion_type_for_diagnostic(destination_ty),
+                self.format_union_constituent_type(destination_ty),
             ),
         ];
         // CTR-04: names are the ambiguity escape — when the pair names a
@@ -1878,18 +1849,14 @@ impl TypeChecker<'_> {
                 .copied()
                 .map(|member| self.lookup_method_signature(member, name))
                 .collect();
-            let mut agree = true;
-            let first = signatures.iter().find_map(std::clone::Clone::clone);
-            let Some(first) = first else {
+            let Some(first) = signatures.iter().find_map(std::clone::Clone::clone) else {
                 continue;
             };
-            for sig in signatures.iter().flatten() {
-                if !self.func_sigs_agree(&first, sig) {
-                    agree = false;
-                    break;
-                }
-            }
-            if !agree {
+            if signatures
+                .iter()
+                .flatten()
+                .any(|sig| !self.func_sigs_agree(&first, sig))
+            {
                 let method = self
                     .interner
                     .map(|interner| interner.resolve(name).to_owned())
@@ -1920,7 +1887,6 @@ impl TypeChecker<'_> {
         self.errors.push(error);
     }
 
-    /// Whether a union constituent is a nominal user type (U1R guardrails).
     /// Whether an annotation, through aliases and a `∪ none` wrapper, names a
     /// declared enum.
     fn annotation_names_enum(&mut self, ty: TypeId) -> bool {
@@ -1937,6 +1903,7 @@ impl TypeChecker<'_> {
         false
     }
 
+    /// Whether a union constituent is a nominal user type (U1R guardrails).
     fn constituent_is_nominal(&self, member: TypeId) -> bool {
         self.struct_def_from_type(member).is_some()
             || self.interface_def_from_type(member).is_some()
@@ -2001,10 +1968,6 @@ impl TypeChecker<'_> {
             .filter(|(_, hits)| *hits >= 2)
             .map(|(name, _)| name)
             .collect()
-    }
-
-    fn format_conversion_type_for_diagnostic(&self, ty: TypeId) -> String {
-        self.format_union_constituent_type(ty)
     }
 
     /// Enforces alternate-exit handling for functions that can produce errors.

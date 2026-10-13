@@ -106,3 +106,23 @@ fn vel_on_an_infallible_or_optional_call_is_unchanged() {
         "functio h(lista<numerus> xs) → numerus {\n    redde xs.accipe(1) vel 0\n}\n",
     ));
 }
+
+// --- zero-argument directional view methods ---------------------------------
+
+#[test]
+fn directional_view_method_rejects_a_written_argument() {
+    // `fini` takes no arguments: the argument is still typechecked, then the
+    // shared arity rejection yields the error type.
+    test_support::assert_rejects_with_issue(
+        concat!(
+            "@ ad 'x:y'\n",
+            "functio f(textus n) → numerus { redde 1 }\n\n",
+            "incipit {\n",
+            "    fixum _ s ← ad 'x:y' (\"a\")\n",
+            "    fixum _ t ← s.tuus<numerus>()\n",
+            "    nota t.fini(1)\n",
+            "}\n",
+        ),
+        "method_accepts_no_arguments",
+    );
+}

@@ -624,83 +624,20 @@ impl<'a> DeviceSafeClassifier<'a> {
 }
 
 impl MirVisitor for DeviceSafeClassifier<'_> {
+    /// WHY no per-function save/restore: `crate::visit::walk_function`
+    /// visits only the current function's params, locals, temps and blocks,
+    /// so this method never re-enters. `classify_structured_allowances` and
+    /// `classify_device_function_slots` overwrite every per-function field
+    /// before the walk, and every reader is guarded by
+    /// `in_device_function`.
     fn visit_function(&mut self, function: &MirFunction) {
-        let was_in_device_function = self.in_device_function;
-        let previous_allows_structured_return_branch = self.allows_structured_return_branch;
-        let previous_allows_structured_indexed_write_branch =
-            self.allows_structured_indexed_write_branch;
-        let previous_allows_structured_indexed_write_goto =
-            self.allows_structured_indexed_write_goto;
-        let previous_allows_structured_indexed_write_loop =
-            self.allows_structured_indexed_write_loop;
-        let previous_allows_structured_indexed_write_loop_break =
-            self.allows_structured_indexed_write_loop_break;
-        let previous_allows_structured_indexed_write_loop_continue =
-            self.allows_structured_indexed_write_loop_continue;
-        let previous_allows_structured_indexed_write_switch =
-            self.allows_structured_indexed_write_switch;
-        let previous_allows_structured_indexed_value_join_branch =
-            self.allows_structured_indexed_value_join_branch;
-        let previous_allows_structured_value_join_branch = self.allows_structured_value_join_branch;
-        let previous_allows_structured_scalar_switch = self.allows_structured_scalar_switch;
-        let previous_allows_structured_scalar_loop = self.allows_structured_scalar_loop;
-        let previous_allows_structured_scalar_loop_break = self.allows_structured_scalar_loop_break;
-        let previous_allows_structured_scalar_loop_continue =
-            self.allows_structured_scalar_loop_continue;
-        let previous_allows_structured_scalar_return_goto =
-            self.allows_structured_scalar_return_goto;
-        let previous_allows_structured_nested_scalar_loop_branch =
-            self.allows_structured_nested_scalar_loop_branch;
-        let previous_allows_structured_nested_indexed_write_loop_branch =
-            self.allows_structured_nested_indexed_write_loop_branch;
-        let previous_allows_structured_nested_indexed_write_loop_break =
-            self.allows_structured_nested_indexed_write_loop_break;
-        let previous_allows_structured_nested_indexed_write_loop_continue =
-            self.allows_structured_nested_indexed_write_loop_continue;
-        enter_device_function(self, function);
+        self.in_device_function = self.device.role_for_function(function).is_some();
 
         if self.in_device_function {
             classify_structured_allowances(self, function);
             classify_device_function_slots(self, function);
             crate::visit::walk_function(self, function);
         }
-
-        self.in_lane_form_function = false;
-        self.throw_slots = None;
-        self.genus_params.clear();
-        self.dead_fold_artifact_slots = FoldArtifactSlots::default();
-        self.dead_const_copy_slots = DeadConstCopySlots::default();
-        self.literal_indexed_access = None;
-        self.result_aggregation_slots = ResultAggregationSlots::default();
-        self.in_device_function = was_in_device_function;
-        self.allows_structured_return_branch = previous_allows_structured_return_branch;
-        self.allows_structured_indexed_write_branch =
-            previous_allows_structured_indexed_write_branch;
-        self.allows_structured_indexed_write_goto = previous_allows_structured_indexed_write_goto;
-        self.allows_structured_indexed_write_loop = previous_allows_structured_indexed_write_loop;
-        self.allows_structured_indexed_write_loop_break =
-            previous_allows_structured_indexed_write_loop_break;
-        self.allows_structured_indexed_write_loop_continue =
-            previous_allows_structured_indexed_write_loop_continue;
-        self.allows_structured_indexed_write_switch =
-            previous_allows_structured_indexed_write_switch;
-        self.allows_structured_indexed_value_join_branch =
-            previous_allows_structured_indexed_value_join_branch;
-        self.allows_structured_value_join_branch = previous_allows_structured_value_join_branch;
-        self.allows_structured_scalar_switch = previous_allows_structured_scalar_switch;
-        self.allows_structured_scalar_loop = previous_allows_structured_scalar_loop;
-        self.allows_structured_scalar_loop_break = previous_allows_structured_scalar_loop_break;
-        self.allows_structured_scalar_loop_continue =
-            previous_allows_structured_scalar_loop_continue;
-        self.allows_structured_scalar_return_goto = previous_allows_structured_scalar_return_goto;
-        self.allows_structured_nested_scalar_loop_branch =
-            previous_allows_structured_nested_scalar_loop_branch;
-        self.allows_structured_nested_indexed_write_loop_branch =
-            previous_allows_structured_nested_indexed_write_loop_branch;
-        self.allows_structured_nested_indexed_write_loop_break =
-            previous_allows_structured_nested_indexed_write_loop_break;
-        self.allows_structured_nested_indexed_write_loop_continue =
-            previous_allows_structured_nested_indexed_write_loop_continue;
     }
 
     fn visit_param(&mut self, param: &MirParam) {
@@ -1159,28 +1096,6 @@ fn reject_runtime_call(classifier: &mut DeviceSafeClassifier<'_>, call: &MirRunt
         format!("{SHAPE_KERNEL_RUNTIME_CALL} {op_name}")
     };
     classifier.record_policy(shape);
-}
-
-fn enter_device_function(classifier: &mut DeviceSafeClassifier<'_>, function: &MirFunction) {
-    classifier.in_device_function = classifier.device.role_for_function(function).is_some();
-    classifier.allows_structured_return_branch = false;
-    classifier.allows_structured_indexed_write_branch = false;
-    classifier.allows_structured_indexed_write_goto = false;
-    classifier.allows_structured_indexed_write_loop = false;
-    classifier.allows_structured_indexed_write_loop_break = false;
-    classifier.allows_structured_indexed_write_loop_continue = false;
-    classifier.allows_structured_indexed_write_switch = false;
-    classifier.allows_structured_indexed_value_join_branch = false;
-    classifier.allows_structured_value_join_branch = false;
-    classifier.allows_structured_scalar_switch = false;
-    classifier.allows_structured_scalar_loop = false;
-    classifier.allows_structured_scalar_loop_break = false;
-    classifier.allows_structured_scalar_loop_continue = false;
-    classifier.allows_structured_scalar_return_goto = false;
-    classifier.allows_structured_nested_scalar_loop_branch = false;
-    classifier.allows_structured_nested_indexed_write_loop_branch = false;
-    classifier.allows_structured_nested_indexed_write_loop_break = false;
-    classifier.allows_structured_nested_indexed_write_loop_continue = false;
 }
 
 fn classify_structured_allowances(

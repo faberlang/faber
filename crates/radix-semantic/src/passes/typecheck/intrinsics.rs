@@ -271,13 +271,6 @@ pub(super) fn check_intrinsic_method_call(
         || "method".to_owned(),
         |interner| interner.resolve(*name).to_owned(),
     );
-    // Pack-authoritative lookup (db54b442): the active pack is the sole
-    // authority for intrinsic spellings under non-la locales. Under a NON-la
-    // pack, only spellings the pack declares as a surface for the receiver's
-    // family resolve — through the family-scoped surface→canonical cache; the
-    // canonical Latin spelling is a miss and a compile error (no registry
-    // bypass, no Latin fallback). Under the la pack or no pack, lookup is
-    // registry-direct: the spelling IS the canonical Latin identity.
     let mut effective_name = method_name.as_str();
     let mut entry = None;
     let is_modular = matches!(checker.types.get(payload_ty), Type::ModularWord(_));
@@ -598,143 +591,160 @@ pub(super) fn check_intrinsic_method_call(
                 Some(resolved)
             }
         }
-        _ => {
-            let params = resolve_param_types(checker, entry, &ctx);
-            let ret = resolve_return_type(checker, entry, &ctx, span);
-            // WHY: tensor `NumerusArray` slots accept `lista<integer>` values
-            // that fit the runtime i64 boundary (DEFER-064) so GPU/KIR source
-            // can pass `lista<u32>` index vectors without a bare-`numerus`
-            // detour. The generic unify path forces
-            // `lista<numerus>` and rejects sized-integer lists under the v1
-            // widening lattice; route tensor calls through a structural checker
-            // instead of widening that lattice globally.
-            let result = if !entry.generic.is_empty() {
-                // Declared catalog generics use GPD's binder. Empty rows keep
-                // the rigid/tensor paths below so receiver-owned shape params
-                // stay unsolved.
-                let type_params = interned_catalog_generics(checker, entry.generic);
-                let sig = FuncSig {
-                    type_params,
-                    params,
-                    ret,
-                    err: None,
-                    is_async: false,
-                    is_generator: false,
-                };
-                checker.check_instantiated_call(&sig, explicit_type_args, args, span, None)
-            } else if matches!(
-                entry.receiver,
-                radix_intrinsics::IntrinsicReceiver::Tensor
-                    | radix_intrinsics::IntrinsicReceiver::Sparsa
-            ) {
-                let checked = check_tensor_method_args(checker, entry, &params, args, ret, span);
-                if entry.failable {
-                    // A registry row that declares `⇥` is a failable call: the
-                    // same handler / `⊥` default / enclosing `⇥` rule (D17.8)
-                    // as a user function with a `⇥ textus` signature. A call
-                    // whose index argument is statically proven in range
-                    // cannot fail (the rule `numeric_conversio_can_fail`
-                    // applies to a literal that fits) and needs no handler; a
-                    // provably out-of-range index is the compile-time
-                    // `index_provably_out_of_bounds`, as the index form gives.
-                    let range = entry
-                        .range_checked_arg
-                        .and_then(|position| args.get(position))
-                        .map(|arg| {
-                            let index = arg.expr.clone();
-                            let range = super::tensor_index::classify_static_index_range(
-                                checker,
-                                receiver_ty,
-                                &index,
-                            );
-                            (index, range)
-                        });
-                    match range {
-                        Some((_, super::tensor_index::StaticIndexRange::InRange)) => {}
-                        Some((
-                            index,
-                            range @ super::tensor_index::StaticIndexRange::OutOfRange { .. },
-                        )) => {
-                            super::tensor_index::report_static_index_oob(checker, &index, &range);
-                        }
-                        _ => {
-                            let err = checker.textus_type();
-                            let sig = FuncSig {
-                                type_params: Vec::new(),
-                                params: Vec::new(),
-                                ret: checked,
-                                err: Some(err),
-                                is_async: false,
-                                is_generator: false,
-                            };
-                            checker.reject_failable_call(&sig, span);
-                        }
-                    }
-                }
-                checked
-            } else if entry.failable {
-                // need: the `at` read (la `apud`) on `lista`, `tabula`
-                // and `textus` is a failable call: an out-of-range index or a
-                // missing key is reported on `⇥ textus`, so the call needs a
-                // handler, a `⊥` default or an enclosing `⇥` (D17.8).
-                let checked = checker.check_known_method_args(args, params, ret, span);
-                let err = checker.textus_type();
-                let sig = FuncSig {
-                    type_params: Vec::new(),
-                    params: Vec::new(),
-                    ret: checked,
-                    err: Some(err),
-                    is_async: false,
-                    is_generator: false,
-                };
-                checker.reject_failable_call(&sig, span);
-                checked
-            } else if bounded_appende {
-                // D6: bounded `appende` is a typed recoverable alternate exit.
-                // Unbounded `lista<T>.appende` stays vacuum with no error channel.
-                let err = checker.textus_type();
-                let sig = FuncSig {
-                    type_params: Vec::new(),
-                    params,
-                    ret,
-                    err: Some(err),
-                    is_async: false,
-                    is_generator: false,
-                };
-                checker.check_instantiated_call(&sig, &[], args, span, None)
-            } else {
-                checker.check_known_method_args(args, params, ret, span)
-            };
-            let result = if matches!(entry.return_kind, IntrinsicReturnKind::GenericTypus) {
-                validate_generic_typus_tensor(checker, receiver_ty, result, span)
-            } else {
-                result
-            };
-            if checker.reject_negative_potentia_exponent(entry, receiver_ty, args) {
-                return Some(checker.error_type);
-            }
-            let result = checker.integer_method_range_type(entry, receiver_ty, args, result);
-            if entry.faber_name == "accipe" && !entry.failable && !args.is_empty() {
-                super::tensor_index::reject_static_bounded_index_oob(
-                    checker,
-                    receiver_ty,
-                    &args[0].expr,
-                );
-            }
-            if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor) {
-                super::tensor_index::apply_tensor_intrinsic_shape_constraints(
-                    checker,
-                    entry.faber_name,
-                    receiver,
-                    receiver_ty,
-                    result,
-                    args,
-                    span,
-                );
-            }
-            Some(result)
-        }
+        _ => Some(check_registered_intrinsic(
+            checker,
+            entry,
+            ctx,
+            bounded_appende,
+            receiver,
+            receiver_ty,
+            explicit_type_args,
+            args,
+            span,
+        )),
     }
+}
+
+/// Resolve and check one registered intrinsic row whose params and return
+/// shape are published from the receiver's element types (every row except
+/// the mapper and reducer rows routed to their own signatures above).
+fn check_registered_intrinsic(
+    checker: &mut TypeChecker<'_>,
+    entry: &MethodIntrinsic,
+    ctx: IntrinsicTypeContext,
+    bounded_appende: bool,
+    receiver: &HirExpression,
+    receiver_ty: TypeId,
+    explicit_type_args: &[TypeId],
+    args: &mut [HirCallArg],
+    span: radix_lexer::Span,
+) -> TypeId {
+    let params = resolve_param_types(checker, entry, &ctx);
+    let ret = resolve_return_type(checker, entry, &ctx, span);
+    // WHY: tensor `NumerusArray` slots accept `lista<integer>` values
+    // that fit the runtime i64 boundary (DEFER-064) so GPU/KIR source
+    // can pass `lista<u32>` index vectors without a bare-`numerus`
+    // detour. The generic unify path forces
+    // `lista<numerus>` and rejects sized-integer lists under the v1
+    // widening lattice; route tensor calls through a structural checker
+    // instead of widening that lattice globally.
+    let result = if !entry.generic.is_empty() {
+        // Declared catalog generics use GPD's binder. Empty rows keep
+        // the rigid/tensor paths below so receiver-owned shape params
+        // stay unsolved.
+        let type_params = interned_catalog_generics(checker, entry.generic);
+        let sig = FuncSig {
+            type_params,
+            params,
+            ret,
+            err: None,
+            is_async: false,
+            is_generator: false,
+        };
+        checker.check_instantiated_call(&sig, explicit_type_args, args, span, None)
+    } else if matches!(
+        entry.receiver,
+        radix_intrinsics::IntrinsicReceiver::Tensor | radix_intrinsics::IntrinsicReceiver::Sparsa
+    ) {
+        let checked = check_tensor_method_args(checker, entry, &params, args, ret, span);
+        if entry.failable {
+            // A registry row that declares `⇥` is a failable call: the
+            // same handler / `⊥` default / enclosing `⇥` rule (D17.8)
+            // as a user function with a `⇥ textus` signature. A call
+            // whose index argument is statically proven in range
+            // cannot fail (the rule `numeric_conversio_can_fail`
+            // applies to a literal that fits) and needs no handler; a
+            // provably out-of-range index is the compile-time
+            // `index_provably_out_of_bounds`, as the index form gives.
+            let range = entry
+                .range_checked_arg
+                .and_then(|position| args.get(position))
+                .map(|arg| {
+                    let index = arg.expr.clone();
+                    let range = super::tensor_index::classify_static_index_range(
+                        checker,
+                        receiver_ty,
+                        &index,
+                    );
+                    (index, range)
+                });
+            match range {
+                Some((_, super::tensor_index::StaticIndexRange::InRange)) => {}
+                Some((index, range @ super::tensor_index::StaticIndexRange::OutOfRange { .. })) => {
+                    super::tensor_index::report_static_index_oob(checker, &index, &range);
+                }
+                _ => {
+                    let err = checker.textus_type();
+                    let sig = FuncSig {
+                        type_params: Vec::new(),
+                        params: Vec::new(),
+                        ret: checked,
+                        err: Some(err),
+                        is_async: false,
+                        is_generator: false,
+                    };
+                    checker.reject_failable_call(&sig, span);
+                }
+            }
+        }
+        checked
+    } else if entry.failable {
+        // need: the `at` read (la `apud`) on `lista`, `tabula`
+        // and `textus` is a failable call: an out-of-range index or a
+        // missing key is reported on `⇥ textus`, so the call needs a
+        // handler, a `⊥` default or an enclosing `⇥` (D17.8).
+        let checked = checker.check_known_method_args(args, params, ret, span);
+        let err = checker.textus_type();
+        let sig = FuncSig {
+            type_params: Vec::new(),
+            params: Vec::new(),
+            ret: checked,
+            err: Some(err),
+            is_async: false,
+            is_generator: false,
+        };
+        checker.reject_failable_call(&sig, span);
+        checked
+    } else if bounded_appende {
+        // D6: bounded `appende` is a typed recoverable alternate exit.
+        // Unbounded `lista<T>.appende` stays vacuum with no error channel.
+        let err = checker.textus_type();
+        let sig = FuncSig {
+            type_params: Vec::new(),
+            params,
+            ret,
+            err: Some(err),
+            is_async: false,
+            is_generator: false,
+        };
+        checker.check_instantiated_call(&sig, &[], args, span, None)
+    } else {
+        checker.check_known_method_args(args, params, ret, span)
+    };
+    let result = if matches!(entry.return_kind, IntrinsicReturnKind::GenericTypus) {
+        validate_generic_typus_tensor(checker, receiver_ty, result, span)
+    } else {
+        result
+    };
+    if checker.reject_negative_potentia_exponent(entry, receiver_ty, args) {
+        return checker.error_type;
+    }
+    let result = checker.integer_method_range_type(entry, receiver_ty, args, result);
+    if entry.faber_name == "accipe" && !entry.failable && !args.is_empty() {
+        super::tensor_index::reject_static_bounded_index_oob(checker, receiver_ty, &args[0].expr);
+    }
+    if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor) {
+        super::tensor_index::apply_tensor_intrinsic_shape_constraints(
+            checker,
+            entry.faber_name,
+            receiver,
+            receiver_ty,
+            result,
+            args,
+            span,
+        );
+    }
+    result
 }
 
 /// `regex.muta(text, closure)` (RX-5): the closure takes the match and returns

@@ -297,10 +297,12 @@ impl CompositionPass<'_> {
                 return;
             }
         }
+        // Only device callers expand: a host caller's call to a device entry
+        // is the launch boundary, not a composition input.
         let leftover = self
             .functions
             .iter()
-            .filter(|function| self.is_device_caller(function) && self.resolver().has_device_call(function))
+            .filter(|function| self.is_device_callee(function) && self.resolver().has_device_call(function))
             .map(|function| function.id)
             .collect::<Vec<_>>();
         for id in leftover {
@@ -407,7 +409,7 @@ impl CompositionPass<'_> {
         let resolver = self.resolver();
         let mut graph = FxHashMap::default();
         for function in self.functions.iter() {
-            if !self.is_device_caller(function) {
+            if !self.is_device_callee(function) {
                 continue;
             }
             let mut edges = Vec::new();
@@ -579,7 +581,7 @@ impl CompositionPass<'_> {
             pass.push_expansion("depth", site.span, depth, pass.budget.max_depth, &chain);
             return false;
         }
-        let cloned_nodes = count_nodes(callee) + u32::try_from(callee.params.len()).unwrap_or(u32::MAX);
+        let cloned_nodes = count_nodes(callee) + saturating_u32(callee.params.len());
         if account.nodes.saturating_add(cloned_nodes) > pass.budget.max_cloned_nodes_per_entry {
             pass.push_expansion(
                 "nodes",
@@ -600,13 +602,7 @@ impl CompositionPass<'_> {
             );
             return false;
         }
-        let site_key = (
-            caller_id,
-            callee.id,
-            site.block_id,
-            site.stmt_index
-                .map_or(u32::MAX, |index| u32::try_from(index).unwrap_or(u32::MAX)),
-        );
+        let site_key = (callee.id, site.block_id, site.stmt_index.map_or(u32::MAX, saturating_u32));
         let inlines = account
             .sites
             .get(&site_key)
@@ -988,12 +984,6 @@ impl CompositionPass<'_> {
         )
     }
 
-    /// Whether `function` itself is device code — the only caller kind whose
-    /// calls compose. Host callers are the launch/partition boundary.
-    fn is_device_caller(&self, function: &MirFunction) -> bool {
-        self.is_device_callee(function)
-    }
-
     /// Expansion roots: launch entries plus synthetic kernel closures (their
     /// own device calls compose inside the region body).
     fn is_entry(&self, function: &MirFunction) -> bool {
@@ -1169,17 +1159,7 @@ fn splice_nesting(
             .saturating_sub(entry.statements.len());
         entry.statements.extend(vec![spliced.clone(); binds]);
         entry.terminator = spliced.clone();
-        for cloned_id in &new_blocks.cloned {
-            let len = caller
-                .blocks
-                .iter()
-                .find(|block| block.id == *cloned_id)
-                .map_or(0, |block| block.statements.len());
-            nesting.insert(
-                *cloned_id,
-                BlockNesting { statements: vec![spliced.clone(); len], terminator: spliced.clone() },
-            );
-        }
+        nest_cloned_blocks(nesting, caller, &new_blocks.cloned, spliced);
         return;
     };
     let inserted = |kept: usize| vec![spliced.clone(); block.statements.len().saturating_sub(kept)];
@@ -1203,25 +1183,38 @@ fn splice_nesting(
             entry.statements.extend(inserted(stmt_index));
             let old_terminator = std::mem::replace(&mut entry.terminator, spliced.clone());
             nesting.insert(continue_id, BlockNesting { statements: tail, terminator: old_terminator });
-            for cloned_id in &new_blocks.cloned {
-                let len = caller
-                    .blocks
-                    .iter()
-                    .find(|block| block.id == *cloned_id)
-                    .map_or(0, |block| block.statements.len());
-                nesting.insert(
-                    *cloned_id,
-                    BlockNesting { statements: vec![spliced.clone(); len], terminator: spliced.clone() },
-                );
-            }
+            nest_cloned_blocks(nesting, caller, &new_blocks.cloned, spliced);
         }
+    }
+}
+
+/// Register the cloned callee blocks at the spliced nesting: every statement
+/// and the terminator sit one call deeper than the site they came from.
+fn nest_cloned_blocks(
+    nesting: &mut FxHashMap<MirBlockId, BlockNesting>,
+    caller: &MirFunction,
+    cloned: &[MirBlockId],
+    spliced: &Nesting,
+) {
+    for cloned_id in cloned {
+        let len = caller
+            .blocks
+            .iter()
+            .find(|block| block.id == *cloned_id)
+            .map_or(0, |block| block.statements.len());
+        nesting.insert(
+            *cloned_id,
+            BlockNesting { statements: vec![spliced.clone(); len], terminator: spliced.clone() },
+        );
     }
 }
 
 struct Account {
     nodes: u32,
     instances: u32,
-    sites: FxHashMap<(MirFunctionId, MirFunctionId, MirBlockId, u32), u32>,
+    /// Per-caller expansion steps; the key omits the caller id because one
+    /// `Account` never spans two expansion roots.
+    sites: FxHashMap<(MirFunctionId, MirBlockId, u32), u32>,
 }
 
 impl Account {
@@ -1307,16 +1300,22 @@ fn error(issue: &'static str, reason: &'static str, span: Span, args: Vec<Diagno
     FragmentCompositionError { issue, reason, span, definition_span: None, args }
 }
 
+/// `usize` → `u32` for budget accounting: a value past `u32::MAX` counts as
+/// the ceiling rather than wrapping.
+fn saturating_u32(value: usize) -> u32 {
+    u32::try_from(value).unwrap_or(u32::MAX)
+}
+
 fn count_nodes(function: &MirFunction) -> u32 {
     let stmts = function
         .blocks
         .iter()
-        .map(|block| u32::try_from(block.statements.len()).unwrap_or(u32::MAX) + 1)
+        .map(|block| saturating_u32(block.statements.len()) + 1)
         .sum::<u32>();
     stmts
-        + u32::try_from(function.locals.len()).unwrap_or(u32::MAX)
-        + u32::try_from(function.temps.len()).unwrap_or(u32::MAX)
-        + u32::try_from(function.blocks.len()).unwrap_or(u32::MAX)
+        + saturating_u32(function.locals.len())
+        + saturating_u32(function.temps.len())
+        + saturating_u32(function.blocks.len())
 }
 
 fn place_ty(function: &MirFunction, place: &MirPlace) -> Option<MirType> {
