@@ -394,6 +394,119 @@ fn function_fact_table_get_returns_expected_fact() {
 
 // ── FunctionFact equality ───────────────────────────────────────────────────
 
+// ── derived capture modes (A-174) ───────────────────────────────────────────
+
+/// Captures recorded for one named top-level function.
+fn function_captures(source: &str, wanted: &str) -> Vec<CaptureFact> {
+    let fixture = crate::test_support::analyze_ok(source);
+    let hir = fixture.result.hir.as_ref().expect("typed HIR");
+    let table = analyze_function_facts(hir, &fixture.result.types);
+    let def_id = hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            radix_hir::HirItemKind::Function(function)
+                if fixture.interner.resolve(function.name) == wanted =>
+            {
+                Some(item.def_id)
+            }
+            _ => None,
+        })
+        .expect("function item");
+    table
+        .get(def_id)
+        .expect("function fact row")
+        .captures
+        .clone()
+}
+
+#[test]
+fn mutating_closure_capture_records_mutate_mode() {
+    let captures = function_captures(
+        r#"
+functio counter() → () → numerus {
+    varia numerus c ← 0
+    redde () → numerus ∴ fac {
+        c ← c + 1
+        redde c
+    }
+}
+incipit { }
+"#,
+        "counter",
+    );
+    assert_eq!(captures.len(), 1, "closure captures c: {captures:?}");
+    assert_eq!(captures[0].mode, CaptureMode::Mutate, "{captures:?}");
+}
+
+#[test]
+fn mutating_loop_binder_capture_records_mutate_mode() {
+    let captures = function_captures(
+        r#"
+functio loops() → numerus {
+    varia numerus total ← 0
+    itera ex [1, 2, 3] varia v {
+        fixum _ f ← () → numerus ∴ fac {
+            v ← v + 10
+            redde v
+        }
+        total ← total + f()
+    }
+    redde total
+}
+incipit { }
+"#,
+        "loops",
+    );
+    assert_eq!(
+        captures.len(),
+        1,
+        "closure captures the loop binder v: {captures:?}"
+    );
+    assert_eq!(captures[0].mode, CaptureMode::Mutate, "{captures:?}");
+}
+
+#[test]
+fn moved_out_closure_capture_records_consume_mode() {
+    let captures = function_captures(
+        r#"
+functio eat(own lista<numerus> xs) → vacuum {
+    nota xs.longitudo()
+}
+functio demo() → vacuum {
+    varia lista<numerus> a ← [1, 2, 3]
+    fixum _ f ← () → vacuum ∴ eat(own a)
+}
+incipit { }
+"#,
+        "demo",
+    );
+    assert_eq!(
+        captures
+            .iter()
+            .filter(|capture| capture.mode == CaptureMode::Consume)
+            .count(),
+        1,
+        "the moved-out binding records one consume capture: {captures:?}"
+    );
+}
+
+#[test]
+fn read_only_closure_capture_records_read_mode() {
+    let captures = function_captures(
+        r#"
+functio peek() → () → numerus {
+    varia numerus n ← 1
+    redde () → numerus ∴ n
+}
+incipit { }
+"#,
+        "peek",
+    );
+    assert_eq!(captures.len(), 1, "closure captures n: {captures:?}");
+    assert_eq!(captures[0].mode, CaptureMode::Read, "{captures:?}");
+}
+
 #[test]
 fn function_fact_equality() {
     let a = FunctionFact::default();
