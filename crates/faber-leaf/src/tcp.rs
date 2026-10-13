@@ -154,11 +154,12 @@ fn listen(args: &[Arg]) -> Result<Reply, LeafError> {
     if !(0..=65_535).contains(&port) {
         return Err(LeafError::invalid_argument(ROUTE, "port out of range"));
     }
+    let addr = format!("0.0.0.0:{port}");
     let listener = TcpListener::bind(("0.0.0.0", u16::try_from(port).unwrap_or(0)))
-        .map_err(|err| LeafError::from_io(ROUTE, "", &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &addr, &err))?;
     listener
         .set_nonblocking(false)
-        .map_err(|err| LeafError::from_io(ROUTE, "", &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &addr, &err))?;
     let cert = optional_str(args, 1);
     let key = optional_str(args, 2);
     let handle = match (cert, key) {
@@ -187,7 +188,7 @@ fn connect(args: &[Arg]) -> Result<Reply, LeafError> {
     let secure = optional_bool(args, 2);
     let addr = format!("{host}:{port}");
     let stream = TcpStream::connect(&addr).map_err(|err| LeafError::from_io(ROUTE, &addr, &err))?;
-    configure_stream(&stream, ROUTE)?;
+    configure_stream(&stream, &addr, ROUTE)?;
     if !secure {
         return Ok(Reply::Int(insert_handle(Handle::Stream(stream))));
     }
@@ -225,14 +226,14 @@ fn accept(args: &[Arg]) -> Result<Reply, LeafError> {
             let (stream, _) = listener
                 .accept()
                 .map_err(|err| LeafError::from_io(ROUTE, "", &err))?;
-            configure_stream(&stream, ROUTE)?;
+            configure_stream(&stream, "", ROUTE)?;
             Handle::Stream(stream)
         }
         PendingAccept::Tls { listener, config } => {
             let (stream, _) = listener
                 .accept()
                 .map_err(|err| LeafError::from_io(ROUTE, "", &err))?;
-            configure_stream(&stream, ROUTE)?;
+            configure_stream(&stream, "", ROUTE)?;
             let conn = ServerConnection::new(config).map_err(|err| {
                 LeafError::unavailable(ROUTE, format!("tls server handshake: {err}"))
             })?;
@@ -396,13 +397,13 @@ fn pick_addr(stream: &TcpStream, remote: bool) -> std::io::Result<std::net::Sock
     }
 }
 
-fn configure_stream(stream: &TcpStream, route: &'static str) -> Result<(), LeafError> {
+fn configure_stream(stream: &TcpStream, addr: &str, route: &'static str) -> Result<(), LeafError> {
     stream
         .set_read_timeout(Some(Duration::from_secs(60)))
-        .map_err(|err| LeafError::from_io(route, "", &err))?;
+        .map_err(|err| LeafError::from_io(route, addr, &err))?;
     stream
         .set_write_timeout(Some(Duration::from_secs(60)))
-        .map_err(|err| LeafError::from_io(route, "", &err))
+        .map_err(|err| LeafError::from_io(route, addr, &err))
 }
 
 fn install_ring() {

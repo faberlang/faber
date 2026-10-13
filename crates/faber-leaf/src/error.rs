@@ -11,6 +11,11 @@ pub enum LeafErrorKind {
     NotADirectory,
     IsADirectory,
     InvalidArgument,
+    AlreadyExists,
+    TimedOut,
+    ConnectionRefused,
+    ConnectionReset,
+    AddrInUse,
     Io,
     Closed,
     Unset,
@@ -125,6 +130,14 @@ impl LeafError {
             io::ErrorKind::NotFound => LeafErrorKind::NotFound,
             io::ErrorKind::PermissionDenied => LeafErrorKind::Permission,
             io::ErrorKind::BrokenPipe => LeafErrorKind::Closed,
+            io::ErrorKind::AlreadyExists => LeafErrorKind::AlreadyExists,
+            io::ErrorKind::InvalidInput => LeafErrorKind::InvalidArgument,
+            io::ErrorKind::TimedOut => LeafErrorKind::TimedOut,
+            io::ErrorKind::ConnectionRefused => LeafErrorKind::ConnectionRefused,
+            io::ErrorKind::ConnectionReset => LeafErrorKind::ConnectionReset,
+            io::ErrorKind::AddrInUse => LeafErrorKind::AddrInUse,
+            io::ErrorKind::IsADirectory => LeafErrorKind::IsADirectory,
+            io::ErrorKind::NotADirectory => LeafErrorKind::NotADirectory,
             _ => LeafErrorKind::Io,
         };
         Self {
@@ -147,3 +160,7 @@ impl fmt::Display for LeafError {
 }
 
 impl std::error::Error for LeafError {}
+
+#[cfg(test)]
+#[path = "error_test.rs"]
+mod tests;

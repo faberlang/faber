@@ -424,7 +424,7 @@ fn exchange(opener: &ClientOpener, open: bool) -> Result<Reply, LeafError> {
     let addr = format!("{}:{}", url.host, url.port);
     let tcp =
         TcpStream::connect(&addr).map_err(|err| LeafError::from_io("http:request", &addr, &err))?;
-    configure_stream(&tcp, timeout, "http:request")?;
+    configure_stream(&tcp, &addr, timeout, "http:request")?;
     let mut stream = if url.https {
         wrap_tls_client(tcp, &url.host, ca_path.as_deref())?
     } else {
@@ -808,7 +808,7 @@ fn accept(args: &[Arg]) -> Result<Reply, LeafError> {
     let (tcp, _) = listener
         .accept()
         .map_err(|err| LeafError::from_io(ROUTE, "", &err))?;
-    configure_stream(&tcp, DEFAULT_TIMEOUT, ROUTE)?;
+    configure_stream(&tcp, "", DEFAULT_TIMEOUT, ROUTE)?;
     let mut stream = match tls {
         Some(config) => {
             let conn = ServerConnection::new(config).map_err(|err| {
@@ -1206,15 +1206,16 @@ fn read_chunked_body(
 
 fn configure_stream(
     stream: &TcpStream,
+    addr: &str,
     timeout: Duration,
     route: &'static str,
 ) -> Result<(), LeafError> {
     stream
         .set_read_timeout(Some(timeout))
-        .map_err(|err| LeafError::from_io(route, "", &err))?;
+        .map_err(|err| LeafError::from_io(route, addr, &err))?;
     stream
         .set_write_timeout(Some(timeout))
-        .map_err(|err| LeafError::from_io(route, "", &err))
+        .map_err(|err| LeafError::from_io(route, addr, &err))
 }
 
 fn install_ring() {

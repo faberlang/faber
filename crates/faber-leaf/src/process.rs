@@ -169,7 +169,7 @@ fn wait(args: &[Arg]) -> Result<Reply, LeafError> {
         .ok_or_else(|| LeafError::invalid_argument(ROUTE, "unknown pid"))?;
     let status = child
         .wait()
-        .map_err(|err| LeafError::from_io(ROUTE, "wait", &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &pid.to_string(), &err))?;
     Ok(Reply::Int(i64::from(status.code().unwrap_or(-1))))
 }
 
