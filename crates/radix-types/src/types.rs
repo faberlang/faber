@@ -177,6 +177,30 @@ impl TypeTableSnapshot {
     }
 }
 
+/// Primitives every table seeds in [`TypeTable::new`] and requires when
+/// rebuilding from a snapshot.
+///
+/// Order is the seeding order; primitive `TypeId`s are assigned by first
+/// intern, so it also fixes their ids in a freshly built table.
+const REQUIRED_PRIMITIVES: [Primitive; 16] = [
+    Primitive::Textus,
+    Primitive::Numerus,
+    Primitive::Fractus,
+    Primitive::Bivalens,
+    Primitive::Nihil,
+    Primitive::Vacuum,
+    Primitive::Numquam,
+    Primitive::Ignotum,
+    Primitive::Octeti,
+    Primitive::Regex,
+    Primitive::Match,
+    Primitive::Json,
+    Primitive::Valor,
+    Primitive::Ascii,
+    Primitive::Littera,
+    Primitive::Instans,
+];
+
 impl TypeTable {
     #[must_use]
     pub fn new() -> Self {
@@ -199,24 +223,7 @@ impl TypeTable {
             closing_contract: None,
         };
 
-        for prim in [
-            Primitive::Textus,
-            Primitive::Numerus,
-            Primitive::Fractus,
-            Primitive::Bivalens,
-            Primitive::Nihil,
-            Primitive::Vacuum,
-            Primitive::Numquam,
-            Primitive::Ignotum,
-            Primitive::Octeti,
-            Primitive::Regex,
-            Primitive::Match,
-            Primitive::Json,
-            Primitive::Valor,
-            Primitive::Ascii,
-            Primitive::Littera,
-            Primitive::Instans,
-        ] {
+        for prim in REQUIRED_PRIMITIVES {
             let id = table.intern(Type::Primitive(prim));
             table.primitives.insert(prim, id);
         }
@@ -405,24 +412,7 @@ impl TypeTable {
                 primitives.insert(*prim, TypeId(index as u32));
             }
         }
-        for prim in [
-            Primitive::Textus,
-            Primitive::Numerus,
-            Primitive::Fractus,
-            Primitive::Bivalens,
-            Primitive::Nihil,
-            Primitive::Vacuum,
-            Primitive::Numquam,
-            Primitive::Ignotum,
-            Primitive::Octeti,
-            Primitive::Regex,
-            Primitive::Match,
-            Primitive::Json,
-            Primitive::Valor,
-            Primitive::Ascii,
-            Primitive::Littera,
-            Primitive::Instans,
-        ] {
+        for prim in REQUIRED_PRIMITIVES {
             if !primitives.contains_key(&prim) {
                 return Err(format!("missing primitive type {prim:?}"));
             }
