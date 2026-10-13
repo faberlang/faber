@@ -351,6 +351,10 @@ pub struct ImportedFileInterfaceMethod {
 #[derive(Debug, Clone)]
 struct ImportedFileStruct {
     is_json: bool,
+    /// Contracts the exporting genus names in `implet`, remapped into this
+    /// file's type table. Phase 2 of file import fills it (every nominal is
+    /// installed by then); typecheck reads it as the declared conformance.
+    implements: Vec<radix_types::ContractRef>,
     def_id: DefId,
     ty: TypeId,
     fields: Vec<ImportedFileStructField>,
@@ -1315,6 +1319,7 @@ impl Resolver {
                             types,
                             interner,
                         );
+                        let implements = self.import_struct_implements(strukt, types, interner);
                         skipped.extend(field_skipped);
                         skipped.extend(method_skipped);
                         for projected_member in projected_members {
@@ -1324,6 +1329,7 @@ impl Resolver {
                             {
                                 existing.fields.clone_from(&fields);
                                 existing.methods.clone_from(&methods);
+                                existing.implements.clone_from(&implements);
                             }
                         }
                     }
@@ -1835,6 +1841,7 @@ impl Resolver {
         }) {
             return Ok(ImportedFileExport::Struct(ImportedFileStruct {
                 is_json: strukt.is_json,
+                implements: Vec::new(),
                 def_id: existing_def,
                 ty: existing_ty,
                 fields: Vec::new(),
@@ -1868,12 +1875,35 @@ impl Resolver {
         );
         Ok(ImportedFileExport::Struct(ImportedFileStruct {
             is_json: strukt.is_json,
+            implements: Vec::new(),
             def_id,
             ty,
             fields: Vec::new(),
             methods: Vec::new(),
             type_params,
         }))
+    }
+
+    /// Remap the contracts an exported struct names in `implet`.
+    ///
+    /// A contract that does not resolve to an interface in this file's tables
+    /// is dropped, so the struct stays unassignable to it (fail closed).
+    fn import_struct_implements(
+        &self,
+        strukt: &InterfaceStructExport,
+        types: &mut TypeTable,
+        interner: &mut radix_lexer::Interner,
+    ) -> Vec<radix_types::ContractRef> {
+        strukt
+            .implements
+            .iter()
+            .filter_map(|contract| {
+                crate::file_interface::import_contract_ref_with_resolver(
+                    contract, types, interner, self,
+                )
+                .ok()
+            })
+            .collect()
     }
 
     /// Import struct fields, skipping any field whose type cannot be remapped.
@@ -2662,6 +2692,22 @@ impl Resolver {
                 ImportedFileExport::Struct(strukt) if strukt.is_json => Some(strukt.def_id),
                 _ => None,
             })
+    }
+
+    /// The declared `implet` contracts of every imported struct that names
+    /// any, keyed by the struct's consumer-local identity.
+    #[must_use]
+    pub fn imported_struct_contracts(&self) -> Vec<(DefId, Vec<radix_types::ContractRef>)> {
+        self.file_interfaces
+            .values()
+            .flat_map(|interface| interface.exports.values())
+            .filter_map(|export| match export {
+                ImportedFileExport::Struct(strukt) if !strukt.implements.is_empty() => {
+                    Some((strukt.def_id, strukt.implements.clone()))
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     /// Flatten one imported struct export into the entry shape shared by the
@@ -3991,6 +4037,7 @@ impl Resolver {
                                 fields,
                                 methods,
                                 is_json,
+                                implements,
                             } => {
                                 let imported_fields: Vec<ImportedFileStructField> = fields
                                     .into_iter()
@@ -4021,6 +4068,7 @@ impl Resolver {
                                     .collect();
                                 ImportedFileExport::Struct(ImportedFileStruct {
                                     is_json,
+                                    implements,
                                     def_id,
                                     ty,
                                     fields: imported_fields,
@@ -4128,6 +4176,7 @@ impl Resolver {
                             },
                             ImportedFileExport::Struct(strukt) => FileExportSnapshot::Struct {
                                 is_json: strukt.is_json,
+                                implements: strukt.implements.clone(),
                                 def_id: strukt.def_id,
                                 ty: strukt.ty,
                                 fields: strukt

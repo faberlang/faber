@@ -1936,10 +1936,23 @@ fn class_export_from_stmt(
         })
         .collect::<Vec<_>>();
     let annotation_contract = annotation_contract_from_stmt(stmt, decl, interner);
+    let class_type_params: BTreeSet<&str> = decl
+        .type_params
+        .iter()
+        .map(|tp| interner.resolve(tp.name.name))
+        .collect();
+    // A contract with no portable form is dropped: the importer then refuses
+    // the genus for that slot (fail closed) instead of guessing.
+    let implements = decl
+        .implements
+        .iter()
+        .filter_map(|contract| contract_ref_snapshot(contract, interner, &class_type_params, nominal_kinds, ctx))
+        .collect();
     Some(FileExport {
         name: name.clone(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: annotations_include_callable_family(&stmt.annotations, interner, "json"),
+            implements,
             name,
             params: interface_generic_params(&decl.type_params, interner),
             fields,
@@ -1947,6 +1960,34 @@ fn class_export_from_stmt(
             annotation_contract,
         }),
     })
+}
+
+/// Portable form of one `implements` contract: a nominal, applied to its
+/// arguments when the contract is generic.
+fn contract_ref_snapshot(
+    contract: &radix_syntax::ContractRefExpr,
+    interner: &crate::lexer::Interner,
+    type_params: &BTreeSet<&str>,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<InterfaceTypeSnapshot> {
+    let base = nominal_snapshot(
+        interner.resolve(contract.name.name),
+        nominal_kinds,
+        ctx.module_identity.as_ref(),
+    );
+    if contract.args.is_empty() {
+        return Some(base);
+    }
+    let args = contract
+        .args
+        .iter()
+        .map(|arg| {
+            interface_type_from_type_expr(arg, interner, type_params, nominal_kinds, ctx)
+                .map(crate::file_interface::InterfaceAppliedArg::Type)
+        })
+        .collect::<Option<Vec<_>>>()?;
+    Some(InterfaceTypeSnapshot::Applied(Box::new(base), args))
 }
 
 fn enum_export_from_stmt(

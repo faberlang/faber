@@ -617,6 +617,7 @@ fn socket_interface(gates: Vec<InterfaceUnavailable>) -> FileInterface {
         name: "Nexus".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Nexus".to_owned(),
             fields: vec![InterfaceStructField {

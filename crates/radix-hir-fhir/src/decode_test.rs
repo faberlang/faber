@@ -141,6 +141,7 @@ fn decode_accepts_imported_nominal_def_living_in_type_table() {
                     Symbol(1),
                     FileExportSnapshot::Struct {
                         is_json: true,
+                        implements: Vec::new(),
                         def_id: imported_def,
                         ty: struct_ty,
                         fields: Vec::new(),
@@ -210,6 +211,7 @@ fn decode_rejects_imported_method_with_dangling_signature_type() {
                             unavailable: Vec::new(),
                         }],
                         is_json: false,
+                        implements: Vec::new(),
                     },
                 )],
                 unavailable: Vec::new(),

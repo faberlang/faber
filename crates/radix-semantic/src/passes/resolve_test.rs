@@ -761,6 +761,7 @@ fn imports_function_export_before_struct_alphabetically() {
         name: "Vector3".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Vector3".to_owned(),
             fields: vec![crate::file_interface::InterfaceStructField {
@@ -818,6 +819,7 @@ fn projects_localized_library_members_by_identity_and_rejects_unmapped_canonical
         name: "Vector".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Vector".to_owned(),
             fields: Vec::new(),
@@ -976,6 +978,7 @@ fn skipped_locale_members_keep_structured_provenance_and_sibling_exports() {
         name: "Thing".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Thing".to_owned(),
             fields: vec![InterfaceStructField {
@@ -1247,6 +1250,7 @@ fn imports_nominal_fields_across_namespaces_before_payloads() {
         name: "SceneNode".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "SceneNode".to_owned(),
             fields: vec![InterfaceStructField {
@@ -1273,6 +1277,7 @@ fn imports_nominal_fields_across_namespaces_before_payloads() {
         name: "Matrix4".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Matrix4".to_owned(),
             fields: Vec::new(),
@@ -1313,6 +1318,7 @@ fn ambiguous_nominal_fields_do_not_bind_to_last_namespace() {
         name: "SceneNode".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "SceneNode".to_owned(),
             fields: vec![InterfaceStructField {
@@ -1339,6 +1345,7 @@ fn ambiguous_nominal_fields_do_not_bind_to_last_namespace() {
         name: "Shape".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Shape".to_owned(),
             fields: Vec::new(),
@@ -1351,6 +1358,7 @@ fn ambiguous_nominal_fields_do_not_bind_to_last_namespace() {
         name: "Shape".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Shape".to_owned(),
             fields: Vec::new(),
@@ -1404,6 +1412,7 @@ functio f(terminus.Terminus value) → vacuum {}
         name: "Terminus".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Terminus".to_owned(),
             fields: Vec::new(),
@@ -2042,6 +2051,7 @@ fn canonical_nominal_identity_distinguishes_modules_and_unifies_aliases() {
         name: name.to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: name.to_owned(),
             fields: Vec::new(),

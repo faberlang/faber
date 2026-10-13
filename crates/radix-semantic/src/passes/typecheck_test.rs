@@ -1385,6 +1385,7 @@ fn rejects_unknown_method_on_imported_struct_receiver() {
         name: "Seed".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Seed".to_owned(),
             fields: Vec::new(),
@@ -2257,6 +2258,7 @@ fn eot_selective_test_interface() -> crate::file_interface::FileInterface {
         name: "Vector".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Vector".to_owned(),
             fields: Vec::new(),

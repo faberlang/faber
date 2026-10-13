@@ -1007,6 +1007,16 @@ impl<'a> TypeChecker<'a> {
             self.instance_field_counts
                 .insert(def_id, instance_field_count);
         }
+        // Declared conformance of imported structs: the same pair
+        // `resolve_struct_implements` fills for local ones, so an imported
+        // struct is assignable only to contracts its own declaration names.
+        for (def_id, contracts) in self.resolver.imported_struct_contracts() {
+            self.implemented_interfaces.insert(
+                def_id,
+                contracts.iter().map(|contract| contract.contract).collect(),
+            );
+            self.implemented_contracts.insert(def_id, contracts);
+        }
     }
 
     /// Register imported enum variants (file-interface enum exports) into the

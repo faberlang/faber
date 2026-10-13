@@ -336,6 +336,7 @@ functio apply() → vacuum {
         name: "Meta".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Meta".to_owned(),
             fields: vec![InterfaceStructField {

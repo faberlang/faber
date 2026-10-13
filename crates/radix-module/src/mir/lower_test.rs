@@ -3973,6 +3973,7 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
         name: "Sample".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Sample".to_owned(),
             fields: Vec::new(),

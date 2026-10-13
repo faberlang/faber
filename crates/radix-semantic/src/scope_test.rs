@@ -464,6 +464,7 @@ fn imported_generic_struct_carries_decl_param_names() {
         name: "Box".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             name: "Box".to_owned(),
             params: vec![InterfaceGenericParam {
                 name: "T".to_owned(),
@@ -682,6 +683,7 @@ fn resolver_snapshot_round_trips_imported_json_opt_in() {
                         fields: Vec::new(),
                         methods: Vec::new(),
                         is_json: true,
+                        implements: Vec::new(),
                     },
                 )],
                 unavailable: Vec::new(),
@@ -749,6 +751,7 @@ fn resolver_snapshot_round_trips_nondum_gates_for_functions_and_methods() {
                                 unavailable: gate(),
                             }],
                             is_json: false,
+                            implements: Vec::new(),
                         },
                     ),
                 ],

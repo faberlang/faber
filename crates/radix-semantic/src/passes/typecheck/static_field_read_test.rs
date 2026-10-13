@@ -78,6 +78,7 @@ mod imported {
             name: "Tab".to_owned(),
             kind: FileExportKind::Struct(InterfaceStructExport {
                 is_json: false,
+                implements: Vec::new(),
                 name: "Tab".to_owned(),
                 params: Vec::new(),
                 fields: vec![

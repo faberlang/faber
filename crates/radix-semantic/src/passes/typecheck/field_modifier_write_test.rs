@@ -143,6 +143,7 @@ fn imported_punctum_interface() -> crate::file_interface::FileInterface {
         name: "Punctum".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Punctum".to_owned(),
             fields: vec![

@@ -232,6 +232,11 @@ impl InterfaceGenericParam {
 pub struct InterfaceStructExport {
     /// Whether the declaration opts into typed JSON conversion.
     pub is_json: bool,
+    /// Contracts the genus names in its `implet` clause, each as a portable
+    /// nominal (applied to its arguments when the contract is generic). The
+    /// importer installs them as the struct's declared conformance; without
+    /// them an imported genus is never assignable to a contract slot.
+    pub implements: Vec<InterfaceTypeSnapshot>,
     pub name: String,
     /// Ordered generic-declaration parameters (`typus`/`magnitudo`).
     pub params: Vec<InterfaceGenericParam>,
@@ -986,6 +991,80 @@ fn snapshot_interface_type_inner(
         | Type::BoundedAscii { .. }
         | Type::BoundedOcteti { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),
     }
+}
+
+/// Snapshot one declared `implet` contract as a portable nominal reference,
+/// applied to its arguments when the contract is generic.
+///
+/// # Errors
+///
+/// Returns [`FileInterfaceError`] when the contract or an argument has no
+/// portable form.
+pub fn snapshot_contract_ref_with_identity(
+    contract: &radix_types::ContractRef,
+    types: &TypeTable,
+    interner: &Interner,
+    resolver: &Resolver,
+    module_identity: Option<&InterfaceLibraryIdentity>,
+) -> FileInterfaceResult<InterfaceTypeSnapshot> {
+    let base = snapshot_nominal_type(
+        contract.contract,
+        InterfaceNominalKind::Interface,
+        interner,
+        Some(resolver),
+        module_identity,
+    )?;
+    if contract.args.is_empty() {
+        return Ok(base);
+    }
+    let args = contract
+        .args
+        .iter()
+        .map(|arg| {
+            snapshot_interface_type_inner(*arg, types, interner, Some(resolver), module_identity)
+                .map(InterfaceAppliedArg::Type)
+        })
+        .collect::<FileInterfaceResult<Vec<_>>>()?;
+    Ok(InterfaceTypeSnapshot::Applied(Box::new(base), args))
+}
+
+/// Import one portable `implet` contract reference into the target table.
+///
+/// # Errors
+///
+/// Returns [`FileInterfaceError`] when the snapshot does not resolve to an
+/// interface nominal (a struct or enum named in `implet` is not a contract).
+pub fn import_contract_ref_with_resolver(
+    snapshot: &InterfaceTypeSnapshot,
+    types: &mut TypeTable,
+    interner: &mut Interner,
+    resolver: &Resolver,
+) -> FileInterfaceResult<radix_types::ContractRef> {
+    let ty = import_interface_type_inner(snapshot, types, interner, Some(resolver))?;
+    let contract_ref = match types.get(ty) {
+        Type::Interface(contract) => Some(radix_types::ContractRef {
+            contract: *contract,
+            args: Vec::new(),
+        }),
+        Type::Applied(base, args) => match types.get(*base) {
+            Type::Interface(contract) => args
+                .iter()
+                .map(|arg| match arg {
+                    radix_types::AppliedArg::Type(arg) => Some(*arg),
+                    radix_types::AppliedArg::Size(_) => None,
+                })
+                .collect::<Option<Vec<_>>>()
+                .map(|args| radix_types::ContractRef {
+                    contract: *contract,
+                    args,
+                }),
+            _ => None,
+        },
+        _ => None,
+    };
+    contract_ref.ok_or(FileInterfaceError::NominalTypeUnsupported {
+        kind: InterfaceNominalKind::Interface,
+    })
 }
 
 fn snapshot_nominal_type(

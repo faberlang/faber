@@ -3418,6 +3418,7 @@ pub(crate) fn validate_referential_integrity(
                     ty,
                     fields,
                     methods,
+                    implements,
                     ..
                 } => {
                     checks.check_def(*def_id)?;
@@ -3425,6 +3426,11 @@ pub(crate) fn validate_referential_integrity(
                     for field in fields {
                         checks.check_symbol(field.name)?;
                         checks.check_type(field.ty)?;
+                    }
+                    for contract in implements {
+                        for arg in &contract.args {
+                            checks.check_type(*arg)?;
+                        }
                     }
                     for method in methods {
                         checks.check_def(method.def_id)?;

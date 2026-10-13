@@ -22,6 +22,7 @@ fn genus(name: &str) -> FileExport {
         name: name.to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: name.to_owned(),
             fields: vec![InterfaceStructField {

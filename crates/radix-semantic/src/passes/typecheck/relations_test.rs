@@ -328,3 +328,100 @@ fn equality_relation_strict_rejects_mixed_width_pairs() {
         "equality_exact_types_required",
     );
 }
+
+// IMPORTED CONTRACTS — a struct exported with its `implet` contracts is
+// assignable to the imported contract slot it names, and only to those.
+
+/// The `forma` module's file interface: contract `Figura`, and genus
+/// `Circulus` naming it in `implet` iff `circulus_implements`.
+fn forma_interface(circulus_implements: bool) -> crate::file_interface::FileInterface {
+    use crate::Primitive;
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity,
+        InterfaceNominalExport, InterfaceNominalKind, InterfaceNominalType, InterfaceStructExport,
+        InterfaceStructField, InterfaceTypeSnapshot,
+    };
+    let identity = InterfaceLibraryIdentity {
+        provider: "test".to_owned(),
+        package: Some("forma".to_owned()),
+        module_path: vec!["forma".to_owned()],
+    };
+    let figura = InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
+        kind: InterfaceNominalKind::Interface,
+        name: "Figura".to_owned(),
+        identity: Some(identity.clone()),
+        kind_guessed: false,
+    });
+    let mut interface = FileInterface::new().with_identity(identity);
+    interface.insert(FileExport {
+        name: "Figura".to_owned(),
+        kind: FileExportKind::Interface(InterfaceNominalExport {
+            name: "Figura".to_owned(),
+            params: Vec::new(),
+            methods: Vec::new(),
+            variants: Vec::new(),
+            shared_fields: Vec::new(),
+            radix_contract: None,
+        }),
+    });
+    interface.insert(FileExport {
+        name: "Circulus".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
+            implements: if circulus_implements {
+                vec![figura]
+            } else {
+                Vec::new()
+            },
+            name: "Circulus".to_owned(),
+            params: Vec::new(),
+            fields: vec![InterfaceStructField {
+                name: "radius".to_owned(),
+                ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                optional: false,
+                required: true,
+                default: None,
+                modifier: Some(radix_syntax::FieldModifier::Varia),
+                visibility: radix_syntax::MemberVisibility::Publica,
+            }],
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+    interface
+}
+
+fn analyze_forma_consumer(circulus_implements: bool) -> AnalyzedFixture {
+    use crate::passes::visibility_annotation::VisibilityTier;
+    use std::collections::BTreeMap;
+    crate::test_support::analyze_source_with_import_contract(
+        "importa ex \"./forma\" forma\n\n\
+         functio utere(forma.Figura f) → vacuum {\n}\n\n\
+         incipit {\n    varia forma.Circulus c ← forma.Circulus { radius = 1 }\n    utere(c)\n}",
+        BTreeMap::from([(
+            "forma".to_owned(),
+            BTreeMap::from([
+                ("Figura".to_owned(), VisibilityTier::Publica),
+                ("Circulus".to_owned(), VisibilityTier::Publica),
+            ]),
+        )]),
+        BTreeMap::from([("forma".to_owned(), forma_interface(circulus_implements))]),
+    )
+}
+
+#[test]
+fn imported_struct_is_assignable_to_the_imported_contract_it_implements() {
+    let result = analyze_forma_consumer(true);
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
+}
+
+#[test]
+fn imported_struct_that_does_not_name_the_contract_stays_rejected() {
+    let result = analyze_forma_consumer(false);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && crate::test_support::issue(err) == Some("argument_type_mismatch")),
+        "{:?}",
+        result.diagnostics
+    );
+}

@@ -112,6 +112,10 @@ pub enum FileExportSnapshot {
         fields: Vec<StructFieldSnapshot>,
         methods: Vec<StructMethodSnapshot>,
         is_json: bool,
+        /// Contracts the struct names in `implet`, in the snapshot's own
+        /// type table, so a loaded artifact still admits the struct into a
+        /// contract-typed slot.
+        implements: Vec<radix_types::ContractRef>,
     },
 }
 
@@ -606,8 +610,11 @@ pub struct FunctionProvenanceTableWire {
 /// fail closed. Version 41 adds `HirPresentation::inferred_constructor_ids`
 /// (which nodes typecheck rewrote from an inferred-constructor hole `_ { … }`,
 /// so the Faber re-emitter prints the hole again); schema-v40 artifacts fail
-/// closed.
-pub const SCHEMA_VERSION: u32 = 41;
+/// closed. Version 42 carries a struct's declared `implet` contracts in the
+/// resolver file-interface snapshot (`FileExportSnapshot::Struct::implements`)
+/// so a loaded artifact still admits an imported struct into a contract-typed
+/// slot; schema-v41 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 42;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

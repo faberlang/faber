@@ -26,6 +26,7 @@ fn circle_interface() -> FileInterface {
         name: "Circle".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             name: "Circle".to_owned(),
             params: Vec::new(),
             fields: vec![InterfaceStructField {

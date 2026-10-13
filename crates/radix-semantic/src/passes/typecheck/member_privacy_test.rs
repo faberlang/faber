@@ -193,6 +193,7 @@ fn imported_interface() -> crate::file_interface::FileInterface {
         name: "Arca".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Arca".to_owned(),
             fields: vec![

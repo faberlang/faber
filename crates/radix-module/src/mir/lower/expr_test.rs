@@ -67,6 +67,7 @@ fn static_field_read_through_an_imported_genus_inlines_the_interface_initializer
         name: "Tab".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
             is_json: false,
+            implements: Vec::new(),
             params: Vec::new(),
             name: "Tab".to_owned(),
             fields: vec![InterfaceStructField {

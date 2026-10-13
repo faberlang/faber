@@ -551,10 +551,28 @@ fn snapshot_struct(
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
 
+    // A contract with no portable form is dropped: the importer then refuses
+    // the genus for that slot (fail closed) instead of guessing.
+    let implements = strukt
+        .implements
+        .iter()
+        .filter_map(|contract| {
+            radix_module::file_interface::snapshot_contract_ref_with_identity(
+                contract,
+                &analysis.types,
+                &analysis.interner,
+                &analysis.resolver,
+                export_identity.map(identity_for).as_ref(),
+            )
+            .ok()
+        })
+        .collect();
+
     Ok(InterfaceStructExport {
         is_json: annotations
             .iter()
             .any(|annotation| analysis.interner.resolve(annotation.family) == "json"),
+        implements,
         name: analysis.interner.resolve(strukt.name).to_owned(),
         params: interface_generic_params(&strukt.type_params, &analysis.interner),
         fields,
