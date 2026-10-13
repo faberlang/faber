@@ -936,3 +936,121 @@ incipit { }
         borrow_region::ProvenanceError::Incoherent { .. }
     ));
 }
+
+/// A module whose only executable content is the hand-built `entry` block.
+fn module_with_entry(entry: HirBlock) -> radix_hir::HirModule {
+    radix_hir::HirModule {
+        items: Vec::new(),
+        entry: Some(entry),
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+fn hand_statement(id: u32, kind: radix_hir::HirStatementKind) -> radix_hir::HirStatement {
+    radix_hir::HirStatement {
+        id: HirId(id),
+        kind,
+        span: radix_lexer::Span::default(),
+    }
+}
+
+fn hand_expression(id: u32, kind: HirExpressionKind) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind,
+        ty: None,
+        span: radix_lexer::Span::default(),
+    }
+}
+
+fn cfg_reaches(
+    cfg: &super::borrow_region_cfg::HirCfg,
+    from: super::borrow_region_cfg::CfgNodeId,
+    to: super::borrow_region_cfg::CfgNodeId,
+) -> bool {
+    let mut seen = vec![from];
+    let mut work = vec![from];
+    while let Some(node) = work.pop() {
+        if node == to {
+            return true;
+        }
+        for edge in cfg.successors(node) {
+            if !seen.contains(&edge.to) {
+                seen.push(edge.to);
+                work.push(edge.to);
+            }
+        }
+    }
+    false
+}
+
+// A-183: an empty block sequenced after a statement is the identity; it must
+// not replace the fall-through the statement already established.
+#[test]
+fn empty_tail_block_keeps_the_arm_fall_through() {
+    let then_block = HirBlock {
+        statements: vec![hand_statement(10, radix_hir::HirStatementKind::Tacet)],
+        expr: Some(Box::new(hand_expression(
+            11,
+            HirExpressionKind::Block(HirBlock::default()),
+        ))),
+        ..HirBlock::default()
+    };
+    let si = hand_expression(
+        30,
+        HirExpressionKind::Si {
+            cond: Box::new(hand_expression(
+                20,
+                HirExpressionKind::Literal(radix_hir::HirLiteral::Int(1)),
+            )),
+            then_block,
+            then_catch: None,
+            else_block: None,
+        },
+    );
+    let module = module_with_entry(HirBlock {
+        statements: vec![hand_statement(31, radix_hir::HirStatementKind::Expr(si))],
+        ..HirBlock::default()
+    });
+
+    let cfg = super::borrow_region_cfg::build_cfg(&module).expect("cfg");
+    let arm = cfg.node_for_hir_id(HirId(10)).expect("arm statement");
+    let join = cfg.node_for_hir_id(HirId(30)).expect("si join");
+    assert!(
+        cfg.successors(arm)
+            .any(|edge| edge.to == join && edge.kind == CfgEdgeKind::Next),
+        "the arm's fall-through must still reach the join: {:?}",
+        cfg.edges()
+    );
+}
+
+// A-183: an expression statement over an empty block keeps its statement
+// node as the fragment entry, so the previous statement flows into it.
+#[test]
+fn empty_block_statement_stays_on_the_fall_through_path() {
+    let module = module_with_entry(HirBlock {
+        statements: vec![
+            hand_statement(1, radix_hir::HirStatementKind::Tacet),
+            hand_statement(
+                3,
+                radix_hir::HirStatementKind::Expr(hand_expression(
+                    2,
+                    HirExpressionKind::Block(HirBlock::default()),
+                )),
+            ),
+            hand_statement(4, radix_hir::HirStatementKind::Tacet),
+        ],
+        ..HirBlock::default()
+    });
+
+    let cfg = super::borrow_region_cfg::build_cfg(&module).expect("cfg");
+    let before = cfg.node_for_hir_id(HirId(1)).expect("first statement");
+    let after = cfg.node_for_hir_id(HirId(4)).expect("last statement");
+    assert!(
+        cfg_reaches(&cfg, before, after),
+        "the empty block statement must not cut the fall-through: {:?}",
+        cfg.edges()
+    );
+}

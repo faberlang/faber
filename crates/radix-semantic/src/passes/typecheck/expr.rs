@@ -568,12 +568,17 @@ impl TypeChecker<'_> {
         }
         let expected = match self.inferred_constructor_expected(expr, expected) {
             Ok(expected) => expected,
-            Err(slot) => return slot,
+            Err(slot) => {
+                self.pending_conversion = saved_pending_conversion;
+                return slot;
+            }
         };
         if let Some(settled) = self.desugar_inferred_constructor_shape(expr, expected) {
+            self.pending_conversion = saved_pending_conversion;
             return settled;
         }
         if let Some(settled) = self.desugar_bracket_literal_shape(expr, expected) {
+            self.pending_conversion = saved_pending_conversion;
             return settled;
         }
         let ty = match &mut expr.kind {

@@ -67,6 +67,11 @@ impl TypeChecker<'_> {
         // Clone children out of the table first — recursive occurs needs `&mut self`.
         let children: Vec<TypeId> = match self.types.get(resolved) {
             Type::Array(inner)
+            | Type::Queue(inner)
+            | Type::Stack(inner)
+            | Type::BoundedArray { element: inner, .. }
+            | Type::BoundedQueue { element: inner, .. }
+            | Type::BoundedStack { element: inner, .. }
             | Type::Option(inner)
             | Type::Ref(_, inner)
             | Type::Promissum(inner)
@@ -80,6 +85,7 @@ impl TypeChecker<'_> {
             | Type::Matrix(inner, _)
             | Type::Sparsa(inner, _) => vec![*inner],
             Type::Map(key, value)
+            | Type::Ledger(key, value)
             | Type::PromissumFailable(key, value)
             | Type::AsyncCursor(key, value) => {
                 vec![*key, *value]
@@ -105,7 +111,7 @@ impl TypeChecker<'_> {
                 }));
                 kids
             }
-            Type::Union(types) => types.clone(),
+            Type::Union(types) | Type::Intersection(types) => types.clone(),
             Type::Tuple(elems) => elems.clone(),
             Type::Record(fields) => fields.values().copied().collect(),
             _ => return false,

@@ -340,6 +340,7 @@ impl Builder {
                         location(Some(statement.id), Some(local.def_id), statement.span),
                     );
                     self.connect_normals(&fragment, binding, CfgEdgeKind::Next);
+                    fragment.entry.get_or_insert(binding);
                     fragment.normal = vec![binding];
                     return Ok(fragment);
                 }
@@ -355,6 +356,7 @@ impl Builder {
                     location(Some(statement.id), None, statement.span),
                 );
                 self.connect_normals(&fragment, statement_node, CfgEdgeKind::Next);
+                fragment.entry.get_or_insert(statement_node);
                 fragment.normal = vec![statement_node];
                 Ok(fragment)
             }
@@ -592,9 +594,12 @@ impl Builder {
         if previous.normal.is_empty() {
             return;
         }
-        if let Some(next_entry) = next.entry {
-            self.connect_normals(previous, next_entry, CfgEdgeKind::Next);
-        }
+        // WHY: an empty fragment (an empty block) has no node to enter and
+        // nothing to fall out of; it is the identity, not a terminator.
+        let Some(next_entry) = next.entry else {
+            return;
+        };
+        self.connect_normals(previous, next_entry, CfgEdgeKind::Next);
         previous.normal = next.normal;
         previous.breaks.extend(next.breaks);
         previous.continues.extend(next.continues);

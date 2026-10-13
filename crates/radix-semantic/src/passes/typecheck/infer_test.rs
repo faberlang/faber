@@ -287,6 +287,95 @@ fn occurs_in_ignores_any_constraint() {
     );
 }
 
+// A-198: every collection shape that carries a type child must be walked by
+// the occurs check, or `T = queue<T>` binds a cyclic substitution.
+#[test]
+fn occurs_in_walks_queue_stack_ledger_bounded_and_intersection() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+
+    let infer = checker.fresh_infer();
+    let numerus = checker.numerus_type();
+    let capacity = checker
+        .types
+        .intern_index(radix_types::IndexExpr::Literal(4));
+
+    let shapes = [
+        ("queue", checker.types.queue(infer)),
+        ("stack", checker.types.stack(infer)),
+        (
+            "bounded lista",
+            checker.types.bounded_array(infer, capacity),
+        ),
+        (
+            "bounded queue",
+            checker.types.bounded_queue(infer, capacity),
+        ),
+        (
+            "bounded stack",
+            checker.types.bounded_stack(infer, capacity),
+        ),
+        ("ledger key", checker.types.ledger(infer, numerus)),
+        ("ledger value", checker.types.ledger(numerus, infer)),
+        (
+            "intersection",
+            checker
+                .types
+                .intern(Type::Intersection(vec![numerus, infer])),
+        ),
+    ];
+
+    for (label, ty) in shapes {
+        assert!(
+            checker.occurs_in(InferVar(0), ty),
+            "occurs_in must detect the var inside {label}",
+        );
+    }
+}
+
+// A-197: the expression dispatcher saves the pending failable-call conversion
+// on entry and must hand it back on every exit, including the named-error
+// returns of the inferred-constructor desugars.
+#[test]
+fn check_expr_early_return_restores_pending_conversion() {
+    use radix_hir::{HirExpression, HirExpressionKind, HirId};
+
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let span = radix_lexer::Span::default();
+
+    // `_ [ … ]` with no expected type: the bracket-literal desugar names the
+    // error and settles the node before the ordinary check runs.
+    let hole = checker.fresh_infer();
+    let mut expr = HirExpression {
+        id: HirId(1),
+        kind: HirExpressionKind::Verte {
+            source: Box::new(HirExpression {
+                id: HirId(2),
+                kind: HirExpressionKind::Array(Vec::new()),
+                ty: None,
+                span,
+            }),
+            target: hole,
+            entries: None,
+        },
+        ty: None,
+        span,
+    };
+
+    checker.pending_conversion = Some(DefId(7));
+    let ty = checker.check_expr_with_expected(&mut expr, None);
+
+    assert_eq!(ty, checker.error_type, "the hole has no expected type");
+    assert_eq!(
+        checker.pending_conversion,
+        Some(DefId(7)),
+        "an early return must restore the saved pending conversion",
+    );
+}
+
 // The Applied arm delegates its paired-argument walk to `unify_applied_args`:
 // type slots unify structurally, size slots stay equal at an absent boundary,
 // and a kind mismatch fails the join with the caller's issue.
