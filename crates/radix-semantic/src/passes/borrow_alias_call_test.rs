@@ -534,3 +534,147 @@ fn method_call_overlap_through_a_container_element_is_rejected() {
         "shared_borrow_conflict",
     );
 }
+
+// =============================================================================
+// Imported method calls (R02): a receiver whose class arrives through a file
+// interface is held to its parameter modes like a locally declared class
+// =============================================================================
+
+/// The library surface an importing package sees: a `Mutator` class whose
+/// `read` takes `mut list<int> a` and a plain `list<int> b`.
+fn imported_mutator_interface() -> crate::file_interface::FileInterface {
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceMethodExport,
+        InterfaceParam, InterfaceStructExport, InterfaceTypeSnapshot,
+    };
+    use crate::{Primitive, SemanticMutability, SemanticParamMode};
+
+    // Locally, `mut list<int> a` lowers the marker into the parameter type
+    // (`Type::Ref(Mut, …)`); an imported snapshot carries the same shape.
+    let list_int = || {
+        InterfaceTypeSnapshot::Array(Box::new(InterfaceTypeSnapshot::Primitive(
+            Primitive::Numerus,
+        )))
+    };
+    let mut_list_int = || {
+        InterfaceTypeSnapshot::Ref(SemanticMutability::Mutable, Box::new(list_int()))
+    };
+    let read = InterfaceMethodExport {
+        name: "read".to_owned(),
+        callable: InterfaceCallable {
+            type_params: Vec::new(),
+            tensor_edge_policy_requirements: Vec::new(),
+            params: vec![
+                InterfaceParam {
+                    ty: mut_list_int(),
+                    mode: SemanticParamMode::MutRef,
+                    optional: false,
+                    sponte: false,
+                },
+                InterfaceParam {
+                    ty: list_int(),
+                    mode: SemanticParamMode::Owned,
+                    optional: false,
+                    sponte: false,
+                },
+            ],
+            ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
+            err: None,
+            is_async: false,
+            is_generator: false,
+            device: None,
+        },
+        visibility: radix_syntax::MemberVisibility::Publica,
+        unavailable: Vec::new(),
+    };
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Mutator".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
+            implements: Vec::new(),
+            name: "Mutator".to_owned(),
+            params: Vec::new(),
+            fields: Vec::new(),
+            methods: vec![read],
+            annotation_contract: None,
+        }),
+    });
+    interface
+}
+
+/// The fixtures are written in the English surface; `library` is the imported
+/// namespace (the exported surface of another file in the package).
+fn analyze_imported_en(source: &str) -> AnalyzedFixture {
+    use crate::passes::visibility_annotation::VisibilityTier;
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    config.namespace_exports = std::collections::BTreeMap::from([(
+        "library".to_owned(),
+        std::collections::BTreeMap::from([("Mutator".to_owned(), VisibilityTier::Publica)]),
+    )]);
+    config.file_interfaces =
+        std::collections::BTreeMap::from([("library".to_owned(), imported_mutator_interface())]);
+    analyze_source_with_config(source, config)
+}
+
+/// `body` runs in `main` after `xs` (the overlapped list), the unrelated `ys`,
+/// and the imported `Mutator` receiver `m`.
+fn imported_program(body: &str) -> String {
+    format!(
+        r#"import from "./library" library
+
+main {{
+    var list<int> xs ← [1]
+    var list<int> ys ← [2]
+    const library.Mutator m ← library.Mutator {{}}
+{body}
+}}
+"#
+    )
+}
+
+fn imported_errors(source: &str) -> Vec<(SemanticErrorKind, String)> {
+    analyze_imported_en(source)
+        .result
+        .diagnostics
+        .iter()
+        .filter(|d| d.is_error())
+        .map(|d| (d.kind.clone(), issue(d).unwrap_or_default().to_string()))
+        .collect()
+}
+
+#[test]
+fn imported_method_same_storage_overlap_is_rejected() {
+    let found = imported_errors(&imported_program("    m.read(mut xs, xs)"));
+    assert!(
+        found
+            .iter()
+            .any(|(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"),
+        "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
+    );
+}
+
+#[test]
+fn imported_method_alias_spelled_overlap_is_rejected() {
+    let found = imported_errors(&imported_program(
+        "    var list<int> alias ← xs\n    m.read(mut xs, alias)",
+    ));
+    assert!(
+        found
+            .iter()
+            .any(|(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"),
+        "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
+    );
+}
+
+#[test]
+fn imported_method_disjoint_storage_call_is_accepted() {
+    let found = imported_errors(&imported_program("    m.read(mut xs, ys)"));
+    assert!(found.is_empty(), "expected no error, got: {found:?}");
+}

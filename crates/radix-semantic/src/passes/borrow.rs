@@ -63,6 +63,7 @@ use self::own_arg::OwnArgState;
 use super::borrow_region::RegionFacts;
 use super::borrow_region_cfg::CfgNodeId;
 
+use crate::scope::ImportedFileInterfaceMethod;
 use crate::{
     AccessMarker, FuncSig, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL,
     ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, ParamType, Primitive, Resolver,
@@ -119,11 +120,11 @@ type PlaceKey = (DefId, Vec<radix_lexer::Symbol>);
 /// Returns access violations as a list of [`SemanticError`]s.
 pub fn analyze_modes(
     hir: &HirModule,
-    _resolver: &Resolver,
+    resolver: &Resolver,
     types: &TypeTable,
     interner: &Interner,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, interner, false, None)
+    run(resolver, hir, types, interner, false, None)
 }
 
 /// Region-routed [`analyze_modes`]: marked-value borrow conflicts consult the
@@ -134,12 +135,12 @@ pub fn analyze_modes(
 /// Returns access violations as a list of [`SemanticError`]s.
 pub fn analyze_modes_with_regions(
     hir: &HirModule,
-    _resolver: &Resolver,
+    resolver: &Resolver,
     types: &TypeTable,
     interner: &Interner,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, interner, false, regions)
+    run(resolver, hir, types, interner, false, regions)
 }
 
 /// Legacy Rust-target analysis: declared access facts plus the Rust lifetime
@@ -152,11 +153,11 @@ pub fn analyze_modes_with_regions(
 /// Returns borrow/lifetime violations as a list of [`SemanticError`]s.
 pub fn analyze(
     hir: &HirModule,
-    _resolver: &Resolver,
+    resolver: &Resolver,
     types: &TypeTable,
     interner: &Interner,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, interner, true, None)
+    run(resolver, hir, types, interner, true, None)
 }
 
 /// Region-routed [`analyze`]: marked-value borrow conflicts consult the
@@ -168,12 +169,12 @@ pub fn analyze(
 /// Returns borrow/lifetime violations as a list of [`SemanticError`]s.
 pub fn analyze_with_regions(
     hir: &HirModule,
-    _resolver: &Resolver,
+    resolver: &Resolver,
     types: &TypeTable,
     interner: &Interner,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, interner, true, regions)
+    run(resolver, hir, types, interner, true, regions)
 }
 
 /// Retired Rust lifetime simulation hook.
@@ -195,13 +196,14 @@ pub fn analyze_rust_lifetime(
 }
 
 fn run(
+    resolver: &Resolver,
     hir: &HirModule,
     types: &TypeTable,
     interner: &Interner,
     rust_lifetime: bool,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    let mut checker = BorrowChecker::new(types, interner, rust_lifetime, regions);
+    let mut checker = BorrowChecker::new(resolver, types, interner, rust_lifetime, regions);
     checker.check_program(hir);
 
     if checker.errors.is_empty() {
@@ -358,6 +360,13 @@ struct BorrowChecker<'a> {
     /// user `MethodCall` carries no callee expression, so the call-site rules
     /// resolve its parameters from the receiver's class.
     method_params: FxHashMap<(DefId, radix_lexer::Symbol), Vec<ParamType>>,
+    /// Imported class-method param contracts keyed like `method_params`
+    /// (R02). The declared index holds only methods whose class is declared in
+    /// this HIR unit; a receiver whose class arrives through a file interface
+    /// resolves here so its call site gets the same overlap checking.
+    imported_method_params: FxHashMap<(DefId, radix_lexer::Symbol), Vec<ParamType>>,
+    /// Resolved names and imported file interfaces of the analyzed unit.
+    resolver: &'a Resolver,
     /// BRI-2 region facts consumed (never reconstructed) for marked-value
     /// conflict decisions; `None` keeps the block-scope approximation.
     regions: Option<&'a RegionFacts>,
@@ -385,6 +394,7 @@ struct ParamUsage {
 
 impl<'a> BorrowChecker<'a> {
     fn new(
+        resolver: &'a Resolver,
         types: &'a TypeTable,
         interner: &'a Interner,
         rust_lifetime: bool,
@@ -420,6 +430,8 @@ impl<'a> BorrowChecker<'a> {
             unmarked_params: FxHashSet::default(),
             func_params: FxHashMap::default(),
             method_params: FxHashMap::default(),
+            imported_method_params: FxHashMap::default(),
+            resolver,
             regions,
             stmt_node: None,
             errors: Vec::new(),
@@ -427,6 +439,7 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn check_program(&mut self, hir: &HirModule) {
+        self.index_imported_methods();
         for item in &hir.items {
             self.index_item(item);
         }
@@ -459,6 +472,35 @@ impl<'a> BorrowChecker<'a> {
 
     fn index_function(&mut self, def_id: DefId, func: &HirFunction) {
         self.func_params.insert(def_id, Self::declared_params(func));
+    }
+
+    /// Seed `imported_method_params` from the resolver's file interfaces.
+    ///
+    /// Both the consumer-locale surface spelling and the canonical library
+    /// name key a row, mirroring `Resolver::imported_method_canonical_name`:
+    /// the HIR method-call symbol is the source spelling, and either may be
+    /// requested.
+    fn index_imported_methods(&mut self) {
+        let seed = |imported: &mut FxHashMap<
+            (DefId, radix_lexer::Symbol),
+            Vec<ParamType>,
+        >,
+                        class: DefId,
+                        methods: &[ImportedFileInterfaceMethod]| {
+            for method in methods {
+                let params = method.sig.params.clone();
+                imported
+                    .entry((class, method.surface_name))
+                    .or_insert(params.clone());
+                imported.entry((class, method.name)).or_insert(params);
+            }
+        };
+        for (class, _, methods, _) in self.resolver.imported_file_structs() {
+            seed(&mut self.imported_method_params, class, &methods);
+        }
+        for (class, methods) in self.resolver.imported_file_interfaces() {
+            seed(&mut self.imported_method_params, class, &methods);
+        }
     }
 
     fn declared_params(func: &HirFunction) -> Vec<ParamType> {
@@ -794,15 +836,19 @@ impl<'a> BorrowChecker<'a> {
         self.check_args_against(&params, callee.ty.is_some(), args);
     }
 
-    /// The parameters a user `MethodCall` is checked against, when the
-    /// receiver's class declares the method in this module.
+    /// The parameters a user `MethodCall` is checked against: the receiver's
+    /// class declares the method in this module, or the class arrived through
+    /// an imported file interface (R02).
     fn user_method_params(
         &self,
         receiver: &HirExpression,
         method: radix_lexer::Symbol,
     ) -> Option<Vec<ParamType>> {
         let class = super::method_receiver_mutation::class_def(self.types, receiver.ty?)?;
-        self.method_params.get(&(class, method)).cloned()
+        if let Some(params) = self.method_params.get(&(class, method)) {
+            return Some(params.clone());
+        }
+        self.imported_method_params.get(&(class, method)).cloned()
     }
 
     fn check_args_against(&mut self, params: &[ParamType], rust_sim: bool, args: &[HirCallArg]) {
