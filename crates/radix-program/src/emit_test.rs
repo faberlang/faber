@@ -30,6 +30,36 @@ fn never_exercised_go_emission(_package: &AnalyzedProgram, _input: &Path) -> Pac
     unreachable!("go emission is a faber-side seam; radix-program tests only run the Rust path")
 }
 
+/// Real Go emission seam for the single-stream merge test: one full Go file
+/// per unit, the raw shape `radix-module` emits before product assembly wraps
+/// (or drops) the sibling files.
+#[cfg(feature = "hir-go")]
+fn go_package_test_emission(package: &AnalyzedProgram, _input: &Path) -> PackageCompileResult {
+    let latin = radix_module::locale::latin_locale_pack();
+    let surface = radix_module::locale::KeywordSurface::new(&latin);
+    let mut entry_code = None;
+    let mut go_modules = Vec::new();
+    for unit in package.nodes.values() {
+        if let Ok(Output::Go(go)) =
+            radix_module::codegen::generate_from_analyzed(Target::HirGo, &unit.analysis, &surface)
+        {
+            if unit.is_entry {
+                entry_code = Some(go.code);
+            } else {
+                go_modules.push((format!("{}.go", unit.module_segments.join("_")), go.code));
+            }
+        }
+    }
+    let output = entry_code.map(|code| Output::Go(radix_module::GoOutput { code }));
+    PackageCompileResult {
+        compile_result: radix_module::CompileResult {
+            output,
+            diagnostics: package.diagnostics.clone(),
+        },
+        go_modules,
+    }
+}
+
 fn temp_dir(label: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -305,5 +335,98 @@ fn {function}(tf32[3] source) → tf32[3] {{
     assert!(output.code.contains("pub mod consumer_b"));
     assert!(output.code.contains("fn resolve_a"));
     assert!(output.code.contains("fn resolve_b"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn compile_package_go_single_stream_defines_imported_declarations() {
+    // The single-stream emit path (`faber emit -t go <package>` and the
+    // `faber corpus --target go` recipe that captures stdout into `main.go`)
+    // receives one Go source. The entry names the imported interface and
+    // genus, so the sibling module's declarations must be merged into that
+    // source; dropping the sibling files leaves `go build` with undefined
+    // names.
+    let dir = temp_dir("go-contract-import");
+    fs::write(
+        dir.join("main.fab"),
+        r#"
+import from "./shapes"
+
+fn render(shapes.Figurable f) → string {
+    return f.draw()
+}
+
+main {
+    const shapes.Circle c ← shapes.Circle { radius = 25 }
+    print render(c)
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("shapes.fab"),
+        r#"
+module shapes
+
+@ public
+interface Figurable {
+    fn draw() → string
+}
+
+@ public
+class Circle implements Figurable {
+    var int radius = 10
+
+    fn draw() → string {
+        return "circle §"(self.radius)
+    }
+}
+"#,
+    )
+    .expect("write shapes module");
+
+    let seams = EmissionSeams {
+        analysis: test_analysis_seams(),
+        #[cfg(feature = "hir-go")]
+        emit_go: go_package_test_emission,
+    };
+    let result = compile_package(
+        &Config::default().with_target(Target::HirGo),
+        &dir.join("main.fab"),
+        &seams,
+    );
+    assert!(
+        result.success(),
+        "go package compile failed: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let Some(Output::Go(output)) = result.output else {
+        panic!("expected Go output");
+    };
+    assert!(
+        output.code.contains("type Figurable interface"),
+        "single-stream Go output must define the imported interface:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("type Circle struct"),
+        "single-stream Go output must define the imported genus:\n{}",
+        output.code
+    );
+    assert!(
+        output.code.contains("func (self *Circle) Draw() string"),
+        "single-stream Go output must define the imported method:\n{}",
+        output.code
+    );
+    assert!(
+        !output.code.contains("/* unresolved_def */"),
+        "no unresolved placeholder may reach emitted Go:\n{}",
+        output.code
+    );
     let _ = fs::remove_dir_all(&dir);
 }
