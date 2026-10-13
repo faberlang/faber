@@ -1,0 +1,20 @@
+module ops
+
+@ public
+interface Utterable {
+    fn speak() → string
+}
+
+@ public
+class Machine implements Utterable {
+    var int wheels = 4
+
+    fn speak() → string {
+        return "machine §"(self.wheels)
+    }
+}
+
+@ public
+fn greet(string who) → string {
+    return "salve §"(who)
+}

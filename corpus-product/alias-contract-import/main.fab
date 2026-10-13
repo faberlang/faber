@@ -1,0 +1,15 @@
+# One aliased import carries both a function call and a contract dispatch:
+# `ops` binds under the alias `o`, so the package identity map, the resolver
+# file interface, and implementor registration are all keyed by `o`.
+
+import from "./ops" ops as o
+
+fn render(o.Utterable u) → string {
+    return u.speak()
+}
+
+main {
+    print o.greet("Faber")
+    const o.Machine m ← o.Machine { wheels = 6 }
+    print render(m)
+}
