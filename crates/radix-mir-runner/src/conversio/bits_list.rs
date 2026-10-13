@@ -252,11 +252,40 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 }
 
+/// An `f32` pattern as the `f64` a list cell holds. The hardware widen quiets
+/// a signaling NaN, which would break the bit-for-bit round trip, so a NaN
+/// moves its payload by shifting: the quiet bit lands on the `f64` quiet bit.
+fn widen_f32_pattern(bits: u32) -> f64 {
+    let value = f32::from_bits(bits);
+    if !value.is_nan() {
+        return f64::from(value);
+    }
+    let sign = u64::from(bits >> 31) << 63;
+    let payload = u64::from(bits & 0x007f_ffff) << 29;
+    f64::from_bits(sign | 0x7ff0_0000_0000_0000 | payload)
+}
+
+/// Inverse of [`widen_f32_pattern`]. A NaN whose payload shifts to nothing
+/// keeps a quiet bit, as the hardware narrow does, and never reads as infinity.
+fn narrow_f32_pattern(value: f64) -> u32 {
+    if !value.is_nan() {
+        return (value as f32).to_bits();
+    }
+    let bits = value.to_bits();
+    let sign = ((bits >> 63) as u32) << 31;
+    let payload = ((bits >> 29) & 0x007f_ffff) as u32;
+    sign | 0x7f80_0000 | if payload == 0 { 0x0040_0000 } else { payload }
+}
+
 fn encode_pattern(value: &Value, cell: Cell) -> Option<u64> {
     match cell {
         Cell::Raw(bits) | Cell::Unsigned(bits) | Cell::Signed(bits) => {
             Some(bits_pattern(value)? & mask(bits))
         }
+        Cell::Float(NumericWidth::F32, _) => match value {
+            Value::Float(v) => Some(u64::from(narrow_f32_pattern(*v))),
+            _ => None,
+        },
         Cell::Float(width, bits) => match pattern_from_float(value, width, bits_width(bits)?)? {
             Value::UInt(pattern) => Some(pattern),
             _ => None,
@@ -272,6 +301,13 @@ fn decode_pattern(pattern: u64, cell: Cell) -> Option<Value> {
             let shift = 64 - bits;
             Value::Int(i64::from_le_bytes((pattern << shift).to_le_bytes()) >> shift)
         }
+        Cell::Float(NumericWidth::F32, _) => {
+            Value::Float(widen_f32_pattern(u32::try_from(pattern).ok()?))
+        }
         Cell::Float(width, bits) => float_from_pattern(pattern, bits_width(bits)?, width)?,
     })
 }
+
+#[cfg(test)]
+#[path = "bits_list_test.rs"]
+mod bits_list_test;
