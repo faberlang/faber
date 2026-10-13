@@ -1053,12 +1053,20 @@ impl Resolver<'_> {
     }
 
     fn is_device_callee(&self, callee: &MirCallee) -> bool {
-        self.resolve_function(callee).is_some_and(|function| {
+        let is_device = |function: &MirFunction| {
             matches!(
                 role_of(function, self.roles, self.metadata),
                 RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel
             )
-        })
+        };
+        match self.resolve_function(callee) {
+            Some(function) => is_device(function),
+            // A generic call whose type args match no instance of a device
+            // source is still a device call: it stays a site so expansion
+            // reports it `unresolved` instead of leaving it behind unchecked.
+            None => matches!(callee, MirCallee::Definition { source, .. }
+                if self.functions.iter().any(|function| function.source == Some(*source) && is_device(function))),
+        }
     }
 
     fn resolve_function(&self, callee: &MirCallee) -> Option<&MirFunction> {
@@ -1074,6 +1082,13 @@ impl Resolver<'_> {
                         .find(|function| function.id == mono.function)
                 })
                 .or_else(|| {
+                    // Only a callee without explicit type args names its
+                    // source plainly; explicit args that match no
+                    // monomorphization are unresolved, never an arbitrary
+                    // same-source function.
+                    if !type_args.is_empty() {
+                        return None;
+                    }
                     self.functions
                         .iter()
                         .find(|function| function.source == Some(*source))

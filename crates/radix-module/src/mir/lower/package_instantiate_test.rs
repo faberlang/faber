@@ -1599,3 +1599,98 @@ fn try_call_error_place_binds_the_generic_error_type() {
     };
     assert_eq!(*callee, MirCallee::Function(monomorphizations[0].function));
 }
+
+/// A-137: an unsigned MIR constant argument binds a generic witness at the
+/// sized `u64`, the same type the single-unit monomorphizer and the lowerer
+/// give `MirConstant::UInt`; plain `numerus` is the signed `i64` default.
+#[test]
+fn uint_constant_argument_binds_the_sized_u64_witness() {
+    const SOURCE: DefId = DefId(79);
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let symbol = interner.intern("T");
+    let generic = MirType::semantic(types.intern(Type::Param(symbol)));
+    let u64_ty = types.sized_numeric(Primitive::Numerus, crate::semantic::NumericWidth::U64);
+    let plain = types.primitive(Primitive::Numerus);
+    assert_ne!(u64_ty, plain, "the fixture needs a sized u64 distinct from plain numerus");
+    let template = MirFunction {
+        id: MirFunctionId(0),
+        source: Some(SOURCE),
+        name: None,
+        params: vec![crate::mir::MirParam {
+            local: crate::mir::MirLocalId(0),
+            name: None,
+            ty: generic,
+            mode: crate::mir::MirParamMode::Owned,
+            span: Span::default(),
+        }],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(0))))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: generic,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let mut program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(1),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: Vec::new(),
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: crate::mir::MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Call {
+                        destination: None,
+                        callee: MirCallee::Definition { source: SOURCE, type_args: Vec::new() },
+                        args: vec![MirOperand::Constant(crate::mir::MirConstant::UInt(7))],
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let generic_params = vec![(
+        SOURCE,
+        vec![MirGenericParam { name: symbol, is_shape: false, runtime_witness: None }],
+    )];
+
+    let monomorphizations = instantiate_merged_generic_calls(
+        &mut program,
+        std::slice::from_ref(&template),
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+    )
+    .expect("a uint constant argument must bind the generic witness");
+
+    assert_eq!(monomorphizations.len(), 1, "one call site mints one instance");
+    let witness = monomorphizations[0].key.type_args[0].semantic_id();
+    assert_eq!(
+        witness, u64_ty,
+        "a uint constant argument must bind the sized u64 witness, not plain numerus"
+    );
+}

@@ -1938,3 +1938,47 @@ fn multi_block_chain_still_counts_nesting_along_the_goto_join() {
         "a 17-deep chain through a Goto-join link must still overflow: {errors:?}"
     );
 }
+
+/// A-129: a generic `Definition` callee whose explicit type args match no
+/// monomorphization of its source must not resolve to an arbitrary same-source
+/// function. The unmatched call stays in place and the expansion reports it
+/// `unresolved` instead of inlining the wrong instance.
+#[test]
+fn unmatched_type_args_do_not_fall_back_to_a_same_source_function() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let other = MirType::semantic(types.primitive(crate::semantic::Primitive::Textus));
+    let template = identity_fragment(1, FRAGMENT, ty);
+    let instance = identity_fragment(2, FRAGMENT, ty);
+    let mut entry = entry_calling(1, 1, ty, Vec::new(), Vec::new());
+    let MirStatementKind::Call { callee, .. } = &mut entry.blocks[0].statements[0].kind else {
+        panic!("entry starts with a call");
+    };
+    *callee = MirCallee::Definition { source: FRAGMENT, type_args: vec![other] };
+    let monomorphizations = [MirMonomorphization {
+        key: crate::mir::MirMonomorphizationKey { source: FRAGMENT, type_args: vec![ty], shape_args: Vec::new() },
+        function: MirFunctionId(2),
+    }];
+    let mut functions = vec![entry, template, instance];
+    let errors = compose(
+        &mut functions,
+        &monomorphizations,
+        &roles(),
+        ExpansionBudget::DOCUMENTED_DEFAULTS,
+        None,
+        &launch_entries(),
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.issue == ISSUE_EXPANSION && err.reason == "unresolved"),
+        "an unmatched generic device call must fail closed as unresolved, got {errors:?}"
+    );
+    assert!(
+        matches!(
+            &functions[0].blocks[0].statements[0].kind,
+            MirStatementKind::Call { callee: MirCallee::Definition { .. }, .. }
+        ),
+        "the unmatched call must stay in place, not be inlined from a same-source function"
+    );
+}

@@ -1469,7 +1469,16 @@ impl PackageInstantiate<'_> {
     fn constant_ty(&self, constant: &radix_mir::MirConstant) -> Option<MirType> {
         use radix_mir::MirConstant;
         let primitive = match constant {
-            MirConstant::Int(_) | MirConstant::UInt(_) => Primitive::Numerus,
+            MirConstant::Int(_) => Primitive::Numerus,
+            // An unsigned constant is the sized `u64`, as the lowerer and the
+            // single-unit monomorphizer type it; plain `numerus` is `i64`.
+            MirConstant::UInt(_) => {
+                return Some(MirType::semantic(
+                    self.types
+                        .find_sized_numeric(Primitive::Numerus, radix_semantic::NumericWidth::U64)
+                        .unwrap_or_else(|| self.types.primitive(Primitive::Numerus)),
+                ));
+            }
             // An exact bignum constant is the unbounded integer.
             MirConstant::Magnus(_) => {
                 return Some(MirType::semantic(
