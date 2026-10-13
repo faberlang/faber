@@ -1,6 +1,9 @@
-use super::{discover_build_layout, is_manifestless_single_file};
+use super::{
+    discover_build_layout, is_manifestless_single_file, target_feature_unavailable_message,
+};
 use crate::package::cargo::{RustRuntimePlan, emit_generated_crate_with_runtime_plan};
 use crate::package::test_support::test_temp_dir;
+use radix::module::codegen::Target;
 use std::collections::BTreeSet;
 use std::fs;
 
@@ -66,4 +69,34 @@ fn manifest_backed_package_keeps_its_own_target_tree() {
             .generated_crate_root
             .starts_with(layout.package_root.join("target"))
     );
+}
+
+#[test]
+fn unavailable_wasm_target_message_names_canonical_wasm_text() {
+    let message = target_feature_unavailable_message(Target::MirWasm, "mir-wasm");
+    assert!(
+        message.contains("target `wasm-text`"),
+        "`-t wasm-text` must be reported by its canonical name, got: {message}"
+    );
+    assert!(
+        message.contains("feature `mir-wasm`"),
+        "message must name the missing feature, got: {message}"
+    );
+}
+
+#[test]
+fn unavailable_target_message_uses_canonical_spelling_for_every_gated_target() {
+    for (target, feature) in [
+        (Target::HirFhir, "hir-fhir"),
+        (Target::MirLlvmHost, "mir-llvm"),
+        (Target::MirWasm, "mir-wasm"),
+        (Target::MirMetal, "mir-metal"),
+        (Target::HirGo, "hir-go"),
+    ] {
+        let message = target_feature_unavailable_message(target, feature);
+        assert!(
+            message.contains(&format!("target `{}`", target.as_str())),
+            "{message}"
+        );
+    }
 }
