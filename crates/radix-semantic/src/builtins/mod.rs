@@ -1,8 +1,10 @@
 //! Compiler-injected builtin genera and types.
 //!
 //! `gpu` registers device vector builtins used by MIR lowering and GPU probes;
-//! registration order is forma → gpu so shared resolver state stays deterministic.
+//! registration order is forma → gpu → erratum so shared resolver state stays
+//! deterministic.
 
+pub mod erratum;
 pub mod forma;
 pub mod frame_types;
 pub mod gpu;
@@ -16,6 +18,7 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
     forma::register(resolver, types, interner);
     gpu::register(resolver, types, interner);
     register_vertex_shader_locals(resolver, types, interner);
+    erratum::register(resolver, types, interner);
     register_builtin_conversion_rows(resolver, types);
 }
 
@@ -104,6 +107,7 @@ pub fn inject_hir_items(
     if forma::program_uses_forma(program, resolver) {
         forma::inject_hir_item(items, resolver, types, interner);
     }
+    erratum::inject_hir_item(items, resolver, types, interner);
     if frame_types::program_needs_frame_types(program, interner, locale_pack) {
         frame_types::inject_hir_items(items, resolver, types, interner);
     }

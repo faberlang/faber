@@ -2818,6 +2818,7 @@ fn is_builtin_type(name: &str) -> bool {
     matches!(
         name,
         "ascii"
+            | "erratum"
             | "forma"
             | "scrinium"
             | "status"
