@@ -662,12 +662,24 @@ impl MirTerminatorKind {
 }
 
 impl MirAggregateKind {
-    /// `DefId` for `Struct`/`EnumVariant` aggregates; `None` for tuple/array/map/set/tensor/vector.
+    /// `DefId` for `Struct`/`EnumVariant` aggregates; `None` for every other
+    /// aggregate kind.
     #[must_use]
     pub fn definition_id(&self) -> Option<DefId> {
         match self {
             Self::Struct(def_id) | Self::EnumVariant(def_id) => Some(*def_id),
-            _ => None,
+            Self::Tuple
+            | Self::Array
+            | Self::Record
+            | Self::ClosureEnvironment(_)
+            | Self::SharedCell
+            | Self::Map
+            | Self::Set
+            | Self::Tensor
+            | Self::SparseTensor
+            | Self::Interval { .. }
+            | Self::Vector
+            | Self::Matrix => None,
         }
     }
 }
@@ -1181,9 +1193,10 @@ impl MirLaneOp {
 /// The vector method a [`MirIntrinsic::VectorOp`] defers.
 ///
 /// Arity: `Length`, `Normalized`, `Negate`, `Not`, `Crea` and `Swizzle` take one
-/// operand (the receiver; `Crea` uses only its declared shape), everything else takes two
-/// (receiver, peer). `Swizzle` carries resolved lane indices, never a symbol,
-/// so symbol remapping needs no rewrite.
+/// operand (the receiver; `Crea` uses only its declared shape); `Select` takes
+/// three (mask, then, else); everything else takes two (receiver, peer).
+/// `Swizzle` carries resolved lane indices, never a symbol, so symbol remapping
+/// needs no rewrite.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirVectorOp {
     /// Lane-wise operator between two vectors of the same width. With
@@ -1315,7 +1328,25 @@ impl MirLiftOp {
         match self {
             Self::Neg | Self::Not => 1,
             Self::Select => 3,
-            _ => 2,
+            Self::Add
+            | Self::Sub
+            | Self::Mul
+            | Self::Div
+            | Self::Mod
+            | Self::TrueDiv
+            | Self::Eq
+            | Self::NotEq
+            | Self::Lt
+            | Self::Gt
+            | Self::LtEq
+            | Self::GtEq
+            | Self::And
+            | Self::Or
+            | Self::Coalesce
+            | Self::Max
+            | Self::Min
+            | Self::WholeEq
+            | Self::WholeNotEq => 2,
         }
     }
 

@@ -1,8 +1,11 @@
-//! `MirFunctionIndex` resolution and the single function-id allocator.
+//! `MirFunctionIndex` resolution, the single function-id allocator, and the
+//! node-model helper predicates that sit beside them in `nodes.rs`.
 
 use crate::{
-    MirFunction, MirFunctionId, MirFunctionIdOverflow, MirFunctionIndex, MirProgram, MirType,
+    MirAggregateKind, MirClosureEnvironmentId, MirFunction, MirFunctionId, MirFunctionIdOverflow,
+    MirFunctionIndex, MirLiftOp, MirProgram, MirType,
 };
+use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::TypeId;
 
@@ -103,5 +106,67 @@ fn allocate_function_id_fails_closed_on_overflow() {
     assert_eq!(
         MirProgram::allocate_function_id(&functions),
         Err(MirFunctionIdOverflow)
+    );
+}
+
+/// Every lift operator reports the operand count of its scalar form, so a new
+/// variant cannot quietly inherit a wrong arity through a wildcard arm.
+#[test]
+fn lift_arity_matches_the_operand_count_each_op_takes() {
+    assert_eq!(MirLiftOp::Neg.arity(), 1);
+    assert_eq!(MirLiftOp::Not.arity(), 1);
+    assert_eq!(MirLiftOp::Select.arity(), 3);
+    for op in [
+        MirLiftOp::Add,
+        MirLiftOp::Sub,
+        MirLiftOp::Mul,
+        MirLiftOp::Div,
+        MirLiftOp::Mod,
+        MirLiftOp::TrueDiv,
+        MirLiftOp::Eq,
+        MirLiftOp::NotEq,
+        MirLiftOp::Lt,
+        MirLiftOp::Gt,
+        MirLiftOp::LtEq,
+        MirLiftOp::GtEq,
+        MirLiftOp::And,
+        MirLiftOp::Or,
+        MirLiftOp::Coalesce,
+        MirLiftOp::Max,
+        MirLiftOp::Min,
+        MirLiftOp::WholeEq,
+        MirLiftOp::WholeNotEq,
+    ] {
+        assert_eq!(op.arity(), 2, "{op:?}");
+    }
+}
+
+/// Only the def-backed aggregate kinds carry a `DefId`; every other kind must
+/// report `None` by its own name rather than through a wildcard arm.
+#[test]
+fn aggregate_definition_id_is_none_for_every_kind_without_a_def() {
+    for kind in [
+        MirAggregateKind::Tuple,
+        MirAggregateKind::Array,
+        MirAggregateKind::Record,
+        MirAggregateKind::ClosureEnvironment(MirClosureEnvironmentId(0)),
+        MirAggregateKind::SharedCell,
+        MirAggregateKind::Map,
+        MirAggregateKind::Set,
+        MirAggregateKind::Tensor,
+        MirAggregateKind::SparseTensor,
+        MirAggregateKind::Interval { inclusive: true },
+        MirAggregateKind::Vector,
+        MirAggregateKind::Matrix,
+    ] {
+        assert_eq!(kind.definition_id(), None, "{kind:?}");
+    }
+    assert_eq!(
+        MirAggregateKind::Struct(DefId(7)).definition_id(),
+        Some(DefId(7))
+    );
+    assert_eq!(
+        MirAggregateKind::EnumVariant(DefId(9)).definition_id(),
+        Some(DefId(9))
     );
 }
