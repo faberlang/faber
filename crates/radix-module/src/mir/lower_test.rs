@@ -2649,13 +2649,26 @@ fn rejects_deferred_control_flow_constructs_with_explicit_diagnostics() {
     assert!(iter_ex_dump.contains("runtime collection length("));
     assert!(!iter_ex_dump.contains("itera ex over tabula before map value iteration MIR lowering"));
 
-    let discerne_unit = analyze("functio handle(numerus n) → vacuum { discerne n { casu x { nota x } } }");
-    let discerne_errors = lower_analyzed_unit(discerne_unit.application_view(), MirLoweringOptions::default())
-        .expect_err("binding discerne is deferred");
-    assert_eq!(discerne_errors.len(), 1);
-    assert_eq!(
-        discerne_errors[0].issue,
-        "unsupported_mir_lowering_non_literal_discerne_pattern_before_switch_mir_lowering"
+    // A bare arm name that is not a member of the matched set never binds: the
+    // resolver refuses it at analysis, so it no longer reaches MIR lowering.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let Err(discerne_errors) = crate::driver::analyze_source(
+        &session,
+        "test.fab",
+        "functio handle(numerus n) → vacuum { discerne n { casu x { nota x } } }",
+        AnalyzeRequest::default(),
+    ) else {
+        panic!("binding discerne arm must fail closed at analysis")
+    };
+    assert!(
+        discerne_errors
+            .iter()
+            .any(|error| error.issue() == Some("discerne_arm_not_member")),
+        "a non-member discerne arm must be rejected: {:?}",
+        discerne_errors
+            .iter()
+            .map(|e| (e.code, e.issue()))
+            .collect::<Vec<_>>()
     );
 }
 
