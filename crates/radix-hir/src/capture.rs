@@ -36,8 +36,9 @@ pub struct CaptureFacts {
     /// bare name) somewhere in the body. These need shared-cell storage.
     pub shared: FxHashSet<DefId>,
     /// Captured locals that are the root of an in-place content mutation: a
-    /// method-call receiver (`xs.append(…)`) or a field/index assignment
-    /// target (`xs[0] ← …`). Conservative: any method call counts.
+    /// method-call receiver (`xs.append(…)`), a field/index assignment target
+    /// (`xs[0] ← …`), or a `⇇` copy-into target (`xs ⇇ ys`). Conservative:
+    /// any method call counts.
     pub content_mutated: FxHashSet<DefId>,
 }
 
@@ -175,6 +176,7 @@ impl HirVisitor for CaptureCollector {
                 self.note_rebind(target);
             }
             HirExpressionKind::MethodCall(receiver, ..) => self.note_content_mutation(receiver),
+            HirExpressionKind::CopyInto { target, .. } => self.note_content_mutation(target),
             HirExpressionKind::Clausura(params, _, _, body) => {
                 self.visit_closure(params, body);
                 return;
@@ -184,3 +186,7 @@ impl HirVisitor for CaptureCollector {
         walk_expr(self, expr);
     }
 }
+
+#[cfg(test)]
+#[path = "capture_test.rs"]
+mod capture_tests;
