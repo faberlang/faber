@@ -408,6 +408,37 @@ fn witness_binds_shape_params_from_tensor_shapes() {
 }
 
 #[test]
+fn union_mismatch_undoes_partial_shape_bindings() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let parameter = Symbol(230);
+    let param_dim = types.intern_index(IndexExpr::Param(parameter));
+    let expected_tensor = types.intern(Type::Tensor(element, param_dim));
+    let numerus = types.primitive(Primitive::Numerus);
+    let expected_member = types.tuple(vec![expected_tensor, numerus]);
+    let expected = types.intern(Type::Union(vec![expected_member]));
+
+    let actual_shape = shape_2x8(&mut types);
+    let actual_tensor = types.intern(Type::Tensor(element, actual_shape));
+    let textus = types.primitive(Primitive::Textus);
+    let actual_member = types.tuple(vec![actual_tensor, textus]);
+    let actual = types.intern(Type::Union(vec![actual_member]));
+
+    let mut generic_bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    assert!(!bind_generic_type_witness_with_shapes(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut generic_bindings,
+        &mut shape_bindings,
+    ));
+    // The failed candidate bound the shape param from the tensor before the
+    // tuple's second element mismatched; rollback must remove it.
+    assert!(shape_bindings.is_empty());
+}
+
+#[test]
 fn witness_inverts_exact_affine_and_divide_shape_dimensions() {
     let mut types = TypeTable::new();
     let element = f32_ty(&mut types);

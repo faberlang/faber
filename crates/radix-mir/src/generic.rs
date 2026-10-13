@@ -6,10 +6,10 @@
 //! here so target emitters never grow their own generic policies.
 
 use crate::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirClosureValue,
-    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirOptionChainLink,
-    MirOptionOp, MirPlace, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind,
-    MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueKind,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirCollectionOp, MirConstant,
+    MirFunction, MirIntrinsic, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace,
+    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator,
+    MirTerminatorKind, MirType, MirValue, MirValueKind,
 };
 use radix_lexer::{Span, Symbol};
 use radix_types::{
@@ -464,7 +464,7 @@ fn existing_literal_index(types: &TypeTable, value: u64) -> Option<IndexId> {
 ///
 /// Insert-only: when `param` is already bound, compares for structural index
 /// equality and never overwrites (mirrors [`bind_type_param`] so union
-/// backtracking can roll back via [`undo_shape_bindings_to`]).
+/// backtracking can roll back via [`undo_bindings_to`]).
 fn bind_shape_param(
     types: &TypeTable,
     param: Symbol,
@@ -545,7 +545,7 @@ fn try_bind_union_member_at(
             seen,
         ) {
             undo_bindings_to(generic_bindings, &keys_before);
-            undo_shape_bindings_to(shape_bindings, &shape_keys_before);
+            undo_bindings_to(shape_bindings, &shape_keys_before);
             continue;
         }
 
@@ -560,12 +560,11 @@ fn try_bind_union_member_at(
             shape_bindings,
             seen,
         ) {
-            matched[actual_index] = false;
             return true;
         }
 
         undo_bindings_to(generic_bindings, &keys_before);
-        undo_shape_bindings_to(shape_bindings, &shape_keys_before);
+        undo_bindings_to(shape_bindings, &shape_keys_before);
         matched[actual_index] = false;
     }
 
@@ -574,14 +573,10 @@ fn try_bind_union_member_at(
 
 /// Remove any keys inserted after `keys_before` was captured.
 ///
-/// Safe only while bindings are insert-only (see [`bind_type_param`]).
-fn undo_bindings_to(generic_bindings: &mut MirGenericBindings, keys_before: &FxHashSet<Symbol>) {
-    generic_bindings.retain(|key, _| keys_before.contains(key));
-}
-
-/// Shape-binding rollback mirroring [`undo_bindings_to`].
-fn undo_shape_bindings_to(shape_bindings: &mut MirShapeBindings, keys_before: &FxHashSet<Symbol>) {
-    shape_bindings.retain(|key, _| keys_before.contains(key));
+/// Safe only while bindings are insert-only (see [`bind_type_param`] and
+/// [`bind_shape_param`]).
+fn undo_bindings_to<V>(bindings: &mut FxHashMap<Symbol, V>, keys_before: &FxHashSet<Symbol>) {
+    bindings.retain(|key, _| keys_before.contains(key));
 }
 
 fn try_bind_function_signature(
@@ -1562,11 +1557,6 @@ fn intern_or_find(types: &mut TypeTable, candidate: &Type, index: &ExistingTypeI
     id
 }
 
-/// Mutable mirror of [`instantiate_existing_type_id`] with shape substitution.
-///
-/// Shape params bind to their concrete index nodes via
-/// [`substitute_index_params`] and concrete indexed types are interned when
-/// absent (see [`intern_or_find`]).
 /// Canonical index identity for monomorphization keys.
 ///
 /// Index arena entries are not content-addressed, so one concrete shape can
@@ -1899,19 +1889,7 @@ pub fn fold_shape_size_constant(
     let dims = i64s_from_literal_index(substituted, types)?;
     let value = match axis {
         None => dims.iter().product::<i64>(),
-        Some(a) => {
-            let a_usize = if a >= 0 {
-                // Guarded: `a >= 0`; `try_from` rejects values beyond usize
-                // instead of truncating on 32-bit targets.
-                usize::try_from(a).ok()?
-            } else {
-                // `checked_neg` fails closed for `a == i64::MIN` instead of
-                // panicking on the negation in debug builds.
-                let neg = usize::try_from(a.checked_neg()?).ok()?;
-                dims.len().checked_sub(neg)?
-            };
-            *dims.get(a_usize)?
-        }
+        Some(a) => *dims.get(axis_extent_index(a, dims.len())?)?,
     };
     if size_param {
         return Some(MirConstant::Int(value));
@@ -1921,6 +1899,21 @@ pub fn fold_shape_size_constant(
     // lista→tensor conversion consumes); precision loss only above 2^53.
     #[expect(clippy::cast_precision_loss)]
     Some(MirConstant::Float(value as f64))
+}
+
+/// Resolve a possibly-negative axis against a rank, failing closed when the
+/// axis is out of range or its magnitude does not fit in `usize`.
+fn axis_extent_index(axis: i64, rank: usize) -> Option<usize> {
+    if axis >= 0 {
+        // Guarded: `axis >= 0`; `try_from` rejects values beyond usize
+        // instead of truncating on 32-bit targets.
+        usize::try_from(axis).ok()
+    } else {
+        // `checked_neg` fails closed for `axis == i64::MIN` instead of
+        // panicking on the negation in debug builds.
+        let neg = usize::try_from(axis.checked_neg()?).ok()?;
+        rank.checked_sub(neg)
+    }
 }
 
 /// Substitute every `MirConstant::ShapeSize` term in a function body to its
@@ -2163,20 +2156,15 @@ fn rewrite_value_constants(
         MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
             rewrite_operand_constants(operand, rewrite)
         }
-        MirValueKind::Closure(closure) => rewrite_closure_value_constants(closure, rewrite),
+        MirValueKind::Closure(closure) => {
+            rewrite_operand_constants(&mut closure.environment, rewrite)
+        }
         MirValueKind::Binary { lhs, rhs, .. } => {
             rewrite_operand_constants(lhs, rewrite) && rewrite_operand_constants(rhs, rewrite)
         }
         MirValueKind::Option(op) => rewrite_option_op_constants(op, rewrite),
         MirValueKind::TensorExtent { tensor, .. } => rewrite_operand_constants(tensor, rewrite),
     }
-}
-
-fn rewrite_closure_value_constants(
-    closure: &mut MirClosureValue,
-    rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
-) -> bool {
-    rewrite_operand_constants(&mut closure.environment, rewrite)
 }
 
 fn rewrite_operand_constants(
