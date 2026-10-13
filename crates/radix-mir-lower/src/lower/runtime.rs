@@ -24,8 +24,8 @@ use radix_hir::HirCallArg;
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_semantic::IndexExpr;
 use radix_semantic::lista_tensor_conversio::{
-    ListaToTensorShape, analyze_rectangular_lista_literal, lista_numerus_type, resolve_bounded_lista_padded_shape,
-    resolve_lista_to_tensor_shape, validate_lista_to_tensor_source,
+    ListaToTensorShape, analyze_rectangular_lista_literal, lista_numerus_type, padded_literal_facts,
+    resolve_bounded_lista_padded_shape, resolve_lista_to_tensor_shape, validate_lista_to_tensor_source,
 };
 
 pub fn shape_relation_applies_to_return(types: &TypeTable, relation: &ShapeRelation, expression: u32) -> bool {
@@ -3706,7 +3706,10 @@ impl FunctionBuilder<'_> {
         // the caller's `⊥` fill or the numeric zero — never a `MaybeUninit`
         // read; a `⊥` on the flat path below stays a failure recovery, so the
         // padded arm runs first and even with a recovery present.
-        if resolve_bounded_lista_padded_shape(source_type_id, target, self.types).is_some() {
+        if self
+            .padded_snapshot_elem(source, source_type_id, target)
+            .is_some()
+        {
             return self.lower_bounded_lista_to_padded_tensor_conversio(
                 source,
                 source_type_id,
@@ -4089,6 +4092,22 @@ impl FunctionBuilder<'_> {
         self.lower_tensor_from_flat_conversio(flat, target, return_ty, span)
     }
 
+    /// The fill element of a Route C padded snapshot, or `None` when the
+    /// conversion is not one. A bounded source of the tensor's own element
+    /// qualifies by type; a list *literal* whose untyped constants adopt the
+    /// tensor element (`[1.0, 2.0] ↦ tf32[2]`) qualifies by shape, because
+    /// typecheck already admitted it through the same facts
+    /// (`padded_literal_facts`) and refused every literal that does not adopt.
+    fn padded_snapshot_elem(&self, source: &HirExpression, source_ty: TypeId, target: TypeId) -> Option<TypeId> {
+        if let Some((elem, _)) = resolve_bounded_lista_padded_shape(source_ty, target, self.types) {
+            return Some(elem);
+        }
+        if !matches!(source.kind, HirExpressionKind::Array(_)) {
+            return None;
+        }
+        padded_literal_facts(source_ty, target, self.types).map(|(elem, _, _)| elem)
+    }
+
     /// Route C padded snapshot: `lista<T, N> ↦ tensor<T, [N]>` with the
     /// caller's fill (a `⊥` value, element-typed) or the numeric zero. The
     /// runtime `TensorFromFlat` pads slots `len..N` with that real value; the
@@ -4102,7 +4121,7 @@ impl FunctionBuilder<'_> {
         recovery: Option<&HirExpression>,
         span: Span,
     ) -> Option<MirOperand> {
-        let (elem, _) = resolve_bounded_lista_padded_shape(source_ty, target, self.types)?;
+        let elem = self.padded_snapshot_elem(source, source_ty, target)?;
         let flat = self.lower_expr_value(source)?;
         let fill = match recovery {
             Some(fill) => self.lower_expr_value(fill)?,

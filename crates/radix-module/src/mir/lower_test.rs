@@ -4215,6 +4215,21 @@ incipit {
 }
 
 #[test]
+fn lowers_literal_lista_to_narrow_float_tensor_conversio_to_tensor_from_flat() {
+    // Typecheck admits the literal's untyped float constants into the `f32`
+    // tensor element (padded snapshot route); lowering must take the same
+    // route instead of leaving a generic aggregate-to-aggregate convert.
+    assert_lista_to_tensor_conversio_lowers_to_tensor_from_flat(
+        r"
+incipit {
+    fixum tf32[3] row ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    nota row.longitudo()
+}
+",
+    );
+}
+
+#[test]
 fn lowers_copia_runtime_methods_to_intrinsics() {
     let dump = dump_source(
         r"
