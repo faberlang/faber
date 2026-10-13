@@ -81,7 +81,7 @@ fn go_emits_method_calls_through_the_pointer_storage() {
     let code = emit(Target::HirGo);
     assert!(code.contains("(*xs) = append((*xs), 3)"), "{code}");
     assert!(code.contains("len((*xs))"), "{code}");
-    assert!(code.contains("len((*t))"), "{code}");
+    assert!(code.contains("len([]rune((*t)))"), "{code}");
     // Indexing an optional list dereferences the pointer too.
     assert!(code.contains("(*xs)[0]"), "{code}");
     assert!(!code.contains(".Length()"), "{code}");
