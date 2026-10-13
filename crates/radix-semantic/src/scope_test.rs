@@ -783,3 +783,112 @@ fn resolver_snapshot_round_trips_nondum_gates_for_functions_and_methods() {
         vec![(function, gate())]
     );
 }
+
+/// Producer-shaped interface exporting the given enums (name, variants) and
+/// primitive-bodied type aliases. Aliases install as `Type` exports without a
+/// definition identity, so they are not enums.
+fn imported_enums_and_aliases(
+    enums: &[(&str, &[&str])],
+    aliases: &[&str],
+) -> crate::file_interface::FileInterface {
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceEnumVariant,
+        InterfaceNominalExport, InterfaceTypeSnapshot,
+    };
+
+    let mut interface = FileInterface::new();
+    for alias in aliases {
+        interface.insert(FileExport {
+            name: (*alias).to_owned(),
+            kind: FileExportKind::TypeAlias(InterfaceAliasExport {
+                name: (*alias).to_owned(),
+                params: Vec::new(),
+                body: InterfaceTypeSnapshot::Primitive(crate::Primitive::Numerus),
+            }),
+        });
+    }
+    for (name, variants) in enums {
+        interface.insert(FileExport {
+            name: (*name).to_owned(),
+            kind: FileExportKind::Enum(InterfaceNominalExport {
+                name: (*name).to_owned(),
+                params: Vec::new(),
+                methods: Vec::new(),
+                shared_fields: Vec::new(),
+                radix_contract: None,
+                variants: variants
+                    .iter()
+                    .map(|variant| InterfaceEnumVariant {
+                        name: (*variant).to_owned(),
+                        fields: Vec::new(),
+                    })
+                    .collect(),
+            }),
+        });
+    }
+    interface
+}
+
+fn install_namespace(
+    interface: crate::file_interface::FileInterface,
+) -> (Resolver, radix_lexer::Interner) {
+    use crate::TypeTable;
+    use std::collections::BTreeMap;
+
+    let mut resolver = Resolver::new();
+    let mut interner = radix_lexer::Interner::new();
+    let mut types = TypeTable::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("lib".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("interface installs");
+    (resolver, interner)
+}
+
+/// A bare `lib.X` naming a variant of two exported enums must not bind to
+/// whichever enum the export table happens to yield first.
+#[test]
+fn namespace_variant_shared_across_enums_fails_closed() {
+    let (resolver, mut interner) = install_namespace(imported_enums_and_aliases(
+        &[("Alpha", &["X", "Y"]), ("Beta", &["X", "Z"])],
+        &[],
+    ));
+    let namespace = interner.intern("lib");
+    let shared = interner.intern("X");
+    let alpha_only = interner.intern("Y");
+    let beta_only = interner.intern("Z");
+
+    assert_eq!(resolver.namespace_file_variant(namespace, shared), None);
+    assert!(
+        resolver
+            .namespace_file_variant(namespace, alpha_only)
+            .is_some()
+    );
+    assert!(
+        resolver
+            .namespace_file_variant(namespace, beta_only)
+            .is_some()
+    );
+}
+
+/// A non-enum `Type` export (an alias carries no definition identity) must
+/// not end the scan before the namespace's enums are reached.
+#[test]
+fn namespace_variant_scan_skips_non_enum_type_exports() {
+    let (resolver, mut interner) = install_namespace(imported_enums_and_aliases(
+        &[("Alpha", &["X", "Y"])],
+        &["First", "Second", "Third"],
+    ));
+    let namespace = interner.intern("lib");
+    let variant = interner.intern("X");
+
+    assert!(
+        resolver
+            .namespace_file_variant(namespace, variant)
+            .is_some(),
+        "an alias export must not hide the enum's variant"
+    );
+}

@@ -1,9 +1,10 @@
 //! S0-R1: interface snapshots serialize kinded applied size arguments.
 
 use crate::file_interface::{
-    FileInterfaceError, InterfaceAppliedArg, InterfaceCallable, InterfaceIndexSnapshot,
-    InterfaceTypeSnapshot, import_interface_callable_with_resolver, import_interface_type,
-    snapshot_interface_callable_with_resolver, snapshot_interface_type,
+    FileInterfaceError, InterfaceAppliedArg, InterfaceCallable, InterfaceCallableParam,
+    InterfaceIndexSnapshot, InterfaceNominalKind, InterfaceNominalType,
+    InterfaceTypeParamConstraint, InterfaceTypeSnapshot, import_interface_callable_with_resolver,
+    import_interface_type, snapshot_interface_callable_with_resolver, snapshot_interface_type,
 };
 use crate::{
     FuncSig, GenericParamDescriptor, GenericParamSort, IndexExpr, InferVar, NumericWidth,
@@ -641,4 +642,109 @@ fn file_interface_round_trips_intersection_without_becoming_union() {
         .collect();
     assert!(kinds.contains(&Type::Primitive(Primitive::Numerus)));
     assert!(kinds.contains(&Type::Primitive(Primitive::Textus)));
+}
+
+/// Resolver holding one local `genus Foo` plus its semantic struct type, the
+/// shape `@ radix type T mut Foo string` constrains a type parameter to.
+fn resolver_with_struct_foo(
+    types: &mut TypeTable,
+    interner: &mut Interner,
+) -> (Resolver, radix_hir::DefId, crate::TypeId) {
+    let mut resolver = Resolver::new();
+    let name = interner.intern("Foo");
+    let def_id = resolver.fresh_def_id();
+    let ty = types.intern(Type::Struct(def_id));
+    resolver
+        .define(crate::Symbol {
+            def_id,
+            name,
+            kind: crate::SymbolKind::Struct,
+            ty: Some(ty),
+            mutable: false,
+            span: radix_lexer::Span::default(),
+        })
+        .expect("Foo defines once");
+    (resolver, def_id, ty)
+}
+
+/// A nominal in a type-param constraint snapshots through the same resolver the
+/// parameter and return types use; the resolver-less path fails closed with
+/// `NominalTypeUnsupported`, which skipped the whole export.
+#[test]
+fn callable_snapshot_keeps_nominal_type_param_constraint() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let (resolver, _, foo) = resolver_with_struct_foo(&mut types, &mut interner);
+    let textus = types.primitive(Primitive::Textus);
+    let t = interner.intern("T");
+    let sig = FuncSig {
+        type_params: vec![GenericParamDescriptor {
+            name: t,
+            sort: GenericParamSort::Typus,
+            constraint: crate::TypeParamConstraint::OneOf(vec![foo, textus]),
+            default: None,
+        }],
+        params: Vec::new(),
+        ret: textus,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+
+    let callable = snapshot_interface_callable_with_resolver(&sig, &types, &interner, &resolver)
+        .expect("a nominal constraint option must be representable");
+
+    let InterfaceTypeParamConstraint::OneOf(options) = &callable.type_params[0].constraint else {
+        panic!("expected a OneOf constraint");
+    };
+    assert_eq!(options.len(), 2);
+    assert!(matches!(
+        &options[0],
+        InterfaceTypeSnapshot::Nominal(nominal)
+            if nominal.name == "Foo" && nominal.kind == InterfaceNominalKind::Struct
+    ));
+    assert_eq!(
+        options[1],
+        InterfaceTypeSnapshot::Primitive(Primitive::Textus)
+    );
+}
+
+/// The import leg resolves a nominal constraint option through the consumer's
+/// resolver instead of failing closed.
+#[test]
+fn callable_import_resolves_nominal_type_param_constraint() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let (resolver, _, foo) = resolver_with_struct_foo(&mut types, &mut interner);
+    let callable = InterfaceCallable {
+        type_params: vec![InterfaceCallableParam {
+            name: "T".to_owned(),
+            kind: GenericParamKind::Typus,
+            constraint: InterfaceTypeParamConstraint::OneOf(vec![InterfaceTypeSnapshot::Nominal(
+                InterfaceNominalType {
+                    kind: InterfaceNominalKind::Struct,
+                    name: "Foo".to_owned(),
+                    identity: None,
+                    kind_guessed: false,
+                },
+            )]),
+            default: None,
+        }],
+        tensor_edge_policy_requirements: Vec::new(),
+        params: Vec::new(),
+        ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
+        err: None,
+        is_async: false,
+        is_generator: false,
+        device: None,
+    };
+
+    let imported =
+        import_interface_callable_with_resolver(&callable, &mut types, &mut interner, &resolver)
+            .expect("a nominal constraint option must import");
+
+    assert_eq!(
+        imported.type_params[0].constraint,
+        crate::TypeParamConstraint::OneOf(vec![foo])
+    );
 }

@@ -1400,7 +1400,12 @@ fn import_interface_callable_inner(
                         GenericParamKind::Typus => GenericParamSort::Typus,
                         GenericParamKind::Magnitudo => GenericParamSort::Magnitudo,
                     },
-                    constraint: import_type_param_constraint(&param.constraint, types, interner)?,
+                    constraint: import_type_param_constraint(
+                        &param.constraint,
+                        types,
+                        interner,
+                        resolver,
+                    )?,
                     default: param
                         .default
                         .as_ref()
@@ -1487,7 +1492,13 @@ fn snapshot_interface_callable_inner(
                         GenericParamSort::Typus => GenericParamKind::Typus,
                         GenericParamSort::Magnitudo => GenericParamKind::Magnitudo,
                     },
-                    constraint: snapshot_type_param_constraint(&param.constraint, types, interner)?,
+                    constraint: snapshot_type_param_constraint(
+                        &param.constraint,
+                        types,
+                        interner,
+                        resolver,
+                        module_identity,
+                    )?,
                     default: param
                         .default
                         .as_ref()
@@ -1558,12 +1569,13 @@ fn import_type_param_constraint(
     constraint: &InterfaceTypeParamConstraint,
     types: &mut TypeTable,
     interner: &mut Interner,
+    resolver: Option<&Resolver>,
 ) -> FileInterfaceResult<TypeParamConstraint> {
     match constraint {
         InterfaceTypeParamConstraint::Any => Ok(TypeParamConstraint::Any),
         InterfaceTypeParamConstraint::OneOf(options) => options
             .iter()
-            .map(|option| import_interface_type(option, types, interner))
+            .map(|option| import_interface_type_inner(option, types, interner, resolver))
             .collect::<FileInterfaceResult<Vec<_>>>()
             .map(TypeParamConstraint::OneOf),
     }
@@ -1573,12 +1585,16 @@ fn snapshot_type_param_constraint(
     constraint: &TypeParamConstraint,
     types: &TypeTable,
     interner: &Interner,
+    resolver: Option<&Resolver>,
+    module_identity: Option<&InterfaceLibraryIdentity>,
 ) -> FileInterfaceResult<InterfaceTypeParamConstraint> {
     match constraint {
         TypeParamConstraint::Any => Ok(InterfaceTypeParamConstraint::Any),
         TypeParamConstraint::OneOf(options) => options
             .iter()
-            .map(|option| snapshot_interface_type(*option, types, interner))
+            .map(|option| {
+                snapshot_interface_type_inner(*option, types, interner, resolver, module_identity)
+            })
             .collect::<FileInterfaceResult<Vec<_>>>()
             .map(InterfaceTypeParamConstraint::OneOf),
         // Contract bounds (D1.1) have no portable interface shape yet; the

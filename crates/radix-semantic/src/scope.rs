@@ -2982,6 +2982,10 @@ impl Resolver {
     /// [`Resolver::variant_child`]: its payload identity is unknown to this
     /// consumer, so a value-position reference must fail closed rather than
     /// name a variant the consumer cannot build.
+    ///
+    /// A member declared by more than one exported enum is ambiguous and
+    /// resolves to `None`; the qualified form (`module.Enum.member`, see
+    /// [`Resolver::namespace_file_type_variant`]) names the intended enum.
     #[must_use]
     pub fn namespace_file_variant(
         &self,
@@ -2989,20 +2993,35 @@ impl Resolver {
         member: LexSymbol,
     ) -> Option<(DefId, TypeId)> {
         let interface = self.file_interfaces.get(&namespace)?;
+        let mut found: Option<(DefId, TypeId)> = None;
         for export in interface.exports.values() {
             let ImportedFileExport::Type(ty) = export else {
                 continue;
             };
-            let enum_def = ty.def_id?;
-            let variants = self.imported_enum_variants.get(&enum_def)?;
-            if let Some(variant) = variants
+            // Aliases and other non-enum type exports carry no variant table;
+            // they must not end the scan before the namespace's enums.
+            let Some(variants) = ty
+                .def_id
+                .and_then(|enum_def| self.imported_enum_variants.get(&enum_def))
+            else {
+                continue;
+            };
+            let Some(variant) = variants
                 .iter()
                 .find(|variant| variant.name == member && !variant.payload_unresolved)
-            {
-                return Some((variant.def_id, ty.ty));
+            else {
+                continue;
+            };
+            match found {
+                // The same variant under a second export key is not a clash.
+                Some((def_id, _)) if def_id == variant.def_id => {}
+                // Two enums declare `member`: fail closed rather than let
+                // export-table order pick one. `module.Enum.member` names it.
+                Some(_) => return None,
+                None => found = Some((variant.def_id, ty.ty)),
             }
         }
-        None
+        found
     }
 
     /// Resolve a namespace type-member variant value reference
