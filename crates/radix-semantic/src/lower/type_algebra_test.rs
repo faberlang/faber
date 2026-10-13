@@ -278,3 +278,115 @@ fn via_members(Readable ∩ Seekable r) → void {{
             .equals(param_ty("via_alias"), param_ty("via_members"))
     );
 }
+
+// ---------------------------------------------------------------------------
+// Qualified bare generic names (`lib.Res`) follow the unqualified rule
+// ---------------------------------------------------------------------------
+
+/// Producer-shaped interface: `lib` exports the generic union `Res<T>`.
+fn qualified_generic_union_interface() -> crate::file_interface::FileInterface {
+    use crate::file_interface::{
+        FileExport, FileExportKind, InterfaceEnumVariant, InterfaceGenericParam,
+        InterfaceNominalExport, InterfaceStructField, InterfaceTypeSnapshot,
+    };
+
+    let mut interface = crate::file_interface::FileInterface::new();
+    interface.insert(FileExport {
+        name: "Res".to_owned(),
+        kind: FileExportKind::Enum(InterfaceNominalExport {
+            params: vec![InterfaceGenericParam {
+                name: "T".to_owned(),
+                kind: radix_syntax::GenericParamKind::Typus,
+            }],
+            name: "Res".to_owned(),
+            methods: Vec::new(),
+            shared_fields: Vec::new(),
+            radix_contract: None,
+            variants: vec![InterfaceEnumVariant {
+                name: "Plena".to_owned(),
+                fields: vec![InterfaceStructField {
+                    name: "res".to_owned(),
+                    ty: InterfaceTypeSnapshot::Primitive(crate::Primitive::Numerus),
+                    optional: false,
+                    required: true,
+                    default: None,
+                    modifier: None,
+                    visibility: radix_syntax::MemberVisibility::Publica,
+                }],
+            }],
+        }),
+    });
+    interface
+}
+
+fn analyze_lib_consumer(source: &str) -> AnalyzedFixture {
+    crate::test_support::analyze_source_with_import_contract(
+        source,
+        std::collections::BTreeMap::from([(
+            "lib".to_owned(),
+            std::collections::BTreeMap::from([(
+                "Res".to_owned(),
+                crate::passes::visibility_annotation::VisibilityTier::Publica,
+            )]),
+        )]),
+        std::collections::BTreeMap::from([("lib".to_owned(), qualified_generic_union_interface())]),
+    )
+}
+
+fn has_arity_mismatch(unit: &AnalyzedFixture) -> bool {
+    unit.diagnostics.iter().any(|err| {
+        err.is_error() && crate::test_support::issue(err) == Some("generic_argument_arity_mismatch")
+    })
+}
+
+#[test]
+fn qualified_bare_generic_in_parameter_position_is_an_arity_mismatch() {
+    // The unqualified `Res r` is already rejected; `lib.Res r` must be too.
+    let unit = analyze_lib_consumer(
+        r#"importa ex "./lib" lib
+
+functio probe(lib.Res r) → numerus {
+    redde 1
+}"#,
+    );
+    assert!(
+        has_arity_mismatch(&unit),
+        "a bare qualified generic outside construction must be an arity mismatch: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn qualified_applied_generic_in_parameter_position_is_accepted() {
+    let unit = analyze_lib_consumer(
+        r#"importa ex "./lib" lib
+
+functio probe(lib.Res<numerus> r) → numerus {
+    redde 1
+}"#,
+    );
+    assert!(
+        !has_arity_mismatch(&unit),
+        "an applied qualified generic must not report an arity mismatch: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn qualified_bare_generic_ascription_in_construction_is_admitted() {
+    // Construction contexts (`allow_bare_generic_construction`) infer the
+    // witnesses, so the bare qualified name is not an arity mismatch there.
+    let unit = analyze_lib_consumer(
+        r#"importa ex "./lib" lib
+
+functio probe() → numerus {
+    fixum x ← finge lib.Res.Plena { res = 3 } ∷ lib.Res
+    redde 1
+}"#,
+    );
+    assert!(
+        !has_arity_mismatch(&unit),
+        "a bare qualified generic in a construction ascription must be admitted: {:?}",
+        unit.diagnostics
+    );
+}

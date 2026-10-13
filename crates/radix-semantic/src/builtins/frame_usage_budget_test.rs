@@ -1,7 +1,8 @@
 use super::program_needs_frame_types;
 use radix_lexer::{Interner, Span};
 use radix_syntax::{
-    BinOp, BinaryExpr, Expr, ExprKind, ExprStmt, Literal, MAX_VISIT_DEPTH, Program, Stmt, StmtKind,
+    BinOp, BinaryExpr, Expr, ExprKind, ExprStmt, Ident, IfBody, IncipitStmt, Literal,
+    MAX_VISIT_DEPTH, MemberExpr, Program, Stmt, StmtKind,
 };
 
 /// Left-nested `1 + (1 + (…))` spine; its deepest leaf is `depth` nodes down.
@@ -65,5 +66,59 @@ fn scan_fails_closed_when_the_walker_stops() {
     assert!(
         program_needs_frame_types(&program, &interner, None),
         "an incomplete scan must register the builtins rather than report no frame use"
+    );
+}
+
+#[test]
+fn frame_member_only_in_incipit_exitus_is_a_use() {
+    let mut interner = Interner::new();
+    let exitus = Expr {
+        id: 0,
+        kind: ExprKind::Member(MemberExpr {
+            object: Box::new(Expr {
+                id: 0,
+                kind: ExprKind::Literal(Literal::Int(1)),
+                span: Span::default(),
+            }),
+            member: Ident {
+                name: interner.intern("meus"),
+                span: Span::default(),
+            },
+        }),
+        span: Span::default(),
+    };
+    let body = Stmt {
+        id: 0,
+        kind: StmtKind::Expr(ExprStmt {
+            expr: Box::new(Expr {
+                id: 0,
+                kind: ExprKind::Literal(Literal::Int(1)),
+                span: Span::default(),
+            }),
+        }),
+        span: Span::default(),
+        annotations: Vec::new(),
+        leading_trivia: Vec::new(),
+    };
+    let program = Program {
+        statements: vec![Stmt {
+            id: 0,
+            kind: StmtKind::Incipit(IncipitStmt {
+                is_async: false,
+                body: IfBody::Ergo(Box::new(body)),
+                args: None,
+                exitus: Some(Box::new(exitus)),
+            }),
+            span: Span::default(),
+            annotations: Vec::new(),
+            leading_trivia: Vec::new(),
+        }],
+        span: Span::default(),
+        end_trivia: Vec::new(),
+        region: None,
+    };
+    assert!(
+        program_needs_frame_types(&program, &interner, None),
+        "a frame member reachable only through the entry exitus must register the builtins"
     );
 }

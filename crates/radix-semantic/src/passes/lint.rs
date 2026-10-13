@@ -210,7 +210,7 @@ impl<'a> LintContext<'a> {
                 );
             }
             match &item.kind {
-                HirItemKind::Import(import) => self.collect_import(import),
+                HirItemKind::Import(import) => self.collect_import(import, item.span),
                 // A `@ ad` handler is used by its route, not by name.
                 HirItemKind::Function(_)
                     if item
@@ -236,13 +236,15 @@ impl<'a> LintContext<'a> {
         }
     }
 
-    fn collect_import(&mut self, import: &HirImport) {
+    /// `span` is the import statement's: HIR import members carry no span of
+    /// their own, so each unused member's warning anchors at its statement.
+    fn collect_import(&mut self, import: &HirImport, span: Span) {
         for item in &import.items {
             let binding = item.alias.unwrap_or(item.name);
             if self.resolver.namespace_used(binding) {
                 self.used.insert(item.def_id);
             }
-            self.imports.push((item.def_id, Span::default()));
+            self.imports.push((item.def_id, span));
         }
     }
 

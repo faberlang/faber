@@ -354,7 +354,7 @@ pub fn program_needs_frame_types(
     interner: &Interner,
     locale_pack: Option<&crate::locale::LocalePack>,
 ) -> bool {
-    use radix_syntax::{DepthExceeded, ExprKind, Program, StmtKind, Visitor, walk_stmt};
+    use radix_syntax::{DepthExceeded, ExprKind, Program, Visitor, walk_stmt};
 
     struct FrameUsageVisitor<'a> {
         interner: &'a Interner,
@@ -385,16 +385,7 @@ pub fn program_needs_frame_types(
             if self.found {
                 return;
             }
-            match &stmt.kind {
-                StmtKind::Incipit(entry) => {
-                    use radix_syntax::IfBody;
-                    match &entry.body {
-                        IfBody::Block(block) => self.visit_block(block),
-                        IfBody::Ergo(inner) => self.visit_stmt(inner),
-                    }
-                }
-                _ => walk_stmt(self, stmt),
-            }
+            walk_stmt(self, stmt);
         }
 
         fn visit_expr(&mut self, expr: &radix_syntax::Expr) {

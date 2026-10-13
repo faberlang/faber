@@ -560,6 +560,49 @@ fn warns_on_unused_import() {
 }
 
 #[test]
+fn unused_import_warning_points_at_the_import_statement() {
+    let import_span = Span::new(40, 62);
+    let program = HirModule {
+        items: vec![HirItem {
+            annotations: Vec::new(),
+            id: radix_hir::HirId(0),
+            def_id: radix_hir::DefId(10),
+            kind: HirItemKind::Import(HirImport {
+                path: radix_lexer::Symbol(1),
+                visibility: Visibility::Privata,
+                items: vec![HirImportItem {
+                    def_id: radix_hir::DefId(11),
+                    name: radix_lexer::Symbol(2),
+                    alias: None,
+                }],
+                selective: false,
+            }),
+            span: import_span,
+        }],
+        entry: None,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    };
+
+    let errors = lint(
+        &program,
+        &Resolver::new(),
+        &TypeTable::new(),
+        &Interner::new(),
+        None,
+    );
+    let warning = errors
+        .iter()
+        .find(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnusedImport))
+        .expect("unused import warning");
+    assert_eq!(
+        warning.span, import_span,
+        "the warning must anchor at the import, not at the file start"
+    );
+}
+
+#[test]
 fn warns_on_shadowed_variable() {
     let program = HirModule {
         items: Vec::new(),

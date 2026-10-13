@@ -1310,15 +1310,22 @@ impl Lowerer<'_> {
             .resolver
             .namespace_file_type(namespace.name, type_name.name)
         {
-            if params.is_empty() {
-                return type_id;
-            }
             // Imported declarations carry their ordered declaration kinds on
             // the file interface (S0-R1); kind mismatches fail closed instead
             // of silently accepting any argument spelling.
             let decl_kinds = self
                 .resolver
                 .namespace_file_decl_param_kinds(namespace.name, type_name.name);
+            if params.is_empty() {
+                // Same rule as the unqualified path: a bare generic name is
+                // admitted only where construction infers the witnesses.
+                let declares_params = decl_kinds.as_ref().is_some_and(|kinds| !kinds.is_empty());
+                if declares_params && !self.allow_bare_generic_construction {
+                    self.error("generic_argument_arity_mismatch");
+                    return self.types.intern(Type::Error);
+                }
+                return type_id;
+            }
             let args = self.lower_applied_args_directed(decl_kinds.as_deref(), params);
             return self.types.intern(Type::Applied(type_id, args));
         }

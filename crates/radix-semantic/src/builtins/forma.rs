@@ -71,9 +71,7 @@ pub(crate) fn type_id(types: &mut TypeTable, def_id: DefId) -> TypeId {
 /// on the visitor for callers that can report it.
 #[must_use]
 pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) -> bool {
-    use radix_syntax::{
-        DepthExceeded, ExprKind, IfBody, Literal, Program, StmtKind, Visitor, walk_expr, walk_stmt,
-    };
+    use radix_syntax::{DepthExceeded, ExprKind, Literal, Program, Visitor, walk_expr, walk_stmt};
 
     struct FormaUsageVisitor {
         forma_name: Symbol,
@@ -108,13 +106,6 @@ pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) 
 
         fn visit_stmt(&mut self, stmt: &radix_syntax::Stmt) {
             if self.found {
-                return;
-            }
-            if let StmtKind::Incipit(entry) = &stmt.kind {
-                match &entry.body {
-                    IfBody::Block(block) => self.visit_block(block),
-                    IfBody::Ergo(inner) => self.visit_stmt(inner),
-                }
                 return;
             }
             walk_stmt(self, stmt);
