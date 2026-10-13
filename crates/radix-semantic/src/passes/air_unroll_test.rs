@@ -799,6 +799,42 @@ functio unsafe_div(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
 }
 
 #[test]
+fn nan_unsafe_div_under_verte_declines_with_causa() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+@ radix backward "div_verte_backward"
+functio unsafe_div_verte(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
+    varia tensor<f32, [4]> acc ← x.divisio(mask) ∷ tensor<f32, [4]>
+    itera ab 0‥4 fixum i {
+        acc ← acc + x
+    }
+    redde (acc ⊙ mask).media()
+}
+"#,
+    );
+    expect_decline_causa(&errors, "nan_unsafe");
+}
+
+#[test]
+fn nan_unsafe_div_under_conversio_declines_with_causa() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+@ radix backward "div_conversio_backward"
+functio unsafe_div_conversio(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
+    varia tensor<f32, [4]> acc ← x.divisio(mask) ↦ tensor<f32, [4]> ⊥ x
+    itera ab 0‥4 fixum i {
+        acc ← acc + x
+    }
+    redde (acc ⊙ mask).media()
+}
+"#,
+    );
+    expect_decline_causa(&errors, "nan_unsafe");
+}
+
+#[test]
 fn unmasked_reduction_exit_declines_with_causa() {
     let errors = air_errors(
         r#"

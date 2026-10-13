@@ -278,26 +278,52 @@ pub(super) fn block_diverges(block: &HirBlock) -> bool {
 }
 
 /// The loop body contains a statement that can leave the loop or the function.
+///
+/// WHY: a `rumpe` inside a nested loop only leaves that inner loop, and a
+/// `redde` inside a closure returns from the closure, so neither stops the
+/// outer loop from running its body again.
 fn block_may_leave(block: &HirBlock) -> bool {
-    let mut finder = LeaveFinder { found: false };
+    let mut finder = LeaveFinder {
+        found: false,
+        loop_depth: 0,
+    };
     finder.visit_block(block);
     finder.found
 }
 
 struct LeaveFinder {
     found: bool,
+    loop_depth: u32,
 }
 
 impl HirVisitor for LeaveFinder {
     fn visit_stmt(&mut self, stmt: &radix_hir::HirStatement) {
-        if matches!(
-            stmt.kind,
-            HirStatementKind::Redde(_) | HirStatementKind::Rumpe
-        ) {
+        let leaves = match stmt.kind {
+            HirStatementKind::Redde(_) => true,
+            HirStatementKind::Rumpe => self.loop_depth == 0,
+            _ => false,
+        };
+        if leaves {
             self.found = true;
             return;
         }
         radix_hir::visit::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Clausura(..) => {}
+            HirExpressionKind::Loop(_)
+            | HirExpressionKind::Dum(..)
+            | HirExpressionKind::Itera { .. }
+            | HirExpressionKind::IteraLockstep { .. }
+            | HirExpressionKind::IteraRange { .. } => {
+                self.loop_depth += 1;
+                walk_expr(self, expr);
+                self.loop_depth -= 1;
+            }
+            _ => walk_expr(self, expr),
+        }
     }
 }
 

@@ -2344,8 +2344,35 @@ impl MaskCollector<'_> {
             }
             HirExpressionKind::Unary(_, operand)
             | HirExpressionKind::Field(operand, _)
-            | HirExpressionKind::Index(operand, _)
             | HirExpressionKind::Praefixum(operand) => self.scan_expr(operand),
+            HirExpressionKind::Index(operand, index) => {
+                self.scan_expr(operand);
+                self.scan_expr(index);
+            }
+            // WHY: `air_purity` descends through casts and conversions, so a
+            // `divisio` or fill hidden under one still reaches the lane.
+            HirExpressionKind::Verte { source, .. } => self.scan_expr(source),
+            HirExpressionKind::Conversio {
+                source, recovery, ..
+            } => {
+                self.scan_expr(source);
+                if let Some(recovery) = recovery {
+                    self.scan_expr(recovery);
+                }
+            }
+            HirExpressionKind::Gradient {
+                call,
+                selected_arguments,
+            } => {
+                self.scan_expr(call);
+                for argument in selected_arguments {
+                    self.scan_expr(argument);
+                }
+            }
+            HirExpressionKind::Ad {
+                opener: Some(opener),
+                ..
+            } => self.scan_expr(opener),
             _ => {}
         }
     }

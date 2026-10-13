@@ -172,6 +172,28 @@ fn a_loop_that_reassigns_or_leaves_after_the_move_is_fine() {
 }
 
 #[test]
+fn a_break_in_a_nested_loop_does_not_leave_the_outer_loop() {
+    let body = format!(
+        "{LOCAL}    var bool c ← true\n    var bool d ← true\n    while c {{\n        eat(own a)\n        while d {{\n            d ← false\n            break\n        }}\n        c ← false\n    }}"
+    );
+    assert_eq!(main_body(&body), ["moved_in_loop"]);
+}
+
+#[test]
+fn a_return_inside_a_closure_does_not_leave_the_loop() {
+    let body = format!(
+        "{LOCAL}    var bool c ← true\n    while c {{\n        eat(own a)\n        const () → int f ← () → int ∴ do {{\n            return 1\n        }}\n        print f()\n        c ← false\n    }}"
+    );
+    assert_eq!(main_body(&body), ["moved_in_loop"]);
+}
+
+#[test]
+fn a_return_in_a_nested_loop_still_leaves_the_function() {
+    let body = "fn f(own list<int> p, bool c, bool d) → void {\n    while c {\n        eat(own p)\n        while d {\n            return\n        }\n    }\n}";
+    assert!(func(body).is_empty());
+}
+
+#[test]
 fn a_closure_called_after_its_captured_name_was_given_away_is_rejected() {
     let body = format!(
         "{LOCAL}    const () → int f ← () → int ∴ a.length()\n    eat(own a)\n    print f()"
