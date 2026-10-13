@@ -1,0 +1,56 @@
++++
+term = "bits"
+kind = "display"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "concrete_type", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "array_element_list", "array_element", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = true
+summary = "A bN inside an optional still prints as hex at full width; an absent optional prints none, and a nested list keeps its brackets."
+syntax = "b8 ∪ nihil x | lista<b8> ∪ nihil xs | lista<lista<b8>> rows"
+related = ["bits", "bits-display", "optionalis"]
+locale = "la"
++++
+# =============================================================================
+# bits — Display of optional and nested bits values
+# =============================================================================
+#
+# What this teaches:
+#   • a present `b8 ∪ nihil` prints exactly as its b8: hex at full width
+#   • an absent `b8 ∪ nihil` prints `nihil`
+#   • a present `lista<b8> ∪ nihil` prints in list shape, each element in hex
+#   • an absent `lista<b8> ∪ nihil` prints `nihil`
+#   • a nested `lista<lista<b8>>` prints its inner lists in brackets
+#
+# Common mistakes:
+#   • expecting an absent optional to print `0x00` or `[]` — absent is `nihil`
+#   • expecting a nested list to flatten into one bracket level
+#
+# See also: bits-display, bits-literals, optionalis
+# =============================================================================
+
+# bits — optional and nested display
+#
+# EXPECTED stdout: see bits-display-optional-la.expected
+
+incipit {
+    # a present optional scalar prints as the b8 it holds
+    fixum b8 sample ← 0xff
+    fixum b8 ∪ nihil present ← sample
+    nota present
+
+    # an absent optional scalar prints nihil
+    fixum b8 ∪ nihil absent ← nulla
+    nota absent
+
+    # a present optional list prints each element in hex
+    fixum lista<b8> raw ← [0xde, 0xad]
+    fixum lista<b8> ∪ nihil bytes ← raw
+    nota bytes
+
+    # an absent optional list prints nihil
+    fixum lista<b8> ∪ nihil missing ← nulla
+    nota missing
+
+    # a nested list keeps its inner brackets
+    fixum lista<lista<b8>> rows ← [[0x01], [0x02, 0xff]]
+    nota rows
+}
