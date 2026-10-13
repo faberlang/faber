@@ -1760,7 +1760,7 @@ fn failed_size_only_explicit_type_arg_reports_once() {
         "one failed explicit size argument reports exactly once: {errors:?}"
     );
     assert_eq!(
-        errors[0].message, "invalid MIR: generic call signature has unresolved type parameter",
+        errors[0].issue, "invalid_mir_generic_call_signature_has_unresolved_type_parameter",
         "the more specific witness diagnostic wins: {errors:?}"
     );
 }
