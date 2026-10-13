@@ -1596,9 +1596,13 @@ impl<'a> BorrowChecker<'a> {
     /// The place whose live borrow conflicts with a use, write or new borrow
     /// of `def_id` by `acting`: another name of the same storage that is
     /// flagged borrowed or carries a live region borrow. `mutable_only`
-    /// selects the read rule (only a mutable borrow blocks a read); a region
-    /// borrow held by `acting` itself is that binding's own borrow and does
-    /// not conflict with it.
+    /// selects the read rule (only a flagged mutable borrow blocks a read).
+    /// Region borrows conflict only when they are mutable: a shared view or
+    /// `ref` borrow of an alias is the memory-independence pass's question,
+    /// and the one-directional alias check this detection mirrors only ever
+    /// treated a mutable borrow as a conflict. A region borrow held by
+    /// `acting` itself is that binding's own borrow and does not conflict
+    /// with it.
     fn conflicting_borrow_on_storage(
         &self,
         def_id: DefId,
@@ -1622,7 +1626,7 @@ impl<'a> BorrowChecker<'a> {
                 if !self.tracked_region_live(tracked.source, tracked.borrower) {
                     continue;
                 }
-                if mutable_only && !matches!(tracked.kind, BorrowKind::Mutable) {
+                if !matches!(tracked.kind, BorrowKind::Mutable) {
                     continue;
                 }
                 return Some(tracked.source);
