@@ -1,6 +1,6 @@
 //! WebSocket leaf: HTTP upgrade, connect, echo.
 
-use super::{empty_text_frame, is_route, reset_handles, serve};
+use super::{empty_text_frame, is_route, reset_handles, serve, split_ws_url, wrap_tls};
 use crate::http;
 use crate::value::{Arg, Reply};
 use std::thread;
@@ -113,4 +113,38 @@ fn route_list_matches_serve() {
     }
     assert!(!is_route("websocket:nope"));
     assert!(serve("websocket:nope", &[]).is_none());
+}
+
+#[test]
+fn split_ws_url_ipv6_literal_without_port_uses_default_port() {
+    let (secure, host, port, target) = split_ws_url("ws://[::1]").unwrap();
+    assert!(!secure);
+    assert_eq!(host, "[::1]");
+    assert_eq!(port, 80);
+    assert_eq!(target, "/");
+}
+
+#[test]
+fn split_ws_url_ipv6_literal_with_port_and_path() {
+    let (secure, host, port, target) = split_ws_url("ws://[::1]:8080/chat?room=1").unwrap();
+    assert!(!secure);
+    assert_eq!(host, "[::1]");
+    assert_eq!(port, 8080);
+    assert_eq!(target, "/chat?room=1");
+}
+
+#[test]
+fn split_ws_url_wss_ipv6_literal_defaults_to_443() {
+    let (secure, host, port, target) = split_ws_url("wss://[2001:db8::1]/").unwrap();
+    assert!(secure);
+    assert_eq!(host, "[2001:db8::1]");
+    assert_eq!(port, 443);
+    assert_eq!(target, "/");
+}
+
+#[test]
+fn split_ws_url_ipv6_literal_tls_server_name_drops_brackets() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let stream = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    assert!(wrap_tls(stream, "[::1]", None).is_ok());
 }

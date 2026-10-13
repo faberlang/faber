@@ -281,7 +281,14 @@ fn split_ws_url(url: &str) -> Result<(bool, String, u16, String), LeafError> {
         Some(index) => (&rest[..index], &rest[index..]),
         None => (rest, "/"),
     };
-    let (host, port) = match authority.rsplit_once(':') {
+    // WHY: an IPv6 literal carries colons of its own, so the port separator is
+    // only a colon after the closing bracket.
+    let port_colon = match authority.rfind(']') {
+        Some(close) => authority[close..].find(':').map(|offset| close + offset),
+        None => authority.rfind(':'),
+    };
+    let split = port_colon.map(|index| (&authority[..index], &authority[index + 1..]));
+    let (host, port) = match split {
         Some((host, port)) if !host.is_empty() => {
             let parsed = port.parse::<u16>().map_err(|_| {
                 LeafError::invalid_argument("websocket:connect", format!("invalid port `{port}`"))
@@ -316,7 +323,10 @@ fn wrap_tls(stream: TcpStream, host: &str, ca_path: Option<&str>) -> Result<Http
             .with_root_certificates(roots)
             .with_no_client_auth(),
     );
-    let name = ServerName::try_from(host.to_owned()).map_err(|_| {
+    // WHY: the URL host keeps its brackets for `addr` and the handshake URL, but a
+    // TLS server name is the bare IP literal.
+    let bare_host = host.trim_start_matches('[').trim_end_matches(']');
+    let name = ServerName::try_from(bare_host.to_owned()).map_err(|_| {
         LeafError::invalid_argument(
             "websocket:connect",
             format!("invalid TLS server name `{host}`"),
