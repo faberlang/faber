@@ -382,15 +382,19 @@ impl TypeChecker<'_> {
         if !arg.spread {
             return false;
         }
+        let errors_before = self.errors.len();
         let arg_ty = self.check_expr(&mut arg.expr);
         let resolved = self.resolve_inferred_type(arg_ty);
         let inner = match self.types.get(resolved) {
-            Type::Array(inner) => *inner,
-            _ => return false,
+            Type::Array(inner) if !sig.params.iter().any(|param| param.optional) => *inner,
+            _ => {
+                // WHY: declining the compat mode sends the argument back
+                // through the per-parameter loop, which checks it again;
+                // drop this pass's diagnostics so each one is reported once.
+                self.errors.truncate(errors_before);
+                return false;
+            }
         };
-        if sig.params.iter().any(|param| param.optional) {
-            return false;
-        }
         for param in &sig.params {
             self.unify_assign_issue(inner, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
         }
@@ -2226,11 +2230,14 @@ impl TypeChecker<'_> {
             if explicit_type_args.len() != arity {
                 self.wrong_arity("wrong_number_of_type_arguments", span);
             }
-            return explicit_type_args
+            // WHY: pad only the parameters the explicit list leaves open; a
+            // witness list longer than the arity yields a different applied
+            // type than the one the caller wrote.
+            let given = explicit_type_args.len().min(arity);
+            return explicit_type_args[..given]
                 .iter()
                 .copied()
-                .take(arity)
-                .chain((0..arity).map(|_| self.fresh_infer()))
+                .chain((given..arity).map(|_| self.fresh_infer()))
                 .collect();
         }
         if let Some(args) = self.applied_args_for_def(expected, def_id)

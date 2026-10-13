@@ -377,3 +377,21 @@ functio scribe(Capsa<3> capsam, vector<f32, 3> valor) → vector<f32, 3> {
 }",
     );
 }
+
+// --- explicit variant type arguments ---
+
+#[test]
+fn explicit_variant_type_args_build_the_applied_union_type() {
+    // `Plena<numerus>(1)` names the one witness; it must not be padded with
+    // extra inference variables that make the result differ from
+    // `Cista<numerus>`.
+    test_support::assert_accepts(
+        r"discretio Cista<T> {
+    Plena { T res }
+}
+
+functio facere() → Cista<numerus> {
+    redde Plena<numerus>(1)
+}",
+    );
+}

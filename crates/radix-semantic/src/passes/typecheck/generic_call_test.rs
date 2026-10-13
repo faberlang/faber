@@ -1133,3 +1133,38 @@ incipit {
         )],
     );
 }
+
+// --- spread argument checked once ---
+
+#[test]
+fn spread_argument_diagnostic_is_reported_once() {
+    let count = |source: &str| {
+        compile(source)
+            .diagnostics
+            .iter()
+            .filter(|diag| diag.issue() == Some("string_operands_required"))
+            .count()
+    };
+    let spread = count(
+        r#"functio duo(numerus a, numerus b) → numerus {
+    redde a + b
+}
+
+incipit {
+    fixum numerus n ← duo(sparge (1 + "a"))
+    nota n
+}"#,
+    );
+    let plain = count(
+        r#"functio duo(numerus a, numerus b) → numerus {
+    redde a + b
+}
+
+incipit {
+    fixum numerus n ← duo((1 + "a"), 2)
+    nota n
+}"#,
+    );
+    assert_eq!(plain, 1, "control: one diagnostic for the plain call");
+    assert_eq!(spread, 1, "spread argument must be checked once");
+}

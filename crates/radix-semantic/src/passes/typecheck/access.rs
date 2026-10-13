@@ -903,6 +903,10 @@ impl TypeChecker<'_> {
                 self.check_field_from_type(inner_ty, *name, object.span)
             }
             radix_hir::HirNonNullKind::Index(index) => {
+                if let Some(element) = self.check_tuple_receiver_index(inner_ty, object.span, index)
+                {
+                    return element;
+                }
                 let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
                 let result = self.check_index_from_type(inner_ty, idx_ty, object.span, index.span);
                 super::tensor_index::check_vector_lane_index(self, inner_ty, index);
@@ -946,10 +950,16 @@ impl TypeChecker<'_> {
                 }
             }
             radix_hir::HirOptionalChainKind::Index(index) => {
-                let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
-                let result = self.check_index_from_type(inner_ty, idx_ty, object.span, index.span);
-                super::tensor_index::check_vector_lane_index(self, inner_ty, index);
-                result
+                if let Some(element) = self.check_tuple_receiver_index(inner_ty, object.span, index)
+                {
+                    element
+                } else {
+                    let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+                    let result =
+                        self.check_index_from_type(inner_ty, idx_ty, object.span, index.span);
+                    super::tensor_index::check_vector_lane_index(self, inner_ty, index);
+                    result
+                }
             }
             radix_hir::HirOptionalChainKind::Call(args) => {
                 self.check_call_from_type(inner_ty, &[], args, span)
@@ -980,15 +990,10 @@ impl TypeChecker<'_> {
             );
             return self.error_type;
         }
-        let resolved = self.resolve_inferred_type(obj_ty);
-        if let Type::Tuple(elements) = self.types.get(resolved).clone() {
-            let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
-            if self.is_range_index(idx_ty) {
-                self.invalid_operand_types(ISSUE_WINDOW_REQUIRES_LIST, object.span);
-                return self.error_type;
-            }
-            return self.check_tuple_index(&elements, index, index.span);
+        if let Some(element) = self.check_tuple_receiver_index(obj_ty, object.span, index) {
+            return element;
         }
+        let resolved = self.resolve_inferred_type(obj_ty);
         let idx_ty = match self.check_tuple_key_bracket(resolved, index) {
             Some(ty) => ty,
             None => self.check_expr_allowing_direct_intervallum_step(index),
@@ -1051,6 +1056,30 @@ impl TypeChecker<'_> {
         let ty = self.check_expr_with_expected(index, Some(key));
         index.ty = Some(ty);
         Some(ty)
+    }
+
+    /// Index access on a tuple receiver, shared by `t[i]`, `t![i]` and `t?[i]`.
+    ///
+    /// Returns `None` when the receiver is not a tuple, leaving the ordinary
+    /// index rule to the caller. `check_index_from_type` cannot resolve a
+    /// tuple element on its own: it never sees the index expression, so the
+    /// constant position is only available here.
+    fn check_tuple_receiver_index(
+        &mut self,
+        receiver_ty: TypeId,
+        object_span: radix_lexer::Span,
+        index: &mut HirExpression,
+    ) -> Option<TypeId> {
+        let resolved = self.resolve_inferred_type(receiver_ty);
+        let Type::Tuple(elements) = self.types.get(resolved).clone() else {
+            return None;
+        };
+        let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
+        if self.is_range_index(idx_ty) {
+            self.invalid_operand_types(ISSUE_WINDOW_REQUIRES_LIST, object_span);
+            return Some(self.error_type);
+        }
+        Some(self.check_tuple_index(&elements, index, index.span))
     }
 
     /// Resolve a `Type::Tuple` index access to the element at the given position.

@@ -69,3 +69,53 @@ fn map_index_type_mismatch_uses_structured_issue_arg() {
         "map_index_type_mismatch",
     );
 }
+
+// --- tuple receivers through `!` and `?` index segments ---
+//
+// `t[0]` resolves the element by position. The non-null and optional-chain
+// index segments must resolve it the same way, not fall to the error type.
+
+#[test]
+fn non_null_index_on_tuple_yields_the_element_type() {
+    let result = compile(
+        r"functio second(iuncta<numerus, textus> t) → textus {
+    fixum textus s ← t![1]
+    redde s
+}",
+    );
+    assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}
+
+#[test]
+fn non_null_index_on_tuple_checks_the_bound() {
+    rejects_with_issue(
+        r"functio past(iuncta<numerus, textus> t) → numerus {
+    fixum numerus s ← t![5]
+    redde s
+}",
+        "tuple_index_out_of_bounds",
+    );
+}
+
+#[test]
+fn optional_chain_index_on_tuple_yields_the_element_type() {
+    let accepted = compile(
+        r"functio second(iuncta<numerus, textus> t) → textus ∪ nihil {
+    fixum textus ∪ nihil s ← t?[1]
+    redde s
+}",
+    );
+    assert!(accepted.is_ok(), "diagnostics: {:?}", accepted.diagnostics);
+    // The element type is real: a mismatched slot is refused.
+    let rejected = compile(
+        r"functio wrong(iuncta<numerus, textus> t) → numerus ∪ nihil {
+    fixum numerus ∪ nihil s ← t?[1]
+    redde s
+}",
+    );
+    assert!(
+        !rejected.is_ok(),
+        "expected a type error, got success: {:?}",
+        rejected.diagnostics
+    );
+}
