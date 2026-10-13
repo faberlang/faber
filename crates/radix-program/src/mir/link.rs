@@ -43,6 +43,58 @@ impl HirVisitorMut for SyntheticCalleeTypePass<'_> {
     }
 }
 
+/// Link a bare call of a selectively imported function to the synthetic
+/// function a `module.f(x)` call reaches.
+///
+/// A selective member (`import from "lib:mod" const f`) is a caller-owned value
+/// local with no namespace receiver, so the namespace-call rewrite never keys
+/// on `f(x)`. The linker registers every export under each import item def
+/// (`links.targets`), so the member's own item def plus its exported name
+/// already names the synthetic target; only the callee needs the swap. The
+/// callee keeps the interface-supplied function type the typechecker gave the
+/// local, so a failable call keeps its try-call edge.
+struct SelectiveMemberCallRewriter<'a> {
+    synthetic: &'a HashMap<DefId, DefId>,
+}
+
+impl HirVisitorMut for SelectiveMemberCallRewriter<'_> {
+    fn visit_expr_mut(&mut self, expr: &mut radix_module::hir::HirExpression) {
+        if let HirExpressionKind::Call(callee, ..) = &mut expr.kind
+            && let HirExpressionKind::Path(def_id) = &mut callee.kind
+            && let Some(target) = self.synthetic.get(def_id).copied()
+        {
+            *def_id = target;
+        }
+        walk_expr_mut(self, expr);
+    }
+}
+
+/// The synthetic function each selectively imported member of `analysis`
+/// links to, keyed by the member's import item def. Members the linker
+/// registered no function target for (consts, types) stay absent.
+fn selective_member_targets(
+    unit_path: &Path,
+    analysis: &radix_module::driver::AnalyzedModule,
+    targets: &NamespaceCallTargets,
+) -> HashMap<DefId, DefId> {
+    let mut members = HashMap::new();
+    for item in &analysis.hir.items {
+        let HirItemKind::Import(import) = &item.kind else {
+            continue;
+        };
+        if !import.selective {
+            continue;
+        }
+        for member in &import.items {
+            let name = analysis.interner.resolve(member.name).to_owned();
+            if let Some(target) = targets.get(&(unit_path.to_path_buf(), member.def_id, name)) {
+                members.insert(member.def_id, *target);
+            }
+        }
+    }
+    members
+}
+
 /// Post-rewrite pass: recover a cape handler binding whose error type was
 /// typed before the shadowed-alias namespace rewrite resolved its body.
 ///
@@ -1321,6 +1373,16 @@ pub(super) fn rewrite_analysis_namespace_calls(
             }
             _ => {}
         }
+    }
+
+    let selective_members = selective_member_targets(unit_path, analysis, targets);
+    if !selective_members.is_empty() {
+        walk_program_mut(
+            &mut SelectiveMemberCallRewriter {
+                synthetic: &selective_members,
+            },
+            &mut analysis.hir,
+        );
     }
 
     // pkg001-mir-fix: recover the callee function type on every synthetic

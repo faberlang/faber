@@ -806,3 +806,7 @@ mod praefixum_clone_link_tests;
 #[cfg(test)]
 #[path = "const_index_link_test.rs"]
 mod const_index_link_tests;
+
+#[cfg(test)]
+#[path = "selective_library_import_link_test.rs"]
+mod selective_library_import_link_tests;
