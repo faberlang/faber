@@ -11,12 +11,31 @@
 
 use super::rounding::RoundingMode;
 use super::{Runner, RunnerError, Value};
-use crate::inf::{from_magnus, to_magnus};
+use crate::inf::{
+    RUNNER_INF_PARSE_DIGIT_CEILING, RUNNER_ISSUE_INF_SIZE_EXHAUSTED, from_magnus, to_magnus,
+};
 use handroll::{Magnus, Radix};
 use radix_codegen_shared::hints::{self, EndianHint};
 use radix_lexer::{Span, Symbol};
 use radix_mir::MirOperand;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, effective_width};
+
+/// The resource fault of ruling 45 for a text token longer than
+/// [`RUNNER_INF_PARSE_DIGIT_CEILING`] digits (same identity as the size faults).
+fn parse_digits_exhausted(span: Span) -> RunnerError {
+    let mut error = RunnerError::internal_with_issue(
+        span,
+        format!(
+            "inf size exhausted in textus to inf: the digit token exceeds the runner ceiling of \
+             {RUNNER_INF_PARSE_DIGIT_CEILING} digits"
+        ),
+        RUNNER_ISSUE_INF_SIZE_EXHAUSTED,
+    );
+    error
+        .args
+        .push(("operation".to_owned(), "textus to inf".to_owned()));
+    error
+}
 
 impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     /// Any source `↦ inf` (ruling 40). Bounded integers and policy words widen
@@ -73,6 +92,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 ),
             },
             Value::Str(text) => {
+                // Ruling 45 on the parse path: the parse is O(n^2), so an
+                // over-long digit token is refused before any limb work.
+                let digits = text.strip_prefix(['-', '+']).unwrap_or(&text);
+                if digits.len() > RUNNER_INF_PARSE_DIGIT_CEILING {
+                    return Err(parse_digits_exhausted(span));
+                }
                 let radix = match self.numerus_radix(params) {
                     Some(16) => Radix::Hex,
                     Some(2) => Radix::Bin,
@@ -148,3 +173,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "inf_test.rs"]
+mod inf_test;

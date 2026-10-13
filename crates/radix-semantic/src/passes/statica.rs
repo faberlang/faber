@@ -553,6 +553,11 @@ fn int_binary(op: HirBinOp, a: i128, b: i128, span: Span) -> Result<Value, Fault
     // Shifts are pure math (ruling 10): `a * 2^n` and `floor(a / 2^n)`, with
     // no count masking; a negative count is an error.
     let shift_left = || {
+        // The count is validated before the operand, as the runner does
+        // (exact_int.rs): `0 ⇐ (0 - 1)` is the negative-shift error, not 0.
+        if b < 0 {
+            return Err(overflow);
+        }
         if a == 0 {
             return Ok(Value::Int(0));
         }

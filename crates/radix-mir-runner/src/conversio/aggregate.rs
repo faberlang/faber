@@ -455,7 +455,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             let key = MapKey::Str(self.struct_wire_field_key(def_id, name));
             let converted = match input.get(&key).cloned() {
                 Some(Value::Nil) if optional.contains(&name) => Value::Nil,
-                Some(field_value) => match self.convert_to_struct_field(field_value, ty, span) {
+                Some(field_value) => match self.convert_to_struct_field(
+                    field_value,
+                    ty,
+                    struct_defaults,
+                    span,
+                ) {
                     Ok(value) => value,
                     Err(_) => {
                         return self.recover_or_fail(
@@ -566,9 +571,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         &mut self,
         value: Value,
         target: TypeId,
+        struct_defaults: &[MirStructFieldDefaults],
         span: Span,
     ) -> Result<Value, RunnerError> {
-        self.convert_to_target(value, target, target, &[], None, &[], span)
+        self.convert_to_target(value, target, target, &[], None, struct_defaults, span)
     }
 
     pub(crate) fn extract_dynamic_value_for_type(
@@ -861,3 +867,7 @@ fn lista_to_tensor_shape(target_ty: TypeId, types: &TypeTable, flat_len: usize) 
         Some(ListaToTensorShape::InferOneD) | None => vec![flat_len as i64],
     }
 }
+
+#[cfg(test)]
+#[path = "aggregate_test.rs"]
+mod aggregate_test;

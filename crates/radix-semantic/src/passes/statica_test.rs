@@ -129,6 +129,28 @@ fn shifts_fold_as_pure_math() {
 }
 
 #[test]
+fn a_negative_shift_count_is_an_error_even_for_a_zero_operand() {
+    // The runner rejects a negative count before looking at the value
+    // (exact_int.rs NEGATIVE_SHIFT); a zero left operand must not fold to 0.
+    // A literal count is refused earlier by the typechecker, so the count
+    // reaches the fold through a constant reference.
+    assert_rejects_with_issue(
+        "fixum numerus N = 0 - 1\nfixum numerus S = 0 ⇐ N\n",
+        "constant_arithmetic_overflow",
+    );
+    assert_rejects_with_issue(
+        "fixum numerus N = 0 - 1\nfixum numerus S = 0 ⇒ N\n",
+        "constant_arithmetic_overflow",
+    );
+}
+
+#[test]
+fn a_zero_operand_shifted_by_a_nonnegative_constant_folds_to_zero() {
+    let (zero, _) = static_const("fixum numerus N = 3\nfixum numerus S = 0 ⇐ N\n", "S");
+    assert_eq!(int_value(&zero.value), 0);
+}
+
+#[test]
 fn references_fold_in_dependency_order() {
     // `B` is declared before the static it depends on.
     let source = "fixum numerus B = A * 2 + 1\nfixum numerus A = 4\n";
