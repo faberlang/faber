@@ -899,9 +899,8 @@ impl ExecutorPlanExtension {
                 kernel_count
             ));
         }
-        let mut seen = std::collections::BTreeSet::new();
         for (position, selection) in self.selections.iter().enumerate() {
-            if selection.kernel_index != position || !seen.insert(selection.kernel_index) {
+            if selection.kernel_index != position {
                 return Err(format!(
                     "executor-plan kernel indices are not the ordered unique range at position {position}"
                 ));
@@ -1784,26 +1783,12 @@ fn validate_view_span(
             detail: "maximum span must be nonzero".to_owned(),
         });
     }
-    let max_element = view
-        .logical_dims
-        .iter()
-        .zip(&view.strides)
-        .try_fold(0u64, |acc, (dim, stride)| {
-            dim.checked_sub(1)
-                .and_then(|extent| extent.checked_mul(*stride))
-                .and_then(|extent| acc.checked_add(extent))
-        })
-        .ok_or_else(|| ExecutorPlanV2Error::InvalidView {
+    let Some(required_elements) = view_required_elements(view) else {
+        return Err(ExecutorPlanV2Error::InvalidView {
             allocation: view.allocation,
             detail: "logical span arithmetic overflows".to_owned(),
-        })?;
-    let required_elements =
-        max_element
-            .checked_add(1)
-            .ok_or_else(|| ExecutorPlanV2Error::InvalidView {
-                allocation: view.allocation,
-                detail: "logical span arithmetic overflows".to_owned(),
-            })?;
+        });
+    };
     let required_span = required_elements
         .checked_mul(allocation.dtype.byte_width())
         .ok_or_else(|| ExecutorPlanV2Error::InvalidView {
@@ -1855,7 +1840,7 @@ fn view_base_bytes_for_binding(
         if view.allocation != allocation.buffer.id || view.maximum_span < view_span {
             return None;
         }
-        let required_span = view_required_span(view, dtype_width)?;
+        let required_span = view_required_elements(view)?.checked_mul(dtype_width)?;
         if view_span < required_span {
             return None;
         }
@@ -1864,7 +1849,9 @@ fn view_base_bytes_for_binding(
     })
 }
 
-fn view_required_span(view: &ViewFact, dtype_width: u64) -> Option<u64> {
+/// The bounded element count a view's logical dims/strides address; `None`
+/// when the logical span arithmetic overflows.
+fn view_required_elements(view: &ViewFact) -> Option<u64> {
     let max_element =
         view.logical_dims
             .iter()
@@ -1874,7 +1861,7 @@ fn view_required_span(view: &ViewFact, dtype_width: u64) -> Option<u64> {
                     .and_then(|extent| extent.checked_mul(*stride))
                     .and_then(|extent| acc.checked_add(extent))
             })?;
-    max_element.checked_add(1)?.checked_mul(dtype_width)
+    max_element.checked_add(1)
 }
 
 impl ExecutorPlanExtensionV2 {
@@ -3688,13 +3675,6 @@ pub fn transformer_subchain_signature_for_emission_with_source(
     // transformer-shaped signature. Mark its local bound so the generic
     // data-flow tail does not append a duplicate gamma buffer after it.
     if let Some(gamma_local) = rms_norm_gamma_local(function) {
-        if let Some(extra) = signature
-            .extra_inputs
-            .iter_mut()
-            .find(|resource| resource.source_local == Some(gamma_local))
-        {
-            extra.source_local = Some(gamma_local);
-        }
         bound.push(gamma_local);
     }
     // RoPE's table resource is already part of the recipe-shaped signature;
@@ -3703,13 +3683,6 @@ pub fn transformer_subchain_signature_for_emission_with_source(
     if op.is_rope()
         && let Some(table_local) = rope_table_local(function, op)
     {
-        if let Some(extra) = signature
-            .extra_inputs
-            .iter_mut()
-            .find(|resource| resource.source_local == Some(table_local))
-        {
-            extra.source_local = Some(table_local);
-        }
         bound.push(table_local);
     }
     finish_subchain_emission_signature(
