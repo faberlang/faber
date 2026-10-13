@@ -1214,13 +1214,20 @@ main args args {
     assert!(manifest.contains("[runtime]"), "manifest:\n{manifest}");
     for requirement in [
         "requirement = \"host:argv\"",
-        "requirement = \"host:fs\"",
         "requirement = \"host:stdout\"",
-        "requirement = \"kernel:solum.join\"",
     ] {
         assert!(
             manifest.contains(requirement),
             "missing {requirement} in manifest:\n{manifest}"
+        );
+    }
+    // core-norma N2 (decision log 2026-10-12): "`solum:*` is not host-required
+    // at plan time." `norma:fs` runs through the `faber-leaf` fs leaf, so the
+    // retired provider-route requirements must not be declared.
+    for retired in ["host:fs", "kernel:solum."] {
+        assert!(
+            !manifest.contains(retired),
+            "retired fs provider requirement {retired} in manifest:\n{manifest}"
         );
     }
 }
@@ -5842,8 +5849,10 @@ main {
     assert!(output.code.contains("processus:lege"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn exec"));
-    // `process.spawn` is a bodiless `@ unstable` declaration: never emitted.
-    assert!(!output.code.contains("pub(crate) fn spawn"));
+    // core-norma N4b: `process.spawn` is a Norma body over `processus:genera`
+    // (it returns the child pid), so it is emitted like `exec`.
+    assert!(output.code.contains("pub(crate) fn spawn"));
+    assert!(output.code.contains("processus:genera"));
     assert!(!output.code.contains("norma::process::exec"));
     assert!(!output.code.contains("norma::process::read_env"));
     assert!(!output.code.contains("crate::norma::hal::process"));
