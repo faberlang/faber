@@ -236,6 +236,10 @@ tuus = "tuus"
 message = "reader locale '{pack}' saw keyword-like spelling '{spelling}'"
 help = "use '{suggestion}' if you meant that keyword; '{spelling}' is a valid name as written"
 
+[diagnostics.LOCALE002.issues.source_reads_as_other_locale]
+message = "source has no declared locale and its keywords read as '{detected}'"
+help = "declare the locale with `+++ locale = \"{detected}\" +++` frontmatter or pass `--locale {detected}`; this note does not select the locale"
+
 [diagnostics.LOCALE003]
 message = "unknown or invalid reader locale '{locale_id}' in frontmatter"
 help = "check the locale id is a valid reader locale directory name under the standard library reader path"

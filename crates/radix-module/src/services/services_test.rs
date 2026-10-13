@@ -2376,3 +2376,41 @@ fn check_misspelled_keyword_at_parse_error_keeps_locale002() {
         result.diagnostics
     );
 }
+
+fn wrong_locale_diagnostic(result: &CheckDiagnosticsResult) -> Option<usize> {
+    result.diagnostics.iter().position(|diagnostic| {
+        diagnostic.code == Some("LOCALE002")
+            && radix_semantic::arg_value(&diagnostic.args, "issue") == Some("source_reads_as_other_locale")
+            && radix_semantic::arg_value(&diagnostic.args, "detected") == Some("en")
+    })
+}
+
+fn assert_wrong_locale_reported_first(name: &str, source: &str) {
+    let result = check_diagnostics_for_source(name, source, false);
+    let reported = wrong_locale_diagnostic(&result)
+        .unwrap_or_else(|| panic!("no detected-locale diagnostic for {name}: {:?}", result.diagnostics));
+    let first_unknown = result
+        .diagnostics
+        .iter()
+        .position(|diagnostic| diagnostic.code == Some("SEM001"))
+        .expect("unknown identifier error");
+    assert!(reported < first_unknown, "diagnostics: {:?}", result.diagnostics);
+    assert!(!result.diagnostics[reported].is_error(), "detection must not be an error");
+}
+
+#[test]
+fn check_wrong_locale_source_reports_detected_locale_on_stdin_route() {
+    assert_wrong_locale_reported_first("<stdin>", "main { print 1 }");
+}
+
+#[test]
+fn check_wrong_locale_source_reports_detected_locale_on_file_route() {
+    let (_dir, path) = temp_fab("wrong-locale", "main { print 1 }");
+    let source = std::fs::read_to_string(&path).expect("read temp fab");
+    assert_wrong_locale_reported_first(&path, &source);
+}
+
+#[test]
+fn check_wrong_locale_source_reports_detected_locale_on_command_route() {
+    assert_wrong_locale_reported_first("command-line", "main { print 1 }");
+}
