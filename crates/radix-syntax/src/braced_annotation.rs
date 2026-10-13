@@ -237,20 +237,6 @@ pub fn braced_operandus_view_strict<'a>(
     })
 }
 
-#[must_use]
-pub fn braced_optio_is_flag(ty: Option<&TypeExpr>, interner: &Interner) -> bool {
-    ty.is_some_and(|ty| {
-        matches!(
-            &ty.kind,
-            crate::TypeExprKind::Named(name, params)
-                if params.is_empty()
-                    && !ty.nullable
-                    && ty.mode.is_none()
-                    && interner.resolve(name.name) == "bivalens"
-        )
-    })
-}
-
 fn find_field<'a>(
     braced: &'a BracedAnnotation,
     name: &str,

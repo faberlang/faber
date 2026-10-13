@@ -41,7 +41,7 @@ pub use ast::*;
 pub use braced_annotation::{
     BracedAnnotationError, BracedOperandusView, BracedOptioView, BracedView, braced_cli_nomen,
     braced_cli_nomen_strict, braced_family_is, braced_imperium_nomen, braced_imperium_nomen_strict,
-    braced_operandus_view, braced_operandus_view_strict, braced_optio_is_flag, braced_optio_view,
+    braced_operandus_view, braced_operandus_view_strict, braced_optio_view,
     braced_optio_view_strict,
 };
 pub use span::Spanned;

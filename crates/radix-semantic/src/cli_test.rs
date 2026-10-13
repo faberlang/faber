@@ -91,3 +91,24 @@ functio jobs() argumenta args {}
         issues(&analysis)
     );
 }
+
+#[test]
+fn braced_and_sugar_bivalens_options_both_lower_as_flags() {
+    let analysis = analyze_mounted(
+        r#"
+@ imperium "jobs"
+@ optio { binding = braced, longum = "braced", typus = bivalens }
+@ optio sugar longum "sugar" typus bivalens
+functio jobs() argumenta args {}
+"#,
+        &["tool"],
+    );
+
+    assert!(analysis.errors.is_empty(), "{:?}", analysis.errors);
+    let program = analysis.program.as_ref().expect("program");
+    let options = &program.commands[0].options;
+    assert_eq!(options.len(), 2, "{options:?}");
+    for option in options {
+        assert!(option.flag, "{} did not lower as a flag", option.binding);
+    }
+}

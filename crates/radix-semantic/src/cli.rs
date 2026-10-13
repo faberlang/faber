@@ -26,8 +26,7 @@ use radix_syntax::{
     Annotation, AnnotationKind, BracedAnnotationError, BracedView, Expr, ExprKind, FuncDecl,
     GenericArgExpr, Ident, IncipitStmt, Literal, MemberExpr, OperandusAnnotation, OptioAnnotation,
     Program, Stmt, StmtKind, TypeExpr, TypeExprKind, braced_cli_nomen, braced_cli_nomen_strict,
-    braced_imperium_nomen_strict, braced_operandus_view_strict, braced_optio_is_flag,
-    braced_optio_view_strict,
+    braced_imperium_nomen_strict, braced_operandus_view_strict, braced_optio_view_strict,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -778,7 +777,7 @@ impl CliBuilder<'_> {
         CliOption {
             binding: self.ident(view.binding),
             binding_symbol: view.binding.name,
-            flag: braced_optio_is_flag(view.ty, self.interner),
+            flag: ty == CliType::Bivalens,
             ty,
             short: view.short.map(|sym| self.resolve(sym)),
             long: view.long.map(|sym| self.resolve(sym)),
