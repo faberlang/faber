@@ -47,9 +47,10 @@ use radix_hir::{
 };
 use radix_lexer::{Span, Symbol};
 use radix_syntax::{
-    AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassDecl, ClassMemberKind,
-    EnumDecl, EnumValue, FuncDecl, ImportDecl, ImportKind, InterfaceDecl, InterfaceMethod, Param,
-    SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl, Variant,
+    AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassDecl, ClassMember,
+    ClassMemberKind, EnumDecl, EnumValue, FuncDecl, ImportDecl, ImportKind, InterfaceDecl,
+    InterfaceMethod, Param, SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl,
+    Variant,
 };
 
 type ModifierLocal = (DefId, Symbol, Span);
@@ -377,6 +378,14 @@ impl Lowerer<'_> {
         locals
     }
 
+    /// Bind injected stage I/O names into the function's local scope so bodies
+    /// resolve them like authored locals.
+    fn bind_shader_locals(&mut self, locals: &[ShaderLocal]) {
+        for &(def_id, name, ..) in locals {
+            self.bind_local(name, def_id);
+        }
+    }
+
     fn shader_stage_vec_types(&mut self) -> (TypeId, TypeId, TypeId) {
         let f32_ty = self
             .types
@@ -489,7 +498,7 @@ impl Lowerer<'_> {
             error_expr(self, name_span)
         };
 
-        let item = HirItem {
+        Some(HirItem {
             annotations,
             id: self.next_hir_id(),
             def_id,
@@ -502,9 +511,7 @@ impl Lowerer<'_> {
                 statica: is_constant.then_some(radix_hir::HirStatic { authored: None }),
             }),
             span: stmt.span,
-        };
-
-        Some(item)
+        })
     }
 
     /// Bind parameters and modifiers before the body so locals resolve. CLI
@@ -580,18 +587,14 @@ impl Lowerer<'_> {
         } else {
             Vec::new()
         };
-        for &(def_id, name, ..) in &vertex_locals {
-            self.bind_local(name, def_id);
-        }
+        self.bind_shader_locals(&vertex_locals);
 
         let fragment_locals = if is_fragment {
             self.inject_fragment_shader_locals(&vertex_locals)
         } else {
             Vec::new()
         };
-        for &(def_id, name, ..) in &fragment_locals {
-            self.bind_local(name, def_id);
-        }
+        self.bind_shader_locals(&fragment_locals);
 
         let body = decl.body.as_ref().map(|body| self.lower_block(body));
         self.pop_scope();
@@ -775,95 +778,7 @@ impl Lowerer<'_> {
                     field_ordinal += 1;
                 }
                 ClassMemberKind::Method(method) => {
-                    let annotations = self.lower_annotations(&member.annotations);
-                    let mut method_type_params = self.lower_type_params(&method.type_params);
-                    self.push_type_params(
-                        method_type_params
-                            .iter()
-                            .map(|param| (param.def_id, param.name, param.kind)),
-                    );
-                    self.lower_type_param_bounds(&mut method_type_params, &method.type_params);
-                    self.apply_type_param_constraints_from_annotations(
-                        &mut method_type_params,
-                        &annotations,
-                    );
-
-                    let mut params = Vec::new();
-                    for (ordinal, param) in method.params.iter().enumerate() {
-                        params.push(self.lower_param(
-                            param,
-                            true,
-                            Some(HirTypeSlot::Parameter(ordinal as u32)),
-                        ));
-                    }
-
-                    self.push_scope();
-                    for param in &params {
-                        self.bind_local(param.name, param.def_id);
-                    }
-                    let prev_ego = self.current_ego_struct;
-                    self.current_ego_struct = Some(def_id);
-                    let modifier_locals = self.bind_modifier_locals(&method.modifiers);
-                    let body = method.body.as_ref().map(|block| self.lower_block(block));
-                    self.pop_scope();
-                    self.current_ego_struct = prev_ego;
-                    let body = body.map(|body| self.prepend_modifier_locals(body, modifier_locals));
-
-                    let ret_ty = method.ret.as_ref().map(|ty| self.lower_signature_type(ty));
-                    let err_ty = method.err.as_ref().map(|ty| self.lower_signature_type(ty));
-                    self.pop_type_params();
-
-                    let posture =
-                        self.resolve_callable_posture(method.posture, &annotations, member.span);
-                    let (nucleum_entry, nucleum_fragment) =
-                        Self::nucleum_role_bits(&annotations, self.interner);
-
-                    let func = HirFunction {
-                        name: method.name.name,
-                        type_params: method_type_params,
-                        params,
-                        cli_args: None,
-                        ret_ty,
-                        err_ty,
-                        body,
-                        posture,
-                        is_async: posture.is_async(),
-                        is_generator: posture.is_stream(),
-                        is_kernel: nucleum_entry,
-                        nucleum_fragment,
-                        is_vertex: Self::annotation_family_is(
-                            &annotations,
-                            self.interner,
-                            "vertex",
-                        ),
-                        is_fragment: Self::annotation_family_is(
-                            &annotations,
-                            self.interner,
-                            "fragment",
-                        ),
-                        test: None,
-                    };
-
-                    let method_def_id = self.next_def_id();
-                    // `ClassMember` and the nested `FuncDecl` each own trivia;
-                    // merge in source order so no claimed comment is dropped.
-                    let mut member_trivia = self.hir_trivia(&member.leading_trivia);
-                    member_trivia.extend(self.hir_trivia(&method.leading_trivia));
-                    if !member_trivia.is_empty() {
-                        self.register_attachment(
-                            HirTriviaOwnerKind::Member,
-                            Some(HirOwnerRef::Def(method_def_id)),
-                            member_trivia,
-                        );
-                    }
-
-                    methods.push(HirMethod {
-                        annotations,
-                        def_id: method_def_id,
-                        func,
-                        receiver: HirReceiver::None,
-                        span: member.span,
-                    });
+                    methods.push(self.lower_gens_method(def_id, member, method));
                 }
             }
         }
@@ -893,6 +808,93 @@ impl Lowerer<'_> {
             kind: HirItemKind::Struct(struct_item),
             span: stmt.span,
         })
+    }
+
+    /// One `genus` method: generic row, parameters, and modifier locals bind
+    /// before the body lowers, with `ego` pointed at the enclosing struct.
+    fn lower_gens_method(
+        &mut self,
+        struct_def_id: DefId,
+        member: &ClassMember,
+        method: &FuncDecl,
+    ) -> HirMethod {
+        let annotations = self.lower_annotations(&member.annotations);
+        let mut method_type_params = self.lower_type_params(&method.type_params);
+        self.push_type_params(
+            method_type_params
+                .iter()
+                .map(|param| (param.def_id, param.name, param.kind)),
+        );
+        self.lower_type_param_bounds(&mut method_type_params, &method.type_params);
+        self.apply_type_param_constraints_from_annotations(&mut method_type_params, &annotations);
+
+        let mut params = Vec::new();
+        for (ordinal, param) in method.params.iter().enumerate() {
+            params.push(self.lower_param(
+                param,
+                true,
+                Some(HirTypeSlot::Parameter(ordinal as u32)),
+            ));
+        }
+
+        self.push_scope();
+        for param in &params {
+            self.bind_local(param.name, param.def_id);
+        }
+        let prev_ego = self.current_ego_struct;
+        self.current_ego_struct = Some(struct_def_id);
+        let modifier_locals = self.bind_modifier_locals(&method.modifiers);
+        let body = method.body.as_ref().map(|block| self.lower_block(block));
+        self.pop_scope();
+        self.current_ego_struct = prev_ego;
+        let body = body.map(|body| self.prepend_modifier_locals(body, modifier_locals));
+
+        let ret_ty = method.ret.as_ref().map(|ty| self.lower_signature_type(ty));
+        let err_ty = method.err.as_ref().map(|ty| self.lower_signature_type(ty));
+        self.pop_type_params();
+
+        let posture = self.resolve_callable_posture(method.posture, &annotations, member.span);
+        let (nucleum_entry, nucleum_fragment) =
+            Self::nucleum_role_bits(&annotations, self.interner);
+
+        let func = HirFunction {
+            name: method.name.name,
+            type_params: method_type_params,
+            params,
+            cli_args: None,
+            ret_ty,
+            err_ty,
+            body,
+            posture,
+            is_async: posture.is_async(),
+            is_generator: posture.is_stream(),
+            is_kernel: nucleum_entry,
+            nucleum_fragment,
+            is_vertex: Self::annotation_family_is(&annotations, self.interner, "vertex"),
+            is_fragment: Self::annotation_family_is(&annotations, self.interner, "fragment"),
+            test: None,
+        };
+
+        let method_def_id = self.next_def_id();
+        // `ClassMember` and the nested `FuncDecl` each own trivia; merge in
+        // source order so no claimed comment is dropped.
+        let mut member_trivia = self.hir_trivia(&member.leading_trivia);
+        member_trivia.extend(self.hir_trivia(&method.leading_trivia));
+        if !member_trivia.is_empty() {
+            self.register_attachment(
+                HirTriviaOwnerKind::Member,
+                Some(HirOwnerRef::Def(method_def_id)),
+                member_trivia,
+            );
+        }
+
+        HirMethod {
+            annotations,
+            def_id: method_def_id,
+            func,
+            receiver: HirReceiver::None,
+            span: member.span,
+        }
     }
 
     /// Plain `ordo` variants carry names and `DefId`s; payload fields belong to `discretio`.

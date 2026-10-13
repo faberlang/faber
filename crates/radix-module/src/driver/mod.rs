@@ -403,7 +403,7 @@ fn compile_cli_program(
             )
             .with_args(vec![
                 DiagnosticArg::new("issue", "cli_codegen_rust_only"),
-                DiagnosticArg::new("target", target_display_name(target)),
+                DiagnosticArg::new("target", target.as_str()),
             ]),
         ),
     }
@@ -438,7 +438,7 @@ fn cli_codegen_diagnostic(target: Target, name: &str, analysis: &AnalyzedModule)
             )
             .with_args(vec![
                 DiagnosticArg::new("issue", "cli_codegen_rust_only"),
-                DiagnosticArg::new("target", target_display_name(target)),
+                DiagnosticArg::new("target", target.as_str()),
             ]),
         ),
     }
@@ -931,10 +931,6 @@ fn generate_llvm_text_output(
     no_fuse: bool,
     emit_nvvm_device_module: bool,
 ) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(not(feature = "mir-llvm"))]
-    {
-        return Err(unavailable_target_spanned(Target::MirLlvm));
-    }
     #[cfg(feature = "mir-llvm")]
     {
         prepare_mir_lowering_interner(analysis);
@@ -1091,10 +1087,6 @@ fn generate_metal_text_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
 ) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(not(feature = "mir-metal"))]
-    {
-        return Err(unavailable_target_spanned(Target::MirMetal));
-    }
     #[cfg(feature = "mir-metal")]
     {
         prepare_mir_lowering_interner(analysis);
@@ -1131,10 +1123,6 @@ fn generate_wgsl_text_output(
     no_fuse: bool,
     target_bindings: &TargetBindings,
 ) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(not(feature = "mir-wgsl"))]
-    {
-        return Err(unavailable_target_spanned(Target::MirWgsl));
-    }
     #[cfg(feature = "mir-wgsl")]
     {
         let graphics_source = analysis.graphics_source.clone();
@@ -1643,10 +1631,6 @@ fn validate_wgsl_fragment_source_entry(
 #[cfg_attr(not(feature = "mir-sexp"), allow(unused_variables))]
 #[cfg(feature = "mir-sexp")]
 fn generate_sexp_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(not(feature = "mir-sexp"))]
-    {
-        return Err(unavailable_target_spanned(Target::MirSexp));
-    }
     #[cfg(feature = "mir-sexp")]
     {
         prepare_mir_lowering_interner(analysis);
@@ -3607,16 +3591,7 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
     // containing path separators.  PathBuf::join replaces the base when the
     // appended component is absolute, so an id like "/etc" would resolve to
     // /etc/pack.toml instead of <stdlib>/reader/etc/pack.toml.
-    if locale_id.starts_with('/')
-        || locale_id.starts_with('\\')
-        || locale_id.contains('/')
-        || locale_id.contains('\\')
-        || locale_id == "."
-        || locale_id == ".."
-        || locale_id.starts_with("../")
-        || locale_id.contains("/../")
-        || locale_id.ends_with("/..")
-    {
+    if locale_id.contains('/') || locale_id.contains('\\') || locale_id == "." || locale_id == ".." {
         return Err(Box::new(
             Diagnostic::error(format!(
                 "frontmatter locale '{locale_id}' is not a valid locale identifier; locale ids must be simple directory names"
@@ -4247,8 +4222,6 @@ fn analyzed_unit_from_semantic(
 
     let libraries = LibraryRegistry::default();
     let shape_obligations = semantic_result.shape_obligations.clone();
-    let kernel_requirements = semantic_result.kernel_requirements.clone();
-    let tensor_edge_policies = semantic_result.tensor_edge_policies.clone();
     let parts = semantic::AnalyzedApplicationParts {
         hir,
         types: semantic_result.types,
@@ -4257,8 +4230,8 @@ fn analyzed_unit_from_semantic(
         libraries,
         radix_lanes: semantic_result.radix_lanes,
         gpu_builtins: semantic_result.gpu_builtins,
-        tensor_edge_policies: tensor_edge_policies.clone(),
-        kernel_requirements: kernel_requirements.clone(),
+        tensor_edge_policies: semantic_result.tensor_edge_policies,
+        kernel_requirements: semantic_result.kernel_requirements,
         access_facts,
         region_facts: semantic_result.region_facts,
         semantic_diagnostics: semantic_result.diagnostics,
@@ -4285,7 +4258,7 @@ fn analyzed_unit_from_semantic(
         interner,
         types: fields.types,
         shape_obligations,
-        kernel_requirements,
+        kernel_requirements: fields.kernel_requirements,
         tensor_edge_policies: fields.tensor_edge_policies,
         resolver: fields.resolver,
         cli_program,
@@ -4500,7 +4473,7 @@ fn collect_radix_lane_target_errors(lanes: &RadixLaneMetadata, target: Target, f
 }
 
 fn radix_lane_target_error(lane: RadixLane, target: Target, file: &str) -> Option<Diagnostic> {
-    let target_name = target_display_name(target);
+    let target_name = target.as_str();
     let (message, issue, lane_name) = match (lane, target) {
         (
             RadixLane::Air,
@@ -4536,10 +4509,6 @@ fn radix_lane_target_error(lane: RadixLane, target: Target, file: &str) -> Optio
             ])
             .with_file(file.to_owned()),
     )
-}
-
-fn target_display_name(target: Target) -> &'static str {
-    target.as_str()
 }
 
 fn retarget_cli_program_symbols(
