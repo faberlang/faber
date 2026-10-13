@@ -1139,11 +1139,7 @@ impl CliBuilder<'_> {
         for command in commands {
             let path = command.path.join("/");
             if !paths.insert(path.clone()) {
-                self.error_with(
-                    command.span,
-                    ISSUE_DUPLICATE_COMMAND_PATH,
-                    [("path", path.clone())],
-                );
+                self.error_with(command.span, ISSUE_DUPLICATE_COMMAND_PATH, [("path", path)]);
             }
         }
         paths
@@ -1158,17 +1154,10 @@ impl CliBuilder<'_> {
         allow_alias_paths: bool,
     ) {
         self.validate_command_aliases(command, paths, aliases, allow_alias_paths);
-        self.validate_surface(&command_label(command), &command.options, &command.operands);
-        self.validate_global_option_collisions(
-            &command_label(command),
-            &command.options,
-            global_bindings,
-        );
-        self.validate_global_operand_collisions(
-            &command_label(command),
-            &command.operands,
-            global_bindings,
-        );
+        let label = command_label(command);
+        self.validate_surface(&label, &command.options, &command.operands);
+        self.validate_global_option_collisions(&label, &command.options, global_bindings);
+        self.validate_global_operand_collisions(&label, &command.operands, global_bindings);
     }
 
     fn validate_command_aliases(
