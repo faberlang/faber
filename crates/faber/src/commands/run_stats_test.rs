@@ -538,15 +538,19 @@ device = "metal"
         output.status
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    // Both stable codes are valid pre-launch refusals; which one fires depends
-    // on whether the Metal driver registers on the host OS. macOS registers
-    // Metal, admits the session, and refuses at the no-kernel image check
-    // (`E_DEVICE_NONE_ADMITTED`); a host with no registered Metal runtime
-    // refuses at admission (`E_DEVICE_UNAVAILABLE`). Either way the explicit
-    // selection fails closed before launch and emits no artifact.
+    // Exact per host: macOS registers the Metal driver, admits the session,
+    // and refuses at the no-kernel image check (`E_DEVICE_NONE_ADMITTED`); a
+    // host with no registered Metal runtime refuses at admission
+    // (`E_DEVICE_UNAVAILABLE`). Either way the explicit selection fails closed
+    // before launch and emits no artifact.
+    let expected_code = if cfg!(target_os = "macos") {
+        "E_DEVICE_NONE_ADMITTED"
+    } else {
+        "E_DEVICE_UNAVAILABLE"
+    };
     assert!(
-        stderr.contains("E_DEVICE_NONE_ADMITTED") || stderr.contains("E_DEVICE_UNAVAILABLE"),
-        "a device selection with --stats must refuse with the stable device code: {stderr}"
+        stderr.contains(expected_code),
+        "a device selection with --stats must refuse with {expected_code}: {stderr}"
     );
     assert!(
         !output
