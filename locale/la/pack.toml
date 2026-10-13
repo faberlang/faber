@@ -989,6 +989,10 @@ help = "check import syntax"
 message = "unknown import field"
 help = "use ex, visibilitas, nomen, ut, or omnia"
 
+[diagnostics.PARSE050.issues.duplicate_import_field]
+message = "duplicate import field `{field}`"
+help = "each import field may appear once; remove the repeated field"
+
 [diagnostics.PARSE050.issues.missing_import_source]
 message = "import record requires an ex source"
 help = "add ex = \"path\" to the import record"

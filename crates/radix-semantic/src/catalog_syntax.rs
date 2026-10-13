@@ -1123,6 +1123,10 @@ fn invalid_import_message(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "unknown_import_field" => Some("unknown import field".to_owned()),
+        "duplicate_import_field" => {
+            let field = arg_value(args, "field")?;
+            Some(format!("duplicate import field `{field}`"))
+        }
         "missing_import_source" => Some("import record requires an ex source".to_owned()),
         "mixed_wildcard_and_named_import" => {
             Some("wildcard import cannot also name a binding".to_owned())
@@ -1143,6 +1147,9 @@ fn invalid_import_help(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "unknown_import_field" => Some("use ex, visibilitas, nomen, ut, or omnia".to_owned()),
+        "duplicate_import_field" => {
+            Some("each import field may appear once; remove the repeated field".to_owned())
+        }
         "missing_import_source" => Some("add ex = \"path\" to the import record".to_owned()),
         "mixed_wildcard_and_named_import" => {
             Some("use omnia by itself, or use nomen/ut for a named import".to_owned())
