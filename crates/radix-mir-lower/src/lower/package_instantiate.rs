@@ -516,6 +516,7 @@ struct PendingCall {
     block_index: usize,
     statement_index: Option<usize>,
     destination: Option<MirPlace>,
+    error_place: Option<MirPlace>,
     source: DefId,
     type_args: Vec<MirType>,
     args: Vec<MirOperand>,
@@ -680,6 +681,7 @@ impl PackageInstantiate<'_> {
                         block_index,
                         statement_index: Some(statement_index),
                         destination: destination.clone(),
+                        error_place: None,
                         source: *source,
                         type_args: type_args.clone(),
                         args: args.clone(),
@@ -692,6 +694,7 @@ impl PackageInstantiate<'_> {
                 destination,
                 callee: MirCallee::Definition { source, type_args },
                 args,
+                error_place,
                 ..
             } = &block.terminator.kind
                 && self.templates.contains_key(source)
@@ -701,6 +704,7 @@ impl PackageInstantiate<'_> {
                     block_index,
                     statement_index: None,
                     destination: destination.clone(),
+                    error_place: Some(error_place.clone()),
                     source: *source,
                     type_args: type_args.clone(),
                     args: args.clone(),
@@ -775,6 +779,24 @@ impl PackageInstantiate<'_> {
                 });
                 return None;
             }
+        }
+        // The catch place is the only witness for an alternate-exit type
+        // parameter that no argument or destination mentions (`⇥ E`).
+        if let (Some(error_ty), Some(error_place)) = (template.error_ty, &call.error_place)
+            && type_contains_param(self.types, error_ty.semantic_id())
+            && let Some(actual) = self.place_ty(error_place, &call.scope, call.span)
+            && !type_contains_param(self.types, actual.semantic_id())
+            && !bind_generic_type_witness_with_shapes(
+                self.types,
+                error_ty,
+                actual,
+                &mut type_bindings,
+                &mut shape_bindings,
+            )
+        {
+            self.errors
+                .push(MirError::validation(call.span, "error destination type mismatch"));
+            return None;
         }
         let key =
             self.key_from_bindings(call.source, &params, &type_bindings, &shape_bindings, &parent_shapes, call.span)?;

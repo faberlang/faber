@@ -1494,3 +1494,108 @@ fn runtime_shape_key_distinguishes_caller_formal_axes_from_local_bindings() {
         "a local runtime binding collapses to the callee's formal witness"
     );
 }
+
+// ── A-139: a generic callee's alternate-exit type binds from the catch place ──
+
+/// `mayfail<E>() → numerus ⇥ E` called through a `TryCall` whose error place is
+/// a concrete `textus` local, with no explicit type arguments and no other
+/// witness for `E`. The error place is the only fact that fixes `E`.
+#[test]
+fn try_call_error_place_binds_the_generic_error_type() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let symbol = interner.intern("E");
+    let error_param = MirType::semantic(types.intern(Type::Param(symbol)));
+    let textus = MirType::semantic(types.primitive(Primitive::Textus));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let callee_source = DefId(9);
+    let template = MirFunction {
+        id: MirFunctionId(0),
+        source: Some(callee_source),
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+            span: Span::default(),
+        }],
+        return_ty: vacuum,
+        error_ty: Some(error_param),
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let block = |id: u32, kind: MirTerminatorKind| MirBlock {
+        id: crate::mir::MirBlockId(id),
+        statements: Vec::new(),
+        terminator: MirTerminator { kind, span: Span::default() },
+        span: Span::default(),
+    };
+    let caller = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: vec![crate::mir::MirLocal {
+            id: crate::mir::MirLocalId(0),
+            name: None,
+            ty: textus,
+            mutable: true,
+            span: Span::default(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![
+            block(
+                0,
+                MirTerminatorKind::TryCall {
+                    destination: None,
+                    callee: MirCallee::Definition { source: callee_source, type_args: Vec::new() },
+                    args: Vec::new(),
+                    ok_block: crate::mir::MirBlockId(1),
+                    error_place: MirPlace::local(crate::mir::MirLocalId(0)),
+                    error_block: crate::mir::MirBlockId(2),
+                },
+            ),
+            block(1, MirTerminatorKind::Return(None)),
+            block(2, MirTerminatorKind::Return(None)),
+        ],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let mut program = MirProgram { functions: vec![caller] };
+    let generic_params = vec![(
+        callee_source,
+        vec![MirGenericParam { name: symbol, is_shape: false, runtime_witness: None }],
+    )];
+
+    let monomorphizations =
+        instantiate_merged_generic_calls(&mut program, &[template], &generic_params, &mut types, &interner, None)
+            .unwrap_or_else(|errors| {
+                panic!(
+                    "the catch place must fix E; link errors: {:?}",
+                    errors
+                        .iter()
+                        .map(|error| error.message.as_str())
+                        .collect::<Vec<_>>()
+                )
+            });
+
+    assert_eq!(monomorphizations.len(), 1, "one concrete instance is created");
+    assert_eq!(
+        monomorphizations[0].key.type_args,
+        vec![textus],
+        "E binds to the catch place type"
+    );
+    let MirTerminatorKind::TryCall { callee, .. } = &program.functions[0].blocks[0].terminator.kind else {
+        panic!("expected the try call terminator");
+    };
+    assert_eq!(*callee, MirCallee::Function(monomorphizations[0].function));
+}
