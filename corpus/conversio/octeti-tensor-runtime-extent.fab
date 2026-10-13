@@ -1,0 +1,71 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "spelled_lift", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "fac_block", "cape_clause", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Bulk typed reinterpretation of octeti as a tensor whose extent is a run-time size read from a binding."
+syntax = "<octeti> ↦ tensor<E, [N, size n]> via Be|Le"
+related = ["↦", "octeti", "tensor", "float"]
+locale = "en"
++++
+# =============================================================================
+# ↦ — octeti as a tensor whose extent is a run-time size.
+# =============================================================================
+#
+# What this teaches:
+#   • A run-time extent — `size n` in the target shape reads the value bound to
+#     `n`, so the byte count the conversion needs is known only when it runs.
+#   • Exact length — the byte count must equal `product(shape) * element width`
+#     for the extents as they are at run time; no truncation, no padding.
+#   • A wrong length is a recoverable failure: `do { } catch err { }` handles it,
+#     exactly as it does for a literal extent.
+#
+# Common mistakes:
+#   • Naming a `size` parameter or an expression extent (`size (n - 1)`) as the
+#     extent — the Rust emitter declines both by name; read a local binding.
+#   • Omitting Be/Le — the byte order is never implied, for any element width.
+#
+# See also: ↦, octeti, tensor, magnitudo
+# =============================================================================
+
+
+# conversio — octeti ↦ tensor<E, [N, size n]> via Be|Le
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' tensorType 'via' endian
+#
+# EXPECTED OUTPUT:
+#   1.0
+#   6.0
+#   [2, 3]
+#   caught
+#
+# BACKEND:
+#   The runner and Rust both compare the byte length with the product of the
+#   extents when the conversion runs. TypeScript, Go and Swift decline by name.
+
+fn runtime_extent(int value) → int {
+    return value
+}
+
+main {
+    const int n ← runtime_extent(3)
+    const bytes raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
+    const bytes short_raw ← |00 00 80 3f 00 00 00 40|
+
+    const tensor<f32, [2, size n]> grid ← raw ↦ tensor<f32, [2, size n]> via Le
+    const list<int, _> dims ← grid.shape()
+
+    print grid[[0, 0]]
+    print grid[[1, 2]]
+    print dims
+
+    do {
+        const tensor<f32, [2, size n]> bad ← short_raw ↦ tensor<f32, [2, size n]> via Le
+        print bad[[0, 0]]
+    }
+    catch err {
+        print "caught"
+    }
+}
