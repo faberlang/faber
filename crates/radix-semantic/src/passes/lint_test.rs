@@ -1054,6 +1054,79 @@ fn never_mutated_varia_stays_flagged_without_in_place_sort() {
     assert_eq!(unnecessary_varia_count(source), 1);
 }
 
+// The bare harness above compiles the latin surface; the corpus exemplar uses
+// the English one. These twins pin the same registry lookup through the en
+// lex pack for both method forms.
+fn en_config() -> crate::PassConfig {
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    config
+}
+
+fn en_unnecessary_varia_count(source: &str) -> usize {
+    let result = crate::test_support::analyze_source_with_config(source, en_config());
+    assert!(
+        !result.diagnostics.iter().any(|diag| diag.is_error()),
+        "en fixture must be error-free: {:?}",
+        result.diagnostics
+    );
+    result
+        .diagnostics
+        .iter()
+        .filter(|diag| !diag.is_error() && diag.issue() == Some("unnecessary_varia"))
+        .count()
+}
+
+#[test]
+fn english_plain_in_place_sort_counts_as_mutation_for_unnecessary_varia() {
+    let source = "main {\n    var list<int> xs ← [3, 1, 2]\n    xs.sort()\n}";
+    assert_eq!(en_unnecessary_varia_count(source), 0);
+}
+
+#[test]
+fn english_plain_in_place_sort_of_copy_binding_counts_as_mutation_for_unnecessary_varia() {
+    // The `copy` access marker must peel for the en `.sort()` surface too.
+    let source = "main {\n    var list<int> xs ← [3, 1, 2]\n    var list<int> ys ← copy xs\n    ys.sort()\n}";
+    assert_eq!(en_unnecessary_varia_count(source), 1);
+}
+
+#[test]
+fn english_keyed_in_place_sort_counts_as_mutation_for_unnecessary_varia() {
+    // The exemplar shape: a `const` source and a `var` copy sorted in place.
+    let source = "class Persona {\n    var string nomen\n    var int aetas\n}\nmain {\n    const list<Persona> ps ← [Persona { nomen = \"b\", aetas = 2 }]\n    var list<Persona> m ← copy ps\n    m.sort(Persona p ∴ p.aetas)\n}";
+    assert_eq!(en_unnecessary_varia_count(source), 0);
+}
+
+const ORDINA_CLAVIS_EXEMPLAR: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../corpus/lista/ordina-clavis.fab"
+));
+
+fn strip_frontmatter(raw: &str) -> &str {
+    if let Some(rest) = raw.strip_prefix("+++") {
+        if let Some(end) = rest.find("+++") {
+            return &rest[end + 3..];
+        }
+    }
+    raw
+}
+
+#[test]
+fn ordina_clavis_exemplar_has_no_unnecessary_varia() {
+    // `personae` is only read (the in-place sort works on `per_aetatem`), so
+    // the exemplar keeps it `const`; this pins the file against a `var`
+    // regression.
+    let source = strip_frontmatter(ORDINA_CLAVIS_EXEMPLAR);
+    assert_eq!(
+        en_unnecessary_varia_count(source),
+        0,
+        "corpus/lista/ordina-clavis.fab must keep a `const` source binding"
+    );
+}
+
 // ---- PST-U1: PreferStringTemplate — naive string concatenation chains ----
 //
 // Threshold B (operator decision 856a3b7a): warn only on string-typed `+`
