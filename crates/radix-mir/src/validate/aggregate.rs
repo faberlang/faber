@@ -353,13 +353,7 @@ impl Validator<'_, '_> {
                 } else {
                     self.error(span, "enum variant aggregate type is not enum");
                 }
-                for item in items {
-                    match item {
-                        MirAggregateItem::Operand(value) | MirAggregateItem::Spread(value) => {
-                            self.validate_operand(scope, value, span);
-                        }
-                    }
-                }
+                self.validate_ordered_variant_payload(scope, *def_id, aggregate.ty, items, span);
             }
             (MirAggregateKind::SharedCell, MirAggregateFields::Ordered(items)) => {
                 self.validate_shared_cell_aggregate(scope, aggregate.ty, items, span);
@@ -622,6 +616,114 @@ impl Validator<'_, '_> {
                 self.error(span, "named aggregate is missing required field");
             }
         }
+    }
+
+    /// A positional (`Ordered`) variant aggregate carries the variant's
+    /// payload fields in declaration order. Check arity and operand types the
+    /// way the tuple case and the named-variant path do; `variant_fields` is
+    /// unordered, so the declaration order comes from `variant_field_order`.
+    fn validate_ordered_variant_payload(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        def_id: DefId,
+        aggregate_ty: MirType,
+        items: &[MirAggregateItem],
+        span: Span,
+    ) {
+        let Some(fields) = self.context.variant_fields.get(&def_id).cloned() else {
+            // No declared payload metadata to check against; still validate
+            // every operand (and reject a positional spread).
+            for item in items {
+                match item {
+                    MirAggregateItem::Operand(value) => {
+                        self.validate_operand(scope, value, span);
+                    }
+                    MirAggregateItem::Spread(value) => {
+                        self.validate_operand(scope, value, span);
+                        self.error(span, "enum variant aggregate spread is unsupported");
+                    }
+                }
+            }
+            return;
+        };
+        let Some(field_tys) = self.variant_payload_field_tys(def_id, &fields, span) else {
+            return;
+        };
+        if items.len() != field_tys.len() {
+            self.error(
+                span,
+                format!(
+                    "enum variant aggregate element count {} does not match variant payload arity {}",
+                    items.len(),
+                    field_tys.len()
+                ),
+            );
+        }
+        for (i, item) in items.iter().enumerate() {
+            let (value, is_spread) = match item {
+                MirAggregateItem::Operand(value) => (value, false),
+                MirAggregateItem::Spread(value) => (value, true),
+            };
+            let value_ty = self.validate_operand(scope, value, span);
+            if is_spread {
+                self.error(span, "enum variant aggregate spread is unsupported");
+                continue;
+            }
+            let Some(raw_field_ty) = field_tys.get(i).copied() else {
+                continue;
+            };
+            // A generic construction's payload field types instantiate at the
+            // aggregate's applied arguments, as in the named-variant path.
+            let expected_ty = if matches!(self.type_kind(aggregate_ty), Type::Applied(..)) {
+                match self.instantiate_variant_field_ty(aggregate_ty, raw_field_ty, span) {
+                    Some(ty) => ty,
+                    None => continue,
+                }
+            } else {
+                raw_field_ty
+            };
+            if let Some(value_ty) = value_ty {
+                self.require_assignable_or_fitting_constant(
+                    value,
+                    value_ty,
+                    expected_ty,
+                    span,
+                    "enum variant aggregate element type mismatch",
+                );
+            }
+        }
+    }
+
+    /// Declared payload field types of a variant in declaration order.
+    ///
+    /// `variant_fields` is an unordered map; `variant_field_order` records the
+    /// order the positional form is written in. Without an order record, fall
+    /// back to the same Symbol ordering `enum_representation` uses.
+    fn variant_payload_field_tys(
+        &mut self,
+        def_id: DefId,
+        fields: &FxHashMap<Symbol, MirType>,
+        span: Span,
+    ) -> Option<Vec<MirType>> {
+        if let Some(order) = self.context.variant_field_order.get(&def_id).cloned() {
+            let mut field_tys = Vec::with_capacity(order.len());
+            for name in &order {
+                match fields.get(name).copied() {
+                    Some(field_ty) => field_tys.push(field_ty),
+                    None => {
+                        self.error(
+                            span,
+                            "enum variant aggregate payload metadata is missing a declared field",
+                        );
+                        return None;
+                    }
+                }
+            }
+            return Some(field_tys);
+        }
+        let mut entries = fields.iter().collect::<Vec<_>>();
+        entries.sort_by_key(|(name, _)| name.0);
+        Some(entries.into_iter().map(|(_, ty)| *ty).collect())
     }
 
     /// A generic variant construction's payload field types instantiate at
