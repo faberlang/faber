@@ -1,0 +1,19 @@
+# Shapes: a contract and a struct that implements it.
+#
+# The entry module imports both and passes the struct to a function that
+# takes the contract, so the conformance must cross the module boundary.
+module shapes
+
+@ public
+interface Figurable {
+    fn draw() → string
+}
+
+@ public
+class Circle implements Figurable {
+    var int radius = 10
+
+    fn draw() → string {
+        return "circle §"(self.radius)
+    }
+}

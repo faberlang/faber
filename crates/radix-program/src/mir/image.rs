@@ -35,6 +35,9 @@ pub struct FmirValidationMetadata {
     pub display_names: HashMap<DefId, String>,
     pub display_tokens: radix_mir::MirDisplayTokens,
     pub struct_type_params: HashMap<DefId, Vec<Symbol>>,
+    /// Struct → the contracts its `implet` clause names. In-memory like the
+    /// rest of this section: a decoded image does not carry it.
+    pub struct_contracts: HashMap<DefId, HashSet<DefId>>,
     pub enum_type_params: HashMap<DefId, Vec<Symbol>>,
     pub optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
     pub nullable_struct_fields: HashMap<DefId, HashSet<Symbol>>,
@@ -82,6 +85,11 @@ pub(super) fn snapshot_validation_metadata(
             .struct_type_params
             .iter()
             .map(|(def, params)| (*def, params.clone()))
+            .collect(),
+        struct_contracts: validation
+            .struct_contracts
+            .iter()
+            .map(|(def, contracts)| (*def, contracts.iter().copied().collect()))
             .collect(),
         enum_type_params: validation
             .enum_type_params
@@ -167,6 +175,11 @@ pub(super) fn apply_validation_metadata(
         .struct_type_params
         .iter()
         .map(|(def, params)| (*def, params.clone()))
+        .collect();
+    context.struct_contracts = metadata
+        .struct_contracts
+        .iter()
+        .map(|(def, contracts)| (*def, contracts.iter().copied().collect()))
         .collect();
     context.enum_type_params = metadata
         .enum_type_params

@@ -43,6 +43,9 @@ pub(super) struct RemappedValidation {
     variant_field_order: HashMap<DefId, Vec<Symbol>>,
     display_names: HashMap<DefId, String>,
     struct_type_params: HashMap<DefId, Vec<Symbol>>,
+    /// Struct → the contracts its `implet` clause names, both sides in the
+    /// destination's `DefId` space.
+    struct_contracts: HashMap<DefId, HashSet<DefId>>,
     optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
     nullable_struct_fields: HashMap<DefId, HashSet<Symbol>>,
     variant_parents: HashMap<DefId, DefId>,
@@ -115,6 +118,12 @@ impl RemappedValidation {
                 .entry(*def)
                 .or_insert_with(|| params.clone());
         }
+        for (def, contracts) in &other.struct_contracts {
+            self.struct_contracts
+                .entry(*def)
+                .or_default()
+                .extend(contracts.iter().copied());
+        }
         union_symbol_sets(
             &mut self.optional_struct_fields,
             &other.optional_struct_fields,
@@ -161,6 +170,13 @@ impl RemappedValidation {
                 .struct_type_params
                 .entry(*def)
                 .or_insert_with(|| params.clone());
+        }
+        for (def, contracts) in &self.struct_contracts {
+            context
+                .struct_contracts
+                .entry(*def)
+                .or_default()
+                .extend(contracts.iter().copied());
         }
         for (def, fields) in &self.optional_struct_fields {
             context
@@ -639,6 +655,18 @@ fn remap_struct_and_variant_defs(
                     .collect()
             });
     }
+    // A contract is a nominal like the struct that names it: both sides ride
+    // the nominal remap so the conformance survives into the entry's space.
+    for (def, contracts) in &source.struct_contracts {
+        out.struct_contracts
+            .entry(remap_nominal_def(*def))
+            .or_default()
+            .extend(
+                contracts
+                    .iter()
+                    .map(|contract| remap_nominal_def(*contract)),
+            );
+    }
     for (def, fields) in &source.optional_struct_fields {
         let dest = remap_nominal_def(*def);
         out.optional_struct_fields.entry(dest).or_default().extend(
@@ -885,6 +913,11 @@ pub(super) fn lower_package_units<'a>(
                 &mut consumer_launch_entries,
             );
         }
+        source_rewrites.extend(imported_method_source_rewrites(
+            &unit.analysis,
+            &unit_path,
+            &links.method_targets,
+        ));
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse, kernel_lowering)?;
         // Remap from the post-lowering table: lowering appends runtime and
         // diagnostic text (format templates, the lockstep length-mismatch
@@ -1391,7 +1424,21 @@ pub(super) fn lower_package_units<'a>(
             &mut consumer_launch_entries,
         );
     }
+    // The entry's own definitions are never source-rewritten, but a contract
+    // dispatch arm calls an imported method by its consumer-local identity.
+    let entry_method_rewrites: SourceRewrites =
+        imported_method_source_rewrites(&entry.analysis, &entry_path, &links.method_targets)
+            .into_iter()
+            .collect();
     let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse, kernel_lowering)?;
+    if !entry_method_rewrites.is_empty() {
+        merged = rewrite_lowered_program_sources(
+            merged,
+            &entry_path,
+            &entry_method_rewrites,
+            &entry_path,
+        )?;
+    }
     ensure_unique_definition_sources(merged.validated.program(), &entry_path)?;
     // Generic limes templates from future library units are already offered
     // to the incremental linker below. Make their portable policy sites
@@ -2624,6 +2671,34 @@ fn remap_lowered_program_text_symbols<'a>(
     lowered.validated = radix_mir::ValidatedMir::new(program, context)
         .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
     Ok(lowered)
+}
+
+/// Consumer-local identities of imported sibling struct methods, each paired
+/// with the linked definition the call rewrite resolves the same
+/// `(struct, method)` to.
+///
+/// A method call through a contract-typed value lowers one dispatch arm per
+/// implementor, against the identity the importing analysis allocated for the
+/// method. The HIR call rewrite never sees those arms (the receiver is a
+/// contract, not a struct), so the link names the linked definition here and
+/// the unit's source rewrite applies it to the lowered program.
+fn imported_method_source_rewrites(
+    analysis: &radix_module::driver::AnalyzedModule,
+    unit_path: &Path,
+    method_targets: &HashMap<PathBuf, HashMap<(DefId, String), DefId>>,
+) -> Vec<((PathBuf, DefId), DefId)> {
+    let Some(targets) = method_targets.get(unit_path) else {
+        return Vec::new();
+    };
+    analysis
+        .resolver
+        .imported_file_method_identities()
+        .into_iter()
+        .filter_map(|(method_def, owner_def, _, _, name)| {
+            let linked = targets.get(&(owner_def, analysis.interner.resolve(name).to_owned()))?;
+            Some(((unit_path.to_path_buf(), method_def), *linked))
+        })
+        .collect()
 }
 
 fn rewrite_lowered_program_sources<'a>(

@@ -656,6 +656,8 @@ impl<'a> LoweringContextMaps<'a> {
             }
         }
 
+        self.record_imported_struct_contracts(unit);
+
         // A direct single-file MIR route has no sibling body to link for an
         // imported nominal method. Preserve the typed method surface as a
         // provider call instead of sending it to the generic unsupported-method
@@ -681,6 +683,104 @@ impl<'a> LoweringContextMaps<'a> {
                 }
             }
         }
+    }
+
+    /// Register the declared conformance of imported structs the way
+    /// `record_struct_item` does for the unit's own: the validator admits an
+    /// imported struct into a slot typed by a contract its declaration names.
+    ///
+    /// A method call through the contract dispatches over its implementors, so
+    /// an implementor joins that list only when its method targets resolve. A
+    /// struct imported from a sibling source module under package identity
+    /// context qualifies: each of its methods is registered by its
+    /// consumer-local identity, which the package link rewrites to the linked
+    /// definition. Every other imported implementor stays out, so a contract
+    /// call keeps dispatching over the implementors it can actually reach.
+    fn record_imported_struct_contracts(&mut self, unit: AnalyzedModuleApplicationView<'_>) {
+        let mut contracts = unit.resolver.imported_struct_contracts();
+        if contracts.is_empty() {
+            return;
+        }
+        contracts.sort_by_key(|(def_id, _)| def_id.0);
+        for (def_id, declared) in &contracts {
+            self.validation
+                .struct_contracts
+                .entry(*def_id)
+                .or_default()
+                .extend(declared.iter().map(|contract| contract.contract));
+        }
+        let Some(package_identities) = unit.package_import_identities else {
+            return;
+        };
+        for item in &unit.hir.items {
+            let HirItemKind::Import(import) = &item.kind else {
+                continue;
+            };
+            for import_item in &import.items {
+                if !package_identities
+                    .imports
+                    .contains_key(self.interner.resolve(import_item.name))
+                {
+                    continue;
+                }
+                let binding = import_item.alias.unwrap_or(import_item.name);
+                for (def_id, _, methods, type_params) in unit.resolver.imported_file_structs_for_namespace(binding) {
+                    let Some((_, declared)) = contracts.iter().find(|(def, _)| *def == def_id) else {
+                        continue;
+                    };
+                    // Generic implementors are not lowered across modules.
+                    if !type_params.is_empty() {
+                        continue;
+                    }
+                    let Some(receiver_ty) = self.validation.types.find_struct(def_id) else {
+                        continue;
+                    };
+                    for method in &methods {
+                        self.record_imported_method_target(def_id, receiver_ty, method);
+                    }
+                    for contract in declared {
+                        let implementors = self
+                            .interface_implementors
+                            .entry(contract.contract)
+                            .or_default();
+                        if !implementors.contains(&(def_id, receiver_ty)) {
+                            implementors.push((def_id, receiver_ty));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Register one imported struct method as a call target under its
+    /// consumer-local identity, with the signature validation checks the call
+    /// against (`record_method_item` does the same for a unit's own method).
+    fn record_imported_method_target(
+        &mut self,
+        owner_def_id: DefId,
+        receiver_ty: TypeId,
+        method: &radix_semantic::scope::ImportedFileInterfaceMethod,
+    ) {
+        let target = MethodTarget { def_id: method.def_id };
+        self.method_targets
+            .insert((owner_def_id, method.name), target);
+        self.method_targets
+            .insert((owner_def_id, method.surface_name), target);
+        if let Some(err_ty) = method.sig.err {
+            self.function_errors
+                .insert(method.def_id, MirType::semantic(err_ty));
+        }
+        self.validation.method_defs.insert(method.def_id);
+        let params = std::iter::once(HirParamSignatureProxy { ty: receiver_ty, optional: false }).chain(
+            method
+                .sig
+                .params
+                .iter()
+                .map(|param| HirParamSignatureProxy { ty: param.ty, optional: param.optional }),
+        );
+        self.validation
+            .functions
+            .insert(method.def_id, function_signature(params, method.sig.ret, method.sig.err));
     }
 
     /// Record imported nominal members so a qualified type test can recover its

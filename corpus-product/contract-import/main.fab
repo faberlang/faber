@@ -1,0 +1,14 @@
+# A contract-typed argument across modules: `shapes.Circle` names
+# `shapes.Figurable` in its `implements` clause, so it is assignable to a
+# parameter typed by that contract, and `f.draw()` dispatches to `Circle`.
+
+import from "./shapes"
+
+fn render(shapes.Figurable f) → string {
+    return f.draw()
+}
+
+main {
+    const shapes.Circle c ← shapes.Circle { radius = 25 }
+    print render(c)
+}
