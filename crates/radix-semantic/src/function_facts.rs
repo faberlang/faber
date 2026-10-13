@@ -609,9 +609,15 @@ impl ClosureCaptureCollector {
             .filter_map(|(def_id, used_at)| {
                 let declared_at = declared.get(&def_id).copied().unwrap_or(0);
                 (used_at > declared_at).then(|| {
-                    let mode = if deepest_move.get(&def_id).is_some_and(|at| *at > declared_at) {
+                    let mode = if deepest_move
+                        .get(&def_id)
+                        .is_some_and(|at| *at > declared_at)
+                    {
                         CaptureMode::Consume
-                    } else if deepest_write.get(&def_id).is_some_and(|at| *at > declared_at) {
+                    } else if deepest_write
+                        .get(&def_id)
+                        .is_some_and(|at| *at > declared_at)
+                    {
                         CaptureMode::Mutate
                     } else {
                         CaptureMode::Read

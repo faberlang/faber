@@ -4227,8 +4227,7 @@ impl FunctionBuilder<'_> {
             Type::Array(element) => matches!(self.normalized_type(*element), Type::Bits(radix_types::BitsWidth::B8)),
             _ => false,
         };
-        octeti_source
-            && self.body_index_contains_runtime_extent(*shape, &mut FxHashSet::default(), true)
+        octeti_source && self.body_index_contains_runtime_extent(*shape, &mut FxHashSet::default(), true)
     }
 
     /// The shape operand of [`Self::is_octeti_runtime_extent_tensor`]: the
@@ -4245,8 +4244,7 @@ impl FunctionBuilder<'_> {
         // byte source carries no shape and the runner cannot read a run-time
         // shape from the target type. Only this path resolves witnessed
         // parameters as run-time extents.
-        let shape =
-            self.lower_lista_to_tensor_shape_with_expression(source, target, None, span, true)?;
+        let shape = self.lower_lista_to_tensor_shape_with_expression(source, target, None, span, true)?;
         let shape_ty = MirType::semantic(lista_numerus_type(self.types)?);
         Some((shape, shape_ty))
     }
@@ -4351,29 +4349,29 @@ impl FunctionBuilder<'_> {
                                 &mut FxHashSet::default(),
                                 witnessed_size_params,
                             ) {
-                                    let mut shape_arguments = Vec::new();
-                                    let expression = match self.lower_shape_expr(
-                                        dimension,
-                                        &mut shape_arguments,
-                                        expression_value,
-                                        ShapeRelationBoundary::FunctionEntry,
-                                        0,
-                                    ) {
-                                        Ok(expression) => expression,
-                                        Err(message) => {
-                                            self.errors.push(MirError::unsupported(span, message));
-                                            return None;
-                                        }
-                                    };
-                                    self.runtime_call_value(
-                                        MirIntrinsic::TensorShapeSize(expression),
-                                        shape_arguments,
-                                        MirType::semantic(self.types.primitive(Primitive::Fractus)),
-                                        span,
-                                    )
-                                } else {
-                                    MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis_id) })
+                                let mut shape_arguments = Vec::new();
+                                let expression = match self.lower_shape_expr(
+                                    dimension,
+                                    &mut shape_arguments,
+                                    expression_value,
+                                    ShapeRelationBoundary::FunctionEntry,
+                                    0,
+                                ) {
+                                    Ok(expression) => expression,
+                                    Err(message) => {
+                                        self.errors.push(MirError::unsupported(span, message));
+                                        return None;
+                                    }
                                 };
+                                self.runtime_call_value(
+                                    MirIntrinsic::TensorShapeSize(expression),
+                                    shape_arguments,
+                                    MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                                    span,
+                                )
+                            } else {
+                                MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis_id) })
+                            };
                             let numerus = self.types.primitive(Primitive::Numerus);
                             self.runtime_call_value(
                                 MirIntrinsic::Convert(MirConversion {

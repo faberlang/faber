@@ -597,7 +597,10 @@ incipit { }
 "#,
         "outer",
     );
-    assert!(captures.is_empty(), "only is local to the closure: {captures:?}");
+    assert!(
+        captures.is_empty(),
+        "only is local to the closure: {captures:?}"
+    );
 }
 
 #[test]
@@ -640,7 +643,11 @@ incipit {
     let hir = fixture.result.hir.as_ref().expect("typed HIR");
     let table = analyze_function_facts(hir, &fixture.result.types);
     let entry = table.entry.as_ref().expect("entry fact row");
-    assert!(entry.captures.is_empty(), "entry captures: {:?}", entry.captures);
+    assert!(
+        entry.captures.is_empty(),
+        "entry captures: {:?}",
+        entry.captures
+    );
 }
 
 #[test]
