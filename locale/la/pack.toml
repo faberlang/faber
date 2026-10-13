@@ -1,3 +1,7 @@
+# Authority: the installed la pack (this file) is authoritative for the la
+# locale. The operator ruled it so (need, definition-gate disposition
+# 494a345c). This is a record of that ruling, not a language change; the pack
+# file is the only documentation surface the pack has, so the record lives here.
 [pack]
 id = "la"
 schema_version = 1

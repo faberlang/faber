@@ -590,8 +590,8 @@ A sized numeric type is written as its **bare width marker** (not a user type pa
 | Family | Markers | Invalid example |
 | ------ | ------- | --------------- |
 | `modulus<W>` | `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, and `inf` (the same type as `inf`) | `modulus<f32>` or `modulus<d64>` → a modular word takes an integer width |
-| `saturatus<W>` | the same eight integer widths, and `inf` (the same type as `inf`) | `saturatus<f32>` → use `f32` |
-| `exactus<W>` | the eight integer widths, `d64`, and `inf` | `exactus<f32>` → the trapping float cell is not built (`trapping_float_not_implemented`) |
+| `saturatus<W>` | the same eight integer widths, the float widths `f16`, `bf16`, `f32` and `f64`, and `inf` (the same type as `inf`) | `saturatus<d64>` → a decimal takes only the trapping policy |
+| `exactus<W>` | the eight integer widths, `d64`, the float widths `f16`, `bf16`, `f32` and `f64`, and `inf` | none: every width marker is valid; a float cell checks only where a non-finite value is stored or converted into it |
 
 Bare `numerus` / `fractus` remain shorthand for `i64` / `f64`.
 The bare marker (`i32`, `f32`, `d64`, `inf`) is the canonical spelling of a sized
@@ -702,9 +702,17 @@ en `trapping<W>`, `wrapping<W>`, `saturating<W>`; la `exactus<W>`, `modulus<W>`,
 **Shipped (N7a, N7e):** the trapping policy word (`exactus<W>` / en
 `trapping<W>`, integer widths and `d64`), bare markers in every type position,
 and signed widths on `modulus<W>` — `wrapping<i8>` reduces into the signed
-range, so `100 + 100` stored into it is −56. **Admitted, not shipped:** the
-float cells (`exactus<f32>` is rejected as `trapping_float_not_implemented`;
-`modulus` and `saturatus` take no float width). **Shipped (N7c/N7d):** the
+range, so `100 + 100` stored into it is −56. **Shipped (float cells,
+2026-10-01):** `saturating<F>` and `trapping<F>` (la `saturatus<F>`,
+`exactus<F>`) over `f16`, `bf16`, `f32` and `f64`, each its own type. A float
+cell follows its container: the policy applies where a value lands in the cell,
+never inside an expression, and no operation traps. A bare float and
+`saturating<F>` behave alike under IEEE: an overflow gives ±infinity, NaN
+propagates, and nothing clamps to the largest finite value. Only `trapping<F>`
+errors, and only when a non-finite value is stored or converted into it.
+`modulus<F>` (en `wrapping<F>`) is still rejected: a modular word takes an
+integer width. The trapping float cell is not available on device targets.
+**Shipped (N7c/N7d):** the
 retirement of the long forms: the canonical emitter writes the bare marker and
 the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with
 `numeric_wrapper_retired`; the policy words keep their `<W>`.
@@ -1941,7 +1949,6 @@ typing, and lowering work is complete; each row records that state.
 | --------- | ----- |
 | `fac omnia { … } cape e { … }` (en `do all`) | admitted (FLD K1); `fac omnia` is `PARSE001` |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
-| `trapping`/`saturating`/`wrapping` float cells | ruled (D11.8); pending. The retirement of `numerus<W>`/`fractus<W>` shipped (N7c/N7d) |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |
 | Slash-delimited regex literals | pending; use `"…" ↦ regex` |
