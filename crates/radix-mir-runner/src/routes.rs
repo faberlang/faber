@@ -56,10 +56,34 @@ fn opener_args(opener: &Value) -> Vec<Value> {
 }
 
 fn opener_leaf_args(opener: &Value) -> Vec<Arg> {
+    if let Some(bytes) = unsigned_byte_list(opener) {
+        return vec![Arg::Bytes(bytes)];
+    }
     match opener {
         Value::Array(items) => items.borrow().iter().filter_map(value_to_arg).collect(),
         Value::Unit | Value::Nil => Vec::new(),
         other => value_to_arg(other).into_iter().collect(),
+    }
+}
+
+/// A whole-opener `lista<b8>`: a non-empty list of unsigned bit patterns
+/// below 256.
+///
+/// WHY: it is one byte argument, not one positional argument per byte. `UInt`
+/// has no scalar leaf form, so flattening it positionally drops every element
+/// and the leaf reports `missing data`.
+fn unsigned_byte_list(opener: &Value) -> Option<Vec<u8>> {
+    let Value::Array(items) = opener else {
+        return None;
+    };
+    let all_unsigned = {
+        let items = items.borrow();
+        !items.is_empty() && items.iter().all(|item| matches!(item, Value::UInt(_)))
+    };
+    if all_unsigned {
+        octeti_bytes(opener)
+    } else {
+        None
     }
 }
 
@@ -161,3 +185,7 @@ fn reply_to_value(reply: Reply) -> Option<Value> {
         )))),
     }
 }
+
+#[cfg(test)]
+#[path = "routes_test.rs"]
+mod tests;
