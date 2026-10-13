@@ -4,7 +4,7 @@
 //! The reader pack looks a row up by `(code, issue)`. A slug with no row falls
 //! back to the code's base text with a `[locale pack missing row: ...]` suffix,
 //! so `faber check --diagnostics` loses the specific message. The gate scans the
-//! production sources of this crate for slug literals in the three emission
+//! production sources of this crate for slug literals in the four emission
 //! shapes the passes use and fails with the slugs that no `en` row names.
 
 use std::collections::BTreeSet;
@@ -44,6 +44,22 @@ fn leading_slug(text: &str) -> Option<&str> {
     .then_some(slug)
 }
 
+/// The slug of a `reject_with_arg(span, "slug", ...)` call, given the text
+/// after its opening paren: the first string literal after the span argument,
+/// which may sit on a later line.
+fn reject_with_arg_slug(call_rest: &str) -> Option<&str> {
+    let mut depth = 0usize;
+    for (at, ch) in call_rest.char_indices() {
+        match ch {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth = depth.checked_sub(1)?,
+            ',' if depth == 0 => return leading_slug(&call_rest[at + 1..]),
+            _ => {}
+        }
+    }
+    None
+}
+
 fn emitted_issue_slugs(source: &str) -> BTreeSet<String> {
     let mut slugs = BTreeSet::new();
     let lines: Vec<&str> = source.lines().collect();
@@ -72,6 +88,13 @@ fn emitted_issue_slugs(source: &str) -> BTreeSet<String> {
             if let Some(slug) = leading_slug(&line[at + "undefined_member(".len()..]) {
                 slugs.insert(slug.to_owned());
             }
+        }
+    }
+    // `reject_with_arg(span, "slug", "name", value)`; the arguments usually sit
+    // on their own lines, so this shape reads the whole source, not one line.
+    for (at, _) in source.match_indices("reject_with_arg(") {
+        if let Some(slug) = reject_with_arg_slug(&source[at + "reject_with_arg(".len()..]) {
+            slugs.insert(slug.to_owned());
         }
     }
     slugs
@@ -122,10 +145,50 @@ fn every_emitted_semantic_issue_slug_has_an_en_message_row() {
     );
 }
 
-/// `tensor_method_receiver` is emitted through `reject_with_arg`, a shape the
-/// slug scan above does not see, so the catalog arm needs its own proof: an
-/// issue with no `air_purity_reason` arm leaves the help renderer at its
-/// fallthrough and the diagnostic loses its baseline help.
+#[test]
+fn scanner_reads_the_slug_of_a_one_line_reject_with_arg_call() {
+    let source = r#"self.reject_with_arg(span, "some_slug", "method", &method);"#;
+    assert_eq!(
+        emitted_issue_slugs(source),
+        BTreeSet::from(["some_slug".to_owned()])
+    );
+}
+
+#[test]
+fn scanner_reads_the_slug_of_a_split_reject_with_arg_call() {
+    let source = r#"
+        self.reject_with_arg(
+            expr.span,
+            "split_slug",
+            "causa",
+            "not_bounded",
+        );
+    "#;
+    assert_eq!(
+        emitted_issue_slugs(source),
+        BTreeSet::from(["split_slug".to_owned()])
+    );
+}
+
+#[test]
+fn scanner_skips_the_reject_with_arg_definition() {
+    let source = r#"
+    fn reject_with_arg(
+        &mut self,
+        span: Span,
+        issue: &'static str,
+        name: &'static str,
+        value: impl Into<String>,
+    ) {
+    }
+    "#;
+    assert!(emitted_issue_slugs(source).is_empty());
+}
+
+/// The slug scan above covers the `en` row for `tensor_method_receiver`; the
+/// catalog arm still needs its own proof: an issue with no
+/// `air_purity_reason` arm leaves the help renderer at its fallthrough and the
+/// diagnostic loses its baseline help.
 #[test]
 fn air_purity_tensor_method_receiver_issue_renders_through_the_catalog() {
     let args = [
