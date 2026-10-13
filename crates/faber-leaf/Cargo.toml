@@ -15,6 +15,10 @@ rustls-pemfile = "2.2.0"
 tungstenite = { version = "0.26.2", default-features = false, features = ["handshake"] }
 webpki-roots = "1.0.9"
 
+# Process CPU time (`tempus:activum`): `clock_gettime` on Unix hosts.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # Local lints: this crate is also a path dependency of standalone
 # `runtime/rust`, which is not the radix workspace.
 [lints.clippy]

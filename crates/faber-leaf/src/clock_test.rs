@@ -43,6 +43,36 @@ fn active_is_non_negative() {
     }
 }
 
+fn active_nanos() -> i64 {
+    match serve("tempus:activum", &[])
+        .expect("route")
+        .expect("active")
+    {
+        Reply::Int(n) => n,
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+/// A host that reports 0 forever passes the non-negative test; this one
+/// fails it. Burns CPU until the process clock moves.
+#[cfg(unix)]
+#[test]
+fn active_advances_under_cpu_work() {
+    let start = active_nanos();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let mut acc = 0_u64;
+    while active_nanos() <= start {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "process CPU time did not advance"
+        );
+        for i in 0..200_000_u64 {
+            acc = std::hint::black_box(acc.wrapping_mul(31).wrapping_add(i));
+        }
+    }
+    assert!(start > 0, "a running test process has used CPU time");
+}
+
 #[test]
 fn sleep_rejects_negative_ms() {
     let error = serve("tempus:dormiet", &[Arg::Int(-1)])

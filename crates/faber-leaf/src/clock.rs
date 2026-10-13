@@ -1,9 +1,9 @@
 //! Blocking clock leaf. Serves Latin `tempus:*` routes.
 //!
 //! Civil datetime is pure Faber. `interval` stays N4b (cursor return).
-//! `tempus:activum` is process CPU time on Linux (`/proc/self/stat` utime+stime
-//! at 100 Hz → nanoseconds). Other hosts return 0; that is not a wall-clock
-//! substitute.
+//! `tempus:activum` is process CPU time in nanoseconds: on Unix hosts
+//! `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)`. A host without that clock
+//! returns 0; that is not a wall-clock substitute.
 
 #[cfg(test)]
 #[path = "clock_test.rs"]
@@ -14,10 +14,6 @@ use crate::value::{Arg, Reply};
 use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-
-/// Assumed Linux `CLK_TCK` when converting `/proc/self/stat` ticks to ns.
-#[cfg(target_os = "linux")]
-const LINUX_CLK_TCK: i64 = 100;
 
 static MONOTONIC_ORIGIN: OnceLock<Instant> = OnceLock::new();
 
@@ -107,28 +103,34 @@ fn active(args: &[Arg]) -> Result<Reply, LeafError> {
 }
 
 fn process_cpu_nanos() -> i64 {
-    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     {
-        linux_process_cpu_nanos().unwrap_or(0)
+        unix_process_cpu_nanos().unwrap_or(0)
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(unix))]
     {
         0
     }
 }
 
-#[cfg(target_os = "linux")]
-fn linux_process_cpu_nanos() -> Option<i64> {
-    let text = std::fs::read_to_string("/proc/self/stat").ok()?;
-    let after = text.rsplit_once(')')?.1;
-    let mut fields = after.split_whitespace();
-    // After `)`: ppid … minflt cminflt majflt cmajflt utime stime
-    for _ in 0..11 {
-        fields.next()?;
+// `time_t` and `c_long` are 32-bit on some Unix hosts, so the widening is
+// real there and a no-op on 64-bit ones.
+#[cfg(unix)]
+#[allow(clippy::useless_conversion)]
+fn unix_process_cpu_nanos() -> Option<i64> {
+    let mut spec = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: `spec` is a valid, writable `timespec` for the whole call, and
+    // `clock_gettime` writes nothing else.
+    let status = unsafe { libc::clock_gettime(libc::CLOCK_PROCESS_CPUTIME_ID, &raw mut spec) };
+    if status != 0 {
+        return None;
     }
-    let utime = fields.next()?.parse::<i64>().ok()?;
-    let stime = fields.next()?.parse::<i64>().ok()?;
-    Some(utime.saturating_add(stime).saturating_mul(1_000_000_000) / LINUX_CLK_TCK)
+    let seconds = i64::from(spec.tv_sec);
+    let nanos = i64::from(spec.tv_nsec);
+    Some(seconds.saturating_mul(1_000_000_000).saturating_add(nanos))
 }
 
 fn sleep(args: &[Arg], is_cancelled: &dyn Fn() -> bool) -> Result<Reply, LeafError> {
