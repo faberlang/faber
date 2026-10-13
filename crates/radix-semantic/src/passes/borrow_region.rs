@@ -195,15 +195,14 @@ pub fn reduce(
         let mut returned_borrow = ReturnedBorrowProvenance::None;
         let mut required_regions: Vec<RegionRelationship> = Vec::new();
         if returns_borrow {
-            let mut returns = Vec::new();
-            collect_returns(body, &mut returns);
+            let returns = collect_returns(body);
             if regions.is_none() && !returns.is_empty() {
                 // The engine did not run (or rejected the CFG): a required
                 // provenance summary is absent, not merely unmatched.
                 return Err(ProvenanceError::Unavailable { function: def_id });
             }
-            for expr in returns {
-                let Some(root) = root_def_id(expr) else {
+            for root in returns {
+                let Some(root) = root else {
                     return Err(ProvenanceError::Incoherent { function: def_id });
                 };
                 if let Some(region) = regions.and_then(|facts| facts.region_for(root)) {
@@ -304,11 +303,35 @@ fn functions_with_bodies(
     out
 }
 
-fn collect_returns<'h>(block: &'h HirBlock, out: &mut Vec<&'h HirExpression>) {
-    for statement in &block.statements {
+/// Root definition of every `redde value` in the function body, including
+/// those nested in `si`, `custodi`, loops, and handlers. `None` marks a
+/// returned value with no definition root.
+///
+/// WHY: a closure's `redde` returns from the closure, not the function, so
+/// closure bodies are not entered.
+fn collect_returns(block: &HirBlock) -> Vec<Option<DefId>> {
+    let mut collector = ReturnCollector { roots: Vec::new() };
+    collector.visit_block(block);
+    collector.roots
+}
+
+struct ReturnCollector {
+    roots: Vec<Option<DefId>>,
+}
+
+impl HirVisitor for ReturnCollector {
+    fn visit_stmt(&mut self, statement: &HirStatement) {
         if let HirStatementKind::Redde(Some(value)) = &statement.kind {
-            out.push(value);
+            self.roots.push(root_def_id(value));
         }
+        walk_stmt(self, statement);
+    }
+
+    fn visit_expr(&mut self, expression: &HirExpression) {
+        if matches!(expression.kind, HirExpressionKind::Clausura(..)) {
+            return;
+        }
+        walk_expr(self, expression);
     }
 }
 

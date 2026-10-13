@@ -880,3 +880,59 @@ fn tensor_receiver_view_methods_still_escape() {
         );
     }
 }
+
+// ── A-08: `redde` nested in control flow reaches the provenance reduction ───
+
+#[test]
+fn borrow_return_only_inside_si_carries_parameter_provenance() {
+    let (_regions, table, hir) = reduced(
+        r"
+functio eadem(bivalens b, de lista<numerus> xs) → de lista<numerus> {
+    si b {
+        redde xs
+    } secus {
+        redde xs
+    }
+}
+incipit { }
+",
+    );
+    let row = table.get(first_function_def(&hir)).expect("row");
+    let param = match &hir.items[0].kind {
+        radix_hir::HirItemKind::Function(function) => function.params[1].def_id,
+        _ => panic!("function item"),
+    };
+    assert_eq!(
+        row.returned_borrow,
+        radix_types::ReturnedBorrowProvenance::Parameter(param)
+    );
+}
+
+#[test]
+fn nested_borrow_return_with_differing_provenance_is_incoherent() {
+    let result = analyze_source(
+        r"
+functio mixta(bivalens b, lista<numerus> xs, lista<numerus> ys) → in lista<numerus> {
+    varia in lista<numerus> a ← xs
+    varia in lista<numerus> c ← ys
+    si b {
+        redde a
+    }
+    redde c
+}
+incipit { }
+",
+    );
+    let hir = result
+        .hir
+        .as_ref()
+        .unwrap_or_else(|| panic!("analysis must succeed: {:?}", result.diagnostics));
+    let access_facts = result.access_facts.as_ref().expect("access facts");
+    let regions = borrow_region::analyze(hir, &result.types, access_facts).expect("regions");
+    let error = borrow_region::reduce(hir, &result.types, Some(&regions))
+        .expect_err("the nested return disagrees with the top-level return");
+    assert!(matches!(
+        error,
+        borrow_region::ProvenanceError::Incoherent { .. }
+    ));
+}
