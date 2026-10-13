@@ -675,17 +675,15 @@ impl<'a> DerivedCapabilityQueries<'a> {
             }
             Type::Struct(_) | Type::Enum(_) => {
                 visiting.push(ty);
-                let result = self
-                    .nominal_field_types(ty)
-                    .and_then(|fields| {
-                        let mut holds = true;
-                        for field in &fields {
-                            if !self.type_law(*field, law, visiting)? {
-                                holds = false;
-                            }
+                let result = self.nominal_field_types(ty).and_then(|fields| {
+                    let mut holds = true;
+                    for field in &fields {
+                        if !self.type_law(*field, law, visiting)? {
+                            holds = false;
                         }
-                        Ok(holds)
-                    });
+                    }
+                    Ok(holds)
+                });
                 visiting.pop();
                 result
             }
@@ -844,14 +842,12 @@ impl<'a> DerivedCapabilityQueries<'a> {
             }
             Type::Struct(_) | Type::Enum(_) => {
                 visiting.push(ty);
-                let result = self
-                    .nominal_field_types(ty)
-                    .and_then(|fields| {
-                        for field in fields {
-                            self.solved_identity(field, visiting, identity)?;
-                        }
-                        Ok(())
-                    });
+                let result = self.nominal_field_types(ty).and_then(|fields| {
+                    for field in fields {
+                        self.solved_identity(field, visiting, identity)?;
+                    }
+                    Ok(())
+                });
                 visiting.pop();
                 result
             }

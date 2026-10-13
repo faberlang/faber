@@ -145,7 +145,10 @@ fn latin_scaffold_carries_word_type_rows() {
     assert_eq!(pack.type_latin_key("exactus"), Some("exactus"));
     assert_eq!(pack.type_latin_key("octetus"), Some("octetus"));
     assert_eq!(pack.type_surface(TypeBindingKind::ModularWord), "modulus_t");
-    assert_eq!(pack.type_surface(TypeBindingKind::SaturatingWord), "saturatus");
+    assert_eq!(
+        pack.type_surface(TypeBindingKind::SaturatingWord),
+        "saturatus"
+    );
 }
 
 #[test]

@@ -1984,10 +1984,7 @@ fn additive_mask_softmax_resolves_row_reduction_contract() {
         .expect("additive-mask softmax carries a dispatch contract");
     assert_eq!(
         contract,
-        CollectionOpContract::RowReduction {
-            rows: 8,
-            width: 64
-        },
+        CollectionOpContract::RowReduction { rows: 8, width: 64 },
         "the additive-mask twin must resolve the row-reduction contract"
     );
 }

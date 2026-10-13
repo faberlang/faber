@@ -1560,9 +1560,7 @@ fn gate_module_versions(module: &Value) -> Result<(), MsgpackError> {
     };
     let manifest = named_field(module_entries, "unit_schema_version")?
         .as_u64()
-        .ok_or_else(|| {
-            MsgpackError::Decode("unit_schema_version must be a uint".to_string())
-        })?;
+        .ok_or_else(|| MsgpackError::Decode("unit_schema_version must be a uint".to_string()))?;
     if manifest != u64::from(SCHEMA_VERSION) {
         return Err(MsgpackError::InvalidPackage(
             FhirPackageError::UnsupportedUnitSchemaVersion {
@@ -1582,9 +1580,7 @@ fn gate_module_versions(module: &Value) -> Result<(), MsgpackError> {
     };
     let unit_version = named_field(unit_entries, "schema_version")?
         .as_u64()
-        .ok_or_else(|| {
-            MsgpackError::Decode("unit schema_version must be a uint".to_string())
-        })?;
+        .ok_or_else(|| MsgpackError::Decode("unit schema_version must be a uint".to_string()))?;
     if unit_version != u64::from(SCHEMA_VERSION) {
         return Err(MsgpackError::InvalidPackage(
             FhirPackageError::UnsupportedUnitSchemaVersion {

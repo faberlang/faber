@@ -311,7 +311,14 @@ macro_rules! intrinsic {
         )
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, $mir:ident) => {
-        intrinsic_row!($receiver, $name, $args, $params, $ret, IntrinsicMirKind::$mir)
+        intrinsic_row!(
+            $receiver,
+            $name,
+            $args,
+            $params,
+            $ret,
+            IntrinsicMirKind::$mir
+        )
     };
 }
 
