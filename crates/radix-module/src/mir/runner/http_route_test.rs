@@ -137,25 +137,36 @@ fn sse_events_are_chunk_framed_through_open_chunk_finish() {
 
 #[test]
 fn bind_limited_refuses_an_oversize_body() {
+    const POST: &[u8] = b"POST /big HTTP/1.1\r\nHost: localhost\r\nContent-Length: 9\r\n\r\n123456789";
     let port = free_port();
     let body = format!(
         "{}  print \"unreachable\"",
         serve_prelude(&format!("{port} ↦ value, 4 ↦ value"))
     );
-    let reply = client(
-        port,
-        b"POST /big HTTP/1.1\r\nHost: localhost\r\nContent-Length: 9\r\n\r\n123456789",
-    );
+    let reply = client(port, POST);
     let mut host = BufferHost::default();
     let errors =
         run_host("http-limit.fab", &program(&body), &mut host).expect_err("accept must refuse the oversize body");
-    assert!(
-        errors[0].message.contains("max_body_bytes")
-            || errors
-                .iter()
-                .any(|error| error.message.contains("max_body_bytes")),
-        "{errors:?}"
-    );
+    assert_eq!(errors[0].issue, "runner_sermo_reply_conversion_failed", "{errors:?}");
     assert!(host.stdout_lines.is_empty());
     assert_eq!(reply.join().expect("client"), "", "a refused body gets no response");
+
+    // WHY: the runner error carries only the leaf's frame text, not its kind or
+    // the limit, so the ceiling is proved the cause by contrast: the same
+    // request is served once the ceiling fits the body.
+    let port = free_port();
+    let body = format!(
+        "{}  const list<value> headers ← []\n  \
+         const list<value> args ← [id ↦ value, 200 ↦ value, headers ↦ value, \"fits\" ↦ value]\n  \
+         const void r1 ← call 'http:respond' (args) ↦ void\n  \
+         const void r2 ← call 'http:stop' (handle) ↦ void",
+        serve_prelude(&format!("{port} ↦ value, 16 ↦ value"))
+    );
+    let reply = client(port, POST);
+    let mut host = BufferHost::default();
+    run_host("http-limit-fits.fab", &program(&body), &mut host)
+        .unwrap_or_else(|errors| panic!("a body within the ceiling should be served: {errors:?}"));
+    let reply = reply.join().expect("client");
+    assert!(reply.starts_with("HTTP/1.1 200 OK\r\n"), "{reply}");
+    assert!(reply.ends_with("\r\n\r\nfits"), "{reply}");
 }

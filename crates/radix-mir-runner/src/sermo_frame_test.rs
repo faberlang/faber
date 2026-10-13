@@ -158,8 +158,16 @@ fn failed_leaf_reply_raises_the_leaf_error_text() {
         .sermo_first_item(&sermo, Span::default())
         .expect_err("a failed leaf reply must raise");
 
-    assert_eq!(error.message, expected);
+    // WHY: the leaf's own Display text is the ruled message of this error
+    // (both runtimes print it), and the error carries it only as its message.
+    // Comparing the whole error against the conversion error built by the same
+    // constructor pins the text together with code, issue, args and span.
+    let want = RunnerError {
+        message: expected.clone(),
+        ..RunnerError::conversion(Span::default(), "sermo reply conversion failed")
+    };
+    assert_eq!(error, want);
     assert_eq!(error.issue, "runner_sermo_reply_conversion_failed");
-    assert!(error.message.contains(ROUTE), "{}", error.message);
-    assert!(error.message.contains(PATH), "{}", error.message);
+    assert!(expected.contains(ROUTE), "{expected}");
+    assert!(expected.contains(PATH), "{expected}");
 }
