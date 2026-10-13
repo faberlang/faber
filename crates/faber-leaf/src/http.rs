@@ -251,6 +251,14 @@ fn headers_from_arg(arg: &Arg) -> Result<Vec<(String, String)>, LeafError> {
     }
 }
 
+/// Headers argument or none at `index`; absent means no headers.
+fn optional_headers(args: &[Arg], index: usize) -> Result<Vec<(String, String)>, LeafError> {
+    match args.get(index) {
+        Some(arg) => headers_from_arg(arg),
+        None => Ok(Vec::new()),
+    }
+}
+
 fn body_from_arg(arg: &Arg) -> Vec<u8> {
     match arg {
         Arg::Str(text) => text.as_bytes().to_vec(),
@@ -314,10 +322,7 @@ fn generic(args: &[Arg], open: bool) -> Result<Reply, LeafError> {
     };
     let method = expect_str("http:request", args, offset, "method")?;
     let url = expect_str("http:request", args, offset + 1, "url")?;
-    let headers = match args.get(offset + 2) {
-        Some(arg) => headers_from_arg(arg)?,
-        None => Vec::new(),
-    };
+    let headers = optional_headers(args, offset + 2)?;
     let body = args.get(offset + 3).map(body_from_arg).unwrap_or_default();
     exchange(
         &ClientOpener {
@@ -342,34 +347,25 @@ fn parse_client_args(
     };
     let url = expect_str("http:request", args, offset, "url")?.to_owned();
     if has_body {
-        return match args.get(offset + 1) {
-            Some(Arg::List(_) | Arg::Map(_) | Arg::Strs(_)) => Ok(ClientOpener {
-                agent,
-                method: method.to_owned(),
-                url,
-                headers: headers_from_arg(&args[offset + 1])?,
-                body: args.get(offset + 2).map(body_from_arg).unwrap_or_default(),
-            }),
-            Some(other) => Ok(ClientOpener {
-                agent,
-                method: method.to_owned(),
-                url,
-                headers: Vec::new(),
-                body: body_from_arg(other),
-            }),
-            None => Ok(ClientOpener {
-                agent,
-                method: method.to_owned(),
-                url,
-                headers: Vec::new(),
-                body: Vec::new(),
-            }),
+        // Body calls are `[url, headers?, body?]`; a non-header second slot is
+        // the body itself, so the positional body shifts one slot later.
+        let (headers, body) = match args.get(offset + 1) {
+            Some(arg @ (Arg::List(_) | Arg::Map(_) | Arg::Strs(_))) => (
+                headers_from_arg(arg)?,
+                args.get(offset + 2).map(body_from_arg).unwrap_or_default(),
+            ),
+            Some(other) => (Vec::new(), body_from_arg(other)),
+            None => (Vec::new(), Vec::new()),
         };
+        return Ok(ClientOpener {
+            agent,
+            method: method.to_owned(),
+            url,
+            headers,
+            body,
+        });
     }
-    let headers = match args.get(offset + 1) {
-        Some(arg) => headers_from_arg(arg)?,
-        None => Vec::new(),
-    };
+    let headers = optional_headers(args, offset + 1)?;
     Ok(ClientOpener {
         agent,
         method: method.to_owned(),
@@ -499,24 +495,23 @@ fn read_chunk(args: &[Arg]) -> Result<Reply, LeafError> {
         Some(Arg::Int(value)) if *value > 0 => usize::try_from(*value).unwrap_or(65_536),
         _ => 65_536,
     };
-    let handle = with_handles(|map| match map.remove(&id) {
-        Some(handle @ Handle::Reader { .. }) => Ok(handle),
-        Some(other) => {
-            map.insert(id, other);
-            Err(LeafError::invalid_argument(ROUTE, "id is not a reader"))
-        }
-        None => Err(LeafError::closed(ROUTE, "reader closed")),
-    })?;
-    let Handle::Reader {
-        mut stream,
-        mut leftover,
-        mut remaining,
-        chunked,
-        mut done,
-    } = handle
-    else {
-        return Err(LeafError::invalid_argument(ROUTE, "id is not a reader"));
-    };
+    // The map lookup filtered for `Handle::Reader`; the insert-back arm keeps
+    // every other handle kind in place under its id.
+    let (mut stream, mut leftover, mut remaining, chunked, mut done) =
+        with_handles(|map| match map.remove(&id) {
+            Some(Handle::Reader {
+                stream,
+                leftover,
+                remaining,
+                chunked,
+                done,
+            }) => Ok((stream, leftover, remaining, chunked, done)),
+            Some(other) => {
+                map.insert(id, other);
+                Err(LeafError::invalid_argument(ROUTE, "id is not a reader"))
+            }
+            None => Err(LeafError::closed(ROUTE, "reader closed")),
+        })?;
     if done {
         with_handles(|map| {
             map.insert(
@@ -621,13 +616,7 @@ fn fill_reader(
                 Ok(n) => {
                     leftover.extend_from_slice(&buf[..n]);
                 }
-                Err(err)
-                    if err.kind() == std::io::ErrorKind::UnexpectedEof
-                        || err.kind() == std::io::ErrorKind::ConnectionReset
-                        || err.kind() == std::io::ErrorKind::BrokenPipe =>
-                {
-                    *done = true;
-                }
+                Err(err) if is_conn_reset(&err) => *done = true,
                 Err(err) => return Err(LeafError::from_io("http:read", "", &err)),
             }
             continue;
@@ -641,6 +630,17 @@ fn fill_reader(
         take_leftover(leftover, remaining.as_deref_mut(), max - out.len(), out);
     }
     Ok(())
+}
+
+/// Whether this I/O error means the peer went away mid-stream; reading past a
+/// closed peer ends the message instead of raising.
+fn is_conn_reset(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::UnexpectedEof
+            | std::io::ErrorKind::ConnectionReset
+            | std::io::ErrorKind::BrokenPipe
+    )
 }
 
 fn is_peer_closed(err: &LeafError) -> bool {
@@ -659,13 +659,7 @@ fn read_byte(stream: &mut IoStream, pending: &mut Vec<u8>) -> Result<Option<u8>,
     match stream.read(&mut byte) {
         Ok(0) => Ok(None),
         Ok(_) => Ok(Some(byte[0])),
-        Err(err)
-            if err.kind() == std::io::ErrorKind::UnexpectedEof
-                || err.kind() == std::io::ErrorKind::ConnectionReset
-                || err.kind() == std::io::ErrorKind::BrokenPipe =>
-        {
-            Ok(None)
-        }
+        Err(err) if is_conn_reset(&err) => Ok(None),
         Err(err) => Err(LeafError::from_io("http:read", "", &err)),
     }
 }
@@ -770,19 +764,14 @@ fn listen(args: &[Arg], tls: bool) -> Result<Reply, LeafError> {
             max_body = usize::try_from(*value).unwrap_or(DEFAULT_MAX_BODY);
         }
     } else {
-        match args.get(1) {
-            Some(Arg::Str(value)) => host = value,
-            Some(Arg::Int(value)) => {
-                max_body = usize::try_from(*value).unwrap_or(DEFAULT_MAX_BODY);
+        for index in [1, 2] {
+            match args.get(index) {
+                Some(Arg::Str(value)) => host = value,
+                Some(Arg::Int(value)) => {
+                    max_body = usize::try_from(*value).unwrap_or(DEFAULT_MAX_BODY);
+                }
+                _ => {}
             }
-            _ => {}
-        }
-        match args.get(2) {
-            Some(Arg::Str(value)) => host = value,
-            Some(Arg::Int(value)) => {
-                max_body = usize::try_from(*value).unwrap_or(DEFAULT_MAX_BODY);
-            }
-            _ => {}
         }
     }
     let listener = TcpListener::bind((host, u16::try_from(port).unwrap_or(0)))
@@ -804,7 +793,7 @@ fn listen(args: &[Arg], tls: bool) -> Result<Reply, LeafError> {
 fn accept(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "http:accept";
     let id = expect_int(ROUTE, args, 0, "handle")?;
-    let pending = with_handles(|map| match map.get(&id) {
+    let (listener, max_body, tls) = with_handles(|map| match map.get(&id) {
         Some(Handle::Listener {
             listener,
             max_body,
@@ -816,7 +805,6 @@ fn accept(args: &[Arg]) -> Result<Reply, LeafError> {
         Some(_) => Err(LeafError::invalid_argument(ROUTE, "id is not a listener")),
         None => Err(LeafError::closed(ROUTE, "listener closed")),
     })?;
-    let (listener, max_body, tls) = pending;
     let (tcp, _) = listener
         .accept()
         .map_err(|err| LeafError::from_io(ROUTE, "", &err))?;
@@ -866,10 +854,7 @@ fn respond(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "http:respond";
     let id = expect_str(ROUTE, args, 0, "id")?;
     let status = expect_int(ROUTE, args, 1, "status")?;
-    let headers = match args.get(2) {
-        Some(arg) => headers_from_arg(arg)?,
-        None => Vec::new(),
-    };
+    let headers = optional_headers(args, 2)?;
     let body = args.get(3).map(body_from_arg).unwrap_or_default();
     let mut slot = take_request(id, ROUTE)?;
     write_response(&mut slot.stream, status, &headers, Some(&body), false)?;
@@ -880,10 +865,7 @@ fn respond_open(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "http:respond_open";
     let id = expect_str(ROUTE, args, 0, "id")?;
     let status = expect_int(ROUTE, args, 1, "status")?;
-    let headers = match args.get(2) {
-        Some(arg) => headers_from_arg(arg)?,
-        None => Vec::new(),
-    };
+    let headers = optional_headers(args, 2)?;
     let slot = take_request(id, ROUTE)?;
     let mut stream = slot.stream;
     write_response(&mut stream, status, &headers, None, true)?;
@@ -1171,17 +1153,8 @@ fn read_chunked_body(
     let mut pending = leftover;
     let mut body = Vec::new();
     loop {
-        if !pending.contains(&b'\n') {
-            let mut scratch = [0_u8; 1024];
-            let n = stream
-                .read(&mut scratch)
-                .map_err(|err| LeafError::from_io("http:accept", "", &err))?;
-            if n == 0 {
-                break;
-            }
-            pending.extend_from_slice(&scratch[..n]);
-            continue;
-        }
+        // A chunk-size line is only parseable once its closing `\r\n` has
+        // arrived; anything shorter reads more bytes.
         let Some(end) = pending.windows(2).position(|window| window == b"\r\n") else {
             let mut scratch = [0_u8; 1024];
             let n = stream

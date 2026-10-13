@@ -1797,7 +1797,7 @@ impl Resolver {
             };
             let name = interner.intern(&method.name);
             let surface_name = interner.intern(
-                projected_member_names(locale_pack, identity, Some(owner), kind, &method.name)
+                projected_surfaces
                     .first()
                     .map_or(method.name.as_str(), String::as_str),
             );
@@ -1822,6 +1822,11 @@ impl Resolver {
         identity: Option<InterfaceLibraryIdentity>,
     ) -> Result<ImportedFileExport, FileInterfaceError> {
         let name = interner.intern(&strukt.name);
+        let type_params: Vec<LexSymbol> = strukt
+            .params
+            .iter()
+            .map(|param| interner.intern(&param.name))
+            .collect();
         // Canonical duplicate-reuse: a second alias of the same module unifies
         // to one semantic type. Only for identity-bearing interfaces; without
         // identity the legacy name-keyed ambiguity guard must keep firing.
@@ -1834,11 +1839,7 @@ impl Resolver {
                 ty: existing_ty,
                 fields: Vec::new(),
                 methods: Vec::new(),
-                type_params: strukt
-                    .params
-                    .iter()
-                    .map(|param| interner.intern(&param.name))
-                    .collect(),
+                type_params,
             }));
         }
         let def_id = self.fresh_def_id();
@@ -1871,11 +1872,7 @@ impl Resolver {
             ty,
             fields: Vec::new(),
             methods: Vec::new(),
-            type_params: strukt
-                .params
-                .iter()
-                .map(|param| interner.intern(&param.name))
-                .collect(),
+            type_params,
         }))
     }
 
@@ -2667,18 +2664,24 @@ impl Resolver {
             })
     }
 
+    /// Flatten one imported struct export into the entry shape shared by the
+    /// `imported_file_structs*` readers.
+    fn imported_struct_entry(strukt: &ImportedFileStruct) -> ImportedFileStructEntry {
+        (
+            strukt.def_id,
+            strukt.fields.clone(),
+            strukt.methods.clone(),
+            strukt.type_params.clone(),
+        )
+    }
+
     #[must_use]
     pub fn imported_file_structs(&self) -> Vec<ImportedFileStructEntry> {
         self.file_interfaces
             .values()
             .flat_map(|interface| interface.exports.values())
             .filter_map(|export| match export {
-                ImportedFileExport::Struct(strukt) => Some((
-                    strukt.def_id,
-                    strukt.fields.clone(),
-                    strukt.methods.clone(),
-                    strukt.type_params.clone(),
-                )),
+                ImportedFileExport::Struct(strukt) => Some(Self::imported_struct_entry(strukt)),
                 ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
             })
             .collect()
@@ -2762,12 +2765,7 @@ impl Resolver {
             .into_iter()
             .flat_map(|interface| interface.exports.values())
             .filter_map(|export| match export {
-                ImportedFileExport::Struct(strukt) => Some((
-                    strukt.def_id,
-                    strukt.fields.clone(),
-                    strukt.methods.clone(),
-                    strukt.type_params.clone(),
-                )),
+                ImportedFileExport::Struct(strukt) => Some(Self::imported_struct_entry(strukt)),
                 ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
             })
             .collect()
@@ -2802,10 +2800,6 @@ impl Resolver {
             .collect()
     }
 
-    /// Consumer-side imported enum declarations with their variant metadata.
-    /// Enums install as `Type` exports; the variant metadata lives in the
-    /// resolver's `imported_enum_variants` table keyed by the consumer enum
-    /// `DefId`.
     /// Record `@ commune` fields for a union definition.
     pub fn register_commune_fields(&mut self, enum_def: DefId, fields: Vec<CommuneField>) {
         self.commune_fields.insert(enum_def, fields);
@@ -2959,6 +2953,10 @@ impl Resolver {
             .map(|symbol| symbol.name)
     }
 
+    /// Consumer-side imported enum declarations with their variant metadata.
+    /// Enums install as `Type` exports; the variant metadata lives in the
+    /// resolver's `imported_enum_variants` table keyed by the consumer enum
+    /// `DefId`.
     #[must_use]
     pub fn imported_file_enums(&self) -> Vec<(DefId, TypeId, Vec<ImportedEnumVariant>)> {
         self.file_interfaces
@@ -4060,55 +4058,14 @@ impl Resolver {
                 .map(|(kind, name)| (interface_nominal_kind_from_wire(kind), name))
                 .collect();
 
-        let global = Scope::new(ScopeId(0), None, ScopeKind::Global);
         Self {
-            scopes: vec![global],
-            symbols: FxHashMap::default(),
-            generic_param_kinds: FxHashMap::default(),
-            generic_param_descriptors: FxHashMap::default(),
-            current_scope: ScopeId(0),
-            next_def_id: USER_DEF_ID_BASE,
-            next_builtin_def_id: BUILTIN_DEF_ID_BASE,
-            builtin_forma_def_id: None,
-            builtin_forma_template_field: None,
-            builtin_forma_params_field: None,
-            builtin_scrinium_def_id: None,
-            builtin_scrinium_field_symbols: Vec::new(),
-            builtin_status_def_id: None,
-            builtin_sermo_def_id: None,
-            builtin_meus_def_id: None,
-            builtin_tuus_def_id: None,
-            imported_ad_routes: Vec::new(),
-            builtin_status_variants: Vec::new(),
-            variant_parents: FxHashMap::default(),
-            variants_by_parent_name: FxHashMap::default(),
-            variants_by_name: FxHashMap::default(),
-            gpu_builtins: FxHashMap::default(),
-            gpu_builtins_order: Vec::new(),
-            lookup_shadow: FxHashMap::default(),
-            name_suggestion_folds: RefCell::new(FxHashMap::default()),
             namespace_exports,
-            namespace_seams: FxHashMap::default(),
-            namespace_declarations: FxHashMap::default(),
             file_interfaces,
             imported_nominal_types,
             ambiguous_imported_nominal_types,
-            canonical_imported_nominal_types: FxHashMap::default(),
-            canonical_imported_nominal_defs: FxHashMap::default(),
-            imported_enum_variants: FxHashMap::default(),
-            commune_fields: FxHashMap::default(),
             conversion_rows,
-            imported_type_def_ids: FxHashSet::default(),
             used_namespaces,
-            schemas: FxHashMap::default(),
-            locale_pack_type_aliases: FxHashMap::default(),
-            shadowed_builtins: FxHashMap::default(),
-            scribe_family_surfaces: FxHashSet::default(),
-            tuple_element_labels: FxHashMap::default(),
-            selective_type_imports: FxHashMap::default(),
-            unavailable_bindings: FxHashMap::default(),
-            imported_contract_type_params: FxHashMap::default(),
-            imported_contract_roles: FxHashMap::default(),
+            ..Self::new()
         }
     }
 

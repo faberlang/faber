@@ -92,8 +92,6 @@ pub struct Stmt {
     pub leading_trivia: Vec<Trivia>,
 }
 
-pub type AnnotatedStmt = Stmt;
-
 /// Top-level and block-level statement forms recognized by the parser.
 ///
 /// Variants name grammar categories, not semantic classes. For example,
@@ -1788,11 +1786,6 @@ impl TypeFormLevel {
     pub const WRAPPING_INF: Self = Self(3);
     /// Explicit `saturating<inf>` / la `saturatus<inf>` head (see [`Self::WRAPPING_INF`]).
     pub const SATURATING_INF: Self = Self(4);
-
-    #[must_use]
-    pub fn is_short(self) -> bool {
-        self.0 == 1
-    }
 }
 
 #[derive(Debug, Clone)]

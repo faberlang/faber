@@ -167,27 +167,7 @@ pub(super) fn apply_tensor_intrinsic_shape_constraints(
             constrain_reshape_result_shape(checker, receiver_ty, result_shape, &args[0].expr, span);
         }
         TENSOR_SECTIO if args.len() >= 2 => {
-            let Some(input_shape) = tensor_shape_id(checker, receiver_ty) else {
-                return;
-            };
-            let (Some(start), Some(end)) = (
-                static_numerus_literal(&args[0].expr),
-                static_numerus_literal(&args[1].expr),
-            ) else {
-                return;
-            };
-            let step = match args.get(2) {
-                Some(step) => {
-                    let Some(step) = static_numerus_literal(&step.expr) else {
-                        return;
-                    };
-                    step
-                }
-                None => 1,
-            };
-            if let Some(output) = sectio_axis0_shape(checker, input_shape, start, end, step) {
-                checker.constrain_index_equal(result_shape, output, span);
-            }
+            constrain_sectio_result_shape(checker, receiver_ty, result_shape, args, span);
         }
         TENSOR_EXPANDE if args.len() == 1 => {
             constrain_expanded_result_shape(
@@ -240,6 +220,39 @@ pub(super) fn apply_tensor_intrinsic_shape_constraints(
             constrain_gather_result_shape(checker, receiver_ty, ids_ty, result_shape, span);
         }
         _ => {}
+    }
+}
+
+/// Axis-0 `sectio(start, end[, step])` result shape when the receiver rank and
+/// bounds are static. A non-literal bound or an empty/zero-step range leaves the
+/// result shape unconstrained.
+fn constrain_sectio_result_shape(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    result_shape: IndexId,
+    args: &[radix_hir::HirCallArg],
+    span: Span,
+) {
+    let Some(input_shape) = tensor_shape_id(checker, receiver_ty) else {
+        return;
+    };
+    let (Some(start), Some(end)) = (
+        static_numerus_literal(&args[0].expr),
+        static_numerus_literal(&args[1].expr),
+    ) else {
+        return;
+    };
+    let step = match args.get(2) {
+        Some(step) => {
+            let Some(step) = static_numerus_literal(&step.expr) else {
+                return;
+            };
+            step
+        }
+        None => 1,
+    };
+    if let Some(output) = sectio_axis0_shape(checker, input_shape, start, end, step) {
+        checker.constrain_index_equal(result_shape, output, span);
     }
 }
 
@@ -301,6 +314,22 @@ pub(super) fn constrain_glyph_matmul_result_shape(
     );
 }
 
+/// Destructure a resolved matmul operand shape as its dim tuple. A rank-agnostic
+/// shape (whole-shape param or hole) emits the caller's typed issue instead.
+fn matmul_operand_tuple(
+    checker: &mut TypeChecker<'_>,
+    resolved_shape: IndexId,
+    issue: &'static str,
+    span: Span,
+) -> Option<Vec<IndexId>> {
+    if let IndexExpr::Tuple(dims) = checker.types.get_index(resolved_shape) {
+        Some(dims.clone())
+    } else {
+        checker.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+        None
+    }
+}
+
 fn constrain_matmul_result_shape_with_rank1(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
@@ -317,25 +346,20 @@ fn constrain_matmul_result_shape_with_rank1(
     };
     let resolved_receiver = checker.resolve_index(receiver_shape);
     let resolved_arg = checker.resolve_index(arg_shape);
-    let receiver_tuple = if let IndexExpr::Tuple(dims) = checker.types.get_index(resolved_receiver)
-    {
-        dims.clone()
-    } else {
-        checker.error_issue(
-            SemanticErrorKind::TypeMismatch,
-            ISSUE_MATMUL_RECEIVER_SHAPE_MUST_BE_TUPLE,
-            span,
-        );
+    let Some(receiver_tuple) = matmul_operand_tuple(
+        checker,
+        resolved_receiver,
+        ISSUE_MATMUL_RECEIVER_SHAPE_MUST_BE_TUPLE,
+        span,
+    ) else {
         return;
     };
-    let arg_tuple = if let IndexExpr::Tuple(dims) = checker.types.get_index(resolved_arg) {
-        dims.clone()
-    } else {
-        checker.error_issue(
-            SemanticErrorKind::TypeMismatch,
-            ISSUE_MATMUL_ARGUMENT_SHAPE_MUST_BE_TUPLE,
-            span,
-        );
+    let Some(arg_tuple) = matmul_operand_tuple(
+        checker,
+        resolved_arg,
+        ISSUE_MATMUL_ARGUMENT_SHAPE_MUST_BE_TUPLE,
+        span,
+    ) else {
         return;
     };
     // U1 head-axis: a rank-3/4 receiver over a rank-2+ argument is the
@@ -527,8 +551,8 @@ fn constrain_transpose_result_shape(
 ///
 /// Reuses the broadcast constraint solver; element strict-equality is already
 /// enforced by the `TensorPeer` parameter resolution against the argument.
-/// Shared by the `addita` method and numeric tensor `+` so both surfaces
-/// publish the same `Figura'` and cannot diverge.
+/// This is the named elementwise method path only; the numeric `+` glyph
+/// enforces exact shape equality in `ops.rs` instead.
 pub(super) fn constrain_elementwise_result_shape(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
@@ -547,17 +571,13 @@ pub(super) fn constrain_elementwise_result_shape(
     }
 }
 
-fn tensor_parts(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<(TypeId, IndexId)> {
+fn tensor_shape_id(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<IndexId> {
     let resolved = checker.resolve_inferred_type(ty);
     let resolved = checker.types.peel_access_marker(resolved).1;
     match checker.types.get(resolved) {
-        Type::Tensor(elem, shape) => Some((*elem, *shape)),
+        Type::Tensor(_, shape) => Some(*shape),
         _ => None,
     }
-}
-
-fn tensor_shape_id(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<IndexId> {
-    tensor_parts(checker, ty).map(|(_, shape)| shape)
 }
 
 /// Conversion-row twin of the retired `from_flat` method form's flat-count
@@ -1214,13 +1234,7 @@ fn best_expanded_axis_mapping(
             let target_id = target[target_axis];
             let target_resolved = checker.resolve_index(target_id);
             let target_term = checker.types.get_index(target_resolved).clone();
-            let exact = source_resolved == target_resolved
-                || matches!((&source_term, &target_term),
-                    (IndexExpr::Literal(a), IndexExpr::Literal(b)) if a == b)
-                || matches!((&source_term, &target_term),
-                    (IndexExpr::Param(a), IndexExpr::Param(b)) if a == b)
-                || matches!((&source_term, &target_term),
-                    (IndexExpr::Runtime(a), IndexExpr::Runtime(b)) if a == b);
+            let exact = dimensions_provably_equal(checker, source_id, target_id);
             let stretched = !exact
                 && matches!(&source_term, IndexExpr::Literal(1))
                 && !matches!(&target_term, IndexExpr::Literal(1));

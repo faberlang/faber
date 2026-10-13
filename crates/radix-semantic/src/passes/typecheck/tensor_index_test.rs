@@ -737,6 +737,21 @@ nota "rankagnostic ok"
     );
 }
 
+#[test]
+fn tensor_matmul_rank_agnostic_argument_rejects() {
+    // A rank-2 receiver with a whole-shape argument has no argument tuple to
+    // contract; the argument rank check reports the typed issue.
+    rejects_with_issue(
+        r#"functio bad<magnitudo Figura>(tensor<f32, [2, 3]> a, tensor<f32, Figura> b) → tensor<f32, [2, 3]> {
+    redde a.matmul(b)
+}
+
+nota "rankagnostic argument ok"
+"#,
+        "matmul_argument_shape_must_be_tuple",
+    );
+}
+
 // --- U1 head-axis: batched rank-3/4 matmul admission (leading head axes) ---
 
 #[test]
