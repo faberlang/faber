@@ -2,8 +2,8 @@ use super::*;
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
     MirLayoutKind, MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace,
-    MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTerminator,
-    MirTerminatorKind, MirType, MirValidationContext,
+    MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTempId,
+    MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
@@ -1895,6 +1895,101 @@ fn projection_prefill_does_not_expand_when_step_has_many_rows() {
     };
     assert_eq!(seq, 10);
     assert_eq!(output_elements, 80, "logical 2*10*4=80, no GEMV expansion");
+}
+
+/// Rank-2 additive-mask softmax kernel: params `(scores, mask, out)`, the
+/// `TensorAdd(scores, mask)` temp the GEA2-U5e causal idiom lowers to, and
+/// one `TensorSoftmax(temp) → out`.
+fn additive_mask_softmax_function(types: &mut TypeTable, dims: [u64; 2]) -> MirFunction {
+    let scores_ty = rank2_ty(types, dims);
+    let out_ty = rank2_ty(types, dims);
+    let span = Span::default();
+    let param = |local: MirLocalId, ty: MirType| MirParam {
+        local,
+        name: None,
+        ty,
+        mode: MirParamMode::Owned,
+        span,
+    };
+    MirFunction {
+        id: MirFunctionId(0),
+        source: Some(DefId(12)),
+        name: None,
+        params: vec![
+            param(MirLocalId(0), scores_ty),
+            param(MirLocalId(1), scores_ty),
+            param(MirLocalId(2), out_ty),
+        ],
+        locals: Vec::new(),
+        temps: vec![MirTemp {
+            id: MirTempId(0),
+            ty: scores_ty,
+            span,
+        }],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::temp(MirTempId(0))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            ],
+                            return_ty: scores_ty,
+                        },
+                    },
+                    span,
+                },
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(2))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSoftmax),
+                            args: vec![MirOperand::Temp(MirTempId(0))],
+                            return_ty: out_ty,
+                        },
+                    },
+                    span,
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: out_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn additive_mask_softmax_resolves_row_reduction_contract() {
+    // PGC-R5 GEA2-U5e: a rank-2 softmax over an `(x + mask)` temp is the
+    // causal-masked row-reduction twin. The contract must resolve from the
+    // shared temp-aware `transformer_recipe_shape` facts (the ABI's local
+    // duplicate of that lookup was removed).
+    let mut types = TypeTable::new();
+    let function = additive_mask_softmax_function(&mut types, [8, 64]);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("additive-mask facts resolve")
+        .expect("additive-mask softmax carries a dispatch contract");
+    assert_eq!(
+        contract,
+        CollectionOpContract::RowReduction {
+            rows: 8,
+            width: 64
+        },
+        "the additive-mask twin must resolve the row-reduction contract"
+    );
 }
 
 // MLC-4: fail-closed sparse admission — a `DeviceView` carrying the sparse

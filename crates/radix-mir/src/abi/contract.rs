@@ -1,6 +1,6 @@
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirParam,
-    MirParamMode, MirPlace, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirTempId, MirType,
+    MirParamMode, MirPlace, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirTempId,
     MirValidationContext, MirValueKind,
 };
 use radix_lexer::Interner;
@@ -402,11 +402,10 @@ fn apply_filum_declaration_launch(
     let Some((lane_width, length)) = filum_declaration_launch_facts(function, validation)? else {
         return Ok(false);
     };
-    let partials = if lane_width == 0 {
+    if lane_width == 0 {
         return Err(MirAbiError::new("filum summa lane width must be non-zero"));
-    } else {
-        length.div_ceil(u64::from(lane_width))
-    };
+    }
+    let partials = length.div_ceil(u64::from(lane_width));
     signature.workgroup = MirWorkgroupSize {
         x: lane_width,
         y: 1,
@@ -943,69 +942,16 @@ fn row_reduction_contract(
     op: MirCollectionOp,
     admission: fn(u64, u64) -> Option<crate::kernel_plan::RowReductionFacts>,
 ) -> Option<CollectionOpContract> {
-    // PGC-R5: the additive-idiom softmax reads an elementwise TEMP
-    // (`(x + mask)`), whose type lives in the temps table — the shared
-    // `transformer_recipe_shape` resolves local operands only, so the dims
-    // come from the temp-aware lookup here (the emitters'
-    // `transformer_operand_dims` precedent).
-    let dims = match crate::kernel_plan::transformer_recipe_shape(function, validation, op) {
-        Some((dims, _)) => dims,
-        None if op == MirCollectionOp::TensorSoftmax => {
-            let args = function_temp_operand_args(function)?;
-            let ty = temp_operand_ty(function, &args[0])?;
-            crate::tensor_type::tensor_literal_dims(ty, validation).ok()?
-        }
-        None => return None,
-    };
+    // `transformer_recipe_shape` resolves the additive-idiom softmax's
+    // elementwise temp (`(x + mask)`) as well as a direct operand, so its
+    // dims are the row-reduction dims here.
+    let (dims, _) = crate::kernel_plan::transformer_recipe_shape(function, validation, op)?;
     if dims.len() != 2 {
         return None;
     }
     let (rows, width) = (dims[0], dims[1]);
     admission(rows, width)?;
     Some(CollectionOpContract::RowReduction { rows, width })
-}
-
-/// PGC-R5: the `TensorSoftmax` statement's args (the additive-idiom twin's
-/// operand scan — same shape as the plan pass's `transformer_statement_args`).
-fn function_temp_operand_args(function: &MirFunction) -> Option<&[MirOperand]> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement)
-                != Some(MirCollectionOp::TensorSoftmax)
-            {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall {
-                call: MirRuntimeCall { args, .. },
-                ..
-            } = &statement.kind
-            else {
-                continue;
-            };
-            return Some(args);
-        }
-    }
-    None
-}
-
-/// PGC-R5: the type of a temp-referencing operand (the temps table lookup
-/// the local-only `operand_local_ty` cannot do).
-fn temp_operand_ty(function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
-    let temp = match operand {
-        MirOperand::Temp(temp) => *temp,
-        MirOperand::Place(place) => match place.base {
-            MirPlaceBase::Temp(temp) => temp,
-            MirPlaceBase::Local(local) => {
-                return crate::local_ty::local_ty(function, local);
-            }
-        },
-        _ => return None,
-    };
-    function
-        .temps
-        .iter()
-        .find(|entry| entry.id == temp)
-        .map(|entry| entry.ty)
 }
 
 /// PGC-R5: whether a `TensorMax`/`TensorMin` destination is dead — the
