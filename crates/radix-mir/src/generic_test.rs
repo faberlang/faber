@@ -1415,3 +1415,75 @@ fn function_sig_binder_binds_matching_modifiers() {
         Some(numerus)
     );
 }
+
+#[test]
+fn ledger_instantiation_finds_interned() {
+    // A-107: an already-interned Ledger must resolve through
+    // ExistingTypeIndex; without a (Ledger, Ledger) arm in
+    // type_matches_candidate the read-only walk reports the concrete type as
+    // missing.
+    let mut types = TypeTable::new();
+    let key = types.primitive(Primitive::Textus);
+    let value = types.primitive(Primitive::Numerus);
+    let interned = types.intern(Type::Ledger(key, value));
+
+    let value_param = types.intern(Type::Param(Symbol(60)));
+    let generic = types.intern(Type::Ledger(key, value_param));
+    let mut bindings = MirGenericBindings::default();
+    bindings.insert(Symbol(60), MirType::semantic(value));
+
+    let resolved = instantiate_existing_generic_type(
+        &types,
+        MirType::semantic(generic),
+        &bindings,
+        Span::default(),
+    )
+    .expect("generic Ledger instantiation must resolve against the interned type");
+    assert_eq!(resolved.semantic_id(), interned);
+}
+
+/// `(param) -> numerus` with an explicit `sponte` flag on the one parameter.
+fn sponte_func_sig(param: TypeId, ret: TypeId, sponte: bool) -> FuncSig {
+    let mut sig = func_sig(param, ret, false, false);
+    sig.params[0].sponte = sponte;
+    sig
+}
+
+#[test]
+fn existing_type_index_does_not_match_sponte_twin() {
+    // A-108: a candidate signature that differs from an interned one only in
+    // `sponte` is a different type (TypeTable::equals compares it); the
+    // full-scan fallback must not return the interned twin.
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let sponte_twin = types.intern(Type::Func(sponte_func_sig(numerus, numerus, true)));
+    let index = ExistingTypeIndex::build(&types);
+
+    let plain = Type::Func(sponte_func_sig(numerus, numerus, false));
+    assert_eq!(index.find(&types, &plain), None);
+    let exact = Type::Func(sponte_func_sig(numerus, numerus, true));
+    assert_eq!(index.find(&types, &exact), Some(sponte_twin));
+}
+
+#[test]
+fn function_sig_binder_rejects_sponte_mismatch() {
+    // A-108: the witness binder compares mode and optional but not sponte,
+    // so a sponte slot would bind against a plain one.
+    let mut types = TypeTable::new();
+    let param = types.intern(Type::Param(Symbol(61)));
+    let numerus = types.primitive(Primitive::Numerus);
+    let expected = sponte_func_sig(param, numerus, true);
+    let actual = sponte_func_sig(numerus, numerus, false);
+    let mut generic_bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    let mut seen = FxHashSet::default();
+
+    assert!(!try_bind_function_signature(
+        &types,
+        &expected,
+        &actual,
+        &mut generic_bindings,
+        &mut shape_bindings,
+        &mut seen,
+    ));
+}

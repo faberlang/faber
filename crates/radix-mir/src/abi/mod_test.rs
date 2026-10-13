@@ -3,7 +3,8 @@ use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
     MirLayoutKind, MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace,
     MirRuntimeCall, MirScalarLayout, MirStatement, MirStatementKind, MirTemp, MirTempId,
-    MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
+    MirTerminator, MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueId,
+    MirValueKind,
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
@@ -2088,4 +2089,87 @@ fn single_lane_form_synthesizes_a_one_lane_signature() {
         (1, 1, 1)
     );
     assert!(signature.runtime_extent().is_none());
+}
+
+/// `TensorMax` into temp 0, a dead-local copy `_1 ← %0`, then `second_reader`
+/// as the temp's only other consumer. Local 1 is neither a param nor read.
+fn tensor_max_temp_with_second_reader(second_reader: MirStatementKind) -> MirFunction {
+    let ty = MirType::semantic(TypeId(0));
+    let span = Span::default();
+    let mut function = scalar_kernel_function(ty);
+    function.temps.push(MirTemp {
+        id: MirTempId(0),
+        ty,
+        span,
+    });
+    function.locals.push(MirLocal {
+        id: MirLocalId(1),
+        name: None,
+        ty,
+        mutable: false,
+        span,
+    });
+    function.blocks[0].statements = vec![
+        MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: Some(MirPlace::temp(MirTempId(0))),
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMax),
+                    args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                    return_ty: ty,
+                },
+            },
+            span,
+        },
+        MirStatement {
+            kind: MirStatementKind::Assign {
+                place: MirPlace::local(MirLocalId(1)),
+                value: MirValue {
+                    id: MirValueId(0),
+                    kind: MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+                    ty,
+                    span,
+                },
+            },
+            span,
+        },
+        MirStatement {
+            kind: second_reader,
+            span,
+        },
+    ];
+    function
+}
+
+#[test]
+fn stability_max_with_dead_copy_and_runtime_call_reader_is_live() {
+    // A-102: the temp is copied into a dead local AND consumed directly by a
+    // runtime call. The copy alone would classify the reduction dead; the
+    // second reader keeps it live.
+    let ty = MirType::semantic(TypeId(0));
+    let function = tensor_max_temp_with_second_reader(MirStatementKind::RuntimeCall {
+        destination: None,
+        call: MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+            args: vec![MirOperand::Temp(MirTempId(0))],
+            return_ty: ty,
+        },
+    });
+    assert!(!stability_max_is_dead(&function));
+}
+
+#[test]
+fn stability_max_with_only_dead_copy_reader_is_dead() {
+    // Control: the same body with the second reader replaced by an unrelated
+    // call keeps the original dead classification.
+    let ty = MirType::semantic(TypeId(0));
+    let function = tensor_max_temp_with_second_reader(MirStatementKind::RuntimeCall {
+        destination: None,
+        call: MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(MirCollectionOp::Sum),
+            args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+            return_ty: ty,
+        },
+    });
+    assert!(stability_max_is_dead(&function));
 }

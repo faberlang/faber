@@ -970,43 +970,39 @@ fn reduction_destination_is_dead(function: &MirFunction, destination: &MirPlace)
     match destination.base {
         MirPlaceBase::Local(local) => local_is_dead(&local),
         MirPlaceBase::Temp(temp) => {
-            // Every reader of the temp must be a pure copy into a dead
-            // local; any other reader keeps the reduction live.
+            // Every reader of the temp — in any statement or terminator,
+            // by the shared slot-level read analysis — must be a pure copy
+            // into a dead local; any other reader keeps the reduction live.
+            let reads_temp = |slots: Vec<MirPlaceBase>| {
+                slots
+                    .iter()
+                    .any(|slot| matches!(slot, MirPlaceBase::Temp(read) if *read == temp))
+            };
             let mut saw_reader = false;
-            let mut all_dead_copies = true;
             for block in &function.blocks {
                 for statement in &block.statements {
-                    let MirStatementKind::Assign { place, value, .. } = &statement.kind else {
-                        continue;
-                    };
-                    let reads_temp = matches!(
-                        &value.kind,
-                        MirValueKind::Operand(source)
-                            if matches!(
-                                (source, &place.base),
-                                (MirOperand::Temp(read), _)
-                                    if read == &temp
-                            ) || matches!(
-                                (source, &place.base),
-                                (MirOperand::Place(source_place), _)
-                                    if matches!(source_place.base, MirPlaceBase::Temp(read) if read == temp)
-                            )
-                    );
-                    if !reads_temp {
+                    if !reads_temp(crate::read_analysis::statement_read_slots(statement)) {
                         continue;
                     }
                     saw_reader = true;
                     // A pure copy: the whole value is exactly the temp read.
-                    let is_pure_copy = matches!(&value.kind, MirValueKind::Operand(_));
-                    match (is_pure_copy, &place.base) {
-                        (true, MirPlaceBase::Local(local)) => {
-                            all_dead_copies &= local_is_dead(local);
-                        }
-                        _ => all_dead_copies = false,
+                    let is_dead_copy = matches!(
+                        &statement.kind,
+                        MirStatementKind::Assign { place, value, .. }
+                            if matches!(value.kind, MirValueKind::Operand(_))
+                                && matches!(place.base, MirPlaceBase::Local(local) if local_is_dead(&local))
+                    );
+                    if !is_dead_copy {
+                        return false;
                     }
                 }
+                if reads_temp(crate::read_analysis::terminator_read_slots(
+                    &block.terminator.kind,
+                )) {
+                    return false;
+                }
             }
-            saw_reader && all_dead_copies
+            saw_reader
         }
     }
 }

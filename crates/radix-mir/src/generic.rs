@@ -597,6 +597,7 @@ fn try_bind_function_signature(
             .all(|(expected_param, actual_param)| {
                 expected_param.mode == actual_param.mode
                     && expected_param.optional == actual_param.optional
+                    && expected_param.sponte == actual_param.sponte
                     && try_bind_generic_type_witness(
                         types,
                         expected_param.ty,
@@ -1591,7 +1592,9 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         (Type::Primitive(a), Type::Primitive(b)) => a == b,
         (Type::SizedNumeric(ap, aw), Type::SizedNumeric(bp, bw)) => ap == bp && aw == bw,
         (Type::SizedInstans(a), Type::SizedInstans(b)) => a == b,
-        (Type::Map(ak, av), Type::Map(bk, bv)) => types.equals(*ak, *bk) && types.equals(*av, *bv),
+        (Type::Map(ak, av), Type::Map(bk, bv)) | (Type::Ledger(ak, av), Type::Ledger(bk, bv)) => {
+            types.equals(*ak, *bk) && types.equals(*av, *bv)
+        }
         (Type::Record(a), Type::Record(b)) => {
             a.len() == b.len()
                 && a.iter()
@@ -1717,6 +1720,7 @@ fn function_signature_matches(types: &TypeTable, a: &FuncSig, b: &FuncSig) -> bo
             .all(|(a_param, b_param)| {
                 a_param.mode == b_param.mode
                     && a_param.optional == b_param.optional
+                    && a_param.sponte == b_param.sponte
                     && types.equals(a_param.ty, b_param.ty)
             })
         && types.equals(a.ret, b.ret)
