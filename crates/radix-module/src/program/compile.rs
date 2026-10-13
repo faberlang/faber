@@ -199,18 +199,9 @@ pub fn compile_cli_input_with_library_bindings(
     if resolve_package_mode(&path, package) {
         return compile_cli_input_with_locale_pack(input, package, target, code_pack, output_mode, module_name);
     }
-    let source = match std::fs::read_to_string(&path) {
-        Ok(source) => source,
-        Err(err) => {
-            return crate::CompileResult {
-                output: None,
-                diagnostics: vec![
-                    crate::Diagnostic::io_error(&path, &err)
-                        .with_code("IO001")
-                        .with_arg("issue", "source_read_failed"),
-                ],
-            };
-        }
+    let source = match read_input_source(input) {
+        Ok((_name, source)) => source,
+        Err(diagnostic) => return crate::CompileResult { output: None, diagnostics: vec![diagnostic] },
     };
     let session = crate::driver::Session::new(config_for_target(target, code_pack, output_mode, module_name, false));
     match prepare_program_module_with_bindings(&path, &source, &session, Some(library_bindings)) {
@@ -1787,30 +1778,143 @@ fn file_export_from_stmt(
     ctx: &SnapshotContext,
 ) -> Option<FileExport> {
     match &stmt.kind {
-        StmtKind::Func(decl) => {
-            let name = interner.resolve(decl.name.name).to_owned();
-            let type_params: Vec<String> = decl
+        StmtKind::Func(decl) => func_export_from_stmt(stmt, decl, interner, nominal_kinds, ctx),
+        StmtKind::Class(decl) => class_export_from_stmt(stmt, decl, interner, nominal_kinds, ctx),
+        StmtKind::Enum(decl) => enum_export_from_stmt(decl, interner, ctx),
+        StmtKind::Union(decl) => union_export_from_stmt(decl, interner, nominal_kinds, ctx),
+        StmtKind::Interface(decl) => interface_export_from_stmt(stmt, decl, interner, nominal_kinds, ctx),
+        StmtKind::TypeAlias(decl) => type_alias_export_from_stmt(decl, interner, nominal_kinds, ctx),
+        StmtKind::Var(var) => var_export_from_stmt(var, interner, nominal_kinds, ctx),
+        _ => None,
+    }
+}
+
+fn func_export_from_stmt(
+    stmt: &Stmt,
+    decl: &crate::syntax::FuncDecl,
+    interner: &crate::lexer::Interner,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<FileExport> {
+    let name = interner.resolve(decl.name.name).to_owned();
+    let type_param_names: BTreeSet<&str> = decl
+        .type_params
+        .iter()
+        .map(|tp| interner.resolve(tp.name.name))
+        .collect();
+    let callable_type_params =
+        interface_callable_params(&decl.type_params, interner, &type_param_names, nominal_kinds, ctx)?;
+    let mut params = Vec::new();
+    for param in &decl.params {
+        params.push(InterfaceParam {
+            ty: interface_type_from_type_expr(&param.ty, interner, &type_param_names, nominal_kinds, ctx)?,
+            mode: semantic_param_mode(param.mode),
+            optional: param.sponte || param.default.is_some(),
+            sponte: param.sponte,
+        });
+    }
+    let ret = match &decl.ret {
+        Some(ret) => interface_type_from_type_expr(ret, interner, &type_param_names, nominal_kinds, ctx)?,
+        None => InterfaceTypeSnapshot::Primitive(Primitive::Vacuum),
+    };
+    let err = match &decl.err {
+        Some(err_ty) => Some(Box::new(interface_type_from_type_expr(
+            err_ty,
+            interner,
+            &type_param_names,
+            nominal_kinds,
+            ctx,
+        )?)),
+        None => None,
+    };
+    let is_async =
+        decl.posture.is_async() || annotations_include_callable_family(&stmt.annotations, interner, "futura");
+    let is_generator =
+        decl.posture.is_stream() || annotations_include_callable_family(&stmt.annotations, interner, "cursor");
+    let device = device_contract_from_stmt(stmt, decl, interner);
+    Some(FileExport {
+        name,
+        kind: FileExportKind::Function(InterfaceCallable {
+            type_params: callable_type_params,
+            params,
+            ret: Box::new(ret),
+            err,
+            is_async,
+            is_generator,
+            tensor_edge_policy_requirements: Vec::new(),
+            device,
+        }),
+    })
+}
+
+fn class_export_from_stmt(
+    stmt: &Stmt,
+    decl: &ClassDecl,
+    interner: &crate::lexer::Interner,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<FileExport> {
+    let name = interner.resolve(decl.name.name).to_owned();
+    let no_params = BTreeSet::new();
+    let fields = decl
+        .members
+        .iter()
+        .filter_map(|member| {
+            let ClassMemberKind::Field(field) = &member.kind else {
+                return None;
+            };
+            Some(InterfaceStructField {
+                name: interner.resolve(field.name.name).to_owned(),
+                ty: interface_type_from_type_expr(&field.ty, interner, &no_params, nominal_kinds, ctx)?,
+                optional: field.sponte,
+                required: !field.sponte && field.init.is_none(),
+                default: None,
+                modifier: field.modifier,
+                visibility: member_visibility(&member.annotations, interner),
+            })
+        })
+        .collect::<Vec<_>>();
+    let methods = decl
+        .members
+        .iter()
+        .filter_map(|member| {
+            let ClassMemberKind::Method(method) = &member.kind else {
+                return None;
+            };
+            let type_param_names: BTreeSet<&str> = method
                 .type_params
                 .iter()
-                .map(|tp| interner.resolve(tp.name.name).to_owned())
+                .map(|tp| interner.resolve(tp.name.name))
                 .collect();
-            let type_param_names: BTreeSet<&str> = type_params.iter().map(String::as_str).collect();
-            let callable_type_params =
-                interface_callable_params(&decl.type_params, interner, &type_param_names, nominal_kinds, ctx)?;
+            let callable_type_params = interface_callable_params(
+                &method.type_params,
+                interner,
+                &type_param_names,
+                nominal_kinds,
+                ctx,
+            )?;
             let mut params = Vec::new();
-            for param in &decl.params {
+            for param in &method.params {
                 params.push(InterfaceParam {
-                    ty: interface_type_from_type_expr(&param.ty, interner, &type_param_names, nominal_kinds, ctx)?,
+                    ty: interface_type_from_type_expr(
+                        &param.ty,
+                        interner,
+                        &type_param_names,
+                        nominal_kinds,
+                        ctx,
+                    )?,
                     mode: semantic_param_mode(param.mode),
                     optional: param.sponte || param.default.is_some(),
                     sponte: param.sponte,
                 });
             }
-            let ret = match &decl.ret {
-                Some(ret) => interface_type_from_type_expr(ret, interner, &type_param_names, nominal_kinds, ctx)?,
+            let ret = match &method.ret {
+                Some(ret) => {
+                    interface_type_from_type_expr(ret, interner, &type_param_names, nominal_kinds, ctx)?
+                }
                 None => InterfaceTypeSnapshot::Primitive(Primitive::Vacuum),
             };
-            let err = match &decl.err {
+            let err = match &method.err {
                 Some(err_ty) => Some(Box::new(interface_type_from_type_expr(
                     err_ty,
                     interner,
@@ -1820,14 +1924,13 @@ fn file_export_from_stmt(
                 )?)),
                 None => None,
             };
-            let is_async =
-                decl.posture.is_async() || annotations_include_callable_family(&stmt.annotations, interner, "futura");
-            let is_generator =
-                decl.posture.is_stream() || annotations_include_callable_family(&stmt.annotations, interner, "cursor");
-            let device = device_contract_from_stmt(stmt, decl, interner);
-            Some(FileExport {
-                name,
-                kind: FileExportKind::Function(InterfaceCallable {
+            let is_async = method.posture.is_async()
+                || annotations_include_callable_family(&member.annotations, interner, "futura");
+            let is_generator = method.posture.is_stream()
+                || annotations_include_callable_family(&member.annotations, interner, "cursor");
+            Some(InterfaceMethodExport {
+                name: interner.resolve(method.name.name).to_owned(),
+                callable: InterfaceCallable {
                     type_params: callable_type_params,
                     params,
                     ret: Box::new(ret),
@@ -1835,204 +1938,101 @@ fn file_export_from_stmt(
                     is_async,
                     is_generator,
                     tensor_edge_policy_requirements: Vec::new(),
-                    device,
-                }),
-            })
-        }
-        StmtKind::Class(decl) => {
-            let name = interner.resolve(decl.name.name).to_owned();
-            let no_params = BTreeSet::new();
-            let fields = decl
-                .members
-                .iter()
-                .filter_map(|member| {
-                    let ClassMemberKind::Field(field) = &member.kind else {
-                        return None;
-                    };
-                    Some(InterfaceStructField {
-                        name: interner.resolve(field.name.name).to_owned(),
-                        ty: interface_type_from_type_expr(&field.ty, interner, &no_params, nominal_kinds, ctx)?,
-                        optional: field.sponte,
-                        required: !field.sponte && field.init.is_none(),
-                        default: None,
-                        modifier: field.modifier,
-                        visibility: member_visibility(&member.annotations, interner),
-                    })
-                })
-                .collect::<Vec<_>>();
-            let methods = decl
-                .members
-                .iter()
-                .filter_map(|member| {
-                    let ClassMemberKind::Method(method) = &member.kind else {
-                        return None;
-                    };
-                    let type_params: Vec<String> = method
-                        .type_params
-                        .iter()
-                        .map(|tp| interner.resolve(tp.name.name).to_owned())
-                        .collect();
-                    let type_param_names: BTreeSet<&str> = type_params.iter().map(String::as_str).collect();
-                    let callable_type_params = interface_callable_params(
-                        &method.type_params,
-                        interner,
-                        &type_param_names,
-                        nominal_kinds,
-                        ctx,
-                    )?;
-                    let mut params = Vec::new();
-                    for param in &method.params {
-                        params.push(InterfaceParam {
-                            ty: interface_type_from_type_expr(
-                                &param.ty,
-                                interner,
-                                &type_param_names,
-                                nominal_kinds,
-                                ctx,
-                            )?,
-                            mode: semantic_param_mode(param.mode),
-                            optional: param.sponte || param.default.is_some(),
-                            sponte: param.sponte,
-                        });
+                    device: None,
+                },
+                visibility: match member_visibility(&member.annotations, interner) {
+                    crate::syntax::MemberVisibility::Publica => {
+                        member_visibility(&method.annotations, interner)
                     }
-                    let ret = match &method.ret {
-                        Some(ret) => {
-                            interface_type_from_type_expr(ret, interner, &type_param_names, nominal_kinds, ctx)?
-                        }
-                        None => InterfaceTypeSnapshot::Primitive(Primitive::Vacuum),
-                    };
-                    let err = match &method.err {
-                        Some(err_ty) => Some(Box::new(interface_type_from_type_expr(
-                            err_ty,
-                            interner,
-                            &type_param_names,
-                            nominal_kinds,
-                            ctx,
-                        )?)),
-                        None => None,
-                    };
-                    let is_async = method.posture.is_async()
-                        || annotations_include_callable_family(&member.annotations, interner, "futura");
-                    let is_generator = method.posture.is_stream()
-                        || annotations_include_callable_family(&member.annotations, interner, "cursor");
-                    Some(InterfaceMethodExport {
-                        name: interner.resolve(method.name.name).to_owned(),
-                        callable: InterfaceCallable {
-                            type_params: callable_type_params,
-                            params,
-                            ret: Box::new(ret),
-                            err,
-                            is_async,
-                            is_generator,
-                            tensor_edge_policy_requirements: Vec::new(),
-                            device: None,
-                        },
-                        visibility: match member_visibility(&member.annotations, interner) {
-                            crate::syntax::MemberVisibility::Publica => {
-                                member_visibility(&method.annotations, interner)
-                            }
-                            visibility => visibility,
-                        },
-                        unavailable: unavailable_gates_from_annotations(&member.annotations, interner),
-                    })
-                })
-                .collect::<Vec<_>>();
-            let annotation_contract = annotation_contract_from_stmt(stmt, decl, interner);
-            Some(FileExport {
-                name: name.clone(),
-                kind: FileExportKind::Struct(InterfaceStructExport {
-                    is_json: annotations_include_callable_family(&stmt.annotations, interner, "json"),
-                    name,
-                    params: interface_generic_params(&decl.type_params, interner),
-                    fields,
-                    methods,
-                    annotation_contract,
-                }),
+                    visibility => visibility,
+                },
+                unavailable: unavailable_gates_from_annotations(&member.annotations, interner),
             })
-        }
-        StmtKind::Enum(decl) => {
-            let name = interner.resolve(decl.name.name).to_owned();
-            // `ordo` members are unit variants: project their names so
-            // consumers can reference `module.MEMBER` values and match them.
-            // Only identity-bearing snapshots project; the identity-less
-            // relative-import surface keeps the legacy empty-variant
-            // fail-closed behavior.
-            let variants = if ctx.module_identity.is_some() {
-                decl.members
-                    .iter()
-                    .map(|member| InterfaceEnumVariant {
-                        name: interner.resolve(member.name.name).to_owned(),
-                        fields: Vec::new(),
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            };
-            Some(FileExport {
-                name: name.clone(),
-                kind: FileExportKind::Enum(InterfaceNominalExport {
-                    name,
-                    // AST `discretio` declarations carry no generic parameters.
-                    params: Vec::new(),
-                    methods: Vec::new(),
-                    variants,
-                    shared_fields: Vec::new(),
-                    radix_contract: None,
-                }),
+        })
+        .collect::<Vec<_>>();
+    let annotation_contract = annotation_contract_from_stmt(stmt, decl, interner);
+    Some(FileExport {
+        name: name.clone(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: annotations_include_callable_family(&stmt.annotations, interner, "json"),
+            name,
+            params: interface_generic_params(&decl.type_params, interner),
+            fields,
+            methods,
+            annotation_contract,
+        }),
+    })
+}
+
+fn enum_export_from_stmt(
+    decl: &crate::syntax::EnumDecl,
+    interner: &crate::lexer::Interner,
+    ctx: &SnapshotContext,
+) -> Option<FileExport> {
+    let name = interner.resolve(decl.name.name).to_owned();
+    // `ordo` members are unit variants: project their names so
+    // consumers can reference `module.MEMBER` values and match them.
+    // Only identity-bearing snapshots project; the identity-less
+    // relative-import surface keeps the legacy empty-variant
+    // fail-closed behavior.
+    let variants = if ctx.module_identity.is_some() {
+        decl.members
+            .iter()
+            .map(|member| InterfaceEnumVariant {
+                name: interner.resolve(member.name.name).to_owned(),
+                fields: Vec::new(),
             })
-        }
-        StmtKind::Union(decl) => {
-            let name = interner.resolve(decl.name.name).to_owned();
-            // Mirror the package path's enum snapshot: `discretio` variants
-            // ride the file interface (name + payload fields) so imported
-            // union patterns (`module.VARIANT` in `discerne` arms) resolve
-            // instead of failing SEM001. Identity-bearing snapshots only —
-            // identity-less relative-import targets keep the legacy
-            // empty-variant surface the error-masking
-            // diagnostics pin (SEM001.unknown_variant / SEM008 on imported
-            // union refs).
-            let (variants, shared_fields) = if ctx.module_identity.is_some() {
-                let type_param_names: BTreeSet<&str> = decl
-                    .type_params
+            .collect()
+    } else {
+        Vec::new()
+    };
+    Some(FileExport {
+        name: name.clone(),
+        kind: FileExportKind::Enum(InterfaceNominalExport {
+            name,
+            // AST `discretio` declarations carry no generic parameters.
+            params: Vec::new(),
+            methods: Vec::new(),
+            variants,
+            shared_fields: Vec::new(),
+            radix_contract: None,
+        }),
+    })
+}
+
+fn union_export_from_stmt(
+    decl: &crate::syntax::UnionDecl,
+    interner: &crate::lexer::Interner,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<FileExport> {
+    let name = interner.resolve(decl.name.name).to_owned();
+    // Mirror the package path's enum snapshot: `discretio` variants
+    // ride the file interface (name + payload fields) so imported
+    // union patterns (`module.VARIANT` in `discerne` arms) resolve
+    // instead of failing SEM001. Identity-bearing snapshots only —
+    // identity-less relative-import targets keep the legacy
+    // empty-variant surface the error-masking
+    // diagnostics pin (SEM001.unknown_variant / SEM008 on imported
+    // union refs).
+    let (variants, shared_fields) = if ctx.module_identity.is_some() {
+        let type_param_names: BTreeSet<&str> = decl
+            .type_params
+            .iter()
+            .map(|tp| interner.resolve(tp.name.name))
+            .collect();
+        let variants = decl
+            .variants
+            .iter()
+            .map(|variant| {
+                let fields = variant
+                    .fields
                     .iter()
-                    .map(|tp| interner.resolve(tp.name.name))
-                    .collect();
-                let variants = decl
-                    .variants
-                    .iter()
-                    .map(|variant| {
-                        let fields = variant
-                            .fields
-                            .iter()
-                            .filter_map(|field| {
-                                Some(InterfaceStructField {
-                                    name: interner.resolve(field.name.name).to_owned(),
-                                    ty: interface_type_from_type_expr(
-                                        &field.ty,
-                                        interner,
-                                        &type_param_names,
-                                        nominal_kinds,
-                                        ctx,
-                                    )?,
-                                    optional: false,
-                                    required: true,
-                                    default: None,
-                                    modifier: None,
-                                    visibility: crate::syntax::MemberVisibility::Publica,
-                                })
-                            })
-                            .collect::<Vec<_>>();
-                        InterfaceEnumVariant { name: interner.resolve(variant.name.name).to_owned(), fields }
-                    })
-                    .collect::<Vec<_>>();
-                let shared_fields = decl
-                    .shared_fields
-                    .iter()
-                    .filter_map(|shared| {
+                    .filter_map(|field| {
                         Some(InterfaceStructField {
-                            name: interner.resolve(shared.field.name.name).to_owned(),
+                            name: interner.resolve(field.name.name).to_owned(),
                             ty: interface_type_from_type_expr(
-                                &shared.field.ty,
+                                &field.ty,
                                 interner,
                                 &type_param_names,
                                 nominal_kinds,
@@ -2046,90 +2046,131 @@ fn file_export_from_stmt(
                         })
                     })
                     .collect::<Vec<_>>();
-                (variants, shared_fields)
-            } else {
-                (Vec::new(), Vec::new())
-            };
-            Some(FileExport {
-                name: name.clone(),
-                kind: FileExportKind::Enum(InterfaceNominalExport {
-                    name,
-                    params: interface_generic_params(&decl.type_params, interner),
-                    methods: Vec::new(),
-                    variants,
-                    shared_fields,
-                    radix_contract: None,
-                }),
+                InterfaceEnumVariant { name: interner.resolve(variant.name.name).to_owned(), fields }
             })
-        }
-        StmtKind::Interface(decl) => {
-            let name = interner.resolve(decl.name.name).to_owned();
-            // Method signatures ride the interface so importers can implement
-            // the contract and call it through a bound (D1.1/D1.2); the
-            // contract's own parameters stay symbolic.
-            let type_param_names: BTreeSet<&str> = decl
-                .type_params
-                .iter()
-                .map(|tp| interner.resolve(tp.name.name))
-                .collect();
-            let methods = decl
-                .methods
-                .iter()
-                .filter_map(|method| interface_method_from_ast(method, interner, &type_param_names, nominal_kinds, ctx))
-                .collect();
-            let radix_contract = stmt.annotations.iter().find_map(|annotation| {
-                crate::semantic::radix_contract::role_from_ast(annotation, interner)
-                    .and_then(Result::ok)
-                    .map(|role| role.as_str().to_owned())
-            });
-            Some(FileExport {
-                name: name.clone(),
-                kind: FileExportKind::Interface(InterfaceNominalExport {
-                    name,
-                    params: interface_generic_params(&decl.type_params, interner),
-                    methods,
-                    variants: Vec::new(),
-                    shared_fields: Vec::new(),
-                    radix_contract,
-                }),
+            .collect::<Vec<_>>();
+        let shared_fields = decl
+            .shared_fields
+            .iter()
+            .filter_map(|shared| {
+                Some(InterfaceStructField {
+                    name: interner.resolve(shared.field.name.name).to_owned(),
+                    ty: interface_type_from_type_expr(
+                        &shared.field.ty,
+                        interner,
+                        &type_param_names,
+                        nominal_kinds,
+                        ctx,
+                    )?,
+                    optional: false,
+                    required: true,
+                    default: None,
+                    modifier: None,
+                    visibility: crate::syntax::MemberVisibility::Publica,
+                })
             })
-        }
-        StmtKind::TypeAlias(decl) => {
-            let name = interner.resolve(decl.name.name).to_owned();
-            let params = interface_generic_params(&decl.type_params, interner);
-            let no_params = BTreeSet::new();
-            Some(FileExport {
-                name: name.clone(),
-                kind: FileExportKind::TypeAlias(InterfaceAliasExport {
-                    name,
-                    params,
-                    body: interface_type_from_type_expr(&decl.ty, interner, &no_params, nominal_kinds, ctx)?,
-                }),
-            })
-        }
-        StmtKind::Var(var) => {
-            // Typed `fixum` consts ride the interface as value exports
-            // (`module.CONST`), mirroring the package path's const library
-            // items. Untyped or mutable declarations are left out.
-            if var.mutability != crate::syntax::AstMutability::Immutable {
-                return None;
-            }
-            let crate::syntax::BindingPattern::Ident(ident) = &var.binding else {
-                return None;
-            };
-            let name = interner.resolve(ident.name).to_owned();
-            let no_params = BTreeSet::new();
-            Some(FileExport {
-                name,
-                kind: FileExportKind::Const(
-                    interface_type_from_type_expr(var.ty.as_ref()?, interner, &no_params, nominal_kinds, ctx)?,
-                    None,
-                ),
-            })
-        }
-        _ => None,
-    }
+            .collect::<Vec<_>>();
+        (variants, shared_fields)
+    } else {
+        (Vec::new(), Vec::new())
+    };
+    Some(FileExport {
+        name: name.clone(),
+        kind: FileExportKind::Enum(InterfaceNominalExport {
+            name,
+            params: interface_generic_params(&decl.type_params, interner),
+            methods: Vec::new(),
+            variants,
+            shared_fields,
+            radix_contract: None,
+        }),
+    })
 }
+
+fn interface_export_from_stmt(
+    stmt: &Stmt,
+    decl: &crate::syntax::InterfaceDecl,
+    interner: &crate::lexer::Interner,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<FileExport> {
+    let name = interner.resolve(decl.name.name).to_owned();
+    // Method signatures ride the interface so importers can implement
+    // the contract and call it through a bound (D1.1/D1.2); the
+    // contract's own parameters stay symbolic.
+    let type_param_names: BTreeSet<&str> = decl
+        .type_params
+        .iter()
+        .map(|tp| interner.resolve(tp.name.name))
+        .collect();
+    let methods = decl
+        .methods
+        .iter()
+        .filter_map(|method| interface_method_from_ast(method, interner, &type_param_names, nominal_kinds, ctx))
+        .collect();
+    let radix_contract = stmt.annotations.iter().find_map(|annotation| {
+        crate::semantic::radix_contract::role_from_ast(annotation, interner)
+            .and_then(Result::ok)
+            .map(|role| role.as_str().to_owned())
+    });
+    Some(FileExport {
+        name: name.clone(),
+        kind: FileExportKind::Interface(InterfaceNominalExport {
+            name,
+            params: interface_generic_params(&decl.type_params, interner),
+            methods,
+            variants: Vec::new(),
+            shared_fields: Vec::new(),
+            radix_contract,
+        }),
+    })
+}
+
+fn type_alias_export_from_stmt(
+    decl: &crate::syntax::TypeAliasDecl,
+    interner: &crate::lexer::Interner,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<FileExport> {
+    let name = interner.resolve(decl.name.name).to_owned();
+    let params = interface_generic_params(&decl.type_params, interner);
+    let no_params = BTreeSet::new();
+    Some(FileExport {
+        name: name.clone(),
+        kind: FileExportKind::TypeAlias(InterfaceAliasExport {
+            name,
+            params,
+            body: interface_type_from_type_expr(&decl.ty, interner, &no_params, nominal_kinds, ctx)?,
+        }),
+    })
+}
+
+fn var_export_from_stmt(
+    var: &crate::syntax::VarDecl,
+    interner: &crate::lexer::Interner,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<FileExport> {
+    // Typed `fixum` consts ride the interface as value exports
+    // (`module.CONST`), mirroring the package path's const library
+    // items. Untyped or mutable declarations are left out.
+    if var.mutability != crate::syntax::AstMutability::Immutable {
+        return None;
+    }
+    let crate::syntax::BindingPattern::Ident(ident) = &var.binding else {
+        return None;
+    };
+    let name = interner.resolve(ident.name).to_owned();
+    let no_params = BTreeSet::new();
+    Some(FileExport {
+        name,
+        kind: FileExportKind::Const(
+            interface_type_from_type_expr(var.ty.as_ref()?, interner, &no_params, nominal_kinds, ctx)?,
+            None,
+        ),
+    })
+}
+
 
 fn semantic_param_mode(mode: AstParamMode) -> SemanticParamMode {
     match mode {
