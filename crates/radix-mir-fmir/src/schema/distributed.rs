@@ -18,8 +18,9 @@
 //! - **Own version ratchet** (`v` + [`WIRE_DISTRIBUTED_SECTION_VERSION`]),
 //!   admitted fail-closed **before field interpretation** (the
 //!   `admit_device_section` pattern, FC4). The nested
-//!   `WIRE_DEVICE_PROGRAM_VERSION` and outer
-//!   `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched.
+//!   `WIRE_DEVICE_PROGRAM_VERSION` and outer `PACKAGE_MIR_ARTIFACT_VERSION`
+//!   stay untouched (the number is deliberately not restated here; mod.rs
+//!   owns the artifact-version value).
 //! - **Equivalence gate** (admission): re-derives `(program,
 //!   declared_placement)` from the single-device wire program + the declared
 //!   placement facts and compares **canonical bytes**
@@ -852,6 +853,20 @@ fn wire_library_operation(
     }
 }
 
+fn wire_resource(
+    resource: &super::wire::WireDeviceResource,
+) -> Result<DeviceResource, FmirImageError> {
+    Ok(DeviceResource {
+        buffer: wire_buffer_identity(&resource.buffer),
+        version: wire_buffer_version(&resource.version)?,
+        binding: Binding {
+            group: resource.binding.group,
+            binding: resource.binding.binding,
+        },
+        access: wire_access_to_access(resource.access),
+    })
+}
+
 fn wire_kernel(kernel: &WireKernelUnit) -> Result<KernelUnit, FmirImageError> {
     Ok(KernelUnit {
         function: MirFunctionId(kernel.function),
@@ -861,17 +876,7 @@ fn wire_kernel(kernel: &WireKernelUnit) -> Result<KernelUnit, FmirImageError> {
         resources: kernel
             .resources
             .iter()
-            .map(|resource| {
-                Ok(DeviceResource {
-                    buffer: wire_buffer_identity(&resource.buffer),
-                    version: wire_buffer_version(&resource.version)?,
-                    binding: Binding {
-                        group: resource.binding.group,
-                        binding: resource.binding.binding,
-                    },
-                    access: wire_access_to_access(resource.access),
-                })
-            })
+            .map(wire_resource)
             .collect::<Result<Vec<_>, FmirImageError>>()?,
         launch: wire_launch_plan(&kernel.launch),
     })
@@ -982,6 +987,21 @@ fn wire_objective(objective: WirePlacementObjective) -> PlacementObjective {
     }
 }
 
+/// The declared constraints/objectives ride the delivered plan itself (they
+/// are not derivation inputs, md2-delivery §MD2-D1), so both the delivered
+/// reconstruction and the re-derived expected plan copy them from the wire's
+/// declared placement.
+fn wire_constraints(wire: &WireDeclaredPlacement) -> Vec<PlacementConstraint> {
+    wire.constraints.iter().map(wire_constraint).collect()
+}
+
+fn wire_objectives(wire: &WireDeclaredPlacement) -> Vec<PlacementObjective> {
+    wire.objectives
+        .iter()
+        .map(|objective| wire_objective(*objective))
+        .collect()
+}
+
 fn wire_result_ref(result: &WireResultRef) -> ResultRef {
     ResultRef {
         buffer: BufferId(result.buffer),
@@ -1068,18 +1088,8 @@ pub(crate) fn wire_plan_to_plan(
             .iter()
             .map(wire_placement)
             .collect(),
-        constraints: wire
-            .declared_placement
-            .constraints
-            .iter()
-            .map(wire_constraint)
-            .collect(),
-        objectives: wire
-            .declared_placement
-            .objectives
-            .iter()
-            .map(|objective| wire_objective(*objective))
-            .collect(),
+        constraints: wire_constraints(&wire.declared_placement),
+        objectives: wire_objectives(&wire.declared_placement),
     };
     let partitions = wire
         .partitions
@@ -1324,20 +1334,8 @@ pub(crate) fn expected_plan_for_section(
     placements.sort_by_key(|placement| placement.value.0);
     let declared_placement = DeclaredPlacement {
         placements,
-        constraints: section
-            .logical_plan
-            .declared_placement
-            .constraints
-            .iter()
-            .map(wire_constraint)
-            .collect(),
-        objectives: section
-            .logical_plan
-            .declared_placement
-            .objectives
-            .iter()
-            .map(|objective| wire_objective(*objective))
-            .collect(),
+        constraints: wire_constraints(&section.logical_plan.declared_placement),
+        objectives: wire_objectives(&section.logical_plan.declared_placement),
     };
     Ok(DistributedExecutionPlan::assemble(
         declared_placement,
