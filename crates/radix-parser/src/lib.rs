@@ -1327,15 +1327,6 @@ impl Parser {
         }
     }
 
-    // Unmigrated declaration, statement, and expression contracts still use prose.
-    fn expect_token(&mut self, kind: &TokenKind, msg: &str) -> Result<&Token, ParseError> {
-        if self.check(kind) {
-            Ok(self.advance())
-        } else {
-            Err(self.expected_message_error(msg))
-        }
-    }
-
     /// Require the current word to be the given keyword identity.
     fn expect_keyword_ident(&mut self, identity: TokenKind, msg: &str) -> Result<(), ParseError> {
         if self.check_keyword_ident(identity) {
