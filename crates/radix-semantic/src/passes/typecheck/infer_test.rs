@@ -208,9 +208,6 @@ fn function_type_join_uses_contravariant_params() {
     // contravariant Join using Assign for params, incompatible param types
     // cause the join to fail because Assign checks is_assignable(param_b, param_a)
     // = is_assignable(fractus, f32) = false.
-    // unsoundly join to (fractus)→void. Under the fixed contravariant Join,
-    // incompatible param types cause the join to fail (error type), because
-    // there is no single param type safe for both functions.
     let joined = checker.unify_join(func_a, func_b, vacuous_span, "test");
     let resolved = checker.resolve_inferred_type(joined);
     assert!(
@@ -288,4 +285,51 @@ fn occurs_in_ignores_any_constraint() {
         !checker.occurs_in(InferVar(999), func_ty),
         "occurs_in must not false-positive through TypeParamConstraint::Any",
     );
+}
+
+// The Applied arm delegates its paired-argument walk to `unify_applied_args`:
+// type slots unify structurally, size slots stay equal at an absent boundary,
+// and a kind mismatch fails the join with the caller's issue.
+#[test]
+fn unify_applied_args_pairs_type_and_size_slots() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let span = radix_lexer::Span::default();
+
+    let base = checker.types.intern(Type::Struct(DefId(7)));
+    let numerus = checker.numerus_type();
+    let fractus = checker.fractus_type();
+    let width = checker.types.intern_index(IndexExpr::Literal(4));
+
+    let applied = |checker: &mut TypeChecker<'_>, type_arg| {
+        checker.types.intern(Type::Applied(
+            base,
+            vec![type_arg, radix_types::AppliedArg::Size(width)],
+        ))
+    };
+    let left = applied(&mut checker, radix_types::AppliedArg::Type(numerus));
+    let right = applied(&mut checker, radix_types::AppliedArg::Type(fractus));
+
+    let joined = checker.unify_join(left, right, span, "test");
+    assert!(checker.errors.is_empty(), "{:?}", checker.errors);
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        matches!(checker.types.get(resolved), Type::Applied(_, args) if args.len() == 2),
+        "expected paired Applied, got {:?}",
+        checker.types.get(resolved),
+    );
+
+    // Kind mismatch: a `Size` slot paired with a `Type` slot reports `issue`.
+    let size_only = checker.types.intern(Type::Applied(
+        base,
+        vec![radix_types::AppliedArg::Size(width)],
+    ));
+    let type_only = checker.types.intern(Type::Applied(
+        base,
+        vec![radix_types::AppliedArg::Type(numerus)],
+    ));
+    let failed = checker.unify_join(size_only, type_only, span, "test");
+    assert!(!checker.errors.is_empty());
+    assert_eq!(failed, checker.error_type);
 }
