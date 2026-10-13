@@ -1,6 +1,6 @@
 //! Package-MIR run/build route API: route selection, image loading, and the stdio entry.
 
-use radix_module::mir::KernelLowering;
+use radix_types::KernelLowering;
 use std::borrow::Cow;
 
 use super::{
@@ -63,7 +63,7 @@ pub fn with_interpreted_bound_package_mir<R, H: Host + ?Sized>(
     seams: &MirSeams,
     run: impl for<'a, 'v> FnOnce(
         &super::LoweredMirUnit<'a>,
-        &radix_module::mir::ValidatedMir<'v>,
+        &radix_mir::ValidatedMir<'v>,
         Option<i32>,
         &mut H,
     ) -> Result<R, Vec<Diagnostic>>,
@@ -87,19 +87,18 @@ pub fn with_interpreted_bound_package_mir<R, H: Host + ?Sized>(
             &*host,
             &prepared.entry_path,
         )?;
-        let mut validation = radix_module::mir::MirValidationContext::new(&types);
-        validation.interner = radix_module::mir::MirInterner::Borrowed(&interner);
+        let mut validation = radix_mir::MirValidationContext::new(&types);
+        validation.interner = radix_mir::MirInterner::Borrowed(&interner);
         super::image::apply_validation_metadata(
             &mut validation,
             &super::image::snapshot_validation_metadata(lowered.validated.validation()),
         );
-        let validated =
-            radix_module::mir::ValidatedMir::new(program, validation).map_err(|errors| {
-                errors
-                    .into_iter()
-                    .map(|error| mir_diag(&prepared.entry_path, error.message))
-                    .collect::<Vec<_>>()
-            })?;
+        let validated = radix_mir::ValidatedMir::new(program, validation).map_err(|errors| {
+            errors
+                .into_iter()
+                .map(|error| mir_diag(&prepared.entry_path, error.message))
+                .collect::<Vec<_>>()
+        })?;
         run(lowered, &validated, prepared.cli_exit_code, host)
     })
 }
@@ -630,6 +629,6 @@ pub fn run_fmir_image_bytes_with_stdio(
     let loaded = load_fmir_image(image_bytes, diagnostic_path, seams.toolchain_version)?;
     let selection = loaded.route_selection()?;
     admit_runner_route(&loaded, selection)?;
-    let mut host = radix_module::mir::StdioHost::with_argumenta(argumenta);
+    let mut host = radix_mir_runner::StdioHost::with_argumenta(argumenta);
     run_fmir_package_image(loaded, &mut host, selection.kernel_policy())
 }

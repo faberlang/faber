@@ -6,7 +6,7 @@
 //! callee was pruned (runner `missing MIR function` at run time).
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 const KERNELS: &str = r#"+++
 locale = "en"

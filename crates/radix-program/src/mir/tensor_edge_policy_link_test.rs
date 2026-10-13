@@ -1,7 +1,7 @@
 //! Generic `limes<P>()` dispatch survives a package boundary.
 
 use super::*;
-use radix_module::mir::{MirEdgePolicy, MirIntrinsic, MirStatementKind};
+use radix_mir::{MirEdgePolicy, MirIntrinsic, MirStatementKind};
 
 const EDGE_POLICY_UTIL: &str = r#"+++
 locale = "en"
@@ -62,7 +62,7 @@ kind = "bin"
     src.join("main.fab")
 }
 
-fn limes_policy(function: &radix_module::mir::MirFunction) -> Option<MirEdgePolicy> {
+fn limes_policy(function: &radix_mir::MirFunction) -> Option<MirEdgePolicy> {
     function
         .blocks
         .iter()
@@ -139,7 +139,7 @@ fn imported_generic_limes_resolves_builtin_and_custom_policy_before_mir_validati
 fn imported_generic_limes_dispatch_runs_for_builtin_and_custom_policy() {
     let dir = crate::test_support::test_temp_dir("tensor-edge-policy-link-run");
     let entry = write_edge_policy_package(dir.as_ref());
-    let mut host = radix_module::mir::BufferHost::default();
+    let mut host = radix_mir_runner::BufferHost::default();
 
     run_package_mir(
         &Config::default(),

@@ -96,9 +96,9 @@ pub fn attach_canonical_mir(
         if !fragment_paths.contains(&relative) {
             continue;
         }
-        let lowered = radix_module::mir::lower_analyzed_unit(
+        let lowered = radix_mir_lower::lower::lower_analyzed_unit(
             node.analysis.application_view(),
-            radix_module::mir::MirLoweringOptions::default(),
+            radix_mir_lower::lower::MirLoweringOptions::default(),
         )
         .map_err(|errors| {
             errors

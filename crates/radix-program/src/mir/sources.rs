@@ -21,7 +21,7 @@ pub(super) fn rewrite_templates_sources(
 }
 
 pub(super) fn rewrite_generic_param_sources(
-    generic_params: &mut [(DefId, Vec<radix_module::mir::MirGenericParam>)],
+    generic_params: &mut [(DefId, Vec<radix_mir_lower::lower::MirGenericParam>)],
     unit_path: &Path,
     source_rewrites: &SourceRewrites,
 ) {

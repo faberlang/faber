@@ -165,7 +165,7 @@ fn test_device_config_for_input(_input: &Path) -> Result<DeviceManifestConfig, V
 /// in radix-program); the seam returns `None`.
 fn test_device_section_builder(
     _prepared: &PreparedPackageMir<'_>,
-    _lowered: &radix_module::mir::LoweredMirUnit<'_>,
+    _lowered: &radix_mir_lower::lower::LoweredMirUnit<'_>,
     _diagnostic_path: &Path,
 ) -> Result<Option<radix_mir_fmir::FmirDeviceSection>, Vec<Diagnostic>> {
     Ok(None)

@@ -9,7 +9,7 @@
 //! exported function body the namespace member call reaches.
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 const SELECTIVE_LIB: &str = r#"+++
 locale = "en"

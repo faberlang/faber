@@ -9,8 +9,7 @@
 
 use super::DefId;
 use super::remap::remap_program_text_symbols;
-use radix_module::lexer::{Interner, Span, Symbol};
-use radix_module::mir::{
+use radix_mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
     MirBlockId, MirCallee, MirClosureCallee, MirClosureEnvironmentId, MirClosureValue, MirConstant,
     MirConversion, MirConversionFlavor, MirFilumCoordinate, MirFilumReduceOp, MirFunction,
@@ -20,6 +19,7 @@ use radix_module::mir::{
     MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase,
     MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
 };
+use radix_module::lexer::{Interner, Span, Symbol};
 use radix_types::{Primitive, TypeTable};
 
 /// The distinct sentinel texts, indexed by fixture slot.
@@ -297,9 +297,9 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                 destination: Some(simple_place()),
                 call: MirRuntimeCall {
                     intrinsic: MirIntrinsic::FilumReduce(MirFilumReduceOp {
-                        op: radix_module::mir::MirReduceOp::Sum,
-                        form: radix_module::mir::MirFilumForm::Declared,
-                        term_ty: radix_module::mir::MirType::semantic(radix_types::TypeId(0)),
+                        op: radix_mir::MirReduceOp::Sum,
+                        form: radix_mir::MirFilumForm::Declared,
+                        term_ty: radix_mir::MirType::semantic(radix_types::TypeId(0)),
                         filum_binder: Some(sym(35)),
                         term_binder: MirLocalId(5),
                         term_binder_name: Some(sym(36)),

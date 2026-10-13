@@ -5,7 +5,7 @@
 //! selection fails closed on the runner route (gpu-reset C2 U7).
 
 use super::*;
-use radix_module::mir::BufferHost;
+use radix_mir_runner::BufferHost;
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 

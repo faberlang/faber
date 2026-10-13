@@ -2,11 +2,11 @@
 //! interned modules.
 
 use super::remap::{remap_constant_text_symbols, remap_runtime_call_text_symbols};
-use radix_module::lexer::{Interner, Span};
-use radix_module::mir::{
+use radix_mir::{
     MirConstant, MirFilumCoordinate, MirFilumReduceOp, MirIntrinsic, MirLocalId, MirProvider,
     MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirType,
 };
+use radix_module::lexer::{Interner, Span};
 use radix_types::{Primitive, TypeTable};
 
 #[test]
@@ -52,9 +52,9 @@ fn filum_declaration_symbols_keep_their_text_after_module_merge() {
     let types = TypeTable::new();
     let mut call = MirRuntimeCall {
         intrinsic: MirIntrinsic::FilumReduce(MirFilumReduceOp {
-            op: radix_module::mir::MirReduceOp::Sum,
-            form: radix_module::mir::MirFilumForm::Declared,
-            term_ty: radix_module::mir::MirType::semantic(radix_types::TypeId(0)),
+            op: radix_mir::MirReduceOp::Sum,
+            form: radix_mir::MirFilumForm::Declared,
+            term_ty: radix_mir::MirType::semantic(radix_types::TypeId(0)),
             filum_binder: Some(filum_binder),
             term_binder: MirLocalId(0),
             term_binder_name: Some(term_binder_name),
