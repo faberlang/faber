@@ -481,12 +481,9 @@ impl<'a> BorrowChecker<'a> {
     /// the HIR method-call symbol is the source spelling, and either may be
     /// requested.
     fn index_imported_methods(&mut self) {
-        let seed = |imported: &mut FxHashMap<
-            (DefId, radix_lexer::Symbol),
-            Vec<ParamType>,
-        >,
-                        class: DefId,
-                        methods: &[ImportedFileInterfaceMethod]| {
+        let seed = |imported: &mut FxHashMap<(DefId, radix_lexer::Symbol), Vec<ParamType>>,
+                    class: DefId,
+                    methods: &[ImportedFileInterfaceMethod]| {
             for method in methods {
                 let params = method.sig.params.clone();
                 imported

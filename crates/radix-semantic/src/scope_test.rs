@@ -1032,12 +1032,12 @@ fn namespace_variant_scan_skips_non_enum_type_exports() {
 #[test]
 fn imported_axis_markers_round_trip_through_the_resolver() {
     use crate::Primitive;
+    use crate::SemanticParamMode;
+    use crate::TypeTable;
     use crate::file_interface::{
         FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceMethodExport,
         InterfaceParam, InterfaceStructExport, InterfaceTypeSnapshot,
     };
-    use crate::SemanticParamMode;
-    use crate::TypeTable;
     use std::collections::BTreeMap;
 
     let number = || InterfaceTypeSnapshot::Primitive(Primitive::Numerus);

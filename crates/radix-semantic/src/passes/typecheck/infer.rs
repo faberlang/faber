@@ -533,7 +533,8 @@ impl TypeChecker<'_> {
             // out of plain structural joins.
             (_, Type::Intersection(members))
                 if members.iter().any(|member| {
-                    self.infer_var_of(self.resolve_inferred_type(*member)).is_some()
+                    self.infer_var_of(self.resolve_inferred_type(*member))
+                        .is_some()
                 }) =>
             {
                 return self.unify_into_destination_intersection(left, members, span, issue);

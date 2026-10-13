@@ -344,8 +344,7 @@ impl TypeChecker<'_> {
         };
         let result_ty = self.resolve_inferred_type(init.ty?);
         let (marker, payload) = self.types.peel_access_marker(result_ty);
-        if !matches!(marker, Some(crate::AccessMarker::Ref))
-            || !self.is_shareable_payload(payload)
+        if !matches!(marker, Some(crate::AccessMarker::Ref)) || !self.is_shareable_payload(payload)
         {
             return None;
         }

@@ -23,8 +23,8 @@ use radix_semantic::file_interface::{
 };
 use radix_semantic::passes::kernel_requirements::KernelRequirementsReport;
 use radix_semantic::{
-    AnalysisStamp, AnnotationContractMetadata, FunctionFactTable, FunctionProvenanceTable,
-    QualifiedIdentityTable, RadixLaneMetadata, ResolvedUseIndex, Resolver, ShapeObligationTable,
+    AnalysisStamp, AnnotationContractMetadata, FunctionFactTable, FunctionProvenanceTable, QualifiedIdentityTable,
+    RadixLaneMetadata, ResolvedUseIndex, Resolver, ShapeObligationTable,
 };
 use radix_syntax::Visibility;
 use std::collections::BTreeMap;
@@ -34,11 +34,7 @@ const VERB: &str = "saluta";
 const TARGET_SEGMENTS: [&str; 1] = ["ops"];
 
 fn binding_identity() -> MirExternalFunctionIdentity {
-    MirExternalFunctionIdentity::new(
-        PRODUCT,
-        TARGET_SEGMENTS.iter().map(|s| (*s).to_owned()).collect(),
-        VERB,
-    )
+    MirExternalFunctionIdentity::new(PRODUCT, TARGET_SEGMENTS.iter().map(|s| (*s).to_owned()).collect(), VERB)
 }
 
 /// A non-generic `textus → textus` verb export, the shape
@@ -82,15 +78,18 @@ fn import_unit(hir_name: &str, hir_alias: Option<&str>, binding: &str, decoy: bo
     let mut resolver = Resolver::new();
 
     // The resolver installs the file interface under the effective binding.
-    let interfaces = BTreeMap::from([(binding.to_owned(), FileInterface {
-        identity: None,
-        exports: BTreeMap::from([(
-            VERB.to_owned(),
-            FileExport { name: VERB.to_owned(), kind: FileExportKind::Function(verb_callable()) },
-        )]),
-        unavailable: BTreeMap::new(),
-        routes: BTreeMap::new(),
-    })]);
+    let interfaces = BTreeMap::from([(
+        binding.to_owned(),
+        FileInterface {
+            identity: None,
+            exports: BTreeMap::from([(
+                VERB.to_owned(),
+                FileExport { name: VERB.to_owned(), kind: FileExportKind::Function(verb_callable()) },
+            )]),
+            unavailable: BTreeMap::new(),
+            routes: BTreeMap::new(),
+        },
+    )]);
     resolver
         .set_file_interfaces_from_snapshots(&interfaces, &mut interner, &mut types)
         .expect("file interface installs");
@@ -101,7 +100,10 @@ fn import_unit(hir_name: &str, hir_alias: Option<&str>, binding: &str, decoy: bo
 
     let mut imports = BTreeMap::from([(
         binding.to_owned(),
-        TARGET_SEGMENTS.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>(),
+        TARGET_SEGMENTS
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect::<Vec<_>>(),
     )]);
     if decoy {
         // What a lookup through the original name would resolve to.
@@ -177,7 +179,12 @@ fn collected(unit: &ImportUnit) -> Recorded {
         .unwrap_or_default();
     let identities = exports
         .values()
-        .filter_map(|def| maps.validation.external_function_identities.get(def).cloned())
+        .filter_map(|def| {
+            maps.validation
+                .external_function_identities
+                .get(def)
+                .cloned()
+        })
         .collect();
     let provider_targets = maps
         .frozen

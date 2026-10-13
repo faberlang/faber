@@ -998,8 +998,7 @@ impl<'a> TypeChecker<'a> {
                 // Imported methods keep their declared `axis` markers so a
                 // call through this class echoes `axis` exactly like a local
                 // method (polish A-202).
-                self.axis_params
-                    .insert(method.def_id, method.axis.clone());
+                self.axis_params.insert(method.def_id, method.axis.clone());
                 if !method.unavailable.is_empty() {
                     self.unavailable_methods
                         .insert((def_id, method.name), method.unavailable.clone());

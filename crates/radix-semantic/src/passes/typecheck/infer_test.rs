@@ -492,7 +492,8 @@ fn unify_with_policy_binds_infer_inside_atomic_and_record() {
     let atomic_joined = checker.unify_join(atomic_infer, atomic_numerus, span, "test");
     let atomic_resolved = checker.resolve_inferred_type(atomic_joined);
     assert_eq!(
-        atomic_resolved, atomic_numerus,
+        atomic_resolved,
+        atomic_numerus,
         "atomic<T> must bind T := numerus, got {:?}",
         checker.types.get(atomic_resolved)
     );
@@ -504,7 +505,8 @@ fn unify_with_policy_binds_infer_inside_atomic_and_record() {
     let record_joined = checker.unify_join(record_infer, record_numerus, span, "test");
     let record_resolved = checker.resolve_inferred_type(record_joined);
     assert_eq!(
-        record_resolved, record_numerus,
+        record_resolved,
+        record_numerus,
         "record field hole must bind to numerus, got {:?}",
         checker.types.get(record_resolved)
     );

@@ -556,9 +556,8 @@ fn imported_mutator_interface() -> crate::file_interface::FileInterface {
             Primitive::Numerus,
         )))
     };
-    let mut_list_int = || {
-        InterfaceTypeSnapshot::Ref(SemanticMutability::Mutable, Box::new(list_int()))
-    };
+    let mut_list_int =
+        || InterfaceTypeSnapshot::Ref(SemanticMutability::Mutable, Box::new(list_int()));
     let read = InterfaceMethodExport {
         name: "read".to_owned(),
         callable: InterfaceCallable {
@@ -711,10 +710,10 @@ fn imported_errors(source: &str) -> Vec<(SemanticErrorKind, String)> {
 fn imported_method_same_storage_overlap_is_rejected() {
     let found = imported_errors(&imported_program("    m.read(mut xs, xs)"));
     assert!(
-        found
-            .iter()
-            .any(|(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
-                && issue == "use_while_mutably_borrowed"),
+        found.iter().any(
+            |(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"
+        ),
         "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
     );
 }
@@ -725,10 +724,10 @@ fn imported_method_alias_spelled_overlap_is_rejected() {
         "    var list<int> alias ← xs\n    m.read(mut xs, alias)",
     ));
     assert!(
-        found
-            .iter()
-            .any(|(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
-                && issue == "use_while_mutably_borrowed"),
+        found.iter().any(
+            |(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"
+        ),
         "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
     );
 }
@@ -739,10 +738,10 @@ fn imported_alias_method_same_storage_overlap_is_rejected() {
         "    const library.MutatorAlias ma ← library.Mutator {}\n    ma.read(mut xs, xs)",
     ));
     assert!(
-        found
-            .iter()
-            .any(|(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
-                && issue == "use_while_mutably_borrowed"),
+        found.iter().any(
+            |(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"
+        ),
         "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
     );
 }
@@ -753,10 +752,10 @@ fn imported_alias_contract_method_same_storage_overlap_is_rejected() {
         "    const library.MutatorContractAlias ma ← m\n    ma.read(mut xs, xs)",
     ));
     assert!(
-        found
-            .iter()
-            .any(|(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
-                && issue == "use_while_mutably_borrowed"),
+        found.iter().any(
+            |(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"
+        ),
         "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
     );
 }
@@ -767,10 +766,10 @@ fn imported_contract_receiver_overlap_is_rejected() {
         "    const library.MutatorContract c ← m\n    c.read(mut xs, xs)",
     ));
     assert!(
-        found
-            .iter()
-            .any(|(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
-                && issue == "use_while_mutably_borrowed"),
+        found.iter().any(
+            |(kind, issue)| *kind == SemanticErrorKind::MutableBorrowConflict
+                && issue == "use_while_mutably_borrowed"
+        ),
         "expected SEM052 use_while_mutably_borrowed, got: {found:?}"
     );
 }

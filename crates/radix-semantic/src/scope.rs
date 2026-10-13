@@ -1837,7 +1837,12 @@ impl Resolver {
                     .first()
                     .map_or(method.name.as_str(), String::as_str),
             );
-            let axis: Vec<bool> = method.callable.params.iter().map(|param| param.axis).collect();
+            let axis: Vec<bool> = method
+                .callable
+                .params
+                .iter()
+                .map(|param| param.axis)
+                .collect();
             imported.push(ImportedFileInterfaceMethod {
                 def_id: self.fresh_def_id(),
                 name,

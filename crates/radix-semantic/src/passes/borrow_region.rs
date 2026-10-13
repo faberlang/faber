@@ -206,7 +206,10 @@ pub fn reduce(
                     return Err(ProvenanceError::Incoherent { function: def_id });
                 };
                 let mut region_found = false;
-                for region in regions.into_iter().flat_map(|facts| facts.regions_for(root)) {
+                for region in regions
+                    .into_iter()
+                    .flat_map(|facts| facts.regions_for(root))
+                {
                     region_found = true;
                     let provenance = if params.iter().any(|param| param.def_id == region.source) {
                         ReturnedBorrowProvenance::Parameter(region.source)

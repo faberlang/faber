@@ -28,9 +28,9 @@ fn error_issues(unit: &AnalyzedFixture) -> Vec<Option<&str>> {
 }
 
 fn has_issue(unit: &AnalyzedFixture, expected: &str) -> bool {
-    unit.diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.is_error() && test_support::issue(diagnostic) == Some(expected))
+    unit.diagnostics.iter().any(|diagnostic| {
+        diagnostic.is_error() && test_support::issue(diagnostic) == Some(expected)
+    })
 }
 
 /// One `axis numerus` parameter.
@@ -107,7 +107,11 @@ fn local_axis_parameter_requires_the_marker() {
         "functio rows(axis numerus a) → numerus { redde a + 1 }\n\
 incipit {\n    fixum numerus x ← rows(1)\n}",
     );
-    assert!(has_issue(&unit, ISSUE), "diagnostics: {:?}", unit.diagnostics);
+    assert!(
+        has_issue(&unit, ISSUE),
+        "diagnostics: {:?}",
+        unit.diagnostics
+    );
 }
 
 #[test]
@@ -116,7 +120,11 @@ fn local_instance_method_axis_parameter_requires_the_marker() {
         "genus Row {\n    functio rows(axis numerus a) → numerus { redde a + 1 }\n}\n\
 functio use(Row r) → numerus { redde r.rows(1) }",
     );
-    assert!(has_issue(&unit, ISSUE), "diagnostics: {:?}", unit.diagnostics);
+    assert!(
+        has_issue(&unit, ISSUE),
+        "diagnostics: {:?}",
+        unit.diagnostics
+    );
 }
 
 // IMPORTED FORM

@@ -210,7 +210,10 @@ fn semantic_error_codes_are_stable() {
 
 #[test]
 fn semantic_stability_table_covers_every_catalog_code() {
-    let table: HashSet<&str> = semantic_code_table().iter().map(|(_, code)| *code).collect();
+    let table: HashSet<&str> = semantic_code_table()
+        .iter()
+        .map(|(_, code)| *code)
+        .collect();
     let catalog: HashSet<&str> = all_specs()
         .iter()
         .map(|spec| spec.code)

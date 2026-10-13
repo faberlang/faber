@@ -1750,10 +1750,15 @@ fn failed_size_only_explicit_type_arg_reports_once() {
         vec![MirGenericParam { name: Symbol(701), is_shape: true, runtime_witness: None }],
     )];
 
-    let errors = instantiate_merged_generic_calls(&mut program, &[template], &generic_params, &mut types, &interner, None)
-        .expect_err("a NATURAL size argument with no interned extent must fail closed");
+    let errors =
+        instantiate_merged_generic_calls(&mut program, &[template], &generic_params, &mut types, &interner, None)
+            .expect_err("a NATURAL size argument with no interned extent must fail closed");
 
-    assert_eq!(errors.len(), 1, "one failed explicit size argument reports exactly once: {errors:?}");
+    assert_eq!(
+        errors.len(),
+        1,
+        "one failed explicit size argument reports exactly once: {errors:?}"
+    );
     assert_eq!(
         errors[0].message, "invalid MIR: generic call signature has unresolved type parameter",
         "the more specific witness diagnostic wins: {errors:?}"

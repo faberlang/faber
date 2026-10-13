@@ -953,13 +953,9 @@ incipit { }
         .as_ref()
         .unwrap_or_else(|| panic!("analysis must succeed: {:?}", result.diagnostics));
     let access_facts = result.access_facts.as_ref().expect("access facts");
-    let regions = borrow_region::analyze_with_interner(
-        hir,
-        &result.types,
-        access_facts,
-        &result.interner,
-    )
-    .expect("regions");
+    let regions =
+        borrow_region::analyze_with_interner(hir, &result.types, access_facts, &result.interner)
+            .expect("regions");
 
     // The conditional binds `view` from both sources, so the returned
     // borrower owns two regions. The reduction must treat that the way it

@@ -3043,11 +3043,9 @@ fn record_subject_member_set(
 ) {
     let members = match &ty.kind {
         TypeExprKind::Union(members) => union_annotation_member_names(interner, members),
-        TypeExprKind::Named(name, params) if params.is_empty() => {
-            resolver
-                .lookup_type(name.name)
-                .and_then(|parent| parent_variant_names(resolver, interner, parent))
-        }
+        TypeExprKind::Named(name, params) if params.is_empty() => resolver
+            .lookup_type(name.name)
+            .and_then(|parent| parent_variant_names(resolver, interner, parent)),
         _ => None,
     };
     if let Some(members) = members {
@@ -3058,17 +3056,14 @@ fn record_subject_member_set(
 /// Source spellings of an explicit union annotation's members, or `None` when
 /// no member is a nameable identifier. Qualified members contribute their
 /// terminal spelling; family members keep the arm-derived fallback.
-fn union_annotation_member_names(
-    interner: &Interner,
-    members: &[TypeExpr],
-) -> Option<Vec<String>> {
+fn union_annotation_member_names(interner: &Interner, members: &[TypeExpr]) -> Option<Vec<String>> {
     let names: Vec<String> = members
         .iter()
         .filter_map(|member| match &member.kind {
             TypeExprKind::Named(ident, _) => Some(interner.resolve(ident.name).to_owned()),
-            TypeExprKind::Qualified(path, _) => {
-                path.last().map(|ident| interner.resolve(ident.name).to_owned())
-            }
+            TypeExprKind::Qualified(path, _) => path
+                .last()
+                .map(|ident| interner.resolve(ident.name).to_owned()),
             _ => None,
         })
         .collect();
