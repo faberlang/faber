@@ -568,9 +568,204 @@ incipit {
                 continue;
             }
         };
+        // PROBE: dump interned literal indices and param-typed type entries.
+        let mut literal_nines = 0usize;
+        for index in 0..unit.types.index_count() {
+            #[expect(clippy::cast_possible_truncation)]
+            let id = crate::semantic::IndexId(index as u32);
+            if let IndexExpr::Literal(9) = unit.types.get_index(id) {
+                literal_nines += 1;
+            }
+        }
+        println!("case {name}: interned Literal(9) count = {literal_nines}");
+        for index in 0..unit.types.type_count() {
+            #[expect(clippy::cast_possible_truncation)]
+            let id = crate::semantic::TypeId(index as u32);
+            if let Type::Param(sym) = unit.types.get(id) {
+                println!("  Type::Param({:?}) text {:?}", sym, unit.interner.resolve(*sym));
+            }
+        }
+        struct ProbeVisitor<'a> {
+            unit: &'a AnalyzedModule,
+        }
+        impl radix_hir::visit::HirVisitor for ProbeVisitor<'_> {
+            fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
+                if let radix_hir::HirExpressionKind::Call(_, type_args, _, _) = &expr.kind {
+                    println!("  call type_args:");
+                    for tid in type_args {
+                        match self.unit.types.get(*tid) {
+                            Type::Param(sym) => println!(
+                                "    tid {:?} Param text {:?}",
+                                tid,
+                                self.unit.interner.resolve(*sym)
+                            ),
+                            other => println!("    tid {tid:?} {other:?}"),
+                        }
+                    }
+                }
+                radix_hir::visit::walk_expr(self, expr);
+            }
+        }
+        let mut probe = ProbeVisitor { unit: &unit };
+        for item in &unit.hir.items {
+            if let radix_hir::HirItemKind::Function(function) = &item.kind {
+                radix_hir::visit::walk_function(&mut probe, function);
+            }
+        }
         match lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()) {
             Ok(_) => println!("case {name}: lowering SUCCEEDED"),
             Err(errors) => println!("case {name}: {} errors: {errors:?}", errors.len()),
+        }
+    }
+}
+
+#[test]
+fn probe_a133_candidates() {
+    let cases: &[(&str, &str)] = &[
+        ("recursive-forward", r"
+functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde take<2, K, 2>(x)
+}
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<2, 2, 2>(a)
+    nota b.longitudo()
+}
+"),
+        ("outer-forward", r"
+functio forward<magnitudo K>(tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
+    redde take<2, K, 2>(x)
+}
+functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← forward<2>(a)
+    nota b.longitudo()
+}
+"),
+        ("wrong-kind-concrete", r"
+functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<2, f32, 2>(a)
+    nota b.longitudo()
+}
+"),
+        ("value-binding-size-lift", r#"+++
+locale = "en"
++++
+fn take<size M, size K, size N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    return x
+}
+@ cli "t"
+@ operand int k
+main args args {
+    const size K ← args.k
+    var tensor<f32, [2, 2]> a ← tf32[2, 2] {}
+    var tensor<f32, [2, 2]> b ← take<2, size K, 2>(a)
+    print b[[0, 0]]
+}
+"#),
+        ("value-binding-size-lift-const", r#"+++
+locale = "en"
++++
+fn take<size M, size K, size N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    return x
+}
+main {
+    const size K ← 9
+    var tensor<f32, [2, 2]> a ← tf32[2, 2] {}
+    var tensor<f32, [2, 2]> b ← take<2, size K, 2>(a)
+    print b[[0, 0]]
+}
+"#),
+        ("plain-numerus-lift", r#"+++
+locale = "en"
++++
+fn take<size M, size K, size N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    return x
+}
+main {
+    const int m ← 2
+    var tensor<f32, [2, 2]> a ← tf32[2, 2] {}
+    var tensor<f32, [2, 2]> b ← take<2, size m, 2>(a)
+    print b[[0, 0]]
+}
+"#),
+        ("operand-lift", r#"+++
+locale = "en"
++++
+fn take<size M, size K, size N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    return x
+}
+@ cli "t"
+@ operand int k
+main args args {
+    var tensor<f32, [2, 2]> a ← tf32[2, 2] {}
+    var tensor<f32, [2, 2]> b ← take<2, size k, 2>(a)
+    print b[[0, 0]]
+}
+"#),
+        ("value-param-lift", r#"+++
+locale = "en"
++++
+fn take<size M, size K, size N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    return x
+}
+fn forward(int m, tensor<f32, [2, 2]> x) → tensor<f32, [2, 2]> {
+    return take<2, size m, 2>(x)
+}
+main {
+    var tensor<f32, [2, 2]> a ← tf32[2, 2] {}
+    var tensor<f32, [2, 2]> b ← forward(9, a)
+    print b[[0, 0]]
+}
+"#),
+        ("used-k-literal", r"
+functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, K]> x) → tensor<f32, [M, K]> {
+    redde x
+}
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<2, 9, 2>(a)
+    nota b.longitudo()
+}
+"),
+    ];
+    for (name, source) in cases {
+        let session_ok = crate::driver::analyze_source(
+            &Session::new(Config::default().with_target(Target::HirTypeScript)),
+            "test.fab",
+            source,
+            AnalyzeRequest::default(),
+        );
+        let unit = match session_ok {
+            Ok(unit) => unit,
+            Err(analysis_errors) => {
+                println!("probe {name}: analysis FAILED: {} diagnostics", analysis_errors.len());
+                for diagnostic in &analysis_errors {
+                    println!(
+                        "    analysis code={:?} issue={:?} line={:?}",
+                        diagnostic.code,
+                        diagnostic.args.iter().find(|arg| arg.name == "issue").map(|arg| arg.value.as_str()),
+                        diagnostic.line
+                    );
+                }
+                continue;
+            }
+        };
+        match lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()) {
+            Ok(_) => println!("probe {name}: lowering SUCCEEDED"),
+            Err(errors) => {
+                println!("probe {name}: {} errors", errors.len());
+                for error in &errors {
+                    println!("    message={:?} issue={:?}", error.message, error.issue);
+                }
+            }
         }
     }
 }

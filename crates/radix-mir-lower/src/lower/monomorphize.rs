@@ -255,6 +255,17 @@ struct MonomorphizationState<'lowerer, 'unit> {
     genus_methods: FxHashMap<(DefId, Symbol), DefId>,
 }
 
+/// A-133: outcome of an explicit size witness lookup. `Found` carries the
+/// resolved index; `MissingReported` means the lookup already pushed the more
+/// specific diagnostic, so the caller must not repeat it; `MissingUnreported`
+/// leaves the kind-mismatch diagnostic to the caller, so one failed argument
+/// reports exactly once.
+enum ExplicitShapeWitness {
+    Found(IndexId),
+    MissingReported,
+    MissingUnreported,
+}
+
 impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     fn new(lowerer: &'lowerer mut MirLowerer<'unit>) -> Self {
         let mut generic_param_order = generic_param_order(lowerer.unit.hir);
@@ -893,12 +904,16 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 return None;
             }
             for (param, concrete) in shape_params.iter().zip(explicit_type_args.iter().copied()) {
-                let Some(index) = self.explicit_shape_witness(caller_source, concrete, span) else {
-                    self.lowerer.errors.push(MirError::validation(
-                        span,
-                        "generic call type argument does not match parameter kind",
-                    ));
-                    return None;
+                let index = match self.explicit_shape_witness(caller_source, concrete, span) {
+                    ExplicitShapeWitness::Found(index) => index,
+                    ExplicitShapeWitness::MissingReported => return None,
+                    ExplicitShapeWitness::MissingUnreported => {
+                        self.lowerer.errors.push(MirError::validation(
+                            span,
+                            "generic call type argument does not match parameter kind",
+                        ));
+                        return None;
+                    }
                 };
                 shape_bindings.insert(param.name, canonical_index(self.types(), index));
             }
@@ -949,7 +964,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         caller_source: Option<DefId>,
         concrete: MirType,
         span: Span,
-    ) -> Option<IndexId> {
+    ) -> ExplicitShapeWitness {
         struct LocalFinder {
             name: Symbol,
             found: Option<DefId>,
@@ -968,18 +983,20 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
         }
         let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
-            return None;
+            return ExplicitShapeWitness::MissingUnreported;
         };
         let sym = *sym;
         if let Some(value) = self.magnitudo_literal_of(concrete) {
-            let index = find_literal_index(self.types(), value);
-            if index.is_none() {
-                self.lowerer.errors.push(MirError::validation(
-                    span,
-                    "generic call signature has unresolved type parameter",
-                ));
-            }
-            return index;
+            return match find_literal_index(self.types(), value) {
+                Some(index) => ExplicitShapeWitness::Found(index),
+                None => {
+                    self.lowerer.errors.push(MirError::validation(
+                        span,
+                        "generic call signature has unresolved type parameter",
+                    ));
+                    ExplicitShapeWitness::MissingReported
+                }
+            };
         }
         let mut finder = LocalFinder { name: sym, found: None };
         finder.visit_program(self.lowerer.unit.hir);
@@ -1004,16 +1021,18 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         if let Some(binding) = value_binding {
             return self.lowerer.unit.shape_obligations.call_size_bindings.values().flatten()
                 .find(|row| matches!(self.types().get_index(row.witness), IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(found)) if *found == binding))
-                .map(|row| row.witness);
+                .map_or(ExplicitShapeWitness::MissingUnreported, |row| ExplicitShapeWitness::Found(row.witness));
         }
-        let index = find_param_index(self.types(), sym);
-        if index.is_none() {
-            self.lowerer.errors.push(MirError::validation(
-                span,
-                "generic call type argument does not match parameter kind",
-            ));
+        match find_param_index(self.types(), sym) {
+            Some(index) => ExplicitShapeWitness::Found(index),
+            None => {
+                self.lowerer.errors.push(MirError::validation(
+                    span,
+                    "generic call type argument does not match parameter kind",
+                ));
+                ExplicitShapeWitness::MissingReported
+            }
         }
-        index
     }
 
     fn ensure_instance(
