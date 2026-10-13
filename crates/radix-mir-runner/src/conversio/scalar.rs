@@ -822,7 +822,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             return Ok(Value::Bool(true));
         }
         if let Some(recovery) = recovery {
-            return self.eval_operand(recovery, span);
+            return self.eval_recovery(recovery, span);
         }
         Ok(Value::Bool(false))
     }

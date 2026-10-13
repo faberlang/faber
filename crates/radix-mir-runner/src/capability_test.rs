@@ -8,11 +8,13 @@
 use super::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
 use radix_lexer::Span;
 use radix_mir::{
-    Lowerability, MirBlock, MirBlockId, MirFunction, MirFunctionId, MirLocal, MirLocalId,
-    MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirRuntimeAbiFamily,
+    Lowerability, MirBlock, MirBlockId, MirFilumCoordinate, MirFilumForm, MirFilumReduceOp,
+    MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId, MirOperand, MirPlace,
+    MirPlaceBase, MirProgram, MirProjection, MirReduceOp, MirRuntimeAbiFamily, MirRuntimeCall,
     MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
     MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
+use radix_types::CapabilityGap;
 use radix_types::{IndexExpr, Primitive, Type, TypeTable};
 
 fn test_span() -> Span {
@@ -191,4 +193,91 @@ fn every_runtime_family_has_a_runner_ledger_status() {
             "ledger status for {family:?}"
         );
     }
+}
+
+/// A filum reduction declaration is device-lane only: the host script runner
+/// rejects it by target policy (its ledger status is `IntentionalReject`), so
+/// the structural verdict is a policy rejection, not a missing shape.
+#[test]
+fn filum_reduce_is_a_target_policy_rejection() {
+    let types = TypeTable::new();
+    let numerus = ty(&types, Primitive::Numerus);
+    let fractus = ty(&types, Primitive::Fractus);
+    let filum = MirFilumReduceOp {
+        op: MirReduceOp::Sum,
+        form: MirFilumForm::Declared,
+        term_ty: numerus,
+        filum_binder: None,
+        term_binder: MirLocalId(1),
+        term_binder_name: None,
+        coordinates: vec![MirFilumCoordinate {
+            local: MirLocalId(2),
+            name: None,
+        }],
+        lane_width: 32,
+        term_body: Vec::new(),
+        term_captures: None,
+        term_result: MirLocalId(3),
+    };
+    let local = |id: u32, ty: MirType| MirLocal {
+        id: MirLocalId(id),
+        name: None,
+        ty,
+        mutable: true,
+        span: test_span(),
+    };
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: vec![
+                local(0, fractus),
+                local(1, numerus),
+                local(2, numerus),
+                local(3, numerus),
+            ],
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(0))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::FilumReduce(filum),
+                            args: vec![MirOperand::Place(MirPlace::local(MirLocalId(1)))],
+                            return_ty: fractus,
+                        },
+                    },
+                    span: test_span(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: test_span(),
+                },
+                span: test_span(),
+            }],
+            return_ty: ty(&types, Primitive::Vacuum),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: test_span(),
+        }],
+    };
+
+    let validated = ValidatedMir::new(program, empty_validation(&types))
+        .expect("filum reduce classification fixture must validate");
+    let Lowerability::Rejected(gaps) = classify_runner_lowerability(&validated) else {
+        panic!("a filum reduction must be rejected in host script mode");
+    };
+
+    let [gap] = gaps.as_slice() else {
+        panic!("expected exactly one gap, got {gaps:?}");
+    };
+    assert!(
+        matches!(gap, CapabilityGap::TargetPolicyRejection { .. }),
+        "filum reduce is a policy rejection, got {gap:?}"
+    );
 }

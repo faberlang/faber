@@ -279,14 +279,18 @@ fn classify_intrinsic(
         MirRuntimeAbiFamily::RuntimeSermo => "intrinsic Sermo",
         MirRuntimeAbiFamily::RuntimeAtomic => "intrinsic Atomic",
         MirRuntimeAbiFamily::RuntimeGpuBuiltin => "intrinsic GpuBuiltin",
+        MirRuntimeAbiFamily::RuntimeFilumReduce => "intrinsic FilumReduce",
         _ => "intrinsic",
     };
     let gap = if matches!(
         family,
-        MirRuntimeAbiFamily::RuntimeAtomic | MirRuntimeAbiFamily::RuntimeGpuBuiltin
+        MirRuntimeAbiFamily::RuntimeAtomic
+            | MirRuntimeAbiFamily::RuntimeGpuBuiltin
+            | MirRuntimeAbiFamily::RuntimeFilumReduce
     ) {
-        // WHY: GPU builtins and atomics belong to storage/device lanes; host
-        // script mode rejects them by policy, not by missing implementation.
+        // WHY: GPU builtins, atomics and the filum reduction declaration
+        // belong to storage/device lanes; host script mode rejects them by
+        // policy, not by missing implementation.
         CapabilityGap::TargetPolicyRejection {
             shape: shape.to_owned(),
             slug: SLUG_POLICY,

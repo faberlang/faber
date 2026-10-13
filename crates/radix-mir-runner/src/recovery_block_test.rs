@@ -571,3 +571,206 @@ fn pure_recovery_operand_evaluates_without_a_region() {
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(value, Some(Value::Int(7)));
 }
+
+/// A `convert` statement with an explicit target type; the shared `convert`
+/// helper targets `numerus`.
+fn convert_to(
+    destination: MirTempId,
+    source: MirOperand,
+    target: radix_mir::MirType,
+    recovery: Option<MirOperand>,
+    types: &TypeTable,
+) -> MirStatement {
+    let mut statement = convert(destination, source, recovery, types);
+    let MirStatementKind::RuntimeCall { call, .. } = &mut statement.kind else {
+        unreachable!("convert builds a runtime call");
+    };
+    let MirIntrinsic::Convert(conversion) = &mut call.intrinsic else {
+        unreachable!("convert builds a conversion");
+    };
+    conversion.target_ty = target;
+    call.return_ty = target;
+    statement
+}
+
+/// A scalar-truthiness `bivalens` conversion whose `⊥` fallback is a deferred
+/// call region must run the region on the falsy path, not read the region's
+/// destination temp before it was written (`uninitialized temp`).
+#[test]
+fn bivalens_truthiness_fallback_runs_deferred_call_region() {
+    let types = TypeTable::new();
+    let mut interner = Interner::new();
+    let fb_ran = interner.intern("fb ran");
+    let bool_ty = radix_mir::MirType::semantic(types.primitive(Primitive::Bivalens));
+    let fb = function(
+        0,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        vec![block(
+            0,
+            vec![print(&fb_ran, &types)],
+            MirTerminatorKind::Return(Some(MirOperand::Constant(MirConstant::Bool(true)))),
+        )],
+        bool_ty,
+    );
+    let main = function(
+        1,
+        Vec::new(),
+        Vec::new(),
+        vec![temp(0, bool_ty), temp(1, bool_ty)],
+        vec![
+            block(
+                0,
+                vec![convert_to(
+                    MirTempId(1),
+                    source_constant(&mut interner, ""),
+                    bool_ty,
+                    Some(MirOperand::Temp(MirTempId(1))),
+                    &types,
+                )],
+                goto(2),
+            ),
+            // Recovery region: %0 = fb(); %1 = %0; goto join.
+            block(
+                1,
+                vec![
+                    call(MirTempId(0), 0, Vec::new(), bool_ty),
+                    assign(
+                        MirTempId(1),
+                        MirValueKind::Operand(MirOperand::Temp(MirTempId(0))),
+                        bool_ty,
+                        0,
+                    ),
+                ],
+                goto(2),
+            ),
+            block(
+                2,
+                Vec::new(),
+                MirTerminatorKind::Return(Some(MirOperand::Temp(MirTempId(1)))),
+            ),
+        ],
+        bool_ty,
+    );
+
+    let (value, stdout, errors) = run_main(vec![fb, main], 1, &types, &interner);
+    assert!(
+        errors.is_empty(),
+        "falsy path must run the deferred fallback: {errors:?}"
+    );
+    assert_eq!(value, Some(Value::Bool(true)));
+    assert_eq!(stdout, ["fb ran"]);
+}
+
+/// A statement inside the recovery region that fails and leaves the frame
+/// (the function has a `textus` alternate exit) ends the walk: the rest of the
+/// region must not run against the caller's frame, and the failure reaches the
+/// caller's error path.
+#[test]
+fn recovery_region_stops_when_a_region_statement_leaves_the_frame() {
+    let types = TypeTable::new();
+    let mut interner = Interner::new();
+    let (fb, _) = witness_callees(&types, &mut interner);
+    let text = text_ty(&types);
+
+    // bad(): %2 = "zz" ↦ numerus ⊥ region; region: %3 = "zz" ↦ numerus (fails,
+    // leaves the frame); %0 = fb(); %2 = %3 + %0; goto join.
+    let mut bad = function(
+        1,
+        Vec::new(),
+        Vec::new(),
+        vec![
+            temp(0, int_ty(&types)),
+            temp(1, int_ty(&types)),
+            temp(2, int_ty(&types)),
+            temp(3, int_ty(&types)),
+        ],
+        vec![
+            block(
+                0,
+                vec![convert(
+                    MirTempId(2),
+                    source_constant(&mut interner, "zz"),
+                    Some(MirOperand::Temp(MirTempId(2))),
+                    &types,
+                )],
+                goto(2),
+            ),
+            block(
+                1,
+                vec![
+                    convert(
+                        MirTempId(3),
+                        source_constant(&mut interner, "zz"),
+                        None,
+                        &types,
+                    ),
+                    call(MirTempId(0), 0, Vec::new(), int_ty(&types)),
+                    assign(
+                        MirTempId(2),
+                        MirValueKind::Binary {
+                            op: MirBinOp::Add,
+                            lhs: MirOperand::Temp(MirTempId(3)),
+                            rhs: MirOperand::Temp(MirTempId(0)),
+                        },
+                        int_ty(&types),
+                        0,
+                    ),
+                ],
+                goto(2),
+            ),
+            block(
+                2,
+                Vec::new(),
+                MirTerminatorKind::Return(Some(MirOperand::Temp(MirTempId(2)))),
+            ),
+        ],
+        int_ty(&types),
+    );
+    bad.error_ty = Some(text);
+
+    // main(): try bad() — the error path returns 99, the ok path 1.
+    let main = function(
+        2,
+        Vec::new(),
+        Vec::new(),
+        vec![temp(0, int_ty(&types)), temp(1, text)],
+        vec![
+            block(
+                0,
+                Vec::new(),
+                MirTerminatorKind::TryCall {
+                    destination: Some(MirPlace::temp(MirTempId(0))),
+                    callee: MirCallee::Function(MirFunctionId(1)),
+                    args: Vec::new(),
+                    ok_block: MirBlockId(1),
+                    error_place: MirPlace::temp(MirTempId(1)),
+                    error_block: MirBlockId(2),
+                },
+            ),
+            block(
+                1,
+                Vec::new(),
+                MirTerminatorKind::Return(Some(MirOperand::Constant(MirConstant::Int(1)))),
+            ),
+            block(
+                2,
+                Vec::new(),
+                MirTerminatorKind::Return(Some(MirOperand::Constant(MirConstant::Int(99)))),
+            ),
+        ],
+        int_ty(&types),
+    );
+
+    let (value, stdout, errors) = run_main(vec![fb, bad, main], 2, &types, &interner);
+    assert!(
+        errors.is_empty(),
+        "a leaving region statement must not keep running in the caller's frame: {errors:?}"
+    );
+    assert_eq!(value, Some(Value::Int(99)));
+    assert!(
+        stdout.is_empty(),
+        "statements after the failing one must not run: {stdout:?}"
+    );
+}

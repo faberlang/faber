@@ -81,6 +81,10 @@ pub(crate) const RUNNER_CODE_CONVERSION: &str = "runner_conversion";
 
 /// Malformed input to the failable JSON parser follows its text alternate exit.
 pub(crate) const RUNNER_JSON_PARSE_FAILED: &str = "runner_json_parse_failed";
+/// A statement of a conversion's recovery region left the frame (its failure
+/// followed the alternate exit). The frame is already popped, so the
+/// conversion statement reports `FrameReturned` instead of writing a result.
+pub(crate) const RUNNER_RECOVERY_FRAME_RETURNED: &str = "runner_recovery_frame_returned";
 /// Two live lists of an elementwise operator differ in length (hard error).
 pub(crate) const RUNNER_LISTA_LENGTH_MISMATCH: &str = "runner_lista_elementwise_length_mismatch";
 /// The same mismatch between two bounded lists is a recoverable runtime
@@ -2089,6 +2093,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     radix_mir::MirIntrinsic::Convert(conversion) => {
                         match self.eval_convert(conversion, &call.args, statement.span) {
                             Ok(value) => Ok(Some(value)),
+                            Err(error) if error.issue == RUNNER_RECOVERY_FRAME_RETURNED => Ok(None),
                             Err(error) if error.is_conversion_failure() => {
                                 self.propagate_runtime_failure(error).map(|_| None)
                             }
@@ -2670,7 +2675,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         loop {
             let block = self.block_snapshot(function_id, current)?;
             for statement in &block.statements {
-                self.execute_statement_inner(statement, false, false)?;
+                // WHY: a region statement that fails through the alternate exit
+                // has already popped this frame; the rest of the region must
+                // not run against the caller's frame.
+                if matches!(
+                    self.execute_statement_inner(statement, false, false)?,
+                    StatementOutcome::FrameReturned
+                ) {
+                    return Err(RunnerError::internal_with_issue(
+                        span,
+                        "conversion recovery region left the frame",
+                        RUNNER_RECOVERY_FRAME_RETURNED,
+                    ));
+                }
             }
             let next = match &block.terminator.kind {
                 MirTerminatorKind::Goto(target) => {
