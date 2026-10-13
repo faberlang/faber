@@ -1,0 +1,56 @@
++++
+term = "bits"
+kind = "display"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "concrete_type", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "array_element_list", "array_element", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = true
+summary = "A bN inside an optional still prints as hex at full width; an absent optional prints none, and a nested list keeps its brackets."
+syntax = "b8 ∪ none x | list<b8> ∪ none xs | list<list<b8>> rows"
+related = ["bits", "bits-display", "optionalis"]
+locale = "en"
++++
+# =============================================================================
+# bits — Display of optional and nested bits values
+# =============================================================================
+#
+# What this teaches:
+#   • a present `b8 ∪ none` prints exactly as its b8: hex at full width
+#   • an absent `b8 ∪ none` prints `none`
+#   • a present `list<b8> ∪ none` prints in list shape, each element in hex
+#   • an absent `list<b8> ∪ none` prints `none`
+#   • a nested `list<list<b8>>` prints its inner lists in brackets
+#
+# Common mistakes:
+#   • expecting an absent optional to print `0x00` or `[]` — absent is `none`
+#   • expecting a nested list to flatten into one bracket level
+#
+# See also: bits-display, bits-literals, optionalis
+# =============================================================================
+
+# bits — optional and nested display
+#
+# EXPECTED stdout: see bits-display-optional.expected
+
+main {
+    # a present optional scalar prints as the b8 it holds
+    const b8 sample ← 0xff
+    const b8 ∪ none present ← sample
+    print present
+
+    # an absent optional scalar prints none
+    const b8 ∪ none absent ← null
+    print absent
+
+    # a present optional list prints each element in hex
+    const list<b8> raw ← [0xde, 0xad]
+    const list<b8> ∪ none bytes ← raw
+    print bytes
+
+    # an absent optional list prints none
+    const list<b8> ∪ none missing ← null
+    print missing
+
+    # a nested list keeps its inner brackets
+    const list<list<b8>> rows ← [[0x01], [0x02, 0xff]]
+    print rows
+}
