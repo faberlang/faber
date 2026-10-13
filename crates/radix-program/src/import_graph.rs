@@ -758,7 +758,10 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         LibraryResolveError::ProviderSpecifierInvalid { specifier, reason } => crate::package_diagnostic_error(format!(
             "invalid library import specifier `{specifier}`: {reason}"
         ))
-        .with_file(file.display().to_string()),
+        .with_file(file.display().to_string())
+        .with_arg("issue", "invalid_library_specifier")
+        .with_arg("specifier", specifier)
+        .with_arg("reason", reason),
         LibraryResolveError::ProviderUnknown {
             specifier,
             provider,

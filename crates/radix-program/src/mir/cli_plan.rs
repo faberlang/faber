@@ -426,9 +426,17 @@ pub(super) fn parse_cli_arguments_with_mode(
     stop_at_first_positional: bool,
 ) -> Option<ParsedCliArguments> {
     if options.is_empty() {
+        // `--` ends option parsing even when none are declared. Leading mode
+        // stops at the first argument, so only a leading `--` is consumed.
+        let mut positionals = argumenta.to_vec();
+        if let Some(end) = argumenta.iter().position(|argument| argument == "--")
+            && (!stop_at_first_positional || end == 0)
+        {
+            positionals.remove(end);
+        }
         return Some(ParsedCliArguments {
             option_fields: Vec::new(),
-            positionals: argumenta.to_vec(),
+            positionals,
             consumed: if stop_at_first_positional {
                 0
             } else {
@@ -446,6 +454,20 @@ pub(super) fn parse_cli_arguments_with_mode(
     let mut argument_index = 0;
     while argument_index < argumenta.len() {
         let argument = &argumenta[argument_index];
+        // WHY: the generated Rust parser and `runtime/llvm` both read a bare
+        // `--` as end-of-options, so a dash-leading operand stays passable.
+        if argument == "--" {
+            positionals.extend(argumenta[argument_index + 1..].iter().cloned());
+            return Some(ParsedCliArguments {
+                option_fields,
+                positionals,
+                consumed: if stop_at_first_positional {
+                    argument_index
+                } else {
+                    argumenta.len()
+                },
+            });
+        }
         if let Some(name) = argument.strip_prefix("--") {
             let (name, inline_value) = name
                 .split_once('=')

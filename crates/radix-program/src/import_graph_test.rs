@@ -498,3 +498,33 @@ fn detect_import_cycles_clean_graph_has_no_diagnostics() {
     assert!(detect_import_cycles(&package, &files).is_empty());
     let _ = fs::remove_dir_all(&root);
 }
+
+// ── library resolve diagnostics ────────────────────────────────────────────
+
+#[test]
+fn provider_specifier_invalid_diagnostic_carries_issue_and_reason() {
+    let resolver = LibraryResolver::with_optional_home(None);
+    let err = resolver
+        .resolve("norma:a/../b")
+        .expect_err("dot-dot module segment must be rejected");
+
+    let diagnostic = library_resolve_diagnostic(Path::new("main.fab"), err);
+
+    assert_eq!(
+        diagnostic.issue(),
+        Some("invalid_library_specifier"),
+        "the failure must stay machine-identifiable: {diagnostic:?}"
+    );
+    let arg = |name: &str| {
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == name)
+            .map(|arg| arg.value.as_str())
+    };
+    assert_eq!(arg("specifier"), Some("norma:a/../b"));
+    assert_eq!(
+        arg("reason"),
+        Some("module path must not contain empty, dot, or dot-dot segments")
+    );
+}
