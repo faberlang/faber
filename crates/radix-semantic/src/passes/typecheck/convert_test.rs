@@ -215,6 +215,13 @@ fn bounded_lista_to_bounded_textus_conversio_rejects() {
 }
 
 #[test]
+fn bounded_textus_conversio_accepts_inline_recovery() {
+    test_support::assert_accepts(
+        "functio s(textus<4> t) → textus {\n  redde t ↦ textus ⊥ \"fallback\"\n}",
+    );
+}
+
+#[test]
 fn octeti_variable_to_textus_conversio_stays_legal() {
     test_support::assert_accepts(
         "incipit {\n  fixum octeti b ← |68 69|\n  fixum _ s ← b ↦ textus\n}",

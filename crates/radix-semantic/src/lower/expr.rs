@@ -60,11 +60,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
     let kind = match &expr.kind {
         ExprKind::Literal(lit) => lower_literal(lowerer, lit),
         ExprKind::Vacua(ident) => {
-            // Typecheck may rewrite this literal into the typed-zero `crea`
-            // call (`empty_dense`) and cannot intern, so the names it needs
-            // are interned here, where the interner is writable.
-            lowerer.intrinsic_surface_symbol("crea");
-            lowerer.interner.intern("crea");
+            lowerer.intern_typed_zero_crea_names();
             lowerer
                 .lower_shadowed_builtin(expr.id, ident.name)
                 .unwrap_or(HirExpressionKind::Vacua)
@@ -405,17 +401,38 @@ impl Lowerer<'_> {
         }
         match self.resolver.lookup_variant_bare(ident.name) {
             crate::BareVariantLookup::Single(def_id) => HirExpressionKind::Path(def_id),
-            crate::BareVariantLookup::Ambiguous { .. } => {
-                self.current_span = ident.span;
-                self.error("undefined_name");
-                HirExpressionKind::Error
-            }
-            crate::BareVariantLookup::None => {
+            // Ambiguous and absent fail identically: the bare name does not
+            // resolve to one variant path, and neither case may silently pick.
+            crate::BareVariantLookup::Ambiguous { .. } | crate::BareVariantLookup::None => {
                 self.current_span = ident.span;
                 self.error("undefined_name");
                 HirExpressionKind::Error
             }
         }
+    }
+
+    /// Intern the names the typed-zero `crea` rewrite needs.
+    ///
+    /// Typecheck may rewrite a bare `vacua` literal or an inferred-constructor
+    /// hole into the typed-zero `crea` call (`empty_dense`) and cannot intern
+    /// there, so the names it needs are interned here, where the interner is
+    /// writable.
+    fn intern_typed_zero_crea_names(&mut self) {
+        self.intrinsic_surface_symbol("crea");
+        self.interner.intern("crea");
+    }
+
+    /// Single-segment variant policy (uvf-u3): a resolver binding wins, then
+    /// the per-union namespace resolves an unambiguous bare variant name. An
+    /// ambiguous or unowned bare name yields nothing rather than a silent
+    /// pick; the caller reports the miss.
+    fn lookup_variant_bare_single(&self, name: radix_lexer::Symbol) -> Option<radix_hir::DefId> {
+        self.resolver
+            .lookup(name)
+            .or_else(|| match self.resolver.lookup_variant_bare(name) {
+                crate::BareVariantLookup::Single(def_id) => Some(def_id),
+                crate::BareVariantLookup::Ambiguous { .. } | crate::BareVariantLookup::None => None,
+            })
     }
 
     /// Lower binary expression (binarius)
@@ -1454,17 +1471,7 @@ impl Lowerer<'_> {
                     } else {
                         Some("conversio_via_unknown_hint")
                     };
-                    match issue {
-                        Some(issue) => self.push_error(
-                            SemanticErrorKind::ConversionInvalid,
-                            vec![
-                                DiagnosticArg::new("issue", issue),
-                                DiagnosticArg::new("hint", hint),
-                            ],
-                            via.span,
-                        ),
-                        None => params.push(via.name),
-                    }
+                    self.apply_via_hint_verdict(issue, hint, via, &mut params);
                 }
                 HirExpressionKind::ConversioAssign {
                     target: Box::new(target),
@@ -1490,11 +1497,7 @@ impl Lowerer<'_> {
     /// shape.
     fn lower_verte(&mut self, verte: &radix_syntax::VerteExpr, owner: HirId) -> HirExpressionKind {
         if matches!(verte.ty.kind, radix_syntax::TypeExprKind::Infer) {
-            // An inferred-constructor hole `_ {}` may become the typed-zero
-            // `crea` call at a dense slot (`empty_dense`); typecheck cannot
-            // intern, so the names it needs are interned here (as for `empty`).
-            self.intrinsic_surface_symbol("crea");
-            self.interner.intern("crea");
+            self.intern_typed_zero_crea_names();
         }
         let previous_bare_generic_construction = self.allow_bare_generic_construction;
         self.allow_bare_generic_construction = matches!(
@@ -1684,8 +1687,7 @@ impl Lowerer<'_> {
             // parent union — `finge missing.A.X { … }` must never bind the
             // local `A.X`, and a shadowing local enum must never capture a
             // qualified imported construction.
-            let symbols: Vec<radix_lexer::Symbol> =
-                finge.variant.iter().map(|ident| ident.name).collect();
+            let symbols = variant_path_symbols(&finge.variant);
             match self.resolver.qualified_variant_path(&symbols) {
                 crate::QualifiedVariantPathLookup::Variant(def_id) => Some(def_id),
                 crate::QualifiedVariantPathLookup::UnknownVariant
@@ -1714,30 +1716,17 @@ impl Lowerer<'_> {
                 // terminal segment's own identity through the bare table and
                 // the per-union namespace — exactly the single-segment policy
                 // (uvf-u3).
-                let symbols: Vec<radix_lexer::Symbol> =
-                    finge.variant.iter().map(|ident| ident.name).collect();
+                let symbols = variant_path_symbols(&finge.variant);
                 match self.resolver.qualified_variant_path(&symbols) {
                     crate::QualifiedVariantPathLookup::Variant(def_id) => Some(def_id),
                     crate::QualifiedVariantPathLookup::UnknownVariant => None,
-                    crate::QualifiedVariantPathLookup::NotQualified => self
-                        .resolver
-                        .lookup(last.name)
-                        .or_else(|| match self.resolver.lookup_variant_bare(last.name) {
-                            crate::BareVariantLookup::Single(def_id) => Some(def_id),
-                            crate::BareVariantLookup::Ambiguous { .. }
-                            | crate::BareVariantLookup::None => None,
-                        }),
+                    crate::QualifiedVariantPathLookup::NotQualified => {
+                        self.lookup_variant_bare_single(last.name)
+                    }
                 }
             }
         } else {
-            self.resolver.lookup(last.name).or_else(|| {
-                match self.resolver.lookup_variant_bare(last.name) {
-                    crate::BareVariantLookup::Single(def_id) => Some(def_id),
-                    crate::BareVariantLookup::Ambiguous { .. } | crate::BareVariantLookup::None => {
-                        None
-                    }
-                }
-            })
+            self.lookup_variant_bare_single(last.name)
         };
         let Some(variant_def_id) = resolved else {
             self.current_span = last.span;
@@ -1745,8 +1734,7 @@ impl Lowerer<'_> {
             return HirExpressionKind::Error;
         };
         if finge.variant.len() >= 2 {
-            let path: Vec<radix_lexer::Symbol> =
-                finge.variant.iter().map(|ident| ident.name).collect();
+            let path = variant_path_symbols(&finge.variant);
             self.record_variant_path(variant_def_id, &path);
         }
 
@@ -1961,6 +1949,18 @@ impl Lowerer<'_> {
         } else {
             None
         };
+        self.apply_via_hint_verdict(issue, hint, via, params);
+    }
+
+    /// Apply a `via`-hint verdict: a rejected hint reports against its own
+    /// span and contributes nothing; an accepted hint travels in `params`.
+    fn apply_via_hint_verdict(
+        &mut self,
+        issue: Option<&'static str>,
+        hint: String,
+        via: &radix_syntax::Ident,
+        params: &mut Vec<radix_lexer::Symbol>,
+    ) {
         match issue {
             Some(issue) => self.push_error(
                 SemanticErrorKind::ConversionInvalid,
@@ -2017,7 +2017,6 @@ impl Lowerer<'_> {
     ///
     /// Backtick application captures template text and parameters; it never routes
     /// through `scriptum` rendering.
-    // consumes args into expression
     fn lower_forma_capture(
         &mut self,
         template: radix_lexer::Symbol,
@@ -2177,6 +2176,12 @@ impl Lowerer<'_> {
             opener,
         }
     }
+}
+
+/// The authored variant path as bare symbols, for the qualified lookup and
+/// for the presentation path recorded against the resolved variant.
+fn variant_path_symbols(variant: &[radix_syntax::Ident]) -> Vec<radix_lexer::Symbol> {
+    variant.iter().map(|ident| ident.name).collect()
 }
 
 fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> TypeId {
