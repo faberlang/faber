@@ -91,3 +91,197 @@ fn exact_division_substitution_preserves_non_integral_failure() {
         Some(radix_types::IndexArithmeticError::NonIntegral)
     );
 }
+
+/// A-03: wrappers for the container variants whose element position carries a
+/// type (or a figura leaf) and that both generic traversals must rebuild, the
+/// way they rebuild the `lista<T>` twin.
+fn unbounded_wrappers() -> Vec<(&'static str, fn(&mut TypeTable, TypeId) -> TypeId)> {
+    vec![
+        ("lista", |types, inner| types.array(inner)),
+        ("queue", |types, inner| types.queue(inner)),
+        ("stack", |types, inner| types.stack(inner)),
+        ("atomic", |types, inner| types.atomic(inner)),
+        ("ledger value", |types, inner| {
+            let key = types.primitive(Primitive::Textus);
+            types.ledger(key, inner)
+        }),
+        ("ledger key", |types, inner| {
+            let value = types.primitive(Primitive::Textus);
+            types.ledger(inner, value)
+        }),
+        ("intersection", |types, inner| {
+            let other = types.primitive(Primitive::Textus);
+            types.intern(Type::Intersection(vec![inner, other]))
+        }),
+        ("record", |types, inner| {
+            types.record([(radix_lexer::Symbol(900), inner)])
+        }),
+    ]
+}
+
+fn bounded_wrappers() -> Vec<(
+    &'static str,
+    fn(&mut TypeTable, TypeId, IndexId) -> TypeId,
+)> {
+    vec![
+        ("bounded lista", |types, element, capacity| {
+            types.bounded_array(element, capacity)
+        }),
+        ("bounded queue", |types, element, capacity| {
+            types.bounded_queue(element, capacity)
+        }),
+        ("bounded stack", |types, element, capacity| {
+            types.bounded_stack(element, capacity)
+        }),
+    ]
+}
+
+#[test]
+fn substitute_type_params_rebuilds_every_container_variant() {
+    for (name, wrap) in unbounded_wrappers() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let mut interner = Interner::new();
+        let t = interner.intern("T");
+        let mut checker =
+            TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let param = checker.types.intern(Type::Param(t));
+        let concrete = checker.types.primitive(Primitive::Numerus);
+        let declared = wrap(checker.types, param);
+        let expected = wrap(checker.types, concrete);
+        let mut vars = FxHashMap::default();
+        vars.insert(t, concrete);
+
+        let instantiated = checker.substitute_type_params(declared, &mut vars, None);
+
+        assert_eq!(
+            instantiated, expected,
+            "{name}<T> must substitute T := numerus; got {:?}",
+            checker.types.get(instantiated)
+        );
+    }
+}
+
+#[test]
+fn substitute_type_params_substitutes_bounded_capacity_and_element() {
+    for (name, wrap) in bounded_wrappers() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let mut interner = Interner::new();
+        let t = interner.intern("T");
+        let n = interner.intern("N");
+        let mut checker =
+            TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let param = checker.types.intern(Type::Param(t));
+        let capacity_param = checker.types.intern_index(IndexExpr::Param(n));
+        let concrete = checker.types.primitive(Primitive::Numerus);
+        let four = checker.types.intern_index(IndexExpr::Literal(4));
+        let declared = wrap(checker.types, param, capacity_param);
+        let expected = wrap(checker.types, concrete, four);
+        let mut vars = FxHashMap::default();
+        vars.insert(t, concrete);
+        let mut shape_vars = FxHashMap::default();
+        shape_vars.insert(n, four);
+
+        let instantiated =
+            checker.substitute_type_params(declared, &mut vars, Some(&mut shape_vars));
+
+        assert_eq!(
+            instantiated, expected,
+            "{name}<T, N> must substitute T := numerus, N := 4; got {:?}",
+            checker.types.get(instantiated)
+        );
+    }
+}
+
+#[test]
+fn freshen_anonymous_type_holes_reaches_every_container_variant() {
+    for (name, wrap) in unbounded_wrappers() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let interner = Interner::new();
+        let mut checker =
+            TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let element = checker.types.primitive(Primitive::Fractus);
+        let hole = checker.fresh_index_hole();
+        let figura = checker.types.tensor_with_shape(element, hole);
+        let declared = wrap(checker.types, figura);
+        let mut holes = FxHashMap::default();
+
+        let freshened = checker.freshen_anonymous_type_holes(declared, &mut holes);
+
+        assert_eq!(
+            holes.len(),
+            1,
+            "{name}<tensor<_>> must reach the extent hole; got {:?}",
+            checker.types.get(freshened)
+        );
+        assert_ne!(
+            freshened, declared,
+            "{name}<tensor<_>> must get a per-call hole instead of the declared one"
+        );
+    }
+}
+
+#[test]
+fn freshen_anonymous_type_holes_reaches_bounded_capacity_and_element() {
+    for (name, wrap) in bounded_wrappers() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let interner = Interner::new();
+        let mut checker =
+            TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let element = checker.types.primitive(Primitive::Fractus);
+        let capacity = checker.fresh_index_hole();
+        let extent = checker.fresh_index_hole();
+        let figura = checker.types.tensor_with_shape(element, extent);
+        let declared = wrap(checker.types, figura, capacity);
+        let mut holes = FxHashMap::default();
+
+        let freshened = checker.freshen_anonymous_type_holes(declared, &mut holes);
+
+        assert_eq!(
+            holes.len(),
+            2,
+            "{name}<tensor<_>, _> must freshen capacity and element extent; got {:?}",
+            checker.types.get(freshened)
+        );
+        assert_ne!(freshened, declared, "{name} kept its declared holes");
+    }
+}
+
+/// A-03 at the source level: the call-site instantiation of `queue<T>` must
+/// bind `T` like the `lista<T>` twin instead of comparing a rigid `T`.
+#[test]
+fn generic_call_binds_type_param_through_queue_and_stack() {
+    crate::test_support::assert_accepts(
+        r#"functio peek_lista<T>(lista<T> q) → numerus {
+    redde 0
+}
+
+functio peek_queue<T>(queue<T> q) → numerus {
+    redde 0
+}
+
+functio peek_stack<T>(stack<T> s) → numerus {
+    redde 0
+}
+
+functio peek_bounded_queue<T>(queue<T, 4> q) → numerus {
+    redde 0
+}
+
+functio peek_bounded_stack<T>(stack<T, 4> s) → numerus {
+    redde 0
+}
+
+functio caller(lista<numerus> l, queue<numerus> q, stack<numerus> s, queue<numerus, 4> bq, stack<numerus, 4> bs) → numerus {
+    fixum numerus a ← peek_lista<numerus>(l)
+    fixum numerus b ← peek_queue<numerus>(q)
+    fixum numerus c ← peek_stack<numerus>(s)
+    fixum numerus d ← peek_bounded_queue<numerus>(bq)
+    fixum numerus e ← peek_bounded_stack<numerus>(bs)
+    redde a + b + c + d + e
+}"#,
+    );
+}

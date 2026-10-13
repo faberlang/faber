@@ -942,6 +942,40 @@ impl TypeChecker<'_> {
                 let capacity = self.freshen_anonymous_index_holes(capacity, holes);
                 self.types.bounded_array(element, capacity)
             }
+            Type::Queue(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.queue(inner)
+            }
+            Type::BoundedQueue { element, capacity } => {
+                let element = self.freshen_anonymous_type_holes(element, holes);
+                let capacity = self.freshen_anonymous_index_holes(capacity, holes);
+                self.types.bounded_queue(element, capacity)
+            }
+            Type::Stack(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.stack(inner)
+            }
+            Type::BoundedStack { element, capacity } => {
+                let element = self.freshen_anonymous_type_holes(element, holes);
+                let capacity = self.freshen_anonymous_index_holes(capacity, holes);
+                self.types.bounded_stack(element, capacity)
+            }
+            Type::Atomic(inner) => {
+                let inner = self.freshen_anonymous_type_holes(inner, holes);
+                self.types.atomic(inner)
+            }
+            Type::Ledger(key, value) => {
+                let key = self.freshen_anonymous_type_holes(key, holes);
+                let value = self.freshen_anonymous_type_holes(value, holes);
+                self.types.ledger(key, value)
+            }
+            Type::Record(fields) => {
+                let fields: Vec<_> = fields
+                    .iter()
+                    .map(|(name, field)| (*name, self.freshen_anonymous_type_holes(*field, holes)))
+                    .collect();
+                self.types.record(fields)
+            }
             Type::Func(sig) => {
                 let instantiated = self.instantiate_anonymous_extents(&sig);
                 self.types.function(instantiated)
@@ -967,6 +1001,13 @@ impl TypeChecker<'_> {
                     .map(|member| self.freshen_anonymous_type_holes(*member, holes))
                     .collect();
                 self.types.intern(Type::Union(types))
+            }
+            Type::Intersection(types) => {
+                let types = types
+                    .iter()
+                    .map(|member| self.freshen_anonymous_type_holes(*member, holes))
+                    .collect();
+                self.types.intern(Type::Intersection(types))
             }
             Type::Tuple(elements) => {
                 let elements = elements
@@ -1144,6 +1185,48 @@ impl TypeChecker<'_> {
                 let capacity = self.substitute_index_params(capacity, shape_vars.as_deref_mut());
                 self.types.bounded_array(element, capacity)
             }
+            Type::Queue(inner) => {
+                self.substitute_unary_type(inner, vars, shape_vars, |this, inner| {
+                    this.types.queue(inner)
+                })
+            }
+            Type::BoundedQueue { element, capacity } => {
+                let element = self.substitute_type_params(element, vars, shape_vars.as_deref_mut());
+                let capacity = self.substitute_index_params(capacity, shape_vars.as_deref_mut());
+                self.types.bounded_queue(element, capacity)
+            }
+            Type::Stack(inner) => {
+                self.substitute_unary_type(inner, vars, shape_vars, |this, inner| {
+                    this.types.stack(inner)
+                })
+            }
+            Type::BoundedStack { element, capacity } => {
+                let element = self.substitute_type_params(element, vars, shape_vars.as_deref_mut());
+                let capacity = self.substitute_index_params(capacity, shape_vars.as_deref_mut());
+                self.types.bounded_stack(element, capacity)
+            }
+            Type::Atomic(inner) => {
+                self.substitute_unary_type(inner, vars, shape_vars, |this, inner| {
+                    this.types.atomic(inner)
+                })
+            }
+            Type::Ledger(key, value) => {
+                let key = self.substitute_type_params(key, vars, shape_vars.as_deref_mut());
+                let value = self.substitute_type_params(value, vars, shape_vars.as_deref_mut());
+                self.types.ledger(key, value)
+            }
+            Type::Record(fields) => {
+                let fields: Vec<_> = fields
+                    .iter()
+                    .map(|(name, field)| {
+                        (
+                            *name,
+                            self.substitute_type_params(*field, vars, shape_vars.as_deref_mut()),
+                        )
+                    })
+                    .collect();
+                self.types.record(fields)
+            }
             Type::Func(sig) => {
                 let substituted = self.substitute_func_sig(&sig, vars, shape_vars.as_deref_mut());
                 self.types.function(substituted)
@@ -1171,6 +1254,15 @@ impl TypeChecker<'_> {
                     })
                     .collect();
                 self.types.intern(Type::Union(types))
+            }
+            Type::Intersection(types) => {
+                let types = types
+                    .iter()
+                    .map(|member| {
+                        self.substitute_type_params(*member, vars, shape_vars.as_deref_mut())
+                    })
+                    .collect();
+                self.types.intern(Type::Intersection(types))
             }
             Type::Tuple(elements) => {
                 let elements = elements
