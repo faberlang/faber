@@ -22,8 +22,10 @@ locale = "en"
 #     exactly as it does for a literal extent.
 #
 # Common mistakes:
-#   • Naming a `size` parameter or an expression extent (`size (n - 1)`) as the
-#     extent — the Rust emitter declines both by name; read a local binding.
+#   • Naming a `size` parameter that no tensor argument witnesses as the
+#     extent — Rust cannot read a value for it and declines by name. A `size`
+#     parameter witnessed by a tensor argument axis works, as does an
+#     expression extent over an in-scope binding (`size (n - 1)`).
 #   • Omitting Be/Le — the byte order is never implied, for any element width.
 #
 # See also: ↦, octeti, tensor, magnitudo
