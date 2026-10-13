@@ -70,6 +70,27 @@ fn run_cli_package(
     Ok(host.stdout_lines)
 }
 
+/// Diagnostic identity for failure context: code, issue and named args.
+fn diagnostic_identities(
+    diagnostics: &[radix_module::diagnostics::Diagnostic],
+) -> Vec<(
+    Option<&'static str>,
+    Option<&str>,
+    Vec<(&'static str, &str)>,
+)> {
+    diagnostics
+        .iter()
+        .map(|diag| {
+            let args = diag
+                .args
+                .iter()
+                .map(|arg| (arg.name, arg.value.as_str()))
+                .collect();
+            (diag.code, diag.issue(), args)
+        })
+        .collect()
+}
+
 const OPTION_AND_OPERAND_MAIN: &str = r#"
 @ cli "tool"
 @ option verbose short "v" long "verbose" type bool
@@ -103,10 +124,7 @@ fn package_mir_cli_double_dash_ends_options_for_root_operand() {
         .unwrap_or_else(|diagnostics| {
             panic!(
                 "`--` must end option parsing for {argumenta:?}, got {:?}",
-                diagnostics
-                    .iter()
-                    .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
-                    .collect::<Vec<_>>()
+                diagnostic_identities(&diagnostics)
             )
         });
         assert_eq!(lines, expected, "arguments {argumenta:?}");
@@ -149,10 +167,7 @@ fn run() args args {
     .unwrap_or_else(|diagnostics| {
         panic!(
             "`--` must end global option parsing, got {:?}",
-            diagnostics
-                .iter()
-                .map(|diag| (diag.code, diag.issue(), diag.message.clone()))
-                .collect::<Vec<_>>()
+            diagnostic_identities(&diagnostics)
         )
     });
     assert_eq!(lines, vec!["Ian".to_owned()]);
