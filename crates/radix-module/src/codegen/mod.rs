@@ -629,6 +629,41 @@ fn ts_gpu_builtins(
         .collect()
 }
 
+/// Register cross-file `DefIds` from sibling module imports into the Go codegen.
+///
+/// When a package file imports another local file, the type checker assigns
+/// `DefIds` for the exported types via the file interface system. The Go name
+/// catalog only collects local HIR declarations, so those cross-file `DefIds`
+/// would be unresolvable during code generation. The flattened Go package
+/// declares the imported items in a sibling file, so registering the exported
+/// member name is enough for the reference to resolve.
+#[cfg(feature = "hir-go")]
+fn register_go_cross_file_defids(
+    r#gen: &mut go::GoCodegen<'_>,
+    hir: &HirModule,
+    resolver: &crate::semantic::Resolver,
+) {
+    for item in &hir.items {
+        let crate::hir::HirItemKind::Import(import) = &item.kind else {
+            continue;
+        };
+        for import_item in &import.items {
+            let binding = import_item.alias.unwrap_or(import_item.name);
+            if !resolver.namespace_has_file_interface(binding) {
+                continue;
+            }
+            for export in resolver.imported_file_type_exports(binding) {
+                r#gen.register_external_def(export.def_id, export.member);
+            }
+        }
+    }
+    for namespace in resolver.file_interface_namespaces() {
+        for export in resolver.imported_file_type_exports(namespace) {
+            r#gen.register_external_def(export.def_id, export.member);
+        }
+    }
+}
+
 #[cfg(feature = "hir-go")]
 fn generate_go_from_analyzed(
     analysis: &crate::driver::AnalyzedModule,
@@ -639,6 +674,7 @@ fn generate_go_from_analyzed(
     r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
     r#gen.set_library_registry(&analysis.libraries);
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
+    register_go_cross_file_defids(&mut r#gen, hir, &analysis.resolver);
     let mut statics = rustc_hash::FxHashMap::default();
     for (def_id, fields, _, _) in analysis.resolver.imported_file_structs() {
         for field in fields {
