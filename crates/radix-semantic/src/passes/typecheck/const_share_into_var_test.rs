@@ -71,3 +71,110 @@ fn module_constant_scalar_into_var_is_accepted() {
         "fixum numerus N = 2\nincipit {\n    varia numerus b ← N\n    b ← b + 1\n    nota b\n}",
     );
 }
+
+#[test]
+fn const_genus_shared_into_var_is_rejected() {
+    let source = "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← c\n    nota d\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn const_genus_field_shared_into_var_is_rejected() {
+    let source = "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia lista<numerus> ys ← c.res\n    ys.appende(3)\n    nota c\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn module_constant_genus_field_shared_into_var_is_rejected() {
+    let source = "genus Custos {\n    varia lista<numerus> res\n}\nfixum Custos C = Custos { res = [1, 2] }\nincipit {\n    varia lista<numerus> ys ← C.res\n    ys.appende(3)\n    nota C\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn call_result_of_const_list_shared_into_var_is_rejected() {
+    let source = "functio pick(de lista<numerus> xs) → de lista<numerus> {\n    redde xs\n}\nincipit {\n    fixum lista<numerus> xs ← [1, 2]\n    varia lista<numerus> ys ← pick(xs)\n    ys.appende(3)\n    nota ys\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn const_nested_list_element_shared_into_var_is_rejected() {
+    let source = "incipit {\n    fixum lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> ys ← r\n        ys.appende(3)\n        nota ys\n    }\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        result.diagnostics.iter().any(|err| err.is_error()
+            && matches!(err.kind, SemanticErrorKind::ConstSharedIntoVar)
+            && test_support::issue(err) == Some(ISSUE)),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn plain_owned_call_result_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "functio pick(lista<numerus> xs) → lista<numerus> {\n    redde xs\n}\nincipit {\n    fixum lista<numerus> xs ← [1, 2]\n    varia lista<numerus> ys ← pick(xs)\n    ys.appende(3)\n    nota ys\n}",
+    );
+}
+
+#[test]
+fn var_nested_list_element_shared_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "incipit {\n    varia lista<lista<numerus>> xs ← [[1], [2]]\n    itera ex xs fixum r {\n        varia lista<numerus> ys ← r\n        nota ys\n    }\n}",
+    );
+}
+
+#[test]
+fn const_genus_copy_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    fixum Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← copy c\n    nota d\n}",
+    );
+}
+
+#[test]
+fn const_list_own_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "incipit {\n    fixum lista<numerus> xs ← [1]\n    varia lista<numerus> ys ← own xs\n    ys.appende(2)\n    nota ys\n}",
+    );
+}
+
+#[test]
+fn const_text_into_var_is_accepted() {
+    test_support::assert_accepts(
+        "incipit {\n    fixum textus s ← \"salve\"\n    varia textus t ← s\n    nota t\n}",
+    );
+}
+
+#[test]
+fn const_to_const_share_is_accepted() {
+    test_support::assert_accepts(
+        "incipit {\n    fixum lista<numerus> xs ← [1, 2]\n    fixum lista<numerus> ys ← xs\n    nota ys\n}",
+    );
+}
