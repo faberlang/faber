@@ -250,8 +250,9 @@ impl TypeChecker<'_> {
     }
 
     /// `const` is deep (need, rule 2): a plain `var T y ← x` of a
-    /// shareable (container or genus) value read through a `const` local
-    /// would make `y` a writable name for state `x` promises not to change.
+    /// shareable (container or genus) value read through a `const` local or a
+    /// module-level constant would make `y` a writable name for state `x`
+    /// promises not to change.
     /// The legal spellings are `← copy x` (an independent value) and
     /// `← own x` (take it over); scalars copy by value and stay legal.
     ///
@@ -274,7 +275,7 @@ impl TypeChecker<'_> {
         let Some(root) = Self::place_root(init) else {
             return;
         };
-        if !self.const_locals.contains(&root) {
+        if !self.is_read_only_root(root) {
             return;
         }
         let name_of = |checker: &Self, symbol: Option<Symbol>| {
@@ -283,7 +284,12 @@ impl TypeChecker<'_> {
                 .unwrap_or("value")
                 .to_owned()
         };
-        let binding = name_of(self, self.binding_names.get(&root).copied());
+        let binding_symbol = self
+            .binding_names
+            .get(&root)
+            .copied()
+            .or_else(|| self.resolver.get_symbol(root).map(|symbol| symbol.name));
+        let binding = name_of(self, binding_symbol);
         let name = name_of(self, Some(local.name));
         self.error_issue_with_args(
             SemanticErrorKind::ConstSharedIntoVar,
@@ -291,6 +297,13 @@ impl TypeChecker<'_> {
             init.span,
             &[("binding", binding), ("name", name)],
         );
+    }
+
+    /// A `const` local, or a module-level constant (an item with no local
+    /// binding, the same test `check_lvalue` uses for `assignment_to_constant`).
+    fn is_read_only_root(&self, root: radix_hir::DefId) -> bool {
+        self.const_locals.contains(&root)
+            || (self.lookup_binding(root).is_none() && self.consts.contains_key(&root))
     }
 
     /// A container or genus instance: a value a plain bind shares rather than
