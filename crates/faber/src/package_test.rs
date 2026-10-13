@@ -1057,6 +1057,17 @@ fn label() → string {
     let layout = discover_build_layout(&entry).expect("layout");
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
 
+    // Env gate (same convention as the tsc gate in this file): rustfmt must be
+    // a working toolchain — a rustup shim with no configured default toolchain
+    // fails `--version`. The emission assertions above are toolchain-free.
+    if !Command::new("rustfmt")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+    {
+        eprintln!("rustfmt not available; skipping rustfmt-clean emission test");
+        return;
+    }
     let rustfmt = Command::new("rustfmt")
         .args(["--edition", "2021", "--check"])
         .arg(&layout.generated_rust_entry)
@@ -10963,6 +10974,16 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &[]).expect("emit go");
+    // Env gate (same convention as the tsc/clang NVPTX gates in this crate):
+    // the assertions above are toolchain-free; the native build needs `go`.
+    if !Command::new("go")
+        .arg("version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+    {
+        eprintln!("go not found on PATH; skipping go build");
+        return;
+    }
     let binary = super::invoke_go_build(&go_layout).expect("go build");
     assert!(binary.exists(), "binary missing at {}", binary.display());
 
@@ -11043,6 +11064,16 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit go");
+    // Env gate (same convention as the tsc/clang NVPTX gates in this crate):
+    // the assertions above are toolchain-free; the native build needs `go`.
+    if !Command::new("go")
+        .arg("version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+    {
+        eprintln!("go not found on PATH; skipping go build");
+        return;
+    }
     let binary = super::invoke_go_build(&go_layout).expect("go build");
     let status = Command::new(&binary).status().expect("run");
     assert_eq!(status.code(), Some(0));
@@ -11238,6 +11269,16 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
+    // Env gate (same convention as the tsc/clang NVPTX gates in this crate):
+    // the assertions above are toolchain-free; the native build needs `go`.
+    if !Command::new("go")
+        .arg("version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+    {
+        eprintln!("go not found on PATH; skipping go build consolum surface");
+        return;
+    }
     let binary = super::invoke_go_build(&go_layout).expect("go build consolum surface");
 
     let mut child = Command::new(&binary)

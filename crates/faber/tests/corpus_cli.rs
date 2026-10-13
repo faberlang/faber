@@ -821,8 +821,28 @@ fn corpus_external_recipe_builds_and_checks_the_program_golden() {
     assert_eq!(records(&mismatch.stdout)[0]["reason"], "stdout mismatch");
 }
 
+/// Whether an LLVM IR verifier (`llvm-as` or `opt`) is on PATH — the same
+/// availability the gpu corpus target fail-closes on
+/// (`commands/corpus/gpu.rs` `find_verifier`).
+fn llvm_verifier_available() -> bool {
+    let probe = |tool: &str| {
+        Command::new(tool)
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+    };
+    probe("llvm-as") || probe("opt")
+}
+
 #[test]
 fn corpus_does_not_report_an_all_inapplicable_target_as_green() {
+    // Env gate (same convention as the tsc/clang NVPTX gates in this crate):
+    // the gpu target refuses to run at all without `llvm-as`/`opt`, so the
+    // no-applicable-cases summary cannot be produced on this host.
+    if !llvm_verifier_available() {
+        eprintln!("llvm-as/opt not found on PATH; skipping gpu inapplicability corpus test");
+        return;
+    }
     let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
     let output = Command::new(env!("CARGO_BIN_EXE_faber"))
         .args(["corpus", "--target", "gpu"])
