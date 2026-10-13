@@ -26,6 +26,12 @@ struct TensorNormFlags {
     beta: bool,
 }
 
+struct TensorConstValidation {
+    label: &'static str,
+    name: &'static str,
+    message: &'static str,
+}
+
 fn int_constant(constant: &MirConstant) -> Option<i64> {
     match constant {
         MirConstant::Int(value) => Some(*value),
@@ -2419,9 +2425,7 @@ impl Validator<'_, '_> {
         scope: &FunctionScope<'_, '_>,
         arg: &MirOperand,
         span: Span,
-        label: &'static str,
-        name: &'static str,
-        expected: &'static str,
+        validation: &TensorConstValidation,
         extract: fn(&MirConstant) -> Option<V>,
         predicate: P,
     ) where
@@ -2434,7 +2438,13 @@ impl Validator<'_, '_> {
         if let Some(value) = extract(constant) {
             predicate(self, value);
         } else {
-            self.error(span, format!("tensor {label} {name} must be {expected}"));
+            self.error(
+                span,
+                format!(
+                    "tensor {} {} must be {}",
+                    validation.label, validation.name, validation.message
+                ),
+            );
         }
     }
 
@@ -2450,9 +2460,11 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            label,
-            "axis",
-            "an int constant or temp",
+            &TensorConstValidation {
+                label,
+                name: "axis",
+                message: "an int constant or temp",
+            },
             int_constant,
             |this: &mut Self, axis_val: i64| {
                 if usize::try_from(axis_val).map_or(true, |axis| axis >= rank) {
@@ -2476,9 +2488,11 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            label,
-            "epsilon",
-            "a float constant or temp",
+            &TensorConstValidation {
+                label,
+                name: "epsilon",
+                message: "a float constant or temp",
+            },
             float_constant,
             |this: &mut Self, f: f64| {
                 if f <= 0.0 || !f.is_finite() {
@@ -2501,9 +2515,11 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            "rope",
-            "pos",
-            "an int constant or temp",
+            &TensorConstValidation {
+                label: "rope",
+                name: "pos",
+                message: "an int constant or temp",
+            },
             int_constant,
             |this: &mut Self, pos_val: i64| {
                 if pos_val < 0 {
