@@ -165,12 +165,6 @@ pub enum IntrinsicMirKind {
     TensorLimes,
 }
 
-/// Static catalog generic declaration.
-///
-/// Catalog rows cannot hold interned [`radix_types::GenericParamDescriptor`]
-/// values at static init. Typecheck interns these names into descriptors and
-/// then uses the shared generic binder. An empty list on a row means explicit
-/// angle-bracket arguments are illegal.
 /// Static `=` default for a catalog generic. Interned at typecheck.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CatalogGenericDefault {
@@ -178,6 +172,12 @@ pub enum CatalogGenericDefault {
     Valor,
 }
 
+/// Static catalog generic declaration.
+///
+/// Catalog rows cannot hold interned [`radix_types::GenericParamDescriptor`]
+/// values at static init. Typecheck interns these names into descriptors and
+/// then uses the shared generic binder. An empty list on a row means explicit
+/// angle-bracket arguments are illegal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CatalogGenericParam {
     pub name: &'static str,
@@ -247,90 +247,71 @@ impl MethodIntrinsic {
     }
 }
 
+/// One catalog row with every policy field at its macro default. Arms of
+/// [`intrinsic!`] supply only the MIR classification; a row that needs a
+/// non-default policy field is written out in full instead.
+macro_rules! intrinsic_row {
+    ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, $mir_kind:expr) => {
+        MethodIntrinsic {
+            receiver: IntrinsicReceiver::$receiver,
+            faber_name: $name,
+            generic: &[],
+            arg_count: $args,
+            params: $params,
+            return_kind: IntrinsicReturnKind::$ret,
+            mir_kind: $mir_kind,
+            missing_generic_issue: None,
+            excess_generic_issue: None,
+            value_arity_issue: None,
+            failable: false,
+            range_checked_arg: None,
+        }
+    };
+}
+
 macro_rules! intrinsic {
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, collection $op:ident) => {
-        MethodIntrinsic {
-            receiver: IntrinsicReceiver::$receiver,
-            faber_name: $name,
-            generic: &[],
-            arg_count: $args,
-            params: $params,
-            return_kind: IntrinsicReturnKind::$ret,
-            mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::$op),
-            missing_generic_issue: None,
-            excess_generic_issue: None,
-            value_arity_issue: None,
-            failable: false,
-            range_checked_arg: None,
-        }
+        intrinsic_row!(
+            $receiver,
+            $name,
+            $args,
+            $params,
+            $ret,
+            IntrinsicMirKind::Collection(MirCollectionOp::$op)
+        )
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, scalar_math $function:ident) => {
-        MethodIntrinsic {
-            receiver: IntrinsicReceiver::$receiver,
-            faber_name: $name,
-            generic: &[],
-            arg_count: $args,
-            params: $params,
-            return_kind: IntrinsicReturnKind::$ret,
-            mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::ScalarMath(
-                MirMathFunction::$function,
-            )),
-            missing_generic_issue: None,
-            excess_generic_issue: None,
-            value_arity_issue: None,
-            failable: false,
-            range_checked_arg: None,
-        }
+        intrinsic_row!(
+            $receiver,
+            $name,
+            $args,
+            $params,
+            $ret,
+            IntrinsicMirKind::Collection(MirCollectionOp::ScalarMath(MirMathFunction::$function))
+        )
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, math $function:ident) => {
-        MethodIntrinsic {
-            receiver: IntrinsicReceiver::$receiver,
-            faber_name: $name,
-            generic: &[],
-            arg_count: $args,
-            params: $params,
-            return_kind: IntrinsicReturnKind::$ret,
-            mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::TensorMath(
-                MirMathFunction::$function,
-            )),
-            missing_generic_issue: None,
-            excess_generic_issue: None,
-            value_arity_issue: None,
-            failable: false,
-            range_checked_arg: None,
-        }
+        intrinsic_row!(
+            $receiver,
+            $name,
+            $args,
+            $params,
+            $ret,
+            IntrinsicMirKind::Collection(MirCollectionOp::TensorMath(MirMathFunction::$function))
+        )
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, atomic $op:ident) => {
-        MethodIntrinsic {
-            receiver: IntrinsicReceiver::$receiver,
-            faber_name: $name,
-            generic: &[],
-            arg_count: $args,
-            params: $params,
-            return_kind: IntrinsicReturnKind::$ret,
-            mir_kind: IntrinsicMirKind::Atomic(MirAtomicOp::$op),
-            missing_generic_issue: None,
-            excess_generic_issue: None,
-            value_arity_issue: None,
-            failable: false,
-            range_checked_arg: None,
-        }
+        intrinsic_row!(
+            $receiver,
+            $name,
+            $args,
+            $params,
+            $ret,
+            IntrinsicMirKind::Atomic(MirAtomicOp::$op)
+        )
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, $mir:ident) => {
-        MethodIntrinsic {
-            receiver: IntrinsicReceiver::$receiver,
-            faber_name: $name,
-            generic: &[],
-            arg_count: $args,
-            params: $params,
-            return_kind: IntrinsicReturnKind::$ret,
-            mir_kind: IntrinsicMirKind::$mir,
-            missing_generic_issue: None,
-            excess_generic_issue: None,
-            value_arity_issue: None,
-            failable: false,
-            range_checked_arg: None,
-        }
+        intrinsic_row!($receiver, $name, $args, $params, $ret, IntrinsicMirKind::$mir)
     };
 }
 
@@ -354,7 +335,9 @@ pub static TENSOR_CONSTRUCTOR_ENTRY: MethodIntrinsic = intrinsic!(
     collection TensorCreate
 );
 
-/// Full promoted intrinsic catalog. Keep rows sorted by receiver, then name.
+/// Full promoted intrinsic catalog. Rows stay grouped by receiver; order
+/// within a receiver is presentation only, because every lookup keys on
+/// `(receiver, name, generic arity, value arity)`.
 pub static INTRINSICS: &[MethodIntrinsic] = &[
     // atomic
     intrinsic!(
