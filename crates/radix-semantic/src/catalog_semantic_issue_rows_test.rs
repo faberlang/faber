@@ -11,6 +11,9 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::SemanticErrorKind;
+use radix_diagnostics::DiagnosticArg;
+
 const EN_PACK: &str = "../../locale/en/pack.toml";
 
 fn production_sources(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -117,4 +120,20 @@ fn every_emitted_semantic_issue_slug_has_an_en_message_row() {
         missing.is_empty(),
         "issue slugs emitted by radix-semantic with no en pack row (locale/en/pack.toml): {missing:?}"
     );
+}
+
+/// `tensor_method_receiver` is emitted through `reject_with_arg`, a shape the
+/// slug scan above does not see, so the catalog arm needs its own proof: an
+/// issue with no `air_purity_reason` arm leaves the help renderer at its
+/// fallthrough and the diagnostic loses its baseline help.
+#[test]
+fn air_purity_tensor_method_receiver_issue_renders_through_the_catalog() {
+    let args = [
+        DiagnosticArg::new("issue", "tensor_method_receiver"),
+        DiagnosticArg::new("lane", "air"),
+        DiagnosticArg::new("method", "gelu"),
+    ];
+    let help = super::semantic_help(SemanticErrorKind::AirPurityViolation, &args)
+        .expect("catalog recognizes the tensor_method_receiver air-purity issue");
+    assert_eq!(help, super::AIR_PURITY_HELP);
 }

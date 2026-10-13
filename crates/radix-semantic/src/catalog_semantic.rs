@@ -1185,6 +1185,12 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         }
         "spread_call_arg" => "spread call arguments are outside the v1 AIR subset".to_owned(),
         "tacet" => "`tacet` is outside the v1 AIR subset".to_owned(),
+        "tensor_method_receiver" => {
+            let method = arg_value(args, "method")?;
+            format!(
+                "tensor method `{method}` on a non-tensor receiver is outside the v1 AIR subset"
+            )
+        }
         _ => return None,
     })
 }

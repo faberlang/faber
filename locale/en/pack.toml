@@ -4717,6 +4717,10 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: `tacet` is outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
+[diagnostics.SEM059.issues.tensor_method_receiver]
+message = "@ radix lane \"{lane}\" rejects this function body: tensor method `{method}` on a non-tensor receiver is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
 [diagnostics.SEM059.issues.closure_capture]
 message = "closure capture is not allowed here"
 help = "pass the value as a parameter instead of capturing it"
