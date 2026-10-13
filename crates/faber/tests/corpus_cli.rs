@@ -715,7 +715,7 @@ fn corpus_known_failure_becoming_green_requires_reclassification() {
     .expect("write suite");
     fs::write(
         case.join("case.toml"),
-        "version = 1\ninput = \"main.fab\"\n\n[targets.runner]\noutcome = \"known-fail\"\nphase = \"run\"\ndiagnostic_contains = \"SEM002.unknown_type\"\n",
+        "version = 1\ninput = \"main.fab\"\n\n[targets.runner]\noutcome = \"known-fail\"\nphase = \"run\"\ndiagnostic_contains = \"SEM002:unknown_type\"\n",
     )
     .expect("write case");
     fs::copy(
