@@ -28,7 +28,6 @@ pub mod stats;
 pub mod store;
 mod tensor_edge;
 mod tensor_lift;
-mod textus_literal;
 pub mod value;
 
 pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
@@ -2734,7 +2733,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 // `textus ↦ regex` conversion must see the decoded textus value
                 // (mirrors `MirConstant::String`), so `\\d+` is `\d+`.
                 let pattern = regex_pattern(
-                    &crate::textus_literal::decode_textus_literal(self.interner.resolve(*pattern)),
+                    &radix_lexer::textus_literal::decode_textus_literal(
+                        self.interner.resolve(*pattern),
+                    ),
                     flags.map(|flags| self.interner.resolve(flags)),
                 );
                 let program = RegexProgram::compile(&pattern).map_err(|payload| {
@@ -2929,7 +2930,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         if let Some(cached) = cache.get(&symbol) {
             return cached.clone();
         }
-        let decoded = crate::textus_literal::decode_textus_literal(self.interner.resolve(symbol));
+        let decoded =
+            radix_lexer::textus_literal::decode_textus_literal(self.interner.resolve(symbol));
         cache.insert(symbol, decoded.clone());
         decoded
     }
@@ -3600,7 +3602,7 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
             handroll::Magnus::parse_decimal(digits).is_ok_and(|left| left == **right)
         }
         (MirConstant::String(symbol), Value::Str(right)) => {
-            crate::textus_literal::decode_textus_literal(interner.resolve(*symbol)) == *right
+            radix_lexer::textus_literal::decode_textus_literal(interner.resolve(*symbol)) == *right
         }
         (MirConstant::Ascii(symbol), Value::Str(right)) => interner.resolve(*symbol) == right,
         (MirConstant::Ascii(symbol), Value::Ascii(right)) => {
@@ -3608,7 +3610,7 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
         }
         (MirConstant::Regex { pattern, flags }, Value::Regex(right)) => {
             regex_pattern(
-                &crate::textus_literal::decode_textus_literal(interner.resolve(*pattern)),
+                &radix_lexer::textus_literal::decode_textus_literal(interner.resolve(*pattern)),
                 flags.map(|flags| interner.resolve(flags)),
             ) == right.pattern()
         }

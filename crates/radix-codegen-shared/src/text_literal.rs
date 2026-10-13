@@ -5,20 +5,24 @@
 //! rustc time, but raw-byte backends (LLVM text globals, Wasm linear-memory
 //! literal tables) must decode the payload to real bytes before emission.
 //!
-//! The function is deliberately pure and dependency-free so every MIR text
-//! backend can share one decoding authority (lifted from the LLVM leaf;
-//! WE2-flagged shared-hub change landing with W11).
+//! The function is deliberately pure so every MIR text backend can share one
+//! decoding authority (lifted from the LLVM leaf; WE2-flagged shared-hub change
+//! landing with W11). The `\u{H…}` scalar escape goes through the lexer's
+//! decoder, so the accepted forms cannot drift from the typechecker's.
+
+use radix_lexer::textus_literal::try_decode_textus_literal;
 
 /// Decode the C-style escapes a fab `textus` literal keeps verbatim in its
 /// interner payload.
 ///
 /// Handles the escapes a Rust string literal accepts (`\\`, `\"`, `\'`,
-/// `\n`, `\t`, `\r`, `\0`); unknown escape pairs are preserved verbatim so a
-/// payload that is not a working fab-to-Rust string still emits faithfully.
+/// `\n`, `\t`, `\r`, `\0`) plus `\u{H…}`; unknown escape pairs and a malformed
+/// `\u` are preserved verbatim so a payload that is not a working fab-to-Rust
+/// string still emits faithfully.
 #[must_use]
 pub fn unescape_faber_text(raw: &str) -> String {
     let mut decoded = String::new();
-    let mut chars = raw.chars().peekable();
+    let mut chars = raw.chars();
     while let Some(ch) = chars.next() {
         if ch != '\\' {
             decoded.push(ch);
@@ -36,6 +40,10 @@ pub fn unescape_faber_text(raw: &str) -> String {
             't' => decoded.push('\t'),
             'r' => decoded.push('\r'),
             '0' => decoded.push('\0'),
+            'u' => match unicode_escape(&mut chars) {
+                Some(scalar) => decoded.push(scalar),
+                None => decoded.push_str("\\u"),
+            },
             other => {
                 decoded.push('\\');
                 decoded.push(other);
@@ -45,6 +53,19 @@ pub fn unescape_faber_text(raw: &str) -> String {
     decoded
 }
 
+/// Read `{H…}` after `\u`; `chars` advances only when the escape is well formed.
+fn unicode_escape(chars: &mut std::str::Chars<'_>) -> Option<char> {
+    // `{`, at most six hex digits, `}`: eight characters bound the scan.
+    let rest = chars.as_str();
+    let (close, _) = rest.char_indices().take(8).find(|&(_, ch)| ch == '}')?;
+    let decoded = try_decode_textus_literal(&format!("\\u{}", &rest[..=close])).ok()?;
+    *chars = rest[close + 1..].chars();
+    decoded.chars().next()
+}
+
 #[cfg(test)]
 #[path = "text_literal_test.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "text_literal_unicode_escape_test.rs"]
+mod unicode_escape_tests;

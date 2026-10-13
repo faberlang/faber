@@ -418,6 +418,9 @@ mod tensor_runtime_abi_tests;
 #[path = "tensor_systems_target_test.rs"]
 mod tensor_systems_target_tests;
 #[cfg(test)]
+#[path = "textus_unicode_escape_test.rs"]
+mod textus_unicode_escape_tests;
+#[cfg(test)]
 #[path = "true_division_zero_trap_test.rs"]
 mod true_division_zero_trap_tests;
 #[cfg(test)]
