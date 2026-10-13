@@ -133,3 +133,33 @@ fn cursor_frames_carry_every_scrinium_field() {
     assert_eq!(frames.len(), 1);
     assert_full_echo_frame(&frames[0], &fixture);
 }
+
+#[test]
+fn failed_leaf_reply_raises_the_leaf_error_text() {
+    const ROUTE: &str = "solum:lege";
+    const PATH: &str = "/nonexistent/radix-error-channel/x";
+    let expected = faber_leaf::serve(ROUTE, &[faber_leaf::Arg::Str(PATH.to_owned())])
+        .expect("solum:lege is a leaf route")
+        .expect_err("a missing file must fail")
+        .to_string();
+
+    let fixture = fixture();
+    runner_over!(fixture, runner);
+    let Value::Sermo(sermo) = runner
+        .sermo_open(ROUTE.to_owned(), Span::default())
+        .expect("open leaf route")
+    else {
+        panic!("sermo_open did not return a sermo");
+    };
+    runner
+        .sermo_set_opener(&sermo, Value::Str(PATH.to_owned()), Span::default())
+        .expect("set opener");
+    let error = runner
+        .sermo_first_item(&sermo, Span::default())
+        .expect_err("a failed leaf reply must raise");
+
+    assert_eq!(error.message, expected);
+    assert_eq!(error.issue, "runner_sermo_reply_conversion_failed");
+    assert!(error.message.contains(ROUTE), "{}", error.message);
+    assert!(error.message.contains(PATH), "{}", error.message);
+}

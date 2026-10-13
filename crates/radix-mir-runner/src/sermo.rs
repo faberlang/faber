@@ -582,9 +582,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     ),
                 ))
             }
-            (Some(SermoTerminal::Error(_) | SermoTerminal::Cancel), _) => Err(
-                RunnerError::conversion(span, "sermo reply conversion failed"),
-            ),
+            // WHY: the error terminal already carries the producer's own text
+            // (a leaf error's route, path and OS message), so that text is the
+            // message. The issue identity stays the stable conversion issue:
+            // it must not vary with the path or the OS wording.
+            (Some(SermoTerminal::Error(data)), _) => {
+                let mut error = RunnerError::conversion(span, "sermo reply conversion failed");
+                error.message = error_text(data);
+                Err(error)
+            }
+            (Some(SermoTerminal::Cancel), _) => Err(RunnerError::conversion(
+                span,
+                "sermo reply conversion failed",
+            )),
         }
     }
 
