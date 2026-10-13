@@ -1,4 +1,6 @@
-//! Plan package CLI dispatch: root entry, argument parsing, and subcommands.
+//! Package CLI planning (root entry, argument parsing, subcommands) and the
+//! semantic-type import surface used when rehoming types between analysis
+//! `TypeTable`s (source → target with canonical nominal identity).
 
 use super::{
     AnalyzedProgram, AnalyzedProgramNode, BTreeSet, CliCommand, CliDefault, CliDispatchPlan,
@@ -317,12 +319,12 @@ pub(super) fn plan_cli_root_entry(
             "CLI options beyond root boolean flags and scalar values",
         ));
     }
-    let operands = cli_program
+    let declared_operands = cli_program
         .global_operands
         .iter()
         .chain(&cli_program.operands)
         .collect::<Vec<_>>();
-    if has_unsupported_package_mir_operands(operands.iter().copied()) {
+    if has_unsupported_package_mir_operands(declared_operands.iter().copied()) {
         diagnostics.push(unsupported_cli_diagnostic(
             &unit.path,
             "CLI operands beyond supported positional values",
@@ -339,13 +341,7 @@ pub(super) fn plan_cli_root_entry(
             .chain(&cli_program.options),
     );
     let parsed = parse_cli_arguments(unit, &options, argumenta, diagnostics)?;
-    let operands = planned_cli_operands(
-        &unit.analysis.interner,
-        cli_program
-            .global_operands
-            .iter()
-            .chain(&cli_program.operands),
-    );
+    let operands = planned_cli_operands(&unit.analysis.interner, declared_operands.into_iter());
     let mut fields = parsed.option_fields;
     fields.extend(cli_operand_record_fields(
         unit,
@@ -855,6 +851,9 @@ pub(super) fn add_cli_runtime_field_type_rewrites(
     if unit_id == entry_id {
         return;
     }
+    // Temporarily move the unit out so its type table can be borrowed
+    // immutably alongside the entry's mutable type table; it is restored below
+    // and on the not-found early return.
     let Some(source) = package.nodes.remove(unit_id) else {
         return;
     };
@@ -1290,9 +1289,7 @@ pub(super) fn import_semantic_type_with_nominal(
         Type::TensorEdgePolicy(policy) => target.tensor_edge_policy(policy),
         Type::Array(inner) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
-            target
-                .find_array(inner)
-                .unwrap_or_else(|| target.array(inner))
+            target.ensure_array(inner)
         }
         Type::BoundedArray { element, capacity } => {
             let element =
@@ -1414,14 +1411,14 @@ pub(super) fn import_semantic_type_with_nominal(
         }
         Type::Intervallum(inner) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
-            target.intern(Type::Intervallum(inner))
+            target.intervallum(inner)
         }
         Type::SizedNumeric(primitive, width) => target.sized_numeric(primitive, width),
         Type::ModularWord(width) => target.intern(Type::ModularWord(width)),
         Type::Bits(width) => target.bits(width),
         Type::SaturatingWord(width) => target.intern(Type::SaturatingWord(width)),
         Type::PolicyFloat(policy, width) => target.intern(Type::PolicyFloat(policy, width)),
-        Type::SizedInstans(precision) => target.intern(Type::SizedInstans(precision)),
+        Type::SizedInstans(precision) => target.sized_instans(precision),
         Type::Option(inner) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.option(inner)
@@ -1487,7 +1484,7 @@ pub(super) fn import_semantic_type_with_nominal(
                     import_semantic_type_with_nominal(source, target, member, imported, nominal)
                 })
                 .collect();
-            target.intern(Type::Tuple(members))
+            target.tuple(members)
         }
         other @ (Type::Struct(_) | Type::Enum(_) | Type::Interface(_)) => {
             import_nominal_by_canonical_key(&other, nominal).unwrap_or_else(|| {
@@ -1590,8 +1587,9 @@ pub(super) fn command_cli_args_type(
         let HirItemKind::Function(function) = &item.kind else {
             return None;
         };
-        (function.name == command.function_symbol)
-            .then(|| function.cli_args.as_ref().map(|param| param.ty))
-            .flatten()
+        if function.name != command.function_symbol {
+            return None;
+        }
+        function.cli_args.as_ref().map(|param| param.ty)
     })
 }
