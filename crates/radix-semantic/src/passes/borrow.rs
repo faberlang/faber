@@ -5,8 +5,8 @@
 //! - [`analyze_modes`] — **target-neutral** access-fact policy: use-after-
 //!   consume, illegal mutation through `ref`, and incompatible access passing.
 //!   Runs for every application-lane target.
-//! - [`analyze`] — Rust uses the same declared-fact rules; it does not add a
-//!   simulated lifetime policy.
+//! - [`analyze`] — legacy Rust-target analysis: the declared access facts plus
+//!   the retained Rust-lifetime approximation for unmarked values.
 //!
 //! Precise lifetime reasoning remains Rust's job. Declared access validity is
 //! decided before target selection so TS/Go cannot silently accept programs
@@ -123,7 +123,7 @@ pub fn analyze_modes(
     types: &TypeTable,
     interner: &Interner,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, interner, false, true, None)
+    run(hir, types, interner, false, None)
 }
 
 /// Region-routed [`analyze_modes`]: marked-value borrow conflicts consult the
@@ -139,7 +139,7 @@ pub fn analyze_modes_with_regions(
     interner: &Interner,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, interner, false, true, regions)
+    run(hir, types, interner, false, regions)
 }
 
 /// Legacy Rust-target analysis: declared access facts plus the Rust lifetime
@@ -156,7 +156,7 @@ pub fn analyze(
     types: &TypeTable,
     interner: &Interner,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, interner, true, true, None)
+    run(hir, types, interner, true, None)
 }
 
 /// Region-routed [`analyze`]: marked-value borrow conflicts consult the
@@ -173,7 +173,7 @@ pub fn analyze_with_regions(
     interner: &Interner,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    run(hir, types, interner, true, true, regions)
+    run(hir, types, interner, true, regions)
 }
 
 /// Retired Rust lifetime simulation hook.
@@ -199,11 +199,9 @@ fn run(
     types: &TypeTable,
     interner: &Interner,
     rust_lifetime: bool,
-    language_conflicts: bool,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
-    let mut checker =
-        BorrowChecker::new(types, interner, rust_lifetime, language_conflicts, regions);
+    let mut checker = BorrowChecker::new(types, interner, rust_lifetime, regions);
     checker.check_program(hir);
 
     if checker.errors.is_empty() {
@@ -276,12 +274,10 @@ struct BorrowChecker<'a> {
     /// Resolves method-call symbols so receiver writes key on the intrinsic
     /// registry (`is_mutating_receiver`), not on the call's return type.
     interner: &'a Interner,
-    /// Retained only for the retired qualification implementation path;
-    /// normal analysis never enables simulated Rust lifetime diagnostics.
+    /// Legacy Rust-lifetime approximation: explicit refs of unmarked values,
+    /// typed-callee argument borrows, and unmarked Move-mode consumption.
+    /// [`analyze`] sets it; target-neutral [`analyze_modes`] does not.
     rust_lifetime: bool,
-    /// When true, emit the mutable-borrow-conflict family as language rules
-    /// (mut-local binds, `mut`/`ref` dests, explicit refs of `mut` roots).
-    language_conflicts: bool,
     states: FxHashMap<DefId, BorrowState>,
     scopes: Vec<BorrowScope>,
     param_usage: FxHashMap<DefId, ParamUsage>,
@@ -379,14 +375,12 @@ impl<'a> BorrowChecker<'a> {
         types: &'a TypeTable,
         interner: &'a Interner,
         rust_lifetime: bool,
-        language_conflicts: bool,
         regions: Option<&'a RegionFacts>,
     ) -> Self {
         Self {
             types,
             interner,
             rust_lifetime,
-            language_conflicts,
             states: FxHashMap::default(),
             scopes: Vec::new(),
             param_usage: FxHashMap::default(),
@@ -512,7 +506,7 @@ impl<'a> BorrowChecker<'a> {
                 param.def_id,
                 ParamUsage {
                     mode: param.mode,
-                    marker: self.types.peel_access_marker(param.ty).0,
+                    marker,
                     span: param.span,
                     mutated: false,
                     passed_in_or_ex: false,
@@ -644,7 +638,7 @@ impl<'a> BorrowChecker<'a> {
             self.note_mut_root(local.def_id, ty);
             self.note_copy_root(local.def_id, ty);
             self.note_own_root(local.def_id, ty);
-            if self.language_conflicts && self.types.is_mut_view(ty) {
+            if self.types.is_mut_view(ty) {
                 self.warn_mut_local(stmt_span);
             }
         }
@@ -720,9 +714,9 @@ impl<'a> BorrowChecker<'a> {
             self.bind_copy_from(init);
         } else if local.ty.is_some_and(|ty| self.types.is_own_view(ty)) {
             self.bind_own_from(init);
-        } else if self.language_conflicts && local.ty.is_some_and(|ty| self.types.is_mut_view(ty)) {
+        } else if local.ty.is_some_and(|ty| self.types.is_mut_view(ty)) {
             self.bind_mut_from(init, Some(local.def_id));
-        } else if self.language_conflicts && local.ty.is_some_and(|ty| self.types.is_ref_view(ty)) {
+        } else if local.ty.is_some_and(|ty| self.types.is_ref_view(ty)) {
             self.bind_ref_from(init, Some(local.def_id));
         } else {
             self.check_expr(init);
@@ -774,7 +768,7 @@ impl<'a> BorrowChecker<'a> {
         // call-scoped so sequential use after a single `mut` param call stays
         // legal. Own-param transfers still run below.
         let rust_sim = callee.ty.is_some();
-        let language_call_borrows = self.language_conflicts && !(rust_sim && self.rust_lifetime);
+        let language_call_borrows = !(rust_sim && self.rust_lifetime);
         // Their mut/ref dest-call borrows are call-scoped in every pass: real
         // Rust releases an argument's `&mut`/`&` reborrow when the call ends,
         // so push a call scope that releases these at call end instead of
@@ -1100,7 +1094,7 @@ impl<'a> BorrowChecker<'a> {
         let mut error = SemanticError::structured(SemanticErrorKind::ImmutableAssignment, arg.span)
             .with_arg("issue", ISSUE_MUT_ARGUMENT_NOT_WRITABLE)
             .with_arg("position", (position + 1).to_string());
-        if let Some(spelling) = origin.and_then(|root| self.param_spelling(root)) {
+        if let Some(spelling) = origin.and_then(|root| self.def_spelling(root)) {
             error = error.with_arg("binding", spelling);
         }
         self.errors.push(error);
@@ -1131,7 +1125,8 @@ impl<'a> BorrowChecker<'a> {
         self.nonmut_agg_aliases.get(&def_id).copied()
     }
 
-    fn param_spelling(&self, def_id: DefId) -> Option<String> {
+    /// Source spelling of a binding, for a diagnostic that names it.
+    fn def_spelling(&self, def_id: DefId) -> Option<String> {
         self.names
             .get(&def_id)
             .and_then(|name| self.interner.strings().get(name.0 as usize))
@@ -1158,7 +1153,7 @@ impl<'a> BorrowChecker<'a> {
     ) {
         let mut error = SemanticError::structured(SemanticErrorKind::ImmutableAssignment, span)
             .with_arg("issue", ISSUE_MUTATING_METHOD_ON_IMMUTABLE)
-            .with_arg("binding", self.param_spelling(origin).unwrap_or_default());
+            .with_arg("binding", self.def_spelling(origin).unwrap_or_default());
         if let Some(name) = self.interner.strings().get(method.0 as usize) {
             error = error.with_arg("method", name.clone());
         }
@@ -1170,12 +1165,8 @@ impl<'a> BorrowChecker<'a> {
     fn nonmut_tensor_write_error(&mut self, def_id: DefId, span: radix_lexer::Span) {
         let mut error = SemanticError::structured(SemanticErrorKind::AssignToImmutableBorrow, span)
             .with_arg("issue", ISSUE_ASSIGN_TO_NONMUT_TENSOR_PARAM);
-        if let Some(spelling) = self
-            .names
-            .get(&def_id)
-            .and_then(|name| self.interner.strings().get(name.0 as usize))
-        {
-            error = error.with_arg("name", spelling.clone());
+        if let Some(spelling) = self.def_spelling(def_id) {
+            error = error.with_arg("name", spelling);
         }
         self.errors.push(error);
     }
@@ -1595,11 +1586,7 @@ impl<'a> BorrowChecker<'a> {
     /// Explicit `&`/`&mut` on unmarked values stay Rust-lifetime only.
     /// `mut` roots are language (MU-4). Combined analysis tracks both.
     fn tracks_explicit_ref(&self, def_id: DefId) -> bool {
-        if self.rust_lifetime {
-            self.language_conflicts || !self.mut_roots.contains(&def_id)
-        } else {
-            self.language_conflicts && self.mut_roots.contains(&def_id)
-        }
+        self.rust_lifetime || self.mut_roots.contains(&def_id)
     }
 
     /// Exclusive-borrow bind of a `mut` local from a path (or projection root).
@@ -2183,12 +2170,8 @@ impl<'a> BorrowChecker<'a> {
     fn conflict(&mut self, issue: &str, def_id: DefId, span: radix_lexer::Span) {
         let mut error = SemanticError::structured(SemanticErrorKind::MutableBorrowConflict, span)
             .with_arg("issue", issue);
-        if let Some(spelling) = self
-            .names
-            .get(&def_id)
-            .and_then(|name| self.interner.strings().get(name.0 as usize))
-        {
-            error = error.with_arg("name", spelling.clone());
+        if let Some(spelling) = self.def_spelling(def_id) {
+            error = error.with_arg("name", spelling);
         }
         self.errors.push(error);
     }
@@ -2393,8 +2376,7 @@ impl HirVisitor for BorrowChecker<'_> {
                     || Self::root_def_id(target).is_some_and(|id| self.own_roots.contains(&id))
                 {
                     self.bind_own_from(value);
-                } else if self.language_conflicts
-                    && !self.is_scalar_place(target)
+                } else if !self.is_scalar_place(target)
                     && (target.ty.is_some_and(|ty| self.types.is_mut_view(ty))
                         || Self::root_def_id(target).is_some_and(|id| self.mut_roots.contains(&id)))
                 {

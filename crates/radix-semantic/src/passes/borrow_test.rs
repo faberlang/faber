@@ -1766,3 +1766,41 @@ fn rust_lifetime_releases_mut_param_call_borrow_after_call() {
         result.err()
     );
 }
+
+#[test]
+fn borrow_conflict_names_the_borrowed_place() {
+    // `conflict` resolves the place spelling through the shared lookup; the
+    // diagnostic must still carry the binding name.
+    let source = r"
+fn f(ref tf32[2, 2] a) → void {
+    var mut tf32[2, 2] x ← a
+    var mut tf32[2, 2] y ← a
+    print x.flatten()
+    print y.flatten()
+}
+main {
+}";
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    let fixture = crate::test_support::analyze_source_with_config(source, config);
+    let conflict = fixture
+        .result
+        .diagnostics
+        .iter()
+        .find(|err| {
+            err.args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "mutable_borrow_conflict")
+        })
+        .expect("mutable_borrow_conflict diagnostic");
+    assert!(
+        conflict
+            .args
+            .iter()
+            .any(|arg| arg.name == "name" && arg.value == "a"),
+        "conflict should name the borrowed place: {conflict:?}"
+    );
+}

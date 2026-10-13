@@ -667,100 +667,7 @@ impl TypeChecker<'_> {
                 iter,
                 body: block,
                 ..
-            } => {
-                let iter_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
-                    self.check_expr_allowing_direct_intervallum_step(iter)
-                } else {
-                    self.check_expr(iter)
-                };
-                // A collection field read through an immutable `ref` root
-                // is a read-only view of the carrier collection. Use that
-                // carrier for iterable-shape dispatch; field projections
-                // retain their `Ref` type for access and borrow checks.
-                let dispatch_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
-                    iter_ty
-                } else {
-                    self.types
-                        .peel_access_marker(self.resolve_inferred_type(iter_ty))
-                        .1
-                };
-                let has_coordinates = !coordinate_bindings.is_empty();
-
-                // Mode rule: `apud` coordinates require `ex` iteration in v1.
-                if has_coordinates && !matches!(mode, radix_hir::HirIteraMode::Ex) {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        ISSUE_ITERA_APUD_REQUIRES_EX,
-                        iter.span,
-                    );
-                }
-
-                // Arity rule (D3.1): the `apud` names are exactly what goes in
-                // the index brackets to get the element back, so their count
-                // equals the iterable's rank — tensor shape length, matrix 2,
-                // lista 1, tabula 1 or its tuple-key arity — never a partial
-                // bind. A rank >= 2 tensor without an `apud` clause is arity
-                // 0 != rank. Unindexed iterables (copia, cursors, text, …)
-                // reject `apud` fail-closed.
-                let numerus = self.numerus_type();
-                let mut coordinate_types = vec![numerus; coordinate_bindings.len()];
-                if matches!(mode, radix_hir::HirIteraMode::Ex) {
-                    match itera_apud_coordinates(
-                        self.types,
-                        dispatch_ty,
-                        numerus,
-                        has_coordinates,
-                        coordinate_bindings.len(),
-                    ) {
-                        IteraApud::Admitted(types) => coordinate_types = types,
-                        IteraApud::RequiresIndexed => self.error_issue(
-                            SemanticErrorKind::TypeMismatch,
-                            ISSUE_ITERA_APUD_REQUIRES_INDEXED_ITERABLE,
-                            iter.span,
-                        ),
-                        IteraApud::Mismatch { expected, actual } => self.errors.push(
-                            SemanticError::structured(SemanticErrorKind::TypeMismatch, iter.span)
-                                .with_arg("issue", ISSUE_ITERA_APUD_ARITY_MISMATCH)
-                                .with_arg("expected", expected.to_string())
-                                .with_arg("actual", actual.to_string()),
-                        ),
-                    }
-                }
-
-                if self.current_air_function {
-                    self.narrow_apud_coordinates(dispatch_ty, &mut coordinate_types);
-                }
-
-                let elem_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
-                    if let Some(bound) = self.intervallum_bound_type(iter_ty) {
-                        self.constant_range_loop_type(iter, bound)
-                    } else {
-                        self.error_issue(
-                            SemanticErrorKind::TypeMismatch,
-                            ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE,
-                            iter.span,
-                        );
-                        self.numerus_type()
-                    }
-                } else {
-                    self.itera_element_type(dispatch_ty, *mode, iter.span)
-                };
-                self.push_scope();
-                for ((def_id, _name), ty) in coordinate_bindings.iter().zip(coordinate_types) {
-                    self.insert_binding(*def_id, ty);
-                }
-                if matches!(mode, radix_hir::HirIteraMode::Ex) {
-                    super::tensor_index::record_coordinate_binder_extents(
-                        self,
-                        dispatch_ty,
-                        coordinate_bindings,
-                    );
-                }
-                self.insert_binding(*binding, elem_ty);
-                self.check_loop_block_over(std::iter::once(&**iter), block);
-                self.pop_scope();
-                self.vacuum_type()
-            }
+            } => self.check_itera_expr(mode, coordinate_bindings, binding, iter, block),
             HirExpressionKind::IteraLockstep {
                 sources,
                 coordinates,
@@ -947,36 +854,7 @@ impl TypeChecker<'_> {
                 self.check_expr(value);
                 self.vacuum_type()
             }
-            HirExpressionKind::Throw(value) => {
-                // A declared `⇥ T` channel is a slot: the thrown value is a
-                // store into `T` (row 11). Local and trap sinks accumulate.
-                let value_ty = match self.current_error {
-                    Some(ErrorSink::Function(slot)) => {
-                        self.check_store_by_type(value, slot, StoreSite::new(HirStoreKind::Throw))
-                    }
-                    _ => self.check_expr(value),
-                };
-                if let Some(err_ty) = self.current_error.map(|sink| match sink {
-                    ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
-                    // UT: the throw payload accumulates into the trap hole —
-                    // same funnel, no channel-specific typing.
-                    ErrorSink::Trap(var) => self.trap_sink_type(var),
-                }) {
-                    self.unify_assign_issue(
-                        value_ty,
-                        err_ty,
-                        value.span,
-                        ISSUE_IACE_VALUE_TYPE_MISMATCH,
-                    );
-                } else {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        ISSUE_IACE_REQUIRES_ALTERNATE_EXIT,
-                        expr.span,
-                    );
-                }
-                self.vacuum_type()
-            }
+            HirExpressionKind::Throw(value) => self.check_throw(value, expr.span),
             HirExpressionKind::Handled { body, catch } => {
                 self.check_handled_block(body, catch, expected)
             }
@@ -1188,6 +1066,139 @@ impl TypeChecker<'_> {
         ty
     }
 
+    /// Typecheck a thrown value against the enclosing error channel. The
+    /// throw expression itself is `vacuum`; no channel is a named error.
+    fn check_throw(&mut self, value: &mut HirExpression, span: radix_lexer::Span) -> TypeId {
+        // A declared `⇥ T` channel is a slot: the thrown value is a
+        // store into `T` (row 11). Local and trap sinks accumulate.
+        let value_ty = match self.current_error {
+            Some(ErrorSink::Function(slot)) => {
+                self.check_store_by_type(value, slot, StoreSite::new(HirStoreKind::Throw))
+            }
+            _ => self.check_expr(value),
+        };
+        if let Some(err_ty) = self.current_error.map(|sink| match sink {
+            ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
+            // UT: the throw payload accumulates into the trap hole —
+            // same funnel, no channel-specific typing.
+            ErrorSink::Trap(var) => self.trap_sink_type(var),
+        }) {
+            self.unify_assign_issue(value_ty, err_ty, value.span, ISSUE_IACE_VALUE_TYPE_MISMATCH);
+        } else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_IACE_REQUIRES_ALTERNATE_EXIT,
+                span,
+            );
+        }
+        self.vacuum_type()
+    }
+
+    /// Typecheck an `itera` loop: the source and element types, the
+    /// `apud`-versus-rank arity law and mode rule, AIR coordinate narrowing,
+    /// the binder scope, and the loop body. The loop itself is `vacuum`.
+    fn check_itera_expr(
+        &mut self,
+        mode: &radix_hir::HirIteraMode,
+        coordinate_bindings: &[(DefId, Symbol)],
+        binding: &DefId,
+        iter: &mut Box<HirExpression>,
+        block: &mut HirBlock,
+    ) -> TypeId {
+        let iter_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
+            self.check_expr_allowing_direct_intervallum_step(iter)
+        } else {
+            self.check_expr(iter)
+        };
+        // A collection field read through an immutable `ref` root
+        // is a read-only view of the carrier collection. Use that
+        // carrier for iterable-shape dispatch; field projections
+        // retain their `Ref` type for access and borrow checks.
+        let dispatch_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
+            iter_ty
+        } else {
+            self.types
+                .peel_access_marker(self.resolve_inferred_type(iter_ty))
+                .1
+        };
+        let has_coordinates = !coordinate_bindings.is_empty();
+
+        // Mode rule: `apud` coordinates require `ex` iteration in v1.
+        if has_coordinates && !matches!(mode, radix_hir::HirIteraMode::Ex) {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_ITERA_APUD_REQUIRES_EX,
+                iter.span,
+            );
+        }
+
+        // Arity rule (D3.1): the `apud` names are exactly what goes in
+        // the index brackets to get the element back, so their count
+        // equals the iterable's rank — tensor shape length, matrix 2,
+        // lista 1, tabula 1 or its tuple-key arity — never a partial
+        // bind. A rank >= 2 tensor without an `apud` clause is arity
+        // 0 != rank. Unindexed iterables (copia, cursors, text, …)
+        // reject `apud` fail-closed.
+        let numerus = self.numerus_type();
+        let mut coordinate_types = vec![numerus; coordinate_bindings.len()];
+        if matches!(mode, radix_hir::HirIteraMode::Ex) {
+            match itera_apud_coordinates(
+                self.types,
+                dispatch_ty,
+                numerus,
+                has_coordinates,
+                coordinate_bindings.len(),
+            ) {
+                IteraApud::Admitted(types) => coordinate_types = types,
+                IteraApud::RequiresIndexed => self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_ITERA_APUD_REQUIRES_INDEXED_ITERABLE,
+                    iter.span,
+                ),
+                IteraApud::Mismatch { expected, actual } => self.errors.push(
+                    SemanticError::structured(SemanticErrorKind::TypeMismatch, iter.span)
+                        .with_arg("issue", ISSUE_ITERA_APUD_ARITY_MISMATCH)
+                        .with_arg("expected", expected.to_string())
+                        .with_arg("actual", actual.to_string()),
+                ),
+            }
+        }
+
+        if self.current_air_function {
+            self.narrow_apud_coordinates(dispatch_ty, &mut coordinate_types);
+        }
+
+        let elem_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {
+            if let Some(bound) = self.intervallum_bound_type(iter_ty) {
+                self.constant_range_loop_type(iter, bound)
+            } else {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_ITERA_AB_SOURCE_REQUIRES_RANGE,
+                    iter.span,
+                );
+                self.numerus_type()
+            }
+        } else {
+            self.itera_element_type(dispatch_ty, *mode, iter.span)
+        };
+        self.push_scope();
+        for ((def_id, _name), ty) in coordinate_bindings.iter().zip(coordinate_types) {
+            self.insert_binding(*def_id, ty);
+        }
+        if matches!(mode, radix_hir::HirIteraMode::Ex) {
+            super::tensor_index::record_coordinate_binder_extents(
+                self,
+                dispatch_ty,
+                coordinate_bindings,
+            );
+        }
+        self.insert_binding(*binding, elem_ty);
+        self.check_loop_block_over(std::iter::once(&**iter), block);
+        self.pop_scope();
+        self.vacuum_type()
+    }
+
     /// Unify a synthesized expression type with the expected type.
     pub(super) fn unify_expected(
         &mut self,
@@ -1282,7 +1293,7 @@ impl TypeChecker<'_> {
         // single collection member, as for a list literal (opt-lit).
         let resolved = self.vacua_collection_member(resolved).unwrap_or(resolved);
 
-        let tensor_shape = match self.types.get(resolved) {
+        let shape = match self.types.get(resolved) {
             Type::Array(_)
             | Type::BoundedArray { .. }
             | Type::Queue(_)
@@ -1293,15 +1304,13 @@ impl TypeChecker<'_> {
             | Type::Set(_) => {
                 return resolved;
             }
-            Type::Tensor(_, shape) | Type::Sparsa(_, shape) => Some(*shape),
+            Type::Tensor(_, shape) | Type::Sparsa(_, shape) => *shape,
             _ => {
                 self.invalid_operand_types("vacua_requires_collection_type", span);
                 return self.error_type;
             }
         };
-        if let Some(shape) = tensor_shape
-            && self.is_unresolved_index_hole(shape)
-        {
+        if self.is_unresolved_index_hole(shape) {
             let rank0 = self.types.rank0_shape();
             self.constrain_index_equal(shape, rank0, span);
         }

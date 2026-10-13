@@ -50,6 +50,8 @@ struct TensorNormSpec {
     label: &'static str,
     receiver_label: &'static str,
     flags: TensorNormFlags,
+    gamma_message: &'static str,
+    result_message: &'static str,
 }
 
 impl Validator<'_, '_> {
@@ -1663,9 +1665,11 @@ impl Validator<'_, '_> {
                 let arg_ty = match self.type_kind(receiver_ty) {
                     Type::Primitive(Primitive::Numerus | Primitive::Fractus)
                     | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _) => receiver_ty,
-                    Type::Array(element)
-                    | Type::BoundedArray { element, .. }
-                    | Type::Tensor(element, _) => MirType::semantic(*element),
+                    // Tensors returned above; a lista receiver clamps by its
+                    // element type.
+                    Type::Array(element) | Type::BoundedArray { element, .. } => {
+                        MirType::semantic(*element)
+                    }
                     _ => {
                         self.error(
                             span,
@@ -2035,17 +2039,16 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                let receiver_kind = self.type_kind(receiver_ty).clone();
-                let Type::Tensor(element, _) = receiver_kind else {
+                let Type::Tensor(element, _) = self.type_kind(receiver_ty) else {
                     self.error(span, "tensor get receiver is not tensor");
                     return;
                 };
                 let result_ok = match self.type_kind(call.return_ty) {
-                    Type::Option(inner) => self.context.types.equals(*inner, element),
+                    Type::Option(inner) => self.context.types.equals(*inner, *element),
                     _ => self
                         .context
                         .types
-                        .equals(call.return_ty.semantic_id(), element),
+                        .equals(call.return_ty.semantic_id(), *element),
                 };
                 if !result_ok {
                     self.error(
@@ -2812,6 +2815,8 @@ impl Validator<'_, '_> {
                     layernorm_arity_gate: true,
                     beta: true,
                 },
+                gamma_message: "tensor layernorm gamma is not tensor",
+                result_message: "tensor layernorm result is not tensor",
             },
         );
     }
@@ -2836,6 +2841,8 @@ impl Validator<'_, '_> {
                     layernorm_arity_gate: false,
                     beta: false,
                 },
+                gamma_message: "tensor rms_norm gamma is not tensor",
+                result_message: "tensor rms_norm result is not tensor",
             },
         );
     }
@@ -2884,14 +2891,7 @@ impl Validator<'_, '_> {
                 .get(3)
                 .and_then(|arg| self.validate_operand(scope, arg, span))
         {
-            self.require_tensor_type(
-                gamma_ty,
-                span,
-                match label {
-                    "layernorm" => "tensor layernorm gamma is not tensor",
-                    _ => "tensor rms_norm gamma is not tensor",
-                },
-            );
+            self.require_tensor_type(gamma_ty, span, spec.gamma_message);
         }
         if flags.beta
             && call.args.len() >= 5
@@ -2902,14 +2902,7 @@ impl Validator<'_, '_> {
         {
             self.require_tensor_type(beta_ty, span, "tensor layernorm beta is not tensor");
         }
-        self.require_tensor_type(
-            call.return_ty,
-            span,
-            match label {
-                "layernorm" => "tensor layernorm result is not tensor",
-                _ => "tensor rms_norm result is not tensor",
-            },
-        );
+        self.require_tensor_type(call.return_ty, span, spec.result_message);
     }
 
     pub(crate) fn validate_tensor_rope(
@@ -2995,11 +2988,11 @@ impl Validator<'_, '_> {
         };
         self.require_arg_count(call.args.len(), expected_args, span, "atomic runtime call");
 
-        let receiver_ty = call
+        let Some(receiver_ty) = call
             .args
             .first()
-            .and_then(|receiver| self.validate_operand(scope, receiver, span));
-        let Some(receiver_ty) = receiver_ty else {
+            .and_then(|receiver| self.validate_operand(scope, receiver, span))
+        else {
             return;
         };
         let Type::Atomic(element_id) = self.type_kind(receiver_ty) else {
