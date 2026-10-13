@@ -5273,6 +5273,228 @@ fn interval_aggregate_rejects_spread_step() {
 }
 
 // -----------------------------------------------------------------------
+// Enum variant positional payload aggregate
+// -----------------------------------------------------------------------
+
+/// One function constructing variant `variant` of `enum_def` from positional
+/// `items`.
+fn ordered_variant_program(
+    types: &mut TypeTable,
+    enum_def: DefId,
+    variant: DefId,
+    items: Vec<MirAggregateItem>,
+) -> MirProgram {
+    let enum_ty = MirType::semantic(types.intern(Type::Enum(enum_def)));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                ty: enum_ty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(0)),
+                            projections: vec![],
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::EnumVariant(variant),
+                            ty: enum_ty,
+                            fields: MirAggregateFields::Ordered(items),
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+/// Validation context registering `variant` under `enum_def` with payload
+/// fields in declaration order.
+fn ordered_variant_context(
+    types: &TypeTable,
+    enum_def: DefId,
+    variant: DefId,
+    fields: Vec<(Symbol, MirType)>,
+) -> MirValidationContext<'_> {
+    let mut context = MirValidationContext::new(types);
+    context.variant_parents.insert(variant, enum_def);
+    context.enum_variants.insert(enum_def, vec![variant]);
+    let mut field_map = FxHashMap::default();
+    let mut order = Vec::new();
+    for (name, ty) in fields {
+        field_map.insert(name, ty);
+        order.push(name);
+    }
+    context.variant_fields.insert(variant, field_map);
+    context.variant_field_order.insert(variant, order);
+    context
+}
+
+fn numerus_and_bivalens(types: &mut TypeTable) -> (MirType, MirType) {
+    (
+        MirType::semantic(types.primitive(Primitive::Numerus)),
+        MirType::semantic(types.primitive(Primitive::Bivalens)),
+    )
+}
+
+#[test]
+fn ordered_variant_aggregate_accepts_declared_payload() {
+    let mut types = TypeTable::new();
+    let (numerus, bivalens) = numerus_and_bivalens(&mut types);
+    let enum_def = DefId(1);
+    let variant = DefId(2);
+    let program = ordered_variant_program(
+        &mut types,
+        enum_def,
+        variant,
+        vec![
+            MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(7))),
+            MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Bool(true))),
+        ],
+    );
+    let context = ordered_variant_context(
+        &types,
+        enum_def,
+        variant,
+        vec![(Symbol(0), numerus), (Symbol(1), bivalens)],
+    );
+    let errors = validate_with(&program, &context);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+#[test]
+fn ordered_variant_aggregate_rejects_missing_payload_operand() {
+    let mut types = TypeTable::new();
+    let (numerus, bivalens) = numerus_and_bivalens(&mut types);
+    let enum_def = DefId(1);
+    let variant = DefId(2);
+    let program = ordered_variant_program(
+        &mut types,
+        enum_def,
+        variant,
+        vec![MirAggregateItem::Operand(MirOperand::Constant(
+            MirConstant::Int(7),
+        ))],
+    );
+    let context = ordered_variant_context(
+        &types,
+        enum_def,
+        variant,
+        vec![(Symbol(0), numerus), (Symbol(1), bivalens)],
+    );
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("does not match variant payload arity")),
+        "expected the missing payload operand rejected, got: {errors:?}"
+    );
+}
+
+#[test]
+fn ordered_variant_aggregate_rejects_extra_payload_operand() {
+    let mut types = TypeTable::new();
+    let (numerus, bivalens) = numerus_and_bivalens(&mut types);
+    let enum_def = DefId(1);
+    let variant = DefId(2);
+    let program = ordered_variant_program(
+        &mut types,
+        enum_def,
+        variant,
+        vec![
+            MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(7))),
+            MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Bool(true))),
+            MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(9))),
+        ],
+    );
+    let context = ordered_variant_context(
+        &types,
+        enum_def,
+        variant,
+        vec![(Symbol(0), numerus), (Symbol(1), bivalens)],
+    );
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("does not match variant payload arity")),
+        "expected the extra payload operand rejected, got: {errors:?}"
+    );
+}
+
+#[test]
+fn ordered_variant_aggregate_rejects_payload_type_mismatch() {
+    let mut types = TypeTable::new();
+    let (numerus, _) = numerus_and_bivalens(&mut types);
+    let enum_def = DefId(1);
+    let variant = DefId(2);
+    let program = ordered_variant_program(
+        &mut types,
+        enum_def,
+        variant,
+        vec![MirAggregateItem::Operand(MirOperand::Constant(
+            MirConstant::Bool(true),
+        ))],
+    );
+    let context = ordered_variant_context(&types, enum_def, variant, vec![(Symbol(0), numerus)]);
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("enum variant aggregate element type mismatch")),
+        "expected the payload type mismatch rejected, got: {errors:?}"
+    );
+}
+
+#[test]
+fn ordered_variant_aggregate_rejects_payload_spread() {
+    let mut types = TypeTable::new();
+    let (numerus, _) = numerus_and_bivalens(&mut types);
+    let enum_def = DefId(1);
+    let variant = DefId(2);
+    let program = ordered_variant_program(
+        &mut types,
+        enum_def,
+        variant,
+        vec![MirAggregateItem::Spread(MirOperand::Constant(
+            MirConstant::Int(7),
+        ))],
+    );
+    let context = ordered_variant_context(&types, enum_def, variant, vec![(Symbol(0), numerus)]);
+    let errors = validate_with(&program, &context);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("enum variant aggregate spread is unsupported")),
+        "expected the payload spread rejected, got: {errors:?}"
+    );
+}
+
+// -----------------------------------------------------------------------
 // Context rehoming keeps contract conformance
 // -----------------------------------------------------------------------
 
