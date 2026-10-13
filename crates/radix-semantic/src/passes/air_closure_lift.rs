@@ -10,7 +10,7 @@
 //! Capture detection is deliberately structural.  A module item is not a
 //! capture, while a path to a local or an enclosing callable parameter is.
 
-use crate::function_facts::{CaptureFact, CaptureMode};
+use crate::function_facts::{CaptureFact, CaptureMode, CaptureMutations};
 use crate::{RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, Type, TypeTable};
 use radix_hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_program};
 use radix_hir::{
@@ -294,6 +294,7 @@ struct CaptureCollector<'a> {
     module_defs: &'a FxHashSet<DefId>,
     bound: FxHashSet<DefId>,
     captures: Vec<CaptureUse>,
+    mutations: CaptureMutations,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -311,13 +312,26 @@ fn collect_captures(
         module_defs,
         bound: params.iter().map(|param| param.def_id).collect(),
         captures: Vec::new(),
+        mutations: CaptureMutations::default(),
     };
     collector.visit_expr(body);
-    collector.captures
+    let CaptureCollector {
+        mutations,
+        captures,
+        ..
+    } = collector;
+    let mut captures = captures;
+    // Derive each capture's mode from the writes and moves the body performs:
+    // the recorded fact stays truthful even though every capture is declined.
+    for capture in &mut captures {
+        capture.fact.mode = mutations.mode(capture.fact.def_id);
+    }
+    captures
 }
 
 impl HirVisitor for CaptureCollector<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
+        self.mutations.note_expr(expr);
         match &expr.kind {
             HirExpressionKind::Path(def_id)
                 if !self.bound.contains(def_id)
@@ -348,6 +362,7 @@ impl HirVisitor for CaptureCollector<'_> {
     }
 
     fn visit_stmt(&mut self, stmt: &radix_hir::HirStatement) {
+        self.mutations.note_stmt(stmt);
         if let radix_hir::HirStatementKind::Local(local) = &stmt.kind {
             self.bound.insert(local.def_id);
         }
