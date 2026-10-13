@@ -156,3 +156,30 @@ fn const_object_field_list_read_stays_accepted() {
          incipit {\n    fixum Punctum p ← Punctum { xs = [] }\n    nota p.xs.longitudo()\n}",
     );
 }
+
+#[test]
+fn ref_parameter_mutating_receiver_reports_only_the_ref_issue() {
+    // A-200: the ref-view gate used to fall through to the binding-modifier
+    // gate and report one fault twice (SEM056 then SEM020).
+    let result = test_support::analyze_source(
+        "functio f(de lista<numerus> xs) → vacuum {\n    xs.appende(1)\n}\nincipit { }",
+    );
+    let issues: Vec<&str> = result
+        .diagnostics
+        .iter()
+        .filter(|err| err.is_error())
+        .filter_map(test_support::issue)
+        .collect();
+    assert_eq!(
+        issues
+            .iter()
+            .filter(|issue| **issue == "mutating_receiver_through_ref")
+            .count(),
+        1,
+        "expected one mutating_receiver_through_ref, got {issues:?}"
+    );
+    assert!(
+        !issues.contains(&ISSUE),
+        "ref gate must not fall through to {ISSUE}, got {issues:?}"
+    );
+}

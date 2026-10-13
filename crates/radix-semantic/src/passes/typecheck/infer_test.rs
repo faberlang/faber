@@ -225,6 +225,57 @@ fn function_type_join_uses_contravariant_params() {
     );
 }
 
+// A-199: a `sponte` slot and a merely defaulted slot are distinct parameter
+// kinds (`types.equals` compares `sponte`), so unifying two function types
+// that differ only there must fail in both argument orders rather than keep
+// whichever `sponte` the left operand carried.
+#[test]
+fn function_unify_rejects_params_differing_only_in_sponte() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let mut sig_of = |sponte: bool| {
+        types.function(FuncSig {
+            type_params: vec![],
+            params: vec![ParamType {
+                ty: numerus,
+                mode: SemanticParamMode::Owned,
+                optional: true,
+                sponte,
+            }],
+            ret: vacuum,
+            err: None,
+            is_async: false,
+            is_generator: false,
+        })
+    };
+    let sponte_fn = sig_of(true);
+    let defaulted_fn = sig_of(false);
+    let sponte_again = sig_of(true);
+
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let span = radix_lexer::Span::default();
+
+    for (left, right) in [(sponte_fn, defaulted_fn), (defaulted_fn, sponte_fn)] {
+        let joined = checker.unify_join(left, right, span, "test");
+        let resolved = checker.resolve_inferred_type(joined);
+        assert!(
+            matches!(checker.types.get(resolved), Type::Error),
+            "A-199: sponte vs defaulted slot must not unify; got {:?}",
+            checker.types.get(resolved),
+        );
+    }
+
+    let joined = checker.unify_join(sponte_fn, sponte_again, span, "test");
+    let resolved = checker.resolve_inferred_type(joined);
+    assert!(
+        !matches!(checker.types.get(resolved), Type::Error),
+        "A-199: two sponte slots must still unify",
+    );
+}
+
 // PRP-076: occurs_in must traverse type_param_constraints.
 #[test]
 fn occurs_in_detects_var_in_type_param_constraints() {

@@ -421,6 +421,10 @@ pub(super) fn check_intrinsic_method_call(
             crate::ISSUE_MUTATING_RECEIVER_THROUGH_REF,
             span,
         );
+        // WHY: the binding-modifier gate below would report the same fault
+        // again as SEM020 for this site.
+        checker.typecheck_call_arg_exprs(args);
+        return Some(checker.error_type);
     }
 
     // A mutating intrinsic (registry `is_mutating_receiver`: Vacuum returns,

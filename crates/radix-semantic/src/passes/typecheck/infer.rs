@@ -774,7 +774,10 @@ impl TypeChecker<'_> {
         }
         let mut params = Vec::with_capacity(sig_a.params.len());
         for (param_a, param_b) in sig_a.params.iter().zip(sig_b.params.iter()) {
-            if param_a.mode != param_b.mode || param_a.optional != param_b.optional {
+            if param_a.mode != param_b.mode
+                || param_a.optional != param_b.optional
+                || param_a.sponte != param_b.sponte
+            {
                 self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
                 return self.error_type;
             }
