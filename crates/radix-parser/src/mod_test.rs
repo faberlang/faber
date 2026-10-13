@@ -6,6 +6,7 @@
 use crate::test_support::{
     ParseExpectation, assert_parse_error_has_no_legacy_message, assert_parse_error_issue,
     assert_parse_error_matches, has_arg, parse_ok, parse_program, span_for, symbol_name,
+    test_span_between,
 };
 use crate::{ParseErrorKind, ParseResult, parse};
 use radix_lexer::{KeywordPack, TokenKind, lex_with_locale_pack};
@@ -1665,6 +1666,53 @@ fn import_unknown_field_rejected() {
         r#"importa { alienum = "norma:chorda" }"#,
         ParseExpectation::Issue("unknown_import_field"),
     );
+}
+
+fn last_span_for(source: &str, needle: &str) -> radix_lexer::Span {
+    let start = u32::try_from(source.rfind(needle).expect("needle in source"))
+        .expect("test fixture byte offset fits u32");
+    test_span_between(
+        start,
+        start + u32::try_from(needle.len()).expect("test fixture byte length fits u32"),
+    )
+}
+
+#[test]
+fn import_unknown_field_error_spans_field_name() {
+    let source = r#"importa { ex = "norma:chorda", alienum = 5, nomen = chorda }"#;
+    let result = parse_program(source);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| has_arg(err, "issue", "unknown_import_field"))
+        .expect("unknown_import_field diagnostic");
+    assert_eq!(err.span, span_for(source, "alienum"));
+}
+
+#[test]
+fn import_duplicate_ex_field_rejected_at_second_field() {
+    let source = r#"importa { ex = "norma:chorda", nomen = chorda, ex = "norma:solum" }"#;
+    let result = parse_program(source);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| has_arg(err, "issue", "duplicate_import_field"))
+        .expect("duplicate_import_field diagnostic");
+    assert!(has_arg(err, "field", "ex"));
+    assert_eq!(err.span, last_span_for(source, "ex"));
+}
+
+#[test]
+fn import_duplicate_nomen_field_rejected_at_second_field() {
+    let source = r#"importa { ex = "norma:chorda", nomen = chorda, nomen = solum }"#;
+    let result = parse_program(source);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| has_arg(err, "issue", "duplicate_import_field"))
+        .expect("duplicate_import_field diagnostic");
+    assert!(has_arg(err, "field", "nomen"));
+    assert_eq!(err.span, last_span_for(source, "nomen"));
 }
 
 #[test]

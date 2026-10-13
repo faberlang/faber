@@ -1777,11 +1777,22 @@ impl Parser {
         let mut name = None;
         let mut alias = None;
         let mut wildcard_alias = None;
+        let mut seen_fields = Vec::new();
 
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let field = self.parse_import_field_name()?;
             let field_name = self.interner.resolve(field.name).to_owned();
             self.expect_issue(&TokenKind::Eq, "import_field_value_separator")?;
+
+            // WHY: unknown names error below on first sight, so a repeat here
+            // is always a known field; last-wins would silently drop the first.
+            if seen_fields.contains(&field.name) {
+                return Err(
+                    Self::invalid_import_error_at("duplicate_import_field", field.span)
+                        .with_arg("field", field_name),
+                );
+            }
+            seen_fields.push(field.name);
 
             match field_name.as_str() {
                 "ex" => {
@@ -1801,7 +1812,10 @@ impl Parser {
                     wildcard_alias = Some(self.parse_ident()?);
                 }
                 _ => {
-                    return Err(self.invalid_import_error("unknown_import_field"));
+                    return Err(Self::invalid_import_error_at(
+                        "unknown_import_field",
+                        field.span,
+                    ));
                 }
             }
 
