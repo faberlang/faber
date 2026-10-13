@@ -577,13 +577,7 @@ fn analyze_package_spec_with_deadline(
                     continue;
                 }
             };
-        let namespace_seams = match namespace_seams_for_file(&spec, file, library_resolver) {
-            Ok(seams) => seams,
-            Err(diag) => {
-                diagnostics.push(diag);
-                continue;
-            }
-        };
+        let namespace_seams = namespace_seams_for_file(&spec, file, library_resolver);
         let namespace_declarations = match namespace_declarations_for_file(
             &spec,
             file,
@@ -1398,9 +1392,6 @@ fn visit_package_analysis_file<'a>(
     ordered.push(file);
 }
 
-/// Resolve every import binding's cross-unit interface for a file.
-///
-/// RP3: moved from `crates/faber/src/package/compile.rs`.
 /// Mint the provider carriage for one file's direct import edges (ARCH-U4
 /// parity on the package-analysis path).
 ///
@@ -1447,18 +1438,17 @@ fn provider_carriage_for_file(
                 }
                 ImportResolution::Unsupported | ImportResolution::Error(_) => continue,
             };
-        let carried = match minted.entry(target_path) {
-            std::collections::btree_map::Entry::Occupied(occupied) => occupied.into_mut(),
-            std::collections::btree_map::Entry::Vacant(vacant) => {
-                let unit = provider_unit_for_target(session, vacant.key(), &target_source);
-                vacant.insert(unit)
-            }
-        };
+        let carried = minted
+            .entry(target_path)
+            .or_insert_with_key(|path| provider_unit_for_target(session, path, &target_source));
         view.insert(import_path, carried.clone());
     }
     view
 }
 
+/// Resolve every import binding's cross-unit interface for a file.
+///
+/// RP3: moved from `crates/faber/src/package/compile.rs`.
 fn file_interfaces_for_file(
     spec: &PackageSpec,
     file: &PackageFile,
@@ -1639,7 +1629,7 @@ fn namespace_seams_for_file(
     spec: &PackageSpec,
     file: &PackageFile,
     library_resolver: &LibraryResolver,
-) -> Result<BTreeMap<String, bool>, Diagnostic> {
+) -> BTreeMap<String, bool> {
     let mut seams = BTreeMap::new();
     for stmt in &file.program.statements {
         let StmtKind::Import(decl) = &stmt.kind else {
@@ -1662,7 +1652,7 @@ fn namespace_seams_for_file(
     for import in &file.expanded_library_imports {
         seams.insert(import.binding.clone(), false);
     }
-    Ok(seams)
+    seams
 }
 
 /// Per-binding declaration surfaces, including module-private names.

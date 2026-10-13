@@ -171,6 +171,68 @@ fn label() → string {
     let _ = fs::remove_dir_all(&dir);
 }
 
+/// The loader mints provider carriage for every resolved import edge
+/// (ARCH-U4): the entry unit's view carries the local sibling under its
+/// import-path spelling. The package declares its reader locale because the
+/// provider re-analysis reads the target package's locale, not the session's
+/// (see `provider_unit_for_target`).
+#[test]
+fn analyze_package_carries_provider_unit_for_local_import() {
+    let dir = temp_root("provider-carriage");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "providercarriage"
+version = "0.1.0"
+
+[locale]
+locale = "en"
+
+[paths]
+source = "."
+entry = "main.fab"
+"#,
+    )
+    .expect("write manifest");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "./thing" thing
+
+main {
+  print thing.label()
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("thing.fab"),
+        r#"
+@ public
+fn label() → string {
+  return "ok"
+}
+"#,
+    )
+    .expect("write module");
+
+    let package =
+        analyze_package(&Config::default(), &entry, &test_seams()).expect("analyze package");
+    let entry_unit = package.entry_node().expect("entry unit");
+    let carried = entry_unit
+        .analysis
+        .provider_units
+        .get("./thing")
+        .expect("local import edge carries its provider unit");
+    match carried {
+        CarriedProviderUnit::Unit(_) => {}
+        CarriedProviderUnit::Failed { message } => panic!("provider carriage failed: {message}"),
+    }
+    let _ = fs::remove_dir_all(&dir);
+}
+
 /// Negative parity for the analysis diagnostics: a semantic error in a
 /// sibling unit surfaces through multi-unit analysis as a package failure
 /// (cross-file diagnostic propagation, not a silent skip).
