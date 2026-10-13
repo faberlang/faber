@@ -862,11 +862,8 @@ impl<'a> Lowerer<'a> {
     ) -> TypeId {
         let mut fields = FxHashMap::default();
         for option in options {
-            let ty = self.cli_value_type(
-                &option.ty,
-                option.default.is_none() && !option.flag,
-                false,
-            );
+            let ty =
+                self.cli_value_type(&option.ty, option.default.is_none() && !option.flag, false);
             fields.insert(option.binding_symbol, ty);
         }
         for operand in operands {

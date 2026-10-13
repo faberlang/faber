@@ -1886,32 +1886,19 @@ fn class_export_from_stmt(
                 .iter()
                 .map(|tp| interner.resolve(tp.name.name))
                 .collect();
-            let callable_type_params = interface_callable_params(
-                &method.type_params,
-                interner,
-                &type_param_names,
-                nominal_kinds,
-                ctx,
-            )?;
+            let callable_type_params =
+                interface_callable_params(&method.type_params, interner, &type_param_names, nominal_kinds, ctx)?;
             let mut params = Vec::new();
             for param in &method.params {
                 params.push(InterfaceParam {
-                    ty: interface_type_from_type_expr(
-                        &param.ty,
-                        interner,
-                        &type_param_names,
-                        nominal_kinds,
-                        ctx,
-                    )?,
+                    ty: interface_type_from_type_expr(&param.ty, interner, &type_param_names, nominal_kinds, ctx)?,
                     mode: semantic_param_mode(param.mode),
                     optional: param.sponte || param.default.is_some(),
                     sponte: param.sponte,
                 });
             }
             let ret = match &method.ret {
-                Some(ret) => {
-                    interface_type_from_type_expr(ret, interner, &type_param_names, nominal_kinds, ctx)?
-                }
+                Some(ret) => interface_type_from_type_expr(ret, interner, &type_param_names, nominal_kinds, ctx)?,
                 None => InterfaceTypeSnapshot::Primitive(Primitive::Vacuum),
             };
             let err = match &method.err {
@@ -1941,9 +1928,7 @@ fn class_export_from_stmt(
                     device: None,
                 },
                 visibility: match member_visibility(&member.annotations, interner) {
-                    crate::syntax::MemberVisibility::Publica => {
-                        member_visibility(&method.annotations, interner)
-                    }
+                    crate::syntax::MemberVisibility::Publica => member_visibility(&method.annotations, interner),
                     visibility => visibility,
                 },
                 unavailable: unavailable_gates_from_annotations(&member.annotations, interner),
@@ -2170,7 +2155,6 @@ fn var_export_from_stmt(
         ),
     })
 }
-
 
 fn semantic_param_mode(mode: AstParamMode) -> SemanticParamMode {
     match mode {
