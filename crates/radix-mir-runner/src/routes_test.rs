@@ -34,6 +34,41 @@ fn consolum_funde_writes_a_single_byte_list() {
 }
 
 #[test]
+fn solum_funde_writes_a_nested_signed_int_byte_list() {
+    // Reviewer repro: a `list<int>` payload must reach the write as bytes,
+    // exactly like an explicit `bytes` value — not as a positional list.
+    let path =
+        std::env::temp_dir().join(format!("radix-routes-test-{}-int.bin", std::process::id()));
+    let path_text = path.to_string_lossy().into_owned();
+    let opener = lista(vec![
+        Value::Str(path_text.clone()),
+        lista(vec![Value::Int(0x6f), Value::Int(0x6b)]),
+    ]);
+    assert_eq!(serve("solum:funde", &opener), Ok(Vec::new()));
+    let read = serve("solum:hauri", &Value::Str(path_text));
+    std::fs::remove_file(&path).expect("remove scratch file");
+    assert_eq!(read, Ok(vec![Value::Octeti(vec![0x6f, 0x6b])]));
+}
+
+#[test]
+fn solum_funde_does_not_convert_a_non_byte_int_list() {
+    // A list with an out-of-range element, or a non-integer element, is not
+    // a byte list: it keeps the generic list path and the leaf refuses it —
+    // nothing is written.
+    let path =
+        std::env::temp_dir().join(format!("radix-routes-test-{}-nonbyte.bin", std::process::id()));
+    let path_text = path.to_string_lossy().into_owned();
+    for data in [
+        lista(vec![Value::Int(300), Value::Int(0x6b)]),
+        lista(vec![Value::Int(0x6f), Value::Str("not an integer".to_owned())]),
+    ] {
+        let opener = lista(vec![Value::Str(path_text.clone()), data]);
+        assert!(serve("solum:funde", &opener).is_err(), "non-byte list must be refused");
+    }
+    assert!(!path.exists(), "a refused non-byte list must not write the file");
+}
+
+#[test]
 fn solum_funde_round_trips_a_nested_byte_list() {
     let path = std::env::temp_dir().join(format!("radix-routes-test-{}.bin", std::process::id()));
     let path_text = path.to_string_lossy().into_owned();

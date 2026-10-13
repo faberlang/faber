@@ -106,12 +106,19 @@ fn value_to_arg(value: &Value) -> Option<Arg> {
                         })
                         .collect(),
                 ))
-            } else if let Some(nested) =
-                items.iter().map(value_to_arg).collect::<Option<Vec<Arg>>>()
-            {
-                Some(Arg::List(nested))
+            } else if let Some(bytes) = octeti_bytes(value) {
+                // Byte list before the generic recursion: a nested list of
+                // valid byte-valued integers is one `octeti` argument (the
+                // base contract; `solum:funde` needs `Arg::Bytes`, not a
+                // positional list of integers). A list that is not a valid
+                // byte list keeps the generic list path below.
+                Some(Arg::Bytes(bytes))
             } else {
-                octeti_bytes(value).map(Arg::Bytes)
+                items
+                    .iter()
+                    .map(value_to_arg)
+                    .collect::<Option<Vec<Arg>>>()
+                    .map(Arg::List)
             }
         }
         Value::Map(map) => {
