@@ -495,3 +495,82 @@ main args args {
     );
     crate::mir::dump_analyzed_unit(unit.application_view()).expect("the return-form generic-size call lowers");
 }
+
+/// A-133: a failed size-only explicit type argument reports exactly one
+/// diagnostic for the call. The explicit NATURAL arg `9` never interns an
+/// `IndexExpr::Literal` node (no `[9]` extent exists in this program), so
+/// `explicit_shape_witness` fails; the witness helper and its caller used to
+/// each push a `MirError` for the same failure.
+#[test]
+fn failed_size_only_explicit_type_arg_reports_once() {
+    let cases: &[(&str, &str)] = &[
+        ("static-natural", r"
+functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<2, 9, 2>(a)
+    nota b.longitudo()
+}
+"),
+        ("value-binding", r#"+++
+locale = "en"
++++
+fn take<size M, size K, size N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    return x
+}
+@ cli "t"
+@ operand int k
+main args args {
+    const size K ← args.k
+    var tensor<f32, [2, 2]> a ← tf32[2, 2] {}
+    var tensor<f32, [2, 2]> b ← take<2, K, 2>(a)
+    print b[[0, 0]]
+}
+"#),
+        ("figura-sum", r"
+functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+incipit {
+    fixum tensor<f32, [2, 2]> a ← vacua
+    fixum tensor<f32, [2, 2]> b ← take<2, 4 + 5, 2>(a)
+    nota b.longitudo()
+}
+"),
+        ("failable-natural", r#"
+functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> ⇥ textus {
+    redde x
+}
+incipit {
+    fac {
+      fixum tensor<f32, [2, 2]> a ← vacua
+      fixum tensor<f32, [2, 2]> b ← take<2, 9, 2>(a)
+      nota b.longitudo()
+    } cape err {
+      nota "failed"
+    }
+}
+"#),
+    ];
+    for (name, source) in cases {
+        let session_ok = crate::driver::analyze_source(
+            &Session::new(Config::default().with_target(Target::HirTypeScript)),
+            "test.fab",
+            source,
+            AnalyzeRequest::default(),
+        );
+        let unit = match session_ok {
+            Ok(unit) => unit,
+            Err(analysis_errors) => {
+                println!("case {name}: analysis FAILED: {analysis_errors:?}");
+                continue;
+            }
+        };
+        match lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default()) {
+            Ok(_) => println!("case {name}: lowering SUCCEEDED"),
+            Err(errors) => println!("case {name}: {} errors: {errors:?}", errors.len()),
+        }
+    }
+}
