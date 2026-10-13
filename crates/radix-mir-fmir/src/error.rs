@@ -39,9 +39,6 @@ pub enum FmirImageError {
         expected: String,
     },
 
-    /// A device runtime requirement is not a known `device:` capability
-    /// (`device:metal`, `device:cuda`). Unknown `device:` requirements fail
-    /// admission at package load (N1.7).
     /// A backend artifact's stored identity digest disagrees with the
     /// recomputed digest (contract §`IdentityDomains` rule 5; B3): the
     /// `content_sha256` is re-verified against the canonical decoded raw

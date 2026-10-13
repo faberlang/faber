@@ -14,8 +14,10 @@
 //!
 //! - No expression form may invent declaration syntax; constructors and casts
 //!   are parsed only through tokenized grammar surfaces.
-//! - Compact closures are the only expression form that uses speculative
-//!   rollback, and rollback restores both token position and node-id allocation.
+//! - Speculative parses (compact closures, call type arguments, `↦` targets,
+//!   long-form and qualified typed constructors) roll back through
+//!   `checkpoint`/`restore`, which rewind token position, node-id allocation,
+//!   and recorded errors.
 //! - `vacua` is recognized as a value-level empty collection marker; required
 //!   collection types are supplied by declaration/type contexts upstream.
 //! - Field separators in object-like expression syntax are canonical `=`, not

@@ -20,7 +20,7 @@
 //! ```text
 //! magic            4 bytes  "FCLI"
 //! version          1 byte   CLI_DESCRIPTOR_VERSION
-//! mode             1 byte   0 = SingleCommand, 1 = Subcommand
+//! mode             1 byte   0 = SingleCommand (also NotCli), 1 = Subcommand
 //! has_version      1 byte
 //! has_description  1 byte
 //! name             str

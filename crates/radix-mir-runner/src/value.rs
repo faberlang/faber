@@ -2711,9 +2711,7 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
             .partial_cmp_at_coarser(*b)
             .is_some_and(|ord| ord == std::cmp::Ordering::Equal),
         // Mixed carriers compare by numeric value: a non-negative `Int` and a
-        // `UInt` with the same magnitude are the same Faber integer. Equality
-        // compares bit patterns per the modular contract; for non-negative
-        // values the bit pattern is the magnitude.
+        // `UInt` with the same magnitude are the same Faber integer.
         // Integer and float operands compare their exact values (ruling 22);
         // NaN equals nothing. Fuzzy `≈` is a collection Approximate call and
         // does not use this exact-value helper.

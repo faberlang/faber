@@ -164,8 +164,7 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let shape = *shape;
-        // A rank-1 list `v[[i]]` is the linear index `i` itself, the same device
-        // form as the scalar spelling `v[i]`.
+        // An empty index list has no linear form; the ordinary lowering takes it.
         if elements.is_empty() {
             return None;
         }
@@ -192,6 +191,8 @@ impl FunctionBuilder<'_> {
     }
 
     /// Emit `((i0 * e1 + i1) * e2 + i2) ...` over the lowered index elements.
+    /// A rank-1 list `v[[i]]` is the linear index `i` itself, the same device
+    /// form as the scalar spelling `v[i]`.
     pub(super) fn lower_row_major_linear_index(
         &mut self,
         base: &MirPlace,

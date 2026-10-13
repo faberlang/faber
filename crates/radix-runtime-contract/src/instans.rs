@@ -112,7 +112,9 @@ impl Instans {
     ///
     /// Replaces the runtime's `Instans::try_from_valor` for the
     /// `Valor::Instans(text) | Valor::Textus(text)` arms, without the `Valor`
-    /// middleman. Returns `None` on any malformed input.
+    /// middleman. Returns `None` when the text is not one of the forms
+    /// `parse_rfc3339` accepts; the offset spellings it takes are wider than
+    /// strict RFC3339.
     #[must_use]
     pub fn from_rfc3339(text: &str, praecisio: InstansPraecisio) -> Option<Self> {
         let nanos = parse_rfc3339(text)?;
@@ -188,8 +190,8 @@ fn coarser_praecisio(a: InstansPraecisio, b: InstansPraecisio) -> InstansPraecis
 
 /// Parse RFC3339 datetimes to nanoseconds since Unix epoch (UTC storage).
 ///
-/// EDGE: accepts `Z` / `±00:00` and numeric offsets `±HH:MM` / `±HHMM`; rejects
-/// missing offset and named zones.
+/// EDGE: accepts `Z` / `±00:00` and numeric offsets `±HH:MM` / `±HHMM` / `±HH`;
+/// rejects missing offset and named zones.
 fn parse_rfc3339(input: &str) -> Option<i64> {
     let (date, rest) = input.split_once('T').or_else(|| input.split_once('t'))?;
     let (year, month, day) = parse_date(date)?;

@@ -976,7 +976,9 @@ pub struct MirShapeCheck {
 
 impl MirShapeCheck {
     /// Whether the checked equalities connect these two runtime witnesses.
-    /// Scalar size bindings can mediate an equality between carrier axes.
+    /// Only `relations` are walked; `size_bindings` are not consulted, so a
+    /// caller that wants a binding to mediate passes its `witness` as an
+    /// endpoint.
     #[must_use]
     pub fn proves_equal(&self, left: &MirShapeExpr, right: &MirShapeExpr) -> bool {
         let mut reached = vec![left];

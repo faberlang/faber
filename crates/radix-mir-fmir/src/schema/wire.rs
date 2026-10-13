@@ -645,7 +645,8 @@ pub struct WireSubWindowProjection {
 
 impl WireSubWindowProjection {
     /// The window's covering span in producer elements:
-    /// `(row_count - 1) · row_stride + row_width`. `None` on overflow.
+    /// `(row_count - 1) · row_stride + row_width`. `None` on overflow or when
+    /// `row_count` is zero.
     #[must_use]
     pub fn covering_span(&self) -> Option<u64> {
         self.row_count
@@ -1214,7 +1215,7 @@ pub enum WireReduceOp {
 // observation cadence, and the typed `KvCacheLayout` carriage.
 
 /// The per-invocation input cadence wire mirror (GI4-2; the GI4-1
-/// [`faber_runtime::session::InputUpdateCadence`] freeze — which inputs
+/// `faber_runtime::session::InputUpdateCadence` freeze — which inputs
 /// update per token versus stay resident across the session).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -1228,7 +1229,7 @@ pub enum WireInputUpdateCadence {
 }
 
 /// The workload-mode wire mirror (GI4-2; the GI4-1
-/// [`faber_runtime::session::InvocationMode`] freeze): one prefill step or
+/// `faber_runtime::session::InvocationMode` freeze): one prefill step or
 /// one scalar-decode step — the regime label for engine receipts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

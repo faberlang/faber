@@ -890,7 +890,9 @@ fn emit_provider_modules(
 /// The same walk serves the consumer unit and each carried provider: the
 /// provider's own `nested` view supplies its nested namespace imports
 /// (`norma:valor` → `norma:chorda` emit as sibling modules), and the
-/// `modules` map is the cycle brake. A binding with a file interface but no
+/// `modules` map skips providers already emitted (a module diamond; the
+/// insert follows the recursion, so it does not brake a cycle). A binding
+/// with a file interface but no
 /// carried unit fails closed — by construction the same contract walk
 /// installed the interface and the carriage, so this only fires for a mid-run
 /// inconsistency (or a cyclic import that interrupted carriage), where the
@@ -962,7 +964,8 @@ fn map_provider_modules(
             // Recurse first so nested namespace imports (norma:value →
             // norma:text) emit their own sibling modules; the provider's own
             // namespace calls then target `crate::<module>::…` paths that
-            // exist. The `contains_key` guard above is the cycle brake.
+            // exist. The `contains_key` guard above only skips modules already
+            // emitted; a cyclic import ends at the missing-carriage error.
             map_provider_modules(
                 &provider.hir,
                 &provider.interner,
