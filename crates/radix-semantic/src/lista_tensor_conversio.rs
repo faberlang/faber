@@ -141,15 +141,23 @@ pub fn validate_lista_to_tensor_source(
             if !is_numeric_element(elem, types) {
                 return Err(ListaToTensorError::NonNumericElement);
             }
-            let dim = i64s_from_literal_index(*shape, types).and_then(|dims| dims.first().copied());
-            let capacity =
-                i64s_from_literal_index(*capacity, types).and_then(|dims| dims.first().copied());
+            let dim = rank_one_literal_dim(*shape, types);
+            let capacity = rank_one_literal_dim(*capacity, types);
             if dim.is_none() || dim != capacity {
                 return Err(ListaToTensorError::CapacityMismatch);
             }
             Ok(())
         }
         _ => Err(ListaToTensorError::NonListaSource),
+    }
+}
+
+/// The single literal extent of a rank-1 index; `None` for any other rank, so a
+/// `[N, M]` target never passes for its leading dim alone.
+fn rank_one_literal_dim(index: IndexId, types: &TypeTable) -> Option<i64> {
+    match i64s_from_literal_index(index, types)?.as_slice() {
+        [dim] => Some(*dim),
+        _ => None,
     }
 }
 
@@ -201,10 +209,8 @@ fn padded_bound(
             if !is_numeric_element(elem, types) {
                 return None;
             }
-            let dim =
-                i64s_from_literal_index(*shape, types).and_then(|dims| dims.first().copied())?;
-            let bound =
-                i64s_from_literal_index(*capacity, types).and_then(|dims| dims.first().copied())?;
+            let dim = rank_one_literal_dim(*shape, types)?;
+            let bound = rank_one_literal_dim(*capacity, types)?;
             (dim == bound).then_some((elem, *target_elem, *capacity, dim))
         }
         _ => None,

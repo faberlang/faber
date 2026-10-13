@@ -22,10 +22,13 @@
 //! storage with a root of its own (the field's definition); a call maps `ego`
 //! to the receiver's storage and each such field to the storage the receiver
 //! holds in that field. Overlap is then judged on the mapped roots like any
-//! other access. The call-site borrow rule does not check the arguments of a
-//! user-method call, so a method call also declines when two
-//! roots it receives, one of them writable, name the same storage
-//! (`overlapping_call_arguments`) rather than relying on that rule.
+//! other access. The call-site borrow rule checks the arguments of a
+//! user-method call by their places, so it catches two arguments spelled as
+//! the same tensor. It cannot see that an argument and the receiver's field
+//! name one storage when the receiver holds that argument, so a method call
+//! also declines when two roots it receives, one of them writable, name the
+//! same storage (`overlapping_call_arguments`). This pass is the sole owner of
+//! the receiver-field spelling.
 //!
 //! This file also owns the scan that bounds what a call outside a `filum`
 //! body can disturb in the alias facts.

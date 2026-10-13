@@ -6,7 +6,7 @@
 
 use super::lista_tensor_conversio::{
     ListaToTensorError, ListaToTensorShape, RectangularListaLiteralError,
-    analyze_rectangular_lista_literal, ensure_lista_numerus_type,
+    analyze_rectangular_lista_literal, ensure_lista_numerus_type, padded_literal_facts,
     resolve_bounded_lista_padded_shape, resolve_lista_to_tensor_shape,
     validate_lista_to_tensor_source,
 };
@@ -393,4 +393,34 @@ fn lista_tensor_conversio_rejects_literal_list_for_text_tensor() {
 }",
     );
     assert!(!result.is_ok(), "diagnostics: {:?}", result.diagnostics);
+}
+
+#[test]
+fn lista_tensor_conversio_rejects_rank_two_target_whose_leading_dim_matches_capacity() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, crate::NumericWidth::F32);
+    let lista = bounded_lista(&mut types, f32, 8);
+    // `tensor<f32, [8, 3]>`: the leading dim equals the capacity, but the
+    // padded snapshot only fills a rank-1 `[N]` tensor.
+    let tensor = tensor_type(&mut types, f32, &[8, 3]);
+
+    assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Err(ListaToTensorError::CapacityMismatch)
+    );
+    assert_eq!(
+        resolve_bounded_lista_padded_shape(lista, tensor, &types),
+        None
+    );
+    assert_eq!(padded_literal_facts(lista, tensor, &types), None);
+}
+
+#[test]
+fn lista_tensor_conversio_rejects_rank_two_target_for_bounded_source_at_check() {
+    assert_rejects_with_issue(
+        r"functio selecta(lista<f32, 8> src) → tensor<f32, [8, 3]> {
+  redde src ↦ tensor<f32, [8, 3]>
+}",
+        "lista_to_tensor_capacity_mismatch",
+    );
 }
