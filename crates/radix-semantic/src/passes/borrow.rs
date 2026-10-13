@@ -844,11 +844,33 @@ impl<'a> BorrowChecker<'a> {
         receiver: &HirExpression,
         method: radix_lexer::Symbol,
     ) -> Option<Vec<ParamType>> {
-        let class = super::method_receiver_mutation::class_def(self.types, receiver.ty?)?;
+        let class = self.receiver_class_def(receiver.ty?)?;
         if let Some(params) = self.method_params.get(&(class, method)) {
             return Some(params.clone());
         }
         self.imported_method_params.get(&(class, method)).cloned()
+    }
+
+    /// Definition a receiver type names for method lookup: the genus behind
+    /// it, or the contract (`implendum`) when the receiver is contract-typed.
+    ///
+    /// `method_receiver_mutation::class_def` reports genera only, so an
+    /// imported contract receiver (`Type::Interface`) would miss the
+    /// contract's own parameter row seeded by `index_imported_methods`.
+    fn receiver_class_def(&self, ty: TypeId) -> Option<DefId> {
+        super::method_receiver_mutation::class_def(self.types, ty)
+            .or_else(|| Self::contract_def(self.types, ty))
+    }
+
+    /// Contract definition behind a receiver type, peeling the same access
+    /// markers, aliases, and generic applications `class_def` peels.
+    fn contract_def(types: &TypeTable, ty: TypeId) -> Option<DefId> {
+        match types.get(ty) {
+            Type::Interface(def) => Some(*def),
+            Type::Ref(_, inner) | Type::Alias(_, inner) => Self::contract_def(types, *inner),
+            Type::Applied(base, _) => Self::contract_def(types, *base),
+            _ => None,
+        }
     }
 
     fn check_args_against(&mut self, params: &[ParamType], rust_sim: bool, args: &[HirCallArg]) {
