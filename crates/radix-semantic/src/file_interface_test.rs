@@ -606,3 +606,39 @@ fn file_interface_default_rejects_unmapped_definition_references() {
         Err(FileInterfaceError::FieldDefaultUnsupported),
     );
 }
+
+#[test]
+fn file_interface_round_trips_intersection_without_becoming_union() {
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let textus = types.primitive(Primitive::Textus);
+    let intersection = types.intern(Type::Intersection(vec![numerus, textus]));
+
+    let snapshot =
+        snapshot_interface_type(intersection, &types, &interner).expect("snapshot intersection");
+
+    assert!(
+        !matches!(snapshot, InterfaceTypeSnapshot::Union(_)),
+        "an exported intersection must not snapshot as a union, got {snapshot:?}"
+    );
+
+    let mut target_types = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner)
+        .expect("import intersection");
+
+    let Type::Intersection(members) = target_types.get(imported) else {
+        panic!(
+            "expected imported intersection, got {:?}",
+            target_types.get(imported)
+        );
+    };
+    assert_eq!(members.len(), 2);
+    let kinds: Vec<_> = members
+        .iter()
+        .map(|member| target_types.get(*member).clone())
+        .collect();
+    assert!(kinds.contains(&Type::Primitive(Primitive::Numerus)));
+    assert!(kinds.contains(&Type::Primitive(Primitive::Textus)));
+}

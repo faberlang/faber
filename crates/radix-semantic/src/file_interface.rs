@@ -372,6 +372,7 @@ pub enum InterfaceTypeSnapshot {
     Param(String),
     Applied(Box<InterfaceTypeSnapshot>, Vec<InterfaceAppliedArg>),
     Union(Vec<InterfaceTypeSnapshot>),
+    Intersection(Vec<InterfaceTypeSnapshot>),
     Tuple(Vec<InterfaceTypeSnapshot>),
     Nominal(InterfaceNominalType),
 }
@@ -971,7 +972,7 @@ fn snapshot_interface_type_inner(
                 snapshot_interface_type_inner(*member, types, interner, resolver, module_identity)
             })
             .collect::<FileInterfaceResult<Vec<_>>>()
-            .map(InterfaceTypeSnapshot::Union),
+            .map(InterfaceTypeSnapshot::Intersection),
         Type::Tuple(elements) => elements
             .iter()
             .map(|element| {
@@ -1191,6 +1192,13 @@ fn import_interface_type_inner(
                 .map(|member| import_interface_type_inner(member, types, interner, resolver))
                 .collect::<FileInterfaceResult<Vec<_>>>()?;
             Ok(types.intern(Type::Union(members)))
+        }
+        InterfaceTypeSnapshot::Intersection(members) => {
+            let members = members
+                .iter()
+                .map(|member| import_interface_type_inner(member, types, interner, resolver))
+                .collect::<FileInterfaceResult<Vec<_>>>()?;
+            Ok(types.intern(Type::Intersection(members)))
         }
         InterfaceTypeSnapshot::Tuple(elements) => {
             let elements = elements
