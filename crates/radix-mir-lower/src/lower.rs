@@ -2647,9 +2647,7 @@ impl<'a> FunctionBuilder<'a> {
         match self.types.get_index(index) {
             IndexExpr::Param(symbol) if witnessed_size_params => self
                 .size_param_source(*symbol)
-                .is_some_and(|source| {
-                    self.body_index_contains_runtime_extent(source, seen, witnessed_size_params)
-                }),
+                .is_some_and(|source| self.body_index_contains_runtime_extent(source, seen, witnessed_size_params)),
             IndexExpr::Param(_) => false,
             IndexExpr::Runtime(_) => true,
             IndexExpr::Affine { base, .. } => {
@@ -2658,9 +2656,9 @@ impl<'a> FunctionBuilder<'a> {
             IndexExpr::Divide { numerator, .. } => {
                 self.body_index_contains_runtime_extent(*numerator, seen, witnessed_size_params)
             }
-            IndexExpr::Tuple(dimensions) => dimensions.iter().any(|dimension| {
-                self.body_index_contains_runtime_extent(*dimension, seen, witnessed_size_params)
-            }),
+            IndexExpr::Tuple(dimensions) => dimensions
+                .iter()
+                .any(|dimension| self.body_index_contains_runtime_extent(*dimension, seen, witnessed_size_params)),
             IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
         }
     }

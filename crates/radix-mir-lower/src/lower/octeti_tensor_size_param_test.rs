@@ -149,6 +149,44 @@ fn lista_source_conversion_keeps_the_symbolic_shape_terms_despite_a_witness() {
     );
 }
 
+/// E2-4.2 pin: the shared shape helper must keep the symbolic `ShapeSize`
+/// term whenever `witnessed_size_params` is off, even with the lowered
+/// receiver handed in as `expression_value` — the argument form the
+/// `TensorFromFlat` collection-op shape site passes. A witnessed `size N`
+/// must never turn into a run-time `TensorShapeSize` read there: the WASM
+/// leaf has no `TensorShapeSize` row and would fail closed. (The conversio
+/// route's wrapper call — the site the ordinary `lista ↦ tensor` expression
+/// rides — is pinned by
+/// [`lista_source_conversion_keeps_the_symbolic_shape_terms_despite_a_witness`]
+/// above; a wrapper-flag flip fails that test.)
+#[test]
+fn lista_source_expression_site_keeps_the_symbolic_shape_terms_despite_a_witness() {
+    let fixture = Fixture::new();
+    let mut builder = fixture.builder(true);
+
+    let block = builder.fresh_block(Span::default());
+    builder.switch_to(block);
+    let source = MirOperand::Constant(MirConstant::Int(0));
+    let expression_value = (0, source.clone());
+    let shape = builder.lower_lista_to_tensor_shape_with_expression(
+        source,
+        fixture.target,
+        Some(&expression_value),
+        Span::default(),
+        false,
+    );
+    assert!(shape.is_some(), "a witnessed size-param target lowers a shape operand");
+    assert!(builder.errors.is_empty(), "lowering reported errors");
+    assert!(
+        lowered_shape_stays_symbolic(&builder),
+        "the expression site must keep the finalizable ShapeSize term"
+    );
+    assert!(
+        !lowered_shape_reads_the_witness(&builder),
+        "the expression site must not read a runtime witness for a lista source"
+    );
+}
+
 /// Pre-371f48cfa1 behaviour on the shared path: a declared `Runtime` extent
 /// (here a tensor-binding axis with a formal parameter present) lowers to
 /// the run-time `TensorShapeSize` read even where witnessed `size`
