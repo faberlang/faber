@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 392,
-    "analyzable": 429
+    "capable": 394,
+    "analyzable": 431
   },
   "terms": [
     {
@@ -372,8 +372,8 @@
     {
       "term": "genus",
       "rule": "keyword",
-      "capable": 16,
-      "analyzable": 16
+      "capable": 18,
+      "analyzable": 18
     },
     {
       "term": "iace",
