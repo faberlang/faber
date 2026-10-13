@@ -223,6 +223,10 @@ tuus = "接收"
 message = "讀者語言包 '{pack}' 發現類似關鍵字的寫法 '{spelling}'"
 help = "若本意是關鍵字請使用 '{suggestion}'；'{spelling}' 按原樣是合法名稱"
 
+[diagnostics.LOCALE002.issues.source_reads_as_other_locale]
+message = "原始碼未宣告 locale，其關鍵字讀起來像 '{detected}'"
+help = "以 `+++ locale = \"{detected}\" +++` frontmatter 宣告 locale，或傳入 `--locale {detected}`；此提示不會選擇 locale"
+
 [diagnostics.LOCALE004]
 message = "識別碼 '{identifier}' 混用了多種文字：{scripts}"
 help = "請檢查是否有來自其他字母體系的形近字元；該名稱按原樣仍然合法"
@@ -746,6 +750,10 @@ help = "檢查匯入語法"
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "未知的匯入欄位"
 help = "使用 ex、visibilitas、nomen、ut 或 omnia"
+
+[diagnostics.PARSE050.issues.duplicate_import_field]
+message = "重複的匯入欄位 `{field}`"
+help = "每個匯入欄位只能出現一次；請移除重複的欄位"
 
 [diagnostics.PARSE050.issues.missing_import_source]
 message = "匯入記錄需要 ex 來源"
@@ -3602,142 +3610,142 @@ message = "expected '>' after generic parameters"
 message = "expected '>' after contract type arguments"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
-message = "expected '[' after 'apud'"
+message = "'apud' 後需要 '['"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
-message = "expected ']' after the 'apud' coordinates"
+message = "'apud' 座標後需要 ']'"
 
 [diagnostics.PARSE001.issues.elige_body_start]
-message = "expected an opening brace for the elige body"
+message = "elige 主體需要以大括號開始"
 
 [diagnostics.PARSE001.issues.elige_body_end]
-message = "expected a closing brace after the elige cases"
+message = "elige 分支後需要 '}'"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
-message = "expected an opening brace for the discerne body"
+message = "discerne 主體需要以大括號開始"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
-message = "expected a closing brace after the discerne arms"
+message = "discerne 分支後需要 '}'"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
-message = "expected an opening brace for the custodi body"
+message = "custodi 主體需要以大括號開始"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
-message = "expected a closing brace after the custodi clauses"
+message = "custodi 子句後需要 '}'"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
-message = "expected '✗' after the conditional value"
+message = "條件值後需要 '✗'"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
-message = "expected ')' after the call arguments"
+message = "呼叫引數後需要 ')'"
 
 [diagnostics.PARSE001.issues.index_end]
-message = "expected ']' after the index expression"
+message = "索引運算式後需要 ']'"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
-message = "expected ']' after the gradient selectors"
+message = "gradient 選擇器後需要 ']'"
 
 [diagnostics.PARSE001.issues.optional_index_end]
-message = "expected ']' after the optional index expression"
+message = "可選索引運算式後需要 ']'"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
-message = "expected ')' after the optional call arguments"
+message = "可選呼叫引數後需要 ')'"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
-message = "expected ']' after the non-null index expression"
+message = "非空索引運算式後需要 ']'"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
-message = "expected ')' after the non-null call arguments"
+message = "非空呼叫引數後需要 ')'"
 
 [diagnostics.PARSE001.issues.first_match_start]
-message = "expected '(' after 'primus_quem'"
+message = "'primus_quem' 後需要 '('"
 
 [diagnostics.PARSE001.issues.first_match_source_separator]
-message = "expected ',' after the first-match source"
+message = "首個匹配來源後需要 ','"
 
 [diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "expected the 'ubi' predicate tail"
+message = "需要 'ubi' 述詞尾部"
 
 [diagnostics.PARSE001.issues.first_match_end]
-message = "expected ')' after the first-match predicate"
+message = "首個匹配述詞後需要 ')'"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
-message = "expected a closing brace after the constructor fields"
+message = "建構子欄位後需要 '}'"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
-message = "expected ']' after the inferred constructor elements"
+message = "推斷建構子元素後需要 ']'"
 
 [diagnostics.PARSE001.issues.array_literal_end]
-message = "expected ']' after the array elements"
+message = "陣列元素後需要 ']'"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
-message = "expected ')' after the parenthesized expression"
+message = "括號內的運算式後需要 ')'"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
-message = "expected '<' after 'ratio'"
+message = "'ratio' 後需要 '<'"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
-message = "expected '>' after the ratio type arguments"
+message = "ratio 型別實參後需要 '>'"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
-message = "expected an opening brace after the ratio type arguments"
+message = "ratio 型別實參後需要大括號"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
-message = "expected a closing brace after the ratio fields"
+message = "ratio 欄位後需要 '}'"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
-message = "expected a closing brace after the typed constructor fields"
+message = "具型別建構子欄位後需要 '}'"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
-message = "expected a closing brace after the finge fields"
+message = "finge 欄位後需要 '}'"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
-message = "expected '<' after 'iuncta'"
+message = "'iuncta' 後需要 '<'"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
-message = "expected '[' after the iuncta type arguments"
+message = "iuncta 型別實參後需要 '['"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
-message = "expected ']' after the iuncta elements"
+message = "iuncta 元素後需要 ']'"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
-message = "expected ')' after the closure parameters"
+message = "閉包參數後需要 ')'"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
-message = "expected '∴' after the closure signature"
+message = "閉包簽名後需要 '∴'"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
-message = "expected ')' after the ad opener"
+message = "ad 開啟括號後需要 ')'"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
-message = "expected ':' after the argument label"
+message = "引數標籤後需要 ':'"
 
 [diagnostics.PARSE001.issues.computed_key_end]
-message = "expected ']' after the computed object key"
+message = "計算鍵值後需要 ']'"
 
 [diagnostics.PARSE001.issues.json_key_separator]
-message = "expected ':' after the JSON key"
+message = "JSON 索引鍵後需要 ':'"
 
 [diagnostics.PARSE001.issues.json_object_end]
-message = "expected a closing brace after the JSON object"
+message = "JSON 物件後需要 '}'"
 
 [diagnostics.PARSE001.issues.json_array_end]
-message = "expected ']' after the JSON array"
+message = "JSON 陣列後需要 ']'"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
-message = "expected a closing brace after the inferred constructor fields"
+message = "推斷建構子欄位後需要 '}'"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
-message = "expected '>' after the call type arguments"
+message = "呼叫型別實參後需要 '>'"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
-message = "expected '<' before the constructor type arguments"
+message = "建構子型別實參前需要 '<'"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
-message = "expected '>' after the constructor type arguments"
+message = "建構子型別實參後需要 '>'"
 
 [diagnostics.PARSE001.issues.scriptum_start]
-message = "expected '(' after 'scriptum'"
+message = "'scriptum' 後需要 '('"
 
 [diagnostics.PARSE001.issues.scriptum_end]
-message = "expected ')' after the scriptum arguments"
+message = "scriptum 引數後需要 ')'"
