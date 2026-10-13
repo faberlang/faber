@@ -15,7 +15,7 @@ fn config() -> ScanConfig {
 const BUDGETS: Budgets = Budgets {
     // WHY: minted at D-03 baseline; frozen, not audited here.
     unwrap: 0,
-    // Parser token expectations are `expect_token`; no production `.expect(` remains.
+    // Parser token expectations go through `expect_issue`; no production `.expect(` remains.
     expect: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     panic: 0,
