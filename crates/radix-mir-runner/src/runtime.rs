@@ -1046,7 +1046,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         Value::Octeti(_),
                         Type::Primitive(Primitive::Octeti) | Type::Array(_)
                     )
-                    | (Value::Array(_), Type::Array(_))
+                    | (Value::Array(_), Type::Array(_) | Type::BoundedArray { .. })
                     | (Value::Map(_), Type::Map(_, _))
                     | (Value::Set(_), Type::Set(_))
                     | (

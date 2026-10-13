@@ -1,12 +1,13 @@
-//! Runner pins for tabula reads selected by the MIR operation's static result type.
+//! Runner pins for tabula reads selected by the MIR operation's static result type, and for the
+//! bounded-lista `est` tag check.
 
 use super::*;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
     MirBlockId, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirOperand, MirProgram,
-    MirRuntimeCall, MirType, MirValidationContext, MirValueId,
+    MirRuntimeCall, MirType, MirTypeCheckOp, MirValidationContext, MirValueId,
 };
-use radix_types::{Primitive, TypeTable};
+use radix_types::{IndexExpr, Primitive, TypeTable};
 use rustc_hash::FxHashMap;
 
 fn eval_missing_tabula_key(optional: bool) -> Result<Value, RunnerError> {
@@ -76,4 +77,72 @@ fn optional_tabula_missing_key_returns_none() {
     let value = eval_missing_tabula_key(true)
         .expect("tabula<textus, numerus union nihil> missing key must stay legal");
     assert_eq!(value, Value::Nil);
+}
+
+/// Evaluate `value est lista<numerus, 8>` (or `non est`) against one runner value.
+fn eval_bounded_lista_type_check(value: Value, positive: bool) -> Value {
+    let mut type_table = TypeTable::new();
+    let numerus = type_table.primitive(Primitive::Numerus);
+    let bool_ty = type_table.primitive(Primitive::Bivalens);
+    let capacity = type_table.intern_index(IndexExpr::Literal(8));
+    let bounded = type_table.bounded_array(numerus, capacity);
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: MirType::semantic(bool_ty),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    });
+    let mut host = crate::host::BufferHost::default();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), value);
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::TypeCheck(MirTypeCheckOp {
+            positive,
+            ty: MirType::semantic(bounded),
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(bool_ty),
+    };
+    runner
+        .eval_runtime_call(&call, Span::default())
+        .expect("bounded lista type check evaluates")
+}
+
+#[test]
+fn a_boxed_list_is_a_bounded_lista() {
+    let list = Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)])));
+    assert_eq!(
+        eval_bounded_lista_type_check(list.clone(), true),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        eval_bounded_lista_type_check(list, false),
+        Value::Bool(false)
+    );
+}
+
+#[test]
+fn a_non_list_is_not_a_bounded_lista() {
+    assert_eq!(
+        eval_bounded_lista_type_check(Value::Int(1), true),
+        Value::Bool(false)
+    );
 }
