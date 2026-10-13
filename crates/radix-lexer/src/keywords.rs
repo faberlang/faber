@@ -1478,11 +1478,16 @@ fn keyword_by_text() -> &'static FxHashMap<&'static str, &'static KeywordSpec> {
 ///
 /// Keyword tokens are unit variants, so discriminant equality matches the prior
 /// `token_kind == kind` linear scan without requiring `TokenKind: Hash`.
+///
+/// EDGE: two spellings may share one identity (alias `conversion` with canonical
+/// `conversio`); the later declaration wins, so a canonical row must follow its
+/// alias in [`KEYWORD_SPECS`].
 fn keyword_by_kind() -> &'static FxHashMap<mem::Discriminant<TokenKind>, &'static KeywordSpec> {
     static MAP: OnceLock<FxHashMap<mem::Discriminant<TokenKind>, &'static KeywordSpec>> =
         OnceLock::new();
     MAP.get_or_init(|| {
-        let mut map = FxHashMap::default();
+        let mut map =
+            FxHashMap::with_capacity_and_hasher(KEYWORD_SPECS.len(), rustc_hash::FxBuildHasher);
         for spec in KEYWORD_SPECS {
             if let Some(kind) = &spec.token_kind {
                 map.insert(mem::discriminant(kind), spec);

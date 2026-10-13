@@ -3884,3 +3884,21 @@ genus Nexus {
     assert_eq!(gates("mitte"), gate(Some("ts"), None));
     assert!(gates("lege").is_empty());
 }
+
+#[test]
+fn library_bindings_route_reports_missing_source_read() {
+    let (_td, dir) = temp_dir("lib-bindings-missing-source");
+    let missing = dir.join("absent.fab");
+    let resolve = |_roots: &std::collections::BTreeSet<PathBuf>| crate::driver::TargetBindings::default();
+    let result = super::compile_cli_input_with_library_bindings(
+        &[missing.display().to_string()],
+        false,
+        crate::codegen::Target::HirRust,
+        None,
+        crate::codegen::OutputMode::Application,
+        None,
+        &resolve,
+    );
+    assert!(result.output.is_none(), "a missing source must not produce output");
+    crate::test_support::assert_has_error_issue(&result.diagnostics, "IO001", "source_read_failed");
+}

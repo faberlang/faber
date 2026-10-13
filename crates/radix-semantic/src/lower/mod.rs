@@ -72,7 +72,7 @@ pub(super) struct TypeFormFrame {
     named: Option<(radix_types::DefId, Vec<Symbol>)>,
 }
 
-use crate::cli::{CliProgram, CliType};
+use crate::cli::{CliOperand, CliOption, CliProgram, CliType};
 use crate::locale::LocalePack;
 use crate::{
     AnnotationContractMetadata, Primitive, Resolver, SemanticErrorKind, SemanticParamMode, Type,
@@ -612,7 +612,6 @@ impl<'a> Lowerer<'a> {
         HirSourceAnchorId(id)
     }
 
-    /// Convert syntax trivia into HIR presentation trivia, preserving order.
     /// Record the file's `regio` declaration and its module doc (D7.7).
     ///
     /// The declaration's leading trivia is registered like any other owner so
@@ -633,6 +632,7 @@ impl<'a> Lowerer<'a> {
         });
     }
 
+    /// Convert syntax trivia into HIR presentation trivia, preserving order.
     fn hir_trivia(&self, trivia: &[Trivia]) -> Vec<HirTrivia> {
         trivia
             .iter()
@@ -824,20 +824,10 @@ impl<'a> Lowerer<'a> {
 
     pub(super) fn incipit_args_type(&mut self) -> TypeId {
         if let Some(cli) = self.cli_program {
-            let mut fields = FxHashMap::default();
-            for option in cli.global_options.iter().chain(cli.options.iter()) {
-                let ty = self.cli_value_type(
-                    &option.ty,
-                    option.default.is_none() && !option.flag,
-                    false,
-                );
-                fields.insert(option.binding_symbol, ty);
-            }
-            for operand in cli.global_operands.iter().chain(cli.operands.iter()) {
-                let ty = self.cli_value_type(&operand.ty, false, operand.rest);
-                fields.insert(operand.binding_symbol, ty);
-            }
-            return self.types.intern(Type::Record(fields));
+            return self.cli_surface_record(
+                cli.global_options.iter().chain(cli.options.iter()),
+                cli.global_operands.iter().chain(cli.operands.iter()),
+            );
         }
 
         let textus = self.types.primitive(Primitive::Textus);
@@ -855,23 +845,32 @@ impl<'a> Lowerer<'a> {
                 command.module_path.is_none() && command.function_symbol == function
             })
         {
-            let mut fields = FxHashMap::default();
-            for option in cli.global_options.iter().chain(command.options.iter()) {
-                let ty = self.cli_value_type(
-                    &option.ty,
-                    option.default.is_none() && !option.flag,
-                    false,
-                );
-                fields.insert(option.binding_symbol, ty);
-            }
-            for operand in cli.global_operands.iter().chain(command.operands.iter()) {
-                let ty = self.cli_value_type(&operand.ty, false, operand.rest);
-                fields.insert(operand.binding_symbol, ty);
-            }
-            return self.types.intern(Type::Record(fields));
+            return self.cli_surface_record(
+                cli.global_options.iter().chain(command.options.iter()),
+                cli.global_operands.iter().chain(command.operands.iter()),
+            );
         }
 
         self.types.primitive(Primitive::Ignotum)
+    }
+
+    /// Build one CLI surface's argument record from its option and operand chains.
+    fn cli_surface_record(
+        &mut self,
+        options: impl Iterator<Item = &'a CliOption>,
+        operands: impl Iterator<Item = &'a CliOperand>,
+    ) -> TypeId {
+        let mut fields = FxHashMap::default();
+        for option in options {
+            let ty =
+                self.cli_value_type(&option.ty, option.default.is_none() && !option.flag, false);
+            fields.insert(option.binding_symbol, ty);
+        }
+        for operand in operands {
+            let ty = self.cli_value_type(&operand.ty, false, operand.rest);
+            fields.insert(operand.binding_symbol, ty);
+        }
+        self.types.intern(Type::Record(fields))
     }
 
     /// Translate validated CLI value metadata into a HIR-visible semantic type.
