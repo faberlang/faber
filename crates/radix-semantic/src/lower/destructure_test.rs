@@ -180,9 +180,7 @@ fn guard_desugars_requirit_and_reice_to_opposite_si_conditions() {
         .statements
         .iter()
         .filter_map(|stmt| match &stmt.kind {
-            HirStatementKind::Expr(expr)
-                if matches!(expr.kind, HirExpressionKind::Si { .. }) =>
-            {
+            HirStatementKind::Expr(expr) if matches!(expr.kind, HirExpressionKind::Si { .. }) => {
                 Some(expr)
             }
             _ => None,

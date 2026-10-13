@@ -958,10 +958,9 @@ impl Lowerer<'_> {
             );
             return HirStatementKind::Expr(error_expr(self, self.current_span));
         }
-        let Some(bindings) = self.lower_itera_name_bindings(
-            iter_stmt,
-            "itera_lockstep_binder_pattern_unsupported",
-        ) else {
+        let Some(bindings) =
+            self.lower_itera_name_bindings(iter_stmt, "itera_lockstep_binder_pattern_unsupported")
+        else {
             return HirStatementKind::Expr(error_expr(self, self.current_span));
         };
 
@@ -1014,7 +1013,10 @@ impl Lowerer<'_> {
         for binding in &iter_stmt.bindings {
             let radix_syntax::BindingPattern::Ident(ident) = binding else {
                 self.error_with_args_at(
-                    vec![radix_diagnostics::DiagnosticArg::new("issue", unsupported_issue)],
+                    vec![radix_diagnostics::DiagnosticArg::new(
+                        "issue",
+                        unsupported_issue,
+                    )],
                     binding_pattern_span(binding),
                 );
                 return None;
@@ -1061,8 +1063,8 @@ impl Lowerer<'_> {
             );
             return HirStatementKind::Expr(error_expr(self, self.current_span));
         }
-        let Some(bindings) = self
-            .lower_itera_name_bindings(iter_stmt, "itera_binder_pattern_unsupported")
+        let Some(bindings) =
+            self.lower_itera_name_bindings(iter_stmt, "itera_binder_pattern_unsupported")
         else {
             return HirStatementKind::Expr(error_expr(self, self.current_span));
         };
