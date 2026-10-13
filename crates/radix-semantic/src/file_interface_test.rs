@@ -1,8 +1,8 @@
 //! S0-R1: interface snapshots serialize kinded applied size arguments.
 
 use crate::file_interface::{
-    FileInterfaceError, InterfaceAppliedArg, InterfaceIndexSnapshot, InterfaceTypeSnapshot,
-    import_interface_callable_with_resolver, import_interface_type,
+    FileInterfaceError, InterfaceAppliedArg, InterfaceCallable, InterfaceIndexSnapshot,
+    InterfaceTypeSnapshot, import_interface_callable_with_resolver, import_interface_type,
     snapshot_interface_callable_with_resolver, snapshot_interface_type,
 };
 use crate::{
@@ -259,6 +259,108 @@ fn twin_callable_round_trips_param_witnesses_to_consumer_tables() {
         }
         other => panic!("expected tuple shape, got {other:?}"),
     }
+}
+
+/// A portable callable stores the raw declared return; importing re-applies
+/// the wrapper the async/generator flags declare, so the consumer's `FuncSig`
+/// matches the exporter's.
+#[test]
+fn async_callable_import_wraps_return_in_promissum_failable() {
+    let callable = InterfaceCallable {
+        type_params: Vec::new(),
+        tensor_edge_policy_requirements: Vec::new(),
+        params: Vec::new(),
+        ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+        err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
+        is_async: true,
+        is_generator: false,
+        device: None,
+    };
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+
+    let imported = import_interface_type(
+        &InterfaceTypeSnapshot::Func(callable),
+        &mut types,
+        &mut interner,
+    )
+    .expect("import async failable callable");
+
+    let Type::Func(sig) = types.get(imported) else {
+        panic!("expected imported callable");
+    };
+    let Type::PromissumFailable(success, alternate) = types.get(sig.ret) else {
+        panic!("expected promissum failable return, got {:?}", types.get(sig.ret));
+    };
+    assert_eq!(*success, types.primitive(Primitive::Numerus));
+    assert_eq!(*alternate, types.primitive(Primitive::Textus));
+    assert_eq!(sig.err, None);
+}
+
+#[test]
+fn async_generator_callable_import_wraps_return_in_async_cursor() {
+    let callable = InterfaceCallable {
+        type_params: Vec::new(),
+        tensor_edge_policy_requirements: Vec::new(),
+        params: Vec::new(),
+        ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+        err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
+        is_async: true,
+        is_generator: true,
+        device: None,
+    };
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+
+    let imported = import_interface_type(
+        &InterfaceTypeSnapshot::Func(callable),
+        &mut types,
+        &mut interner,
+    )
+    .expect("import async generator callable");
+
+    let Type::Func(sig) = types.get(imported) else {
+        panic!("expected imported callable");
+    };
+    let Type::AsyncCursor(item, alternate) = types.get(sig.ret) else {
+        panic!("expected async cursor return, got {:?}", types.get(sig.ret));
+    };
+    assert_eq!(*item, types.primitive(Primitive::Numerus));
+    assert_eq!(*alternate, types.primitive(Primitive::Textus));
+    assert_eq!(sig.err, None);
+    assert!(sig.is_async);
+    assert!(sig.is_generator);
+}
+
+#[test]
+fn generator_callable_import_wraps_return_in_array() {
+    let callable = InterfaceCallable {
+        type_params: Vec::new(),
+        tensor_edge_policy_requirements: Vec::new(),
+        params: Vec::new(),
+        ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
+        err: None,
+        is_async: false,
+        is_generator: true,
+        device: None,
+    };
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+
+    let imported = import_interface_type(
+        &InterfaceTypeSnapshot::Func(callable),
+        &mut types,
+        &mut interner,
+    )
+    .expect("import generator callable");
+
+    let Type::Func(sig) = types.get(imported) else {
+        panic!("expected imported callable");
+    };
+    let Type::Array(item) = types.get(sig.ret) else {
+        panic!("expected array return, got {:?}", types.get(sig.ret));
+    };
+    assert_eq!(*item, types.primitive(Primitive::Numerus));
 }
 
 /// Fail-closed pins (PKG-REP done_when (d)): inference holes, error types,

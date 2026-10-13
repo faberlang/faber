@@ -1328,18 +1328,19 @@ pub fn import_interface_callable_with_resolver(
     import_interface_callable_inner(callable, types, interner, Some(resolver))
 }
 
-fn import_interface_callable_inner(
+/// Rebuild the declared return wrapper from the portable async/generator
+/// flags.
+///
+/// The snapshot carries the raw declared return type; importing re-applies
+/// the wrapper the exporting `FuncSig` declared (`async_cursor`,
+/// `promissum[_failable]`, `array`). A return that already carries its wrapper
+/// is left alone, so a round trip does not double-wrap.
+fn import_callable_return_shape(
     callable: &InterfaceCallable,
+    mut ret: TypeId,
+    mut err: Option<TypeId>,
     types: &mut TypeTable,
-    interner: &mut Interner,
-    resolver: Option<&Resolver>,
-) -> FileInterfaceResult<FuncSig> {
-    let mut ret = import_interface_type_inner(&callable.ret, types, interner, resolver)?;
-    let mut err = callable
-        .err
-        .as_ref()
-        .map(|err| import_interface_type_inner(err, types, interner, resolver))
-        .transpose()?;
+) -> (TypeId, Option<TypeId>) {
     if callable.is_async
         && callable.is_generator
         && !matches!(types.get(ret), Type::AsyncCursor(_, _))
@@ -1364,6 +1365,22 @@ fn import_interface_callable_inner(
     if callable.is_generator && !callable.is_async && !matches!(types.get(ret), Type::Array(_)) {
         ret = types.array(ret);
     }
+    (ret, err)
+}
+
+fn import_interface_callable_inner(
+    callable: &InterfaceCallable,
+    types: &mut TypeTable,
+    interner: &mut Interner,
+    resolver: Option<&Resolver>,
+) -> FileInterfaceResult<FuncSig> {
+    let ret = import_interface_type_inner(&callable.ret, types, interner, resolver)?;
+    let err = callable
+        .err
+        .as_ref()
+        .map(|err| import_interface_type_inner(err, types, interner, resolver))
+        .transpose()?;
+    let (ret, err) = import_callable_return_shape(callable, ret, err, types);
     Ok(FuncSig {
         type_params: callable
             .type_params
