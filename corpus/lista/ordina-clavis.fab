@@ -45,7 +45,7 @@ fn nomina(list<Persona> ps) → string {
 }
 
 main {
-    var list<Persona> personae ← [
+    const list<Persona> personae ← [
         Persona { nomen = "Livia", aetas = 30 },
         Persona { nomen = "Marcus", aetas = 30 },
         Persona { nomen = "Aulus", aetas = 25 },
