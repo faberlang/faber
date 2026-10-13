@@ -4,8 +4,8 @@
 //! The reader pack looks a row up by `(code, issue)`. A slug with no row falls
 //! back to the code's base text with a `[locale pack missing row: ...]` suffix,
 //! so `faber check --diagnostics` loses the specific message. The gate scans the
-//! production sources of this crate for slug literals in the four emission
-//! shapes the passes use and fails with the slugs that no `en` row names.
+//! production sources of this crate for slug literals in the emission shapes the
+//! passes use and fails with the slugs that no `en` row names.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -15,6 +15,12 @@ use crate::SemanticErrorKind;
 use radix_diagnostics::DiagnosticArg;
 
 const EN_PACK: &str = "../../locale/en/pack.toml";
+
+/// The air-purity pass's `reject(span, issue)` definition. Other passes define
+/// a method of the same name with another signature (`insere_fold`'s takes the
+/// issue first, `air_unroll`'s takes only a cause), so the call shape is read
+/// only from a source that defines this one.
+const AIR_PURITY_REJECT_SIGNATURE: &str = "fn reject(&mut self, span: Span, issue: &'static str)";
 
 fn production_sources(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).expect("read src dir") {
@@ -44,9 +50,9 @@ fn leading_slug(text: &str) -> Option<&str> {
     .then_some(slug)
 }
 
-/// The slug of a `reject_with_arg(span, "slug", ...)` call, given the text
-/// after its opening paren: the first string literal after the span argument,
-/// which may sit on a later line.
+/// The slug of a `reject_with_arg(span, "slug", ...)` or `reject(span, "slug")`
+/// call, given the text after its opening paren: the first string literal after
+/// the span argument, which may sit on a later line.
 fn reject_with_arg_slug(call_rest: &str) -> Option<&str> {
     let mut depth = 0usize;
     for (at, ch) in call_rest.char_indices() {
@@ -95,6 +101,15 @@ fn emitted_issue_slugs(source: &str) -> BTreeSet<String> {
     for (at, _) in source.match_indices("reject_with_arg(") {
         if let Some(slug) = reject_with_arg_slug(&source[at + "reject_with_arg(".len()..]) {
             slugs.insert(slug.to_owned());
+        }
+    }
+    // `self.reject(span, "slug")`, read only where the air-purity `reject` is
+    // defined.
+    if source.contains(AIR_PURITY_REJECT_SIGNATURE) {
+        for (at, _) in source.match_indices(".reject(") {
+            if let Some(slug) = reject_with_arg_slug(&source[at + ".reject(".len()..]) {
+                slugs.insert(slug.to_owned());
+            }
         }
     }
     slugs
@@ -185,6 +200,39 @@ fn scanner_skips_the_reject_with_arg_definition() {
     assert!(emitted_issue_slugs(source).is_empty());
 }
 
+#[test]
+fn scanner_reads_the_slug_of_an_air_purity_reject_call() {
+    let source = r#"
+    fn reject(&mut self, span: Span, issue: &'static str) {}
+
+    fn check(&mut self) {
+        self.reject(span, "plain_slug");
+        match region {
+            Some(HandlerRegion::Catch) => self.reject(expr.span, "arm_slug"),
+            None => self.reject(cape.span, ISSUE_NOT_A_LITERAL),
+        }
+        self.reject(expr.span, issue);
+    }
+    "#;
+    assert_eq!(
+        emitted_issue_slugs(source),
+        BTreeSet::from(["plain_slug".to_owned(), "arm_slug".to_owned()])
+    );
+}
+
+#[test]
+fn scanner_skips_a_reject_method_with_another_signature() {
+    let source = r#"
+    fn reject(&mut self, issue: &'static str, path: Symbol, span: Span) {}
+
+    fn check(&mut self) {
+        self.reject("not_a_slug_row", path, span);
+        self.reject(name, "also_not_a_slug_row");
+    }
+    "#;
+    assert!(emitted_issue_slugs(source).is_empty());
+}
+
 /// The slug scan above covers the `en` row for `tensor_method_receiver`; the
 /// catalog arm still needs its own proof: an issue with no
 /// `air_purity_reason` arm leaves the help renderer at its fallthrough and the
@@ -199,4 +247,25 @@ fn air_purity_tensor_method_receiver_issue_renders_through_the_catalog() {
     let help = super::semantic_help(SemanticErrorKind::AirPurityViolation, &args)
         .expect("catalog recognizes the tensor_method_receiver air-purity issue");
     assert_eq!(help, super::AIR_PURITY_HELP);
+}
+
+/// The five issues emitted through `reject(span, slug)` / `reject_with_arg`
+/// that had no `en` row each need their own catalog arm, for the same reason.
+#[test]
+fn air_purity_first_match_sort_and_recovery_issues_render_through_the_catalog() {
+    for issue in [
+        "first_match_expression_unsupported",
+        "first_match_unbounded_source",
+        "recovery_type_mismatch",
+        "rethrow_in_recovery",
+        "sort_expression_unsupported",
+    ] {
+        let args = [
+            DiagnosticArg::new("issue", issue),
+            DiagnosticArg::new("lane", "air"),
+        ];
+        let help = super::semantic_help(SemanticErrorKind::AirPurityViolation, &args)
+            .unwrap_or_else(|| panic!("catalog recognizes the {issue} air-purity issue"));
+        assert_eq!(help, super::AIR_PURITY_HELP, "{issue}");
+    }
 }

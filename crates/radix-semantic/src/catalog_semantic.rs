@@ -1139,6 +1139,14 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         "dum_loop" => "`dum` loops are outside the v1 AIR subset".to_owned(),
         "expression_ad" => "expression-form ad is outside the v1 AIR subset".to_owned(),
         "expression_statement" => "expression statements are outside the v1 AIR subset".to_owned(),
+        "first_match_expression_unsupported" => {
+            "first-match expressions with coordinate bindings are outside the v1 AIR subset"
+                .to_owned()
+        }
+        "first_match_unbounded_source" => {
+            "first-match sources must have a statically known extent in the v1 AIR subset"
+                .to_owned()
+        }
         "generator_function" => "generator functions are outside the v1 AIR subset".to_owned(),
         "iace" => "`iace` is outside the v1 AIR subset".to_owned(),
         "inc_dec_mutation" => {
@@ -1172,8 +1180,15 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
             "reduction expressions are outside the v1 AIR subset".to_owned()
         }
         "recoverable_handler" => "recoverable handlers are outside the v1 AIR subset".to_owned(),
+        "recovery_type_mismatch" => {
+            "a recovery arm must exit with the handled region's value type in the v1 AIR subset"
+                .to_owned()
+        }
         "reference_place_op" => {
             "reference/place operations are outside the v1 AIR subset".to_owned()
+        }
+        "rethrow_in_recovery" => {
+            "`iace` inside a recovery arm is outside the v1 AIR subset".to_owned()
         }
         "runtime_assertion" => "runtime assertions are outside the v1 AIR subset".to_owned(),
         "runtime_conversion" => "runtime `↦` conversion is outside the v1 AIR subset".to_owned(),
@@ -1182,6 +1197,9 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         }
         "runtime_variant_check" => {
             "runtime `est` variant check is outside the v1 AIR subset".to_owned()
+        }
+        "sort_expression_unsupported" => {
+            "sort expressions are outside the v1 AIR subset".to_owned()
         }
         "spread_call_arg" => "spread call arguments are outside the v1 AIR subset".to_owned(),
         "tacet" => "`tacet` is outside the v1 AIR subset".to_owned(),

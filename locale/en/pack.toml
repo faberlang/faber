@@ -4617,6 +4617,14 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: expression statements are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
+[diagnostics.SEM059.issues.first_match_expression_unsupported]
+message = "@ radix lane \"{lane}\" rejects this function body: first-match expressions with coordinate bindings are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.first_match_unbounded_source]
+message = "@ radix lane \"{lane}\" rejects this function body: the source of a first-match expression has no statically known extent, which the v1 AIR subset requires"
+help = "use a literal array, a concrete `intervallum` range, or a source with a static shape (a fully shaped tensor or matrix, or a bounded array) as the first-match source"
+
 [diagnostics.SEM059.issues.generator_function]
 message = "@ radix lane \"{lane}\" rejects this function body: generator functions are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
@@ -4689,8 +4697,16 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: recoverable handlers are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
+[diagnostics.SEM059.issues.recovery_type_mismatch]
+message = "@ radix lane \"{lane}\" rejects this function body: a recovery arm's exit value type differs from the handled region's normal-exit type, which the v1 AIR subset requires"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
 [diagnostics.SEM059.issues.reference_place_op]
 message = "@ radix lane \"{lane}\" rejects this function body: reference/place operations are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.rethrow_in_recovery]
+message = "@ radix lane \"{lane}\" rejects this function body: `iace` inside a recovery arm (a rethrow) is outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM059.issues.runtime_assertion]
@@ -4707,6 +4723,10 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 
 [diagnostics.SEM059.issues.runtime_variant_check]
 message = "@ radix lane \"{lane}\" rejects this function body: runtime `est` variant check is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.sort_expression_unsupported]
+message = "@ radix lane \"{lane}\" rejects this function body: sort expressions are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM059.issues.spread_call_arg]
