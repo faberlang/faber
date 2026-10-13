@@ -71,8 +71,11 @@ fn rust_emits_method_calls_on_the_asserted_payload() {
 fn ts_emits_method_calls_on_the_asserted_payload() {
     let code = emit(Target::HirTypeScript);
     assert!(code.contains("xs!.push(3);"), "{code}");
+    // A list length stays `.length`; a text length counts Unicode characters
+    // on every target, so the asserted text payload is walked by code point.
     assert!(code.contains("xs!.length"), "{code}");
-    assert!(code.contains("t!.length"), "{code}");
+    assert!(code.contains("Array.from(t!).length"), "{code}");
+    assert!(!code.contains("t!.length"), "{code}");
     assert!(!code.contains(".length()"), "{code}");
 }
 
