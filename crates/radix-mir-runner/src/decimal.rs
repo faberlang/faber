@@ -61,6 +61,12 @@ pub(crate) fn canonical(mut carrier: i128, mut scale: u32) -> crate::Value {
 fn align(a: (i128, u32), b: (i128, u32), span: Span) -> Result<(i128, i128, u32), RunnerError> {
     let scale = a.1.max(b.1);
     let up = |(carrier, from): (i128, u32)| -> Result<i128, RunnerError> {
+        // A zero carrier is zero at every scale: it never goes through
+        // `pow10`, which overflows past a gap of 38 digits and would trap an
+        // exact value.
+        if carrier == 0 {
+            return Ok(0);
+        }
         pow10(scale - from)
             .and_then(|factor| carrier.checked_mul(factor))
             .ok_or_else(|| RunnerError::internal(span, OVERFLOW))

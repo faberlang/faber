@@ -62,6 +62,53 @@ fn compare_with_a_zero_carrier_past_the_power_of_ten_gap_orders_by_the_other_sig
     assert_eq!(compare(stored(0), wide(0)), Ordering::Equal);
 }
 
+fn run(left: &Value, right: &Value, op: MirBinOp) -> Result<Value, crate::RunnerError> {
+    binop(left, right, op, Span::default())
+}
+
+#[test]
+fn add_and_sub_with_a_zero_carrier_past_the_power_of_ten_gap_are_exact() {
+    // `Int(0)` is a scale-8 zero; `Dec(_, 48)` is a gap of 40, so `10^40`
+    // overflows the i128 carrier and the zero cannot be rescaled by
+    // multiplication.
+    let zero = Value::Int(0);
+    let wide = Value::Dec(7, 48);
+    let negative = Value::Dec(-7, 48);
+
+    assert_eq!(run(&wide, &zero, MirBinOp::Add), Ok(wide.clone()));
+    assert_eq!(run(&zero, &wide, MirBinOp::Add), Ok(wide.clone()));
+    assert_eq!(run(&wide, &zero, MirBinOp::Sub), Ok(wide.clone()));
+    assert_eq!(run(&zero, &wide, MirBinOp::Sub), Ok(negative.clone()));
+    assert_eq!(run(&negative, &zero, MirBinOp::Add), Ok(negative.clone()));
+    assert_eq!(run(&zero, &negative, MirBinOp::Sub), Ok(wide));
+}
+
+#[test]
+fn mod_with_a_zero_carrier_past_the_power_of_ten_gap_is_exact() {
+    let zero = Value::Int(0);
+    let wide = Value::Dec(7, 48);
+
+    // 0 mod x = 0, and a zero divisor is a division failure, not an overflow.
+    assert_eq!(run(&zero, &wide, MirBinOp::Mod), Ok(Value::Int(0)));
+    let error = run(&wide, &zero, MirBinOp::Mod).unwrap_err();
+    assert_eq!(error.issue, "runner_numerus_division_failed");
+}
+
+#[test]
+fn add_still_traps_when_a_nonzero_carrier_rescale_overflows() {
+    // 10^40 overflows the i128 carrier: the power of ten itself is past it.
+    let narrow = Value::Int(1);
+    let wide = Value::Dec(1, 48);
+    let error = run(&narrow, &wide, MirBinOp::Add).unwrap_err();
+    assert_eq!(error.issue, "runner_numerus_overflow");
+
+    // The power of ten fits, but the product with the carrier does not.
+    let huge = Value::Dec(i128::MAX, 0);
+    let fine = Value::Dec(1, 30);
+    let error = run(&huge, &fine, MirBinOp::Add).unwrap_err();
+    assert_eq!(error.issue, "runner_numerus_overflow");
+}
+
 #[test]
 fn store_rounds_half_even_and_checks_the_carrier_range() {
     assert_eq!(store_carrier(25, 9), Some(2)); // 0.000000025 -> 2 (even tie)
