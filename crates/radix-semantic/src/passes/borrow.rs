@@ -97,7 +97,7 @@ const ISSUE_COPY_INTO_TARGET_VIEW: &str = "copy_into_target_view";
 const ISSUE_COPY_INTO_TARGET_NOT_STORAGE: &str = "copy_into_target_not_storage";
 /// R3: the right side of `⇇` reads the storage the left side writes.
 const ISSUE_COPY_INTO_ALIAS: &str = "copy_into_alias";
-/// R6: a whole tensor is rebound into a `mut` tensor parameter by `←`.
+/// R6: a whole tensor is rebound into a `mut` tensor parameter by `←` inside a kernel.
 const ISSUE_MUT_TENSOR_PARAM_REBIND: &str = "mut_tensor_param_rebind";
 const ISSUE_ASSIGN_TO_NONMUT_TENSOR_PARAM: &str = "assign_to_nonmut_tensor_param";
 const ISSUE_IMMUTABLE_SECOND_ASSIGNMENT: &str = "immutable_second_assignment";
@@ -317,6 +317,9 @@ struct BorrowChecker<'a> {
     flow_depth: u32,
     /// Parameters declared `mut` (`in` mode or a `mut` access marker).
     mut_params: FxHashSet<DefId>,
+    /// The function being checked is a kernel or a kernel fragment: its
+    /// parameters are device buffers with no binding to rebind.
+    in_kernel: bool,
     /// Tensor parameters written without any access marker (not `mut`, `own`,
     /// `copy`, `ref`, `in` or `de`): read-only, so no write reaches the caller.
     nonmut_tensor_params: FxHashSet<DefId>,
@@ -400,6 +403,7 @@ impl<'a> BorrowChecker<'a> {
             bind_alias_roots: FxHashMap::default(),
             flow_depth: 0,
             mut_params: FxHashSet::default(),
+            in_kernel: false,
             nonmut_tensor_params: FxHashSet::default(),
             nonmut_tensor_aliases: FxHashMap::default(),
             nonmut_agg_params: FxHashSet::default(),
@@ -485,6 +489,7 @@ impl<'a> BorrowChecker<'a> {
 
     fn check_function(&mut self, func: &HirFunction) {
         self.reset();
+        self.in_kernel = func.is_kernel || func.nucleum_fragment;
         for param in &func.params {
             self.names.insert(param.def_id, param.name);
             self.ensure_state(param.def_id);
@@ -549,6 +554,7 @@ impl<'a> BorrowChecker<'a> {
         self.bind_alias_roots.clear();
         self.flow_depth = 0;
         self.mut_params.clear();
+        self.in_kernel = false;
         self.nonmut_tensor_params.clear();
         self.nonmut_tensor_aliases.clear();
         self.nonmut_agg_params.clear();
@@ -1517,11 +1523,12 @@ impl<'a> BorrowChecker<'a> {
         self.write_use(root, target.span);
     }
 
-    /// R6: a plain `←` of a whole tensor into a `mut` tensor parameter. `⇇`
-    /// is the one way to write the caller's storage, so a rebind of the
-    /// parameter name is rejected on the host and in a kernel alike.
+    /// R6: a plain `←` of a whole tensor into a `mut` tensor parameter inside
+    /// a kernel. A kernel parameter is a device buffer, so `⇇` is the one way
+    /// to write it; on the host the same `←` is the ordinary rebind.
     fn check_mut_tensor_param_rebind(&mut self, target: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = &target.kind
+        if self.in_kernel
+            && let HirExpressionKind::Path(def_id) = &target.kind
             && self.mut_params.contains(def_id)
             && self.is_tensor_typed(target)
         {

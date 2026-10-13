@@ -1,17 +1,18 @@
 +++
 term = "⇇"
 kind = "reject"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "transfer", "expression", "ternary", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "literal"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "transfer", "expression", "ternary", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "literal"]
 category = "collection"
 canonical = false
-summary = "A whole-tensor ← into a mut tensor parameter is rejected."
-syntax = "rebind of a mut tensor parameter"
+summary = "A whole-tensor ← into a mut tensor parameter of a kernel is rejected."
+syntax = "rebind of a mut tensor parameter in a kernel"
 related = ["tensor", "⇇"]
 locale = "en"
 +++
 
-# R6 (provisional): `←` rebinds a name, so a whole-tensor `←` into a `mut` tensor parameter is rejected everywhere; write `target ⇇ source`.
+# R6 (provisional): a kernel parameter is a device buffer with no binding to rebind, so a whole-tensor `←` into a `mut` tensor parameter of a kernel is rejected; write `target ⇇ source`. On the host the same `←` is the ordinary rebind.
 
+@ kernel
 fn fill(mut tf32[2, 2] target, tf32[2, 2] source) → void {
     target ← source
 }

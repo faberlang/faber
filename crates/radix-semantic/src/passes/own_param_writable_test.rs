@@ -136,16 +136,12 @@ main {}",
 }
 
 #[test]
-fn mut_tensor_parameter_rebind_is_still_rejected() {
-    let errs = errors(
+fn mut_tensor_parameter_may_be_rebound_whole_on_the_host() {
+    assert_accepts(
         "fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {
     b ← a + a
 }
 main {}",
-    );
-    assert!(
-        errs.iter().any(|e| e == "mut_tensor_param_rebind"),
-        "{errs:?}"
     );
 }
 

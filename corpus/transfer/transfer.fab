@@ -33,9 +33,9 @@ locale = "en"
 #     `assignment`), so `target ⇇ a + b` copies the whole sum
 #
 # Common mistakes:
-#   • writing `target ← value` into a `mut` tensor parameter — `←` rebinds, so
-#     a whole-tensor `←` into a `mut` tensor parameter is rejected
-#     (`mut_tensor_param_rebind`); write `⇇`
+#   • writing `target ← value` into a `mut` tensor parameter of a kernel — a
+#     kernel parameter is a device buffer with no binding to rebind, so a
+#     whole-tensor `←` there is rejected (`mut_tensor_param_rebind`); write `⇇`
 #   • a `const` or non-`mut` target, a scalar/list/matrix/vector target (a
 #     value type is written by `←`), or a view target such as
 #     `out.slice(0, 1) ⇇ x` — all rejected

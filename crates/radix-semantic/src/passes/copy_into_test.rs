@@ -10,6 +10,7 @@
 //! - R3 the value does not alias the target
 //! - R4/R5 a statement without a result, no chains, no use as a value
 //! - R6 `←` of a whole tensor into a `mut` tensor parameter is rejected
+//!   inside a kernel; on the host it is the ordinary rebind
 //! - R7 the callable-sink form is retired
 
 use crate::SemanticErrorKind;
@@ -532,23 +533,21 @@ main {}",
 }
 
 // =============================================================================
-// R6 `←` never writes a mut tensor parameter
+// R6 `←` never writes a mut tensor parameter inside a kernel
 // =============================================================================
 
 #[test]
-fn r6_a_whole_tensor_arrow_into_a_mut_parameter_is_rejected() {
-    assert_rejects(
+fn r6_a_host_arrow_into_a_mut_tensor_parameter_is_the_ordinary_rebind() {
+    assert_accepts(
         r"fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {
     b ← a + a
 }
 main {}",
-        SemanticErrorKind::ModeMismatch,
-        "mut_tensor_param_rebind",
     );
 }
 
 #[test]
-fn r6_a_kernel_arrow_into_the_mut_output_is_rejected_the_same_way() {
+fn r6_a_kernel_arrow_into_the_mut_output_is_rejected() {
     assert_rejects(
         r"@ kernel
 fn t(tf32[3, 3] a, mut tf32[3, 3] b) → void {
