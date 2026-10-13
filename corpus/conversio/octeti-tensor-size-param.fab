@@ -1,0 +1,86 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "spelled_lift", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "fac_block", "cape_clause", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Bulk typed reinterpretation of octeti as a tensor whose extent is a size parameter witnessed by a tensor argument axis."
+syntax = "<octeti> ↦ tensor<E, [N]> via Be|Le"
+related = ["↦", "octeti", "tensor", "size"]
+locale = "en"
++++
+# =============================================================================
+# ↦ — octeti as a tensor whose extent is a size parameter witnessed by the
+# tensor argument.
+# =============================================================================
+#
+# What this teaches:
+#   • A `size N` parameter in the target shape and a `tensor<f32, [N]>`
+#     argument that witnesses it: the extent is read from the argument's axis
+#     when the conversion runs, so the byte count is known only then.
+#   • Exact length — the byte count must equal `product(shape) * element width`
+#     for the extents as they are at run time; no truncation, no padding.
+#   • A wrong length is a recoverable failure: `do { } catch err { }` handles
+#     it, exactly as it does for a literal extent.
+#
+# Common mistakes:
+#   • Naming a `size` parameter that no tensor argument witnesses — no lane
+#     can read a value for it, so the conversion is declined by name. A `size`
+#     parameter witnessed by a tensor argument axis works, as does an
+#     expression extent over an in-scope binding (`size (n - 1)`).
+#   • Omitting Be/Le — the byte order is never implied, for any element width.
+#
+# See also: ↦, octeti, tensor, size
+# =============================================================================
+
+
+# conversio — octeti ↦ tensor<E, [N]> via Be|Le
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' tensorType 'via' endian
+#
+# EXPECTED OUTPUT:
+#   1.0
+#   3.0
+#   [3]
+#   caught
+#
+# BACKEND:
+#   The runner and Rust both compare the byte length with the product of the
+#   extents when the conversion runs, reading the witnessed size parameter
+#   from the tensor argument. TypeScript, Go and Swift decline by name.
+
+fn runtime_extent(int value) → int {
+    return value
+}
+
+fn decode<size N>(tensor<f32, [N]> proto, bytes raw) → tensor<f32, [N]> ⇥ string {
+    return raw ↦ tensor<f32, [N]> via Le
+}
+
+main {
+    const int n ← runtime_extent(3)
+    const list<f32> values ← [1.0, 2.0, 3.0]
+    const tensor<f32, [size n]> proto ← values ↦ tensor<f32, [size n]>
+    const bytes raw ← |00 00 80 3f 00 00 00 40 00 00 40 40|
+
+    do {
+        const tensor<f32, [size n]> decoded ← decode(proto, raw)
+        print decoded[[0]]
+        print decoded[[2]]
+        const list<int, _> dims ← proto.shape()
+        print dims
+    }
+    catch err {
+        print "unexpected"
+    }
+
+    const bytes short_raw ← |00 00 80 3f 00 00 00 40|
+    do {
+        const tensor<f32, [size n]> bad ← decode(proto, short_raw)
+        print bad[[0]]
+    }
+    catch err {
+        print "caught"
+    }
+}
