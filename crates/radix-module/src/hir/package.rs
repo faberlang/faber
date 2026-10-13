@@ -1122,14 +1122,27 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
     }
 }
 
+/// One device function in the call graph: `(module path, name)`.
+type DeviceNode<'a> = (&'a str, &'a str);
+
 /// Detect a cycle in the concrete device call graph (all device roles).
+///
+/// A recorded callee is a device function of the caller's own module
+/// (`collect_nucleum_index` is built per unit), so its node is the caller's
+/// module path plus the callee name. Bare names would merge same-named
+/// functions of different modules into one node and report a false cycle.
 fn device_call_cycle(metadata: &NucleumProgramMetadata) -> Option<String> {
-    let mut graph: FxHashMap<&str, Vec<&str>> = FxHashMap::default();
+    let mut graph: FxHashMap<DeviceNode<'_>, Vec<DeviceNode<'_>>> = FxHashMap::default();
     for item in &metadata.items {
+        let module = item.relative_path.as_str();
         graph
-            .entry(item.name.as_str())
+            .entry((module, item.name.as_str()))
             .or_default()
-            .extend(item.device_callees.iter().map(String::as_str));
+            .extend(
+                item.device_callees
+                    .iter()
+                    .map(|callee| (module, callee.as_str())),
+            );
     }
     let mut visiting = rustc_hash::FxHashSet::default();
     let mut visited = rustc_hash::FxHashSet::default();
@@ -1144,31 +1157,37 @@ fn device_call_cycle(metadata: &NucleumProgramMetadata) -> Option<String> {
 }
 
 fn dfs_cycle<'a>(
-    node: &'a str,
-    graph: &FxHashMap<&'a str, Vec<&'a str>>,
-    visiting: &mut rustc_hash::FxHashSet<&'a str>,
-    visited: &mut rustc_hash::FxHashSet<&'a str>,
-    stack: &mut Vec<&'a str>,
+    node: DeviceNode<'a>,
+    graph: &FxHashMap<DeviceNode<'a>, Vec<DeviceNode<'a>>>,
+    visiting: &mut rustc_hash::FxHashSet<DeviceNode<'a>>,
+    visited: &mut rustc_hash::FxHashSet<DeviceNode<'a>>,
+    stack: &mut Vec<DeviceNode<'a>>,
 ) -> Option<String> {
-    if visited.contains(node) {
+    if visited.contains(&node) {
         return None;
     }
     if !visiting.insert(node) {
         let start = stack.iter().position(|item| *item == node).unwrap_or(0);
         let mut cycle = stack[start..].to_vec();
         cycle.push(node);
-        return Some(cycle.join(" → "));
+        return Some(
+            cycle
+                .into_iter()
+                .map(|(_, name)| name)
+                .collect::<Vec<_>>()
+                .join(" → "),
+        );
     }
     stack.push(node);
-    if let Some(edges) = graph.get(node) {
+    if let Some(edges) = graph.get(&node) {
         for next in edges {
-            if let Some(cycle) = dfs_cycle(next, graph, visiting, visited, stack) {
+            if let Some(cycle) = dfs_cycle(*next, graph, visiting, visited, stack) {
                 return Some(cycle);
             }
         }
     }
     stack.pop();
-    visiting.remove(node);
+    visiting.remove(&node);
     visited.insert(node);
     None
 }

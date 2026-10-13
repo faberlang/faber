@@ -573,3 +573,154 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
         "companion 'masked_mean_backward' must be installed in the lowered MIR; got functions: {names:?}"
     );
 }
+
+// ── companion call chaining: a later call reads the rewritten destination ──
+
+/// One symbolic companion template `name(tensor<f32, [shape]>) → tensor<f32, [shape]>`.
+fn chained_companion_template(id: u32, source: u32, ty: crate::mir::MirType) -> crate::mir::MirFunction {
+    use crate::hir::DefId;
+    use crate::mir::{
+        MirBlock, MirBlockId, MirFunction, MirFunctionId, MirLocalId, MirParam, MirParamMode, MirTerminator,
+        MirTerminatorKind,
+    };
+    use crate::test_support::test_span;
+
+    MirFunction {
+        id: MirFunctionId(id),
+        source: Some(DefId(source)),
+        name: None,
+        params: vec![MirParam { local: MirLocalId(0), name: None, ty, mode: MirParamMode::Owned, span: test_span() }],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: test_span() },
+            span: test_span(),
+        }],
+        return_ty: ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+#[test]
+fn chained_companion_call_reads_the_rewritten_destination_type() {
+    use crate::driver::rewrite_air_backward_calls;
+    use crate::hir::DefId;
+    use crate::lexer::Interner;
+    use crate::mir::generic::canonical_index;
+    use crate::mir::{
+        MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirLocal, MirLocalId, MirMonomorphizationKey,
+        MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirStatement, MirStatementKind, MirTemp, MirTempId,
+        MirTerminator, MirTerminatorKind, MirType,
+    };
+    use crate::semantic::{NumericWidth, Primitive, TypeTable};
+    use crate::test_support::test_span;
+
+    // Two companion templates over distinct shape symbols: `first<N>` and
+    // `second<M>`. The caller computes `t0 ← first(x)` and feeds the result to
+    // `second(t0)`. The pre-rewrite type of `t0` is still the symbolic
+    // `tensor<f32, [N]>`; only the rewrite of the first call makes it
+    // `tensor<f32, [4]>`, which is what binds `M` for the second call.
+    let mut interner = Interner::new();
+    let n = interner.intern("N");
+    let m = interner.intern("M");
+    let mut types = TypeTable::new();
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let four = types.intern_index(IndexExpr::Literal(4));
+    let shape_n = types.intern_index(IndexExpr::Param(n));
+    let shape_m = types.intern_index(IndexExpr::Param(m));
+    let concrete = MirType::semantic(types.tensor_with_shape(element, four));
+    let symbolic_n = MirType::semantic(types.tensor_with_shape(element, shape_n));
+    let symbolic_m = MirType::semantic(types.tensor_with_shape(element, shape_m));
+
+    let first = DefId(10);
+    let second = DefId(11);
+    let call = |destination: MirPlace, source: DefId, argument: MirOperand| MirStatement {
+        kind: MirStatementKind::Call {
+            destination: Some(destination),
+            callee: MirCallee::definition(source),
+            args: vec![argument],
+        },
+        span: test_span(),
+    };
+    let caller = MirFunction {
+        id: MirFunctionId(3),
+        source: Some(DefId(12)),
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: concrete,
+            mode: MirParamMode::Owned,
+            span: test_span(),
+        }],
+        // Lowering declares every param in `locals` as well as `params`.
+        locals: vec![
+            MirLocal { id: MirLocalId(0), name: None, ty: concrete, mutable: false, span: test_span() },
+            MirLocal { id: MirLocalId(1), name: None, ty: symbolic_m, mutable: false, span: test_span() },
+        ],
+        temps: vec![MirTemp { id: MirTempId(0), ty: symbolic_n, span: test_span() }],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                call(
+                    MirPlace { base: MirPlaceBase::Temp(MirTempId(0)), projections: Vec::new() },
+                    first,
+                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                ),
+                call(MirPlace::local(MirLocalId(1)), second, MirOperand::Temp(MirTempId(0))),
+            ],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: test_span() },
+            span: test_span(),
+        }],
+        return_ty: concrete,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    };
+    let mut functions = vec![
+        chained_companion_template(1, 10, symbolic_n),
+        chained_companion_template(2, 11, symbolic_m),
+        caller,
+    ];
+
+    let companion_sources = [first, second]
+        .into_iter()
+        .collect::<rustc_hash::FxHashSet<_>>();
+    let concrete_shape = canonical_index(&types, four);
+    let mut instances = rustc_hash::FxHashMap::default();
+    let mut instance_return_types = rustc_hash::FxHashMap::default();
+    for (source, id) in [(first, 21), (second, 22)] {
+        let key = MirMonomorphizationKey { source, type_args: Vec::new(), shape_args: vec![concrete_shape] };
+        instances.insert(key.clone(), MirFunctionId(id));
+        instance_return_types.insert(key, concrete);
+    }
+
+    expect_codegen_ok(
+        rewrite_air_backward_calls(&mut functions, &types, &companion_sources, &instances, &instance_return_types),
+        "a companion call fed by an earlier companion call must see the rewritten destination type",
+    );
+
+    let callees = functions[2].blocks[0]
+        .statements
+        .iter()
+        .map(|statement| match &statement.kind {
+            MirStatementKind::Call { callee, .. } => callee.clone(),
+            other => panic!("expected a call statement, got {other:?}"),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        callees,
+        vec![
+            MirCallee::Function(MirFunctionId(21)),
+            MirCallee::Function(MirFunctionId(22))
+        ]
+    );
+}

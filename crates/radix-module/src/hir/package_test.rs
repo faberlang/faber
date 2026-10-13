@@ -710,6 +710,44 @@ functio k2(f32 x) → f32 {
 }
 
 #[test]
+fn device_call_graph_keeps_same_named_functions_of_different_modules_apart() {
+    // `a.fab` has `f → g` and `b.fab` has `g → f`, but the two `f`s and the two
+    // `g`s are different functions. Keyed by bare name the merged package graph
+    // reads `f → g → f`; keyed by module and name it has no cycle.
+    let a = analyze(
+        "a.fab",
+        r"
+@ nucleum fragment
+functio g(f32 x) → f32 {
+    redde x
+}
+
+@ nucleum fragment
+functio f(f32 x) → f32 {
+    redde g(x)
+}
+",
+    );
+    let b = analyze(
+        "b.fab",
+        r"
+@ nucleum fragment
+functio f(f32 x) → f32 {
+    redde x
+}
+
+@ nucleum fragment
+functio g(f32 x) → f32 {
+    redde f(x)
+}
+",
+    );
+    let metadata = nucleum_metadata_from_unit_inputs(&[nucleum_input("a.fab", &a), nucleum_input("b.fab", &b)])
+        .expect("same-named functions of different modules are not a call cycle");
+    assert_eq!(metadata.items.len(), 4);
+}
+
+#[test]
 fn non_launch_device_bodies_are_omitted_from_target_symbols() {
     let unit = analyze("device.fab", nucleum_source());
     let metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");

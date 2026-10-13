@@ -2243,28 +2243,20 @@ fn rewrite_air_backward_calls(
     };
 
     fn operand_ty(
-        function: &crate::mir::MirFunction,
+        locals: &[crate::mir::MirLocal],
+        temps: &[crate::mir::MirTemp],
         values: &rustc_hash::FxHashMap<crate::mir::MirValueId, crate::mir::MirType>,
         operand: &MirOperand,
     ) -> Option<crate::mir::MirType> {
         match operand {
             MirOperand::Place(place) => match place.base {
-                MirPlaceBase::Local(id) => function
-                    .locals
+                MirPlaceBase::Local(id) => locals
                     .iter()
                     .find(|local| local.id == id)
                     .map(|local| local.ty),
-                MirPlaceBase::Temp(id) => function
-                    .temps
-                    .iter()
-                    .find(|temp| temp.id == id)
-                    .map(|temp| temp.ty),
+                MirPlaceBase::Temp(id) => temps.iter().find(|temp| temp.id == id).map(|temp| temp.ty),
             },
-            MirOperand::Temp(id) => function
-                .temps
-                .iter()
-                .find(|temp| temp.id == *id)
-                .map(|temp| temp.ty),
+            MirOperand::Temp(id) => temps.iter().find(|temp| temp.id == *id).map(|temp| temp.ty),
             MirOperand::Value(id) => values.get(id).copied(),
             MirOperand::Constant(_) => None,
         }
@@ -2277,7 +2269,9 @@ fn rewrite_air_backward_calls(
         .collect::<rustc_hash::FxHashMap<_, _>>();
 
     for function in functions {
-        let function_snapshot = function.clone();
+        // Operand types are read from the live locals and temps: an earlier
+        // companion call in this function has already retyped its destination,
+        // and a later call consuming it must bind against that concrete type.
         for block in &mut function.blocks {
             let mut values = rustc_hash::FxHashMap::default();
             for statement in &mut block.statements {
@@ -2296,7 +2290,7 @@ fn rewrite_air_backward_calls(
                 let mut bindings = MirShapeBindings::default();
                 let mut type_bindings = MirGenericBindings::default();
                 for (expected, argument) in template.params.iter().zip(args.iter()) {
-                    let Some(actual) = operand_ty(&function_snapshot, &values, argument) else {
+                    let Some(actual) = operand_ty(&function.locals, &function.temps, &values, argument) else {
                         continue;
                     };
                     if !bind_generic_type_witness_with_shapes(
