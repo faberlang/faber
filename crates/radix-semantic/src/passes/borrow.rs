@@ -310,6 +310,12 @@ struct BorrowChecker<'a> {
     /// either name reaches both. Closed transitively when the alias is
     /// recorded. Value types (scalars, text) copy and never enter this table.
     bind_alias_roots: FxHashMap<DefId, FxHashSet<DefId>>,
+    /// Containers initialised from a list or tuple literal, mapped to the
+    /// bindings whose storage the literal's elements share. An element read
+    /// `xs[i]` names every one of them (a conservative union: any element may
+    /// alias any listed place). Written only by literal initialisers and
+    /// rebinds of the container; no flow through calls or element writes.
+    element_alias_roots: FxHashMap<DefId, FxHashSet<DefId>>,
     /// Nesting depth of the statement being checked: zero only for a
     /// straight-line `name ← place` rebind written as its own statement in a
     /// block that no branch, loop, closure or short-circuit guards. A rebind
@@ -401,6 +407,7 @@ impl<'a> BorrowChecker<'a> {
             de_aliases: FxHashSet::default(),
             tensor_view_roots: FxHashMap::default(),
             bind_alias_roots: FxHashMap::default(),
+            element_alias_roots: FxHashMap::default(),
             flow_depth: 0,
             mut_params: FxHashSet::default(),
             in_kernel: false,
@@ -552,6 +559,7 @@ impl<'a> BorrowChecker<'a> {
         self.de_aliases.clear();
         self.tensor_view_roots.clear();
         self.bind_alias_roots.clear();
+        self.element_alias_roots.clear();
         self.flow_depth = 0;
         self.mut_params.clear();
         self.in_kernel = false;
@@ -1248,9 +1256,17 @@ impl<'a> BorrowChecker<'a> {
         };
         if must {
             self.bind_alias_roots.remove(&local);
+            self.element_alias_roots.remove(&local);
             if rebind == Rebind::Must {
                 self.detach_storage_name(local);
             }
+        }
+        let elements = self.element_sources(init);
+        if !elements.is_empty() {
+            self.element_alias_roots
+                .entry(local)
+                .or_default()
+                .extend(elements);
         }
         self.nonmut_tensor_aliases.remove(&local);
         self.nonmut_agg_aliases.remove(&local);
@@ -1291,6 +1307,107 @@ impl<'a> BorrowChecker<'a> {
             && origin != local
         {
             self.nonmut_agg_aliases.insert(local, origin);
+        }
+    }
+
+    /// Whether a value of type `ty` shares storage when it is bound or listed
+    /// (reference model); exclusive values and scalars copy.
+    fn shares_storage(&self, ty: TypeId) -> bool {
+        !self.types.is_exclusive_value(ty) && self.is_aliasing_type(ty)
+    }
+
+    /// The bindings whose storage the elements of a list or tuple literal
+    /// share: each listed place of an aliasing type (with the bindings it
+    /// already aliases), each listed call result's sources, and the elements
+    /// of nested literals and spread places. Anything else is empty.
+    fn element_sources(&self, init: &HirExpression) -> Vec<DefId> {
+        let mut out = Vec::new();
+        match &init.kind {
+            HirExpressionKind::Array(elements) => {
+                for element in elements {
+                    match element {
+                        radix_hir::HirArrayElement::Expr(expr) => {
+                            self.collect_element_sources(expr, &mut out)
+                        }
+                        radix_hir::HirArrayElement::Spread(expr) => {
+                            if let Some((root, _)) = Self::place_key(expr) {
+                                for name in self.storage_names(root) {
+                                    if let Some(roots) = self.element_alias_roots.get(&name) {
+                                        out.extend(roots.iter().copied());
+                                    }
+                                }
+                            }
+                        }
+                        radix_hir::HirArrayElement::Infer(_) => {}
+                    }
+                }
+            }
+            HirExpressionKind::Tuple(elements, _) => {
+                for expr in elements {
+                    self.collect_element_sources(expr, &mut out);
+                }
+            }
+            _ => {}
+        }
+        out
+    }
+
+    fn collect_element_sources(&self, expr: &HirExpression, out: &mut Vec<DefId>) {
+        if matches!(
+            expr.kind,
+            HirExpressionKind::Array(_) | HirExpressionKind::Tuple(..)
+        ) {
+            out.extend(self.element_sources(expr));
+            return;
+        }
+        if !expr.ty.is_some_and(|ty| self.shares_storage(ty)) {
+            return;
+        }
+        match Self::place_key(expr) {
+            Some((root, _)) => out.extend(self.storage_names(root)),
+            None => out.extend(self.call_result_sources(expr)),
+        }
+    }
+
+    /// The bindings an element read `xs[i]` (or a tuple position) can share
+    /// storage with: the element aliases recorded for any name of the
+    /// container's storage.
+    fn element_storage_names(&self, root: DefId) -> FxHashSet<DefId> {
+        let mut names = FxHashSet::default();
+        for holder in self.storage_names(root) {
+            if let Some(roots) = self.element_alias_roots.get(&holder) {
+                for element in roots {
+                    names.extend(self.storage_names(*element));
+                }
+            }
+        }
+        names
+    }
+
+    /// An element read of a container whose elements alias a mutably borrowed
+    /// place is a use while mutably borrowed, like a read of the place itself.
+    fn read_element_storage(&mut self, expr: &HirExpression) {
+        let Some(root) = Self::root_def_id(expr) else {
+            return;
+        };
+        let borrowed = self
+            .element_storage_names(root)
+            .into_iter()
+            .find(|name| self.states.get(name).is_some_and(|state| state.mutable));
+        if let Some(name) = borrowed {
+            self.conflict(ISSUE_USE_WHILE_MUTABLY_BORROWED, name, expr.span);
+        }
+    }
+
+    /// Whether `expr` reads an element (index or field projection) rather
+    /// than naming a binding itself.
+    fn is_element_read(expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::Field(..) | HirExpressionKind::Index(..) => true,
+            HirExpressionKind::Deref(inner) | HirExpressionKind::NonNull(inner, _) => {
+                Self::is_element_read(inner)
+            }
+            _ => false,
         }
     }
 
@@ -1359,7 +1476,15 @@ impl<'a> BorrowChecker<'a> {
             .filter(|(holder, roots)| **holder != name && roots.contains(&name))
             .map(|(holder, _)| *holder)
             .collect();
-        let Some(&rep) = holders.iter().min_by_key(|holder| holder.0) else {
+        let rep = holders.iter().min_by_key(|holder| holder.0).copied();
+        for roots in self.element_alias_roots.values_mut() {
+            if roots.remove(&name)
+                && let Some(rep) = rep
+            {
+                roots.insert(rep);
+            }
+        }
+        let Some(rep) = rep else {
             return;
         };
         holders.retain(|holder| *holder != rep);
@@ -1405,8 +1530,12 @@ impl<'a> BorrowChecker<'a> {
             return;
         };
         self.check_projection_inputs(expr);
+        let mut storage = self.storage_names(root);
+        if Self::is_element_read(expr) {
+            storage.extend(self.element_storage_names(root));
+        }
         let mut names = vec![root];
-        names.extend(self.storage_names(root).into_iter().filter(|n| *n != root));
+        names.extend(storage.into_iter().filter(|n| *n != root));
         for name in names {
             let before = self.errors.len();
             match kind {
@@ -2336,6 +2465,12 @@ impl HirVisitor for BorrowChecker<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.read_use(*def_id, expr.span),
+            HirExpressionKind::Field(object, _) | HirExpressionKind::Index(object, _)
+                if matches!(object.kind, HirExpressionKind::Path(_)) =>
+            {
+                self.read_element_storage(expr);
+                walk_expr(self, expr);
+            }
             HirExpressionKind::Call(callee, _, args, _) => {
                 self.visit_expr(callee);
                 self.check_call_args(callee, args);

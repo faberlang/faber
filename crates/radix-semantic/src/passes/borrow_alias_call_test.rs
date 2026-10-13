@@ -328,6 +328,89 @@ fn call_result_alias_is_replaced_by_a_rebind() {
 }
 
 // =============================================================================
+// Container elements: an element of a literal aliases the places it lists
+// =============================================================================
+
+#[test]
+fn container_element_aliases_the_listed_place() {
+    assert_rejects(
+        "    var list<tf32[2, 2]> xs ← [g]\n    mut_ref(mut g, xs[0])",
+        "shared_borrow_conflict",
+    );
+    assert_rejects(
+        "    var list<tf32[2, 2]> xs ← [g]\n    mut_read(mut g, xs[0])",
+        "use_while_mutably_borrowed",
+    );
+    assert_rejects(
+        "    var list<tf32[2, 2]> xs ← [g]\n    mut_read(mut xs[0], g)",
+        "use_while_mutably_borrowed",
+    );
+}
+
+#[test]
+fn container_element_matches_the_direct_spelling() {
+    assert_rejects("    mut_ref(mut g, g)", "shared_borrow_conflict");
+    assert_rejects(
+        "    var list<tf32[2, 2]> xs ← [g]\n    mut_ref(mut g, xs[0])",
+        "shared_borrow_conflict",
+    );
+}
+
+#[test]
+fn container_element_of_any_index_may_alias_any_listed_place() {
+    assert_rejects(
+        "    var list<tf32[2, 2]> xs ← [fresh, g]\n    mut_ref(mut g, xs[0])",
+        "shared_borrow_conflict",
+    );
+}
+
+#[test]
+fn container_element_chains_through_a_bind_alias() {
+    assert_rejects(
+        "    var tf32[2, 2] alias ← g\n    var list<tf32[2, 2]> xs ← [alias]\n    mut_ref(mut g, xs[0])",
+        "shared_borrow_conflict",
+    );
+}
+
+#[test]
+fn nested_container_element_aliases_the_listed_place() {
+    assert_rejects(
+        "    var list<list<tf32[2, 2]>> xs ← [[g]]\n    mut_ref(mut g, xs[0][0])",
+        "shared_borrow_conflict",
+    );
+}
+
+#[test]
+fn container_element_survives_a_bind_of_the_container() {
+    assert_rejects(
+        "    var list<tf32[2, 2]> xs ← [g]\n    var list<tf32[2, 2]> ys ← xs\n    mut_ref(mut g, ys[0])",
+        "shared_borrow_conflict",
+    );
+}
+
+#[test]
+fn container_element_of_an_unrelated_tensor_does_not_overlap() {
+    assert_accepts("    var list<tf32[2, 2]> xs ← [fresh]\n    mut_ref(mut g, xs[0])");
+}
+
+#[test]
+fn container_element_read_read_stays_legal() {
+    assert_accepts("    var list<tf32[2, 2]> xs ← [g]\n    read_read(g, xs[0])");
+}
+
+#[test]
+fn container_rebind_replaces_the_element_aliases() {
+    assert_accepts(
+        "    var list<tf32[2, 2]> xs ← [g]\n    xs ← [fresh]\n    mut_ref(mut g, xs[0])",
+    );
+}
+
+#[test]
+fn container_element_names_the_old_storage_after_a_source_rebind() {
+    assert_accepts("    var list<tf32[2, 2]> xs ← [g]\n    g ← fresh\n    mut_ref(mut g, xs[0])");
+}
+
+// =============================================================================
 // User method calls: the receiver's methods obey the same overlap rule
 // =============================================================================
 
@@ -441,5 +524,13 @@ fn sequential_method_calls_release_call_scoped_borrows() {
     assert_method_accepts("    k.mut_read(mut g, fresh)\n    k.mut_read(mut g, fresh)");
     assert_method_accepts(
         "    var tf32[2, 2] alias ← g\n    k.mut_read(mut g, fresh)\n    k.mut_read(mut alias, fresh)",
+    );
+}
+
+#[test]
+fn method_call_overlap_through_a_container_element_is_rejected() {
+    assert_method_rejects(
+        "    var list<tf32[2, 2]> xs ← [g]\n    k.mut_ref(mut g, xs[0])",
+        "shared_borrow_conflict",
     );
 }
