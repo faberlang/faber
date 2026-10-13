@@ -638,11 +638,7 @@ fn ts_gpu_builtins(
 /// declares the imported items in a sibling file, so registering the exported
 /// member name is enough for the reference to resolve.
 #[cfg(feature = "hir-go")]
-fn register_go_cross_file_defids(
-    r#gen: &mut go::GoCodegen<'_>,
-    hir: &HirModule,
-    resolver: &crate::semantic::Resolver,
-) {
+fn register_go_cross_file_defids(r#gen: &mut go::GoCodegen<'_>, hir: &HirModule, resolver: &crate::semantic::Resolver) {
     for item in &hir.items {
         let crate::hir::HirItemKind::Import(import) = &item.kind else {
             continue;
