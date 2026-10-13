@@ -168,3 +168,27 @@ fn read_of_an_alias_after_the_mut_local_last_use_is_accepted() {
 }",
     );
 }
+
+// =============================================================================
+// A shared view borrow on an alias is not an alias conflict
+// =============================================================================
+
+/// The write to `base` is the K8 independence check's territory, not the
+/// borrow pass's: the borrow the alias carries is a *shared* view borrow, and
+/// the one-directional alias check this mirrors only ever treated a mutable
+/// borrow as a conflict. K8 reports `written_storage_neighbor_read` inside a
+/// `filum lane`; the borrow pass must not double-report the same fault.
+#[test]
+fn write_to_the_source_while_a_shared_view_of_an_alias_is_live_is_accepted() {
+    assert_accepts(
+        r"main {
+    const list<f32> data ← [1.0, 2.0, 3.0, 4.0]
+    var tensor<f32, [2, 2]> base ← data ↦ tensor<f32, [2, 2]>
+    var tensor<f32, [2, 2]> alias ← base
+    const tensor<f32, [2, 2]> view ← alias.transpose()
+    base.set([0, 0], 9.0)
+    const int dimensions ← view.length()
+    print dimensions
+}",
+    );
+}
