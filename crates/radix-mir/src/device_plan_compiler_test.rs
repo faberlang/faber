@@ -716,3 +716,16 @@ fn hybrid_ssm_unservable_state_layout_fails_closed() {
         .expect_err("unservable SSM layout must reject");
     assert!(error.to_string().contains("not servable"), "{error}");
 }
+
+#[test]
+fn row_major_strides_place_the_innermost_axis_first() {
+    assert_eq!(row_major_strides(&[5, 3, 8, 4]), vec![96, 32, 4, 1]);
+    assert_eq!(row_major_strides(&[7]), vec![1]);
+    assert!(row_major_strides(&[]).is_empty());
+}
+
+#[test]
+fn u32_uniform_clamps_an_extent_wider_than_its_field() {
+    assert_eq!(u32_uniform("extent", u64::from(u32::MAX)).bits, u32::MAX);
+    assert_eq!(u32_uniform("extent", u64::MAX).bits, u32::MAX);
+}

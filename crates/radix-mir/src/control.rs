@@ -378,17 +378,6 @@ pub fn structured_indexed_write_switch(
     if !matches!(join.terminator.kind, MirTerminatorKind::Return(None)) {
         return None;
     }
-    if !targets.iter().all(|target| {
-        function
-            .blocks
-            .iter()
-            .find(|block| block.id == *target)
-            .is_some_and(|block| {
-                branch_arm_writes_output(block, terminals.output, terminals.index, join.id)
-            })
-    }) {
-        return None;
-    }
 
     if !function.blocks.iter().all(|block| {
         switch_blocks.contains(&block.id)
@@ -892,8 +881,8 @@ fn structured_scalar_loop_control(
     else {
         return None;
     };
-    let body = block_by_id(function, then_block)?;
-    let exit = block_by_id(function, else_block)?;
+    let body = function.block_by_id(then_block)?;
+    let exit = function.block_by_id(else_block)?;
     loop_blocks.insert(body.id);
     loop_blocks.insert(exit.id);
     let MirTerminatorKind::Branch {
@@ -904,8 +893,8 @@ fn structured_scalar_loop_control(
     else {
         return None;
     };
-    let control_block = block_by_id(function, control_block_id)?;
-    let continuation = block_by_id(function, continuation_id)?;
+    let control_block = function.block_by_id(control_block_id)?;
+    let continuation = function.block_by_id(continuation_id)?;
     loop_blocks.insert(control_block.id);
     loop_blocks.insert(continuation.id);
     if !body_branches_to_loop_control(body, control_block.id, continuation.id) {
@@ -979,8 +968,8 @@ fn structured_indexed_write_loop_control(
     else {
         return None;
     };
-    let body = block_by_id(function, then_block)?;
-    let exit = block_by_id(function, else_block)?;
+    let body = function.block_by_id(then_block)?;
+    let exit = function.block_by_id(else_block)?;
     loop_blocks.insert(body.id);
     loop_blocks.insert(exit.id);
     let MirTerminatorKind::Branch {
@@ -991,8 +980,8 @@ fn structured_indexed_write_loop_control(
     else {
         return None;
     };
-    let control_block = block_by_id(function, control_block_id)?;
-    let continuation = block_by_id(function, continuation_id)?;
+    let control_block = function.block_by_id(control_block_id)?;
+    let continuation = function.block_by_id(continuation_id)?;
     loop_blocks.insert(control_block.id);
     loop_blocks.insert(continuation.id);
     if !body_branches_to_loop_control(body, control_block.id, continuation.id) {
@@ -1063,8 +1052,8 @@ pub fn structured_indexed_write_loop(function: &MirFunction) -> Option<Structure
     else {
         return None;
     };
-    let body = block_by_id(function, then_block)?;
-    let exit = block_by_id(function, else_block)?;
+    let body = function.block_by_id(then_block)?;
+    let exit = function.block_by_id(else_block)?;
     loop_blocks.insert(body.id);
     loop_blocks.insert(exit.id);
     if !body_writes_output_and_updates_loop_local(
@@ -1123,8 +1112,8 @@ pub fn structured_scalar_loop(function: &MirFunction) -> Option<StructuredScalar
     else {
         return None;
     };
-    let body = block_by_id(function, then_block)?;
-    let exit = block_by_id(function, else_block)?;
+    let body = function.block_by_id(then_block)?;
+    let exit = function.block_by_id(else_block)?;
     loop_blocks.insert(body.id);
     loop_blocks.insert(exit.id);
     if !body_updates_loop_local(body, loop_local)
@@ -1171,7 +1160,7 @@ fn loop_entry_condition_target<'a>(
         if !visited.insert(target_id) {
             return None;
         }
-        let target = block_by_id(function, target_id)?;
+        let target = function.block_by_id(target_id)?;
         loop_blocks.insert(target.id);
         match target.terminator.kind {
             MirTerminatorKind::Goto(next) if target.statements.is_empty() => target_id = next,
@@ -1180,24 +1169,8 @@ fn loop_entry_condition_target<'a>(
     }
 }
 
-fn block_by_id(function: &MirFunction, id: super::MirBlockId) -> Option<&MirBlock> {
-    function.block_by_id(id)
-}
-
 fn is_empty_unreachable_block(block: &MirBlock) -> bool {
     block.statements.is_empty() && matches!(block.terminator.kind, MirTerminatorKind::Unreachable)
-}
-
-fn branch_arm_writes_output(
-    block: &MirBlock,
-    output: MirLocalId,
-    index: MirLocalId,
-    join: super::MirBlockId,
-) -> bool {
-    if !matches!(&block.terminator.kind, MirTerminatorKind::Goto(target) if *target == join) {
-        return false;
-    }
-    block_writes_output(block, output, index)
 }
 
 fn indexed_output_write_target<'a>(
@@ -1322,11 +1295,10 @@ fn entry_loop_local(entry: &MirBlock, param: MirLocalId) -> Option<MirLocalId> {
                 if local == param || !place.projections.is_empty() {
                     return None;
                 }
-                match assigned_local {
-                    Some(existing) if existing != local => return None,
-                    Some(_) => return None,
-                    None => assigned_local = Some(local),
+                if assigned_local.is_some() {
+                    return None;
                 }
+                assigned_local = Some(local);
             }
             _ => return None,
         }

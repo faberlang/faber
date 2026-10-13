@@ -12,7 +12,8 @@ use super::validate::{
     validate_causal_masked_softmax_plan, validate_distributed_sum_plan, validate_gather_plan,
     validate_grouped_matmul_plan, validate_matmul_plan, validate_quantized_matmul_plan,
     validate_reduction_plan, validate_rms_normalization_plan, validate_rope_plan,
-    validate_ssm_conv1d_plan, validate_ssm_scan_plan, validate_transpose_plan,
+    validate_row_softmax_plan, validate_ssm_conv1d_plan, validate_ssm_scan_plan,
+    validate_transpose_plan,
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
@@ -134,11 +135,7 @@ impl CollectionKernelPlan {
                     length,
                     workgroup_x,
                     partials,
-                    shared_memory: SharedMemoryLayout {
-                        element_byte_width: F32_ELEMENT_BYTE_WIDTH,
-                        slot_count: workgroup_x,
-                        buffer_name: REDUCTION_SHARED_BUFFER_NAME.to_owned(),
-                    },
+                    shared_memory: reduction_shared_memory(workgroup_x),
                     barriers: reduction_barrier_schedule(workgroup_x),
                     oob_padding: OobPaddingPolicy::ZeroFill,
                 }))
@@ -169,7 +166,6 @@ impl CollectionKernelPlan {
                 if !signature_matches_matmul(signature, dispatch_x, dispatch_y, shapes) {
                     return None;
                 }
-                let tile_slots = tile * tile;
                 Some(CollectionKernelPlan::TiledMatMul(MatMulPlan {
                     dims: crate::kernel_plan::MatMulDims::Literal {
                         m: shapes.m,
@@ -184,18 +180,7 @@ impl CollectionKernelPlan {
                     tile,
                     workgroup_x: signature.workgroup.x,
                     workgroup_y: signature.workgroup.y,
-                    shared_memory: MatMulSharedMemory {
-                        shared_a: SharedMemoryLayout {
-                            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
-                            slot_count: tile_slots,
-                            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
-                        },
-                        shared_b: SharedMemoryLayout {
-                            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
-                            slot_count: tile_slots,
-                            buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
-                        },
-                    },
+                    shared_memory: matmul_shared_memory(tile),
                     barriers: matmul_barrier_schedule(),
                     oob_padding: OobPaddingPolicy::ZeroFill,
                     batch,
@@ -216,7 +201,6 @@ impl CollectionKernelPlan {
                     return None;
                 }
                 let tile = MATMUL_TILE;
-                let tile_slots = tile * tile;
                 Some(CollectionKernelPlan::TiledMatMul(MatMulPlan {
                     dims: crate::kernel_plan::MatMulDims::Runtime {
                         class: crate::kernel_plan::MatMulClass::Tiled,
@@ -229,18 +213,7 @@ impl CollectionKernelPlan {
                     tile,
                     workgroup_x: signature.workgroup.x,
                     workgroup_y: signature.workgroup.y,
-                    shared_memory: MatMulSharedMemory {
-                        shared_a: SharedMemoryLayout {
-                            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
-                            slot_count: tile_slots,
-                            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
-                        },
-                        shared_b: SharedMemoryLayout {
-                            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
-                            slot_count: tile_slots,
-                            buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
-                        },
-                    },
+                    shared_memory: matmul_shared_memory(tile),
                     barriers: matmul_barrier_schedule(),
                     oob_padding: OobPaddingPolicy::ZeroFill,
                     batch: 1,
@@ -370,24 +343,6 @@ impl CollectionKernelPlan {
                 {
                     return None;
                 }
-                let output_strides = match kind {
-                    BatchedAttentionKind::ProjectionQ => [
-                        q_per_kv.saturating_mul(seq).saturating_mul(head_dim),
-                        seq.saturating_mul(head_dim),
-                        head_dim,
-                        1,
-                    ],
-                    BatchedAttentionKind::ProjectionK | BatchedAttentionKind::ProjectionV => {
-                        [seq.saturating_mul(head_dim), head_dim, 1, 1]
-                    }
-                    BatchedAttentionKind::Scores | BatchedAttentionKind::Softmax => [
-                        q_per_kv.saturating_mul(seq).saturating_mul(seq),
-                        seq.saturating_mul(seq),
-                        seq,
-                        1,
-                    ],
-                    BatchedAttentionKind::ContextSequenceMajor => [hidden, 1, 1, 1],
-                };
                 Some(CollectionKernelPlan::BatchedAttention(
                     BatchedAttentionPlan {
                         kind,
@@ -398,23 +353,13 @@ impl CollectionKernelPlan {
                         hidden,
                         layout,
                         rotate_half,
-                        output_strides,
+                        output_strides: attention_output_strides(
+                            kind, q_per_kv, seq, head_dim, hidden,
+                        ),
                         scale_bits,
-                        // R4 repair: the M=1 projection body computes this
-                        // many outputs per 64-thread workgroup, so the same
-                        // typed fact must drive the launch grid. `seq` here
-                        // is the contract's step-row count (decode = 1).
-                        decode_outputs_per_workgroup: if seq == 1
-                            && matches!(
-                                kind,
-                                BatchedAttentionKind::ProjectionQ
-                                    | BatchedAttentionKind::ProjectionK
-                                    | BatchedAttentionKind::ProjectionV
-                            ) {
-                            Some(crate::abi::PROJECTION_GEMV_DISPATCH_LANES)
-                        } else {
-                            None
-                        },
+                        decode_outputs_per_workgroup: attention_decode_outputs_per_workgroup(
+                            kind, seq,
+                        ),
                     },
                 ))
             }
@@ -488,11 +433,7 @@ impl CollectionKernelPlan {
             length,
             workgroup_x,
             partials,
-            shared_memory: SharedMemoryLayout {
-                element_byte_width: F32_ELEMENT_BYTE_WIDTH,
-                slot_count: workgroup_x,
-                buffer_name: REDUCTION_SHARED_BUFFER_NAME.to_owned(),
-            },
+            shared_memory: reduction_shared_memory(workgroup_x),
             barriers: reduction_barrier_schedule(workgroup_x),
             oob_padding: OobPaddingPolicy::ZeroFill,
         }))
@@ -660,9 +601,7 @@ impl CollectionKernelPlan {
             // check in [`CollectionKernelPlan::from_transformer_op`].
             // U2 head-axis: a batched row-softmax image additionally pins
             // the batch/mask counts law.
-            CollectionKernelPlan::RowSoftmax(plan) => {
-                super::validate::validate_row_softmax_plan(plan)
-            }
+            CollectionKernelPlan::RowSoftmax(plan) => validate_row_softmax_plan(plan),
             // GI3-1: the inference recipes carry no static grid/shared-memory
             // structure — every algorithmic fact (axis/epsilon/gamma-width,
             // pos/dim/row-width, table/id dims, causal extents) is a
@@ -703,6 +642,56 @@ impl CollectionKernelPlan {
                 Ok(())
             }
         }
+    }
+}
+
+/// The batched-attention plan's row-major output strides (the last element of
+/// each tuple is the contiguous axis). The projection and score families
+/// stride over `[rows, cols, ...]`; the sequence-major context keeps the
+/// `hidden`-wide contiguous vector.
+fn attention_output_strides(
+    kind: BatchedAttentionKind,
+    q_per_kv: u64,
+    seq: u64,
+    head_dim: u64,
+    hidden: u64,
+) -> [u64; 4] {
+    match kind {
+        BatchedAttentionKind::ProjectionQ => [
+            q_per_kv.saturating_mul(seq).saturating_mul(head_dim),
+            seq.saturating_mul(head_dim),
+            head_dim,
+            1,
+        ],
+        BatchedAttentionKind::ProjectionK | BatchedAttentionKind::ProjectionV => {
+            [seq.saturating_mul(head_dim), head_dim, 1, 1]
+        }
+        BatchedAttentionKind::Scores | BatchedAttentionKind::Softmax => [
+            q_per_kv.saturating_mul(seq).saturating_mul(seq),
+            seq.saturating_mul(seq),
+            seq,
+            1,
+        ],
+        BatchedAttentionKind::ContextSequenceMajor => [hidden, 1, 1, 1],
+    }
+}
+
+/// R4 repair: the M=1 projection body computes this many outputs per
+/// 64-thread workgroup, so the same typed fact must drive the launch grid.
+/// `seq` is the contract's step-row count (decode = 1); the score, softmax
+/// and context kinds keep the generic one-thread-per-output law (`None`).
+fn attention_decode_outputs_per_workgroup(kind: BatchedAttentionKind, seq: u64) -> Option<u64> {
+    if seq == 1
+        && matches!(
+            kind,
+            BatchedAttentionKind::ProjectionQ
+                | BatchedAttentionKind::ProjectionK
+                | BatchedAttentionKind::ProjectionV
+        )
+    {
+        Some(crate::abi::PROJECTION_GEMV_DISPATCH_LANES)
+    } else {
+        None
     }
 }
 
@@ -787,6 +776,16 @@ pub(super) fn reduction_barrier_schedule(workgroup_x: u32) -> Vec<BarrierPoint> 
     barriers
 }
 
+/// Shared-memory layout of the tree-floor reduction: one f32 slot per
+/// workgroup lane, the slots the tree halving steps combine in place.
+fn reduction_shared_memory(workgroup_x: u32) -> SharedMemoryLayout {
+    SharedMemoryLayout {
+        element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+        slot_count: workgroup_x,
+        buffer_name: REDUCTION_SHARED_BUFFER_NAME.to_owned(),
+    }
+}
+
 /// Per-K-tile barrier schedule for the tiled-matmul recipe: the
 /// post-cooperative-load barrier (publishes the loaded A/B tiles to the
 /// inner product), then the post-inner-product-step barrier (publishes the
@@ -801,6 +800,24 @@ pub(crate) fn matmul_barrier_schedule() -> Vec<BarrierPoint> {
             after: BarrierPhase::InnerProductStep,
         },
     ]
+}
+
+/// The matmul recipe's two shared-memory operand tiles: `tile` × `tile` f32
+/// slots each, the cooperative-load targets the per-K-tile barrier pair
+/// guards.
+fn matmul_shared_memory(tile: u32) -> MatMulSharedMemory {
+    MatMulSharedMemory {
+        shared_a: SharedMemoryLayout {
+            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+            slot_count: tile * tile,
+            buffer_name: MATMUL_SHARED_A_BUFFER_NAME.to_owned(),
+        },
+        shared_b: SharedMemoryLayout {
+            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+            slot_count: tile * tile,
+            buffer_name: MATMUL_SHARED_B_BUFFER_NAME.to_owned(),
+        },
+    }
 }
 
 /// The matmul shapes must reproduce the contract's tile grid: `dispatch_y`
@@ -882,6 +899,18 @@ fn signature_matches_reduction(
         && signature.output.element_count == partials
 }
 
+/// The tiled-matmul recipes' launch workgroup: the `MATMUL_TILE` ×
+/// `MATMUL_TILE` cooperative tile grid, one thread per tile slot.
+///
+/// WHY: three signature matchers (`signature_matches_matmul`,
+/// `signature_matches_matmul_runtime`, `signature_matches_grouped_matmul`)
+/// pin the same workgroup; one predicate keeps them from drifting apart.
+fn matmul_workgroup_matches(signature: &MirKernelSignature) -> bool {
+    signature.workgroup.x == MATMUL_TILE
+        && signature.workgroup.y == MATMUL_TILE
+        && signature.workgroup.z == 1
+}
+
 /// The matmul signature must already carry the contract it was built from:
 /// `apply_collection_op_contract` sets workgroup `(8, 8, 1)`, the tile-grid
 /// dispatch, and the operand buffers hold the flat `batch·M·K` (left) /
@@ -898,9 +927,7 @@ fn signature_matches_matmul(
     if matmul_batch_from_signature(signature, shapes).is_none() {
         return false;
     }
-    signature.workgroup.x == MATMUL_TILE
-        && signature.workgroup.y == MATMUL_TILE
-        && signature.workgroup.z == 1
+    matmul_workgroup_matches(signature)
         && signature.dispatch_size.x == dispatch_x
         && signature.dispatch_size.y == dispatch_y
         && signature.dispatch_size.z == 1
@@ -926,11 +953,7 @@ fn signature_matches_matmul_runtime(signature: &MirKernelSignature) -> bool {
             .extra_inputs
             .first()
             .is_some_and(crate::abi::MirKernelResource::is_runtime_shaped);
-    signature.workgroup.x == MATMUL_TILE
-        && signature.workgroup.y == MATMUL_TILE
-        && signature.workgroup.z == 1
-        && has_extent
-        && runtime_shaped
+    matmul_workgroup_matches(signature) && has_extent && runtime_shaped
 }
 
 /// The grouped-matmul signature must already carry the contract it was built
@@ -944,9 +967,7 @@ fn signature_matches_grouped_matmul(
     shapes: MatMulShapes,
     groups: u64,
 ) -> bool {
-    signature.workgroup.x == MATMUL_TILE
-        && signature.workgroup.y == MATMUL_TILE
-        && signature.workgroup.z == 1
+    matmul_workgroup_matches(signature)
         && signature.dispatch_size.x == dispatch_x
         && signature.dispatch_size.y == dispatch_y
         && signature.dispatch_size.z == 1
@@ -1528,7 +1549,7 @@ fn rope_plan_facts(
     }
     let pos = const_non_negative(args.get(1)?)?;
     let dim = const_non_negative(args.get(2)?)?;
-    if dim == 0 || dim % 2 != 0 {
+    if dim == 0 || !dim.is_multiple_of(2) {
         return None;
     }
     let axis_index = usize::try_from(axis)

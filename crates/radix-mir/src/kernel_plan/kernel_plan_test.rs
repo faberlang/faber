@@ -616,6 +616,127 @@ fn matmul_contract_with_non_matmul_op_returns_none() {
     );
 }
 
+/// A post-contract batched-attention signature: the 64-thread flat workgroup
+/// and a dispatch of `output_elements` — the shape
+/// `apply_collection_op_contract` produces for the batched attention ops.
+fn attention_signature(output_elements: u64) -> MirKernelSignature {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    MirKernelSignature {
+        function: MirFunctionId(0),
+        input: MirKernelResource {
+            group: 0,
+            binding: 0,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty,
+            element_count: output_elements,
+            source_local: Some(MirLocalId(0)),
+            source_name: None,
+            reduced_projection: None,
+        },
+        extra_inputs: Vec::new(),
+        output: MirKernelResource {
+            group: 0,
+            binding: 1,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Output,
+            access: MirKernelResourceAccess::Write,
+            element_ty,
+            element_count: output_elements,
+            source_local: None,
+            source_name: None,
+            reduced_projection: None,
+        },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize { x: 64, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize {
+            x: output_elements,
+            y: 1,
+            z: 1,
+        },
+    }
+}
+
+#[test]
+fn batched_attention_plan_resolves_typed_strides_and_decode_lane_fact() {
+    // A decode projection: seq=1 selects the R4 GEMV lane expansion, and the
+    // q_proj output strides over `[heads, rows, head_dim]`.
+    let signature = attention_signature(8);
+    let contract = CollectionOpContract::BatchedAttention {
+        kind: BatchedAttentionKind::ProjectionQ,
+        kv_heads: 2,
+        q_per_kv: 2,
+        seq: 1,
+        head_dim: 4,
+        hidden: 16,
+        layout: None,
+        rotate_half: false,
+        scale_bits: 0x3f80_0000,
+        output_elements: 8,
+    };
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &contract,
+        MirCollectionOp::TensorBatchedAttention,
+        None,
+    )
+    .expect("the batched attention contract resolves a plan");
+    let CollectionKernelPlan::BatchedAttention(projection) = &plan else {
+        panic!("expected a batched attention plan");
+    };
+    assert_eq!(
+        projection.output_strides,
+        [8, 4, 4, 1],
+        "ProjectionQ strides over [q_per_kv*seq*head_dim, head_dim, ...]"
+    );
+    assert_eq!(
+        projection.decode_outputs_per_workgroup,
+        Some(crate::abi::PROJECTION_GEMV_DISPATCH_LANES),
+        "the decode projection carries the GEMV lane fact"
+    );
+    plan.validate().expect("the resolved plan validates");
+
+    // The sequence-major context keeps the contiguous hidden vector and no
+    // GEMV lane fact.
+    let context_contract = CollectionOpContract::BatchedAttention {
+        kind: BatchedAttentionKind::ContextSequenceMajor,
+        kv_heads: 2,
+        q_per_kv: 2,
+        seq: 1,
+        head_dim: 4,
+        hidden: 16,
+        layout: None,
+        rotate_half: false,
+        scale_bits: 0x3f80_0000,
+        output_elements: 8,
+    };
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &context_contract,
+        MirCollectionOp::TensorBatchedAttention,
+        None,
+    )
+    .expect("the context attention contract resolves a plan");
+    let CollectionKernelPlan::BatchedAttention(context) = &plan else {
+        panic!("expected a batched attention plan");
+    };
+    assert_eq!(
+        context.output_strides,
+        [16, 1, 1, 1],
+        "the sequence-major context keeps the contiguous hidden vector"
+    );
+    assert_eq!(
+        context.decode_outputs_per_workgroup, None,
+        "only Q/K/V projections carry the GEMV lane fact"
+    );
+    plan.validate().expect("the resolved plan validates");
+}
+
 // ── Transpose recipe (S5-U1) ──────────────────────────────────────────
 
 #[test]
