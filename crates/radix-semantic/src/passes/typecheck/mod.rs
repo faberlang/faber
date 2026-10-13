@@ -256,6 +256,10 @@ pub(crate) struct StructInfo {
 #[derive(Clone)]
 pub(crate) struct InterfaceMethodInfo {
     sig: FuncSig,
+    /// Declared `axis` markers in parameter order; the echo rule reads this
+    /// for a contract method call (its signature's `SemanticParamMode` cannot
+    /// carry the marker).
+    axis: Vec<bool>,
     availability: Vec<HirAvailability>,
     span: radix_lexer::Span,
 }
@@ -984,6 +988,11 @@ impl<'a> TypeChecker<'a> {
             for method in &methods {
                 self.method_defs
                     .insert((def_id, method.name), method.def_id);
+                // Imported methods keep their declared `axis` markers so a
+                // call through this class echoes `axis` exactly like a local
+                // method (polish A-202).
+                self.axis_params
+                    .insert(method.def_id, method.axis.clone());
                 if !method.unavailable.is_empty() {
                     self.unavailable_methods
                         .insert((def_id, method.name), method.unavailable.clone());
@@ -1050,6 +1059,7 @@ impl<'a> TypeChecker<'a> {
                         method.name,
                         InterfaceMethodInfo {
                             sig: method.sig,
+                            axis: method.axis,
                             availability: Vec::new(),
                             span: radix_lexer::Span::default(),
                         },
@@ -1115,6 +1125,10 @@ mod axis_marker_test;
 #[cfg(test)]
 #[path = "imported_generic_enum_test.rs"]
 mod imported_generic_enum_test;
+
+#[cfg(test)]
+#[path = "imported_axis_marker_test.rs"]
+mod imported_axis_marker_test;
 
 #[cfg(test)]
 #[path = "ascii_cursor_test.rs"]

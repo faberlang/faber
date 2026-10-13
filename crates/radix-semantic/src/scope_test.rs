@@ -895,3 +895,89 @@ fn namespace_variant_scan_skips_non_enum_type_exports() {
         "an alias export must not hide the enum's variant"
     );
 }
+
+/// An imported function's and method's declared `axis` markers survive the
+/// file-interface install and are readable by the canonical accessors
+/// (polish A-202). The echo rule reads these at every imported call site.
+#[test]
+fn imported_axis_markers_round_trip_through_the_resolver() {
+    use crate::Primitive;
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceMethodExport,
+        InterfaceParam, InterfaceStructExport, InterfaceTypeSnapshot,
+    };
+    use crate::SemanticParamMode;
+    use crate::TypeTable;
+    use std::collections::BTreeMap;
+
+    let number = || InterfaceTypeSnapshot::Primitive(Primitive::Numerus);
+    let param = |axis| InterfaceParam {
+        ty: number(),
+        mode: SemanticParamMode::Owned,
+        optional: false,
+        sponte: false,
+        axis,
+    };
+    let callable = |params| InterfaceCallable {
+        type_params: Vec::new(),
+        params,
+        ret: Box::new(number()),
+        err: None,
+        is_async: false,
+        is_generator: false,
+        tensor_edge_policy_requirements: Vec::new(),
+        device: None,
+    };
+
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "rows".to_owned(),
+        kind: FileExportKind::Function(callable(vec![param(true), param(false)])),
+    });
+    interface.insert(FileExport {
+        name: "Row".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
+            implements: Vec::new(),
+            name: "Row".to_owned(),
+            params: Vec::new(),
+            fields: Vec::new(),
+            methods: vec![InterfaceMethodExport {
+                name: "rows".to_owned(),
+                callable: callable(vec![param(true)]),
+                visibility: radix_syntax::MemberVisibility::Publica,
+                unavailable: Vec::new(),
+            }],
+            annotation_contract: None,
+        }),
+    });
+
+    let mut resolver = Resolver::new();
+    let mut interner = radix_lexer::Interner::new();
+    let mut types = TypeTable::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("lib".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("axis interface installs");
+
+    let namespace = interner.intern("lib");
+    let rows = interner.intern("rows");
+    assert_eq!(
+        resolver.namespace_file_axis_params_canonical(namespace, rows),
+        Some(&[true, false][..]),
+        "imported function axis flags stay on the exported parameter records"
+    );
+
+    let exported = resolver.imported_file_structs();
+    assert_eq!(exported.len(), 1);
+    let methods = &exported[0].2;
+    assert_eq!(methods.len(), 1);
+    assert_eq!(
+        methods[0].axis,
+        vec![true],
+        "imported method axis flags stay on the imported method record"
+    );
+}

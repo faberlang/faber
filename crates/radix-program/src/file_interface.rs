@@ -463,14 +463,22 @@ fn snapshot_interface_method(
         is_async: false,
         is_generator: false,
     };
-    snapshot_interface_callable_with_identity(
+    let mut callable = snapshot_interface_callable_with_identity(
         &sig,
         &analysis.types,
         &analysis.interner,
         &analysis.resolver,
         export_identity.map(identity_for).as_ref(),
     )
-    .map_err(|err| interface_error(file_label, interface_name, err))
+    .map_err(|err| interface_error(file_label, interface_name, err))?;
+    callable.set_axis_params(
+        &method
+            .params
+            .iter()
+            .map(|param| param.mode == HirParamMode::Axis)
+            .collect::<Vec<_>>(),
+    );
+    Ok(callable)
 }
 
 fn snapshot_struct(
@@ -611,14 +619,23 @@ fn snapshot_struct_method(
         is_async: method.func.is_async,
         is_generator: method.func.is_generator,
     };
-    snapshot_interface_callable_with_identity(
+    let mut callable = snapshot_interface_callable_with_identity(
         &sig,
         &analysis.types,
         &analysis.interner,
         &analysis.resolver,
         export_identity.map(identity_for).as_ref(),
     )
-    .map_err(|err| interface_error(file_label, struct_name, err))
+    .map_err(|err| interface_error(file_label, struct_name, err))?;
+    callable.set_axis_params(
+        &method
+            .func
+            .params
+            .iter()
+            .map(|param| param.mode == HirParamMode::Axis)
+            .collect::<Vec<_>>(),
+    );
+    Ok(callable)
 }
 
 fn annotation_contract_export(
@@ -704,6 +721,13 @@ fn snapshot_function(
         export_identity.map(identity_for).as_ref(),
     )
     .map_err(|err| interface_error(file_label, name, err))?;
+    callable.set_axis_params(
+        &func
+            .params
+            .iter()
+            .map(|param| param.mode == HirParamMode::Axis)
+            .collect::<Vec<_>>(),
+    );
     // Library-cache parity (KPC-WIRE): the module-side import link attaches
     // the v2 device contract at its export-surface builder; this snapshot is
     // the library/package interface source, and without the same fact an

@@ -1811,6 +1811,7 @@ fn func_export_from_stmt(
             mode: semantic_param_mode(param.mode),
             optional: param.sponte || param.default.is_some(),
             sponte: param.sponte,
+            axis: param.mode == AstParamMode::Axis,
         });
     }
     let ret = match &decl.ret {
@@ -1895,6 +1896,7 @@ fn class_export_from_stmt(
                     mode: semantic_param_mode(param.mode),
                     optional: param.sponte || param.default.is_some(),
                     sponte: param.sponte,
+                    axis: param.mode == AstParamMode::Axis,
                 });
             }
             let ret = match &method.ret {
@@ -2397,6 +2399,7 @@ fn interface_type_from_type_expr(
                     mode: SemanticParamMode::Owned,
                     optional: false,
                     sponte: false,
+                    axis: false,
                 });
             }
             let ret = interface_type_from_type_expr(&func.ret, interner, &no_params, nominal_kinds, ctx)?;
@@ -2668,6 +2671,7 @@ fn interface_method_from_ast(
             mode: semantic_param_mode(param.mode),
             optional: param.sponte || param.default.is_some(),
             sponte: param.sponte,
+            axis: param.mode == AstParamMode::Axis,
         });
     }
     let ret = match &method.ret {

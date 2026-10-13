@@ -302,7 +302,11 @@ pub struct ImportedFileInterface {
 /// Remapped contract for a single imported file export.
 #[derive(Debug, Clone)]
 enum ImportedFileExport {
-    Function(FuncSig),
+    /// Imported function: remapped signature plus the declared `axis`
+    /// markers in parameter order. A [`FuncSig`] collapses `axis` into
+    /// `SemanticParamMode::Owned`, so the flags travel beside it rather
+    /// than being lost at the import boundary.
+    Function(FuncSig, Vec<bool>),
     Type(ImportedFileType),
     Struct(ImportedFileStruct),
 }
@@ -342,6 +346,9 @@ pub struct ImportedFileInterfaceMethod {
     /// Consumer-locale spelling accepted at the source boundary.
     pub surface_name: LexSymbol,
     pub sig: FuncSig,
+    /// Declared `axis` markers in parameter order; empty when the exporter
+    /// predates the flag or the method declares none.
+    pub axis: Vec<bool>,
     /// Member visibility for `genus` methods (D5.3); public elsewhere.
     pub visibility: radix_syntax::MemberVisibility,
     /// `@ nondum` gates of a `genus` method; every call is refused (SEM017).
@@ -501,7 +508,7 @@ fn exported_member_kind(export: &FileExportKind) -> InterfaceMemberKind {
 /// Whether an installed file export carries the given consumer `DefId`.
 fn export_contains_def_id(export: &ImportedFileExport, def_id: DefId) -> bool {
     match export {
-        ImportedFileExport::Function(_) => false,
+        ImportedFileExport::Function(..) => false,
         ImportedFileExport::Type(ty) => ty.def_id == Some(def_id),
         ImportedFileExport::Struct(strukt) => strukt.def_id == def_id,
     }
@@ -1423,7 +1430,9 @@ impl Resolver {
                     requirements,
                 ) {
                     (Ok(sig), Ok(requirements)) => {
-                        let exported = ImportedFileExport::Function(sig);
+                        let axis: Vec<bool> =
+                            callable.params.iter().map(|param| param.axis).collect();
+                        let exported = ImportedFileExport::Function(sig, axis);
                         let policy_def =
                             (!requirements.is_empty()).then(|| self.fresh_builtin_def_id());
                         let gates = interface.unavailable.get(member);
@@ -1818,11 +1827,13 @@ impl Resolver {
                     .first()
                     .map_or(method.name.as_str(), String::as_str),
             );
+            let axis: Vec<bool> = method.callable.params.iter().map(|param| param.axis).collect();
             imported.push(ImportedFileInterfaceMethod {
                 def_id: self.fresh_def_id(),
                 name,
                 surface_name,
                 sig,
+                axis,
                 visibility: method.visibility,
                 unavailable: method.unavailable.clone(),
             });
@@ -2085,7 +2096,7 @@ impl Resolver {
             .exports
             .get(&self.file_interface_export_key(interface, member)?)?
         {
-            ImportedFileExport::Function(sig) => Some(sig),
+            ImportedFileExport::Function(sig, _) => Some(sig),
             ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
         }
     }
@@ -2168,7 +2179,33 @@ impl Resolver {
             .exports
             .get(&self.file_interface_export_key_for_canonical(interface, canonical)?)?
         {
-            ImportedFileExport::Function(sig) => Some(sig),
+            ImportedFileExport::Function(sig, _) => Some(sig),
+            ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
+        }
+    }
+
+    /// Declared `axis` markers of the imported function a post-HIR canonical
+    /// member names, in parameter order. `None` when the member is not an
+    /// imported function; a shorter vector than the signature's parameter
+    /// count is treated as all-false by the call checker.
+    #[must_use]
+    pub fn namespace_file_axis_params_canonical(
+        &self,
+        namespace: LexSymbol,
+        canonical: LexSymbol,
+    ) -> Option<&[bool]> {
+        if self
+            .namespace_member_rejection_issue(namespace, canonical)
+            .is_some()
+        {
+            return None;
+        }
+        let interface = self.file_interfaces.get(&namespace)?;
+        match interface
+            .exports
+            .get(&self.file_interface_export_key_for_canonical(interface, canonical)?)?
+        {
+            ImportedFileExport::Function(_, axis) => Some(axis),
             ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
         }
     }
@@ -2253,7 +2290,7 @@ impl Resolver {
         }
         match interface.exports.get(&member)? {
             ImportedFileExport::Type(ty) => Some(ty.ty),
-            ImportedFileExport::Struct(_) | ImportedFileExport::Function(_) => None,
+            ImportedFileExport::Struct(_) | ImportedFileExport::Function(..) => None,
         }
     }
 
@@ -2361,7 +2398,7 @@ impl Resolver {
             .into_iter()
             .flat_map(|interface| interface.exports.iter())
             .filter_map(|(member, export)| match export {
-                ImportedFileExport::Function(sig) => Some((*member, sig)),
+                ImportedFileExport::Function(sig, _) => Some((*member, sig)),
                 ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
             })
             .collect()
@@ -2386,7 +2423,7 @@ impl Resolver {
         {
             ImportedFileExport::Type(ty) => Some(ty.ty),
             ImportedFileExport::Struct(strukt) => Some(strukt.ty),
-            ImportedFileExport::Function(_) => None,
+            ImportedFileExport::Function(..) => None,
         }
     }
 
@@ -2414,7 +2451,7 @@ impl Resolver {
             ImportedFileExport::Struct(strukt) => self
                 .generic_param_kinds(strukt.def_id)
                 .map(ToOwned::to_owned),
-            ImportedFileExport::Function(_) => None,
+            ImportedFileExport::Function(..) => None,
         }
     }
 
@@ -2432,7 +2469,7 @@ impl Resolver {
         }
         match interface.exports.get(&member)? {
             ImportedFileExport::Type(ty) => Some(ty.ty),
-            ImportedFileExport::Struct(_) | ImportedFileExport::Function(_) => None,
+            ImportedFileExport::Struct(_) | ImportedFileExport::Function(..) => None,
         }
     }
 
@@ -2494,7 +2531,7 @@ impl Resolver {
                         by_type.insert(export.ty, spelling.clone());
                         by_def.insert(export.def_id, spelling);
                     }
-                    ImportedFileExport::Function(_) => {}
+                    ImportedFileExport::Function(..) => {}
                 }
             }
         }
@@ -2739,7 +2776,7 @@ impl Resolver {
             .flat_map(|interface| interface.exports.values())
             .filter_map(|export| match export {
                 ImportedFileExport::Struct(strukt) => Some(Self::imported_struct_entry(strukt)),
-                ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
+                ImportedFileExport::Function(..) | ImportedFileExport::Type(_) => None,
             })
             .collect()
     }
@@ -2792,7 +2829,7 @@ impl Resolver {
             .filter_map(|(name, export)| match export {
                 ImportedFileExport::Struct(strukt) => Some((strukt.def_id, *name)),
                 ImportedFileExport::Type(ty) => ty.def_id.map(|def_id| (def_id, *name)),
-                ImportedFileExport::Function(_) => None,
+                ImportedFileExport::Function(..) => None,
             })
             .collect()
     }
@@ -2807,7 +2844,7 @@ impl Resolver {
             .flat_map(|(_, interface)| interface.exports.values())
             .filter_map(|export| match export {
                 ImportedFileExport::Struct(strukt) => Some(strukt.def_id),
-                ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
+                ImportedFileExport::Function(..) | ImportedFileExport::Type(_) => None,
             })
             .collect()
     }
@@ -2823,7 +2860,7 @@ impl Resolver {
             .flat_map(|interface| interface.exports.values())
             .filter_map(|export| match export {
                 ImportedFileExport::Struct(strukt) => Some(Self::imported_struct_entry(strukt)),
-                ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
+                ImportedFileExport::Function(..) | ImportedFileExport::Type(_) => None,
             })
             .collect()
     }
@@ -2859,7 +2896,7 @@ impl Resolver {
             .flat_map(|interface| interface.exports.values())
             .filter_map(|export| match export {
                 ImportedFileExport::Type(ty) => Some((ty.def_id?, ty.methods.clone())),
-                ImportedFileExport::Function(_) | ImportedFileExport::Struct(_) => None,
+                ImportedFileExport::Function(..) | ImportedFileExport::Struct(_) => None,
             })
             .filter(|(_, methods)| !methods.is_empty())
             .collect()
@@ -3033,7 +3070,7 @@ impl Resolver {
                     let variants = self.imported_enum_variants.get(&def_id)?;
                     Some((def_id, ty.ty, variants.clone()))
                 }
-                ImportedFileExport::Function(_) | ImportedFileExport::Struct(_) => None,
+                ImportedFileExport::Function(..) | ImportedFileExport::Struct(_) => None,
             })
             .collect()
     }
@@ -3190,7 +3227,7 @@ impl Resolver {
         match export {
             ImportedFileExport::Type(ty) => ty.def_id,
             ImportedFileExport::Struct(strukt) => Some(strukt.def_id),
-            ImportedFileExport::Function(_) => None,
+            ImportedFileExport::Function(..) => None,
         }
     }
 
@@ -3207,7 +3244,7 @@ impl Resolver {
         let type_key = self.file_interface_export_key(interface, type_name)?;
         match interface.exports.get(&type_key)? {
             ImportedFileExport::Struct(strukt) => Some(strukt.def_id),
-            ImportedFileExport::Type(_) | ImportedFileExport::Function(_) => None,
+            ImportedFileExport::Type(_) | ImportedFileExport::Function(..) => None,
         }
     }
 
@@ -3233,7 +3270,7 @@ impl Resolver {
                     member: *member,
                     def_id: ty.def_id?,
                 }),
-                ImportedFileExport::Function(_) => None,
+                ImportedFileExport::Function(..) => None,
             })
             .collect()
     }
@@ -3313,7 +3350,7 @@ impl Resolver {
                 let (export_def_id, methods) = match export {
                     ImportedFileExport::Type(ty) => (ty.def_id?, &ty.methods),
                     ImportedFileExport::Struct(strukt) => (strukt.def_id, &strukt.methods),
-                    ImportedFileExport::Function(_) => return None,
+                    ImportedFileExport::Function(..) => return None,
                 };
                 (export_def_id == def_id)
                     .then(|| {
@@ -4038,7 +4075,13 @@ impl Resolver {
                     .into_iter()
                     .map(|(member, export)| {
                         let imported = match export {
-                            FileExportSnapshot::Function(sig) => ImportedFileExport::Function(sig),
+                            FileExportSnapshot::Function(sig) => {
+                                // The wire snapshot predates the axis flag and
+                                // must not grow a schema field for it
+                                // (RESOLVER_SCHEMA is frozen); restored
+                                // interfaces keep all-false flags.
+                                ImportedFileExport::Function(sig, Vec::new())
+                            }
                             FileExportSnapshot::Type { ty, def_id } => {
                                 ImportedFileExport::Type(ImportedFileType {
                                     ty,
@@ -4077,6 +4120,9 @@ impl Resolver {
                                         name: method.name,
                                         surface_name: method.surface_name,
                                         sig: method.sig,
+                                        // Restored artifact route: the wire
+                                        // snapshot carries no axis flag.
+                                        axis: Vec::new(),
                                         visibility: method.visibility,
                                         unavailable: method
                                             .unavailable
@@ -4186,7 +4232,7 @@ impl Resolver {
                     .iter()
                     .map(|(&member, export)| {
                         let snapshot = match export {
-                            ImportedFileExport::Function(sig) => {
+                            ImportedFileExport::Function(sig, _) => {
                                 FileExportSnapshot::Function(sig.clone())
                             }
                             ImportedFileExport::Type(ty) => FileExportSnapshot::Type {

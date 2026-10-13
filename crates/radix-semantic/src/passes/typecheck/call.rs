@@ -359,7 +359,14 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let resolved = self.resolve_inferred_type(callee_ty);
         if let Some(sig) = self.signature_from_type(resolved) {
-            return self.check_instantiated_call_marked(&sig, explicit_type_args, args, span, None);
+            return self.check_instantiated_call_marked(
+                &sig,
+                explicit_type_args,
+                args,
+                span,
+                None,
+                None,
+            );
         }
 
         if let Some(result) =
@@ -679,6 +686,13 @@ impl TypeChecker<'_> {
             self.tensor_edge_policy_imported_requirements
                 .insert(*def_id, requirements.clone());
         }
+        // An imported function has no consumer-local declaration `DefId` for
+        // `axis_params`, so the echo rule reads the interface's exported
+        // parameter flags here (polish A-202).
+        let imported_axis = self
+            .resolver
+            .namespace_file_axis_params_canonical(namespace, name)
+            .map(<[_]>::to_vec);
         self.set_chorda_scalar_closure_context(name);
         let ret = self.check_user_function_call(
             &sig,
@@ -687,6 +701,7 @@ impl TypeChecker<'_> {
             receiver.span,
             expected,
             imported_policy.map(|(def_id, _)| def_id),
+            imported_axis.as_deref(),
         );
         self.validate_interval_bound_call_args(name, &sig, args);
         Some(ret)
@@ -891,6 +906,12 @@ impl TypeChecker<'_> {
                     return self.error_type;
                 }
             }
+            // Contract methods have no stable `DefId` to key `axis_params`,
+            // so their exported/declared `axis` flags ride the method info
+            // (polish A-202).
+            let interface_method_axis = self
+                .lookup_interface_method_info(receiver_ty, *name)
+                .map(|method| method.axis.clone());
             self.set_chorda_scalar_closure_context(*name);
             let method_def = self
                 .struct_def_from_type(receiver_ty)
@@ -911,6 +932,7 @@ impl TypeChecker<'_> {
                     args,
                     receiver.span,
                     expected,
+                    interface_method_axis.as_deref(),
                 )
             };
             self.validate_interval_bound_call_args(*name, &sig, args);
@@ -930,6 +952,7 @@ impl TypeChecker<'_> {
                 args,
                 receiver.span,
                 expected,
+                None,
             );
         }
 
@@ -953,6 +976,7 @@ impl TypeChecker<'_> {
                     args,
                     receiver.span,
                     expected,
+                    None,
                 );
                 self.validate_interval_bound_call_args(*name, &sig, args);
                 return ret;
@@ -1646,6 +1670,7 @@ impl TypeChecker<'_> {
                 args,
                 callee.span,
                 expected,
+                None,
             );
         }
 
