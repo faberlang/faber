@@ -272,8 +272,15 @@ impl TypeChecker<'_> {
         if marker.is_some() || !self.is_shareable_payload(payload) {
             return;
         }
-        let Some(root) = Self::place_root(init) else {
-            return;
+        let root = match Self::place_root(init) {
+            Some(root) => root,
+            // A `de`-declared returned borrow (`→ de T`) hands back the state
+            // of the argument at its single matching `de` parameter. A plain
+            // (`→ T`) call result is a fresh owned value and stays legal.
+            None => match self.call_result_alias_root(init) {
+                Some(root) => root,
+                None => return,
+            },
         };
         if !self.is_read_only_root(root) {
             return;
@@ -304,6 +311,62 @@ impl TypeChecker<'_> {
     fn is_read_only_root(&self, root: radix_hir::DefId) -> bool {
         self.const_locals.contains(&root)
             || (self.lookup_binding(root).is_none() && self.consts.contains_key(&root))
+    }
+
+    /// The place a `de`-returning call hands back, when that place is the
+    /// call's only possible source: the result type is a `ref` view (`→ de T`)
+    /// and the callee has exactly one `de` parameter of the returned payload
+    /// type. A plain (owned) call result is a fresh value, not an alias; a
+    /// call with several `de` parameters of that type is ambiguous without the
+    /// callee body, so both stay accepted here.
+    fn call_result_alias_root(&self, init: &HirExpression) -> Option<radix_hir::DefId> {
+        let HirExpressionKind::Call(callee, _, args, _) = &init.kind else {
+            return None;
+        };
+        let HirExpressionKind::Path(callee_def) = &callee.kind else {
+            return None;
+        };
+        let result_ty = self.resolve_inferred_type(init.ty?);
+        let (marker, payload) = self.types.peel_access_marker(result_ty);
+        if !matches!(marker, Some(crate::AccessMarker::Ref))
+            || !self.is_shareable_payload(payload)
+        {
+            return None;
+        }
+        let sig = self.functions.get(callee_def)?;
+        let mut candidates = sig.params.iter().enumerate().filter(|(_, param)| {
+            param.mode == SemanticParamMode::Ref
+                && self.types.equals(
+                    self.types
+                        .peel_access_marker(self.resolve_inferred_type(param.ty))
+                        .1,
+                    payload,
+                )
+        });
+        let (index, _) = candidates.next()?;
+        if candidates.next().is_some() {
+            return None;
+        }
+        let arg = args.get(index)?;
+        if arg.spread {
+            return None;
+        }
+        Self::place_root(&arg.expr)
+    }
+
+    /// A loop binder aliases its iterated source: when the source reads a
+    /// read-only place, the binder is read-only too, so a later `varia y ← r`
+    /// shares const state and is SEM065.
+    fn mark_read_only_itera_binder(&mut self, expr: &HirExpression) {
+        let HirExpressionKind::Itera { binding, iter, .. } = &expr.kind else {
+            return;
+        };
+        let Some(root) = Self::place_root(iter) else {
+            return;
+        };
+        if self.is_read_only_root(root) {
+            self.const_locals.insert(*binding);
+        }
     }
 
     /// A container or genus instance: a value a plain bind shares rather than
@@ -440,6 +503,7 @@ impl TypeChecker<'_> {
                 self.check_local(local);
             }
             HirStatementKind::Expr(expr) => {
+                self.mark_read_only_itera_binder(expr);
                 let expr_ty = self.check_expr(expr);
                 // U1R: an `adfirma` whose condition narrows a binding holds
                 // for the rest of the block (failure aborts before control
