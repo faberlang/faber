@@ -626,6 +626,7 @@ impl Lowerer<'_> {
 
     fn lower_ex_stmt(&mut self, stmt: &radix_syntax::ExStmt) -> Vec<HirStatement> {
         let mut out = Vec::new();
+        let mutable = stmt.mutability == radix_syntax::AstMutability::Mutable;
 
         for field in &stmt.fields {
             let name = field
@@ -634,31 +635,16 @@ impl Lowerer<'_> {
                 .map_or(field.name.name, |ident| ident.name);
             let def_id = self.next_def_id();
             self.bind_local(name, def_id);
-            let local = radix_hir::HirLocal {
-                def_id,
-                name,
-                ty: None,
-                init: Some(HirExpression {
-                    id: self.next_hir_id(),
-                    kind: HirExpressionKind::Field(
-                        Box::new(self.lower_expr(&stmt.source)),
-                        field.name.name,
-                    ),
-                    ty: None,
-                    span: field.name.span,
-                }),
-                mutable: stmt.mutability == radix_syntax::AstMutability::Mutable,
-                is_await: false,
-                runtime_provided: false,
-                await_store: None,
-                size_decl: false,
-                size_static: false,
-            };
-            out.push(HirStatement {
+            let init = HirExpression {
                 id: self.next_hir_id(),
-                kind: HirStatementKind::Local(local),
+                kind: HirExpressionKind::Field(
+                    Box::new(self.lower_expr(&stmt.source)),
+                    field.name.name,
+                ),
+                ty: None,
                 span: field.name.span,
-            });
+            };
+            out.push(self.destructured_local(def_id, name, init, mutable));
         }
 
         if let Some(rest) = &stmt.is_rest {
@@ -821,12 +807,7 @@ impl Lowerer<'_> {
             ty: None,
             span: self.current_span,
         };
-        let expr = if let Some(catch) = &while_stmt.catch {
-            let cape = self.lower_cape_clause(catch);
-            self.handled_expr(dum, cape)
-        } else {
-            dum
-        };
+        let expr = self.with_optional_catch(while_stmt.catch.as_ref(), dum);
 
         HirStatementKind::Expr(expr)
     }
@@ -952,12 +933,7 @@ impl Lowerer<'_> {
             span: self.current_span,
         };
 
-        let expr = if let Some(catch) = &iter_stmt.catch {
-            let cape = self.lower_cape_clause(catch);
-            self.handled_expr(expr, cape)
-        } else {
-            expr
-        };
+        let expr = self.with_optional_catch(iter_stmt.catch.as_ref(), expr);
 
         HirStatementKind::Expr(expr)
     }
@@ -982,21 +958,11 @@ impl Lowerer<'_> {
             );
             return HirStatementKind::Expr(error_expr(self, self.current_span));
         }
-        let mut bindings = Vec::new();
-        for binding in &iter_stmt.bindings {
-            let radix_syntax::BindingPattern::Ident(ident) = binding else {
-                self.error_with_args_at(
-                    vec![radix_diagnostics::DiagnosticArg::new(
-                        "issue",
-                        "itera_lockstep_binder_pattern_unsupported",
-                    )],
-                    binding_pattern_span(binding),
-                );
-                return HirStatementKind::Expr(error_expr(self, self.current_span));
-            };
-            let def_id = self.next_def_id();
-            bindings.push((def_id, ident.name));
-        }
+        let Some(bindings) =
+            self.lower_itera_name_bindings(iter_stmt, "itera_lockstep_binder_pattern_unsupported")
+        else {
+            return HirStatementKind::Expr(error_expr(self, self.current_span));
+        };
 
         self.push_scope();
         let coordinate_bindings = iter_stmt
@@ -1031,14 +997,34 @@ impl Lowerer<'_> {
             span: self.current_span,
         };
 
-        let expr = if let Some(catch) = &iter_stmt.catch {
-            let cape = self.lower_cape_clause(catch);
-            self.handled_expr(expr, cape)
-        } else {
-            expr
-        };
+        let expr = self.with_optional_catch(iter_stmt.catch.as_ref(), expr);
 
         HirStatementKind::Expr(expr)
+    }
+
+    /// Lower the name-only binders shared by the `itera ex` / `itera ab` series
+    /// nodes; a pattern binder declines with `unsupported_issue`.
+    fn lower_itera_name_bindings(
+        &mut self,
+        iter_stmt: &radix_syntax::IteraStmt,
+        unsupported_issue: &'static str,
+    ) -> Option<Vec<(radix_hir::DefId, radix_lexer::Symbol)>> {
+        let mut bindings = Vec::new();
+        for binding in &iter_stmt.bindings {
+            let radix_syntax::BindingPattern::Ident(ident) = binding else {
+                self.error_with_args_at(
+                    vec![radix_diagnostics::DiagnosticArg::new(
+                        "issue",
+                        unsupported_issue,
+                    )],
+                    binding_pattern_span(binding),
+                );
+                return None;
+            };
+            let def_id = self.next_def_id();
+            bindings.push((def_id, ident.name));
+        }
+        Some(bindings)
     }
 
     /// Lower the N-ary Cartesian `itera ab` range product to its node.
@@ -1077,21 +1063,11 @@ impl Lowerer<'_> {
             );
             return HirStatementKind::Expr(error_expr(self, self.current_span));
         }
-        let mut bindings = Vec::new();
-        for binding in &iter_stmt.bindings {
-            let radix_syntax::BindingPattern::Ident(ident) = binding else {
-                self.error_with_args_at(
-                    vec![radix_diagnostics::DiagnosticArg::new(
-                        "issue",
-                        "itera_binder_pattern_unsupported",
-                    )],
-                    binding_pattern_span(binding),
-                );
-                return HirStatementKind::Expr(error_expr(self, self.current_span));
-            };
-            let def_id = self.next_def_id();
-            bindings.push((def_id, ident.name));
-        }
+        let Some(bindings) =
+            self.lower_itera_name_bindings(iter_stmt, "itera_binder_pattern_unsupported")
+        else {
+            return HirStatementKind::Expr(error_expr(self, self.current_span));
+        };
 
         let ranges = iter_stmt
             .sources
@@ -1117,12 +1093,7 @@ impl Lowerer<'_> {
             span: self.current_span,
         };
 
-        let expr = if let Some(catch) = &iter_stmt.catch {
-            let cape = self.lower_cape_clause(catch);
-            self.handled_expr(expr, cape)
-        } else {
-            expr
-        };
+        let expr = self.with_optional_catch(iter_stmt.catch.as_ref(), expr);
 
         HirStatementKind::Expr(expr)
     }
@@ -1177,45 +1148,35 @@ impl Lowerer<'_> {
     /// function is rejected downstream by the same `iace` channel check. This
     /// mirrors `adfirma`'s shape with a recoverable, catchable payload.
     fn lower_require(&mut self, stmt: &radix_syntax::RequireStmt) -> HirStatementKind {
-        let cond = self.lower_expr(&stmt.cond);
-        let error = self.lower_expr(&stmt.error);
-        let negated = HirExpression {
-            id: self.next_hir_id(),
-            kind: HirExpressionKind::Unary(radix_hir::HirUnOp::Not, Box::new(cond)),
-            ty: None,
-            span: self.current_span,
-        };
-        let throw_stmt = HirStatement {
-            id: self.next_hir_id(),
-            kind: HirStatementKind::Expr(HirExpression {
-                id: self.next_hir_id(),
-                kind: HirExpressionKind::Throw(Box::new(error)),
-                ty: None,
-                span: self.current_span,
-            }),
-            span: self.current_span,
-        };
-        let then_block = HirBlock::simple(vec![throw_stmt], None, self.current_span);
-        let guard_id = self.next_hir_id();
-        self.presentation.guard_si_ids.push(guard_id);
-        HirStatementKind::Expr(HirExpression {
-            id: guard_id,
-            kind: HirExpressionKind::Si {
-                cond: Box::new(negated),
-                then_block,
-                then_catch: None,
-                else_block: None,
-            },
-            ty: None,
-            span: self.current_span,
-        })
+        self.lower_guard_desugar(&stmt.cond, &stmt.error, true)
     }
 
     /// Lower `reice` as the reject-guard desugar `si (cond) { iace err }` — the
     /// boolean opposite of `requirit`: it fails when the condition holds.
     fn lower_reject(&mut self, stmt: &radix_syntax::RejectStmt) -> HirStatementKind {
-        let cond = self.lower_expr(&stmt.cond);
-        let error = self.lower_expr(&stmt.error);
+        self.lower_guard_desugar(&stmt.cond, &stmt.error, false)
+    }
+
+    /// Shared `requirit` / `reice` guard desugar: a single `iace` in a branch
+    /// whose condition is `cond` (or its negation) throws the authored error.
+    fn lower_guard_desugar(
+        &mut self,
+        cond: &radix_syntax::Expr,
+        error: &radix_syntax::Expr,
+        negate: bool,
+    ) -> HirStatementKind {
+        let cond = self.lower_expr(cond);
+        let error = self.lower_expr(error);
+        let cond = if negate {
+            HirExpression {
+                id: self.next_hir_id(),
+                kind: HirExpressionKind::Unary(radix_hir::HirUnOp::Not, Box::new(cond)),
+                ty: None,
+                span: self.current_span,
+            }
+        } else {
+            cond
+        };
         let throw_stmt = HirStatement {
             id: self.next_hir_id(),
             kind: HirStatementKind::Expr(HirExpression {
@@ -1378,12 +1339,7 @@ impl Lowerer<'_> {
         // Record the `Discerne` node's own id: a trailing `cape` wraps the
         // expression in a fresh node, but emission matches the inner id.
         self.presentation.elige_expr_ids.push(expr.id);
-        let expr = if let Some(catch) = &elige_stmt.catch {
-            let cape = self.lower_cape_clause(catch);
-            self.handled_expr(expr, cape)
-        } else {
-            expr
-        };
+        let expr = self.with_optional_catch(elige_stmt.catch.as_ref(), expr);
 
         HirStatementKind::Expr(expr)
     }
@@ -1656,6 +1612,21 @@ impl Lowerer<'_> {
         let span = self.current_span;
         let body = self.block_from_expr(body);
         self.handled_block_expr(body, catch, span)
+    }
+
+    /// Wrap a lowered loop or dispatch expression in its authored `cape`
+    /// clause when one is present.
+    fn with_optional_catch(
+        &mut self,
+        catch: Option<&radix_syntax::CapeClause>,
+        expr: HirExpression,
+    ) -> HirExpression {
+        if let Some(catch) = catch {
+            let cape = self.lower_cape_clause(catch);
+            self.handled_expr(expr, cape)
+        } else {
+            expr
+        }
     }
 
     fn handled_block_expr(

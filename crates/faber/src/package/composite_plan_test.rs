@@ -386,3 +386,144 @@ fn typed_error_names_the_first_failing_domain() {
             .contains(&DiagnosticArg::new("domain", "model"))
     );
 }
+
+#[test]
+fn non_canonical_model_algorithm_rejects_even_when_sources_agree() {
+    // The canonical well-formedness rules apply after exact agreement, so a
+    // plan whose source of truth carries a non-`sha-256` algorithm still
+    // fails closed (admission rule of `gradus:model/artifact`).
+    let package = empty_package("exec-01-m2-canonical-algorithm");
+    let mut source = fixture_identity_source();
+    let mut facts = fixture_facts();
+    source.model.content.algorithm = "sha-512".to_owned();
+    facts.model_identity.content.algorithm = "sha-512".to_owned();
+    let error = assemble_composite_plan(&package, Target::MirFmir, facts, &source).unwrap_err();
+    assert_first_domain(&error, "model");
+}
+
+#[test]
+fn non_canonical_model_digest_rejects_even_when_sources_agree() {
+    let package = empty_package("exec-01-m2-canonical-digest");
+    let mut source = fixture_identity_source();
+    let mut facts = fixture_facts();
+    source.model.content.digestio = "sha256:not-a-canonical-digest".to_owned();
+    facts.model_identity.content.digestio = "sha256:not-a-canonical-digest".to_owned();
+    let error = assemble_composite_plan(&package, Target::MirFmir, facts, &source).unwrap_err();
+    assert_first_domain(&error, "model");
+}
+
+#[test]
+fn mutated_packet_digest_is_rejected_not_repaired() {
+    // The packet digest re-verification is the sibling of the content digest
+    // check: a mutated `packet_sha256` fails closed over the carried metadata.
+    let package = empty_package("exec-01-m2-packet-digest");
+    let source = fixture_identity_source();
+    let mut facts = fixture_facts();
+    facts.device_artifacts[0].packet_sha256 = format!("sha256:{}", "d".repeat(64));
+    let error = assemble_composite_plan(&package, Target::MirFmir, facts, &source).unwrap_err();
+    assert_first_domain(&error, "backend");
+    let detail = error
+        .iter()
+        .find(|diag| {
+            diag.args.contains(&DiagnosticArg::new(
+                "issue",
+                "composite_plan_identity_divergence",
+            ))
+        })
+        .expect("typed divergence diagnostic present");
+    assert!(
+        detail
+            .args
+            .iter()
+            .any(|arg| arg.name == "detail" && arg.value.contains("packet_sha256"))
+    );
+}
+
+#[test]
+fn reserved_buffer_version_zero_rejects_with_buffer_domain() {
+    // Version 0 is reserved; the derived registry rejects it before the
+    // expected-version comparison, even when the typed source agrees.
+    let package = empty_package("exec-01-m2-reserved-version");
+    let mut source = fixture_identity_source();
+    let mut facts = fixture_facts();
+    facts.device_program.kernels[0].resources[0].version.version = 0;
+    source.buffers[0].versions[0].version = 0;
+    let error = assemble_composite_plan(&package, Target::MirFmir, facts, &source).unwrap_err();
+    assert_first_domain(&error, "buffer");
+}
+
+#[test]
+fn prepared_region_partition_rules_fail_closed() {
+    let package = empty_package("exec-01-m2-region-partition");
+    let source = fixture_identity_source();
+    let plan = assemble_composite_plan(&package, Target::MirFmir, fixture_facts(), &source)
+        .expect("pristine plan assembles");
+
+    // A region member that is not a declared launch.
+    let mut unknown_member = plan.clone();
+    unknown_member.prepared_regions[0].launches = vec![LaunchId(99)];
+    assert_eq!(
+        verify_identity_preservation(&unknown_member, &source)
+            .unwrap_err()
+            .domain(),
+        IdentityDomain::Kernel
+    );
+
+    // One launch covered by two regions (the region count still agrees).
+    let mut duplicate_member = plan.clone();
+    duplicate_member.prepared_regions = vec![
+        duplicate_member.prepared_regions[0].clone(),
+        duplicate_member.prepared_regions[0].clone(),
+    ];
+    let mut duplicate_source = source.clone();
+    duplicate_source.regions = vec![0, 0];
+    assert_eq!(
+        verify_identity_preservation(&duplicate_member, &duplicate_source)
+            .unwrap_err()
+            .domain(),
+        IdentityDomain::Kernel
+    );
+
+    // A declared launch covered by no region (the region count still agrees).
+    let mut uncovered = plan.clone();
+    uncovered.prepared_regions.clear();
+    let mut uncovered_source = source.clone();
+    uncovered_source.regions.clear();
+    assert_eq!(
+        verify_identity_preservation(&uncovered, &uncovered_source)
+            .unwrap_err()
+            .domain(),
+        IdentityDomain::Kernel
+    );
+}
+
+#[test]
+fn rendered_document_is_deterministic_and_carries_identity_facts_only() {
+    let package = empty_package("exec-01-m2-render");
+    let source = fixture_identity_source();
+    let plan = assemble_composite_plan(&package, Target::MirFmir, fixture_facts(), &source)
+        .expect("pristine plan assembles");
+    let first = render_composite_plan_v1(&plan).expect("plan renders");
+    let second = render_composite_plan_v1(&plan).expect("plan renders again");
+    assert_eq!(first, second, "a fixed plan renders deterministically");
+    let document: serde_json::Value =
+        serde_json::from_str(&first).expect("rendered document is JSON");
+    assert_eq!(document["schema"].as_str(), Some(COMPOSITE_PLAN_SCHEMA));
+    assert_eq!(
+        document["device_artifacts"][0]["content_sha256"].as_str(),
+        Some(plan.device_artifacts[0].content_sha256.as_str())
+    );
+    assert_eq!(
+        document["device_artifacts"][0]["byte_length"].as_u64(),
+        Some(18)
+    );
+    assert_eq!(
+        document["device_program"]["kernels"][0]["function"].as_u64(),
+        Some(7)
+    );
+    assert_eq!(document["prepared_regions"][0]["id"].as_u64(), Some(0));
+    assert!(
+        !first.contains("kernel void matmul"),
+        "raw artifact payload bytes must never be rendered"
+    );
+}
