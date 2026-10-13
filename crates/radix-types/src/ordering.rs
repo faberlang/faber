@@ -45,6 +45,7 @@ pub enum OrderingKind {
 /// `genus_conforms` answers whether a genus declares the ordering contract
 /// over itself; `param_conforms` whether a type parameter is bounded by it.
 /// Returns `None` when `ty` does not conform.
+#[allow(clippy::match_same_arms)] // WHY: `Type::Bits` is ruling B2 and must stay its own arm, not merge into `numerus`.
 pub fn ordering_kind(
     types: &TypeTable,
     ty: TypeId,
