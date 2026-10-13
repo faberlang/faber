@@ -793,7 +793,7 @@ help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "variant không xác định"
-help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
+help = "khai báo biến trước khi dùng{?members| (|)}{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "các trường variant không xác định"

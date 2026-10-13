@@ -1258,7 +1258,7 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "unknown variant"
-help = "declare the variable before use{?suggestion|; did you mean |?}"
+help = "declare the variable before use{?members| (|)}{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "unknown variant fields"

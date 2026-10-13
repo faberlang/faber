@@ -793,7 +793,7 @@ help = "صرح عن المتغير قبل استخدامه{?suggestion|؛ هل �
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "variant غير معروف"
-help = "صرح عن المتغير قبل استخدامه{?suggestion|؛ هل قصدت |?}"
+help = "صرح عن المتغير قبل استخدامه{?members| (|)}{?suggestion|؛ هل قصدت |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "variant fields غير معروفة"

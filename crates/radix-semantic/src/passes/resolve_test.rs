@@ -3130,9 +3130,11 @@ const ARM_FORMA: &str =
     "discretio Forma {\n    Circulus { numerus r },\n    Quadratum { numerus s },\n    Punctum\n}";
 
 #[test]
-fn arm_not_member_union_of_types_is_rejected() {
+fn arm_not_member_union_of_types_lists_members() {
     // Repro 1: an undeclared name in a union-of-types match used to be a
-    // silent catch-all that swallowed every remaining member.
+    // silent catch-all that swallowed every remaining member. The set comes
+    // from the subject's annotation, so every member is named even when no
+    // arm spells one correctly.
     let source = r"genus Punctum { varia numerus x }
 genus Linea { varia numerus y }
 functio f(Punctum ∪ Linea u) → vacuum {
@@ -3143,10 +3145,24 @@ functio f(Punctum ∪ Linea u) → vacuum {
 }";
     let args = arm_not_member_args(source);
     assert_eq!(arm_arg(&args, "name"), Some("Nusquam"));
+    assert_eq!(arm_arg(&args, "members"), Some("Punctum, Linea"));
+    assert_eq!(arm_arg(&args, "suggestion"), None);
+
+    let near_miss = r"genus Punctum { varia numerus x }
+genus Linea { varia numerus y }
+functio f(Punctum ∪ Linea u) → vacuum {
+    discerne u {
+        casu Punctum { nota 1 }
+        casu Punctm { nota 2 }
+    }
+}";
+    let args = arm_not_member_args(near_miss);
+    assert_eq!(arm_arg(&args, "members"), Some("Punctum, Linea"));
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Punctum"));
 }
 
 #[test]
-fn arm_not_member_unrelated_local_constant_is_rejected() {
+fn arm_not_member_unrelated_local_constant_lists_members() {
     // Repro 2: a value name that exists in scope is still not a member.
     let source = r"genus Punctum { varia numerus x }
 genus Linea { varia numerus y }
@@ -3160,6 +3176,7 @@ functio f(Punctum ∪ Linea u) → vacuum {
 }";
     let args = arm_not_member_args(source);
     assert_eq!(arm_arg(&args, "name"), Some("Septem"));
+    assert_eq!(arm_arg(&args, "members"), Some("Punctum, Linea"));
 }
 
 #[test]
@@ -3221,12 +3238,21 @@ fn arm_not_member_is_checked_in_each_multi_subject_position() {
     );
     let args = arm_not_member_args(&first);
     assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
+    assert_eq!(
+        arm_arg(&args, "members"),
+        Some("Circulus, Quadratum, Punctum")
+    );
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Punctum"));
 
     let second = format!(
         "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Punctum et Punctum {{ nota 1 }}\n        casu Punctum et Punctm {{ nota 2 }}\n        ceterum {{ nota 3 }}\n    }}\n}}"
     );
     let args = arm_not_member_args(&second);
     assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
+    assert_eq!(
+        arm_arg(&args, "members"),
+        Some("Circulus, Quadratum, Punctum")
+    );
     assert_eq!(arm_arg(&args, "suggestion"), Some("Punctum"));
 }
 
@@ -3237,6 +3263,10 @@ fn arm_not_member_is_checked_under_omnia() {
     );
     let args = arm_not_member_args(&source);
     assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
+    assert_eq!(
+        arm_arg(&args, "members"),
+        Some("Circulus, Quadratum, Punctum")
+    );
 }
 
 #[test]
@@ -3246,12 +3276,16 @@ fn arm_not_member_is_checked_in_each_aut_alternative() {
     );
     let args = arm_not_member_args(&first);
     assert_eq!(arm_arg(&args, "name"), Some("Viridiss"));
+    assert_eq!(arm_arg(&args, "members"), Some("Rubrum, Viridis"));
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Viridis"));
 
     let leading = format!(
         "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    discerne c {{\n        casu Rubum aut Viridis {{ nota 1 }}\n        ceterum {{ nota 2 }}\n    }}\n}}"
     );
     let args = arm_not_member_args(&leading);
     assert_eq!(arm_arg(&args, "name"), Some("Rubum"));
+    assert_eq!(arm_arg(&args, "members"), Some("Rubrum, Viridis"));
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Rubrum"));
 }
 
 #[test]
@@ -3263,6 +3297,30 @@ fn arm_not_member_elige_case_naming_nothing_is_an_error() {
         "SEM001",
         "unknown_identifier",
     );
+}
+
+#[test]
+fn arm_not_member_elige_misspelled_enum_case_lists_members_and_suggests() {
+    // Over a closed-set subject an unresolved bare `elige` case name is a
+    // misspelled member: the diagnostic names the set and the nearest
+    // spelling instead of the generic unknown identifier.
+    let source = format!(
+        "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    elige c {{\n        casu Rubrum {{ nota 1 }}\n        casu Viridiss {{ nota 2 }}\n        ceterum {{ nota 3 }}\n    }}\n}}"
+    );
+    let result = crate::test_support::analyze_source(&source);
+    let diag = result
+        .diagnostics
+        .iter()
+        .find(|diag| diag.issue() == Some("unknown_variant"))
+        .unwrap_or_else(|| panic!("unknown_variant not found: {:?}", result.diagnostics));
+    assert_eq!(crate::semantic_spec(diag.kind).code, "SEM001");
+    let args: Vec<(String, String)> = diag
+        .args
+        .iter()
+        .map(|arg| (arg.name.to_owned(), arg.value.clone()))
+        .collect();
+    assert_eq!(arm_arg(&args, "members"), Some("Rubrum, Viridis"));
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Viridis"));
 }
 
 #[test]
