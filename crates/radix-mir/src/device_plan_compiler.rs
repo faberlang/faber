@@ -1252,10 +1252,7 @@ impl PlanCompiler {
                 detail: "SSM state extent overflows the plan grid".to_owned(),
             })?;
             let dims = facts.state_dims();
-            let mut strides = vec![1u64; dims.len()];
-            for axis in (0..dims.len()).rev().skip(1) {
-                strides[axis] = strides[axis + 1].saturating_mul(dims[axis + 1]);
-            }
+            let strides = row_major_strides(&dims);
             return Ok(BindDescriptor {
                 dims,
                 strides,
@@ -1275,10 +1272,7 @@ impl PlanCompiler {
                     detail: "selection source node disappeared".to_owned(),
                 })?;
         let dims = node.shape.dims.clone();
-        let mut strides = vec![1u64; dims.len()];
-        for axis in (0..dims.len()).rev().skip(1) {
-            strides[axis] = strides[axis + 1].saturating_mul(dims[axis + 1]);
-        }
+        let strides = row_major_strides(&dims);
         Ok(BindDescriptor {
             dims,
             strides,
@@ -1350,13 +1344,9 @@ impl PlanCompiler {
                 &mut offsets,
             )?;
         }
-        let (mut uniforms, workspace, requirements) = if let Some(facts) = causal_facts {
+        let (mut uniforms, workspace, mut requirements) = if let Some(facts) = causal_facts {
             (
-                vec![UniformBinding {
-                    name: "scale_bits".to_owned(),
-                    ty: crate::device_program_plans::UniformType::U32,
-                    bits: facts.scale_bits,
-                }],
+                vec![u32_uniform("scale_bits", u64::from(facts.scale_bits))],
                 Some(WorkspaceBinding {
                     bytes: 0,
                     alignment: 16,
@@ -1371,7 +1361,6 @@ impl PlanCompiler {
         };
         // MoE selections carry their declared expert policy and a
         // metal-scoped body admission requirement; dispatch lands in M8-U1b.
-        let mut requirements = requirements;
         push_operation_uniforms(
             operation,
             moe_facts,
@@ -1457,6 +1446,26 @@ fn layer_decompositions(
         });
     }
     layers
+}
+
+/// Row-major packed strides for `dims` (outermost first): the innermost axis
+/// is contiguous and each outer axis is the next inner stride times its
+/// extent.  Products saturate rather than overflow.
+fn row_major_strides(dims: &[u64]) -> Vec<u64> {
+    let mut strides = vec![1u64; dims.len()];
+    for axis in (0..dims.len()).rev().skip(1) {
+        strides[axis] = strides[axis + 1].saturating_mul(dims[axis + 1]);
+    }
+    strides
+}
+
+/// A `u32` uniform binding, clamping an over-wide extent to `u32::MAX`.
+fn u32_uniform(name: &str, value: u64) -> UniformBinding {
+    UniformBinding {
+        name: name.to_owned(),
+        ty: crate::device_program_plans::UniformType::U32,
+        bits: u32::try_from(value).unwrap_or(u32::MAX),
+    }
 }
 
 fn push_causal_attention_binds(
@@ -1560,16 +1569,8 @@ fn push_operation_uniforms(
     match operation {
         LibraryOperation::RouterSelection => {
             let facts = moe_facts.ok_or_else(|| missing_facts(candidate, "router"))?;
-            uniforms.push(UniformBinding {
-                name: "expert_count".to_owned(),
-                ty: crate::device_program_plans::UniformType::U32,
-                bits: u32::try_from(facts.experts).unwrap_or(u32::MAX),
-            });
-            uniforms.push(UniformBinding {
-                name: "active_experts".to_owned(),
-                ty: crate::device_program_plans::UniformType::U32,
-                bits: u32::try_from(facts.active).unwrap_or(u32::MAX),
-            });
+            uniforms.push(u32_uniform("expert_count", facts.experts));
+            uniforms.push(u32_uniform("active_experts", facts.active));
             requirements.push(BackendRequirement {
                 backend: "metal".to_owned(),
                 feature: "RouterSelection".to_owned(),
@@ -1577,11 +1578,7 @@ fn push_operation_uniforms(
         }
         LibraryOperation::GroupedExpertGemm => {
             let facts = moe_facts.ok_or_else(|| missing_facts(candidate, "expert"))?;
-            uniforms.push(UniformBinding {
-                name: "expert_count".to_owned(),
-                ty: crate::device_program_plans::UniformType::U32,
-                bits: u32::try_from(facts.experts).unwrap_or(u32::MAX),
-            });
+            uniforms.push(u32_uniform("expert_count", facts.experts));
             requirements.push(BackendRequirement {
                 backend: "metal".to_owned(),
                 feature: "GroupedExpertGemm".to_owned(),
@@ -1591,11 +1588,7 @@ fn push_operation_uniforms(
             let Some(SsmFacts::Conv1d { kernel_width, .. }) = ssm_facts else {
                 return Err(missing_facts(candidate, "SSM conv"));
             };
-            uniforms.push(UniformBinding {
-                name: "kernel_width".to_owned(),
-                ty: crate::device_program_plans::UniformType::U32,
-                bits: u32::try_from(kernel_width).unwrap_or(u32::MAX),
-            });
+            uniforms.push(u32_uniform("kernel_width", kernel_width));
             requirements.push(BackendRequirement {
                 backend: "metal".to_owned(),
                 feature: "SsmConv1d".to_owned(),
@@ -1605,11 +1598,7 @@ fn push_operation_uniforms(
             let Some(SsmFacts::Scan { state_dim, .. }) = ssm_facts else {
                 return Err(missing_facts(candidate, "SSM scan"));
             };
-            uniforms.push(UniformBinding {
-                name: "state_dim".to_owned(),
-                ty: crate::device_program_plans::UniformType::U32,
-                bits: u32::try_from(state_dim).unwrap_or(u32::MAX),
-            });
+            uniforms.push(u32_uniform("state_dim", state_dim));
             requirements.push(BackendRequirement {
                 backend: "metal".to_owned(),
                 feature: "SsmScan".to_owned(),
