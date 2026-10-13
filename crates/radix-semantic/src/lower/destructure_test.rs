@@ -1,10 +1,11 @@
 //! D14.1 / D14.2: destructuring evaluates its initializer once and binds the
-//! rest name to the tail, never the whole value.
+//! rest name to the tail, never the whole value. Also pins the `ex` extraction
+//! run and the `requirit` / `reice` guard desugar shapes.
 
 use crate::test_support;
 use radix_hir::{
-    HirDestructurePattern, HirExpression, HirExpressionKind, HirLiteral, HirLocal,
-    HirStatementKind, visit::HirVisitor,
+    HirDestructurePattern, HirExpression, HirExpressionKind, HirItemKind, HirLiteral, HirLocal,
+    HirStatementKind, HirUnOp, visit::HirVisitor,
 };
 
 const PAR: &str = "functio par() → lista<numerus> {\n    redde [7, 8, 9]\n}\n";
@@ -131,4 +132,78 @@ fn place_subject_is_not_hoisted_and_call_subject_is() {
         &facts[1].pattern,
         HirDestructurePattern::Array { elements, rest: None } if elements.len() == 2
     ));
+}
+
+#[test]
+fn ex_extraction_binds_each_field_and_the_rest_source() {
+    let unit = test_support::analyze_ok(
+        "genus Punctum {\n    varia numerus x\n    varia numerus y\n}\nincipit {\n    fixum Punctum p ← Punctum { x = 1, y = 2 }\n    ex p fixum x, ceteri r\n}\n",
+    );
+    let locals = entry_locals(&unit);
+    let x = local(&unit, &locals, "x");
+    assert!(matches!(
+        &x.init,
+        Some(HirExpression {
+            kind: HirExpressionKind::Field(_, _),
+            ..
+        })
+    ));
+    // The rest binding reads the whole source, not a field tail.
+    let r = local(&unit, &locals, "r");
+    assert!(matches!(
+        &r.init,
+        Some(HirExpression {
+            kind: HirExpressionKind::Path(_),
+            ..
+        })
+    ));
+}
+
+#[test]
+fn guard_desugars_requirit_and_reice_to_opposite_si_conditions() {
+    let unit = test_support::analyze_ok(
+        "functio guardia() → numerus ⇥ textus {\n    requirit verum iace \"opus\"\n    reice falsum iace \"vitium\"\n    redde 1\n}\n",
+    );
+    let hir = unit.hir.as_ref().expect("hir");
+    let function = hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Function(function) => Some(function),
+            _ => None,
+        })
+        .expect("function");
+    let si_exprs: Vec<&HirExpression> = function
+        .body
+        .as_ref()
+        .expect("body")
+        .statements
+        .iter()
+        .filter_map(|stmt| match &stmt.kind {
+            HirStatementKind::Expr(expr)
+                if matches!(expr.kind, HirExpressionKind::Si { .. }) =>
+            {
+                Some(expr)
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(si_exprs.len(), 2);
+    assert_eq!(unit.presentation.guard_si_ids.len(), 2);
+    assert!(
+        si_exprs
+            .iter()
+            .all(|expr| unit.presentation.guard_si_ids.contains(&expr.id))
+    );
+    let not_count = si_exprs
+        .iter()
+        .filter(|expr| {
+            matches!(
+                &expr.kind,
+                HirExpressionKind::Si { cond, .. }
+                    if matches!(cond.kind, HirExpressionKind::Unary(HirUnOp::Not, _))
+            )
+        })
+        .count();
+    assert_eq!(not_count, 1, "exactly `requirit` negates its condition");
 }
