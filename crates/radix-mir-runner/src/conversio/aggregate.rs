@@ -455,21 +455,18 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             let key = MapKey::Str(self.struct_wire_field_key(def_id, name));
             let converted = match input.get(&key).cloned() {
                 Some(Value::Nil) if optional.contains(&name) => Value::Nil,
-                Some(field_value) => match self.convert_to_struct_field(
-                    field_value,
-                    ty,
-                    struct_defaults,
-                    span,
-                ) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        return self.recover_or_fail(
-                            recovery,
-                            span,
-                            "valor to genus conversion failed",
-                        );
+                Some(field_value) => {
+                    match self.convert_to_struct_field(field_value, ty, struct_defaults, span) {
+                        Ok(value) => value,
+                        Err(_) => {
+                            return self.recover_or_fail(
+                                recovery,
+                                span,
+                                "valor to genus conversion failed",
+                            );
+                        }
                     }
-                },
+                }
                 None if optional.contains(&name) => self
                     .eval_struct_default(def_id, name, struct_defaults, span)?
                     .unwrap_or(Value::Nil),

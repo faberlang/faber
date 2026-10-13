@@ -1510,9 +1510,10 @@ fn oversized_elementwise_train_step_with_dead_recipe(
         mutable: false,
         span: test_span(),
     });
-    function.blocks[0]
-        .statements
-        .insert(at, collection_statement(MirCollectionOp::Sum, &[0], 54, tensor));
+    function.blocks[0].statements.insert(
+        at,
+        collection_statement(MirCollectionOp::Sum, &[0], 54, tensor),
+    );
     function
 }
 
@@ -1530,7 +1531,13 @@ fn assert_dead_recipe_does_not_perturb_the_split(at: usize) {
     let decomposition = decompose_kernel_function(&function, &validation)
         .expect("a dead recipe must not break the oversized elementwise split");
 
-    let shift = |statement: usize| if statement >= at { statement + 1 } else { statement };
+    let shift = |statement: usize| {
+        if statement >= at {
+            statement + 1
+        } else {
+            statement
+        }
+    };
     let expected: Vec<Vec<usize>> = baseline
         .subchains
         .iter()

@@ -119,10 +119,7 @@ fn unbounded_wrappers() -> Vec<(&'static str, fn(&mut TypeTable, TypeId) -> Type
     ]
 }
 
-fn bounded_wrappers() -> Vec<(
-    &'static str,
-    fn(&mut TypeTable, TypeId, IndexId) -> TypeId,
-)> {
+fn bounded_wrappers() -> Vec<(&'static str, fn(&mut TypeTable, TypeId, IndexId) -> TypeId)> {
     vec![
         ("bounded lista", |types, element, capacity| {
             types.bounded_array(element, capacity)
@@ -143,8 +140,7 @@ fn substitute_type_params_rebuilds_every_container_variant() {
         let resolver = Resolver::new();
         let mut interner = Interner::new();
         let t = interner.intern("T");
-        let mut checker =
-            TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
         let param = checker.types.intern(Type::Param(t));
         let concrete = checker.types.primitive(Primitive::Numerus);
         let declared = wrap(checker.types, param);
@@ -155,7 +151,8 @@ fn substitute_type_params_rebuilds_every_container_variant() {
         let instantiated = checker.substitute_type_params(declared, &mut vars, None);
 
         assert_eq!(
-            instantiated, expected,
+            instantiated,
+            expected,
             "{name}<T> must substitute T := numerus; got {:?}",
             checker.types.get(instantiated)
         );
@@ -170,8 +167,7 @@ fn substitute_type_params_substitutes_bounded_capacity_and_element() {
         let mut interner = Interner::new();
         let t = interner.intern("T");
         let n = interner.intern("N");
-        let mut checker =
-            TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
         let param = checker.types.intern(Type::Param(t));
         let capacity_param = checker.types.intern_index(IndexExpr::Param(n));
         let concrete = checker.types.primitive(Primitive::Numerus);
@@ -187,7 +183,8 @@ fn substitute_type_params_substitutes_bounded_capacity_and_element() {
             checker.substitute_type_params(declared, &mut vars, Some(&mut shape_vars));
 
         assert_eq!(
-            instantiated, expected,
+            instantiated,
+            expected,
             "{name}<T, N> must substitute T := numerus, N := 4; got {:?}",
             checker.types.get(instantiated)
         );
@@ -200,8 +197,7 @@ fn freshen_anonymous_type_holes_reaches_every_container_variant() {
         let mut types = TypeTable::new();
         let resolver = Resolver::new();
         let interner = Interner::new();
-        let mut checker =
-            TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
         let element = checker.types.primitive(Primitive::Fractus);
         let hole = checker.fresh_index_hole();
         let figura = checker.types.tensor_with_shape(element, hole);
@@ -229,8 +225,7 @@ fn freshen_anonymous_type_holes_reaches_bounded_capacity_and_element() {
         let mut types = TypeTable::new();
         let resolver = Resolver::new();
         let interner = Interner::new();
-        let mut checker =
-            TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
         let element = checker.types.primitive(Primitive::Fractus);
         let capacity = checker.fresh_index_hole();
         let extent = checker.fresh_index_hole();
