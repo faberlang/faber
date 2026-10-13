@@ -919,7 +919,13 @@ fn reduction_contract(
     };
     let length = device_view_element_count(operand_ty, validation)?;
     if length == 0 {
-        return Err(MirAbiError::new("reduction tensor length must be non-zero"));
+        // Stable decline identity: tests and callers must pin this decline
+        // by issue slug, not by message prose.
+        return Err(MirAbiError::with_detail(
+            "reduction tensor length must be non-zero",
+            "mir_reduction_tensor_length_nonzero",
+            format!("{op:?} reduction over an empty source tensor"),
+        ));
     }
     let workgroup_x = reduction_workgroup_x(length);
     let partials = length.div_ceil(u64::from(workgroup_x));
