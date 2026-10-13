@@ -110,6 +110,7 @@ const ISSUE_TYPE_ALIAS_CYCLE: &str = "type_alias_cycle";
 const ISSUE_TYPE_NAME_NOT_TYPE: &str = "type_name_not_type";
 const ISSUE_VARIANT_AMBIGUOUS: &str = "variant_ambiguous";
 const ISSUE_DISCERNE_LITERAL_ARM_NOT_IN_CLOSED_SET: &str = "discerne_literal_arm_not_in_closed_set";
+const ISSUE_DISCERNE_ARM_NOT_MEMBER: &str = "discerne_arm_not_member";
 const ISSUE_UNION_ONLY_NIHIL: &str = "union_only_nihil";
 /// `x est V` where `V` names a value, not a type (DECISIONS D23.1).
 const ISSUE_EST_VALUE_RHS: &str = "est_value_rhs";
@@ -909,11 +910,13 @@ fn resolve_discerne(
         resolve_expr(resolver, interner, subject, errors);
     }
 
+    let member_sets = discerne_member_sets(resolver, interner, stmt);
     resolver.enter_scope(ScopeKind::Match);
     for arm in &stmt.arms {
         resolver.enter_scope(ScopeKind::Block);
-        for pattern in &arm.patterns {
-            resolve_pattern(resolver, pattern, errors);
+        for (position, pattern) in arm.patterns.iter().enumerate() {
+            let members = member_sets.get(position).map_or(&[][..], Vec::as_slice);
+            resolve_pattern(resolver, interner, pattern, members, errors);
         }
         resolve_if_body(resolver, interner, &arm.body, errors);
         resolver.exit_scope();
@@ -932,7 +935,125 @@ fn push_closed_set_refusal(span: radix_lexer::Span, errors: &mut Vec<SemanticErr
     );
 }
 
-fn resolve_pattern(resolver: &mut Resolver, pattern: &Pattern, errors: &mut Vec<SemanticError>) {
+/// Parent definition of the closed set one arm pattern names a member of.
+///
+/// Only a pattern that already resolves to a variant (bare or through its
+/// enum/union parent) identifies a set; a misspelled name identifies nothing.
+fn pattern_member_parent(
+    resolver: &Resolver,
+    pattern: &Pattern,
+    parents: &rustc_hash::FxHashMap<DefId, DefId>,
+) -> Option<DefId> {
+    let bare_parent = |name: radix_lexer::Symbol| match resolver.lookup_variant_bare(name) {
+        BareVariantLookup::Single(variant) => parents.get(&variant).copied(),
+        BareVariantLookup::Ambiguous { .. } | BareVariantLookup::None => None,
+    };
+    match pattern {
+        Pattern::Ident(ident, _) => bare_parent(ident.name),
+        Pattern::Type(ty, _) => match &ty.kind {
+            TypeExprKind::Named(ident, params) if params.is_empty() => bare_parent(ident.name),
+            _ => None,
+        },
+        Pattern::Path(path) => match path.segments.as_slice() {
+            [.., parent, _] => resolver
+                .lookup(parent.name)
+                .filter(|def| {
+                    resolver
+                        .get_symbol(*def)
+                        .is_some_and(|symbol| symbol.kind == SymbolKind::Enum)
+                })
+                .or_else(|| bare_parent(path.segments.last()?.name)),
+            _ => None,
+        },
+        Pattern::Or(alternatives) => alternatives
+            .iter()
+            .find_map(|alternative| pattern_member_parent(resolver, alternative, parents)),
+        Pattern::Wildcard(_) | Pattern::Literal(..) | Pattern::NegatedLiteral(..) => None,
+    }
+}
+
+/// Member names of the closed set each subject position of a `discerne`
+/// matches, in declaration order.
+///
+/// Resolution runs before types are known, so the set is read from the
+/// variants the arms of that position already name. A position whose arms
+/// name no variant has no known set and yields an empty list.
+fn discerne_member_sets(
+    resolver: &Resolver,
+    interner: &Interner,
+    stmt: &DiscerneStmt,
+) -> Vec<Vec<String>> {
+    let parents: rustc_hash::FxHashMap<DefId, DefId> =
+        resolver.variant_parents_all().into_iter().collect();
+    (0..stmt.subjects.len())
+        .map(|position| {
+            let parent = stmt
+                .arms
+                .iter()
+                .filter_map(|arm| arm.patterns.get(position))
+                .find_map(|pattern| pattern_member_parent(resolver, pattern, &parents));
+            let Some(parent) = parent else {
+                return Vec::new();
+            };
+            let mut variants: Vec<DefId> = parents
+                .iter()
+                .filter(|(_, owner)| **owner == parent)
+                .map(|(variant, _)| *variant)
+                .collect();
+            variants.sort_by_key(|variant| variant.0);
+            variants
+                .into_iter()
+                .filter_map(|variant| resolver.get_symbol(variant))
+                .map(|symbol| interner.resolve(symbol.name).to_owned())
+                .collect()
+        })
+        .collect()
+}
+
+/// The member spelling nearest to a misspelled arm name, if any is close.
+fn nearest_member<'a>(spelling: &str, members: &'a [String]) -> Option<&'a str> {
+    let folded = name_suggestion_key(spelling);
+    members
+        .iter()
+        .filter_map(|member| {
+            let candidate = name_suggestion_key(member);
+            let distance = edit_distance(&folded, &candidate);
+            (distance <= name_suggestion_distance_threshold(&candidate))
+                .then_some((distance, member.as_str()))
+        })
+        .min()
+        .map(|(_, member)| member)
+}
+
+/// An arm name that is not a member of the matched set.
+///
+/// `discerne` iterates a closed set, so a bare arm name is a member or an
+/// error; it never binds. `_` and the default arm are the only catch-alls.
+fn arm_not_member_error(
+    interner: &Interner,
+    ident: &radix_syntax::Ident,
+    members: &[String],
+) -> SemanticError {
+    let spelling = interner.resolve(ident.name);
+    let mut error = SemanticError::structured(SemanticErrorKind::TypeMismatch, ident.span)
+        .with_arg("issue", ISSUE_DISCERNE_ARM_NOT_MEMBER)
+        .with_arg("name", spelling.to_owned());
+    if !members.is_empty() {
+        error = error.with_arg("members", members.join(", "));
+        if let Some(suggestion) = nearest_member(spelling, members) {
+            error = error.with_arg("suggestion", suggestion.to_owned());
+        }
+    }
+    error
+}
+
+fn resolve_pattern(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    pattern: &Pattern,
+    members: &[String],
+    errors: &mut Vec<SemanticError>,
+) {
     match pattern {
         Pattern::Wildcard(_) => {}
         // `discerne` matches a closed set (union members, enum variants). The
@@ -957,29 +1078,35 @@ fn resolve_pattern(resolver: &mut Resolver, pattern: &Pattern, errors: &mut Vec<
             resolve_pattern_bind(resolver, bind.as_ref(), errors);
         }
         Pattern::Ident(ident, bind) => {
-            // A bare name that two or more unions define is an ambiguous
-            // variant pattern; report it and never bind it silently. A name
-            // that exactly one union defines is a variant constructor
-            // pattern, not a binding (lowering owns the variant shape), so it
-            // defines no local: the same variant may appear in several subject
-            // positions of one multi-subject arm without a duplicate
-            // definition.
-            let lookup = resolver.lookup_variant_bare(ident.name);
-            if matches!(lookup, BareVariantLookup::Ambiguous { .. }) {
-                errors.push(
-                    SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
-                        .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
-                );
-            }
-            if !matches!(lookup, BareVariantLookup::Single(_)) {
-                define_symbol(
-                    resolver,
-                    ident.name,
-                    ident.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
+            // A bare arm name is a member of the matched set, never a
+            // binding. A name that two or more unions define is an ambiguous
+            // variant pattern. A name that exactly one union defines is a
+            // variant constructor pattern (lowering owns the variant shape),
+            // so it defines no local: the same variant may appear in several
+            // subject positions of one multi-subject arm without a duplicate
+            // definition. A name that resolves as a type is classified at
+            // lowering as a type pattern. Anything else is not a member and
+            // is an error; `_` and the default arm are the only catch-alls.
+            match resolver.lookup_variant_bare(ident.name) {
+                BareVariantLookup::Single(_) => {}
+                BareVariantLookup::Ambiguous { .. } => {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
+                            .with_arg("issue", ISSUE_VARIANT_AMBIGUOUS),
+                    );
+                }
+                BareVariantLookup::None => {
+                    let names_type = resolver.lookup_type(ident.name).is_some()
+                        || resolver.lookup_selective_import_type(ident.name).is_some();
+                    let names_variant = resolver.lookup(ident.name).is_some_and(|def| {
+                        resolver
+                            .get_symbol(def)
+                            .is_some_and(|symbol| symbol.kind == SymbolKind::Variant)
+                    });
+                    if !names_type && !names_variant {
+                        errors.push(arm_not_member_error(interner, ident, members));
+                    }
+                }
             }
             resolve_pattern_bind(resolver, bind.as_ref(), errors);
         }
@@ -987,13 +1114,13 @@ fn resolve_pattern(resolver: &mut Resolver, pattern: &Pattern, errors: &mut Vec<
             let Some((first, rest)) = alternatives.split_first() else {
                 return;
             };
-            resolve_pattern(resolver, first, errors);
+            resolve_pattern(resolver, interner, first, members, errors);
             for alternative in rest {
                 // Alternative-only bindings must not collide with the arm's
                 // canonical first-alternative bindings. Lowering/typecheck
                 // compare the alternatives and expose the common environment.
                 resolver.enter_scope(ScopeKind::Match);
-                resolve_pattern(resolver, alternative, errors);
+                resolve_pattern(resolver, interner, alternative, members, errors);
                 resolver.exit_scope();
             }
         }

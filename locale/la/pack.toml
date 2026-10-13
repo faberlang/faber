@@ -2366,6 +2366,10 @@ help = "ask an integer width or range with an `est` test, and a length with `.lo
 message = "`{discerne}` discriminates a closed set; a literal arm tests a value of an open set"
 help = "test values with `{elige}`; `{discerne}` accepts only the members of a union, the variants of an enum, or the bool and absent literals"
 
+[diagnostics.SEM010.issues.discerne_arm_not_member]
+message = "`{discerne}` arm '{name}' is not a member of the matched set"
+help = "name a member{?members| (|)}; use `_` or a `{ceterum}` arm for the rest{?suggestion|; did you mean |?}"
+
 [diagnostics.SEM010.issues.discerne_subject_not_in_closed_set]
 message = "`{discerne}` over several subjects needs a closed set for each; subject {position} is not a union, an enum, or a bool"
 help = "test values with `{elige}`, or branch on the value first and match closed sets with `{discerne}`"

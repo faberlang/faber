@@ -3077,3 +3077,193 @@ fn width_issue_literals_are_not_duplicated_in_semantic_production_sources() {
         "width issue names must be consumed from WidthLowerIssue consts, not quoted: {offenders:?}"
     );
 }
+
+// ── discerne arms name members of the closed set ───────────
+//
+// An arm name is a member of the scrutinee's set or an error: `_` and
+// `ceterum` are the only catch-alls, and a bare name that is not a member must
+// never become a silent binding.
+
+const ARM_NOT_MEMBER: &str = "discerne_arm_not_member";
+
+fn arm_not_member_args(source: &str) -> Vec<(String, String)> {
+    let result = crate::test_support::analyze_source(source);
+    let diag = result
+        .diagnostics
+        .iter()
+        .find(|diag| diag.issue() == Some(ARM_NOT_MEMBER))
+        .unwrap_or_else(|| {
+            panic!(
+                "diagnostic {ARM_NOT_MEMBER} not found: {:?}",
+                result.diagnostics
+            )
+        });
+    assert_eq!(crate::semantic_spec(diag.kind).code, "SEM010");
+    assert!(
+        args_have_no_legacy_message(&diag.args),
+        "migrated diagnostic should not choose prose at emit site"
+    );
+    diag.args
+        .iter()
+        .map(|arg| (arg.name.to_owned(), arg.value.clone()))
+        .collect()
+}
+
+fn arm_arg<'a>(args: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    args.iter()
+        .find(|(arg_name, _)| arg_name == name)
+        .map(|(_, value)| value.as_str())
+}
+
+const ARM_COLOR: &str = "ordo Color { Rubrum, Viridis }";
+const ARM_FORMA: &str =
+    "discretio Forma {\n    Circulus { numerus r },\n    Quadratum { numerus s },\n    Punctum\n}";
+
+#[test]
+fn arm_not_member_union_of_types_is_rejected() {
+    // Repro 1: an undeclared name in a union-of-types match used to be a
+    // silent catch-all that swallowed every remaining member.
+    let source = r"genus Punctum { varia numerus x }
+genus Linea { varia numerus y }
+functio f(Punctum ∪ Linea u) → vacuum {
+    discerne u {
+        casu Punctum { nota 1 }
+        casu Nusquam { nota 2 }
+    }
+}";
+    let args = arm_not_member_args(source);
+    assert_eq!(arm_arg(&args, "name"), Some("Nusquam"));
+}
+
+#[test]
+fn arm_not_member_unrelated_local_constant_is_rejected() {
+    // Repro 2: a value name that exists in scope is still not a member.
+    let source = r"genus Punctum { varia numerus x }
+genus Linea { varia numerus y }
+functio f(Punctum ∪ Linea u) → vacuum {
+    fixum numerus Septem ← 7
+    nota Septem
+    discerne u {
+        casu Punctum { nota 1 }
+        casu Septem { nota 2 }
+    }
+}";
+    let args = arm_not_member_args(source);
+    assert_eq!(arm_arg(&args, "name"), Some("Septem"));
+}
+
+#[test]
+fn arm_not_member_error_survives_where_exhaustiveness_used_to_be_defeated() {
+    // Repro 3: with the bogus arm the match used to look exhaustive. The arm
+    // is now an error of its own, so the match cannot compile either way.
+    let result = crate::test_support::analyze_source(
+        r"genus Punctum { varia numerus x }
+genus Linea { varia numerus y }
+functio f(Punctum ∪ Linea u) → vacuum {
+    discerne u {
+        casu Punctum { nota 1 }
+        casu Nusquam { nota 2 }
+    }
+}",
+    );
+    assert!(!result.is_ok(), "bogus arm must not compile");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some(ARM_NOT_MEMBER)),
+        "got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn arm_not_member_misspelled_enum_member_lists_members_and_suggests() {
+    // Repro 4: a misspelled enum member used to pass `check` and die late in
+    // MIR lowering.
+    let source = format!(
+        "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    discerne c {{\n        casu Rubrum {{ nota 1 }}\n        casu Viridiss {{ nota 2 }}\n    }}\n}}"
+    );
+    let args = arm_not_member_args(&source);
+    assert_eq!(arm_arg(&args, "name"), Some("Viridiss"));
+    assert_eq!(arm_arg(&args, "members"), Some("Rubrum, Viridis"));
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Viridis"));
+}
+
+#[test]
+fn arm_not_member_misspelled_discretio_variant_lists_members_and_suggests() {
+    let source = format!(
+        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne x {{\n        casu Circulus fixum r {{ nota r }}\n        casu Quadratum fixum s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
+    );
+    let args = arm_not_member_args(&source);
+    assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
+    assert_eq!(
+        arm_arg(&args, "members"),
+        Some("Circulus, Quadratum, Punctum")
+    );
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Punctum"));
+}
+
+#[test]
+fn arm_not_member_is_checked_in_each_multi_subject_position() {
+    let first = format!(
+        "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Punctm et Punctum {{ nota 1 }}\n        ceterum {{ nota 2 }}\n    }}\n}}"
+    );
+    let args = arm_not_member_args(&first);
+    assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
+
+    let second = format!(
+        "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Punctum et Punctum {{ nota 1 }}\n        casu Punctum et Punctm {{ nota 2 }}\n        ceterum {{ nota 3 }}\n    }}\n}}"
+    );
+    let args = arm_not_member_args(&second);
+    assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Punctum"));
+}
+
+#[test]
+fn arm_not_member_is_checked_under_omnia() {
+    let source = format!(
+        "{ARM_FORMA}\nfunctio f(Forma x) → vacuum {{\n    discerne omnia x {{\n        casu Circulus fixum r {{ nota r }}\n        casu Quadratum fixum s {{ nota s }}\n        casu Punctm {{ nota 0 }}\n    }}\n}}"
+    );
+    let args = arm_not_member_args(&source);
+    assert_eq!(arm_arg(&args, "name"), Some("Punctm"));
+}
+
+#[test]
+fn arm_not_member_is_checked_in_each_aut_alternative() {
+    let first = format!(
+        "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    discerne c {{\n        casu Rubrum aut Viridiss {{ nota 1 }}\n        ceterum {{ nota 2 }}\n    }}\n}}"
+    );
+    let args = arm_not_member_args(&first);
+    assert_eq!(arm_arg(&args, "name"), Some("Viridiss"));
+
+    let leading = format!(
+        "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    discerne c {{\n        casu Rubum aut Viridis {{ nota 1 }}\n        ceterum {{ nota 2 }}\n    }}\n}}"
+    );
+    let args = arm_not_member_args(&leading);
+    assert_eq!(arm_arg(&args, "name"), Some("Rubum"));
+}
+
+#[test]
+fn arm_not_member_elige_case_naming_nothing_is_an_error() {
+    // `elige` tests values, so an unknown case name is an undefined name
+    // rather than a member miss; it must stay a check error.
+    compile_and_expect(
+        "functio f(numerus n) → vacuum {\n    elige n {\n        casu Nusquam { nota 1 }\n        ceterum { nota 2 }\n    }\n}",
+        "SEM001",
+        "unknown_identifier",
+    );
+}
+
+#[test]
+fn arm_not_member_leaves_members_wildcard_and_default_valid() {
+    crate::test_support::assert_accepts(&format!(
+        "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Circulus fixum r et Punctum {{ nota r }}\n        casu Punctum et _ {{ nota 1 }}\n        casu Quadratum fixum s et _ {{ nota s }}\n        ceterum {{ nota 3 }}\n    }}\n}}"
+    ));
+    crate::test_support::assert_accepts(&format!(
+        "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    discerne c {{\n        casu Rubrum aut Viridis {{ nota 1 }}\n        ceterum {{ nota 2 }}\n    }}\n}}"
+    ));
+    crate::test_support::assert_accepts(&format!(
+        "{ARM_COLOR}\nfunctio f(Color c) → vacuum {{\n    discerne omnia c {{\n        casu Rubrum {{ nota 1 }}\n        casu Viridis {{ nota 2 }}\n    }}\n}}"
+    ));
+}
