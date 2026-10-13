@@ -1169,6 +1169,15 @@ fn generic_arg_is_ascii_format_hint(
     }
 }
 
+/// Signature of one sized-word lowering entry ([`crate::numeric_width`]'s
+/// `lower_modular_word`/`lower_trapping_word`/`lower_saturating_word`).
+type WordLowering = fn(
+    &[TypeExpr],
+    &radix_lexer::Interner,
+    &mut radix_types::TypeTable,
+    &mut dyn FnMut(crate::numeric_width::WidthLowerIssue),
+) -> TypeId;
+
 impl Lowerer<'_> {
     fn lower_modular_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
         self.lower_word_type(params, crate::numeric_width::lower_modular_word)
@@ -1184,16 +1193,7 @@ impl Lowerer<'_> {
 
     /// Lower one sized word wrapper (`modulus`/`saturatus`/`exactus`) and
     /// report its first width-lowering issue, if any.
-    fn lower_word_type(
-        &mut self,
-        params: &[GenericArgExpr],
-        lower: fn(
-            &[TypeExpr],
-            &radix_lexer::Interner,
-            &mut radix_types::TypeTable,
-            &mut dyn FnMut(crate::numeric_width::WidthLowerIssue),
-        ) -> TypeId,
-    ) -> TypeId {
+    fn lower_word_type(&mut self, params: &[GenericArgExpr], lower: WordLowering) -> TypeId {
         let Some(type_params) = generic_type_exprs(params) else {
             self.error("generic_size_argument_in_type_position");
             return self.types.intern(Type::Error);
