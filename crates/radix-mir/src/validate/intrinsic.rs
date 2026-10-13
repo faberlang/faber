@@ -185,7 +185,13 @@ impl Validator<'_, '_> {
                 );
             }
             MirIntrinsic::Convert(conversion) => {
-                self.require_arg_count(call.args.len(), 1, span, "conversion runtime call");
+                // A byte string read as a tensor with run-time extents
+                // carries the target's shape as a second operand.
+                if let [_, shape] = call.args.as_slice() {
+                    self.validate_conversion_shape_operand(scope, conversion, shape, span);
+                } else {
+                    self.require_arg_count(call.args.len(), 1, span, "conversion runtime call");
+                }
                 self.validate_mir_type(conversion.source_ty, span);
                 self.validate_mir_type(conversion.target_ty, span);
                 self.require_assignable(
@@ -676,6 +682,43 @@ impl Validator<'_, '_> {
                     | Primitive::Textus
             )
         )
+    }
+
+    /// The second operand of `octeti ↦ tensor<E, [.., size n]>`: an integer
+    /// list the runner reads the extents from, since a run-time extent is a
+    /// value and not a literal in the target type.
+    fn validate_conversion_shape_operand(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        conversion: &MirConversion,
+        shape: &MirOperand,
+        span: Span,
+    ) {
+        let octeti_source = match self.type_kind(conversion.source_ty) {
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => true,
+            Type::Array(element) => {
+                matches!(
+                    self.context.types.get(*element),
+                    Type::Bits(radix_types::BitsWidth::B8)
+                )
+            }
+            _ => false,
+        };
+        let tensor_target = matches!(self.type_kind(conversion.target_ty), Type::Tensor(_, _));
+        if !(octeti_source && tensor_target) {
+            self.error(
+                span,
+                "conversion shape operand is only valid for octeti to tensor",
+            );
+        }
+        if let Some(shape_ty) = self.validate_operand(scope, shape, span)
+            && !radix_types::numeric_width::is_integer_index_vector(
+                self.context.types.as_table(),
+                shape_ty.semantic_id(),
+            )
+        {
+            self.error(span, "conversion shape operand is not an integer list");
+        }
     }
 
     pub(crate) fn validate_conversion_struct_defaults(

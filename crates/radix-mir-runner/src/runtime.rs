@@ -947,8 +947,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         args: &[MirOperand],
         span: Span,
     ) -> Result<Value, RunnerError> {
-        let [source] = args else {
-            return Err(RunnerError::internal(span, "conversion runtime arity"));
+        let (source, shape) = match args {
+            [source] => (source, None),
+            // `octeti ↦ tensor<E, [.., size n]>`: the run-time extents.
+            [source, shape] => (source, Some(self.conversion_shape_arg(shape, span)?)),
+            _ => return Err(RunnerError::internal(span, "conversion runtime arity")),
         };
         let value = self.eval_operand(source, span)?;
         if matches!(value, Value::Nil)
@@ -964,7 +967,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         match conversion.flavor {
             MirConversionFlavor::Cast => self.eval_cast(value, &conversion.target_ty, span),
-            MirConversionFlavor::Runtime => self.eval_runtime_convert(conversion, value, span),
+            MirConversionFlavor::Runtime => match shape {
+                Some(shape) => self.eval_runtime_convert_shaped(conversion, value, shape, span),
+                None => self.eval_runtime_convert(conversion, value, span),
+            },
         }
     }
 

@@ -23,8 +23,9 @@ use radix_types::{NumericWidth, Type, TypeId, effective_width};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Stable issue for a non-literal (runtime) extent: outside this row today.
-const RUNTIME_EXTENT_ISSUE: &str = "octeti_tensor_runtime_extent_unsupported";
+/// Stable issue for a target with run-time extents that arrived without its
+/// shape operand: lowering always supplies one, so this is an invariant break.
+const SHAPE_OPERAND_MISSING_ISSUE: &str = "octeti_tensor_shape_operand_missing";
 
 /// Elements that decode into boxed `Values` (no `DenseKind`).
 #[derive(Clone, Copy)]
@@ -79,6 +80,9 @@ macro_rules! decode_vec {
 impl<H: Host + ?Sized> Runner<'_, H> {
     /// Convert `Value::Octeti(bytes)` into the tensor `target_ty` names.
     ///
+    /// `shape` is the evaluated shape operand of a target with run-time
+    /// extents; a literal target reads its dims from the type instead.
+    ///
     /// A wrong byte length is the recoverable `runner_conversion` failure with
     /// issue `runner_octeti_tensor_length_mismatch` (`⊥`, `fac/cape`, `⇥`
     /// route through [`Runner::recover_or_fail`] exactly like the scalar row).
@@ -86,6 +90,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         &mut self,
         bytes: Vec<u8>,
         target_ty: TypeId,
+        shape: Option<Vec<i64>>,
         params: &[Symbol],
         recovery: Option<&MirOperand>,
         span: Span,
@@ -97,11 +102,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             ));
         };
         let element_ty = *element_ty;
-        let Some(shape) = literal_tensor_dims(target_ty, self.types) else {
+        let Some(shape) = literal_tensor_dims(target_ty, self.types).or(shape) else {
             return Err(RunnerError::internal_with_issue(
                 span,
-                "octeti tensor conversio needs literal extents",
-                RUNTIME_EXTENT_ISSUE,
+                "octeti tensor conversio needs a shape operand for run-time extents",
+                SHAPE_OPERAND_MISSING_ISSUE,
             ));
         };
         let Some(element) = self.octeti_tensor_element(element_ty) else {

@@ -10,7 +10,7 @@ use radix_mir::{
     MirBlockId, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram, MirType,
     MirValidationContext,
 };
-use radix_types::{IndexExpr, NumericWidth, Primitive, TypeId, TypeTable};
+use radix_types::{DefId, IndexExpr, NumericWidth, Primitive, RuntimeExtentId, TypeId, TypeTable};
 
 /// Run one `octeti ↦ tensor<element, dims> via hint` conversion.
 fn convert(
@@ -20,14 +20,28 @@ fn convert(
     hint: &str,
     recovery: Option<&MirOperand>,
 ) -> Result<Value, RunnerError> {
+    let extents: Vec<_> = dims.iter().map(|dim| IndexExpr::Literal(*dim)).collect();
+    convert_extents(bytes, element, extents, None, hint, recovery)
+}
+
+/// Run the conversion over a target whose extents are `extents`, with the
+/// evaluated shape operand `shape` a run-time extent needs.
+fn convert_extents(
+    bytes: Vec<u8>,
+    element: (Primitive, NumericWidth),
+    extents: Vec<IndexExpr>,
+    shape: Option<Vec<i64>>,
+    hint: &str,
+    recovery: Option<&MirOperand>,
+) -> Result<Value, RunnerError> {
     let mut types = TypeTable::new();
     let element_ty = types.sized_numeric(element.0, element.1);
-    let dim_ids: Vec<_> = dims
-        .iter()
-        .map(|dim| types.intern_index(IndexExpr::Literal(*dim)))
+    let dim_ids: Vec<_> = extents
+        .into_iter()
+        .map(|extent| types.intern_index(extent))
         .collect();
-    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
-    let target = types.tensor_with_shape(element_ty, shape);
+    let shape_index = types.intern_index(IndexExpr::Tuple(dim_ids));
+    let target = types.tensor_with_shape(element_ty, shape_index);
     let mut interner = Interner::new();
     let hint_sym = interner.intern(hint);
     let context = MirValidationContext::new(&types);
@@ -51,7 +65,7 @@ fn convert(
     let mut runner = crate::Runner::new(&program, &context, &types, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
     runner.push_frame(fn0.id, MirBlockId(0));
-    runner.convert_octeti_to_tensor(bytes, target, &[hint_sym], recovery, Span::default())
+    runner.convert_octeti_to_tensor(bytes, target, shape, &[hint_sym], recovery, Span::default())
 }
 
 const F32: (Primitive, NumericWidth) = (Primitive::Fractus, NumericWidth::F32);
@@ -74,6 +88,68 @@ fn f32_bits(value: Value) -> Vec<u32> {
 
 fn le_bytes_of(bits: &[u32]) -> Vec<u8> {
     bits.iter().flat_map(|b| b.to_le_bytes()).collect()
+}
+
+/// A `[2, size n]` target: the second extent is a binding the type table
+/// cannot resolve, so the decode reads it from the shape operand.
+fn runtime_extents() -> Vec<IndexExpr> {
+    vec![
+        IndexExpr::Literal(2),
+        IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(DefId(7))),
+    ]
+}
+
+#[test]
+fn octeti_tensor_runtime_extent_reads_the_shape_operand() {
+    let bits: Vec<u32> = (0..6).map(|i| 0x4000_0000 + i).collect();
+    let value = convert_extents(
+        le_bytes_of(&bits),
+        F32,
+        runtime_extents(),
+        Some(vec![2, 3]),
+        "Le",
+        None,
+    )
+    .expect("run-time extent decode");
+    let t = tensor(value);
+    assert_eq!(t.borrow().shape, vec![2, 3]);
+    assert_eq!(t.borrow().data.kind(), Some(DenseKind::F32));
+    assert_eq!(f32_bits(Value::Tensor(t)), bits);
+}
+
+#[test]
+fn octeti_tensor_runtime_extent_length_mismatch_is_recoverable() {
+    // 24 bytes against a [2, 2] shape operand: 16 bytes expected.
+    let err = convert_extents(
+        vec![0_u8; 24],
+        F32,
+        runtime_extents(),
+        Some(vec![2, 2]),
+        "Le",
+        None,
+    )
+    .expect_err("wrong length");
+    assert_eq!(err.code, "runner_conversion");
+    assert_eq!(err.issue, "runner_octeti_tensor_length_mismatch");
+    let recovery = MirOperand::Constant(MirConstant::Int(42));
+    let value = convert_extents(
+        vec![0_u8; 24],
+        F32,
+        runtime_extents(),
+        Some(vec![2, 2]),
+        "Le",
+        Some(&recovery),
+    )
+    .expect("recovered");
+    assert_eq!(value, Value::Int(42));
+}
+
+#[test]
+fn octeti_tensor_runtime_extent_without_shape_operand_is_internal() {
+    let err = convert_extents(vec![0_u8; 24], F32, runtime_extents(), None, "Le", None)
+        .expect_err("no shape operand");
+    assert_eq!(err.code, "runner_internal");
+    assert_eq!(err.issue, "octeti_tensor_shape_operand_missing");
 }
 
 #[test]
@@ -323,7 +399,7 @@ fn round_trip(
     let fn0 = program.functions.first().unwrap();
     runner.push_frame(fn0.id, MirBlockId(0));
     let decoded = runner
-        .convert_octeti_to_tensor(bytes, tensor_ty, &[hint_sym], None, Span::default())
+        .convert_octeti_to_tensor(bytes, tensor_ty, None, &[hint_sym], None, Span::default())
         .expect("octeti to tensor");
     let tensor = tensor(decoded);
     let encoded = runner

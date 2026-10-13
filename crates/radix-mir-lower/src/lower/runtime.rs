@@ -89,6 +89,9 @@ fn recovery_contains_call(recovery: &HirExpression) -> bool {
 
 struct HandledConversio<'a> {
     source: MirOperand,
+    /// The run-time shape of an `octeti ↦ tensor` target, as the conversion's
+    /// second operand (see [`FunctionBuilder::lower_octeti_tensor_shape`]).
+    shape: Option<(MirOperand, MirType)>,
     source_ty: MirType,
     target: TypeId,
     params: &'a [Symbol],
@@ -3726,8 +3729,25 @@ impl FunctionBuilder<'_> {
             return self.lower_rectangular_lista_literal_to_tensor_conversio(source, target, ty, expr.span);
         }
 
+        // `octeti ↦ tensor<E, [.., size n]>`: the extents are values, not
+        // type-table literals. The shape travels as a second operand, built
+        // from the declared target (whose extents name the bindings); the
+        // conversion itself targets the expression's own type, which is the
+        // tensor type validation compares the result against.
+        let declared_target = target;
+        let runtime_extent_tensor = self.is_octeti_runtime_extent_tensor(source_type_id, declared_target);
+        let target = if runtime_extent_tensor {
+            ty.semantic_id()
+        } else {
+            declared_target
+        };
         let conversion_source_ty = self.lowered_conversio_source_ty(source, source_type_id, target);
         let source = self.lower_conversio_source(source, target)?;
+        let shape = if runtime_extent_tensor {
+            Some(self.lower_octeti_tensor_shape(source.clone(), declared_target, expr.span)?)
+        } else {
+            None
+        };
         let struct_defaults = self.valor_genus_struct_defaults(source_type_id, target, expr.span)?;
         let conversion_block = self.current;
         let lowered_recovery = match recovery {
@@ -3742,6 +3762,7 @@ impl FunctionBuilder<'_> {
         {
             return Some(self.lower_handled_conversio(HandledConversio {
                 source,
+                shape,
                 source_ty: conversion_source_ty,
                 target,
                 params,
@@ -3762,7 +3783,9 @@ impl FunctionBuilder<'_> {
                     .map(|(operand, _)| operand.clone()),
                 struct_defaults,
             }),
-            vec![source],
+            std::iter::once(source)
+                .chain(shape.map(|(operand, _)| operand))
+                .collect(),
             ty,
             expr.span,
         );
@@ -4193,6 +4216,35 @@ impl FunctionBuilder<'_> {
         ))
     }
 
+    /// Whether `source_ty ↦ target` is the byte-string-to-tensor row with an
+    /// extent that is bound at run time (`size n`). The runner reads a literal
+    /// shape from the target type but cannot read a run-time one from it.
+    fn is_octeti_runtime_extent_tensor(&self, source_ty: TypeId, target: TypeId) -> bool {
+        let Type::Tensor(_, shape) = self.normalized_type(target) else {
+            return false;
+        };
+        let octeti_source = match self.normalized_type(source_ty) {
+            Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. } => true,
+            Type::Array(element) => matches!(self.normalized_type(*element), Type::Bits(radix_types::BitsWidth::B8)),
+            _ => false,
+        };
+        octeti_source && index_contains_runtime_extent(self.types, *shape, &mut FxHashSet::default())
+    }
+
+    /// The shape operand of [`Self::is_octeti_runtime_extent_tensor`]: the
+    /// same `lista<numerus>` the `TensorFromFlat` conversion carries, paired
+    /// with its type so a handled-conversio helper can declare the parameter.
+    fn lower_octeti_tensor_shape(
+        &mut self,
+        source: MirOperand,
+        target: TypeId,
+        span: Span,
+    ) -> Option<(MirOperand, MirType)> {
+        let shape = self.lower_lista_to_tensor_shape(source, target, span)?;
+        let shape_ty = MirType::semantic(lista_numerus_type(self.types)?);
+        Some((shape, shape_ty))
+    }
+
     fn lower_lista_to_tensor_shape(&mut self, flat: MirOperand, target: TypeId, span: Span) -> Option<MirOperand> {
         self.lower_lista_to_tensor_shape_with_expression(flat, target, None, span)
     }
@@ -4339,15 +4391,21 @@ impl FunctionBuilder<'_> {
     }
 
     fn lower_handled_conversio(&mut self, request: HandledConversio<'_>) -> MirOperand {
-        let HandledConversio { source, source_ty, target, params, return_ty, handler, span } = request;
-        let callee = self.push_conversio_helper(source_ty, target, params, return_ty, handler.error_ty, span);
+        let HandledConversio { source, shape, source_ty, target, params, return_ty, handler, span } = request;
+        let param_tys: Vec<MirType> = std::iter::once(source_ty)
+            .chain(shape.as_ref().map(|(_, ty)| *ty))
+            .collect();
+        let args: Vec<MirOperand> = std::iter::once(source)
+            .chain(shape.map(|(operand, _)| operand))
+            .collect();
+        let callee = self.push_conversio_helper(&param_tys, target, params, return_ty, handler.error_ty, span);
         let ok_block = self.fresh_block(span);
         if self.is_vacuum(return_ty) {
             self.terminate_current(
                 MirTerminatorKind::TryCall {
                     destination: None,
                     callee: MirCallee::Function(callee),
-                    args: vec![source],
+                    args,
                     ok_block,
                     error_place: handler.error_place,
                     error_block: handler.error_block,
@@ -4363,7 +4421,7 @@ impl FunctionBuilder<'_> {
             MirTerminatorKind::TryCall {
                 destination: Some(MirPlace::temp(destination)),
                 callee: MirCallee::Function(callee),
-                args: vec![source],
+                args,
                 ok_block,
                 error_place: handler.error_place,
                 error_block: handler.error_block,
@@ -4374,9 +4432,12 @@ impl FunctionBuilder<'_> {
         MirOperand::Temp(destination)
     }
 
+    /// A synthetic function that runs one `Convert` and returns its result.
+    /// `param_tys` is the source type, then the shape type when the target
+    /// has run-time extents; each is a parameter of the helper.
     fn push_conversio_helper(
         &mut self,
-        source_ty: MirType,
+        param_tys: &[MirType],
         target: TypeId,
         params: &[Symbol],
         return_ty: MirType,
@@ -4396,13 +4457,18 @@ impl FunctionBuilder<'_> {
             self.device_role,
             None,
         );
-        let param = nested.next_local_id();
-        nested
-            .params
-            .push(MirParam { local: param, name: None, ty: source_ty, mode: MirParamMode::Owned, span });
-        nested
-            .locals
-            .push(MirLocalDecl { id: param, name: None, ty: source_ty, mutable: false, span });
+        let mut args = Vec::with_capacity(param_tys.len());
+        for ty in param_tys {
+            let param = nested.next_local_id();
+            nested
+                .params
+                .push(MirParam { local: param, name: None, ty: *ty, mode: MirParamMode::Owned, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: param, name: None, ty: *ty, mutable: false, span });
+            args.push(MirOperand::Place(MirPlace::local(param)));
+        }
+        let source_ty = param_tys[0];
 
         let entry = nested.fresh_block(span);
         nested.switch_to(entry);
@@ -4418,7 +4484,7 @@ impl FunctionBuilder<'_> {
                 recovery: None,
                 struct_defaults: Vec::new(),
             }),
-            vec![MirOperand::Place(MirPlace::local(param))],
+            args,
             return_ty,
             span,
         );

@@ -78,6 +78,39 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         )
     }
 
+    /// `octeti ↦ tensor<E, [.., size n]>`: the conversion carries the target's
+    /// evaluated `shape` as a second operand, because a run-time extent is a
+    /// value and cannot be read from the target type the way a literal is.
+    pub(crate) fn eval_runtime_convert_shaped(
+        &mut self,
+        conversion: &MirConversion,
+        value: Value,
+        shape: Vec<i64>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let bytes = match value {
+            Value::Octeti(bytes) => bytes,
+            Value::Array(cell) if self.is_bytes_list_type(conversion.source_ty.semantic_id()) => {
+                bytes_of_list(&cell.borrow(), span)?
+            }
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("conversion shape operand on a non-byte source: {other:?}"),
+                ));
+            }
+        };
+        let target_ty = self.resolve_conversion_target(conversion.target_ty.semantic_id());
+        self.convert_octeti_to_tensor(
+            bytes,
+            target_ty,
+            Some(shape),
+            &conversion.params,
+            conversion.recovery.as_ref(),
+            span,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn convert_to_target(
         &mut self,
@@ -257,7 +290,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // `octeti ↦ tensor<E, [shape]> via Le|Be`: faithful bulk
                 // reinterpretation; the `via` hint rides in `params`.
                 Value::Octeti(bytes) if matches!(target, Type::Tensor(_, _)) => {
-                    self.convert_octeti_to_tensor(bytes, target_ty, params, recovery, span)
+                    self.convert_octeti_to_tensor(bytes, target_ty, None, params, recovery, span)
                 }
                 // The same row over a `lista<b8>` value held as a list of
                 // byte patterns (need: `octeti` is `lista<b8>`).
@@ -265,19 +298,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     if matches!(target, Type::Tensor(_, _))
                         && self.is_bytes_list_type(source_ty) =>
                 {
-                    let mut bytes = Vec::with_capacity(cell.borrow().len());
-                    for item in cell.borrow().iter() {
-                        let Some(byte) =
-                            bits_pattern(item).and_then(|pattern| u8::try_from(pattern).ok())
-                        else {
-                            return Err(RunnerError::internal(
-                                span,
-                                "bytes tensor conversio met an element that is not a byte",
-                            ));
-                        };
-                        bytes.push(byte);
-                    }
-                    self.convert_octeti_to_tensor(bytes, target_ty, params, recovery, span)
+                    let bytes = bytes_of_list(&cell.borrow(), span)?;
+                    self.convert_octeti_to_tensor(bytes, target_ty, None, params, recovery, span)
                 }
                 value => self.convert_to_eager_sequence(value, target_ty, struct_defaults, span),
             },
@@ -360,6 +382,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         target_ty
     }
+}
+
+/// The bytes of a `lista<b8>` value held as a list of byte patterns.
+fn bytes_of_list(items: &[Value], span: Span) -> Result<Vec<u8>, RunnerError> {
+    items
+        .iter()
+        .map(|item| bits_pattern(item).and_then(|pattern| u8::try_from(pattern).ok()))
+        .collect::<Option<Vec<u8>>>()
+        .ok_or_else(|| {
+            RunnerError::internal(
+                span,
+                "bytes tensor conversio met an element that is not a byte",
+            )
+        })
 }
 
 fn is_signed_width(width: NumericWidth) -> bool {

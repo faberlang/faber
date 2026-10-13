@@ -689,6 +689,7 @@ pub fn lower_analyzed_unit(
     ensure_map_iteration_array_types(&mut types);
     ensure_itera_coordinate_array_types(unit.hir, &mut types);
     ensure_tensor_bracket_index_array_types(unit.hir, &mut types);
+    ensure_runtime_extent_shape_array_type(&mut types);
     if options.kernel_lowering == KernelLowering::Device {
         lane_form::ensure_lane_word_type(&mut types);
     }
@@ -1253,6 +1254,28 @@ fn ensure_map_iteration_array_types(types: &mut TypeTable) {
     }
     for element in elements {
         types.ensure_array(element);
+    }
+}
+
+/// A tensor with a run-time extent can be the target of `octeti ↦ tensor`,
+/// whose shape operand is a `lista<numerus>`. Lowering holds the type table
+/// immutably, so the list type is interned here, once, when any tensor type
+/// names a run-time extent.
+fn ensure_runtime_extent_shape_array_type(types: &mut TypeTable) {
+    let mut seen = FxHashSet::default();
+    let has_runtime_extent = (0..types.type_count()).any(|index| {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "TypeId is u32 by design; type_count is bounded by u32::MAX"
+        )]
+        match types.get(TypeId(index as u32)) {
+            Type::Tensor(_, shape) => index_contains_runtime_extent(types, *shape, &mut seen),
+            _ => false,
+        }
+    });
+    if has_runtime_extent {
+        let numerus = types.primitive(Primitive::Numerus);
+        types.ensure_array(numerus);
     }
 }
 
