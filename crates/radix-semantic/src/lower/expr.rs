@@ -1536,7 +1536,15 @@ impl Lowerer<'_> {
                 target,
                 entries: Some(Vec::new()),
             }
-        } else if let radix_syntax::ExprKind::Object(object) = &verte.expr.kind {
+        } else if let Some(object) = match &verte.expr.kind {
+            radix_syntax::ExprKind::Object(object) => Some(object),
+            // WHY: `{ f = v } ∷ Genus` is `Genus { f = v }` (constructor =
+            // type + shape), so the ascribed field literal takes the genus
+            // instead of nesting a hole construction under an ascription
+            // whose own entries would be missing in MIR.
+            _ => Self::ascribed_field_hole(&verte.expr)
+                .filter(|_| self.ascription_target_is_genus(target)),
+        } {
             let mut entries = Vec::new();
             for field in &object.fields {
                 entries.push(self.lower_object_field(field));
@@ -1560,6 +1568,21 @@ impl Lowerer<'_> {
                 target,
                 entries: None,
             }
+        }
+    }
+
+    /// The field list of a bare field literal `{ f = v }` or `_ { f = v }`:
+    /// the parser's hole constructor, an `Infer`-typed `Verte` over an object.
+    fn ascribed_field_hole(expr: &radix_syntax::Expr) -> Option<&radix_syntax::ObjectExpr> {
+        let radix_syntax::ExprKind::Verte(hole) = &expr.kind else {
+            return None;
+        };
+        if !matches!(hole.ty.kind, radix_syntax::TypeExprKind::Infer) {
+            return None;
+        }
+        match &hole.expr.kind {
+            radix_syntax::ExprKind::Object(object) => Some(object),
+            _ => None,
         }
     }
 

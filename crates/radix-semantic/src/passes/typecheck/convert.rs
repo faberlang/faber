@@ -3384,9 +3384,26 @@ impl TypeChecker<'_> {
                 ));
         let effective_target =
             self.effective_constructor_target(target_resolved, expected, constructor_source);
+        // WHY: a quoted-key JSON literal is `json` data, not a genus value, so
+        // `{ "k": v } ∷ Genus` names the entries-need-a-map error exactly as
+        // `_ { "k": v }` does. The empty literal is the genus construction and
+        // reaches here as `entries`, never as a JSON source.
+        let json_entries_for_genus = entries.is_none()
+            && matches!(
+                &source.kind,
+                HirExpressionKind::Literal(HirLiteral::JsonValor(radix_syntax::JsonValue::Object(
+                    _
+                )))
+            )
+            && self.is_genus_ascription_target(target_resolved);
 
         if let Some(result) = self.check_verte_object_entries(effective_target, entries, span) {
             return result;
+        }
+        if json_entries_for_genus {
+            self.invalid_conversion(ISSUE_INFERRED_CONSTRUCTOR_ENTRIES_NEED_MAP, span);
+            // The named error stands alone: the node takes the target's type.
+            return effective_target;
         }
 
         // WHY: an empty list has no element evidence to check in the array
@@ -3592,6 +3609,20 @@ impl TypeChecker<'_> {
             return false;
         };
         self.variant_parent.contains_key(def_id)
+    }
+
+    /// Whether a resolved type is a genus (bare or applied struct), the only
+    /// ascription target that a keyed literal constructs.
+    fn is_genus_ascription_target(&self, ty: TypeId) -> bool {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.get(resolved) {
+            Type::Struct(_) => true,
+            Type::Applied(base, _) => matches!(
+                self.types.get(self.resolve_inferred_type(*base)),
+                Type::Struct(_)
+            ),
+            _ => false,
+        }
     }
 
     /// Whether a resolved type is a struct/enum construction target (bare or
