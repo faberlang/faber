@@ -223,6 +223,10 @@ tuus = "รับ"
 message = "ชุดภาษา '{pack}' พบการสะกดที่คล้ายคำสำคัญ '{spelling}'"
 help = "ใช้ '{suggestion}' หากตั้งใจหมายถึงคำสำคัญ; '{spelling}' เป็นชื่อที่ใช้ได้ตามที่เขียน"
 
+[diagnostics.LOCALE002.issues.source_reads_as_other_locale]
+message = "ซอร์สไม่ได้ประกาศ locale และคำสำคัญของมันอ่านเหมือน '{detected}'"
+help = "ประกาศ locale ด้วย frontmatter `+++ locale = \"{detected}\" +++` หรือส่ง `--locale {detected}`; หมายเหตุนี้ไม่ได้เลือก locale ให้"
+
 [diagnostics.LOCALE004]
 message = "ตัวระบุ '{identifier}' ผสมหลายสคริปต์: {scripts}"
 help = "ตรวจหาอักขระที่มีรูปคล้ายกันจากอักษรอื่น; ชื่อนี้ยังใช้ได้ตามที่เขียน"
@@ -746,6 +750,10 @@ help = "ตรวจไวยากรณ์การนำเข้า"
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "ฟิลด์การนำเข้าไม่รู้จัก"
 help = "ใช้ ex, visibilitas, nomen, ut หรือ omnia"
+
+[diagnostics.PARSE050.issues.duplicate_import_field]
+message = "ฟิลด์การนำเข้า `{field}` ซ้ำ"
+help = "แต่ละฟิลด์การนำเข้าปรากฏได้เพียงครั้งเดียว; ลบฟิลด์ที่ซ้ำออก"
 
 [diagnostics.PARSE050.issues.missing_import_source]
 message = "เรกคอร์ดการนำเข้าต้องมีแหล่งที่มา ex"
@@ -3509,247 +3517,247 @@ message = "ต้องมี ']' หลังมิติรูปร่าง"
 message = "ต้องมี ')' หลังรูปร่างในวงเล็บ"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
-message = "expected '←' after the awaited binding"
+message = "ต้องมี '←' หลัง binding ที่ค้าง"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
-message = "expected '[' to start the array binding pattern"
+message = "ต้องมี '[' เปิดแพตเทิร์น binding ของอาร์เรย์"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
-message = "expected ']' to end the array binding pattern"
+message = "ต้องมี ']' ปิดแพตเทิร์น binding ของอาร์เรย์"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
-message = "expected an opening brace for the object binding pattern"
+message = "ต้องมีวงเล็บปีกกาเปิดแพตเทิร์น binding ของออบเจ็กต์"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
-message = "expected a closing brace for the object binding pattern"
+message = "ต้องมีวงเล็บปีกกาปิดแพตเทิร์น binding ของออบเจ็กต์"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
-message = "expected '(' before function declaration parameters"
+message = "ต้องมี '(' ก่อนพารามิเตอร์ของการประกาศฟังก์ชัน"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
-message = "expected ')' after function declaration parameters"
+message = "ต้องมี ')' หลังพารามิเตอร์ของการประกาศฟังก์ชัน"
 
 [diagnostics.PARSE001.issues.class_body_end]
-message = "expected a closing brace after the class body"
+message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี class"
 
 [diagnostics.PARSE001.issues.interface_body_start]
-message = "expected an opening brace for the interface body"
+message = "ต้องมีวงเล็บปีกกาเปิดบอดี interface"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
-message = "expected '(' before interface method parameters"
+message = "ต้องมี '(' ก่อนพารามิเตอร์ของเมธอด interface"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
-message = "expected ')' after interface method parameters"
+message = "ต้องมี ')' หลังพารามิเตอร์ของเมธอด interface"
 
 [diagnostics.PARSE001.issues.interface_body_end]
-message = "expected a closing brace after the interface body"
+message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี interface"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
-message = "expected '=' before the type alias value"
+message = "ต้องมี '=' ก่อนค่าของ type alias"
 
 [diagnostics.PARSE001.issues.schema_body_start]
-message = "expected an opening brace for the schema body"
+message = "ต้องมีวงเล็บปีกกาเปิดบอดี schema"
 
 [diagnostics.PARSE001.issues.schema_body_end]
-message = "expected a closing brace after the schema body"
+message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี schema"
 
 [diagnostics.PARSE001.issues.enum_body_start]
-message = "expected an opening brace for the enum body"
+message = "ต้องมีวงเล็บปีกกาเปิดบอดี enum"
 
 [diagnostics.PARSE001.issues.enum_body_end]
-message = "expected a closing brace after the enum body"
+message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี enum"
 
 [diagnostics.PARSE001.issues.union_body_start]
-message = "expected an opening brace for the union body"
+message = "ต้องมีวงเล็บปีกกาเปิดบอดี union"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
-message = "expected a closing brace after the union variant fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ variant ของ union"
 
 [diagnostics.PARSE001.issues.union_body_end]
-message = "expected a closing brace after the union body"
+message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี union"
 
 [diagnostics.PARSE001.issues.import_record_start]
-message = "expected an opening brace for the import record"
+message = "ต้องมีวงเล็บปีกกาเปิดเรกคอร์ดการนำเข้า"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
-message = "expected '=' after the import field name"
+message = "ต้องมี '=' หลังชื่อฟิลด์การนำเข้า"
 
 [diagnostics.PARSE001.issues.import_record_end]
-message = "expected a closing brace after the import record fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของเรกคอร์ดการนำเข้า"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
-message = "expected an opening brace for the probandum body"
+message = "ต้องมีวงเล็บปีกกาเปิดบอดี probandum"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
-message = "expected a closing brace after the probandum body"
+message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี probandum"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
-message = "expected an opening brace for the annotation fields"
+message = "ต้องมีวงเล็บปีกกาเปิดฟิลด์ annotation"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
-message = "expected '=' after the annotation field name"
+message = "ต้องมี '=' หลังชื่อฟิลด์ annotation"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
-message = "expected a closing brace after the annotation fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ annotation"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
-message = "expected an opening brace for the nucleum annotation fields"
+message = "ต้องมีวงเล็บปีกกาเปิดฟิลด์ annotation ของ nucleum"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
-message = "expected '=' after the nucleum annotation field name"
+message = "ต้องมี '=' หลังชื่อฟิลด์ annotation ของ nucleum"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
-message = "expected a closing brace after the nucleum annotation fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ annotation ของ nucleum"
 
 [diagnostics.PARSE001.issues.block_start]
-message = "expected an opening brace for the block"
+message = "ต้องมีวงเล็บปีกกาเปิดบล็อก"
 
 [diagnostics.PARSE001.issues.block_end]
-message = "expected a closing brace to end the block"
+message = "ต้องมีวงเล็บปีกกาปิดบล็อก"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
-message = "expected '>' after generic parameters"
+message = "ต้องมี '>' หลังพารามิเตอร์ generic"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
-message = "expected '>' after contract type arguments"
+message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของ contract"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
-message = "expected '[' after 'apud'"
+message = "ต้องมี '[' หลัง 'apud'"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
-message = "expected ']' after the 'apud' coordinates"
+message = "ต้องมี ']' หลังพิกัด 'apud'"
 
 [diagnostics.PARSE001.issues.elige_body_start]
-message = "expected an opening brace for the elige body"
+message = "ต้องมีวงเล็บปีกกาเปิดบอดี elige"
 
 [diagnostics.PARSE001.issues.elige_body_end]
-message = "expected a closing brace after the elige cases"
+message = "ต้องมีวงเล็บปีกกาปิด หลังกรณีของ elige"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
-message = "expected an opening brace for the discerne body"
+message = "ต้องมีวงเล็บปีกกาเปิดบอดี discerne"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
-message = "expected a closing brace after the discerne arms"
+message = "ต้องมีวงเล็บปีกกาปิด หลังแขนงของ discerne"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
-message = "expected an opening brace for the custodi body"
+message = "ต้องมีวงเล็บปีกกาเปิดบอดี custodi"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
-message = "expected a closing brace after the custodi clauses"
+message = "ต้องมีวงเล็บปีกกาปิด หลังอนุประโยคของ custodi"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
-message = "expected '✗' after the conditional value"
+message = "ต้องมี '✗' หลังค่าของเงื่อนไข"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
-message = "expected ')' after the call arguments"
+message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียก"
 
 [diagnostics.PARSE001.issues.index_end]
-message = "expected ']' after the index expression"
+message = "ต้องมี ']' หลังนิพจน์ดัชนี"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
-message = "expected ']' after the gradient selectors"
+message = "ต้องมี ']' หลัง gradient selector"
 
 [diagnostics.PARSE001.issues.optional_index_end]
-message = "expected ']' after the optional index expression"
+message = "ต้องมี ']' หลังนิพจน์ดัชนีแบบ optional"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
-message = "expected ')' after the optional call arguments"
+message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียกแบบ optional"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
-message = "expected ']' after the non-null index expression"
+message = "ต้องมี ']' หลังนิพจน์ดัชนีแบบไม่เป็น null"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
-message = "expected ')' after the non-null call arguments"
+message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียกแบบไม่เป็น null"
 
 [diagnostics.PARSE001.issues.first_match_start]
-message = "expected '(' after 'primus_quem'"
+message = "ต้องมี '(' หลัง 'primus_quem'"
 
 [diagnostics.PARSE001.issues.first_match_source_separator]
-message = "expected ',' after the first-match source"
+message = "ต้องมี ',' หลังแหล่งที่มาของ first-match"
 
 [diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "expected the 'ubi' predicate tail"
+message = "ต้องมีส่วนท้าย predicate 'ubi'"
 
 [diagnostics.PARSE001.issues.first_match_end]
-message = "expected ')' after the first-match predicate"
+message = "ต้องมี ')' หลัง predicate ของ first-match"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
-message = "expected a closing brace after the constructor fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้าง"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
-message = "expected ']' after the inferred constructor elements"
+message = "ต้องมี ']' หลังองค์ประกอบของตัวสร้างที่อนุมาน"
 
 [diagnostics.PARSE001.issues.array_literal_end]
-message = "expected ']' after the array elements"
+message = "ต้องมี ']' หลังองค์ประกอบของอาร์เรย์"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
-message = "expected ')' after the parenthesized expression"
+message = "ต้องมี ')' หลังนิพจน์ในวงเล็บ"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
-message = "expected '<' after 'ratio'"
+message = "ต้องมี '<' หลัง 'ratio'"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
-message = "expected '>' after the ratio type arguments"
+message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของ ratio"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
-message = "expected an opening brace after the ratio type arguments"
+message = "ต้องมีวงเล็บปีกกาเปิด หลังอาร์กิวเมนต์ชนิดของ ratio"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
-message = "expected a closing brace after the ratio fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของ ratio"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
-message = "expected a closing brace after the typed constructor fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้างแบบมีชนิด"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
-message = "expected a closing brace after the finge fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของ finge"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
-message = "expected '<' after 'iuncta'"
+message = "ต้องมี '<' หลัง 'iuncta'"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
-message = "expected '[' after the iuncta type arguments"
+message = "ต้องมี '[' หลังอาร์กิวเมนต์ชนิดของ iuncta"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
-message = "expected ']' after the iuncta elements"
+message = "ต้องมี ']' หลังองค์ประกอบของ iuncta"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
-message = "expected ')' after the closure parameters"
+message = "ต้องมี ')' หลังพารามิเตอร์ clausura"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
-message = "expected '∴' after the closure signature"
+message = "ต้องมี '∴' หลังลายเซ็น clausura"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
-message = "expected ')' after the ad opener"
+message = "ต้องมี ')' หลังตัวเปิด ad"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
-message = "expected ':' after the argument label"
+message = "ต้องมี ':' หลังป้ายกำกับอาร์กิวเมนต์"
 
 [diagnostics.PARSE001.issues.computed_key_end]
-message = "expected ']' after the computed object key"
+message = "ต้องมี ']' หลังคีย์ออบเจ็กต์แบบคำนวณ"
 
 [diagnostics.PARSE001.issues.json_key_separator]
-message = "expected ':' after the JSON key"
+message = "ต้องมี ':' หลังคีย์ JSON"
 
 [diagnostics.PARSE001.issues.json_object_end]
-message = "expected a closing brace after the JSON object"
+message = "ต้องมีวงเล็บปีกกาปิด หลังออบเจ็กต์ JSON"
 
 [diagnostics.PARSE001.issues.json_array_end]
-message = "expected ']' after the JSON array"
+message = "ต้องมี ']' หลังอาร์เรย์ JSON"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
-message = "expected a closing brace after the inferred constructor fields"
+message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้างที่อนุมาน"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
-message = "expected '>' after the call type arguments"
+message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของการเรียก"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
-message = "expected '<' before the constructor type arguments"
+message = "ต้องมี '<' ก่อนอาร์กิวเมนต์ชนิดของตัวสร้าง"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
-message = "expected '>' after the constructor type arguments"
+message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของตัวสร้าง"
 
 [diagnostics.PARSE001.issues.scriptum_start]
-message = "expected '(' after 'scriptum'"
+message = "ต้องมี '(' หลัง 'scriptum'"
 
 [diagnostics.PARSE001.issues.scriptum_end]
-message = "expected ')' after the scriptum arguments"
+message = "ต้องมี ')' หลังอาร์กิวเมนต์ของ scriptum"
