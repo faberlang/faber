@@ -1,0 +1,35 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "expression", "literal", "cast_expr", "member_suffix", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A non-empty keyed brace literal ascribed with `∷` builds the class; a bare `{ field = value }` takes a class cell."
+syntax = "<type> <name> ← { <field> = <value>, … } ∷ <Class>"
+related = ["genus"]
+locale = "la"
++++
+# =============================================================================
+# genus — non-empty literal ascription
+# =============================================================================
+#
+# What this teaches:
+#   • `{ field = value, … } ∷ Class` is the same value as `Class { field = value, … }`.
+#   • A bare `{ field = value }` into a typed cell takes the cell's class.
+#   • A field left out of the literal keeps its declared default.
+#
+# See also: genus
+# =============================================================================
+
+genus Calc {
+    varia bivalens flag = falsum
+    varia numerus ∪ nihil bonus = nulla
+}
+
+incipit {
+    fixum Calc a ← { flag = verum, bonus = nulla } ∷ Calc
+    fixum Calc b ← { flag = falsum }
+    nota a.flag
+    nota b.flag
+    nota a.bonus
+}
