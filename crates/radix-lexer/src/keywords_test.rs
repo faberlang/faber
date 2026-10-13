@@ -223,6 +223,19 @@ fn token_spelling_lookup_uses_registry_text() {
 }
 
 #[test]
+fn alias_rows_sharing_an_identity_resolve_token_lookup_to_the_canonical_row() {
+    // `conversion` is an alias of `conversio` and both rows carry
+    // `TokenKind::Conversio`; the token→spec index keeps the later row, so the
+    // canonical row must stay declared after its alias.
+    assert_eq!(keyword_token_kind("conversion"), Some(TokenKind::Conversio));
+    assert_eq!(keyword_token_kind("conversio"), Some(TokenKind::Conversio));
+    assert_eq!(
+        keyword_spelling_for_token(&TokenKind::Conversio),
+        Some("conversio")
+    );
+}
+
+#[test]
 fn contextual_keywords_are_identifier_like_only_for_owners() {
     // Structural/modifier owners keep per-keyword gating.
     assert_eq!(
@@ -485,9 +498,8 @@ fn non_keyword_token_returns_none_spelling() {
 }
 
 #[test]
-fn unknown_owner_returns_none_from_allowed_as_ident() {
-    // A completely unknown keyword spelling (not in registry) returns None
-    // regardless of owner.
+fn unregistered_token_kind_returns_none_from_allowed_as_ident() {
+    // A token kind with no registry row returns None regardless of owner.
     assert_eq!(
         keyword_allowed_as_ident(KeywordOwner::DeclarationName, &TokenKind::Integer(0)),
         None
