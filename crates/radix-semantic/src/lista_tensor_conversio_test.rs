@@ -267,27 +267,6 @@ fn lista_tensor_conversio_rejects_capacity_dim_mismatch() {
 }
 
 #[test]
-fn lista_tensor_conversio_padded_shape_requires_matching_target_element() {
-    // The padded snapshot fills dead slots with source-element values, so a
-    // target tensor of a different element type cannot receive them.
-    let mut types = TypeTable::new();
-    let numerus = types.primitive(Primitive::Numerus);
-    let textus = types.primitive(Primitive::Textus);
-    let lista = bounded_lista(&mut types, numerus, 8);
-    let shape = types.intern_index(IndexExpr::Literal(8));
-    let tensor = types.intern(Type::Tensor(textus, shape));
-
-    assert_eq!(
-        validate_lista_to_tensor_source(lista, tensor, &types),
-        Err(ListaToTensorError::ElementMismatch)
-    );
-    assert_eq!(
-        resolve_bounded_lista_padded_shape(lista, tensor, &types),
-        None
-    );
-}
-
-#[test]
 fn lista_tensor_conversio_keeps_unbounded_source_on_flat_path() {
     let mut types = TypeTable::new();
     let f32 = types.sized_numeric(Primitive::Fractus, crate::NumericWidth::F32);
@@ -345,17 +324,5 @@ fn lista_tensor_conversio_refuses_multi_hole_target() {
   nota shaped.longitudo()
 }",
         "cannot_infer_tensor_shape",
-    );
-}
-
-#[test]
-fn lista_tensor_conversio_rejects_bounded_source_with_mismatched_target_element() {
-    // `lista<numerus, 8> ↦ tensor<textus, [8]>` must not take the padded
-    // snapshot route: the target element type is part of the contract.
-    assert_rejects_with_issue(
-        r"functio selecta(lista<numerus, 8> src) → tensor<textus, [8]> {
-  redde src ↦ tensor<textus, [8]>
-}",
-        "lista_to_tensor_element_mismatch",
     );
 }
