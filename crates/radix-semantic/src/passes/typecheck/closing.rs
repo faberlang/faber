@@ -190,7 +190,10 @@ impl TypeChecker<'_> {
 
         for (owner, span, name, ty) in fields {
             let owner_closable = self.def_is_closable(owner);
-            if !cyclic(owner) || !(owner_closable || self.type_holds_closable(ty, 0)) {
+            if !cyclic(owner)
+                || !(owner_closable
+                    || self.type_holds_closable(ty, &cyclic, &mut FxHashSet::default(), 0))
+            {
                 continue;
             }
             let (owner_name, field_name) = self.interner.map_or_else(
@@ -231,8 +234,19 @@ impl TypeChecker<'_> {
             .is_some_and(|declared| declared.iter().any(|c| c.contract == contract))
     }
 
-    /// Whether a value of `ty` can be, or directly contain, a closable value.
-    fn type_holds_closable(&self, ty: TypeId, depth: usize) -> bool {
+    /// Whether a value of `ty` can be, or contain, a closable value.
+    ///
+    /// A genus off every cycle is looked through: its own fields never warn,
+    /// so the field that holds it must. A genus on a cycle is not, because its
+    /// fields warn for themselves and the field that merely points at it would
+    /// repeat them.
+    fn type_holds_closable(
+        &self,
+        ty: TypeId,
+        cyclic: &dyn Fn(DefId) -> bool,
+        seen: &mut FxHashSet<DefId>,
+        depth: usize,
+    ) -> bool {
         if depth > 64 {
             return false;
         }
@@ -241,16 +255,37 @@ impl TypeChecker<'_> {
         }
         let next = depth + 1;
         match self.types.get(ty) {
-            Type::Struct(def) => self.def_is_closable(*def),
+            Type::Struct(def) => {
+                self.def_is_closable(*def)
+                    || (!cyclic(*def)
+                        && seen.insert(*def)
+                        && self.struct_fields_hold_closable(*def, cyclic, seen, next))
+            }
             Type::Interface(def) => self.types.closing_contract == Some(*def),
             _ => {
                 let mut children = Vec::new();
                 child_types(self.types.get(ty), &mut children);
                 children
                     .into_iter()
-                    .any(|child| self.type_holds_closable(child, next))
+                    .any(|child| self.type_holds_closable(child, cyclic, seen, next))
             }
         }
+    }
+
+    /// Whether an instance field of `def` can hold a closable value.
+    fn struct_fields_hold_closable(
+        &self,
+        def: DefId,
+        cyclic: &dyn Fn(DefId) -> bool,
+        seen: &mut FxHashSet<DefId>,
+        depth: usize,
+    ) -> bool {
+        self.structs.get(&def).is_some_and(|info| {
+            info.fields
+                .values()
+                .filter(|field| field.modifier != Some(radix_syntax::FieldModifier::Generis))
+                .any(|field| self.type_holds_closable(field.ty, cyclic, seen, depth))
+        })
     }
 }
 
@@ -292,9 +327,14 @@ fn child_types(ty: &Type, out: &mut Vec<TypeId>) {
         Type::BoundedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. } => out.push(*element),
-        Type::Map(key, value) | Type::Ledger(key, value) => out.extend([*key, *value]),
+        Type::Map(key, value)
+        | Type::Ledger(key, value)
+        | Type::PromissumFailable(key, value)
+        | Type::AsyncCursor(key, value) => out.extend([*key, *value]),
         Type::Record(fields) => out.extend(fields.values().copied()),
-        Type::Tuple(members) | Type::Union(members) => out.extend(members.iter().copied()),
+        Type::Tuple(members) | Type::Union(members) | Type::Intersection(members) => {
+            out.extend(members.iter().copied());
+        }
         Type::Applied(base, args) => {
             out.push(*base);
             out.extend(args.iter().filter_map(|arg| match arg {

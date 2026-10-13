@@ -157,3 +157,56 @@ fn closable_genus_on_a_cycle_warns() {
         vec![("Fasciculus".to_owned(), "proximus".to_owned())]
     );
 }
+
+#[test]
+fn closable_held_through_a_plain_genus_on_a_cycle_warns() {
+    // A-194: `Tenens` is off the cycle, so its own `canalis` never warns; the
+    // owner's field that holds a `Tenens` is the one that must.
+    let warnings = cycle_warnings(
+        "genus Tenens {\n    varia sermo canalis\n}\n\
+         genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia Tenens t\n}\n\
+         incipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+    );
+    assert_eq!(warnings, vec![("Nodus".to_owned(), "t".to_owned())]);
+}
+
+#[test]
+fn closable_held_through_a_struct_that_is_itself_cyclic_warns_once() {
+    // The cyclic holder reports its own field; the field that merely points
+    // at it does not repeat the warning.
+    let warnings = cycle_warnings(
+        "genus A {\n    varia B ∪ nihil b\n}\n\
+         genus B {\n    varia A ∪ nihil a\n    varia sermo canalis\n}\n\
+         incipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+    );
+    assert_eq!(warnings, vec![("B".to_owned(), "canalis".to_owned())]);
+}
+
+#[test]
+fn failable_promissum_of_a_sermo_on_a_cycle_warns() {
+    // A-195: `promissum<T ⇥ E>` is `PromissumFailable`, not `Promissum`.
+    let warnings = cycle_warnings(
+        "genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia promissum<sermo ⇥ textus> f\n}\n\
+         incipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+    );
+    assert_eq!(warnings, vec![("Nodus".to_owned(), "f".to_owned())]);
+}
+
+#[test]
+fn infallible_promissum_of_a_sermo_on_a_cycle_warns() {
+    let warnings = cycle_warnings(
+        "genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia promissum<sermo> f\n}\n\
+         incipit {\n    fixum sermo s ← ad 'runtime:echo' (1)\n}\n",
+    );
+    assert_eq!(warnings, vec![("Nodus".to_owned(), "f".to_owned())]);
+}
+
+#[test]
+fn intersection_with_the_closing_contract_on_a_cycle_warns() {
+    let warnings = cycle_warnings(&with_closable(
+        "implendum Aliud {\n    functio aliud() → textus\n}\n\
+         genus Nodus {\n    varia Nodus ∪ nihil sequens\n    varia Closable ∩ Aliud x\n}\n\
+         incipit {}\n",
+    ));
+    assert_eq!(warnings, vec![("Nodus".to_owned(), "x".to_owned())]);
+}
