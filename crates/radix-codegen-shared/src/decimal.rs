@@ -33,8 +33,11 @@ pub fn decimal_carrier_rust_type(width: NumericWidth) -> Option<&'static str> {
 }
 
 /// The decimal width of a type id, when the type is a sized decimal numeric.
+///
+/// WHY: an alias of `d64` (or a `ref` view of one) carries the same carrier as
+/// `d64`, so the type is peeled the way the other shared gates peel it.
 fn decimal_width_of_type(ty: TypeId, types: &TypeTable) -> Option<NumericWidth> {
-    match types.get(ty) {
+    match types.get(types.peel_access_marker(ty).1) {
         Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
         _ => None,
     }

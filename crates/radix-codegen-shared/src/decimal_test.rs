@@ -1,14 +1,15 @@
 //! Decimal carrier math pins for codegen tiers (decimal-widths D5).
 
 use super::{
-    carrier_in_width, decimal_expr_width, decimal_literal_payload, decimal_scale_factor,
-    decimal_source_width, decimal_text_to_carrier, round_half_even_quotient,
+    carrier_in_width, decimal_binop_width, decimal_expr_width, decimal_leaf_scale,
+    decimal_literal_payload, decimal_scale_factor, decimal_source_width, decimal_text_to_carrier,
+    round_half_even_quotient,
 };
 use radix_hir::{
     DefId, HirBinOp, HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirPattern,
 };
 use radix_lexer::Span;
-use radix_types::{NumericWidth, Primitive, TypeId, TypeTable};
+use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
 
 #[test]
 fn decimal_scale_factors_match_the_cto_ruling() {
@@ -85,6 +86,43 @@ fn decimal_width_helpers_agree_on_decimal_and_non_decimal_types() {
         Some(NumericWidth::D64)
     );
     assert_eq!(decimal_source_width(&path(1, i64), &types, |_| None), None);
+}
+
+#[test]
+fn alias_of_a_decimal_reports_the_decimal_width() {
+    let mut types = TypeTable::new();
+    let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let alias = types.intern(Type::Alias(radix_types::DefId(9_001), d64));
+    let alias_of_alias = types.intern(Type::Alias(radix_types::DefId(9_002), alias));
+    let int_alias = types.intern(Type::Alias(radix_types::DefId(9_003), i64));
+
+    assert_eq!(
+        decimal_expr_width(&path(1, alias), &types),
+        Some(NumericWidth::D64)
+    );
+    assert_eq!(
+        decimal_expr_width(&path(1, alias_of_alias), &types),
+        Some(NumericWidth::D64)
+    );
+    assert_eq!(decimal_expr_width(&path(1, int_alias), &types), None);
+
+    // The leaf scale follows the width: an alias of `d64` is a scale-8 leaf.
+    assert_eq!(decimal_leaf_scale(&path(1, alias), &types), 8);
+    assert_eq!(decimal_leaf_scale(&path(1, int_alias), &types), 0);
+
+    // An alias of `d64` joins decimal arithmetic as a decimal operand.
+    assert_eq!(
+        decimal_binop_width(HirBinOp::Add, &path(1, alias), &path(2, alias), &types),
+        Some(NumericWidth::D64)
+    );
+
+    // A `ref` access marker over an aliased decimal is still the decimal.
+    let referenced = types.reference(SemanticMutability::Immutable, alias);
+    assert_eq!(
+        decimal_expr_width(&path(1, referenced), &types),
+        Some(NumericWidth::D64)
+    );
 }
 
 #[test]
