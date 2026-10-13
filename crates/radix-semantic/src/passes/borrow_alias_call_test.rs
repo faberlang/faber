@@ -3,7 +3,8 @@
 //! `k(g, alias)` overlaps exactly like `k(g, g)`. Alias-spelled overlaps are
 //! rejected with the same issues the direct spelling produces. Read/read
 //! aliasing stays legal, `copy`/`own` binds do not alias, and call-scoped
-//! borrows release at call end.
+//! borrows release at call end. A call result that can return an argument
+//! aliases that argument's storage like a `←` bind of the place.
 
 use crate::SemanticErrorKind;
 use crate::test_support::{AnalyzedFixture, analyze_source_with_config, issue};
@@ -23,6 +24,14 @@ fn mut_mut(mut tf32[2, 2] a, mut tf32[2, 2] b) → void {
 fn read_read(tf32[2, 2] a, tf32[2, 2] b) → void {
     print a.flatten()
     print b.flatten()
+}
+
+fn id(tf32[2, 2] a) → tf32[2, 2] {
+    return a
+}
+
+fn id_copy(copy tf32[2, 2] a) → tf32[2, 2] {
+    return a
 }
 ";
 
@@ -267,6 +276,55 @@ fn conditional_source_rebind_keeps_the_may_alias() {
 #[test]
 fn unconditional_alias_rebind_clears_the_alias() {
     assert_accepts("    var tf32[2, 2] alias ← g\n    alias ← fresh\n    mut_read(mut g, alias)");
+}
+
+// =============================================================================
+// Call results: a result that can return an argument aliases its storage
+// =============================================================================
+
+#[test]
+fn call_result_aliases_the_returned_argument() {
+    assert_rejects(
+        "    var tf32[2, 2] viaid ← id(g)\n    mut_ref(mut g, viaid)",
+        "shared_borrow_conflict",
+    );
+    assert_rejects(
+        "    var tf32[2, 2] viaid ← id(g)\n    mut_read(mut viaid, g)",
+        "use_while_mutably_borrowed",
+    );
+}
+
+#[test]
+fn call_result_alias_chains_through_a_bind_alias() {
+    assert_rejects(
+        "    var tf32[2, 2] alias ← g\n    var tf32[2, 2] viaid ← id(alias)\n    mut_ref(mut g, viaid)",
+        "shared_borrow_conflict",
+    );
+}
+
+#[test]
+fn call_result_of_a_copied_argument_does_not_alias() {
+    assert_accepts("    var tf32[2, 2] viaid ← id_copy(copy g)\n    mut_ref(mut g, viaid)");
+}
+
+#[test]
+fn call_result_of_a_copied_bind_does_not_alias() {
+    assert_accepts(
+        "    var tf32[2, 2] dup ← copy g\n    var tf32[2, 2] viaid ← id(dup)\n    mut_ref(mut g, viaid)",
+    );
+}
+
+#[test]
+fn call_result_of_an_unrelated_tensor_does_not_overlap() {
+    assert_accepts("    var tf32[2, 2] viaid ← id(fresh)\n    mut_ref(mut g, viaid)");
+    assert_accepts("    var tf32[2, 2] viaid ← id(flat ↦ tf32[2, 2])\n    mut_ref(mut g, viaid)");
+}
+
+#[test]
+fn call_result_alias_is_replaced_by_a_rebind() {
+    assert_accepts(
+        "    var tf32[2, 2] viaid ← id(g)\n    viaid ← fresh\n    mut_ref(mut g, viaid)",
+    );
 }
 
 // =============================================================================

@@ -1253,19 +1253,28 @@ impl<'a> BorrowChecker<'a> {
         if self.types.is_exclusive_value(ty) || !self.is_aliasing_type(ty) {
             return;
         }
-        let Some((source, _)) = Self::place_key(init) else {
-            return;
+        let place = Self::place_key(init).map(|(source, _)| source);
+        let sources = match place {
+            Some(source) => vec![source],
+            None => self.call_result_sources(init),
         };
-        let mut roots = self
-            .bind_alias_roots
-            .get(&source)
-            .cloned()
-            .unwrap_or_default();
-        roots.insert(source);
+        if sources.is_empty() {
+            return;
+        }
+        let mut roots = FxHashSet::default();
+        for source in sources {
+            if let Some(named) = self.bind_alias_roots.get(&source) {
+                roots.extend(named.iter().copied());
+            }
+            roots.insert(source);
+        }
         if let Some(prior) = self.bind_alias_roots.get(&local) {
             roots.extend(prior.iter().copied());
         }
         self.bind_alias_roots.insert(local, roots);
+        let Some(source) = place else {
+            return;
+        };
         if self.is_tensor_typed(init)
             && let Some(origin) = self.nonmut_tensor_origin(source)
             && origin != local
@@ -1277,6 +1286,61 @@ impl<'a> BorrowChecker<'a> {
         {
             self.nonmut_agg_aliases.insert(local, origin);
         }
+    }
+
+    /// The bindings a call result of an aliasing type can share storage with.
+    ///
+    /// Conservative rule: an argument may flow into the result when its
+    /// parameter has the result's aliasing type and takes the argument by
+    /// sharing. A `copy`/`own` parameter duplicates or consumes the argument,
+    /// and a moved one leaves the name dead, so none of those alias. A call
+    /// argument that is itself a call contributes its own sources.
+    fn call_result_sources(&self, call: &HirExpression) -> Vec<DefId> {
+        let Some(result) = call.ty else {
+            return Vec::new();
+        };
+        if self.types.is_exclusive_value(result) || !self.is_aliasing_type(result) {
+            return Vec::new();
+        }
+        let (params, args) = match &call.kind {
+            HirExpressionKind::Call(callee, _, args, _) => {
+                (self.call_params(callee).map(<[ParamType]>::to_vec), args)
+            }
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
+                (self.user_method_params(receiver, *method), args)
+            }
+            _ => return Vec::new(),
+        };
+        let Some(params) = params else {
+            return Vec::new();
+        };
+        let carrier = self.alias_carrier(result);
+        let mut sources = Vec::new();
+        for (arg, param) in args.iter().zip(&params) {
+            if arg.spread {
+                break;
+            }
+            if matches!(param.mode, SemanticParamMode::Move)
+                || self.types.is_exclusive_value(param.ty)
+                || !self.types.equals(self.alias_carrier(param.ty), carrier)
+            {
+                continue;
+            }
+            match Self::place_key(&arg.expr) {
+                Some((root, _)) => sources.push(root),
+                None => sources.extend(self.call_result_sources(&arg.expr)),
+            }
+        }
+        sources
+    }
+
+    /// The storage-carrying type under access markers, aliases and `∪ nihil`.
+    fn alias_carrier(&self, ty: TypeId) -> TypeId {
+        let (_, mut inner) = self.types.peel_access_marker(ty);
+        while let Type::Option(next) = self.types.get(inner) {
+            inner = self.types.peel_access_marker(*next).1;
+        }
+        inner
     }
 
     /// `name` was rebound to a new place: the entries that named `name` keep
