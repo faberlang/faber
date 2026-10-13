@@ -35,7 +35,7 @@ use radix_hir::{
     HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirImport, HirItem,
     HirItemKind, HirLiteral, HirLocal, HirModule, HirParam, HirStatement, HirStatementKind,
 };
-use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type};
+use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type_id};
 use radix_lexer::{Interner, Span};
 use radix_types::{IndexExpr, RuntimeExtentId};
 use rustc_hash::FxHashSet;
@@ -578,11 +578,14 @@ impl<'a> LintContext<'a> {
         }
 
         // Keyed on the same registry predicate typecheck rejects with, so the
-        // lint never suggests a `fixum` the typechecker would refuse.
+        // lint never suggests a `fixum` the typechecker would refuse. The
+        // lookup peels access markers: a `varia T b ← copy a` binding carries
+        // the `copy` wrapper on its type, and its in-place `ordina` still
+        // mutates `b`.
         let method_name = self.interner.resolve(method);
         let reassigns = receiver
             .ty
-            .and_then(|ty| lookup_method_for_type(self.types.get(ty), method_name, arg_count))
+            .and_then(|ty| lookup_method_for_type_id(ty, self.types, method_name, arg_count))
             .is_some_and(is_mutating_receiver);
         let user_mutator = receiver
             .ty

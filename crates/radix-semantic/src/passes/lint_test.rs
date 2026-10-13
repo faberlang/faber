@@ -963,6 +963,54 @@ incipit {
     );
 }
 
+const SORT_PERSONA: &str = "genus Persona {\n    varia textus nomen\n    varia numerus aetas\n}\n";
+
+fn unnecessary_varia_count(source: &str) -> usize {
+    crate::test_support::analyze_source(source)
+        .diagnostics
+        .iter()
+        .filter(|diag| !diag.is_error() && diag.issue() == Some("unnecessary_varia"))
+        .count()
+}
+
+#[test]
+fn plain_in_place_sort_counts_as_mutation_for_unnecessary_varia() {
+    let source = "incipit {\n    varia lista<numerus> xs ← [3, 1, 2]\n    xs.ordina()\n}";
+    assert_eq!(unnecessary_varia_count(source), 0);
+}
+
+#[test]
+fn plain_in_place_sort_of_copy_binding_counts_as_mutation_for_unnecessary_varia() {
+    // `copy` wraps the binding type in an access marker; the receiver lookup
+    // must see through it. Only the never-mutated source `xs` is flagged.
+    let source = "incipit {\n    varia lista<numerus> xs ← [3, 1, 2]\n    varia lista<numerus> ys ← copy xs\n    ys.ordina()\n}";
+    assert_eq!(unnecessary_varia_count(source), 1);
+}
+
+#[test]
+fn keyed_in_place_sort_counts_as_mutation_for_unnecessary_varia() {
+    let source = format!(
+        "{SORT_PERSONA}incipit {{\n    varia lista<Persona> ps ← [Persona {{ nomen = \"b\", aetas = 2 }}]\n    ps.ordina(Persona p ∴ p.aetas)\n}}"
+    );
+    assert_eq!(unnecessary_varia_count(&source), 0);
+}
+
+#[test]
+fn keyed_in_place_sort_of_copy_keeps_never_mutated_source_flagged() {
+    // `ps` is only read (copied); `m` is the sorted receiver. Only the source
+    // binding is unnecessary.
+    let source = format!(
+        "{SORT_PERSONA}incipit {{\n    varia lista<Persona> ps ← [Persona {{ nomen = \"b\", aetas = 2 }}]\n    varia lista<Persona> m ← copy ps\n    m.ordina(Persona p ∴ p.aetas)\n}}"
+    );
+    assert_eq!(unnecessary_varia_count(&source), 1);
+}
+
+#[test]
+fn never_mutated_varia_stays_flagged_without_in_place_sort() {
+    let source = "incipit {\n    varia lista<numerus> xs ← [3, 1, 2]\n    nota xs.longitudo()\n}";
+    assert_eq!(unnecessary_varia_count(source), 1);
+}
+
 // ---- PST-U1: PreferStringTemplate — naive string concatenation chains ----
 //
 // Threshold B (operator decision 856a3b7a): warn only on string-typed `+`
