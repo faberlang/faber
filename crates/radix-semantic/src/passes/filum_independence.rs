@@ -463,11 +463,18 @@ fn param_root(
     }
 }
 
-/// Whether this conversion is one of the `lower_conversio` arms that
-/// constructs a fresh tensor aggregate and fills it through
-/// `TensorFromFlat`: the padded bounded-lista snapshot, the flat lista, or
-/// the rectangular lista literal. The same predicates the lowering arm
-/// dispatches on, so the fact cannot outrun the lowering.
+/// Whether this conversion yields storage no other root names: one of the
+/// `lower_conversio` arms that constructs a fresh tensor aggregate and fills
+/// it through `TensorFromFlat` (the padded bounded-lista snapshot, the flat
+/// lista, or the rectangular lista literal; the same predicates the lowering
+/// arm dispatches on), or a list literal whose untyped constants adopt the
+/// tensor element.
+///
+/// The adopted literal is admitted by the typechecker's `literal_padded_shape`
+/// although its element type is not the tensor's, so the strict padded
+/// predicate no longer names it. Its source is a list built in place,
+/// which no existing tensor can alias, so the conversion result is fresh
+/// whichever lowering arm builds it.
 fn lowers_lista_to_fresh_tensor(
     source: &HirExpression,
     source_ty: TypeId,
@@ -480,6 +487,9 @@ fn lowers_lista_to_fresh_tensor(
             .is_ok()
         || crate::lista_tensor_conversio::analyze_rectangular_lista_literal(source, target, types)
             .is_ok()
+        || (matches!(source.kind, HirExpressionKind::Array(_))
+            && crate::lista_tensor_conversio::padded_literal_facts(source_ty, target, types)
+                .is_some())
 }
 
 fn is_access_intrinsic(

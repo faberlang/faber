@@ -212,6 +212,22 @@ fn tensor_conversio_initializer_proves_fresh_storage() {
 }
 
 #[test]
+fn float_literal_conversio_initializer_proves_fresh_storage() {
+    // An untyped float literal adopts the tensor element at the conversion
+    // (`[1.0, 2.0] ↦ tf32[2]`): the list's own element type is not `f32`, but
+    // the lowering still builds a fresh tensor, so the fact stands.
+    accepted(
+        r"incipit {
+    fixum tf32[2] lanes ← [1.0, 2.0] ↦ tf32[2]
+    varia tf32[2] grid ← tf32[2] {}
+    itera ex lanes apud [i] filum lane fixum value {
+        grid[i] ← value
+    }
+}",
+    );
+}
+
+#[test]
 fn tensor_constructor_initializer_proves_fresh_storage() {
     // The `tf32[4]` constructor lowers to the synthesized `crea` call, so it
     // proves without the seed-method costume.
