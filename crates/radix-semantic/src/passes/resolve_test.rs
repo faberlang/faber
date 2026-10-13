@@ -3324,6 +3324,35 @@ fn arm_not_member_elige_misspelled_enum_case_lists_members_and_suggests() {
 }
 
 #[test]
+fn arm_not_member_elige_misspelled_union_member_lists_members_and_suggests() {
+    // An `elige` over a union-of-types subject: the annotation names the set,
+    // so a misspelled case name carries the members and nearest spelling.
+    let source = r"genus Punctum { varia numerus x }
+genus Linea { varia numerus y }
+functio f(Punctum ∪ Linea u) → vacuum {
+    elige u {
+        casu Punctum { nota 1 }
+        casu Lineam { nota 2 }
+        ceterum { nota 3 }
+    }
+}";
+    let result = crate::test_support::analyze_source(source);
+    let diag = result
+        .diagnostics
+        .iter()
+        .find(|diag| diag.issue() == Some("unknown_variant"))
+        .unwrap_or_else(|| panic!("unknown_variant not found: {:?}", result.diagnostics));
+    assert_eq!(crate::semantic_spec(diag.kind).code, "SEM001");
+    let args: Vec<(String, String)> = diag
+        .args
+        .iter()
+        .map(|arg| (arg.name.to_owned(), arg.value.clone()))
+        .collect();
+    assert_eq!(arm_arg(&args, "members"), Some("Punctum, Linea"));
+    assert_eq!(arm_arg(&args, "suggestion"), Some("Linea"));
+}
+
+#[test]
 fn arm_not_member_leaves_members_wildcard_and_default_valid() {
     crate::test_support::assert_accepts(&format!(
         "{ARM_FORMA}\nfunctio f(Forma a, Forma b) → vacuum {{\n    discerne a et b {{\n        casu Circulus fixum r et Punctum {{ nota r }}\n        casu Punctum et _ {{ nota 1 }}\n        casu Quadratum fixum s et _ {{ nota s }}\n        ceterum {{ nota 3 }}\n    }}\n}}"

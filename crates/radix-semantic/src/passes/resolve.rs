@@ -59,7 +59,6 @@ use radix_syntax::{
     Program, SiStmt, Stmt, StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
 use radix_types::AppliedArg;
-use std::cell::RefCell;
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 const ISSUE_DUPLICATE_DEFINITION: &str = "duplicate_definition";
@@ -130,21 +129,6 @@ const ISSUE_VECTOR_INCOMPLETE: &str = "vector_incomplete";
 const ISSUE_VECTOR_MISSING_WIDTH: &str = "vector_missing_width";
 const ISSUE_VECTOR_WIDTH_SINGLE_DIM: &str = "vector_width_single_dim";
 
-thread_local! {
-    /// Member names of a closed-set binding annotation, keyed by the binding's
-    /// `DefId`, for the duration of one `resolve()` run.
-    ///
-    /// A `discerne` arm names a member of the scrutinee's set or it is an
-    /// error; when every named arm of a subject position is misspelled, the
-    /// arms alone cannot spell the set. The subject's annotation can:
-    /// `Punctum ∪ Linea` names both members, and `Color`/`Forma` name their
-    /// variants. `resolve()` cannot thread the table through every recursive
-    /// resolver call and `Resolver` owns no such table, so it is parked per
-    /// thread and cleared by the outer `resolve()` call.
-    static SUBJECT_MEMBER_SETS: RefCell<rustc_hash::FxHashMap<DefId, Vec<String>>> =
-        RefCell::new(rustc_hash::FxHashMap::default());
-}
-
 /// Resolve AST-level names and type aliases after declaration collection.
 ///
 /// The resulting resolver contains the lexical scope tree and any type-alias
@@ -164,10 +148,6 @@ pub fn resolve(
 ) -> Result<(), Vec<SemanticError>> {
     let mut errors = Vec::new();
     let mut aliases = Vec::new();
-
-    // Definition ids restart at the same base for every `Resolver`, so the
-    // pass-scoped table cannot outlive one run without aliasing stale ids.
-    SUBJECT_MEMBER_SETS.with(|cell| cell.borrow_mut().clear());
 
     // Bind ordered parameter kinds to declaration identities before any named
     // application is lowered. This is the resolver/HIR identity seam; source
@@ -212,9 +192,6 @@ pub fn resolve(
     resolve_alias_types(&aliases, resolver, interner, types, &mut errors);
     register_named_generic_descriptors(program, resolver, interner, types, &mut errors);
     resolve_schema_decls(program, resolver, interner, types, &mut errors);
-
-    // The table is pass-scoped; nothing outside `resolve()` may read it.
-    SUBJECT_MEMBER_SETS.with(|cell| cell.borrow_mut().clear());
 
     if errors.is_empty() {
         Ok(())
@@ -1024,10 +1001,10 @@ fn pattern_member_parent(
 /// matches, in declaration order.
 ///
 /// Resolution runs before value types are known. A binding whose annotation
-/// names a union or an enum/discretio carries its members in
-/// [`SUBJECT_MEMBER_SETS`]; otherwise the set is read from the variants the
-/// arms of that position already name. A position with neither source has no
-/// known set and yields an empty list.
+/// names a union or an enum/discretio carries its members on the resolver (see
+/// [`Resolver::subject_member_set`]); otherwise the set is read from the
+/// variants the arms of that position already name. A position with neither
+/// source has no known set and yields an empty list.
 fn discerne_member_sets(
     resolver: &Resolver,
     interner: &Interner,
@@ -3059,7 +3036,7 @@ fn record_iuncta_labels_for_name(
 /// binding identity, so a later `discerne` subject lookup can spell the set
 /// even when no arm names a member correctly.
 fn record_subject_member_set(
-    resolver: &Resolver,
+    resolver: &mut Resolver,
     interner: &Interner,
     def_id: DefId,
     ty: &TypeExpr,
@@ -3074,7 +3051,7 @@ fn record_subject_member_set(
         _ => None,
     };
     if let Some(members) = members {
-        SUBJECT_MEMBER_SETS.with(|cell| cell.borrow_mut().insert(def_id, members));
+        resolver.record_subject_member_set(def_id, members);
     }
 }
 
@@ -3134,7 +3111,7 @@ fn subject_member_set(resolver: &Resolver, subject: &Expr) -> Option<Vec<String>
         return None;
     };
     let def_id = resolver.lookup(ident.name)?;
-    SUBJECT_MEMBER_SETS.with(|cell| cell.borrow().get(&def_id).cloned())
+    resolver.subject_member_set(def_id).map(<[String]>::to_vec)
 }
 
 fn record_iuncta_labels_for_var(

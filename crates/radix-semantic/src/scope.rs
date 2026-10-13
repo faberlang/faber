@@ -855,6 +855,15 @@ pub struct Resolver {
     ///
     /// Labels never enter `Type::Tuple`. Runtime-only; excluded from snapshots.
     tuple_element_labels: FxHashMap<DefId, Vec<Option<LexSymbol>>>,
+    /// Member names of a binding annotation's closed set, keyed by the
+    /// binding `DefId`.
+    ///
+    /// A `discerne` arm names a member of the scrutinee's set or it is an
+    /// error; when every named arm of a subject position is misspelled, the
+    /// arms alone cannot spell the set. The annotation can: `Punctum ∪ Linea`
+    /// names both members, and `Color`/`Forma` name their variants. Runtime-only;
+    /// excluded from snapshots.
+    subject_member_sets: FxHashMap<DefId, Vec<String>>,
     /// Selective imports that bind a type export (D22.5), keyed by the
     /// caller-owned binding `DefId` → (import path, exported spelling). The
     /// binding names the imported type itself: type positions resolve it to
@@ -924,6 +933,7 @@ impl Resolver {
             shadowed_builtins: FxHashMap::default(),
             scribe_family_surfaces: FxHashSet::default(),
             tuple_element_labels: FxHashMap::default(),
+            subject_member_sets: FxHashMap::default(),
             selective_type_imports: FxHashMap::default(),
             unavailable_bindings: FxHashMap::default(),
             imported_contract_type_params: FxHashMap::default(),
@@ -3787,6 +3797,17 @@ impl Resolver {
     #[must_use]
     pub fn tuple_element_labels(&self, def_id: DefId) -> Option<&[Option<LexSymbol>]> {
         self.tuple_element_labels.get(&def_id).map(Vec::as_slice)
+    }
+
+    /// Record the closed-set member names a binding's annotation names.
+    pub fn record_subject_member_set(&mut self, def_id: DefId, members: Vec<String>) {
+        self.subject_member_sets.insert(def_id, members);
+    }
+
+    /// Closed-set member names recorded for a binding, if an annotation was seen.
+    #[must_use]
+    pub fn subject_member_set(&self, def_id: DefId) -> Option<&[String]> {
+        self.subject_member_sets.get(&def_id).map(Vec::as_slice)
     }
 
     /// Return visible value-namespace names from the current lexical scope.
