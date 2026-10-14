@@ -3,7 +3,7 @@
 //! declaration cell does, instead of failing SEM010.
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source(source)
+    crate::test_support::analyze_source_la(source)
 }
 
 fn accepts(result: &crate::SemanticResult) {
@@ -73,7 +73,7 @@ fn ascribed_list_with_wrong_element_still_rejects() {
 
 #[test]
 fn declaration_form_nested_json_map_rejects_requires_valor() {
-    crate::test_support::assert_rejects_with_issue(
+    crate::test_support::assert_rejects_with_issue_la(
         r#"incipit {
   fixum tabula<textus, tabula<textus, numerus>> n ← {"a": {"b": 1}}
   nota n
@@ -84,7 +84,7 @@ fn declaration_form_nested_json_map_rejects_requires_valor() {
 
 #[test]
 fn ascribed_nested_json_map_rejects_requires_valor() {
-    crate::test_support::assert_rejects_with_issue(
+    crate::test_support::assert_rejects_with_issue_la(
         r#"incipit {
   fixum _ n ← {"a": {"b": 1}} ∷ tabula<textus, tabula<textus, numerus>>
   nota n

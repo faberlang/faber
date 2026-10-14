@@ -4,7 +4,7 @@
 //! asserted in `codegen/rust/tests/comparison_test.rs`.
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source(source)
+    crate::test_support::analyze_source_la(source)
 }
 
 fn accepts(result: &crate::SemanticResult) {

@@ -1,12 +1,12 @@
 //! BB-7R pins: `lista<T, N>` typechecks as `BoundedArray`, D6 appende overflow,
 //! and D7 conversions to/from unbounded `lista<T>`.
 
-use crate::test_support::{analyze_ok, assert_accepts, assert_rejects_with_issue, entry_local_tys};
+use crate::test_support::{analyze_ok_la, assert_accepts_la, assert_rejects_with_issue_la, entry_local_tys};
 use crate::{IndexExpr, Type};
 
 #[test]
 fn bounded_lista_typechecks_as_bounded_array_distinct_from_unbounded() {
-    let unit = analyze_ok(
+    let unit = analyze_ok_la(
         r"incipit {
     fixum lista<numerus, 8> bounded ← vacua
     fixum lista<numerus> unbounded ← vacua
@@ -42,7 +42,7 @@ fn bounded_lista_typechecks_as_bounded_array_distinct_from_unbounded() {
 
 #[test]
 fn bounded_lista_longitudo_and_vacua_are_len_not_capacity() {
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum lista<numerus, 8> xs ← vacua
     fixum numerus n ← xs.longitudo()
@@ -55,7 +55,7 @@ fn bounded_lista_longitudo_and_vacua_are_len_not_capacity() {
 
 #[test]
 fn bounded_lista_accipe_and_index_return_element() {
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     varia lista<numerus, 8> xs ← vacua
     fixum numerus ∪ nihil got ← xs.accipe(0)
@@ -68,7 +68,7 @@ fn bounded_lista_accipe_and_index_return_element() {
 
 #[test]
 fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"incipit {
     fixum lista<numerus, 8> xs ← vacua
     fixum _ bad ← xs[8]
@@ -76,7 +76,7 @@ fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
 }",
         "index_provably_out_of_bounds",
     );
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"incipit {
     fixum lista<numerus, 8> xs ← vacua
     fixum _ bad ← xs[-1]
@@ -106,14 +106,14 @@ fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
     nota bad
 }",
     ] {
-        assert_rejects_with_issue(source, "index_provably_out_of_bounds");
+        assert_rejects_with_issue_la(source, "index_provably_out_of_bounds");
     }
 }
 
 #[test]
 fn bounded_lista_appende_requires_alternate_exit() {
     // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio grow() → vacuum {
     varia lista<numerus, 8> xs ← vacua
     xs.appende(1)
@@ -124,7 +124,7 @@ fn bounded_lista_appende_requires_alternate_exit() {
 
 #[test]
 fn bounded_lista_appende_propagates_on_textus_channel() {
-    assert_accepts(
+    assert_accepts_la(
         r"functio grow() → vacuum ⇥ textus {
     varia lista<numerus, 8> xs ← vacua
     xs.appende(1)
@@ -138,7 +138,7 @@ incipit {
 
 #[test]
 fn unbounded_lista_appende_stays_infallible() {
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     varia lista<numerus> xs ← vacua
     xs.appende(1)
@@ -148,7 +148,7 @@ fn unbounded_lista_appende_stays_infallible() {
 
 #[test]
 fn bounded_lista_d7_conversions_are_explicit() {
-    assert_accepts(
+    assert_accepts_la(
         r"incipit {
     fixum lista<numerus> unbounded ← [1, 2]
     fixum lista<numerus, 8> bounded ← unbounded ↦ lista<numerus, 8>
@@ -160,7 +160,7 @@ fn bounded_lista_d7_conversions_are_explicit() {
 
 #[test]
 fn bounded_lista_assignment_is_not_implicit_conversion() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"incipit {
     fixum lista<numerus> unbounded ← [1, 2]
     fixum lista<numerus, 8> bounded ← unbounded
@@ -172,7 +172,7 @@ fn bounded_lista_assignment_is_not_implicit_conversion() {
 
 #[test]
 fn unannotated_lista_literal_carries_exact_bound() {
-    let unit = analyze_ok(
+    let unit = analyze_ok_la(
         r"incipit {
     fixum _ xs ← [1, 2]
     nota xs
@@ -192,7 +192,7 @@ fn unannotated_lista_literal_carries_exact_bound() {
 
 #[test]
 fn bounded_lista_hole_solves_from_literal_witness() {
-    let unit = analyze_ok(
+    let unit = analyze_ok_la(
         r"incipit {
     fixum lista<numerus, _> xs ← [1, 2]
     nota xs
@@ -212,8 +212,8 @@ fn bounded_lista_hole_solves_from_literal_witness() {
 
 #[test]
 fn explicit_bounded_lista_literal_checks_capacity() {
-    assert_accepts("incipit { fixum lista<numerus, 2> xs ← [1, 2] }");
-    assert_rejects_with_issue(
+    assert_accepts_la("incipit { fixum lista<numerus, 2> xs ← [1, 2] }");
+    assert_rejects_with_issue_la(
         "incipit { fixum lista<numerus, 3> xs ← [1, 2] }",
         "incompatible_tensor_index",
     );
@@ -224,7 +224,7 @@ fn explicit_bounded_lista_literal_checks_capacity() {
 // zero-length witness.
 #[test]
 fn empty_list_literal_takes_the_bounded_cell_capacity() {
-    let unit = analyze_ok(
+    let unit = analyze_ok_la(
         r"incipit {
     varia lista<fractus, 4> xs ← []
     nota xs
@@ -244,7 +244,7 @@ fn empty_list_literal_takes_the_bounded_cell_capacity() {
 
 #[test]
 fn unannotated_literal_pair_length_mismatch_rejects_at_typecheck() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         "incipit { fixum _ xs ← [1, 2] + [3] }",
         "lista_capacity_mismatch",
     );
@@ -252,7 +252,7 @@ fn unannotated_literal_pair_length_mismatch_rejects_at_typecheck() {
 
 #[test]
 fn bounded_lista_hole_without_literal_witness_still_reports_sem014() {
-    crate::test_support::assert_analysis_rejects_with_issue(
+    crate::test_support::assert_analysis_rejects_with_issue_la(
         "functio missing() → lista<numerus, _> { tacet }",
         "bounded_capacity_unsolved",
     );
@@ -260,7 +260,7 @@ fn bounded_lista_hole_without_literal_witness_still_reports_sem014() {
 
 #[test]
 fn bounded_lista_parameter_widening_stays_explicit() {
-    assert_rejects_with_issue(
+    assert_rejects_with_issue_la(
         r"functio consume(lista<numerus, 3> xs) → vacuum { nota xs }
 incipit { consume([1, 2]) }",
         "argument_type_mismatch",

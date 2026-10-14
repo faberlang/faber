@@ -5,12 +5,17 @@ use crate::passes::collect;
 use crate::passes::resolve::resolve;
 use crate::test_support;
 use crate::{IndexExpr, Resolver, TypeTable};
-use radix_lexer::{Interner, lex};
+use radix_lexer::Interner;
 use radix_parser::parse;
 use radix_target::Target;
 
+fn latin_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
 fn resolve_alias(source: &str) -> (TypeTable, crate::TypeId) {
-    let mut parsed = parse(lex(source));
+    let mut parsed = parse(radix_lexer::lex_with_locale_pack(source, &latin_pack()));
     assert!(
         parsed.errors.is_empty(),
         "parse errors: {:?}",
@@ -80,7 +85,7 @@ fn lista_element_and_capacity_holes() {
 
 #[test]
 fn bare_ascii_accepts_char_literal() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum ascii c ← 'x'
     nota c
@@ -90,7 +95,7 @@ fn bare_ascii_accepts_char_literal() {
 
 #[test]
 fn ascii_hole_accepts_char_literal() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum ascii<_> c ← 'x'
     fixum ascii<1> d ← c
@@ -101,7 +106,7 @@ fn ascii_hole_accepts_char_literal() {
 
 #[test]
 fn ascii_hole_solved_to_one_widens_to_eight() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum ascii<_> c ← 'x'
     fixum ascii<8> d ← c
@@ -112,7 +117,7 @@ fn ascii_hole_solved_to_one_widens_to_eight() {
 
 #[test]
 fn ascii_eight_accepts_char_literal() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum ascii<8> c ← 'x'
     nota c
@@ -122,7 +127,7 @@ fn ascii_eight_accepts_char_literal() {
 
 #[test]
 fn ascii_hole_rejects_bare_multi_byte() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit {
     fixum ascii<_> c ← 'ab'
     nota c
@@ -133,7 +138,7 @@ fn ascii_hole_rejects_bare_multi_byte() {
 
 #[test]
 fn ascii_hole_rejects_unbounded_textus() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r#"incipit {
     fixum ascii<_> c ← "hi"
     nota c
@@ -144,7 +149,7 @@ fn ascii_hole_rejects_unbounded_textus() {
 
 #[test]
 fn unsolved_ascii_hole_errors() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         r"functio k() → ascii<_> {
     tacet
 }",
@@ -213,7 +218,7 @@ fn harness_twins_unify_same_family() {
 
 #[test]
 fn alias_uses_freshen_independently() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"typus X = ascii<_>
 incipit {
     fixum X a ← 'x'
@@ -240,7 +245,7 @@ fn alias_first_solve_does_not_lock_second() {
     //
     // Two uses with the same witness both accept — and a use of X as dest
     // of an already-solved ascii<1> still accepts on a second binding.
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"typus X = ascii<_>
 incipit {
     fixum X a ← 'x'

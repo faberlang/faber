@@ -4,27 +4,27 @@ use crate::test_support;
 
 #[test]
 fn numerus_to_ascii_hex_accepts() {
-    test_support::assert_accepts("incipit { fixum ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
+    test_support::assert_accepts_la("incipit { fixum ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
 }
 
 #[test]
 fn numerus_to_ascii_hex_pads() {
-    test_support::assert_accepts("incipit { fixum ascii<8> hex ← 37 ↦ ascii<8> via Hex }");
+    test_support::assert_accepts_la("incipit { fixum ascii<8> hex ← 37 ↦ ascii<8> via Hex }");
 }
 
 #[test]
 fn numerus_to_ascii_bin_accepts() {
-    test_support::assert_accepts("incipit { fixum ascii<8> bits ← 255 ↦ ascii<8> via Bin }");
+    test_support::assert_accepts_la("incipit { fixum ascii<8> bits ← 255 ↦ ascii<8> via Bin }");
 }
 
 #[test]
 fn numerus_to_ascii_oct_accepts() {
-    test_support::assert_accepts("incipit { fixum ascii<3> oct ← 255 ↦ ascii<3> via Oct }");
+    test_support::assert_accepts_la("incipit { fixum ascii<3> oct ← 255 ↦ ascii<3> via Oct }");
 }
 
 #[test]
 fn sized_unsigned_to_ascii_hex_accepts() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit { fixum u8 n ← 255
 fixum ascii<2> hex ← n ↦ ascii<2> via Hex }",
     );
@@ -32,7 +32,7 @@ fixum ascii<2> hex ← n ↦ ascii<2> via Hex }",
 
 #[test]
 fn overflow_literal_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ hex ← 256 ↦ ascii<2> via Hex }",
         "ascii_pack_width_overflow",
     );
@@ -40,7 +40,7 @@ fn overflow_literal_rejects() {
 
 #[test]
 fn negative_literal_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ hex ← -1 ↦ ascii<2> via Hex }",
         "ascii_pack_negative_source",
     );
@@ -48,7 +48,7 @@ fn negative_literal_rejects() {
 
 #[test]
 fn float_source_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ hex ← 1.5 ↦ ascii<2> via Hex }",
         "unsupported_conversio",
     );
@@ -58,7 +58,7 @@ fn float_source_rejects() {
 /// capacity error (the second-argument form is a parse error, D11.9).
 #[test]
 fn hint_as_the_capacity_argument_rejects() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit { fixum _ hex ← 255 ↦ ascii<Hex> }",
         "ascii_format_hint_not_capacity",
     );
@@ -66,22 +66,22 @@ fn hint_as_the_capacity_argument_rejects() {
 
 #[test]
 fn const_source_hole_infers_hex_digit_capacity() {
-    test_support::assert_accepts("incipit { fixum ascii<_> hex ← 255 ↦ ascii<_> via Hex }");
+    test_support::assert_accepts_la("incipit { fixum ascii<_> hex ← 255 ↦ ascii<_> via Hex }");
 }
 
 #[test]
 fn const_source_hole_infers_bin_digit_capacity() {
-    test_support::assert_accepts("incipit { fixum ascii<_> bits ← 255 ↦ ascii<_> via Bin }");
+    test_support::assert_accepts_la("incipit { fixum ascii<_> bits ← 255 ↦ ascii<_> via Bin }");
 }
 
 #[test]
 fn const_source_hole_infers_oct_digit_capacity() {
-    test_support::assert_accepts("incipit { fixum ascii<_> oct ← 255 ↦ ascii<_> via Oct }");
+    test_support::assert_accepts_la("incipit { fixum ascii<_> oct ← 255 ↦ ascii<_> via Oct }");
 }
 
 #[test]
 fn runtime_source_hole_reports_unsolved_capacity() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         "functio pack(numerus n) → ascii<_> { redde n ↦ ascii<_> via Hex }",
         "bounded_capacity_unsolved",
     );
@@ -89,7 +89,7 @@ fn runtime_source_hole_reports_unsolved_capacity() {
 
 #[test]
 fn runtime_source_overflow_is_not_a_type_error() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "functio pack(numerus n) → ascii<2> { redde n ↦ ascii<2> via Hex }",
     );
 }

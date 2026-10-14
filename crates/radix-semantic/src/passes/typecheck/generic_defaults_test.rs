@@ -11,7 +11,7 @@ use radix_types::{
 use crate::test_support::AnalyzedFixture;
 
 fn compile(source: &str) -> AnalyzedFixture {
-    crate::test_support::analyze_source(source)
+    crate::test_support::analyze_source_la(source)
 }
 
 fn accepts(fixture: &AnalyzedFixture) {

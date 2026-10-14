@@ -6,7 +6,7 @@
 use radix_diagnostics::DiagnosticArg;
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
-    crate::test_support::analyze_source(source)
+    crate::test_support::analyze_source_la(source)
 }
 
 fn rejects_with_issue(source: &str, issue: &str) {

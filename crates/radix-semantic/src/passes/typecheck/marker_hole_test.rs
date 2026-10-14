@@ -9,12 +9,17 @@ use crate::passes::resolve::resolve;
 use crate::test_support;
 use crate::{InstansPrecision, MarkerFamily, NumericWidth, Resolver, TypeTable};
 use radix_hir::{HirItemKind, HirStatementKind};
-use radix_lexer::{Interner, lex};
+use radix_lexer::Interner;
 use radix_parser::parse;
 use radix_target::Target;
 
+fn latin_pack() -> crate::locale::LocalePack {
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
+        .expect("load Latin locale pack")
+}
+
 fn resolve_alias(source: &str) -> (TypeTable, crate::TypeId) {
-    let mut parsed = parse(lex(source));
+    let mut parsed = parse(radix_lexer::lex_with_locale_pack(source, &latin_pack()));
     assert!(
         parsed.errors.is_empty(),
         "parse errors: {:?}",
@@ -68,13 +73,13 @@ fn the_numeric_marker_holes_are_retired_with_the_wrapper() {
         "incipit {\n    fixum fractus<_> x ← 1.0\n    nota x\n}",
         "functio k() → numerus<_> {\n    tacet\n}",
     ] {
-        test_support::assert_rejects_with_issue(source, "numeric_wrapper_retired");
+        test_support::assert_rejects_with_issue_la(source, "numeric_wrapper_retired");
     }
 }
 
 #[test]
 fn bare_numerus_still_accepts_i32_via_default_path() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         r"incipit {
     fixum numerus n ← 1 ∷ i32
     nota n
@@ -84,7 +89,7 @@ fn bare_numerus_still_accepts_i32_via_default_path() {
 
 #[test]
 fn modulus_hole_solves_exact_width() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r"incipit {
     fixum modulus<_> m ← 1 ∷ modulus<u32>
     fixum modulus<u32> n ← m
@@ -95,7 +100,7 @@ fn modulus_hole_solves_exact_width() {
 
 #[test]
 fn instans_hole_solves_exact_precision() {
-    test_support::assert_analysis_accepts(
+    test_support::assert_analysis_accepts_la(
         r"functio pin(instans<ms> t) → instans<ms> {
     fixum instans<_> hole ← t
     redde hole
@@ -105,7 +110,7 @@ fn instans_hole_solves_exact_precision() {
 
 #[test]
 fn modulus_hole_interns_u32() {
-    let unit = test_support::analyze_ok(
+    let unit = test_support::analyze_ok_la(
         r"incipit {
     fixum modulus<_> m ← 1 ∷ modulus<u32>
     nota m
@@ -122,7 +127,7 @@ fn modulus_hole_interns_u32() {
 
 #[test]
 fn modulus_hole_rejects_signed_numerus() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         r"incipit {
     fixum modulus<_> m ← 1 ∷ i32
     nota m
@@ -133,7 +138,7 @@ fn modulus_hole_rejects_signed_numerus() {
 
 #[test]
 fn instans_hole_interns_millis() {
-    let unit = test_support::analyze_ok(
+    let unit = test_support::analyze_ok_la(
         r"functio pin(instans<ms> t) → vacuum {
     fixum instans<_> hole ← t
     nota hole
@@ -159,7 +164,7 @@ fn instans_hole_interns_millis() {
 
 #[test]
 fn instans_hole_rejects_numerus_witness() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         r"incipit {
     fixum instans<_> t ← 1
     nota t
@@ -170,7 +175,7 @@ fn instans_hole_rejects_numerus_witness() {
 
 #[test]
 fn instans_hole_from_bare_stays_seconds() {
-    let unit = test_support::analyze_ok(
+    let unit = test_support::analyze_ok_la(
         r"functio pin(instans t) → vacuum {
     fixum instans<_> hole ← t
     nota hole
@@ -193,7 +198,7 @@ fn instans_hole_from_bare_stays_seconds() {
 
 #[test]
 fn unsolved_modulus_hole_errors() {
-    test_support::assert_analysis_rejects_with_issue(
+    test_support::assert_analysis_rejects_with_issue_la(
         r"functio k() → modulus<_> {
     tacet
 }",

@@ -23,7 +23,7 @@ fn with_closable(body: &str) -> String {
 }
 
 fn cycle_warnings(source: &str) -> Vec<(String, String)> {
-    test_support::analyze_source(source)
+    test_support::analyze_source_la(source)
         .diagnostics
         .iter()
         .filter(|diag| diag.kind == SemanticErrorKind::Warning(WarningKind::ClosableInCycle))
@@ -43,7 +43,7 @@ fn cycle_warnings(source: &str) -> Vec<(String, String)> {
 
 #[test]
 fn sermo_close_defaults_on_failure() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "incipit {\n\
          fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
          fixum bivalens clausa ← s.close() ⊥ falsum\n\
@@ -54,7 +54,7 @@ fn sermo_close_defaults_on_failure() {
 
 #[test]
 fn typed_sermo_close_propagates_textus() {
-    test_support::assert_accepts(
+    test_support::assert_accepts_la(
         "@ ad 'numeri:bis'\n\
          functio bis(numerus n) → numerus { redde n * 2 }\n\
          functio finis(sermo<numerus, numerus> s) → bivalens ⇥ textus {\n\
@@ -69,7 +69,7 @@ fn typed_sermo_close_propagates_textus() {
 
 #[test]
 fn sermo_close_needs_an_error_sink() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
         "functio g() → vacuum {\n\
          fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
@@ -81,7 +81,7 @@ fn sermo_close_needs_an_error_sink() {
 
 #[test]
 fn sermo_close_takes_no_arguments() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "incipit {\n\
          fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
          fixum bivalens clausa ← s.close(1) ⊥ falsum\n\
@@ -92,7 +92,7 @@ fn sermo_close_takes_no_arguments() {
 
 #[test]
 fn sermo_satisfies_the_closing_contract() {
-    test_support::assert_accepts(&with_closable(
+    test_support::assert_accepts_la(&with_closable(
         "incipit {\n\
          fixum sermo s ← ad 'runtime:echo' (\"x\")\n\
          nota claude(s) ⊥ falsum\n\
@@ -102,7 +102,7 @@ fn sermo_satisfies_the_closing_contract() {
 
 #[test]
 fn genus_without_implet_does_not_satisfy_closing() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         &with_closable(
             "genus Lapis {\n    varia numerus massa\n}\n\
              incipit {\n\
@@ -115,7 +115,7 @@ fn genus_without_implet_does_not_satisfy_closing() {
 
 #[test]
 fn closing_mark_requires_the_close_shape() {
-    test_support::assert_rejects_with_issue(
+    test_support::assert_rejects_with_issue_la(
         "@ radix contract \"closing\"\nimplendum Closable {\n    functio close() → vacuum\n}\n",
         "radix_contract_closing_shape",
     );
