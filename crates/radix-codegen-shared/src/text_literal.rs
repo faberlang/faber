@@ -16,9 +16,9 @@ use radix_lexer::textus_literal::try_decode_textus_literal;
 /// interner payload.
 ///
 /// Handles the escapes a Rust string literal accepts (`\\`, `\"`, `\'`,
-/// `\n`, `\t`, `\r`, `\0`) plus `\u{H…}`; unknown escape pairs and a malformed
-/// `\u` are preserved verbatim so a payload that is not a working fab-to-Rust
-/// string still emits faithfully.
+/// `\n`, `\t`, `\r`) plus `\u{H…}` (a NUL byte is written `\u{0}`); unknown
+/// escape pairs and a malformed `\u` are preserved verbatim so a payload that
+/// is not a working fab-to-Rust string still emits faithfully.
 #[must_use]
 pub fn unescape_faber_text(raw: &str) -> String {
     let mut decoded = String::new();
@@ -39,7 +39,6 @@ pub fn unescape_faber_text(raw: &str) -> String {
             'n' => decoded.push('\n'),
             't' => decoded.push('\t'),
             'r' => decoded.push('\r'),
-            '0' => decoded.push('\0'),
             'u' => match unicode_escape(&mut chars) {
                 Some(scalar) => decoded.push(scalar),
                 None => decoded.push_str("\\u"),

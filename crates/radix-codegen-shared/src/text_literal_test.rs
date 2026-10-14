@@ -12,7 +12,8 @@ fn unescapes_c_style_escapes_to_real_bytes() {
     assert_eq!(unescape_faber_text("a\\tb\\r"), "a\tb\r");
     assert_eq!(unescape_faber_text("say \\\"salve\\\""), "say \"salve\"");
     assert_eq!(unescape_faber_text("slash\\\\slash"), "slash\\slash");
-    assert_eq!(unescape_faber_text("nul\\0byte"), "nul\0byte");
+    assert_eq!(unescape_faber_text("nul\\u{0}byte"), "nul\0byte");
+    assert_eq!(unescape_faber_text("nul\\0byte"), "nul\\0byte");
 }
 
 #[test]
