@@ -59,7 +59,7 @@ fn faber_emitter_keeps_a_ledger_type() {
 }
 
 /// The en spelling `ledger<K, V>` parses and type-checks; an operation on a
-/// ledger value is refused by name.
+/// ledger value that is not admitted by need is refused by name.
 #[cfg(feature = "hir-faber")]
 fn en_compile(body: &str) -> (bool, Vec<String>) {
     let source = format!("+++\nlocale = \"en\"\n+++\n{body}");
@@ -92,8 +92,8 @@ fn en_ledger_spelling_resolves_as_a_parameter_and_a_return_type() {
 
 #[cfg(feature = "hir-faber")]
 #[test]
-fn en_ledger_index_is_refused_by_name() {
-    let (_, issues) = en_compile("fn f(ledger<string, int> l) → int {\n    return l[\"a\"]\n}\n");
+fn en_ledger_print_is_refused_by_name() {
+    let (_, issues) = en_compile("fn f(ledger<string, int> l) {\n    print l\n}\n");
     assert!(
         issues
             .iter()
