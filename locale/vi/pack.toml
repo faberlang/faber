@@ -216,6 +216,7 @@ ratio = "ratio"
 # the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
 sermo = "kênh"
 scrinium = "khung"
+trapped = "mắc_bẫy"
 meus = "gửi"
 tuus = "nhận"
 

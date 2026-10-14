@@ -229,6 +229,7 @@ ratio = "ratio"
 # the sermo view methods `s.meus<T>()` / `s.tuus<T>()`.
 sermo = "sermo"
 scrinium = "scrinium"
+trapped = "interceptum"
 meus = "meus"
 tuus = "tuus"
 

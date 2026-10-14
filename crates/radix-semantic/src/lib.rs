@@ -1125,6 +1125,7 @@ fn register_locale_pack_type_spellings(
             TypeBindingKind::Frame(_)
                 | TypeBindingKind::TensorEdgePolicy(_)
                 | TypeBindingKind::Erratum
+                | TypeBindingKind::Trapped
         ) {
             continue;
         }
@@ -1152,6 +1153,7 @@ fn register_locale_pack_type_spellings(
                 | TypeBindingKind::Relational(_)
                 | TypeBindingKind::Ratio
                 | TypeBindingKind::Erratum
+                | TypeBindingKind::Trapped
                 | TypeBindingKind::Frame(_)
                 | TypeBindingKind::TensorEdgePolicy(_) => None,
             };

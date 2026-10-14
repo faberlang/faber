@@ -875,6 +875,7 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
         },
         TypeBindingKind::Ratio => "ratio",
         TypeBindingKind::Erratum => "erratum",
+        TypeBindingKind::Trapped => "interceptum",
         TypeBindingKind::Frame(kind) => kind.latin(),
     }
 }
@@ -1042,6 +1043,9 @@ pub enum TypeBindingKind {
     /// Compiler-owned error carrier `erratum<T>` (en `error`): the generic
     /// payload genus a `⇥ T` channel names.
     Erratum,
+    /// Compiler-owned trap-result carrier `trapped<R, T>`: the two-variant
+    /// genus a `trap { … }` block returns.
+    Trapped,
     /// Compiler-owned conversation family (`sermo`, `scrinium`, and the
     /// `meus`/`tuus` directional views). The view rows also spell the sermo
     /// view methods `s.meus<T>()` / `s.tuus<T>()` (DECISIONS D6.16).
@@ -1431,6 +1435,17 @@ fn insert_latin_extra_types(types: &mut BTreeMap<String, TypeBinding>) {
             },
         );
     }
+    // `trapped<R, T>` (builtin trap-result genus): the la reader surface is a
+    // past participle of `intercipio` (`interceptum`), not the registry key.
+    types.insert(
+        "trapped".to_owned(),
+        TypeBinding {
+            key: "trapped".to_owned(),
+            canonical: "interceptum".to_owned(),
+            aliases: Vec::new(),
+            kind: TypeBindingKind::Trapped,
+        },
+    );
     // Identity rows so the la scaffold carries the same `[types]` keys every
     // installed pack must own (completeness gates compare key sets against
     // this scaffold).
@@ -2545,6 +2560,7 @@ fn type_binding_kind_for_key(key: &str) -> Option<TypeBindingKind> {
         "census" => return Some(TypeBindingKind::Relational(RelationalTypeKind::Census)),
         "ratio" => return Some(TypeBindingKind::Ratio),
         "erratum" => return Some(TypeBindingKind::Erratum),
+        "trapped" => return Some(TypeBindingKind::Trapped),
         "sermo" => return Some(TypeBindingKind::Frame(FrameTypeKind::Sermo)),
         "scrinium" => return Some(TypeBindingKind::Frame(FrameTypeKind::Scrinium)),
         "meus" => return Some(TypeBindingKind::Frame(FrameTypeKind::Meus)),
