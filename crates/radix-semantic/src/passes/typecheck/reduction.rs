@@ -122,7 +122,13 @@ impl TypeChecker<'_> {
             }
         };
         let axis_expr = &args[0].expr;
-        let Some(axis) = super::integer_range::const_int_value(axis_expr) else {
+        // Need: a named compile-time integer binding (an immutable
+        // `const int` local or a module constant) is a constant axis; a
+        // run-time variable has no recorded value and stays refused.
+        let Some(axis) = super::integer_range::const_int_value_resolved(
+            axis_expr,
+            &self.const_int_values,
+        ) else {
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,
                 ISSUE_AXIS_REDUCTION_NOT_CONSTANT,

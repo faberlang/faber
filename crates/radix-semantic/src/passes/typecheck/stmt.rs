@@ -133,6 +133,17 @@ impl TypeChecker<'_> {
         {
             self.static_size_values.insert(local.def_id, *value);
         }
+        // Need: an immutable compile-time integer binding is a valid
+        // `axis` argument. Record its exact value; a `var` binding is not
+        // recorded, so a named mutable axis stays the named refusal.
+        if !local.mutable {
+            let value = local.init.as_ref().and_then(|init| {
+                super::integer_range::const_int_value_resolved(init, &self.const_int_values)
+            });
+            if let Some(value) = value {
+                self.const_int_values.insert(local.def_id, value);
+            }
+        }
         if let Some(ty) = local.ty {
             let span = Self::local_init_span(local);
             self.reject_tensor_edge_policy_value_type(ty, span);
