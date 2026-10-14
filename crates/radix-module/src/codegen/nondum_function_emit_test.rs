@@ -23,7 +23,7 @@ incipit {
 "#;
 
 fn compile(target: Target, source: &str) -> crate::CompileResult {
-    let session = Session::new(Config::default().with_target(target));
+    let session = Session::new(Config::default().with_target(target).with_latin_locale());
     crate::driver::compile(&session, "nondum.fab", source, ModuleCompileRequest::default())
 }
 
@@ -98,7 +98,11 @@ fn faber_re_emission_keeps_the_declaration() {
 
 #[test]
 fn mir_lowering_skips_a_bodiless_nondum_function() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let unit = crate::driver::analyze_source(&session, "nondum.fab", SOURCE, AnalyzeRequest::default())
         .expect("analysis succeeds");
     let dump = crate::mir::dump_analyzed_unit(unit.application_view()).expect("MIR lowering succeeds");
@@ -195,7 +199,11 @@ fn faber_re_emission_keeps_the_method_declaration() {
 
 #[test]
 fn mir_lowering_skips_a_bodiless_nondum_method() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
     let unit = crate::driver::analyze_source(&session, "nondum.fab", GENUS_SOURCE, AnalyzeRequest::default())
         .expect("analysis succeeds");
     let dump = crate::mir::dump_analyzed_unit(unit.application_view()).expect("MIR lowering succeeds");

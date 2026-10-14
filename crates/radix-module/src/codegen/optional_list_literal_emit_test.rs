@@ -17,7 +17,7 @@ incipit {
 ";
 
 fn emit(target: Target) -> String {
-    let session = Session::new(Config::default().with_target(target));
+    let session = Session::new(Config::default().with_target(target).with_latin_locale());
     let result = crate::driver::compile(&session, "optional-literal.fab", SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "{target} compilation failed: {:?}", result.diagnostics);
     match result.output.expect("output") {

@@ -226,7 +226,7 @@ const HOST_ONLY_SYMBOLS: &[&str] = &[
 
 #[cfg(any(feature = "hir-go", feature = "hir-ts"))]
 fn compile(target: Target) -> String {
-    let compiler = Compiler::new(Config::default().with_target(target));
+    let compiler = Compiler::new(Config::default().with_target(target).with_latin_locale());
     let result = compiler.compile_str(
         "frame-coherence.fab",
         r#"incipit {

@@ -41,7 +41,7 @@ incipit { nota 1 }
 ";
 
 fn compile(target: Target, source: &str) -> crate::CompileResult {
-    let session = Session::new(Config::default().with_target(target));
+    let session = Session::new(Config::default().with_target(target).with_latin_locale());
     crate::driver::compile(&session, "conversio.fab", source, ModuleCompileRequest::default())
 }
 
