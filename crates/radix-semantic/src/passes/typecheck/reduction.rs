@@ -55,7 +55,10 @@ impl TypeChecker<'_> {
     /// the coordinates other than `n` in order, and `t.mean(axis n)` is that
     /// grouped sum divided by the extent of the removed axis. The axis is a
     /// compile-time constant in `0..rank`; the result is the receiver shape
-    /// with that axis removed.
+    /// with that axis removed. Need: a `mean` over an integer element
+    /// sums exactly in the element family and converts the summed tensor to
+    /// `fractus` before the division, matching the scalar `.mean()`; a float
+    /// element keeps its own width.
     pub(super) fn desugar_axis_reduction(&mut self, expr: &mut HirExpression) -> AxisReduction {
         let HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) =
             &mut expr.kind
@@ -138,8 +141,13 @@ impl TypeChecker<'_> {
         let axis = axis as usize;
         let rank = dims.len();
         let mut divisor = None;
+        // An integer-element `mean` converts after the exact integer sum; a
+        // float element keeps its own type.
+        let mut mean_float_element = None;
         if mean {
-            if !self.is_fractus(element) {
+            if self.is_integer(element) {
+                mean_float_element = Some(self.types.primitive(Primitive::Fractus));
+            } else if !self.is_fractus(element) {
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,
                     ISSUE_AXIS_REDUCTION_MEAN_REQUIRES_FLOAT,
@@ -166,7 +174,8 @@ impl TypeChecker<'_> {
             let kept_dims = kept.iter().map(|&index| dims[index]).collect();
             self.types.intern_index(IndexExpr::Tuple(kept_dims))
         };
-        let result = self.types.tensor_with_shape(element, result_shape);
+        let result_element = mean_float_element.unwrap_or(element);
+        let result = self.types.tensor_with_shape(result_element, result_shape);
         let coordinate_ids: Vec<DefId> = (0..rank)
             .map(|offset| DefId(self.next_synthetic_def + offset as u32))
             .collect();
@@ -214,11 +223,35 @@ impl TypeChecker<'_> {
             Some(count) => {
                 let sum = self.synthesized(reduction, span);
                 self.axis_reduction_results.insert(sum.id, result);
+                // The summed integer tensor becomes `fractus` through the
+                // ordinary tensor element `↦` row (the same HIR a written
+                // `grid.sum(axis 1) ↦ tf64[2]` yields) before the division.
+                let numerator = match mean_float_element {
+                    None => sum,
+                    Some(float_element) => {
+                        let target = self.types.tensor_with_shape(float_element, result_shape);
+                        self.synthesized(
+                            HirExpressionKind::Conversio {
+                                source: Box::new(sum),
+                                target: radix_hir::HirConversioTarget::Type(target),
+                                params: Vec::new(),
+                                recovery: None,
+                                route: None,
+                                implicit: None,
+                            },
+                            span,
+                        )
+                    }
+                };
                 let count = self.synthesized(
                     HirExpressionKind::Literal(radix_hir::HirLiteral::Float(count as f64)),
                     span,
                 );
-                HirExpressionKind::Binary(radix_hir::HirBinOp::Div, Box::new(sum), Box::new(count))
+                HirExpressionKind::Binary(
+                    radix_hir::HirBinOp::Div,
+                    Box::new(numerator),
+                    Box::new(count),
+                )
             }
         };
         AxisReduction::Expanded

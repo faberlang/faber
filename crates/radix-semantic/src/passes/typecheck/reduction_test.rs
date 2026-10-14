@@ -370,7 +370,7 @@ functio bad(tensor<f32, [4]> g) → f32 { redde g.summa(axis 0) }
 fn axis_reduction_mean_needs_a_float_element() {
     assert_rejects_with_issue(
         r"
-functio bad(tensor<i32, [2, 3]> g) → tensor<f32, [2]> { redde g.media(axis 1) }
+functio bad(tensor<textus, [2, 3]> g) → tensor<f32, [2]> { redde g.media(axis 1) }
 ",
         "axis_reduction_mean_requires_float",
     );
