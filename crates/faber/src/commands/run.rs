@@ -44,7 +44,9 @@ pub(super) fn cmd_run(args: RunArgs) {
     }
 
     if let Some(seed) = args.shuffle_seed {
-        let _ = radix::module::mir::configure_shuffle_seed(seed);
+        if !radix::module::mir::configure_shuffle_seed(seed) {
+            eprintln!("note: shuffle seed already configured; the first value stays in effect");
+        }
     }
     #[cfg(all(feature = "device-runtime", target_os = "macos"))]
     if args.debug {
