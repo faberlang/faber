@@ -1146,6 +1146,39 @@ fn rejects_unlabeled_ratio_type_argument_with_targeted_issue() {
 }
 
 #[test]
+fn record_field_list_hole_parses_as_hole_type() {
+    let result = parse_ok_la("functio f(ratio<*> v) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    assert!(matches!(
+        func.params[0].ty.kind,
+        TypeExprKind::FieldListHole
+    ));
+}
+
+#[test]
+fn record_field_list_hole_must_be_sole_argument() {
+    expect_expected_issue(
+        "functio f(ratio<g: f32, *> value) → vacuum {}",
+        "ratio_field_list_hole_not_sole",
+    );
+    expect_expected_issue(
+        "functio f(ratio<*, g: f32> value) → vacuum {}",
+        "ratio_field_list_hole_not_sole",
+    );
+}
+
+#[test]
+fn record_underscore_argument_still_requires_label() {
+    expect_expected_issue(
+        "functio f(ratio<_> value) → vacuum {}",
+        "ratio_type_arg_label_required",
+    );
+}
+
+#[test]
 fn rejects_duplicate_ratio_labels_at_the_duplicate_label() {
     let source = "functio f(ratio<g: f32, g: numerus> value) → vacuum {}";
     let result = parse_program_la(source);

@@ -1876,7 +1876,7 @@ fn resolve_type_expr(
     errors: &mut Vec<SemanticError>,
 ) {
     match &ty.kind {
-        TypeExprKind::Infer => {}
+        TypeExprKind::Infer | TypeExprKind::FieldListHole => {}
         TypeExprKind::UnionHole => {}
         TypeExprKind::Tensor(elem, figura) => {
             resolve_type_expr(resolver, interner, elem, errors);
@@ -3489,7 +3489,9 @@ fn lower_type_expr_with_context(
     // declared shape of a type expression so aliases have stable TypeIds, but
     // assignability and expression typing remain HIR-phase responsibilities.
     let mut ty_id = match &ty.kind {
-        TypeExprKind::Infer => types.intern(Type::Infer(crate::InferVar(ty.span.start))),
+        TypeExprKind::Infer | TypeExprKind::FieldListHole => {
+            types.intern(Type::Infer(crate::InferVar(ty.span.start)))
+        }
         TypeExprKind::UnionHole => types.intern(Type::InferUnion(crate::InferVar(ty.span.start))),
         TypeExprKind::Tensor(elem, figura) => {
             lower_tensor_type_expr(elem, figura, resolver, interner, types)?

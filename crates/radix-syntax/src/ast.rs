@@ -1887,6 +1887,11 @@ pub enum TypeExprKind {
     /// hole consumes the whole type expression; it is distinct from `Infer`
     /// (monomorphic hole) and from `Union` (explicit member list).
     UnionHole,
+    /// Field-list hole: `*` as the sole argument of `record<...>` (la
+    /// `ratio<*>`). It stands for the whole field list, solved from the
+    /// shape. The whole `record<*>` spelling is this one node; it has no
+    /// `Named` wrapper.
+    FieldListHole,
     Named(Ident, Vec<GenericArgExpr>),
     /// Qualified named type: `namespace.Type`.
     Qualified(Vec<Ident>, Vec<GenericArgExpr>),

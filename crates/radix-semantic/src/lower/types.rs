@@ -164,7 +164,12 @@ impl Lowerer<'_> {
     ) -> TypeId {
         self.current_span = ty.span;
 
-        if signature_position && matches!(ty.kind, TypeExprKind::Infer | TypeExprKind::UnionHole) {
+        if signature_position
+            && matches!(
+                ty.kind,
+                TypeExprKind::Infer | TypeExprKind::UnionHole | TypeExprKind::FieldListHole
+            )
+        {
             self.error("signature_position_hole");
             return self.types.intern(Type::Error);
         }
@@ -178,7 +183,7 @@ impl Lowerer<'_> {
         }
 
         let mut ty_id = match &ty.kind {
-            TypeExprKind::Infer => {
+            TypeExprKind::Infer | TypeExprKind::FieldListHole => {
                 let infer_id = self.next_def_id().0;
                 self.types.intern(Type::Infer(InferVar(infer_id)))
             }
@@ -330,7 +335,7 @@ impl Lowerer<'_> {
         frame: super::TypeFormFrame,
     ) -> radix_hir::HirTypeForm {
         let head = match &expr.kind {
-            TypeExprKind::Infer => radix_hir::HirTypeFormHead::Infer,
+            TypeExprKind::Infer | TypeExprKind::FieldListHole => radix_hir::HirTypeFormHead::Infer,
             TypeExprKind::UnionHole => radix_hir::HirTypeFormHead::UnionHole,
             _ => match frame.named {
                 Some((def_id, path)) => radix_hir::HirTypeFormHead::Named { def_id, path },
