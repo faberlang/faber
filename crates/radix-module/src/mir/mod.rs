@@ -98,6 +98,9 @@ mod lane_form_test;
 #[path = "interface_dispatch_test.rs"]
 mod interface_dispatch_test;
 #[cfg(test)]
+#[path = "ledger_lower_test.rs"]
+mod ledger_lower_test;
+#[cfg(test)]
 #[path = "lista_lift_test.rs"]
 mod lista_lift_test;
 #[cfg(test)]

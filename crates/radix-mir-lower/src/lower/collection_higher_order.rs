@@ -563,7 +563,7 @@ impl FunctionBuilder<'_> {
         let (is_set, is_map) = match self.normalized_type(payload) {
             Type::Array(_) | Type::BoundedArray { .. } => (false, false),
             Type::Set(_) => (true, false),
-            Type::Map(_, _) => (false, true),
+            Type::Map(_, _) | Type::Ledger(_, _) => (false, true),
             _ => {
                 self.errors.push(MirError::unsupported(
                     source.span,

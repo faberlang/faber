@@ -215,7 +215,7 @@ pub fn index_projection_result_ty(
         | Type::BoundedArray { element: inner, .. }
         | Type::Tensor(inner, _)
         | Type::Vector(inner, _) => Ok(MirType::semantic(*inner)),
-        Type::Map(_, value) => Ok(MirType::semantic(*value)),
+        Type::Map(_, value) | Type::Ledger(_, value) => Ok(MirType::semantic(*value)),
         Type::Primitive(Primitive::Textus) => {
             Ok(MirType::semantic(types.primitive(Primitive::Textus)))
         }

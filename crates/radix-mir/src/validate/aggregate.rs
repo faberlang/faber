@@ -259,7 +259,7 @@ impl Validator<'_, '_> {
             }
             (MirAggregateKind::Map, MirAggregateFields::Keyed(items)) => {
                 let (key_ty, value_ty) = match self.type_kind(aggregate.ty) {
-                    Type::Map(key, value) => (
+                    Type::Map(key, value) | Type::Ledger(key, value) => (
                         Some(MirType::semantic(*key)),
                         Some(MirType::semantic(*value)),
                     ),

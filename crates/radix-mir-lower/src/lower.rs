@@ -1242,7 +1242,7 @@ fn ensure_map_iteration_array_types(types: &mut TypeTable) {
             reason = "TypeId is u32 by design; type_count is bounded by u32::MAX"
         )]
         match types.get(TypeId(index as u32)) {
-            Type::Map(key, value) => {
+            Type::Map(key, value) | Type::Ledger(key, value) => {
                 elements.insert(*key);
                 elements.insert(*value);
             }
@@ -4368,7 +4368,7 @@ impl<'a> FunctionBuilder<'a> {
                 mir_ty,
                 span,
             )),
-            Type::Map(_, _) => {
+            Type::Map(_, _) | Type::Ledger(_, _) => {
                 Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(Vec::new()), mir_ty, span))
             }
             Type::Set(_) => {

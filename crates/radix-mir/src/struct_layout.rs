@@ -198,7 +198,7 @@ fn field_spec(
         Type::Tuple(_) => return Err(StructLayoutRefusal::Tuple),
         Type::Record(_) => return Err(StructLayoutRefusal::Record),
         Type::Array(_) => return Err(StructLayoutRefusal::List),
-        Type::Map(_, _) => return Err(StructLayoutRefusal::Map),
+        Type::Map(_, _) | Type::Ledger(_, _) => return Err(StructLayoutRefusal::Map),
         Type::Set(_) => return Err(StructLayoutRefusal::Set),
         Type::Tensor(_, _) | Type::Sparsa(_, _) => return Err(StructLayoutRefusal::Tensor),
         Type::Option(_) => return Err(StructLayoutRefusal::Nullable),

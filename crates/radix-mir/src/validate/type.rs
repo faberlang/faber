@@ -121,7 +121,7 @@ impl Validator<'_, '_> {
                 .map_err(|error| self.error(error.span, error.message))
                 .ok()
             }
-            Type::Map(key, value) => {
+            Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.require_assignable(
                     self.primitive(Primitive::Textus),
                     MirType::semantic(key),
@@ -364,7 +364,7 @@ impl Validator<'_, '_> {
                 }
                 Some(MirType::semantic(inner))
             }
-            Type::Map(key, value) => {
+            Type::Map(key, value) | Type::Ledger(key, value) => {
                 if let Some((index_op, index_ty)) = index {
                     self.require_assignable_or_fitting_constant(
                         index_op,

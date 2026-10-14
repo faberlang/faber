@@ -4024,12 +4024,16 @@ impl FunctionBuilder<'_> {
             Type::Stack(item) | Type::BoundedStack { element: item, .. } if matches!(mode, HirIteraMode::Ex) => {
                 CollectionIteraKind::Stack(*item)
             }
-            Type::Map(key, value) if matches!(mode, HirIteraMode::Ex) && has_coordinates => {
+            Type::Map(key, value) | Type::Ledger(key, value) if matches!(mode, HirIteraMode::Ex) && has_coordinates => {
                 CollectionIteraKind::MapEntries { key: *key, value: *value }
             }
             Type::Set(element) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::SetElements(*element),
-            Type::Map(key, _) if matches!(mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
-            Type::Map(_, value) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
+            Type::Map(key, _) | Type::Ledger(key, _) if matches!(mode, HirIteraMode::De) => {
+                CollectionIteraKind::MapKeys(*key)
+            }
+            Type::Map(_, value) | Type::Ledger(_, value) if matches!(mode, HirIteraMode::Ex) => {
+                CollectionIteraKind::MapValues(*value)
+            }
             // Borrowed receiver (`de`/`mut` param, or a field read through
             // a reference): peel the `Ref` marker and classify the pointee
             // with this same classifier, so a borrowed receiver and its
@@ -4119,7 +4123,7 @@ impl FunctionBuilder<'_> {
         if matches!(&collection_kind, CollectionIteraKind::Unsupported) {
             // Only map-value iteration carries the tabula decline; tensor and
             // bounded-lista declines keep the generic iterator diagnostic.
-            let is_map = matches!(self.normalized_type(iter_ty), Type::Map(_, _));
+            let is_map = matches!(self.normalized_type(iter_ty), Type::Map(_, _) | Type::Ledger(_, _));
             self.errors.push(MirError::unsupported(
                 iter.iter.span,
                 if matches!(iter.mode, HirIteraMode::Ex) && is_map {

@@ -101,7 +101,7 @@ impl FunctionBuilder<'_> {
                 ty,
                 expr.span,
             )),
-            Type::Map(_, _) => {
+            Type::Map(_, _) | Type::Ledger(_, _) => {
                 Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(Vec::new()), ty, expr.span))
             }
             Type::Set(_) => {
@@ -316,7 +316,7 @@ impl FunctionBuilder<'_> {
                 let ty = self.expr_ty(expr).unwrap_or(MirType::semantic(target));
                 Some(self.construct_temp(MirAggregateKind::Record, MirAggregateFields::Named(fields), ty, expr.span))
             }
-            Type::Map(_, _) => {
+            Type::Map(_, _) | Type::Ledger(_, _) => {
                 // A bare `{ "k": v }` literal ascribed with `∷` stays a JSON
                 // valor literal source (it has no object entries); its members
                 // are the key/value pairs of the ascribed map type, exactly as
@@ -723,7 +723,7 @@ impl FunctionBuilder<'_> {
         };
         let mir_ty = MirType::semantic(type_id);
         match self.types.get(type_id) {
-            Type::Map(_, _) => {
+            Type::Map(_, _) | Type::Ledger(_, _) => {
                 let radix_syntax::JsonValue::Object(members) = value else {
                     self.errors.push(MirError::unsupported(
                         span,

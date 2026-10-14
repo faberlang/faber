@@ -875,7 +875,7 @@ impl FunctionBuilder<'_> {
             else {
                 return None;
             };
-            let keyed = matches!(self.types.get(receiver_ty.semantic_id()), Type::Map(..));
+            let keyed = matches!(self.types.get(receiver_ty.semantic_id()), Type::Map(..) | Type::Ledger(..));
             let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
             let helper = self.push_checked_at_helper(keyed, [receiver_ty, index_ty], expr_ty, textus, expr.span);
             return self.lower_failable_call(
@@ -3349,7 +3349,14 @@ impl FunctionBuilder<'_> {
             return Some(MirCollectionOp::TensorCreate);
         }
         let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
-        let entry = radix_intrinsics::lookup_method_for_type(payload, method_name, args.len())?;
+        // A ledger method dispatches through its map twin's Tabula rows: the
+        // carrier shape is the same and only the value kind distinguishes it.
+        let entry = match payload {
+            Type::Ledger(key, value) => {
+                radix_intrinsics::lookup_method_for_type(&Type::Map(*key, *value), method_name, args.len())?
+            }
+            other => radix_intrinsics::lookup_method_for_type(other, method_name, args.len())?,
+        };
         radix_intrinsics::mir_collection_op(entry)
     }
 
