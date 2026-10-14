@@ -39,6 +39,7 @@ const ISSUE_AXIS_REDUCTION_OUT_OF_RANGE: &str = "axis_reduction_out_of_range";
 const ISSUE_AXIS_REDUCTION_REPEATED: &str = "axis_reduction_repeated";
 const ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN: &str = "axis_reduction_extent_unknown";
 const ISSUE_AXIS_REDUCTION_MEAN_REQUIRES_FLOAT: &str = "axis_reduction_mean_requires_float";
+const ISSUE_SOFTMAX_AXIS_NOT_LAST: &str = "softmax_axis_not_last";
 
 /// Outcome of the `t.sum(axis n)` / `t.mean(axis n)` expansion probe.
 pub(super) enum AxisReduction {
@@ -320,6 +321,98 @@ impl TypeChecker<'_> {
             }
         };
         AxisReduction::Expanded
+    }
+}
+
+/// Outcome of the `t.softmax(axis n)` marker probe (SOFTAXIS).
+pub(super) enum SoftmaxAxis {
+    /// Not an explicit-axis softmax call: checked as written.
+    NotApplicable,
+    /// A named diagnostic was reported; the node is typed as an error.
+    Refused,
+    /// The marker was consumed; the call continues as the bare form.
+    Cleared,
+}
+
+impl TypeChecker<'_> {
+    /// SOFTAXIS: `t.softmax(axis n)` may name the axis
+    /// explicitly, as `laminatio` / `rms_norm` do, but softmax normalizes over
+    /// the last axis only. The axis is a compile-time constant in `0..rank`
+    /// and must equal `rank - 1`; the marker is then cleared so every later
+    /// pass sees the bare `t.softmax()` and the pipeline is unchanged.
+    pub(super) fn desugar_softmax_axis(&mut self, expr: &mut HirExpression) -> SoftmaxAxis {
+        let HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) =
+            &mut expr.kind
+        else {
+            return SoftmaxAxis::NotApplicable;
+        };
+        if !type_args.is_empty()
+            || conversion.is_some()
+            || args.len() != 1
+            || args[0].marker != Some(radix_hir::HirArgMarker::Axis)
+            || args[0].spread
+            || args[0].name.is_some()
+        {
+            return SoftmaxAxis::NotApplicable;
+        }
+        let Some(interner) = self.interner else {
+            return SoftmaxAxis::NotApplicable;
+        };
+        let surface = interner.resolve(*name).to_owned();
+        let canonical = self
+            .locale_pack
+            .and_then(|pack| {
+                pack.intrinsic_canonical(radix_intrinsics::IntrinsicReceiver::Tensor, &surface)
+            })
+            .map_or(surface, str::to_owned);
+        if canonical != "activatio_softmax" {
+            return SoftmaxAxis::NotApplicable;
+        }
+        let receiver_ty = self.check_expr(receiver);
+        // The receiver is checked exactly once, whether the probe declines or
+        // the marker is consumed (see `twin_probed_receiver`).
+        self.twin_probed_receiver = Some((receiver.id, receiver_ty));
+        let resolved = self.resolve_inferred_type(receiver_ty);
+        let dispatch = self.types.peel_access_marker(resolved).1;
+        let shape = match self.types.get(dispatch) {
+            Type::Tensor(_, shape) => *shape,
+            _ => return SoftmaxAxis::NotApplicable,
+        };
+        let dims = match self.types.get_index(shape) {
+            IndexExpr::Tuple(dims) if (1..=MAX_AXIS_REDUCTION_RANK).contains(&dims.len()) => {
+                dims.clone()
+            }
+            _ => return SoftmaxAxis::NotApplicable,
+        };
+        let rank = dims.len();
+        let Some(axis) =
+            super::integer_range::const_int_value_resolved(&args[0].expr, &self.const_int_values)
+        else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_AXIS_REDUCTION_NOT_CONSTANT,
+                args[0].span,
+            );
+            return SoftmaxAxis::Refused;
+        };
+        if !(0..rank as i128).contains(&axis) {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_AXIS_REDUCTION_OUT_OF_RANGE,
+                args[0].span,
+            );
+            return SoftmaxAxis::Refused;
+        }
+        if axis != (rank - 1) as i128 {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_SOFTMAX_AXIS_NOT_LAST,
+                args[0].span,
+            );
+            return SoftmaxAxis::Refused;
+        }
+        args.clear();
+        SoftmaxAxis::Cleared
     }
 }
 

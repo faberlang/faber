@@ -2999,6 +2999,10 @@ help = "`axis 1` जैसा literal axis लिखें; result shape उस 
 message = "axis tensor के rank के बाहर है"
 help = "0 से rank से एक कम तक का axis उपयोग करें"
 
+[diagnostics.SEM010.issues.softmax_axis_not_last]
+message = "softmax का axis अंतिम axis होना चाहिए"
+help = "softmax केवल अंतिम axis पर सामान्यीकरण करता है; अंतिम axis लिखें या बिना argument वाला रूप उपयोग करें"
+
 [diagnostics.SEM010.issues.axis_reduction_repeated]
 message = "reduction में एक ही axis एक से अधिक बार आया है"
 help = "दोहराया गया axis हटाएँ; हर axis केवल एक बार आ सकता है"

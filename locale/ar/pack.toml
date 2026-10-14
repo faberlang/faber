@@ -2987,6 +2987,10 @@ help = "اكتب محورا حرفيا مثل `axis 1`؛ فشكل النتيجة
 message = "المحور خارج رتبة tensor"
 help = "استخدم محورا من 0 حتى واحد أقل من الرتبة"
 
+[diagnostics.SEM010.issues.softmax_axis_not_last]
+message = "يجب أن يكون محور softmax هو المحور الأخير"
+help = "يقوم softmax بالتطبيع على المحور الأخير فقط؛ اكتب آخر محور أو استخدم الصيغة المجرّدة"
+
 [diagnostics.SEM010.issues.axis_reduction_repeated]
 message = "المحور نفسه مذكور أكثر من مرة في الاختزال"
 help = "أزل المحور المكرر؛ يمكن أن يظهر كل محور مرة واحدة"

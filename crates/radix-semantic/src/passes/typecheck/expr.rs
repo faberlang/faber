@@ -647,6 +647,12 @@ impl TypeChecker<'_> {
             self.pending_conversion = saved_pending_conversion;
             return self.error_type;
         }
+        // SOFTAXIS: `t.softmax(axis n)` may name the last axis
+        // explicitly; the marker is cleared before the call is checked.
+        if let super::reduction::SoftmaxAxis::Refused = self.desugar_softmax_axis(expr) {
+            self.pending_conversion = saved_pending_conversion;
+            return self.error_type;
+        }
         // ss1: a numeric method twin means its operator; rewrite it first.
         let in_place_twin = self.desugar_numeric_twin(expr);
         // Ruling 2026-10-08: `empty` at a dense tensor, vector, or matrix slot

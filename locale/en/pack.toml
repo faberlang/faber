@@ -4503,6 +4503,10 @@ help = "write a literal axis such as `axis 1`; the result shape depends on it"
 message = "the axis is outside the rank of the tensor"
 help = "use an axis from 0 up to one less than the rank"
 
+[diagnostics.SEM010.issues.softmax_axis_not_last]
+message = "the softmax axis must be the last axis"
+help = "softmax normalizes over the last axis only; write the last axis or use the bare form"
+
 [diagnostics.SEM010.issues.axis_reduction_repeated]
 message = "the same axis is named more than once in the reduction"
 help = "remove the repeated axis; each axis may appear once"

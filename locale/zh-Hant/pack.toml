@@ -2987,6 +2987,10 @@ help = "寫出字面軸，例如 `axis 1`；結果形狀取決於它"
 message = "該軸超出張量的秩"
 help = "使用從 0 到比秩小 1 的軸"
 
+[diagnostics.SEM010.issues.softmax_axis_not_last]
+message = "softmax 的軸必須是最後一軸"
+help = "softmax 僅在最後一軸上正規化；請寫出最後一軸，或使用無引數形式"
+
 [diagnostics.SEM010.issues.axis_reduction_repeated]
 message = "同一個軸在歸約中被多次指定"
 help = "刪除重複的軸；每個軸只能出現一次"
