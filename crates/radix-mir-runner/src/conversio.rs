@@ -33,6 +33,7 @@ mod rounding;
 #[cfg(test)]
 mod rounding_test;
 mod scalar;
+mod scalar_octeti;
 
 #[derive(Clone, Copy)]
 pub(crate) enum MissingFieldPolicy {
@@ -268,7 +269,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.convert_to_bounded_textus(value, *capacity, recovery, span)
             }
             Type::BoundedOcteti { capacity } => {
-                self.convert_to_bounded_octeti(value, *capacity, recovery, span)
+                if matches!(
+                    value,
+                    Value::Int(_) | Value::UInt(_) | Value::Float(_)
+                ) {
+                    self.convert_scalar_to_bounded_octeti(
+                        value, source_ty, *capacity, params, span,
+                    )
+                } else {
+                    self.convert_to_bounded_octeti(value, *capacity, recovery, span)
+                }
             }
             Type::Primitive(Primitive::Regex) => self.convert_to_regex(value, recovery, span),
             Type::Primitive(Primitive::Json) => self.convert_to_json(value, recovery, span),
