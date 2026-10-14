@@ -472,6 +472,33 @@ fn instans_cross_precision_compare_emits_partial_cmp_at_coarser() {
 }
 
 #[test]
+fn instans_cross_precision_approx_eq_emits_partial_cmp_at_coarser() {
+    let session = test_session_la(Target::HirRust);
+    let source = "functio same(instans<ns> fine, instans<ms> coarse) → bivalens { redde fine ≅ coarse }";
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let code = super::rust_output(result).code;
+    assert!(
+        code.contains(".partial_cmp_at_coarser(") && code.contains("std::cmp::Ordering::Equal"),
+        "expected coarser-precision instans approx-eq compare, got:\n{code}"
+    );
+}
+
+#[test]
+fn instans_cross_precision_approx_not_eq_emits_partial_cmp_at_coarser() {
+    let session = test_session_la(Target::HirRust);
+    let source = "functio differ(instans<ns> fine, instans<ms> coarse) → bivalens { redde fine ≇ coarse }";
+    let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+    let code = super::rust_output(result).code;
+    assert!(
+        code.contains(".partial_cmp_at_coarser(")
+            && code.contains("!= Some(std::cmp::Ordering::Equal)"),
+        "expected coarser-precision instans approx-not-eq compare, got:\n{code}"
+    );
+}
+
+#[test]
 fn instans_to_textus_conversio_emits_to_rfc3339() {
     let session = test_session_la(Target::HirRust);
     let source = "functio wire(instans t) → textus { redde t ↦ textus }";
