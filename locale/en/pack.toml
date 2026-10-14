@@ -4554,8 +4554,8 @@ message = "the right side of '⇇' reads the storage the left side writes"
 help = "copy from a different tensor, or call materialize() on the right side first"
 
 [diagnostics.SEM057.issues.mut_tensor_param_rebind]
-message = "'←' cannot rebind a mut tensor parameter"
-help = "write into the caller's tensor with 'target ⇇ value'; '←' only binds names"
+message = "a kernel parameter is a device buffer; '←' cannot re-point it"
+help = "fill the buffer with 'target ⇇ value'"
 
 [diagnostics.SEM058]
 message = "use before initialization"
