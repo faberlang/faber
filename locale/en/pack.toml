@@ -391,6 +391,7 @@ planata = "flatten"
 gather = "gather"
 rms_norm = "rms_norm"
 rope_norm = "rope_norm"
+causal_softmax = "causal_softmax"
 gelu = "gelu"
 silu = "silu"
 # K5 (rule 15): the built-in scalar math functions lifted over a tensor.

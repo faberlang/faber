@@ -914,7 +914,6 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::TensorFromFlat,
         // Internal device vocabulary (target-lane owned).
         MirCollectionOp::TensorRopeHalf,
-        MirCollectionOp::TensorCausalMaskedSoftmax,
         MirCollectionOp::TensorQuantizedMatMul,
         MirCollectionOp::TensorGroupedMatMul,
         MirCollectionOp::TensorBatchedAttention,
