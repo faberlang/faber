@@ -21,7 +21,7 @@ functio bad(Foo f) → numerus {
 
 #[test]
 fn textus_to_regex_conversio_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { fixum _ r ← "\d+" ↦ regex }"#);
+    test_support::assert_accepts_la(r#"incipit { fixum _ r ← "\\d+" ↦ regex }"#);
 }
 
 #[test]
@@ -32,7 +32,7 @@ fn ascii_to_regex_conversio_typechecks_via_textus_widening() {
 #[test]
 fn regex_conversio_rejects_recovery_slot() {
     test_support::assert_rejects_with_issue_la(
-        r#"incipit { fixum _ r ← "\d[" ↦ regex ⊥ "\d+" }"#,
+        r#"incipit { fixum _ r ← "\\d[" ↦ regex ⊥ "\\d+" }"#,
         "regex_recovery_unsupported",
     );
 }
