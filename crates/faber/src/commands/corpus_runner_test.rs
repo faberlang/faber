@@ -1,4 +1,4 @@
-use super::{Case, ChildError, Outcome, TargetExpectation, runner_run_args, run_bounded};
+use super::{Case, ChildError, Outcome, TargetExpectation, run_bounded, runner_run_args};
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -57,7 +57,10 @@ fn run_bounded_times_out_when_a_descendant_holds_the_pipe_after_the_parent_exits
         panic!("a descendant holding the pipe must hit the deadline, not return output");
     };
     assert_eq!(limit, Duration::from_secs(1));
-    assert!(elapsed < Duration::from_secs(10), "run_bounded took {elapsed:?}");
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "run_bounded took {elapsed:?}"
+    );
     let pid = fs::read_to_string(&pidfile)
         .expect("the case recorded its descendant pid")
         .trim()
