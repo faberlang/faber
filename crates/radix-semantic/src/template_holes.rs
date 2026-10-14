@@ -52,6 +52,22 @@ impl TemplateHoleAnalysis {
     pub fn labels_are_unique(&self) -> bool {
         self.duplicate_labels.is_empty()
     }
+
+    /// The positional value slots a template application must supply.
+    ///
+    /// The first element is the number of required values: the largest hole
+    /// position plus one, or zero when the template has no holes. The second
+    /// element is the number of distinct positions some hole actually reads;
+    /// when it is smaller than the first, the template leaves a value slot
+    /// unread.
+    #[must_use]
+    pub fn value_slots(&self) -> (usize, usize) {
+        let Some(max_position) = self.holes.iter().map(|hole| hole.position).max() else {
+            return (0, 0);
+        };
+        let distinct: BTreeSet<usize> = self.holes.iter().map(|hole| hole.position).collect();
+        (max_position.saturating_add(1), distinct.len())
+    }
 }
 
 /// Scan `template` and assign all holes to the existing positional domain.

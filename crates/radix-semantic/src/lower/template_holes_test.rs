@@ -239,6 +239,55 @@ incipit {
 }
 
 #[test]
+fn repeated_numbered_hole_takes_one_value() {
+    let (template, args) = scriptum_application(
+        r#"
+incipit {
+    fixum textus out ← "§0, §0, §0, and §1"("her", "me")
+    nota out
+}
+"#,
+    );
+    assert_eq!(template, "§0, §0, §0, and §1");
+    assert_eq!(args, vec!["str:her".to_owned(), "str:me".to_owned()]);
+}
+
+#[test]
+fn repeated_numbered_hole_with_duplicate_values_is_rejected() {
+    test_support::assert_rejects_with_issue(
+        r#"
+incipit {
+    fixum textus out ← "§0, §0, §0, and §1"("her", "her", "her", "me")
+    nota out
+}
+"#,
+        "template_application_arity_mismatch",
+    );
+}
+
+#[test]
+fn gap_in_numbered_holes_is_rejected() {
+    test_support::assert_rejects_with_issue(
+        r#"
+incipit {
+    fixum textus out ← "§0 and §2"("a", "b", "c")
+    nota out
+}
+"#,
+        "template_application_arity_mismatch",
+    );
+    test_support::assert_rejects_with_issue(
+        r#"
+incipit {
+    fixum textus out ← "§0 and §2"("a", "b")
+    nota out
+}
+"#,
+        "template_application_arity_mismatch",
+    );
+}
+
+#[test]
 fn under_arity_template_application_is_rejected() {
     test_support::assert_rejects_with_issue(
         r#"
@@ -395,6 +444,20 @@ incipit {
 }
 
 #[test]
+fn forma_repeated_numbered_hole_takes_one_value() {
+    let (template, params) = forma_capture(
+        r#"
+incipit {
+    fixum _ captured ← `x = §0 or y = §0`("v")
+    nota captured
+}
+"#,
+    );
+    assert_eq!(template, "x = §0 or y = §0");
+    assert_eq!(params, vec!["str:v".to_owned()]);
+}
+
+#[test]
 fn bare_forma_literal_keeps_named_hole_text() {
     let text = forma_template_text(
         r"
@@ -535,13 +598,13 @@ fn named_hole_before_repeated_explicit_index_has_positional_hir_parity() {
         "§{greet} §0 ≡ § §0",
         r#"
 incipit {
-    fixum textus out ← "§{greet} §0"("one", "two")
+    fixum textus out ← "§{greet} §0"("one")
     nota out
 }
 "#,
         r#"
 incipit {
-    fixum textus out ← "§ §0"       ("one", "two")
+    fixum textus out ← "§ §0"       ("one")
     nota out
 }
 "#,

@@ -93,6 +93,27 @@ fn invalid_label_body_falls_back_to_literal_text_after_an_auto_hole() {
 }
 
 #[test]
+fn value_slots_require_the_highest_index_plus_one() {
+    let analysis = analyze_template("§0, §0, §0, and §1");
+
+    assert_eq!(analysis.value_slots(), (2, 2));
+}
+
+#[test]
+fn value_slots_report_unread_positions_as_distinct_slots() {
+    let analysis = analyze_template("§0 and §2");
+
+    assert_eq!(analysis.value_slots(), (3, 2));
+}
+
+#[test]
+fn value_slots_follow_automatic_and_explicit_positions() {
+    assert_eq!(analyze_template("§1 §").value_slots(), (2, 2));
+    assert_eq!(analyze_template("§{greet} §0").value_slots(), (1, 1));
+    assert_eq!(analyze_template("plain text").value_slots(), (0, 0));
+}
+
+#[test]
 fn explicit_indexes_do_not_consume_automatic_positions() {
     let analysis = analyze_template("§2 § §{named}");
 
