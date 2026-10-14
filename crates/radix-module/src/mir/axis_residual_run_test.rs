@@ -41,9 +41,7 @@ fn issues(body: &str) -> Vec<String> {
 #[test]
 fn integer_axis_mean_over_rows_prints_float_means() {
     assert_eq!(
-        ok(
-            "    const tf64[2] means ← grid.mean(axis 1)\n    print means[0]\n    print means[1]"
-        ),
+        ok("    const tf64[2] means ← grid.mean(axis 1)\n    print means[0]\n    print means[1]"),
         ["2.0", "5.0"]
     );
 }
@@ -51,19 +49,14 @@ fn integer_axis_mean_over_rows_prints_float_means() {
 #[test]
 fn integer_axis_mean_over_columns_prints_float_means() {
     assert_eq!(
-        ok(
-            "    const tf64[3] means ← grid.mean(axis 0)\n    print means[0]\n    print means[1]\n    print means[2]"
-        ),
+        ok("    const tf64[3] means ← grid.mean(axis 0)\n    print means[0]\n    print means[1]\n    print means[2]"),
         ["2.5", "3.5", "4.5"]
     );
 }
 
 #[test]
 fn integer_axis_mean_accepts_the_tf64_result_and_refuses_ti32() {
-    assert_eq!(
-        ok("    const tf64[2] means ← grid.mean(axis 1)\n    print means[0]"),
-        ["2.0"]
-    );
+    assert_eq!(ok("    const tf64[2] means ← grid.mean(axis 1)\n    print means[0]"), ["2.0"]);
     let rejected = issues("    const ti32[2] means ← grid.mean(axis 1)");
     assert!(
         rejected

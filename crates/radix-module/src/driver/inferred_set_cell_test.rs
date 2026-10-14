@@ -37,8 +37,7 @@ fn inferred_set_cell_bare_literal_runs_on_the_mir_runner() {
 #[test]
 fn inferred_set_cell_element_type_mismatch_is_named() {
     let session = test_session(Target::HirRust);
-    let source =
-        "+++\nlocale = \"en\"\n+++\n\nmain {\n    const set<int> s ← [\"a\"]\n    print s.length()\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\n\nmain {\n    const set<int> s ← [\"a\"]\n    print s.length()\n}\n";
     assert_compile_fails_with_issue(&session, "set-mismatch.fab", source, "expression_type_mismatch");
 }
 
