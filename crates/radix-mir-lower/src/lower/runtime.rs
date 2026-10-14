@@ -3005,8 +3005,8 @@ impl FunctionBuilder<'_> {
         let sermo_def = self.context.sermo_def?;
         match self.normalized_type(source_ty) {
             Type::Struct(def_id) if *def_id == sermo_def => {}
-            Type::Applied(base, _)
-                if matches!(self.types.get(*base), Type::Struct(def_id) if *def_id == sermo_def) => {}
+            Type::Applied(base, _) if matches!(self.types.get(*base), Type::Struct(def_id) if *def_id == sermo_def) => {
+            }
             _ => return None,
         }
         let destination = self.error_ty?;
@@ -3811,14 +3811,7 @@ impl FunctionBuilder<'_> {
                 .collect();
             let value_ty = MirType::semantic(self.types.primitive(Primitive::Valor));
             let helper = self.push_conversio_helper(&param_tys, target, params, ty, value_ty, expr.span);
-            return self.lower_failable_call(
-                MirCallee::Function(helper),
-                args,
-                ty,
-                value_ty,
-                Some(row),
-                expr.span,
-            );
+            return self.lower_failable_call(MirCallee::Function(helper), args, ty, value_ty, Some(row), expr.span);
         }
         let result = self.runtime_call_value(
             MirIntrinsic::Convert(MirConversion {
