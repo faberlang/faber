@@ -107,6 +107,24 @@ fn value_slots_report_unread_positions_as_distinct_slots() {
 }
 
 #[test]
+fn first_unread_slot_names_the_first_missing_position() {
+    let analysis = analyze_template("§0 and §2");
+
+    assert_eq!(analysis.first_unread_slot(), Some(1));
+}
+
+#[test]
+fn first_unread_slot_is_none_when_every_position_is_read() {
+    assert_eq!(
+        analyze_template("§0, §0, §0, and §1").first_unread_slot(),
+        None
+    );
+    assert_eq!(analyze_template("§1 §").first_unread_slot(), None);
+    assert_eq!(analyze_template("§2 § §{named}").first_unread_slot(), None);
+    assert_eq!(analyze_template("plain").first_unread_slot(), None);
+}
+
+#[test]
 fn value_slots_follow_automatic_and_explicit_positions() {
     assert_eq!(analyze_template("§1 §").value_slots(), (2, 2));
     assert_eq!(analyze_template("§{greet} §0").value_slots(), (1, 1));

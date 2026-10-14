@@ -68,6 +68,19 @@ impl TemplateHoleAnalysis {
         let distinct: BTreeSet<usize> = self.holes.iter().map(|hole| hole.position).collect();
         (max_position.saturating_add(1), distinct.len())
     }
+
+    /// The smallest required value slot that no hole addresses.
+    ///
+    /// A missing position exists exactly when [`Self::value_slots`] reports a
+    /// distinct count smaller than its required count. This names the first
+    /// gap in `0..required`, or `None` when every position in that range is
+    /// read.
+    #[must_use]
+    pub fn first_unread_slot(&self) -> Option<usize> {
+        let (required, _) = self.value_slots();
+        let read: BTreeSet<usize> = self.holes.iter().map(|hole| hole.position).collect();
+        (0..required).find(|position| !read.contains(position))
+    }
 }
 
 /// Scan `template` and assign all holes to the existing positional domain.
