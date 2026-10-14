@@ -88,3 +88,64 @@ fn wildcard_import_alias_stays_a_value_pattern() {
     };
     assert_eq!(result.interner.resolve(name.name), "g");
 }
+
+#[test]
+fn selective_import_keyword_spelled_member_keeps_later_members() {
+    let result = parse_ok(
+        "importa ex \"./figura.fab\" fixum solum, Figura\n\
+         genus Punctum { varia numerus x }\n\
+         functio f(Punctum ∪ Figura u) → vacuum {\n\
+         \x20   discerne u {\n\
+         \x20       casu Figura { tacet }\n\
+         \x20   }\n\
+         }",
+    );
+
+    let pattern = discerne_first_arm_pattern(&result, 2, 0);
+    let Pattern::Type(ty, _) = pattern else {
+        panic!("expected type pattern, got {pattern:?}");
+    };
+    let TypeExprKind::Named(name, _) = &ty.kind else {
+        panic!("expected named type, got {:?}", ty.kind);
+    };
+    assert_eq!(result.interner.resolve(name.name), "Figura");
+}
+
+#[test]
+fn selective_import_keyword_spelled_alias_keeps_later_members() {
+    let result = parse_ok(
+        "importa ex \"./figura.fab\" fixum Forma ut solum, Figura\n\
+         genus Punctum { varia numerus x }\n\
+         functio f(Punctum ∪ Figura u) → vacuum {\n\
+         \x20   discerne u {\n\
+         \x20       casu Figura { tacet }\n\
+         \x20   }\n\
+         }",
+    );
+
+    let pattern = discerne_first_arm_pattern(&result, 2, 0);
+    let Pattern::Type(ty, _) = pattern else {
+        panic!("expected type pattern, got {pattern:?}");
+    };
+    let TypeExprKind::Named(name, _) = &ty.kind else {
+        panic!("expected named type, got {:?}", ty.kind);
+    };
+    assert_eq!(result.interner.resolve(name.name), "Figura");
+}
+
+#[test]
+fn selective_import_trailing_comma_before_declaration_still_ends_list() {
+    let result = parse_ok(
+        "importa ex \"./figura.fab\" fixum Figura,\n\
+         genus Punctum { varia numerus x }",
+    );
+
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(class) = &program.statements[1].kind else {
+        panic!(
+            "expected genus declaration after the trailing comma, got {:?}",
+            program.statements[1].kind
+        );
+    };
+    assert_eq!(result.interner.resolve(class.name.name), "Punctum");
+}

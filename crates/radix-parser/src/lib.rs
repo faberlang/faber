@@ -551,23 +551,31 @@ impl Parser {
         }
     }
 
-    /// The plain-identifier member (or alias) at `index`, with the index just
-    /// past it. Keyword-spelled member names are skipped: a type-pattern
-    /// target is an identifier the peek can classify.
+    /// The member (or alias) name at `index`, with the index just past it.
+    ///
+    /// Mirrors the parser's declaration-name slot: a keyword-spelled `Ident`
+    /// is accepted whenever `keyword_allowed_as_ident` admits it, keeping the
+    /// surface spelling. The `ut` alias marker is the one keyword that names
+    /// nothing.
     fn import_member_name(
         &self,
         tokens: &[&radix_lexer::Token],
         index: usize,
     ) -> Option<(String, usize)> {
-        match tokens.get(index).map(|token| &token.kind) {
-            Some(TokenKind::Ident(sym))
-                if self
-                    .keyword_claim_key(*sym)
-                    .and_then(lookup_keyword_spec)
-                    .is_none() =>
-            {
+        let kind = &tokens.get(index)?.kind;
+        if self.token_keyword_identity(kind) == Some(TokenKind::Ut) {
+            return None;
+        }
+        match kind {
+            TokenKind::Ident(sym) => {
+                if let Some(identity) = self.token_keyword_identity(kind)
+                    && keyword_allowed_as_ident(KeywordOwner::DeclarationName, &identity).is_none()
+                {
+                    return None;
+                }
                 Some((self.interner.resolve(*sym).to_owned(), index + 1))
             }
+            TokenKind::Underscore(sym) => Some((self.interner.resolve(*sym).to_owned(), index + 1)),
             _ => None,
         }
     }
