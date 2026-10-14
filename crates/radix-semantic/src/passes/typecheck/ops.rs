@@ -1389,7 +1389,7 @@ impl TypeChecker<'_> {
                 {
                     result
                 } else if let Some(result) = self.check_addita_plus(lhs_ty, rhs_ty, lhs.span) {
-                    // Numeric tensor/vector/matrix `-` is the live `subtrahe` / `.subtract()` op.
+                    // Numeric tensor/vector/matrix `-` is the live `subtracta` / `.subtract()` op.
                     // Same-shape / tensor-broadcast contract as `+` — no extra broadcast.
                     result
                 } else if let Some(result) =

@@ -633,6 +633,23 @@ fn policy_float_cells_lower_for_every_float_width_and_both_policies() {
 }
 
 #[test]
+fn tensor_copy_out_elementwise_methods_require_numeric_element() {
+    use crate::tensor_method_requires_numeric_element;
+    for name in ["subtracta", "multiplicata"] {
+        assert!(
+            tensor_method_requires_numeric_element(name),
+            "tensor `{name}` must keep the numeric-element gate"
+        );
+    }
+    for name in ["subtrahe", "multiplica"] {
+        assert!(
+            !tensor_method_requires_numeric_element(name),
+            "imperative `{name}` is Numeric-only and must not gate tensor methods"
+        );
+    }
+}
+
+#[test]
 fn policy_float_saturating_keeps_the_decimal_rejection() {
     let mut interner = Interner::new();
     let mut types = TypeTable::new();

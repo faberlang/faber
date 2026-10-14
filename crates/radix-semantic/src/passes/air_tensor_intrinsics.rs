@@ -13,9 +13,9 @@ const ALLOWED_TENSOR_INTRINSICS: &[&str] = &[
     "addita",
     // S6-C2: the bounded bias-broadcast add is an AIR-lane tensor method.
     "addita_bias",
-    "subtrahe",
-    "multiplica",
-    "divisio",
+    "subtracta",
+    "multiplicata",
+    "divisa",
     "nega",
     "summa",
     "media",

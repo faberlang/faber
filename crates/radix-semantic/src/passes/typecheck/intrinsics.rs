@@ -451,8 +451,8 @@ pub(super) fn check_intrinsic_method_call(
     // A mutating intrinsic (registry `is_mutating_receiver`: Vacuum returns,
     // in-place collection ops, atomic exchange) rewrites its receiver's
     // contents in place, so a direct path to an immutable binding is rejected
-    // like a reassignment. Tensor elementwise `subtrahe`/`multiplica` share
-    // names with the numeric imperativus ops but return `SameAsReceiver`, so
+    // like a reassignment. Tensor elementwise `subtracta`/`multiplicata` share
+    // names with the numeric perfect forms but return `SameAsReceiver`, so
     // the registry predicate alone is the gate. Non-path receivers keep the
     // shallow mutability-engine D-1 behavior: a `fixum` field's contents stay
     // mutable through calls.
@@ -537,13 +537,13 @@ pub(super) fn check_intrinsic_method_call(
         return Some(check_matrix_applica(checker, receiver_ty, args, span));
     }
 
-    // Vector `multiplica`: elementwise multiply by a same-shape peer or by a
+    // Vector `multiplicata`: elementwise multiply by a same-shape peer or by a
     // scalar of the element type (S0-G8 scalar splat — the scalar operand
     // broadcasts across the lanes; the result keeps the receiver shape).
     if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Vector)
-        && entry.faber_name == "multiplica"
+        && entry.faber_name == "multiplicata"
     {
-        return Some(check_vector_multiplica(checker, receiver_ty, args, span));
+        return Some(check_vector_multiplicata(checker, receiver_ty, args, span));
     }
 
     // Tensor, vector and matrix `maximus`/`minimus` (`⤒`/`⤓`): the elementwise
@@ -1378,10 +1378,10 @@ fn check_matrix_transpone(checker: &mut TypeChecker<'_>, receiver_ty: TypeId) ->
     checker.types.matrix_with_shape(element_ty, shape)
 }
 
-/// Typecheck `vector.multiplica(operand)`: same-shape peer multiply, or a
+/// Typecheck `vector.multiplicata(operand)`: same-shape peer multiply, or a
 /// scalar of the element type splat-multiplied across the lanes (S0-G8).
 /// The result keeps the receiver shape at any width, parametric included.
-fn check_vector_multiplica(
+fn check_vector_multiplicata(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
     args: &mut [HirCallArg],

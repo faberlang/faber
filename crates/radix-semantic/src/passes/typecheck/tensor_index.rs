@@ -30,9 +30,9 @@ pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK1: &str =
     "glyph_transpose_rank1_no_row_column_distinction";
 pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED: &str = "glyph_transpose_static_rank_required";
 const TENSOR_ADDITA: &str = "addita";
-const TENSOR_SUBTRAHE: &str = "subtrahe";
-const TENSOR_MULTIPLICA: &str = "multiplica";
-const TENSOR_DIVISIO: &str = "divisio";
+const TENSOR_SUBTRAHE: &str = "subtracta";
+const TENSOR_MULTIPLICA: &str = "multiplicata";
+const TENSOR_DIVISIO: &str = "divisa";
 const TENSOR_MATMUL: &str = "matmul";
 const ISSUE_MATMUL_RECEIVER_SHAPE_MUST_BE_TUPLE: &str = "matmul_receiver_shape_must_be_tuple";
 const ISSUE_MATMUL_ARGUMENT_SHAPE_MUST_BE_TUPLE: &str = "matmul_argument_shape_must_be_tuple";
