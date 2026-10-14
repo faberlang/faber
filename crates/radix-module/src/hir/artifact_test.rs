@@ -467,6 +467,93 @@ fn selective_import_rust_emit_is_identical_after_load() {
     );
 }
 
+/// Analyze `source`, serialize it to FHIR, and return the load result.
+/// Shared by the `dangling_defid_repro_*` pins of UNIT 21398a30-5.1.
+fn load_error_for(source: &str) -> Result<(), HirArtifactError> {
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "dangling-defid.fab", source, AnalyzeRequest::default())
+        .expect("dangling-defid fixture analyzes");
+    let artifact = from_analyzed(&original, "dangling-defid", "dangling-defid.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize dangling-defid artifact");
+    load_fhir(&bytes).map(|_| ())
+}
+
+#[test]
+fn dangling_defid_repro_comptime_module_local() {
+    // A referenced local binding inside a *module-level* constant initializer
+    // (`const int N = comptime { const int t = 3; return t }`) is the smallest
+    // source that yields `DanglingIndex { kind: "DefId" }`. Printed once:
+    // index 1000000, arena size 1.
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "const int N = comptime {\n",
+        "    const int t = 3\n",
+        "    return t\n",
+        "}\n",
+    );
+    let result = load_error_for(source);
+    assert!(
+        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
+        "expected dangling DefId, got {result:?}"
+    );
+}
+
+#[test]
+fn dangling_defid_repro_comptime_block_local() {
+    // The same referenced local inside a *block-level* constant initializer
+    // (`const int x = comptime { … }` in `main`) also yields
+    // `DanglingIndex { kind: "DefId" }`. Printed once: index 1000001,
+    // arena size 1.
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "main {\n",
+        "    const int x = comptime {\n",
+        "        const int t = 3\n",
+        "        return t\n",
+        "    }\n",
+        "    print x\n",
+        "}\n",
+    );
+    let result = load_error_for(source);
+    assert!(
+        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
+        "expected dangling DefId, got {result:?}"
+    );
+}
+
+#[test]
+fn dangling_defid_repro_comptime_class_static_local() {
+    // A class `static` field initialized by `comptime` with a referenced
+    // local (`static int X = comptime { const int t = 3; return t }`) read as
+    // `Tab.X` from `main` also yields `DanglingIndex { kind: "DefId" }`.
+    // Printed once: index 1000000, arena size 2.
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "class Tab {\n",
+        "    static int X = comptime {\n",
+        "        const int t = 3\n",
+        "        return t\n",
+        "    }\n",
+        "}\n\n",
+        "main {\n",
+        "    print Tab.X\n",
+        "}\n",
+    );
+    let result = load_error_for(source);
+    assert!(
+        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
+        "expected dangling DefId, got {result:?}"
+    );
+}
+
 #[test]
 fn octeti_zero_argument_type_form_survives_the_fhir_round_trip() {
     // `octeti` is authored as a zero-argument primitive spelling, but its
